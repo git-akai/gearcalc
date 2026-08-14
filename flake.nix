@@ -39,11 +39,38 @@
       craneLibFor = system:
         (crane.mkLib (pkgsFor system)).overrideToolchain (rustToolchainFor system);
 
+      # Crane's `cleanCargoSource` keeps only what Cargo itself needs — .rs,
+      # Cargo.toml, Cargo.lock. gear-core also `include_str!`s a data file (the
+      # JGMA tolerance tables, deliberately kept as a flat CSV so it can be
+      # diffed against the standard), and that would be filtered out, so the
+      # crate compiles from a checkout but not from the Nix sandbox. Keep the
+      # data files too.
+      #
+      # Anything else added under a `data/` directory is picked up automatically;
+      # a new file *type* elsewhere would need adding here.
+      srcFor = system:
+        let
+          pkgs = pkgsFor system;
+          craneLib = craneLibFor system;
+        in
+        pkgs.lib.cleanSourceWith {
+          src = ./.;
+          name = "source";
+          filter = path: type:
+            (craneLib.filterCargoSources path type)
+            || (builtins.match ".*/data/[^/]*\\.csv$" path != null);
+        };
+
       commonArgsFor = system:
-        let craneLib = craneLibFor system;
-        in {
-          src = craneLib.cleanCargoSource ./.;
+        {
+          src = srcFor system;
           strictDeps = true;
+          # The workspace root has no [package], so crane cannot infer these.
+          # Setting them names the derivations usefully; it does not silence
+          # crane's eval-time "placeholder value" warning, which is emitted
+          # while inspecting the root manifest and is cosmetic.
+          pname = "gears";
+          version = "0.1.0";
           buildInputs = [ ];
           nativeBuildInputs = [ ];
         };
