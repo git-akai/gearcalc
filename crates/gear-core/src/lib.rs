@@ -16,6 +16,7 @@
 //! ```
 
 pub mod involute;
+pub mod jgma;
 pub mod mesh;
 pub mod metrology;
 pub mod params;

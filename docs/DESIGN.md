@@ -1,6 +1,6 @@
 # Gear & geartrain design tool — architecture and mathematics
 
-Status: **proposal, revision 8.** Incorporates the answers to Q1–Q7, the JGMA
+Status: **proposal, revision 9.** Incorporates the answers to Q1–Q7, the JGMA
 116-02 tables now in `docs/`, the change of GUI target to Svelte/TypeScript, the
 JGMA / units decisions, and the planned angularly varying profile shift for
 eccentric motion at constant ratio with a commanded centre distance. No
@@ -10,6 +10,13 @@ Conventions: angles in **degrees at the UI boundary, radians everywhere
 inside**; lengths in mm; `m` is the **normal** module unless subscripted `m_t`;
 subscript `n` = normal plane, `t` = transverse. This follows the prior work in
 `handoff_inbound/`.
+
+**Changes in revision 9:**
+
+| § | Change |
+|---|---|
+| 4.6.1 | **Correction.** Revision 3's claim that the standard scale's grade 4 is tighter than the fine scale's *grade 0* is wrong (7 against 6.3) and is withdrawn. The argument it supported is unaffected — the merged ladder still drops between grades 3 and 4 — and is now stated from the transcribed data rather than from memory. |
+| 11 | Milestone 2 complete. |
 
 **Changes in revision 8:**
 
@@ -592,10 +599,22 @@ For module 1.0–1.6 at a 12 mm pitch diameter, where both tables apply:
 | 6 | 45 / 140 | 14 / 50 |
 | 7–12 | — | 20/71 … 71/224 |
 
-Page 2's grade 4 is **three times tighter** than page 1's grade 4, and tighter
-than page 1's *grade 0*. Taking the smaller value at each grade therefore
-produces a ladder where grade 4 is finer than grade 0 — a non-monotonic scale,
-which is worse than either table alone.
+Page 2's grade 4 is **three times tighter** than page 1's grade 4. Taking the
+smaller value at each grade produces the ladder
+
+```
+6.3   8   10   14   7   10   14   20   28   36   45   56   71
+                    ^ grade 4
+```
+
+which **drops between grade 3 and grade 4**. No rule for choosing between
+overlapping entries avoids this, because the grade numbers do not denote the
+same thing on the two tables.
+
+*(Corrected in revision 9: revision 3 also claimed page 2's grade 4 was tighter
+than page 1's grade 0. It is not — 7 against 6.3, marginally looser. The
+non-monotonicity is real and is what the argument rests on; that one comparison
+was wrong and is withdrawn.)*
 
 The cause is that page 1 and page 2 are **two different grade scales**, and the
 grade numbers are not comparable between them. Roughly, page 1 grade *N* lands
@@ -1264,7 +1283,7 @@ it can be validated in isolation.
 |---|---|---|
 | 0 | ✅ **Scaffold** — workspace, wasm target, `gear-cli`, Vite/Svelte shell, flake `.#web` | **met** — `nix flake check` green; the wasm binary returns bit-identical numbers to the native build |
 | 1 | ✅ **Geometry core** — port `gear.py` + thickness modification + rack-simulation suite | **met** — penetration 2.1e-15 mm, deviation 6.2e-4 mm over 1080 cases |
-| 2 | **Primitives & metrology** — safeguarded `inv⁻¹`, centre distance, backlash, span, pins, JGMA table | textbook cross-checks and the independent pin-tangency check pass |
+| 2 | ✅ **Primitives & metrology** — safeguarded `inv⁻¹`, centre distance, backlash, span, pins, JGMA table | **met** — span reproduces the textbook form to 1e-12 mm, backlash matches a direct computation to 1e-16 mm, pin tangency verified to 3e-10 mm against the generated flank |
 | 3 | **Gear Calculator UI** — sidebar, tabs, parameter grid, canvas viewport, DXF export | end to end: type a module, see a gear, export it, open it in CAD |
 | 4 | **Materials** — TOML library, import/export, the twelve preloaded materials | values sourced and cited |
 | 5 | **Mesh & strength** — contact ratio, efficiency, Hofer bending, Hertz, S-N, face width | invariant tests in §9.3 |
