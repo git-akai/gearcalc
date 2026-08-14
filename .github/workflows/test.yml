@@ -34,3 +34,15 @@ jobs:
       # pulls the Node toolchain, and a failure here is a packaging problem
       # rather than a code one.
       - run: nix build .#web -L
+
+      # Read an exported DXF back with ezdxf. The Rust tests can only show the
+      # writer agrees with itself; this shows an unrelated parser gets the same
+      # gear out.
+      - name: Validate DXF export against an independent parser
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            cargo run -q --release --bin gear-cli -- dxf 17 0.2 0.001 > /tmp/gear17.dxf
+            python3 tools/validate_dxf.py /tmp/gear17.dxf \
+              --root 7.45 --tip 9.7 --base 7.987387276680222 --pitch 8.5 --teeth 17
+          '

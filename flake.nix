@@ -190,6 +190,11 @@
               pkgs.wasm-bindgen-cli       # Rust -> wasm boundary
               pkgs.binaryen               # wasm-opt
               pkgs.nodejs                 # Svelte / Vite front end
+
+              # ezdxf reads exported DXF back with an implementation unrelated
+              # to ours, so tools/validate_dxf.py checks the geometry rather
+              # than only our agreement with ourselves.
+              (pkgs.python3.withPackages (ps: [ ps.ezdxf ]))
             ];
 
             RUST_BACKTRACE = "1";

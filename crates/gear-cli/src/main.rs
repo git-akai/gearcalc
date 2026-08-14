@@ -14,6 +14,11 @@ fn main() {
     match args.first().map(String::as_str) {
         Some("sweep") => sweep(),
         Some("dump") => dump(),
+        Some("dxf") => dxf(
+            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
+            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.0),
+            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1e-3),
+        ),
         Some("verify") => verify(
             args.get(1)
                 .and_then(|s| s.parse().ok())
@@ -187,4 +192,23 @@ fn verify(limit: usize) {
     println!("  worst deviation          {worst_dev:.6e} mm   {dev_case}");
     println!("  worst fillet envelope    {worst_env:.6e} mm");
     println!("  worst sdf vs polyline    {worst_sdf:.6e} mm");
+}
+
+/// Write a DXF to stdout, for inspecting or importing into CAD.
+fn dxf(teeth: u32, x: f64, tol: f64) {
+    let g = Gear::new(GearParams {
+        teeth,
+        profile_shift: x,
+        ..Default::default()
+    });
+    print!(
+        "{}",
+        gear_io::gear_to_dxf(
+            &g,
+            &gear_io::DxfOptions {
+                chord_tolerance: tol,
+                reference_circles: true,
+            }
+        )
+    );
 }

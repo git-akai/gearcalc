@@ -19,6 +19,7 @@ pub mod involute;
 pub mod jgma;
 pub mod mesh;
 pub mod metrology;
+pub mod outline;
 pub mod params;
 pub mod profile;
 pub mod solve;
@@ -26,5 +27,6 @@ pub mod verify;
 
 pub use involute::{inv, inv_from_roll, inv_inverse};
 pub use mesh::{Mesh, MeshError, MeshKind};
+pub use outline::Vertex;
 pub use params::{Clamps, GearParams};
 pub use profile::{Gear, Section};

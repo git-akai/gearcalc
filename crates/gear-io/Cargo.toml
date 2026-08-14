@@ -1,6 +1,6 @@
 [package]
-name = "gear-cli"
-description = "Development harness: drive gear-core without a browser."
+name = "gear-io"
+description = "File formats: DXF export, and the human-readable TOML documents."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,7 +8,6 @@ repository.workspace = true
 
 [dependencies]
 gear-core = { path = "../gear-core" }
-gear-io = { path = "../gear-io" }
 
 [lints]
 workspace = true

@@ -19,6 +19,7 @@ name = "gear-cli"
 version = "0.1.0"
 dependencies = [
  "gear-core",
+ "gear-io",
 ]
 
 [[package]]
@@ -26,6 +27,13 @@ name = "gear-core"
 version = "0.1.0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "gear-io"
+version = "0.1.0"
+dependencies = [
+ "gear-core",
 ]
 
 [[package]]
