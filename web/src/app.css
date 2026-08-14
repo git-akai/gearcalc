@@ -9,6 +9,10 @@
   --accent: #2f5d8a;
   --flank: #dbe3ec;
   --warn: #9a5b1e;
+  --hover: #eceff3;
+  --selected: #e2e8f0;
+  --reference: #9aa4b2;
+  --on-accent: #ffffff;
   color-scheme: light dark;
 }
 
@@ -22,6 +26,10 @@
     --accent: #7fb0e0;
     --flank: #263140;
     --warn: #d9a05b;
+    --hover: #21262d;
+    --selected: #262d36;
+    --reference: #5b6672;
+    --on-accent: #0d1117;
   }
 }
 
@@ -34,6 +42,10 @@
   --accent: #7fb0e0;
   --flank: #263140;
   --warn: #d9a05b;
+  --hover: #21262d;
+  --selected: #262d36;
+  --reference: #5b6672;
+  --on-accent: #0d1117;
 }
 
 * { box-sizing: border-box; }

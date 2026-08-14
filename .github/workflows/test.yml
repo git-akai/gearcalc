@@ -35,6 +35,11 @@ jobs:
       # rather than a code one.
       - run: nix build .#web -L
 
+      # Types are stripped by the bundler without being checked, so a type
+      # error would otherwise only surface at runtime in the browser.
+      - name: Typecheck the front end
+        run: nix develop --command bash -c 'cd web && npm ci && npm run check'
+
       # Read an exported DXF back with ezdxf. The Rust tests can only show the
       # writer agrees with itself; this shows an unrelated parser gets the same
       # gear out.

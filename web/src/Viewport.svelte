@@ -1,59 +1,164 @@
 <script lang="ts">
-  // Draws the profile the core produced. It computes nothing: the points arrive
-  // as a flat [x0, y0, x1, y1, ...] array and are only scaled to fit.
-  let { points }: { points: Float64Array | null } = $props();
+  // Draws what the core produced. It computes no geometry: the profile arrives
+  // as a flat [x0, y0, x1, y1, ...] array and the reference radii as numbers.
+  // Only view transform lives here.
+
+  let {
+    points,
+    pitch,
+    base,
+    tip,
+    root,
+  }: {
+    points: Float64Array | null;
+    pitch: number;
+    base: number;
+    tip: number;
+    root: number;
+  } = $props();
 
   let canvas: HTMLCanvasElement | undefined = $state();
+  let showCircles = $state(true);
+  let zoom = $state(1);
+  let panX = $state(0);
+  let panY = $state(0);
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  function reset() {
+    zoom = 1;
+    panX = 0;
+    panY = 0;
+  }
+
+  function onWheel(e: WheelEvent) {
+    e.preventDefault();
+    zoom = Math.min(50, Math.max(0.2, zoom * Math.exp(-e.deltaY / 400)));
+  }
+  function onDown(e: PointerEvent) {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    (e.currentTarget as HTMLCanvasElement).setPointerCapture(e.pointerId);
+  }
+  function onMove(e: PointerEvent) {
+    if (!dragging) return;
+    panX += e.clientX - lastX;
+    panY += e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  }
+  function onUp() {
+    dragging = false;
+  }
 
   $effect(() => {
     const c = canvas;
     if (!c || !points || points.length < 4) return;
+    // referenced so the effect re-runs on view changes
+    void [zoom, panX, panY, showCircles, pitch, base, tip, root];
 
     const dpr = window.devicePixelRatio || 1;
     const w = c.clientWidth;
     const h = c.clientHeight;
     c.width = Math.round(w * dpr);
     c.height = Math.round(h * dpr);
-
     const ctx = c.getContext("2d");
     if (!ctx) return;
+
+    const style = getComputedStyle(c);
+    const token = (n: string, fallback: string) =>
+      style.getPropertyValue(n).trim() || fallback;
+
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    let extent = 0;
-    for (let i = 0; i < points.length; i++) {
-      const v = Math.abs(points[i]);
-      if (v > extent) extent = v;
-    }
-    if (extent === 0) return;
-
-    const scale = (Math.min(w, h) * 0.45) / extent;
-    const style = getComputedStyle(c);
-    ctx.translate(w / 2, h / 2);
+    const scale = ((Math.min(w, h) * 0.45) / Math.max(tip, 1e-9)) * zoom;
+    ctx.translate(w / 2 + panX, h / 2 + panY);
     ctx.scale(scale, -scale); // +y up, the way a drawing is read
+    ctx.lineWidth = 1 / scale;
+
+    if (showCircles) {
+      ctx.setLineDash([4 / scale, 4 / scale]);
+      ctx.strokeStyle = token("--reference", "#888");
+      for (const r of [root, base, pitch, tip]) {
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
 
     ctx.beginPath();
     ctx.moveTo(points[0], points[1]);
     for (let i = 2; i < points.length; i += 2) ctx.lineTo(points[i], points[i + 1]);
     ctx.closePath();
-
-    ctx.fillStyle = style.getPropertyValue("--flank").trim() || "#cbd5e1";
+    ctx.fillStyle = token("--flank", "#dbe3ec");
     ctx.fill();
-    ctx.lineWidth = 1 / scale;
-    ctx.strokeStyle = style.getPropertyValue("--accent").trim() || "#2563eb";
+    ctx.strokeStyle = token("--accent", "#2f5d8a");
     ctx.stroke();
   });
 </script>
 
-<canvas bind:this={canvas}></canvas>
+<div class="wrap">
+  <canvas
+    bind:this={canvas}
+    onwheel={onWheel}
+    onpointerdown={onDown}
+    onpointermove={onMove}
+    onpointerup={onUp}
+    onpointercancel={onUp}
+  ></canvas>
+  <div class="bar">
+    <label><input type="checkbox" bind:checked={showCircles} /> Reference circles</label>
+    <span class="hint">drag to pan · scroll to zoom</span>
+    <button onclick={reset}>Reset view</button>
+  </div>
+</div>
 
 <style>
+  .wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
   canvas {
     width: 100%;
     aspect-ratio: 1;
-    max-height: 60vh;
+    max-height: 58vh;
     border: 1px solid var(--rule);
     border-radius: 4px;
     background: var(--bg);
+    touch-action: none;
+    cursor: grab;
+  }
+  canvas:active {
+    cursor: grabbing;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+  .bar label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .hint {
+    margin-left: auto;
+  }
+  button {
+    font: inherit;
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--panel);
+    color: var(--fg);
+    cursor: pointer;
   }
 </style>
