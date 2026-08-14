@@ -1,0 +1,13 @@
+[package]
+name = "gear-cli"
+description = "Development harness: drive gear-core without a browser."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+gear-core = { path = "../gear-core" }
+
+[lints]
+workspace = true

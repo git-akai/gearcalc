@@ -1,0 +1,91 @@
+# Gears
+
+A browser tool for designing gears and geartrains: parameter calculation and
+optimisation, 2D profile visualisation, and DXF export.
+
+All mathematics is Rust, compiled to WebAssembly. TypeScript and Svelte do
+layout and event handling only.
+
+> **Project rule: no engineering calculation in TypeScript.** If a number appears
+> in the UI, Rust computed it. TypeScript may format it for display and nothing
+> else. That is what keeps the Rust test suite meaningful.
+
+The architecture, the mathematics behind every formula, and the verification log
+are in [`docs/DESIGN.md`](docs/DESIGN.md). Read that before changing anything in
+`gear-core`.
+
+## Layout
+
+| Path | Role |
+|---|---|
+| `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. Depends only on `serde`. |
+| `crates/gear-wasm` | The WebAssembly boundary. Three functions, JSON in, JSON out. |
+| `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
+| `web/` | Svelte 5 + TypeScript + Vite front end. |
+| `docs/` | Design document and the JGMA 116-02 tolerance tables. |
+| `handoff_inbound/` | Prior Python work. **Reference only** — do not build on it. |
+
+## Getting started
+
+Everything runs inside the Nix dev shell, which pins the Rust toolchain, Node,
+and `wasm-bindgen-cli` together.
+
+```bash
+nix develop              # or `direnv allow` once, for automatic entry
+
+cargo nextest run        # the full test suite, ~27 s
+cargo clippy --all-targets -- --deny warnings
+cargo fmt
+
+nix flake check          # everything CI checks: build, clippy, fmt, tests
+```
+
+### Driving the mathematics without a browser
+
+This is the fastest way to see what the core is doing.
+
+```bash
+cargo run --bin gear-cli -- show 17 0.2   # derived geometry for z=17, x=+0.2
+cargo run --bin gear-cli -- sweep         # scan a grid for undercut and clamps
+cargo run --release --bin gear-cli -- verify 100   # two-sided cutter check
+```
+
+### The web application
+
+```bash
+cd web
+npm install
+npm run dev              # rebuilds the wasm, then serves with hot reload
+```
+
+`npm run build:wasm` alone regenerates `web/src/wasm/` after a change to
+`gear-core` or `gear-wasm`; `npm run dev` and `npm run build` do it for you.
+
+For a reproducible production build:
+
+```bash
+nix build .#web          # deployable static site in ./result
+```
+
+## Notes for anyone changing the geometry
+
+`gear-core::profile` is a port of a Python implementation that was validated to
+5e-4 mm against a full simulation of the generating rack, and the port reproduces
+it to 7.5e-14 mm over a 1188-case grid. Three things in it look like they could
+be tidied and must not be:
+
+1. **The flank continues below the base circle** to its true intersection with the
+   trochoid. Clamping it there and bridging the gap — the obvious-looking
+   approach — leaves a visible 0.3 mm step on undercut gears.
+   `Gear::with_legacy_clamp` reproduces that fault on purpose, as a negative test
+   fixture; if `legacy_clamp_still_shows_the_junction_step…` ever passes trivially,
+   the *detection* has broken.
+2. **The fillet fit cap** is `w_tip·cos α / (2(1 − sin α))`. The plausible
+   `w_tip / (2 cos α)` is wrong and silently shrinks the fillet on every
+   profile-shifted gear.
+3. **`theta` is not monotone** along the profile. Undercut gears are legitimately
+   re-entrant. The correct invariant is monotone *radius*.
+
+Any change here must keep `cargo nextest run` green — in particular
+`profile_is_bounded_from_both_sides_by_the_cutter`, which checks 1080 gears
+against the cutter that would make them, from both sides at once.

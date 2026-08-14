@@ -1,0 +1,47 @@
+/* Light palette on :root, redefined per theme. Every colour is a token so a
+   component never hard-codes one that only works in one theme. */
+:root {
+  --bg: #ffffff;
+  --panel: #f6f7f9;
+  --fg: #1b1f24;
+  --muted: #6b7280;
+  --rule: #d8dce2;
+  --accent: #2f5d8a;
+  --flank: #dbe3ec;
+  --warn: #9a5b1e;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14171b;
+    --panel: #1b1f24;
+    --fg: #e6e8ea;
+    --muted: #9aa2ad;
+    --rule: #2c333b;
+    --accent: #7fb0e0;
+    --flank: #263140;
+    --warn: #d9a05b;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #14171b;
+  --panel: #1b1f24;
+  --fg: #e6e8ea;
+  --muted: #9aa2ad;
+  --rule: #2c333b;
+  --accent: #7fb0e0;
+  --flank: #263140;
+  --warn: #d9a05b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+}

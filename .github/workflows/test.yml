@@ -1,0 +1,29 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v22
+
+      # No binary cache action here on purpose. Determinate's magic-nix-cache
+      # was sunset for general use and now needs FlakeHub auth, and a cache that
+      # silently stops working is worse than a slower build that does not. Add
+      # one deliberately (FlakeHub or Cachix, with its secret) if CI time
+      # becomes a problem.
+
+      # Everything CI needs to check: build, clippy --deny warnings, fmt, tests.
+      - run: nix flake check -L
+
+      # The deployable browser build. Separate from `flake check` because it
+      # pulls the Node toolchain, and a failure here is a packaging problem
+      # rather than a code one.
+      - run: nix build .#web -L

@@ -1,0 +1,19 @@
+[package]
+name = "gear-core"
+description = "Involute gear geometry and geartrain mathematics. No I/O, no UI, no wasm."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Intentionally none beyond serialisation. Root finding is hand-rolled in
+# `solve`, so the numerics stay auditable and the crate compiles in seconds.
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+default = []
+serde = ["dep:serde"]
+
+[lints]
+workspace = true

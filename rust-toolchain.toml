@@ -1,0 +1,14 @@
+# Single source of truth for the Rust toolchain.
+#
+# - Nix reads this via `rust-bin.fromRustupToolchainFile` in flake.nix, so the
+#   exact build stays pinned through rust-overlay in flake.lock.
+# - Non-Nix users with rustup get the identical version automatically.
+#
+# To upgrade Rust: bump `channel` here, then commit. Nix follows this file.
+[toolchain]
+channel = "1.96.1"
+profile = "default"
+components = ["rust-src", "rust-analyzer", "llvm-tools-preview"]
+# The browser build target. gear-wasm compiles to this; gear-core and gear-cli
+# build natively so the mathematics stays debuggable without a browser.
+targets = ["wasm32-unknown-unknown"]
