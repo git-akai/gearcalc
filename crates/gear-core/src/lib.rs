@@ -16,11 +16,14 @@
 //! ```
 
 pub mod involute;
+pub mod mesh;
+pub mod metrology;
 pub mod params;
 pub mod profile;
 pub mod solve;
 pub mod verify;
 
 pub use involute::{inv, inv_from_roll, inv_inverse};
+pub use mesh::{Mesh, MeshError, MeshKind};
 pub use params::{Clamps, GearParams};
 pub use profile::{Gear, Section};
