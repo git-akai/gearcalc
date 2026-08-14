@@ -8,7 +8,7 @@
     "dev": "npm run build:wasm && vite",
     "build": "npm run build:wasm && vite build",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.json"
+    "check": "npm run build:wasm && svelte-check --tsconfig ./tsconfig.json"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",

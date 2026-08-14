@@ -152,7 +152,7 @@ let ready: Promise<void> | null = null;
 
 /** Load the core once. Safe to await repeatedly. */
 export function loadCore(): Promise<void> {
-  ready ??= init().then(() => undefined);
+  if (!ready) ready = init().then(() => undefined);
   return ready;
 }
 
