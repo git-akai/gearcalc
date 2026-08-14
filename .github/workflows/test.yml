@@ -11,14 +11,21 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
+
       - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          # Off explicitly. Left at its default the action attempts a FlakeHub
+          # login, which fails on this repo and leaves a red annotation on an
+          # otherwise green run — the kind of noise that trains you to ignore
+          # annotations. Turn it on together with a cache, not before.
+          determinate: false
 
       # No binary cache action here on purpose. Determinate's magic-nix-cache
       # was sunset for general use and now needs FlakeHub auth, and a cache that
       # silently stops working is worse than a slower build that does not. Add
       # one deliberately (FlakeHub or Cachix, with its secret) if CI time
-      # becomes a problem.
+      # becomes a problem — the from-scratch build is ~5 min today.
 
       # Everything CI needs to check: build, clippy --deny warnings, fmt, tests.
       - run: nix flake check -L
