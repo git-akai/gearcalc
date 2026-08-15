@@ -11,7 +11,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use gear_core::strength::{root_section, TANGENT_ANGLE_DEG};
+use gear_core::strength::{root_section_with, CriticalSection, TANGENT_ANGLE_DEG};
 use gear_core::{Gear, GearParams};
 
 /// Closed-form critical section of a rack-cut tooth: `(s_Fn/m, h_Fe/m, Y_F)`.
@@ -60,7 +60,7 @@ fn form_factor_converges_to_the_rack_limit() {
                 root_radius: rho,
                 ..Default::default()
             });
-            let sec = root_section(&g, g.u_tip).unwrap();
+            let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
             let gap = (sec.form_factor - want_y).abs();
             assert!(
                 gap < previous_gap,
@@ -78,7 +78,7 @@ fn form_factor_converges_to_the_rack_limit() {
             root_radius: rho,
             ..Default::default()
         });
-        let sec = root_section(&g, g.u_tip).unwrap();
+        let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
         let m = g.params.module;
         assert!(
             (sec.root_chord / m - want_s).abs() < 5e-3,
@@ -97,6 +97,70 @@ fn form_factor_converges_to_the_rack_limit() {
         );
         println!(
             "α={alpha:>5} ρ={rho}: Y_F {:.6} vs rack limit {want_y:.6}",
+            sec.form_factor
+        );
+    }
+}
+
+/// The Lewis parabola has its own rack limit, and it is a different number.
+///
+/// On a rack the largest inscribed parabola touches the **straight flank**, not
+/// the fillet — 0.54 module above where the fillet ends. That is not a detail:
+/// a fillet-only search finds no solution at all on large teeth, which is how
+/// the first implementation failed.
+fn parabola_rack_limit(alpha_deg: f64, ha: f64, hf: f64) -> (f64, f64, f64) {
+    let a = alpha_deg.to_radians();
+    let b = a.tan();
+    let big_a = std::f64::consts::PI / 4.0 + hf * b;
+
+    // Load at the tip corner, along the flank normal; the vertex is where that
+    // line crosses the centreline.
+    let x_tip = std::f64::consts::PI / 4.0 - ha * b;
+    let y_v = (hf + ha) + (-x_tip / a.cos()) * a.sin();
+
+    // Tangency of x² = 4p(y_v − y) with the flank x = A − b y is a double root.
+    let p = b * (big_a - b * y_v);
+    let y_t = (big_a * b - 2.0 * p) / (b * b);
+    let x_t = big_a - b * y_t;
+
+    let s_fn = 2.0 * x_t;
+    let h_fe = y_v - y_t;
+    (s_fn, h_fe, 6.0 * h_fe / (s_fn * s_fn))
+}
+
+#[test]
+fn parabola_form_factor_converges_to_its_own_rack_limit() {
+    for alpha in [20.0_f64, 25.0] {
+        let (want_s, want_h, want_y) = parabola_rack_limit(alpha, 1.0, 1.25);
+        let g = Gear::new(GearParams {
+            teeth: 4000,
+            pressure_angle: alpha,
+            ..Default::default()
+        });
+        let sec = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
+        assert!(
+            sec.tangency_on_flank,
+            "at z=4000 the parabola must touch the flank"
+        );
+
+        let m = g.params.module;
+        assert!(
+            (sec.root_chord / m - want_s).abs() < 1e-2,
+            "s_Fn/m {} vs {want_s}",
+            sec.root_chord / m
+        );
+        assert!(
+            (sec.moment_arm / m - want_h).abs() < 1e-2,
+            "h_Fe/m {} vs {want_h}",
+            sec.moment_arm / m
+        );
+        assert!(
+            (sec.form_factor - want_y).abs() < 1e-2,
+            "Y_F {} vs {want_y}",
+            sec.form_factor
+        );
+        println!(
+            "α={alpha:>5}: parabola Y_F {:.6} vs its rack limit {want_y:.6}",
             sec.form_factor
         );
     }

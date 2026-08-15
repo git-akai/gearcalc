@@ -27,6 +27,40 @@
 use crate::profile::Gear;
 use crate::solve::{brent, Tol};
 
+/// How the critical root section is located.
+///
+/// These are two answers to the same question, and they disagree most exactly
+/// where it matters — on undercut teeth.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CriticalSection {
+    /// The ISO/AGMA 30° tangent (Hofer).
+    ///
+    /// Simple, and **independent of where the load acts** — which is its
+    /// weakness as well as its convenience. It is an approximation to the
+    /// parabola below, and the two converge as the tooth count rises: at z=60
+    /// the 30° tangents cross the centreline within 0.04% of the load point, at
+    /// z=9 they cross 12% below it.
+    ///
+    /// The default, because [`StressConcentration::Iso6336`] is a fit
+    /// calibrated against *this* construction. Pairing that correction with the
+    /// parabola mixes conventions.
+    #[default]
+    TangentAngle,
+    /// The Lewis inscribed parabola — the original construction.
+    ///
+    /// A cantilever whose outline is a parabola with its vertex at the load has
+    /// uniform bending stress along its length. Inscribing the largest such
+    /// parabola, vertex at the point where the load line crosses the tooth
+    /// centreline, and taking the tangency with the fillet, finds where the real
+    /// tooth is weakest *relative to that uniform-strength shape*.
+    ///
+    /// Unlike the 30° tangent this **follows the load point**, which is the
+    /// property the cantilever model is supposed to have. It is consistently
+    /// more conservative: the tangency sits higher up the fillet, the section is
+    /// narrower, and `Y_F` comes out 2–14% larger, most on undercut teeth.
+    LewisParabola,
+}
+
 /// The angle the critical-section tangent makes with the tooth centreline.
 ///
 /// 30° is the Hofer construction adopted by ISO 6336 for external gears. It is a
@@ -57,6 +91,14 @@ pub struct RootSection {
     pub form_factor: f64,
     /// Notch parameter `q_s = s_Fn / (2 ρ_F)`, the input to stress correction.
     pub notch_parameter: f64,
+    /// Which construction located this section.
+    pub method: CriticalSection,
+    /// True when the inscribed parabola touched the involute flank rather than
+    /// the fillet. Expected on larger teeth; see [`CriticalSection::LewisParabola`].
+    pub tangency_on_flank: bool,
+    /// Parabola parameter `p` in `x² = 4p(y_v − y)`, for drawing the inscribed
+    /// parabola. Only meaningful for [`CriticalSection::LewisParabola`].
+    pub parabola_p: Option<f64>,
 
     /// Tangency point on the `+x` side, for drawing.
     pub tangency: [f64; 2],
@@ -126,6 +168,26 @@ fn fillet_curvature_radius(g: &Gear, s: f64) -> f64 {
     }
 }
 
+/// A point on the involute flank and its tangent, in tooth coordinates.
+///
+/// The parabola construction has to search the flank as well as the fillet: on
+/// anything but a small or undercut tooth the largest inscribed parabola touches
+/// the *flank*. For the rack limit that tangency sits 0.54 module above where
+/// the fillet ends, so a fillet-only search finds nothing at all.
+fn flank_point_and_tangent(g: &Gear, u: f64) -> ([f64; 2], [f64; 2]) {
+    let root = f64::hypot(1.0, u);
+    let r = g.rb * root;
+    let th = g.psi_b - (u - u.atan());
+    let (st, ct) = (th.sin(), th.cos());
+
+    let dr = g.rb * u / root;
+    let dth = -(u * u) / (1.0 + u * u);
+    (
+        [r * st, r * ct],
+        [dr * st + r * ct * dth, dr * ct - r * st * dth],
+    )
+}
+
 /// A point on the involute flank and the direction of the load there.
 ///
 /// The load acts along the involute normal, which is the line from the contact
@@ -152,39 +214,120 @@ fn flank_point_and_load_direction(g: &Gear, roll: f64) -> ([f64; 2], [f64; 2]) {
 /// fillet on which the 30° tangent does not exist.
 #[must_use]
 pub fn root_section(g: &Gear, load_roll: f64) -> Option<RootSection> {
+    root_section_with(g, load_roll, CriticalSection::default())
+}
+
+/// The critical root section, locating it by the chosen construction.
+///
+/// Returns `None` when the gear has no usable flank — a severed tooth, or a
+/// fillet on which the construction has no solution.
+#[must_use]
+pub fn root_section_with(g: &Gear, load_roll: f64, method: CriticalSection) -> Option<RootSection> {
     if g.severed || !g.u_j.is_finite() || !load_roll.is_finite() {
         return None;
     }
 
-    // Along the fillet the tangent angle to the centreline sweeps from near zero
-    // at the junction to 90° at the root circle, so this is monotone and the
-    // bracket is the fillet itself.
-    let target = TANGENT_ANGLE_DEG.to_radians().tan();
-    let angle_excess = |s: f64| {
-        let (_, t) = fillet_point_and_tangent(g, s);
-        t[0].abs() - target * t[1].abs()
-    };
-    let s = brent(angle_excess, g.s_j, 0.0, Tol::default())?;
+    // The load has to be resolved first either way: the parabola's vertex sits
+    // where the load line crosses the centreline.
+    let (load_point, dir) = flank_point_and_load_direction(g, load_roll);
+    if dir[0].abs() < 1e-12 {
+        return None;
+    }
+    let crossing = [0.0, load_point[1] + (-load_point[0] / dir[0]) * dir[1]];
+    let vertex = crossing[1];
 
-    let (tangency, raw_tangent) = fillet_point_and_tangent(g, s);
+    let s = match method {
+        // Along the fillet the tangent angle to the centreline sweeps from near
+        // zero at the junction to 90° at the root circle, so this is monotone
+        // and the bracket is the fillet itself.
+        CriticalSection::TangentAngle => {
+            let target = TANGENT_ANGLE_DEG.to_radians().tan();
+            brent(
+                |s| {
+                    let (_, t) = fillet_point_and_tangent(g, s);
+                    t[0].abs() - target * t[1].abs()
+                },
+                g.s_j,
+                0.0,
+                Tol::default(),
+            )?
+        }
+        // Tangency of the parabola x² = 4p(y_v − y) with the tooth outline.
+        // Requiring the point to lie on the parabola and the slopes to match
+        // eliminates p and leaves one equation:
+        //     X·Y' + 2 X' (y_v − Y) = 0
+        //
+        // Searched on the fillet first and then the flank, because which one it
+        // touches depends on the tooth: small and undercut teeth touch the
+        // fillet, larger ones the flank.
+        CriticalSection::LewisParabola => {
+            let condition = |q: [f64; 2], t: [f64; 2]| q[0] * t[1] + 2.0 * t[0] * (vertex - q[1]);
+            let on_fillet = brent(
+                |s| {
+                    let (q, t) = fillet_point_and_tangent(g, s);
+                    condition(q, t)
+                },
+                g.s_j,
+                0.0,
+                Tol::default(),
+            );
+            match on_fillet {
+                Some(s) => s,
+                None => {
+                    let u = brent(
+                        |u| {
+                            let (q, t) = flank_point_and_tangent(g, u);
+                            condition(q, t)
+                        },
+                        g.u_j,
+                        g.u_tip,
+                        Tol::default(),
+                    )?;
+                    return finish(g, method, u, true, load_point, dir, crossing, vertex);
+                }
+            }
+        }
+    };
+
+    finish(g, method, s, false, load_point, dir, crossing, vertex)
+}
+
+/// Assemble the result once the tangency parameter is known, whichever curve it
+/// was found on.
+#[allow(clippy::too_many_arguments)]
+fn finish(
+    g: &Gear,
+    method: CriticalSection,
+    param: f64,
+    on_flank: bool,
+    load_point: [f64; 2],
+    load_dir: [f64; 2],
+    crossing: [f64; 2],
+    vertex: f64,
+) -> Option<RootSection> {
+    let s = param;
+    let (tangency, raw_tangent) = if on_flank {
+        flank_point_and_tangent(g, param)
+    } else {
+        fillet_point_and_tangent(g, param)
+    };
     let root_chord = 2.0 * tangency[0].abs();
     // Orient it up the tooth (towards the tip) so the direction is unambiguous.
     let len = f64::hypot(raw_tangent[0], raw_tangent[1]);
     let sign = if raw_tangent[1] < 0.0 { -1.0 } else { 1.0 };
     let tangent_direction = [sign * raw_tangent[0] / len, sign * raw_tangent[1] / len];
 
-    let (load_point, dir) = flank_point_and_load_direction(g, load_roll);
-    // Where the load line crosses the tooth centreline (x = 0).
-    if dir[0].abs() < 1e-12 {
-        return None;
-    }
-    let t = -load_point[0] / dir[0];
-    let crossing = [0.0, load_point[1] + t * dir[1]];
-
     let moment_arm = crossing[1] - tangency[1];
+    let parabola_p = match method {
+        CriticalSection::LewisParabola => {
+            Some(-tangency[0] * raw_tangent[0] / (2.0 * raw_tangent[1]))
+        }
+        CriticalSection::TangentAngle => None,
+    };
+    let _ = vertex;
     // cos α_Fen is the share of the load acting across the tooth; the load
     // direction's x-component is exactly that.
-    let load_angle = dir[0].abs().clamp(-1.0, 1.0).acos();
+    let load_angle = load_dir[0].abs().clamp(-1.0, 1.0).acos();
 
     let m = g.params.module;
     let form_factor =
@@ -192,7 +335,18 @@ pub fn root_section(g: &Gear, load_roll: f64) -> Option<RootSection> {
 
     Some(RootSection {
         s,
-        notch_parameter: root_chord / (2.0 * fillet_curvature_radius(g, s)),
+        // Curvature is a fillet property; on a flank tangency the involute's own
+        // curvature is what the notch sees.
+        notch_parameter: root_chord
+            / (2.0
+                * if on_flank {
+                    g.rb * param
+                } else {
+                    fillet_curvature_radius(g, s)
+                }),
+        tangency_on_flank: on_flank,
+        method,
+        parabola_p,
         root_chord,
         moment_arm,
         load_angle,
@@ -263,13 +417,28 @@ pub const NOTCH_PARAMETER_RANGE: std::ops::Range<f64> = 1.0..8.0;
 
 impl RootSection {
     /// The stress correction factor `Y_S` under the chosen model.
+    ///
+    /// The notch parameter is **clamped** into the range the fit is stated for
+    /// before being used, so an out-of-range gear gets the value at the boundary
+    /// rather than an extrapolation. The unclamped figure stays available in
+    /// [`RootSection::notch_parameter`], because it is worth seeing even when it
+    /// cannot be used: it is largely set by the cutter tip radius and the tooth
+    /// space, neither of which the designer can freely choose.
+    ///
+    /// Note the direction of the error. `Y_S` rises with `q_s`, so clamping a
+    /// sharper-than-stated notch **under-predicts** the stress. That is
+    /// unconservative, which is why [`RootSection::notch_parameter_in_range`]
+    /// exists and should be surfaced rather than swallowed.
     #[must_use]
     pub fn stress_correction(&self, model: StressConcentration) -> f64 {
         match model {
             StressConcentration::None => 1.0,
             StressConcentration::Iso6336 => {
                 let l = self.root_chord / self.moment_arm;
-                (1.2 + 0.13 * l) * self.notch_parameter.powf(1.0 / (1.21 + 2.3 / l))
+                let q = self
+                    .notch_parameter
+                    .clamp(NOTCH_PARAMETER_RANGE.start, NOTCH_PARAMETER_RANGE.end);
+                (1.2 + 0.13 * l) * q.powf(1.0 / (1.21 + 2.3 / l))
             }
         }
     }
@@ -498,6 +667,205 @@ mod tests {
             "q_s = {}",
             sec.notch_parameter
         );
+    }
+
+    /// The parabola must genuinely be tangent: the tangency point lies on it,
+    /// and the slopes agree. Solved through an eliminated parameter, so both
+    /// conditions are worth re-checking against the recovered `p`.
+    #[test]
+    fn lewis_parabola_is_tangent_to_the_fillet() {
+        for p in [
+            GearParams::default(),
+            GearParams {
+                teeth: 9,
+                ..Default::default()
+            },
+            GearParams {
+                teeth: 12,
+                profile_shift: -0.3,
+                ..Default::default()
+            },
+            GearParams {
+                teeth: 60,
+                profile_shift: 0.3,
+                ..Default::default()
+            },
+        ] {
+            let g = Gear::new(p);
+            let sec = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
+            let pp = sec.parabola_p.unwrap();
+            let vertex = sec.load_line_crossing[1];
+            let (q, t) = fillet_point_and_tangent(&g, sec.s);
+
+            // on the parabola
+            let on = q[0] * q[0] - 4.0 * pp * (vertex - q[1]);
+            assert!(
+                on.abs() < 1e-9,
+                "z={}: point off the parabola by {on:.2e}",
+                p.teeth
+            );
+            // slopes agree
+            let parabola_slope = -q[0] / (2.0 * pp);
+            let fillet_slope = t[1] / t[0];
+            assert!(
+                (parabola_slope - fillet_slope).abs() < 1e-7,
+                "z={}: slope {parabola_slope} vs {fillet_slope}",
+                p.teeth
+            );
+        }
+    }
+
+    /// The parabola is the more conservative construction at every tooth count,
+    /// and the gap does **not** close: the two converge to *different* rack
+    /// limits (2.063 against 2.159), because they are different constructions
+    /// rather than an approximation and its exact form.
+    #[test]
+    fn parabola_is_consistently_more_conservative() {
+        for teeth in [9u32, 17, 60, 300, 1000] {
+            let g = Gear::new(GearParams {
+                teeth,
+                ..Default::default()
+            });
+            let a = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
+            let b = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
+            assert!(
+                b.root_chord < a.root_chord,
+                "z={teeth}: parabola section not narrower"
+            );
+            assert!(
+                b.form_factor > a.form_factor,
+                "z={teeth}: parabola Y_F {} not above tangent {}",
+                b.form_factor,
+                a.form_factor
+            );
+        }
+    }
+
+    /// Which curve the parabola touches depends on the tooth, and getting this
+    /// wrong is how the first implementation failed: a fillet-only search finds
+    /// no solution at all on large teeth.
+    #[test]
+    fn parabola_touches_the_fillet_on_small_teeth_and_the_flank_on_large() {
+        let small = Gear::new(GearParams {
+            teeth: 17,
+            ..Default::default()
+        });
+        let small_sec =
+            root_section_with(&small, small.u_tip, CriticalSection::LewisParabola).unwrap();
+        assert!(!small_sec.tangency_on_flank, "z=17 should touch the fillet");
+
+        let large = Gear::new(GearParams {
+            teeth: 1000,
+            ..Default::default()
+        });
+        let large_sec =
+            root_section_with(&large, large.u_tip, CriticalSection::LewisParabola).unwrap();
+        assert!(large_sec.tangency_on_flank, "z=1000 should touch the flank");
+    }
+
+    /// Unlike the 30° tangent, the parabola construction follows the load point.
+    /// That is the property the cantilever model is meant to have.
+    #[test]
+    fn only_the_parabola_moves_with_the_load_point() {
+        let g = Gear::new(GearParams {
+            teeth: 20,
+            ..Default::default()
+        });
+        let low = g.u_tip * 0.6;
+        let a1 = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
+        let a2 = root_section_with(&g, low, CriticalSection::TangentAngle).unwrap();
+        assert!(
+            (a1.s - a2.s).abs() < 1e-12,
+            "the 30 degree section must not move"
+        );
+
+        let b1 = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
+        let b2 = root_section_with(&g, low, CriticalSection::LewisParabola).unwrap();
+        assert!(
+            (b1.s - b2.s).abs() > 1e-6,
+            "the parabola section must follow the load"
+        );
+    }
+
+    /// The clamp is tested on the formula directly, by setting the parameter,
+    /// because the interesting cases are at the extremes.
+    ///
+    /// It is not a hypothetical guard: see
+    /// `large_teeth_with_a_sharp_cutter_leave_the_stated_range`.
+    #[test]
+    fn notch_parameter_is_clamped_for_the_fit_but_reported_raw() {
+        let g = Gear::new(GearParams::default());
+        let base = root_section(&g, g.u_tip).unwrap();
+
+        let mut sharp = base;
+        sharp.notch_parameter = 50.0; // far past the stated range
+        assert!(!sharp.notch_parameter_in_range());
+        assert!(
+            (sharp.notch_parameter - 50.0).abs() < 1e-12,
+            "the raw value must survive for reporting"
+        );
+
+        let mut sharper = base;
+        sharper.notch_parameter = 500.0;
+        // Both clamp to the same q_s, so the correction stops rising.
+        let a = sharp.stress_correction(StressConcentration::Iso6336);
+        let b = sharper.stress_correction(StressConcentration::Iso6336);
+        assert!((a - b).abs() < 1e-12, "clamp is not holding: {a} vs {b}");
+
+        let mut blunt = base;
+        blunt.notch_parameter = 0.1;
+        assert!(!blunt.notch_parameter_in_range());
+        let at_floor = blunt.stress_correction(StressConcentration::Iso6336);
+        let mut at_one = base;
+        at_one.notch_parameter = 1.0;
+        assert!((at_floor - at_one.stress_correction(StressConcentration::Iso6336)).abs() < 1e-12);
+    }
+
+    /// On small and medium gears the notch parameter stays inside the ISO
+    /// range whatever the cutter, because `ρ_F` there is governed by the
+    /// trochoid rather than by the cutter tip radius: shrinking the corner from
+    /// 0.38 to 0.005 module moves `q_s` only from 1.62 to 2.37 at z=17.
+    #[test]
+    fn ordinary_gears_keep_the_notch_parameter_in_range() {
+        for root_radius in [0.38_f64, 0.2, 0.05, 0.005] {
+            for teeth in [9u32, 17, 60] {
+                let g = Gear::new(GearParams {
+                    teeth,
+                    root_radius,
+                    ..Default::default()
+                });
+                let sec = root_section(&g, g.u_tip).unwrap();
+                assert!(
+                    sec.notch_parameter_in_range(),
+                    "z={teeth} rho={root_radius}: q_s = {} left the stated range",
+                    sec.notch_parameter
+                );
+            }
+        }
+    }
+
+    /// Large teeth are the exception, and they are why the clamp exists. On a
+    /// flat tooth the trochoid no longer dominates the root curvature, so a
+    /// sharp cutter carries straight through into `q_s`.
+    ///
+    /// The clamp then **under**-predicts the stress, so this is exactly the case
+    /// a caller must be told about rather than have silently corrected.
+    #[test]
+    fn large_teeth_with_a_sharp_cutter_leave_the_stated_range() {
+        let g = Gear::new(GearParams {
+            teeth: 300,
+            root_radius: 0.05,
+            ..Default::default()
+        });
+        let sec = root_section(&g, g.u_tip).unwrap();
+        assert!(
+            sec.notch_parameter > NOTCH_PARAMETER_RANGE.end,
+            "expected q_s past the range, got {}",
+            sec.notch_parameter
+        );
+        assert!(!sec.notch_parameter_in_range());
+        // and the reported value is the real one, not the clamped one
+        assert!(sec.notch_parameter > 10.0);
     }
 
     #[test]

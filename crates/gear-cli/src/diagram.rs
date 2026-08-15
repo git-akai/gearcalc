@@ -11,7 +11,7 @@
 //! Elements carry classes rather than colours so the embedding page can theme
 //! them.
 
-use gear_core::strength::{root_section, RootSection};
+use gear_core::strength::{root_section_with, CriticalSection, RootSection};
 use gear_core::{Gear, GearParams};
 use std::fmt::Write as _;
 
@@ -56,7 +56,7 @@ fn path_of(pts: &[[f64; 2]]) -> String {
 pub fn tooth_diagram(p: GearParams, width: f64) -> String {
     let g = Gear::new(p);
     let outline = tooth_outline(&g, 900);
-    let Some(sec) = root_section(&g, g.u_tip) else {
+    let Some(sec) = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle) else {
         return format!(
             r#"<svg viewBox="0 0 100 60" class="diagram"><text x="50" y="30" class="label" \
                text-anchor="middle">z={} x={}: no root section (severed)</text></svg>"#,
@@ -174,6 +174,39 @@ pub fn tooth_diagram(p: GearParams, width: f64) -> String {
         0.045 * p.module
     );
 
+    // The Lewis parabola: vertex at the end of the moment arm, tangent to the
+    // tooth. Drawn alongside the 30 degree construction so the difference — and
+    // where it matters — is visible rather than argued.
+    if let Some(par) = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola) {
+        if let Some(pp) = par.parabola_p {
+            let vertex = par.load_line_crossing[1];
+            let x_end = par.tangency[0].abs() * 1.45;
+            let mut d = String::new();
+            let steps = 90;
+            for i in 0..=steps {
+                #[allow(clippy::cast_precision_loss)]
+                let t = -1.0 + 2.0 * (i as f64) / f64::from(steps);
+                let xx = t * x_end;
+                let yy = vertex - xx * xx / (4.0 * pp);
+                let _ = write!(d, "{}{xx:.4} {yy:.4} ", if i == 0 { "M" } else { "L" });
+            }
+            let _ = write!(
+                s,
+                r#"<path d="{d}" class="parabola" stroke-width="{}"/>"#,
+                sw(1.1)
+            );
+            for side in [-1.0_f64, 1.0] {
+                let _ = write!(
+                    s,
+                    r#"<circle cx="{:.4}" cy="{:.4}" r="{:.4}" class="marker-par"/>"#,
+                    side * par.tangency[0].abs(),
+                    par.tangency[1],
+                    0.035 * p.module
+                );
+            }
+        }
+    }
+
     // the moment arm h_Fe, along the centreline
     let _ = write!(
         s,
@@ -190,7 +223,8 @@ pub fn tooth_diagram(p: GearParams, width: f64) -> String {
 /// A caption of the numbers behind one diagram.
 pub fn tooth_caption(p: GearParams) -> String {
     let g = Gear::new(p);
-    match root_section(&g, g.u_tip) {
+    let parabola = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola);
+    match root_section_with(&g, g.u_tip, CriticalSection::TangentAngle) {
         Some(RootSection {
             root_chord,
             moment_arm,
@@ -198,14 +232,25 @@ pub fn tooth_caption(p: GearParams) -> String {
             fillet_curvature,
             ..
         }) => format!(
-            "z={} x={:+.2}{} — s_Fn/m {:.3}, h_Fe/m {:.3}, ρ_F/m {:.3}, <b>Y_F {:.3}</b>",
+            "z={} x={:+.2}{}<br>30°: s_Fn/m {:.3}, h_Fe/m {:.3}, ρ_F/m {:.3}, <b>Y_F {:.3}</b>\
+             <br>parabola: <b>Y_F {}</b>{}",
             p.teeth,
             p.profile_shift,
             if g.undercut { ", undercut" } else { "" },
             root_chord / p.module,
             moment_arm / p.module,
             fillet_curvature / p.module,
-            form_factor
+            form_factor,
+            parabola.map_or_else(|| "—".to_string(), |q| format!("{:.3}", q.form_factor)),
+            parabola.map_or_else(String::new, |q| format!(
+                " ({:+.1}%, touches the {})",
+                100.0 * (q.form_factor - form_factor) / form_factor,
+                if q.tangency_on_flank {
+                    "flank"
+                } else {
+                    "fillet"
+                }
+            )),
         ),
         None => format!("z={} x={:+.2} — no root section", p.teeth, p.profile_shift),
     }
@@ -226,7 +271,8 @@ pub fn form_factor_chart(width: f64, height: f64) -> String {
                     profile_shift: x,
                     ..Default::default()
                 });
-                root_section(&g, g.u_tip).map(|s| [f64::from(z), s.form_factor])
+                root_section_with(&g, g.u_tip, CriticalSection::TangentAngle)
+                    .map(|s| [f64::from(z), s.form_factor])
             })
             .collect();
         series.push((x, pts));
