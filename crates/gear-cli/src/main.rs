@@ -8,6 +8,7 @@
 //! ```
 
 mod diagram;
+mod matrix;
 
 use gear_core::{Gear, GearParams};
 
@@ -17,6 +18,7 @@ fn main() {
         Some("sweep") => sweep(),
         Some("dump") => dump(),
         Some("bending") => bending_report(),
+        Some("matrix") => matrix_report(),
         Some("dxf") => dxf(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.0),
@@ -253,4 +255,94 @@ fn bending_report() {
     println!("</div>");
     println!("<h2>Form factor against tooth count</h2>");
     println!("{}", diagram::form_factor_chart(660.0, 380.0));
+}
+
+/// Precision study of the bending-model matrix. Text, so the numbers can be
+/// read before anything is drawn from them.
+fn matrix_report() {
+    let pop = matrix::population();
+    println!("population: {} designs\n", pop.len());
+
+    println!("== 1. continuity ==");
+    println!(
+        "{:<24} {:>18} {:>10} {:>22}",
+        "model", "worst z step", "at z", "worst x step (fine)"
+    );
+    for m in matrix::MATRIX {
+        let (step, at) = matrix::continuity_in_tooth_count(m);
+        let xs = matrix::continuity_in_profile_shift(m, 120);
+        println!(
+            "{:<24} {:>17.4}% {:>10} {:>21.5}%",
+            m.name(),
+            100.0 * step,
+            at,
+            100.0 * xs
+        );
+    }
+
+    println!("\n== 2. rank agreement (Spearman) ==");
+    for i in 0..matrix::MATRIX.len() {
+        for j in (i + 1)..matrix::MATRIX.len() {
+            let (r, n) = matrix::rank_correlation(matrix::MATRIX[i], matrix::MATRIX[j], &pop);
+            println!(
+                "  {:<22} vs {:<22} rho = {r:.6}  (n={n})",
+                matrix::MATRIX[i].name(),
+                matrix::MATRIX[j].name()
+            );
+        }
+    }
+
+    for thresh in [0.0_f64, 0.002, 0.01] {
+        println!(
+            "\n== 3. gradient sign agreement, ignoring effects below {:.1}% ==",
+            100.0 * thresh
+        );
+        println!(
+            "  {:<48} {:>7} {:>7} {:>7}",
+            "", "shift", "fillet", "dedend"
+        );
+        for i in 0..matrix::MATRIX.len() {
+            for j in (i + 1)..matrix::MATRIX.len() {
+                let g =
+                    matrix::gradient_agreement(matrix::MATRIX[i], matrix::MATRIX[j], &pop, thresh);
+                println!(
+                    "  {:<22} vs {:<22} {:6.1}% {:6.1}% {:6.1}%",
+                    matrix::MATRIX[i].name(),
+                    matrix::MATRIX[j].name(),
+                    100.0 * g[0],
+                    100.0 * g[1],
+                    100.0 * g[2]
+                );
+            }
+        }
+    }
+
+    println!("\n== 4. divergence across the matrix, by tooth count (x=0, rho=0.38) ==");
+    println!("{:>6} {:>12}", "z", "spread");
+    for teeth in [9u32, 12, 17, 25, 40, 70, 120, 250] {
+        let p = GearParams {
+            teeth,
+            ..Default::default()
+        };
+        if let Some(d) = matrix::divergence(p) {
+            println!("{teeth:>6} {:>11.2}%", 100.0 * d);
+        }
+    }
+    println!("\n   worst divergence over the whole population:");
+    let mut worst = (0.0_f64, GearParams::default());
+    for p in &pop {
+        if let Some(d) = matrix::divergence(*p) {
+            if d > worst.0 {
+                worst = (d, *p);
+            }
+        }
+    }
+    println!(
+        "   {:.2}% at z={} x={:+.1} rho={} alpha={}",
+        100.0 * worst.0,
+        worst.1.teeth,
+        worst.1.profile_shift,
+        worst.1.root_radius,
+        worst.1.pressure_angle
+    );
 }

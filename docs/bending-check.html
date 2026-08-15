@@ -249,6 +249,146 @@ their combination, which could hide two errors cancelling.</p>
 </table>
 </div>
 
+
+<h2>Precision study: which choices actually change a conclusion</h2>
+
+<p>For a predictive tool, absolute accuracy matters less than whether the model
+ranks designs correctly and points the right way when a parameter moves. A model
+15% high everywhere is usable; one with a kink, a reversal, or a gradient of the
+wrong sign sends a designer the wrong way. So the matrix of options was measured
+against those criteria over <b>1521 designs</b> — z from 9 to 140, x from −0.4 to
++0.8, ρ from 0.10 to 0.38, α of 14.5°, 20° and 25°.</p>
+
+<h2>1. Continuity — and a defect it found</h2>
+
+<p>Any jump in output for a smooth change of input is disqualifying. Sweeping
+profile shift in 4000 steps at z=120:</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>model</th><th class="num">worst step, before</th><th class="num">after</th></tr></thead>
+<tbody>
+<tr><td>30° · Y_F only</td><td class="num">0.0045%</td><td class="num">0.0045%</td></tr>
+<tr><td>30° · Y_F·Y_S</td><td class="num">0.0009%</td><td class="num">0.0009%</td></tr>
+<tr><td>parabola · Y_F only</td><td class="num">0.0052%</td><td class="num">0.0052%</td></tr>
+<tr><td>parabola · Y_F·Y_S</td><td class="num"><b>22.88%</b></td><td class="num pass">0.0051%</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>That last row was a cliff in the middle of the design space, and finding it
+was the most useful thing this study did. The cause was <em>mine</em>, and it is
+a category error rather than a numerical one: <b>the ISO stress correction is a
+notch factor</b>, and its input ρ_F is the notch radius. Where the inscribed
+parabola touches the flank there is no notch — but the code substituted the
+involute's own curvature. Across the seam at z=150→151:</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>z</th><th>touches</th><th class="num">q_s</th><th class="num">Y_F</th><th class="num">Y_F·Y_S</th></tr></thead>
+<tbody>
+<tr><td>150</td><td>fillet</td><td class="num">1.8052</td><td class="num">2.2012</td><td class="num">3.6235</td></tr>
+<tr><td>151</td><td>flank</td><td class="num">0.0480</td><td class="num">2.2005</td><td class="num">2.9914</td></tr>
+</tbody>
+</table>
+</div>
+
+<p class="note">The geometry was fine — Y_F moved 0.03% across the seam. The
+correction jumped <b>17%</b>. The fix is not a smoothing fudge: the combination
+is now <em>undefined</em> where the section leaves the fillet, and says so. A
+tool that admits a combination has no answer is worth more than one that
+interpolates across a category boundary.</p>
+
+<h2>2. Rank agreement — the construction hardly matters</h2>
+
+<p>Spearman correlation over the population; this is the question "would these
+two ever pick a different design?"</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>pair</th><th class="num">ρ</th><th>reading</th></tr></thead>
+<tbody>
+<tr><td>30° vs parabola, both Y_F only</td><td class="num"><b>0.993</b></td><td>effectively interchangeable</td></tr>
+<tr><td>30° vs parabola, both Y_F·Y_S</td><td class="num">0.915</td><td>close</td></tr>
+<tr><td>Y_F only vs Y_F·Y_S, both 30°</td><td class="num">0.794</td><td>reorders designs</td></tr>
+<tr><td>Y_F only vs Y_F·Y_S, both parabola</td><td class="num">0.823</td><td>reorders designs</td></tr>
+</tbody>
+</table>
+</div>
+
+<p><b>The critical-section construction is not the consequential choice.</b>
+Whether the stress correction is included is — it changes the ranking far more
+than the 30°/parabola decision does.</p>
+
+<h2>3. Gradient agreement — and why the raw number misleads</h2>
+
+<p>Whether two models agree on <em>which way</em> a lever moves the answer.
+Counting every case, the numbers look alarming; screening out cases where the
+lever barely does anything, they collapse to agreement:</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>pair</th><th class="num">shift</th><th class="num">fillet</th><th class="num">dedendum</th></tr></thead>
+<tbody>
+<tr><td colspan="4"><em>counting every case</em></td></tr>
+<tr><td>30° vs parabola (Y_F only)</td><td class="num">95.0%</td><td class="num">95.4%</td><td class="num">92.8%</td></tr>
+<tr><td>Y_F only vs Y_F·Y_S (parabola)</td><td class="num">61.7%</td><td class="num">100.0%</td><td class="num">51.9%</td></tr>
+<tr><td colspan="4"><em>ignoring effects below 1%</em></td></tr>
+<tr><td>30° vs parabola (Y_F only)</td><td class="num pass">100.0%</td><td class="num pass">100.0%</td><td class="num pass">100.0%</td></tr>
+<tr><td>Y_F only vs Y_F·Y_S (parabola)</td><td class="num pass">93.4%</td><td class="num pass">100.0%</td><td class="num pass">91.5%</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>The 51.9% is <b>noise at turning points</b>, not a real disagreement: where a
+lever has no effect its sign is meaningless. Where a lever actually moves the
+answer by 1% or more, every pair agrees on direction 91–100% of the time. For
+design guidance that is the reassuring result — the model choice changes the
+<em>magnitude</em>, not the direction.</p>
+
+<h2>4. Where the choice matters</h2>
+
+<p>Spread across the whole matrix, as a fraction of the lowest prediction, grows
+steadily with tooth count — 43% at z=9, 52% at z=17, 75% at z=70, 88% at z=120,
+worst 165% at z=30 with x=+0.8 and a sharp fillet. Almost all of that is the
+presence or absence of Y_S, which is a factor of roughly 1.5–1.8 in its own
+right.</p>
+
+<h2>What the external work says</h2>
+
+<p>Two findings from the literature bear directly on this.</p>
+
+<p><b>The measured critical location sits higher in the fillet than the 30°
+tangent predicts.</b> Experimental single-tooth-bending work found most critical
+locations slightly above the ISO-predicted point, with the prediction falling at
+the <em>edge</em> of the observed range. That is the direction the parabola moves
+the section, so it is corroboration — though the authors note the divergence may
+be partly explained by the large deformations of low-cycle testing, so it is
+supporting evidence rather than proof.</p>
+
+<p><b>ISO 6336 and AGMA 2101 do not agree with each other in absolute terms</b>,
+despite resting on the same principles, having "evolved to such an extent that
+they are not necessarily in agreement". Comparisons against FEA and strain-gauge
+measurement put the empirical fits within roughly 8% of finite-element results.
+For a comparative tool this is the licence to pick one convention and hold it,
+rather than chase an absolute.</p>
+
+<h2>What this implies for the tool</h2>
+
+<ul>
+<li><b>Report Y_F and Y_F·Y_S side by side.</b> This is the choice that reorders
+designs (ρ 0.79–0.82), so a user should see both rather than have one picked for
+them.</li>
+<li><b>The 30°/parabola choice can default on principle</b>, since it barely
+affects ranking (ρ 0.993) or direction (100% above a 1% effect). The parabola is
+the better-motivated construction and the more conservative one; the 30° tangent
+is what the ISO Y_S fit is calibrated against.</li>
+<li><b>Never mix parabola geometry with the ISO correction on a flank
+tangency</b> — now unrepresentable rather than merely discouraged.</li>
+<li><b>Hold one convention across a comparison.</b> Absolute agreement between
+conventions is not available at better than tens of percent; consistency is.</li>
+</ul>
+
 <h2>Reading the diagrams</h2>
 
 <p>Two things are worth checking by eye. First, the <span class="k chord">red

@@ -418,6 +418,19 @@ pub const NOTCH_PARAMETER_RANGE: std::ops::Range<f64> = 1.0..8.0;
 impl RootSection {
     /// The stress correction factor `Y_S` under the chosen model.
     ///
+    /// Returns `None` when the correction has no meaning for this section:
+    /// [`StressConcentration::Iso6336`] is a *notch* factor, and its input `ρ_F`
+    /// is the notch radius. When the inscribed parabola touches the involute
+    /// flank there is no notch at the critical section, so the fit has no valid
+    /// input.
+    ///
+    /// This is not a formality. Evaluating it anyway substitutes the involute's
+    /// own curvature for `ρ_F`, which on a large tooth is enormous — `q_s` falls
+    /// from 1.81 to 0.048 across the seam at z=150→151 and the corrected factor
+    /// **jumps 17%** while `Y_F` itself moves by 0.03%. A design tool with a
+    /// cliff in the middle of its parameter space is worse than one that admits
+    /// the combination is undefined.
+    ///
     /// The notch parameter is **clamped** into the range the fit is stated for
     /// before being used, so an out-of-range gear gets the value at the boundary
     /// rather than an extrapolation. The unclamped figure stays available in
@@ -430,15 +443,16 @@ impl RootSection {
     /// unconservative, which is why [`RootSection::notch_parameter_in_range`]
     /// exists and should be surfaced rather than swallowed.
     #[must_use]
-    pub fn stress_correction(&self, model: StressConcentration) -> f64 {
+    pub fn stress_correction(&self, model: StressConcentration) -> Option<f64> {
         match model {
-            StressConcentration::None => 1.0,
+            StressConcentration::None => Some(1.0),
+            StressConcentration::Iso6336 if self.tangency_on_flank => None,
             StressConcentration::Iso6336 => {
                 let l = self.root_chord / self.moment_arm;
                 let q = self
                     .notch_parameter
                     .clamp(NOTCH_PARAMETER_RANGE.start, NOTCH_PARAMETER_RANGE.end);
-                (1.2 + 0.13 * l) * q.powf(1.0 / (1.21 + 2.3 / l))
+                Some((1.2 + 0.13 * l) * q.powf(1.0 / (1.21 + 2.3 / l)))
             }
         }
     }
@@ -450,9 +464,12 @@ impl RootSection {
     }
 
     /// `Y_F · Y_S`: the full geometry factor multiplying `F_t / (b m)`.
+    ///
+    /// `None` where the correction is undefined; see
+    /// [`RootSection::stress_correction`].
     #[must_use]
-    pub fn bending_factor(&self, model: StressConcentration) -> f64 {
-        self.form_factor * self.stress_correction(model)
+    pub fn bending_factor(&self, model: StressConcentration) -> Option<f64> {
+        Some(self.form_factor * self.stress_correction(model)?)
     }
 }
 
@@ -628,9 +645,10 @@ mod tests {
     fn stress_correction_can_be_switched_off_for_comparison() {
         let g = Gear::new(GearParams::default());
         let sec = root_section(&g, g.u_tip).unwrap();
-        assert!((sec.stress_correction(StressConcentration::None) - 1.0).abs() < 1e-15);
+        assert!((sec.stress_correction(StressConcentration::None).unwrap() - 1.0).abs() < 1e-15);
         assert!(
-            (sec.bending_factor(StressConcentration::None) - sec.form_factor).abs() < 1e-15,
+            (sec.bending_factor(StressConcentration::None).unwrap() - sec.form_factor).abs()
+                < 1e-15,
             "with no correction the bending factor must be the form factor alone"
         );
     }
@@ -646,7 +664,7 @@ mod tests {
                 ..Default::default()
             });
             let sec = root_section(&g, g.u_tip).unwrap();
-            let ys = sec.stress_correction(StressConcentration::Iso6336);
+            let ys = sec.stress_correction(StressConcentration::Iso6336).unwrap();
             assert!(
                 ys > last,
                 "rho={root_radius}: Y_S {ys} did not exceed {last} for a blunter fillet"
@@ -808,17 +826,30 @@ mod tests {
         let mut sharper = base;
         sharper.notch_parameter = 500.0;
         // Both clamp to the same q_s, so the correction stops rising.
-        let a = sharp.stress_correction(StressConcentration::Iso6336);
-        let b = sharper.stress_correction(StressConcentration::Iso6336);
+        let a = sharp
+            .stress_correction(StressConcentration::Iso6336)
+            .unwrap();
+        let b = sharper
+            .stress_correction(StressConcentration::Iso6336)
+            .unwrap();
         assert!((a - b).abs() < 1e-12, "clamp is not holding: {a} vs {b}");
 
         let mut blunt = base;
         blunt.notch_parameter = 0.1;
         assert!(!blunt.notch_parameter_in_range());
-        let at_floor = blunt.stress_correction(StressConcentration::Iso6336);
+        let at_floor = blunt
+            .stress_correction(StressConcentration::Iso6336)
+            .unwrap();
         let mut at_one = base;
         at_one.notch_parameter = 1.0;
-        assert!((at_floor - at_one.stress_correction(StressConcentration::Iso6336)).abs() < 1e-12);
+        assert!(
+            (at_floor
+                - at_one
+                    .stress_correction(StressConcentration::Iso6336)
+                    .unwrap())
+            .abs()
+                < 1e-12
+        );
     }
 
     /// On small and medium gears the notch parameter stays inside the ISO
@@ -866,6 +897,26 @@ mod tests {
         assert!(!sec.notch_parameter_in_range());
         // and the reported value is the real one, not the clamped one
         assert!(sec.notch_parameter > 10.0);
+    }
+
+    /// The ISO correction is a notch factor. Where the parabola leaves the
+    /// fillet there is no notch, and the combination must say so rather than
+    /// substitute the involute's curvature — which produced a 17% cliff at
+    /// z=150→151 while the form factor moved 0.03%.
+    #[test]
+    fn iso_correction_is_undefined_on_a_flank_tangency() {
+        let g = Gear::new(GearParams {
+            teeth: 1000,
+            ..Default::default()
+        });
+        let sec = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
+        assert!(sec.tangency_on_flank);
+        assert!(sec
+            .stress_correction(StressConcentration::Iso6336)
+            .is_none());
+        assert!(sec.bending_factor(StressConcentration::Iso6336).is_none());
+        // the uncorrected factor is still perfectly well defined
+        assert!(sec.bending_factor(StressConcentration::None).is_some());
     }
 
     #[test]
