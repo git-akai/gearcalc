@@ -1,78 +1,43 @@
 # Gear & geartrain design tool — architecture and mathematics
 
-Status: **proposal, revision 10.** Incorporates the answers to Q1–Q7, the JGMA
-116-02 tables now in `docs/`, the change of GUI target to Svelte/TypeScript, the
-JGMA / units decisions, and the planned angularly varying profile shift for
-eccentric motion at constant ratio with a commanded centre distance. No
-application code written yet.
+**Status: milestones 0–3 complete and in CI; milestone 5 (strength) partly
+built.** This document is the design of record and is current as of the head of
+`main`. Where implementation contradicted the design, the design was corrected
+and the correction recorded — see §12.
 
 Conventions: angles in **degrees at the UI boundary, radians everywhere
 inside**; lengths in mm; `m` is the **normal** module unless subscripted `m_t`;
-subscript `n` = normal plane, `t` = transverse. This follows the prior work in
-`handoff_inbound/`.
+subscript `n` = normal plane, `t` = transverse.
 
-**Changes in revision 10:**
+## What exists
 
-| § | Change |
-|---|---|
-| 4.5 | **Correction.** The approach and recess lengths were both written with `a_w sin α_w`; each must subtract its own gear's `r′ sin α_w`. As written both came out negative. Only their sum uses `a_w`. |
-| 4.7 | Critical section defaults to the **Lewis parabola**, a deliberate divergence from ISO/AGMA; the 30° tangent is retained for standards-comparable numbers. Stress correction stays switchable and is **refused** where the parabola leaves the fillet. |
-| 4.7 | Load cases measured: HPSTC is **27–32% below** tip-worst-case, and load sharing adds only a further 0.0–0.2% because the governing point *is* the HPSTC once sharing applies. |
+| | Built | Verified by |
+|---|---|---|
+| Geometry core | involute + trochoid profile, undercut, severed teeth | rack simulation, both bounds, 1080 cases |
+| Primitives | safeguarded `inv⁻¹`, Brent, bracketed Newton | textbook special cases |
+| Mesh | centre distance, exact backlash, contact path | direct tooth-thickness computation |
+| Metrology | span, over-pins, cutter tip width, JGMA tables | independent pin-tangency check |
+| Strength | critical section, form factor, stress correction | closed-form rack limits |
+| Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
+| UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-**Changes in revision 9:**
+98 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+and tests; CI additionally typechecks the front end and re-reads an exported DXF
+with `ezdxf`.
 
-| § | Change |
-|---|---|
-| 4.6.1 | **Correction.** Revision 3's claim that the standard scale's grade 4 is tighter than the fine scale's *grade 0* is wrong (7 against 6.3) and is withdrawn. The argument it supported is unaffected — the merged ladder still drops between grades 3 and 4 — and is now stated from the transcribed data rather than from memory. |
-| 11 | Milestone 2 complete. |
+```bash
+nix develop                       # or `direnv allow` once
+cargo nextest run                 # the suite
+cargo run --bin gear-cli -- show 17 0.2      # drive the maths, no browser
+cargo run --release --bin gear-cli -- bending   # the bending verification sheet
+cd web && npm run dev             # the application
+```
 
-**Changes in revision 8:**
+## What is next
 
-| § | Change |
-|---|---|
-| 4.10 | Operating mode settled: **centre distance is commanded** to track the ideal, making `a_w(θ)` a first-class output (and it is *not* sinusoidal even when `x(θ)` is). **Correction: λ = 1 is optimal only at fixed centre distance** — a commanded `a(θ)` contributes its own phase term, so λ must be solved for, not fixed. The coefficient is **not yet closed**; a trial mesh model failed validation and nothing from it is quoted. |
-
-**Changes in revision 7:**
-
-| § | Change |
-|---|---|
-| 4.10 | **E1 withdrawn** — varying the addendum alone leaves both flanks exactly where a standard gear puts them. **E3 shown to be directional**: reversing costs 2× the uncompensated error. Exact impossibility result added (varying tooth thickness ⟹ cannot be conjugate both ways), and **E2 shown to be the minimax optimum**. |
-
-**Changes in revision 6:**
-
-| § | Change |
-|---|---|
-| 4.10 | Intended function confirmed as **eccentric motion at constant ratio**, which **reverses revision 5's conclusion**: pure-involute flanks are required, so the generator stays unchanged and no new envelope derivation is needed. |
-
-**Changes in revision 5:**
-
-| § | Change |
-|---|---|
-| 4.10 | **Revision 4 read the feature wrongly** — it is an *angular* (2D) profile-shift variation, not an axial taper. The beveloid treatment is withdrawn. |
-
-**Changes in revision 4:**
-
-| § | Change |
-|---|---|
-| 4.6.1 | JGMA settled: one dropdown, two named scales, fine-then-lowest-grade precedence. |
-
-**Changes in revision 3:**
-
-| § | Change |
-|---|---|
-| 4.6.1 | **The two JGMA tables are two different grade scales, not one.** Verified against the page images. The "smaller value wins" rule cannot be applied across them without producing a non-monotonic ladder; two named scales instead. |
-| 6 | Units settled: **SI internally**, g/cm³ at display; the two deliberate exceptions named. |
-
-**Changes in revision 2**, if you have not read it:
-
-| § | Change |
-|---|---|
-| 1 | **egui dropped.** Rust core compiled to wasm + Svelte/TypeScript UI, targeting the rof-gui shape directly. |
-| 4.3 | **Working-depth formula corrected.** Revision 1 had the wrong construction; the corrected one reproduces the classical z=17 result exactly. |
-| 4.5 | Crossed-axis helical unified with worm gearing — they are the same mathematics, which collapses most of Q2's cost. |
-| 4.6 | Three-pin and odd/even two-pin formulas added and independently verified; JGMA is a **lookup table**, not a formula; min/max deferred. |
-| 4.8 | Ring tooth search now has a **closed-form bracket** and a proof of completeness. |
-| 5 | Domain guards added — reachable failure mode found while testing. |
+Milestone 4 (materials) and milestone 6 (spur stage) are the open work; §11 has
+the full list. Nothing is blocked. The one deferred decision with a written
+rationale is load sharing, §4.7.
 
 ---
 
@@ -104,7 +69,7 @@ synchronise across the boundary, no lifecycle, no callbacks.
 Given that, the trade-off is not close:
 
 - **egui-then-Svelte means writing the UI twice** and throwing one away.
-- The argument I made for egui in revision 1 was native debugging. That argument
+- The argument for egui was native debugging. That argument
   **does not survive this architecture**: `gear-core` is a plain Rust library, so
   every hard piece — geometry, solvers, stress, the rack-simulation test suite —
   is debuggable natively through `cargo nextest` and a small CLI, whichever UI
@@ -436,7 +401,7 @@ radians, combined with the centre-distance term above.
 ε_β = b sin β / (π m)
 ```
 
-*(Corrected in revision 10: revision 1 wrote `a_w sin α_w` in **both** lines.
+*(Corrected — an earlier draft wrote `a_w sin α_w` in **both** lines.
 Each length is measured from the pitch point, so each subtracts its own gear's
 share `r′ sin α_w`. Only the sum uses `a_w`, since `r′₁ + r′₂ = a_w` — which is
 why the familiar contact-ratio formula contains `a_w` and these do not. As
@@ -597,7 +562,7 @@ being right. They are. What the standard contains:
 
 You asked for "the band with the smaller value wins, regardless of page", on the
 sound principle that a tighter allowance is automatically compliant with a looser
-one. That principle is right. The problem is the premise I gave you in revision 2
+one. That principle is right. The problem is the premise it rests on
 — that these are overlapping bands of *one* grade scale. **They are not.**
 
 For module 1.0–1.6 at a 12 mm pitch diameter, where both tables apply:
@@ -625,7 +590,7 @@ which **drops between grade 3 and grade 4**. No rule for choosing between
 overlapping entries avoids this, because the grade numbers do not denote the
 same thing on the two tables.
 
-*(Corrected in revision 9: revision 3 also claimed page 2's grade 4 was tighter
+*(Corrected — an earlier draft also claimed page 2's grade 4 was tighter
 than page 1's grade 0. It is not — 7 against 6.3, marginally looser. The
 non-monotonicity is real and is what the argument rests on; that one comparison
 was wrong and is withdrawn.)*
@@ -721,24 +686,54 @@ Where the parabola's tangency lands on the flank there is no notch, so `ρ_F` ha
 no meaning and the ISO correction returns nothing. Evaluating it anyway produced
 a **17% discontinuity** at z=150→151 while `Y_F` moved 0.03%.
 
-**Load point.** Three cases, measured over ordinary meshes:
+**Load point — decided: (b), the highest point of single-pair contact.**
 
-| | case | vs worst case |
-|---|---|---|
-| a | tip load, tooth carrying everything | — |
-| b | highest point of single-pair contact | **−27% to −32%** |
-| c | worst point of the cycle with load sharing | −27% to −33% |
+Three cases, measured over ordinary meshes at module 1:
 
-The result that decides the design: **(c) adds only 0.0–0.2% over (b)**, because
-once sharing is allowed the governing point *is* the HPSTC — at the tip the tooth
-carries about a third of the load, so tip loading stops governing. The expensive
-part of (c), a calibrated mesh-stiffness model, buys almost nothing for a
-worst-case number.
+| mesh | ε | (a) tip | (b) HPSTC | (c) shared | b vs a | c vs a |
+|---|---|---|---|---|---|---|
+| 17 : 17 | 1.515 | 4.2923 | 3.1078 | 3.1074 | −27.6% | −27.6% |
+| 17 : 43 | 1.621 | 4.2923 | 2.9416 | 2.9372 | −31.5% | −31.6% |
+| 13 : 60 | 1.614 | 4.7441 | 3.2057 | 3.2003 | −32.4% | −32.5% |
+| 25 : 25 | 1.612 | 3.9052 | 2.7760 | 2.7749 | −28.9% | −28.9% |
+| 12 : 30, x=+0.4 | 1.455 | 4.0337 | 2.9290 | 2.9224 | −27.4% | −27.5% |
+| 20 : 20, x=−0.2 | 1.550 | 4.5534 | 3.1814 | 3.1752 | −30.1% | −30.3% |
 
-One honest exception: `Y_S`, the root stress-concentration factor, is the
-Dolan–Broghamer empirical fit — genuinely fitted constants from photoelastic
-work, with no closed form. It is isolated in one commented function with its
-source cited rather than smeared through the calculation.
+**(a) is reported alongside (b)** as the theoretical bound: tip load with the
+tooth carrying everything is well defined without a mate, so it is also what the
+single-gear calculator shows. (b) is the expected figure wherever a mate exists.
+
+### Why load sharing is not included
+
+(c) was the leading candidate. The measurement retired it, and the reason is
+structural rather than a matter of tuning:
+
+> **Once sharing is allowed, the governing point *becomes* the HPSTC.** At the
+> tip a tooth carries roughly a third of the load, so tip loading stops
+> governing — and the worst surviving point of the cycle is exactly where (b)
+> already places it. (c) therefore lands within **0.0–0.2%** of (b) across every
+> mesh tried.
+
+So the expensive part of (c) — a calibrated mesh-stiffness model — buys almost
+nothing for a worst-case number, while dragging in tooth and rim stiffness,
+deflection under load, and manufacturing deviation. Those inputs are not
+available to a high-level design tool, and a stiffness model that is not
+calibrated produces confident numbers that are *worse* than the conservative
+bound, because they look authoritative.
+
+Two conditions would change this, and both are worth naming so the decision can
+be revisited rather than rediscovered:
+
+- **A duty-cycle or transmission-error calculation**, where the whole mesh cycle
+  matters rather than its worst instant. Sharing is essential there and the
+  0.2% figure does not apply.
+- **High contact ratio (ε ≥ 2)**, where two pairs are *always* engaged and the
+  single-pair zone this argument rests on does not exist.
+
+The machinery is in place either way: `ContactPath::load_fraction` takes a
+`LoadSharing` model, and `LoadSharing::LinearRamp` exists as an explicitly
+uncalibrated 1/3→2/3 ramp. It is labelled a placeholder for a stiffness model,
+not a substitute for one; its purpose was to size the effect, and it has.
 
 **Contact.** Exact Hertzian line contact. At a contact point `ξ` from the pitch
 point, `ρ₁ = r_b1 tan α_w + ξ` and `ρ₂ = r_b2 tan α_w − ξ` (note
@@ -865,15 +860,10 @@ in the first stage is nearly free. Min/max propagate identically.
 
 ### 4.10 Angularly varying profile shift (planned)
 
-**Correcting revision 4.** I first read "one end / the opposite end" as the two
-*axial* ends of the face and wrote this up as a beveloid (tapered) gear. That was
-wrong. The feature is a purely **2D** variation: the profile shift varies with
-angular position about the axis, maximum at 0° and minimum at 180°, produced by
-moving the hob radially in and out once per revolution. The paragraph below
-replaces the beveloid treatment entirely.
-
-The distinction matters because the two are not variations on a theme. A beveloid
-is cheap; this is not, and the reason is worth understanding before committing.
+A purely **2D** variation: the profile shift varies with angular position about
+the axis, maximum at 0° and minimum at 180°, as a hob moving radially in and out
+once per revolution would produce. It is *not* a beveloid — the variation is
+angular, not axial.
 
 #### The model
 
@@ -927,11 +917,11 @@ involute is truncated. Tooth thickness is free — it only decides backlash and
 when contact transfers. That freedom is what makes the feature possible at all,
 and it is why the tip envelope can be eccentric while the action stays uniform.
 
-#### E1 is withdrawn — varying the addendum alone cannot work
+#### Varying the addendum alone cannot work
 
-An earlier draft offered a variant that varied only the radial part of the shift
-and held tooth thickness uniform. **That is not a candidate**, and the reason is
-decisive: addendum modification does not move the flanks at all. [verified] Both
+A variant that varies only the radial part of the shift, holding tooth thickness
+uniform, is **not a candidate**: addendum modification does not move the flanks
+at all. [verified] Both
 flank seats come out identical to a standard gear — drive and coast pitch error
 exactly 0.000 μm, tooth thickness variation exactly 0.000 mm — for any `e`.
 
@@ -998,29 +988,25 @@ extra axis relationship on a CNC hobber with an electronic gearbox, unavailable
 on a mechanically geared machine. E2, by contrast, is exactly what the plain
 radial oscillation gives.
 
-#### This makes the feature much cheaper than revision 5 concluded
+#### The feature is cheap, for a reason worth stating
 
-Revision 5 argued that a per-tooth constant `x` was an unusable approximation,
-because the physical hob sweeps 1.7 tooth pitches while cutting one tooth (the
-measurements below still stand). That argument assumed the flanks had to follow
-the physical process exactly. **They must not.** Constant ratio *requires* each
-driving flank to be a pure involute at a single seat — which is exactly what the
-existing generator produces for a single scalar `x`.
-
-So the per-tooth model is not an approximation of the specification; it **is**
-the specification, and the conclusions invert:
+A per-tooth constant `x` might look like an approximation — the physical hob
+sweeps 1.7 tooth pitches while cutting one tooth. But constant ratio *requires*
+each driving flank to be a pure involute at a single seat, which is exactly what
+the generator produces for a single scalar `x`. The per-tooth model is therefore
+not an approximation of the specification; it **is** the specification:
 
 - The profile generator stays **unchanged**, taking one scalar profile shift, and
   is called ⌈z/2⌉+1 times.
 - **No new envelope derivation is needed.** The "L3" exact-envelope work
-  described in revision 5 is not required.
+  once considered here is not required.
 - The existing rack-simulation test suite applies unchanged, since every tooth is
   an ordinary gear tooth that must pass it.
 
 What does change is assembly: teeth are generated individually and placed at
 `2πk/z + offset_k` rather than replicated z times from one half-tooth.
 
-#### Retained from revision 5: why the naive process fails
+#### Why the naive process fails
 
 This is the finding that determines how much work the feature is, and it is not
 obvious. **One flank is generated over a large sweep of gear rotation** — the hob
@@ -1159,7 +1145,7 @@ That is as close to closed form as involute geometry allows — the involute
 function is not algebraically invertible, and that single fact causes #1, #2 and
 #4.
 
-The one addition since revision 1: **guards matter as much as the solvers.**
+Worth stating separately: **guards matter as much as the solvers.**
 Testing found that ordinary planetary inputs routinely request a centre distance
 outside the involute domain, and the difference between a guarded and unguarded
 `inv⁻¹` there is the difference between "this ring tooth count is impossible" and
@@ -1283,7 +1269,7 @@ On top of that:
 
 ---
 
-## 10. Resolved spec items
+## 10. Specification decisions and what is still open
 
 | Q | Resolution |
 |---|---|
@@ -1299,18 +1285,22 @@ On top of that:
 worm starts `≥ 1`; minimum tip width compared against `dedendum × module`;
 gear-tab automatic toggles are Inputs; default material "4340 Hardened Steel".
 
-**Settled since revision 2:** JGMA modelled as two named scales in one dropdown,
-grade 0 included, precedence fine-then-lowest-grade independent of the error
-values (§4.6.1); density stored SI and displayed in g/cm³ under a general
-SI-internally rule (§6); axially varying profile shift scoped and confirmed
-buildable as a layer above the unchanged generator (§4.10).
+**Everything from the original Q1–Q7 review is settled** and folded into the
+sections above. What remains open is listed here in full, so a fresh reader does
+not have to hunt for it.
 
-**Open — none of it blocking.** Two confirmations on the angularly varying
-profile shift are listed at the end of §4.10, plus one piece of unfinished
-mathematics (the mesh-phase coefficient that sets the optimal λ, §4.10 and the
-appendix). All of it is contained within that feature's own milestone, which sits
-after the geometry test suite; nothing in milestones 0–9 depends on it, and §4.4
-is unaffected.
+| Open item | Where | Blocks |
+|---|---|---|
+| Mesh-phase coefficient that sets the optimal λ | §4.10, appendix | only the angular-profile-shift milestone |
+| Sinusoidal `x(θ)`, or another interpolation? | §4.10 | same |
+| What the eccentric mechanism can physically follow | §4.10 | same |
+| Material data: sourcing and per-entry provenance | §6 | milestone 4 |
+| Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
+| Crossed-axis contact model | §4.5.1 | milestone 10 |
+
+**Deliberately deferred, with a written rationale:** load sharing — see the end
+of §4.7. It is not an omission; the measurement says it buys 0.0–0.2% for a
+worst-case number, and the conditions that would change that are named.
 
 **Pressure angle range.** Keeping 60° as specified. Nothing found so far forces
 branching: the only casualty of high pressure angles is that more `(z, x)`
@@ -1332,15 +1322,15 @@ it can be validated in isolation.
 | 0 | ✅ **Scaffold** — workspace, wasm target, `gear-cli`, Vite/Svelte shell, flake `.#web` | **met** — `nix flake check` green; the wasm binary returns bit-identical numbers to the native build |
 | 1 | ✅ **Geometry core** — port `gear.py` + thickness modification + rack-simulation suite | **met** — penetration 2.1e-15 mm, deviation 6.2e-4 mm over 1080 cases |
 | 2 | ✅ **Primitives & metrology** — safeguarded `inv⁻¹`, centre distance, backlash, span, pins, JGMA table | **met** — span reproduces the textbook form to 1e-12 mm, backlash matches a direct computation to 1e-16 mm, pin tangency verified to 3e-10 mm against the generated flank |
-| 3 | **Gear Calculator UI** — sidebar, tabs, parameter grid, canvas viewport, DXF export | end to end: type a module, see a gear, export it, open it in CAD |
-| 4 | **Materials** — TOML library, import/export, the twelve preloaded materials | values sourced and cited |
-| 5 | **Mesh & strength** — contact ratio, efficiency, Hofer bending, Hertz, S-N, face width | invariant tests in §9.3 |
-| 6 | **Spur stage** — accordion, train accumulation, torque/cycle propagation | a two-stage train computes end to end |
-| 7 | **Worm stage** — screw-gear model, lead angle, self-locking, axial backlash | self-locking threshold matches the closed form |
-| 8 | **Ring gear geometry** — internal profile, shaper trochoid, interference checks | own rack-equivalent validation |
-| 9 | **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency | common centre distance to 1e-12; all six drive modes |
-| 10 | **Crossed-axis spur** — reuse `screw.rs`, point-contact Hertz | Q2 revisited with the worm model in hand |
-| 11 | **Polish** — train import/export, confirmations, error surfacing, docs | — |
+| 3 | ✅ **Gear Calculator UI** — sidebar, tabs, parameter grid, canvas viewport, DXF export | **met** — the UI's own request path produces a DXF `ezdxf` reads back with the right geometry |
+| 4 | ⬜ **Materials** — TOML library, import/export, the twelve preloaded materials | values sourced and cited |
+| 5 | 🟡 **Mesh & strength** — contact path ✅, bending ✅; remaining: efficiency, Hertz, S-N, face width | bending met — both constructions converge to their own closed-form rack limits |
+| 6 | ⬜ **Spur stage** — accordion, train accumulation, torque/cycle propagation | a two-stage train computes end to end |
+| 7 | ⬜ **Worm stage** — screw-gear model, lead angle, self-locking, axial backlash | self-locking threshold matches the closed form |
+| 8 | ⬜ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | own rack-equivalent validation |
+| 9 | ⬜ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency | common centre distance to 1e-12; all six drive modes |
+| 10 | ⬜ **Crossed-axis spur** — reuse `screw.rs`, point-contact Hertz | Q2 revisited with the worm model in hand |
+| 11 | ⬜ **Polish** — train import/export, confirmations, error surfacing, docs | — |
 
 Milestones 1–3 de-risk everything else: they prove the geometry is right, the
 mathematics is testable in Rust, and the wasm-to-Svelte pipeline works. I would
@@ -1378,6 +1368,42 @@ state, so adding them later is additive.
 
 ---
 
+---
+
+## 12. Corrections made during implementation
+
+Every one of these was a claim in an earlier revision of this document that
+turned out to be wrong. They are recorded rather than quietly edited, because
+the pattern is more useful than any single entry: **the errors that survived
+longest were the ones that looked reasonable and were never checked against
+something independent.**
+
+| § | What was wrong | How it surfaced |
+|---|---|---|
+| 4.3 | Working depth modelled as a constraint on the form radius | Would not reproduce the classical z=17 result; the correct reading substitutes `h_w` for `h_f` in the cutter-depth term |
+| 4.5 | Approach and recess lengths each subtracted `a_w sin α_w` | Both came out **negative**; each must subtract its own gear's `r′ sin α_w`, and only their sum uses `a_w` |
+| 4.6.1 | "The standard scale's grade 4 is tighter than the fine scale's grade 0" | False — 7 against 6.3. The argument it supported (non-monotonic merged ladder) survives and is now stated from the transcribed data |
+| 4.6.1 | JGMA diameter bands stored half-open as printed | Left a **gap**: a gear of exactly 12.00 mm got no tolerance at all |
+| 4.7 | 30° tangent treated as the model rather than an approximation | Its tangents miss the load point by 11.8% at z=9; the Lewis parabola is the construction the cantilever model implies |
+| 4.7 | Parabola tangency searched on the fillet only | No solution at all above z≈150 — on large teeth it touches the **flank** |
+| 4.7 | ISO `Y_S` applied to a flank tangency | **17% discontinuity** at z=150→151 while `Y_F` moved 0.03%; the correction is a notch factor and there is no notch there |
+| 4.7 | "Rack-generated fillets keep `q_s` in range" | False at large z — 10.3 at z=300 with a sharp cutter |
+| 4.10 | Read as an axial taper (beveloid) | It is an *angular* variation; the beveloid treatment was withdrawn entirely |
+| 4.10 | "No changes to the generator" (beveloid reading) | Did not survive the correction above |
+| — | Involute inversion by series seed + Newton | **Diverges above ~60°**, inside the allowed pressure-angle range; needs safeguarding |
+
+Two process notes worth carrying forward:
+
+- **A green local test run does not imply a green build.** Twice, the working
+  tree held something a fresh checkout does not: a data file crane's source
+  filter stripped, and generated wasm bindings that are gitignored. Before
+  pushing anything that adds a generated or non-`.rs` file, delete the generated
+  directory and re-run the step that consumes it.
+- **Independent checks caught what assertions did not.** The rack limits, the
+  pin-tangency measurement against the generated flank, `ezdxf`, and the
+  continuity sweep each found something that self-consistent tests had passed.
+
+
 ## Appendix — verification log
 
 Everything marked **[verified]** was checked numerically before being written
@@ -1411,7 +1437,8 @@ here. Revision 2 additions are marked ★.
 | ✫ Minimax over indexing λ | λ = 0, 0.5, 1 | worse-direction error minimised at **λ = 0** (E2); λ = 0.5 gives 31/94 μm, λ = 1 gives 0/125 μm |
 | ✫ Both flanks uniform ⟹ uniform thickness | algebraic, two lines | exact; base tooth thickness spread is 339 μm at e = 0.25 mm, so the two are incompatible |
 
-★ revision 2, ☆ revision 3, ✦ revision 4, ✧ revision 5, ✪ revision 6, ✫ revision 7.
+The marks record which round of review each check came from; they are kept only
+so a claim can be traced to the work that produced it.
 
 **Not verified, and deliberately not quoted.** The mesh-phase coefficient of
 §4.10 — how far a commanded centre-distance change shifts the drive-flank phase.
@@ -1421,7 +1448,7 @@ The principle is not in doubt (the rack limit gives `δ tan α` per flank, which
 the §4.1 thickness relation), but no figure for it, and no optimal λ, appears in
 this document. Reproducing the backlash law is the gate any replacement must pass
 first.
-Revision 4's beveloid entries are withdrawn — the two `✦` rows are general facts
-about profile shift and remain valid. The `✧` rows remain valid as measurements
-of the physical hob process; revision 6 shows why that process must be corrected
-rather than modelled faithfully.
+The beveloid entries are withdrawn (§4.10 is an angular, not axial, variation);
+the two `✦` rows are general facts about profile shift and remain valid. The `✧`
+rows remain valid as measurements of the physical hob process — §4.10 explains
+why that process must be corrected rather than modelled faithfully.
