@@ -35,16 +35,17 @@ use crate::solve::{brent, Tol};
 pub enum CriticalSection {
     /// The ISO/AGMA 30° tangent (Hofer).
     ///
-    /// Simple, and **independent of where the load acts** — which is its
-    /// weakness as well as its convenience. It is an approximation to the
-    /// parabola below, and the two converge as the tooth count rises: at z=60
-    /// the 30° tangents cross the centreline within 0.04% of the load point, at
-    /// z=9 they cross 12% below it.
+    /// **Retained but not the default.** Kept because it is what ISO 6336 and
+    /// AGMA 2101 specify, so it is the setting to return to for a
+    /// standards-comparable number, and because
+    /// [`StressConcentration::Iso6336`] is a fit calibrated against *this*
+    /// construction.
     ///
-    /// The default, because [`StressConcentration::Iso6336`] is a fit
-    /// calibrated against *this* construction. Pairing that correction with the
-    /// parabola mixes conventions.
-    #[default]
+    /// Its weakness is that it is **independent of where the load acts**, which
+    /// is precisely the property the cantilever model is supposed to have. The
+    /// two constructions converge as teeth get larger — at z=60 the 30° tangents
+    /// cross the centreline within 0.04% of the load point — and diverge where
+    /// the geometry is worst, crossing 12% below it at z=9.
     TangentAngle,
     /// The Lewis inscribed parabola — the original construction.
     ///
@@ -58,6 +59,33 @@ pub enum CriticalSection {
     /// property the cantilever model is supposed to have. It is consistently
     /// more conservative: the tangency sits higher up the fillet, the section is
     /// narrower, and `Y_F` comes out 2–14% larger, most on undercut teeth.
+    ///
+    /// # Divergence from the standards
+    ///
+    /// This is **the default here and it is not what ISO 6336 or AGMA 2101
+    /// specify.** The reasons for diverging, and the reasons to be careful:
+    ///
+    /// - It is the original construction; the 30° tangent is a later
+    ///   simplification adopted for ease of calculation. This project computes
+    ///   the exact profile, so the simplification buys nothing.
+    /// - Experimental single-tooth-bending work reports measured critical
+    ///   locations *above* the 30° prediction, with that prediction at the edge
+    ///   of the observed range — the direction the parabola moves the section.
+    ///   (The authors note large test deformations may contribute, so this is
+    ///   support rather than proof.)
+    /// - It is the more conservative of the two, everywhere.
+    ///
+    /// Against that: it changes ranking very little — Spearman ρ = 0.993 against
+    /// the 30° tangent over 1521 designs, with identical gradient direction
+    /// wherever a parameter moves the answer by 1% or more — so the choice is
+    /// principled rather than consequential. And **`Y_S` is calibrated against
+    /// the 30° construction**, so pairing the two mixes conventions; where the
+    /// parabola leaves the fillet the pairing is refused outright, see
+    /// [`RootSection::stress_correction`].
+    ///
+    /// For a number to compare against a published ISO or AGMA rating, switch to
+    /// [`CriticalSection::TangentAngle`].
+    #[default]
     LewisParabola,
 }
 
@@ -517,7 +545,7 @@ mod tests {
             },
         ] {
             let g = Gear::new(p);
-            let sec = root_section(&g, g.u_tip).unwrap();
+            let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
             let (_, t) = fillet_point_and_tangent(&g, sec.s);
             let angle = (t[0].abs()).atan2(t[1].abs()).to_degrees();
             assert!(
@@ -619,7 +647,7 @@ mod tests {
             },
         ] {
             let g = Gear::new(p);
-            let sec = root_section(&g, g.u_tip).unwrap();
+            let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
             let d = sec.tangent_direction;
             assert!(
                 d[1] > 0.0,
@@ -663,7 +691,7 @@ mod tests {
                 root_radius,
                 ..Default::default()
             });
-            let sec = root_section(&g, g.u_tip).unwrap();
+            let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
             let ys = sec.stress_correction(StressConcentration::Iso6336).unwrap();
             assert!(
                 ys > last,
@@ -677,7 +705,7 @@ mod tests {
     #[test]
     fn notch_parameter_is_the_ratio_the_iso_fit_expects() {
         let g = Gear::new(GearParams::default());
-        let sec = root_section(&g, g.u_tip).unwrap();
+        let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
         let want = sec.root_chord / (2.0 * sec.fillet_curvature);
         assert!((sec.notch_parameter - want).abs() < 1e-12);
         assert!(
@@ -865,7 +893,7 @@ mod tests {
                     root_radius,
                     ..Default::default()
                 });
-                let sec = root_section(&g, g.u_tip).unwrap();
+                let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
                 assert!(
                     sec.notch_parameter_in_range(),
                     "z={teeth} rho={root_radius}: q_s = {} left the stated range",
@@ -888,7 +916,7 @@ mod tests {
             root_radius: 0.05,
             ..Default::default()
         });
-        let sec = root_section(&g, g.u_tip).unwrap();
+        let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
         assert!(
             sec.notch_parameter > NOTCH_PARAMETER_RANGE.end,
             "expected q_s past the range, got {}",

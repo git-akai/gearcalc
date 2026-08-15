@@ -1,6 +1,6 @@
 # Gear & geartrain design tool — architecture and mathematics
 
-Status: **proposal, revision 9.** Incorporates the answers to Q1–Q7, the JGMA
+Status: **proposal, revision 10.** Incorporates the answers to Q1–Q7, the JGMA
 116-02 tables now in `docs/`, the change of GUI target to Svelte/TypeScript, the
 JGMA / units decisions, and the planned angularly varying profile shift for
 eccentric motion at constant ratio with a commanded centre distance. No
@@ -10,6 +10,14 @@ Conventions: angles in **degrees at the UI boundary, radians everywhere
 inside**; lengths in mm; `m` is the **normal** module unless subscripted `m_t`;
 subscript `n` = normal plane, `t` = transverse. This follows the prior work in
 `handoff_inbound/`.
+
+**Changes in revision 10:**
+
+| § | Change |
+|---|---|
+| 4.5 | **Correction.** The approach and recess lengths were both written with `a_w sin α_w`; each must subtract its own gear's `r′ sin α_w`. As written both came out negative. Only their sum uses `a_w`. |
+| 4.7 | Critical section defaults to the **Lewis parabola**, a deliberate divergence from ISO/AGMA; the 30° tangent is retained for standards-comparable numbers. Stress correction stays switchable and is **refused** where the parabola leaves the fillet. |
+| 4.7 | Load cases measured: HPSTC is **27–32% below** tip-worst-case, and load sharing adds only a further 0.0–0.2% because the governing point *is* the HPSTC once sharing applies. |
 
 **Changes in revision 9:**
 
@@ -422,11 +430,17 @@ radians, combined with the centre-distance term above.
 **Path of contact** (external), from the pitch point:
 
 ```
-ξ_recess   = √(r_a1² − r_b1²) − a_w sin α_w
-ξ_approach = √(r_a2² − r_b2²) − a_w sin α_w
+ξ_recess   = √(r_a1² − r_b1²) − r′₁ sin α_w
+ξ_approach = √(r_a2² − r_b2²) − r′₂ sin α_w
 ε_α = (ξ_approach + ξ_recess)/p_bt,     p_bt = π m_t cos α_t
 ε_β = b sin β / (π m)
 ```
+
+*(Corrected in revision 10: revision 1 wrote `a_w sin α_w` in **both** lines.
+Each length is measured from the pitch point, so each subtracts its own gear's
+share `r′ sin α_w`. Only the sum uses `a_w`, since `r′₁ + r′₂ = a_w` — which is
+why the familiar contact-ratio formula contains `a_w` and these do not. As
+written, both lengths came out negative.)*
 
 Internal: `ε_α = [√(r_a1²−r_b1²) − √(r_a2²−r_b2²) + a_w sin α_w]/p_bt`.
 
@@ -664,28 +678,62 @@ did in fact exhibit before the images were checked).
 ### 4.7 Strength
 
 **Bending.** The spec asks for a new Lewis-type formula accounting for undercut,
-profile shift and thickness modification. I want to argue for a different framing:
+profile shift and thickness modification. The framing that replaced it: *stop
+using a table of form factors and measure the form factor off the profile we
+already generate exactly.* Undercut, profile shift and thickness modification are
+then handled because they change the profile, and we measured the profile.
 
-> We do not need a new formula. We need to stop using a *table* of form factors
-> and instead **measure the form factor off the profile we already generate
-> exactly.**
+**Critical section — the Lewis parabola, by default.** A cantilever whose outline
+is a parabola with its vertex at the load carries uniform bending stress, so the
+largest such parabola inscribed in the tooth touches where the real tooth is
+weakest. This **diverges from ISO 6336 and AGMA 2101**, which specify a fixed 30°
+tangent. The reasons, and the caveats, in one place:
 
-Lewis factors are tabulated because historically nobody could compute the real
-root geometry. We can. So:
+- The 30° tangent is *independent of where the load acts* — the one property the
+  cantilever model is meant to have. Its tangents cross the centreline 11.8%
+  below the load point at z=9 and 0.04% above it at z=60.
+- Experimental single-tooth-bending work reports measured critical locations
+  *above* the 30° prediction, with that prediction at the edge of the observed
+  range — the direction the parabola moves it. The authors attribute part of the
+  divergence to large test deformations, so this is support, not proof.
+- It is the more conservative construction everywhere: +2.9% to +13.7% on `Y_F`.
+- It changes rankings very little (Spearman ρ = 0.993 over 1521 designs), so the
+  choice is principled rather than consequential.
+- **`Y_S` is calibrated against the 30° construction.** Where the parabola leaves
+  the fillet the pairing is *refused* rather than approximated — see below.
 
-1. Locate the critical section by the **30° tangent method** (Hofer) — the point
-   on the fillet whose tangent makes 30° to the tooth centreline. On our
-   parametric trochoid this is a monotone 1-D solve with an analytic derivative.
-2. Read `s_Fn` (chord thickness) and `h_Fe` (moment arm) **directly from the
-   geometry**.
-3. Apply the load at the outer point of single-pair contact (closed form from
-   §4.5), not the tip.
-4. `σ_F = (F_t/(b m)) Y_F Y_S Y_β`, with
-   `Y_F = 6 (h_Fe/m) cos α_Fen / [(s_Fn/m)² cos α_n]`.
+`CriticalSection::TangentAngle` is retained, unused by default, for a number
+comparable with a published ISO or AGMA rating.
 
-Undercut, profile shift and thickness modification are handled **because they
-change the profile, and we measured the profile**. No special cases, and it
-extends to any future geometry change for free.
+**Stress correction — switchable, and sometimes undefined.** `Y_S` is the ISO
+6336 fit, chosen over Dolan–Broghamer because it is written in the geometry we
+already measure (`s_Fn`, `h_Fe`, `ρ_F`) rather than indexed by tooth count and
+shift. `StressConcentration::None` reports the form factor alone, which is what
+separates a geometry error from an over-fitted correction.
+
+The notch parameter `q_s` is **clamped into the fit's stated range and reported
+raw**. The direction matters: `Y_S` rises with `q_s`, so clamping a
+sharper-than-stated notch under-predicts stress. `q_s` leaves the range in
+practice — 10.3 at z=300 with a 0.05-module cutter — so this is a live case, not
+a guard.
+
+Where the parabola's tangency lands on the flank there is no notch, so `ρ_F` has
+no meaning and the ISO correction returns nothing. Evaluating it anyway produced
+a **17% discontinuity** at z=150→151 while `Y_F` moved 0.03%.
+
+**Load point.** Three cases, measured over ordinary meshes:
+
+| | case | vs worst case |
+|---|---|---|
+| a | tip load, tooth carrying everything | — |
+| b | highest point of single-pair contact | **−27% to −32%** |
+| c | worst point of the cycle with load sharing | −27% to −33% |
+
+The result that decides the design: **(c) adds only 0.0–0.2% over (b)**, because
+once sharing is allowed the governing point *is* the HPSTC — at the tip the tooth
+carries about a third of the load, so tip loading stops governing. The expensive
+part of (c), a calibrated mesh-stiffness model, buys almost nothing for a
+worst-case number.
 
 One honest exception: `Y_S`, the root stress-concentration factor, is the
 Dolan–Broghamer empirical fit — genuinely fitted constants from photoelastic

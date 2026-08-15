@@ -15,6 +15,7 @@
 //! let outline = g.profile(400);        // closed cross-section, CCW
 //! ```
 
+pub mod contact;
 pub mod involute;
 pub mod jgma;
 pub mod mesh;

@@ -19,6 +19,7 @@ fn main() {
         Some("dump") => dump(),
         Some("bending") => bending_report(),
         Some("matrix") => matrix_report(),
+        Some("loadcase") => loadcase_report(),
         Some("dxf") => dxf(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.0),
@@ -345,4 +346,83 @@ fn matrix_report() {
         worst.1.root_radius,
         worst.1.pressure_angle
     );
+}
+
+/// Compare the three load cases on a few ordinary meshes.
+///
+/// (a) worst case  -- load at the tip, this tooth carrying everything
+/// (b) HPSTC       -- load at the highest point of single-pair contact
+/// (c) shared      -- worst point of the mesh cycle with load sharing applied
+fn loadcase_report() {
+    use gear_core::contact::{ContactPath, LoadSharing};
+    use gear_core::mesh::{Mesh, MeshKind};
+    use gear_core::strength::{root_section, StressConcentration};
+
+    let meshes = [
+        ("pinion 17 : 17", 17u32, 17u32, 0.0_f64),
+        ("pinion 17 : 43", 17, 43, 0.0),
+        ("pinion 13 : 60", 13, 60, 0.0),
+        ("pinion 25 : 25", 25, 25, 0.0),
+        ("pinion 12 : 30, x=+0.4", 12, 30, 0.4),
+        ("pinion 20 : 20, x=-0.2", 20, 20, -0.2),
+    ];
+
+    println!(
+        "{:<24} {:>6} {:>9} {:>9} {:>9} {:>8} {:>8}",
+        "mesh", "eps", "(a) tip", "(b) HPSTC", "(c) shared", "b vs a", "c vs a"
+    );
+
+    for (name, z1, z2, x) in meshes {
+        let p1 = GearParams {
+            teeth: z1,
+            profile_shift: x,
+            ..Default::default()
+        };
+        let p2 = GearParams {
+            teeth: z2,
+            profile_shift: -x,
+            ..Default::default()
+        };
+        let (g1, g2) = (Gear::new(p1), Gear::new(p2));
+        let Ok(m) = Mesh::new(&g1, &g2, MeshKind::External) else {
+            println!("{name}: mesh failed");
+            continue;
+        };
+        let Some(path) = ContactPath::new(&g1, &g2, &m) else {
+            println!("{name}: path failed");
+            continue;
+        };
+
+        // The bending factor is proportional to stress for a fixed torque, so
+        // ratios of (factor x load fraction) are ratios of stress.
+        let factor = |roll: f64| {
+            root_section(&g1, roll).and_then(|s| s.bending_factor(StressConcentration::Iso6336))
+        };
+
+        let Some(a) = factor(path.roll_at(path.tip())) else {
+            println!("{name}: tip factor failed");
+            continue;
+        };
+        let Some(b) = factor(path.roll_at(path.highest_single_pair())) else {
+            println!("{name}: hpstc factor failed");
+            continue;
+        };
+
+        // (c): the worst point of the whole cycle once sharing is applied.
+        let mut c = 0.0_f64;
+        for i in 0..=400 {
+            let t = f64::from(i) / 400.0;
+            let xi = -path.approach + t * (path.approach + path.recess);
+            if let Some(f) = factor(path.roll_at(xi)) {
+                c = c.max(f * path.load_fraction(xi, LoadSharing::LinearRamp));
+            }
+        }
+
+        println!(
+            "{name:<24} {:>6.3} {a:>9.4} {b:>9.4} {c:>9.4} {:>7.1}% {:>7.1}%",
+            path.contact_ratio,
+            100.0 * (b - a) / a,
+            100.0 * (c - a) / a
+        );
+    }
 }
