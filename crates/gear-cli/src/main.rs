@@ -7,6 +7,8 @@
 //! gear-cli sweep              scan a parameter grid for clamps and undercut
 //! ```
 
+mod diagram;
+
 use gear_core::{Gear, GearParams};
 
 fn main() {
@@ -14,6 +16,7 @@ fn main() {
     match args.first().map(String::as_str) {
         Some("sweep") => sweep(),
         Some("dump") => dump(),
+        Some("bending") => bending_report(),
         Some("dxf") => dxf(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.0),
@@ -211,4 +214,43 @@ fn dxf(teeth: u32, x: f64, tol: f64) {
             }
         )
     );
+}
+
+/// Emit an HTML page showing the bending construction, for visual checking.
+fn bending_report() {
+    let cases = [
+        (9u32, 0.0),
+        (13, 0.0),
+        (17, 0.0),
+        (17, 0.5),
+        (30, 0.0),
+        (60, 0.0),
+        (12, -0.3),
+        (12, 0.4),
+    ];
+    println!("<h2>The construction, tooth by tooth</h2>");
+    println!(
+        "<p class=\"lede\">Load at the tooth tip. \
+        Grey dashed: tip, pitch, base and root circles. \
+        <span class=\"k tangent\">Amber</span>: the 30° tangents and their tangency points. \
+        <span class=\"k chord\">Red</span>: the critical section chord s_Fn. \
+        <span class=\"k loadline\">Blue</span>: the load line, from the contact point to the \
+        centreline. <span class=\"k arm\">Green</span>: the moment arm h_Fe.</p>"
+    );
+    println!("<div class=\"grid\">");
+    for (teeth, profile_shift) in cases {
+        let p = GearParams {
+            teeth,
+            profile_shift,
+            ..Default::default()
+        };
+        println!("<figure>{}", diagram::tooth_diagram(p, 210.0));
+        println!(
+            "<figcaption>{}</figcaption></figure>",
+            diagram::tooth_caption(p)
+        );
+    }
+    println!("</div>");
+    println!("<h2>Form factor against tooth count</h2>");
+    println!("{}", diagram::form_factor_chart(660.0, 380.0));
 }
