@@ -17,13 +17,13 @@ subscript `n` = normal plane, `t` = transverse.
 | Primitives | safeguarded `inv⁻¹`, Brent, bracketed Newton | textbook special cases |
 | Mesh | centre distance, exact backlash, contact path | direct tooth-thickness computation |
 | Metrology | span, over-pins, cutter tip width, JGMA tables | independent pin-tangency check |
-| Strength | critical section, form factor, bending stress, Hertz, face width | closed-form rack limits; the contact-half-width route |
+| Strength | critical section, form factor, bending stress, Hertz, face width, helical | closed-form rack limits; the contact-half-width route; plane-change identities |
 | Efficiency | parallel-axis mesh loss from sliding along the path | numerical average of the instantaneous loss |
 | Materials | eight-material library, per-value provenance, TOML round-trip | primary datasheets; cross-family consistency laws |
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-125 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+130 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -32,7 +32,8 @@ nix develop                       # or `direnv allow` once
 cargo nextest run                 # the suite
 cargo run --bin gear-cli -- show 17 0.2      # drive the maths, no browser
 cargo run --bin gear-cli -- materials        # the library, with each value's basis
-cargo run --bin gear-cli -- strength 17 43 2.0   # a worked mesh, end to end
+cargo run --bin gear-cli -- strength 17 43 2.0        # a worked mesh, end to end
+cargo run --bin gear-cli -- strength 17 43 2.0 '4340 Hardened Steel' 20  # helical
 cargo run --release --bin gear-cli -- bending   # the bending verification sheet
 cd web && npm run dev             # the application
 ```
@@ -775,6 +776,54 @@ with the labelling. Checking only the inner one made the contact stress of one
 physical mesh depend on which gear the caller called 1. **Both boundaries are
 now evaluated**, and a test asserts that swapping the labels leaves the answer
 unchanged.
+
+**The load is stored as torque, not as a force.** Every force in a mesh is a
+projection, and a projection means nothing until you say of what, onto which
+plane, at which radius. There are four in play and they differ by `cos α_t`,
+`cos α_w` and `cos β_b`:
+
+```
+F_t  = 2000 T / d       tangential at the reference cylinder
+       2000 T / d'      tangential at the operating cylinder
+F_bt = T / r_b          along the transverse line of action
+F_bn = F_bt / cos β_b   normal to the tooth flank
+```
+
+Storing any one of them bakes a choice of plane and radius into a bare number
+that no longer records which it made. Torque does not: it is a property of the
+shaft, invariant under every redefinition of a radius, and it is what the
+specification takes in and reports out. Each projection is therefore spelled out
+at its point of use. `F_bt` is the one quantity **both gears share** — action and
+reaction along the line of action — which is why contact stress is built on it,
+and `Load::across_mesh` re-quotes a load against the mate by `T₂ = T₁ r_b2/r_b1`.
+
+*(Corrected — an earlier revision stored `F_bt` in a field called `normal_force`.
+Nothing it computed was wrong, but the name asserted the normal plane while the
+value was transverse, which is the exact failure this arrangement forecloses.)*
+
+**Helical: three plane changes, and they nearly cancel.** For contact,
+
+```
+ρ_n  = ρ_t / cos β_b        curvature is seen in the normal plane
+F_bn = F_bt / cos β_b       the flank force, not its transverse projection
+L    = b / cos β_b          one contact line, inclined across the face
+```
+
+which collapses to `σ_H = √((F_bt/b)·cos β_b/ρ_t·E*/π)` — a helical mesh comes
+out below the same transverse geometry by exactly `√(cos β_b)`, 3 % at β = 20°.
+That is pure geometry and owes nothing to load sharing. The *extra* benefit of
+several contact lines being engaged at once **is** load sharing and stays
+deferred; assuming a single line is the conservative reading and is continuous
+with the spur case at β = 0.
+
+For bending, a helical tooth bends as its **normal** section, so the form factor
+is measured on the ISO virtual spur gear, `z_n = z/cos³β` at module `m_n` and
+pressure angle `α_n`. This needs no new geometry: the existing generator produces
+it, since the tooth form is a continuous function of `z` and only the *fractional*
+count is new (`Gear::z`). Measuring the transverse section and dividing by `m_n`
+mixes planes and under-predicts by about `cos β`. **`Y_β` is not applied** — ISO's
+helix factor is an empirical fit, and omitting it leaves `Y_β = 1`, which
+over-predicts stress; conservative, and no fitted constant enters.
 
 **Minimum face width — closed form, no iteration.** Since `σ_F ∝ 1/b` and
 `σ_H ∝ 1/√b`:
@@ -1524,6 +1573,9 @@ something independent.**
 | 4.7 | "Rack-generated fillets keep `q_s` in range" | False at large z — 10.3 at z=300 with a sharp cutter |
 | 4.5 | Mesh efficiency without the `/ε_α` | Implicitly let every engaged pair carry the full load, so the mesh transmitted `ε_α F_n` and the loss came out too large by exactly the contact ratio. Caught by a numerical average of the instantaneous loss |
 | 4.7 | Hertz checked at "the inner point of single-pair contact (usually the pinion's worst case)" | Label-dependent: the relative-radius peak moves to the other side when gear 1 is the wheel, so one physical mesh gave two answers. Both boundaries are now checked |
+| 4.7 | `Load` stored a force in a field named `normal_force` | The value was the **transverse** `F_bt = T/r_b` while the name asserted the normal plane. Numerically right for spur, but the name would have survived a refactor its meaning did not. Now stores torque, with each projection named at its point of use |
+| 4.7 | Helical contact used the transverse force, face width and curvature throughout | Three separate `cos β_b` factors were missing. They nearly cancel — the net is `√(cos β_b)` — so the error was small but the model was wrong in three places at once rather than right |
+| 4.7 | Helical bending measured `Y_F` on the transverse section and divided by `m_n` | Mixes planes; under-predicts by about `cos β` (6 % at 20°, 13 % at 30°). Now measured on the ISO virtual spur gear `z_n = z/cos³β` |
 | 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
 | 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
 | 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |
@@ -1588,6 +1640,12 @@ here. Revision 2 additions are marked ★.
 | ✦ `b_min` independent of `b` | face widths 1, 5, 12.5, 100 mm, bending and contact | identical to 1e-9 — the check that catches a stress not scaling with `b` |
 | ✦ `σ_H ∝ √E*` | steel `E*` = 103 723 MPa vs polymer 1 700 MPa | ratio matches `√(E*₁/E*₂)` to 1e-9 |
 | ✦ `σ_H` independent of gear labelling | five meshes including 43/17 and 60/13, labels swapped | identical to 1e-12; caught the inner-boundary-only defect above |
+| ✧ Force projections mutually consistent | β = 0, 15, 30°: `F_t`, `F_bt`, `F_bn` against each other | exact; `F_bn = F_bt` only at β = 0 |
+| ✧ `F_bt` shared across a mesh | `Load::across_mesh`, three ratios | unchanged to 1e-9; torque scales as `z₂/z₁`, round trip exact |
+| ✧ Virtual spur gear | β = 10…45° | `z_n = z/cos³β` to 1e-12, `α_t = α_n`, `m_t = m_n`, β = 0; identity for a spur gear |
+| ✧ Normal vs transverse section | β = 0, 15, 30° | identical at β = 0, diverging monotonically thereafter — the helical bending error |
+| ✧ Helical `σ_H` ratio | β = 10, 20, 30° against the same mesh without the plane change | exactly `√(cos β_b)` to 1e-12 |
+| ✧ Spur results unchanged by the refactor | `gear-cli strength 17 43 2.0` | bit-identical: `σ_F` 69.2/63.4, `σ_H` 692.7, ρ 1.723 |
 | ✦ `σ_F` composition vs. §4.7's load-case table | z = 17/43 at HPSTC, `Y_F · Y_S` | 2.9415 against the recorded 2.9416 |
 
 The marks record which round of review each check came from; they are kept only

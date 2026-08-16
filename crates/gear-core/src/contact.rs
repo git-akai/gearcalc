@@ -186,6 +186,19 @@ impl ContactPath {
 /// **`μ` is a mesh input, not a material property.** It depends on lubrication,
 /// speed, finish and temperature at least as much as on the pair of materials,
 /// and no defensible per-pair table was available.
+///
+/// # Helical gears: this is the transverse figure
+///
+/// The average above is taken over the **transverse** path of contact, so `ε_α`
+/// here is the transverse contact ratio. A helical mesh also slides along the
+/// tooth, and the usual correction replaces `ε_α` with the total contact ratio
+/// `ε_γ = ε_α + ε_β`. That is not applied, for two reasons: `ε_β = b sin β / π m`
+/// needs a face width, which a path of contact does not have, and DESIGN.md §4.5
+/// records the substitution as standard but **approximate** rather than derived.
+///
+/// The direction of the error is knowable: `ε_γ > ε_α`, and the loss goes as
+/// `1/ε_α`, so ignoring the overlap **over**-states the loss. A helical mesh is
+/// at least as efficient as this reports.
 #[must_use]
 pub fn efficiency(path: &ContactPath, mesh: &Mesh, friction: f64) -> f64 {
     let e1 = path.approach / path.base_pitch;

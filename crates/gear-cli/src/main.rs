@@ -6,7 +6,7 @@
 //! gear-cli show   [z] [x]     print the derived geometry of one gear
 //! gear-cli sweep              scan a parameter grid for clamps and undercut
 //! gear-cli materials          the material library, with each value's basis
-//! gear-cli strength [z1] [z2] [torque] [material]
+//! gear-cli strength [z1] [z2] [torque] [material] [helix]
 //!                             a worked mesh: bending, contact, efficiency
 //! ```
 
@@ -29,6 +29,7 @@ fn main() {
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(43),
             args.get(3).and_then(|s| s.parse().ok()).unwrap_or(2.0),
             args.get(4).map_or("4340 Hardened Steel", String::as_str),
+            args.get(5).and_then(|s| s.parse().ok()).unwrap_or(0.0),
         ),
         Some("dxf") => dxf(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
@@ -59,13 +60,14 @@ fn main() {
 /// actually consumes the material library. Both gears are rated, because the
 /// pinion is not automatically the worse one — it sees the higher contact
 /// stress but the wheel may have the weaker root.
-fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str) {
+fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f64) {
     use gear_core::contact::{efficiency, ContactPath};
     use gear_core::material::contact_modulus;
     use gear_core::mesh::{Mesh, MeshKind};
+    use gear_core::metrology::base_helix_angle;
     use gear_core::strength::{
-        bending_stress, contact_stress, min_face_width_bending, min_face_width_contact,
-        root_section, Load, StressConcentration,
+        bending_section, bending_stress, contact_stress, min_face_width_bending,
+        min_face_width_contact, Load, StressConcentration,
     };
 
     let lib = gear_io::default_library();
@@ -74,12 +76,15 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str) {
         return;
     };
 
+    // Meshing helical gears have equal and opposite hands.
     let g1 = Gear::new(GearParams {
         teeth: z1,
+        helix_angle: helix,
         ..Default::default()
     });
     let g2 = Gear::new(GearParams {
         teeth: z2,
+        helix_angle: -helix,
         ..Default::default()
     });
     let Ok(mesh) = Mesh::new(&g1, &g2, MeshKind::External) else {
@@ -94,7 +99,7 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str) {
     // A face width to evaluate at. Any value does: the minimum face widths
     // below are independent of it, which is asserted in the test suite.
     const B: f64 = 10.0;
-    let load = Load::from_torque(&g1, torque, B);
+    let load = Load::new(torque, B);
 
     println!(
         "mesh   z {z1}/{z2}  module {}  a_w {:.4} mm",
@@ -105,9 +110,17 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str) {
         mesh.alpha_w.to_degrees(),
         path.contact_ratio
     );
+    if helix != 0.0 {
+        println!(
+            "helix  beta {helix} deg  base helix beta_b {:.3} deg  virtual teeth {:.2}/{:.2}",
+            base_helix_angle(&g1).to_degrees(),
+            g1.virtual_spur().z,
+            g2.virtual_spur().z
+        );
+    }
     println!(
         "load   {torque} Nm on gear 1  ->  F_n {:.1} N along the line of action",
-        load.normal_force
+        load.transverse_line_of_action(&g1)
     );
     println!(
         "       F_t {:.1} N at the reference circle,  face width {B} mm",
@@ -150,11 +163,11 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str) {
             println!("  {label:<6} no contact path");
             continue;
         };
-        let Some(sec) = root_section(g, p.roll_at(p.highest_single_pair())) else {
+        let Some(sec) = bending_section(g, p.roll_at(p.highest_single_pair())) else {
             println!("  {label:<6} no root section (severed tooth?)");
             continue;
         };
-        let load_g = Load::from_torque(g, load.torque(g), B);
+        let load_g = load.across_mesh(&g1, g);
         let ys = sec.stress_correction(StressConcentration::Iso6336);
         let Some(sf) = bending_stress(&sec, g, &load_g, StressConcentration::Iso6336) else {
             println!(
@@ -182,7 +195,7 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str) {
 
     // --- contact, shared by the pair
     let e_star = contact_modulus(mat, mat);
-    if let Some(cs) = contact_stress(&path, &mesh, &load, e_star) {
+    if let Some(cs) = contact_stress(&path, &mesh, &g1, &load, e_star) {
         println!("\ncontact   E* {e_star:.0} MPa (like on like)");
         println!("  at the pitch point        {:>7.1} MPa", cs.at_pitch_point);
         println!(

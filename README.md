@@ -50,6 +50,7 @@ cargo run --bin gear-cli -- show 17 0.2   # derived geometry for z=17, x=+0.2
 cargo run --bin gear-cli -- sweep         # scan a grid for undercut and clamps
 cargo run --bin gear-cli -- materials     # the material library and its provenance
 cargo run --bin gear-cli -- strength 17 43 2.0   # a worked mesh: bending, contact, efficiency
+cargo run --bin gear-cli -- strength 17 43 2.0 '4340 Hardened Steel' 20   # the same, helical
 cargo run --release --bin gear-cli -- verify 100   # two-sided cutter check
 ```
 

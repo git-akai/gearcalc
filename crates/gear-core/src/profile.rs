@@ -126,6 +126,13 @@ pub struct Gear {
     pub theta0: f64,
     /// Half the angular pitch, `π/z`.
     pub half_pitch: f64,
+    /// Tooth count used for the tooth **form**.
+    ///
+    /// Normally `params.teeth`. For a virtual spur gear built by
+    /// [`Gear::virtual_spur`] it is the fractional ISO count `z / cos³β`, which
+    /// is why it is an `f64` while `params.teeth` stays a whole number — a real
+    /// gear has an integer tooth count, a virtual one need not.
+    pub z: f64,
     /// True when undercut has removed the tooth entirely (DESIGN.md; the
     /// profile is truncated at the centreline so it stays a simple closed curve).
     pub severed: bool,
@@ -147,11 +154,49 @@ impl Gear {
         Self::build(params, true)
     }
 
-    #[allow(clippy::too_many_lines)]
+    /// The **virtual spur gear**: this gear's tooth form seen in the normal
+    /// plane.
+    ///
+    /// A helical tooth bends as its *normal* section, not its transverse one.
+    /// ISO 6336-3 handles that by rating an equivalent spur gear with
+    ///
+    /// ```text
+    /// z_n = z / cos³β        module m_n, pressure angle α_n, same shift
+    /// ```
+    ///
+    /// where one power of `cos β` comes from the section being taken obliquely
+    /// and two from the radius of curvature of the pitch ellipse that section
+    /// cuts. For a spur gear `β = 0` and this returns the gear unchanged, so
+    /// callers need no special case.
+    ///
+    /// The count is fractional, which is exactly why [`Gear::z`] exists. Nothing
+    /// else in the construction cares: the tooth *form* is a continuous function
+    /// of `z`. What is **not** meaningful on the result is [`Gear::profile`],
+    /// which replicates a whole number of teeth around a real gear — this object
+    /// exists to be measured, not drawn.
+    #[must_use]
+    pub fn virtual_spur(&self) -> Self {
+        let beta = self.params.helix_angle.to_radians();
+        if beta == 0.0 {
+            return self.clone();
+        }
+        let params = GearParams {
+            helix_angle: 0.0,
+            pressure_angle: self.alpha_n.to_degrees(),
+            ..self.params
+        };
+        Self::build_with_z(params, false, self.z / beta.cos().powi(3))
+    }
+
     fn build(params: GearParams, legacy_clamp: bool) -> Self {
+        let z = f64::from(params.teeth);
+        Self::build_with_z(params, legacy_clamp, z)
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn build_with_z(params: GearParams, legacy_clamp: bool, z: f64) -> Self {
         let mut clamps = Clamps::default();
         let m = params.module;
-        let z = f64::from(params.teeth);
         let x = params.profile_shift;
 
         // ---- pressure angle, guarded -----------------------------------
@@ -277,6 +322,7 @@ impl Gear {
             r_j: 0.0,
             theta0: ac / r,
             half_pitch: std::f64::consts::PI / z,
+            z,
             severed: false,
         };
 
@@ -510,6 +556,15 @@ impl Gear {
         r_full.extend_from_slice(&r[1..]);
         th_full.extend_from_slice(&th[1..]);
 
+        // A virtual spur gear has a fractional tooth count and exists only to be
+        // measured; replicating it `params.teeth` times would draw a shape whose
+        // teeth do not close. Catch that in development rather than emitting a
+        // plausible-looking wrong outline.
+        debug_assert!(
+            (self.z - f64::from(self.params.teeth)).abs() < 1e-12,
+            "profile() called on a virtual gear (z = {}); it exists to be measured, not drawn",
+            self.z
+        );
         let z = self.params.teeth;
         let mut out = Vec::with_capacity(r_full.len() * z as usize + 1);
         for k in 0..z {

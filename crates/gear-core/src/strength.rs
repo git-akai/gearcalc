@@ -26,6 +26,7 @@
 
 use crate::contact::ContactPath;
 use crate::mesh::{Mesh, MeshKind};
+use crate::metrology::base_helix_angle;
 use crate::profile::Gear;
 use crate::solve::{brent, Tol};
 
@@ -505,59 +506,101 @@ impl RootSection {
 
 // ------------------------------------------------------------------ load ---
 
-/// What a mesh is carrying.
+/// What a gear is carrying.
 ///
-/// # Why the load is stored as the normal force
+/// # Why this stores torque and not a force
 ///
-/// A torque can be turned into a tangential force at the reference pitch
-/// circle, at the operating pitch circle, or anywhere else, and the three
-/// differ — which is a reliable source of quiet factor-of-`cos α` errors.
-///
-/// The force along the **line of action** has no such ambiguity. Power crosses
-/// an involute mesh along the common tangent to the base circles, so the exact
-/// lever arm is the *base* radius:
+/// Every force in a gear mesh is a projection, and a projection is only defined
+/// once you say *of what, onto which plane, at which radius*. There are at least
+/// four in play here and they differ by factors of `cos α_t`, `cos α_w` and
+/// `cos β_b`:
 ///
 /// ```text
-/// T = F_n · r_b        (exact, not a convention)
+/// F_t   = 2000 T / d      tangential at the REFERENCE cylinder
+///         2000 T / d'     tangential at the OPERATING cylinder
+/// F_bt  = T / r_b         along the transverse line of action
+/// F_bn  = F_bt / cos β_b  normal to the tooth flank
 /// ```
 ///
-/// Every other force follows from it by projection — `F_t = F_n cos α_t` at the
-/// reference circle, `F_n cos α_w` at the operating circle — so storing `F_n`
-/// makes each conversion explicit at the point of use.
+/// Storing any one of them bakes a choice of radius and plane into a bare `f64`
+/// that no longer says which it made. Torque does not: it is a property of the
+/// shaft, invariant under every redefinition of a radius, and it is what the
+/// specification takes as input and reports as output. So torque is what is
+/// stored, and each projection is spelled out at the point of use, where the
+/// plane it belongs to is visible.
+///
+/// An earlier revision stored `F_bt` under the name `normal_force`. Nothing it
+/// computed was wrong, but the name asserted the normal plane while the value
+/// was transverse — exactly the failure this arrangement is meant to make
+/// impossible. See DESIGN.md §12.
+///
+/// # Sign and reference
+///
+/// A `Load` is quoted **against a particular gear**, since `T₁ ≠ T₂` across a
+/// mesh. The accessors take that gear explicitly rather than assuming it. What
+/// *is* shared by both gears is `F_bt`, by action and reaction — see
+/// [`Load::transverse_line_of_action`].
 #[derive(Clone, Copy, Debug)]
 pub struct Load {
-    /// Force along the line of action, N.
-    pub normal_force: f64,
+    /// Torque on the gear this load is quoted against, N·m.
+    pub torque: f64,
     /// Face width, mm.
     pub face_width: f64,
 }
 
 impl Load {
-    /// From a torque in **N·m** on this gear, and a face width in mm.
-    ///
-    /// The 1000 converts N·m to N·mm, because every length in this crate is
-    /// millimetres.
     #[must_use]
-    pub fn from_torque(g: &Gear, torque: f64, face_width: f64) -> Self {
-        Self {
-            normal_force: 1000.0 * torque / g.rb,
-            face_width,
-        }
+    pub fn new(torque: f64, face_width: f64) -> Self {
+        Self { torque, face_width }
     }
 
-    /// Tangential force at the **reference** pitch circle, N.
+    /// Tangential force at the **reference** cylinder, N — ISO 6336's `F_t`.
     ///
-    /// This is the force the form factor is normalised against, and the one ISO
-    /// 6336 calls `F_t`.
+    /// `F_t = 2000 T / d = 1000 T / r`. The 1000 converts N·m to N·mm, because
+    /// every length in this crate is millimetres.
     #[must_use]
     pub fn tangential(&self, g: &Gear) -> f64 {
-        self.normal_force * g.alpha_t.cos()
+        1000.0 * self.torque / g.r
     }
 
-    /// The torque this load represents on a given gear, N·m.
+    /// Force along the **transverse** line of action, N — `F_bt = T / r_b`.
+    ///
+    /// The exact lever arm for an involute is the base radius, so this relation
+    /// is a geometric identity rather than a convention. It is also the one load
+    /// quantity **both gears of a pair share**: action and reaction along the
+    /// line of action are the same force, which is why contact stress — a
+    /// property of the pair — is built on it.
     #[must_use]
-    pub fn torque(&self, g: &Gear) -> f64 {
-        self.normal_force * g.rb / 1000.0
+    pub fn transverse_line_of_action(&self, g: &Gear) -> f64 {
+        1000.0 * self.torque / g.rb
+    }
+
+    /// Force **normal to the tooth flank**, N — `F_bn = F_bt / cos β_b`.
+    ///
+    /// For a spur gear `β_b = 0` and this equals
+    /// [`Self::transverse_line_of_action`]. For a helical gear it does not, and
+    /// this is the force that actually presses the flanks together: the contact
+    /// line is inclined at the base helix angle, so the transverse force is only
+    /// its projection.
+    #[must_use]
+    pub fn normal_to_flank(&self, g: &Gear) -> f64 {
+        self.transverse_line_of_action(g) / base_helix_angle(g).cos()
+    }
+
+    /// The same mesh load, re-quoted against the mating gear.
+    ///
+    /// `F_bt` is shared across the mesh, so `T₂ = T₁ · r_b2 / r_b1`. This is the
+    /// **geometric** transfer only: efficiency losses belong to train
+    /// accumulation (DESIGN.md §4.9), not here.
+    ///
+    /// Face width is carried across unchanged, since a `Load` describes what is
+    /// being carried rather than by what.
+    #[must_use]
+    pub fn across_mesh(&self, from: &Gear, to: &Gear) -> Self {
+        Self {
+            torque: self.torque * to.rb / from.rb,
+            face_width: self.face_width,
+        }
     }
 }
 
@@ -569,9 +612,25 @@ impl Load {
 ///
 /// `F_t` in newtons and `b`, `m` in millimetres give N/mm² = MPa directly.
 ///
-/// The **normal** module is used, not the transverse one: `Y_F` is measured in
-/// the normal plane, where the tooth form actually lives, so pairing it with
-/// `m_t` would double-count the helix angle.
+/// # Helical gears
+///
+/// `F_t` is the **transverse** tangential force at the reference cylinder while
+/// `m_n` is the **normal** module, and that pairing is deliberate — it is ISO
+/// 6336-3's, and it is only consistent if `Y_F` is measured on the *normal*
+/// section. So `section` must come from the virtual spur gear,
+/// [`Gear::virtual_spur`], which is what [`bending_section`] returns.
+///
+/// Measuring `Y_F` on the transverse section and dividing by `m_n` — which an
+/// earlier revision did — mixes the two planes and under-predicts the stress by
+/// about `cos β` (6 % at 20°, 13 % at 30°). Spur gears are unaffected, since the
+/// two sections coincide.
+///
+/// **`Y_β` is not applied.** ISO's helix-angle factor `Y_β = 1 − ε_β β/120`
+/// accounts for the load being spread along an inclined contact line; it is an
+/// empirical fit, and omitting it leaves `Y_β = 1`, which *over*-predicts the
+/// stress. That is the safe direction, and it keeps a fitted constant out of the
+/// calculation — but it means a helical rating here is conservative against ISO
+/// by up to about 25 % at high helix angle and overlap.
 ///
 /// Returns `None` when the stress correction is undefined for this section —
 /// see [`RootSection::stress_correction`]. That is not a failure to compute; it
@@ -587,6 +646,22 @@ pub fn bending_stress(
     Some(load.tangential(g) / (load.face_width * g.params.module) * factor)
 }
 
+/// The critical section to rate a gear's bending on, given where the load acts.
+///
+/// Wraps [`root_section`] with the one step that is easy to forget: for a
+/// helical gear the tooth bends as its normal section, so the form must be
+/// measured on the virtual spur gear rather than on the gear itself. For a spur
+/// gear this is exactly `root_section`.
+///
+/// `load_roll` is the involute roll parameter of the load point **on the real
+/// gear** — typically `path.roll_at(path.highest_single_pair())`. It is carried
+/// across to the virtual gear unchanged, because the roll parameter is where the
+/// load sits on the flank and that does not change when the section does.
+#[must_use]
+pub fn bending_section(g: &Gear, load_roll: f64) -> Option<RootSection> {
+    root_section(&g.virtual_spur(), load_roll)
+}
+
 /// Hertzian contact stress along the path of contact, MPa.
 #[derive(Clone, Copy, Debug)]
 pub struct ContactStress {
@@ -599,24 +674,45 @@ pub struct ContactStress {
     /// Position of the worst point on the line of action, mm from the pitch
     /// point.
     pub worst_position: f64,
-    /// Relative radius of curvature at the worst point, mm. Reported because it
-    /// is what the number is really driven by.
+    /// Relative radius of curvature at the worst point, mm, in the **normal**
+    /// plane — the one the contact actually sees. Reported because it is what
+    /// the number is really driven by. Equal to the transverse radius for a spur
+    /// gear.
     pub relative_radius: f64,
 }
 
 /// Exact Hertzian line contact for a meshing pair.
 ///
 /// At a point `ξ` from the pitch point the two flanks are locally cylinders of
-/// radius `ρ₁ = r_b1 tan α_w + ξ` and `ρ₂ = r_b2 tan α_w − ξ`, so
+/// **transverse** radius `ρ₁ = r_b1 tan α_w + ξ` and `ρ₂ = r_b2 tan α_w − ξ`, so
 ///
 /// ```text
-/// 1/ρ = 1/ρ₁ ± 1/ρ₂                 + external, − internal
-/// σ_H = √( (F_n / b) · (1/ρ) · E* / π )
+/// 1/ρ_t = 1/ρ₁ ± 1/ρ₂               + external, − internal
+/// σ_H   = √( (F' / ρ_n) · E* / π )
 /// ```
 ///
 /// `e_star` is the effective contact modulus `E*`, from
 /// [`crate::material::contact_modulus`]. It is passed as a number rather than
 /// taken from two materials so this stays a statement about mechanics.
+///
+/// # Helical gears
+///
+/// Three things change together, and they nearly cancel:
+///
+/// ```text
+/// ρ_n = ρ_t / cos β_b        curvature is seen in the NORMAL plane
+/// F_bn = F_bt / cos β_b      the flank force, not its transverse projection
+/// L    = b / cos β_b         one contact line, inclined across the face
+/// ```
+///
+/// Substituting all three collapses to `σ_H = √((F_bt/b) · cos β_b / ρ_t ·
+/// E*/π)`, so a helical mesh comes out lower than the same transverse geometry
+/// by exactly `√(cos β_b)` — 3 % at β = 20°, 6 % at β = 30°. That benefit is
+/// pure geometry: longer contact line and flatter normal-plane curvature. It is
+/// **not** the extra benefit helical gears get from having several contact lines
+/// engaged at once, which is load sharing and is deferred (DESIGN.md §4.7).
+/// Assuming a single line is the conservative reading and is continuous with the
+/// spur case at β = 0.
 ///
 /// # Which points are checked
 ///
@@ -641,6 +737,7 @@ pub struct ContactStress {
 pub fn contact_stress(
     path: &ContactPath,
     mesh: &Mesh,
+    g1: &Gear,
     load: &Load,
     e_star: f64,
 ) -> Option<ContactStress> {
@@ -650,23 +747,31 @@ pub fn contact_stress(
     let rb1 = path.base_radius_1;
     let rb2 = mesh.a_w * f64::from(mesh.z2) / sz * mesh.alpha_w.cos();
 
+    // F_bt is shared by both gears of the pair, so which gear the load was
+    // quoted against does not survive into the answer.
+    let f_bt = load.transverse_line_of_action(g1);
+    let cos_bb = base_helix_angle(g1).cos();
+
     let at = |xi: f64| -> Option<(f64, f64)> {
         let rho1 = rb1 * mesh.alpha_w.tan() + xi;
         let rho2 = rb2 * mesh.alpha_w.tan() - xi;
         if rho1 <= 0.0 || rho2 <= 0.0 {
             return None;
         }
-        let inv_rho = match mesh.kind {
+        let inv_rho_t = match mesh.kind {
             MeshKind::External => 1.0 / rho1 + 1.0 / rho2,
             MeshKind::Internal => 1.0 / rho1 - 1.0 / rho2,
         };
-        if inv_rho <= 0.0 {
+        if inv_rho_t <= 0.0 {
             return None;
         }
-        let sigma = ((load.normal_force / load.face_width) * inv_rho * e_star
-            / std::f64::consts::PI)
-            .sqrt();
-        Some((sigma, 1.0 / inv_rho))
+        // F_bn / L = (F_bt/cos β_b) / (b/cos β_b) = F_bt / b, and
+        // 1/ρ_n = cos β_b / ρ_t. Written out rather than pre-cancelled so the
+        // two plane changes stay visible.
+        let f_per_length = f_bt / load.face_width;
+        let inv_rho_n = cos_bb * inv_rho_t;
+        let sigma = (f_per_length * inv_rho_n * e_star / std::f64::consts::PI).sqrt();
+        Some((sigma, 1.0 / inv_rho_n))
     };
 
     let (pitch, r_pitch) = at(0.0)?;
@@ -1190,25 +1295,64 @@ mod tests {
         (a, b, m)
     }
 
+    /// The three force projections must be mutually consistent, and each must
+    /// name the plane it is in. This is the check the old `normal_force` field
+    /// could not have passed: it was transverse but called normal.
     #[test]
-    fn torque_and_normal_force_are_exact_inverses() {
-        let g = Gear::new(GearParams {
-            teeth: 23,
-            module: 2.0,
-            helix_angle: 15.0,
-            ..Default::default()
-        });
-        let load = Load::from_torque(&g, 4.5, 10.0);
-        assert!((load.torque(&g) - 4.5).abs() < 1e-12);
+    fn the_force_projections_are_mutually_consistent() {
+        for beta in [0.0, 15.0, 30.0] {
+            let g = Gear::new(GearParams {
+                teeth: 23,
+                module: 2.0,
+                helix_angle: beta,
+                ..Default::default()
+            });
+            let load = Load::new(4.5, 10.0);
 
-        // The tangential force at the reference circle is the projection, and
-        // it must equal torque / pitch radius independently.
-        let expected_ft = 1000.0 * 4.5 / g.r;
-        assert!(
-            (load.tangential(&g) - expected_ft).abs() < 1e-9,
-            "{} vs {expected_ft}",
-            load.tangential(&g)
-        );
+            // F_t = T / r, independently of anything else.
+            assert!((load.tangential(&g) - 1000.0 * 4.5 / g.r).abs() < 1e-9);
+            // F_bt = F_t / cos α_t — the transverse projection onto the line of
+            // action.
+            let f_bt = load.transverse_line_of_action(&g);
+            assert!((f_bt - load.tangential(&g) / g.alpha_t.cos()).abs() < 1e-9);
+            // F_bn = F_bt / cos β_b, and for a spur gear the two coincide.
+            let f_bn = load.normal_to_flank(&g);
+            let cos_bb = base_helix_angle(&g).cos();
+            assert!((f_bn - f_bt / cos_bb).abs() < 1e-9);
+            if beta == 0.0 {
+                assert!(
+                    (f_bn - f_bt).abs() < 1e-12,
+                    "spur: normal must equal transverse"
+                );
+            } else {
+                assert!(
+                    f_bn > f_bt,
+                    "beta={beta}: the flank force must exceed its projection"
+                );
+            }
+        }
+    }
+
+    /// `F_bt` is shared across a mesh, so re-quoting the load against the other
+    /// gear must leave it unchanged. That is the invariant that replaced storing
+    /// the force directly.
+    #[test]
+    fn a_load_carried_across_a_mesh_keeps_the_same_force_on_the_line_of_action() {
+        for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25)] {
+            let (g1, g2, _) = pair(z1, z2);
+            let l1 = Load::new(2.0, 8.0);
+            let l2 = l1.across_mesh(&g1, &g2);
+
+            assert!(
+                (l1.transverse_line_of_action(&g1) - l2.transverse_line_of_action(&g2)).abs()
+                    < 1e-9,
+                "z={z1}/{z2}: F_bt changed across the mesh"
+            );
+            // Torque scales with the ratio, and the round trip is exact.
+            let ratio = f64::from(z2) / f64::from(z1);
+            assert!((l2.torque / l1.torque - ratio).abs() < 1e-9);
+            assert!((l2.across_mesh(&g2, &g1).torque - l1.torque).abs() < 1e-12);
+        }
     }
 
     #[test]
@@ -1219,13 +1363,7 @@ mod tests {
         });
         let sec = root_section(&g, g.u_tip).unwrap();
         let s = |t: f64, b: f64| {
-            bending_stress(
-                &sec,
-                &g,
-                &Load::from_torque(&g, t, b),
-                StressConcentration::None,
-            )
-            .unwrap()
+            bending_stress(&sec, &g, &Load::new(t, b), StressConcentration::None).unwrap()
         };
 
         let base = s(1.0, 10.0);
@@ -1247,9 +1385,9 @@ mod tests {
 
         let (mut bend, mut cont) = (Vec::new(), Vec::new());
         for b in [1.0, 5.0, 12.5, 100.0] {
-            let load = Load::from_torque(&g1, 3.0, b);
+            let load = Load::new(3.0, b);
             let sf = bending_stress(&sec, &g1, &load, StressConcentration::None).unwrap();
-            let sh = contact_stress(&path, &mesh, &load, 100_000.0).unwrap();
+            let sh = contact_stress(&path, &mesh, &g1, &load, 100_000.0).unwrap();
             bend.push(min_face_width_bending(sf, b, 200.0));
             cont.push(min_face_width_contact(sh.worst, b, 800.0));
         }
@@ -1277,11 +1415,11 @@ mod tests {
     fn contact_stress_matches_the_half_width_route() {
         let (g1, g2, mesh) = pair(17, 43);
         let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
-        let load = Load::from_torque(&g1, 2.0, 8.0);
+        let load = Load::new(2.0, 8.0);
         let e_star = 113_000.0;
-        let cs = contact_stress(&path, &mesh, &load, e_star).unwrap();
+        let cs = contact_stress(&path, &mesh, &g1, &load, e_star).unwrap();
 
-        let f_prime = load.normal_force / load.face_width;
+        let f_prime = load.transverse_line_of_action(&g1) / load.face_width;
         let r = cs.relative_radius;
         let half_width = (4.0 * f_prime * r / (std::f64::consts::PI * e_star)).sqrt();
         let p_max = 2.0 * f_prime / (std::f64::consts::PI * half_width);
@@ -1314,6 +1452,122 @@ mod tests {
         }
     }
 
+    // --------------------------------------------------------- helical ----
+
+    /// A spur gear is its own normal section, so the virtual construction must
+    /// be the identity there — otherwise every spur result would shift.
+    #[test]
+    fn the_virtual_spur_gear_of_a_spur_gear_is_itself() {
+        let g = Gear::new(GearParams {
+            teeth: 25,
+            ..Default::default()
+        });
+        let v = g.virtual_spur();
+        assert!((v.z - g.z).abs() < 1e-15);
+        assert!((v.r - g.r).abs() < 1e-15);
+        assert!((v.rb - g.rb).abs() < 1e-15);
+
+        let a = root_section(&g, g.u_tip).unwrap();
+        let b = bending_section(&g, g.u_tip).unwrap();
+        assert!((a.form_factor - b.form_factor).abs() < 1e-15);
+    }
+
+    /// `z_n = z / cos³β`, and the virtual gear is a genuine spur gear cut with
+    /// the normal rack.
+    #[test]
+    fn the_virtual_spur_gear_has_the_iso_tooth_count_and_the_normal_rack() {
+        for beta in [10.0, 20.0, 30.0, 45.0] {
+            let g = Gear::new(GearParams {
+                teeth: 30,
+                helix_angle: beta,
+                ..Default::default()
+            });
+            let v = g.virtual_spur();
+            let b = beta.to_radians();
+
+            assert!(
+                (v.z - 30.0 / b.cos().powi(3)).abs() < 1e-12,
+                "beta={beta}: z_n = {}",
+                v.z
+            );
+            // It is a spur gear, in the normal plane, with the normal module.
+            assert!(v.beta.abs() < 1e-15);
+            assert!((v.alpha_t - g.alpha_n).abs() < 1e-12);
+            assert!((v.mt - g.params.module).abs() < 1e-12);
+            // ...and it always has more teeth than the real gear, which is why
+            // a helical tooth is stronger in bending than its count suggests.
+            assert!(v.z > g.z);
+        }
+    }
+
+    /// Measuring the form on the transverse section but dividing by the normal
+    /// module — what an earlier revision did — under-predicts helical bending
+    /// stress. The gap must be real and must grow with the helix angle.
+    #[test]
+    fn the_normal_section_is_what_bends_and_it_differs_from_the_transverse_one() {
+        let mut previous = 0.0;
+        for beta in [0.0, 15.0, 30.0] {
+            let g = Gear::new(GearParams {
+                teeth: 20,
+                helix_angle: beta,
+                ..Default::default()
+            });
+            let transverse = root_section(&g, g.u_tip).unwrap().form_factor;
+            let normal = bending_section(&g, g.u_tip).unwrap().form_factor;
+            let gap = (normal - transverse).abs() / transverse;
+
+            if beta == 0.0 {
+                assert!(gap < 1e-15, "spur sections must coincide");
+            } else {
+                assert!(gap > 0.005, "beta={beta}: sections differ by only {gap:.4}");
+                assert!(gap > previous, "the gap must widen with the helix angle");
+            }
+            previous = gap;
+        }
+    }
+
+    /// Helical contact comes out below the equivalent transverse geometry by
+    /// exactly `√(cos β_b)` — the combined effect of a longer contact line, a
+    /// larger flank force and a flatter normal-plane curvature. Anything else
+    /// means one of the three `cos β_b` factors is missing or doubled.
+    #[test]
+    fn helical_contact_stress_falls_by_the_square_root_of_the_base_helix_cosine() {
+        let load = Load::new(2.0, 8.0);
+        for beta in [10.0, 20.0, 30.0] {
+            let g1 = Gear::new(GearParams {
+                teeth: 17,
+                helix_angle: beta,
+                ..Default::default()
+            });
+            let g2 = Gear::new(GearParams {
+                teeth: 43,
+                helix_angle: -beta,
+                ..Default::default()
+            });
+            let mesh = Mesh::new(&g1, &g2, MeshKind::External).unwrap();
+            let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+            let cs = contact_stress(&path, &mesh, &g1, &load, 113_000.0).unwrap();
+
+            // The transverse geometry itself changes with beta (m_t grows), so
+            // compare against the same mesh computed without the plane change
+            // rather than against the spur mesh directly.
+            let cos_bb = base_helix_angle(&g1).cos();
+            let f_bt = load.transverse_line_of_action(&g1);
+            // relative_radius is reported in the normal plane, ρ_n = ρ_t/cos β_b.
+            let rho_t = cs.relative_radius * cos_bb;
+            let transverse_only =
+                ((f_bt / load.face_width) / rho_t * 113_000.0 / std::f64::consts::PI).sqrt();
+
+            let ratio = cs.worst / transverse_only;
+            assert!(
+                (ratio - cos_bb.sqrt()).abs() < 1e-12,
+                "beta={beta}: ratio {ratio} vs sqrt(cos beta_b) {}",
+                cos_bb.sqrt()
+            );
+            assert!(cs.worst < transverse_only);
+        }
+    }
+
     /// Contact stress belongs to the *pair*, so it cannot depend on which gear
     /// the caller labelled 1. Checking only the inner single-pair boundary — as
     /// DESIGN.md §4.7 originally prescribed — breaks this, because the relative
@@ -1330,14 +1584,11 @@ mod tests {
 
             // Same physical mesh and same transmitted power, so the same load
             // along the line of action.
-            let load = Load::from_torque(&g1, 2.0, 8.0);
-            let load_rev = Load {
-                normal_force: load.normal_force,
-                face_width: load.face_width,
-            };
+            let load = Load::new(2.0, 8.0);
+            let load_rev = load.across_mesh(&g1, &g2);
 
-            let a = contact_stress(&path, &mesh, &load, 113_000.0).unwrap();
-            let b = contact_stress(&path_rev, &m_rev, &load_rev, 113_000.0).unwrap();
+            let a = contact_stress(&path, &mesh, &g1, &load, 113_000.0).unwrap();
+            let b = contact_stress(&path_rev, &m_rev, &g2, &load_rev, 113_000.0).unwrap();
 
             assert!(
                 (a.worst - b.worst).abs() / a.worst < 1e-12,
@@ -1363,15 +1614,15 @@ mod tests {
     fn contact_stress_is_worst_off_the_pitch_point_and_softens_with_a_softer_pair() {
         let (g1, g2, mesh) = pair(17, 43);
         let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
-        let load = Load::from_torque(&g1, 2.0, 8.0);
+        let load = Load::new(2.0, 8.0);
 
-        let steel = contact_stress(&path, &mesh, &load, 113_000.0).unwrap();
+        let steel = contact_stress(&path, &mesh, &g1, &load, 113_000.0).unwrap();
         // The single-pair point has the smaller relative radius, so it governs.
         assert!(steel.at_single_pair > steel.at_pitch_point);
         assert!((steel.worst - steel.at_single_pair).abs() < 1e-12);
 
         // A compliant pair spreads the contact and drops the pressure, as √E*.
-        let poly = contact_stress(&path, &mesh, &load, 1_700.0).unwrap();
+        let poly = contact_stress(&path, &mesh, &g1, &load, 1_700.0).unwrap();
         assert!(poly.worst < steel.worst);
         let ratio = steel.worst / poly.worst;
         assert!(
