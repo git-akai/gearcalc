@@ -6,6 +6,8 @@
 //! gear-cli show   [z] [x]     print the derived geometry of one gear
 //! gear-cli sweep              scan a parameter grid for clamps and undercut
 //! gear-cli materials          the material library, with each value's basis
+//! gear-cli strength [z1] [z2] [torque] [material]
+//!                             a worked mesh: bending, contact, efficiency
 //! ```
 
 mod diagram;
@@ -22,6 +24,12 @@ fn main() {
         Some("matrix") => matrix_report(),
         Some("loadcase") => loadcase_report(),
         Some("materials") => materials(),
+        Some("strength") => strength_report(
+            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
+            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(43),
+            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(2.0),
+            args.get(4).map_or("4340 Hardened Steel", String::as_str),
+        ),
         Some("dxf") => dxf(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.0),
@@ -42,6 +50,163 @@ fn main() {
             });
         }
         Some(other) => eprintln!("unknown command {other:?}; try `show` or `sweep`"),
+    }
+}
+
+/// A worked mesh end to end: load, bending, contact, efficiency, face width.
+///
+/// This is the whole of milestone 5 in one view, and the first thing that
+/// actually consumes the material library. Both gears are rated, because the
+/// pinion is not automatically the worse one — it sees the higher contact
+/// stress but the wheel may have the weaker root.
+fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str) {
+    use gear_core::contact::{efficiency, ContactPath};
+    use gear_core::material::contact_modulus;
+    use gear_core::mesh::{Mesh, MeshKind};
+    use gear_core::strength::{
+        bending_stress, contact_stress, min_face_width_bending, min_face_width_contact,
+        root_section, Load, StressConcentration,
+    };
+
+    let lib = gear_io::default_library();
+    let Some(mat) = lib.get(material_name) else {
+        eprintln!("no material named {material_name:?}; try `gear-cli materials`");
+        return;
+    };
+
+    let g1 = Gear::new(GearParams {
+        teeth: z1,
+        ..Default::default()
+    });
+    let g2 = Gear::new(GearParams {
+        teeth: z2,
+        ..Default::default()
+    });
+    let Ok(mesh) = Mesh::new(&g1, &g2, MeshKind::External) else {
+        eprintln!("z={z1}/{z2} cannot mesh");
+        return;
+    };
+    let Some(path) = ContactPath::new(&g1, &g2, &mesh) else {
+        eprintln!("z={z1}/{z2} has no usable path of contact");
+        return;
+    };
+
+    // A face width to evaluate at. Any value does: the minimum face widths
+    // below are independent of it, which is asserted in the test suite.
+    const B: f64 = 10.0;
+    let load = Load::from_torque(&g1, torque, B);
+
+    println!(
+        "mesh   z {z1}/{z2}  module {}  a_w {:.4} mm",
+        g1.params.module, mesh.a_w
+    );
+    println!(
+        "       operating pressure angle {:.3} deg  contact ratio {:.4}",
+        mesh.alpha_w.to_degrees(),
+        path.contact_ratio
+    );
+    println!(
+        "load   {torque} Nm on gear 1  ->  F_n {:.1} N along the line of action",
+        load.normal_force
+    );
+    println!(
+        "       F_t {:.1} N at the reference circle,  face width {B} mm",
+        load.tangential(&g1)
+    );
+    println!(
+        "material  {}  [{}]",
+        mat.name,
+        if mat.weakest_basis().is_measured() {
+            "all values measured"
+        } else {
+            "contains estimates - see `gear-cli materials`"
+        }
+    );
+    println!(
+        "       E {:.0} MPa   nu {:.2}   ultimate {:.1} MPa   fatigue {:.1} MPa",
+        mat.elastic_modulus.get(),
+        mat.poissons_ratio.get(),
+        mat.ultimate_allowable.get(),
+        mat.fatigue_allowable.get()
+    );
+    println!();
+
+    // --- bending, each gear at its own highest point of single-pair contact
+    println!("bending");
+    println!(
+        "  {:<6} {:>8} {:>8} {:>9} {:>10} {:>10}",
+        "gear", "Y_F", "Y_S", "sigma_F", "b_min fat", "b_min ult"
+    );
+    let reversed = Mesh::new(&g2, &g1, MeshKind::External).ok();
+    for (label, g, p) in [
+        (1u32, &g1, Some(path)),
+        (
+            2,
+            &g2,
+            reversed.and_then(|m| ContactPath::new(&g2, &g1, &m)),
+        ),
+    ] {
+        let Some(p) = p else {
+            println!("  {label:<6} no contact path");
+            continue;
+        };
+        let Some(sec) = root_section(g, p.roll_at(p.highest_single_pair())) else {
+            println!("  {label:<6} no root section (severed tooth?)");
+            continue;
+        };
+        let load_g = Load::from_torque(g, load.torque(g), B);
+        let ys = sec.stress_correction(StressConcentration::Iso6336);
+        let Some(sf) = bending_stress(&sec, g, &load_g, StressConcentration::Iso6336) else {
+            println!(
+                "  {label:<6} {:>8.4} {:>8} {:>9} - stress correction undefined (tangency on the flank)",
+                sec.form_factor, "-", "-"
+            );
+            continue;
+        };
+        println!(
+            "  {label:<6} {:>8.4} {:>8.4} {:>7.1} MPa {:>8.3} mm {:>8.3} mm",
+            sec.form_factor,
+            ys.unwrap_or(1.0),
+            sf,
+            min_face_width_bending(sf, B, mat.fatigue_allowable.get()),
+            min_face_width_bending(sf, B, mat.ultimate_allowable.get()),
+        );
+        if !sec.notch_parameter_in_range() {
+            println!(
+                "         note: notch parameter q_s = {:.2} is outside the ISO fit's range, so",
+                sec.notch_parameter
+            );
+            println!("               Y_S was clamped and the stress is UNDER-predicted");
+        }
+    }
+
+    // --- contact, shared by the pair
+    let e_star = contact_modulus(mat, mat);
+    if let Some(cs) = contact_stress(&path, &mesh, &load, e_star) {
+        println!("\ncontact   E* {e_star:.0} MPa (like on like)");
+        println!("  at the pitch point        {:>7.1} MPa", cs.at_pitch_point);
+        println!(
+            "  at single-pair contact    {:>7.1} MPa   <- governs",
+            cs.at_single_pair
+        );
+        println!("  relative radius           {:>7.3} mm", cs.relative_radius);
+        println!(
+            "  b_min against fatigue     {:>7.3} mm",
+            min_face_width_contact(cs.worst, B, mat.fatigue_allowable.get())
+        );
+        println!(
+            "  b_min against ultimate    {:>7.3} mm",
+            min_face_width_contact(cs.worst, B, mat.ultimate_allowable.get())
+        );
+    }
+
+    // --- efficiency
+    println!("\nefficiency (equal in both directions for a parallel-axis mesh)");
+    for mu in [0.02, 0.04, 0.06, 0.10] {
+        println!(
+            "  mu {mu:.2}   {:.3} %",
+            100.0 * efficiency(&path, &mesh, mu)
+        );
     }
 }
 

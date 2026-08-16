@@ -24,6 +24,8 @@
 //! Everything is done in **tooth coordinates**: `y` along the tooth centreline
 //! pointing outward, `x` across it, origin at the gear axis.
 
+use crate::contact::ContactPath;
+use crate::mesh::{Mesh, MeshKind};
 use crate::profile::Gear;
 use crate::solve::{brent, Tol};
 
@@ -501,6 +503,221 @@ impl RootSection {
     }
 }
 
+// ------------------------------------------------------------------ load ---
+
+/// What a mesh is carrying.
+///
+/// # Why the load is stored as the normal force
+///
+/// A torque can be turned into a tangential force at the reference pitch
+/// circle, at the operating pitch circle, or anywhere else, and the three
+/// differ — which is a reliable source of quiet factor-of-`cos α` errors.
+///
+/// The force along the **line of action** has no such ambiguity. Power crosses
+/// an involute mesh along the common tangent to the base circles, so the exact
+/// lever arm is the *base* radius:
+///
+/// ```text
+/// T = F_n · r_b        (exact, not a convention)
+/// ```
+///
+/// Every other force follows from it by projection — `F_t = F_n cos α_t` at the
+/// reference circle, `F_n cos α_w` at the operating circle — so storing `F_n`
+/// makes each conversion explicit at the point of use.
+#[derive(Clone, Copy, Debug)]
+pub struct Load {
+    /// Force along the line of action, N.
+    pub normal_force: f64,
+    /// Face width, mm.
+    pub face_width: f64,
+}
+
+impl Load {
+    /// From a torque in **N·m** on this gear, and a face width in mm.
+    ///
+    /// The 1000 converts N·m to N·mm, because every length in this crate is
+    /// millimetres.
+    #[must_use]
+    pub fn from_torque(g: &Gear, torque: f64, face_width: f64) -> Self {
+        Self {
+            normal_force: 1000.0 * torque / g.rb,
+            face_width,
+        }
+    }
+
+    /// Tangential force at the **reference** pitch circle, N.
+    ///
+    /// This is the force the form factor is normalised against, and the one ISO
+    /// 6336 calls `F_t`.
+    #[must_use]
+    pub fn tangential(&self, g: &Gear) -> f64 {
+        self.normal_force * g.alpha_t.cos()
+    }
+
+    /// The torque this load represents on a given gear, N·m.
+    #[must_use]
+    pub fn torque(&self, g: &Gear) -> f64 {
+        self.normal_force * g.rb / 1000.0
+    }
+}
+
+/// Tooth root bending stress, MPa.
+///
+/// ```text
+/// σ_F = F_t / (b · m_n) · Y_F · Y_S
+/// ```
+///
+/// `F_t` in newtons and `b`, `m` in millimetres give N/mm² = MPa directly.
+///
+/// The **normal** module is used, not the transverse one: `Y_F` is measured in
+/// the normal plane, where the tooth form actually lives, so pairing it with
+/// `m_t` would double-count the helix angle.
+///
+/// Returns `None` when the stress correction is undefined for this section —
+/// see [`RootSection::stress_correction`]. That is not a failure to compute; it
+/// is the model declining to apply a notch factor where there is no notch.
+#[must_use]
+pub fn bending_stress(
+    section: &RootSection,
+    g: &Gear,
+    load: &Load,
+    model: StressConcentration,
+) -> Option<f64> {
+    let factor = section.bending_factor(model)?;
+    Some(load.tangential(g) / (load.face_width * g.params.module) * factor)
+}
+
+/// Hertzian contact stress along the path of contact, MPa.
+#[derive(Clone, Copy, Debug)]
+pub struct ContactStress {
+    /// At the pitch point, where the relative radius is largest.
+    pub at_pitch_point: f64,
+    /// At the worse of the two single-pair contact boundaries.
+    pub at_single_pair: f64,
+    /// The higher of the two, which is what a design is rated on.
+    pub worst: f64,
+    /// Position of the worst point on the line of action, mm from the pitch
+    /// point.
+    pub worst_position: f64,
+    /// Relative radius of curvature at the worst point, mm. Reported because it
+    /// is what the number is really driven by.
+    pub relative_radius: f64,
+}
+
+/// Exact Hertzian line contact for a meshing pair.
+///
+/// At a point `ξ` from the pitch point the two flanks are locally cylinders of
+/// radius `ρ₁ = r_b1 tan α_w + ξ` and `ρ₂ = r_b2 tan α_w − ξ`, so
+///
+/// ```text
+/// 1/ρ = 1/ρ₁ ± 1/ρ₂                 + external, − internal
+/// σ_H = √( (F_n / b) · (1/ρ) · E* / π )
+/// ```
+///
+/// `e_star` is the effective contact modulus `E*`, from
+/// [`crate::material::contact_modulus`]. It is passed as a number rather than
+/// taken from two materials so this stays a statement about mechanics.
+///
+/// # Which points are checked
+///
+/// `ρ₁ + ρ₂` is constant along the path, so the relative radius `ρ₁ρ₂/(ρ₁+ρ₂)`
+/// is largest where the two are equal and falls away toward **both** ends. The
+/// worst single-pair point is therefore whichever boundary of the single-pair
+/// zone lies further from that balance point.
+///
+/// **Both boundaries are evaluated, not just the inner one.** DESIGN.md §4.7
+/// says to take the inner point of single-pair contact, "usually the pinion's
+/// worst case" — but "usually" is doing real work there. The balance point sits
+/// at `(r_b2 − r_b1) tan α_w / 2`, so it is on the recess side when gear 1 is
+/// the pinion and on the approach side when gear 1 is the wheel. Checking only
+/// the inner boundary would therefore make the answer depend on which gear the
+/// caller happened to label 1 — for the same physical mesh. Contact stress is a
+/// property of the *pair*; a test asserts that swapping the labels leaves it
+/// unchanged.
+///
+/// Returns `None` if the geometry puts a contact point outside both flanks,
+/// which cannot happen for a mesh [`ContactPath`] accepted.
+#[must_use]
+pub fn contact_stress(
+    path: &ContactPath,
+    mesh: &Mesh,
+    load: &Load,
+    e_star: f64,
+) -> Option<ContactStress> {
+    // r_b1 + r_b2 = a_w cos α_w, so the two tangent lengths sum to a_w sin α_w
+    // and ρ₁ + ρ₂ is constant along the path — a useful invariant to test.
+    let sz = f64::from(mesh.z1) + f64::from(mesh.z2);
+    let rb1 = path.base_radius_1;
+    let rb2 = mesh.a_w * f64::from(mesh.z2) / sz * mesh.alpha_w.cos();
+
+    let at = |xi: f64| -> Option<(f64, f64)> {
+        let rho1 = rb1 * mesh.alpha_w.tan() + xi;
+        let rho2 = rb2 * mesh.alpha_w.tan() - xi;
+        if rho1 <= 0.0 || rho2 <= 0.0 {
+            return None;
+        }
+        let inv_rho = match mesh.kind {
+            MeshKind::External => 1.0 / rho1 + 1.0 / rho2,
+            MeshKind::Internal => 1.0 / rho1 - 1.0 / rho2,
+        };
+        if inv_rho <= 0.0 {
+            return None;
+        }
+        let sigma = ((load.normal_force / load.face_width) * inv_rho * e_star
+            / std::f64::consts::PI)
+            .sqrt();
+        Some((sigma, 1.0 / inv_rho))
+    };
+
+    let (pitch, r_pitch) = at(0.0)?;
+    let lo = path.lowest_single_pair();
+    let hi = path.highest_single_pair();
+    let (s_lo, r_lo) = at(lo)?;
+    let (s_hi, r_hi) = at(hi)?;
+
+    let (single, r_single, xi_single) = if s_lo >= s_hi {
+        (s_lo, r_lo, lo)
+    } else {
+        (s_hi, r_hi, hi)
+    };
+    let (worst, relative_radius, worst_position) = if single >= pitch {
+        (single, r_single, xi_single)
+    } else {
+        (pitch, r_pitch, 0.0)
+    };
+
+    Some(ContactStress {
+        at_pitch_point: pitch,
+        at_single_pair: single,
+        worst,
+        worst_position,
+        relative_radius,
+    })
+}
+
+/// Minimum face width for a bending stress, mm.
+///
+/// `σ_F ∝ 1/b`, so `b_min = b · σ_F / σ_allow`.
+///
+/// **The `b` cancels.** Whatever face width the stress was evaluated at, the
+/// answer is the same — which is the invariant worth testing, because it is the
+/// one that catches a stress that did not actually scale the way it should.
+#[must_use]
+pub fn min_face_width_bending(stress: f64, evaluated_at: f64, allowable: f64) -> f64 {
+    evaluated_at * stress / allowable
+}
+
+/// Minimum face width for a contact stress, mm.
+///
+/// `σ_H ∝ 1/√b`, so `b_min = b · (σ_H / σ_allow)²`. The square is the whole
+/// difference from the bending case, and it is why contact usually governs the
+/// face width of a lightly loaded gear while bending governs a heavily loaded
+/// one.
+#[must_use]
+pub fn min_face_width_contact(stress: f64, evaluated_at: f64, allowable: f64) -> f64 {
+    evaluated_at * (stress / allowable).powi(2)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -956,5 +1173,210 @@ mod tests {
         });
         assert!(g.severed);
         assert!(root_section(&g, 0.5).is_none());
+    }
+
+    // ------------------------------------------------------------ load ----
+
+    fn pair(z1: u32, z2: u32) -> (Gear, Gear, Mesh) {
+        let a = Gear::new(GearParams {
+            teeth: z1,
+            ..Default::default()
+        });
+        let b = Gear::new(GearParams {
+            teeth: z2,
+            ..Default::default()
+        });
+        let m = Mesh::new(&a, &b, MeshKind::External).unwrap();
+        (a, b, m)
+    }
+
+    #[test]
+    fn torque_and_normal_force_are_exact_inverses() {
+        let g = Gear::new(GearParams {
+            teeth: 23,
+            module: 2.0,
+            helix_angle: 15.0,
+            ..Default::default()
+        });
+        let load = Load::from_torque(&g, 4.5, 10.0);
+        assert!((load.torque(&g) - 4.5).abs() < 1e-12);
+
+        // The tangential force at the reference circle is the projection, and
+        // it must equal torque / pitch radius independently.
+        let expected_ft = 1000.0 * 4.5 / g.r;
+        assert!(
+            (load.tangential(&g) - expected_ft).abs() < 1e-9,
+            "{} vs {expected_ft}",
+            load.tangential(&g)
+        );
+    }
+
+    #[test]
+    fn bending_stress_scales_the_way_the_cantilever_model_says() {
+        let g = Gear::new(GearParams {
+            teeth: 25,
+            ..Default::default()
+        });
+        let sec = root_section(&g, g.u_tip).unwrap();
+        let s = |t: f64, b: f64| {
+            bending_stress(
+                &sec,
+                &g,
+                &Load::from_torque(&g, t, b),
+                StressConcentration::None,
+            )
+            .unwrap()
+        };
+
+        let base = s(1.0, 10.0);
+        // Linear in load...
+        assert!((s(2.0, 10.0) - 2.0 * base).abs() < 1e-9);
+        // ...and inversely proportional to face width.
+        assert!((s(1.0, 20.0) - base / 2.0).abs() < 1e-9);
+        assert!(base > 0.0);
+    }
+
+    /// `b_min` must not depend on the `b` the stress was evaluated at. It is the
+    /// invariant that catches a stress which did not actually scale with face
+    /// width — the failure a single spot check would sail past.
+    #[test]
+    fn minimum_face_width_is_independent_of_the_face_width_used() {
+        let (g1, g2, mesh) = pair(19, 31);
+        let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+        let sec = root_section(&g1, path.roll_at(path.highest_single_pair())).unwrap();
+
+        let (mut bend, mut cont) = (Vec::new(), Vec::new());
+        for b in [1.0, 5.0, 12.5, 100.0] {
+            let load = Load::from_torque(&g1, 3.0, b);
+            let sf = bending_stress(&sec, &g1, &load, StressConcentration::None).unwrap();
+            let sh = contact_stress(&path, &mesh, &load, 100_000.0).unwrap();
+            bend.push(min_face_width_bending(sf, b, 200.0));
+            cont.push(min_face_width_contact(sh.worst, b, 800.0));
+        }
+        for v in &bend {
+            assert!(
+                (v - bend[0]).abs() < 1e-9,
+                "bending b_min drifted: {bend:?}"
+            );
+        }
+        for v in &cont {
+            assert!(
+                (v - cont[0]).abs() < 1e-9,
+                "contact b_min drifted: {cont:?}"
+            );
+        }
+        assert!(bend[0] > 0.0 && cont[0] > 0.0);
+    }
+
+    /// Hertz, reached a second way: through the contact half-width.
+    ///
+    /// `b_h = √(4F'R/πE*)` and `p_max = 2F'/(π b_h)` is the textbook line-contact
+    /// pair. Eliminating `b_h` gives `√(F'E*/πR)`, so agreement checks the
+    /// algebra in `contact_stress` against a route that shares none of it.
+    #[test]
+    fn contact_stress_matches_the_half_width_route() {
+        let (g1, g2, mesh) = pair(17, 43);
+        let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+        let load = Load::from_torque(&g1, 2.0, 8.0);
+        let e_star = 113_000.0;
+        let cs = contact_stress(&path, &mesh, &load, e_star).unwrap();
+
+        let f_prime = load.normal_force / load.face_width;
+        let r = cs.relative_radius;
+        let half_width = (4.0 * f_prime * r / (std::f64::consts::PI * e_star)).sqrt();
+        let p_max = 2.0 * f_prime / (std::f64::consts::PI * half_width);
+        assert!(
+            (cs.worst - p_max).abs() / p_max < 1e-12,
+            "{} vs {p_max}",
+            cs.worst
+        );
+        assert!(half_width > 0.0 && half_width < r, "implausible half width");
+    }
+
+    /// `ρ₁ + ρ₂ = a_w sin α_w` everywhere on the path — the two flanks' local
+    /// radii are complementary, which is what makes the relative radius peak at
+    /// the pitch point and fall toward both ends.
+    #[test]
+    fn the_two_local_radii_sum_to_the_line_of_action() {
+        let (g1, g2, mesh) = pair(17, 43);
+        let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+        let sz = f64::from(mesh.z1) + f64::from(mesh.z2);
+        let rb2 = mesh.a_w * f64::from(mesh.z2) / sz * mesh.alpha_w.cos();
+        let want = mesh.a_w * mesh.alpha_w.sin();
+
+        for i in 0..=20 {
+            #[allow(clippy::cast_precision_loss)]
+            let t = i as f64 / 20.0;
+            let xi = -path.approach + t * (path.approach + path.recess);
+            let rho1 = path.base_radius_1 * mesh.alpha_w.tan() + xi;
+            let rho2 = rb2 * mesh.alpha_w.tan() - xi;
+            assert!((rho1 + rho2 - want).abs() < 1e-9);
+        }
+    }
+
+    /// Contact stress belongs to the *pair*, so it cannot depend on which gear
+    /// the caller labelled 1. Checking only the inner single-pair boundary — as
+    /// DESIGN.md §4.7 originally prescribed — breaks this, because the relative
+    /// radius peaks on the recess side for a pinion and the approach side for a
+    /// wheel.
+    #[test]
+    fn contact_stress_does_not_depend_on_which_gear_is_called_first() {
+        for (za, zb) in [(17u32, 43u32), (13, 60), (25, 25), (43, 17), (60, 13)] {
+            let (g1, g2, mesh) = pair(za, zb);
+            let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+
+            let m_rev = Mesh::new(&g2, &g1, MeshKind::External).unwrap();
+            let path_rev = ContactPath::new(&g2, &g1, &m_rev).unwrap();
+
+            // Same physical mesh and same transmitted power, so the same load
+            // along the line of action.
+            let load = Load::from_torque(&g1, 2.0, 8.0);
+            let load_rev = Load {
+                normal_force: load.normal_force,
+                face_width: load.face_width,
+            };
+
+            let a = contact_stress(&path, &mesh, &load, 113_000.0).unwrap();
+            let b = contact_stress(&path_rev, &m_rev, &load_rev, 113_000.0).unwrap();
+
+            assert!(
+                (a.worst - b.worst).abs() / a.worst < 1e-12,
+                "z={za}/{zb}: {} vs {} when the labels are swapped",
+                a.worst,
+                b.worst
+            );
+            assert!((a.relative_radius - b.relative_radius).abs() < 1e-9);
+            // The worst point is the same physical place. Its sign flips with
+            // the labels, since ξ is measured toward gear 1's tip — except on a
+            // symmetric mesh, where both single-pair boundaries are equally bad
+            // and the tie-break picks the same one in both frames.
+            assert!(
+                (a.worst_position.abs() - b.worst_position.abs()).abs() < 1e-9,
+                "z={za}/{zb}: worst at {} vs {}",
+                a.worst_position,
+                b.worst_position
+            );
+        }
+    }
+
+    #[test]
+    fn contact_stress_is_worst_off_the_pitch_point_and_softens_with_a_softer_pair() {
+        let (g1, g2, mesh) = pair(17, 43);
+        let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+        let load = Load::from_torque(&g1, 2.0, 8.0);
+
+        let steel = contact_stress(&path, &mesh, &load, 113_000.0).unwrap();
+        // The single-pair point has the smaller relative radius, so it governs.
+        assert!(steel.at_single_pair > steel.at_pitch_point);
+        assert!((steel.worst - steel.at_single_pair).abs() < 1e-12);
+
+        // A compliant pair spreads the contact and drops the pressure, as √E*.
+        let poly = contact_stress(&path, &mesh, &load, 1_700.0).unwrap();
+        assert!(poly.worst < steel.worst);
+        let ratio = steel.worst / poly.worst;
+        assert!(
+            (ratio - (113_000.0f64 / 1_700.0).sqrt()).abs() < 1e-9,
+            "contact stress should go as sqrt(E*), got ratio {ratio}"
+        );
     }
 }

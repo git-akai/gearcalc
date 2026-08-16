@@ -17,12 +17,13 @@ subscript `n` = normal plane, `t` = transverse.
 | Primitives | safeguarded `inv⁻¹`, Brent, bracketed Newton | textbook special cases |
 | Mesh | centre distance, exact backlash, contact path | direct tooth-thickness computation |
 | Metrology | span, over-pins, cutter tip width, JGMA tables | independent pin-tangency check |
-| Strength | critical section, form factor, stress correction | closed-form rack limits |
+| Strength | critical section, form factor, bending stress, Hertz, face width | closed-form rack limits; the contact-half-width route |
+| Efficiency | parallel-axis mesh loss from sliding along the path | numerical average of the instantaneous loss |
 | Materials | eight-material library, per-value provenance, TOML round-trip | primary datasheets; cross-family consistency laws |
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-105 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+125 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -31,16 +32,18 @@ nix develop                       # or `direnv allow` once
 cargo nextest run                 # the suite
 cargo run --bin gear-cli -- show 17 0.2      # drive the maths, no browser
 cargo run --bin gear-cli -- materials        # the library, with each value's basis
+cargo run --bin gear-cli -- strength 17 43 2.0   # a worked mesh, end to end
 cargo run --release --bin gear-cli -- bending   # the bending verification sheet
 cd web && npm run dev             # the application
 ```
 
 ## What is next
 
-The rest of milestone 5 — the load-to-stress path, efficiency, Hertz and face
-width — and milestone 6 (spur stage) are the open work; §11 has the full list.
-Nothing is blocked. Two deferred decisions have written rationales: load
-sharing (§4.7) and the gear-rating standards (§6.2).
+Milestone 6 (spur stage) is the open work; §11 has the full list. Nothing is
+blocked. The mathematics of a single mesh is now complete — what milestone 6
+adds is the *stage*: face width and material as inputs, torque and cycle
+propagation, and the UI that surfaces all of it. Two deferred decisions have
+written rationales: load sharing (§4.7) and the gear-rating standards (§6.2).
 
 ---
 
@@ -127,9 +130,10 @@ gears/
 │   │   ├── profile.rs       generated 2D profile (port of gear.py)
 │   │   ├── ring.rs          internal-gear profile
 │   │   ├── screw.rs         crossed-axis screw gearing (worm + crossed helical)
-│   │   ├── mesh.rs          centre distance, contact ratio, backlash, efficiency
+│   │   ├── mesh.rs          centre distance, operating angle, backlash
 │   │   ├── metrology.rs     span, over-pins, tip width, JGMA lookup
-│   │   ├── strength.rs      bending, Hertz, face width
+│   │   ├── contact.rs       path of contact, load sharing, mesh efficiency
+│   │   ├── strength.rs      load, bending, Hertz, face width
 │   │   ├── material.rs      material model — values, provenance, allowables
 │   │   ├── train/           spur.rs, worm.rs, planetary.rs, accumulate.rs
 │   │   └── data/            jgma_116_02.csv
@@ -425,6 +429,15 @@ so the time average is uniform in `ξ`:
 
 `ε₁ = ξ_approach/p_bt`, `ε₂ = ξ_recess/p_bt`, `+` external, `−` internal. This is
 Buckingham's formula recovered from first principles — no fitted constants.
+[verified against a direct numerical average of the instantaneous loss over five
+meshes, agreement to 1e-10 relative.]
+
+**The `/ε_α` is load-sharing bookkeeping, and dropping it is the easy mistake.**
+It is what holds the *total* transmitted force at `F_n`. Average `|ξ|` per
+engagement instead — counting one engagement per base pitch, each carrying the
+full load — and the mesh implicitly transmits `ε_α F_n`, so the loss comes out
+too large by exactly the contact ratio. The first draft of this implementation
+made that error; the numerical check above is what caught it.
 
 Two honest notes. **Forward and backward efficiency come out equal** for
 parallel-axis meshes: the formula is symmetric in `(ε₁²+ε₂²)`, and physically it
@@ -749,9 +762,19 @@ point, `ρ₁ = r_b1 tan α_w + ξ` and `ρ₂ = r_b2 tan α_w − ξ` (note
 ```
 
 `+` external, `−` internal — which is why the material library carries `E` and
-`ν`. Evaluated at the pitch point *and* the inner point of single-pair contact
-(usually the pinion's worst case), reporting the higher. Crossed-axis stages use
-point contact instead (§4.5.1).
+`ν`. Crossed-axis stages use point contact instead (§4.5.1).
+
+**Which points are checked — corrected.** An earlier draft said "the pitch point
+and the inner point of single-pair contact (usually the pinion's worst case)".
+That "usually" was hiding a real defect. Since `ρ₁ + ρ₂` is constant along the
+path, the relative radius peaks where the two are equal — at
+`ξ = (r_b2 − r_b1) tan α_w / 2` — and falls away toward **both** ends. That
+balance point is on the recess side when gear 1 is the pinion and on the
+approach side when gear 1 is the wheel, so the worse single-pair boundary swaps
+with the labelling. Checking only the inner one made the contact stress of one
+physical mesh depend on which gear the caller called 1. **Both boundaries are
+now evaluated**, and a test asserts that swapping the labels leaves the answer
+unchanged.
 
 **Minimum face width — closed form, no iteration.** Since `σ_F ∝ 1/b` and
 `σ_H ∝ 1/√b`:
@@ -1435,7 +1458,7 @@ it can be validated in isolation.
 | 2 | ✅ **Primitives & metrology** — safeguarded `inv⁻¹`, centre distance, backlash, span, pins, JGMA table | **met** — span reproduces the textbook form to 1e-12 mm, backlash matches a direct computation to 1e-16 mm, pin tangency verified to 3e-10 mm against the generated flank |
 | 3 | ✅ **Gear Calculator UI** — sidebar, tabs, parameter grid, canvas viewport, DXF export | **met** — the UI's own request path produces a DXF `ezdxf` reads back with the right geometry |
 | 4 | ✅ **Materials** — TOML library, import/export, the preloaded materials | **met** — every value carries a cited primary source and a `basis`; the library round-trips through TOML unchanged and satisfies cross-family consistency laws |
-| 5 | 🟡 **Mesh & strength** — contact path ✅, bending geometry ✅; remaining: load-to-stress path, efficiency, Hertz, face width | bending met — both constructions converge to their own closed-form rack limits |
+| 5 | ✅ **Mesh & strength** — contact path, bending, load-to-stress path, efficiency, Hertz, face width | **met** — both bending constructions converge to their own closed-form rack limits; Hertz agrees with the contact-half-width route to 1e-12; efficiency matches a numerical average of the instantaneous loss to 1e-10; `b_min` is independent of the face width it was evaluated at |
 | 6 | ⬜ **Spur stage** — accordion, train accumulation, torque/cycle propagation | a two-stage train computes end to end |
 | 7 | ⬜ **Worm stage** — screw-gear model, lead angle, self-locking, axial backlash | self-locking threshold matches the closed form |
 | 8 | ⬜ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | own rack-equivalent validation |
@@ -1499,6 +1522,8 @@ something independent.**
 | 4.7 | Parabola tangency searched on the fillet only | No solution at all above z≈150 — on large teeth it touches the **flank** |
 | 4.7 | ISO `Y_S` applied to a flank tangency | **17% discontinuity** at z=150→151 while `Y_F` moved 0.03%; the correction is a notch factor and there is no notch there |
 | 4.7 | "Rack-generated fillets keep `q_s` in range" | False at large z — 10.3 at z=300 with a sharp cutter |
+| 4.5 | Mesh efficiency without the `/ε_α` | Implicitly let every engaged pair carry the full load, so the mesh transmitted `ε_α F_n` and the loss came out too large by exactly the contact ratio. Caught by a numerical average of the instantaneous loss |
+| 4.7 | Hertz checked at "the inner point of single-pair contact (usually the pinion's worst case)" | Label-dependent: the relative-radius peak moves to the other side when gear 1 is the wheel, so one physical mesh gave two answers. Both boundaries are now checked |
 | 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
 | 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
 | 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |
@@ -1557,6 +1582,13 @@ here. Revision 2 additions are marked ★.
 | ✰ Brass `ν` from published moduli | `ν = E/2G − 1`, CDA `E` = 14 000 ksi, `G` = 5 300 ksi | 0.321 — derived, not estimated |
 | ✰ Material library round-trip | default library → TOML → parse, compared field by field | identical |
 | ✰ Polyamide family consistency | Grilon BS / BG-30 S / BG-50 S / Grivory GVX-7H, three separate datasheets | stiffness and density strictly increase with glass; moisture gap strictly closes — a column misread would break it |
+| ✦ Mesh efficiency closed form | vs. a direct numerical average of `μ\|ξ\|(1/r_b1+1/r_b2)` over the path, five meshes | agreement to 1e-10 relative; caught a missing `/ε_α` |
+| ✦ Hertz `σ_H` | vs. the contact-half-width route, `b_h = √(4F'R/πE*)` then `p_max = 2F'/(π b_h)` | 1e-12 relative — an independent path through the same physics |
+| ✦ `ρ₁ + ρ₂` along the path | swept 21 points, z = 17/43 | constant at `a_w sin α_w` to 1e-9 |
+| ✦ `b_min` independent of `b` | face widths 1, 5, 12.5, 100 mm, bending and contact | identical to 1e-9 — the check that catches a stress not scaling with `b` |
+| ✦ `σ_H ∝ √E*` | steel `E*` = 103 723 MPa vs polymer 1 700 MPa | ratio matches `√(E*₁/E*₂)` to 1e-9 |
+| ✦ `σ_H` independent of gear labelling | five meshes including 43/17 and 60/13, labels swapped | identical to 1e-12; caught the inner-boundary-only defect above |
+| ✦ `σ_F` composition vs. §4.7's load-case table | z = 17/43 at HPSTC, `Y_F · Y_S` | 2.9415 against the recorded 2.9416 |
 
 The marks record which round of review each check came from; they are kept only
 so a claim can be traced to the work that produced it.
