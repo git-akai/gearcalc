@@ -1,11 +1,60 @@
 <script lang="ts">
-  import { workspace } from "./state.svelte";
+  import { workspace, library } from "./state.svelte";
+  import { exportLibrary } from "./core";
 
   let { version }: { version: string | null } = $props();
+
+  let picker: HTMLInputElement;
+
+  async function onPicked(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    library.import(await file.text(), file.name);
+    // Clear it, or re-picking the same file after fixing it fires nothing.
+    input.value = "";
+  }
+
+  function saveLibrary() {
+    const r = exportLibrary(library.materials);
+    if ("error" in r) {
+      library.error = r.error;
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([r.ok], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "materials.toml";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 </script>
 
 <aside>
   <h1>Gears</h1>
+
+  <section class="library">
+    <h2>Materials</h2>
+    <div class="row">
+      <button onclick={() => picker.click()}>Import</button>
+      <button onclick={saveLibrary} disabled={library.materials.material.length === 0}>
+        Export
+      </button>
+    </div>
+    <input
+      bind:this={picker}
+      type="file"
+      accept=".toml,text/plain"
+      onchange={onPicked}
+      hidden
+    />
+    <p class="detail">
+      {library.materials.material.length} materials{library.origin ? ` · ${library.origin}` : ""}
+    </p>
+    {#if library.error}
+      <p class="err">{library.error}</p>
+    {/if}
+  </section>
 
   <section>
     <h2>Gears</h2>
@@ -121,6 +170,38 @@
     font-size: 0.75rem;
     color: var(--muted);
     margin: 0 0 0 0.25rem;
+  }
+  .row {
+    display: flex;
+    gap: 0.35rem;
+  }
+  .row button {
+    flex: 1;
+    font: inherit;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: none;
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .row button:hover:not(:disabled) {
+    background: var(--hover);
+  }
+  .row button:disabled {
+    color: var(--muted);
+    cursor: default;
+  }
+  .library .detail {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin: 0.35rem 0 0 0.25rem;
+  }
+  .library .err {
+    font-size: 0.7rem;
+    color: var(--warn);
+    margin: 0.35rem 0 0 0.25rem;
   }
   .version {
     margin-top: auto;

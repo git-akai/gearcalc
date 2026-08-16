@@ -1,6 +1,6 @@
 # Gear & geartrain design tool — architecture and mathematics
 
-**Status: milestones 0–3 complete and in CI; milestone 5 (strength) partly
+**Status: milestones 0–4 complete and in CI; milestone 5 (strength) partly
 built.** This document is the design of record and is current as of the head of
 `main`. Where implementation contradicted the design, the design was corrected
 and the correction recorded — see §12.
@@ -18,10 +18,11 @@ subscript `n` = normal plane, `t` = transverse.
 | Mesh | centre distance, exact backlash, contact path | direct tooth-thickness computation |
 | Metrology | span, over-pins, cutter tip width, JGMA tables | independent pin-tangency check |
 | Strength | critical section, form factor, stress correction | closed-form rack limits |
+| Materials | eight-material library, per-value provenance, TOML round-trip | primary datasheets; cross-family consistency laws |
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-98 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+105 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -29,15 +30,17 @@ with `ezdxf`.
 nix develop                       # or `direnv allow` once
 cargo nextest run                 # the suite
 cargo run --bin gear-cli -- show 17 0.2      # drive the maths, no browser
+cargo run --bin gear-cli -- materials        # the library, with each value's basis
 cargo run --release --bin gear-cli -- bending   # the bending verification sheet
 cd web && npm run dev             # the application
 ```
 
 ## What is next
 
-Milestone 4 (materials) and milestone 6 (spur stage) are the open work; §11 has
-the full list. Nothing is blocked. The one deferred decision with a written
-rationale is load sharing, §4.7.
+The rest of milestone 5 — the load-to-stress path, efficiency, Hertz and face
+width — and milestone 6 (spur stage) are the open work; §11 has the full list.
+Nothing is blocked. Two deferred decisions have written rationales: load
+sharing (§4.7) and the gear-rating standards (§6.2).
 
 ---
 
@@ -126,11 +129,12 @@ gears/
 │   │   ├── screw.rs         crossed-axis screw gearing (worm + crossed helical)
 │   │   ├── mesh.rs          centre distance, contact ratio, backlash, efficiency
 │   │   ├── metrology.rs     span, over-pins, tip width, JGMA lookup
-│   │   ├── strength.rs      bending, Hertz, S-N, face width
-│   │   ├── material.rs      material model
+│   │   ├── strength.rs      bending, Hertz, face width
+│   │   ├── material.rs      material model — values, provenance, allowables
 │   │   ├── train/           spur.rs, worm.rs, planetary.rs, accumulate.rs
-│   │   └── data/            jgma_116_02.toml, materials_default.toml
+│   │   └── data/            jgma_116_02.csv
 │   ├── gear-io/         DXF writer, TOML (de)serialisation
+│   │   └── data/            materials_default.toml   (TOML is I/O, so it lives here)
 │   ├── gear-wasm/       the three #[wasm_bindgen] entry points. Thin.
 │   └── gear-cli/        dev-only harness: solve a file, dump numbers, sweep
 ├── web/                 Svelte + TS + Vite front end
@@ -759,17 +763,12 @@ b_min,bending = b σ_F / σ_allow          b_min,contact = b (σ_H / σ_allow)²
 `b_min` is independent of the `b` it was evaluated at, as it must be — a good
 invariant test.
 
-**S-N.** Two points define a Basquin law `σ = C N^(−1/k)`, closed form both ways:
-
-```
-k = ln(N₂/N₁)/ln(σ₁/σ₂)      C = σ₁ N₁^(1/k)
-σ_allow(N) = C N^(−1/k)      life(σ) = (C/σ)^k
-```
-
-Recommendation: store **two points plus an optional endurance knee**
-`(N_knee, σ_endurance)` — three numbers, still closed form, piecewise continuous,
-and it captures the flat region steels have and plastics do not. That fits your
-material list better than either two points alone or a single fixed allowable.
+**S-N — withdrawn, replaced by two allowables.** An earlier draft specified a
+Basquin law `σ = C N^(−1/k)` fitted to two points, with an optional endurance
+knee. The material survey killed it: those two points do not exist for six of
+the eight materials, and no amount of modelling recovers data that was never
+measured. Each material instead carries a peak allowable and a cyclic allowable,
+which pair with the peak and cyclic input torques. The reasoning is in §6.2.
 
 ### 4.8 Planetary layout
 
@@ -1155,34 +1154,146 @@ a NaN silently reaching a stress figure.
 
 ## 6. Material library
 
-**TOML**, one file, human-readable and editable.
+**TOML**, one file, human-readable and editable —
+`crates/gear-io/data/materials_default.toml`. The model is
+`gear_core::material`; parsing and export are `gear_io::materials`, because
+TOML is I/O and `gear-core` stays serde-only.
 
 ```toml
 [[material]]
 name = "PA6 GF30"
-source = "EMS-Grivory Grilon TSG-30/4, datasheet rev. …"
-condition = "23 °C, dry as moulded"
-density = 1360.0            # kg/m³
-elastic_modulus = 6000.0    # MPa
-poissons_ratio = 0.38
-yield_strength = 110.0      # MPa
-sn = { n1 = 1.0e3, s1 = 80.0, n2 = 1.0e7, s2 = 25.0, knee_n = 1.0e7, knee_s = 25.0 }
+class = "polyamide"
+grade = "EMS-GRIVORY Grilon BG-30 S"
+condition = "dry as moulded / conditioned at 23 °C, 50 % RH"
+source = "EMS-GRIVORY Grilon BG-30 S CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15."
+density           = { dry = 1350.0, basis = "datasheet" }
+elastic_modulus   = { dry = 9500.0, conditioned = 6000.0, basis = "datasheet" }
+poissons_ratio    = { dry = 0.36,   basis = "estimated", note = "0.39 less 0.001 per % glass" }
+ultimate_allowable = { dry = 185.0, conditioned = 125.0, basis = "datasheet", note = "Stress at break" }
+ultimate_measure  = "break"
+fatigue_allowable = { dry = 55.5,  conditioned = 37.5, basis = "estimated", note = "0.30 × ultimate" }
 ```
+
+### 6.1 What the survey found, and the decision it forced
+
+The data was researched before the model was written, and the model is shaped by
+what actually exists. Across the library:
+
+| Property | Availability |
+|---|---|
+| Density, elastic modulus, tensile strength | published for **all** materials, on primary datasheets |
+| Poisson's ratio | published for the steels and POM; **no polyamide datasheet publishes it** |
+| Fatigue | published for the steels; a printed **graph** for POM; **nothing at all** for the polyamides |
+
+Two structural findings, not merely missing numbers:
+
+1. **Glass-filled grades have no yield point.** They break first, so their
+   datasheets report stress at break, not yield. `ultimate_measure` records
+   which, so the number stays comparable to its own source.
+2. **`1215 Hardened Steel` is not metallurgically coherent.** 1215 is a ~0.09 %C
+   resulphurised free-machining steel and cannot be through-hardened, only
+   carburised — a hard case over a soft core, which one scalar cannot represent.
+   Both 1215 entries were **dropped**; the list is eight materials, not twelve.
+
+**The decision: ship estimates, label them, and let the user edit them.** A
+calculator with empty fields cannot produce a ballpark number, and ballpark
+numbers before refinement are the point of the tool. This is a deliberate
+departure from the no-magic-numbers bar the rest of the document holds to, and
+it is confined to material data — no geometry or solver takes an estimated
+constant. Three things keep it honest:
+
+- **Every value carries a `basis`**: `datasheet`, `derived` (computed exactly
+  from two published values), `chart` (read off a published graph), or
+  `estimated`. `Material::weakest_basis` gives the entry's overall confidence,
+  because a material is only as good as its worst number.
+- **Anything that is not a plain datasheet reading must carry a `note`** saying
+  what it is. A test enforces this.
+- **Estimates are class-uniform**, so entries stay comparable to each other even
+  where the absolute value is a guess: polyamide fatigue is `0.30 × ultimate`
+  throughout, and polyamide `ν` is `0.39 − 0.001 per % glass`.
+
+The `ν` estimates are cheap in consequence and it is worth saying why: `ν`
+enters Hertz only through `(1−ν²)/E` and `σ_H ∝ √E*`, so the **entire** plausible
+polymer range `ν ∈ [0.33, 0.44]` moves contact stress by **±2.5 %** [verified].
+The slope of the estimate is anchored on DuPont's own POM measurements, which
+fall 0.37 → 0.35 over 20 % glass. Fatigue is the opposite case — the uncertainty
+there is order-of-magnitude and it is flagged as the weakest column in the file.
+
+### 6.2 Two allowables, not an S-N curve
+
+Earlier drafts stored a two-point Basquin law with an optional knee. **Withdrawn.**
+Fitting Basquin needs two points on a fatigue curve, and those points do not
+exist for six of the eight materials. A curve fitted to invented points is worse
+than an honest scalar, because it looks like it knows more than it does.
+
+Instead each material carries `ultimate_allowable` and `fatigue_allowable`,
+which map onto the **peak** and **cyclic** input torques the geartrain already
+takes (§4.9). Two allowables answer the two questions the tool is actually
+asked, and close a loop the spec had left open. Tooth cycles remain an output
+for the engineer's judgement rather than feeding a life calculation.
+
+The two available standards that would have done better were considered and are
+**not** used: ISO 6336-5 (σ_Flim/σ_Hlim for steels by material class) and
+VDI 2736-2 (gear-specific Wöhler lines, but only for unfilled POM, PA66, PET and
+PE — none of the glass grades). Both are paywalled, and transcribing their
+tables into an open repository is a licensing question the JGMA precedent does
+not settle. Named here so the decision can be revisited rather than rediscovered.
+
+### 6.3 Conventions
 
 - **Density units — settled.** Stored SI (kg/m³), displayed as g/cm³. This
   follows the general rule now adopted: **SI internally wherever reasonable, unit
   conversion only at the display boundary.** The two places that rule bends are
   where the domain's own conventions are unambiguous and SI would be perverse —
   lengths in mm rather than metres (all gear geometry, and what DXF expects) and
-  stresses in MPa rather than Pa. Both are noted in the type names
-  (`Mm`, `MPa`), so a unit mistake is a compile error rather than a wrong number.
-- **Provenance per entry**, since you asked for consistent sourcing. In the data,
-  not a README, or it is lost on the first edit.
-- **Condition field.** PA6/PA66 stiffness and strength roughly halve between
-  dry-as-moulded and conditioned. Without this field the library is actively
-  misleading for exactly the materials you listed.
+  stresses in MPa rather than Pa.
+- **Moisture is stored, not chosen.** Unfilled PA6 loses **two thirds** of its
+  stiffness between dry-as-moulded and 50 % RH — far the largest uncertainty in
+  the file. Both states are published, so both are stored, and `Value::get`
+  returns the conditioned figure wherever one exists: a gear in service has been
+  in service. The selection is not exposed in the UI; the stored dry value is
+  there for anyone who needs it.
+- **Provenance per entry**, in the data, not a README, or it is lost on the
+  first edit. Each entry names the specific *grade* measured — "PA6" is not a
+  material, some particular grade was tested, and the entry says which.
 - **Default material**: "4340 Hardened Steel" (the spec's "Hardened
   Medium-Carbon Steel" is not in the list — confirmed as one of the typos).
+- **Every property is editable in the UI**, seeded from the library and shown
+  greyed until edited, so a user can tweak a value for their own case without
+  authoring a library file. Overrides live in the input state, so §3.1 still
+  holds: outputs remain a pure function of inputs.
+
+### 6.4 The library
+
+Eight materials. Grade choices worth recording:
+
+| Entry | Grade | Note |
+|---|---|---|
+| 4340 Steel | AISI 4340, annealed | |
+| 4340 Hardened Steel | AISI 4340, oil quenched 845 °C, tempered 425 °C | 46 HRC, yield 1365 / UTS 1500 MPa. Lower tempering gives more strength (1860 MPa yield at 205 °C) but 53 HRC is past where a through-hardened gear is practical to finish. This temper is also the one the published `R = −1` fatigue work uses. |
+| Brass C360 | UNS C36000, H02 half hard | `ν = 0.32` is **derived**, not estimated: CDA publishes both `E = 14 000 ksi` and `G = 5 300 ksi`, and `ν = E/2G − 1`. |
+| POM Delrin 100P | DuPont Delrin 100P NC010 | The one polymer with a published `ν` (0.37) and a real fatigue curve. |
+| PA6 | EMS-GRIVORY Grilon BS | |
+| PA6 GF30 | EMS-GRIVORY Grilon BG-30 S | |
+| PA GF50 | EMS-GRIVORY Grilon BG-50 S | |
+| PA GF70 | EMS-GRIVORY Grivory GVX-7H | Partially aromatic copolyamide — 70 % glass does not exist on a plain PA base. |
+
+**No glass-filled POM, and that is a finding.** The obvious candidate, Delrin
+570, is glass *filled*: fibres added without effective coupling to the matrix,
+so load does not transfer. It is **25 % weaker** in tension than unfilled Delrin
+(53 MPa against 71) while being 63 % stiffer — for a tooth in bending, the wrong
+trade. Glass *coupled* acetals are genuinely stronger (Celcon GC25A: 106 MPa,
+8600 MPa modulus), so a glass POM can be added later provided it is a coupled
+grade. The distinction is not pedantry; it reverses the sign of the strength
+change.
+
+**Sourcing note.** MatWeb refuses automated access, CAMPUS is a JavaScript
+application, and the MatWeb mirrors are corrupted — one "PA6" page carried a
+different grade's data and two contradictory yield values. Manufacturer PDF
+datasheets in CAMPUS/ISO 10350 format are the reliable route and are what every
+polymer entry rests on. PA66 was dropped partly for this reason: EMS publishes
+no verifiable unfilled PA66 sheet, and a BASF entry beside seven EMS ones adds a
+vendor inconsistency for a material barely distinguishable from PA6.
 
 ---
 
@@ -1294,7 +1405,7 @@ not have to hunt for it.
 | Mesh-phase coefficient that sets the optimal λ | §4.10, appendix | only the angular-profile-shift milestone |
 | Sinusoidal `x(θ)`, or another interpolation? | §4.10 | same |
 | What the eccentric mechanism can physically follow | §4.10 | same |
-| Material data: sourcing and per-entry provenance | §6 | milestone 4 |
+| A coupled glass POM grade, if one is wanted back in the library | §6.4 | nothing |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
 | Crossed-axis contact model | §4.5.1 | milestone 10 |
 
@@ -1323,8 +1434,8 @@ it can be validated in isolation.
 | 1 | ✅ **Geometry core** — port `gear.py` + thickness modification + rack-simulation suite | **met** — penetration 2.1e-15 mm, deviation 6.2e-4 mm over 1080 cases |
 | 2 | ✅ **Primitives & metrology** — safeguarded `inv⁻¹`, centre distance, backlash, span, pins, JGMA table | **met** — span reproduces the textbook form to 1e-12 mm, backlash matches a direct computation to 1e-16 mm, pin tangency verified to 3e-10 mm against the generated flank |
 | 3 | ✅ **Gear Calculator UI** — sidebar, tabs, parameter grid, canvas viewport, DXF export | **met** — the UI's own request path produces a DXF `ezdxf` reads back with the right geometry |
-| 4 | ⬜ **Materials** — TOML library, import/export, the twelve preloaded materials | values sourced and cited |
-| 5 | 🟡 **Mesh & strength** — contact path ✅, bending ✅; remaining: efficiency, Hertz, S-N, face width | bending met — both constructions converge to their own closed-form rack limits |
+| 4 | ✅ **Materials** — TOML library, import/export, the preloaded materials | **met** — every value carries a cited primary source and a `basis`; the library round-trips through TOML unchanged and satisfies cross-family consistency laws |
+| 5 | 🟡 **Mesh & strength** — contact path ✅, bending geometry ✅; remaining: load-to-stress path, efficiency, Hertz, face width | bending met — both constructions converge to their own closed-form rack limits |
 | 6 | ⬜ **Spur stage** — accordion, train accumulation, torque/cycle propagation | a two-stage train computes end to end |
 | 7 | ⬜ **Worm stage** — screw-gear model, lead angle, self-locking, axial backlash | self-locking threshold matches the closed form |
 | 8 | ⬜ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | own rack-equivalent validation |
@@ -1388,6 +1499,11 @@ something independent.**
 | 4.7 | Parabola tangency searched on the fillet only | No solution at all above z≈150 — on large teeth it touches the **flank** |
 | 4.7 | ISO `Y_S` applied to a flank tangency | **17% discontinuity** at z=150→151 while `Y_F` moved 0.03%; the correction is a notch factor and there is no notch there |
 | 4.7 | "Rack-generated fillets keep `q_s` in range" | False at large z — 10.3 at z=300 with a sharp cutter |
+| 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
+| 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
+| 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |
+| 6 | Delrin 570 assumed a reasonable "POM GF20" | It is glass *filled*, not *reinforced* — **25 % weaker** than unfilled Delrin. Entry dropped; only a glass *coupled* grade would belong |
+| 6 | PA6/PA66 stiffness "roughly halves" when conditioned | Understated: unfilled PA6 modulus falls 3000 → 1000 MPa, a factor of **three** |
 | 4.10 | Read as an axial taper (beveloid) | It is an *angular* variation; the beveloid treatment was withdrawn entirely |
 | 4.10 | "No changes to the generator" (beveloid reading) | Did not survive the correction above |
 | — | Involute inversion by series seed + Newton | **Diverges above ~60°**, inside the allowed pressure-angle range; needs safeguarding |
@@ -1436,6 +1552,11 @@ here. Revision 2 additions are marked ★.
 | ✫ E3 under reversal | same three eccentricities | 50 / 125 / 250 μm — exactly **2×** E2, and unbounded relative to its own forward error |
 | ✫ Minimax over indexing λ | λ = 0, 0.5, 1 | worse-direction error minimised at **λ = 0** (E2); λ = 0.5 gives 31/94 μm, λ = 1 gives 0/125 μm |
 | ✫ Both flanks uniform ⟹ uniform thickness | algebraic, two lines | exact; base tooth thickness spread is 339 μm at e = 0.25 mm, so the two are incompatible |
+| ✰ Poisson's ratio sensitivity of `σ_H` | swept ν = 0.33…0.44, polymer-on-steel and polymer-on-polymer | **±2.5 %** total — the polyamide `ν` estimates are low-consequence |
+| ✰ Steel endurance ratio `0.5 × UTS` | vs. the published annealed 4340 fatigue strength | 345 against 330 MPa, within 5 %. **Not** corroborated at the hardened temper — no published figure exists there, and the ratio is known to fall away above ~1400 MPa UTS, so that entry is flagged optimistic |
+| ✰ Brass `ν` from published moduli | `ν = E/2G − 1`, CDA `E` = 14 000 ksi, `G` = 5 300 ksi | 0.321 — derived, not estimated |
+| ✰ Material library round-trip | default library → TOML → parse, compared field by field | identical |
+| ✰ Polyamide family consistency | Grilon BS / BG-30 S / BG-50 S / Grivory GVX-7H, three separate datasheets | stiffness and density strictly increase with glass; moisture gap strictly closes — a column misread would break it |
 
 The marks record which round of review each check came from; they are kept only
 so a claim can be traced to the work that produced it.

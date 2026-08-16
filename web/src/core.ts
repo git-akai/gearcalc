@@ -3,7 +3,15 @@
 // Project rule: no engineering calculation lives on this side of the boundary.
 // Everything here either forwards inputs to Rust or formats what Rust returned.
 
-import init, { solve_gear, gear_profile, export_dxf, version } from "./wasm/gear_wasm.js";
+import init, {
+  solve_gear,
+  gear_profile,
+  export_dxf,
+  version,
+  default_materials,
+  import_materials,
+  export_materials,
+} from "./wasm/gear_wasm.js";
 
 export interface GearParams {
   module: number;
@@ -179,6 +187,74 @@ export function profile(req: GearRequest, pointsPerTooth: number): Float64Array 
 export function dxf(req: GearRequest): { ok: string } | { error: string } {
   try {
     return { ok: export_dxf(JSON.stringify(req)) };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// --------------------------------------------------------------------- //
+//  Materials
+// --------------------------------------------------------------------- //
+
+/** How far a published value can be trusted. Mirrors the Rust `Basis`. */
+export type Basis = "datasheet" | "derived" | "chart" | "estimated";
+
+/** What the ultimate allowable measures. Glass-filled grades have no yield. */
+export type Measure = "yield" | "break";
+
+export type MaterialClass = "steel" | "brass" | "pom" | "polyamide";
+
+/** One property: its value, its moisture states, and its provenance.
+ *
+ *  There is deliberately no `effective(v)` helper on this side. Choosing
+ *  between `dry` and `conditioned` is an engineering decision, not formatting,
+ *  and the project rule keeps those in Rust — see DESIGN.md §6.3. When a
+ *  material property needs displaying as a single number, Rust will send that
+ *  number. */
+export interface MaterialValue {
+  dry: number;
+  conditioned?: number;
+  basis: Basis;
+  note?: string;
+}
+
+export interface Material {
+  name: string;
+  class: MaterialClass;
+  grade: string;
+  condition: string;
+  source: string;
+  density: MaterialValue;
+  elastic_modulus: MaterialValue;
+  poissons_ratio: MaterialValue;
+  ultimate_allowable: MaterialValue;
+  ultimate_measure: Measure;
+  fatigue_allowable: MaterialValue;
+}
+
+/** The array is named `material` because that is what the TOML calls it, and
+ *  the two formats are kept in step deliberately. */
+export interface MaterialLibrary {
+  material: Material[];
+}
+
+export function defaultLibrary(): MaterialLibrary {
+  return JSON.parse(default_materials()) as MaterialLibrary;
+}
+
+/** Parse a hand-edited library. The TOML never touches TypeScript: the file is
+ *  read as text and handed straight to the one tested parser. */
+export function importLibrary(tomlText: string): { ok: MaterialLibrary } | { error: string } {
+  try {
+    return { ok: JSON.parse(import_materials(tomlText)) as MaterialLibrary };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export function exportLibrary(lib: MaterialLibrary): { ok: string } | { error: string } {
+  try {
+    return { ok: export_materials(JSON.stringify(lib)) };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }

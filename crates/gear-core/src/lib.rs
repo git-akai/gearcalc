@@ -18,6 +18,7 @@
 pub mod contact;
 pub mod involute;
 pub mod jgma;
+pub mod material;
 pub mod mesh;
 pub mod metrology;
 pub mod outline;
@@ -28,6 +29,7 @@ pub mod strength;
 pub mod verify;
 
 pub use involute::{inv, inv_from_roll, inv_inverse};
+pub use material::{Material, MaterialLibrary};
 pub use mesh::{Mesh, MeshError, MeshKind};
 pub use outline::Vertex;
 pub use params::{Clamps, GearParams};

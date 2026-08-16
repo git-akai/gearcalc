@@ -5,6 +5,7 @@
 //! ```text
 //! gear-cli show   [z] [x]     print the derived geometry of one gear
 //! gear-cli sweep              scan a parameter grid for clamps and undercut
+//! gear-cli materials          the material library, with each value's basis
 //! ```
 
 mod diagram;
@@ -20,6 +21,7 @@ fn main() {
         Some("bending") => bending_report(),
         Some("matrix") => matrix_report(),
         Some("loadcase") => loadcase_report(),
+        Some("materials") => materials(),
         Some("dxf") => dxf(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.0),
@@ -40,6 +42,70 @@ fn main() {
             });
         }
         Some(other) => eprintln!("unknown command {other:?}; try `show` or `sweep`"),
+    }
+}
+
+/// The shipped material library, with each value's provenance.
+///
+/// The `basis` column is the point of this view: the library deliberately
+/// contains estimates as well as measurements, and the difference should be
+/// visible at a glance rather than buried in the TOML.
+fn materials() {
+    let lib = gear_io::default_library();
+    println!(
+        "{:<20} {:>8} {:>9} {:>6} {:>10} {:>9}",
+        "material", "rho", "E", "nu", "ultimate", "fatigue"
+    );
+    println!(
+        "{:<20} {:>8} {:>9} {:>6} {:>10} {:>9}",
+        "", "kg/m3", "MPa", "", "MPa", "MPa"
+    );
+    println!("{}", "-".repeat(67));
+
+    for m in &lib.materials {
+        // A single letter per value, so a row reads as a confidence pattern:
+        // `d` datasheet, `D` derived, `c` chart, `e` estimated.
+        let tag = |v: &gear_core::material::Value| match v.basis {
+            gear_core::material::Basis::Datasheet => 'd',
+            gear_core::material::Basis::Derived => 'D',
+            gear_core::material::Basis::Chart => 'c',
+            gear_core::material::Basis::Estimated => 'e',
+        };
+        println!(
+            "{:<20} {:>7.0}{} {:>8.0}{} {:>5.2}{} {:>9.1}{} {:>8.1}{}",
+            m.name,
+            m.density.get(),
+            tag(&m.density),
+            m.elastic_modulus.get(),
+            tag(&m.elastic_modulus),
+            m.poissons_ratio.get(),
+            tag(&m.poissons_ratio),
+            m.ultimate_allowable.get(),
+            tag(&m.ultimate_allowable),
+            m.fatigue_allowable.get(),
+            tag(&m.fatigue_allowable),
+        );
+    }
+
+    println!("\nbasis: d datasheet   D derived   c read off a chart   e estimated");
+    println!("values are the conditioned state where the material has one\n");
+
+    for m in &lib.materials {
+        println!("{}  [{}]", m.name, m.grade);
+        println!("  condition: {}", m.condition);
+        println!("  source:    {}", m.source);
+        for (label, v) in [
+            ("density", &m.density),
+            ("modulus", &m.elastic_modulus),
+            ("poisson", &m.poissons_ratio),
+            ("ultimate", &m.ultimate_allowable),
+            ("fatigue", &m.fatigue_allowable),
+        ] {
+            if let Some(note) = &v.note {
+                println!("  {label:<9} {note}");
+            }
+        }
+        println!();
     }
 }
 

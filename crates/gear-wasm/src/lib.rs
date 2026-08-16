@@ -260,6 +260,49 @@ pub fn export_dxf(input: &str) -> Result<String, JsError> {
     export_dxf_impl(input).map_err(|e| JsError::new(&e))
 }
 
+fn default_materials_impl() -> Result<String, String> {
+    serde_json::to_string(&gear_io::default_library()).map_err(|e| e.to_string())
+}
+
+fn import_materials_impl(toml_text: &str) -> Result<String, String> {
+    let lib = gear_io::from_toml(toml_text).map_err(|e| e.to_string())?;
+    serde_json::to_string(&lib).map_err(|e| e.to_string())
+}
+
+fn export_materials_impl(library_json: &str) -> Result<String, String> {
+    let lib: gear_core::MaterialLibrary =
+        serde_json::from_str(library_json).map_err(|e| e.to_string())?;
+    gear_io::to_toml(&lib).map_err(|e| e.to_string())
+}
+
+/// The material library the tool ships with, as JSON.
+///
+/// Includes each value's `basis` and `note`, because the UI is expected to show
+/// which numbers are measured and which are estimates — see `docs/DESIGN.md`
+/// §6.1. Dropping that on the floor would present a class estimate with the
+/// same authority as a datasheet reading.
+#[wasm_bindgen]
+pub fn default_materials() -> Result<String, JsError> {
+    default_materials_impl().map_err(|e| JsError::new(&e))
+}
+
+/// Import a material library: TOML text in, JSON out.
+///
+/// The TOML never reaches TypeScript — the browser reads a file as text and
+/// hands it straight here, so exactly one parser exists and it is the tested
+/// one. A malformed library returns the parser's own complaint, which names the
+/// line, rather than a generic failure.
+#[wasm_bindgen]
+pub fn import_materials(toml_text: &str) -> Result<String, JsError> {
+    import_materials_impl(toml_text).map_err(|e| JsError::new(&e))
+}
+
+/// Export a material library: JSON in, TOML text out, ready for a download.
+#[wasm_bindgen]
+pub fn export_materials(library_json: &str) -> Result<String, JsError> {
+    export_materials_impl(library_json).map_err(|e| JsError::new(&e))
+}
+
 /// Version of the core, so the UI can show what it is actually running.
 #[wasm_bindgen]
 #[must_use]
@@ -325,6 +368,47 @@ mod tests {
     fn profile_is_flat_pairs() {
         let v = gear_profile_impl(REQ, 200).unwrap();
         assert!(v.len().is_multiple_of(2) && v.len() > 100);
+    }
+
+    #[test]
+    fn the_material_library_crosses_the_boundary_with_its_provenance_intact() {
+        let json = default_materials_impl().unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let materials = v["material"].as_array().unwrap();
+        assert_eq!(materials.len(), 8);
+
+        let pa6 = materials.iter().find(|m| m["name"] == "PA6").unwrap();
+        // The conditioned value must survive: it is the one the tool uses.
+        assert!((pa6["elastic_modulus"]["conditioned"].as_f64().unwrap() - 1000.0).abs() < 1e-9);
+        // ...and so must the honesty about where a number came from.
+        assert_eq!(pa6["poissons_ratio"]["basis"], "estimated");
+        assert!(pa6["poissons_ratio"]["note"].is_string());
+        assert_eq!(pa6["elastic_modulus"]["basis"], "datasheet");
+    }
+
+    #[test]
+    fn a_material_library_survives_export_and_reimport() {
+        // The user-facing loop: ship defaults, export to a file, edit, import.
+        let original = default_materials_impl().unwrap();
+        let toml_text = export_materials_impl(&original).unwrap();
+        let reimported = import_materials_impl(&toml_text).unwrap();
+
+        let a: serde_json::Value = serde_json::from_str(&original).unwrap();
+        let b: serde_json::Value = serde_json::from_str(&reimported).unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn a_broken_material_file_explains_itself_rather_than_panicking() {
+        // The message must name what is wrong, not merely report failure: this
+        // is what the user sees after hand-editing their own library.
+        let err = import_materials_impl("[[material]]\nname = ").unwrap_err();
+        assert!(err.contains("not valid"), "unhelpful message: {err}");
+
+        assert!(import_materials_impl("")
+            .unwrap_err()
+            .contains("no materials"));
+        assert!(export_materials_impl("{ not json").is_err());
     }
 
     #[test]

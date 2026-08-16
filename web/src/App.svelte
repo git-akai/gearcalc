@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { loadCore, coreVersion } from "./core";
-  import { workspace } from "./state.svelte";
+  import { workspace, library } from "./state.svelte";
   import Sidebar from "./Sidebar.svelte";
   import GearPanel from "./GearPanel.svelte";
 
@@ -11,6 +11,9 @@
   onMount(async () => {
     try {
       await loadCore();
+      // The shipped materials live in the core, so they cannot be read before
+      // it is up.
+      library.loadDefaults();
       loaded = true;
     } catch (e) {
       failed = e instanceof Error ? e.message : String(e);

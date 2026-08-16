@@ -7,7 +7,12 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-gear-core = { path = "../gear-core" }
+gear-core = { path = "../gear-core", features = ["serde"] }
+# TOML is a spec requirement: the material library and geartrains are exchanged
+# as human-readable, hand-editable documents. Parsing it is I/O, not
+# engineering, so the dependency lives here — `gear-core` stays serde-only.
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
 
 [lints]
 workspace = true

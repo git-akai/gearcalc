@@ -19,10 +19,11 @@ are in [`docs/DESIGN.md`](docs/DESIGN.md). Read that before changing anything in
 | Path | Role |
 |---|---|
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. Depends only on `serde`. |
-| `crates/gear-wasm` | The WebAssembly boundary. Three functions, JSON in, JSON out. |
+| `crates/gear-io` | File formats: DXF export, and the TOML material library. |
+| `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
 | `web/` | Svelte 5 + TypeScript + Vite front end. |
-| `docs/` | Design document and the JGMA 116-02 tolerance tables. |
+| `docs/` | Design document, the initial specification, and the JGMA 116-02 tables. |
 | `handoff_inbound/` | Prior Python work. **Reference only** — do not build on it. |
 
 ## Getting started
@@ -47,8 +48,21 @@ This is the fastest way to see what the core is doing.
 ```bash
 cargo run --bin gear-cli -- show 17 0.2   # derived geometry for z=17, x=+0.2
 cargo run --bin gear-cli -- sweep         # scan a grid for undercut and clamps
+cargo run --bin gear-cli -- materials     # the material library and its provenance
 cargo run --release --bin gear-cli -- verify 100   # two-sided cutter check
 ```
+
+### A note on the material library
+
+`crates/gear-io/data/materials_default.toml` is the one place in this project
+where numbers are not derived from first principles, and it says so. Published
+data does not exist for every property of every material — no polyamide
+datasheet gives Poisson's ratio, and none gives any fatigue figure at all — so
+some values are estimates. **Every value carries a `basis`** recording whether
+it was read from a datasheet, derived from other published values, read off a
+chart, or estimated. `gear-cli materials` prints that as a column; the UI is
+expected to surface it too. Treat the estimates as starting points to be
+overridden, not as authority.
 
 ### The web application
 

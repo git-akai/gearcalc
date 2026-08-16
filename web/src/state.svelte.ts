@@ -4,7 +4,14 @@
 // nothing can go stale — every output on screen is recomputed from these by
 // Rust on each change.
 
-import { defaultParams, type ClassRef, type GearParams } from "./core";
+import {
+  defaultParams,
+  defaultLibrary,
+  importLibrary,
+  type ClassRef,
+  type GearParams,
+  type MaterialLibrary,
+} from "./core";
 
 export interface GearTab {
   id: number;
@@ -78,3 +85,43 @@ class Workspace {
 }
 
 export const workspace = new Workspace();
+
+/** The material library.
+ *
+ *  Loaded from the core rather than defined here, so the shipped values and
+ *  their provenance have exactly one home. Importing replaces the whole
+ *  library, as the specification requires: the file is the library, and nothing
+ *  is written back except by an explicit export. */
+class Library {
+  materials = $state<MaterialLibrary>({ material: [] });
+  /** Set when the last import failed, so the sidebar can say why. */
+  error = $state<string | null>(null);
+  /** Name of the file the current library came from, if it was imported. */
+  origin = $state<string | null>(null);
+
+  /** Called once the wasm core is ready — the defaults live inside it. */
+  loadDefaults() {
+    this.materials = defaultLibrary();
+    this.origin = null;
+    this.error = null;
+  }
+
+  import(text: string, filename: string) {
+    const r = importLibrary(text);
+    if ("error" in r) {
+      // The previous library survives a bad import. Replacing it with nothing
+      // would lose the user's working set over a typo.
+      this.error = r.error;
+      return;
+    }
+    this.materials = r.ok;
+    this.origin = filename;
+    this.error = null;
+  }
+
+  get names(): string[] {
+    return this.materials.material.map((m) => m.name);
+  }
+}
+
+export const library = new Library();
