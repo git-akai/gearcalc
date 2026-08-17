@@ -122,11 +122,10 @@ pub fn automatic_profile_shift(p: &GearParams, working_depth: f64) -> f64 {
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ShiftRange {
-    /// Smallest buildable shift. Below it the tooth is thinner than the geometry
-    /// guards allow, or the cutter runs past the centre.
-    pub min: f64,
-    /// Largest buildable shift. Above it the cutter no longer reaches the root.
-    pub max: f64,
+    /// What can be built: below it the tooth is thinner than the guards allow or
+    /// the cutter runs past the centre; above it the cutter no longer reaches
+    /// the root.
+    pub bound: Bound,
     /// Below this the flank is undercut at the stated working depth — the same
     /// figure [`minimum_profile_shift`] returns. **Advisory, not a limit:** an
     /// undercut gear is a real gear, and this crate generates it exactly.
@@ -234,21 +233,83 @@ pub fn admissible_profile_shift(p: &GearParams, working_depth: f64) -> ShiftRang
     };
 
     ShiftRange {
-        min,
-        max,
+        bound: Bound::between(Some(min), Some(max)),
         undercut: shift.with_cutter_radius,
         sharp_rack_undercut: shift.sharp_rack,
         pointed,
     }
 }
 
-/// A bound the geometry itself imposes on one parameter. `None` where that side
-/// is genuinely unbounded.
-#[derive(Clone, Copy, Debug, Default)]
+/// A bound on one input. `None` on a side that is genuinely unbounded.
+///
+/// Exclusivity matters and is carried rather than assumed: a module of exactly
+/// zero collapses every radius, so `m > 0`, while an addendum exactly at its
+/// floor is a legal (if pointless) tooth.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Bound {
     pub min: Option<f64>,
     pub max: Option<f64>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub exclusive_min: bool,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub exclusive_max: bool,
+}
+
+impl Bound {
+    /// Inclusive on both sides.
+    #[must_use]
+    pub const fn between(min: Option<f64>, max: Option<f64>) -> Self {
+        Self {
+            min,
+            max,
+            exclusive_min: false,
+            exclusive_max: false,
+        }
+    }
+
+    /// Exclusive on both sides.
+    #[must_use]
+    pub const fn strictly(min: f64, max: f64) -> Self {
+        Self {
+            min: Some(min),
+            max: Some(max),
+            exclusive_min: true,
+            exclusive_max: true,
+        }
+    }
+
+    /// Why `v` is outside, or `None` if it is inside.
+    ///
+    /// The message is produced here rather than in the view so that the two
+    /// panels cannot word — or bound — the same condition differently.
+    #[must_use]
+    pub fn rejects(&self, v: f64) -> Option<String> {
+        if !v.is_finite() {
+            return Some("must be a number".into());
+        }
+        if let Some(lo) = self.min {
+            if if self.exclusive_min { v <= lo } else { v < lo } {
+                let how = if self.exclusive_min {
+                    "greater than"
+                } else {
+                    "at least"
+                };
+                return Some(format!("must be {how} {lo}"));
+            }
+        }
+        if let Some(hi) = self.max {
+            if if self.exclusive_max { v >= hi } else { v > hi } {
+                let how = if self.exclusive_max {
+                    "less than"
+                } else {
+                    "at most"
+                };
+                return Some(format!("must be {how} {hi}"));
+            }
+        }
+        None
+    }
 }
 
 /// Every input range the geometry decides, rather than convention.
@@ -270,6 +331,18 @@ pub struct Bound {
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ranges {
+    /// `m > 0`: at zero every radius collapses.
+    pub module: Bound,
+    /// `0 < α < 90°`: at zero the thickness-equivalent shift diverges, at 90°
+    /// the base circle does.
+    pub pressure_angle: Bound,
+    /// `z ≥ 1`.
+    pub teeth: Bound,
+    /// `|β| < 90°`: the transverse module diverges at the limit.
+    pub helix_angle: Bound,
+    /// `0 < k < 2`: a rack whose tooth or space has non-positive width is not a
+    /// rack.
+    pub thickness_mod: Bound,
     pub profile_shift: ShiftRange,
     /// Lower bound only. There is no upper: too much addendum gives a pointed
     /// tooth, which the generator caps and reports rather than refuses.
@@ -331,19 +404,23 @@ pub fn admissible_ranges(p: &GearParams, working_depth: f64) -> Ranges {
     let rho_max = guard::FILLET_FRACTION_OF_MAX * bd.min(rho_fit);
 
     Ranges {
-        profile_shift: admissible_profile_shift(p, working_depth),
-        addendum: Bound {
-            min: Some(above_root.max(above_base)),
-            max: None,
-        },
-        dedendum: Bound {
-            min: Some(-p.addendum),
-            max: Some(root_positive),
-        },
-        root_radius: Bound {
+        // Invariant bounds. They do not vary, but they live here so that there
+        // is exactly one place any input limit is written down.
+        module: Bound {
             min: Some(0.0),
-            max: Some((rho_max / mt).max(0.0)),
+            max: None,
+            exclusive_min: true,
+            exclusive_max: false,
         },
+        pressure_angle: Bound::strictly(0.0, 90.0),
+        teeth: Bound::between(Some(1.0), None),
+        helix_angle: Bound::strictly(-90.0, 90.0),
+        thickness_mod: Bound::strictly(0.0, 2.0),
+
+        profile_shift: admissible_profile_shift(p, working_depth),
+        addendum: Bound::between(Some(above_root.max(above_base)), None),
+        dedendum: Bound::between(Some(-p.addendum), Some(root_positive)),
+        root_radius: Bound::between(Some(0.0), Some((rho_max / mt).max(0.0))),
     }
 }
 
@@ -620,8 +697,9 @@ mod tests {
                 ..Default::default()
             },
         ] {
-            let r = admissible_profile_shift(&p, 1.0);
-            assert!(r.min < r.max, "empty range for {p:?}");
+            let r = admissible_profile_shift(&p, 1.0).bound;
+            let (lo, hi) = (r.min.unwrap(), r.max.unwrap());
+            assert!(lo < hi, "empty range for {p:?}");
 
             let clamps = |x: f64| {
                 Gear::new(GearParams {
@@ -635,15 +713,15 @@ mod tests {
             };
             let eps = 0.01;
             assert!(
-                !clamps(r.max - eps),
+                !clamps(hi - eps),
                 "clamped inside the top of the range: {p:?}"
             );
             assert!(
-                clamps(r.max + eps),
+                clamps(hi + eps),
                 "no clamp above the top of the range: {p:?}"
             );
-            assert!(!clamps(r.min + eps), "clamped inside the bottom: {p:?}");
-            assert!(clamps(r.min - eps), "no clamp below the bottom: {p:?}");
+            assert!(!clamps(lo + eps), "clamped inside the bottom: {p:?}");
+            assert!(clamps(lo - eps), "no clamp below the bottom: {p:?}");
         }
     }
 
@@ -654,7 +732,8 @@ mod tests {
     fn the_fixed_plus_minus_two_is_wrong_in_both_directions() {
         // Too loose above: the real ceiling is the cutter depth.
         let d = admissible_profile_shift(&GearParams::default(), 1.0);
-        assert!(d.max < 2.0 && (d.max - 1.20).abs() < 1e-9, "max {}", d.max);
+        let dmax = d.bound.max.unwrap();
+        assert!(dmax < 2.0 && (dmax - 1.20).abs() < 1e-9, "max {dmax}");
 
         // Too tight below at a low pressure angle...
         let low = admissible_profile_shift(
@@ -664,11 +743,8 @@ mod tests {
             },
             1.0,
         );
-        assert!(
-            low.min < -2.0,
-            "14.5 deg floor {} should be below -2",
-            low.min
-        );
+        let lmin = low.bound.min.unwrap();
+        assert!(lmin < -2.0, "14.5 deg floor {lmin} should be below -2");
 
         // ...and too loose below at a high one.
         let high = admissible_profile_shift(
@@ -678,11 +754,8 @@ mod tests {
             },
             1.0,
         );
-        assert!(
-            high.min > -2.0,
-            "30 deg floor {} should be above -2",
-            high.min
-        );
+        let hmin = high.bound.min.unwrap();
+        assert!(hmin > -2.0, "30 deg floor {hmin} should be above -2");
 
         // And blind to thickness modification entirely.
         let thick = admissible_profile_shift(
@@ -692,7 +765,10 @@ mod tests {
             },
             1.0,
         );
-        assert!(thick.min < d.min - 0.5, "k should move the floor");
+        assert!(
+            thick.bound.min.unwrap() < d.bound.min.unwrap() - 0.5,
+            "k should move the floor"
+        );
     }
 
     /// The design thresholds sit INSIDE the buildable range, not at its edges:
@@ -705,15 +781,18 @@ mod tests {
                 ..Default::default()
             };
             let r = admissible_profile_shift(&p, 1.0);
-            assert!(r.undercut > r.min && r.undercut < r.max, "z={teeth}");
+            assert!(
+                r.undercut > r.bound.min.unwrap() && r.undercut < r.bound.max.unwrap(),
+                "z={teeth}"
+            );
             // A real cutter always needs less shift than a sharp rack.
             assert!(r.undercut < r.sharp_rack_undercut);
 
             if let Some(pointed) = r.pointed {
-                assert!(pointed > r.min && pointed <= r.max);
+                assert!(pointed > r.bound.min.unwrap() && pointed <= r.bound.max.unwrap());
                 // Just past it the generator caps the tip, and says so.
                 let capped = Gear::new(GearParams {
-                    profile_shift: (pointed + 0.02).min(r.max),
+                    profile_shift: (pointed + 0.02).min(r.bound.max.unwrap()),
                     ..p
                 });
                 assert!(
@@ -722,6 +801,55 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Exclusivity is carried, not assumed. A module of exactly zero is not a
+    /// gear; an addendum exactly at its floor is.
+    #[test]
+    fn bounds_carry_their_own_exclusivity_and_wording() {
+        let strict = Bound::strictly(0.0, 90.0);
+        assert!(strict.rejects(0.0).is_some(), "0 is outside (0, 90)");
+        assert!(strict.rejects(90.0).is_some());
+        assert!(strict.rejects(0.001).is_none());
+        assert!(strict.rejects(20.0).is_none());
+        assert!(strict.rejects(f64::NAN).is_some());
+
+        let inclusive = Bound::between(Some(-1.25), None);
+        assert!(
+            inclusive.rejects(-1.25).is_none(),
+            "the floor itself is legal"
+        );
+        assert!(inclusive.rejects(-1.26).is_some());
+        assert!(inclusive.rejects(1e9).is_none(), "no ceiling");
+
+        // The wording distinguishes the two, since it is the only thing the user
+        // sees and both panels take it from here.
+        assert!(strict.rejects(0.0).unwrap().contains("greater than"));
+        assert!(inclusive.rejects(-2.0).unwrap().contains("at least"));
+    }
+
+    /// Every input has a bound, and they come from one place.
+    #[test]
+    fn every_input_is_bounded_and_the_defaults_are_inside() {
+        let p = GearParams::default();
+        let r = admissible_ranges(&p, 1.0);
+
+        assert!(r.module.rejects(p.module).is_none());
+        assert!(r.pressure_angle.rejects(p.pressure_angle).is_none());
+        assert!(r.teeth.rejects(f64::from(p.teeth)).is_none());
+        assert!(r.helix_angle.rejects(p.helix_angle).is_none());
+        assert!(r.thickness_mod.rejects(p.thickness_mod).is_none());
+        assert!(r.profile_shift.bound.rejects(p.profile_shift).is_none());
+        assert!(r.addendum.rejects(p.addendum).is_none());
+        assert!(r.dedendum.rejects(p.dedendum).is_none());
+        assert!(r.root_radius.rejects(p.root_radius).is_none());
+
+        // ...and the invariant ones reject what they must.
+        assert!(r.module.rejects(0.0).is_some());
+        assert!(r.teeth.rejects(0.0).is_some());
+        assert!(r.pressure_angle.rejects(90.0).is_some());
+        assert!(r.helix_angle.rejects(-90.0).is_some());
+        assert!(r.thickness_mod.rejects(2.0).is_some());
     }
 
     #[test]

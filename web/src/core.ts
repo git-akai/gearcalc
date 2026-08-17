@@ -64,30 +64,77 @@ export interface ToleranceOut {
   total: number;
 }
 
+/** A bound on one input, mirroring Rust's `Bound`. */
+export interface Bound {
+  min: number | null;
+  max: number | null;
+  exclusive_min: boolean;
+  exclusive_max: boolean;
+}
+
 /** The profile shifts this gear can be built at, plus the design thresholds
  *  inside them. Every number here is computed in Rust; this side only compares
  *  and formats. */
 export interface ShiftRange {
-  min: number;
-  max: number;
+  bound: Bound;
   undercut: number;
   sharp_rack_undercut: number;
   pointed: number | null;
 }
 
-/** A bound the geometry imposes; either side absent means unbounded. */
-export interface Bound {
-  min: number | null;
-  max: number | null;
-}
-
-/** Every input range this gear's own geometry decides. Fields not listed here
- *  have bounds that do not vary, and stay as constants in FIELDS. */
+/** Every bound on a gear's inputs — including the ones that do not vary.
+ *
+ *  There are deliberately no numeric limits anywhere in this file: a limit
+ *  written here would be a second place it could be changed, and a second place
+ *  it could be wrong. Rust decides them all. */
 export interface Ranges {
+  module: Bound;
+  pressure_angle: Bound;
+  teeth: Bound;
+  helix_angle: Bound;
+  thickness_mod: Bound;
   profile_shift: ShiftRange;
   addendum: Bound;
   dedendum: Bound;
   root_radius: Bound;
+}
+
+/** Why `v` is outside `b`, or null if it is inside. Comparison only. */
+export function outside(v: number, b: Bound): string | null {
+  if (!Number.isFinite(v)) return "must be a number";
+  if (b.min !== null && (b.exclusive_min ? v <= b.min : v < b.min)) {
+    return `must be ${b.exclusive_min ? "greater than" : "at least"} ${b.min}`;
+  }
+  if (b.max !== null && (b.exclusive_max ? v >= b.max : v > b.max)) {
+    return `must be ${b.exclusive_max ? "less than" : "at most"} ${b.max}`;
+  }
+  return null;
+}
+
+/** The bound for a field, from the gear's own ranges. */
+export function boundFor(key: keyof GearParams, r: Ranges): Bound | null {
+  switch (key) {
+    case "module":
+      return r.module;
+    case "pressure_angle":
+      return r.pressure_angle;
+    case "teeth":
+      return r.teeth;
+    case "helix_angle":
+      return r.helix_angle;
+    case "thickness_mod":
+      return r.thickness_mod;
+    case "profile_shift":
+      return r.profile_shift.bound;
+    case "addendum":
+      return r.addendum;
+    case "dedendum":
+      return r.dedendum;
+    case "root_radius":
+      return r.root_radius;
+    default:
+      return null;
+  }
 }
 
 export interface GearSummary {
@@ -136,50 +183,16 @@ export interface FieldSpec {
   unit: string;
   step: number;
   integer?: boolean;
-  min?: number;
-  max?: number;
-  /** true when the bound itself is not allowed */
-  exclusiveMin?: boolean;
-  exclusiveMax?: boolean;
   /** shown under the field */
   note?: string;
 }
 
 export const FIELDS: FieldSpec[] = [
-  { key: "module", label: "Normal module", unit: "mm", step: 0.1, min: 0, exclusiveMin: true },
-  // The bounds below are the mathematical ones, not the specification's
-  // conventional ones. alpha -> 0 sends the thickness-equivalent shift to
-  // infinity and alpha -> 90 collapses the base circle; |beta| -> 90 sends the
-  // transverse module to infinity. Everything strictly inside generates a real
-  // gear, however peculiar — see crates/gear-core/tests/extremes.rs.
-  {
-    key: "pressure_angle",
-    label: "Pressure angle",
-    unit: "°",
-    step: 0.5,
-    min: 0,
-    max: 90,
-    exclusiveMin: true,
-    exclusiveMax: true,
-  },
-  { key: "teeth", label: "Tooth count", unit: "", step: 1, integer: true, min: 1 },
-  {
-    key: "helix_angle",
-    label: "Helix angle",
-    unit: "°",
-    step: 1,
-    min: -90,
-    max: 90,
-    exclusiveMin: true,
-    exclusiveMax: true,
-  },
-  // No fixed range: the real bound depends on dedendum, pressure angle and
-  // thickness modification, so it comes back from Rust per gear and is applied
-  // in GearPanel. See DESIGN.md §4.3.
+  { key: "module", label: "Normal module", unit: "mm", step: 0.1 },
+  { key: "pressure_angle", label: "Pressure angle", unit: "°", step: 0.5 },
+  { key: "teeth", label: "Tooth count", unit: "", step: 1, integer: true },
+  { key: "helix_angle", label: "Helix angle", unit: "°", step: 1 },
   { key: "profile_shift", label: "Profile shift", unit: "module", step: 0.05 },
-  // Bounded by the geometry, not by a constant: the tooth must have positive
-  // height, the root circle must stay off the axis, and the fillet must fit the
-  // space. Rust returns all three per gear; GearPanel applies them.
   { key: "addendum", label: "Addendum", unit: "module", step: 0.05 },
   { key: "dedendum", label: "Dedendum", unit: "module", step: 0.05 },
   { key: "root_radius", label: "Root radius coefficient", unit: "module", step: 0.01 },
@@ -188,29 +201,14 @@ export const FIELDS: FieldSpec[] = [
     label: "Tooth thickness modification",
     unit: "",
     step: 0.05,
-    min: 0,
-    max: 2,
-    exclusiveMin: true,
-    exclusiveMax: true,
     note: "1 is the standard rack; a meshing pair must sum to 2",
   },
 ];
 
-/** Why a value is not acceptable, or null if it is. */
-export function validate(f: FieldSpec, v: number): string | null {
-  if (!Number.isFinite(v)) return "must be a number";
+/** Why a value is not acceptable, given the bound Rust returned. */
+export function validate(f: FieldSpec, v: number, b: Bound | null): string | null {
   if (f.integer && !Number.isInteger(v)) return "must be a whole number";
-  if (f.min !== undefined) {
-    if (f.exclusiveMin ? v <= f.min : v < f.min) {
-      return `must be ${f.exclusiveMin ? "greater than" : "at least"} ${f.min}`;
-    }
-  }
-  if (f.max !== undefined) {
-    if (f.exclusiveMax ? v >= f.max : v > f.max) {
-      return `must be ${f.exclusiveMax ? "less than" : "at most"} ${f.max}`;
-    }
-  }
-  return null;
+  return b === null ? (Number.isFinite(v) ? null : "must be a number") : outside(v, b);
 }
 
 // --------------------------------------------------------------------- //

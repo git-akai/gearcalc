@@ -6,6 +6,7 @@
     profile,
     solve,
     validate,
+    boundFor,
     type GearRequest,
     type Maybe,
     type PinsOut,
@@ -21,31 +22,6 @@
     Object.fromEntries(FIELDS.map((f) => [f.key, String(tab.params[f.key])])),
   );
   let errors = $state<Record<string, string | null>>({});
-
-  /** The spec to validate against. Four fields have no fixed range — the
-   *  geometry decides them per gear — so Rust returns the bounds and this
-   *  substitutes them in. Comparison only; nothing is computed here. */
-  function specFor(f: (typeof FIELDS)[number]) {
-    if (!("ok" in result)) return f;
-    const r = result.ok.ranges;
-    const at = (b: { min: number | null; max: number | null }) => ({
-      ...f,
-      min: b.min ?? undefined,
-      max: b.max ?? undefined,
-    });
-    switch (f.key) {
-      case "profile_shift":
-        return { ...f, min: r.profile_shift.min, max: r.profile_shift.max };
-      case "addendum":
-        return at(r.addendum);
-      case "dedendum":
-        return at(r.dedendum);
-      case "root_radius":
-        return at(r.root_radius);
-      default:
-        return f;
-    }
-  }
 
   /** The bound, phrased for the field it belongs to. */
   function boundNote(key: string): string | null {
@@ -71,7 +47,8 @@
     raw[key] = text;
     const f = FIELDS.find((f) => f.key === key)!;
     const v = Number(text);
-    const err = text.trim() === "" ? "required" : validate(specFor(f), v);
+    const b = "ok" in result ? boundFor(f.key, result.ok.ranges) : null;
+    const err = text.trim() === "" ? "required" : validate(f, v, b);
     errors[key] = err;
     if (!err) tab.params[f.key] = v;
   }
@@ -160,7 +137,9 @@
           {:else if f.key === "profile_shift" && "ok" in result}
             {@const r = result.ok.ranges.profile_shift}
             <small
-              >buildable {n(r.min)} … {n(r.max)} · undercut below {n(r.undercut)}
+              >buildable {n(r.bound.min ?? 0)} … {n(r.bound.max ?? 0)} · undercut below {n(
+                r.undercut,
+              )}
               <span class="ref">(sharp rack {n(r.sharp_rack_undercut)})</span>{#if r.pointed !== null}
                 · pointed above {n(r.pointed)}{/if}</small
             >

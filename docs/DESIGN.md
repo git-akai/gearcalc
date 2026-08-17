@@ -25,7 +25,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-164 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+166 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -380,7 +380,15 @@ mathematics; all four were convention.
 | Root radius | `≥ 0` | the fillet cannot fit the tooth space | **computed** |
 | Thickness mod. | `0 < k < 2` | rack tooth or space width `≤ 0` | unchanged |
 
-The four computed ranges are closed form, and each is placed exactly where the
+**Every bound lives in Rust, including the ones that do not vary.** The
+invariant limits above were briefly declared in TypeScript, which made two
+places a limit could be written down and two places it could be wrong — and the
+two panels had grown separate validators besides. `Bound` now carries its own
+exclusivity *and its own wording*, `admissible_ranges` returns one for every
+input, and the wasm layer serialises the core type rather than mirroring it. The
+view supplies labels, units and step sizes; not one numeric limit.
+
+The four *computed* ranges are closed form, and each is placed exactly where the
 generator's own guards begin to clamp — so **inside the range implies no clamp
 note**, asserted against the generator rather than against the algebra.
 
@@ -1961,6 +1969,8 @@ here. Revision 2 additions are marked ★.
 | ★ Admissible shift range | the closed form vs where the generator actually clamps, 6 parameter sets | clean just inside each bound, clamped just outside |
 | ★ Pointed-tooth threshold | predicted 0.635 at z = 9 | generator caps at 0.64, not at 0.63 |
 | ★ The spec's ranges are conventional | z = 1, α = 0.5…85°, β = ±85°, negative addendum | all generate finite, closed, correctly ordered sections |
+| ★ Bounds carry exclusivity and wording | `(0, 90)` vs `[−1.25, ∞)` | the open end rejects its endpoint, the closed end accepts it; "greater than" vs "at least" |
+| ★ Every input is bounded | all nine, against the defaults | defaults inside; `m = 0`, `z = 0`, `α = 90`, `β = −90`, `k = 2` all rejected |
 | ★ Addendum / dedendum / root-radius bounds | closed form vs where the generator clamps, 5 parameter sets | clean just inside, clamped just outside |
 | ★ Stage automatic addendum | set a minimum tip width, solve the stage, measure the gear it built | requested width to 1e-9 mm |
 | ★ Manual centre distance | set by hand at the zero-backlash distance with a large clearance | clearance ignored, backlash exactly zero |
