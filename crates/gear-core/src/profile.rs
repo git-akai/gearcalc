@@ -591,4 +591,4 @@ impl Gear {
 /// `u = tan α_r`, so this corresponds to a roll angle of about 88.9°. A tooth
 /// whose flanks converge only that far out is long past pointed; the bound is a
 /// bracket end, not a design limit.
-const POINTED_TOOTH_MAX_ROLL: f64 = 50.0;
+pub(crate) const POINTED_TOOTH_MAX_ROLL: f64 = 50.0;

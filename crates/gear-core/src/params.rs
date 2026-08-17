@@ -70,6 +70,54 @@ impl GearParams {
     }
 }
 
+/// A value the solver can work out for you, or that you can set yourself.
+///
+/// The specification has about a dozen of these — profile shift, altered
+/// addendum, centre distance, face width — all with the same shape: a toggle,
+/// and a field that is locked while the toggle is on. One generic covers them
+/// all (`docs/DESIGN.md` §3.3).
+///
+/// `manual` is kept even while `auto` is set, so turning automatic *off* leaves
+/// the field showing the last value rather than jumping to a stale one. It is
+/// the UI's job to seed `manual` from the solved value when the toggle flips.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Auto<T> {
+    pub auto: bool,
+    pub manual: T,
+}
+
+impl<T: Copy> Auto<T> {
+    /// Automatic, with `manual` seeded to a sensible starting value.
+    pub const fn automatic(seed: T) -> Self {
+        Self {
+            auto: true,
+            manual: seed,
+        }
+    }
+
+    /// Manual, at this value.
+    pub const fn fixed(v: T) -> Self {
+        Self {
+            auto: false,
+            manual: v,
+        }
+    }
+
+    /// The value in force: `computed` when automatic, otherwise `manual`.
+    ///
+    /// Takes the computed value rather than a closure so the caller decides
+    /// whether computing it is worth the work — several of these involve a
+    /// solve.
+    pub fn resolve(&self, computed: T) -> T {
+        if self.auto {
+            computed
+        } else {
+            self.manual
+        }
+    }
+}
+
 /// Guard rails applied to degenerate input.
 ///
 /// These encode no physics. They stop input that cannot describe a real gear

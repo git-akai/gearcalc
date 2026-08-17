@@ -15,6 +15,7 @@
 //! let outline = g.profile(400);        // closed cross-section, CCW
 //! ```
 
+pub mod auto;
 pub mod contact;
 pub mod involute;
 pub mod jgma;
@@ -32,5 +33,5 @@ pub use involute::{inv, inv_from_roll, inv_inverse};
 pub use material::{Material, MaterialLibrary};
 pub use mesh::{Mesh, MeshError, MeshKind};
 pub use outline::Vertex;
-pub use params::{Clamps, GearParams};
+pub use params::{Auto, Clamps, GearParams};
 pub use profile::{Gear, Section};

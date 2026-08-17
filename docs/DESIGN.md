@@ -19,11 +19,12 @@ subscript `n` = normal plane, `t` = transverse.
 | Metrology | span, over-pins, cutter tip width, JGMA tables | independent pin-tangency check |
 | Strength | critical section, form factor, bending stress, Hertz, face width, helical | closed-form rack limits; the contact-half-width route; plane-change identities |
 | Efficiency | parallel-axis mesh loss from sliding along the path | numerical average of the instantaneous loss |
+| Automatic inputs | minimum profile shift, altered addendum, `Auto<T>` | the generator's own undercut flag; tip width measured off the result |
 | Materials | eight-material library, per-value provenance, TOML round-trip | primary datasheets; cross-family consistency laws |
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-133 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+139 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -1842,6 +1843,9 @@ here. Revision 2 additions are marked ★.
 | ✧ Closed-form HPSTC roll | `u_tip − (ε_α−1)p_b/r_b` vs the path construction, seven meshes | exact (≤ 5.6e-17) |
 | ✧ Helical efficiency | numerical average including `1/cos β_b`, five meshes × β = 0, 12, 25° | 1e-10 relative |
 | ✧ Virtual gear identity at β = 0 | rebuild vs the original gear | bit-identical, by construction not by branch |
+| ★ `x_min` thresholds | bisection on `z`, independent of the implementation | 17.10 / 21.37 / 12.82 — reproduces §4.3's table |
+| ★ `x_min` against the generator | build at `x_min ± 1e-4`, z = 9…40 | undercut flag flips across it every time |
+| ★ Automatic addendum | set it, generate, measure the tip width off the result | requested width to 1e-9 mm, 9 cases |
 | ✧ `ε_αn = ε_α/cos²β_b` vs a measured virtual pair | β = 0, 10, 20, 30°, two meshes | exact at 0; 0.03 / 0.11 / 0.20 % apart — the construction's own limit, not an error |
 | ✧ What that gap costs | perturb `ε_αn` by the observed spread, β = 30° | `Y_F` moves **0.38 %** |
 | ✦ `σ_F` composition vs. §4.7's load-case table | z = 17/43 at HPSTC, `Y_F · Y_S` | 2.9415 against the recorded 2.9416 |
