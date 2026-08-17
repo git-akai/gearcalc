@@ -23,7 +23,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-130 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+132 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -425,13 +425,26 @@ is `F_n v_b`, `v_b = ω₁r_b1 = ω₂r_b2`. So the instantaneous fractional los
 so the time average is uniform in `ξ`:
 
 ```
-η = 1 − μ π (1/z₁ ± 1/z₂) (ε₁² + ε₂²) / ε_α
+η = 1 − μ π (1/z₁ ± 1/z₂) (ε₁² + ε₂²) / (ε_α cos β_b)
 ```
 
 `ε₁ = ξ_approach/p_bt`, `ε₂ = ξ_recess/p_bt`, `+` external, `−` internal. This is
 Buckingham's formula recovered from first principles — no fitted constants.
 [verified against a direct numerical average of the instantaneous loss over five
-meshes, agreement to 1e-10 relative.]
+meshes at three helix angles each, agreement to 1e-10 relative.]
+
+**One formula for spur and helical.** `cos β_b` is exactly 1 at zero helix, so
+the spur case is a *value* of this expression, not a branch beside it. Friction
+acts on `F_bn = F_bt/cos β_b` while useful power crosses as `F_bt`, which is the
+whole of the helical correction — the load being spread over several inclined
+contact lines changes nothing, because the field of action is uniform along the
+face, so the line-weighted mean of `|ξ|` is the same average the spur case takes.
+
+**The `ε_γ` substitution is deliberately not used.** Replacing `ε_α` by
+`ε_α + ε_β` is common but drives the predicted loss toward zero as overlap grows,
+which is unphysical. Mean sliding does not depend on overlap; only the force
+does. What *is* missing is sliding along the contact line — a real helical loss
+this under-states, and the honest limit of a one-coefficient friction model.
 
 **The `/ε_α` is load-sharing bookkeeping, and dropping it is the easy mistake.**
 It is what holds the *total* transmitted force at `F_n`. Average `|ξ|` per
@@ -445,8 +458,9 @@ parallel-axis meshes: the formula is symmetric in `(ε₁²+ε₂²)`, and physi
 should be, since swapping driver and driven swaps approach and recess but not the
 total sliding. They differ only at second order, which we compute consistently as
 `η = P_out/P_in`. Expect to see two identical numbers in the UI; that is a
-result, not a bug. Second, the helical correction via `ε_γ = ε_α + ε_β` is
-standard but approximate, and will be commented as such.
+result, not a bug. Second, the helical case is handled by the `cos β_b` above
+rather than by an `ε_γ` substitution — see the paragraphs preceding this one for
+why that substitution was rejected.
 
 #### 4.5.1 Worm and crossed-helical are the same mathematics
 
@@ -816,14 +830,35 @@ several contact lines being engaged at once **is** load sharing and stays
 deferred; assuming a single line is the conservative reading and is continuous
 with the spur case at β = 0.
 
-For bending, a helical tooth bends as its **normal** section, so the form factor
-is measured on the ISO virtual spur gear, `z_n = z/cos³β` at module `m_n` and
-pressure angle `α_n`. This needs no new geometry: the existing generator produces
-it, since the tooth form is a continuous function of `z` and only the *fractional*
-count is new (`Gear::z`). Measuring the transverse section and dividing by `m_n`
-mixes planes and under-predicts by about `cos β`. **`Y_β` is not applied** — ISO's
-helix factor is an empirical fit, and omitting it leaves `Y_β = 1`, which
-over-predicts stress; conservative, and no fitted constant enters.
+For bending, a helical tooth bends as its **normal** section, so *both* the form
+factor and the load point are taken on the ISO virtual spur gear, `z_n = z/cos³β`
+at module `m_n` and pressure angle `α_n`. This needs no new geometry: the existing
+generator produces it, since the tooth form is a continuous function of `z` and
+only the *fractional* count is new (`Gear::z`).
+
+The load point matters as much as the section, and moving one without the other
+is a trap. The highest point of single-pair contact, measured from the tip,
+depends only on the gear's own geometry and the contact ratio:
+
+```
+u_load = u_tip − (ε_α − 1) p_b / r_b
+```
+
+[verified exact against the path-of-contact construction over seven meshes,
+including reversed pairs]. The same relation then applies on the virtual gear
+with the **virtual** contact ratio `ε_αn = ε_α/cos²β_b`. Carrying the *real*
+gear's roll parameter across instead puts the load at the wrong place, because
+the virtual gear's involute is not the real one.
+
+At `β = 0` every one of these reduces exactly: `cos β_b = 1`, `z_n = z`,
+`ε_αn = ε_α`, and the virtual gear is rebuilt bit-for-bit identical to the real
+one. **There is no spur branch anywhere in the strength path** — the spur results
+are values of the helical formulas, and the CLI's spur output is unchanged to the
+last digit across this whole revision.
+
+**`Y_β` is not applied** — ISO's helix factor is an empirical fit, and omitting it
+leaves `Y_β = 1`, which over-predicts stress; conservative, and no fitted constant
+enters.
 
 **Minimum face width — closed form, no iteration.** Since `σ_F ∝ 1/b` and
 `σ_H ∝ 1/√b`:
@@ -1646,6 +1681,9 @@ here. Revision 2 additions are marked ★.
 | ✧ Normal vs transverse section | β = 0, 15, 30° | identical at β = 0, diverging monotonically thereafter — the helical bending error |
 | ✧ Helical `σ_H` ratio | β = 10, 20, 30° against the same mesh without the plane change | exactly `√(cos β_b)` to 1e-12 |
 | ✧ Spur results unchanged by the refactor | `gear-cli strength 17 43 2.0` | bit-identical: `σ_F` 69.2/63.4, `σ_H` 692.7, ρ 1.723 |
+| ✧ Closed-form HPSTC roll | `u_tip − (ε_α−1)p_b/r_b` vs the path construction, seven meshes | exact (≤ 5.6e-17) |
+| ✧ Helical efficiency | numerical average including `1/cos β_b`, five meshes × β = 0, 12, 25° | 1e-10 relative |
+| ✧ Virtual gear identity at β = 0 | rebuild vs the original gear | bit-identical, by construction not by branch |
 | ✦ `σ_F` composition vs. §4.7's load-case table | z = 17/43 at HPSTC, `Y_F · Y_S` | 2.9415 against the recorded 2.9416 |
 
 The marks record which round of review each check came from; they are kept only

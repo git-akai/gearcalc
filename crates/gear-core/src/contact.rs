@@ -149,11 +149,12 @@ impl ContactPath {
 /// # Derived, not quoted
 ///
 /// At a contact point `ξ` from the pitch point the flanks slide at `ξ(ω₁+ω₂)`
-/// while the transmitted power is `F_n v_b`, with `v_b = ω₁r_b1 = ω₂r_b2`. So
-/// the instantaneous fractional loss is
+/// while the useful power crosses the mesh as `F_bt v_b`, with
+/// `v_b = ω₁r_b1 = ω₂r_b2`. Friction acts on the force pressing the flanks
+/// together, `F_bn = F_bt / cos β_b`, so the instantaneous fractional loss is
 ///
 /// ```text
-/// μ |ξ| (1/r_b1 + 1/r_b2)
+/// μ |ξ| (1/r_b1 + 1/r_b2) / cos β_b
 /// ```
 ///
 /// Contact travels the line of action at constant speed, so the time average is
@@ -162,12 +163,16 @@ impl ContactPath {
 /// it to
 ///
 /// ```text
-/// η = 1 − μ π (1/z₁ ± 1/z₂) (ε₁² + ε₂²) / ε_α        + external, − internal
+/// η = 1 − μ π (1/z₁ ± 1/z₂) (ε₁² + ε₂²) / (ε_α cos β_b)
+///                                          + external, − internal
 /// ```
 ///
 /// which is Buckingham's formula recovered from first principles — no fitted
-/// constants. [verified against a numerical average of the instantaneous loss
-/// over six meshes: agreement to 1e-10 relative.]
+/// constants. **This is one formula for spur and helical alike**; `cos β_b` is
+/// exactly 1 at zero helix, so the spur case is a value of this expression
+/// rather than a separate branch. [verified against a numerical average of the
+/// instantaneous loss over five meshes at three helix angles each: agreement to
+/// 1e-10 relative.]
 ///
 /// **The `/ε_α` is not decoration, and dropping it is the easy mistake.** It is
 /// what holds the *total* transmitted force at `F_n`. Average `|ξ|` per
@@ -187,27 +192,47 @@ impl ContactPath {
 /// speed, finish and temperature at least as much as on the pair of materials,
 /// and no defensible per-pair table was available.
 ///
-/// # Helical gears: this is the transverse figure
+/// # Why the helical case needs nothing else
 ///
-/// The average above is taken over the **transverse** path of contact, so `ε_α`
-/// here is the transverse contact ratio. A helical mesh also slides along the
-/// tooth, and the usual correction replaces `ε_α` with the total contact ratio
-/// `ε_γ = ε_α + ε_β`. That is not applied, for two reasons: `ε_β = b sin β / π m`
-/// needs a face width, which a path of contact does not have, and DESIGN.md §4.5
-/// records the substitution as standard but **approximate** rather than derived.
+/// `ε₁`, `ε₂` and `ε_α` are transverse quantities, and the transverse geometry
+/// already carries the helix angle through `m_t` and `α_t`. The one genuinely
+/// new thing is the `cos β_b` above. What might look like a second thing is not:
 ///
-/// The direction of the error is knowable: `ε_γ > ε_α`, and the loss goes as
-/// `1/ε_α`, so ignoring the overlap **over**-states the loss. A helical mesh is
-/// at least as efficient as this reports.
+/// **The load is spread over several inclined contact lines** instead of one
+/// straight one — and it does not matter. The field of action is a rectangle,
+/// uniform along the face, so the line-length-weighted mean of `|ξ|` equals the
+/// plain average over the path, the same `(ξ_a² + ξ_r²)/2(ξ_a + ξ_r)` the spur
+/// case uses. Spreading the load redistributes it across positions that were
+/// being averaged over anyway.
+///
+/// At fixed transverse geometry the `1/cos β_b` makes a helical mesh slightly
+/// *less* efficient — the accepted direction, and the reason DIN 3990's loss
+/// factor carries the same term. At fixed **normal** module the net usually goes
+/// the other way, because `ε_α` falls with helix angle and outweighs it. Both
+/// are consequences of one formula, not two cases.
+///
+/// # What is left out, and which way it errs
+///
+/// The **`ε_γ` substitution is deliberately not used.** Replacing `ε_α` with
+/// `ε_α + ε_β` is common, but it drives the predicted loss toward zero as the
+/// overlap grows, which is unphysical — friction does not vanish on a
+/// high-overlap gear. The mean sliding distance does not depend on the overlap;
+/// only the force does, and that is the factor above.
+///
+/// What *is* genuinely missing is **sliding along the contact line**: only
+/// profile sliding, `|ξ|(ω₁+ω₂)`, is modelled. That is a real helical loss this
+/// under-states, and it is the honest limit of a friction model built on a
+/// single coefficient.
 #[must_use]
-pub fn efficiency(path: &ContactPath, mesh: &Mesh, friction: f64) -> f64 {
+pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Gear, friction: f64) -> f64 {
     let e1 = path.approach / path.base_pitch;
     let e2 = path.recess / path.base_pitch;
     let z = match mesh.kind {
         MeshKind::External => 1.0 / f64::from(mesh.z1) + 1.0 / f64::from(mesh.z2),
         MeshKind::Internal => 1.0 / f64::from(mesh.z1) - 1.0 / f64::from(mesh.z2),
     };
-    1.0 - friction * std::f64::consts::PI * z * (e1 * e1 + e2 * e2) / path.contact_ratio
+    let cos_bb = crate::metrology::base_helix_angle(g1).cos();
+    1.0 - friction * std::f64::consts::PI * z * (e1 * e1 + e2 * e2) / (path.contact_ratio * cos_bb)
 }
 
 /// Load fraction at the outer edge of a double-contact zone.
@@ -325,34 +350,79 @@ mod tests {
     /// The closed form against a direct numerical average of the instantaneous
     /// loss it was derived from. This is the check that catches the `/ε_α`: drop
     /// it and every case here is wrong by exactly the contact ratio.
+    ///
+    /// Helical angles are included, and they exercise the `cos β_b` too — the
+    /// friction acts on `F_bn` while the useful power crosses as `F_bt`.
     #[test]
     fn efficiency_matches_a_numerical_average_of_the_instantaneous_loss() {
         for (z1, z2) in [(17u32, 17u32), (17, 43), (13, 60), (25, 25), (19, 31)] {
-            let (a, b, m) = pair(z1, z2);
-            let path = ContactPath::new(&a, &b, &m).unwrap();
-            let mu = 0.06;
+            for beta in [0.0, 12.0, 25.0] {
+                let a = Gear::new(crate::GearParams {
+                    teeth: z1,
+                    helix_angle: beta,
+                    ..Default::default()
+                });
+                let b = Gear::new(crate::GearParams {
+                    teeth: z2,
+                    helix_angle: -beta,
+                    ..Default::default()
+                });
+                let m = Mesh::new(&a, &b, MeshKind::External).unwrap();
+                let path = ContactPath::new(&a, &b, &m).unwrap();
+                let mu = 0.06;
 
-            // Instantaneous fractional loss is mu|xi|(1/rb1 + 1/rb2); contact
-            // sweeps the path at constant speed, so average it uniformly in xi.
-            let rb1 = a.rb;
-            let rb2 = b.rb;
-            const N: usize = 200_000;
-            let span = path.approach + path.recess;
-            let mut sum = 0.0;
-            for i in 0..N {
+                // Instantaneous fractional loss is mu|xi|(1/rb1 + 1/rb2)/cos(beta_b);
+                // contact sweeps the path at constant speed, so average it
+                // uniformly in xi.
+                const N: usize = 200_000;
+                let span = path.approach + path.recess;
+                let mut sum = 0.0;
+                for i in 0..N {
+                    #[allow(clippy::cast_precision_loss)]
+                    let t = (i as f64 + 0.5) / N as f64;
+                    sum += (-path.approach + span * t).abs();
+                }
                 #[allow(clippy::cast_precision_loss)]
-                let t = (i as f64 + 0.5) / N as f64;
-                sum += (-path.approach + span * t).abs();
-            }
-            #[allow(clippy::cast_precision_loss)]
-            let mean_abs_xi = sum / N as f64;
-            let numeric = 1.0 - mu * mean_abs_xi * (1.0 / rb1 + 1.0 / rb2);
+                let mean_abs_xi = sum / N as f64;
+                let cos_bb = crate::metrology::base_helix_angle(&a).cos();
+                let numeric = 1.0 - mu * mean_abs_xi * (1.0 / a.rb + 1.0 / b.rb) / cos_bb;
 
-            let closed = efficiency(&path, &m, mu);
+                let closed = efficiency(&path, &m, &a, mu);
+                assert!(
+                    (closed - numeric).abs() < 1e-9,
+                    "z={z1}/{z2} beta={beta}: closed {closed} vs numeric {numeric}"
+                );
+            }
+        }
+    }
+
+    /// `cos β_b` is exactly 1 at zero helix, so the helical formula *is* the
+    /// spur formula rather than a generalisation with a special case attached.
+    #[test]
+    fn the_helical_efficiency_formula_reduces_exactly_at_zero_helix() {
+        let (a, b, m) = pair(17, 43);
+        let path = ContactPath::new(&a, &b, &m).unwrap();
+        assert!((crate::metrology::base_helix_angle(&a).cos() - 1.0).abs() < f64::EPSILON);
+
+        // The loss carries the 1/cos(beta_b), so at a fixed transverse geometry
+        // more helix means more loss. That the CLI shows helical meshes as
+        // slightly *more* efficient is a separate effect: the transverse contact
+        // ratio falls with beta, and that outweighs this factor.
+        let mut previous = 0.0;
+        for beta in [0.0, 15.0, 30.0] {
+            let g = Gear::new(crate::GearParams {
+                teeth: 17,
+                helix_angle: beta,
+                ..Default::default()
+            });
+            let cos_bb = crate::metrology::base_helix_angle(&g).cos();
+            let loss = (1.0 - efficiency(&path, &m, &g, 0.06)) * 1.0;
             assert!(
-                (closed - numeric).abs() < 1e-9,
-                "z={z1}/{z2}: closed {closed} vs numeric {numeric}"
+                loss > previous,
+                "beta={beta}: loss must rise with 1/cos(beta_b)"
             );
+            assert!(cos_bb <= 1.0);
+            previous = loss;
         }
     }
 
@@ -360,14 +430,14 @@ mod tests {
     fn efficiency_is_unity_without_friction_and_falls_linearly_with_it() {
         let (a, b, m) = pair(17, 43);
         let path = ContactPath::new(&a, &b, &m).unwrap();
-        assert!((efficiency(&path, &m, 0.0) - 1.0).abs() < 1e-15);
+        assert!((efficiency(&path, &m, &a, 0.0) - 1.0).abs() < 1e-15);
 
-        let l1 = 1.0 - efficiency(&path, &m, 0.05);
-        let l2 = 1.0 - efficiency(&path, &m, 0.10);
+        let l1 = 1.0 - efficiency(&path, &m, &a, 0.05);
+        let l2 = 1.0 - efficiency(&path, &m, &a, 0.10);
         assert!((l2 - 2.0 * l1).abs() < 1e-12, "loss must be linear in mu");
 
         // A plain steel spur mesh should land in the high nineties.
-        let eta = efficiency(&path, &m, 0.06);
+        let eta = efficiency(&path, &m, &a, 0.06);
         assert!((0.97..1.0).contains(&eta), "implausible efficiency {eta}");
     }
 
@@ -378,11 +448,11 @@ mod tests {
     fn forward_and_backward_efficiency_are_equal() {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25)] {
             let (a, b, m) = pair(z1, z2);
-            let forward = efficiency(&ContactPath::new(&a, &b, &m).unwrap(), &m, 0.07);
+            let forward = efficiency(&ContactPath::new(&a, &b, &m).unwrap(), &m, &a, 0.07);
 
             // The same physical mesh, described from the other gear.
             let m_rev = Mesh::new(&b, &a, MeshKind::External).unwrap();
-            let backward = efficiency(&ContactPath::new(&b, &a, &m_rev).unwrap(), &m_rev, 0.07);
+            let backward = efficiency(&ContactPath::new(&b, &a, &m_rev).unwrap(), &m_rev, &b, 0.07);
 
             assert!(
                 (forward - backward).abs() < 1e-12,

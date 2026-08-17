@@ -646,20 +646,49 @@ pub fn bending_stress(
     Some(load.tangential(g) / (load.face_width * g.params.module) * factor)
 }
 
-/// The critical section to rate a gear's bending on, given where the load acts.
+/// The critical section to rate a gear's bending on, loaded at the highest
+/// point of single-pair contact.
 ///
-/// Wraps [`root_section`] with the one step that is easy to forget: for a
-/// helical gear the tooth bends as its normal section, so the form must be
-/// measured on the virtual spur gear rather than on the gear itself. For a spur
-/// gear this is exactly `root_section`.
+/// One formula for spur and helical alike. The tooth bends as its **normal**
+/// section, so both the form and the load point are taken on the virtual spur
+/// gear ([`Gear::virtual_spur`]); for a spur gear that is the gear itself, by
+/// construction rather than by a branch.
 ///
-/// `load_roll` is the involute roll parameter of the load point **on the real
-/// gear** — typically `path.roll_at(path.highest_single_pair())`. It is carried
-/// across to the virtual gear unchanged, because the roll parameter is where the
-/// load sits on the flank and that does not change when the section does.
+/// # Locating the load point without the mate
+///
+/// The highest point of single-pair contact is one base pitch back from the far
+/// end of the path of contact, so measuring from the *tip* it depends only on
+/// this gear's own geometry and the contact ratio:
+///
+/// ```text
+/// u_load = u_tip − (ε_α − 1) · p_b / r_b
+/// ```
+///
+/// [verified exact against the path-of-contact construction over seven meshes,
+/// including reversed pairs.] That is what lets this take a scalar rather than
+/// the mating gear, and it is what makes the helical case tractable: the same
+/// relation applies on the virtual gear, using the **virtual** contact ratio
+///
+/// ```text
+/// ε_αn = ε_α / cos² β_b
+/// ```
+///
+/// Carrying the *real* gear's roll parameter across instead — which an earlier
+/// revision did — puts the load at the wrong place on the flank, because the
+/// virtual gear's involute is not the real one.
+///
+/// `transverse_contact_ratio` is `ε_α` from [`ContactPath::contact_ratio`].
 #[must_use]
-pub fn bending_section(g: &Gear, load_roll: f64) -> Option<RootSection> {
-    root_section(&g.virtual_spur(), load_roll)
+pub fn bending_section(g: &Gear, transverse_contact_ratio: f64) -> Option<RootSection> {
+    let v = g.virtual_spur();
+    // The virtual gear is a spur gear, so its transverse plane is the normal
+    // plane: `v.mt` is m_n and `v.alpha_t` is α_n.
+    let base_pitch = std::f64::consts::PI * v.mt * v.alpha_t.cos();
+    let cos_bb = base_helix_angle(g).cos();
+    let eps_n = transverse_contact_ratio / (cos_bb * cos_bb);
+
+    let load_roll = v.u_tip - (eps_n - 1.0) * base_pitch / v.rb;
+    root_section(&v, load_roll)
 }
 
 /// Hertzian contact stress along the path of contact, MPa.
@@ -1467,8 +1496,11 @@ mod tests {
         assert!((v.r - g.r).abs() < 1e-15);
         assert!((v.rb - g.rb).abs() < 1e-15);
 
-        let a = root_section(&g, g.u_tip).unwrap();
-        let b = bending_section(&g, g.u_tip).unwrap();
+        // Loaded at the same place, the two must agree exactly.
+        let eps = 1.6;
+        let pb = std::f64::consts::PI * g.mt * g.alpha_t.cos();
+        let a = root_section(&g, g.u_tip - (eps - 1.0) * pb / g.rb).unwrap();
+        let b = bending_section(&g, eps).unwrap();
         assert!((a.form_factor - b.form_factor).abs() < 1e-15);
     }
 
@@ -1500,9 +1532,10 @@ mod tests {
         }
     }
 
-    /// Measuring the form on the transverse section but dividing by the normal
-    /// module — what an earlier revision did — under-predicts helical bending
-    /// stress. The gap must be real and must grow with the helix angle.
+    /// Measuring the form on the transverse section — what an earlier revision
+    /// did — is not the same as measuring it on the normal one. Compared at the
+    /// *same* load point, so this isolates the section change from the load
+    /// point change that also comes with the virtual gear.
     #[test]
     fn the_normal_section_is_what_bends_and_it_differs_from_the_transverse_one() {
         let mut previous = 0.0;
@@ -1512,17 +1545,51 @@ mod tests {
                 helix_angle: beta,
                 ..Default::default()
             });
-            let transverse = root_section(&g, g.u_tip).unwrap().form_factor;
-            let normal = bending_section(&g, g.u_tip).unwrap().form_factor;
+            let v = g.virtual_spur();
+            let roll = 0.35;
+            let transverse = root_section(&g, roll).unwrap().form_factor;
+            let normal = root_section(&v, roll).unwrap().form_factor;
             let gap = (normal - transverse).abs() / transverse;
 
             if beta == 0.0 {
-                assert!(gap < 1e-15, "spur sections must coincide");
+                assert!(gap < 1e-15, "spur sections must coincide exactly");
             } else {
                 assert!(gap > 0.005, "beta={beta}: sections differ by only {gap:.4}");
                 assert!(gap > previous, "the gap must widen with the helix angle");
             }
             previous = gap;
+        }
+    }
+
+    /// The load point moves too, and it must move the way ISO says: the virtual
+    /// contact ratio is `ε_α / cos² β_b`, so a helical gear is loaded further
+    /// down its (virtual) flank than the transverse contact ratio alone implies.
+    #[test]
+    fn the_bending_load_point_uses_the_virtual_contact_ratio() {
+        for beta in [0.0, 15.0, 30.0] {
+            let g = Gear::new(GearParams {
+                teeth: 20,
+                helix_angle: beta,
+                ..Default::default()
+            });
+            let v = g.virtual_spur();
+            let eps = 1.55;
+            let cos_bb = base_helix_angle(&g).cos();
+            let pbn = std::f64::consts::PI * v.mt * v.alpha_t.cos();
+
+            let want =
+                root_section(&v, v.u_tip - (eps / (cos_bb * cos_bb) - 1.0) * pbn / v.rb).unwrap();
+            let got = bending_section(&g, eps).unwrap();
+            assert!(
+                (got.form_factor - want.form_factor).abs() < 1e-15,
+                "beta={beta}"
+            );
+
+            // At beta = 0 the virtual contact ratio IS the transverse one.
+            if beta == 0.0 {
+                let plain = root_section(&g, g.u_tip - (eps - 1.0) * pbn / g.rb).unwrap();
+                assert!((got.form_factor - plain.form_factor).abs() < 1e-15);
+            }
         }
     }
 

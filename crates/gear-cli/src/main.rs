@@ -163,7 +163,7 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
             println!("  {label:<6} no contact path");
             continue;
         };
-        let Some(sec) = bending_section(g, p.roll_at(p.highest_single_pair())) else {
+        let Some(sec) = bending_section(g, p.contact_ratio) else {
             println!("  {label:<6} no root section (severed tooth?)");
             continue;
         };
@@ -218,7 +218,7 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
     for mu in [0.02, 0.04, 0.06, 0.10] {
         println!(
             "  mu {mu:.2}   {:.3} %",
-            100.0 * efficiency(&path, &mesh, mu)
+            100.0 * efficiency(&path, &mesh, &g1, mu)
         );
     }
 }

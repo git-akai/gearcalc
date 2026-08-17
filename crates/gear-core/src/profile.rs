@@ -166,23 +166,28 @@ impl Gear {
     ///
     /// where one power of `cos β` comes from the section being taken obliquely
     /// and two from the radius of curvature of the pitch ellipse that section
-    /// cuts. For a spur gear `β = 0` and this returns the gear unchanged, so
-    /// callers need no special case.
+    /// cuts.
     ///
     /// The count is fractional, which is exactly why [`Gear::z`] exists. Nothing
     /// else in the construction cares: the tooth *form* is a continuous function
     /// of `z`. What is **not** meaningful on the result is [`Gear::profile`],
     /// which replicates a whole number of teeth around a real gear — this object
     /// exists to be measured, not drawn.
+    ///
+    /// # Spur gears are not a special case
+    ///
+    /// At `β = 0` this is the identity, and **by construction rather than by a
+    /// branch**: `cos 0` is exactly 1 so `z_n = z`, and `helix_angle` is already
+    /// zero so the parameters are unchanged. The rebuild therefore reproduces
+    /// the same gear bit for bit. Note that `GearParams::pressure_angle` is
+    /// *already* the normal pressure angle, so it is carried across untouched —
+    /// passing `self.alpha_n.to_degrees()` instead would round-trip through
+    /// degrees and cost the exactness for nothing.
     #[must_use]
     pub fn virtual_spur(&self) -> Self {
         let beta = self.params.helix_angle.to_radians();
-        if beta == 0.0 {
-            return self.clone();
-        }
         let params = GearParams {
             helix_angle: 0.0,
-            pressure_angle: self.alpha_n.to_degrees(),
             ..self.params
         };
         Self::build_with_z(params, false, self.z / beta.cos().powi(3))
