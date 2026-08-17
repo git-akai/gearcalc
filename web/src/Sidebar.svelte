@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { workspace, library } from "./state.svelte";
+  import { workspace, trains, library } from "./state.svelte";
   import { exportLibrary } from "./core";
 
   let { version }: { version: string | null } = $props();
@@ -63,7 +63,7 @@
         <li>
           <button
             class="tab"
-            class:selected={tab.id === workspace.selectedId}
+            class:selected={tab.id === workspace.selectedId && trains.active === "gear"}
             onclick={() => workspace.select(tab.id)}
           >
             <span class="name">{tab.name || "Unnamed"}</span>
@@ -75,9 +75,23 @@
     <button class="add" onclick={() => workspace.create()}>+ New gear</button>
   </section>
 
-  <section class="pending">
+  <section>
     <h2>Geartrains</h2>
-    <p>Arrives in a later milestone.</p>
+    <ul>
+      {#each trains.tabs as tab (tab.id)}
+        <li>
+          <button
+            class="tab"
+            class:selected={tab.id === trains.selectedId && trains.active === "train"}
+            onclick={() => trains.select(tab.id)}
+          >
+            <span class="name">{tab.name || "Unnamed"}</span>
+            <span class="teeth">{tab.train.stages.length} stage{tab.train.stages.length === 1 ? "" : "s"}</span>
+          </button>
+        </li>
+      {/each}
+    </ul>
+    <button class="add" onclick={() => trains.create()}>+ New geartrain</button>
   </section>
 
   {#if version}
@@ -165,11 +179,6 @@
   .add:hover {
     color: var(--fg);
     border-color: var(--muted);
-  }
-  .pending p {
-    font-size: 0.75rem;
-    color: var(--muted);
-    margin: 0 0 0 0.25rem;
   }
   .row {
     display: flex;

@@ -260,6 +260,25 @@ pub fn export_dxf(input: &str) -> Result<String, JsError> {
     export_dxf_impl(input).map_err(|e| JsError::new(&e))
 }
 
+/// A geartrain, plus optionally the material library to rate it against.
+#[derive(Deserialize)]
+pub struct TrainRequest {
+    pub train: gear_core::train::Train,
+    /// The library to use. Omitted means the one the tool ships with, which is
+    /// the common case — the UI only sends this once the user has imported or
+    /// edited a library of their own.
+    #[serde(default)]
+    pub materials: Option<gear_core::MaterialLibrary>,
+}
+
+fn solve_train_impl(input: &str) -> Result<String, String> {
+    let req: TrainRequest =
+        serde_json::from_str(input).map_err(|e| format!("bad train request: {e}"))?;
+    let lib = req.materials.unwrap_or_else(gear_io::default_library);
+    let out = gear_core::train::solve_train(&req.train, &lib).map_err(|e| e.to_string())?;
+    serde_json::to_string(&out).map_err(|e| format!("could not encode result: {e}"))
+}
+
 fn default_materials_impl() -> Result<String, String> {
     serde_json::to_string(&gear_io::default_library()).map_err(|e| e.to_string())
 }
@@ -273,6 +292,16 @@ fn export_materials_impl(library_json: &str) -> Result<String, String> {
     let lib: gear_core::MaterialLibrary =
         serde_json::from_str(library_json).map_err(|e| e.to_string())?;
     gear_io::to_toml(&lib).map_err(|e| e.to_string())
+}
+
+/// Derived results for a whole geartrain.
+///
+/// The third of the three entry points DESIGN.md §1 planned. Like the others it
+/// is JSON in, JSON out, with no state held across the boundary: the UI owns the
+/// inputs and this recomputes everything from them on each change.
+#[wasm_bindgen]
+pub fn solve_train(input: &str) -> Result<String, JsError> {
+    solve_train_impl(input).map_err(|e| JsError::new(&e))
 }
 
 /// The material library the tool ships with, as JSON.
@@ -396,6 +425,62 @@ mod tests {
         let a: serde_json::Value = serde_json::from_str(&original).unwrap();
         let b: serde_json::Value = serde_json::from_str(&reimported).unwrap();
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn a_two_stage_train_crosses_the_boundary() {
+        // The shape the UI will send: a train, and no library, meaning "use the
+        // one you ship with".
+        let req = r#"{"train":{
+            "input_speed": 3000.0,
+            "input_torque": 2.0,
+            "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
+            "stages": [
+              {"module":1.0,"pressure_angle":20.0,"helix_angle":0.0,"friction":0.06,
+               "thickness_mod":1.0,
+               "centre_distance":{"auto":true,"manual":0.0},
+               "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
+               "gears":[
+                 {"teeth":17,"profile_shift":{"auto":true,"manual":0.0},"working_depth":1.0,
+                  "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
+                  "dedendum":1.25,"root_radius":0.38,
+                  "face_width":{"auto":true,"manual":0.0},
+                  "auto_face_from_bending":true,"auto_face_from_contact":true,
+                  "material":"4340 Hardened Steel"},
+                 {"teeth":43,"profile_shift":{"auto":true,"manual":0.0},"working_depth":1.0,
+                  "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
+                  "dedendum":1.25,"root_radius":0.38,
+                  "face_width":{"auto":true,"manual":0.0},
+                  "auto_face_from_bending":true,"auto_face_from_contact":true,
+                  "material":"4340 Hardened Steel"}
+               ]}
+            ]}}"#;
+
+        let v: serde_json::Value = serde_json::from_str(&solve_train_impl(req).unwrap()).unwrap();
+        assert!((v["total_ratio"].as_f64().unwrap() - 43.0 / 17.0).abs() < 1e-12);
+        assert!(v["output_torque"].as_f64().unwrap() > 2.0);
+
+        let g0 = &v["stages"][0]["gears"][0];
+        // The automatic face width came back, and so did the cycle count.
+        assert!(g0["face_width"].as_f64().unwrap() > 0.0);
+        assert!(g0["tooth_cycles"].as_f64().unwrap() > 0.0);
+        assert!((g0["speed"].as_f64().unwrap() - 3000.0).abs() < 1e-9);
+        // Spur stage: the overlap ratio is exactly zero, not merely small.
+        assert_eq!(
+            v["stages"][0]["contact_ratios"]["overlap"]
+                .as_f64()
+                .unwrap(),
+            0.0
+        );
+    }
+
+    #[test]
+    fn a_train_that_cannot_be_solved_says_why() {
+        let bad = r#"{"train":{"input_speed":1.0,"input_torque":1.0,
+            "actuation":{"intermittent":{"range_degrees":25.0,"actuations":1000}},
+            "stages":[]}}"#;
+        assert!(solve_train_impl(bad).unwrap_err().contains("no stages"));
+        assert!(solve_train_impl("{ not json").is_err());
     }
 
     #[test]

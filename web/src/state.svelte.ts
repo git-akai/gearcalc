@@ -7,10 +7,12 @@
 import {
   defaultParams,
   defaultLibrary,
+  defaultStage,
   importLibrary,
   type ClassRef,
   type GearParams,
   type MaterialLibrary,
+  type Train,
 } from "./core";
 
 export interface GearTab {
@@ -26,7 +28,14 @@ export interface GearTab {
   referenceCircles: boolean;
 }
 
+export interface TrainTab {
+  id: number;
+  name: string;
+  train: Train;
+}
+
 let nextId = 1;
+let nextTrainId = 1;
 
 function freshTab(name = "Gear"): GearTab {
   return {
@@ -50,12 +59,13 @@ class Workspace {
 
   select(id: number) {
     this.selectedId = id;
+    trains.active = "gear";
   }
 
   create() {
     const t = freshTab();
     this.tabs.push(t);
-    this.selectedId = t.id;
+    this.select(t.id);
   }
 
   /** Duplicates the tab, name included, as the specification requires. */
@@ -85,6 +95,67 @@ class Workspace {
 }
 
 export const workspace = new Workspace();
+
+function freshTrain(name = "Geartrain"): TrainTab {
+  return {
+    id: nextTrainId++,
+    name,
+    train: {
+      input_speed: 30000,
+      input_torque: 0.1,
+      actuation: { intermittent: { range_degrees: 25, actuations: 1000 } },
+      stages: [defaultStage()],
+    },
+  };
+}
+
+/** The geartrain tabs.
+ *
+ *  Deliberately a separate list from the gear tabs rather than one list of a
+ *  union type: the two share no fields, and the sidebar shows them under
+ *  separate headings anyway. */
+class Trains {
+  tabs = $state<TrainTab[]>([freshTrain()]);
+  selectedId = $state<number>(1);
+  /** Which list the main panel is showing. */
+  active = $state<"gear" | "train">("gear");
+
+  get selected(): TrainTab {
+    return this.tabs.find((t) => t.id === this.selectedId) ?? this.tabs[0];
+  }
+
+  select(id: number) {
+    this.selectedId = id;
+    this.active = "train";
+  }
+
+  create() {
+    const t = freshTrain();
+    this.tabs.push(t);
+    this.select(t.id);
+  }
+
+  copy(id: number) {
+    const src = this.tabs.find((t) => t.id === id);
+    if (!src) return;
+    const t: TrainTab = { ...structuredClone($state.snapshot(src)), id: nextTrainId++ };
+    this.tabs.splice(this.tabs.indexOf(src) + 1, 0, t);
+    this.select(t.id);
+  }
+
+  /** Deleting the last tab leaves a fresh one, as for gears. */
+  remove(id: number) {
+    const i = this.tabs.findIndex((t) => t.id === id);
+    if (i < 0) return;
+    this.tabs.splice(i, 1);
+    if (this.tabs.length === 0) this.tabs.push(freshTrain());
+    if (!this.tabs.some((t) => t.id === this.selectedId)) {
+      this.selectedId = this.tabs[Math.min(i, this.tabs.length - 1)].id;
+    }
+  }
+}
+
+export const trains = new Trains();
 
 /** The material library.
  *

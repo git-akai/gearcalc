@@ -25,7 +25,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-148 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+152 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -1703,7 +1703,7 @@ it can be validated in isolation.
 | 3 | ✅ **Gear Calculator UI** — sidebar, tabs, parameter grid, canvas viewport, DXF export | **met** — the UI's own request path produces a DXF `ezdxf` reads back with the right geometry |
 | 4 | ✅ **Materials** — TOML library, import/export, the preloaded materials | **met** — every value carries a cited primary source and a `basis`; the library round-trips through TOML unchanged and satisfies cross-family consistency laws |
 | 5 | ✅ **Mesh & strength** — contact path, bending, load-to-stress path, efficiency, Hertz, face width | **met** — both bending constructions converge to their own closed-form rack limits; Hertz agrees with the contact-half-width route to 1e-12; efficiency matches a numerical average of the instantaneous loss to 1e-10; `b_min` is independent of the face width it was evaluated at |
-| 6 | 🟡 **Spur stage** — core ✅ (stage solve, train accumulation, face width/material inputs, `ε_β`/`ε_γ` outputs); remaining: tooth cycles, wasm boundary, accordion UI | **core gate met** — `gear-cli train` computes a two-stage train end to end; `ε_β = 0` exactly for a spur stage |
+| 6 | ✅ **Spur stage** — stage solve, train accumulation, tooth cycles, `solve_train` across the wasm boundary, geartrain tabs and the stage accordion | **met** — a two-stage train computes end to end in `gear-cli` *and* in the browser, with `ε_β = 0` exactly for a spur stage; the UI's own numbers were checked against the CLI's in a headless render |
 | 7 | ⬜ **Worm stage** — screw-gear model, lead angle, self-locking, axial backlash | self-locking threshold matches the closed form |
 | 8 | ⬜ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | own rack-equivalent validation |
 | 9 | ⬜ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency | common centre distance to 1e-12; all six drive modes |
@@ -1851,6 +1851,9 @@ here. Revision 2 additions are marked ★.
 | ★ Efficiency costs torque | same train at `μ = 0` and `μ = 0.06` | output torque falls by exactly the product of the stage efficiencies |
 | ★ Output backlash weighting | loosen stage 1 vs stage 2 by the same amount | the **last** stage dominates, as §4.9 predicts |
 | ★ Automatic face width | bending only, contact only, both | equals the larger of the enabled checks; contact governs a lightly loaded steel pair |
+| ★ Tooth cycles | intermittent and continuous duty, two-stage train | cycles fall monotonically toward the output; adjacent gears in a mesh differ by exactly that stage ratio |
+| ★ Train across the wasm boundary | JSON in, JSON out, shipped library | ratio, face width, cycles and `ε_β = 0` all survive |
+| ★ The UI's own numbers | headless Chromium render vs `gear-cli train` | ratio, output speed/torque, efficiency, stresses and cycles all agree; no console errors |
 | ✧ `ε_αn = ε_α/cos²β_b` vs a measured virtual pair | β = 0, 10, 20, 30°, two meshes | exact at 0; 0.03 / 0.11 / 0.20 % apart — the construction's own limit, not an error |
 | ✧ What that gap costs | perturb `ε_αn` by the observed spread, β = 30° | `Y_F` moves **0.38 %** |
 | ✦ `σ_F` composition vs. §4.7's load-case table | z = 17/43 at HPSTC, `Y_F · Y_S` | 2.9415 against the recorded 2.9416 |

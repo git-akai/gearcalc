@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { loadCore, coreVersion } from "./core";
-  import { workspace, library } from "./state.svelte";
+  import { workspace, trains, library } from "./state.svelte";
   import Sidebar from "./Sidebar.svelte";
   import GearPanel from "./GearPanel.svelte";
+  import TrainPanel from "./TrainPanel.svelte";
 
   let loaded = $state(false);
   let failed = $state<string | null>(null);
@@ -29,9 +30,15 @@
     {:else if !loaded}
       <p class="muted">Loading core…</p>
     {:else}
-      {#key workspace.selected.id}
-        <GearPanel tab={workspace.selected} />
-      {/key}
+      {#if trains.active === "train"}
+        {#key trains.selected.id}
+          <TrainPanel tab={trains.selected} />
+        {/key}
+      {:else}
+        {#key workspace.selected.id}
+          <GearPanel tab={workspace.selected} />
+        {/key}
+      {/if}
     {/if}
   </main>
 </div>

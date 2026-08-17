@@ -34,6 +34,7 @@ use crate::strength::{
 /// Note what is *absent*: module, pressure angle and helix angle live on the
 /// stage, because they are shared.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StageGear {
     pub teeth: u32,
     /// Automatic uses [`minimum_profile_shift`] at `working_depth`.
@@ -77,6 +78,7 @@ impl Default for StageGear {
 /// Crossed axes are milestone 10 and are not accepted here; the specification's
 /// "Axis Angle" input belongs with that work.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SpurStage {
     /// Normal module, mm. Shared by both gears.
     pub module: f64,
@@ -123,6 +125,7 @@ impl Default for SpurStage {
 
 /// The three contact ratios.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ContactRatios {
     /// Transverse, `ε_α` — profile overlap.
     pub transverse: f64,
@@ -147,6 +150,7 @@ impl ContactRatios {
 
 /// Angular backlash at one gear, in degrees.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Backlash {
     pub nominal: f64,
     pub minimum: f64,
@@ -155,6 +159,7 @@ pub struct Backlash {
 
 /// What a stage does to one of its gears.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct GearResult {
     /// The shift in force, after any automatic calculation.
     pub profile_shift: f64,
@@ -188,6 +193,7 @@ pub struct GearResult {
 
 /// Everything one stage produces.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct StageResult {
     /// `z₂ / z₁`.
     pub ratio: f64,
@@ -443,6 +449,8 @@ const fn gcd(mut a: u32, mut b: u32) -> u32 {
 
 /// How the train is used, which is what turns a ratio into a tooth count.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum Actuation {
     /// A limited sweep, repeated. The range is measured **at the output**, so
     /// every gear's revolutions are worked *backwards* from there — upstream
@@ -471,6 +479,7 @@ impl Default for Actuation {
 
 /// A whole geartrain.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Train {
     /// Peak input speed, rpm.
     pub input_speed: f64,
@@ -482,6 +491,7 @@ pub struct Train {
 
 /// What a train produces.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TrainResult {
     /// Product of the stage ratios.
     pub total_ratio: f64,

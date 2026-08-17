@@ -5,6 +5,7 @@
 
 import init, {
   solve_gear,
+  solve_train,
   gear_profile,
   export_dxf,
   version,
@@ -255,6 +256,143 @@ export function importLibrary(tomlText: string): { ok: MaterialLibrary } | { err
 export function exportLibrary(lib: MaterialLibrary): { ok: string } | { error: string } {
   try {
     return { ok: export_materials(JSON.stringify(lib)) };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// --------------------------------------------------------------------- //
+//  Geartrains
+// --------------------------------------------------------------------- //
+
+/** A value the solver can work out, or that you set. Mirrors Rust's `Auto<T>`. */
+export interface Auto<T> {
+  auto: boolean;
+  manual: T;
+}
+
+export type Actuation =
+  | { intermittent: { range_degrees: number; actuations: number } }
+  | { continuous: { operating_percent: number; runtime_hours: number } };
+
+export interface StageGear {
+  teeth: number;
+  profile_shift: Auto<number>;
+  working_depth: number;
+  addendum: Auto<number>;
+  min_tip_width: number;
+  dedendum: number;
+  root_radius: number;
+  face_width: Auto<number>;
+  auto_face_from_bending: boolean;
+  auto_face_from_contact: boolean;
+  material: string;
+}
+
+export interface SpurStage {
+  module: number;
+  pressure_angle: number;
+  helix_angle: number;
+  friction: number;
+  thickness_mod: number;
+  centre_distance: Auto<number>;
+  clearance: number;
+  tolerance_plus: number;
+  tolerance_minus: number;
+  gears: [StageGear, StageGear];
+}
+
+export interface Train {
+  input_speed: number;
+  input_torque: number;
+  actuation: Actuation;
+  stages: SpurStage[];
+}
+
+export interface ContactRatios {
+  transverse: number;
+  overlap: number;
+  total: number;
+}
+export interface Backlash {
+  nominal: number;
+  minimum: number;
+  maximum: number;
+}
+export interface GearResult {
+  profile_shift: number;
+  addendum: number;
+  face_width: number;
+  torque: number;
+  speed: number;
+  tooth_cycles: number;
+  bending_stress: number | null;
+  contact_stress: number;
+  min_face_width_bending: number | null;
+  min_face_width_contact: number;
+  clamps: string[];
+}
+export interface StageResult {
+  ratio: number;
+  centre_distance_nominal: number;
+  centre_distance: number;
+  contact_ratios: ContactRatios;
+  efficiency: number;
+  backlash: [Backlash, Backlash];
+  coprime: boolean;
+  gears: [GearResult, GearResult];
+  notes: string[];
+}
+export interface TrainResult {
+  total_ratio: number;
+  output_speed: number;
+  output_torque: number;
+  total_efficiency: number;
+  output_backlash: Backlash;
+  stages: StageResult[];
+}
+
+/** Defaults from the specification. */
+export function defaultStageGear(teeth: number): StageGear {
+  return {
+    teeth,
+    profile_shift: { auto: true, manual: 0 },
+    working_depth: 1,
+    addendum: { auto: false, manual: 1 },
+    min_tip_width: 0.1,
+    dedendum: 1.25,
+    root_radius: 0.38,
+    face_width: { auto: true, manual: 5 },
+    auto_face_from_bending: true,
+    auto_face_from_contact: true,
+    material: "4340 Hardened Steel",
+  };
+}
+
+export function defaultStage(): SpurStage {
+  return {
+    module: 1,
+    pressure_angle: 20,
+    helix_angle: 0,
+    friction: 0.06,
+    thickness_mod: 1,
+    centre_distance: { auto: true, manual: 0 },
+    clearance: 0.02,
+    tolerance_plus: 0.02,
+    tolerance_minus: 0.02,
+    gears: [defaultStageGear(17), defaultStageGear(43)],
+  };
+}
+
+/** Solve a whole train. The library is omitted unless the user changed it, in
+ *  which case Rust uses the one it ships with. */
+export function solveTrain(
+  train: Train,
+  materials?: MaterialLibrary,
+): { ok: TrainResult } | { error: string } {
+  try {
+    const body = JSON.stringify({ train, materials: materials ?? null });
+    return { ok: JSON.parse(solve_train(body)) as TrainResult };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
