@@ -20,7 +20,7 @@
 
 use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift, Ranges};
 use crate::contact::{efficiency, ContactPath};
-use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides, Used};
+use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
 use crate::mesh::{Member, Mesh, MeshError, MeshKind};
 use crate::params::{Auto, GearParams};
 use crate::profile::Gear;
@@ -194,10 +194,9 @@ pub struct GearResult {
     pub min_face_width_contact: f64,
     /// Guards that altered this gear's geometry.
     pub clamps: Vec<String>,
-    /// The material as used, after any overrides and with the moisture state
-    /// resolved — what the numbers were actually computed from, rather than what
-    /// the library holds.
-    pub material: Used,
+    /// The material as used, after any overrides — what the numbers were
+    /// actually computed from, rather than what the library holds.
+    pub material: Material,
     /// What this gear's geometry allows its own inputs to be.
     ///
     /// Computed from the **resolved** parameters, so an automatic profile shift
@@ -367,7 +366,7 @@ pub fn solve_stage(
     for i in 0..2 {
         let load_i = probe_load.across_mesh(&g[0], &g[i]);
         let sf = bending_stress(&sections[i], &g[i], &load_i, StressConcentration::Iso6336);
-        let allow = materials[i].fatigue_allowable.get();
+        let allow = materials[i].fatigue_allowable.value;
 
         let mut want: f64 = 0.0;
         if stage.gears[i].auto_face_from_bending {
@@ -392,7 +391,7 @@ pub fn solve_stage(
     for i in 0..2 {
         let load_i = load.across_mesh(&g[0], &g[i]);
         let sf = bending_stress(&sections[i], &g[i], &load_i, StressConcentration::Iso6336);
-        let allow = materials[i].fatigue_allowable.get();
+        let allow = materials[i].fatigue_allowable.value;
         gears.push(GearResult {
             profile_shift: p[i].profile_shift,
             addendum: p[i].addendum,
@@ -407,7 +406,7 @@ pub fn solve_stage(
             min_face_width_bending: sf.map(|s| min_face_width_bending(s, effective, allow)),
             min_face_width_contact: min_face_width_contact(cs.worst, effective, allow),
             clamps: g[i].clamps.notes.clone(),
-            material: materials[i].used(),
+            material: materials[i].clone(),
             ranges: admissible_ranges(&p[i], stage.gears[i].working_depth),
         });
     }
@@ -643,8 +642,7 @@ mod tests {
                 ultimate_allowable: Value::datasheet(1365.0),
                 ultimate_measure: Measure::Yield,
                 fatigue_allowable: Value {
-                    dry: 750.0,
-                    conditioned: None,
+                    value: 750.0,
                     basis: Basis::Estimated,
                     note: Some("test".into()),
                 },

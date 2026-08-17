@@ -25,7 +25,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-166 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+165 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -1583,12 +1583,22 @@ not settle. Named here so the decision can be revisited rather than rediscovered
   where the domain's own conventions are unambiguous and SI would be perverse —
   lengths in mm rather than metres (all gear geometry, and what DXF expects) and
   stresses in MPa rather than Pa.
-- **Moisture is stored, not chosen.** Unfilled PA6 loses **two thirds** of its
-  stiffness between dry-as-moulded and 50 % RH — far the largest uncertainty in
-  the file. Both states are published, so both are stored, and `Value::get`
-  returns the conditioned figure wherever one exists: a gear in service has been
-  in service. The selection is not exposed in the UI; the stored dry value is
-  there for anyone who needs it.
+- **One entry, one condition.** Each entry describes a material in a single
+  state, named by its `condition` field. A material in another state is another
+  entry — which is how "4340 Steel" and "4340 Hardened Steel" always worked.
+
+  *(Corrected — an earlier revision instead gave each **property** two moisture
+  states, so the library had two mechanisms for one idea: heat treatment as
+  separate entries, moisture as paired numbers. Collapsing them onto the entry
+  deleted a field, a resolver, and a whole layer of types whose only job was to
+  pick one of the pair before it crossed the wasm boundary.)*
+
+  The polyamides are therefore quoted **conditioned**, at 23 °C / 50 % RH,
+  because a gear in service is not dry-as-moulded and the gap is not small:
+  unfilled PA6 loses two thirds of its stiffness. The dry figures are kept in
+  each note, so nothing is lost and a dry entry can be added later exactly as a
+  hardened steel was. The numbers the calculator uses did not change — the
+  conditioned figures were already the ones in force.
 - **Provenance per entry**, in the data, not a README, or it is lost on the
   first edit. Each entry names the specific *grade* measured — "PA6" is not a
   material, some particular grade was tested, and the entry says which.
@@ -1969,6 +1979,7 @@ here. Revision 2 additions are marked ★.
 | ★ Admissible shift range | the closed form vs where the generator actually clamps, 6 parameter sets | clean just inside each bound, clamped just outside |
 | ★ Pointed-tooth threshold | predicted 0.635 at z = 9 | generator caps at 0.64, not at 0.63 |
 | ★ The spec's ranges are conventional | z = 1, α = 0.5…85°, β = ±85°, negative addendum | all generate finite, closed, correctly ordered sections |
+| ★ Every entry names its condition | all eight | condition non-empty; the four polyamides say "conditioned", and the dry figure they replaced survives in the note |
 | ★ Bounds carry exclusivity and wording | `(0, 90)` vs `[−1.25, ∞)` | the open end rejects its endpoint, the closed end accepts it; "greater than" vs "at least" |
 | ★ Every input is bounded | all nine, against the defaults | defaults inside; `m = 0`, `z = 0`, `α = 90`, `β = −90`, `k = 2` all rejected |
 | ★ Addendum / dedendum / root-radius bounds | closed form vs where the generator clamps, 5 parameter sets | clean just inside, clamped just outside |

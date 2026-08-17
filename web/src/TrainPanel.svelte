@@ -6,7 +6,7 @@
     type Auto,
     type Overrides,
     type StageGear,
-    type UsedValue,
+    type MaterialValue,
   } from "./core";
   import { trains, library, type TrainTab } from "./state.svelte";
 
@@ -66,7 +66,7 @@
   label: string,
   gear: StageGear,
   key: keyof Overrides,
-  used: UsedValue | undefined,
+  used: MaterialValue | undefined,
   step: number,
   unit: string,
 )}

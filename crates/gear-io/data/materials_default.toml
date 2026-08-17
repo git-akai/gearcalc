@@ -10,9 +10,15 @@
 #   estimated  a class-consistent estimate; no measurement of this property for
 #              this material was found
 #
-# `dry` and `conditioned` are the two moisture states. Only the polyamides are
-# moisture-sensitive; where `conditioned` is present the calculator uses it,
-# because a gear in service is not dry-as-moulded.
+# Each entry is one material in ONE state, named by its `condition`. A material
+# in a different state is a different entry — which is how "4340 Steel" and
+# "4340 Hardened Steel" already worked, and now how the polyamides work too.
+#
+# The polyamides are quoted CONDITIONED, at 23 °C and 50 % relative humidity,
+# because a gear in service is not dry-as-moulded and the difference is not
+# small: unfilled PA6 loses two thirds of its stiffness. The dry-as-moulded
+# figures are kept in each note, so nothing is lost and a dry entry can be added
+# later the same way a hardened steel was.
 #
 # WHAT IS WEAK HERE, STATED PLAINLY. Density, modulus and tensile strength are
 # published for all eight materials. Poisson's ratio is published for the steels
@@ -37,12 +43,12 @@ class = "steel"
 grade = "AISI 4340 (UNS G43400)"
 condition = "annealed"
 source = "MakeItFrom, Annealed 4340 Ni-Cr-Mo Steel; density cross-checked against AZoM UNS G43400. Retrieved 2026-08-15."
-density = { dry = 7850.0, basis = "datasheet" }
-elastic_modulus = { dry = 190000.0, basis = "datasheet" }
-poissons_ratio = { dry = 0.29, basis = "datasheet" }
-ultimate_allowable = { dry = 470.0, basis = "datasheet", note = "Tensile yield strength. UTS is 690 MPa." }
+density = { value = 7850.0, basis = "datasheet" }
+elastic_modulus = { value = 190000.0, basis = "datasheet" }
+poissons_ratio = { value = 0.29, basis = "datasheet" }
+ultimate_allowable = { value = 470.0, basis = "datasheet", note = "Tensile yield strength. UTS is 690 MPa." }
 ultimate_measure = "yield"
-fatigue_allowable = { dry = 330.0, basis = "datasheet", note = "Published fatigue strength; the source does not state the cycle count." }
+fatigue_allowable = { value = 330.0, basis = "datasheet", note = "Published fatigue strength; the source does not state the cycle count." }
 
 [[material]]
 name = "4340 Hardened Steel"
@@ -50,12 +56,12 @@ class = "steel"
 grade = "AISI 4340 (UNS G43400)"
 condition = "oil quenched from 845 °C, tempered at 425 °C — 46 HRC"
 source = "ASM Desk Edition tempering table for oil-quenched 4340, as reproduced by theworldmaterial.com. Retrieved 2026-08-15."
-density = { dry = 7850.0, basis = "datasheet" }
-elastic_modulus = { dry = 190000.0, basis = "datasheet" }
-poissons_ratio = { dry = 0.29, basis = "datasheet" }
-ultimate_allowable = { dry = 1365.0, basis = "datasheet", note = "Tensile yield strength at this temper. UTS is 1500 MPa." }
+density = { value = 7850.0, basis = "datasheet" }
+elastic_modulus = { value = 190000.0, basis = "datasheet" }
+poissons_ratio = { value = 0.29, basis = "datasheet" }
+ultimate_allowable = { value = 1365.0, basis = "datasheet", note = "Tensile yield strength at this temper. UTS is 1500 MPa." }
 ultimate_measure = "yield"
-fatigue_allowable = { dry = 750.0, basis = "estimated", note = "0.5 × UTS, the classical steel endurance ratio, which reproduces the annealed entry's published 330 MPa to within 5 %. No published fatigue figure was found at THIS temper. Treat as optimistic: the endurance ratio is known to fall away above roughly 1400 MPa UTS rather than track 0.5 indefinitely, so the true figure is plausibly nearer 700 MPa. The first number here worth replacing with your own data." }
+fatigue_allowable = { value = 750.0, basis = "estimated", note = "0.5 × UTS, the classical steel endurance ratio, which reproduces the annealed entry's published 330 MPa to within 5 %. No published fatigue figure was found at THIS temper. Treat as optimistic: the endurance ratio is known to fall away above roughly 1400 MPa UTS rather than track 0.5 indefinitely, so the true figure is plausibly nearer 700 MPa. The first number here worth replacing with your own data." }
 
 # The 425 °C temper is chosen deliberately. Tempering 4340 lower gives more
 # strength (1860 MPa yield at 205 °C) but takes the hardness to 53 HRC, past
@@ -71,12 +77,12 @@ class = "brass"
 grade = "UNS C36000 free-cutting brass"
 condition = "H02 half hard — the temper free-cutting brass is normally supplied in"
 source = "Copper Development Association alloy data for C36000, as published by National Bronze. Retrieved 2026-08-15."
-density = { dry = 8500.0, basis = "datasheet", note = "0.307 lb/in³. Some secondary sources give 8.2 g/cm³, which is wrong." }
-elastic_modulus = { dry = 96500.0, basis = "datasheet", note = "14 000 ksi." }
-poissons_ratio = { dry = 0.32, basis = "derived", note = "ν = E/2G − 1, from the published E = 14 000 ksi and G = 5 300 ksi. Not an estimate: both moduli are measured." }
-ultimate_allowable = { dry = 310.0, basis = "datasheet", note = "Typical H02 yield, 45 ksi. UTS is 386 MPa. Yield is strongly temper-dependent — the published range across tempers is 124–310 MPa." }
+density = { value = 8500.0, basis = "datasheet", note = "0.307 lb/in³. Some secondary sources give 8.2 g/cm³, which is wrong." }
+elastic_modulus = { value = 96500.0, basis = "datasheet", note = "14 000 ksi." }
+poissons_ratio = { value = 0.32, basis = "derived", note = "ν = E/2G − 1, from the published E = 14 000 ksi and G = 5 300 ksi. Not an estimate: both moduli are measured." }
+ultimate_allowable = { value = 310.0, basis = "datasheet", note = "Typical H02 yield, 45 ksi. UTS is 386 MPa. Yield is strongly temper-dependent — the published range across tempers is 124–310 MPa." }
 ultimate_measure = "yield"
-fatigue_allowable = { dry = 115.0, basis = "estimated", note = "0.30 × UTS, the usual endurance ratio for wrought copper alloys. No fatigue figure for C36000 was found in the CDA data." }
+fatigue_allowable = { value = 115.0, basis = "estimated", note = "0.30 × UTS, the usual endurance ratio for wrought copper alloys. No fatigue figure for C36000 was found in the CDA data." }
 
 # ------------------------------------------------------------------- POM ----
 
@@ -86,12 +92,12 @@ class = "pom"
 grade = "DuPont Delrin 100P NC010, acetal homopolymer"
 condition = "23 °C, as moulded"
 source = "DuPont Delrin 100P product datasheet (ISO test methods). Fatigue from the DuPont Delrin design guide, figure 6.14. Retrieved 2026-08-15."
-density = { dry = 1420.0, basis = "datasheet" }
-elastic_modulus = { dry = 3000.0, basis = "datasheet", note = "ISO 527-1/-2. Flexural modulus is 2800 MPa." }
-poissons_ratio = { dry = 0.37, basis = "datasheet", note = "ISO 527-1/-2. Published, unusually for a polymer." }
-ultimate_allowable = { dry = 71.0, basis = "datasheet", note = "Yield stress, ISO 527-1/-2, at 22 % yield strain." }
+density = { value = 1420.0, basis = "datasheet" }
+elastic_modulus = { value = 3000.0, basis = "datasheet", note = "ISO 527-1/-2. Flexural modulus is 2800 MPa." }
+poissons_ratio = { value = 0.37, basis = "datasheet", note = "ISO 527-1/-2. Published, unusually for a polymer." }
+ultimate_allowable = { value = 71.0, basis = "datasheet", note = "Yield stress, ISO 527-1/-2, at 22 % yield strain." }
 ultimate_measure = "yield"
-fatigue_allowable = { dry = 35.0, basis = "chart", note = "Read off DuPont figure 6.14, flexural fatigue of Delrin 100 at 10⁷ cycles — ASTM D671, 23 °C, 50 % RH, fully reversed, 30 Hz. The curve is published for Delrin 100, not 100P. Roughly half the yield stress, which is high for a thermoplastic and characteristic of acetal." }
+fatigue_allowable = { value = 35.0, basis = "chart", note = "Read off DuPont figure 6.14, flexural fatigue of Delrin 100 at 10⁷ cycles — ASTM D671, 23 °C, 50 % RH, fully reversed, 30 Hz. The curve is published for Delrin 100, not 100P. Roughly half the yield stress, which is high for a thermoplastic and characteristic of acetal." }
 
 # No glass-filled POM is included, and that is a finding rather than an
 # omission. The obvious candidate, Delrin 570, is glass *filled* — fibres added
@@ -112,53 +118,53 @@ fatigue_allowable = { dry = 35.0, basis = "chart", note = "Read off DuPont figur
 name = "PA6"
 class = "polyamide"
 grade = "EMS-GRIVORY Grilon BS"
-condition = "dry as moulded / conditioned at 23 °C, 50 % RH"
+condition = "conditioned, 23 °C / 50 % RH"
 source = "EMS-GRIVORY Grilon BS CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15."
-density = { dry = 1130.0, basis = "datasheet" }
-elastic_modulus = { dry = 3000.0, conditioned = 1000.0, basis = "datasheet", note = "ISO 527-1/-2. Moisture costs two thirds of the stiffness." }
-poissons_ratio = { dry = 0.39, basis = "estimated", note = "No polyamide datasheet publishes ν. Class value for unfilled PA. The whole plausible range 0.33–0.44 moves Hertzian contact stress by only ±2.5 %, so this is a low-consequence estimate." }
-ultimate_allowable = { dry = 80.0, conditioned = 40.0, basis = "datasheet", note = "Yield stress, ISO 527-1/-2." }
+density = { value = 1130.0, basis = "datasheet" }
+elastic_modulus = { value = 1000.0, basis = "datasheet", note = "ISO 527-1/-2. Moisture costs two thirds of the stiffness. Dry as moulded: 3000.0." }
+poissons_ratio = { value = 0.39, basis = "estimated", note = "No polyamide datasheet publishes ν. Class value for unfilled PA. The whole plausible range 0.33–0.44 moves Hertzian contact stress by only ±2.5 %, so this is a low-consequence estimate." }
+ultimate_allowable = { value = 40.0, basis = "datasheet", note = "Yield stress, ISO 527-1/-2. Dry as moulded: 80.0." }
 ultimate_measure = "yield"
-fatigue_allowable = { dry = 24.0, conditioned = 12.0, basis = "estimated", note = "0.30 × ultimate. No S-N data exists for this grade in any published form." }
+fatigue_allowable = { value = 12.0, basis = "estimated", note = "0.30 × ultimate. No S-N data exists for this grade in any published form. Dry as moulded: 24.0." }
 
 [[material]]
 name = "PA6 GF30"
 class = "polyamide"
 grade = "EMS-GRIVORY Grilon BG-30 S"
-condition = "dry as moulded / conditioned at 23 °C, 50 % RH"
+condition = "conditioned, 23 °C / 50 % RH"
 source = "EMS-GRIVORY Grilon BG-30 S CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15."
-density = { dry = 1350.0, basis = "datasheet" }
-elastic_modulus = { dry = 9500.0, conditioned = 6000.0, basis = "datasheet" }
-poissons_ratio = { dry = 0.36, basis = "estimated", note = "0.39 less 0.001 per % glass; see the file header." }
-ultimate_allowable = { dry = 185.0, conditioned = 125.0, basis = "datasheet", note = "Stress at break — glass-filled polyamide has no yield point." }
+density = { value = 1350.0, basis = "datasheet" }
+elastic_modulus = { value = 6000.0, basis = "datasheet", note = "Dry as moulded: 9500.0." }
+poissons_ratio = { value = 0.36, basis = "estimated", note = "0.39 less 0.001 per % glass; see the file header." }
+ultimate_allowable = { value = 125.0, basis = "datasheet", note = "Stress at break — glass-filled polyamide has no yield point. Dry as moulded: 185.0." }
 ultimate_measure = "break"
-fatigue_allowable = { dry = 55.5, conditioned = 37.5, basis = "estimated", note = "0.30 × ultimate. No S-N data exists for this grade." }
+fatigue_allowable = { value = 37.5, basis = "estimated", note = "0.30 × ultimate. No S-N data exists for this grade. Dry as moulded: 55.5." }
 
 [[material]]
 name = "PA GF50"
 class = "polyamide"
 grade = "EMS-GRIVORY Grilon BG-50 S"
-condition = "dry as moulded / conditioned at 23 °C, 50 % RH"
+condition = "conditioned, 23 °C / 50 % RH"
 source = "EMS-GRIVORY Grilon BG-50 S CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15."
-density = { dry = 1580.0, basis = "datasheet" }
-elastic_modulus = { dry = 17500.0, conditioned = 11500.0, basis = "datasheet" }
-poissons_ratio = { dry = 0.34, basis = "estimated", note = "0.39 less 0.001 per % glass; see the file header." }
-ultimate_allowable = { dry = 245.0, conditioned = 165.0, basis = "datasheet", note = "Stress at break." }
+density = { value = 1580.0, basis = "datasheet" }
+elastic_modulus = { value = 11500.0, basis = "datasheet", note = "Dry as moulded: 17500.0." }
+poissons_ratio = { value = 0.34, basis = "estimated", note = "0.39 less 0.001 per % glass; see the file header." }
+ultimate_allowable = { value = 165.0, basis = "datasheet", note = "Stress at break. Dry as moulded: 245.0." }
 ultimate_measure = "break"
-fatigue_allowable = { dry = 73.5, conditioned = 49.5, basis = "estimated", note = "0.30 × ultimate. No S-N data exists for this grade." }
+fatigue_allowable = { value = 49.5, basis = "estimated", note = "0.30 × ultimate. No S-N data exists for this grade. Dry as moulded: 73.5." }
 
 [[material]]
 name = "PA GF70"
 class = "polyamide"
 grade = "EMS-GRIVORY Grivory GVX-7H"
-condition = "dry as moulded / conditioned at 23 °C, 50 % RH"
+condition = "conditioned, 23 °C / 50 % RH"
 source = "EMS-GRIVORY Grivory GVX-7H CAMPUS datasheet, ISO 10350. Retrieved 2026-08-15."
-density = { dry = 1850.0, basis = "datasheet" }
-elastic_modulus = { dry = 28000.0, conditioned = 27500.0, basis = "datasheet", note = "At 70 % glass the moisture effect nearly vanishes." }
-poissons_ratio = { dry = 0.32, basis = "estimated", note = "0.39 less 0.001 per % glass; see the file header." }
-ultimate_allowable = { dry = 290.0, conditioned = 260.0, basis = "datasheet", note = "Stress at break, at 1.5 % strain — this material is stiff and brittle." }
+density = { value = 1850.0, basis = "datasheet" }
+elastic_modulus = { value = 27500.0, basis = "datasheet", note = "At 70 % glass the moisture effect nearly vanishes. Dry as moulded: 28000.0." }
+poissons_ratio = { value = 0.32, basis = "estimated", note = "0.39 less 0.001 per % glass; see the file header." }
+ultimate_allowable = { value = 260.0, basis = "datasheet", note = "Stress at break, at 1.5 % strain — this material is stiff and brittle. Dry as moulded: 290.0." }
 ultimate_measure = "break"
-fatigue_allowable = { dry = 87.0, conditioned = 78.0, basis = "estimated", note = "0.30 × ultimate. No S-N data exists for this grade." }
+fatigue_allowable = { value = 78.0, basis = "estimated", note = "0.30 × ultimate. No S-N data exists for this grade. Dry as moulded: 87.0." }
 
 # GVX-7H is a partially aromatic copolyamide, not a straight PA6 or PA66 — 70 %
 # glass does not exist on a plain polyamide base. The entry is named "PA GF70"

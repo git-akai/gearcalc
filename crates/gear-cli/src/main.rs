@@ -239,10 +239,10 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
     );
     println!(
         "       E {:.0} MPa   nu {:.2}   ultimate {:.1} MPa   fatigue {:.1} MPa",
-        mat.elastic_modulus.get(),
-        mat.poissons_ratio.get(),
-        mat.ultimate_allowable.get(),
-        mat.fatigue_allowable.get()
+        mat.elastic_modulus.value,
+        mat.poissons_ratio.value,
+        mat.ultimate_allowable.value,
+        mat.fatigue_allowable.value
     );
     println!();
 
@@ -283,8 +283,8 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
             sec.form_factor,
             ys.unwrap_or(1.0),
             sf,
-            min_face_width_bending(sf, B, mat.fatigue_allowable.get()),
-            min_face_width_bending(sf, B, mat.ultimate_allowable.get()),
+            min_face_width_bending(sf, B, mat.fatigue_allowable.value),
+            min_face_width_bending(sf, B, mat.ultimate_allowable.value),
         );
         if !sec.notch_parameter_in_range() {
             println!(
@@ -307,11 +307,11 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
         println!("  relative radius           {:>7.3} mm", cs.relative_radius);
         println!(
             "  b_min against fatigue     {:>7.3} mm",
-            min_face_width_contact(cs.worst, B, mat.fatigue_allowable.get())
+            min_face_width_contact(cs.worst, B, mat.fatigue_allowable.value)
         );
         println!(
             "  b_min against ultimate    {:>7.3} mm",
-            min_face_width_contact(cs.worst, B, mat.ultimate_allowable.get())
+            min_face_width_contact(cs.worst, B, mat.ultimate_allowable.value)
         );
     }
 
@@ -355,21 +355,21 @@ fn materials() {
         println!(
             "{:<20} {:>7.0}{} {:>8.0}{} {:>5.2}{} {:>9.1}{} {:>8.1}{}",
             m.name,
-            m.density.get(),
+            m.density.value,
             tag(&m.density),
-            m.elastic_modulus.get(),
+            m.elastic_modulus.value,
             tag(&m.elastic_modulus),
-            m.poissons_ratio.get(),
+            m.poissons_ratio.value,
             tag(&m.poissons_ratio),
-            m.ultimate_allowable.get(),
+            m.ultimate_allowable.value,
             tag(&m.ultimate_allowable),
-            m.fatigue_allowable.get(),
+            m.fatigue_allowable.value,
             tag(&m.fatigue_allowable),
         );
     }
 
     println!("\nbasis: d datasheet   D derived   c read off a chart   e estimated   o overridden");
-    println!("values are the conditioned state where the material has one\n");
+    println!("each entry is one material in one state; the condition names it\n");
 
     for m in &lib.materials {
         println!("{}  [{}]", m.name, m.grade);

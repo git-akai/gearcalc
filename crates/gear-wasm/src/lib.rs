@@ -421,8 +421,9 @@ mod tests {
         assert_eq!(materials.len(), 8);
 
         let pa6 = materials.iter().find(|m| m["name"] == "PA6").unwrap();
-        // The conditioned value must survive: it is the one the tool uses.
-        assert!((pa6["elastic_modulus"]["conditioned"].as_f64().unwrap() - 1000.0).abs() < 1e-9);
+        // One state per entry, and the polyamides are quoted conditioned.
+        assert!((pa6["elastic_modulus"]["value"].as_f64().unwrap() - 1000.0).abs() < 1e-9);
+        assert!(pa6["condition"].as_str().unwrap().contains("conditioned"));
         // ...and so must the honesty about where a number came from.
         assert_eq!(pa6["poissons_ratio"]["basis"], "estimated");
         assert!(pa6["poissons_ratio"]["note"].is_string());

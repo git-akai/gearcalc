@@ -119,53 +119,49 @@ mod tests {
     fn every_material_carries_physically_sane_values() {
         for m in &default_library().materials {
             let name = &m.name;
-            assert!(m.density.get() > 0.0, "{name}: density");
-            assert!(m.elastic_modulus.get() > 0.0, "{name}: modulus");
+            assert!(m.density.value > 0.0, "{name}: density");
+            assert!(m.elastic_modulus.value > 0.0, "{name}: modulus");
 
             // Outside (-1, 0.5) a material has a negative bulk or shear
             // modulus. Real engineering materials sit well inside that.
-            let nu = m.poissons_ratio.get();
+            let nu = m.poissons_ratio.value;
             assert!((0.2..0.5).contains(&nu), "{name}: Poisson's ratio {nu}");
 
             // A cyclic allowable at or above the peak allowable would mean
             // fatigue never governs, which is never true.
             assert!(
-                m.fatigue_allowable.get() < m.ultimate_allowable.get(),
+                m.fatigue_allowable.value < m.ultimate_allowable.value,
                 "{name}: fatigue allowable is not below ultimate"
             );
-            assert!(m.fatigue_allowable.get() > 0.0, "{name}: fatigue allowable");
+            assert!(m.fatigue_allowable.value > 0.0, "{name}: fatigue allowable");
         }
     }
 
+    /// Every entry describes one state, and says which. That is what replaced
+    /// the old paired dry/conditioned numbers, and it is only honest if the
+    /// condition is actually filled in.
     #[test]
-    fn moisture_sensitivity_matches_the_material_class() {
+    fn every_entry_names_the_condition_its_numbers_describe() {
         for m in &default_library().materials {
-            // Only polyamides should carry a second moisture state, and every
-            // polyamide should carry one for modulus and strength. Getting this
-            // backwards would silently apply dry values to a gear in service.
-            let expected = m.class.is_moisture_sensitive();
-            assert_eq!(
-                m.elastic_modulus.conditioned.is_some(),
-                expected,
-                "{}: modulus moisture state",
-                m.name
+            assert!(!m.condition.is_empty(), "{}: no condition", m.name);
+        }
+        // The polyamides are the conditioned state, and say so.
+        for name in ["PA6", "PA6 GF30", "PA GF50", "PA GF70"] {
+            let m = default_library();
+            let m = m.get(name).unwrap();
+            assert!(
+                m.condition.contains("conditioned"),
+                "{name}: {}",
+                m.condition
             );
-            assert_eq!(
-                m.ultimate_allowable.conditioned.is_some(),
-                expected,
-                "{}: strength moisture state",
-                m.name
+            // ...and the dry figure it replaced is preserved rather than lost.
+            assert!(
+                m.elastic_modulus
+                    .note
+                    .as_deref()
+                    .is_some_and(|n| n.contains("Dry as moulded")),
+                "{name}: the dry modulus should survive in the note"
             );
-
-            if expected {
-                // Water plasticises: conditioned must be the weaker state.
-                assert!(
-                    m.elastic_modulus.conditioned.unwrap() < m.elastic_modulus.dry,
-                    "{}: conditioned modulus is not below dry",
-                    m.name
-                );
-                assert!(m.class == Class::Polyamide);
-            }
         }
     }
 
@@ -189,7 +185,7 @@ mod tests {
     }
 
     #[test]
-    fn glass_content_raises_stiffness_and_closes_the_moisture_gap() {
+    fn glass_content_raises_stiffness_and_density_across_the_family() {
         // A consistency check across the polyamide family rather than on any
         // one entry: these came from three separate datasheets, and if a column
         // were misread the monotonicity would break.
@@ -198,18 +194,16 @@ mod tests {
 
         for w in pa.windows(2) {
             assert!(
-                w[1].elastic_modulus.dry > w[0].elastic_modulus.dry,
+                w[1].elastic_modulus.value > w[0].elastic_modulus.value,
                 "{} is not stiffer than {}",
                 w[1].name,
                 w[0].name
             );
-            assert!(w[1].density.dry > w[0].density.dry, "{} density", w[1].name);
-
-            // More glass, less polymer, less water uptake.
-            let gap = |m: &gear_core::Material| {
-                1.0 - m.elastic_modulus.conditioned.unwrap() / m.elastic_modulus.dry
-            };
-            assert!(gap(w[1]) < gap(w[0]), "{} moisture gap", w[1].name);
+            assert!(
+                w[1].density.value > w[0].density.value,
+                "{} density",
+                w[1].name
+            );
         }
     }
 
@@ -248,18 +242,12 @@ mod tests {
         // library whose estimates no longer mean the same thing.
         let lib = default_library();
         for m in lib.materials.iter().filter(|m| m.class == Class::Polyamide) {
-            for (state, ult, fat) in [
-                ("dry", m.ultimate_allowable.dry, m.fatigue_allowable.dry),
-                (
-                    "conditioned",
-                    m.ultimate_allowable.conditioned.unwrap(),
-                    m.fatigue_allowable.conditioned.unwrap(),
-                ),
-            ] {
+            {
+                let (ult, fat) = (m.ultimate_allowable.value, m.fatigue_allowable.value);
                 let ratio = fat / ult;
                 assert!(
                     (ratio - 0.30).abs() < 1e-9,
-                    "{} {state}: fatigue/ultimate is {ratio:.4}, not the stated 0.30",
+                    "{}: fatigue/ultimate is {ratio:.4}, not the stated 0.30",
                     m.name
                 );
             }
@@ -276,12 +264,12 @@ mod tests {
             grade = "g"
             condition = "c"
             source = "s"
-            density = { dry = 7850.0, basis = "datasheet" }
-            elastic_modulus = { dry = 190000.0, basis = "datasheet" }
-            poissons_ratio = { dry = 0.29, basis = "datasheet" }
-            ultimate_allowable = { dry = 470.0, basis = "datasheet" }
+            density = { value = 7850.0, basis = "datasheet" }
+            elastic_modulus = { value = 190000.0, basis = "datasheet" }
+            poissons_ratio = { value = 0.29, basis = "datasheet" }
+            ultimate_allowable = { value = 470.0, basis = "datasheet" }
             ultimate_measure = "yield"
-            fatigue_allowable = { dry = 330.0, basis = "datasheet" }
+            fatigue_allowable = { value = 330.0, basis = "datasheet" }
         "#;
         assert!(from_toml(one).is_ok());
 

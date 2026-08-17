@@ -261,16 +261,10 @@ export type Measure = "yield" | "break";
 
 export type MaterialClass = "steel" | "brass" | "pom" | "polyamide";
 
-/** One property: its value, its moisture states, and its provenance.
- *
- *  There is deliberately no `effective(v)` helper on this side. Choosing
- *  between `dry` and `conditioned` is an engineering decision, not formatting,
- *  and the project rule keeps those in Rust — see DESIGN.md §6.3. When a
- *  material property needs displaying as a single number, Rust will send that
- *  number. */
+/** One property: its value and its provenance. One number, because an entry
+ *  describes a material in one state — the `condition` field names it. */
 export interface MaterialValue {
-  dry: number;
-  conditioned?: number;
+  value: number;
   basis: Basis;
   note?: string;
 }
@@ -341,27 +335,6 @@ export interface Overrides {
   fatigue_allowable: number | null;
 }
 
-/** One property as actually used: a single number, moisture state already
- *  resolved by Rust. */
-export interface UsedValue {
-  value: number;
-  basis: Basis;
-  note?: string;
-}
-
-/** A material as the calculation used it — after overrides. */
-export interface Used {
-  name: string;
-  grade: string;
-  condition: string;
-  density: UsedValue;
-  elastic_modulus: UsedValue;
-  poissons_ratio: UsedValue;
-  ultimate_allowable: UsedValue;
-  ultimate_measure: Measure;
-  fatigue_allowable: UsedValue;
-}
-
 export interface StageGear {
   teeth: number;
   profile_shift: Auto<number>;
@@ -419,7 +392,7 @@ export interface GearResult {
   min_face_width_bending: number | null;
   min_face_width_contact: number;
   clamps: string[];
-  material: Used;
+  material: Material;
   ranges: Ranges;
 }
 export interface StageResult {
