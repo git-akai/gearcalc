@@ -227,12 +227,31 @@
               <input type="number" step="0.05" bind:value={stage.thickness_mod} />
               <em>k₁</em>
             </label>
+            {@render autoNumber("C2C distance", stage.centre_distance, res?.centre_distance, 0.1)}
             <label>
               <span>C2C clearance</span>
-              <input type="number" step="0.01" bind:value={stage.clearance} />
+              <input
+                type="number"
+                step="0.01"
+                bind:value={stage.clearance}
+                disabled={!stage.centre_distance.auto}
+                class:computed={!stage.centre_distance.auto}
+              />
+              <em>mm</em>
+            </label>
+            <label>
+              <span>C2C tolerance +</span>
+              <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
+              <em>mm</em>
+            </label>
+            <label>
+              <span>C2C tolerance −</span>
+              <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
               <em>mm</em>
             </label>
           </div>
+          <!-- Clearance is meaningless once the centre distance is set by hand:
+               the specification locks it to zero, and so does the solver. -->
 
           <div class="gears">
             {#each stage.gears as gear, j (j)}
@@ -264,6 +283,13 @@
                   {/if}
                 </label>
                 {@render autoNumber("Profile shift", gear.profile_shift, g?.profile_shift, 0.05)}
+                {#if gear.profile_shift.auto}
+                  <label class="sub">
+                    <span>Working tooth depth</span>
+                    <input type="number" step="0.05" bind:value={gear.working_depth} />
+                    <em>module</em>
+                  </label>
+                {/if}
                 {#if g && !gear.profile_shift.auto}
                   {@const r = g.ranges.profile_shift}
                   {@const bad = outside(gear.profile_shift.manual, { min: r.min, max: r.max })}
@@ -271,7 +297,27 @@
                     {bad ?? `buildable ${n(r.min)} … ${n(r.max)} · undercut below ${n(r.undercut)}`}
                   </p>
                 {/if}
+                {@render autoNumber("Addendum", gear.addendum, g?.addendum, 0.05)}
+                {#if gear.addendum.auto}
+                  <label class="sub">
+                    <span>Minimum tip width</span>
+                    <input type="number" step="0.02" bind:value={gear.min_tip_width} />
+                    <em>mm</em>
+                  </label>
+                {/if}
                 {@render autoNumber("Face width", gear.face_width, g?.face_width, 0.5)}
+                {#if gear.face_width.auto}
+                  <div class="subtoggles">
+                    <label class="check">
+                      <input type="checkbox" bind:checked={gear.auto_face_from_bending} />
+                      <span>from bending</span>
+                    </label>
+                    <label class="check">
+                      <input type="checkbox" bind:checked={gear.auto_face_from_contact} />
+                      <span>from contact</span>
+                    </label>
+                  </div>
+                {/if}
                 <label>
                   <span>Material</span>
                   <select bind:value={gear.material}>
@@ -577,6 +623,28 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--muted);
+  }
+  .sub {
+    font-size: 0.78rem;
+  }
+  .sub span {
+    padding-left: 0.8rem;
+  }
+  .subtoggles {
+    display: flex;
+    gap: 0.9rem;
+    padding: 0 0 0.3rem 0.8rem;
+  }
+  .check {
+    display: flex;
+    grid-template-columns: none;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    margin: 0;
+  }
+  .check input {
+    width: auto;
   }
   .hint {
     margin: -0.1rem 0 0.3rem;

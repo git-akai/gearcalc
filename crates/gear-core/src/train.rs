@@ -831,6 +831,58 @@ mod tests {
         assert!(r.stages[1].gears[1].tooth_cycles < r.stages[0].gears[0].tooth_cycles);
     }
 
+    /// The automatic addendum, exercised through a whole stage rather than in
+    /// isolation: set a minimum tip width, solve the stage, and measure the tip
+    /// width off the gear the stage actually built.
+    #[test]
+    fn the_stages_automatic_addendum_produces_the_requested_tip_width() {
+        for want in [0.05, 0.15, 0.3] {
+            let mut stage = SpurStage::default();
+            for g in &mut stage.gears {
+                g.addendum = Auto::automatic(1.0);
+                g.min_tip_width = want;
+            }
+            let r = solve_stage(&stage, 2.0, &library()).unwrap();
+
+            for i in 0..2 {
+                let built = Gear::new(stage.params(i));
+                let got = 2.0 * built.ra * built.theta_a;
+                assert!(
+                    (got - want).abs() < 1e-9,
+                    "gear {i}: wanted tip width {want}, built {got}"
+                );
+                // ...and the addendum reported is the one that produced it.
+                assert!((r.gears[i].addendum - built.params.addendum).abs() < 1e-12);
+            }
+        }
+    }
+
+    /// Setting the centre distance by hand takes clearance out of the picture,
+    /// which is what the specification requires and what changes the backlash.
+    #[test]
+    fn a_manual_centre_distance_ignores_the_clearance() {
+        let lib = library();
+        let auto = solve_stage(&SpurStage::default(), 2.0, &lib).unwrap();
+
+        // The same distance, set by hand, with a clearance that must be ignored.
+        let manual = solve_stage(
+            &SpurStage {
+                centre_distance: Auto::fixed(auto.centre_distance_nominal),
+                clearance: 0.5,
+                ..SpurStage::default()
+            },
+            2.0,
+            &lib,
+        )
+        .unwrap();
+
+        assert!((manual.centre_distance - auto.centre_distance_nominal).abs() < 1e-12);
+        // At the zero-backlash distance there is, by construction, no backlash.
+        assert!(manual.backlash[1].nominal.abs() < 1e-9);
+        // Whereas the automatic one carries its clearance into real backlash.
+        assert!(auto.backlash[1].nominal > 0.0);
+    }
+
     #[test]
     fn an_unknown_material_is_named_rather_than_swallowed() {
         let mut s = SpurStage::default();

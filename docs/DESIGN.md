@@ -25,7 +25,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-158 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+160 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -1938,6 +1938,8 @@ here. Revision 2 additions are marked ★.
 | ★ Pointed-tooth threshold | predicted 0.635 at z = 9 | generator caps at 0.64, not at 0.63 |
 | ★ The spec's ranges are conventional | z = 1, α = 0.5…85°, β = ±85°, negative addendum | all generate finite, closed, correctly ordered sections |
 | ★ Addendum / dedendum / root-radius bounds | closed form vs where the generator clamps, 5 parameter sets | clean just inside, clamped just outside |
+| ★ Stage automatic addendum | set a minimum tip width, solve the stage, measure the gear it built | requested width to 1e-9 mm |
+| ★ Manual centre distance | set by hand at the zero-backlash distance with a large clearance | clearance ignored, backlash exactly zero |
 | ★ Two-stage train | `gear-cli train`, 17:43 then 13:31 helical | ratio, speed and torque agree with the stage products; stage 1's automatic face width reproduces the standalone `strength` run's `b_min` exactly |
 | ★ Efficiency costs torque | same train at `μ = 0` and `μ = 0.06` | output torque falls by exactly the product of the stage efficiencies |
 | ★ Output backlash weighting | loosen stage 1 vs stage 2 by the same amount | the **last** stage dominates, as §4.9 predicts |
