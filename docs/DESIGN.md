@@ -136,6 +136,9 @@ gears/
 │   ├── gear-core/       pure mathematics. No I/O, no wasm, no UI.
 │   │   ├── involute.rs      inv, safeguarded inv⁻¹
 │   │   ├── solve.rs         Brent, bracketed Newton — the root finders
+│   │   ├── elliptic.rs      Carlson symmetric integrals R_F, R_D
+│   │   ├── hertz.rs         general elliptical contact; line contact is its
+│   │   │                    degenerate value, not a second formula
 │   │   ├── params.rs        a gear's inputs, `Auto<T>`, and the clamp record
 │   │   ├── profile.rs       generated 2D profile (port of gear.py); the rack
 │   │   │                    and its thickness modification live here, because
@@ -165,12 +168,16 @@ gears/
 development without touching the browser. Sweeps, regression dumps and
 "why is this number wrong" all happen there.
 
-Three modules are named by the milestones ahead and do not exist yet:
-`elliptic.rs` (Carlson symmetric integrals, milestone 7), `screw.rs`
+Two modules are named by the milestones ahead and do not exist yet: `screw.rs`
 (crossed-axis screw gearing, shared by the worm stage and a crossed-axis spur
 stage) and `ring.rs` (internal-gear profile, milestone 8). `train.rs` is one
 file rather than a directory, and stays that way until a second stage type
 gives the split something to divide.
+
+`elliptic.rs` and `hertz.rs` are the first two steps of the contact unification
+(§4.7) and are deliberately **gear-free**: one is pure special functions and the
+other is pure contact mechanics, so both are testable against textbook closed
+forms with no gear in sight. Nothing calls them yet — that is step 3.
 
 ---
 
@@ -1631,7 +1638,7 @@ and no other feature depends on the mesh-phase model.
 
 ## 5. Where closed form is genuinely impossible
 
-The complete list. Five scalar solves, each monotone, each bracketed, each with
+The complete list. Six scalar solves, each monotone, each bracketed, each with
 an analytic derivative. Everything else in this document is algebraic.
 
 | # | Solve | Method | Iterations |
@@ -1641,11 +1648,22 @@ an analytic derivative. Everything else in this document is algebraic.
 | 3 | Flank/fillet junction when undercut | Brent, bracketed by construction | ~40 |
 | 4 | Planet profile shift for common centre distance | Newton, **closed-form bracket** (§4.8) | 4 |
 | 5 | 30° tangent critical root section | Brent on the trochoid parameter | ~40 |
+| 6 | Contact ellipse aspect ratio `κ` (§4.7) | Brent in `ln κ`, bracket expanded to the representable floor | ~50 |
 
 None is an optimiser, none can fail to converge, none has a tuning parameter.
 That is as close to closed form as involute geometry allows — the involute
 function is not algebraically invertible, and that single fact causes #1, #2 and
 #4.
+
+**#6 is the one that had a tempting alternative**, and refusing it is the same
+decision as the rest of this section. Hertz's aspect-ratio relation has widely
+used closed forms — Hamrock–Dowson's `κ ≈ 1.0339(R_y/R_x)^0.636` is the usual
+one — but they are *fits* to the relation, not solutions of it, so taking one
+would have put a fitted exponent underneath every crossed-axis contact stress
+the tool reports. The solve costs about fifty function evaluations and is exact.
+It is posed in `ln κ` rather than `κ` so that its tolerance is relative: the
+line-contact limit sits at `κ → 0`, and an absolute tolerance would dissolve
+precisely the end the unified model exists to reach.
 
 Worth stating separately: **guards matter as much as the solvers.**
 Testing found that ordinary planetary inputs routinely request a centre distance
