@@ -133,12 +133,33 @@ pub struct ShiftRangeOut {
     pub pointed: Option<f64>,
 }
 
+/// A bound the geometry imposes, either side absent where it is unbounded.
+#[derive(Serialize)]
+pub struct BoundOut {
+    pub min: Option<f64>,
+    pub max: Option<f64>,
+}
+
+/// Every input range this gear's own geometry decides.
+///
+/// Sent so the UI can bound a field by what can exist rather than by
+/// convention — see `gear_core::auto::admissible_ranges`. The fields absent here
+/// are the ones whose bounds do not vary (`m > 0`, `z ≥ 1`, `0 < α < 90°`,
+/// `|β| < 90°`, `0 < k < 2`), which the UI carries as constants.
+#[derive(Serialize)]
+pub struct RangesOut {
+    pub profile_shift: ShiftRangeOut,
+    pub addendum: BoundOut,
+    pub dedendum: BoundOut,
+    pub root_radius: BoundOut,
+}
+
 /// Derived geometry and metrology for one gear.
 ///
 /// Lengths are millimetres, angles degrees, composite errors micrometres.
 #[derive(Serialize)]
 pub struct GearSummary {
-    pub shift_range: ShiftRangeOut,
+    pub ranges: RangesOut,
     pub pitch_radius: f64,
     pub base_radius: f64,
     pub tip_radius: f64,
@@ -204,15 +225,24 @@ fn summarise(g: &Gear, req: &GearRequest) -> GearSummary {
         },
     };
 
-    let sr = gear_core::auto::admissible_profile_shift(&g.params, req.working_depth);
+    let rg = gear_core::auto::admissible_ranges(&g.params, req.working_depth);
+    let bound = |b: gear_core::auto::Bound| BoundOut {
+        min: b.min,
+        max: b.max,
+    };
 
     GearSummary {
-        shift_range: ShiftRangeOut {
-            min: sr.min,
-            max: sr.max,
-            undercut: sr.undercut,
-            sharp_rack_undercut: sr.sharp_rack_undercut,
-            pointed: sr.pointed,
+        ranges: RangesOut {
+            profile_shift: ShiftRangeOut {
+                min: rg.profile_shift.min,
+                max: rg.profile_shift.max,
+                undercut: rg.profile_shift.undercut,
+                sharp_rack_undercut: rg.profile_shift.sharp_rack_undercut,
+                pointed: rg.profile_shift.pointed,
+            },
+            addendum: bound(rg.addendum),
+            dedendum: bound(rg.dedendum),
+            root_radius: bound(rg.root_radius),
         },
         pitch_radius: g.r,
         base_radius: g.rb,

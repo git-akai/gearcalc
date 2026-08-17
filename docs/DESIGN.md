@@ -25,7 +25,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-155 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+158 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -356,7 +356,46 @@ calculation uses the **actual root radius coefficient** the user has entered, an
 the UI should show the sharp-rack figure alongside it for reference. That is one
 extra line of output and it makes the difference visible instead of arguable.
 
-#### 4.3.1 The profile-shift range, replacing `|x| ≤ 2`
+#### 4.3.1 Input ranges: what the geometry decides, and what convention did
+
+**The bar for an input limit is "could this gear exist?", not "would anyone want
+it?".** A guard that refuses a legal shape will one day refuse a legitimate
+design, and every shape this crate can generate is one it should accept.
+
+Probing the generator outside the specification's ranges settles which limits are
+real. A **one-tooth** gear, an **85° helix**, a **2° pressure angle** and a
+**negative addendum** all produce finite, closed, correctly ordered
+cross-sections [verified, `tests/extremes.rs`]. None of those is a limit of the
+mathematics; all four were convention.
+
+| Input | Specification | Impossible when | Now |
+|---|---|---|---|
+| Normal module | `> 0` | `m ≤ 0` — every radius collapses | unchanged |
+| Pressure angle | 10…60° | `α ≤ 0` (`x_s → ∞`) or `α ≥ 90°` (`r_b → 0`) | **(0, 90)** |
+| Tooth count | `≥ 3` | `z < 1` | **`≥ 1`** |
+| Helix angle | `±45°` | `\|β\| ≥ 90°` (`m_t → ∞`) | **(−90, 90)** |
+| Profile shift | `\|x\| ≤ 2` | see below | **computed** |
+| Addendum | `≥ 0` | tip inside the root or the base circle | **computed** |
+| Dedendum | `≥ 0` | negative tooth height, or root circle through the axis | **computed** |
+| Root radius | `≥ 0` | the fillet cannot fit the tooth space | **computed** |
+| Thickness mod. | `0 < k < 2` | rack tooth or space width `≤ 0` | unchanged |
+
+The four computed ranges are closed form, and each is placed exactly where the
+generator's own guards begin to clamp — so **inside the range implies no clamp
+note**, asserted against the generator rather than against the algebra.
+
+- **Addendum**, lower: `r_a > r_f` reduces to `h_a > −h_f`, the tooth must have
+  positive height; and `r_a > r_b`, which is what actually binds on a small gear
+  (−0.271 at z = 9, from the base circle rather than the root). No upper bound:
+  excess addendum gives a pointed tooth, which is capped and reported, not
+  refused.
+- **Dedendum**: `h_f > −h_a` the same condition read the other way, and
+  `m(h_f − x) < r` to keep the root circle off the axis.
+- **Root radius**, upper: the tip round must fit both the cutter depth and the
+  tooth space, `ρ_max = w_tip cos α_t / (2(1 − sin α_t))` — the fit the prior work
+  records as easy to get wrong.
+
+##### The profile-shift range, replacing `|x| ≤ 2`
 
 The specification bounds profile shift at `|x| ≤ 2`. Once the geometry checks
 existed, that constant turned out to be not merely arbitrary but **wrong in three
@@ -1698,8 +1737,9 @@ On top of that:
 | Q6 | Ring search is provably complete because required planet shift is strictly monotone in ring tooth count, with a closed-form bracket (§4.8). |
 | Q7 | Gear Calculator is single-gear; mating-gear references dropped (§8). |
 
-**Applied corrections**: profile shift range `|x| ≤ 2` — **since withdrawn**,
-see §4.3.1; output torque unit Nm;
+**Applied corrections**: profile shift range `|x| ≤ 2` — **since withdrawn**
+along with the conventional ranges on pressure angle, tooth count, helix angle,
+addendum, dedendum and root radius, see §4.3.1; output torque unit Nm;
 worm starts `≥ 1`; minimum tip width compared against `dedendum × module`;
 gear-tab automatic toggles are Inputs; default material "4340 Hardened Steel".
 
@@ -1896,6 +1936,8 @@ here. Revision 2 additions are marked ★.
 | ★ Automatic addendum | set it, generate, measure the tip width off the result | requested width to 1e-9 mm, 9 cases |
 | ★ Admissible shift range | the closed form vs where the generator actually clamps, 6 parameter sets | clean just inside each bound, clamped just outside |
 | ★ Pointed-tooth threshold | predicted 0.635 at z = 9 | generator caps at 0.64, not at 0.63 |
+| ★ The spec's ranges are conventional | z = 1, α = 0.5…85°, β = ±85°, negative addendum | all generate finite, closed, correctly ordered sections |
+| ★ Addendum / dedendum / root-radius bounds | closed form vs where the generator clamps, 5 parameter sets | clean just inside, clamped just outside |
 | ★ Two-stage train | `gear-cli train`, 17:43 then 13:31 helical | ratio, speed and torque agree with the stage products; stage 1's automatic face width reproduces the standalone `strength` run's `b_min` exactly |
 | ★ Efficiency costs torque | same train at `μ = 0` and `μ = 0.06` | output torque falls by exactly the product of the stage efficiencies |
 | ★ Output backlash weighting | loosen stage 1 vs stage 2 by the same amount | the **last** stage dominates, as §4.9 predicts |

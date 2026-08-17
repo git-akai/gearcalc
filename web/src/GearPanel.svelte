@@ -22,12 +22,49 @@
   );
   let errors = $state<Record<string, string | null>>({});
 
-  /** The field spec to validate against, which for profile shift is not static:
-   *  Rust returns the buildable range for this particular gear. */
+  /** The spec to validate against. Four fields have no fixed range — the
+   *  geometry decides them per gear — so Rust returns the bounds and this
+   *  substitutes them in. Comparison only; nothing is computed here. */
   function specFor(f: (typeof FIELDS)[number]) {
-    if (f.key !== "profile_shift" || !("ok" in result)) return f;
-    const r = result.ok.shift_range;
-    return { ...f, min: r.min, max: r.max };
+    if (!("ok" in result)) return f;
+    const r = result.ok.ranges;
+    const at = (b: { min: number | null; max: number | null }) => ({
+      ...f,
+      min: b.min ?? undefined,
+      max: b.max ?? undefined,
+    });
+    switch (f.key) {
+      case "profile_shift":
+        return { ...f, min: r.profile_shift.min, max: r.profile_shift.max };
+      case "addendum":
+        return at(r.addendum);
+      case "dedendum":
+        return at(r.dedendum);
+      case "root_radius":
+        return at(r.root_radius);
+      default:
+        return f;
+    }
+  }
+
+  /** The bound, phrased for the field it belongs to. */
+  function boundNote(key: string): string | null {
+    if (!("ok" in result)) return null;
+    const r = result.ok.ranges;
+    switch (key) {
+      case "addendum":
+        return r.addendum.min === null ? null : `above ${n(r.addendum.min)}: the tooth must have height`;
+      case "dedendum":
+        return r.dedendum.max === null
+          ? null
+          : `${n(r.dedendum.min ?? 0)} … ${n(r.dedendum.max)} · the root circle must clear the axis`;
+      case "root_radius":
+        return r.root_radius.max === null
+          ? null
+          : `up to ${n(r.root_radius.max)} · the fillet must fit the tooth space`;
+      default:
+        return null;
+    }
   }
 
   function onInput(key: string, text: string) {
@@ -121,12 +158,13 @@
           <em>{f.unit}</em>
           {#if errors[f.key]}<small class="err">{errors[f.key]}</small>
           {:else if f.key === "profile_shift" && "ok" in result}
-            {@const r = result.ok.shift_range}
+            {@const r = result.ok.ranges.profile_shift}
             <small
               >buildable {n(r.min)} … {n(r.max)} · undercut below {n(r.undercut)}
               <span class="ref">(sharp rack {n(r.sharp_rack_undercut)})</span>{#if r.pointed !== null}
                 · pointed above {n(r.pointed)}{/if}</small
             >
+          {:else if boundNote(f.key)}<small>{boundNote(f.key)}</small>
           {:else if f.note}<small>{f.note}</small>{/if}
         </label>
       {/each}

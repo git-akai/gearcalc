@@ -75,8 +75,23 @@ export interface ShiftRange {
   pointed: number | null;
 }
 
+/** A bound the geometry imposes; either side absent means unbounded. */
+export interface Bound {
+  min: number | null;
+  max: number | null;
+}
+
+/** Every input range this gear's own geometry decides. Fields not listed here
+ *  have bounds that do not vary, and stay as constants in FIELDS. */
+export interface Ranges {
+  profile_shift: ShiftRange;
+  addendum: Bound;
+  dedendum: Bound;
+  root_radius: Bound;
+}
+
 export interface GearSummary {
-  shift_range: ShiftRange;
+  ranges: Ranges;
   pitch_radius: number;
   base_radius: number;
   tip_radius: number;
@@ -132,16 +147,42 @@ export interface FieldSpec {
 
 export const FIELDS: FieldSpec[] = [
   { key: "module", label: "Normal module", unit: "mm", step: 0.1, min: 0, exclusiveMin: true },
-  { key: "pressure_angle", label: "Pressure angle", unit: "°", step: 0.5, min: 10, max: 60 },
-  { key: "teeth", label: "Tooth count", unit: "", step: 1, integer: true, min: 3 },
-  { key: "helix_angle", label: "Helix angle", unit: "°", step: 1, min: -45, max: 45 },
+  // The bounds below are the mathematical ones, not the specification's
+  // conventional ones. alpha -> 0 sends the thickness-equivalent shift to
+  // infinity and alpha -> 90 collapses the base circle; |beta| -> 90 sends the
+  // transverse module to infinity. Everything strictly inside generates a real
+  // gear, however peculiar — see crates/gear-core/tests/extremes.rs.
+  {
+    key: "pressure_angle",
+    label: "Pressure angle",
+    unit: "°",
+    step: 0.5,
+    min: 0,
+    max: 90,
+    exclusiveMin: true,
+    exclusiveMax: true,
+  },
+  { key: "teeth", label: "Tooth count", unit: "", step: 1, integer: true, min: 1 },
+  {
+    key: "helix_angle",
+    label: "Helix angle",
+    unit: "°",
+    step: 1,
+    min: -90,
+    max: 90,
+    exclusiveMin: true,
+    exclusiveMax: true,
+  },
   // No fixed range: the real bound depends on dedendum, pressure angle and
   // thickness modification, so it comes back from Rust per gear and is applied
   // in GearPanel. See DESIGN.md §4.3.
   { key: "profile_shift", label: "Profile shift", unit: "module", step: 0.05 },
-  { key: "addendum", label: "Addendum", unit: "module", step: 0.05, min: 0 },
-  { key: "dedendum", label: "Dedendum", unit: "module", step: 0.05, min: 0 },
-  { key: "root_radius", label: "Root radius coefficient", unit: "module", step: 0.01, min: 0 },
+  // Bounded by the geometry, not by a constant: the tooth must have positive
+  // height, the root circle must stay off the axis, and the fillet must fit the
+  // space. Rust returns all three per gear; GearPanel applies them.
+  { key: "addendum", label: "Addendum", unit: "module", step: 0.05 },
+  { key: "dedendum", label: "Dedendum", unit: "module", step: 0.05 },
+  { key: "root_radius", label: "Root radius coefficient", unit: "module", step: 0.01 },
   {
     key: "thickness_mod",
     label: "Tooth thickness modification",

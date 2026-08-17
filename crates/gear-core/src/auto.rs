@@ -241,6 +241,109 @@ pub fn admissible_profile_shift(p: &GearParams, working_depth: f64) -> ShiftRang
     }
 }
 
+/// A bound the geometry itself imposes on one parameter. `None` where that side
+/// is genuinely unbounded.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Bound {
+    pub min: Option<f64>,
+    pub max: Option<f64>,
+}
+
+/// Every input range the geometry decides, rather than convention.
+///
+/// # What these are for
+///
+/// **Only to stop a gear that cannot exist**, not one that is merely strange or
+/// useless. A one-tooth gear, an 85° helix, a negative addendum and a pressure
+/// angle of 2° are all peculiar and all perfectly constructible — the generator
+/// builds every one of them, finite and closed. They are not this crate's to
+/// forbid.
+///
+/// So the bounds here mark impossibility: a tip inside its own root, a root
+/// circle at or through the axis, a fillet that cannot fit the space it must sit
+/// in. The parameters that stay fixed in the UI are the ones whose bounds are
+/// *also* impossibility, and simply do not vary: `m > 0`, `z ≥ 1`, `0 < α < 90°`,
+/// `|β| < 90°`, and `0 < k < 2` (a rack whose tooth or space has non-positive
+/// width is not a rack).
+#[derive(Clone, Copy, Debug)]
+pub struct Ranges {
+    pub profile_shift: ShiftRange,
+    /// Lower bound only. There is no upper: too much addendum gives a pointed
+    /// tooth, which the generator caps and reports rather than refuses.
+    pub addendum: Bound,
+    pub dedendum: Bound,
+    /// Upper bound only, from the fillet fit.
+    pub root_radius: Bound,
+}
+
+/// The ranges the geometry imposes on this gear's remaining parameters.
+///
+/// All closed form. Each bound is the point at which the generator's own guards
+/// begin to clamp, so **inside the range implies no clamp note** — a property
+/// the tests assert directly against the generator rather than against algebra.
+///
+/// - **Addendum**, lower: the tip must be outside the root, `r_a > r_f`, which
+///   reduces to the pleasingly simple `h_a > −h_f` — the tooth must have
+///   positive height. Also `r_a > r_b`, which binds only at extreme negative
+///   addendum.
+/// - **Dedendum**, lower: the same condition read the other way, `h_f > −h_a`.
+///   Upper: the root circle must stay off the axis, `m(h_f − x) < r`.
+/// - **Root radius**, upper: the tip round must fit both the cutter depth and
+///   the tooth space. The space limit is
+///   `ρ_max = w_tip cos α_t / (2(1 − sin α_t))` — the fit the prior work records
+///   as easy to get wrong, since the plausible `w_tip/(2 cos α_t)` silently
+///   shrinks every profile-shifted fillet.
+#[must_use]
+pub fn admissible_ranges(p: &GearParams, working_depth: f64) -> Ranges {
+    use crate::params::guard;
+    use std::f64::consts::PI;
+
+    let beta = p.helix_angle.to_radians();
+    let an = p
+        .pressure_angle
+        .to_radians()
+        .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
+    let alpha_t = (an.tan() / beta.cos()).atan();
+    let mt = p.module / beta.cos();
+    let r = mt * f64::from(p.teeth) / 2.0;
+    let rb = r * alpha_t.cos();
+    let x = p.profile_shift;
+
+    // Addendum: tip outside the root, and outside the base circle.
+    let above_root = -p.dedendum;
+    let above_base = (rb * (1.0 + guard::TIP_ABOVE_BASE_FRACTION) - r) / p.module - x;
+
+    // Dedendum: positive height, and a root circle that does not reach the axis.
+    let root_positive = x + guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r / p.module;
+
+    // Root radius: the tip round must fit the cutter depth and the tooth space.
+    let bd = p.module * (p.dedendum - x);
+    let st = p.module * (PI / 2.0 + 2.0 * (x + p.thickness_shift()) * an.tan()) / beta.cos();
+    let w_tip = (PI * mt - st) - 2.0 * bd * alpha_t.tan();
+    let rho_fit = if w_tip > 0.0 {
+        w_tip * alpha_t.cos() / (2.0 * (1.0 - alpha_t.sin()))
+    } else {
+        0.0
+    };
+    let rho_max = guard::FILLET_FRACTION_OF_MAX * bd.min(rho_fit);
+
+    Ranges {
+        profile_shift: admissible_profile_shift(p, working_depth),
+        addendum: Bound {
+            min: Some(above_root.max(above_base)),
+            max: None,
+        },
+        dedendum: Bound {
+            min: Some(-p.addendum),
+            max: Some(root_positive),
+        },
+        root_radius: Bound {
+            min: Some(0.0),
+            max: Some((rho_max / mt).max(0.0)),
+        },
+    }
+}
+
 /// Addendum coefficient that leaves the tooth tip exactly `min_tip_width` wide.
 ///
 /// The transverse thickness at radius `r'` is `s(r') = 2r'(ψ_b − inv α_{r'})`
