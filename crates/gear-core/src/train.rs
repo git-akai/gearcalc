@@ -164,6 +164,14 @@ pub struct GearResult {
     pub face_width: f64,
     /// Torque on this gear, N·m.
     pub torque: f64,
+    /// Rotational speed, rpm.
+    pub speed: f64,
+    /// Tooth load cycles over the duty the train describes.
+    ///
+    /// One cycle per revolution for a simple gear: a given tooth meets the mate
+    /// once per turn. Sun and ring gears in a planetary stage see `N_planets`
+    /// per revolution, and a planet is a special case again — DESIGN.md §4.9.
+    pub tooth_cycles: f64,
     /// Tooth root bending stress, MPa. `None` where the stress correction is
     /// undefined for this section — see [`crate::strength::bending_stress`].
     pub bending_stress: Option<f64>,
@@ -366,6 +374,10 @@ pub fn solve_stage(
             addendum: p[i].addendum,
             face_width: widths[i],
             torque: load_i.torque,
+            // Filled in by `solve_train`, which is the only level that knows the
+            // duty cycle and where this gear sits in the shaft line.
+            speed: 0.0,
+            tooth_cycles: 0.0,
             bending_stress: sf,
             contact_stress: cs.worst,
             min_face_width_bending: sf.map(|s| min_face_width_bending(s, effective, allow)),
@@ -429,6 +441,34 @@ const fn gcd(mut a: u32, mut b: u32) -> u32 {
     a
 }
 
+/// How the train is used, which is what turns a ratio into a tooth count.
+#[derive(Clone, Copy, Debug)]
+pub enum Actuation {
+    /// A limited sweep, repeated. The range is measured **at the output**, so
+    /// every gear's revolutions are worked *backwards* from there — upstream
+    /// gears turn further, not less.
+    Intermittent {
+        /// Output sweep per actuation, degrees.
+        range_degrees: f64,
+        actuations: u32,
+    },
+    /// Continuous running at a fraction of peak speed.
+    Continuous {
+        /// Percentage of the peak input speed.
+        operating_percent: f64,
+        runtime_hours: f64,
+    },
+}
+
+impl Default for Actuation {
+    fn default() -> Self {
+        Self::Intermittent {
+            range_degrees: 25.0,
+            actuations: 1000,
+        }
+    }
+}
+
 /// A whole geartrain.
 #[derive(Clone, Debug)]
 pub struct Train {
@@ -436,6 +476,7 @@ pub struct Train {
     pub input_speed: f64,
     /// Peak input torque, N·m.
     pub input_torque: f64,
+    pub actuation: Actuation,
     pub stages: Vec<SpurStage>,
 }
 
@@ -495,6 +536,35 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
 
     let total_ratio: f64 = stages.iter().map(|s| s.ratio).product();
     let total_efficiency: f64 = stages.iter().map(|s| s.efficiency).product();
+
+    // --- speeds and tooth cycles, which need the whole shaft line.
+    let ratios: Vec<f64> = stages.iter().map(|s| s.ratio).collect();
+    for (k, s) in stages.iter_mut().enumerate() {
+        let upstream: f64 = ratios[..k].iter().product();
+        let speed_in = train.input_speed / upstream;
+        let speeds = [speed_in, speed_in / ratios[k]];
+
+        for (i, (gear, speed)) in s.gears.iter_mut().zip(speeds).enumerate() {
+            // The reduction between this gear and the output. Gear 0 of a stage
+            // sits before that stage's own mesh, gear 1 after it.
+            let to_output: f64 = if i == 0 {
+                ratios[k..].iter().product()
+            } else {
+                ratios[k + 1..].iter().product()
+            };
+            gear.speed = speed;
+            gear.tooth_cycles = match train.actuation {
+                Actuation::Intermittent {
+                    range_degrees,
+                    actuations,
+                } => (range_degrees / 360.0) * to_output * f64::from(actuations),
+                Actuation::Continuous {
+                    operating_percent,
+                    runtime_hours,
+                } => speeds[i] * 60.0 * runtime_hours * operating_percent / 100.0,
+            };
+        }
+    }
 
     // Each stage's backlash, seen from the output, divided by everything after it.
     let refer = |pick: fn(&Backlash) -> f64| {
@@ -556,6 +626,7 @@ mod tests {
         Train {
             input_speed: 3000.0,
             input_torque: 2.0,
+            actuation: Actuation::default(),
             stages: vec![
                 SpurStage::default(),
                 SpurStage {
@@ -691,6 +762,58 @@ mod tests {
         assert!(c > b);
     }
 
+    /// Intermittent duty is measured at the OUTPUT, so upstream gears turn
+    /// further, not less. Getting the direction backwards would silently
+    /// under-count cycles on exactly the gears that see the most.
+    #[test]
+    fn intermittent_cycles_are_worked_backwards_from_the_output() {
+        let mut t = two_stage();
+        t.actuation = Actuation::Intermittent {
+            range_degrees: 360.0,
+            actuations: 100,
+        };
+        let r = solve_train(&t, &library()).unwrap();
+
+        // The output gear turns exactly once per actuation.
+        let last = &r.stages[1].gears[1];
+        assert!((last.tooth_cycles - 100.0).abs() < 1e-9);
+
+        // Every gear upstream turns more than the one after it.
+        let seq = [
+            r.stages[0].gears[0].tooth_cycles,
+            r.stages[0].gears[1].tooth_cycles,
+            r.stages[1].gears[1].tooth_cycles,
+        ];
+        for w in seq.windows(2) {
+            assert!(w[0] > w[1], "cycles must fall towards the output: {seq:?}");
+        }
+        // The input gear sees the whole train ratio's worth.
+        assert!((seq[0] - 100.0 * r.total_ratio).abs() < 1e-9);
+
+        // The two gears meshing with each other turn at different speeds but
+        // share a mesh, so their cycle counts differ by exactly that stage ratio.
+        let s0 = &r.stages[0];
+        assert!((s0.gears[0].tooth_cycles / s0.gears[1].tooth_cycles - s0.ratio).abs() < 1e-9);
+    }
+
+    #[test]
+    fn continuous_cycles_follow_each_gears_own_speed() {
+        let mut t = two_stage();
+        t.actuation = Actuation::Continuous {
+            operating_percent: 50.0,
+            runtime_hours: 2.0,
+        };
+        let r = solve_train(&t, &library()).unwrap();
+
+        // Input gear: 3000 rpm * 60 min * 2 h * 50%.
+        let want = 3000.0 * 60.0 * 2.0 * 0.5;
+        assert!((r.stages[0].gears[0].tooth_cycles - want).abs() < 1e-6);
+        // Speeds fall through the train, and cycles follow them.
+        assert!((r.stages[0].gears[0].speed - 3000.0).abs() < 1e-9);
+        assert!((r.stages[1].gears[1].speed - r.output_speed).abs() < 1e-9);
+        assert!(r.stages[1].gears[1].tooth_cycles < r.stages[0].gears[0].tooth_cycles);
+    }
+
     #[test]
     fn an_unknown_material_is_named_rather_than_swallowed() {
         let mut s = SpurStage::default();
@@ -705,6 +828,7 @@ mod tests {
         let t = Train {
             input_speed: 1.0,
             input_torque: 1.0,
+            actuation: Actuation::default(),
             stages: vec![],
         };
         assert_eq!(solve_train(&t, &library()).unwrap_err(), TrainError::Empty);

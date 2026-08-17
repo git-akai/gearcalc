@@ -59,7 +59,7 @@ fn main() {
 /// A two-stage geartrain, end to end — milestone 6's gate.
 fn train_report() {
     use gear_core::params::Auto;
-    use gear_core::train::{solve_train, SpurStage, StageGear, Train};
+    use gear_core::train::{solve_train, Actuation, SpurStage, StageGear, Train};
 
     let lib = gear_io::default_library();
     let auto_width = |teeth: u32| StageGear {
@@ -70,6 +70,10 @@ fn train_report() {
     let train = Train {
         input_speed: 3000.0,
         input_torque: 2.0,
+        actuation: Actuation::Continuous {
+            operating_percent: 80.0,
+            runtime_hours: 1000.0,
+        },
         stages: vec![
             SpurStage {
                 gears: [auto_width(17), auto_width(43)],
@@ -130,18 +134,20 @@ fn train_report() {
         );
         println!("  efficiency {:.3} %", 100.0 * s.efficiency);
         println!(
-            "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>10}",
-            "gear", "x", "b mm", "torque Nm", "sigma_F", "sigma_H"
+            "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>10} {:>9} {:>12}",
+            "gear", "x", "b mm", "torque Nm", "sigma_F", "sigma_H", "rpm", "cycles"
         );
         for (i, g) in s.gears.iter().enumerate() {
             println!(
-                "  {:<6} {:>8.4} {:>8.3} {:>10.4} {:>8.1} MPa {:>7.1} MPa",
+                "  {:<6} {:>8.4} {:>8.3} {:>10.4} {:>6.1} MPa {:>5.1} MPa {:>9.1} {:>12.3e}",
                 i + 1,
                 g.profile_shift,
                 g.face_width,
                 g.torque,
                 g.bending_stress.unwrap_or(f64::NAN),
-                g.contact_stress
+                g.contact_stress,
+                g.speed,
+                g.tooth_cycles
             );
         }
         for n in &s.notes {
