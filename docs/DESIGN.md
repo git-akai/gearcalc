@@ -20,11 +20,12 @@ subscript `n` = normal plane, `t` = transverse.
 | Strength | critical section, form factor, bending stress, Hertz, face width, helical | closed-form rack limits; the contact-half-width route; plane-change identities |
 | Efficiency | parallel-axis mesh loss from sliding along the path | numerical average of the instantaneous loss |
 | Automatic inputs | minimum profile shift, altered addendum, `Auto<T>` | the generator's own undercut flag; tip width measured off the result |
+| Geartrain core | spur/helical stage, ratio, contact ratios, backlash, stresses, face width; train accumulation | a two-stage train end to end; `ε_β = 0` exactly for spur |
 | Materials | eight-material library, per-value provenance, TOML round-trip | primary datasheets; cross-family consistency laws |
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-139 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+148 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -1702,7 +1703,7 @@ it can be validated in isolation.
 | 3 | ✅ **Gear Calculator UI** — sidebar, tabs, parameter grid, canvas viewport, DXF export | **met** — the UI's own request path produces a DXF `ezdxf` reads back with the right geometry |
 | 4 | ✅ **Materials** — TOML library, import/export, the preloaded materials | **met** — every value carries a cited primary source and a `basis`; the library round-trips through TOML unchanged and satisfies cross-family consistency laws |
 | 5 | ✅ **Mesh & strength** — contact path, bending, load-to-stress path, efficiency, Hertz, face width | **met** — both bending constructions converge to their own closed-form rack limits; Hertz agrees with the contact-half-width route to 1e-12; efficiency matches a numerical average of the instantaneous loss to 1e-10; `b_min` is independent of the face width it was evaluated at |
-| 6 | ⬜ **Spur stage** — accordion, train accumulation, torque/cycle propagation, face width and material as inputs, overlap ratio `ε_β`/`ε_γ` as outputs (§4.5) | a two-stage train computes end to end; `ε_β = 0` exactly for a spur stage |
+| 6 | 🟡 **Spur stage** — core ✅ (stage solve, train accumulation, face width/material inputs, `ε_β`/`ε_γ` outputs); remaining: tooth cycles, wasm boundary, accordion UI | **core gate met** — `gear-cli train` computes a two-stage train end to end; `ε_β = 0` exactly for a spur stage |
 | 7 | ⬜ **Worm stage** — screw-gear model, lead angle, self-locking, axial backlash | self-locking threshold matches the closed form |
 | 8 | ⬜ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | own rack-equivalent validation |
 | 9 | ⬜ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency | common centre distance to 1e-12; all six drive modes |
@@ -1846,6 +1847,10 @@ here. Revision 2 additions are marked ★.
 | ★ `x_min` thresholds | bisection on `z`, independent of the implementation | 17.10 / 21.37 / 12.82 — reproduces §4.3's table |
 | ★ `x_min` against the generator | build at `x_min ± 1e-4`, z = 9…40 | undercut flag flips across it every time |
 | ★ Automatic addendum | set it, generate, measure the tip width off the result | requested width to 1e-9 mm, 9 cases |
+| ★ Two-stage train | `gear-cli train`, 17:43 then 13:31 helical | ratio, speed and torque agree with the stage products; stage 1's automatic face width reproduces the standalone `strength` run's `b_min` exactly |
+| ★ Efficiency costs torque | same train at `μ = 0` and `μ = 0.06` | output torque falls by exactly the product of the stage efficiencies |
+| ★ Output backlash weighting | loosen stage 1 vs stage 2 by the same amount | the **last** stage dominates, as §4.9 predicts |
+| ★ Automatic face width | bending only, contact only, both | equals the larger of the enabled checks; contact governs a lightly loaded steel pair |
 | ✧ `ε_αn = ε_α/cos²β_b` vs a measured virtual pair | β = 0, 10, 20, 30°, two meshes | exact at 0; 0.03 / 0.11 / 0.20 % apart — the construction's own limit, not an error |
 | ✧ What that gap costs | perturb `ε_αn` by the observed spread, β = 30° | `Y_F` moves **0.38 %** |
 | ✦ `σ_F` composition vs. §4.7's load-case table | z = 17/43 at HPSTC, `Y_F · Y_S` | 2.9415 against the recorded 2.9416 |

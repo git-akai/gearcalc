@@ -8,6 +8,7 @@
 //! gear-cli materials          the material library, with each value's basis
 //! gear-cli strength [z1] [z2] [torque] [material] [helix]
 //!                             a worked mesh: bending, contact, efficiency
+//! gear-cli train              a two-stage geartrain, end to end
 //! ```
 
 mod diagram;
@@ -24,6 +25,7 @@ fn main() {
         Some("matrix") => matrix_report(),
         Some("loadcase") => loadcase_report(),
         Some("materials") => materials(),
+        Some("train") => train_report(),
         Some("strength") => strength_report(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(43),
@@ -51,6 +53,100 @@ fn main() {
             });
         }
         Some(other) => eprintln!("unknown command {other:?}; try `show` or `sweep`"),
+    }
+}
+
+/// A two-stage geartrain, end to end — milestone 6's gate.
+fn train_report() {
+    use gear_core::params::Auto;
+    use gear_core::train::{solve_train, SpurStage, StageGear, Train};
+
+    let lib = gear_io::default_library();
+    let auto_width = |teeth: u32| StageGear {
+        teeth,
+        face_width: Auto::automatic(0.0),
+        ..StageGear::default()
+    };
+    let train = Train {
+        input_speed: 3000.0,
+        input_torque: 2.0,
+        stages: vec![
+            SpurStage {
+                gears: [auto_width(17), auto_width(43)],
+                ..SpurStage::default()
+            },
+            SpurStage {
+                helix_angle: 15.0,
+                gears: [auto_width(13), auto_width(31)],
+                ..SpurStage::default()
+            },
+        ],
+    };
+
+    let r = match solve_train(&train, &lib) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("train did not solve: {e}");
+            return;
+        }
+    };
+
+    println!(
+        "train  in {:.0} rpm / {:.3} Nm   ->   out {:.1} rpm / {:.3} Nm",
+        train.input_speed, train.input_torque, r.output_speed, r.output_torque
+    );
+    println!(
+        "       total ratio {:.4}:1   total efficiency {:.3} %",
+        r.total_ratio,
+        100.0 * r.total_efficiency
+    );
+    println!(
+        "       output backlash {:.5} deg  (min {:.5}, max {:.5})",
+        r.output_backlash.nominal, r.output_backlash.minimum, r.output_backlash.maximum
+    );
+
+    for (k, s) in r.stages.iter().enumerate() {
+        let st = &train.stages[k];
+        println!(
+            "\nstage {}  z {}/{}  beta {} deg  ratio {:.4}  a_w {:.4} mm{}",
+            k + 1,
+            st.gears[0].teeth,
+            st.gears[1].teeth,
+            st.helix_angle,
+            s.ratio,
+            s.centre_distance,
+            if s.coprime { "  coprime" } else { "" }
+        );
+        println!(
+            "  contact ratio  transverse {:.4}   overlap {:.4}   total {:.4}{}",
+            s.contact_ratios.transverse,
+            s.contact_ratios.overlap,
+            s.contact_ratios.total,
+            if st.helix_angle != 0.0 && !s.contact_ratios.has_full_axial_overlap() {
+                "   <- no full axial overlap"
+            } else {
+                ""
+            }
+        );
+        println!("  efficiency {:.3} %", 100.0 * s.efficiency);
+        println!(
+            "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>10}",
+            "gear", "x", "b mm", "torque Nm", "sigma_F", "sigma_H"
+        );
+        for (i, g) in s.gears.iter().enumerate() {
+            println!(
+                "  {:<6} {:>8.4} {:>8.3} {:>10.4} {:>8.1} MPa {:>7.1} MPa",
+                i + 1,
+                g.profile_shift,
+                g.face_width,
+                g.torque,
+                g.bending_stress.unwrap_or(f64::NAN),
+                g.contact_stress
+            );
+        }
+        for n in &s.notes {
+            println!("  note: {n}");
+        }
     }
 }
 

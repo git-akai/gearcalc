@@ -27,6 +27,7 @@ pub mod params;
 pub mod profile;
 pub mod solve;
 pub mod strength;
+pub mod train;
 pub mod verify;
 
 pub use involute::{inv, inv_from_roll, inv_inverse};

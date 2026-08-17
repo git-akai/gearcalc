@@ -91,6 +91,30 @@ pub fn minimum_profile_shift(p: &GearParams, working_depth: f64) -> MinimumShift
     }
 }
 
+/// The shift the automatic toggle should apply: enough to avoid undercut, and no
+/// more.
+///
+/// [`minimum_profile_shift`] is a **lower bound**, and on any gear with a
+/// comfortable tooth count it is negative — −1.76 at z = 43, α = 20°, `h_w` = 1.
+/// Applying that literally would thin a tooth that needed no help, for nothing.
+///
+/// It is worse than merely pointless in a pair. Operating pressure angle comes
+/// from `inv α_w = inv α_t + 2Σx tan α_n / Σz`, so a sufficiently negative `Σx`
+/// drives `inv α_w` below zero and the mesh leaves the involute domain — there
+/// is no centre distance at which those two gears run. A 17:43 pair with both
+/// shifts set to their minimum does exactly that.
+///
+/// So the automatic value is `max(x_min, 0)`: shift when the geometry demands
+/// it, otherwise leave it alone. Deliberate negative shift remains available by
+/// switching the toggle off, which is the right place for it — it is a decision
+/// about centre distance or balance, not about undercut.
+#[must_use]
+pub fn automatic_profile_shift(p: &GearParams, working_depth: f64) -> f64 {
+    minimum_profile_shift(p, working_depth)
+        .with_cutter_radius
+        .max(0.0)
+}
+
 /// Addendum coefficient that leaves the tooth tip exactly `min_tip_width` wide.
 ///
 /// The transverse thickness at radius `r'` is `s(r') = 2r'(ψ_b − inv α_{r'})`
@@ -296,6 +320,43 @@ mod tests {
             (past.ra - pointed.ra).abs() < 1e-6,
             "the cap should hold it"
         );
+    }
+
+    /// The automatic value is a *choice*, not the bound itself. Applying the raw
+    /// minimum to a gear that does not need shifting thins it for nothing, and in
+    /// a pair can push the mesh out of the involute domain altogether.
+    #[test]
+    fn the_automatic_shift_never_thins_a_tooth_that_did_not_need_it() {
+        for teeth in [9_u32, 12, 17, 25, 43, 100] {
+            let p = GearParams {
+                teeth,
+                ..Default::default()
+            };
+            let bound = minimum_profile_shift(&p, 1.0).with_cutter_radius;
+            let applied = automatic_profile_shift(&p, 1.0);
+
+            assert!(applied >= 0.0, "z={teeth}: automatic shift went negative");
+            assert!(
+                applied >= bound - 1e-15,
+                "z={teeth}: below the undercut bound"
+            );
+            if bound > 0.0 {
+                assert!(
+                    (applied - bound).abs() < 1e-15,
+                    "z={teeth}: should sit on the bound"
+                );
+            }
+        }
+        // The case that motivated it: a comfortable tooth count has a large
+        // negative bound.
+        let big = minimum_profile_shift(
+            &GearParams {
+                teeth: 43,
+                ..Default::default()
+            },
+            1.0,
+        );
+        assert!(big.with_cutter_radius < -1.5);
     }
 
     #[test]
