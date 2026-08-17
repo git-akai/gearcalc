@@ -169,7 +169,7 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
     use gear_core::metrology::base_helix_angle;
     use gear_core::strength::{
         bending_section, bending_stress, contact_stress, min_face_width_bending,
-        min_face_width_contact, Load, StressConcentration,
+        min_face_width_contact, Load, StressConcentration, PARALLEL_AXES,
     };
 
     let lib = gear_io::default_library();
@@ -297,7 +297,7 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
 
     // --- contact, shared by the pair
     let e_star = contact_modulus(mat, mat);
-    if let Some(cs) = contact_stress(&path, &mesh, &g1, &load, e_star) {
+    if let Some(cs) = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, e_star) {
         println!("\ncontact   E* {e_star:.0} MPa (like on like)");
         println!("  at the pitch point        {:>7.1} MPa", cs.at_pitch_point);
         println!(

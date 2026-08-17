@@ -26,7 +26,7 @@ use crate::params::{Auto, GearParams};
 use crate::profile::Gear;
 use crate::strength::{
     bending_section, bending_stress, contact_stress, min_face_width_bending,
-    min_face_width_contact, Load, StressConcentration,
+    min_face_width_contact, Load, StressConcentration, PARALLEL_AXES,
 };
 
 /// One gear of a stage.
@@ -359,8 +359,8 @@ pub fn solve_stage(
         bending_section(&g[0], path.contact_ratio).ok_or(TrainError::NoRootSection)?,
         bending_section(&g[1], path.contact_ratio).ok_or(TrainError::NoRootSection)?,
     ];
-    let probe_contact =
-        contact_stress(&path, &mesh, &g[0], &probe_load, e_star).ok_or(TrainError::NoContact)?;
+    let probe_contact = contact_stress(&path, &mesh, &g[0], PARALLEL_AXES, &probe_load, e_star)
+        .ok_or(TrainError::NoContact)?;
 
     let mut widths = [0.0_f64; 2];
     for i in 0..2 {
@@ -385,7 +385,8 @@ pub fn solve_stage(
     let effective = widths[0].min(widths[1]);
 
     let load = Load::new(input_torque, effective);
-    let cs = contact_stress(&path, &mesh, &g[0], &load, e_star).ok_or(TrainError::NoContact)?;
+    let cs = contact_stress(&path, &mesh, &g[0], PARALLEL_AXES, &load, e_star)
+        .ok_or(TrainError::NoContact)?;
 
     let mut gears = Vec::with_capacity(2);
     for i in 0..2 {

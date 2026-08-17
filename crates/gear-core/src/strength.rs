@@ -25,6 +25,7 @@
 //! pointing outward, `x` across it, origin at the gear axis.
 
 use crate::contact::ContactPath;
+use crate::hertz::elliptical_contact;
 use crate::mesh::{Mesh, MeshKind};
 use crate::metrology::base_helix_angle;
 use crate::profile::Gear;
@@ -718,6 +719,15 @@ pub fn bending_section(g: &Gear, transverse_contact_ratio: f64) -> Option<RootSe
     root_section(&v, load_roll)
 }
 
+/// The lengthwise relative curvature of a parallel-axis, uncrowned mesh:
+/// exactly zero.
+///
+/// Named rather than written as `0.0` at each call site, because it is a
+/// *value of the general contact model* — the one at which the ellipse becomes
+/// a line — and not a placeholder for something not yet passed. Every mesh this
+/// crate builds today takes it.
+pub const PARALLEL_AXES: f64 = 0.0;
+
 /// Hertzian contact stress along the path of contact, MPa.
 #[derive(Clone, Copy, Debug)]
 pub struct ContactStress {
@@ -737,19 +747,45 @@ pub struct ContactStress {
     pub relative_radius: f64,
 }
 
-/// Exact Hertzian line contact for a meshing pair.
+/// Exact Hertzian contact for a meshing pair.
 ///
 /// At a point `ξ` from the pitch point the two flanks are locally cylinders of
 /// **transverse** radius `ρ₁ = r_b1 tan α_w + ξ` and `ρ₂ = r_b2 tan α_w − ξ`, so
 ///
 /// ```text
 /// 1/ρ_t = 1/ρ₁ ± 1/ρ₂               + external, − internal
-/// σ_H   = √( (F' / ρ_n) · E* / π )
+/// σ_H   = max( σ_elliptical , √( (F' / ρ_n) · E* / π ) )
 /// ```
 ///
 /// `e_star` is the effective contact modulus `E*`, from
 /// [`crate::material::contact_modulus`]. It is passed as a number rather than
 /// taken from two materials so this stays a statement about mechanics.
+///
+/// # The lengthwise curvature, and why there is no second function
+///
+/// `lengthwise_curvature` is `1/R_L`, the relative curvature **along** the
+/// contact line, in 1/mm. It is exactly zero for every mesh this crate builds
+/// today — parallel axes, uncrowned flanks — and positive only for crossed axes
+/// or crowning. It is the single parameter that unifies point and line contact
+/// (DESIGN.md §4.7), and the reason the crossed-axis work adds an argument here
+/// rather than a second function chosen by stage type.
+///
+/// The general elliptical solution ([`crate::hertz`]) is evaluated
+/// unconditionally, and at `1/R_L = 0` its peak pressure is **exactly zero**:
+/// the patch lengthens without bound and a finite load spread over it presses
+/// on nothing. So the `max` above returns the line term, bit for bit, with no
+/// branch to choose it. That is the acceptance gate — every existing contact
+/// check and `gear-cli strength 17 43 2.0` to the last digit — and it is passed
+/// by construction rather than by two routes happening to agree.
+///
+/// The `max` itself is not a fudge between two models; it is where the *body*
+/// takes over from elasticity. A tooth has finite face width, so an ellipse
+/// longer than the contact line is truncated by the tooth rather than by the
+/// contact solution, and in that regime the line term — the same load spread
+/// over the length that actually exists — is the physical one. The two cross
+/// once. Near the crossing the truth sits slightly above both, since a
+/// truncated ellipse concentrates load more than a uniform line does; that is
+/// the honest limit of the expression rather than something papered over.
 ///
 /// # Helical gears
 ///
@@ -794,6 +830,7 @@ pub fn contact_stress(
     path: &ContactPath,
     mesh: &Mesh,
     g1: &Gear,
+    lengthwise_curvature: f64,
     load: &Load,
     e_star: f64,
 ) -> Option<ContactStress> {
@@ -806,6 +843,9 @@ pub fn contact_stress(
     // F_bt is shared by both gears of the pair, so which gear the load was
     // quoted against does not survive into the answer.
     let f_bt = load.transverse_line_of_action(g1);
+    // The elliptical patch carries the whole flank force at a point, where the
+    // line carries it per unit length; F_bn is the same force either way.
+    let f_bn = load.normal_to_flank(g1);
     let cos_bb = base_helix_angle(g1).cos();
 
     let at = |xi: f64| -> Option<(f64, f64)> {
@@ -826,8 +866,13 @@ pub fn contact_stress(
         // two plane changes stay visible.
         let f_per_length = f_bt / load.face_width;
         let inv_rho_n = cos_bb * inv_rho_t;
-        let sigma = (f_per_length * inv_rho_n * e_star / std::f64::consts::PI).sqrt();
-        Some((sigma, 1.0 / inv_rho_n))
+        let line = (f_per_length * inv_rho_n * e_star / std::f64::consts::PI).sqrt();
+        // Zero at zero lengthwise curvature, so this `max` is the line term
+        // unchanged for every mesh built today. A patch that cannot exist —
+        // no load, say — carries no pressure, which the line term still can.
+        let elliptical = elliptical_contact(lengthwise_curvature, inv_rho_n, f_bn, e_star)
+            .map_or(0.0, |c| c.max_pressure);
+        Some((line.max(elliptical), 1.0 / inv_rho_n))
     };
 
     let (pitch, r_pitch) = at(0.0)?;
@@ -1443,7 +1488,7 @@ mod tests {
         for b in [1.0, 5.0, 12.5, 100.0] {
             let load = Load::new(3.0, b);
             let sf = bending_stress(&sec, &g1, &load, StressConcentration::None).unwrap();
-            let sh = contact_stress(&path, &mesh, &g1, &load, 100_000.0).unwrap();
+            let sh = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 100_000.0).unwrap();
             bend.push(min_face_width_bending(sf, b, 200.0));
             cont.push(min_face_width_contact(sh.worst, b, 800.0));
         }
@@ -1473,7 +1518,7 @@ mod tests {
         let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
         let load = Load::new(2.0, 8.0);
         let e_star = 113_000.0;
-        let cs = contact_stress(&path, &mesh, &g1, &load, e_star).unwrap();
+        let cs = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, e_star).unwrap();
 
         let f_prime = load.transverse_line_of_action(&g1) / load.face_width;
         let r = cs.relative_radius;
@@ -1485,6 +1530,106 @@ mod tests {
             cs.worst
         );
         assert!(half_width > 0.0 && half_width < r, "implausible half width");
+    }
+
+    /// **The acceptance gate for the contact unification** (DESIGN.md §4.7).
+    ///
+    /// At `1/R_L = 0` the general elliptical solution must not perturb the line
+    /// result — not "agree to 1e-12", but return the identical `f64`. It can,
+    /// because the elliptical patch's peak pressure is exactly zero there and
+    /// the `max` therefore selects the untouched line expression. Anything less
+    /// than bit equality means the line term was rewritten rather than carried
+    /// across, which is the one way this step can silently move an answer.
+    #[test]
+    fn the_general_form_is_bit_identical_to_line_contact_at_parallel_axes() {
+        for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25), (19, 31)] {
+            for beta in [0.0, 15.0, 30.0] {
+                let g1 = Gear::new(GearParams {
+                    teeth: z1,
+                    helix_angle: beta,
+                    ..Default::default()
+                });
+                let g2 = Gear::new(GearParams {
+                    teeth: z2,
+                    helix_angle: -beta,
+                    ..Default::default()
+                });
+                let mesh = Mesh::new(&g1, &g2, MeshKind::External).unwrap();
+                let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+                let load = Load::new(2.0, 10.0);
+                let e_star = 113_000.0;
+                let cs = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, e_star).unwrap();
+
+                // The line formula, spelled out in the same order the function
+                // evaluates it. The duplication *is* the assertion: it says
+                // this exact expression survived the unification. Reaching the
+                // same number by a different order of operations would only
+                // prove agreement to an ulp or so, which is not the claim —
+                // that check is `contact_stress_matches_the_half_width_route`.
+                let sum_z = f64::from(mesh.z1) + f64::from(mesh.z2);
+                let rb2 = mesh.a_w * f64::from(mesh.z2) / sum_z * mesh.alpha_w.cos();
+                let rho1 = path.base_radius_1 * mesh.alpha_w.tan() + cs.worst_position;
+                let rho2 = rb2 * mesh.alpha_w.tan() - cs.worst_position;
+                let inv_rho_n = base_helix_angle(&g1).cos() * (1.0 / rho1 + 1.0 / rho2);
+                let f_prime = load.transverse_line_of_action(&g1) / load.face_width;
+                let line = (f_prime * inv_rho_n * e_star / std::f64::consts::PI).sqrt();
+                assert_eq!(
+                    cs.worst, line,
+                    "z={z1}/{z2} beta={beta}: the general form moved the line answer"
+                );
+            }
+        }
+    }
+
+    /// The lengthwise curvature is a one-way parameter: it can only concentrate
+    /// the load further, so the stress rises monotonically with it and returns
+    /// continuously to the line value as it goes to zero. There is no jump at
+    /// the parallel-axis point, which is the property that lets one function
+    /// serve both regimes.
+    #[test]
+    fn stress_rises_monotonically_with_lengthwise_curvature_and_returns_to_the_line() {
+        let (g1, g2, mesh) = pair(17, 43);
+        let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+        let load = Load::new(2.0, 10.0);
+        let e_star = 113_000.0;
+
+        let line = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, e_star)
+            .unwrap()
+            .worst;
+
+        // Coming down toward parallel axes, the answer converges on the line
+        // value from above and never below it.
+        let mut previous = f64::INFINITY;
+        for exponent in 0..12 {
+            let curvature = 10.0_f64.powi(-exponent);
+            let worst = contact_stress(&path, &mesh, &g1, curvature, &load, e_star)
+                .unwrap()
+                .worst;
+            assert!(
+                worst >= line,
+                "curvature {curvature}: {worst} fell below the line value {line}"
+            );
+            assert!(
+                worst <= previous,
+                "curvature {curvature}: stress must fall as the mesh flattens"
+            );
+            previous = worst;
+        }
+        assert!(
+            (previous - line).abs() < 1e-9 * line,
+            "at 1e-11/mm the answer should have returned to the line value: \
+             {previous} vs {line}"
+        );
+
+        // And a curvature comparable with the profile's makes the point contact
+        // govern outright, which is the crossed-axis regime.
+        let crossed = contact_stress(&path, &mesh, &g1, 0.5, &load, e_star)
+            .unwrap()
+            .worst;
+        assert!(
+            crossed > 2.0 * line,
+            "a point contact should be far worse than a line: {crossed} vs {line}"
+        );
     }
 
     /// `ρ₁ + ρ₂ = a_w sin α_w` everywhere on the path — the two flanks' local
@@ -1667,7 +1812,7 @@ mod tests {
             });
             let mesh = Mesh::new(&g1, &g2, MeshKind::External).unwrap();
             let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
-            let cs = contact_stress(&path, &mesh, &g1, &load, 113_000.0).unwrap();
+            let cs = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 113_000.0).unwrap();
 
             // The transverse geometry itself changes with beta (m_t grows), so
             // compare against the same mesh computed without the plane change
@@ -1708,8 +1853,9 @@ mod tests {
             let load = Load::new(2.0, 8.0);
             let load_rev = load.across_mesh(&g1, &g2);
 
-            let a = contact_stress(&path, &mesh, &g1, &load, 113_000.0).unwrap();
-            let b = contact_stress(&path_rev, &m_rev, &g2, &load_rev, 113_000.0).unwrap();
+            let a = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 113_000.0).unwrap();
+            let b = contact_stress(&path_rev, &m_rev, &g2, PARALLEL_AXES, &load_rev, 113_000.0)
+                .unwrap();
 
             assert!(
                 (a.worst - b.worst).abs() / a.worst < 1e-12,
@@ -1737,13 +1883,13 @@ mod tests {
         let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
         let load = Load::new(2.0, 8.0);
 
-        let steel = contact_stress(&path, &mesh, &g1, &load, 113_000.0).unwrap();
+        let steel = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 113_000.0).unwrap();
         // The single-pair point has the smaller relative radius, so it governs.
         assert!(steel.at_single_pair > steel.at_pitch_point);
         assert!((steel.worst - steel.at_single_pair).abs() < 1e-12);
 
         // A compliant pair spreads the contact and drops the pressure, as √E*.
-        let poly = contact_stress(&path, &mesh, &g1, &load, 1_700.0).unwrap();
+        let poly = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 1_700.0).unwrap();
         assert!(poly.worst < steel.worst);
         let ratio = steel.worst / poly.worst;
         assert!(

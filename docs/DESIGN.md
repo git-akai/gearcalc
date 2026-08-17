@@ -1246,22 +1246,30 @@ rewritten, not that the general form is wrong.
 
 ##### Order of work
 
-1. Carlson symmetric elliptic integrals — testable alone against known values.
-2. General Hertz on top of them — testable against sphere-on-sphere and
-   sphere-on-plane, which have exact closed forms and need no gear.
-3. Swap `contact_stress` to the general form with `1/R_L = 0`; the gate above
+1. ✅ Carlson symmetric elliptic integrals — testable alone against known
+   values. `elliptic.rs`.
+2. ✅ General Hertz on top of them — testable against sphere-on-sphere and
+   sphere-on-plane, which have exact closed forms and need no gear. `hertz.rs`.
+3. ✅ Swap `contact_stress` to the general form with `1/R_L = 0`; the gate above
    must pass **before** any crossed-axis geometry is added.
-4. Sliding as a vector; same discipline — parallel-axis efficiency unchanged
+4. ⬜ Sliding as a vector; same discipline — parallel-axis efficiency unchanged
    first, lengthwise component second.
-5. Only then the worm geometry, lead angle `sin γ = z m_n/d`, and self-locking.
+5. ⬜ Only then the worm geometry, lead angle `sin γ = z m_n/d`, and
+   self-locking.
 
 Steps 1–4 change no answer the tool currently gives. That is the point: the
 crossed-axis work should add a parameter, not a branch, and the way to be sure is
 to unify *before* there is anything new to get wrong.
 
-**Implementation waits for milestone 7**, where it can be checked against a real
-crossed-axis mesh. What is fixed now is that it arrives as one function with a
-lengthwise-curvature argument, not as a second function chosen by stage type.
+**Where step 3 landed.** `contact_stress` took a `lengthwise_curvature`
+argument, and every existing call site passes the named constant
+`PARALLEL_AXES`, which is `0.0` — a *value* of the model rather than a
+placeholder. The elliptical solution is evaluated unconditionally and returns
+exactly zero pressure there, so `max` selects the untouched line expression
+with no branch. The gate held: `gear-cli strength 17 43 2.0` is unchanged, and
+a test asserts **bit equality** with the line formula over four meshes at three
+helix angles each — not agreement to a tolerance, which would only have shown
+that the line term had been rewritten into something very close.
 
 **Minimum face width — closed form, no iteration.** Since `σ_F ∝ 1/b` and
 `σ_H ∝ 1/√b`:
@@ -2181,6 +2189,16 @@ here. Revision 2 additions are marked ★.
 | ✧ `ε_αn = ε_α/cos²β_b` vs a measured virtual pair | β = 0, 10, 20, 30°, two meshes | exact at 0; 0.03 / 0.11 / 0.20 % apart — the construction's own limit, not an error |
 | ✧ What that gap costs | perturb `ε_αn` by the observed spread, β = 30° | `Y_F` moves **0.38 %** |
 | ✦ `σ_F` composition vs. §4.7's load-case table | z = 17/43 at HPSTC, `Y_F · Y_S` | 2.9415 against the recorded 2.9416 |
+| ◆ Carlson `R_F`, `R_D` | vs. direct quadrature of the defining integrals, six argument sets including near-degenerate | 1e-11 relative |
+| ◆ Carlson vs. the classical form | `K(m)`, `E(m)` recovered from them and checked against the arithmetic–geometric mean, seven moduli | 1e-13 relative — the equivalence the no-branch argument rests on |
+| ◆ Duplication stopping tolerance | asserted to be `ε^(1/6)`, the sixth root of the machine epsilon | holds; it is derived from the truncation order, not chosen |
+| ◆ General Hertz vs. the sphere closed form | sphere-on-sphere and sphere-on-flat, 4 radii × 3 loads × 2 moduli | `a`, `p₀` and the approach `δ = a²/R` all to 1e-12 |
+| ◆ The constant in front of the Hertz integrals | the elastic conditions themselves, by quadrature, six curvature pairs | 1e-8 relative — the check that pins the one factor a derivation slips on |
+| ◆ Aspect-ratio solve (#6) | `κ → q → κ` round trip over six decades of `κ` | 1e-11 relative; solving in `ln κ` is what holds the small end |
+| ◆ Direction labelling | `curvature_x` and `curvature_y` exchanged, four pairs | same pressure, axes swapped, to 1e-12 |
+| ◆ **Line contact is the degenerate value** | `σ_H` at `1/R_L = 0` vs. the line expression, four meshes × three helix angles | **bit-identical** — the acceptance gate |
+| ◆ Approach to the limit | `1/R_L` swept 1 → 1e-11 /mm | `σ_H` falls monotonically and returns to the line value to 1e-9; no jump at zero |
+| ◆ Canary after the swap | `gear-cli strength 17 43 2.0`, and the two-stage train | unchanged in every figure |
 
 The marks record which round of review each check came from; they are kept only
 so a claim can be traced to the work that produced it.
