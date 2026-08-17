@@ -17,6 +17,7 @@
 
 pub mod auto;
 pub mod contact;
+pub mod elliptic;
 pub mod involute;
 pub mod jgma;
 pub mod material;
