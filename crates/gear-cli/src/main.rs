@@ -346,6 +346,7 @@ fn materials() {
         // A single letter per value, so a row reads as a confidence pattern:
         // `d` datasheet, `D` derived, `c` chart, `e` estimated.
         let tag = |v: &gear_core::material::Value| match v.basis {
+            gear_core::material::Basis::Overridden => 'o',
             gear_core::material::Basis::Datasheet => 'd',
             gear_core::material::Basis::Derived => 'D',
             gear_core::material::Basis::Chart => 'c',
@@ -367,7 +368,7 @@ fn materials() {
         );
     }
 
-    println!("\nbasis: d datasheet   D derived   c read off a chart   e estimated");
+    println!("\nbasis: d datasheet   D derived   c read off a chart   e estimated   o overridden");
     println!("values are the conditioned state where the material has one\n");
 
     for m in &lib.materials {

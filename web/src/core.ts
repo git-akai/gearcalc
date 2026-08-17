@@ -256,7 +256,7 @@ export function dxf(req: GearRequest): { ok: string } | { error: string } {
 // --------------------------------------------------------------------- //
 
 /** How far a published value can be trusted. Mirrors the Rust `Basis`. */
-export type Basis = "datasheet" | "derived" | "chart" | "estimated";
+export type Basis = "overridden" | "datasheet" | "derived" | "chart" | "estimated";
 
 /** What the ultimate allowable measures. Glass-filled grades have no yield. */
 export type Measure = "yield" | "break";
@@ -333,6 +333,37 @@ export type Actuation =
   | { intermittent: { range_degrees: number; actuations: number } }
   | { continuous: { operating_percent: number; runtime_hours: number } };
 
+/** Per-use replacements for a material's properties. `null` means "as the
+ *  library says". These live in the input state, not in the library. */
+export interface Overrides {
+  density: number | null;
+  elastic_modulus: number | null;
+  poissons_ratio: number | null;
+  ultimate_allowable: number | null;
+  fatigue_allowable: number | null;
+}
+
+/** One property as actually used: a single number, moisture state already
+ *  resolved by Rust. */
+export interface UsedValue {
+  value: number;
+  basis: Basis;
+  note?: string;
+}
+
+/** A material as the calculation used it — after overrides. */
+export interface Used {
+  name: string;
+  grade: string;
+  condition: string;
+  density: UsedValue;
+  elastic_modulus: UsedValue;
+  poissons_ratio: UsedValue;
+  ultimate_allowable: UsedValue;
+  ultimate_measure: Measure;
+  fatigue_allowable: UsedValue;
+}
+
 export interface StageGear {
   teeth: number;
   profile_shift: Auto<number>;
@@ -345,6 +376,7 @@ export interface StageGear {
   auto_face_from_bending: boolean;
   auto_face_from_contact: boolean;
   material: string;
+  material_overrides: Overrides;
 }
 
 export interface SpurStage {
@@ -389,6 +421,7 @@ export interface GearResult {
   min_face_width_bending: number | null;
   min_face_width_contact: number;
   clamps: string[];
+  material: Used;
   ranges: Ranges;
 }
 export interface StageResult {
@@ -425,6 +458,13 @@ export function defaultStageGear(teeth: number): StageGear {
     auto_face_from_bending: true,
     auto_face_from_contact: true,
     material: "4340 Hardened Steel",
+    material_overrides: {
+      density: null,
+      elastic_modulus: null,
+      poissons_ratio: null,
+      ultimate_allowable: null,
+      fatigue_allowable: null,
+    },
   };
 }
 

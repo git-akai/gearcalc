@@ -20,7 +20,7 @@
 
 use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift, Ranges};
 use crate::contact::{efficiency, ContactPath};
-use crate::material::{contact_modulus, MaterialLibrary};
+use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides, Used};
 use crate::mesh::{Member, Mesh, MeshError, MeshKind};
 use crate::params::{Auto, GearParams};
 use crate::profile::Gear;
@@ -53,6 +53,10 @@ pub struct StageGear {
     pub auto_face_from_contact: bool,
     /// Name of a material in the library.
     pub material: String,
+    /// Properties replaced for this gear only. Empty means "as the library
+    /// says" — see [`Overrides`].
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub material_overrides: Overrides,
 }
 
 impl Default for StageGear {
@@ -69,6 +73,7 @@ impl Default for StageGear {
             auto_face_from_bending: true,
             auto_face_from_contact: true,
             material: "4340 Hardened Steel".to_string(),
+            material_overrides: Overrides::default(),
         }
     }
 }
@@ -189,6 +194,10 @@ pub struct GearResult {
     pub min_face_width_contact: f64,
     /// Guards that altered this gear's geometry.
     pub clamps: Vec<String>,
+    /// The material as used, after any overrides and with the moisture state
+    /// resolved — what the numbers were actually computed from, rather than what
+    /// the library holds.
+    pub material: Used,
     /// What this gear's geometry allows its own inputs to be.
     ///
     /// Computed from the **resolved** parameters, so an automatic profile shift
@@ -320,12 +329,15 @@ pub fn solve_stage(
     let mesh = Mesh::new(&g[0], &g[1], MeshKind::External).map_err(TrainError::Mesh)?;
     let path = ContactPath::new(&g[0], &g[1], &mesh).ok_or(TrainError::NoContact)?;
 
-    let materials: Vec<&crate::Material> = stage
+    // Owned rather than borrowed, because a gear's own overrides may replace
+    // properties of the library entry and the result is a different material.
+    let materials: Vec<Material> = stage
         .gears
         .iter()
         .map(|s| {
             lib.get(&s.material)
                 .ok_or_else(|| TrainError::UnknownMaterial(s.material.clone()))
+                .map(|m| m.overridden(&s.material_overrides))
         })
         .collect::<Result<_, _>>()?;
 
@@ -341,7 +353,7 @@ pub fn solve_stage(
     // (DESIGN §4.7), so one evaluation at any width gives every minimum, and
     // nothing has to be iterated.
     const PROBE: f64 = 10.0;
-    let e_star = contact_modulus(materials[0], materials[1]);
+    let e_star = contact_modulus(&materials[0], &materials[1]);
     let probe_load = Load::new(input_torque, PROBE);
 
     let sections = [
@@ -395,6 +407,7 @@ pub fn solve_stage(
             min_face_width_bending: sf.map(|s| min_face_width_bending(s, effective, allow)),
             min_face_width_contact: min_face_width_contact(cs.worst, effective, allow),
             clamps: g[i].clamps.notes.clone(),
+            material: materials[i].used(),
             ranges: admissible_ranges(&p[i], stage.gears[i].working_depth),
         });
     }
@@ -881,6 +894,67 @@ mod tests {
         assert!(manual.backlash[1].nominal.abs() < 1e-9);
         // Whereas the automatic one carries its clearance into real backlash.
         assert!(auto.backlash[1].nominal > 0.0);
+    }
+
+    /// An override has to reach the arithmetic, not just the display. Doubling
+    /// the fatigue allowable must halve the face width contact asks for, since
+    /// `b_min ∝ (σ_H/σ_allow)²` and the automatic width is sized by it.
+    #[test]
+    fn a_material_override_changes_the_answer() {
+        let lib = library();
+        let auto_width = |o: Overrides| {
+            let mut s = SpurStage::default();
+            for g in &mut s.gears {
+                g.face_width = Auto::automatic(0.0);
+                g.auto_face_from_bending = false;
+                g.material_overrides = o;
+            }
+            solve_stage(&s, 2.0, &lib).unwrap()
+        };
+
+        let base = auto_width(Overrides::default());
+        let doubled = auto_width(Overrides {
+            fatigue_allowable: Some(2.0 * 750.0),
+            ..Default::default()
+        });
+
+        let ratio = base.gears[0].face_width / doubled.gears[0].face_width;
+        assert!(
+            (ratio - 4.0).abs() < 1e-9,
+            "doubling the allowable should quarter the width: ratio {ratio}"
+        );
+
+        // ...and the reported material says the number came from the user.
+        assert_eq!(
+            doubled.gears[0].material.fatigue_allowable.basis,
+            crate::material::Basis::Overridden
+        );
+        assert_eq!(
+            base.gears[0].material.fatigue_allowable.basis,
+            crate::material::Basis::Estimated
+        );
+    }
+
+    /// Overriding the modulus moves contact stress, and by the right law.
+    #[test]
+    fn overriding_the_modulus_moves_contact_stress_as_the_square_root() {
+        let lib = library();
+        let at = |e: Option<f64>| {
+            let mut s = SpurStage::default();
+            for g in &mut s.gears {
+                g.material_overrides = Overrides {
+                    elastic_modulus: e,
+                    ..Default::default()
+                };
+            }
+            solve_stage(&s, 2.0, &lib).unwrap().gears[0].contact_stress
+        };
+        let base = at(None);
+        let quarter = at(Some(190_000.0 / 4.0));
+        assert!(
+            (base / quarter - 2.0).abs() < 1e-9,
+            "sigma_H goes as sqrt(E*): {base} vs {quarter}"
+        );
     }
 
     #[test]

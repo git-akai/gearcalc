@@ -1,5 +1,12 @@
 <script lang="ts">
-  import { solveTrain, defaultStage, type Auto } from "./core";
+  import {
+    solveTrain,
+    defaultStage,
+    type Auto,
+    type Overrides,
+    type StageGear,
+    type UsedValue,
+  } from "./core";
   import { trains, library, type TrainTab } from "./state.svelte";
 
   let { tab }: { tab: TrainTab } = $props();
@@ -55,6 +62,48 @@
      When automatic the field shows the SOLVED value, greyed, so a computed
      number is never mistaken for one that was chosen. Turning the toggle off
      leaves `manual` where it was, so the field does not jump. -->
+<!-- A material property: the value the calculation used, greyed while it is the
+     library's and un-greyed once replaced, so a default is never mistaken for a
+     considered choice. Editing makes an override; the cross clears it.
+
+     The number shown is Rust's — it has already chosen between the dry and
+     conditioned states, which is an engineering decision and not this side's to
+     make. -->
+{#snippet property(
+  label: string,
+  gear: StageGear,
+  key: keyof Overrides,
+  used: UsedValue | undefined,
+  step: number,
+  unit: string,
+)}
+  <label class="prop">
+    <span>{label}</span>
+    <input
+      type="number"
+      {step}
+      value={gear.material_overrides[key] ?? used?.value ?? 0}
+      class:computed={gear.material_overrides[key] === null}
+      oninput={(e) => {
+        const v = Number(e.currentTarget.value);
+        gear.material_overrides[key] = Number.isFinite(v) ? v : null;
+      }}
+    />
+    <em>{unit}</em>
+    {#if gear.material_overrides[key] !== null}
+      <button
+        class="clear"
+        title="Restore the library value"
+        onclick={() => (gear.material_overrides[key] = null)}>×</button
+      >
+    {:else if used}
+      <em class="basis" class:weak={used.basis === "estimated" || used.basis === "chart"}
+        >{used.basis[0]}</em
+      >
+    {/if}
+  </label>
+{/snippet}
+
 {#snippet autoNumber(label: string, a: Auto<number>, computed: number | undefined, step: number)}
   <label class="auto">
     <span>{label}</span>
@@ -328,6 +377,13 @@
                 </label>
 
                 {#if g}
+                  <div class="props">
+                    {@render property("Density", gear, "density", g.material.density, 10, "kg/m³")}
+                    {@render property("Elastic modulus", gear, "elastic_modulus", g.material.elastic_modulus, 100, "MPa")}
+                    {@render property("Poisson's ratio", gear, "poissons_ratio", g.material.poissons_ratio, 0.01, "")}
+                    {@render property("Ultimate allowable", gear, "ultimate_allowable", g.material.ultimate_allowable, 10, "MPa")}
+                    {@render property("Fatigue allowable", gear, "fatigue_allowable", g.material.fatigue_allowable, 10, "MPa")}
+                  </div>
                   <dl class="out small">
                     <dt>Torque</dt>
                     <dd>{g.torque.toFixed(4)} Nm</dd>
@@ -645,6 +701,31 @@
   }
   .check input {
     width: auto;
+  }
+  .props {
+    margin: 0.2rem 0 0.4rem;
+  }
+  /* More specific than `.gear label`, which would otherwise win and collapse
+     the basis marker onto its own line. */
+  .gear .prop {
+    grid-template-columns: 1fr 6.5rem 2.2rem auto;
+    font-size: 0.78rem;
+    margin-bottom: 0.15rem;
+  }
+  .basis {
+    width: 1ch;
+    text-align: center;
+    opacity: 0.55;
+  }
+  .basis.weak {
+    color: var(--warn);
+    opacity: 0.9;
+  }
+  .clear {
+    font-size: 0.75rem;
+    line-height: 1;
+    padding: 0.05rem 0.3rem;
+    color: var(--muted);
   }
   .hint {
     margin: -0.1rem 0 0.3rem;

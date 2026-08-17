@@ -25,7 +25,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-160 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+164 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -1680,10 +1680,34 @@ once the data they need is present:
 
 Both are outputs only, so §3.1 is untouched — nothing new becomes state.
 
-The material properties themselves are shown as **editable fields seeded from the
-library**, greyed until edited and un-greyed once they are, so a user can tweak a
-value for their own case without authoring a library file. The overrides live in
-the input state, which is what keeps outputs a pure function of inputs.
+### 8.2 Editable material properties
+
+Every material property is an editable field beside the dropdown, seeded from the
+library, **greyed while it is the library's and un-greyed once replaced** — so a
+default is never mistaken for a considered choice. A cross restores the library
+value.
+
+Three things make this safe rather than a hole in the model:
+
+- **The overrides live in the input state**, not in the library. `§3.1` therefore
+  still holds: the library stays the shipped reference, outputs stay a pure
+  function of inputs, and nothing is written back except by explicit export.
+- **An overridden value loses its moisture states.** One number the user typed is
+  the number they meant, not a dry figure waiting to be re-derated.
+- **Its basis becomes `overridden`**, which is ordered *ahead* of `datasheet`
+  rather than behind `estimated`. This crate has no standing to judge someone
+  else's number: replacing a class estimate with a figure off their own datasheet
+  should stop the entry reporting itself as an estimate, and replacing it with a
+  guess is their guess to make.
+
+Each property also carries its basis as a one-letter marker, weak ones (`chart`,
+`estimated`) coloured, so the library's estimates stay visible at the point of
+use rather than only in the TOML.
+
+[verified that overrides reach the arithmetic and not merely the display:
+doubling the fatigue allowable quarters the face width contact asks for, since
+`b_min ∝ (σ_H/σ_allow)²`, and quartering the modulus doubles the contact stress,
+since `σ_H ∝ √E*`.]
 
 ---
 
@@ -1940,6 +1964,7 @@ here. Revision 2 additions are marked ★.
 | ★ Addendum / dedendum / root-radius bounds | closed form vs where the generator clamps, 5 parameter sets | clean just inside, clamped just outside |
 | ★ Stage automatic addendum | set a minimum tip width, solve the stage, measure the gear it built | requested width to 1e-9 mm |
 | ★ Manual centre distance | set by hand at the zero-backlash distance with a large clearance | clearance ignored, backlash exactly zero |
+| ★ Material overrides reach the arithmetic | double the fatigue allowable; quarter the modulus | face width quarters (`b_min ∝ (σ_H/σ_allow)²`); contact stress doubles (`σ_H ∝ √E*`) |
 | ★ Two-stage train | `gear-cli train`, 17:43 then 13:31 helical | ratio, speed and torque agree with the stage products; stage 1's automatic face width reproduces the standalone `strength` run's `b_min` exactly |
 | ★ Efficiency costs torque | same train at `μ = 0` and `μ = 0.06` | output torque falls by exactly the product of the stage efficiencies |
 | ★ Output backlash weighting | loosen stage 1 vs stage 2 by the same amount | the **last** stage dominates, as §4.9 predicts |

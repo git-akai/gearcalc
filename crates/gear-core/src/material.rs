@@ -53,6 +53,14 @@
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum Basis {
+    /// Supplied by the user, replacing whatever the library held.
+    ///
+    /// Ordered first — that is, *not* counted as weak — because this crate has
+    /// no standing to judge someone else's number. If a user replaces the
+    /// library's class estimate with a figure off their own datasheet, the entry
+    /// should stop reporting itself as an estimate; if they replace it with a
+    /// guess, that is their guess to make.
+    Overridden,
     /// Read directly from a primary manufacturer or standards datasheet.
     Datasheet,
     /// Computed exactly from two or more published values on the same
@@ -71,12 +79,13 @@ impl Basis {
     /// Whether this value rests on a measurement of *this* material.
     #[must_use]
     pub fn is_measured(self) -> bool {
-        matches!(self, Self::Datasheet | Self::Derived)
+        matches!(self, Self::Overridden | Self::Datasheet | Self::Derived)
     }
 
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::Overridden => "overridden",
             Self::Datasheet => "datasheet",
             Self::Derived => "derived",
             Self::Chart => "chart",
@@ -238,6 +247,127 @@ impl Material {
     }
 }
 
+/// Per-use replacements for a material's properties.
+///
+/// The specification asks for every material property to be editable beside the
+/// dropdown, so a value can be tweaked for one design without authoring a whole
+/// library file. `None` means "whatever the library says".
+///
+/// These live in the **input** state rather than in the library, which is what
+/// keeps `docs/DESIGN.md` §3.1 intact: the library stays the shipped reference,
+/// outputs stay a pure function of inputs, and nothing is written back except by
+/// an explicit export.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Overrides {
+    pub density: Option<f64>,
+    pub elastic_modulus: Option<f64>,
+    pub poissons_ratio: Option<f64>,
+    pub ultimate_allowable: Option<f64>,
+    pub fatigue_allowable: Option<f64>,
+}
+
+impl Overrides {
+    /// Whether anything at all has been replaced.
+    #[must_use]
+    pub fn any(&self) -> bool {
+        [
+            self.density,
+            self.elastic_modulus,
+            self.poissons_ratio,
+            self.ultimate_allowable,
+            self.fatigue_allowable,
+        ]
+        .iter()
+        .any(Option::is_some)
+    }
+}
+
+impl Material {
+    /// This material with the given properties replaced.
+    ///
+    /// A replaced value loses its moisture states — a single number the user
+    /// typed is the number they meant, not a dry figure to be re-derated — and
+    /// its basis becomes [`Basis::Overridden`].
+    #[must_use]
+    pub fn overridden(&self, o: &Overrides) -> Self {
+        let swap = |v: &Value, new: Option<f64>| match new {
+            Some(x) => Value {
+                dry: x,
+                conditioned: None,
+                basis: Basis::Overridden,
+                note: Some("supplied by the user".into()),
+            },
+            None => v.clone(),
+        };
+        Self {
+            density: swap(&self.density, o.density),
+            elastic_modulus: swap(&self.elastic_modulus, o.elastic_modulus),
+            poissons_ratio: swap(&self.poissons_ratio, o.poissons_ratio),
+            ultimate_allowable: swap(&self.ultimate_allowable, o.ultimate_allowable),
+            fatigue_allowable: swap(&self.fatigue_allowable, o.fatigue_allowable),
+            ..self.clone()
+        }
+    }
+}
+
+/// One property as actually used: a single number, with no moisture state left
+/// for the caller to choose between.
+///
+/// [`Value`] carries both states because both are published; picking between
+/// them is an engineering decision and belongs on this side of the boundary. So
+/// anything that renders a material renders this, not a `Value`.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct UsedValue {
+    pub value: f64,
+    pub basis: Basis,
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
+    pub note: Option<String>,
+}
+
+/// A material as a calculation actually used it — after overrides, and with the
+/// moisture state already resolved.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Used {
+    pub name: String,
+    pub grade: String,
+    pub condition: String,
+    pub density: UsedValue,
+    pub elastic_modulus: UsedValue,
+    pub poissons_ratio: UsedValue,
+    pub ultimate_allowable: UsedValue,
+    pub ultimate_measure: Measure,
+    pub fatigue_allowable: UsedValue,
+}
+
+impl Material {
+    /// This material with every choice already made.
+    #[must_use]
+    pub fn used(&self) -> Used {
+        let u = |v: &Value| UsedValue {
+            value: v.get(),
+            basis: v.basis,
+            note: v.note.clone(),
+        };
+        Used {
+            name: self.name.clone(),
+            grade: self.grade.clone(),
+            condition: self.condition.clone(),
+            density: u(&self.density),
+            elastic_modulus: u(&self.elastic_modulus),
+            poissons_ratio: u(&self.poissons_ratio),
+            ultimate_allowable: u(&self.ultimate_allowable),
+            ultimate_measure: self.ultimate_measure,
+            fatigue_allowable: u(&self.fatigue_allowable),
+        }
+    }
+}
+
 /// A set of materials, in presentation order.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -336,6 +466,50 @@ mod tests {
         // material's own like-on-like value.
         assert!(ab < contact_modulus(&b, &b) * 2.0);
         assert!(ab > 0.0);
+    }
+
+    #[test]
+    fn an_override_replaces_the_value_and_stops_it_reporting_as_an_estimate() {
+        let mut m = steel();
+        m.fatigue_allowable = Value {
+            dry: 100.0,
+            conditioned: None,
+            basis: Basis::Estimated,
+            note: Some("class estimate".into()),
+        };
+        assert_eq!(m.weakest_basis(), Basis::Estimated);
+
+        let o = Overrides {
+            fatigue_allowable: Some(420.0),
+            ..Default::default()
+        };
+        let user = m.overridden(&o);
+        assert!((user.fatigue_allowable.get() - 420.0).abs() < 1e-12);
+        assert_eq!(user.fatigue_allowable.basis, Basis::Overridden);
+        // The entry no longer calls itself an estimate on the user's behalf.
+        assert!(user.weakest_basis().is_measured());
+        // Everything untouched is untouched.
+        assert_eq!(user.elastic_modulus, m.elastic_modulus);
+        assert!(o.any() && !Overrides::default().any());
+    }
+
+    /// A moisture-dependent property replaced by one number means that number,
+    /// not a dry figure waiting to be derated.
+    #[test]
+    fn an_override_drops_the_moisture_states() {
+        let mut m = steel();
+        m.elastic_modulus = Value {
+            dry: 3000.0,
+            conditioned: Some(1000.0),
+            basis: Basis::Datasheet,
+            note: None,
+        };
+        let user = m.overridden(&Overrides {
+            elastic_modulus: Some(2000.0),
+            ..Default::default()
+        });
+        assert!(user.elastic_modulus.conditioned.is_none());
+        assert!((user.elastic_modulus.get() - 2000.0).abs() < 1e-12);
     }
 
     #[test]
