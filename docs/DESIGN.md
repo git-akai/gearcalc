@@ -1089,6 +1089,61 @@ real peak. It stays, with its own validated range reported per result
 (`notch_parameter_in_range`), which is the honest treatment of a fit that is
 load-bearing rather than decorative.
 
+#### One contact model, not two — decided before milestone 7
+
+Worm and crossed-helical stages contact at a **point** rather than a line, and
+the obvious implementation is a branch: line Hertz for parallel axes, elliptical
+Hertz for crossed. **That branch is not going in.** The reasoning, settled now so
+milestone 7 inherits it:
+
+**Line contact is not a different theory; it is a limiting case of the same
+one.** General Hertz takes the two *relative principal curvatures* of the
+contacting pair and returns an ellipse. Write them as the **profile** curvature
+`1/ρ` — the transverse relative curvature §4.7 already computes — and the
+**lengthwise** curvature `1/R_L` along the contact line. Then:
+
+| | `1/R_L` | contact |
+|---|---|---|
+| spur or helical, uncrowned | exactly 0 | ellipse infinitely long → line |
+| crossed axes | > 0 | finite ellipse → point |
+| crowned flank | > 0 | finite ellipse → point |
+
+So there is **one controlling parameter**, and it is zero for every mesh the tool
+supports today. That is why the spur/helical work never needed the general form,
+and why adding crossed axes should extend the model rather than fork it.
+
+**The formulation that stays unbranched is Carlson's.** The classical Hertz
+solution is written with `K(e)` and `E(e)` and requires knowing which semi-axis
+is major — itself a branch, and ill-conditioned as the ellipse degenerates.
+Carlson's symmetric elliptic integrals are the standard remedy: they make no
+distinction between the axes and are well conditioned in the degenerate limits,
+which is exactly the property needed when `1/R_L → 0`. Computed by a duplication
+algorithm — no tables, no fitted coefficients, in keeping with §5.
+
+**The one genuine discontinuity is not elastic, it is geometric.** A real tooth
+has finite face width, so an ellipse longer than the face gets truncated by the
+tooth rather than by elasticity. In that regime the patch length is set by the
+body, not by the contact solution. The uniform statement is therefore
+
+```
+σ_H = max( σ_elliptical , σ_line over the available length )
+```
+
+which is **exact at both ends** — as `1/R_L → 0` the ellipse lengthens without
+limit and its peak pressure falls to zero, so the line term wins; on a narrow
+crossed-axis mesh the ellipse fits inside the face and the line term, spreading
+the same load further, loses. The two cross once. Near that crossing the truth
+sits slightly above both, since a truncated ellipse concentrates load more than
+a uniform line does, and that is the honest limit of the expression rather than
+something to paper over.
+
+**Implementation waits for milestone 7**, where it can be checked against a real
+crossed-axis mesh. What is fixed now is that it arrives as one function with a
+lengthwise-curvature argument, not as a second function chosen by stage type.
+The elliptical path is independently testable before any worm exists: sphere on
+sphere and sphere on plane have exact closed forms, and the line limit must
+reproduce the present numbers unchanged.
+
 **Minimum face width — closed form, no iteration.** Since `σ_F ∝ 1/b` and
 `σ_H ∝ 1/√b`:
 
@@ -1796,7 +1851,7 @@ not have to hunt for it.
 | What the eccentric mechanism can physically follow | §4.10 | same |
 | A coupled glass POM grade, if one is wanted back in the library | §6.4 | nothing |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
-| Crossed-axis contact model | §4.5.1 | milestone 10 |
+| Crossed-axis contact model — *model settled (§4.7), implementation pending* | §4.5.1 | milestone 7 |
 
 **Standing policy: no ISO/AGMA correction factors** — `Y_β`, `K_A`, `K_v`,
 `K_Fβ`, `K_Fα`, `Z_ε`, `Z_β` and relatives. Their validated bands are narrow
