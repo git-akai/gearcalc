@@ -1,8 +1,8 @@
 # Gear & geartrain design tool — architecture and mathematics
 
-**Status: milestones 0–4 complete and in CI; milestone 5 (strength) partly
-built.** This document is the design of record and is current as of the head of
-`main`. Where implementation contradicted the design, the design was corrected
+**Status: milestones 0–6 complete and in CI; milestone 7 (worm stage) is the
+open work.** This document is the design of record and is current as of the head
+of `main`. Where implementation contradicted the design, the design was corrected
 and the correction recorded — see §12.
 
 Conventions: angles in **degrees at the UI boundary, radians everywhere
@@ -23,7 +23,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Geartrain core | spur/helical stage, ratio, contact ratios, backlash, stresses, face width; train accumulation | a two-stage train end to end; `ε_β = 0` exactly for spur |
 | Materials | eight-material library, per-value provenance, TOML round-trip | primary datasheets; cross-family consistency laws |
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
-| UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
+| UI | gear tabs, parameter grid, viewport, DXF download; geartrain tabs and the stage accordion; editable material properties | end-to-end through the real wasm; a headless render checked against the CLI |
 
 165 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
@@ -36,17 +36,23 @@ cargo run --bin gear-cli -- show 17 0.2      # drive the maths, no browser
 cargo run --bin gear-cli -- materials        # the library, with each value's basis
 cargo run --bin gear-cli -- strength 17 43 2.0        # a worked mesh, end to end
 cargo run --bin gear-cli -- strength 17 43 2.0 '4340 Hardened Steel' 20  # helical
+cargo run --bin gear-cli -- train            # a two-stage train, end to end
 cargo run --release --bin gear-cli -- bending   # the bending verification sheet
+cargo run --release --bin gear-cli -- verify 100  # the two-sided cutter check
 cd web && npm run dev             # the application
 ```
 
 ## What is next
 
-Milestone 6 (spur stage) is the open work; §11 has the full list. Nothing is
-blocked. The mathematics of a single mesh is now complete — what milestone 6
-adds is the *stage*: face width and material as inputs, torque and cycle
-propagation, and the UI that surfaces all of it. Two deferred decisions have
-written rationales: load sharing (§4.7) and the gear-rating standards (§6.2).
+Milestone 7 (worm stage) is the open work; §11 has the full list. Nothing is
+blocked. The parallel-axis mesh is complete, gear through train, so what
+milestone 7 adds is the *crossed* axis — and the decision already taken is that
+it arrives as a parameter rather than a branch. **The contact section is unified
+first**: three unifications, one parameter each, with the present parallel-axis
+result as the degenerate value in every case, and no answer the tool currently
+gives allowed to move. The plan, the acceptance gate and the order of work are in
+§4.7 under "Unifying the contact section". Two deferred decisions have written
+rationales: load sharing (§4.7) and the gear-rating standards (§6.2).
 
 ---
 
@@ -128,21 +134,27 @@ gears/
 ├── flake.nix, rust-toolchain.toml, Cargo.toml     (workspace root)
 ├── crates/
 │   ├── gear-core/       pure mathematics. No I/O, no wasm, no UI.
-│   │   ├── involute.rs      inv, safeguarded inv⁻¹, root finders
-│   │   ├── rack.rs          basic rack, thickness modification
-│   │   ├── profile.rs       generated 2D profile (port of gear.py)
-│   │   ├── ring.rs          internal-gear profile
-│   │   ├── screw.rs         crossed-axis screw gearing (worm + crossed helical)
+│   │   ├── involute.rs      inv, safeguarded inv⁻¹
+│   │   ├── solve.rs         Brent, bracketed Newton — the root finders
+│   │   ├── params.rs        a gear's inputs, `Auto<T>`, and the clamp record
+│   │   ├── profile.rs       generated 2D profile (port of gear.py); the rack
+│   │   │                    and its thickness modification live here, because
+│   │   │                    they are how the profile is defined
+│   │   ├── outline.rs       chord-tolerance sampling into a CAD-ready path
+│   │   ├── auto.rs          automatic profile shift, altered addendum, ranges
 │   │   ├── mesh.rs          centre distance, operating angle, backlash
-│   │   ├── metrology.rs     span, over-pins, tip width, JGMA lookup
+│   │   ├── metrology.rs     span, over-pins, tip width
+│   │   ├── jgma.rs          JGMA 116-02 tolerance lookup (a banded table)
 │   │   ├── contact.rs       path of contact, load sharing, mesh efficiency
 │   │   ├── strength.rs      load, bending, Hertz, face width
 │   │   ├── material.rs      material model — values, provenance, allowables
-│   │   ├── train/           spur.rs, worm.rs, planetary.rs, accumulate.rs
-│   │   └── data/            jgma_116_02.csv
+│   │   ├── train.rs         stage solve and train accumulation
+│   │   ├── verify.rs        the two-sided rack check
+│   │   └── data/            jgma_116_02.csv        (beside src/, not in it)
 │   ├── gear-io/         DXF writer, TOML (de)serialisation
 │   │   └── data/            materials_default.toml   (TOML is I/O, so it lives here)
-│   ├── gear-wasm/       the three #[wasm_bindgen] entry points. Thin.
+│   ├── gear-wasm/       the #[wasm_bindgen] entry points, JSON in / JSON out.
+│   │                    Thin: seven of them, all pure functions.
 │   └── gear-cli/        dev-only harness: solve a file, dump numbers, sweep
 ├── web/                 Svelte + TS + Vite front end
 ├── docs/                DESIGN.md, JGMA 116-02 1983.pdf
@@ -152,6 +164,13 @@ gears/
 `gear-cli` is worth calling out: it is how you drive the mathematics during
 development without touching the browser. Sweeps, regression dumps and
 "why is this number wrong" all happen there.
+
+Three modules are named by the milestones ahead and do not exist yet:
+`elliptic.rs` (Carlson symmetric integrals, milestone 7), `screw.rs`
+(crossed-axis screw gearing, shared by the worm stage and a crossed-axis spur
+stage) and `ring.rs` (internal-gear profile, milestone 8). `train.rs` is one
+file rather than a directory, and stays that way until a second stage type
+gives the split something to divide.
 
 ---
 
@@ -1120,6 +1139,27 @@ distinction between the axes and are well conditioned in the degenerate limits,
 which is exactly the property needed when `1/R_L → 0`. Computed by a duplication
 algorithm — no tables, no fitted coefficients, in keeping with §5.
 
+**It costs one more scalar solve, and §5's list becomes six.** The ellipse's
+aspect ratio `κ = b/a` is fixed only *implicitly* by the ratio of the two
+relative curvatures: in Carlson form the condition is symmetric between the
+axes, but it is still transcendental in `κ`. The published closed forms for it
+— Hamrock–Dowson's `κ ≈ 1.0339 (R_y/R_x)^0.636` and its relatives — are
+**fitted**, so they are exactly what §5's rule excludes; the solve is the honest
+route and it qualifies on the same terms as the other five, being monotone,
+bracketed, and free of any tuning parameter.
+
+Two conditions on how it is posed, both consequences of the degenerate limit
+being the case that matters:
+
+- **Solve in `κ ∈ [0, 1]`, never in `a/b`.** Parallel axes is then the
+  *endpoint* `κ = 0` — inside the bracket, reached exactly — rather than an
+  infinity in an unbounded variable. This is the argument that chose Carlson
+  over `K(e)`/`E(e)`, applied one level up to the solve that sits on top of it.
+- **`κ → 0` must return zero pressure, not `NaN`.** The elliptical branch
+  degenerates there, and a limit evaluated as `0/0` would put a `NaN` into a
+  stress figure — the failure mode §5 already names for `inv⁻¹`. The limit is
+  the first thing to test, before any gear is involved.
+
 **The one genuine discontinuity is not elastic, it is geometric.** A real tooth
 has finite face width, so an ellipse longer than the face gets truncated by the
 tooth rather than by elasticity. In that regime the patch length is set by the
@@ -1186,6 +1226,16 @@ unchanged:
 
 A unification that cannot reproduce those is not a unification; it is a
 replacement, and would need its own validation from scratch.
+
+**The last of those is passable by construction, and should be kept that way.**
+At `1/R_L = 0` the ellipse lengthens without bound and its peak pressure falls
+to zero, so `max(σ_elliptical, σ_line)` returns the *line* term for every mesh
+the tool supports today. Bit-identity therefore does not depend on the two
+routes agreeing numerically — it depends on the line term still being the same
+expression, evaluated the same way. So carry it across unchanged rather than
+re-deriving it from the general form and hoping the last digit survives. If the
+canary moves during steps 1–3, the cause is that the line expression was
+rewritten, not that the general form is wrong.
 
 ##### Order of work
 
