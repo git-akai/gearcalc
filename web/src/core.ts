@@ -389,6 +389,7 @@ export interface GearResult {
   min_face_width_bending: number | null;
   min_face_width_contact: number;
   clamps: string[];
+  ranges: Ranges;
 }
 export interface StageResult {
   ratio: number;

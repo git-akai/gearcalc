@@ -120,6 +120,7 @@ pub fn automatic_profile_shift(p: &GearParams, working_depth: f64) -> f64 {
 ///
 /// Two tiers, deliberately, because they answer different questions.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ShiftRange {
     /// Smallest buildable shift. Below it the tooth is thinner than the geometry
     /// guards allow, or the cutter runs past the centre.
@@ -244,6 +245,7 @@ pub fn admissible_profile_shift(p: &GearParams, working_depth: f64) -> ShiftRang
 /// A bound the geometry itself imposes on one parameter. `None` where that side
 /// is genuinely unbounded.
 #[derive(Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Bound {
     pub min: Option<f64>,
     pub max: Option<f64>,
@@ -266,6 +268,7 @@ pub struct Bound {
 /// `|β| < 90°`, and `0 < k < 2` (a rack whose tooth or space has non-positive
 /// width is not a rack).
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ranges {
     pub profile_shift: ShiftRange,
     /// Lower bound only. There is no upper: too much addendum gives a pointed

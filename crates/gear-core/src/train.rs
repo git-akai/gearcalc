@@ -18,7 +18,7 @@
 //!   derived, because a meshing pair must sum to 2. The invariant is unwritable
 //!   rather than merely tested.
 
-use crate::auto::{addendum_for_tip_width, automatic_profile_shift};
+use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift, Ranges};
 use crate::contact::{efficiency, ContactPath};
 use crate::material::{contact_modulus, MaterialLibrary};
 use crate::mesh::{Member, Mesh, MeshError, MeshKind};
@@ -189,6 +189,12 @@ pub struct GearResult {
     pub min_face_width_contact: f64,
     /// Guards that altered this gear's geometry.
     pub clamps: Vec<String>,
+    /// What this gear's geometry allows its own inputs to be.
+    ///
+    /// Computed from the **resolved** parameters, so an automatic profile shift
+    /// or addendum is already folded in. The UI bounds its fields by these
+    /// rather than by constants — see `docs/DESIGN.md` §4.3.1.
+    pub ranges: Ranges,
 }
 
 /// Everything one stage produces.
@@ -389,6 +395,7 @@ pub fn solve_stage(
             min_face_width_bending: sf.map(|s| min_face_width_bending(s, effective, allow)),
             min_face_width_contact: min_face_width_contact(cs.worst, effective, allow),
             clamps: g[i].clamps.notes.clone(),
+            ranges: admissible_ranges(&p[i], stage.gears[i].working_depth),
         });
     }
 

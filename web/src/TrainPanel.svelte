@@ -39,6 +39,16 @@
   }
 
   const pct = (v: number) => (100 * v).toFixed(3);
+  const n = (v: number) => v.toFixed(3);
+
+  /** Why a value is outside what the geometry allows, or null if it is inside.
+   *  The bounds come from Rust; this only compares. */
+  function outside(v: number, b: { min: number | null; max: number | null }): string | null {
+    if (!Number.isFinite(v)) return "must be a number";
+    if (b.min !== null && v < b.min) return `at least ${n(b.min)}`;
+    if (b.max !== null && v > b.max) return `at most ${n(b.max)}`;
+    return null;
+  }
 </script>
 
 <!-- A value + automatic toggle, locked while automatic (DESIGN.md 3.3).
@@ -229,15 +239,38 @@
               {@const g = res?.gears[j]}
               <div class="gear">
                 <h4>Gear {gearNumber(i, j)}</h4>
-                <label>
+                <label class:invalid={gear.teeth < 1}>
                   <span>Tooth count</span>
-                  <input type="number" step="1" bind:value={gear.teeth} />
+                  <input type="number" step="1" min="1" bind:value={gear.teeth} />
                 </label>
-                <label>
+                <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
                   <span>Dedendum</span>
                   <input type="number" step="0.05" bind:value={gear.dedendum} />
+                  {#if g}
+                    {@const bad = outside(gear.dedendum, g.ranges.dedendum)}
+                    <small class:err={bad}>
+                      {bad ?? `${n(g.ranges.dedendum.min ?? 0)} … ${n(g.ranges.dedendum.max ?? 0)}`}
+                    </small>
+                  {/if}
+                </label>
+                <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
+                  <span>Root radius</span>
+                  <input type="number" step="0.01" bind:value={gear.root_radius} />
+                  {#if g}
+                    {@const bad = outside(gear.root_radius, g.ranges.root_radius)}
+                    <small class:err={bad}>
+                      {bad ?? `up to ${n(g.ranges.root_radius.max ?? 0)} · fillet must fit`}
+                    </small>
+                  {/if}
                 </label>
                 {@render autoNumber("Profile shift", gear.profile_shift, g?.profile_shift, 0.05)}
+                {#if g && !gear.profile_shift.auto}
+                  {@const r = g.ranges.profile_shift}
+                  {@const bad = outside(gear.profile_shift.manual, { min: r.min, max: r.max })}
+                  <p class="hint" class:err={bad}>
+                    {bad ?? `buildable ${n(r.min)} … ${n(r.max)} · undercut below ${n(r.undercut)}`}
+                  </p>
+                {/if}
                 {@render autoNumber("Face width", gear.face_width, g?.face_width, 0.5)}
                 <label>
                   <span>Material</span>
@@ -544,6 +577,18 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--muted);
+  }
+  .hint {
+    margin: -0.1rem 0 0.3rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-align: right;
+  }
+  .err {
+    color: var(--warn);
+  }
+  label.invalid input {
+    border-color: var(--warn);
   }
   .gear label {
     grid-template-columns: 1fr 6.5rem auto;
