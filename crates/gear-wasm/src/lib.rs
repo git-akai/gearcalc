@@ -36,6 +36,13 @@ pub struct GearRequest {
     /// Include the pitch, base, tip and root circles in the DXF.
     #[serde(default = "yes")]
     pub reference_circles: bool,
+    /// Depth, in modules, at which the undercut question is asked.
+    #[serde(default = "one")]
+    pub working_depth: f64,
+}
+
+fn one() -> f64 {
+    1.0
 }
 
 fn yes() -> bool {
@@ -109,11 +116,29 @@ pub struct ToleranceOut {
     pub total: f64,
 }
 
+/// The profile shifts this gear can be built at, and the thresholds inside them.
+///
+/// Sent so the UI can validate against the *real* bound rather than the
+/// specification's fixed `|x| ≤ 2`, which is loose above and both loose and
+/// tight below depending on pressure angle — see
+/// [`gear_core::auto::admissible_profile_shift`]. The project rule applies here
+/// as much as anywhere: the bounds are computed in Rust and merely compared in
+/// TypeScript.
+#[derive(Serialize)]
+pub struct ShiftRangeOut {
+    pub min: f64,
+    pub max: f64,
+    pub undercut: f64,
+    pub sharp_rack_undercut: f64,
+    pub pointed: Option<f64>,
+}
+
 /// Derived geometry and metrology for one gear.
 ///
 /// Lengths are millimetres, angles degrees, composite errors micrometres.
 #[derive(Serialize)]
 pub struct GearSummary {
+    pub shift_range: ShiftRangeOut,
     pub pitch_radius: f64,
     pub base_radius: f64,
     pub tip_radius: f64,
@@ -179,7 +204,16 @@ fn summarise(g: &Gear, req: &GearRequest) -> GearSummary {
         },
     };
 
+    let sr = gear_core::auto::admissible_profile_shift(&g.params, req.working_depth);
+
     GearSummary {
+        shift_range: ShiftRangeOut {
+            min: sr.min,
+            max: sr.max,
+            undercut: sr.undercut,
+            sharp_rack_undercut: sr.sharp_rack_undercut,
+            pointed: sr.pointed,
+        },
         pitch_radius: g.r,
         base_radius: g.rb,
         tip_radius: g.ra,

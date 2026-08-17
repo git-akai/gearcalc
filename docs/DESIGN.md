@@ -25,7 +25,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-152 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+155 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -355,6 +355,52 @@ Since the honest answer depends on which cutter you are modelling, the automatic
 calculation uses the **actual root radius coefficient** the user has entered, and
 the UI should show the sharp-rack figure alongside it for reference. That is one
 extra line of output and it makes the difference visible instead of arguable.
+
+#### 4.3.1 The profile-shift range, replacing `|x| ≤ 2`
+
+The specification bounds profile shift at `|x| ≤ 2`. Once the geometry checks
+existed, that constant turned out to be not merely arbitrary but **wrong in three
+directions at once**, because every real bound depends on something a constant
+cannot see:
+
+| | true `x_min` | true `x_max` | vs `|x| ≤ 2` |
+|---|---|---|---|
+| z = 17, α = 20°, `h_f` = 1.25 | −2.130 | **1.200** | too loose above |
+| `h_f` = 1.0 | −2.130 | **0.950** | far too loose above |
+| α = 14.5° | **−2.998** | 1.200 | too tight below |
+| α = 30° | **−1.343** | 1.200 | too loose below |
+| `k` = 1.3 | **−2.778** | 1.200 | blind to thickness modification |
+
+The upper bound is *always* the cutter depth, `h_f − 0.05`, and has nothing to do
+with 2 — so a shift entered between 1.2 and 2 today has its dedendum silently
+raised. Meanwhile the floor swings by more than a factor of two across the
+allowed pressure-angle range. Note it barely moves with tooth count, which is
+why `|x| ≤ 2` *looks* plausible and is not.
+
+**The replacement is closed form.** Every guard that bounds `x` is linear in `x`,
+so the admissible interval is an intersection of half-lines:
+
+```
+thickness:  0.02 m ≤ s_t ≤ 0.95 π m_t     s_t = m(π/2 + 2(x + x_s) tan α_n)/cos β
+depth:      0.05 m ≤ m(h_f − x) ≤ 0.9 r
+```
+
+[verified against the generator, which builds cleanly at 1.19 and −2.12 and
+raises *"cutter depth was ≤ 0"* at 1.21 and *"tooth thickness raised"* at −2.14.]
+
+**Two tiers, and they are not interchangeable.** `min`/`max` are *degeneracy*
+limits — where geometry stops being constructible, per the guards in §3.4 — and
+they are the hard input range. The *design* thresholds sit **inside** that range
+rather than bounding it, because they are advice and not law: an undercut gear is
+a real gear and this crate generates it exactly. Those are the undercut shift
+(§4.3, with its sharp-rack reference beside it) and the pointed-tooth shift
+[verified: predicted 0.635 at z = 9, and the generator caps the tip at 0.64 but
+not 0.63].
+
+**What no per-gear range can express.** A meshing pair must also satisfy
+`inv α_w ≥ 0`, a constraint on the **sum** of both shifts. That stays a
+mesh-level error from §4.4, and it is the failure that broke the first
+two-stage train.
 
 **Automatic altered addendum** (tip radius from a minimum tip width): the
 transverse thickness at radius `r'` is `s(r') = 2r'(ψ_b − inv α_{r'})` with
@@ -1652,7 +1698,8 @@ On top of that:
 | Q6 | Ring search is provably complete because required planet shift is strictly monotone in ring tooth count, with a closed-form bracket (§4.8). |
 | Q7 | Gear Calculator is single-gear; mating-gear references dropped (§8). |
 
-**Applied corrections**: profile shift range `|x| ≤ 2`; output torque unit Nm;
+**Applied corrections**: profile shift range `|x| ≤ 2` — **since withdrawn**,
+see §4.3.1; output torque unit Nm;
 worm starts `≥ 1`; minimum tip width compared against `dedendum × module`;
 gear-tab automatic toggles are Inputs; default material "4340 Hardened Steel".
 
@@ -1847,6 +1894,8 @@ here. Revision 2 additions are marked ★.
 | ★ `x_min` thresholds | bisection on `z`, independent of the implementation | 17.10 / 21.37 / 12.82 — reproduces §4.3's table |
 | ★ `x_min` against the generator | build at `x_min ± 1e-4`, z = 9…40 | undercut flag flips across it every time |
 | ★ Automatic addendum | set it, generate, measure the tip width off the result | requested width to 1e-9 mm, 9 cases |
+| ★ Admissible shift range | the closed form vs where the generator actually clamps, 6 parameter sets | clean just inside each bound, clamped just outside |
+| ★ Pointed-tooth threshold | predicted 0.635 at z = 9 | generator caps at 0.64, not at 0.63 |
 | ★ Two-stage train | `gear-cli train`, 17:43 then 13:31 helical | ratio, speed and torque agree with the stage products; stage 1's automatic face width reproduces the standalone `strength` run's `b_min` exactly |
 | ★ Efficiency costs torque | same train at `μ = 0` and `μ = 0.06` | output torque falls by exactly the product of the stage efficiencies |
 | ★ Output backlash weighting | loosen stage 1 vs stage 2 by the same amount | the **last** stage dominates, as §4.9 predicts |

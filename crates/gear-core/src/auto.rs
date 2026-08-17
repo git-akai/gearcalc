@@ -8,7 +8,7 @@
 //! assumption visible — which is why they are here rather than folded silently
 //! into the profile generator.
 
-use crate::involute::inv_from_roll;
+use crate::involute::{inv, inv_from_roll};
 use crate::params::GearParams;
 use crate::profile::{Gear, POINTED_TOOTH_MAX_ROLL};
 use crate::solve::{brent, Tol};
@@ -113,6 +113,132 @@ pub fn automatic_profile_shift(p: &GearParams, working_depth: f64) -> f64 {
     minimum_profile_shift(p, working_depth)
         .with_cutter_radius
         .max(0.0)
+}
+
+/// What profile shifts a gear can be built at, and the design thresholds inside
+/// that range.
+///
+/// Two tiers, deliberately, because they answer different questions.
+#[derive(Clone, Copy, Debug)]
+pub struct ShiftRange {
+    /// Smallest buildable shift. Below it the tooth is thinner than the geometry
+    /// guards allow, or the cutter runs past the centre.
+    pub min: f64,
+    /// Largest buildable shift. Above it the cutter no longer reaches the root.
+    pub max: f64,
+    /// Below this the flank is undercut at the stated working depth — the same
+    /// figure [`minimum_profile_shift`] returns. **Advisory, not a limit:** an
+    /// undercut gear is a real gear, and this crate generates it exactly.
+    pub undercut: f64,
+    /// The undercut threshold a sharp-cornered rack would give. Reported so the
+    /// classical rule's hidden assumption stays visible.
+    pub sharp_rack_undercut: f64,
+    /// Above this the tooth would be pointed at the requested addendum, so the
+    /// tip radius is capped and a clamp note is raised. `None` when the tooth
+    /// never comes to a point anywhere in the buildable range.
+    pub pointed: Option<f64>,
+}
+
+/// The profile shifts this gear can actually be built at.
+///
+/// # Why this exists
+///
+/// The specification gives profile shift a fixed range of `|x| ≤ 2`. That is not
+/// merely arbitrary — it is **wrong in three different directions**, because
+/// every real bound depends on parameters a constant cannot see:
+///
+/// - The upper bound is always the cutter depth, `h_f − 0.05`: **1.20** at the
+///   default dedendum and 0.95 at `h_f = 1`. Anything entered between there and
+///   2 silently has its dedendum raised.
+/// - The lower bound is tooth thickness, and it swings across the allowed
+///   pressure-angle range: **−3.00** at 14.5°, −2.13 at 20°, **−1.34** at 30°.
+/// - Thickness modification moves it again — `k = 1.3` takes the floor to −2.78
+///   — and `|x| ≤ 2` cannot know that either.
+///
+/// # Closed form
+///
+/// Every guard that bounds `x` is **linear in `x`**, so the admissible interval
+/// is an intersection of half-lines and needs no solve:
+///
+/// ```text
+/// thickness:  0.02 m ≤ s_t ≤ 0.95 π m_t     s_t = m(π/2 + 2(x + x_s) tan α_n)/cos β
+/// depth:      0.05 m ≤ m(h_f − x) ≤ 0.9 r
+/// ```
+///
+/// [verified against the generator: at z = 17, α = 20°, `h_f` = 1.25 it predicts
+/// 1.200 and −2.130, and the generator builds cleanly at 1.19 and −2.12 while
+/// raising *"cutter depth was ≤ 0"* at 1.21 and *"tooth thickness raised"* at
+/// −2.14.]
+///
+/// # The two tiers are not interchangeable
+///
+/// `min` and `max` are **degeneracy** limits — where the geometry stops being
+/// constructible at all, per the guards in [`crate::params`]. They are not
+/// design advice, and a shift near either end produces a legal but absurd tooth.
+/// [`ShiftRange::undercut`] and [`ShiftRange::pointed`] are the design-relevant
+/// thresholds, and they sit *inside* the range rather than bounding it: an
+/// undercut gear is perfectly real and this crate generates it exactly.
+///
+/// # What no per-gear range can express
+///
+/// A meshing pair must also satisfy `inv α_w ≥ 0`, which constrains the **sum**
+/// of both shifts. No per-gear interval can state that, and violating it is
+/// reported by [`crate::Mesh::new`] instead.
+#[must_use]
+pub fn admissible_profile_shift(p: &GearParams, working_depth: f64) -> ShiftRange {
+    use crate::params::guard;
+    use std::f64::consts::PI;
+
+    let beta = p.helix_angle.to_radians();
+    let an = p
+        .pressure_angle
+        .to_radians()
+        .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
+    let alpha_t = (an.tan() / beta.cos()).atan();
+    let mt = p.module / beta.cos();
+    let r = mt * f64::from(p.teeth) / 2.0;
+    let xs = p.thickness_shift();
+    let ta = an.tan();
+
+    // Tooth thickness, both ends. `x_s` shifts the whole interval.
+    let lo_t = (guard::MIN_TOOTH_THICKNESS_MODULES * beta.cos() - PI / 2.0) / (2.0 * ta) - xs;
+    let hi_t = (guard::MAX_TOOTH_THICKNESS_FRACTION_OF_PITCH * PI - PI / 2.0) / (2.0 * ta) - xs;
+
+    // Cutter depth, both ends.
+    let hi_d = p.dedendum - guard::MIN_CUTTER_DEPTH_MODULES;
+    let lo_d = p.dedendum - guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r / p.module;
+
+    let min = lo_t.max(lo_d);
+    let max = hi_t.min(hi_d);
+
+    let shift = minimum_profile_shift(p, working_depth);
+
+    // Where the tooth comes to a point at the requested addendum. Monotone in
+    // practice but not guaranteed, so it is bracketed on the admissible range
+    // and simply absent if the tooth never points within it.
+    let rb = r * alpha_t.cos();
+    let half_tip_angle = |x: f64| {
+        let st = p.module * (PI / 2.0 + 2.0 * (x + xs) * ta) / beta.cos();
+        let psi_b = st / (2.0 * r) + inv(alpha_t);
+        let ra = r + p.module * (p.addendum + x);
+        if ra <= rb {
+            return psi_b;
+        }
+        psi_b - inv_from_roll(((ra / rb).powi(2) - 1.0).sqrt())
+    };
+    let pointed = if half_tip_angle(min) * half_tip_angle(max) < 0.0 {
+        brent(half_tip_angle, min, max, Tol::default())
+    } else {
+        None
+    };
+
+    ShiftRange {
+        min,
+        max,
+        undercut: shift.with_cutter_radius,
+        sharp_rack_undercut: shift.sharp_rack,
+        pointed,
+    }
 }
 
 /// Addendum coefficient that leaves the tooth tip exactly `min_tip_width` wide.
@@ -357,6 +483,139 @@ mod tests {
             1.0,
         );
         assert!(big.with_cutter_radius < -1.5);
+    }
+
+    /// The closed-form bounds against the generator itself: just inside each
+    /// bound the geometry builds with no such clamp, just outside it clamps.
+    /// That is what makes them the *real* limits rather than a tidier constant.
+    #[test]
+    fn the_admissible_range_is_exactly_where_the_generator_starts_clamping() {
+        for p in [
+            GearParams::default(),
+            GearParams {
+                teeth: 9,
+                ..Default::default()
+            },
+            GearParams {
+                pressure_angle: 14.5,
+                ..Default::default()
+            },
+            GearParams {
+                pressure_angle: 30.0,
+                ..Default::default()
+            },
+            GearParams {
+                thickness_mod: 1.3,
+                ..Default::default()
+            },
+            GearParams {
+                dedendum: 1.0,
+                helix_angle: 20.0,
+                ..Default::default()
+            },
+        ] {
+            let r = admissible_profile_shift(&p, 1.0);
+            assert!(r.min < r.max, "empty range for {p:?}");
+
+            let clamps = |x: f64| {
+                Gear::new(GearParams {
+                    profile_shift: x,
+                    ..p
+                })
+                .clamps
+                .notes
+                .iter()
+                .any(|n| n.contains("cutter depth") || n.contains("tooth thickness"))
+            };
+            let eps = 0.01;
+            assert!(
+                !clamps(r.max - eps),
+                "clamped inside the top of the range: {p:?}"
+            );
+            assert!(
+                clamps(r.max + eps),
+                "no clamp above the top of the range: {p:?}"
+            );
+            assert!(!clamps(r.min + eps), "clamped inside the bottom: {p:?}");
+            assert!(clamps(r.min - eps), "no clamp below the bottom: {p:?}");
+        }
+    }
+
+    /// The specification's fixed `|x| <= 2` is not a conservative version of the
+    /// real bound — it is loose in some places and tight in others, which is
+    /// exactly what a constant cannot fix.
+    #[test]
+    fn the_fixed_plus_minus_two_is_wrong_in_both_directions() {
+        // Too loose above: the real ceiling is the cutter depth.
+        let d = admissible_profile_shift(&GearParams::default(), 1.0);
+        assert!(d.max < 2.0 && (d.max - 1.20).abs() < 1e-9, "max {}", d.max);
+
+        // Too tight below at a low pressure angle...
+        let low = admissible_profile_shift(
+            &GearParams {
+                pressure_angle: 14.5,
+                ..Default::default()
+            },
+            1.0,
+        );
+        assert!(
+            low.min < -2.0,
+            "14.5 deg floor {} should be below -2",
+            low.min
+        );
+
+        // ...and too loose below at a high one.
+        let high = admissible_profile_shift(
+            &GearParams {
+                pressure_angle: 30.0,
+                ..Default::default()
+            },
+            1.0,
+        );
+        assert!(
+            high.min > -2.0,
+            "30 deg floor {} should be above -2",
+            high.min
+        );
+
+        // And blind to thickness modification entirely.
+        let thick = admissible_profile_shift(
+            &GearParams {
+                thickness_mod: 1.3,
+                ..Default::default()
+            },
+            1.0,
+        );
+        assert!(thick.min < d.min - 0.5, "k should move the floor");
+    }
+
+    /// The design thresholds sit INSIDE the buildable range, not at its edges:
+    /// an undercut gear is a real gear and this crate generates it exactly.
+    #[test]
+    fn the_advisory_thresholds_are_inside_the_range_not_bounds_on_it() {
+        for teeth in [9_u32, 13, 17, 40] {
+            let p = GearParams {
+                teeth,
+                ..Default::default()
+            };
+            let r = admissible_profile_shift(&p, 1.0);
+            assert!(r.undercut > r.min && r.undercut < r.max, "z={teeth}");
+            // A real cutter always needs less shift than a sharp rack.
+            assert!(r.undercut < r.sharp_rack_undercut);
+
+            if let Some(pointed) = r.pointed {
+                assert!(pointed > r.min && pointed <= r.max);
+                // Just past it the generator caps the tip, and says so.
+                let capped = Gear::new(GearParams {
+                    profile_shift: (pointed + 0.02).min(r.max),
+                    ..p
+                });
+                assert!(
+                    capped.clamps.notes.iter().any(|n| n.contains("pointed")),
+                    "z={teeth}: no pointed-tooth cap past {pointed}"
+                );
+            }
+        }
     }
 
     #[test]

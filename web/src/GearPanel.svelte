@@ -22,14 +22,24 @@
   );
   let errors = $state<Record<string, string | null>>({});
 
+  /** The field spec to validate against, which for profile shift is not static:
+   *  Rust returns the buildable range for this particular gear. */
+  function specFor(f: (typeof FIELDS)[number]) {
+    if (f.key !== "profile_shift" || !("ok" in result)) return f;
+    const r = result.ok.shift_range;
+    return { ...f, min: r.min, max: r.max };
+  }
+
   function onInput(key: string, text: string) {
     raw[key] = text;
     const f = FIELDS.find((f) => f.key === key)!;
     const v = Number(text);
-    const err = text.trim() === "" ? "required" : validate(f, v);
+    const err = text.trim() === "" ? "required" : validate(specFor(f), v);
     errors[key] = err;
     if (!err) tab.params[f.key] = v;
   }
+
+  const n = (v: number) => v.toFixed(3);
 
   const request = $derived<GearRequest>({
     params: tab.params,
@@ -110,6 +120,13 @@
           />
           <em>{f.unit}</em>
           {#if errors[f.key]}<small class="err">{errors[f.key]}</small>
+          {:else if f.key === "profile_shift" && "ok" in result}
+            {@const r = result.ok.shift_range}
+            <small
+              >buildable {n(r.min)} … {n(r.max)} · undercut below {n(r.undercut)}
+              <span class="ref">(sharp rack {n(r.sharp_rack_undercut)})</span>{#if r.pointed !== null}
+                · pointed above {n(r.pointed)}{/if}</small
+            >
           {:else if f.note}<small>{f.note}</small>{/if}
         </label>
       {/each}

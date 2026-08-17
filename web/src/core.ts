@@ -33,6 +33,8 @@ export interface ClassRef {
 
 export interface GearRequest {
   params: GearParams;
+  /** Depth, in modules, at which the undercut question is asked. */
+  working_depth?: number;
   pin_diameter?: number | null;
   tolerance_class?: ClassRef | null;
   chord_tolerance?: number;
@@ -62,7 +64,19 @@ export interface ToleranceOut {
   total: number;
 }
 
+/** The profile shifts this gear can be built at, plus the design thresholds
+ *  inside them. Every number here is computed in Rust; this side only compares
+ *  and formats. */
+export interface ShiftRange {
+  min: number;
+  max: number;
+  undercut: number;
+  sharp_rack_undercut: number;
+  pointed: number | null;
+}
+
 export interface GearSummary {
+  shift_range: ShiftRange;
   pitch_radius: number;
   base_radius: number;
   tip_radius: number;
@@ -121,7 +135,10 @@ export const FIELDS: FieldSpec[] = [
   { key: "pressure_angle", label: "Pressure angle", unit: "°", step: 0.5, min: 10, max: 60 },
   { key: "teeth", label: "Tooth count", unit: "", step: 1, integer: true, min: 3 },
   { key: "helix_angle", label: "Helix angle", unit: "°", step: 1, min: -45, max: 45 },
-  { key: "profile_shift", label: "Profile shift", unit: "module", step: 0.05, min: -2, max: 2 },
+  // No fixed range: the real bound depends on dedendum, pressure angle and
+  // thickness modification, so it comes back from Rust per gear and is applied
+  // in GearPanel. See DESIGN.md §4.3.
+  { key: "profile_shift", label: "Profile shift", unit: "module", step: 0.05 },
   { key: "addendum", label: "Addendum", unit: "module", step: 0.05, min: 0 },
   { key: "dedendum", label: "Dedendum", unit: "module", step: 0.05, min: 0 },
   { key: "root_radius", label: "Root radius coefficient", unit: "module", step: 0.01, min: 0 },
