@@ -23,7 +23,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs, parameter grid, viewport, DXF download | end-to-end through the real wasm |
 
-132 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+133 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -417,6 +417,36 @@ why the familiar contact-ratio formula contains `a_w` and these do not. As
 written, both lengths came out negative.)*
 
 Internal: `ε_α = [√(r_a1²−r_b1²) − √(r_a2²−r_b2²) + a_w sin α_w]/p_bt`.
+
+##### Overlap ratio and total contact ratio — planned, milestone 6
+
+`ε_β` is written above but **not yet computed**, for a simple reason: it needs a
+face width, and face width is not an input until the stage exists. It arrives
+with milestone 6, alongside material and torque.
+
+```
+ε_β = b sin β / (π m_n)          overlap (axial) contact ratio
+ε_γ = ε_α + ε_β                  total contact ratio
+```
+
+`ε_β` is the number of base pitches the tooth trace advances across the face, so
+it counts *axial* overlap the way `ε_α` counts profile overlap. Spur gears have
+`ε_β = 0` identically, so — like everything else in the helical treatment — this
+is one formula with the spur case as a value of it, not a branch.
+
+**It is a design check, not an input to any stress.** Efficiency deliberately
+does not use `ε_γ` (see the rejection of that substitution below), and neither
+bending nor contact needs it. What it tells the designer is whether the mesh has
+full axial overlap: at `ε_β ≥ 1` at least one contact line is engaged at all
+times, which is the property helical gears are chosen for — smooth load transfer
+and no abrupt engagement. Below 1 the gear is helical in form but still transfers
+load like a spur gear, which is usually not what was intended and is invisible
+without this output.
+
+**UI**: a `Spur Stage` output beside `Ratio` — three read-only fields, transverse
+`ε_α`, overlap `ε_β` and total `ε_γ`, with `ε_β < 1` flagged. This is an addition
+to the specification, which lists neither; it is cheap once face width is present
+and it answers a question the spec's own helix-angle inputs raise.
 
 **Parallel-axis mesh efficiency, derived rather than quoted.** At a contact point
 `ξ` from the pitch point the sliding velocity is `ξ(ω₁+ω₂)` while the input power
@@ -830,31 +860,82 @@ several contact lines being engaged at once **is** load sharing and stays
 deferred; assuming a single line is the conservative reading and is continuous
 with the spur case at β = 0.
 
-For bending, a helical tooth bends as its **normal** section, so *both* the form
-factor and the load point are taken on the ISO virtual spur gear, `z_n = z/cos³β`
-at module `m_n` and pressure angle `α_n`. This needs no new geometry: the existing
-generator produces it, since the tooth form is a continuous function of `z` and
-only the *fractional* count is new (`Gear::z`).
+##### Helical bending: where each `cos β` comes from
 
-The load point matters as much as the section, and moving one without the other
-is a trap. The highest point of single-pair contact, measured from the tip,
-depends only on the gear's own geometry and the contact ratio:
+A helical tooth does not bend as its transverse section. Two separate corrections
+follow, and they pull in opposite directions — getting one without the other is
+worse than getting neither, because the errors stop cancelling.
+
+**The section: `z_n = z / cos³β`.** Cut the pitch cylinder with a plane normal to
+the helix. The intersection is an ellipse whose semi-minor axis is `r` — the cut
+does not change the radius perpendicular to the axis — and whose semi-major axis
+is `r/cos β`, stretched by the obliquity. The tooth sits at the end of the *minor*
+axis, where an ellipse of semi-axes `A ≥ B` has radius of curvature `A²/B`:
+
+```
+ρ = (r/cos β)² / r = r / cos²β                    ← two powers, from curvature
+```
+
+That `ρ` is the pitch radius of the equivalent spur gear. Converting it to a
+tooth count at the *normal* module supplies the third power, because the
+transverse module is the larger one, `m_t = m_n/cos β`:
+
+```
+z_n = 2ρ/m_n = 2r/(m_n cos²β),  r = m_n z/(2 cos β)   ⟹   z_n = z / cos³β
+```
+
+**What it accounts for:** the normal section is *flatter* than the transverse
+one — larger effective radius, straighter flanks, lower form factor. A helical
+tooth is therefore stronger in bending than its actual tooth count suggests,
+which is why `σ_F` falls monotonically with helix angle (69.2 → 53.5 MPa from
+β = 0 to 30° in the worked mesh).
+
+**The load point: `ε_αn = ε_α / cos²β_b`.** Again two powers, from two places:
+
+- **Base pitch.** Contact lines in the plane of action lie at `β_b` to the axis,
+  so their perpendicular spacing is shorter than the transverse spacing:
+  `p_bn = p_bt cos β_b`.
+- **Path length.** The path of contact measured in the normal section is longer
+  than the transverse path by `1/cos β_b`.
+
+```
+ε_αn = (g_α / cos β_b) / (p_bt cos β_b) = ε_α / cos²β_b
+```
+
+Note it is the **base** helix angle, `sin β_b = sin β cos α_n`, not `β` — the
+contact lines live on the base cylinder, not the reference one.
+
+**What it accounts for:** where the load sits. The highest point of single-pair
+contact is one base pitch back from the end of the path, so a higher contact
+ratio pushes it *closer to the tip* — longer moment arm, higher stress. This
+partly offsets the section effect above, and it is why applying only the `z_n`
+correction would over-state a helical gear's strength.
+
+**The load point itself needs no mate.** Measured from the tip it depends only on
+the gear's own geometry and the contact ratio:
 
 ```
 u_load = u_tip − (ε_α − 1) p_b / r_b
 ```
 
 [verified exact against the path-of-contact construction over seven meshes,
-including reversed pairs]. The same relation then applies on the virtual gear
-with the **virtual** contact ratio `ε_αn = ε_α/cos²β_b`. Carrying the *real*
-gear's roll parameter across instead puts the load at the wrong place, because
-the virtual gear's involute is not the real one.
+including reversed pairs]. That is what lets the same relation be reused on the
+virtual gear with `ε_αn`, and what keeps the API a scalar rather than a mesh.
 
-At `β = 0` every one of these reduces exactly: `cos β_b = 1`, `z_n = z`,
-`ε_αn = ε_α`, and the virtual gear is rebuilt bit-for-bit identical to the real
-one. **There is no spur branch anywhere in the strength path** — the spur results
-are values of the helical formulas, and the CLI's spur output is unchanged to the
-last digit across this whole revision.
+**One honest limit.** `ε_αn = ε_α/cos²β_b` is ISO's *relation*, not an identity.
+Building the virtual pair and measuring its contact ratio directly disagrees with
+it — exactly at β = 0, by 0.03 % at 10°, 0.11 % at 20° and 0.20 % at 30°. The gap
+is inherent to the construction rather than an error: the virtual gear keeps the
+addendum in normal modules, so its tip circle is a smaller fraction of its pitch
+radius than the real gear's is, and the two tip circles are not in exact
+correspondence. [verified] The consequence is bounded and small — at β = 30° that
+0.20 % moves `Y_F` by **0.38 %**.
+
+**At `β = 0` all of it reduces exactly**: `cos β_b = 1`, `z_n = z`, `ε_αn = ε_α`,
+and the virtual gear is rebuilt bit-for-bit identical to the real one. **There is
+no spur branch anywhere in the strength path** — the spur results are values of
+the helical formulas, and the CLI's spur output is unchanged to the last digit
+across this whole revision.
 
 **`Y_β` is not applied** — ISO's helix factor is an empirical fit, and omitting it
 leaves `Y_β = 1`, which over-predicts stress; conservative, and no fitted constant
@@ -1447,6 +1528,23 @@ The viewport draws the profile with the first tooth centred up, with pan/zoom an
 toggleable reference circles. Deleting a tab confirms first; deleting the last
 tab creates a fresh default one.
 
+### 8.1 Additions to the specification's field list
+
+Two things the spec does not list are added, both read-only outputs, both cheap
+once the data they need is present:
+
+| Where | Output | Why |
+|---|---|---|
+| Stage, beside `Ratio` | **Contact ratios** — transverse `ε_α`, overlap `ε_β`, total `ε_γ` | The spec has helix-angle inputs but no way to see whether they bought full axial overlap. `ε_β < 1` is flagged: the gear is helical in form but still transfers load like a spur gear. §4.5 |
+| Stage, per gear | **Provenance marker** on each material property | The library ships estimates as well as measurements and must not present them alike. §6.1 |
+
+Both are outputs only, so §3.1 is untouched — nothing new becomes state.
+
+The material properties themselves are shown as **editable fields seeded from the
+library**, greyed until edited and un-greyed once they are, so a user can tweak a
+value for their own case without authoring a library file. The overrides live in
+the input state, which is what keeps outputs a pure function of inputs.
+
 ---
 
 ## 9. Testing
@@ -1543,7 +1641,7 @@ it can be validated in isolation.
 | 3 | ✅ **Gear Calculator UI** — sidebar, tabs, parameter grid, canvas viewport, DXF export | **met** — the UI's own request path produces a DXF `ezdxf` reads back with the right geometry |
 | 4 | ✅ **Materials** — TOML library, import/export, the preloaded materials | **met** — every value carries a cited primary source and a `basis`; the library round-trips through TOML unchanged and satisfies cross-family consistency laws |
 | 5 | ✅ **Mesh & strength** — contact path, bending, load-to-stress path, efficiency, Hertz, face width | **met** — both bending constructions converge to their own closed-form rack limits; Hertz agrees with the contact-half-width route to 1e-12; efficiency matches a numerical average of the instantaneous loss to 1e-10; `b_min` is independent of the face width it was evaluated at |
-| 6 | ⬜ **Spur stage** — accordion, train accumulation, torque/cycle propagation | a two-stage train computes end to end |
+| 6 | ⬜ **Spur stage** — accordion, train accumulation, torque/cycle propagation, face width and material as inputs, overlap ratio `ε_β`/`ε_γ` as outputs (§4.5) | a two-stage train computes end to end; `ε_β = 0` exactly for a spur stage |
 | 7 | ⬜ **Worm stage** — screw-gear model, lead angle, self-locking, axial backlash | self-locking threshold matches the closed form |
 | 8 | ⬜ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | own rack-equivalent validation |
 | 9 | ⬜ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency | common centre distance to 1e-12; all six drive modes |
@@ -1684,6 +1782,8 @@ here. Revision 2 additions are marked ★.
 | ✧ Closed-form HPSTC roll | `u_tip − (ε_α−1)p_b/r_b` vs the path construction, seven meshes | exact (≤ 5.6e-17) |
 | ✧ Helical efficiency | numerical average including `1/cos β_b`, five meshes × β = 0, 12, 25° | 1e-10 relative |
 | ✧ Virtual gear identity at β = 0 | rebuild vs the original gear | bit-identical, by construction not by branch |
+| ✧ `ε_αn = ε_α/cos²β_b` vs a measured virtual pair | β = 0, 10, 20, 30°, two meshes | exact at 0; 0.03 / 0.11 / 0.20 % apart — the construction's own limit, not an error |
+| ✧ What that gap costs | perturb `ε_αn` by the observed spread, β = 30° | `Y_F` moves **0.38 %** |
 | ✦ `σ_F` composition vs. §4.7's load-case table | z = 17/43 at HPSTC, `Y_F · Y_S` | 2.9415 against the recorded 2.9416 |
 
 The marks record which round of review each check came from; they are kept only

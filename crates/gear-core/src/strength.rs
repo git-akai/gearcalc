@@ -1593,6 +1593,33 @@ mod tests {
         }
     }
 
+    /// `ε_αn = ε_α/cos²β_b` is ISO's relation, not an identity: building the
+    /// virtual pair and measuring its contact ratio directly gives a slightly
+    /// different number, because the virtual gear keeps the addendum in normal
+    /// modules and so its tip circle is not in exact correspondence with the
+    /// real one. This pins down what that modelling gap actually costs, so the
+    /// approximation is a measured quantity rather than an assumption.
+    #[test]
+    fn the_virtual_contact_ratio_relation_barely_moves_the_answer() {
+        for (beta, spread) in [(10.0, 0.0004), (20.0, 0.0012), (30.0, 0.0020)] {
+            let g = Gear::new(GearParams {
+                teeth: 17,
+                helix_angle: beta,
+                ..Default::default()
+            });
+            let eps = 1.5;
+            let a = bending_section(&g, eps).unwrap();
+            // Perturb the contact ratio by the observed disagreement between the
+            // two routes and see how far the form factor moves.
+            let b = bending_section(&g, eps * (1.0 + spread)).unwrap();
+            let shift = (b.form_factor - a.form_factor).abs() / a.form_factor;
+            assert!(
+                shift < 0.005,
+                "beta={beta}: a {spread:.4} contact-ratio gap moved Y_F by {shift:.5}"
+            );
+        }
+    }
+
     /// Helical contact comes out below the equivalent transverse geometry by
     /// exactly `√(cos β_b)` — the combined effect of a longer contact line, a
     /// larger flank force and a flatter normal-plane curvature. Anything else
