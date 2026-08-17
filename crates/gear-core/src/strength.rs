@@ -407,6 +407,27 @@ pub fn tip_load_section(g: &Gear) -> Option<RootSection> {
 /// geometry and is checkable against a closed-form limit; a stress correction is
 /// an empirical fit, and being able to separate the two is what makes it
 /// possible to tell a geometry error from an over-fitted correction.
+///
+/// # Why this survives the no-correction-factors policy
+///
+/// DESIGN.md §4.7 excludes the ISO correction factors — `Y_β`, `K_A`, `K_v`,
+/// `K_Fβ`, `K_Fα`, `Z_ε`, `Z_β`. `Y_S` is kept, and the difference is not
+/// special pleading:
+///
+/// - **It points the other way.** Those factors are mostly `≤ 1` for bending, so
+///   omitting them is conservative. `Y_S ≥ 1` — typically 1.6 to 2.1. Dropping
+///   it would report a nominal section stress well *below* the real peak, which
+///   is the unconservative direction.
+/// - **It is local, not population-calibrated.** It converts nominal stress at a
+///   section into peak stress at a notch. Its inputs `s_Fn`, `h_Fe` and `ρ_F`
+///   are measured off this gear's own generated profile, not looked up against a
+///   population of test gears.
+/// - **Its range is reported, not assumed.** See
+///   [`RootSection::notch_parameter_in_range`]; a result that leaves the fit's
+///   band says so instead of quietly returning a boundary value.
+///
+/// It remains a fit, and [`StressConcentration::None`] exists so any result can
+/// be re-run without it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum StressConcentration {
     /// ISO 6336-3.
@@ -625,12 +646,18 @@ impl Load {
 /// about `cos β` (6 % at 20°, 13 % at 30°). Spur gears are unaffected, since the
 /// two sections coincide.
 ///
-/// **`Y_β` is not applied.** ISO's helix-angle factor `Y_β = 1 − ε_β β/120`
-/// accounts for the load being spread along an inclined contact line; it is an
-/// empirical fit, and omitting it leaves `Y_β = 1`, which *over*-predicts the
-/// stress. That is the safe direction, and it keeps a fitted constant out of the
-/// calculation — but it means a helical rating here is conservative against ISO
-/// by up to about 25 % at high helix angle and overlap.
+/// **No ISO correction factors are applied** — not `Y_β`, and not the `K` and `Z`
+/// families either. This is a standing project policy, set out at the end of
+/// DESIGN.md §4.7: their validated bands are narrow against modern designs, they
+/// are only balanced as a complete set against `σ_Flim` values this project does
+/// not have, and they buy precision at the cost of accuracy. Since `Y_β ≤ 1`,
+/// leaving it out over-predicts stress — the safe direction — but it does mean a
+/// helical result here is conservative against a published ISO rating by up to
+/// about 25 % at high helix angle and overlap, and should not be compared to one
+/// without saying so.
+///
+/// The notch factor `Y_S` is deliberately *not* in that category; see
+/// [`StressConcentration`].
 ///
 /// Returns `None` when the stress correction is undefined for this section —
 /// see [`RootSection::stress_correction`]. That is not a failure to compute; it

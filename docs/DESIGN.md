@@ -937,9 +937,62 @@ no spur branch anywhere in the strength path** — the spur results are values o
 the helical formulas, and the CLI's spur output is unchanged to the last digit
 across this whole revision.
 
-**`Y_β` is not applied** — ISO's helix factor is an empirical fit, and omitting it
-leaves `Y_β = 1`, which over-predicts stress; conservative, and no fitted constant
-enters.
+**`Y_β` is not applied**, and neither is any other ISO correction factor. This is
+a standing project policy rather than a decision about one term — see below.
+
+#### Correction factors are excluded — standing policy
+
+**The ISO/AGMA system factors are not used, and will not be added on request
+without revisiting this section.** That covers `Y_β` (helix), `K_A`
+(application), `K_v` (dynamic), `K_Fβ`/`K_Hβ` (face load distribution),
+`K_Fα`/`K_Hα` (transverse load distribution), `Z_ε`, `Z_β`, and their relatives.
+
+Three reasons, in order of weight.
+
+**1. Their validated band is narrow relative to modern designs.** Each is a fit
+to a population of gears, and every one carries hard caps — `ε_β ≤ 1`, `β ≤ 30°`,
+a floor at `Y_β = 0.75`. Those are not physical thresholds; nothing changes in
+the mechanics at exactly `ε_β = 1`. They are the edges of the data. A derived
+quantity does not need caps; a fit does, because past the data it is
+extrapolation. Outside the band the formula does not fail — it quietly returns
+the boundary value, which is the worst failure mode available.
+
+**2. They are only balanced as a set.** `Y_β` reduces stress and `K_Fβ` raises
+it, and they describe the *same* face-width physics from opposite directions.
+Both were calibrated against `σ_Flim` values themselves back-derived using the
+whole set. Adopting one is not a partial improvement; it is taking the
+favourable half of a calibration. We also do not have ISO's `σ_Flim` (§6.2), so
+even the complete set would have nothing consistent to be measured against.
+
+**3. It trades accuracy for precision.** A fitted factor makes the output look
+sharper without making it truer, and its assumptions are invisible at the point
+of use. The project's bias is the other way: compute exactly what the stated
+model implies, say plainly what the model omits, and let the reader see the size
+of the gap. A number that is exactly right about a simpler question beats one
+that is approximately right about a harder one while hiding which question it
+answered.
+
+The evidence that these are empirical rather than derivable is direct: published
+comparisons against finite-element analysis find methods that disagree on
+whether root stress *rises or falls* with helix angle — the sign of the trend,
+not merely its size. There would be nothing to disagree about if it were
+geometry.
+
+**Where this leaves the numbers.** Bending here is conservative against a
+published ISO rating, by up to roughly 25 % at high helix and overlap, since
+`Y_β ≤ 1`. That is the deliberate direction. The tool reports what the geometry
+implies, not what a rating standard would certify, and it should not be compared
+to an ISO rating without saying so.
+
+**The one factor that is not in this category** is the notch factor `Y_S`, and
+the distinction is worth stating because it is easy to lump together. `Y_S ≥ 1`:
+it is the ratio of peak fillet stress to nominal section stress, a *local*
+effect, computed from `s_Fn`, `h_Fe` and `ρ_F` — all measured off our own exact
+profile rather than looked up against a gear population. Dropping it would not
+be conservative; it would report a nominal stress roughly 1.6–2.1× below the
+real peak. It stays, with its own validated range reported per result
+(`notch_parameter_in_range`), which is the honest treatment of a fit that is
+load-bearing rather than decorative.
 
 **Minimum face width — closed form, no iteration.** Since `σ_F ∝ 1/b` and
 `σ_H ∝ 1/√b`:
@@ -1613,6 +1666,13 @@ not have to hunt for it.
 | A coupled glass POM grade, if one is wanted back in the library | §6.4 | nothing |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
 | Crossed-axis contact model | §4.5.1 | milestone 10 |
+
+**Standing policy: no ISO/AGMA correction factors** — `Y_β`, `K_A`, `K_v`,
+`K_Fβ`, `K_Fα`, `Z_ε`, `Z_β` and relatives. Their validated bands are narrow
+against modern designs, they are only balanced as a complete set against
+`σ_Flim` values we do not have, and they buy precision at the cost of accuracy.
+Full reasoning at the end of §4.7, including why the notch factor `Y_S` is a
+different case and stays.
 
 **Deliberately deferred, with a written rationale:** load sharing — see the end
 of §4.7. It is not an omission; the measurement says it buys 0.0–0.2% for a
