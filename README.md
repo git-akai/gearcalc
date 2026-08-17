@@ -12,7 +12,9 @@ layout and event handling only.
 
 The architecture, the mathematics behind every formula, and the verification log
 are in [`docs/DESIGN.md`](docs/DESIGN.md). Read that before changing anything in
-`gear-core`.
+`gear-core`. [`docs/HANDOFF.md`](docs/HANDOFF.md) is the shorter route in: current
+state, the rules and why they are rules, the traps, and what the next milestone
+needs.
 
 ## Layout
 
@@ -23,7 +25,7 @@ are in [`docs/DESIGN.md`](docs/DESIGN.md). Read that before changing anything in
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
 | `web/` | Svelte 5 + TypeScript + Vite front end. |
-| `docs/` | Design document, the initial specification, and the JGMA 116-02 tables. |
+| `docs/` | Design document, handoff, the initial specification, and the JGMA 116-02 tables. |
 | `handoff_inbound/` | Prior Python work. **Reference only** — do not build on it. |
 
 ## Getting started

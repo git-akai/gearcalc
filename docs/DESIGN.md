@@ -1089,7 +1089,7 @@ real peak. It stays, with its own validated range reported per result
 (`notch_parameter_in_range`), which is the honest treatment of a fit that is
 load-bearing rather than decorative.
 
-#### One contact model, not two — decided before milestone 7
+#### Unifying the contact section — the plan for milestone 7
 
 Worm and crossed-helical stages contact at a **point** rather than a line, and
 the obvious implementation is a branch: line Hertz for parallel axes, elliptical
@@ -1137,12 +1137,74 @@ sits slightly above both, since a truncated ellipse concentrates load more than
 a uniform line does, and that is the honest limit of the expression rather than
 something to paper over.
 
+##### The same argument applies to the rest of the section
+
+Pressure is not the only place a crossed-axis branch would otherwise appear.
+Following the same reasoning through gives **three unifications, one parameter
+each**, and in every case the present parallel-axis result is the degenerate
+value rather than a separate case:
+
+| | unified by | parallel axes is | currently |
+|---|---|---|---|
+| **Geometry** — path of contact, field of action | shaft angle `Σ` | `Σ = 0` | `ContactPath`, parallel only |
+| **Pressure** — Hertz | lengthwise relative curvature `1/R_L` | `1/R_L = 0` | line only |
+| **Friction** — efficiency | the sliding **velocity vector** | its lengthwise component is 0 | profile sliding only |
+
+The third is the one worth spelling out, because it also closes a gap already
+admitted in §4.5. Friction acts on the magnitude of the relative sliding
+velocity, which is a vector: a **profile** component `|ξ|(ω₁+ω₂)` along the line
+of action, and a **lengthwise** component along the tooth. Today only the first
+is modelled, which is exact for spur gears, *understates* helical loss — the
+along-tooth sliding a helical mesh really has — and would be hopeless for a worm,
+where the lengthwise component dominates and is the entire reason worm drives are
+inefficient and can self-lock.
+
+Integrating `μ` against `|v_slide|` therefore replaces three things with one: the
+Buckingham formula recovered in §4.5, the missing helical term, and the
+screw-gear efficiency of §4.5.1 that would otherwise arrive as a separate
+formula. Buckingham becomes the case where the lengthwise component vanishes.
+It also explains, rather than merely asserts, why efficiency is direction-
+dependent for a worm and not for a parallel-axis mesh: reversing the drive
+reverses the sliding direction relative to the transmitted force only when there
+is a lengthwise component to reverse.
+
+##### The acceptance gate is the existing model
+
+The unified implementation is not accepted because it is more general. It is
+accepted when, at its degenerate parameters, it reproduces **every result the
+present model has already been verified against** — the checks in the appendix,
+unchanged:
+
+- `σ_H` against the contact-half-width route (1e-12), `ρ₁ + ρ₂` constant along
+  the path, independence from which gear is labelled 1, `σ_H ∝ √E*`, and the
+  helical ratio of exactly `√(cos β_b)`.
+- `η` against the numerical average of the instantaneous loss (1e-10), including
+  the `/ε_α` that holds total transmitted force at `F_n`, and forward equal to
+  backward for a parallel-axis mesh.
+- `gear-cli strength 17 43 2.0` unchanged **to the last digit**, which is the
+  check that has caught every regression in this area so far.
+
+A unification that cannot reproduce those is not a unification; it is a
+replacement, and would need its own validation from scratch.
+
+##### Order of work
+
+1. Carlson symmetric elliptic integrals — testable alone against known values.
+2. General Hertz on top of them — testable against sphere-on-sphere and
+   sphere-on-plane, which have exact closed forms and need no gear.
+3. Swap `contact_stress` to the general form with `1/R_L = 0`; the gate above
+   must pass **before** any crossed-axis geometry is added.
+4. Sliding as a vector; same discipline — parallel-axis efficiency unchanged
+   first, lengthwise component second.
+5. Only then the worm geometry, lead angle `sin γ = z m_n/d`, and self-locking.
+
+Steps 1–4 change no answer the tool currently gives. That is the point: the
+crossed-axis work should add a parameter, not a branch, and the way to be sure is
+to unify *before* there is anything new to get wrong.
+
 **Implementation waits for milestone 7**, where it can be checked against a real
 crossed-axis mesh. What is fixed now is that it arrives as one function with a
 lengthwise-curvature argument, not as a second function chosen by stage type.
-The elliptical path is independently testable before any worm exists: sphere on
-sphere and sphere on plane have exact closed forms, and the line limit must
-reproduce the present numbers unchanged.
 
 **Minimum face width — closed form, no iteration.** Since `σ_F ∝ 1/b` and
 `σ_H ∝ 1/√b`:
@@ -1888,7 +1950,7 @@ it can be validated in isolation.
 | 4 | ✅ **Materials** — TOML library, import/export, the preloaded materials | **met** — every value carries a cited primary source and a `basis`; the library round-trips through TOML unchanged and satisfies cross-family consistency laws |
 | 5 | ✅ **Mesh & strength** — contact path, bending, load-to-stress path, efficiency, Hertz, face width | **met** — both bending constructions converge to their own closed-form rack limits; Hertz agrees with the contact-half-width route to 1e-12; efficiency matches a numerical average of the instantaneous loss to 1e-10; `b_min` is independent of the face width it was evaluated at |
 | 6 | ✅ **Spur stage** — stage solve, train accumulation, tooth cycles, `solve_train` across the wasm boundary, geartrain tabs and the stage accordion | **met** — a two-stage train computes end to end in `gear-cli` *and* in the browser, with `ε_β = 0` exactly for a spur stage; the UI's own numbers were checked against the CLI's in a headless render |
-| 7 | ⬜ **Worm stage** — screw-gear model, lead angle, self-locking, axial backlash | self-locking threshold matches the closed form |
+| 7 | ⬜ **Worm stage** — unify the contact section first (§4.7), then screw-gear geometry, lead angle, self-locking, axial backlash | the unified model reproduces every existing contact and efficiency check at its degenerate parameters, and `gear-cli strength 17 43 2.0` to the last digit; then the self-locking threshold matches the closed form |
 | 8 | ⬜ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | own rack-equivalent validation |
 | 9 | ⬜ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency | common centre distance to 1e-12; all six drive modes |
 | 10 | ⬜ **Crossed-axis spur** — reuse `screw.rs`, point-contact Hertz | Q2 revisited with the worm model in hand |
