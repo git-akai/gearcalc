@@ -26,6 +26,12 @@ fn main() {
         Some("loadcase") => loadcase_report(),
         Some("materials") => materials(),
         Some("train") => train_report(),
+        Some("wormstage") => worm_stage_report(
+            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(1),
+            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(40),
+            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(7.0),
+            args.get(4).and_then(|s| s.parse().ok()).unwrap_or(2.0),
+        ),
         Some("worm") => worm_report(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(1),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(40),
@@ -890,4 +896,68 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
         );
     }
     println!("  bending                     not reported - see DESIGN.md 4.5.1");
+}
+
+/// A worm stage end to end: geometry, both directions, contact and backlash.
+fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: f64) {
+    use gear_core::train::{solve_worm_stage, WormMember, WormStage};
+
+    let stage = WormStage {
+        starts,
+        wheel_teeth,
+        worm_pitch_diameter: worm_diameter,
+        wheel: WormMember {
+            material: "Brass C360".into(),
+            ..WormMember::default()
+        },
+        ..WormStage::default()
+    };
+    let lib = gear_io::default_library();
+    let r = match solve_worm_stage(&stage, torque, &lib) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("cannot solve that stage: {e}");
+            return;
+        }
+    };
+
+    println!(
+        "worm stage  z {starts}/{wheel_teeth}  module {}  ratio {:.4}:1  a {:.4} mm",
+        stage.module, r.ratio, r.centre_distance
+    );
+    println!(
+        "  lead angle {:.4} deg   wheel helix {:.4} deg   lead {:.4} mm",
+        r.lead_angle, r.wheel_helix_angle, r.lead
+    );
+    println!();
+    println!("  member      torque Nm   face mm   d mm      material");
+    for (name, m) in ["worm", "wheel"].iter().zip(&r.members) {
+        println!(
+            "  {name:<10} {:9.4} {:9.3} {:9.4}   {}",
+            m.torque, m.face_width, m.pitch_diameter, m.material.name
+        );
+    }
+    println!();
+    println!(
+        "  efficiency   forward {:.3} %   backward {:.3} %{}",
+        r.efficiency_forward * 100.0,
+        r.efficiency_backward * 100.0,
+        if r.self_locking {
+            "  (self-locking)"
+        } else {
+            ""
+        }
+    );
+    println!(
+        "  contact      {:.1} MPa   patch {:.4} x {:.4} mm",
+        r.contact.max_pressure, r.contact.patch_length, r.contact.patch_width
+    );
+    println!(
+        "  backlash     worm {:.5} deg   wheel {:.5} deg  (min {:.5}, max {:.5})",
+        r.backlash[0].nominal, r.backlash[1].nominal, r.backlash[1].minimum, r.backlash[1].maximum
+    );
+    println!("  bending      not reported - see DESIGN.md 4.5.1");
+    for note in &r.notes {
+        println!("  ! {note}");
+    }
 }

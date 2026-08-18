@@ -1,10 +1,15 @@
 //! Geartrains: a stage at a time, and the accumulation along the shaft line.
 //!
-//! Each stage kind has its own module — [`spur`] so far — and what stays here is
-//! everything a stage of *any* kind produces: [`StageResult`], [`GearResult`],
-//! [`Backlash`], and the train that strings them together. That division is the
-//! reason a new stage kind is additive rather than a rewrite: it has to produce
-//! a `StageResult`, and the accumulation never asks what kind it was.
+//! Each stage kind has its own module — `spur` and `worm` — and what stays here
+//! is the vocabulary they share ([`Backlash`], [`TrainError`], the duty cycle)
+//! and the train that strings them together.
+//!
+//! **Each kind keeps its own result type**, and that was a decision rather than
+//! an oversight. A worm stage has no bending stress, no minimum face width from
+//! contact — a point contact does not care how wide the tooth is — and two
+//! efficiencies rather than one. Forcing that into [`StageResult`] would have
+//! meant four `Option`s and a comment apologising for each. A result shaped like
+//! the answer says the same thing without the apology.
 //!
 //! # What is state and what is not
 //!
@@ -24,8 +29,12 @@ use crate::material::{Material, MaterialLibrary};
 use crate::mesh::MeshError;
 
 mod spur;
+mod worm;
 
 pub use spur::{solve_stage, SpurStage, StageGear};
+pub use worm::{
+    solve_worm_stage, WormContact, WormMember, WormMemberResult, WormResult, WormStage,
+};
 
 /// The three contact ratios.
 #[derive(Clone, Copy, Debug)]
@@ -131,6 +140,8 @@ pub struct StageResult {
 /// Why a stage could not be solved.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TrainError {
+    /// The screw pair cannot exist — see [`crate::screw::ScrewError`].
+    Screw(crate::screw::ScrewError),
     /// The pair cannot mesh, or the shifts put it outside the involute domain.
     Mesh(MeshError),
     /// No usable path of contact — the teeth do not reach each other.
@@ -147,6 +158,24 @@ impl std::fmt::Display for TrainError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Mesh(e) => write!(f, "{e}"),
+            Self::Screw(e) => match e {
+                crate::screw::ScrewError::NotPositive => {
+                    write!(f, "a module, diameter or tooth count is not positive")
+                }
+                crate::screw::ScrewError::WormTooThin => write!(
+                    f,
+                    "the worm is too thin for that many starts at that module: \
+                     the thread would have to wrap at ninety degrees or more"
+                ),
+                crate::screw::ScrewError::ShaftAngleImpossible => {
+                    write!(f, "that shaft angle leaves the wheel with no lead angle")
+                }
+                crate::screw::ScrewError::AxesAreParallel => write!(
+                    f,
+                    "parallel axes: a worm stage needs crossed shafts, and a \
+                     parallel pair is a spur stage"
+                ),
+            },
             Self::NoContact => write!(f, "the teeth never come into contact"),
             Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
             Self::NoRootSection => write!(f, "the tooth is too undercut to have a root section"),
@@ -156,6 +185,46 @@ impl std::fmt::Display for TrainError {
 }
 
 impl std::error::Error for TrainError {}
+
+/// A self-contained material library for tests, so `gear-core` keeps no
+/// dependency on `gear-io`. Shared by every stage kind's tests.
+#[cfg(test)]
+pub(super) fn test_library() -> MaterialLibrary {
+    use crate::material::{Basis, Class, Measure, Value};
+    let steel = Material {
+        name: "4340 Hardened Steel".into(),
+        class: Class::Steel,
+        grade: "test".into(),
+        condition: "test".into(),
+        source: "test".into(),
+        density: Value::datasheet(7850.0),
+        elastic_modulus: Value::datasheet(190_000.0),
+        poissons_ratio: Value::datasheet(0.29),
+        ultimate_allowable: Value::datasheet(1365.0),
+        ultimate_measure: Measure::Yield,
+        fatigue_allowable: Value {
+            value: 750.0,
+            basis: Basis::Estimated,
+            note: Some("test".into()),
+        },
+    };
+    let bronze = Material {
+        name: "Brass C360".into(),
+        class: Class::Brass,
+        elastic_modulus: Value::datasheet(97_000.0),
+        poissons_ratio: Value::datasheet(0.321),
+        ultimate_allowable: Value::datasheet(310.0),
+        fatigue_allowable: Value {
+            value: 140.0,
+            basis: Basis::Estimated,
+            note: Some("test".into()),
+        },
+        ..steel.clone()
+    };
+    MaterialLibrary {
+        materials: vec![steel, bronze],
+    }
+}
 
 /// How the train is used, which is what turns a ratio into a tooth count.
 #[derive(Clone, Copy, Debug)]
@@ -321,27 +390,7 @@ mod tests {
     use crate::profile::Gear;
 
     fn library() -> MaterialLibrary {
-        // A self-contained stand-in so gear-core keeps no dependency on gear-io.
-        use crate::material::{Basis, Class, Material, Measure, Value};
-        MaterialLibrary {
-            materials: vec![Material {
-                name: "4340 Hardened Steel".into(),
-                class: Class::Steel,
-                grade: "test".into(),
-                condition: "test".into(),
-                source: "test".into(),
-                density: Value::datasheet(7850.0),
-                elastic_modulus: Value::datasheet(190_000.0),
-                poissons_ratio: Value::datasheet(0.29),
-                ultimate_allowable: Value::datasheet(1365.0),
-                ultimate_measure: Measure::Yield,
-                fatigue_allowable: Value {
-                    value: 750.0,
-                    basis: Basis::Estimated,
-                    note: Some("test".into()),
-                },
-            }],
-        }
+        super::test_library()
     }
 
     fn two_stage() -> Train {

@@ -153,7 +153,10 @@ gears/
 │   │   ├── material.rs      material model — values, provenance, allowables
 │   │   ├── screw.rs         crossed-axis screw gearing — worm and crossed
 │   │   │                    helical, one module
-│   │   ├── train.rs         stage solve and train accumulation
+│   │   ├── train/           mod.rs   the vocabulary stages share, and the
+│   │   │                              train that strings them together
+│   │   │                    spur.rs  the parallel-axis stage
+│   │   │                    worm.rs  the crossed-axis stage
 │   │   ├── verify.rs        the two-sided rack check
 │   │   └── data/            jgma_116_02.csv        (beside src/, not in it)
 │   ├── gear-io/         DXF writer, TOML (de)serialisation
@@ -171,9 +174,14 @@ development without touching the browser. Sweeps, regression dumps and
 "why is this number wrong" all happen there.
 
 One module is named by the milestones ahead and does not exist yet: `ring.rs`
-(internal-gear profile, milestone 8). `train.rs` is one file rather than a
-directory, and stays that way until a second stage type gives the split
-something to divide — the worm stage will be the one that forces it.
+(internal-gear profile, milestone 8). `train/` became a directory when the worm
+stage arrived and gave the split something to divide, exactly as planned.
+
+**Each stage kind keeps its own result type.** A worm stage has no bending
+stress, no minimum face width from contact, and two efficiencies rather than
+one; forcing that into `StageResult` would have meant four `Option`s and a
+comment apologising for each. What the kinds share is the vocabulary —
+`Backlash`, `TrainError`, the duty cycle — not the shape of their answers.
 
 `elliptic.rs` and `hertz.rs` are the first two steps of the contact unification
 (§4.7) and are deliberately **gear-free**: one is pure special functions and the
@@ -2329,6 +2337,8 @@ here. Revision 2 additions are marked ★.
 | ◆ **Lengthwise sliding, parallel axes** | two meshes × β = 0, 8, 20, 35°, eleven points along each path | zero to 1e-14 of the pitch line velocity, at every helix angle — the measurement that corrected §4.5 and §4.7 |
 | ◆ Sliding magnitude vs. the scalar the closed form uses | three meshes × three helix angles, nine points each | `\|ξ\|(ω₁+ω₂)` to 1e-11 — so the closed form integrates the *whole* sliding, not a component |
 | ◆ Efficiency as the integral of the vector | closed form vs. a 200 000-point average of `μ\|v_s\|/(v_b cos β_b)` driven by the vector model, three meshes × three helix angles | 1e-9 absolute; the loop closes on the formula in use |
+| ◆ **Worm backlash from one projection** | the derived `j_n = j_axial sin β_b1 + Δa sin α_n` against the two relations handbooks give separately — wheel turns by `j/r₂`, worm by `2π j/lead` — three worms | 1e-12 both, so one projection reproduces both rules |
+| ◆ Worm contact vs. face width | wheel face width 4 mm against 40 mm | **bit-identical** peak pressure — which is why a worm stage has no automatic face width from strength: a point contact has nothing for `σ_H ∝ 1/√b` to invert |
 | ◆ Flank rulings | projection construction vs. `cos β_b`, four shaft angles × four helix angles | 1e-14 — the base helix angle is a *consequence* of projecting the axis onto the tangent plane, not an input to it |
 | ◆ **Crossed construction at zero shaft angle** | `σ_H` at the pitch point from the crossed-axis curvatures vs. the verified line-contact path, three meshes including β = 20° and 30° | flatter curvature **exactly** 0; stress agrees to 1e-12 — the crossed model and the parallel one are measuring the same curvature |
 | ◆ Flat curvature vs. shaft angle | Σ swept 0 → 90°, worm-like flank | rises monotonically off zero; the line shortens into an ellipse rather than jumping to one |
