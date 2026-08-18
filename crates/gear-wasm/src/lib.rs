@@ -442,6 +442,74 @@ mod tests {
         assert_eq!(a, b);
     }
 
+    /// A train with two kinds of stage in it, which is what the `kind` tag on
+    /// each stage is for. The worm result has a different shape from the spur
+    /// one, and both have to survive the same boundary.
+    #[test]
+    fn a_mixed_train_crosses_the_boundary_with_both_shapes_intact() {
+        let req = r#"{"train":{
+            "input_speed": 3000.0,
+            "input_torque": 2.0,
+            "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
+            "stages": [
+              {"kind":"spur",
+               "module":1.0,"pressure_angle":20.0,"helix_angle":0.0,"friction":0.06,
+               "thickness_mod":1.0,
+               "centre_distance":{"auto":true,"manual":0.0},
+               "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
+               "gears":[
+                 {"teeth":17,"profile_shift":{"auto":true,"manual":0.0},"working_depth":1.0,
+                  "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
+                  "dedendum":1.25,"root_radius":0.38,
+                  "face_width":{"auto":true,"manual":0.0},
+                  "auto_face_from_bending":true,"auto_face_from_contact":true,
+                  "material":"4340 Hardened Steel"},
+                 {"teeth":43,"profile_shift":{"auto":true,"manual":0.0},"working_depth":1.0,
+                  "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
+                  "dedendum":1.25,"root_radius":0.38,
+                  "face_width":{"auto":true,"manual":0.0},
+                  "auto_face_from_bending":true,"auto_face_from_contact":true,
+                  "material":"4340 Hardened Steel"}
+               ]},
+              {"kind":"worm",
+               "module":1.0,"pressure_angle":20.0,"shaft_angle":90.0,"friction":0.06,
+               "starts":1,"worm_pitch_diameter":7.0,"wheel_teeth":40,
+               "centre_distance":{"auto":true,"manual":0.0},
+               "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
+               "axial_clearance":0.04,
+               "worm":{"face_width":10.0,"material":"4340 Hardened Steel"},
+               "wheel":{"face_width":10.0,"material":"Brass C360"}}
+            ]}}"#;
+
+        let v: serde_json::Value = serde_json::from_str(&solve_train_impl(req).unwrap()).unwrap();
+        let want = (43.0 / 17.0) * 40.0;
+        assert!((v["total_ratio"].as_f64().unwrap() - want).abs() < 1e-9);
+
+        // Each stage says what it is, and carries its own shape.
+        assert_eq!(v["stages"][0]["kind"], "spur");
+        assert_eq!(v["stages"][1]["kind"], "worm");
+        assert!(
+            v["stages"][0]["gears"][0]["bending_stress"]
+                .as_f64()
+                .unwrap()
+                > 0.0
+        );
+
+        let worm = &v["stages"][1];
+        assert!(
+            worm["gears"].is_null(),
+            "a worm stage has members, not gears"
+        );
+        assert!(worm["contact"]["max_pressure"].as_f64().unwrap() > 0.0);
+        assert!(
+            worm["efficiency_backward"].as_f64().unwrap()
+                < worm["efficiency_forward"].as_f64().unwrap()
+        );
+        // The sliding speed could only be filled once the shaft line was known.
+        assert!(worm["sliding_velocity"].as_f64().unwrap() > 0.0);
+        assert!(worm["members"][1]["speed"].as_f64().unwrap() > 0.0);
+    }
+
     #[test]
     fn a_two_stage_train_crosses_the_boundary() {
         // The shape the UI will send: a train, and no library, meaning "use the
@@ -451,7 +519,8 @@ mod tests {
             "input_torque": 2.0,
             "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
             "stages": [
-              {"module":1.0,"pressure_angle":20.0,"helix_angle":0.0,"friction":0.06,
+              {"kind":"spur",
+               "module":1.0,"pressure_angle":20.0,"helix_angle":0.0,"friction":0.06,
                "thickness_mod":1.0,
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,

@@ -25,7 +25,7 @@ fn main() {
         Some("matrix") => matrix_report(),
         Some("loadcase") => loadcase_report(),
         Some("materials") => materials(),
-        Some("train") => train_report(),
+        Some("train") => train_report(args.get(1).map(String::as_str) == Some("mixed")),
         Some("wormstage") => worm_stage_report(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(1),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(40),
@@ -69,9 +69,11 @@ fn main() {
 }
 
 /// A two-stage geartrain, end to end — milestone 6's gate.
-fn train_report() {
+fn train_report(mixed: bool) {
     use gear_core::params::Auto;
-    use gear_core::train::{solve_train, Actuation, SpurStage, StageGear, Train};
+    use gear_core::train::{
+        solve_train, Actuation, SpurStage, Stage, StageGear, StageResult, Train, WormStage,
+    };
 
     let lib = gear_io::default_library();
     let auto_width = |teeth: u32| StageGear {
@@ -86,17 +88,33 @@ fn train_report() {
             operating_percent: 80.0,
             runtime_hours: 1000.0,
         },
-        stages: vec![
-            SpurStage {
-                gears: [auto_width(17), auto_width(43)],
-                ..SpurStage::default()
-            },
-            SpurStage {
-                helix_angle: 15.0,
-                gears: [auto_width(13), auto_width(31)],
-                ..SpurStage::default()
-            },
-        ],
+        stages: if mixed {
+            vec![
+                Stage::Spur(SpurStage {
+                    gears: [auto_width(17), auto_width(43)],
+                    ..SpurStage::default()
+                }),
+                Stage::Worm(WormStage {
+                    wheel: gear_core::train::WormMember {
+                        material: "Brass C360".into(),
+                        ..gear_core::train::WormMember::default()
+                    },
+                    ..WormStage::default()
+                }),
+            ]
+        } else {
+            vec![
+                Stage::Spur(SpurStage {
+                    gears: [auto_width(17), auto_width(43)],
+                    ..SpurStage::default()
+                }),
+                Stage::Spur(SpurStage {
+                    helix_angle: 15.0,
+                    gears: [auto_width(13), auto_width(31)],
+                    ..SpurStage::default()
+                }),
+            ]
+        },
     };
 
     let r = match solve_train(&train, &lib) {
@@ -122,49 +140,96 @@ fn train_report() {
     );
 
     for (k, s) in r.stages.iter().enumerate() {
-        let st = &train.stages[k];
-        println!(
-            "\nstage {}  z {}/{}  beta {} deg  ratio {:.4}  a_w {:.4} mm{}",
-            k + 1,
-            st.gears[0].teeth,
-            st.gears[1].teeth,
-            st.helix_angle,
-            s.ratio,
-            s.centre_distance,
-            if s.coprime { "  coprime" } else { "" }
-        );
-        println!(
-            "  contact ratio  transverse {:.4}   overlap {:.4}   total {:.4}{}",
-            s.contact_ratios.transverse,
-            s.contact_ratios.overlap,
-            s.contact_ratios.total,
-            if st.helix_angle != 0.0 && !s.contact_ratios.has_full_axial_overlap() {
-                "   <- no full axial overlap"
-            } else {
-                ""
-            }
-        );
-        println!("  efficiency {:.3} %", 100.0 * s.efficiency);
-        println!(
-            "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>10} {:>9} {:>12}",
-            "gear", "x", "b mm", "torque Nm", "sigma_F", "sigma_H", "rpm", "cycles"
-        );
-        for (i, g) in s.gears.iter().enumerate() {
-            println!(
-                "  {:<6} {:>8.4} {:>8.3} {:>10.4} {:>6.1} MPa {:>5.1} MPa {:>9.1} {:>12.3e}",
-                i + 1,
-                g.profile_shift,
-                g.face_width,
-                g.torque,
-                g.bending_stress.unwrap_or(f64::NAN),
-                g.contact_stress,
-                g.speed,
-                g.tooth_cycles
-            );
+        match (&train.stages[k], s) {
+            (Stage::Spur(st), StageResult::Spur(res)) => print_spur_stage(k, st, res),
+            (Stage::Worm(st), StageResult::Worm(res)) => print_worm_stage(k, st, res),
+            _ => println!("\nstage {}: kind and result disagree", k + 1),
         }
-        for n in &s.notes {
-            println!("  note: {n}");
+    }
+}
+
+fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::train::SpurResult) {
+    println!(
+        "\nstage {}  spur  z {}/{}  beta {} deg  ratio {:.4}  a_w {:.4} mm{}",
+        k + 1,
+        st.gears[0].teeth,
+        st.gears[1].teeth,
+        st.helix_angle,
+        s.ratio,
+        s.centre_distance,
+        if s.coprime { "  coprime" } else { "" }
+    );
+    println!(
+        "  contact ratio  transverse {:.4}   overlap {:.4}   total {:.4}{}",
+        s.contact_ratios.transverse,
+        s.contact_ratios.overlap,
+        s.contact_ratios.total,
+        if st.helix_angle != 0.0 && !s.contact_ratios.has_full_axial_overlap() {
+            "   <- no full axial overlap"
+        } else {
+            ""
         }
+    );
+    println!("  efficiency {:.3} %", 100.0 * s.efficiency);
+    println!(
+        "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>10} {:>9} {:>12}",
+        "gear", "x", "b mm", "torque Nm", "sigma_F", "sigma_H", "rpm", "cycles"
+    );
+    for (i, g) in s.gears.iter().enumerate() {
+        println!(
+            "  {:<6} {:>8.4} {:>8.3} {:>10.4} {:>6.1} MPa {:>5.1} MPa {:>9.1} {:>12.3e}",
+            i + 1,
+            g.profile_shift,
+            g.face_width,
+            g.torque,
+            g.bending_stress.unwrap_or(f64::NAN),
+            g.contact_stress,
+            g.speed,
+            g.tooth_cycles
+        );
+    }
+    for n in &s.notes {
+        println!("  note: {n}");
+    }
+}
+
+fn print_worm_stage(k: usize, st: &gear_core::train::WormStage, s: &gear_core::train::WormResult) {
+    println!(
+        "\nstage {}  worm  z {}/{}  ratio {:.4}  a {:.4} mm  lead angle {:.4} deg",
+        k + 1,
+        st.starts,
+        st.wheel_teeth,
+        s.ratio,
+        s.centre_distance,
+        s.lead_angle
+    );
+    println!(
+        "  efficiency  forward {:.3} %  backward {:.3} %{}",
+        100.0 * s.efficiency_forward,
+        100.0 * s.efficiency_backward,
+        if s.self_locking {
+            "  (self-locking)"
+        } else {
+            ""
+        }
+    );
+    println!(
+        "  contact {:.1} MPa   patch {:.4} x {:.4} mm   sliding {:.1} mm/s",
+        s.contact.max_pressure, s.contact.patch_length, s.contact.patch_width, s.sliding_velocity
+    );
+    println!(
+        "  {:<6} {:>8} {:>10} {:>9} {:>12}   material",
+        "member", "b mm", "torque Nm", "rpm", "cycles"
+    );
+    for (name, m) in ["worm", "wheel"].iter().zip(&s.members) {
+        println!(
+            "  {name:<6} {:>8.3} {:>10.4} {:>9.1} {:>12.3e}   {}",
+            m.face_width, m.torque, m.speed, m.tooth_cycles, m.material.name
+        );
+    }
+    println!("  bending not reported, flank type ZI - see DESIGN.md 4.5.1");
+    for n in &s.notes {
+        println!("  note: {n}");
     }
 }
 

@@ -113,10 +113,10 @@ pub struct GearResult {
     pub ranges: Ranges,
 }
 
-/// Everything one stage produces.
+/// Everything a parallel-axis stage produces.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct StageResult {
+pub struct SpurResult {
     /// `z₂ / z₁`.
     pub ratio: f64,
     /// Zero-backlash centre distance, mm.
@@ -226,6 +226,142 @@ pub(super) fn test_library() -> MaterialLibrary {
     }
 }
 
+/// A stage of a geartrain, of whichever kind.
+///
+/// Serialised with a `kind` tag alongside the stage's own fields, so a train
+/// file says what each stage is rather than relying on position.
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
+pub enum Stage {
+    Spur(SpurStage),
+    Worm(WormStage),
+}
+
+impl Default for Stage {
+    fn default() -> Self {
+        Self::Spur(SpurStage::default())
+    }
+}
+
+/// What a stage produced, of whichever kind.
+///
+/// **Each kind keeps its own shape.** A worm stage has no bending stress, no
+/// minimum face width from contact and two efficiencies; a spur stage has all
+/// three and one. What the train needs from either is small enough to read
+/// through the accessors below — ratio, efficiency, the backlash at the output
+/// member — so the accumulation never asks what kind it was, without every
+/// result having to pretend to be the same shape.
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
+pub enum StageResult {
+    // Both variants are boxed. A result carries material records, admissible
+    // ranges and notes, so the kinds differ in size by an order of magnitude and
+    // will keep doing so as more arrive; a `Vec<StageResult>` would otherwise
+    // pay the largest of them for every stage whatever its kind. The boxes are
+    // invisible to readers and to serde.
+    Spur(Box<SpurResult>),
+    Worm(Box<WormResult>),
+}
+
+impl StageResult {
+    /// `z₂/z₁`.
+    #[must_use]
+    pub fn ratio(&self) -> f64 {
+        match self {
+            Self::Spur(r) => r.ratio,
+            Self::Worm(r) => r.ratio,
+        }
+    }
+
+    /// The efficiency in the direction the train is driven.
+    ///
+    /// For a parallel-axis stage the two directions are equal and this is
+    /// simply *the* efficiency; for a worm it is the worm-driving one, which is
+    /// the direction a train propagates torque in.
+    #[must_use]
+    pub fn efficiency(&self) -> f64 {
+        match self {
+            Self::Spur(r) => r.efficiency,
+            Self::Worm(r) => r.efficiency_forward,
+        }
+    }
+
+    /// Angular backlash at the stage's output member, degrees.
+    #[must_use]
+    pub fn output_backlash(&self) -> Backlash {
+        match self {
+            Self::Spur(r) => r.backlash[1],
+            Self::Worm(r) => r.backlash[1],
+        }
+    }
+
+    /// The parallel-axis result, if that is what this is.
+    #[must_use]
+    pub fn as_spur(&self) -> Option<&SpurResult> {
+        match self {
+            Self::Spur(r) => Some(r),
+            Self::Worm(_) => None,
+        }
+    }
+
+    /// The worm result, if that is what this is.
+    #[must_use]
+    pub fn as_worm(&self) -> Option<&WormResult> {
+        match self {
+            Self::Worm(r) => Some(r),
+            Self::Spur(_) => None,
+        }
+    }
+
+    /// Write in the speeds and cycles, which only the whole shaft line knows.
+    ///
+    /// A worm's "tooth cycles" are revolutions: its thread is engaged
+    /// continuously rather than meeting a mate once per turn, so the count is
+    /// the same arithmetic but means something looser. It is reported because a
+    /// duty cycle has to be reported somewhere, not because a worm thread has a
+    /// fatigue life this crate can rate.
+    fn set_kinematics(&mut self, speeds: [f64; 2], cycles: [f64; 2]) {
+        match self {
+            Self::Spur(r) => {
+                for (i, g) in r.gears.iter_mut().enumerate() {
+                    g.speed = speeds[i];
+                    g.tooth_cycles = cycles[i];
+                }
+            }
+            Self::Worm(r) => {
+                for (i, m) in r.members.iter_mut().enumerate() {
+                    m.speed = speeds[i];
+                    m.tooth_cycles = cycles[i];
+                }
+                // Sliding needs a shaft speed, so it could only be filled here.
+                r.sliding_velocity = r.sliding_ratio
+                    * (speeds[0] / 60.0 * std::f64::consts::TAU)
+                    * (r.members[0].pitch_diameter / 2.0);
+            }
+        }
+    }
+}
+
+/// Solve one stage of whichever kind, given the torque on its input member.
+///
+/// # Errors
+///
+/// Whatever the stage kind reports.
+pub fn solve_any(
+    stage: &Stage,
+    input_torque: f64,
+    lib: &MaterialLibrary,
+) -> Result<StageResult, TrainError> {
+    match stage {
+        Stage::Spur(s) => solve_stage(s, input_torque, lib).map(|r| StageResult::Spur(Box::new(r))),
+        Stage::Worm(s) => {
+            solve_worm_stage(s, input_torque, lib).map(|r| StageResult::Worm(Box::new(r)))
+        }
+    }
+}
+
 /// How the train is used, which is what turns a ratio into a tooth count.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -265,7 +401,7 @@ pub struct Train {
     /// Peak input torque, N·m.
     pub input_torque: f64,
     pub actuation: Actuation,
-    pub stages: Vec<SpurStage>,
+    pub stages: Vec<Stage>,
 }
 
 /// What a train produces.
@@ -318,31 +454,31 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     let mut torque = train.input_torque;
     let mut stages = Vec::with_capacity(train.stages.len());
     for stage in &train.stages {
-        let r = solve_stage(stage, torque, lib)?;
-        torque = torque * r.ratio * r.efficiency;
+        let r = solve_any(stage, torque, lib)?;
+        torque = torque * r.ratio() * r.efficiency();
         stages.push(r);
     }
 
-    let total_ratio: f64 = stages.iter().map(|s| s.ratio).product();
-    let total_efficiency: f64 = stages.iter().map(|s| s.efficiency).product();
+    let total_ratio: f64 = stages.iter().map(StageResult::ratio).product();
+    let total_efficiency: f64 = stages.iter().map(StageResult::efficiency).product();
 
-    // --- speeds and tooth cycles, which need the whole shaft line.
-    let ratios: Vec<f64> = stages.iter().map(|s| s.ratio).collect();
+    // --- speeds and tooth cycles, which need the whole shaft line. None of this
+    // asks what kind of stage it is looking at.
+    let ratios: Vec<f64> = stages.iter().map(StageResult::ratio).collect();
     for (k, s) in stages.iter_mut().enumerate() {
         let upstream: f64 = ratios[..k].iter().product();
         let speed_in = train.input_speed / upstream;
         let speeds = [speed_in, speed_in / ratios[k]];
 
-        for (i, (gear, speed)) in s.gears.iter_mut().zip(speeds).enumerate() {
-            // The reduction between this gear and the output. Gear 0 of a stage
-            // sits before that stage's own mesh, gear 1 after it.
+        // The reduction between each member and the output. Member 0 of a stage
+        // sits before that stage's own mesh, member 1 after it.
+        let cycles = [0usize, 1].map(|i| {
             let to_output: f64 = if i == 0 {
                 ratios[k..].iter().product()
             } else {
                 ratios[k + 1..].iter().product()
             };
-            gear.speed = speed;
-            gear.tooth_cycles = match train.actuation {
+            match train.actuation {
                 Actuation::Intermittent {
                     range_degrees,
                     actuations,
@@ -351,8 +487,9 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
                     operating_percent,
                     runtime_hours,
                 } => speeds[i] * 60.0 * runtime_hours * operating_percent / 100.0,
-            };
-        }
+            }
+        });
+        s.set_kinematics(speeds, cycles);
     }
 
     // Each stage's backlash, seen from the output, divided by everything after it.
@@ -361,8 +498,8 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
             .iter()
             .enumerate()
             .map(|(k, s)| {
-                let downstream: f64 = stages[k + 1..].iter().map(|d| d.ratio).product();
-                pick(&s.backlash[1]) / downstream
+                let downstream: f64 = stages[k + 1..].iter().map(StageResult::ratio).product();
+                pick(&s.output_backlash()) / downstream
             })
             .sum()
     };
@@ -393,14 +530,27 @@ mod tests {
         super::test_library()
     }
 
+    /// These tests build spur trains, so they know the kind and say so once.
+    fn spur(r: &StageResult) -> &SpurResult {
+        r.as_spur().expect("this train's stages are all spur")
+    }
+
+    /// ...and the same for reaching into a stage's inputs.
+    fn spur_input(s: &mut Stage) -> &mut SpurStage {
+        match s {
+            Stage::Spur(st) => st,
+            Stage::Worm(_) => panic!("this train's stages are all spur"),
+        }
+    }
+
     fn two_stage() -> Train {
         Train {
             input_speed: 3000.0,
             input_torque: 2.0,
             actuation: Actuation::default(),
             stages: vec![
-                SpurStage::default(),
-                SpurStage {
+                Stage::Spur(SpurStage::default()),
+                Stage::Spur(SpurStage {
                     gears: [
                         StageGear {
                             teeth: 13,
@@ -412,7 +562,7 @@ mod tests {
                         },
                     ],
                     ..SpurStage::default()
-                },
+                }),
             ],
         }
     }
@@ -428,7 +578,7 @@ mod tests {
         assert!((r.output_speed - 3000.0 / want).abs() < 1e-9);
 
         // Every stage produced real numbers.
-        for s in &r.stages {
+        for s in r.stages.iter().map(spur) {
             assert!(s.centre_distance > 0.0);
             assert!(s.contact_ratios.transverse > 1.0);
             assert!(s.efficiency > 0.9 && s.efficiency < 1.0);
@@ -448,7 +598,7 @@ mod tests {
         let lib = library();
         let mut lossless = two_stage();
         for s in &mut lossless.stages {
-            s.friction = 0.0;
+            spur_input(s).friction = 0.0;
         }
         let ideal = solve_train(&lossless, &lib).unwrap();
         let real = solve_train(&two_stage(), &lib).unwrap();
@@ -489,7 +639,7 @@ mod tests {
 
         let loosen = |k: usize| {
             let mut t = base.clone();
-            t.stages[k].clearance *= 4.0;
+            spur_input(&mut t.stages[k]).clearance *= 4.0;
             solve_train(&t, &lib).unwrap().output_backlash.nominal
         };
 
@@ -546,14 +696,14 @@ mod tests {
         let r = solve_train(&t, &library()).unwrap();
 
         // The output gear turns exactly once per actuation.
-        let last = &r.stages[1].gears[1];
+        let last = &spur(&r.stages[1]).gears[1];
         assert!((last.tooth_cycles - 100.0).abs() < 1e-9);
 
         // Every gear upstream turns more than the one after it.
         let seq = [
-            r.stages[0].gears[0].tooth_cycles,
-            r.stages[0].gears[1].tooth_cycles,
-            r.stages[1].gears[1].tooth_cycles,
+            spur(&r.stages[0]).gears[0].tooth_cycles,
+            spur(&r.stages[0]).gears[1].tooth_cycles,
+            spur(&r.stages[1]).gears[1].tooth_cycles,
         ];
         for w in seq.windows(2) {
             assert!(w[0] > w[1], "cycles must fall towards the output: {seq:?}");
@@ -563,7 +713,7 @@ mod tests {
 
         // The two gears meshing with each other turn at different speeds but
         // share a mesh, so their cycle counts differ by exactly that stage ratio.
-        let s0 = &r.stages[0];
+        let s0 = spur(&r.stages[0]);
         assert!((s0.gears[0].tooth_cycles / s0.gears[1].tooth_cycles - s0.ratio).abs() < 1e-9);
     }
 
@@ -578,11 +728,13 @@ mod tests {
 
         // Input gear: 3000 rpm * 60 min * 2 h * 50%.
         let want = 3000.0 * 60.0 * 2.0 * 0.5;
-        assert!((r.stages[0].gears[0].tooth_cycles - want).abs() < 1e-6);
+        assert!((spur(&r.stages[0]).gears[0].tooth_cycles - want).abs() < 1e-6);
         // Speeds fall through the train, and cycles follow them.
-        assert!((r.stages[0].gears[0].speed - 3000.0).abs() < 1e-9);
-        assert!((r.stages[1].gears[1].speed - r.output_speed).abs() < 1e-9);
-        assert!(r.stages[1].gears[1].tooth_cycles < r.stages[0].gears[0].tooth_cycles);
+        assert!((spur(&r.stages[0]).gears[0].speed - 3000.0).abs() < 1e-9);
+        assert!((spur(&r.stages[1]).gears[1].speed - r.output_speed).abs() < 1e-9);
+        assert!(
+            spur(&r.stages[1]).gears[1].tooth_cycles < spur(&r.stages[0]).gears[0].tooth_cycles
+        );
     }
 
     /// The automatic addendum, exercised through a whole stage rather than in

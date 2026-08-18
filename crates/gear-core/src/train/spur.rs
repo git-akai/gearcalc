@@ -6,7 +6,7 @@
 //! of *any* kind produces — [`StageResult`], [`GearResult`], [`Backlash`] — and
 //! the train that strings them together.
 
-use super::{Backlash, ContactRatios, GearResult, StageResult, TrainError};
+use super::{Backlash, ContactRatios, GearResult, SpurResult, TrainError};
 use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift};
 use crate::contact::{efficiency, ContactPath};
 use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
@@ -181,7 +181,7 @@ pub fn solve_stage(
     stage: &SpurStage,
     input_torque: f64,
     lib: &MaterialLibrary,
-) -> Result<StageResult, TrainError> {
+) -> Result<SpurResult, TrainError> {
     let p = [stage.params(0), stage.params(1)];
     let g = [Gear::new(p[0]), Gear::new(p[1])];
     let mesh = Mesh::new(&g[0], &g[1], MeshKind::External).map_err(TrainError::Mesh)?;
@@ -304,7 +304,7 @@ pub fn solve_stage(
         ));
     }
 
-    Ok(StageResult {
+    Ok(SpurResult {
         ratio: f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth),
         centre_distance_nominal: mesh.a_w,
         centre_distance: centre,

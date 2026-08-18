@@ -351,6 +351,7 @@ export interface StageGear {
 }
 
 export interface SpurStage {
+  kind: "spur";
   module: number;
   pressure_angle: number;
   helix_angle: number;
@@ -363,11 +364,37 @@ export interface SpurStage {
   gears: [StageGear, StageGear];
 }
 
+export interface WormMember {
+  face_width: number;
+  material: string;
+  material_overrides: Overrides;
+}
+export interface WormStage {
+  kind: "worm";
+  module: number;
+  pressure_angle: number;
+  shaft_angle: number;
+  friction: number;
+  starts: number;
+  worm_pitch_diameter: number;
+  wheel_teeth: number;
+  centre_distance: Auto<number>;
+  clearance: number;
+  tolerance_plus: number;
+  tolerance_minus: number;
+  axial_clearance: number;
+  worm: WormMember;
+  wheel: WormMember;
+}
+
+/** A stage of either kind. The `kind` tag is what Rust's enum serialises as. */
+export type Stage = SpurStage | WormStage;
+
 export interface Train {
   input_speed: number;
   input_torque: number;
   actuation: Actuation;
-  stages: SpurStage[];
+  stages: Stage[];
 }
 
 export interface ContactRatios {
@@ -395,7 +422,8 @@ export interface GearResult {
   material: Material;
   ranges: Ranges;
 }
-export interface StageResult {
+export interface SpurResult {
+  kind: "spur";
   ratio: number;
   centre_distance_nominal: number;
   centre_distance: number;
@@ -406,6 +434,50 @@ export interface StageResult {
   gears: [GearResult, GearResult];
   notes: string[];
 }
+export interface WormMemberResult {
+  torque: number;
+  speed: number;
+  tooth_cycles: number;
+  face_width: number;
+  pitch_diameter: number;
+  material: Material;
+}
+export interface WormContact {
+  max_pressure: number;
+  patch_length: number;
+  patch_width: number;
+  curvature_along: number;
+  curvature_across: number;
+}
+export interface WormResult {
+  kind: "worm";
+  ratio: number;
+  centre_distance_nominal: number;
+  centre_distance: number;
+  lead_angle: number;
+  wheel_lead_angle: number;
+  wheel_helix_angle: number;
+  lead: number;
+  axial_module: number;
+  efficiency_forward: number;
+  efficiency_backward: number;
+  self_locking: boolean;
+  self_locking_friction: number;
+  sliding_ratio: number;
+  sliding_velocity: number;
+  contact: WormContact;
+  backlash: [Backlash, Backlash];
+  members: [WormMemberResult, WormMemberResult];
+  notes: string[];
+}
+
+/**
+ * What a stage produced. Each kind keeps its own shape — a worm stage has no
+ * bending stress and two efficiencies — so this is a tagged union rather than
+ * one interface with everything optional.
+ */
+export type StageResult = SpurResult | WormResult;
+
 export interface TrainResult {
   total_ratio: number;
   output_speed: number;
@@ -439,8 +511,39 @@ export function defaultStageGear(teeth: number): StageGear {
   };
 }
 
+export function defaultWormStage(): WormStage {
+  const member = (material: string): WormMember => ({
+    face_width: 10,
+    material,
+    material_overrides: {
+      density: null,
+      elastic_modulus: null,
+      poissons_ratio: null,
+      ultimate_allowable: null,
+      fatigue_allowable: null,
+    },
+  });
+  return {
+    kind: "worm",
+    module: 1,
+    pressure_angle: 20,
+    shaft_angle: 90,
+    friction: 0.06,
+    starts: 1,
+    worm_pitch_diameter: 7,
+    wheel_teeth: 40,
+    centre_distance: { auto: true, manual: 0 },
+    clearance: 0.02,
+    tolerance_plus: 0.02,
+    tolerance_minus: 0.02,
+    axial_clearance: 0.04,
+    worm: member("4340 Hardened Steel"),
+    wheel: member("Brass C360"),
+  };
+}
 export function defaultStage(): SpurStage {
   return {
+    kind: "spur",
     module: 1,
     pressure_angle: 20,
     helix_angle: 0,

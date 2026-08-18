@@ -2,6 +2,7 @@
   import {
     solveTrain,
     defaultStage,
+    defaultWormStage,
     outside,
     type Auto,
     type Overrides,
@@ -33,6 +34,11 @@
 
   function addStage() {
     tab.train.stages.push(defaultStage());
+    open[tab.train.stages.length - 1] = true;
+  }
+
+  function addWormStage() {
+    tab.train.stages.push(defaultWormStage());
     open[tab.train.stages.length - 1] = true;
   }
 
@@ -231,233 +237,435 @@
   {#each tab.train.stages as stage, i (i)}
     {@const res = "ok" in result ? result.ok.stages[i] : null}
     <section class="stage">
-      <button class="head" onclick={() => (open[i] = !open[i])}>
-        <span class="caret">{open[i] ? "▾" : "▸"}</span>
-        <strong>Stage {i + 1}</strong>
-        <span class="teeth">z {stage.gears[0].teeth} / {stage.gears[1].teeth}</span>
-        {#if res}
-          <span class="ratio">{res.ratio.toFixed(4)} : 1</span>
-          <span class="eff">{pct(res.efficiency)} %</span>
-        {/if}
-      </button>
+      {#if stage.kind === "spur"}
+        {@const sres = res && res.kind === "spur" ? res : null}
+        <button class="head" onclick={() => (open[i] = !open[i])}>
+          <span class="caret">{open[i] ? "▾" : "▸"}</span>
+          <strong>Stage {i + 1}</strong>
+          <span class="teeth">z {stage.gears[0].teeth} / {stage.gears[1].teeth}</span>
+          {#if sres}
+            <span class="ratio">{sres.ratio.toFixed(4)} : 1</span>
+            <span class="eff">{pct(sres.efficiency)} %</span>
+          {/if}
+        </button>
 
-      {#if open[i]}
-        <div class="body">
-          <div class="grid shared">
-            <label>
-              <span>Normal module</span>
-              <input type="number" step="0.1" bind:value={stage.module} />
-              <em>mm</em>
-            </label>
-            <label>
-              <span>Pressure angle</span>
-              <input type="number" step="0.5" bind:value={stage.pressure_angle} />
-              <em>°</em>
-            </label>
-            <label>
-              <span>Helix angle</span>
-              <input type="number" step="1" bind:value={stage.helix_angle} />
-              <em>°</em>
-            </label>
-            <label>
-              <span>Coefficient of friction</span>
-              <input type="number" step="0.01" bind:value={stage.friction} />
-              <em></em>
-            </label>
-            <label>
-              <span>Tooth thickness mod.</span>
-              <input type="number" step="0.05" bind:value={stage.thickness_mod} />
-              <em>k₁</em>
-            </label>
-            {@render autoNumber("C2C distance", stage.centre_distance, res?.centre_distance, 0.1)}
-            <label>
-              <span>C2C clearance</span>
-              <input
-                type="number"
-                step="0.01"
-                bind:value={stage.clearance}
-                disabled={!stage.centre_distance.auto}
-                class:computed={!stage.centre_distance.auto}
-              />
-              <em>mm</em>
-            </label>
-            <label>
-              <span>C2C tolerance +</span>
-              <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
-              <em>mm</em>
-            </label>
-            <label>
-              <span>C2C tolerance −</span>
-              <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
-              <em>mm</em>
-            </label>
+        {#if open[i]}
+          <div class="body">
+            <div class="grid shared">
+              <label>
+                <span>Normal module</span>
+                <input type="number" step="0.1" bind:value={stage.module} />
+                <em>mm</em>
+              </label>
+              <label>
+                <span>Pressure angle</span>
+                <input type="number" step="0.5" bind:value={stage.pressure_angle} />
+                <em>°</em>
+              </label>
+              <label>
+                <span>Helix angle</span>
+                <input type="number" step="1" bind:value={stage.helix_angle} />
+                <em>°</em>
+              </label>
+              <label>
+                <span>Coefficient of friction</span>
+                <input type="number" step="0.01" bind:value={stage.friction} />
+                <em></em>
+              </label>
+              <label>
+                <span>Tooth thickness mod.</span>
+                <input type="number" step="0.05" bind:value={stage.thickness_mod} />
+                <em>k₁</em>
+              </label>
+              {@render autoNumber("C2C distance", stage.centre_distance, sres?.centre_distance, 0.1)}
+              <label>
+                <span>C2C clearance</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  bind:value={stage.clearance}
+                  disabled={!stage.centre_distance.auto}
+                  class:computed={!stage.centre_distance.auto}
+                />
+                <em>mm</em>
+              </label>
+              <label>
+                <span>C2C tolerance +</span>
+                <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
+                <em>mm</em>
+              </label>
+              <label>
+                <span>C2C tolerance −</span>
+                <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
+                <em>mm</em>
+              </label>
+            </div>
+            <!-- Clearance is meaningless once the centre distance is set by hand:
+                 the specification locks it to zero, and so does the solver. -->
+
+            <div class="gears">
+              {#each stage.gears as gear, j (j)}
+                {@const g = sres?.gears[j]}
+                <div class="gear">
+                  <h4>Gear {gearNumber(i, j)}</h4>
+                  <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
+                    <span>Tooth count</span>
+                    <input type="number" step="1" bind:value={gear.teeth} />
+                  </label>
+                  <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
+                    <span>Dedendum</span>
+                    <input type="number" step="0.05" bind:value={gear.dedendum} />
+                    {#if g}
+                      {@const bad = outside(gear.dedendum, g.ranges.dedendum)}
+                      <small class:err={bad}>
+                        {bad ?? `${n(g.ranges.dedendum.min ?? 0)} … ${n(g.ranges.dedendum.max ?? 0)}`}
+                      </small>
+                    {/if}
+                  </label>
+                  <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
+                    <span>Root radius</span>
+                    <input type="number" step="0.01" bind:value={gear.root_radius} />
+                    {#if g}
+                      {@const bad = outside(gear.root_radius, g.ranges.root_radius)}
+                      <small class:err={bad}>
+                        {bad ?? `up to ${n(g.ranges.root_radius.max ?? 0)} · fillet must fit`}
+                      </small>
+                    {/if}
+                  </label>
+                  {@render autoNumber("Profile shift", gear.profile_shift, g?.profile_shift, 0.05)}
+                  {#if gear.profile_shift.auto}
+                    <label class="sub">
+                      <span>Working tooth depth</span>
+                      <input type="number" step="0.05" bind:value={gear.working_depth} />
+                      <em>module</em>
+                    </label>
+                  {/if}
+                  {#if g && !gear.profile_shift.auto}
+                    {@const r = g.ranges.profile_shift}
+                    {@const bad = outside(gear.profile_shift.manual, r.bound)}
+                    <p class="hint" class:err={bad}>
+                      {bad ??
+                        `buildable ${n(r.bound.min ?? 0)} … ${n(r.bound.max ?? 0)} · undercut below ${n(r.undercut)}`}
+                    </p>
+                  {/if}
+                  {@render autoNumber("Addendum", gear.addendum, g?.addendum, 0.05)}
+                  {#if gear.addendum.auto}
+                    <label class="sub">
+                      <span>Minimum tip width</span>
+                      <input type="number" step="0.02" bind:value={gear.min_tip_width} />
+                      <em>mm</em>
+                    </label>
+                  {/if}
+                  {@render autoNumber("Face width", gear.face_width, g?.face_width, 0.5)}
+                  {#if gear.face_width.auto}
+                    <div class="subtoggles">
+                      <label class="check">
+                        <input type="checkbox" bind:checked={gear.auto_face_from_bending} />
+                        <span>from bending</span>
+                      </label>
+                      <label class="check">
+                        <input type="checkbox" bind:checked={gear.auto_face_from_contact} />
+                        <span>from contact</span>
+                      </label>
+                    </div>
+                  {/if}
+                  <label>
+                    <span>Material</span>
+                    <select bind:value={gear.material}>
+                      {#each library.materials.material as m (m.name)}
+                        <option value={m.name}>{m.name}</option>
+                      {/each}
+                    </select>
+                  </label>
+
+                  {#if g}
+                    <div class="props">
+                      {@render property("Density", gear, "density", g.material.density, 10, "kg/m³")}
+                      {@render property("Elastic modulus", gear, "elastic_modulus", g.material.elastic_modulus, 100, "MPa")}
+                      {@render property("Poisson's ratio", gear, "poissons_ratio", g.material.poissons_ratio, 0.01, "")}
+                      {@render property("Ultimate allowable", gear, "ultimate_allowable", g.material.ultimate_allowable, 10, "MPa")}
+                      {@render property("Fatigue allowable", gear, "fatigue_allowable", g.material.fatigue_allowable, 10, "MPa")}
+                    </div>
+                    <dl class="out small">
+                      <dt>Torque</dt>
+                      <dd>{g.torque.toFixed(4)} Nm</dd>
+                      <dt>Speed</dt>
+                      <dd>{g.speed.toFixed(1)} rpm</dd>
+                      <dt>Tooth cycles</dt>
+                      <dd>{Math.ceil(g.tooth_cycles).toLocaleString()}</dd>
+                      <dt>Bending stress</dt>
+                      <dd>
+                        {g.bending_stress === null
+                          ? "—"
+                          : `${g.bending_stress.toFixed(1)} MPa`}
+                      </dd>
+                      <dt>Contact stress</dt>
+                      <dd>{g.contact_stress.toFixed(1)} MPa</dd>
+                      <dt>Min face width</dt>
+                      <dd>
+                        {g.min_face_width_bending === null
+                          ? "—"
+                          : `${g.min_face_width_bending.toFixed(3)}`} /
+                        {g.min_face_width_contact.toFixed(3)} mm
+                        <small>bending / contact</small>
+                      </dd>
+                    </dl>
+                    {#if g.clamps.length}
+                      <ul class="notes">
+                        {#each g.clamps as c (c)}<li>{c}</li>{/each}
+                      </ul>
+                    {/if}
+                  {/if}
+                </div>
+              {/each}
+            </div>
+
+            {#if sres}
+              <dl class="out">
+                <dt>Centre distance</dt>
+                <dd>
+                  {sres.centre_distance.toFixed(4)} mm
+                  <small>nominal {sres.centre_distance_nominal.toFixed(4)}</small>
+                </dd>
+                <dt>Contact ratio</dt>
+                <dd>
+                  ε<sub>α</sub> {sres.contact_ratios.transverse.toFixed(4)} · ε<sub>β</sub>
+                  {sres.contact_ratios.overlap.toFixed(4)} · ε<sub>γ</sub>
+                  {sres.contact_ratios.total.toFixed(4)}
+                  {#if stage.helix_angle !== 0 && sres.contact_ratios.overlap < 1}
+                    <small class="warn">no full axial overlap</small>
+                  {/if}
+                </dd>
+                <dt>Mesh efficiency</dt>
+                <dd>{pct(sres.efficiency)} %</dd>
+                <dt>Backlash</dt>
+                <dd>
+                  {sres.backlash[1].nominal.toFixed(5)}° at gear {gearNumber(i, 1)}
+                  <small
+                    >({sres.backlash[1].minimum.toFixed(5)} – {sres.backlash[1].maximum.toFixed(5)})</small
+                  >
+                </dd>
+                <dt>Coprime</dt>
+                <dd>{sres.coprime ? "yes" : "no"}</dd>
+              </dl>
+              {#if sres.notes.length}
+                <ul class="notes">
+                  {#each sres.notes as n (n)}<li>{n}</li>{/each}
+                </ul>
+              {/if}
+            {/if}
+
+            <button
+              class="danger small"
+              onclick={() => removeStage(i)}
+              disabled={tab.train.stages.length === 1}>Remove stage</button
+            >
           </div>
-          <!-- Clearance is meaningless once the centre distance is set by hand:
-               the specification locks it to zero, and so does the solver. -->
+        {/if}
+      {:else}
+        {@const wres = res && res.kind === "worm" ? res : null}
+        <button class="head" onclick={() => (open[i] = !open[i])}>
+          <span class="caret">{open[i] ? "▾" : "▸"}</span>
+          <strong>Stage {i + 1}</strong>
+          <span class="kind">worm</span>
+          <span class="teeth">z {stage.starts} / {stage.wheel_teeth}</span>
+          {#if wres}
+            <span class="ratio">{wres.ratio.toFixed(4)} : 1</span>
+            <span class="eff">{pct(wres.efficiency_forward)} %</span>
+          {/if}
+        </button>
 
-          <div class="gears">
-            {#each stage.gears as gear, j (j)}
-              {@const g = res?.gears[j]}
+        {#if open[i]}
+          <div class="body">
+            <div class="grid shared">
+              <label>
+                <span>Normal module</span>
+                <input type="number" step="0.1" bind:value={stage.module} />
+                <em>mm</em>
+              </label>
+              <label>
+                <span>Pressure angle</span>
+                <input type="number" step="0.5" bind:value={stage.pressure_angle} />
+                <em>°</em>
+              </label>
+              <label>
+                <span>Axis angle</span>
+                <input type="number" step="1" bind:value={stage.shaft_angle} />
+                <em>°</em>
+              </label>
+              <label>
+                <span>Coefficient of friction</span>
+                <input type="number" step="0.01" bind:value={stage.friction} />
+                <em></em>
+              </label>
+              {@render autoNumber("C2C distance", stage.centre_distance, wres?.centre_distance, 0.1)}
+              <label>
+                <span>C2C clearance</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  bind:value={stage.clearance}
+                  disabled={!stage.centre_distance.auto}
+                  class:computed={!stage.centre_distance.auto}
+                />
+                <em>mm</em>
+              </label>
+              <label>
+                <span>C2C tolerance +</span>
+                <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
+                <em>mm</em>
+              </label>
+              <label>
+                <span>C2C tolerance −</span>
+                <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
+                <em>mm</em>
+              </label>
+              <label>
+                <span>Worm axial clearance</span>
+                <input type="number" step="0.01" bind:value={stage.axial_clearance} />
+                <em>mm</em>
+              </label>
+            </div>
+
+            <div class="gears">
               <div class="gear">
-                <h4>Gear {gearNumber(i, j)}</h4>
-                <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
-                  <span>Tooth count</span>
-                  <input type="number" step="1" bind:value={gear.teeth} />
+                <h4>Worm</h4>
+                <label>
+                  <span>Starts</span>
+                  <input type="number" step="1" bind:value={stage.starts} />
                 </label>
-                <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
-                  <span>Dedendum</span>
-                  <input type="number" step="0.05" bind:value={gear.dedendum} />
-                  {#if g}
-                    {@const bad = outside(gear.dedendum, g.ranges.dedendum)}
-                    <small class:err={bad}>
-                      {bad ?? `${n(g.ranges.dedendum.min ?? 0)} … ${n(g.ranges.dedendum.max ?? 0)}`}
-                    </small>
-                  {/if}
+                <label>
+                  <span>Pitch diameter</span>
+                  <input type="number" step="0.5" bind:value={stage.worm_pitch_diameter} />
+                  <em>mm</em>
                 </label>
-                <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
-                  <span>Root radius</span>
-                  <input type="number" step="0.01" bind:value={gear.root_radius} />
-                  {#if g}
-                    {@const bad = outside(gear.root_radius, g.ranges.root_radius)}
-                    <small class:err={bad}>
-                      {bad ?? `up to ${n(g.ranges.root_radius.max ?? 0)} · fillet must fit`}
-                    </small>
-                  {/if}
+                <label>
+                  <span>Length</span>
+                  <input type="number" step="1" bind:value={stage.worm.face_width} />
+                  <em>mm</em>
                 </label>
-                {@render autoNumber("Profile shift", gear.profile_shift, g?.profile_shift, 0.05)}
-                {#if gear.profile_shift.auto}
-                  <label class="sub">
-                    <span>Working tooth depth</span>
-                    <input type="number" step="0.05" bind:value={gear.working_depth} />
-                    <em>module</em>
-                  </label>
-                {/if}
-                {#if g && !gear.profile_shift.auto}
-                  {@const r = g.ranges.profile_shift}
-                  {@const bad = outside(gear.profile_shift.manual, r.bound)}
-                  <p class="hint" class:err={bad}>
-                    {bad ??
-                      `buildable ${n(r.bound.min ?? 0)} … ${n(r.bound.max ?? 0)} · undercut below ${n(r.undercut)}`}
-                  </p>
-                {/if}
-                {@render autoNumber("Addendum", gear.addendum, g?.addendum, 0.05)}
-                {#if gear.addendum.auto}
-                  <label class="sub">
-                    <span>Minimum tip width</span>
-                    <input type="number" step="0.02" bind:value={gear.min_tip_width} />
-                    <em>mm</em>
-                  </label>
-                {/if}
-                {@render autoNumber("Face width", gear.face_width, g?.face_width, 0.5)}
-                {#if gear.face_width.auto}
-                  <div class="subtoggles">
-                    <label class="check">
-                      <input type="checkbox" bind:checked={gear.auto_face_from_bending} />
-                      <span>from bending</span>
-                    </label>
-                    <label class="check">
-                      <input type="checkbox" bind:checked={gear.auto_face_from_contact} />
-                      <span>from contact</span>
-                    </label>
-                  </div>
-                {/if}
                 <label>
                   <span>Material</span>
-                  <select bind:value={gear.material}>
+                  <select bind:value={stage.worm.material}>
                     {#each library.materials.material as m (m.name)}
                       <option value={m.name}>{m.name}</option>
                     {/each}
                   </select>
                 </label>
-
-                {#if g}
-                  <div class="props">
-                    {@render property("Density", gear, "density", g.material.density, 10, "kg/m³")}
-                    {@render property("Elastic modulus", gear, "elastic_modulus", g.material.elastic_modulus, 100, "MPa")}
-                    {@render property("Poisson's ratio", gear, "poissons_ratio", g.material.poissons_ratio, 0.01, "")}
-                    {@render property("Ultimate allowable", gear, "ultimate_allowable", g.material.ultimate_allowable, 10, "MPa")}
-                    {@render property("Fatigue allowable", gear, "fatigue_allowable", g.material.fatigue_allowable, 10, "MPa")}
-                  </div>
-                  <dl class="out small">
+                {#if wres}
+                  <dl class="out">
+                    <dt>Lead angle</dt>
+                    <dd>{wres.lead_angle.toFixed(4)}°</dd>
+                    <dt>Lead</dt>
+                    <dd>{wres.lead.toFixed(4)} mm</dd>
                     <dt>Torque</dt>
-                    <dd>{g.torque.toFixed(4)} Nm</dd>
+                    <dd>{wres.members[0].torque.toFixed(4)} N·m</dd>
                     <dt>Speed</dt>
-                    <dd>{g.speed.toFixed(1)} rpm</dd>
-                    <dt>Tooth cycles</dt>
-                    <dd>{Math.ceil(g.tooth_cycles).toLocaleString()}</dd>
-                    <dt>Bending stress</dt>
-                    <dd>
-                      {g.bending_stress === null
-                        ? "—"
-                        : `${g.bending_stress.toFixed(1)} MPa`}
-                    </dd>
-                    <dt>Contact stress</dt>
-                    <dd>{g.contact_stress.toFixed(1)} MPa</dd>
-                    <dt>Min face width</dt>
-                    <dd>
-                      {g.min_face_width_bending === null
-                        ? "—"
-                        : `${g.min_face_width_bending.toFixed(3)}`} /
-                      {g.min_face_width_contact.toFixed(3)} mm
-                      <small>bending / contact</small>
-                    </dd>
+                    <dd>{wres.members[0].speed.toFixed(1)} rpm</dd>
+                    <dt>Backlash</dt>
+                    <dd>{wres.backlash[0].nominal.toFixed(5)}°</dd>
                   </dl>
-                  {#if g.clamps.length}
-                    <ul class="notes">
-                      {#each g.clamps as c (c)}<li>{c}</li>{/each}
-                    </ul>
-                  {/if}
                 {/if}
               </div>
-            {/each}
-          </div>
 
-          {#if res}
-            <dl class="out">
-              <dt>Centre distance</dt>
-              <dd>
-                {res.centre_distance.toFixed(4)} mm
-                <small>nominal {res.centre_distance_nominal.toFixed(4)}</small>
-              </dd>
-              <dt>Contact ratio</dt>
-              <dd>
-                ε<sub>α</sub> {res.contact_ratios.transverse.toFixed(4)} · ε<sub>β</sub>
-                {res.contact_ratios.overlap.toFixed(4)} · ε<sub>γ</sub>
-                {res.contact_ratios.total.toFixed(4)}
-                {#if stage.helix_angle !== 0 && res.contact_ratios.overlap < 1}
-                  <small class="warn">no full axial overlap</small>
+              <div class="gear">
+                <h4>Wormwheel</h4>
+                <label>
+                  <span>Tooth count</span>
+                  <input type="number" step="1" bind:value={stage.wheel_teeth} />
+                </label>
+                <label>
+                  <span>Face width</span>
+                  <input type="number" step="1" bind:value={stage.wheel.face_width} />
+                  <em>mm</em>
+                </label>
+                <label>
+                  <span>Material</span>
+                  <select bind:value={stage.wheel.material}>
+                    {#each library.materials.material as m (m.name)}
+                      <option value={m.name}>{m.name}</option>
+                    {/each}
+                  </select>
+                </label>
+                {#if wres}
+                  <dl class="out">
+                    <dt>Helix angle</dt>
+                    <dd>{wres.wheel_helix_angle.toFixed(4)}°</dd>
+                    <dt>Pitch diameter</dt>
+                    <dd>{wres.members[1].pitch_diameter.toFixed(4)} mm</dd>
+                    <dt>Torque</dt>
+                    <dd>{wres.members[1].torque.toFixed(4)} N·m</dd>
+                    <dt>Speed</dt>
+                    <dd>{wres.members[1].speed.toFixed(1)} rpm</dd>
+                    <dt>Backlash</dt>
+                    <dd>{wres.backlash[1].nominal.toFixed(5)}°</dd>
+                  </dl>
                 {/if}
-              </dd>
-              <dt>Mesh efficiency</dt>
-              <dd>{pct(res.efficiency)} %</dd>
-              <dt>Backlash</dt>
-              <dd>
-                {res.backlash[1].nominal.toFixed(5)}° at gear {gearNumber(i, 1)}
-                <small
-                  >({res.backlash[1].minimum.toFixed(5)} – {res.backlash[1].maximum.toFixed(5)})</small
-                >
-              </dd>
-              <dt>Coprime</dt>
-              <dd>{res.coprime ? "yes" : "no"}</dd>
-            </dl>
-            {#if res.notes.length}
-              <ul class="notes">
-                {#each res.notes as n (n)}<li>{n}</li>{/each}
-              </ul>
-            {/if}
-          {/if}
+              </div>
+            </div>
 
-          <button
-            class="danger small"
-            onclick={() => removeStage(i)}
-            disabled={tab.train.stages.length === 1}>Remove stage</button
-          >
-        </div>
+            {#if wres}
+              <dl class="out">
+                <dt>Centre distance</dt>
+                <dd>
+                  {wres.centre_distance.toFixed(4)} mm
+                  <small>nominal {wres.centre_distance_nominal.toFixed(4)}</small>
+                </dd>
+                <dt>Mesh efficiency</dt>
+                <dd>
+                  {pct(wres.efficiency_forward)} % driving
+                  · {pct(wres.efficiency_backward)} % back-driven
+                  {#if wres.self_locking}
+                    <small class="warn">self-locking</small>
+                  {/if}
+                </dd>
+                <dt>Self-locks at μ</dt>
+                <dd>{wres.self_locking_friction.toFixed(4)}</dd>
+                <dt>Contact stress</dt>
+                <dd>
+                  {wres.contact.max_pressure.toFixed(1)} MPa
+                  <small>
+                    patch {wres.contact.patch_length.toFixed(4)} × {wres.contact.patch_width.toFixed(
+                      4,
+                    )} mm
+                  </small>
+                </dd>
+                <dt>Sliding speed</dt>
+                <dd>{wres.sliding_velocity.toFixed(1)} mm/s</dd>
+                <dt>Bending stress</dt>
+                <dd>
+                  <small
+                    >not reported — a worm wheel's tooth form and load case are not the ones this
+                    bending model measures (DESIGN §4.5.1)</small
+                  >
+                </dd>
+                <dt>Flank type</dt>
+                <dd>
+                  ZI (involute helicoid)
+                  <small>a ZN worm's contact stress is 1–15 % lower, rising with lead angle</small>
+                </dd>
+              </dl>
+              {#if wres.notes.length}
+                <ul class="notes">
+                  {#each wres.notes as n (n)}<li>{n}</li>{/each}
+                </ul>
+              {/if}
+            {/if}
+
+            <button
+              class="danger small"
+              onclick={() => removeStage(i)}
+              disabled={tab.train.stages.length === 1}>Remove stage</button
+            >
+          </div>
+        {/if}
+
       {/if}
     </section>
   {/each}
 
   <button class="add" onclick={addStage}>+ Add spur stage</button>
+  <button class="add" onclick={addWormStage}>+ Add worm stage</button>
 </div>
 
 <style>
