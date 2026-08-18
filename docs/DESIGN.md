@@ -653,9 +653,46 @@ So the architectural call is: build **one crossed-axis screw-gear model**
 (`screw.rs`) and let both the Worm Stage and a non-zero-axis-angle Spur Stage use
 it. That collapses most of Q2's cost — crossed helical becomes nearly free once
 the worm stage exists, which is why the milestone order puts worm before it.
-The honest limitation to surface in the UI is the bending model; I would show
-point-contact Hertz and contact ratio, and mark bending as indicative with the
-derating convention named.
+
+##### Decided: a worm stage reports no bending stress at all
+
+An earlier revision of this section proposed showing the parallel-axis bending
+figure marked "indicative". **That is withdrawn.** The question that settles it
+is whether the parallel-axis number is anywhere near the real one, and there is
+no reason to think it is — for three reasons that are differences in kind, not
+factors:
+
+- **The tooth measured would not be the tooth loaded.** §4.7's whole bending
+  method is to inscribe a Lewis parabola in *the profile this crate generates*
+  and measure the form. A worm wheel's tooth is the envelope of the worm thread:
+  throated, curved along its length, with a section that changes across the face.
+  Measuring `Y_F` on a virtual parallel-axis helical gear would be measuring a
+  tooth that does not appear anywhere in the pair.
+- **The load case differs in kind.** Parallel-axis bending puts the whole load at
+  one tooth's HPSTC in the transverse plane. A worm mesh carries a point contact
+  tracking diagonally across the flank with several pairs engaged. No derating
+  factor turns one picture into the other.
+- **There would be nothing to check it against.** Worm gearing's rating standards
+  rate *durability* — AGMA 6034 and its relatives return an allowable tangential
+  load from empirical material and ratio factors — not bending. So no published
+  bending allowable exists for these materials, and a user could not audit the
+  number even in principle.
+
+The convention does exist and is worth naming rather than pretending otherwise:
+the classical estimate is a Lewis calculation on the wheel, `σ = W_t/(p_n b y)`,
+with `y` read from a four-entry table indexed by **normal pressure angle alone**.
+That is exactly the construction §4.7 rejected in favour of measuring the form —
+so adopting it for the hardest case, having refused it for the easy one, would be
+backwards. In practice worm bending is an FEA question, and the honest answer for
+a closed-form tool is silence.
+
+What the stage reports instead is what a worm drive is actually limited by:
+**contact stress** (now available in general form, §4.7), **sliding velocity** at
+the pitch point, and **mesh power loss** in both directions. Worm drives fail by
+wear and by heat far more often than by tooth breakage, and all three of those
+are computed rather than estimated. An omitted field with a stated reason is
+worth more than a number with no basis — the same standard §6 applies to material
+data, where every value must be able to say what it is.
 
 **The lead-angle note matters.** People commonly write `tan γ = z m_x/d` and then
 iterate, because `m_x = m_n/cos γ` depends on `γ`. Substituting once gives

@@ -255,15 +255,18 @@ and `sliding_velocity` already takes an arbitrary second axis. Step 5 supplies a
 different `axis_2` and a non-zero `1/R_L`; it should not need to add a branch to
 any of them.
 
-Two things milestone 7 must decide for itself:
+Both of milestone 7's open decisions are now taken:
 
 - **Efficiency is genuinely direction-dependent** for a worm, unlike every mesh
-  so far. Self-locking falls out: `η_back ≤ 0 ⟺ μ ≥ cos α_n tan γ`.
-- **Bending has no accepted analytical model for crossed axes.** Practice is to
-  derate a parallel-axis calculation, which is convention rather than derivation
-  — and the no-correction-factors policy says a derating factor is exactly what
-  this project does not adopt. Most likely: report the parallel-axis figure and
-  mark it indicative. Take that decision deliberately.
+  so far. Built: `screw.rs` derives both directions from a force balance, and
+  self-locking falls out as a sign change at `μ ≥ cos α_n tan γ`.
+- **A worm stage reports no bending stress.** Decided against showing the
+  parallel-axis figure marked indicative, because there is no reason to think it
+  is near the truth: the tooth whose form would be measured is not the tooth that
+  is loaded, the load case differs in kind rather than by a factor, and no
+  standard rates worm bending, so nothing could check it. Reasoning in DESIGN
+  §4.5.1. The stage reports contact stress, sliding velocity and power loss
+  instead — which is what worm drives are actually limited by.
 
 ### After
 
