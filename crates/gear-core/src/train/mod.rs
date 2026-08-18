@@ -25,6 +25,7 @@
 //!   rather than merely tested.
 
 use crate::auto::Ranges;
+use crate::contact::{Directional, Drive};
 use crate::material::{Material, MaterialLibrary};
 use crate::mesh::MeshError;
 
@@ -124,11 +125,17 @@ pub struct SpurResult {
     /// The centre distance actually used, including clearance.
     pub centre_distance: f64,
     pub contact_ratios: ContactRatios,
-    /// Mesh efficiency, 0..1. Equal in both directions for a parallel-axis
-    /// stage — see [`crate::contact::efficiency`].
-    pub efficiency: f64,
-    /// Angular backlash referred to each gear.
-    pub backlash: [Backlash; 2],
+    /// Mesh efficiency, 0..1, in both drive directions.
+    ///
+    /// The two are equal for a parallel-axis stage, and they are computed
+    /// independently rather than copied — see
+    /// [`crate::contact::efficiency`] for why they come out that way.
+    pub efficiency: Directional<f64>,
+    /// Angular backlash at whichever gear is the output in each direction,
+    /// degrees: gear 2 driving forward, gear 1 driving backward. The same tooth
+    /// gap subtends a different angle at each, so these differ whenever the
+    /// tooth counts do.
+    pub backlash: Directional<Backlash>,
     /// Whether the tooth counts share no factor — a hunting ratio, which spreads
     /// wear evenly instead of repeatedly pairing the same teeth.
     pub coprime: bool,
@@ -275,25 +282,29 @@ impl StageResult {
         }
     }
 
-    /// The efficiency in the direction the train is driven.
+    /// Mesh efficiency, both directions.
     ///
-    /// For a parallel-axis stage the two directions are equal and this is
-    /// simply *the* efficiency; for a worm it is the worm-driving one, which is
-    /// the direction a train propagates torque in.
+    /// A parallel-axis stage puts the same number in both and a worm does not;
+    /// the train does not have to know which is which. It takes `.forward` to
+    /// propagate torque, and reports the pair.
     #[must_use]
-    pub fn efficiency(&self) -> f64 {
+    pub fn efficiency(&self) -> Directional<f64> {
         match self {
             Self::Spur(r) => r.efficiency,
-            Self::Worm(r) => r.efficiency_forward,
+            Self::Worm(r) => r.efficiency,
         }
     }
 
-    /// Angular backlash at the stage's output member, degrees.
+    /// Angular backlash at whichever member is the *output* in each direction.
+    ///
+    /// The same tooth gap seen from two lever arms: it subtends a larger angle
+    /// at the smaller member, so a pair with different tooth counts genuinely
+    /// reports two different numbers.
     #[must_use]
-    pub fn output_backlash(&self) -> Backlash {
+    pub fn backlash(&self) -> Directional<Backlash> {
         match self {
-            Self::Spur(r) => r.backlash[1],
-            Self::Worm(r) => r.backlash[1],
+            Self::Spur(r) => r.backlash,
+            Self::Worm(r) => r.backlash,
         }
     }
 
@@ -414,10 +425,14 @@ pub struct TrainResult {
     pub output_speed: f64,
     /// Output torque, N·m, after efficiency losses.
     pub output_torque: f64,
-    /// Product of the stage efficiencies.
-    pub total_efficiency: f64,
-    /// Angular backlash referred to the **output** shaft, degrees.
-    pub output_backlash: Backlash,
+    /// Product of the stage efficiencies, in both drive directions.
+    ///
+    /// A train containing a self-locking stage cannot be back-driven at all, and
+    /// [`Directional::self_locking`] on this pair says so.
+    pub total_efficiency: Directional<f64>,
+    /// Angular backlash referred to whichever shaft is the output, degrees: the
+    /// last shaft driving forward, the first driving backward.
+    pub backlash: Directional<Backlash>,
     pub stages: Vec<StageResult>,
 }
 
@@ -455,12 +470,19 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     let mut stages = Vec::with_capacity(train.stages.len());
     for stage in &train.stages {
         let r = solve_any(stage, torque, lib)?;
-        torque = torque * r.ratio() * r.efficiency();
+        // Forward is the direction a train propagates torque in; the backward
+        // figure is reported, not applied.
+        torque = torque * r.ratio() * r.efficiency().forward;
         stages.push(r);
     }
 
     let total_ratio: f64 = stages.iter().map(StageResult::ratio).product();
-    let total_efficiency: f64 = stages.iter().map(StageResult::efficiency).product();
+    let total_efficiency = Directional::of(|d| {
+        stages
+            .iter()
+            .map(|s| *s.efficiency().get(d))
+            .product::<f64>()
+    });
 
     // --- speeds and tooth cycles, which need the whole shaft line. None of this
     // asks what kind of stage it is looking at.
@@ -492,14 +514,30 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
         s.set_kinematics(speeds, cycles);
     }
 
-    // Each stage's backlash, seen from the output, divided by everything after it.
-    let refer = |pick: fn(&Backlash) -> f64| {
+    // Each stage's backlash, referred to whichever shaft is the output.
+    //
+    // Driven forward that is the last shaft, so a stage's contribution is
+    // divided by everything downstream of it. Driven backward the *input* shaft
+    // is the output, so the contribution is multiplied by everything upstream
+    // instead: those shafts turn faster, and the same play is a larger angle
+    // there. The last stage dominates either way, and by more going backward.
+    let refer = |drive: Drive, pick: fn(&Backlash) -> f64| -> f64 {
         stages
             .iter()
             .enumerate()
             .map(|(k, s)| {
-                let downstream: f64 = stages[k + 1..].iter().map(StageResult::ratio).product();
-                pick(&s.output_backlash()) / downstream
+                let stage = pick(s.backlash().get(drive));
+                match drive {
+                    Drive::Forward => {
+                        let downstream: f64 =
+                            stages[k + 1..].iter().map(StageResult::ratio).product();
+                        stage / downstream
+                    }
+                    Drive::Backward => {
+                        let upstream: f64 = stages[..k].iter().map(StageResult::ratio).product();
+                        stage * upstream
+                    }
+                }
             })
             .sum()
     };
@@ -509,11 +547,11 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
         output_speed: train.input_speed / total_ratio,
         output_torque: torque,
         total_efficiency,
-        output_backlash: Backlash {
-            nominal: refer(|b| b.nominal),
-            minimum: refer(|b| b.minimum),
-            maximum: refer(|b| b.maximum),
-        },
+        backlash: Directional::of(|d| Backlash {
+            nominal: refer(d, |b| b.nominal),
+            minimum: refer(d, |b| b.minimum),
+            maximum: refer(d, |b| b.maximum),
+        }),
         stages,
     })
 }
@@ -581,13 +619,52 @@ mod tests {
         for s in r.stages.iter().map(spur) {
             assert!(s.centre_distance > 0.0);
             assert!(s.contact_ratios.transverse > 1.0);
-            assert!(s.efficiency > 0.9 && s.efficiency < 1.0);
+            assert!(s.efficiency.forward > 0.9 && s.efficiency.forward < 1.0);
+            assert_eq!(
+                s.efficiency.forward, s.efficiency.backward,
+                "a parallel-axis stage is as efficient driven either way"
+            );
             for g in &s.gears {
                 assert!(g.face_width > 0.0);
                 assert!(g.contact_stress > 0.0);
                 assert!(g.bending_stress.unwrap() > 0.0);
             }
         }
+    }
+
+    /// **The two backlash figures are one gap seen from the two ends.**
+    ///
+    /// Referred to the output shaft or to the input shaft, the same play must
+    /// differ by exactly the total ratio — every stage's contribution scales the
+    /// same way, because a stage's own two figures are its gap at two lever arms
+    /// whose ratio *is* that stage's ratio. If a stage ever got that wrong the
+    /// products would stop matching, which no per-stage check would catch.
+    #[test]
+    fn backlash_at_the_two_ends_differs_by_exactly_the_total_ratio() {
+        let r = solve_train(&two_stage(), &library()).unwrap();
+        for (forward, backward) in [
+            (r.backlash.forward.nominal, r.backlash.backward.nominal),
+            (r.backlash.forward.maximum, r.backlash.backward.maximum),
+        ] {
+            assert!(forward > 0.0);
+            assert!(
+                (backward - forward * r.total_ratio).abs() < 1e-9 * backward,
+                "{backward} vs {forward} x {}",
+                r.total_ratio
+            );
+        }
+        // ...and the input end is the looser one, because it turns faster.
+        assert!(r.backlash.backward.nominal > r.backlash.forward.nominal);
+    }
+
+    /// A train of parallel-axis stages is as efficient driven either way, and
+    /// cannot lock. Both are consequences of the meshes, not rules the train
+    /// applies.
+    #[test]
+    fn a_parallel_axis_train_reports_equal_efficiencies_and_cannot_lock() {
+        let r = solve_train(&two_stage(), &library()).unwrap();
+        assert_eq!(r.total_efficiency.forward, r.total_efficiency.backward);
+        assert!(!r.total_efficiency.self_locking());
     }
 
     /// Efficiency must always *reduce* delivered torque. Getting this sign wrong
@@ -603,10 +680,12 @@ mod tests {
         let ideal = solve_train(&lossless, &lib).unwrap();
         let real = solve_train(&two_stage(), &lib).unwrap();
 
-        assert!((ideal.total_efficiency - 1.0).abs() < 1e-12);
+        assert!((ideal.total_efficiency.forward - 1.0).abs() < 1e-12);
         assert!(real.output_torque < ideal.output_torque);
         // ...and the shortfall is exactly the product of the stage efficiencies.
-        assert!((real.output_torque - ideal.output_torque * real.total_efficiency).abs() < 1e-9);
+        assert!(
+            (real.output_torque - ideal.output_torque * real.total_efficiency.forward).abs() < 1e-9
+        );
     }
 
     #[test]
@@ -640,10 +719,10 @@ mod tests {
         let loosen = |k: usize| {
             let mut t = base.clone();
             spur_input(&mut t.stages[k]).clearance *= 4.0;
-            solve_train(&t, &lib).unwrap().output_backlash.nominal
+            solve_train(&t, &lib).unwrap().backlash.forward.nominal
         };
 
-        let reference = solve_train(&base, &lib).unwrap().output_backlash.nominal;
+        let reference = solve_train(&base, &lib).unwrap().backlash.forward.nominal;
         let first = loosen(0) - reference;
         let last = loosen(1) - reference;
         assert!(first > 0.0 && last > 0.0);
@@ -784,9 +863,9 @@ mod tests {
 
         assert!((manual.centre_distance - auto.centre_distance_nominal).abs() < 1e-12);
         // At the zero-backlash distance there is, by construction, no backlash.
-        assert!(manual.backlash[1].nominal.abs() < 1e-9);
+        assert!(manual.backlash.forward.nominal.abs() < 1e-9);
         // Whereas the automatic one carries its clearance into real backlash.
-        assert!(auto.backlash[1].nominal > 0.0);
+        assert!(auto.backlash.forward.nominal > 0.0);
     }
 
     /// An override has to reach the arithmetic, not just the display. Doubling

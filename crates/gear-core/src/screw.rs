@@ -66,7 +66,7 @@
 //! DESIGN §4.7 — is the sliding vector, the Hertzian contact, and the geometry;
 //! not this pitch-point shortcut.
 
-use crate::contact::{cross, dot, norm, scale, sub};
+use crate::contact::{cross, dot, norm, scale, sub, Drive};
 use crate::mesh::Member;
 
 /// What a screw pair is made of.
@@ -266,24 +266,28 @@ impl Screw {
     /// exceeds what the flank can push back with, the numerator of the backward
     /// case changes sign and `η_wheel_driving ≤ 0`.
     #[must_use]
-    pub fn efficiency(&self, friction: f64) -> ScrewEfficiency {
-        let (on_1, on_2) = self.tangential_per_normal(friction, Flank::Driving);
-        let (back_1, back_2) = self.tangential_per_normal(friction, Flank::BackDriving);
+    pub fn efficiency(&self, friction: f64, drive: Drive) -> f64 {
+        let flank = match drive {
+            Drive::Forward => Flank::Driving,
+            Drive::Backward => Flank::BackDriving,
+        };
+        let (on_1, on_2) = self.tangential_per_normal(friction, flank);
         let k = self.velocity_ratio();
-
-        let worm_driving = k * on_2 / on_1;
-        let wheel_driving = back_1 / (k * back_2);
-
-        // Where the backward numerator changes sign.
-        let self_locking_friction =
-            self.normal_pressure_angle.cos() * self.lead_angle.sin() / self.slide_on(1);
-
-        ScrewEfficiency {
-            worm_driving,
-            wheel_driving,
-            self_locking: wheel_driving <= 0.0,
-            self_locking_friction,
+        match drive {
+            Drive::Forward => k * on_2 / on_1,
+            Drive::Backward => on_1 / (k * on_2),
         }
+    }
+
+    /// The coefficient of friction at which the drive stops being back-driveable
+    /// — `cos α_n tan γ` for a right-angle worm.
+    ///
+    /// **Reported rather than compared against silently**, because it is the
+    /// number a designer actually wants: a worm sized just past it is relying on
+    /// a friction coefficient nobody measured.
+    #[must_use]
+    pub fn self_locking_friction(&self) -> f64 {
+        self.normal_pressure_angle.cos() * self.lead_angle.sin() / self.slide_on(1)
     }
 
     /// The sliding direction resolved on member `which`'s velocity direction.
@@ -524,30 +528,12 @@ fn project_out(v: [f64; 3], n: [f64; 3]) -> Option<[f64; 3]> {
     Some(scale(in_plane, 1.0 / length))
 }
 
-/// Efficiency in both directions, and whether the drive can be back-driven.
-#[derive(Clone, Copy, Debug)]
-pub struct ScrewEfficiency {
-    /// Worm driving the wheel — the ordinary direction.
-    pub worm_driving: f64,
-    /// Wheel driving the worm. Zero or negative means the drive cannot be
-    /// back-driven at all.
-    pub wheel_driving: f64,
-    /// Whether the pair is self-locking at this friction coefficient.
-    pub self_locking: bool,
-    /// The coefficient of friction at which self-locking begins:
-    /// `cos α_n tan γ` for a 90° drive.
-    ///
-    /// **Reported rather than compared against silently**, because it is the
-    /// number a designer actually wants — a worm sized just past it is relying
-    /// on a friction coefficient nobody measured.
-    pub self_locking_friction: f64,
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use crate::contact::sliding_velocity;
+    use crate::contact::Directional;
     use std::f64::consts::PI;
 
     fn worm(starts: u32, teeth: u32, d1: f64) -> Screw {
@@ -862,18 +848,18 @@ mod tests {
             let cos_alpha = s.normal_pressure_angle.cos();
             let (tan_g, cot_g) = (s.lead_angle.tan(), 1.0 / s.lead_angle.tan());
             for mu in [0.0, 0.02, 0.05, 0.1, 0.2] {
-                let e = s.efficiency(mu);
+                let e = Directional::of(|d| s.efficiency(mu, d));
                 let forward = (cos_alpha - mu * tan_g) / (cos_alpha + mu * cot_g);
                 let backward = (cos_alpha - mu * cot_g) / (cos_alpha + mu * tan_g);
                 assert!(
-                    (e.worm_driving - forward).abs() < 1e-14,
+                    (e.forward - forward).abs() < 1e-14,
                     "z₁={starts} d={d1} mu={mu}: forward {} vs {forward}",
-                    e.worm_driving
+                    e.forward
                 );
                 assert!(
-                    (e.wheel_driving - backward).abs() < 1e-14,
+                    (e.backward - backward).abs() < 1e-14,
                     "z₁={starts} d={d1} mu={mu}: backward {} vs {backward}",
-                    e.wheel_driving
+                    e.backward
                 );
             }
         }
@@ -895,13 +881,13 @@ mod tests {
             })
             .unwrap();
             for mu in [0.0, 0.03, 0.08, 0.15] {
-                let e = s.efficiency(mu);
+                let e = Directional::of(|d| s.efficiency(mu, d));
                 // Per unit normal force and unit worm pitch line speed.
                 let cos_alpha = s.normal_pressure_angle.cos();
                 let k = s.velocity_ratio();
                 let slide_on_1 = (1.0 - k * s.shaft_angle.cos()) / s.sliding_ratio;
                 let power_in = (cos_alpha * s.lead_angle.sin() + mu * slide_on_1) * 1.0;
-                let power_out = e.worm_driving * power_in;
+                let power_out = e.forward * power_in;
                 let loss = mu * s.sliding_ratio;
                 assert!(
                     (power_in - power_out - loss).abs() < 1e-13 * power_in,
@@ -923,10 +909,10 @@ mod tests {
                 ..Default::default()
             })
             .unwrap();
-            let e = s.efficiency(0.0);
-            assert!((e.worm_driving - 1.0).abs() < 1e-15);
-            assert!((e.wheel_driving - 1.0).abs() < 1e-15);
-            assert!(!e.self_locking);
+            let e = Directional::of(|d| s.efficiency(0.0, d));
+            assert!((e.forward - 1.0).abs() < 1e-15);
+            assert!((e.backward - 1.0).abs() < 1e-15);
+            assert!(!e.self_locking());
         }
     }
 
@@ -939,23 +925,23 @@ mod tests {
             let s = worm(starts, 41, d1);
             let threshold = s.normal_pressure_angle.cos() * s.lead_angle.tan();
             assert!(
-                (s.efficiency(0.05).self_locking_friction - threshold).abs() < 1e-14,
+                (s.self_locking_friction() - threshold).abs() < 1e-14,
                 "z₁={starts} d={d1}: threshold {} vs cos α_n tan γ {threshold}",
-                s.efficiency(0.05).self_locking_friction
+                s.self_locking_friction()
             );
 
-            let at = s.efficiency(threshold);
+            let at = Directional::of(|d| s.efficiency(threshold, d));
             assert!(
-                at.wheel_driving.abs() < 1e-15,
+                at.backward.abs() < 1e-15,
                 "at the threshold the backward efficiency should vanish: {}",
-                at.wheel_driving
+                at.backward
             );
-            assert!(at.self_locking, "the threshold itself counts as locked");
+            assert!(at.self_locking(), "the threshold itself counts as locked");
 
-            let below = s.efficiency(threshold * 0.9);
-            assert!(below.wheel_driving > 0.0 && !below.self_locking);
-            let above = s.efficiency(threshold * 1.1);
-            assert!(above.wheel_driving < 0.0 && above.self_locking);
+            let below = Directional::of(|d| s.efficiency(threshold * 0.9, d));
+            assert!(below.backward > 0.0 && !below.self_locking());
+            let above = Directional::of(|d| s.efficiency(threshold * 1.1, d));
+            assert!(above.backward < 0.0 && above.self_locking());
         }
     }
 
@@ -973,20 +959,20 @@ mod tests {
         );
 
         for s in [steep, shallow] {
-            let e = s.efficiency(mu);
+            let e = Directional::of(|d| s.efficiency(mu, d));
             assert!(
-                e.wheel_driving < e.worm_driving,
+                e.backward < e.forward,
                 "back-driving must be the worse direction: {} vs {}",
-                e.wheel_driving,
-                e.worm_driving
+                e.backward,
+                e.forward
             );
         }
         assert!(
-            !steep.efficiency(mu).self_locking,
+            !Directional::of(|d| steep.efficiency(mu, d)).self_locking(),
             "a steep thread back-drives"
         );
         assert!(
-            shallow.efficiency(mu).self_locking,
+            Directional::of(|d| shallow.efficiency(mu, d)).self_locking(),
             "a 1-start worm on a 25 mm diameter should self-lock at mu={mu}"
         );
     }
@@ -1000,7 +986,7 @@ mod tests {
         let mut previous = 0.0;
         for (starts, d1) in [(1u32, 30.0), (1, 12.0), (2, 12.0), (4, 12.0), (6, 12.0)] {
             let s = worm(starts, 60, d1);
-            let e = s.efficiency(mu).worm_driving;
+            let e = s.efficiency(mu, Drive::Forward);
             assert!(
                 e > previous,
                 "z₁={starts} d={d1}: γ={:.2}° gave {e}, below the previous {previous}",

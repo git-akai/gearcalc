@@ -622,11 +622,29 @@ too large by exactly the contact ratio. The first draft of this implementation
 made that error; the numerical check above is what caught it.
 
 Two honest notes. **Forward and backward efficiency come out equal** for
-parallel-axis meshes: the formula is symmetric in `(ε₁²+ε₂²)`, and physically it
-should be, since swapping driver and driven swaps approach and recess but not the
-total sliding. They differ only at second order, which we compute consistently as
-`η = P_out/P_in`. Expect to see two identical numbers in the UI; that is a
-result, not a bug. Second, the helical case is handled by the `cos β_b` above
+parallel-axis meshes, and the reason is the mirror symmetry of involute flanks:
+reversing the drive moves the load onto the other flank, where the path of
+contact is traversed the other way round, so approach and recess exchange — and
+the loss depends on `(ε₁²+ε₂²)`, which does not notice. Expect to see two
+identical numbers in the UI; that is a result, not a bug.
+
+**Every mesh is asked both questions, and none of them is told which meshes are
+symmetric.** `efficiency` takes a [`Drive`] and reads the path from whichever end
+is driving; `Directional::of` evaluates it twice. There is no "is this mesh
+symmetric?" branch to be wrong, the equality is arrived at rather than assigned,
+and a mesh that is *not* symmetric — a worm, or a profile with different drive
+and coast pressure angles — reports two different numbers through the same code
+rather than needing a new interface. The specification asks for the pair on
+every stage type and at the train level, so this is what it wanted all along.
+
+Two limits worth stating. The equality is a property of a **first-order** model:
+the whole parallel-axis path is linear in `μ`, and an exact force balance — with
+the normal force determined by the load *including* friction, as the worm's is —
+carries `O(μ²)` terms whose sign depends on which member drives. That is not
+modelled anywhere here, so "equal" means equal within the model, not that a real
+spur mesh is exactly reversible. And a **worm's** asymmetry is nothing to do with
+that: it is first order, arriving with the lengthwise sliding, which is why it is
+large enough to see. Second, the helical case is handled by the `cos β_b` above
 rather than by an `ε_γ` substitution — see the paragraphs preceding this one for
 why that substitution was rejected.
 
@@ -2392,6 +2410,8 @@ here. Revision 2 additions are marked ★.
 | ◆ Worm type: ZI against ZN and ZA | peak contact pressure, five worms from γ = 4.8° to 19.5°, everything but the flank type held fixed | ZN 0.9–14.8 % **below** ZI, ZA between them. The effective `α_n` is identical to 0.01° across all three, so nothing but contact stress moves |
 | ◆ **Worm backlash from one projection** | the derived `j_n = j_axial sin β_b1 + Δa sin α_n` against the two relations handbooks give separately — wheel turns by `j/r₂`, worm by `2π j/lead` — three worms | 1e-12 both, so one projection reproduces both rules |
 | ◆ Worm contact vs. face width | wheel face width 4 mm against 40 mm | **bit-identical** peak pressure — which is why a worm stage has no automatic face width from strength: a point contact has nothing for `σ_H ∝ 1/√b` to invert |
+| ◆ Efficiency under drive reversal | the same mesh driven both ways — not relabelled — four meshes × three helix angles | **bit-identical**, computed independently through the same code with a different `Drive` |
+| ◆ Backlash at the two ends of a train | referred to the output shaft against the input shaft | differ by **exactly the total ratio**, since each stage's own pair is its gap at two lever arms whose ratio is that stage's ratio |
 | ◆ Flank rulings | projection construction vs. `cos β_b`, four shaft angles × four helix angles | 1e-14 — the base helix angle is a *consequence* of projecting the axis onto the tangent plane, not an input to it |
 | ◆ **Crossed construction at zero shaft angle** | `σ_H` at the pitch point from the crossed-axis curvatures vs. the verified line-contact path, three meshes including β = 20° and 30° | flatter curvature **exactly** 0; stress agrees to 1e-12 — the crossed model and the parallel one are measuring the same curvature |
 | ◆ Flat curvature vs. shaft angle | Σ swept 0 → 90°, worm-like flank | rises monotonically off zero; the line shortens into an ellipse rather than jumping to one |

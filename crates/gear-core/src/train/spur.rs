@@ -8,7 +8,7 @@
 
 use super::{Backlash, ContactRatios, GearResult, SpurResult, TrainError};
 use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift};
-use crate::contact::{efficiency, ContactPath};
+use crate::contact::{efficiency, ContactPath, Directional, Drive};
 use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
 use crate::mesh::{Member, Mesh, MeshKind};
 use crate::params::{Auto, GearParams};
@@ -284,10 +284,19 @@ pub fn solve_stage(
     // --- backlash at the three centre distances.
     let angular =
         |a: f64, at: Member| -> f64 { mesh.angular_backlash(a, at).unwrap_or(0.0).to_degrees() };
-    let backlash = [Member::First, Member::Second].map(|m| Backlash {
-        nominal: angular(centre, m),
-        minimum: angular(centre - stage.tolerance_minus, m),
-        maximum: angular(centre + stage.tolerance_plus, m),
+    // Reported by direction rather than by member: the output of a forward
+    // drive is gear 2, of a backward drive gear 1, and the same gap subtends a
+    // different angle at each.
+    let backlash = Directional::of(|d| {
+        let at = match d {
+            Drive::Forward => Member::Second,
+            Drive::Backward => Member::First,
+        };
+        Backlash {
+            nominal: angular(centre, at),
+            minimum: angular(centre - stage.tolerance_minus, at),
+            maximum: angular(centre + stage.tolerance_plus, at),
+        }
     });
 
     let mut notes = Vec::new();
@@ -309,7 +318,7 @@ pub fn solve_stage(
         centre_distance_nominal: mesh.a_w,
         centre_distance: centre,
         contact_ratios,
-        efficiency: efficiency(&path, &mesh, &g[0], stage.friction),
+        efficiency: Directional::of(|d| efficiency(&path, &mesh, &g[0], stage.friction, d)),
         backlash,
         coprime: gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
         gears: [gears[0].clone(), gears[1].clone()],

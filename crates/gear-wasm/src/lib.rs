@@ -501,10 +501,17 @@ mod tests {
             "a worm stage has members, not gears"
         );
         assert!(worm["contact"]["max_pressure"].as_f64().unwrap() > 0.0);
-        assert!(
-            worm["efficiency_backward"].as_f64().unwrap()
-                < worm["efficiency_forward"].as_f64().unwrap()
-        );
+        let eff = &worm["efficiency"];
+        assert!(eff["backward"].as_f64().unwrap() < eff["forward"].as_f64().unwrap());
+        // ...while the spur stage puts the same number in both, which is the
+        // point of reporting it directionally everywhere rather than only where
+        // it differs.
+        let spur_eff = &v["stages"][0]["efficiency"];
+        assert_eq!(spur_eff["forward"], spur_eff["backward"]);
+        // And the train reports both totals, plus backlash at each end.
+        assert!(v["total_efficiency"]["backward"].as_f64().unwrap() > 0.0);
+        assert!(v["backlash"]["forward"]["nominal"].as_f64().unwrap() > 0.0);
+        assert!(v["backlash"]["backward"]["nominal"].as_f64().unwrap() > 0.0);
         // The sliding speed could only be filled once the shaft line was known.
         assert!(worm["sliding_velocity"].as_f64().unwrap() > 0.0);
         assert!(worm["members"][1]["speed"].as_f64().unwrap() > 0.0);

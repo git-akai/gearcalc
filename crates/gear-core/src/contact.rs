@@ -144,6 +144,77 @@ impl ContactPath {
     }
 }
 
+/// Which way a mesh is being driven.
+///
+/// A parameter rather than a branch on "is this mesh symmetric?". Reversing the
+/// drive is a real change of configuration — the load moves to the other flank —
+/// and every mesh answers the same question; that some answer identically is a
+/// *result*, not a case to special-case.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Drive {
+    /// Member 1 drives member 2 — the direction a train propagates torque in.
+    Forward,
+    /// Member 2 drives member 1.
+    Backward,
+}
+
+impl Drive {
+    /// Both directions, in the order they are reported.
+    pub const BOTH: [Self; 2] = [Self::Forward, Self::Backward];
+}
+
+/// A quantity reported for both drive directions.
+///
+/// Efficiency and angular backlash are both like this, and for the same reason:
+/// the answer depends on which end is the output. For efficiency it is the
+/// friction that reverses its role; for backlash it is the lever arm, since the
+/// same tooth gap subtends a different angle at each member.
+///
+/// A symmetric mesh puts equal numbers in both fields — computed twice through
+/// the same path, not copied — so nothing has to decide in advance which meshes
+/// are symmetric.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct Directional<T> {
+    pub forward: T,
+    pub backward: T,
+}
+
+impl<T> Directional<T> {
+    /// Ask the same question of both directions.
+    ///
+    /// This is the idiom the whole directional treatment rests on: one
+    /// expression, evaluated twice with a different `Drive`. There is no path
+    /// through which a mesh can report one direction without the other.
+    pub fn of(mut f: impl FnMut(Drive) -> T) -> Self {
+        Self {
+            forward: f(Drive::Forward),
+            backward: f(Drive::Backward),
+        }
+    }
+
+    /// The value for one direction.
+    pub fn get(&self, drive: Drive) -> &T {
+        match drive {
+            Drive::Forward => &self.forward,
+            Drive::Backward => &self.backward,
+        }
+    }
+}
+
+impl Directional<f64> {
+    /// Reading this pair as an efficiency: whether the mesh refuses to be
+    /// back-driven at all.
+    ///
+    /// Derived rather than stored, so it cannot disagree with the number it
+    /// describes. Impossible for a parallel-axis mesh, which is a consequence of
+    /// its symmetry rather than a rule applied to it.
+    #[must_use]
+    pub fn self_locking(&self) -> bool {
+        self.backward <= 0.0
+    }
+}
+
 /// Mesh efficiency, as a fraction — `0.98` means 98 %.
 ///
 /// # Derived, not quoted
@@ -235,9 +306,17 @@ impl ContactPath {
 /// lengthwise component is not zero, it dominates, and it is why a worm drive
 /// can self-lock.
 #[must_use]
-pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Gear, friction: f64) -> f64 {
-    let e1 = path.approach / path.base_pitch;
-    let e2 = path.recess / path.base_pitch;
+pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Gear, friction: f64, drive: Drive) -> f64 {
+    // Reversing the drive moves the load onto the mirror flank, where the path
+    // of contact is traversed the other way round: what was approach is recess.
+    // That the loss comes out the same is the symmetry result, not an assumption
+    // this function makes — it does the same arithmetic either way.
+    let (approach, recess) = match drive {
+        Drive::Forward => (path.approach, path.recess),
+        Drive::Backward => (path.recess, path.approach),
+    };
+    let e1 = approach / path.base_pitch;
+    let e2 = recess / path.base_pitch;
     let z = match mesh.kind {
         MeshKind::External => 1.0 / f64::from(mesh.z1) + 1.0 / f64::from(mesh.z2),
         MeshKind::Internal => 1.0 / f64::from(mesh.z1) - 1.0 / f64::from(mesh.z2),
@@ -621,7 +700,7 @@ mod tests {
                 let mean_slide = sum / N as f64;
                 let numeric = 1.0 - mu * mean_slide / (v_b * cos_bb);
 
-                let closed = efficiency(&path, &m, &a, mu);
+                let closed = efficiency(&path, &m, &a, mu, Drive::Forward);
                 assert!(
                     (closed - numeric).abs() < 1e-9,
                     "z={z1}/{z2} beta={beta}: closed {closed} vs vector-driven {numeric}"
@@ -737,7 +816,7 @@ mod tests {
                 let cos_bb = crate::metrology::base_helix_angle(&a).cos();
                 let numeric = 1.0 - mu * mean_abs_xi * (1.0 / a.rb + 1.0 / b.rb) / cos_bb;
 
-                let closed = efficiency(&path, &m, &a, mu);
+                let closed = efficiency(&path, &m, &a, mu, Drive::Forward);
                 assert!(
                     (closed - numeric).abs() < 1e-9,
                     "z={z1}/{z2} beta={beta}: closed {closed} vs numeric {numeric}"
@@ -766,7 +845,7 @@ mod tests {
                 ..Default::default()
             });
             let cos_bb = crate::metrology::base_helix_angle(&g).cos();
-            let loss = (1.0 - efficiency(&path, &m, &g, 0.06)) * 1.0;
+            let loss = (1.0 - efficiency(&path, &m, &g, 0.06, Drive::Forward)) * 1.0;
             assert!(
                 loss > previous,
                 "beta={beta}: loss must rise with 1/cos(beta_b)"
@@ -780,33 +859,70 @@ mod tests {
     fn efficiency_is_unity_without_friction_and_falls_linearly_with_it() {
         let (a, b, m) = pair(17, 43);
         let path = ContactPath::new(&a, &b, &m).unwrap();
-        assert!((efficiency(&path, &m, &a, 0.0) - 1.0).abs() < 1e-15);
+        assert!((efficiency(&path, &m, &a, 0.0, Drive::Forward) - 1.0).abs() < 1e-15);
 
-        let l1 = 1.0 - efficiency(&path, &m, &a, 0.05);
-        let l2 = 1.0 - efficiency(&path, &m, &a, 0.10);
+        let l1 = 1.0 - efficiency(&path, &m, &a, 0.05, Drive::Forward);
+        let l2 = 1.0 - efficiency(&path, &m, &a, 0.10, Drive::Forward);
         assert!((l2 - 2.0 * l1).abs() < 1e-12, "loss must be linear in mu");
 
         // A plain steel spur mesh should land in the high nineties.
-        let eta = efficiency(&path, &m, &a, 0.06);
+        let eta = efficiency(&path, &m, &a, 0.06, Drive::Forward);
         assert!((0.97..1.0).contains(&eta), "implausible efficiency {eta}");
     }
 
-    /// Swapping driver and driven swaps approach and recess but not the total
-    /// sliding, so a parallel-axis mesh has the same efficiency both ways. Two
-    /// identical numbers in the UI are a result, not a bug.
+    /// **Reversing the drive, not relabelling the gears.**
+    ///
+    /// An earlier version of this test swapped which gear was called 1, which
+    /// produces the same `ε₁ ↔ ε₂` exchange and so proved only that the
+    /// expression is symmetric in it. This asks the question the design actually
+    /// makes a claim about: drive the same mesh the other way. The load moves to
+    /// the mirror flank, the path is traversed the other way round, and the loss
+    /// is unchanged — because involute flanks are mirror images of each other.
+    ///
+    /// The two numbers are computed independently, through the same code with a
+    /// different `Drive`. Nothing copies one into the other, so an asymmetric
+    /// mesh — a worm, or a profile with different drive and coast pressure
+    /// angles — would show it here rather than needing a new API.
     #[test]
-    fn forward_and_backward_efficiency_are_equal() {
+    fn a_parallel_axis_mesh_is_as_efficient_driven_either_way() {
+        for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25), (19, 31)] {
+            for beta in [0.0, 15.0, 30.0] {
+                let (a, b, m) = helical_pair(z1, z2, beta);
+                let path = ContactPath::new(&a, &b, &m).unwrap();
+                let both = Directional::of(|d| efficiency(&path, &m, &a, 0.07, d));
+                assert_eq!(
+                    both.forward, both.backward,
+                    "z={z1}/{z2} beta={beta}: the two directions should agree"
+                );
+                assert!(!both.self_locking(), "a gear mesh cannot self-lock");
+            }
+        }
+    }
+
+    /// ...and the same mesh described from the other gear is still the same
+    /// mesh. This is the labelling check the one above used to be.
+    #[test]
+    fn efficiency_does_not_depend_on_which_gear_is_called_first() {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25)] {
             let (a, b, m) = pair(z1, z2);
-            let forward = efficiency(&ContactPath::new(&a, &b, &m).unwrap(), &m, &a, 0.07);
-
-            // The same physical mesh, described from the other gear.
+            let forward = efficiency(
+                &ContactPath::new(&a, &b, &m).unwrap(),
+                &m,
+                &a,
+                0.07,
+                Drive::Forward,
+            );
             let m_rev = Mesh::new(&b, &a, MeshKind::External).unwrap();
-            let backward = efficiency(&ContactPath::new(&b, &a, &m_rev).unwrap(), &m_rev, &b, 0.07);
-
+            let relabelled = efficiency(
+                &ContactPath::new(&b, &a, &m_rev).unwrap(),
+                &m_rev,
+                &b,
+                0.07,
+                Drive::Forward,
+            );
             assert!(
-                (forward - backward).abs() < 1e-12,
-                "z={z1}/{z2}: {forward} vs {backward}"
+                (forward - relabelled).abs() < 1e-12,
+                "z={z1}/{z2}: {forward} vs {relabelled}"
             );
         }
     }

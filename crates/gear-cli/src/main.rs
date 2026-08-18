@@ -130,13 +130,23 @@ fn train_report(mixed: bool) {
         train.input_speed, train.input_torque, r.output_speed, r.output_torque
     );
     println!(
-        "       total ratio {:.4}:1   total efficiency {:.3} %",
+        "       total ratio {:.4}:1   total efficiency {:.3} % forward / {:.3} % backward{}",
         r.total_ratio,
-        100.0 * r.total_efficiency
+        100.0 * r.total_efficiency.forward,
+        100.0 * r.total_efficiency.backward,
+        if r.total_efficiency.self_locking() {
+            "  (cannot be back-driven)"
+        } else {
+            ""
+        }
     );
     println!(
-        "       output backlash {:.5} deg  (min {:.5}, max {:.5})",
-        r.output_backlash.nominal, r.output_backlash.minimum, r.output_backlash.maximum
+        "       backlash at the output shaft  {:.5} deg  (min {:.5}, max {:.5})",
+        r.backlash.forward.nominal, r.backlash.forward.minimum, r.backlash.forward.maximum
+    );
+    println!(
+        "       backlash at the input shaft   {:.5} deg  (min {:.5}, max {:.5})",
+        r.backlash.backward.nominal, r.backlash.backward.minimum, r.backlash.backward.maximum
     );
 
     for (k, s) in r.stages.iter().enumerate() {
@@ -170,7 +180,11 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
             ""
         }
     );
-    println!("  efficiency {:.3} %", 100.0 * s.efficiency);
+    println!(
+        "  efficiency {:.3} % forward / {:.3} % backward",
+        100.0 * s.efficiency.forward,
+        100.0 * s.efficiency.backward
+    );
     println!(
         "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>10} {:>9} {:>12}",
         "gear", "x", "b mm", "torque Nm", "sigma_F", "sigma_H", "rpm", "cycles"
@@ -205,9 +219,9 @@ fn print_worm_stage(k: usize, st: &gear_core::train::WormStage, s: &gear_core::t
     );
     println!(
         "  efficiency  forward {:.3} %  backward {:.3} %{}",
-        100.0 * s.efficiency_forward,
-        100.0 * s.efficiency_backward,
-        if s.self_locking {
+        100.0 * s.efficiency.forward,
+        100.0 * s.efficiency.backward,
+        if s.efficiency.self_locking() {
             "  (self-locking)"
         } else {
             ""
@@ -240,7 +254,7 @@ fn print_worm_stage(k: usize, st: &gear_core::train::WormStage, s: &gear_core::t
 /// pinion is not automatically the worse one — it sees the higher contact
 /// stress but the wheel may have the weaker root.
 fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f64) {
-    use gear_core::contact::{efficiency, ContactPath};
+    use gear_core::contact::{efficiency, ContactPath, Drive};
     use gear_core::material::contact_modulus;
     use gear_core::mesh::{Mesh, MeshKind};
     use gear_core::metrology::base_helix_angle;
@@ -397,7 +411,7 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
     for mu in [0.02, 0.04, 0.06, 0.10] {
         println!(
             "  mu {mu:.2}   {:.3} %",
-            100.0 * efficiency(&path, &mesh, &g1, mu)
+            100.0 * efficiency(&path, &mesh, &g1, mu, Drive::Forward)
         );
     }
 }
@@ -853,6 +867,7 @@ fn loadcase_report() {
 
 /// A worm pair, end to end: geometry, sliding, and both drive directions.
 fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_deg: f64) {
+    use gear_core::contact::{Directional, Drive};
     use gear_core::mesh::Member;
     use gear_core::screw::{Screw, ScrewParams};
 
@@ -911,18 +926,15 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
     println!();
     println!("efficiency          worm driving   wheel driving");
     for mu in [0.0, 0.02, 0.04, 0.06, 0.10] {
-        let e = s.efficiency(mu);
-        let back = if e.self_locking {
+        let e = Directional::of(|d| s.efficiency(mu, d));
+        let back = if e.self_locking() {
             "  self-locking".to_string()
         } else {
-            format!("{:12.3} %", e.wheel_driving * 100.0)
+            format!("{:12.3} %", e.backward * 100.0)
         };
-        println!(
-            "  mu {mu:.2}        {:10.3} % {back}",
-            e.worm_driving * 100.0
-        );
+        println!("  mu {mu:.2}        {:10.3} % {back}", e.forward * 100.0);
     }
-    let threshold = s.efficiency(0.0).self_locking_friction;
+    let threshold = s.self_locking_friction();
     println!("  self-locks at mu >= {threshold:.4}   (cos alpha_n tan gamma)");
 
     // Contact is the strength figure a worm stage reports. There is deliberately
@@ -935,7 +947,7 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
     let e_star = gear_core::material::contact_modulus(m1, m2);
     let mu = 0.06;
     let torque_in = 2.0;
-    let torque_out = torque_in * s.ratio * s.efficiency(mu).worm_driving;
+    let torque_out = torque_in * s.ratio * s.efficiency(mu, Drive::Forward);
 
     println!();
     println!("contact   {worm_material} on {wheel_material},  E* {e_star:.0} MPa");
@@ -1010,9 +1022,9 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
     println!();
     println!(
         "  efficiency   forward {:.3} %   backward {:.3} %{}",
-        r.efficiency_forward * 100.0,
-        r.efficiency_backward * 100.0,
-        if r.self_locking {
+        r.efficiency.forward * 100.0,
+        r.efficiency.backward * 100.0,
+        if r.efficiency.self_locking() {
             "  (self-locking)"
         } else {
             ""
@@ -1023,8 +1035,11 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
         r.contact.max_pressure, r.contact.patch_length, r.contact.patch_width
     );
     println!(
-        "  backlash     worm {:.5} deg   wheel {:.5} deg  (min {:.5}, max {:.5})",
-        r.backlash[0].nominal, r.backlash[1].nominal, r.backlash[1].minimum, r.backlash[1].maximum
+        "  backlash     at the wheel {:.5} deg (min {:.5}, max {:.5})   at the worm {:.5} deg",
+        r.backlash.forward.nominal,
+        r.backlash.forward.minimum,
+        r.backlash.forward.maximum,
+        r.backlash.backward.nominal
     );
     println!("  bending      not reported - see DESIGN.md 4.5.1");
     println!(

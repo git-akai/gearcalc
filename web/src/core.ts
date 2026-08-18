@@ -402,6 +402,11 @@ export interface ContactRatios {
   overlap: number;
   total: number;
 }
+/** A quantity reported for both drive directions — see Rust's `Directional`. */
+export interface Directional<T> {
+  forward: T;
+  backward: T;
+}
 export interface Backlash {
   nominal: number;
   minimum: number;
@@ -428,8 +433,8 @@ export interface SpurResult {
   centre_distance_nominal: number;
   centre_distance: number;
   contact_ratios: ContactRatios;
-  efficiency: number;
-  backlash: [Backlash, Backlash];
+  efficiency: Directional<number>;
+  backlash: Directional<Backlash>;
   coprime: boolean;
   gears: [GearResult, GearResult];
   notes: string[];
@@ -459,14 +464,12 @@ export interface WormResult {
   wheel_helix_angle: number;
   lead: number;
   axial_module: number;
-  efficiency_forward: number;
-  efficiency_backward: number;
-  self_locking: boolean;
+  efficiency: Directional<number>;
   self_locking_friction: number;
   sliding_ratio: number;
   sliding_velocity: number;
   contact: WormContact;
-  backlash: [Backlash, Backlash];
+  backlash: Directional<Backlash>;
   members: [WormMemberResult, WormMemberResult];
   notes: string[];
 }
@@ -482,8 +485,8 @@ export interface TrainResult {
   total_ratio: number;
   output_speed: number;
   output_torque: number;
-  total_efficiency: number;
-  output_backlash: Backlash;
+  total_efficiency: Directional<number>;
+  backlash: Directional<Backlash>;
   stages: StageResult[];
 }
 

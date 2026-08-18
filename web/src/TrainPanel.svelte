@@ -219,15 +219,31 @@
       <dt>Output torque</dt>
       <dd>{result.ok.output_torque.toFixed(4)} Nm</dd>
       <dt>Total efficiency</dt>
-      <dd>{pct(result.ok.total_efficiency)} %</dd>
-      <dt>Output backlash</dt>
       <dd>
-        {result.ok.output_backlash.nominal.toFixed(5)}°
+        {pct(result.ok.total_efficiency.forward)} % driven forward
+        · {pct(result.ok.total_efficiency.backward)} % driven backward
+        {#if result.ok.total_efficiency.backward <= 0}
+          <small class="warn">cannot be back-driven</small>
+        {/if}
+      </dd>
+      <dt>Backlash at the output shaft</dt>
+      <dd>
+        {result.ok.backlash.forward.nominal.toFixed(5)}°
         <small
-          >({result.ok.output_backlash.minimum.toFixed(5)} – {result.ok.output_backlash.maximum.toFixed(
+          >({result.ok.backlash.forward.minimum.toFixed(5)} – {result.ok.backlash.forward.maximum.toFixed(
             5,
           )})</small
         >
+      </dd>
+      <dt>Backlash at the input shaft</dt>
+      <dd>
+        {result.ok.backlash.backward.nominal.toFixed(5)}°
+        <small
+          >({result.ok.backlash.backward.minimum.toFixed(5)} – {result.ok.backlash.backward.maximum.toFixed(
+            5,
+          )})</small
+        >
+        <small>the same play, at a shaft turning the whole ratio faster</small>
       </dd>
     </dl>
   {/if}
@@ -245,7 +261,7 @@
           <span class="teeth">z {stage.gears[0].teeth} / {stage.gears[1].teeth}</span>
           {#if sres}
             <span class="ratio">{sres.ratio.toFixed(4)} : 1</span>
-            <span class="eff">{pct(sres.efficiency)} %</span>
+            <span class="eff">{pct(sres.efficiency.forward)} %</span>
           {/if}
         </button>
 
@@ -437,13 +453,20 @@
                   {/if}
                 </dd>
                 <dt>Mesh efficiency</dt>
-                <dd>{pct(sres.efficiency)} %</dd>
+                <dd>
+                  {pct(sres.efficiency.forward)} % driven forward
+                  · {pct(sres.efficiency.backward)} % driven backward
+                  <small>equal, as a parallel-axis mesh must be</small>
+                </dd>
                 <dt>Backlash</dt>
                 <dd>
-                  {sres.backlash[1].nominal.toFixed(5)}° at gear {gearNumber(i, 1)}
+                  {sres.backlash.forward.nominal.toFixed(5)}° at gear {gearNumber(i, 1)}
                   <small
-                    >({sres.backlash[1].minimum.toFixed(5)} – {sres.backlash[1].maximum.toFixed(5)})</small
+                    >({sres.backlash.forward.minimum.toFixed(5)} – {sres.backlash.forward.maximum.toFixed(
+                      5,
+                    )})</small
                   >
+                  · {sres.backlash.backward.nominal.toFixed(5)}° at gear {gearNumber(i, 0)}
                 </dd>
                 <dt>Coprime</dt>
                 <dd>{sres.coprime ? "yes" : "no"}</dd>
@@ -471,7 +494,7 @@
           <span class="teeth">z {stage.starts} / {stage.wheel_teeth}</span>
           {#if wres}
             <span class="ratio">{wres.ratio.toFixed(4)} : 1</span>
-            <span class="eff">{pct(wres.efficiency_forward)} %</span>
+            <span class="eff">{pct(wres.efficiency.forward)} %</span>
           {/if}
         </button>
 
@@ -563,7 +586,7 @@
                     <dt>Speed</dt>
                     <dd>{wres.members[0].speed.toFixed(1)} rpm</dd>
                     <dt>Backlash</dt>
-                    <dd>{wres.backlash[0].nominal.toFixed(5)}°</dd>
+                    <dd>{wres.backlash.backward.nominal.toFixed(5)}°</dd>
                   </dl>
                 {/if}
               </div>
@@ -598,7 +621,7 @@
                     <dt>Speed</dt>
                     <dd>{wres.members[1].speed.toFixed(1)} rpm</dd>
                     <dt>Backlash</dt>
-                    <dd>{wres.backlash[1].nominal.toFixed(5)}°</dd>
+                    <dd>{wres.backlash.forward.nominal.toFixed(5)}°</dd>
                   </dl>
                 {/if}
               </div>
@@ -613,9 +636,9 @@
                 </dd>
                 <dt>Mesh efficiency</dt>
                 <dd>
-                  {pct(wres.efficiency_forward)} % driving
-                  · {pct(wres.efficiency_backward)} % back-driven
-                  {#if wres.self_locking}
+                  {pct(wres.efficiency.forward)} % driven forward
+                  · {pct(wres.efficiency.backward)} % driven backward
+                  {#if wres.efficiency.backward <= 0}
                     <small class="warn">self-locking</small>
                   {/if}
                 </dd>

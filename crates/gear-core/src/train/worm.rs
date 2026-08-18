@@ -36,6 +36,7 @@
 //! rather than two rules, and it holds at any shaft angle.
 
 use super::{Backlash, TrainError};
+use crate::contact::{Directional, Drive};
 use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
 use crate::mesh::Member;
 use crate::params::Auto;
@@ -181,11 +182,13 @@ pub struct WormResult {
     /// Lead, mm, and axial module, mm.
     pub lead: f64,
     pub axial_module: f64,
-    /// Worm driving the wheel.
-    pub efficiency_forward: f64,
-    /// Wheel driving the worm. Zero or below means it cannot be back-driven.
-    pub efficiency_backward: f64,
-    pub self_locking: bool,
+    /// Mesh efficiency in both drive directions.
+    ///
+    /// Unlike a parallel-axis stage these genuinely differ, and the backward one
+    /// can be zero or negative — that is what self-locking is, and
+    /// [`Directional::self_locking`] reads it rather than a separate flag that
+    /// could disagree.
+    pub efficiency: Directional<f64>,
     /// The coefficient of friction at which self-locking begins.
     pub self_locking_friction: f64,
     /// Sliding speed at the pitch point as a multiple of the worm's pitch line
@@ -195,8 +198,11 @@ pub struct WormResult {
     /// Sliding speed at the pitch point, mm/s. Filled in by the train.
     pub sliding_velocity: f64,
     pub contact: WormContact,
-    /// Angular backlash at each member, degrees — worm first.
-    pub backlash: [Backlash; 2],
+    /// Angular backlash at whichever member is the output in each direction,
+    /// degrees: the wheel driving forward, the worm driving backward. A worm
+    /// stage shows the gap the two ways round more starkly than any other,
+    /// because the ratio between the lever arms *is* the gear ratio.
+    pub backlash: Directional<Backlash>,
     pub members: [WormMemberResult; 2],
     pub notes: Vec<String>,
 }
@@ -248,8 +254,9 @@ pub fn solve_worm_stage(
         (stage.centre_distance.manual, 0.0)
     };
 
-    let e = s.efficiency(stage.friction);
-    let output_torque = input_torque * s.ratio * e.worm_driving;
+    let efficiency = Directional::of(|d| s.efficiency(stage.friction, d));
+    let threshold = s.self_locking_friction();
+    let output_torque = input_torque * s.ratio * efficiency.forward;
 
     // Contact is rated on the wheel's torque: which torque is held fixed decides
     // which way friction moves the flank load, and only this direction is the
@@ -261,43 +268,49 @@ pub fn solve_worm_stage(
         .contact(output_torque, Member::Second, stage.friction, e_star)
         .ok_or(TrainError::NoContact)?;
 
-    let backlash = [Member::First, Member::Second].map(|at| Backlash {
-        nominal: angular_backlash(&s, stage, centre - s.centre_distance, at).to_degrees(),
-        minimum: angular_backlash(
-            &s,
-            stage,
-            centre - stage.tolerance_minus - s.centre_distance,
-            at,
-        )
-        .to_degrees(),
-        maximum: angular_backlash(
-            &s,
-            stage,
-            centre + stage.tolerance_plus - s.centre_distance,
-            at,
-        )
-        .to_degrees(),
+    let backlash = Directional::of(|d| {
+        let at = match d {
+            Drive::Forward => Member::Second,
+            Drive::Backward => Member::First,
+        };
+        Backlash {
+            nominal: angular_backlash(&s, stage, centre - s.centre_distance, at).to_degrees(),
+            minimum: angular_backlash(
+                &s,
+                stage,
+                centre - stage.tolerance_minus - s.centre_distance,
+                at,
+            )
+            .to_degrees(),
+            maximum: angular_backlash(
+                &s,
+                stage,
+                centre + stage.tolerance_plus - s.centre_distance,
+                at,
+            )
+            .to_degrees(),
+        }
     });
 
     let mut notes = Vec::new();
-    if e.self_locking {
+    if efficiency.self_locking() {
         notes.push(format!(
             "self-locking at mu = {:.3}: the wheel cannot back-drive the worm \
-             (the threshold is {:.4})",
-            stage.friction, e.self_locking_friction
+             (the threshold is {threshold:.4})",
+            stage.friction
         ));
-    } else if stage.friction > 0.8 * e.self_locking_friction {
+    } else if stage.friction > 0.8 * threshold {
         notes.push(format!(
-            "close to self-locking: mu = {:.3} against a threshold of {:.4}, so \
-             back-driving depends on a friction coefficient nobody measured",
-            stage.friction, e.self_locking_friction
+            "close to self-locking: mu = {:.3} against a threshold of {threshold:.4}, \
+             so back-driving depends on a friction coefficient nobody measured",
+            stage.friction
         ));
     }
-    if e.worm_driving < 0.5 {
+    if efficiency.forward < 0.5 {
         notes.push(format!(
             "mesh efficiency {:.1} % — most of the input becomes heat, and a \
              worm drive is usually limited by that rather than by stress",
-            e.worm_driving * 100.0
+            efficiency.forward * 100.0
         ));
     }
 
@@ -329,10 +342,8 @@ pub fn solve_worm_stage(
         wheel_helix_angle: s.wheel_helix_angle.to_degrees(),
         lead: s.lead,
         axial_module: s.axial_module,
-        efficiency_forward: e.worm_driving,
-        efficiency_backward: e.wheel_driving,
-        self_locking: e.self_locking,
-        self_locking_friction: e.self_locking_friction,
+        efficiency,
+        self_locking_friction: threshold,
         sliding_ratio: s.sliding_ratio,
         sliding_velocity: 0.0,
         contact: WormContact {
@@ -402,17 +413,17 @@ mod tests {
 
             let wheel = 0.04 / (s.wheel_pitch_diameter / 2.0);
             assert!(
-                (r.backlash[1].nominal.to_radians() - wheel).abs() < 1e-12 * wheel,
+                (r.backlash.forward.nominal.to_radians() - wheel).abs() < 1e-12 * wheel,
                 "z₁={starts}: wheel backlash {} vs j/r₂ {}",
-                r.backlash[1].nominal.to_radians(),
+                r.backlash.forward.nominal.to_radians(),
                 wheel
             );
 
             let worm = std::f64::consts::TAU * 0.04 / s.lead;
             assert!(
-                (r.backlash[0].nominal.to_radians() - worm).abs() < 1e-12 * worm,
+                (r.backlash.backward.nominal.to_radians() - worm).abs() < 1e-12 * worm,
                 "z₁={starts}: worm backlash {} vs 2π j/lead {}",
-                r.backlash[0].nominal.to_radians(),
+                r.backlash.backward.nominal.to_radians(),
                 worm
             );
         }
@@ -431,13 +442,16 @@ mod tests {
             ..Default::default()
         };
         let r = solved(&stage);
-        assert_eq!(r.backlash[1].nominal, 0.0, "nominal, with no slack at all");
+        assert_eq!(
+            r.backlash.forward.nominal, 0.0,
+            "nominal, with no slack at all"
+        );
         assert!(
-            r.backlash[1].maximum > 0.0,
+            r.backlash.forward.maximum > 0.0,
             "opening the centres opens the mesh"
         );
         assert_eq!(
-            r.backlash[1].minimum, 0.0,
+            r.backlash.forward.minimum, 0.0,
             "tighter than nominal is contact"
         );
     }
@@ -447,9 +461,9 @@ mod tests {
     fn a_worm_stage_reports_contact_and_two_efficiencies_and_no_bending() {
         let r = solved(&WormStage::default());
         assert!((r.ratio - 40.0).abs() < 1e-12);
-        assert!(r.efficiency_forward > 0.0 && r.efficiency_forward < 1.0);
+        assert!(r.efficiency.forward > 0.0 && r.efficiency.forward < 1.0);
         assert!(
-            r.efficiency_backward < r.efficiency_forward,
+            r.efficiency.backward < r.efficiency.forward,
             "back-driving is the worse direction"
         );
         assert!(r.contact.max_pressure > 0.0 && r.contact.max_pressure.is_finite());
@@ -464,7 +478,7 @@ mod tests {
             r.contact.patch_width
         );
         // Torque follows the ratio and the operative efficiency.
-        let expected = 2.0 * r.ratio * r.efficiency_forward;
+        let expected = 2.0 * r.ratio * r.efficiency.forward;
         assert!((r.members[1].torque - expected).abs() < 1e-12 * expected);
     }
 
@@ -505,7 +519,7 @@ mod tests {
             friction: 0.06,
             ..Default::default()
         });
-        assert!(r.self_locking);
+        assert!(r.efficiency.self_locking());
         assert!(
             r.notes.iter().any(|n| n.contains("self-locking")),
             "notes: {:?}",
