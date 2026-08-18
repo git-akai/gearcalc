@@ -10,9 +10,9 @@ this file is stale.
 
 ## 1. State
 
-**Milestones 0–6 complete and in CI; milestone 7's contact unification is done
-and the screw-gear mathematics with it. What remains of 7 is the worm *stage*.
-200 tests, ~27 s.**
+**Milestones 0–6 complete and in CI. Milestone 7: the contact unification, the
+screw-gear mathematics and the worm stage are all built; what remains is wiring
+the stage into a train and surfacing it. 215 tests, ~25 s.**
 
 ```bash
 nix develop                       # or `direnv allow` once
@@ -48,6 +48,7 @@ cargo run --bin gear-cli -- materials            # the library, with each value'
 cargo run --bin gear-cli -- strength 17 43 2.0   # a worked mesh, end to end
 cargo run --bin gear-cli -- train                # a two-stage train, end to end
 cargo run --bin gear-cli -- worm 1 40 7 90       # a worm pair, both directions
+cargo run --bin gear-cli -- wormstage 1 40 7 2   # a worm stage, end to end
 cargo run --release --bin gear-cli -- verify 100 # the two-sided cutter check
 ```
 
@@ -241,14 +242,24 @@ which is the point — unify *before* there is anything new to get wrong.
    reproduces the two published closed forms to 1e-14, and energy balances at
    every shaft angle. Drive it with `gear-cli worm 1 40 7 90`.
 
-**What is left of milestone 7 is the worm *stage*, not its mathematics.** The
-mesh is complete: geometry, sliding, both efficiencies, self-locking, the
-relative curvatures and the contact patch, all in `screw.rs` and driveable with
-`gear-cli worm`. What remains is a `WormStage` beside `SpurStage` — which is what
-finally splits `train.rs` into a directory — then torque and backlash through the
-train, the wasm boundary, and the UI.
+**What is left of milestone 7 is wiring, not mathematics.** `screw.rs` has the
+mesh — geometry, sliding, both efficiencies, self-locking, relative curvatures,
+contact patch. `train/worm.rs` has the stage — materials, torque, contact,
+backlash, notes. `train.rs` became `train/` on the way, as planned. Both are
+driveable from `gear-cli`.
 
-Three things that stage inherits and should not re-litigate:
+What remains:
+
+1. **A stage enum on `Train`** so a train can hold both kinds, and the
+   accumulation in `solve_train` dispatching on it. Each kind keeps its own
+   result type — that is deliberate, see `train/mod.rs` — so the accumulation
+   reads ratio, efficiency and output backlash through a small interface rather
+   than a shared struct.
+2. **The wasm boundary**, which currently types `stages` as `Vec<SpurStage>`.
+3. **The UI**: a worm panel, and the stage-kind choice in the geartrain tab.
+   `TrainPanel.svelte` is written entirely around a spur stage today.
+
+Three things the stage settled that should not be re-litigated:
 
 - **Rate the contact on the wheel's torque, not the worm's.** Which torque is
   held fixed decides which way friction moves the flank load — down at fixed
