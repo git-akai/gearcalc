@@ -151,6 +151,8 @@ gears/
 │   │   ├── contact.rs       path of contact, load sharing, mesh efficiency
 │   │   ├── strength.rs      load, bending, Hertz, face width
 │   │   ├── material.rs      material model — values, provenance, allowables
+│   │   ├── shaper.rs        generation by a pinion cutter; the rack is its
+│   │   │                    limit, and internal gears its other sign
 │   │   ├── screw.rs         crossed-axis screw gearing — worm and crossed
 │   │   │                    helical, one module
 │   │   ├── train/           mod.rs   the vocabulary stages share, and the
@@ -2410,6 +2412,9 @@ here. Revision 2 additions are marked ★.
 | ◆ Worm type: ZI against ZN and ZA | peak contact pressure, five worms from γ = 4.8° to 19.5°, everything but the flank type held fixed | ZN 0.9–14.8 % **below** ZI, ZA between them. The effective `α_n` is identical to 0.01° across all three, so nothing but contact stress moves |
 | ◆ **Worm backlash from one projection** | the derived `j_n = j_axial sin β_b1 + Δa sin α_n` against the two relations handbooks give separately — wheel turns by `j/r₂`, worm by `2π j/lead` — three worms | 1e-12 both, so one projection reproduces both rules |
 | ◆ Worm contact vs. face width | wheel face width 4 mm against 40 mm | **bit-identical** peak pressure — which is why a worm stage has no automatic face width from strength: a point contact has nothing for `σ_H ∝ 1/√b` to invert |
+| ▲ **The rack is the shaper's limit** | shaper-cut fillet vs. `Gear::trochoid_at`, cutter tooth count 10² → 10⁶, four gears including profile shifts | converges monotonically; the residue at 10⁶ matches the pitch line's own curvature term `s_j²/2r_c`, so what is left is geometry rather than arithmetic |
+| ▲ Order of that convergence | error at `z_c` = 1 000 against 10 000 | falls by 10^1.00 — first order in `1/z_c`, as a circle departing from its tangent must be |
+| ▲ **The envelope condition** | every fillet point against the cutter at 81 phases either side, external and internal, three tooth pairs each | on its own corner circle to 1e-9, outside it at every other phase. This is what pins the rolling sense: assuming an internal workpiece reversed put the fillet 0.017 mm **inside** the tool half a tooth later |
 | ◆ Efficiency under drive reversal | the same mesh driven both ways — not relabelled — four meshes × three helix angles | **bit-identical**, computed independently through the same code with a different `Drive` |
 | ◆ Backlash at the two ends of a train | referred to the output shaft against the input shaft | differ by **exactly the total ratio**, since each stage's own pair is its gap at two lever arms whose ratio is that stage's ratio |
 | ◆ Flank rulings | projection construction vs. `cos β_b`, four shaft angles × four helix angles | 1e-14 — the base helix angle is a *consequence* of projecting the axis onto the tangent plane, not an input to it |

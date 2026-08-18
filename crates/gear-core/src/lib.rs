@@ -28,6 +28,7 @@ pub mod outline;
 pub mod params;
 pub mod profile;
 pub mod screw;
+pub mod shaper;
 pub mod solve;
 pub mod strength;
 pub mod train;

@@ -202,6 +202,28 @@ geartrain side.
 
 ### Milestone 8 — ring gear geometry
 
+**Started.** `shaper.rs` has the generating curve: the fillet swept by a pinion
+cutter's tip corner, for an external or an internal workpiece. The rack is its
+`z_c → ∞` limit and that is *measured*, so the two are one construction rather
+than two — the residue at a million cutter teeth is the pitch line's own
+curvature term, not slop.
+
+What that leaves for the profile itself: assemble the internal half-profile
+(tip arc → involute flank → shaper trochoid → root arc, with the tip *inside*
+the root), the interference checks a rack cutter never needs, and the
+rack-equivalent validation that is the milestone's gate. `verify.rs`'s two-sided
+bound is the model for that gate; the envelope test in `shaper.rs` is the same
+idea applied to one curve.
+
+**One trap already paid for.** The rolling sense has *no* `σ` in it. An internal
+workpiece does turn the other way relative to its cutter — but the cutter also
+turns the other way for increasing travel, because its corner points outward
+rather than inward, and the two reversals cancel. Assuming otherwise put the
+fillet 0.017 mm inside the tool half a tooth later, which the envelope test
+caught and no smoke test would have.
+
+
+
 The largest remaining piece of *new geometry*: an internal profile cut by a
 pinion-shaped shaper rather than a rack, its trochoid, and the interference
 checks a rack cutter never needs. Its gate is its own rack-equivalent
