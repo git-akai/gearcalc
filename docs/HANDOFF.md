@@ -10,9 +10,7 @@ this file is stale.
 
 ## 1. State
 
-**Milestones 0–6 complete and in CI. Milestone 7: the contact unification, the
-screw-gear mathematics and the worm stage are all built; what remains is wiring
-the stage into a train and surfacing it. 215 tests, ~25 s.**
+**Milestones 0–7 complete and in CI. 216 tests, ~26 s.**
 
 ```bash
 nix develop                       # or `direnv allow` once
@@ -37,8 +35,10 @@ contact path) · metrology (span, over-pins, JGMA 116-02 tables) · strength
 (critical section, form factor, bending stress, Hertz line contact, face width,
 helical throughout) · efficiency · an eight-material library with per-value
 provenance · automatic profile shift and altered addendum · a spur/helical
-geartrain with torque, backlash and cycle accumulation · the gear tab and the
-geartrain tab with its stage accordion · DXF export.
+geartrain with torque, backlash and cycle accumulation · **crossed-axis screw
+gearing — lead angle, both efficiencies, self-locking, elliptical contact and
+backlash — and a worm stage a train can hold beside a spur one** · the gear tab
+and the geartrain tab with its stage accordion, spur and worm · DXF export.
 
 ### Driving it without a browser
 
@@ -200,101 +200,38 @@ geartrain side.
 
 ## 6. Next
 
-### Milestone 7 — worm stage
+### Milestone 8 — ring gear geometry
 
-**Unify the contact section first.** The full plan is DESIGN §4.7; the shape of
-it is that three things unify, one parameter each, and in every case the present
-parallel-axis result is the degenerate value:
+The largest remaining piece of *new geometry*: an internal profile cut by a
+pinion-shaped shaper rather than a rack, its trochoid, and the interference
+checks a rack cutter never needs. Its gate is its own rack-equivalent
+validation, the way milestone 1's was.
 
-| | unified by | parallel axes is |
-|---|---|---|
-| Geometry — path of contact | shaft angle `Σ` | `Σ = 0` |
-| Pressure — Hertz | lengthwise relative curvature `1/R_L` | `1/R_L = 0` |
-| Friction — efficiency | the sliding **velocity vector** | lengthwise component 0 |
+Milestone 7 is done. What it left, and what a ring gear should copy:
 
-Use **Carlson symmetric elliptic integrals**, not the classical `K(e)`/`E(e)`
-form: the classical one requires knowing which semi-axis is major — itself a
-branch — and is ill-conditioned exactly as the ellipse degenerates, which is the
-limit that matters here.
+- **The contact model takes parameters, not branches.** `contact_stress` takes a
+  lengthwise curvature (`PARALLEL_AXES` is the named zero), `elliptical_contact`
+  takes any curvature pair, `sliding_velocity` any second axis, and
+  `relative_curvatures` any per-body principal curvatures including negative
+  ones. An internal mesh is a negative curvature, so it should need no new
+  contact code at all — only geometry.
+- **Each stage kind keeps its own result type**, and the train reads what it
+  needs through a small interface (`ratio`, `efficiency`, `output_backlash`,
+  `set_kinematics`). A planetary stage will want the same freedom; do not force
+  it into `SpurResult`.
+- **Say what is not modelled, next to the number.** The worm stage reports no
+  bending stress and states why on screen, and its contact stress carries the
+  ZI-flank caveat. That is cheaper than a footnote nobody reads.
 
-The one real discontinuity is geometric, not elastic: a tooth has finite face
-width, so an ellipse longer than the face is truncated by the tooth. Hence
-`σ_H = max(σ_elliptical, σ_line over the available length)`, exact at both ends.
+Deliberately not built in milestone 7, none of it blocking:
 
-**Order matters.** Steps 1–4 below change no answer the tool currently gives,
-which is the point — unify *before* there is anything new to get wrong.
-
-1. ✅ Carlson integrals, tested alone. `gear-core/src/elliptic.rs`.
-2. ✅ General Hertz on them — sphere-on-sphere and sphere-on-plane have exact
-   closed forms and need no gear. `gear-core/src/hertz.rs`.
-3. ✅ Swap `contact_stress` to the general form at `1/R_L = 0`. **The acceptance
-   gate must pass before any crossed-axis geometry is added**: every existing
-   contact and efficiency check, plus the canary to the last digit. It passed,
-   and the canary is bit-identical rather than merely close — a test asserts
-   `==` against the line formula, because agreement to a tolerance would have
-   been equally consistent with the line term having been re-derived.
-4. ✅ Sliding as a vector; parallel-axis efficiency unchanged first.
-   `contact::sliding_velocity`. This one **corrected the design** rather than
-   confirming it — see §4 below.
-5. 🔶 Worm geometry, `sin γ = z m_n/d` (exact — no iteration), self-locking.
-   **Built and verified** in `screw.rs`: pitch-point geometry, sliding, and both
-   drive directions derived from a force balance rather than quoted — at 90° it
-   reproduces the two published closed forms to 1e-14, and energy balances at
-   every shaft angle. Drive it with `gear-cli worm 1 40 7 90`.
-
-**What is left of milestone 7 is wiring, not mathematics.** `screw.rs` has the
-mesh — geometry, sliding, both efficiencies, self-locking, relative curvatures,
-contact patch. `train/worm.rs` has the stage — materials, torque, contact,
-backlash, notes. `train.rs` became `train/` on the way, as planned. Both are
-driveable from `gear-cli`.
-
-What remains:
-
-1. **A stage enum on `Train`** so a train can hold both kinds, and the
-   accumulation in `solve_train` dispatching on it. Each kind keeps its own
-   result type — that is deliberate, see `train/mod.rs` — so the accumulation
-   reads ratio, efficiency and output backlash through a small interface rather
-   than a shared struct.
-2. **The wasm boundary**, which currently types `stages` as `Vec<SpurStage>`.
-3. **The UI**: a worm panel, and the stage-kind choice in the geartrain tab.
-   `TrainPanel.svelte` is written entirely around a spur stage today.
-
-Three things the stage settled that should not be re-litigated:
-
-- **Rate the contact on the wheel's torque, not the worm's.** Which torque is
-  held fixed decides which way friction moves the flank load — down at fixed
-  input, up at fixed output — and only the second is the conservative reading.
-  `Screw::normal_force` takes a `Member` so the choice has to be made explicitly.
-- **No bending stress**, decided below.
-- **The worm is a ZI (involute helicoid)**, which is what makes each flank a
-  cylinder and the parallel case an exact limit. That was measured against ZN
-  and ZA rather than assumed: all three are the same surface family, the choice
-  moves **only** contact stress, and ZN comes out 1–15 % *below* ZI as the lead
-  angle rises — so keeping ZI is the conservative reading, and it is also the
-  conjugate partner of the involute helical wheel. DESIGN §4.5.1 has the table
-  and `tools/worm_flank_curvature.py` reproduces it. **The UI must carry that
-  caveat beside the contact stress**, as `gear-cli worm` and `wormstage` already
-  do.
-
-What steps 1–4 leave in place for step 5: `contact_stress` already takes a
-lengthwise curvature (`PARALLEL_AXES` is the named zero every current call site
-passes), `elliptical_contact` already returns the patch for any curvature pair,
-and `sliding_velocity` already takes an arbitrary second axis. Step 5 supplies a
-different `axis_2` and a non-zero `1/R_L`; it should not need to add a branch to
-any of them.
-
-Both of milestone 7's open decisions are now taken:
-
-- **Efficiency is genuinely direction-dependent** for a worm, unlike every mesh
-  so far. Built: `screw.rs` derives both directions from a force balance, and
-  self-locking falls out as a sign change at `μ ≥ cos α_n tan γ`.
-- **A worm stage reports no bending stress.** Decided against showing the
-  parallel-axis figure marked indicative, because there is no reason to think it
-  is near the truth: the tooth whose form would be measured is not the tooth that
-  is loaded, the load case differs in kind rather than by a factor, and no
-  standard rates worm bending, so nothing could check it. Reasoning in DESIGN
-  §4.5.1. The stage reports contact stress, sliding velocity and power loss
-  instead — which is what worm drives are actually limited by.
+| Gap | Why |
+|---|---|
+| Worm contact ratio | needs the zone of action for a throated wheel; the model is a cylindrical (crossed-helical) pair |
+| Worm profile drawing and DXF | the gear tab draws parallel-axis involutes; a worm needs its own section |
+| Automatic worm length and wheel face width | the published rules are proportions — conventions, which §4.7's policy excludes |
+| `Driven By` on a worm stage | torque propagates worm→wheel; back-driving is reported as an efficiency, not modelled as a train direction |
+| Throated wheels | a throated wheel is concave along the contact, lowering `1/R_L`; the cylindrical figure is conservative. It would enter as a curvature, not a rework |
 
 ### After
 

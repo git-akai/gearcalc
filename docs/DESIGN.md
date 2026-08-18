@@ -1,7 +1,7 @@
 # Gear & geartrain design tool — architecture and mathematics
 
-**Status: milestones 0–6 complete and in CI; milestone 7 (worm stage) is the
-open work.** This document is the design of record and is current as of the head
+**Status: milestones 0–7 complete and in CI; milestone 8 (ring gear geometry)
+is the open work.** This document is the design of record and is current as of the head
 of `main`. Where implementation contradicted the design, the design was corrected
 and the correction recorded — see §12.
 
@@ -44,7 +44,7 @@ cd web && npm run dev             # the application
 
 ## What is next
 
-Milestone 7 (worm stage) is the open work; §11 has the full list. Nothing is
+Milestone 8 (ring gear geometry) is the open work; §11 has the full list. Nothing is
 blocked. The parallel-axis mesh is complete, gear through train, so what
 milestone 7 adds is the *crossed* axis — and the decision already taken is that
 it arrives as a parameter rather than a branch. **The contact section is unified
@@ -2210,7 +2210,7 @@ it can be validated in isolation.
 | 4 | ✅ **Materials** — TOML library, import/export, the preloaded materials | **met** — every value carries a cited primary source and a `basis`; the library round-trips through TOML unchanged and satisfies cross-family consistency laws |
 | 5 | ✅ **Mesh & strength** — contact path, bending, load-to-stress path, efficiency, Hertz, face width | **met** — both bending constructions converge to their own closed-form rack limits; Hertz agrees with the contact-half-width route to 1e-12; efficiency matches a numerical average of the instantaneous loss to 1e-10; `b_min` is independent of the face width it was evaluated at |
 | 6 | ✅ **Spur stage** — stage solve, train accumulation, tooth cycles, `solve_train` across the wasm boundary, geartrain tabs and the stage accordion | **met** — a two-stage train computes end to end in `gear-cli` *and* in the browser, with `ε_β = 0` exactly for a spur stage; the UI's own numbers were checked against the CLI's in a headless render |
-| 7 | ⬜ **Worm stage** — unify the contact section first (§4.7), then screw-gear geometry, lead angle, self-locking, axial backlash | the unified model reproduces every existing contact and efficiency check at its degenerate parameters, and `gear-cli strength 17 43 2.0` to the last digit; then the self-locking threshold matches the closed form |
+| 7 | ✅ **Worm stage** — the contact unification, screw-gear mathematics, the worm stage, and a train that holds both kinds | **met** — the unified contact model is bit-identical to line contact at its degenerate parameters and `gear-cli strength 17 43 2.0` is unchanged to the last digit; the self-locking threshold is exact (η_back is zero at `μ = cos α_n tan γ`, not merely small); a mixed train solves end to end in the CLI, across the wasm boundary and in the browser |
 | 8 | ⬜ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | own rack-equivalent validation |
 | 9 | ⬜ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency | common centre distance to 1e-12; all six drive modes |
 | 10 | ⬜ **Crossed-axis spur** — reuse `screw.rs`, point-contact Hertz | Q2 revisited with the worm model in hand |
