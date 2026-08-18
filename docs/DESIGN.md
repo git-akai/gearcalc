@@ -2309,6 +2309,9 @@ here. Revision 2 additions are marked ★.
 | ◆ **Lengthwise sliding, parallel axes** | two meshes × β = 0, 8, 20, 35°, eleven points along each path | zero to 1e-14 of the pitch line velocity, at every helix angle — the measurement that corrected §4.5 and §4.7 |
 | ◆ Sliding magnitude vs. the scalar the closed form uses | three meshes × three helix angles, nine points each | `\|ξ\|(ω₁+ω₂)` to 1e-11 — so the closed form integrates the *whole* sliding, not a component |
 | ◆ Efficiency as the integral of the vector | closed form vs. a 200 000-point average of `μ\|v_s\|/(v_b cos β_b)` driven by the vector model, three meshes × three helix angles | 1e-9 absolute; the loop closes on the formula in use |
+| ◆ Relative curvature reduction | closed form vs. the eigenvalues of the summed 2×2 curvature forms, eight skew angles × four body pairs | 1e-13 — an independent route through the same geometry, and the one that actually tests the skew term |
+| ◆ Parallel cylinders through the reduction | four radius pairs at zero skew | flat direction **exactly** 0, sharp one equal to `1/R₁ + 1/R₂` — line contact reached exactly, which is why the `sin²ψ` form is used rather than `cos 2ψ` |
+| ◆ Equal cylinders crossed at 90° | through the reduction and on into the contact solution | circular patch, and the same peak pressure as the sphere pair of that relative radius |
 | ◆ Lead angle `sin γ = z m_n/d` | vs. the fixed point of `tan γ = z m_x/d`, `m_x = m_n/cos γ`, five worms | residual < 1e-15 — the substitution is exact, and the iteration people write is unnecessary |
 | ◆ The same law on the wheel | `sin γ₂` vs. `z₂ m_n/d₂`, four shaft angles | 1e-14 |
 | ◆ Screw ratio is not imposed | `(d₂/d₁)/(v₂/v₁)` vs. `z₂/z₁`, four pairs including Σ = 75° and 100° | 1e-12 — the geometry is self-consistent rather than fitted together |

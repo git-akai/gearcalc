@@ -193,6 +193,70 @@ pub fn elliptical_contact(
     })
 }
 
+/// The two **relative** principal curvatures of a contacting pair, from each
+/// body's own principal curvatures and the angle between their principal
+/// planes.
+///
+/// This is the step between a pair of surfaces and [`elliptical_contact`],
+/// which wants the relative curvatures and nothing else. Each body is given as
+/// `(1/R', 1/R'')` in 1/mm — its two principal curvatures, positive for a
+/// convex surface — and `skew` is the angle from body 1's first principal plane
+/// to body 2's.
+///
+/// ```text
+/// 2A + 2B = Σ curvatures
+/// 2B − 2A = √[ (Δ₁ + Δ₂)² − 4 Δ₁ Δ₂ sin²ψ ],     Δᵢ = 1/Rᵢ′ − 1/Rᵢ″
+/// ```
+///
+/// The returned pair is `(2A, 2B)` with `2A ≤ 2B`: the flatter direction first,
+/// which is the one that degenerates.
+///
+/// # Why it is written with `sin²ψ`
+///
+/// The textbook form of the second line carries `cos 2ψ`, and the two are the
+/// same identity apart. This one is **exact at `ψ = 0`**: the radicand collapses
+/// to `(Δ₁ + Δ₂)²`, whose square root is that sum to the last bit, so the
+/// flatter relative curvature comes back as **exactly zero** rather than as a
+/// rounding-sized positive number. Parallel cylinders therefore reach line
+/// contact exactly, which is the property the whole §4.7 unification rests on —
+/// with the `cos 2ψ` form the same case would arrive as an ellipse a few
+/// hundred metres long, and while that is harmless in the `max`, "harmless"
+/// is not the claim being made.
+///
+/// # Errors
+///
+/// `None` if either relative curvature comes out negative — the surfaces are
+/// conformal in that direction and do not touch at a point at all, which
+/// Hertz's theory does not cover.
+#[must_use]
+pub fn relative_curvatures(
+    body_1: (f64, f64),
+    body_2: (f64, f64),
+    skew: f64,
+) -> Option<(f64, f64)> {
+    let finite = |v: f64| v.is_finite();
+    if !finite(body_1.0) || !finite(body_1.1) || !finite(body_2.0) || !finite(body_2.1) {
+        return None;
+    }
+
+    let sum = body_1.0 + body_1.1 + body_2.0 + body_2.1;
+    let d1 = body_1.0 - body_1.1;
+    let d2 = body_2.0 - body_2.1;
+
+    let s = skew.sin();
+    let radicand = (d1 + d2) * (d1 + d2) - 4.0 * d1 * d2 * s * s;
+    // Rounding can put a vanishing radicand a hair below zero; the difference
+    // it represents is zero either way.
+    let difference = radicand.max(0.0).sqrt();
+
+    let flatter = 0.5 * (sum - difference);
+    let sharper = 0.5 * (sum + difference);
+    if flatter < 0.0 || sharper <= 0.0 {
+        return None;
+    }
+    Some((flatter, sharper))
+}
+
 /// The ellipse's aspect ratio `κ = b/a ∈ [0,1]` for a curvature ratio
 /// `q = (1/R_long)/(1/R_short) ∈ [0,1]`.
 ///
@@ -256,6 +320,130 @@ fn curvature_ratio(kappa: f64) -> Option<f64> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use std::f64::consts::FRAC_PI_2;
+
+    /// Parallel cylinders are the gear case, and the relative curvature must
+    /// come out as the flat direction being **exactly** flat — not nearly. This
+    /// is what lets a crossed-axis stage at zero shaft angle return the same
+    /// number a parallel one does.
+    #[test]
+    fn parallel_cylinders_are_exactly_line_contact() {
+        for (r1, r2) in [(10.0, 10.0), (3.0, 25.0), (1.5, 0.4), (100.0, 2.0)] {
+            let (flat, sharp) = relative_curvatures((1.0 / r1, 0.0), (1.0 / r2, 0.0), 0.0).unwrap();
+            assert_eq!(
+                flat, 0.0,
+                "R={r1}/{r2}: the flat direction must be exactly 0"
+            );
+            // and the sharp one is the relative curvature the line-contact
+            // formula in `strength` uses
+            assert!((sharp - (1.0 / r1 + 1.0 / r2)).abs() < 1e-15 * sharp);
+        }
+    }
+
+    /// Cylinders crossed at a right angle: the classic case, where the two
+    /// relative curvatures are simply the two bodies' own.
+    #[test]
+    fn cylinders_crossed_at_a_right_angle_keep_their_own_curvatures() {
+        for (r1, r2) in [(10.0, 10.0), (3.0, 25.0), (0.4, 1.5)] {
+            let (flat, sharp) =
+                relative_curvatures((1.0 / r1, 0.0), (1.0 / r2, 0.0), FRAC_PI_2).unwrap();
+            let (lo, hi) = if r1 >= r2 {
+                (1.0 / r1, 1.0 / r2)
+            } else {
+                (1.0 / r2, 1.0 / r1)
+            };
+            assert!(
+                (flat - lo).abs() < 1e-15 * hi,
+                "R={r1}/{r2}: {flat} vs {lo}"
+            );
+            assert!((sharp - hi).abs() < 1e-15 * hi);
+        }
+    }
+
+    /// Equal cylinders crossed at a right angle press a **circular** patch —
+    /// the standard result, and a check that runs the whole way through to a
+    /// contact solution rather than stopping at the curvatures.
+    #[test]
+    fn equal_crossed_cylinders_press_a_circle() {
+        let r = 8.0;
+        let (cx, cy) = relative_curvatures((1.0 / r, 0.0), (1.0 / r, 0.0), FRAC_PI_2).unwrap();
+        let c = elliptical_contact(cx, cy, 400.0, 113_000.0).unwrap();
+        assert!(
+            (c.semi_x - c.semi_y).abs() < 1e-12 * c.semi_x,
+            "{} vs {}",
+            c.semi_x,
+            c.semi_y
+        );
+        // and it is the sphere-on-sphere answer for the same relative radius
+        let sphere = elliptical_contact(1.0 / r, 1.0 / r, 400.0, 113_000.0).unwrap();
+        assert!((c.max_pressure - sphere.max_pressure).abs() < 1e-12 * sphere.max_pressure);
+    }
+
+    /// Against an independent route: build each body's curvature as a 2×2 form,
+    /// rotate the second one, add them, and take the eigenvalues. That is the
+    /// derivation the closed form summarises, done by different arithmetic, and
+    /// it is what actually tests the skew term.
+    #[test]
+    fn the_closed_form_matches_the_eigenvalues_of_the_summed_curvature_forms() {
+        for skew_deg in [0.0, 15.0, 30.0, 45.0, 60.0, 90.0, 120.0, 175.0] {
+            let skew = f64::to_radians(skew_deg);
+            for (b1, b2) in [
+                ((0.1, 0.0), (0.25, 0.0)),
+                ((0.4, 0.05), (0.2, 0.02)),
+                ((0.3, 0.3), (0.1, 0.0)),
+                ((1.0 / 7.0, 1.0 / 90.0), (1.0 / 20.0, 0.0)),
+            ] {
+                let (flat, sharp) = relative_curvatures(b1, b2, skew).unwrap();
+
+                // Body 1 in its own frame, body 2 rotated into it. The quadratic
+                // form of a surface with principal curvatures (k', k'') is
+                // diag(k'/2, k''/2); the gap is the sum of the two.
+                let (c, s) = (skew.cos(), skew.sin());
+                let (p, q) = (b2.0 / 2.0, b2.1 / 2.0);
+                let a11 = b1.0 / 2.0 + p * c * c + q * s * s;
+                let a22 = b1.1 / 2.0 + p * s * s + q * c * c;
+                let a12 = (p - q) * s * c;
+
+                let mean = 0.5 * (a11 + a22);
+                let spread = (0.25 * (a11 - a22) * (a11 - a22) + a12 * a12).sqrt();
+                let (lo, hi) = (2.0 * (mean - spread), 2.0 * (mean + spread));
+
+                assert!(
+                    (flat - lo).abs() < 1e-13 * hi.max(1e-9),
+                    "skew={skew_deg} b1={b1:?} b2={b2:?}: flat {flat} vs eigenvalue {lo}"
+                );
+                assert!(
+                    (sharp - hi).abs() < 1e-13 * hi,
+                    "skew={skew_deg}: sharp {sharp} vs eigenvalue {hi}"
+                );
+            }
+        }
+    }
+
+    /// Two invariants worth pinning: the curvatures sum to the same total
+    /// however the bodies are turned, and turning them by a straight angle
+    /// changes nothing, because a principal plane has no direction.
+    #[test]
+    fn the_sum_is_invariant_and_a_straight_angle_changes_nothing() {
+        let (b1, b2) = ((0.3, 0.05), (0.12, 0.02));
+        let total = b1.0 + b1.1 + b2.0 + b2.1;
+        for skew_deg in [0.0, 23.0, 90.0, 137.0] {
+            let skew = f64::to_radians(skew_deg);
+            let (flat, sharp) = relative_curvatures(b1, b2, skew).unwrap();
+            assert!(
+                (flat + sharp - total).abs() < 1e-15 * total,
+                "skew={skew_deg}"
+            );
+
+            let turned = relative_curvatures(b1, b2, skew + PI).unwrap();
+            assert!((turned.0 - flat).abs() < 1e-15 * total);
+            assert!((turned.1 - sharp).abs() < 1e-15 * total);
+        }
+        // and the pair is symmetric in the two bodies
+        let a = relative_curvatures(b1, b2, 0.7).unwrap();
+        let b = relative_curvatures(b2, b1, 0.7).unwrap();
+        assert!((a.0 - b.0).abs() < 1e-15 * total && (a.1 - b.1).abs() < 1e-15 * total);
+    }
 
     /// Sphere on sphere and sphere on flat, against the textbook closed forms.
     /// These need no gear and share nothing with the algebra above.
