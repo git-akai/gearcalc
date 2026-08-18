@@ -654,6 +654,26 @@ So the architectural call is: build **one crossed-axis screw-gear model**
 it. That collapses most of Q2's cost — crossed helical becomes nearly free once
 the worm stage exists, which is why the milestone order puts worm before it.
 
+##### The worm is modelled as an involute helicoid (ZI)
+
+Both flanks are taken to be involute helicoids, which makes the worm a helical
+gear with few teeth and a large helix angle — exactly the reading that makes
+"worm and crossed-helical are the same mathematics" true rather than merely
+convenient. It also matters for the contact: an involute helicoid is
+**developable**, so one of its principal curvatures is exactly zero along the
+straight ruling lying on the flank, and each flank is locally a *cylinder*.
+
+That is what makes point contact and line contact the same picture. For parallel
+axes the two rulings coincide — that is what a contact line *is* — and the
+relative curvature along them is exactly zero. Cross the shafts and the rulings
+separate, the flatter relative curvature lifts off zero, and the line shortens
+into an ellipse. `1/R_L` of §4.7 is precisely that curvature.
+
+A **ZA** worm (straight-sided in the axial section) or a **ZN** has a different
+flank form and would need its own curvature — a separate piece of work, not a
+factor on this one. Naming which type is modelled is the honest alternative to
+implying all of them are covered.
+
 ##### Decided: a worm stage reports no bending stress at all
 
 An earlier revision of this section proposed showing the parallel-axis bending
@@ -2309,6 +2329,10 @@ here. Revision 2 additions are marked ★.
 | ◆ **Lengthwise sliding, parallel axes** | two meshes × β = 0, 8, 20, 35°, eleven points along each path | zero to 1e-14 of the pitch line velocity, at every helix angle — the measurement that corrected §4.5 and §4.7 |
 | ◆ Sliding magnitude vs. the scalar the closed form uses | three meshes × three helix angles, nine points each | `\|ξ\|(ω₁+ω₂)` to 1e-11 — so the closed form integrates the *whole* sliding, not a component |
 | ◆ Efficiency as the integral of the vector | closed form vs. a 200 000-point average of `μ\|v_s\|/(v_b cos β_b)` driven by the vector model, three meshes × three helix angles | 1e-9 absolute; the loop closes on the formula in use |
+| ◆ Flank rulings | projection construction vs. `cos β_b`, four shaft angles × four helix angles | 1e-14 — the base helix angle is a *consequence* of projecting the axis onto the tangent plane, not an input to it |
+| ◆ **Crossed construction at zero shaft angle** | `σ_H` at the pitch point from the crossed-axis curvatures vs. the verified line-contact path, three meshes including β = 20° and 30° | flatter curvature **exactly** 0; stress agrees to 1e-12 — the crossed model and the parallel one are measuring the same curvature |
+| ◆ Flat curvature vs. shaft angle | Σ swept 0 → 90°, worm-like flank | rises monotonically off zero; the line shortens into an ellipse rather than jumping to one |
+| ◆ Flank load vs. which torque is held | fixed input against fixed output, μ = 0 and 0.06 | opposite directions, as the balance says: friction *lowers* the flank load at fixed input and *raises* it at fixed output. A rating takes the second |
 | ◆ Relative curvature reduction | closed form vs. the eigenvalues of the summed 2×2 curvature forms, eight skew angles × four body pairs | 1e-13 — an independent route through the same geometry, and the one that actually tests the skew term |
 | ◆ Parallel cylinders through the reduction | four radius pairs at zero skew | flat direction **exactly** 0, sharp one equal to `1/R₁ + 1/R₂` — line contact reached exactly, which is why the `sin²ψ` form is used rather than `cos 2ψ` |
 | ◆ Equal cylinders crossed at 90° | through the reduction and on into the contact solution | circular patch, and the same peak pressure as the sphere pair of that relative radius |

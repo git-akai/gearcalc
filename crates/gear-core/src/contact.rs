@@ -378,7 +378,11 @@ pub fn sliding_at(path: &ContactPath, mesh: &Mesh, g1: &Gear, xi: f64, speed_1: 
     )
 }
 
-fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+/// Three-component vector helpers. Shared with [`crate::screw`], which needs
+/// the same arithmetic to find where a crossed pair's tooth traces point;
+/// deliberately not a public vector type, because two modules wanting a cross
+/// product is not a reason to invent one.
+pub(crate) fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [
         a[1] * b[2] - a[2] * b[1],
         a[2] * b[0] - a[0] * b[2],
@@ -386,19 +390,19 @@ fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     ]
 }
 
-fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
+pub(crate) fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
-fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+pub(crate) fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 
-fn scale(a: [f64; 3], k: f64) -> [f64; 3] {
+pub(crate) fn scale(a: [f64; 3], k: f64) -> [f64; 3] {
     [a[0] * k, a[1] * k, a[2] * k]
 }
 
-fn norm(a: [f64; 3]) -> f64 {
+pub(crate) fn norm(a: [f64; 3]) -> f64 {
     dot(a, a).sqrt()
 }
 

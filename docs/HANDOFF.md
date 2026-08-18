@@ -241,12 +241,23 @@ which is the point — unify *before* there is anything new to get wrong.
    reproduces the two published closed forms to 1e-14, and energy balances at
    every shaft angle. Drive it with `gear-cli worm 1 40 7 90`.
 
-**What is left of milestone 7 is the worm *stage*, not its mathematics.** In
-rough order: a `WormStage` beside `SpurStage` — which is what finally splits
-`train.rs` into a directory — the crossed-axis relative curvatures so
-`contact_stress` can be handed a real `1/R_L` instead of `PARALLEL_AXES`, torque
-and backlash through the train, and the UI. The two decisions below are still
-open and belong to that work.
+**What is left of milestone 7 is the worm *stage*, not its mathematics.** The
+mesh is complete: geometry, sliding, both efficiencies, self-locking, the
+relative curvatures and the contact patch, all in `screw.rs` and driveable with
+`gear-cli worm`. What remains is a `WormStage` beside `SpurStage` — which is what
+finally splits `train.rs` into a directory — then torque and backlash through the
+train, the wasm boundary, and the UI.
+
+Three things that stage inherits and should not re-litigate:
+
+- **Rate the contact on the wheel's torque, not the worm's.** Which torque is
+  held fixed decides which way friction moves the flank load — down at fixed
+  input, up at fixed output — and only the second is the conservative reading.
+  `Screw::normal_force` takes a `Member` so the choice has to be made explicitly.
+- **No bending stress**, decided below.
+- **The worm is a ZI (involute helicoid)**, which is what makes each flank a
+  cylinder and the parallel case an exact limit. ZA and ZN worms would need their
+  own flank curvature.
 
 What steps 1–4 leave in place for step 5: `contact_stress` already takes a
 lengthwise curvature (`PARALLEL_AXES` is the named zero every current call site

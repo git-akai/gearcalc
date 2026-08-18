@@ -782,6 +782,7 @@ fn loadcase_report() {
 
 /// A worm pair, end to end: geometry, sliding, and both drive directions.
 fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_deg: f64) {
+    use gear_core::mesh::Member;
     use gear_core::screw::{Screw, ScrewParams};
 
     let params = ScrewParams {
@@ -852,4 +853,41 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
     }
     let threshold = s.efficiency(0.0).self_locking_friction;
     println!("  self-locks at mu >= {threshold:.4}   (cos alpha_n tan gamma)");
+
+    // Contact is the strength figure a worm stage reports. There is deliberately
+    // no bending stress here; DESIGN.md §4.5.1 says why.
+    let lib = gear_io::default_library();
+    let (worm_material, wheel_material) = ("4340 Hardened Steel", "Brass C360");
+    let (Some(m1), Some(m2)) = (lib.get(worm_material), lib.get(wheel_material)) else {
+        return;
+    };
+    let e_star = gear_core::material::contact_modulus(m1, m2);
+    let mu = 0.06;
+    let torque_in = 2.0;
+    let torque_out = torque_in * s.ratio * s.efficiency(mu).worm_driving;
+
+    println!();
+    println!("contact   {worm_material} on {wheel_material},  E* {e_star:.0} MPa");
+    println!("  worm torque {torque_in:.3} Nm  ->  wheel torque {torque_out:.3} Nm at mu {mu}");
+    let (flat, sharp) = match s.contact_curvatures() {
+        Some(c) => c,
+        None => {
+            println!("  the flanks do not touch at a point");
+            return;
+        }
+    };
+    println!("  relative curvature   along {flat:.6} /mm   across {sharp:.6} /mm");
+    if let Some(c) = s.contact(torque_out, Member::Second, mu, e_star) {
+        println!(
+            "  patch  {:.4} x {:.4} mm   (rated on the wheel's torque)",
+            c.semi_major() * 2.0,
+            c.semi_minor() * 2.0
+        );
+        println!("  peak pressure               {:.1} MPa", c.max_pressure);
+        println!(
+            "  sliding speed at 3000 rpm   {:.1} mm/s",
+            s.sliding_ratio * 3000.0 / 60.0 * std::f64::consts::TAU * s.worm_pitch_diameter / 2.0
+        );
+    }
+    println!("  bending                     not reported - see DESIGN.md 4.5.1");
 }
