@@ -26,6 +26,12 @@ fn main() {
         Some("loadcase") => loadcase_report(),
         Some("materials") => materials(),
         Some("train") => train_report(),
+        Some("worm") => worm_report(
+            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(1),
+            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(40),
+            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(7.0),
+            args.get(4).and_then(|s| s.parse().ok()).unwrap_or(90.0),
+        ),
         Some("strength") => strength_report(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(43),
@@ -772,4 +778,78 @@ fn loadcase_report() {
             100.0 * (c - a) / a
         );
     }
+}
+
+/// A worm pair, end to end: geometry, sliding, and both drive directions.
+fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_deg: f64) {
+    use gear_core::screw::{Screw, ScrewParams};
+
+    let params = ScrewParams {
+        starts,
+        wheel_teeth,
+        worm_pitch_diameter: worm_diameter,
+        shaft_angle: shaft_angle_deg.to_radians(),
+        ..Default::default()
+    };
+    let s = match Screw::new(&params) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("cannot build that pair: {e:?}");
+            return;
+        }
+    };
+
+    println!(
+        "worm   z {}/{}  module {}  alpha_n {:.1} deg  shaft angle {:.1} deg",
+        starts,
+        wheel_teeth,
+        params.normal_module,
+        params.normal_pressure_angle.to_degrees(),
+        shaft_angle_deg
+    );
+    println!(
+        "       ratio {:.4}:1   centre distance {:.4} mm",
+        s.ratio, s.centre_distance
+    );
+    println!();
+    println!("geometry");
+    println!(
+        "  lead angle          worm {:8.4} deg    wheel {:8.4} deg",
+        s.lead_angle.to_degrees(),
+        s.wheel_lead_angle.to_degrees()
+    );
+    println!(
+        "  helix angle         worm {:8.4} deg    wheel {:8.4} deg",
+        s.worm_helix_angle.to_degrees(),
+        s.wheel_helix_angle.to_degrees()
+    );
+    println!(
+        "  pitch diameter      worm {:8.4} mm     wheel {:8.4} mm",
+        s.worm_pitch_diameter, s.wheel_pitch_diameter
+    );
+    println!(
+        "  lead {:.4} mm   axial module {:.5} mm",
+        s.lead, s.axial_module
+    );
+    println!(
+        "  sliding at the pitch point   {:.4} x the worm's pitch line speed",
+        s.sliding_ratio
+    );
+
+    println!();
+    println!("efficiency          worm driving   wheel driving");
+    for mu in [0.0, 0.02, 0.04, 0.06, 0.10] {
+        let e = s.efficiency(mu);
+        let back = if e.self_locking {
+            "  self-locking".to_string()
+        } else {
+            format!("{:12.3} %", e.wheel_driving * 100.0)
+        };
+        println!(
+            "  mu {mu:.2}        {:10.3} % {back}",
+            e.worm_driving * 100.0
+        );
+    }
+    let threshold = s.efficiency(0.0).self_locking_friction;
+    println!("  self-locks at mu >= {threshold:.4}   (cos alpha_n tan gamma)");
 }

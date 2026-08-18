@@ -151,6 +151,8 @@ gears/
 │   │   ├── contact.rs       path of contact, load sharing, mesh efficiency
 │   │   ├── strength.rs      load, bending, Hertz, face width
 │   │   ├── material.rs      material model — values, provenance, allowables
+│   │   ├── screw.rs         crossed-axis screw gearing — worm and crossed
+│   │   │                    helical, one module
 │   │   ├── train.rs         stage solve and train accumulation
 │   │   ├── verify.rs        the two-sided rack check
 │   │   └── data/            jgma_116_02.csv        (beside src/, not in it)
@@ -168,11 +170,10 @@ gears/
 development without touching the browser. Sweeps, regression dumps and
 "why is this number wrong" all happen there.
 
-Two modules are named by the milestones ahead and do not exist yet: `screw.rs`
-(crossed-axis screw gearing, shared by the worm stage and a crossed-axis spur
-stage) and `ring.rs` (internal-gear profile, milestone 8). `train.rs` is one
-file rather than a directory, and stays that way until a second stage type
-gives the split something to divide.
+One module is named by the milestones ahead and does not exist yet: `ring.rs`
+(internal-gear profile, milestone 8). `train.rs` is one file rather than a
+directory, and stays that way until a second stage type gives the split
+something to divide — the worm stage will be the one that forces it.
 
 `elliptic.rs` and `hertz.rs` are the first two steps of the contact unification
 (§4.7) and are deliberately **gear-free**: one is pure special functions and the
@@ -1277,12 +1278,46 @@ rewritten, not that the general form is wrong.
    must pass **before** any crossed-axis geometry is added.
 4. ✅ Sliding as a vector; same discipline — parallel-axis efficiency unchanged
    first, lengthwise component second. `contact::sliding_velocity`.
-5. ⬜ Only then the worm geometry, lead angle `sin γ = z m_n/d`, and
-   self-locking.
+5. 🔶 Then the worm geometry, lead angle `sin γ = z m_n/d`, and self-locking.
+   `screw.rs` — geometry, sliding and both drive directions are built and
+   verified; the worm **stage** (torque, face width, contact stress through the
+   train, and the UI) is what remains of milestone 7.
 
 Steps 1–4 change no answer the tool currently gives. That is the point: the
 crossed-axis work should add a parameter, not a branch, and the way to be sure is
 to unify *before* there is anything new to get wrong.
+
+**Where step 5 landed so far.** `screw.rs` covers the pitch-point geometry and
+mechanics of a screw pair — worm drive and crossed-helical alike, as §4.5.1
+argued they should be. Three things are worth recording because they came out
+better than the plan assumed:
+
+- **`sin γ = z m_n/d` holds on both members**, not just the worm. Writing the
+  wheel's diameter as `z₂ m_n / sin γ₂` removes the axial module from the chain
+  entirely, and the transmission ratio `z₂/z₁` then *falls out* of the two
+  diameters and two lead angles rather than being imposed on them. That is a
+  test, not a remark.
+- **The classical screw-gear efficiencies are derived, not quoted.** A force
+  balance at the pitch point — normal force along the flank normal, friction
+  along the sliding direction — gives `η = v₂(F·û₂) / v₁(F·ŷ)`, and at `Σ = 90°`
+  that reproduces both published formulas to 1e-14. The separating force drops
+  out of both projections, which is why the pressure angle appears only as
+  `cos α_n`. Energy balances at every shaft angle: in minus out is exactly
+  `μ F_n |v_s|`.
+- **Direction dependence has a mechanism rather than an assertion.** Reversing
+  the drive loads the other flank, flipping the normal force's in-plane
+  component while leaving the sliding direction alone — the rotation senses did
+  not change. Self-locking is that sign change reaching the numerator, and the
+  threshold `μ ≥ cos α_n tan γ` is exact: at it, backward efficiency is zero
+  rather than small.
+
+**Parallel axes are deliberately *not* a case of `screw.rs`.** At `Σ = 0` the
+pitch point does not slide at all, so the friction direction is undefined and
+the pitch-point efficiency is `0/0`. That is not a discontinuity to smooth over:
+a parallel-axis mesh's loss lives on the path of contact, which is §4.5's
+integral, and a screw pair's lives at the pitch point. Two regimes, not two
+branches. What *is* unified across both — and what §4.7 set out to unify — is
+the sliding vector, the Hertzian contact and the geometry.
 
 **Where step 4 landed.** `sliding_velocity` takes the two axes, the two signed
 speeds, the contact point and the contact line, and returns the sliding resolved
@@ -2237,6 +2272,14 @@ here. Revision 2 additions are marked ★.
 | ◆ **Lengthwise sliding, parallel axes** | two meshes × β = 0, 8, 20, 35°, eleven points along each path | zero to 1e-14 of the pitch line velocity, at every helix angle — the measurement that corrected §4.5 and §4.7 |
 | ◆ Sliding magnitude vs. the scalar the closed form uses | three meshes × three helix angles, nine points each | `\|ξ\|(ω₁+ω₂)` to 1e-11 — so the closed form integrates the *whole* sliding, not a component |
 | ◆ Efficiency as the integral of the vector | closed form vs. a 200 000-point average of `μ\|v_s\|/(v_b cos β_b)` driven by the vector model, three meshes × three helix angles | 1e-9 absolute; the loop closes on the formula in use |
+| ◆ Lead angle `sin γ = z m_n/d` | vs. the fixed point of `tan γ = z m_x/d`, `m_x = m_n/cos γ`, five worms | residual < 1e-15 — the substitution is exact, and the iteration people write is unnecessary |
+| ◆ The same law on the wheel | `sin γ₂` vs. `z₂ m_n/d₂`, four shaft angles | 1e-14 |
+| ◆ Screw ratio is not imposed | `(d₂/d₁)/(v₂/v₁)` vs. `z₂/z₁`, four pairs including Σ = 75° and 100° | 1e-12 — the geometry is self-consistent rather than fitted together |
+| ◆ Helix angles add | `β₁ + β₂ = Σ` and `γ₁ + γ₂ = 180° − Σ`, four shaft angles | 1e-15 |
+| ◆ Screw sliding vs. the vector kinematics | `screw.rs`'s closed form against `contact::sliding_velocity` built from two axes and two speeds, Σ = 70, 90, 110° | 1e-10 relative |
+| ◆ **Classical screw efficiency, derived** | the force balance at Σ = 90° vs. both published closed forms, four worms × five friction coefficients | 1e-14 in both directions |
+| ◆ Screw energy balance | `P_in − P_out` vs. `μ F_n \|v_s\|`, four shaft angles × four friction coefficients | 1e-13 relative — at any shaft angle, not only 90° |
+| ◆ Self-locking threshold | `η_back` at `μ = cos α_n tan γ`, four worms | **exactly zero** (< 1e-15), positive below, negative above |
 | ◆ Crossed-axis sliding at the pitch point | perpendicular axes, worm and wheel radii | `√(v₁²+v₂²)`, equal to the textbook `v₁/cos γ` to 1e-12; resolved on the worm axis it is exactly the wheel's pitch velocity |
 
 The marks record which round of review each check came from; they are kept only

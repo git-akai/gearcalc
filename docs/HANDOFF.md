@@ -10,8 +10,9 @@ this file is stale.
 
 ## 1. State
 
-**Milestones 0–6 complete and in CI; milestone 7's contact unification (steps
-1–4 of 5) landed. 188 tests, ~25 s.**
+**Milestones 0–6 complete and in CI; milestone 7's contact unification is done
+and the screw-gear mathematics with it. What remains of 7 is the worm *stage*.
+200 tests, ~27 s.**
 
 ```bash
 nix develop                       # or `direnv allow` once
@@ -46,6 +47,7 @@ cargo run --bin gear-cli -- show 17 0.2          # one gear's derived geometry
 cargo run --bin gear-cli -- materials            # the library, with each value's basis
 cargo run --bin gear-cli -- strength 17 43 2.0   # a worked mesh, end to end
 cargo run --bin gear-cli -- train                # a two-stage train, end to end
+cargo run --bin gear-cli -- worm 1 40 7 90       # a worm pair, both directions
 cargo run --release --bin gear-cli -- verify 100 # the two-sided cutter check
 ```
 
@@ -233,8 +235,18 @@ which is the point — unify *before* there is anything new to get wrong.
 4. ✅ Sliding as a vector; parallel-axis efficiency unchanged first.
    `contact::sliding_velocity`. This one **corrected the design** rather than
    confirming it — see §4 below.
-5. ⬜ **Next.** Worm geometry, `sin γ = z m_n/d` (exact — no iteration),
-   self-locking. This is where answers start to be new.
+5. 🔶 Worm geometry, `sin γ = z m_n/d` (exact — no iteration), self-locking.
+   **Built and verified** in `screw.rs`: pitch-point geometry, sliding, and both
+   drive directions derived from a force balance rather than quoted — at 90° it
+   reproduces the two published closed forms to 1e-14, and energy balances at
+   every shaft angle. Drive it with `gear-cli worm 1 40 7 90`.
+
+**What is left of milestone 7 is the worm *stage*, not its mathematics.** In
+rough order: a `WormStage` beside `SpurStage` — which is what finally splits
+`train.rs` into a directory — the crossed-axis relative curvatures so
+`contact_stress` can be handed a real `1/R_L` instead of `PARALLEL_AXES`, torque
+and backlash through the train, and the UI. The two decisions below are still
+open and belong to that work.
 
 What steps 1–4 leave in place for step 5: `contact_stress` already takes a
 lengthwise curvature (`PARALLEL_AXES` is the named zero every current call site
