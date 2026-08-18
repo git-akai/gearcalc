@@ -10,7 +10,8 @@ this file is stale.
 
 ## 1. State
 
-**Milestones 0–6 complete and in CI. 165 tests, ~26 s.**
+**Milestones 0–6 complete and in CI; milestone 7's contact unification (steps
+1–4 of 5) landed. 188 tests, ~25 s.**
 
 ```bash
 nix develop                       # or `direnv allow` once
@@ -154,6 +155,12 @@ DESIGN §12; these are the ones most likely to be stepped on again.
   only see tracked files.
 - **Typechecking is not running.** The headless render caught an automatic face
   width overflowing its field as `0.42646(` while every test was green.
+- **"A helical mesh slides along its teeth."** It does not, with parallel axes,
+  and two documents said it did. Both surface velocities are `ω ẑ × r`, so the
+  sliding has no axial component; the contact line is inclined and the sliding
+  is exactly perpendicular to it at every helix angle. The efficiency formula
+  was already exact and was being apologised for. The general lesson is the one
+  §12 keeps making: the claim sounded physical, and nothing had measured it.
 
 ---
 
@@ -161,7 +168,7 @@ DESIGN §12; these are the ones most likely to be stepped on again.
 
 | Item | Where | Blocks |
 |---|---|---|
-| Crossed-axis contact — **model settled, implementation pending** | §4.7 | milestone 7 |
+| Crossed-axis contact — **unified; steps 1–4 built, worm geometry pending** | §4.7 | milestone 7 |
 | Mesh-phase coefficient setting the optimal λ | §4.10 | only the angular-profile-shift milestone |
 | Sinusoidal `x(θ)`, or another interpolation | §4.10 | same |
 | What the eccentric mechanism can physically follow | §4.10 | same |
@@ -214,14 +221,27 @@ width, so an ellipse longer than the face is truncated by the tooth. Hence
 **Order matters.** Steps 1–4 below change no answer the tool currently gives,
 which is the point — unify *before* there is anything new to get wrong.
 
-1. Carlson integrals, tested alone.
-2. General Hertz on them — sphere-on-sphere and sphere-on-plane have exact closed
-   forms and need no gear.
-3. Swap `contact_stress` to the general form at `1/R_L = 0`. **The acceptance
+1. ✅ Carlson integrals, tested alone. `gear-core/src/elliptic.rs`.
+2. ✅ General Hertz on them — sphere-on-sphere and sphere-on-plane have exact
+   closed forms and need no gear. `gear-core/src/hertz.rs`.
+3. ✅ Swap `contact_stress` to the general form at `1/R_L = 0`. **The acceptance
    gate must pass before any crossed-axis geometry is added**: every existing
-   contact and efficiency check, plus the canary to the last digit.
-4. Sliding as a vector; parallel-axis efficiency unchanged first.
-5. Then worm geometry, `sin γ = z m_n/d` (exact — no iteration), self-locking.
+   contact and efficiency check, plus the canary to the last digit. It passed,
+   and the canary is bit-identical rather than merely close — a test asserts
+   `==` against the line formula, because agreement to a tolerance would have
+   been equally consistent with the line term having been re-derived.
+4. ✅ Sliding as a vector; parallel-axis efficiency unchanged first.
+   `contact::sliding_velocity`. This one **corrected the design** rather than
+   confirming it — see §4 below.
+5. ⬜ **Next.** Worm geometry, `sin γ = z m_n/d` (exact — no iteration),
+   self-locking. This is where answers start to be new.
+
+What steps 1–4 leave in place for step 5: `contact_stress` already takes a
+lengthwise curvature (`PARALLEL_AXES` is the named zero every current call site
+passes), `elliptical_contact` already returns the patch for any curvature pair,
+and `sliding_velocity` already takes an arbitrary second axis. Step 5 supplies a
+different `axis_2` and a non-zero `1/R_L`; it should not need to add a branch to
+any of them.
 
 Two things milestone 7 must decide for itself:
 
