@@ -173,8 +173,11 @@ Known-approximate, documented at the call site rather than hidden:
 - **`Y_β` omitted** — helical bending is conservative against a published ISO
   rating by up to ~25 % at high helix and overlap. Do not compare to an ISO
   rating without saying so.
-- **Efficiency models profile sliding only** — understates helical loss. This is
-  the gap the milestone 7 unification closes.
+- **Efficiency is exact for parallel axes, and the single friction coefficient
+  is the limit that remains.** The earlier note here said profile-only sliding
+  under-stated helical loss; building the sliding as a vector showed there is no
+  lengthwise component to charge for when the axes are parallel — the sliding is
+  transverse and the contact line is not. DESIGN §12.
 - **Hardened 4340's fatigue allowable is the weakest number in the library.**
   0.5 × UTS with no published figure at that temper, and the endurance ratio is
   known to fall away above ~1400 MPa UTS. Likely nearer 700 than 750.

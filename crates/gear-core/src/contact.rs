@@ -219,10 +219,21 @@ impl ContactPath {
 /// high-overlap gear. The mean sliding distance does not depend on the overlap;
 /// only the force does, and that is the factor above.
 ///
-/// What *is* genuinely missing is **sliding along the contact line**: only
-/// profile sliding, `|ξ|(ω₁+ω₂)`, is modelled. That is a real helical loss this
-/// under-states, and it is the honest limit of a friction model built on a
-/// single coefficient.
+/// **Nothing is missing along the contact line, and an earlier draft of this
+/// documentation said otherwise.** The concern was that only profile sliding is
+/// modelled, so a helical mesh's along-tooth sliding would be unaccounted for.
+/// It is not there to account for: both bodies rotate about **parallel** axes,
+/// so both surface velocities are perpendicular to those axes, and so is their
+/// difference. The relative sliding is therefore entirely transverse, and
+/// [`sliding_velocity`] measures its component along the contact line as
+/// identically zero at any helix angle. `|ξ|(ω₁+ω₂)` is the **whole** sliding
+/// magnitude, not a component of it, so this formula is exact rather than
+/// conservative. See DESIGN.md §12.
+///
+/// What does remain a limit is the single friction coefficient itself, and the
+/// fact that a crossed-axis mesh is a genuinely different question — there the
+/// lengthwise component is not zero, it dominates, and it is why a worm drive
+/// can self-lock.
 #[must_use]
 pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Gear, friction: f64) -> f64 {
     let e1 = path.approach / path.base_pitch;
@@ -233,6 +244,162 @@ pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Gear, friction: f64) -> 
     };
     let cos_bb = crate::metrology::base_helix_angle(g1).cos();
     1.0 - friction * std::f64::consts::PI * z * (e1 * e1 + e2 * e2) / (path.contact_ratio * cos_bb)
+}
+
+/// A relative sliding velocity, resolved in the plane where the flanks touch.
+///
+/// Coulomb friction acts on the **magnitude**, so the split is not what a loss
+/// is computed from. It is here because the split is exactly what separates a
+/// parallel-axis mesh from a crossed one, and because a claim that one
+/// component vanishes is only worth making if something can measure it.
+#[derive(Clone, Copy, Debug)]
+pub struct Sliding {
+    /// Across the tooth, perpendicular to the contact line, mm/s.
+    pub profile: f64,
+    /// Along the contact line, mm/s.
+    ///
+    /// **Analytically zero for parallel axes**, at every helix angle — see
+    /// [`sliding_velocity`]. What the implementation returns there is rounding
+    /// noise, bounded by test at 1e-14 of the magnitude.
+    pub lengthwise: f64,
+}
+
+impl Sliding {
+    /// What friction acts on, mm/s.
+    #[must_use]
+    pub fn magnitude(&self) -> f64 {
+        self.profile.hypot(self.lengthwise)
+    }
+}
+
+/// The relative sliding velocity of two rotating bodies at a point they touch.
+///
+/// This is the friction side of the unification in DESIGN.md §4.7: one
+/// expression covering parallel and crossed axes, with the shaft angle carried
+/// in `axis_2` rather than selecting between two formulas.
+///
+/// ```text
+/// v_s = ω₁ â₁ × p  −  ω₂ â₂ × (p − c)
+/// ```
+///
+/// Gear 1's axis is `[0,0,1]` through the origin **by construction** — that is
+/// a choice of frame, not a restriction. `speed_1` and `speed_2` are signed
+/// about their own axes, so an external parallel-axis mesh has them of opposite
+/// sign; getting that wrong shows up immediately as a mesh that slides at its
+/// pitch point.
+///
+/// # Why parallel axes have no lengthwise sliding
+///
+/// It is a kinematic identity rather than an approximation. With `â₁ = â₂ = ẑ`
+/// both surface velocities are `ω ẑ × r`, which has no `z` component; so
+/// neither does their difference, and the sliding is **entirely transverse**.
+/// The contact line, meanwhile, is inclined out of the transverse plane by the
+/// base helix angle, and the transverse sliding turns out to be perpendicular
+/// to it at every helix angle: the sliding is `∝ ẑ × û` for `û` along the line
+/// of action, and the contact line is a combination of `ẑ` and `û`, so the two
+/// are orthogonal by construction.
+///
+/// That is worth stating plainly because an earlier draft of the design assumed
+/// the opposite — that a helical mesh has along-tooth sliding this crate was
+/// failing to charge for. It does not, so [`efficiency`] is exact rather than
+/// conservative (DESIGN.md §12).
+///
+/// # What changes when the axes cross
+///
+/// Everything the worm depends on. With `â₂` no longer parallel to `â₁` the
+/// sliding does not vanish at the pitch point at all: for perpendicular axes it
+/// is `√(v₁² + v₂²)` there, which is the textbook `v₁ / cos γ` written without
+/// naming the lead angle. That non-vanishing term is the entire reason a worm
+/// drive is inefficient and can self-lock, and it arrives here as a value of
+/// this function rather than as a separate screw-gear formula.
+#[must_use]
+pub fn sliding_velocity(
+    axis_2: [f64; 3],
+    speed_1: f64,
+    speed_2: f64,
+    offset: [f64; 3],
+    point: [f64; 3],
+    contact_line: [f64; 3],
+) -> Sliding {
+    let v1 = scale(cross([0.0, 0.0, 1.0], point), speed_1);
+    let v2 = scale(cross(axis_2, sub(point, offset)), speed_2);
+    let slip = sub(v1, v2);
+
+    let lengthwise = dot(slip, contact_line);
+    let across = sub(slip, scale(contact_line, lengthwise));
+    Sliding {
+        profile: norm(across),
+        lengthwise,
+    }
+}
+
+/// The sliding velocity at a point on a parallel-axis mesh's path of contact.
+///
+/// `xi` is the position along the line of action from the pitch point, the same
+/// coordinate [`ContactPath`] uses, and `speed_1` is gear 1's angular velocity
+/// in rad/s. This places the mesh in [`sliding_velocity`]'s frame: gear 1 on the
+/// `z` axis, gear 2 one centre distance away along `x`, the line of action
+/// through the pitch point inclined at the operating pressure angle, and the
+/// contact line inclined out of the transverse plane by the base helix angle.
+///
+/// The crossed-axis version of this arrives with the screw geometry it needs
+/// (milestone 7, step 5); what is fixed now is that it will build a different
+/// `axis_2` for the *same* function, not call a different one.
+#[must_use]
+pub fn sliding_at(path: &ContactPath, mesh: &Mesh, g1: &Gear, xi: f64, speed_1: f64) -> Sliding {
+    let along_action = [path.alpha_w.sin(), path.alpha_w.cos(), 0.0];
+    let point = [
+        path.operating_radius_1 + xi * along_action[0],
+        xi * along_action[1],
+        0.0,
+    ];
+
+    // Signed about a shared axis: an external pair turns opposite ways.
+    let ratio = f64::from(mesh.z1) / f64::from(mesh.z2);
+    let speed_2 = match mesh.kind {
+        MeshKind::External => -speed_1 * ratio,
+        MeshKind::Internal => speed_1 * ratio,
+    };
+
+    let beta_b = crate::metrology::base_helix_angle(g1);
+    let contact_line = [
+        beta_b.sin() * along_action[0],
+        beta_b.sin() * along_action[1],
+        beta_b.cos(),
+    ];
+
+    sliding_velocity(
+        [0.0, 0.0, 1.0],
+        speed_1,
+        speed_2,
+        [mesh.a_w, 0.0, 0.0],
+        point,
+        contact_line,
+    )
+}
+
+fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+
+fn scale(a: [f64; 3], k: f64) -> [f64; 3] {
+    [a[0] * k, a[1] * k, a[2] * k]
+}
+
+fn norm(a: [f64; 3]) -> f64 {
+    dot(a, a).sqrt()
 }
 
 /// Load fraction at the outer edge of a double-contact zone.
@@ -278,6 +445,185 @@ mod tests {
         });
         let m = Mesh::new(&a, &b, MeshKind::External).unwrap();
         (a, b, m)
+    }
+
+    fn helical_pair(z1: u32, z2: u32, beta: f64) -> (Gear, Gear, Mesh) {
+        let a = Gear::new(GearParams {
+            teeth: z1,
+            helix_angle: beta,
+            ..Default::default()
+        });
+        let b = Gear::new(GearParams {
+            teeth: z2,
+            helix_angle: -beta,
+            ..Default::default()
+        });
+        let m = Mesh::new(&a, &b, MeshKind::External).unwrap();
+        (a, b, m)
+    }
+
+    /// A parallel-axis mesh rolls without sliding at its pitch point — spur and
+    /// helical alike. Anything else means the two speeds were not the meshing
+    /// pair they claim to be.
+    #[test]
+    fn a_parallel_axis_mesh_does_not_slide_at_its_pitch_point() {
+        for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25)] {
+            for beta in [0.0, 15.0, 30.0] {
+                let (a, b, m) = helical_pair(z1, z2, beta);
+                let path = ContactPath::new(&a, &b, &m).unwrap();
+                let s = sliding_at(&path, &m, &a, 0.0, 100.0);
+                let reference = 100.0 * path.operating_radius_1;
+                assert!(
+                    s.magnitude() < 1e-12 * reference,
+                    "z={z1}/{z2} beta={beta}: {} mm/s at the pitch point",
+                    s.magnitude()
+                );
+            }
+        }
+    }
+
+    /// **The correction this step exists to make.** The sliding of a
+    /// parallel-axis mesh has no component along the contact line, at any helix
+    /// angle — so `|ξ|(ω₁+ω₂)` is the whole sliding magnitude and the closed
+    /// form for efficiency is exact, not conservative.
+    ///
+    /// An earlier draft of the design assumed a helical mesh slid along its
+    /// teeth and that the loss from it was going uncharged. It does not: both
+    /// surface velocities are perpendicular to the shared axis direction, so
+    /// the difference is transverse, while the contact line is not.
+    #[test]
+    fn parallel_axes_slide_across_the_teeth_and_never_along_them() {
+        for (z1, z2) in [(17u32, 43u32), (19, 31)] {
+            for beta in [0.0, 8.0, 20.0, 35.0] {
+                let (a, b, m) = helical_pair(z1, z2, beta);
+                let path = ContactPath::new(&a, &b, &m).unwrap();
+                for step in 0..=10 {
+                    #[allow(clippy::cast_precision_loss)]
+                    let t = step as f64 / 10.0;
+                    let xi = -path.approach + t * (path.approach + path.recess);
+                    let s = sliding_at(&path, &m, &a, xi, 100.0);
+                    // The velocities being differenced are of order the pitch
+                    // line speed, so that — not the small sliding that survives
+                    // the difference — is the scale rounding noise lives on.
+                    let pitch_line = 100.0 * path.operating_radius_1;
+                    assert!(
+                        s.lengthwise.abs() <= 1e-14 * pitch_line,
+                        "z={z1}/{z2} beta={beta} xi={xi}: lengthwise {} against \
+                         a pitch line speed of {pitch_line}",
+                        s.lengthwise
+                    );
+                }
+            }
+        }
+    }
+
+    /// The vector model reproduces the scalar the closed form was built on:
+    /// `|v_s| = |ξ|(ω₁+ω₂)`, which is the step that lets the closed form stand
+    /// unchanged.
+    #[test]
+    fn the_sliding_magnitude_is_the_scalar_the_closed_form_uses() {
+        for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25)] {
+            for beta in [0.0, 12.0, 25.0] {
+                let (a, b, m) = helical_pair(z1, z2, beta);
+                let path = ContactPath::new(&a, &b, &m).unwrap();
+                let omega_1 = 100.0;
+                let omega_2 = omega_1 * f64::from(z1) / f64::from(z2);
+                for step in 0..=8 {
+                    #[allow(clippy::cast_precision_loss)]
+                    let t = step as f64 / 8.0;
+                    let xi = -path.approach + t * (path.approach + path.recess);
+                    let expected = xi.abs() * (omega_1 + omega_2);
+                    let got = sliding_at(&path, &m, &a, xi, omega_1).magnitude();
+                    let pitch_line = omega_1 * path.operating_radius_1;
+                    assert!(
+                        (got - expected).abs() <= 1e-11 * expected + 1e-14 * pitch_line,
+                        "z={z1}/{z2} beta={beta} xi={xi}: {got} vs {expected}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Crossing the axes is what makes the pitch point slide, and the amount is
+    /// the textbook worm figure `√(v₁² + v₂²) = v₁/cos γ`. No gear geometry is
+    /// involved — two axes, two speeds and a point.
+    #[test]
+    fn crossed_axes_slide_at_the_pitch_point_by_the_worm_relation() {
+        let (r1, r2) = (7.0, 25.0);
+        let (omega_1, omega_2) = (300.0, 12.0);
+        let centre = r1 + r2;
+        // Axis 2 perpendicular to axis 1, offset along x: a worm and its wheel.
+        let s = sliding_velocity(
+            [0.0, 1.0, 0.0],
+            omega_1,
+            omega_2,
+            [centre, 0.0, 0.0],
+            [r1, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+        );
+
+        let (v1, v2) = (omega_1 * r1, omega_2 * r2);
+        let expected = v1.hypot(v2);
+        assert!(
+            (s.magnitude() - expected).abs() < 1e-12 * expected,
+            "{} vs {expected}",
+            s.magnitude()
+        );
+
+        // and it is the same number as v1/cos(lead angle), which is how the
+        // literature writes it
+        let gamma = (v2 / v1).atan();
+        assert!((s.magnitude() - v1 / gamma.cos()).abs() < 1e-12 * expected);
+
+        // Resolved along the worm's own axis — which is not the contact line,
+        // but is a direction that exists without any tooth geometry — the
+        // sliding has a component of exactly the wheel's pitch velocity. A
+        // parallel-axis mesh has no such component at all, at any helix angle.
+        assert!(
+            (s.lengthwise.abs() - v2).abs() < 1e-12 * v2,
+            "along the worm axis: {} vs the wheel's {v2} mm/s",
+            s.lengthwise
+        );
+    }
+
+    /// The closed form for efficiency, checked against a numerical average
+    /// driven by the **vector** model rather than by the scalar it was derived
+    /// from. This closes the loop: the formula in use is the exact integral of
+    /// `μ|v_s|` over the path, not an approximation of it.
+    #[test]
+    fn efficiency_is_the_integral_of_the_sliding_vector() {
+        for (z1, z2) in [(17u32, 43u32), (13, 60), (19, 31)] {
+            for beta in [0.0, 12.0, 25.0] {
+                let (a, b, m) = helical_pair(z1, z2, beta);
+                let path = ContactPath::new(&a, &b, &m).unwrap();
+                let mu = 0.06;
+                let omega_1 = 100.0;
+
+                // Fractional loss is mu |v_s| / (v_b cos beta_b): friction acts
+                // on F_bn while the useful power crosses as F_bt.
+                let v_b = omega_1 * a.rb;
+                let cos_bb = crate::metrology::base_helix_angle(&a).cos();
+
+                const N: usize = 200_000;
+                let span = path.approach + path.recess;
+                let mut sum = 0.0;
+                for i in 0..N {
+                    #[allow(clippy::cast_precision_loss)]
+                    let t = (i as f64 + 0.5) / N as f64;
+                    let xi = -path.approach + span * t;
+                    sum += sliding_at(&path, &m, &a, xi, omega_1).magnitude();
+                }
+                #[allow(clippy::cast_precision_loss)]
+                let mean_slide = sum / N as f64;
+                let numeric = 1.0 - mu * mean_slide / (v_b * cos_bb);
+
+                let closed = efficiency(&path, &m, &a, mu);
+                assert!(
+                    (closed - numeric).abs() < 1e-9,
+                    "z={z1}/{z2} beta={beta}: closed {closed} vs vector-driven {numeric}"
+                );
+            }
+        }
     }
 
     /// The two lengths must reproduce the familiar contact-ratio formula, which

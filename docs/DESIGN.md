@@ -594,8 +594,16 @@ face, so the line-weighted mean of `|ξ|` is the same average the spur case take
 **The `ε_γ` substitution is deliberately not used.** Replacing `ε_α` by
 `ε_α + ε_β` is common but drives the predicted loss toward zero as overlap grows,
 which is unphysical. Mean sliding does not depend on overlap; only the force
-does. What *is* missing is sliding along the contact line — a real helical loss
-this under-states, and the honest limit of a one-coefficient friction model.
+does.
+
+*(An earlier revision added here that sliding along the contact line was missing,
+and that helical loss was therefore under-stated. **That was wrong** — measured
+in §12. For parallel axes there is no such component: both surface velocities are
+perpendicular to the shared axis direction, so the sliding is entirely
+transverse, and it is perpendicular to the inclined contact line at every helix
+angle. `|ξ|(ω₁+ω₂)` is the whole sliding magnitude, so this formula is exact
+rather than conservative. The honest limit that remains is the single friction
+coefficient.)*
 
 **The `/ε_α` is load-sharing bookkeeping, and dropping it is the easy mistake.**
 It is what holds the *total* transmitted force at `F_n`. Average `|ξ|` per
@@ -1197,19 +1205,34 @@ value rather than a separate case:
 | **Pressure** — Hertz | lengthwise relative curvature `1/R_L` | `1/R_L = 0` | line only |
 | **Friction** — efficiency | the sliding **velocity vector** | its lengthwise component is 0 | profile sliding only |
 
-The third is the one worth spelling out, because it also closes a gap already
-admitted in §4.5. Friction acts on the magnitude of the relative sliding
-velocity, which is a vector: a **profile** component `|ξ|(ω₁+ω₂)` along the line
-of action, and a **lengthwise** component along the tooth. Today only the first
-is modelled, which is exact for spur gears, *understates* helical loss — the
-along-tooth sliding a helical mesh really has — and would be hopeless for a worm,
-where the lengthwise component dominates and is the entire reason worm drives are
-inefficient and can self-lock.
+The third is the one worth spelling out. Friction acts on the magnitude of the
+relative sliding velocity, which is a vector: a **profile** component
+`|ξ|(ω₁+ω₂)` across the tooth, and a **lengthwise** component along it. Today
+only the first is modelled — and, for parallel axes, that turns out to be the
+whole of it rather than half of it.
 
-Integrating `μ` against `|v_slide|` therefore replaces three things with one: the
-Buckingham formula recovered in §4.5, the missing helical term, and the
-screw-gear efficiency of §4.5.1 that would otherwise arrive as a separate
-formula. Buckingham becomes the case where the lengthwise component vanishes.
+**This corrected an assumption rather than confirming one, and the correction is
+the useful part.** An earlier revision of this section said the lengthwise
+component was a real helical loss going uncharged. It is not, and the reason is
+kinematic rather than numerical: with both axes parallel, both surface
+velocities are `ω ẑ × r` and so have no component along `ẑ`; neither, then, does
+their difference. The sliding is entirely transverse. The contact line is not —
+it is inclined out of the transverse plane by `β_b` — and the transverse sliding
+turns out to be exactly perpendicular to it, because the sliding is `∝ ẑ × û`
+while the contact line is a combination of `ẑ` and `û`. So the lengthwise
+component is identically zero at **every** helix angle, and §4.5's closed form is
+exact rather than conservative. Measured in §12; the table row above ("parallel
+axes is: its lengthwise component is 0") was right and the paragraph that
+followed it was not.
+
+For a worm none of that holds: the axes are not parallel, the sliding does not
+vanish at the pitch point, and the lengthwise component is the entire reason worm
+drives are inefficient and can self-lock.
+
+Integrating `μ` against `|v_slide|` therefore replaces two things with one: the
+Buckingham formula recovered in §4.5 and the screw-gear efficiency of §4.5.1 that
+would otherwise arrive as a separate formula. Buckingham becomes the case where
+the lengthwise component vanishes.
 It also explains, rather than merely asserts, why efficiency is direction-
 dependent for a worm and not for a parallel-axis mesh: reversing the drive
 reverses the sliding direction relative to the transmitted force only when there
@@ -1252,14 +1275,24 @@ rewritten, not that the general form is wrong.
    sphere-on-plane, which have exact closed forms and need no gear. `hertz.rs`.
 3. ✅ Swap `contact_stress` to the general form with `1/R_L = 0`; the gate above
    must pass **before** any crossed-axis geometry is added.
-4. ⬜ Sliding as a vector; same discipline — parallel-axis efficiency unchanged
-   first, lengthwise component second.
+4. ✅ Sliding as a vector; same discipline — parallel-axis efficiency unchanged
+   first, lengthwise component second. `contact::sliding_velocity`.
 5. ⬜ Only then the worm geometry, lead angle `sin γ = z m_n/d`, and
    self-locking.
 
 Steps 1–4 change no answer the tool currently gives. That is the point: the
 crossed-axis work should add a parameter, not a branch, and the way to be sure is
 to unify *before* there is anything new to get wrong.
+
+**Where step 4 landed.** `sliding_velocity` takes the two axes, the two signed
+speeds, the contact point and the contact line, and returns the sliding resolved
+across and along that line — one expression, with the shaft angle carried in the
+second axis rather than selecting between formulas. `sliding_at` builds the
+parallel-axis frame from a mesh. Efficiency's closed form is **unchanged**, and
+is now checked against a numerical average driven by the vector model rather
+than by the scalar it was derived from, which is what turns "the formula is
+Buckingham" into "the formula is the exact integral of the sliding this mesh
+actually has". The step also cost the design an assumption; see above and §12.
 
 **Where step 3 landed.** `contact_stress` took a `lengthwise_curvature`
 argument, and every existing call site passes the named constant
@@ -2088,6 +2121,7 @@ something independent.**
 | 4.7 | Parabola tangency searched on the fillet only | No solution at all above z≈150 — on large teeth it touches the **flank** |
 | 4.7 | ISO `Y_S` applied to a flank tangency | **17% discontinuity** at z=150→151 while `Y_F` moved 0.03%; the correction is a notch factor and there is no notch there |
 | 4.7 | "Rack-generated fillets keep `q_s` in range" | False at large z — 10.3 at z=300 with a sharp cutter |
+| 4.5, 4.7 | "A helical mesh slides along its contact line, and the efficiency formula under-states that loss" | **No such component exists for parallel axes.** Building the sliding as a vector and resolving it on the contact line returned zero at every helix angle to 1e-14 of the pitch line velocity. Both surface velocities are `ω ẑ × r`, so the sliding is transverse, while the contact line is not — and the two are orthogonal by construction. The closed form was already exact; two documents described it as conservative |
 | 4.5 | Mesh efficiency without the `/ε_α` | Implicitly let every engaged pair carry the full load, so the mesh transmitted `ε_α F_n` and the loss came out too large by exactly the contact ratio. Caught by a numerical average of the instantaneous loss |
 | 4.7 | Hertz checked at "the inner point of single-pair contact (usually the pinion's worst case)" | Label-dependent: the relative-radius peak moves to the other side when gear 1 is the wheel, so one physical mesh gave two answers. Both boundaries are now checked |
 | 4.7 | `Load` stored a force in a field named `normal_force` | The value was the **transverse** `F_bt = T/r_b` while the name asserted the normal plane. Numerically right for spur, but the name would have survived a refactor its meaning did not. Now stores torque, with each projection named at its point of use |
@@ -2199,6 +2233,11 @@ here. Revision 2 additions are marked ★.
 | ◆ **Line contact is the degenerate value** | `σ_H` at `1/R_L = 0` vs. the line expression, four meshes × three helix angles | **bit-identical** — the acceptance gate |
 | ◆ Approach to the limit | `1/R_L` swept 1 → 1e-11 /mm | `σ_H` falls monotonically and returns to the line value to 1e-9; no jump at zero |
 | ◆ Canary after the swap | `gear-cli strength 17 43 2.0`, and the two-stage train | unchanged in every figure |
+| ◆ Sliding at the pitch point, parallel axes | three meshes × β = 0, 15, 30° | zero to 1e-12 of the pitch line velocity — pure rolling, as it must be |
+| ◆ **Lengthwise sliding, parallel axes** | two meshes × β = 0, 8, 20, 35°, eleven points along each path | zero to 1e-14 of the pitch line velocity, at every helix angle — the measurement that corrected §4.5 and §4.7 |
+| ◆ Sliding magnitude vs. the scalar the closed form uses | three meshes × three helix angles, nine points each | `\|ξ\|(ω₁+ω₂)` to 1e-11 — so the closed form integrates the *whole* sliding, not a component |
+| ◆ Efficiency as the integral of the vector | closed form vs. a 200 000-point average of `μ\|v_s\|/(v_b cos β_b)` driven by the vector model, three meshes × three helix angles | 1e-9 absolute; the loop closes on the formula in use |
+| ◆ Crossed-axis sliding at the pitch point | perpendicular axes, worm and wheel radii | `√(v₁²+v₂²)`, equal to the textbook `v₁/cos γ` to 1e-12; resolved on the worm axis it is exactly the wheel's pitch velocity |
 
 The marks record which round of review each check came from; they are kept only
 so a claim can be traced to the work that produced it.
