@@ -896,6 +896,11 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
         );
     }
     println!("  bending                     not reported - see DESIGN.md 4.5.1");
+    println!(
+        "  flank type   ZI (involute helicoid). A ZN worm's contact stress is\n\
+         {:24}1-15 % lower, rising with lead angle - see DESIGN.md 4.5.1",
+        ""
+    );
 }
 
 /// A worm stage end to end: geometry, both directions, contact and backlash.
@@ -957,6 +962,11 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
         r.backlash[0].nominal, r.backlash[1].nominal, r.backlash[1].minimum, r.backlash[1].maximum
     );
     println!("  bending      not reported - see DESIGN.md 4.5.1");
+    println!(
+        "  flank type   ZI (involute helicoid); a ZN worm's contact stress is\n\
+         {:15}1-15 % lower, rising with lead angle - see DESIGN.md 4.5.1",
+        ""
+    );
     for note in &r.notes {
         println!("  ! {note}");
     }

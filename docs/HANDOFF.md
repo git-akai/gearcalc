@@ -267,8 +267,14 @@ Three things the stage settled that should not be re-litigated:
   `Screw::normal_force` takes a `Member` so the choice has to be made explicitly.
 - **No bending stress**, decided below.
 - **The worm is a ZI (involute helicoid)**, which is what makes each flank a
-  cylinder and the parallel case an exact limit. ZA and ZN worms would need their
-  own flank curvature.
+  cylinder and the parallel case an exact limit. That was measured against ZN
+  and ZA rather than assumed: all three are the same surface family, the choice
+  moves **only** contact stress, and ZN comes out 1–15 % *below* ZI as the lead
+  angle rises — so keeping ZI is the conservative reading, and it is also the
+  conjugate partner of the involute helical wheel. DESIGN §4.5.1 has the table
+  and `tools/worm_flank_curvature.py` reproduces it. **The UI must carry that
+  caveat beside the contact stress**, as `gear-cli worm` and `wormstage` already
+  do.
 
 What steps 1–4 leave in place for step 5: `contact_stress` already takes a
 lengthwise curvature (`PARALLEL_AXES` is the named zero every current call site

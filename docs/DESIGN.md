@@ -677,10 +677,61 @@ relative curvature along them is exactly zero. Cross the shafts and the rulings
 separate, the flatter relative curvature lifts off zero, and the line shortens
 into an ellipse. `1/R_L` of §4.7 is precisely that curvature.
 
-A **ZA** worm (straight-sided in the axial section) or a **ZN** has a different
-flank form and would need its own curvature — a separate piece of work, not a
-factor on this one. Naming which type is modelled is the honest alternative to
-implying all of them are covered.
+##### ZA, ZN and ZI are one surface family — and ZI is the one we keep
+
+The three are all **ruled helicoids**: a straight line under screw motion. They
+differ only in where that line sits — through the axis (ZA), in the normal plane
+at the pitch cylinder (ZN), tangent to the base cylinder (ZI). So supporting all
+three would be a *parameter*, not a branch: one curvature computation taking the
+generating line as an argument, with **ZI falling out as the member whose
+Gaussian curvature is zero** — the developable one. Measured at `K ≈ 2e-9`
+against `~1e-3` for the other two, which is the same shape of degenerate-value
+argument the rest of §4.7 rests on.
+
+What it would cost is not the branch, it is the derivative. ZN and ZA are
+**saddles**: `K < 0`, one principal curvature negative, and principal directions
+rotated 58–77° from the ruling rather than the exact 90° an involute helicoid
+gives. The analytic shortcut this crate uses — one curvature exactly zero along
+the ruling, the other `r sin α_t / cos β_b` — is available only for ZI. The
+others need the helicoid's second fundamental form in closed form, which is the
+first place in the crate where a curvature would come from differential geometry
+rather than a plane construction.
+
+**What it is worth, measured.** Same wheel, same load, only the worm's flank
+type changed (`tools/worm_flank_curvature.py`):
+
+| Lead angle | Worm | ZN vs ZI peak pressure | ZA vs ZI |
+|---|---|---|---|
+| 4.78° | 1 start, d 12 | −0.9 % | −0.7 % |
+| 8.21° | 1 start, d 7 | −4.2 % | −3.2 % |
+| 11.54° | 2 starts, d 20, m 2 | −4.7 % | −3.7 % |
+| 12.84° | 2 starts, d 9 | −8.4 % | −6.5 % |
+| 19.47° | 4 starts, d 12 | −14.8 % | −11.2 % |
+
+Two things contain that. **ZN is always the lower stress**, so keeping ZI is
+conservative — by 1 % at ordinary single-start lead angles, 15 % at the steepest
+worms anyone builds. And **the type touches contact stress and nothing else**:
+the flank normal at the pitch point comes out at exactly `α_n` for all three, so
+the force balance, both efficiencies, self-locking, the sliding velocity, the
+ratio and the backlash are identical between them. Only curvature moves.
+
+**The argument that settles it is conjugacy.** The wheel is a true involute
+helical gear, and the involute helical gear's conjugate partner is the ZI worm.
+A ZN worm meshing with an involute helical wheel is not exactly conjugate, so
+adopting ZN would immediately raise "then what is the wheel?", which a crate
+built entirely from the involute has no clean answer to. ZI is the
+self-consistent pairing for the model as it stands, and the 1–15 % it costs is
+in the safe direction.
+
+**So: ZI, and the number a ZN worm gets is 1–15 % below what this reports.** That
+belongs in the UI beside the contact stress, not buried here — a user machining
+ZN on a conventional lathe should know which way the figure errs and roughly by
+how much. The door stays open cheaply: `hertz::relative_curvatures` already takes
+arbitrary per-body principal curvatures **including negative ones**, so ZN would
+arrive as a different `(κ₁, κ₂, direction)` triple rather than a rework.
+
+A **ZK** worm — ground with a conical wheel — is not in this family at all: its
+flank is not ruled, and it would need its own treatment.
 
 ##### Decided: a worm stage reports no bending stress at all
 
@@ -2337,6 +2388,8 @@ here. Revision 2 additions are marked ★.
 | ◆ **Lengthwise sliding, parallel axes** | two meshes × β = 0, 8, 20, 35°, eleven points along each path | zero to 1e-14 of the pitch line velocity, at every helix angle — the measurement that corrected §4.5 and §4.7 |
 | ◆ Sliding magnitude vs. the scalar the closed form uses | three meshes × three helix angles, nine points each | `\|ξ\|(ω₁+ω₂)` to 1e-11 — so the closed form integrates the *whole* sliding, not a component |
 | ◆ Efficiency as the integral of the vector | closed form vs. a 200 000-point average of `μ\|v_s\|/(v_b cos β_b)` driven by the vector model, three meshes × three helix angles | 1e-9 absolute; the loop closes on the formula in use |
+| ◆ **Worm flank curvature vs. the surface itself** | `screw.rs`'s analytic construction against numerical differentiation of the parametric helicoid — a route sharing no code and no gear reasoning, `tools/worm_flank_curvature.py` | `1/ρ_n` to **6 digits** on three worms, `K` at 2e-9, principal direction 90.00° from the ruling. The relative curvatures for the 1-start 7 mm pair come out (0.081615, 0.173243) against the crate's (0.081615, 0.173242) /mm |
+| ◆ Worm type: ZI against ZN and ZA | peak contact pressure, five worms from γ = 4.8° to 19.5°, everything but the flank type held fixed | ZN 0.9–14.8 % **below** ZI, ZA between them. The effective `α_n` is identical to 0.01° across all three, so nothing but contact stress moves |
 | ◆ **Worm backlash from one projection** | the derived `j_n = j_axial sin β_b1 + Δa sin α_n` against the two relations handbooks give separately — wheel turns by `j/r₂`, worm by `2π j/lead` — three worms | 1e-12 both, so one projection reproduces both rules |
 | ◆ Worm contact vs. face width | wheel face width 4 mm against 40 mm | **bit-identical** peak pressure — which is why a worm stage has no automatic face width from strength: a point contact has nothing for `σ_H ∝ 1/√b` to invert |
 | ◆ Flank rulings | projection construction vs. `cos β_b`, four shaft angles × four helix angles | 1e-14 — the base helix angle is a *consequence* of projecting the axis onto the tangent plane, not an input to it |
