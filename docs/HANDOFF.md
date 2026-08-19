@@ -224,16 +224,30 @@ sampled at the pitch circle where the backwards sign would also pass.
    Closed form from the line of action instead: conjugate points share a
    position on it, and for an internal pair the two distances differ by
    `a sin α_t` rather than summing to it.
-3. **Assembly** — tip arc → flank → fillet → root arc, reusing the arc-length
-   point allocation `Gear::half_profile` already has. `Ring` has all four
-   boundaries now (`u_tip`, `u_j`, `s_j`, `s_root`); what is missing is the
-   sampling and a closed outline.
-4. **Interference checks** a rack cutter never needs: involute (trimming),
+3. ✅ **Assembly** — `Ring::sections`, `half_profile` and `profile` mirror the
+   external gear's, with the radius climbing rather than falling.
+4. **A CAD-grade outline, and the export path it feeds.** `Ring::profile` gives
+   a plain polyline, enough to draw; `Gear::outline` gives **exact arcs** at a
+   chord tolerance, which is what a DXF deserves and what the ring still lacks.
+   Then `gear_to_dxf` — which takes a `&Gear` today — wants generalising to a
+   polyline plus its reference circles, so both kinds feed it without a branch.
+   Then the wasm entries, then the gear tab's internal option.
+
+   **This is what the internal-gear option on the gear tab needs**, and it is
+   worth doing in that order: outline, DXF, wasm, Svelte.
+5. **Interference checks** a rack cutter never needs: involute (trimming),
    trochoid, and radial-assembly. The `z_ring − z_cutter ≥ 10` rule of thumb is
    a convention; the geometric condition behind it is what belongs here.
-5. **The gate** — `verify.rs`'s two-sided bound (penetration *and* deviation)
+6. **The gate** — `verify.rs`'s two-sided bound (penetration *and* deviation)
    against the shaper. The envelope test in `shaper.rs` is that idea applied to
    one curve; this applies it to the whole profile.
+
+**A ring's smallest tooth count is a function, not a number.** The tip clears
+the base circle while `z > 2 h_a cos β / (1 − cos α_t)`: 34 teeth at a full
+addendum and 20°, but 20 at a 0.6 addendum, 22 at 25°, 63 at 14.5°, and 23 at a
+30° helix. The module cancels, as it must for a statement about tooth counts.
+The familiar "internal gears need about 34 teeth" is one row of that table and
+would be wrong for the other five.
 
 **One trap already paid for.** The rolling sense has *no* `σ` in it. An internal
 workpiece does turn the other way relative to its cutter — but the cutter also
