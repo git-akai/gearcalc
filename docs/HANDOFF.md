@@ -208,12 +208,29 @@ cutter's tip corner, for an external or an internal workpiece. The rack is its
 than two — the residue at a million cutter teeth is the pitch line's own
 curvature term, not slop.
 
-What that leaves for the profile itself: assemble the internal half-profile
-(tip arc → involute flank → shaper trochoid → root arc, with the tip *inside*
-the root), the interference checks a rack cutter never needs, and the
-rack-equivalent validation that is the milestone's gate. `verify.rs`'s two-sided
-bound is the model for that gate; the envelope test in `shaper.rs` is the same
-idea applied to one curve.
+`ring.rs` has the involute side: the radii the other way round, and the one sign
+that makes a ring a ring — its tooth *widens* outward, because what narrows is
+the space. Checked as the complement it is, swept across the flank rather than
+sampled at the pitch circle where the backwards sign would also pass.
+
+**What is left, in order:**
+
+1. **The fillet's phase.** `shaper.rs` has the curve; placing it needs the
+   cutter's own tooth geometry to say where its tip corner sits relative to its
+   tooth centreline, and that phase is what ties the fillet to the flank. The
+   offset of an involute along its normal is another involute of the same base
+   circle, shifted in angle by `ρ/r_b` — that is the clean route in, and it is
+   exact rather than iterative. Deliberately not guessed at: the rack-limit
+   check (`ac = s_t/2 + b_c tan α_t + ρ/cos α_t`) is available to confirm
+   whatever comes out.
+2. **Assembly** — tip arc → flank → fillet → root arc, reusing the arc-length
+   point allocation `Gear::half_profile` already has.
+3. **Interference checks** a rack cutter never needs: involute (trimming),
+   trochoid, and radial-assembly. The `z_ring − z_cutter ≥ 10` rule of thumb is
+   a convention; the geometric condition behind it is what belongs here.
+4. **The gate** — `verify.rs`'s two-sided bound (penetration *and* deviation)
+   against the shaper. The envelope test in `shaper.rs` is that idea applied to
+   one curve; this applies it to the whole profile.
 
 **One trap already paid for.** The rolling sense has *no* `σ` in it. An internal
 workpiece does turn the other way relative to its cutter — but the cutter also

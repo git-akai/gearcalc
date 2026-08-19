@@ -151,6 +151,7 @@ gears/
 │   │   ├── contact.rs       path of contact, load sharing, mesh efficiency
 │   │   ├── strength.rs      load, bending, Hertz, face width
 │   │   ├── material.rs      material model — values, provenance, allowables
+│   │   ├── ring.rs          internal gear — the involute used the other way
 │   │   ├── shaper.rs        generation by a pinion cutter; the rack is its
 │   │   │                    limit, and internal gears its other sign
 │   │   ├── screw.rs         crossed-axis screw gearing — worm and crossed
@@ -175,8 +176,7 @@ gears/
 development without touching the browser. Sweeps, regression dumps and
 "why is this number wrong" all happen there.
 
-One module is named by the milestones ahead and does not exist yet: `ring.rs`
-(internal-gear profile, milestone 8). `train/` became a directory when the worm
+`train/` became a directory when the worm
 stage arrived and gave the split something to divide, exactly as planned.
 
 **Each stage kind keeps its own result type.** A worm stage has no bending
@@ -2412,6 +2412,8 @@ here. Revision 2 additions are marked ★.
 | ◆ Worm type: ZI against ZN and ZA | peak contact pressure, five worms from γ = 4.8° to 19.5°, everything but the flank type held fixed | ZN 0.9–14.8 % **below** ZI, ZA between them. The effective `α_n` is identical to 0.01° across all three, so nothing but contact stress moves |
 | ◆ **Worm backlash from one projection** | the derived `j_n = j_axial sin β_b1 + Δa sin α_n` against the two relations handbooks give separately — wheel turns by `j/r₂`, worm by `2π j/lead` — three worms | 1e-12 both, so one projection reproduces both rules |
 | ◆ Worm contact vs. face width | wheel face width 4 mm against 40 mm | **bit-identical** peak pressure — which is why a worm stage has no automatic face width from strength: a point contact has nothing for `σ_H ∝ 1/√b` to invert |
+| ▲ A ring's tooth and space are complements at **every** radius | swept across the flank, three tooth counts | 1e-12 of the circular pitch. Setting the sign backwards still looks right at the pitch circle, which is why the check sweeps |
+| ▲ A ring's tooth widens outward, an external gear's narrows | the same size measured both ways | opposite directions, as the flipped `inv` term requires |
 | ▲ **The rack is the shaper's limit** | shaper-cut fillet vs. `Gear::trochoid_at`, cutter tooth count 10² → 10⁶, four gears including profile shifts | converges monotonically; the residue at 10⁶ matches the pitch line's own curvature term `s_j²/2r_c`, so what is left is geometry rather than arithmetic |
 | ▲ Order of that convergence | error at `z_c` = 1 000 against 10 000 | falls by 10^1.00 — first order in `1/z_c`, as a circle departing from its tangent must be |
 | ▲ **The envelope condition** | every fillet point against the cutter at 81 phases either side, external and internal, three tooth pairs each | on its own corner circle to 1e-9, outside it at every other phase. This is what pins the rolling sense: assuming an internal workpiece reversed put the fillet 0.017 mm **inside** the tool half a tooth later |

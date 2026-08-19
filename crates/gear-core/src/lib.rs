@@ -27,6 +27,7 @@ pub mod metrology;
 pub mod outline;
 pub mod params;
 pub mod profile;
+pub mod ring;
 pub mod screw;
 pub mod shaper;
 pub mod solve;
