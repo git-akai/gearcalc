@@ -41,6 +41,7 @@
 use crate::involute::{inv, inv_from_roll};
 use crate::mesh::MeshKind;
 use crate::params::GearParams;
+use crate::profile::Section;
 use crate::shaper::{CutParams, ShaperCut};
 use crate::solve::{brent, Tol};
 
@@ -325,6 +326,104 @@ impl Ring {
     pub fn space_width_at(&self, radius: f64) -> f64 {
         2.0 * radius * self.half_pitch - self.tooth_thickness_at(radius)
     }
+    // ---------------------------------------------------------------- //
+    //  assembly
+    // ---------------------------------------------------------------- //
+
+    /// The half-profile sections, ordered tip → mid tooth-space.
+    ///
+    /// The same four an external gear has, in the same order — but the radius
+    /// *climbs* through them rather than falling, because a ring's tooth points
+    /// inward. A fully filleted root drops the last one.
+    #[must_use]
+    pub fn sections(&self) -> Vec<Section> {
+        let mut out = vec![Section::TipArc, Section::Involute, Section::Trochoid];
+        if self.trochoid_at(self.s_root).1 < self.half_pitch {
+            out.push(Section::RootArc);
+        }
+        out
+    }
+
+    fn sample_section(&self, section: Section, n: usize) -> Vec<(f64, f64)> {
+        let n = n.max(2);
+        #[allow(clippy::cast_precision_loss)]
+        let lerp = |a: f64, b: f64, i: usize| a + (b - a) * (i as f64 / (n - 1) as f64);
+        (0..n)
+            .map(|i| match section {
+                Section::TipArc => (self.ra, lerp(0.0, self.involute_at(self.u_tip).1, i)),
+                Section::Involute => self.involute_at(lerp(self.u_tip, self.u_j, i)),
+                Section::Trochoid => self.trochoid_at(lerp(self.s_j, self.s_root, i)),
+                Section::RootArc => (
+                    self.rf,
+                    lerp(self.trochoid_at(self.s_root).1, self.half_pitch, i),
+                ),
+            })
+            .collect()
+    }
+
+    /// `(radius, angle)` from the tooth tip centre to mid tooth-space, spaced by
+    /// arc length so no section is starved of points.
+    #[must_use]
+    pub fn half_profile(&self, n: usize) -> Vec<(f64, f64)> {
+        const LENGTH_SAMPLES: usize = 60;
+        const MIN_SHARE: f64 = 0.004;
+        const MIN_POINTS: usize = 3;
+
+        let sections = self.sections();
+        let lengths: Vec<f64> = sections
+            .iter()
+            .map(|&s| {
+                let pts = self.sample_section(s, LENGTH_SAMPLES);
+                (1..pts.len())
+                    .map(|i| {
+                        let dr = pts[i].0 - pts[i - 1].0;
+                        let dt = (pts[i].0 + pts[i - 1].0) / 2.0 * (pts[i].1 - pts[i - 1].1);
+                        f64::hypot(dr, dt)
+                    })
+                    .sum()
+            })
+            .collect();
+        let total: f64 = lengths.iter().sum();
+        let shares: Vec<f64> = lengths.iter().map(|w| w.max(total * MIN_SHARE)).collect();
+        let share_total: f64 = shares.iter().sum();
+
+        let mut out: Vec<(f64, f64)> = Vec::new();
+        for (&section, share) in sections.iter().zip(shares) {
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let count = ((share / share_total) * n as f64) as usize;
+            let pts = self.sample_section(section, count.max(MIN_POINTS));
+            let skip = usize::from(!out.is_empty());
+            out.extend_from_slice(&pts[skip..]);
+        }
+        out
+    }
+
+    /// The closed cross-section, counter-clockwise, `per_tooth` points a tooth.
+    ///
+    /// The outline of the *material's inner boundary*: a ring's teeth point
+    /// inward, so this traces the bore, and whatever rim sits outside it is the
+    /// designer's business rather than the tooth geometry's.
+    #[must_use]
+    pub fn profile(&self, per_tooth: usize) -> Vec<[f64; 2]> {
+        let half = self.half_profile((per_tooth / 2).max(8));
+
+        let mut full: Vec<(f64, f64)> = half.iter().rev().map(|&(r, t)| (r, -t)).collect();
+        full.extend_from_slice(&half[1..]);
+
+        let z = self.teeth;
+        let mut out = Vec::with_capacity(full.len() * z as usize + 1);
+        for k in 0..z {
+            let base = 2.0 * std::f64::consts::PI * f64::from(k) / f64::from(z);
+            for &(r, t) in &full {
+                let a = base + t;
+                out.push([r * a.cos(), r * a.sin()]);
+            }
+        }
+        if let Some(&first) = out.first() {
+            out.push(first);
+        }
+        out
+    }
 }
 
 #[cfg(test)]
@@ -343,36 +442,69 @@ mod tests {
         )
     }
 
-    /// **A standard addendum does not fit on a small ring**, and the threshold
-    /// is exact rather than a rule of thumb.
+    /// **The smallest ring is a function of the design, not a number.**
     ///
-    /// A ring's tip is at `r − h_a` and its base circle at `r cos α_t`, so the
-    /// tip clears the base circle only while `h_a < r(1 − cos α_t)`. At a
-    /// module and 20° that puts the smallest ring with a full addendum at 34
-    /// teeth — which is where the handbook advice about internal gears needing
-    /// plenty of teeth comes from, stated as the geometry it is.
+    /// A ring's tip sits at `r − h_a` and its base circle at `r cos α_t`, so the
+    /// tip clears the base circle only while
+    ///
+    /// ```text
+    /// z > 2 h_a cos β / (1 − cos α_t)
+    /// ```
+    ///
+    /// Three things move it and one does not. A **shallower tooth** allows far
+    /// fewer teeth; a **larger pressure angle** allows fewer, because the base
+    /// circle drops away from the pitch circle; a **helix** allows fewer, since
+    /// the transverse module grows with it. The **module cancels**, which is
+    /// right — this is a statement about tooth counts.
+    ///
+    /// The familiar "internal gears need at least about 34 teeth" is the single
+    /// row of this table at a full addendum and 20°, and quoting it as a rule
+    /// would have been wrong for every other row.
     #[test]
-    fn a_ring_too_small_for_its_addendum_is_clamped_at_the_threshold_the_geometry_gives() {
-        let alpha_t = 20.0_f64.to_radians();
-        let smallest = (2.0 / (1.0 - alpha_t.cos())).ceil();
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let smallest = smallest as u32;
-        assert_eq!(smallest, 34, "the threshold at a module and 20 degrees");
+    fn the_smallest_ring_follows_the_design_rather_than_a_rule_of_thumb() {
+        let cases = [
+            // addendum, α_n°, β°, the count the geometry gives
+            (1.0, 20.0, 0.0, 34u32),
+            (0.8, 20.0, 0.0, 27),
+            (0.6, 20.0, 0.0, 20),
+            (1.0, 25.0, 0.0, 22),
+            (1.0, 14.5, 0.0, 63),
+            (1.0, 20.0, 30.0, 23),
+        ];
+        for (addendum, alpha_deg, beta_deg, expected) in cases {
+            let beta = f64::to_radians(beta_deg);
+            let alpha_t = (f64::to_radians(alpha_deg).tan() / beta.cos()).atan();
+            let threshold = 2.0 * addendum * beta.cos() / (1.0 - alpha_t.cos());
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let smallest = threshold.ceil() as u32;
+            assert_eq!(
+                smallest, expected,
+                "a={addendum} α={alpha_deg} β={beta_deg}: the formula gives {threshold}"
+            );
 
-        assert!(
-            !ring(smallest)
-                .clamps
-                .iter()
-                .any(|c| c.contains("base circle")),
-            "z={smallest} should just fit"
-        );
-        let below = ring(smallest - 1);
-        assert!(
-            below.clamps.iter().any(|c| c.contains("base circle")),
-            "z={} should not fit: {:?}",
-            smallest - 1,
-            below.clamps
-        );
+            let build = |teeth: u32| {
+                Ring::new(
+                    &GearParams {
+                        teeth,
+                        addendum,
+                        pressure_angle: alpha_deg,
+                        helix_angle: beta_deg,
+                        ..Default::default()
+                    },
+                    &Cutter::default(),
+                )
+            };
+            let clamped = |r: &Ring| r.clamps.iter().any(|c| c.contains("base circle"));
+            assert!(
+                !clamped(&build(smallest)),
+                "a={addendum} α={alpha_deg} β={beta_deg}: z={smallest} should fit"
+            );
+            assert!(
+                clamped(&build(smallest - 1)),
+                "a={addendum} α={alpha_deg} β={beta_deg}: z={} should not",
+                smallest - 1
+            );
+        }
     }
 
     /// **The flank and the fillet actually meet.** That is what the phase buys:
@@ -498,6 +630,93 @@ mod tests {
         assert!(
             (r_small - r_large).abs() > 1e-6,
             "the cutter should change the junction: {r_small} against {r_large}"
+        );
+    }
+
+    /// The outline closes, stays between the tip and the root, and has the
+    /// tooth count it claims.
+    #[test]
+    fn the_profile_closes_and_stays_between_the_tip_and_the_root() {
+        for teeth in [43u32, 60, 90] {
+            let g = ring(teeth);
+            let outline = g.profile(120);
+            assert!(
+                outline.len() > 100,
+                "z={teeth}: only {} points",
+                outline.len()
+            );
+            assert_eq!(
+                outline.first(),
+                outline.last(),
+                "z={teeth}: the outline must close"
+            );
+            for [x, y] in &outline {
+                let r = f64::hypot(*x, *y);
+                assert!(
+                    r >= g.ra - 1e-9 && r <= g.rf + 1e-9,
+                    "z={teeth}: a point at {r}, outside ({}, {})",
+                    g.ra,
+                    g.rf
+                );
+            }
+            // The tip is reached once per tooth and the root likewise.
+            let at_tip = outline
+                .iter()
+                .filter(|[x, y]| (f64::hypot(*x, *y) - g.ra).abs() < 1e-9)
+                .count();
+            assert!(
+                at_tip >= teeth as usize,
+                "z={teeth}: the tip is touched {at_tip} times"
+            );
+        }
+    }
+
+    /// A ring's outline is traced the way its material lies: every point of it
+    /// is *outside* the tip circle, so the shape is a bore rather than a disc.
+    /// An external gear of the same teeth is the mirror statement.
+    #[test]
+    fn the_outline_is_a_bore_where_an_external_gears_is_a_disc() {
+        let g = ring(60);
+        let external = Gear::new(GearParams {
+            teeth: 60,
+            ..Default::default()
+        });
+        let ring_max = g
+            .profile(120)
+            .iter()
+            .map(|[x, y]| f64::hypot(*x, *y))
+            .fold(0.0_f64, f64::max);
+        let ext_max = external
+            .profile(120)
+            .iter()
+            .map(|[x, y]| f64::hypot(*x, *y))
+            .fold(0.0_f64, f64::max);
+        // The furthest point is where the fillet stops. With a fully filleted
+        // root that is where the two fillets meet at mid-space, a hair *inside*
+        // the root circle — the root circle is the cutter's reach, not the
+        // part's boundary, and the two only coincide when a root arc exists.
+        let deepest = g.trochoid_at(g.s_root).0;
+        assert!(
+            (ring_max - deepest).abs() < 1e-9,
+            "a ring's furthest point is where its fillet ends: {ring_max} against {deepest}"
+        );
+        assert!(
+            deepest <= g.rf + 1e-12,
+            "and that cannot be beyond the root circle"
+        );
+        if g.s_root != 0.0 {
+            assert!(
+                deepest < g.rf,
+                "a fully filleted root never reaches the root circle"
+            );
+        }
+        assert!(
+            (ext_max - external.ra).abs() < 1e-9,
+            "an external gear's furthest point is its tip"
+        );
+        assert!(
+            ring_max > ext_max,
+            "the ring encloses the gear of the same z"
         );
     }
 
