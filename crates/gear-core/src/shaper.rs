@@ -42,6 +42,7 @@
 //! An internal gear's root is *outside* its pitch circle and its material is
 //! *outside* its teeth, which is the whole of what `σ` says.
 
+use crate::involute::inv;
 use crate::mesh::MeshKind;
 use crate::profile::Gear;
 
@@ -120,6 +121,54 @@ impl ShaperCut {
         (f64::hypot(fx, fy), fx.atan2(fy) - rotation)
     }
 
+    /// Where the cutter's tip-round centre sits, as an angle from the cutter's
+    /// own tooth centreline.
+    ///
+    /// # The offset of an involute is another involute
+    ///
+    /// The round is tangent to the flank, so its centre lies a distance `ρ` from
+    /// the flank along the normal. That locus is not some new curve: an
+    /// involute's normal is the tangent line to its base circle, and the
+    /// arc-length along that base circle *is* the involute's angular origin. So
+    /// stepping back `ρ` along the normal lands on **the involute of the same
+    /// base circle with its origin shifted by `ρ/r_b`** — exact, and no solve.
+    ///
+    /// The corner centre is then that curve at radius `r_g = r_ac − ρ`:
+    ///
+    /// ```text
+    /// θ_g = s_c/2r_c + inv α_t − inv α_g − ρ/r_bc,     cos α_g = r_bc/r_g
+    /// ```
+    ///
+    /// `s_c` is the cutter's tooth thickness at its pitch circle. The three
+    /// terms after it are the tooth narrowing as it climbs to the tip, and the
+    /// round's inset.
+    fn corner_angle(
+        cutter_radius: f64,
+        corner_radius: f64,
+        tooth: f64,
+        alpha_t: f64,
+        rho: f64,
+    ) -> Option<f64> {
+        let base = cutter_radius * alpha_t.cos();
+        if corner_radius <= base {
+            return None;
+        }
+        let alpha_g = (base / corner_radius).acos();
+        Some(tooth / (2.0 * cutter_radius) + inv(alpha_t) - inv(alpha_g) - rho / base)
+    }
+
+    /// The travel at which the corner is at the workpiece's tooth centreline —
+    /// the phase [`Self::trochoid_at`] measures from.
+    ///
+    /// The cutter's tooth fills the workpiece's space, so its centreline sits
+    /// half a circular pitch from the workpiece's tooth centreline, and the
+    /// corner is `r_c θ_g` of arc back from that. Rolling preserves arc length,
+    /// which is why the cutter's angle converts straight into the workpiece's
+    /// travel.
+    fn phase_from(module_t: f64, cutter_radius: f64, corner_angle: f64) -> f64 {
+        std::f64::consts::PI * module_t / 2.0 - cutter_radius * corner_angle
+    }
+
     /// The cutter that a rack-generated [`Gear`] would be, if the rack had
     /// `cutter_teeth` teeth instead of infinitely many.
     ///
@@ -153,12 +202,18 @@ impl ShaperCut {
         if corner_radius.is_nan() || corner_radius <= 0.0 {
             return None;
         }
+        // The cutter's tooth fills the workpiece's space, so its thickness at
+        // the pitch circle is what the workpiece's tooth leaves over.
+        let workpiece_tooth = 2.0 * g.r * (g.psi_b - crate::involute::inv(g.alpha_t));
+        let cutter_tooth = std::f64::consts::PI * g.mt - workpiece_tooth;
+        let angle =
+            Self::corner_angle(cutter_radius, corner_radius, cutter_tooth, g.alpha_t, g.rho)?;
         Some(Self {
             workpiece_radius: g.r,
             cutter_radius,
             corner_radius,
             tip_round: g.rho,
-            phase: g.ac,
+            phase: Self::phase_from(g.mt, cutter_radius, angle),
             kind,
         })
     }
@@ -224,6 +279,41 @@ mod tests {
                 previous < 3.0 * expected,
                 "z={teeth} x={shift}: {previous} mm apart at a million teeth, \
                  against a curvature term of {expected}"
+            );
+        }
+    }
+
+    /// **The derived phase against the rack's, which is verified code.**
+    ///
+    /// `profile.rs` places the rack's corner at `a_c = s_t/2 + b_c tan α_t +
+    /// ρ/cos α_t`, measured from the workpiece's tooth centreline. The shaper's
+    /// phase is derived a different way — the cutter's own tooth thickness, its
+    /// narrowing to the tip, and the round's inset, all in angle — so agreement
+    /// in the limit is a check on the derivation rather than a restatement.
+    ///
+    /// It is worth its own test even though the convergence test above would
+    /// also fail without it: there the phase error would arrive mixed into a
+    /// distance, and a claim about the phase should be measured as one.
+    #[test]
+    fn the_derived_phase_converges_on_the_racks_corner_offset() {
+        for (teeth, shift) in [(17u32, 0.0), (17, 0.3), (43, -0.2), (60, 0.0)] {
+            let g = gear(teeth, shift);
+            let mut previous = f64::INFINITY;
+            for power in 2..6 {
+                let z_c = 10_u32.pow(power);
+                let cut = ShaperCut::equivalent_to_rack(&g, z_c, MeshKind::External).unwrap();
+                let error = (cut.phase - g.ac).abs();
+                assert!(
+                    error < previous,
+                    "z={teeth} x={shift} z_c={z_c}: phase error {error} did not improve \
+                     on {previous}"
+                );
+                previous = error;
+            }
+            assert!(
+                previous < 1e-4,
+                "z={teeth} x={shift}: phase still {previous} mm from the rack's {}",
+                g.ac
             );
         }
     }
