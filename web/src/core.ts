@@ -5,6 +5,9 @@
 
 import init, {
   solve_gear,
+  solve_ring,
+  ring_profile,
+  export_ring_dxf,
   solve_train,
   gear_profile,
   export_dxf,
@@ -287,6 +290,60 @@ export interface Material {
  *  the two formats are kept in step deliberately. */
 export interface MaterialLibrary {
   material: Material[];
+}
+
+/** The pinion cutter that shapes a ring. Without one its fillet is undefined. */
+export interface CutterRef {
+  teeth: number;
+  addendum: number;
+  tip_round: number;
+}
+export interface RingRequest {
+  params: GearParams;
+  cutter: CutterRef;
+  chord_tolerance: number;
+  reference_circles: boolean;
+}
+export interface RingSummary {
+  teeth: number;
+  transverse_module: number;
+  transverse_pressure_angle: number;
+  pitch_radius: number;
+  base_radius: number;
+  tip_radius: number;
+  root_radius: number;
+  junction_radius: number;
+  fully_filleted_root: boolean;
+  smallest_tooth_count: number;
+  clamps: string[];
+}
+
+export function defaultCutter(): CutterRef {
+  return { teeth: 20, addendum: 1.25, tip_round: 0.38 };
+}
+
+export function solveRing(req: RingRequest): { ok: RingSummary } | { error: string } {
+  try {
+    return { ok: JSON.parse(solve_ring(JSON.stringify(req))) as RingSummary };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export function ringProfile(req: RingRequest, pointsPerTooth: number): Float64Array | null {
+  try {
+    return ring_profile(JSON.stringify(req), pointsPerTooth);
+  } catch {
+    return null;
+  }
+}
+
+export function ringDxf(req: RingRequest): { ok: string } | { error: string } {
+  try {
+    return { ok: export_ring_dxf(JSON.stringify(req)) };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 export function defaultLibrary(): MaterialLibrary {

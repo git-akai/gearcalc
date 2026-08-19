@@ -7,6 +7,8 @@
 import {
   defaultParams,
   defaultLibrary,
+  defaultCutter,
+  type CutterRef,
   defaultStage,
   importLibrary,
   type ClassRef,
@@ -26,6 +28,10 @@ export interface GearTab {
   /** Export accuracy, mm. */
   chordTolerance: number;
   referenceCircles: boolean;
+  /** An internal (ring) gear rather than an external one. */
+  internal: boolean;
+  /** The pinion cutter that shapes it, used only when internal. */
+  cutter: CutterRef;
 }
 
 export interface TrainTab {
@@ -46,6 +52,8 @@ function freshTab(name = "Gear"): GearTab {
     toleranceClass: null,
     chordTolerance: 0.001,
     referenceCircles: true,
+    internal: false,
+    cutter: defaultCutter(),
   };
 }
 

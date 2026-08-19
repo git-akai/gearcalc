@@ -215,11 +215,200 @@ impl Gear {
     }
 }
 
+impl crate::ring::Ring {
+    /// The closed outline of a ring's bore, accurate to `chord_tolerance`
+    /// millimetres.
+    ///
+    /// The same seven steps an external gear's takes and in the same order —
+    /// root arc, fillet, flank, tip arc, flank, fillet, root arc — but traversed
+    /// **inward and back out** rather than outward and back in, because a ring's
+    /// tooth points at its own axis. The tip and root arcs are exact, as arcs,
+    /// and only the involute and the trochoid are subdivided.
+    ///
+    /// A fully filleted root has no root arc to emit; the fillets meet at
+    /// mid-space and the closing bulge is simply zero.
+    #[must_use]
+    pub fn outline(&self, chord_tolerance: f64) -> Vec<Vertex> {
+        let tol = if chord_tolerance.is_finite() && chord_tolerance > 0.0 {
+            chord_tolerance.max(MIN_RELATIVE_TOLERANCE * self.rf)
+        } else {
+            DEFAULT_CHORD_TOLERANCE
+        };
+
+        let theta_tip = self.involute_at(self.u_tip).1;
+        let theta_root = self.trochoid_at(self.s_root).1;
+        let root_arc = self.half_pitch - theta_root;
+
+        let z = self.teeth;
+        let pitch = 2.0 * std::f64::consts::PI / f64::from(z);
+        let mut out: Vec<Vertex> = Vec::new();
+
+        for k in 0..z {
+            let base = pitch * f64::from(k);
+            let pt = |r: f64, th: f64| {
+                let a = base + th;
+                (r * a.cos(), r * a.sin())
+            };
+
+            // 1. root arc, from mid tooth-space round to where the fillet starts
+            let start = pt(self.rf, -self.half_pitch);
+            out.push(Vertex {
+                x: start.0,
+                y: start.1,
+                bulge: bulge_for(root_arc),
+            });
+
+            // 2. fillet, minus side, climbing inward from the root
+            let fillet = |t: f64| self.trochoid_at(self.s_root + t * (self.s_j - self.s_root));
+            let f_minus = |t: f64| {
+                let (r, th) = fillet(t);
+                pt(r, -th)
+            };
+            subdivide(&f_minus, 0.0, 1.0, tol, 0, &mut out);
+
+            // 3. flank, minus side, on inward to the tip
+            let flank = |t: f64| self.involute_at(self.u_j + t * (self.u_tip - self.u_j));
+            let l_minus = |t: f64| {
+                let (r, th) = flank(t);
+                pt(r, -th)
+            };
+            subdivide(&l_minus, 0.0, 1.0, tol, 0, &mut out);
+
+            // 4. tip arc, across the tooth. Exact.
+            if let Some(last) = out.last_mut() {
+                last.bulge = bulge_for(2.0 * theta_tip);
+            }
+            let tip = pt(self.ra, theta_tip);
+            out.push(Vertex::line(tip.0, tip.1));
+
+            // 5. flank, plus side, back out toward the root
+            let l_plus = |t: f64| {
+                let (r, th) = flank(t);
+                pt(r, th)
+            };
+            subdivide(&l_plus, 1.0, 0.0, tol, 0, &mut out);
+
+            // 6. fillet, plus side, out to where the root arc resumes
+            let f_plus = |t: f64| {
+                let (r, th) = fillet(t);
+                pt(r, th)
+            };
+            subdivide(&f_plus, 1.0, 0.0, tol, 0, &mut out);
+
+            // 7. the run out to mid tooth-space opens the next tooth, so only
+            //    its bulge is recorded here.
+            if let Some(last) = out.last_mut() {
+                last.bulge = bulge_for(root_arc);
+            }
+        }
+
+        out
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use crate::GearParams;
+
+    /// The ring's outline against its own profile sampler: two routes to the
+    /// same curve, one adaptive with exact arcs and one uniform in parameter.
+    ///
+    /// Every outline vertex must sit on the profile to within the tolerance
+    /// asked for, and the outline must close. That is what makes it exportable
+    /// rather than merely plottable.
+    #[test]
+    fn a_rings_outline_tracks_its_profile_and_closes() {
+        use crate::ring::{Cutter, Ring};
+        for teeth in [43u32, 60, 90] {
+            let g = Ring::new(
+                &GearParams {
+                    teeth,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            );
+            let tol = 1e-3;
+            let v = g.outline(tol);
+            assert!(
+                v.len() > 20 * teeth as usize / 4,
+                "z={teeth}: {} vertices",
+                v.len()
+            );
+
+            // A dense reference built section by section, so none is starved
+            // the way an arc-length budget can starve a short one. Uniform in
+            // each parameter, which is not how the outline samples — the point
+            // is for the two routes to share as little as possible.
+            const DENSE: usize = 4000;
+            let mut dense: Vec<(f64, f64)> = Vec::new();
+            for i in 0..=DENSE {
+                #[allow(clippy::cast_precision_loss)]
+                let t = i as f64 / DENSE as f64;
+                dense.push((g.ra, -g.involute_at(g.u_tip).1 * (1.0 - 2.0 * t)));
+                dense.push(g.involute_at(g.u_tip + (g.u_j - g.u_tip) * t));
+                dense.push(g.trochoid_at(g.s_j + (g.s_root - g.s_j) * t));
+                dense.push((
+                    g.rf,
+                    g.trochoid_at(g.s_root).1 + (g.half_pitch - g.trochoid_at(g.s_root).1) * t,
+                ));
+            }
+            let cartesian: Vec<(f64, f64)> = dense
+                .iter()
+                .flat_map(|&(r, th)| [(r, th), (r, -th)])
+                .map(|(r, th)| (r * th.cos(), r * th.sin()))
+                .collect();
+
+            // Only the first tooth: the rest are rotations of it.
+            let mut worst: f64 = 0.0;
+            for vert in v.iter().take(v.len() / teeth as usize) {
+                let near = cartesian
+                    .iter()
+                    .map(|&(x, y)| f64::hypot(x - vert.x, y - vert.y))
+                    .fold(f64::INFINITY, f64::min);
+                worst = worst.max(near);
+            }
+            assert!(
+                worst < tol,
+                "z={teeth}: an outline vertex is {worst} mm from the profile"
+            );
+
+            // Closes, and stays inside its own annulus.
+            let first = v[0];
+            let last = *v.last().unwrap();
+            let gap = f64::hypot(first.x - last.x, first.y - last.y);
+            let pitch_arc = 2.0 * g.rf * g.half_pitch;
+            assert!(
+                gap < 2.0 * pitch_arc,
+                "z={teeth}: the loop's ends are {gap} mm apart"
+            );
+            for vert in &v {
+                let r = f64::hypot(vert.x, vert.y);
+                assert!(r >= g.ra - 1e-9 && r <= g.rf + 1e-9, "z={teeth}: r={r}");
+            }
+        }
+    }
+
+    /// A tighter tolerance buys more vertices and a closer fit — the property
+    /// the adaptive subdivision exists to have.
+    #[test]
+    fn a_rings_outline_refines_when_asked_to() {
+        use crate::ring::{Cutter, Ring};
+        let g = Ring::new(
+            &GearParams {
+                teeth: 60,
+                ..Default::default()
+            },
+            &Cutter::default(),
+        );
+        let coarse = g.outline(1e-2).len();
+        let fine = g.outline(1e-5).len();
+        assert!(
+            fine > coarse,
+            "a tighter tolerance should add vertices: {fine} against {coarse}"
+        );
+    }
 
     /// Reconstruct a bulged segment and measure how far the real profile strays
     /// from it. This is the property the whole module exists to provide.

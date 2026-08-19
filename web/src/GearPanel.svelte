@@ -7,7 +7,11 @@
     solve,
     validate,
     boundFor,
+    ringDxf,
+    ringProfile,
+    solveRing,
     type GearRequest,
+    type RingRequest,
     type Maybe,
     type PinsOut,
   } from "./core";
@@ -65,6 +69,16 @@
 
   const result = $derived(solve(request));
 
+  // A ring is a different part with different answers, so it gets its own
+  // request and its own summary rather than optional fields on the gear's.
+  const ringRequest = $derived<RingRequest>({
+    params: tab.params,
+    cutter: tab.cutter,
+    chord_tolerance: tab.chordTolerance,
+    reference_circles: tab.referenceCircles,
+  });
+  const ring = $derived(tab.internal ? solveRing(ringRequest) : null);
+
   // Kept as a typed array rather than an inline tuple list: destructuring a
   // mixed tuple inside {#each} widens both members to their union and loses the
   // field types.
@@ -76,18 +90,27 @@
         ]
       : [],
   );
-  const outline = $derived("ok" in result ? profile(request, 600) : null);
+  const outline = $derived(
+    tab.internal
+      ? ring && "ok" in ring
+        ? ringProfile(ringRequest, 600)
+        : null
+      : "ok" in result
+        ? profile(request, 600)
+        : null,
+  );
 
   let confirmingDelete = $state(false);
 
   function saveDxf() {
-    const r = dxf(request);
+    const r = tab.internal ? ringDxf(ringRequest) : dxf(request);
     if ("error" in r) return;
     const blob = new Blob([r.ok], { type: "application/dxf" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${(tab.name || "gear").replace(/\s+/g, "_")}_m${tab.params.module}_z${tab.params.teeth}.dxf`;
+    const kind = tab.internal ? "ring" : "gear";
+    a.download = `${(tab.name || kind).replace(/\s+/g, "_")}_m${tab.params.module}_z${tab.params.teeth}.dxf`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -122,6 +145,32 @@
 <div class="columns">
   <section class="inputs">
     <h2>Parameters</h2>
+    <div class="grid">
+      <label class="check">
+        <input type="checkbox" bind:checked={tab.internal} />
+        <span>Internal (ring) gear</span>
+        <small>the teeth point inward: the tip circle is inside the pitch circle</small>
+      </label>
+    </div>
+    {#if tab.internal}
+      <div class="grid">
+        <label>
+          <span>Cutter teeth</span>
+          <input type="number" step="1" min="1" bind:value={tab.cutter.teeth} />
+          <small>a ring is shaped by a pinion, and its fillet depends on which one</small>
+        </label>
+        <label>
+          <span>Cutter addendum</span>
+          <input type="number" step="0.05" bind:value={tab.cutter.addendum} />
+          <em>m</em>
+        </label>
+        <label>
+          <span>Cutter tip round</span>
+          <input type="number" step="0.02" bind:value={tab.cutter.tip_round} />
+          <em>m</em>
+        </label>
+      </div>
+    {/if}
     <div class="grid">
       {#each FIELDS as f (f.key)}
         <label class:invalid={errors[f.key]}>
@@ -201,7 +250,59 @@
   </section>
 
   <section class="results">
-    {#if "error" in result}
+    {#if tab.internal}
+      {#if ring && "error" in ring}
+        <p class="error">{ring.error}</p>
+      {:else if ring && "ok" in ring}
+        {@const r = ring.ok}
+        <Viewport
+          points={outline}
+          pitch={r.pitch_radius}
+          base={r.base_radius}
+          tip={r.tip_radius}
+          root={r.root_radius}
+        />
+        <h2>Geometry</h2>
+        <dl>
+          <dt>Transverse module</dt>
+          <dd>{mm(r.transverse_module)}</dd>
+          <dt>Transverse pressure angle</dt>
+          <dd>{r.transverse_pressure_angle.toFixed(4)}°</dd>
+          <dt>Pitch radius</dt>
+          <dd>{mm(r.pitch_radius)}</dd>
+          <dt>Base radius</dt>
+          <dd>{mm(r.base_radius)}</dd>
+          <dt>Tip radius</dt>
+          <dd>{mm(r.tip_radius)} <small>inside the pitch circle</small></dd>
+          <dt>Root radius</dt>
+          <dd>{mm(r.root_radius)} <small>outside it</small></dd>
+          <dt>Flank / fillet junction</dt>
+          <dd>{mm(r.junction_radius)}</dd>
+          <dt>Root form</dt>
+          <dd>
+            {r.fully_filleted_root ? "fully filleted — no root arc" : "root arc between the fillets"}
+          </dd>
+          <dt>Smallest tooth count</dt>
+          <dd>
+            {r.smallest_tooth_count}
+            <small>
+              below this the tip would reach inside the base circle; it moves with the addendum,
+              pressure angle and helix
+            </small>
+          </dd>
+        </dl>
+        {#if r.clamps.length}
+          <ul class="notes">
+            {#each r.clamps as c (c)}<li>{c}</li>{/each}
+          </ul>
+        {/if}
+        <p class="muted">
+          Measurement over teeth and pins, and the strength rating, are not shown for an internal
+          gear: they are external-gear constructions and this tool does not yet have their internal
+          equivalents.
+        </p>
+      {/if}
+    {:else if "error" in result}
       <p class="error">{result.error}</p>
     {:else}
       {@const s = result.ok}

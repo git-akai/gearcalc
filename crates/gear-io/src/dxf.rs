@@ -20,6 +20,7 @@
 //! the two curves with no exact arc representation. Their accuracy is set by the
 //! chord tolerance passed to [`gear_core::Gear::outline`].
 
+use gear_core::ring::Ring;
 use gear_core::{Gear, Vertex};
 
 /// Layer names. Geometry and construction aids are separated so the reference
@@ -98,15 +99,42 @@ impl Writer {
 /// origin, matching the on-screen view.
 #[must_use]
 pub fn gear_to_dxf(gear: &Gear, opts: &DxfOptions) -> String {
+    outline_to_dxf(
+        &gear.outline(opts.chord_tolerance),
+        &[gear.r, gear.rb, gear.ra, gear.rf],
+        opts,
+    )
+}
+
+/// The same, for an internal gear.
+///
+/// A ring exports the outline of its **bore**: its teeth point inward, so what
+/// this traces is the hole, and whatever rim sits outside it is the designer's
+/// business rather than the tooth geometry's.
+#[must_use]
+pub fn ring_to_dxf(ring: &Ring, opts: &DxfOptions) -> String {
+    outline_to_dxf(
+        &ring.outline(opts.chord_tolerance),
+        &[ring.r, ring.rb, ring.ra, ring.rf],
+        opts,
+    )
+}
+
+/// Write any closed outline, with its reference circles.
+///
+/// Both gear kinds come through here. The writer has no reason to know which it
+/// is holding — a polyline is a polyline — and keeping it that way is what stops
+/// a second export path growing its own quirks.
+fn outline_to_dxf(outline: &[Vertex], circles: &[f64], opts: &DxfOptions) -> String {
     let mut w = Writer::new();
     header(&mut w);
     tables(&mut w, opts.reference_circles);
 
     w.tag(0, "SECTION");
     w.tag(2, "ENTITIES");
-    polyline(&mut w, &gear.outline(opts.chord_tolerance));
+    polyline(&mut w, outline);
     if opts.reference_circles {
-        for r in [gear.r, gear.rb, gear.ra, gear.rf] {
+        for &r in circles {
             circle(&mut w, r);
         }
     }

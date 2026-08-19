@@ -226,15 +226,16 @@ sampled at the pitch circle where the backwards sign would also pass.
    `a sin α_t` rather than summing to it.
 3. ✅ **Assembly** — `Ring::sections`, `half_profile` and `profile` mirror the
    external gear's, with the radius climbing rather than falling.
-4. **A CAD-grade outline, and the export path it feeds.** `Ring::profile` gives
-   a plain polyline, enough to draw; `Gear::outline` gives **exact arcs** at a
-   chord tolerance, which is what a DXF deserves and what the ring still lacks.
-   Then `gear_to_dxf` — which takes a `&Gear` today — wants generalising to a
-   polyline plus its reference circles, so both kinds feed it without a branch.
-   Then the wasm entries, then the gear tab's internal option.
+4. ✅ **A CAD-grade outline and the export path.** `Ring::outline` gives exact
+   arcs at a chord tolerance like the external gear's; `gear_to_dxf` was
+   generalised to `outline_to_dxf(polyline, circles, opts)` so both kinds feed
+   one writer; `solve_ring`, `ring_profile` and `export_ring_dxf` cross the wasm
+   boundary; and the gear tab has an **Internal (ring) gear** option with its
+   cutter, verified in the browser through the real wasm.
 
-   **This is what the internal-gear option on the gear tab needs**, and it is
-   worth doing in that order: outline, DXF, wasm, Svelte.
+   Measurement over teeth and pins and the strength rating are *not* shown for a
+   ring, with the reason on screen: they are external-gear constructions and the
+   internal equivalents do not exist here yet.
 5. **Interference checks** a rack cutter never needs: involute (trimming),
    trochoid, and radial-assembly. The `z_ring − z_cutter ≥ 10` rule of thumb is
    a convention; the geometric condition behind it is what belongs here.

@@ -222,6 +222,139 @@ fn summarise(g: &Gear, req: &GearRequest) -> GearSummary {
 // in it directly would make the error paths untestable — which is exactly where
 // a calculation engine most needs tests.
 
+/// Everything the UI asks about one **internal** gear.
+///
+/// A separate request from [`GearRequest`], for the reason the worm stage got a
+/// separate result: a ring's answers are a different shape. It has no span or
+/// over-pins measurement in the sense the metrology module means, no strength
+/// rating yet, and it has something an external gear does not — the cutter that
+/// shaped it, without which its fillet is undefined.
+#[derive(Deserialize)]
+pub struct RingRequest {
+    pub params: GearParams,
+    #[serde(default)]
+    pub cutter: CutterRef,
+    #[serde(default)]
+    pub chord_tolerance: Option<f64>,
+    #[serde(default = "yes")]
+    pub reference_circles: bool,
+}
+
+/// The pinion cutter, as the UI sends it.
+#[derive(Clone, Copy, Deserialize, Serialize)]
+pub struct CutterRef {
+    pub teeth: u32,
+    /// Addendum, in modules.
+    pub addendum: f64,
+    /// Tip corner round, in modules.
+    pub tip_round: f64,
+}
+
+impl Default for CutterRef {
+    fn default() -> Self {
+        let c = gear_core::ring::Cutter::default();
+        Self {
+            teeth: c.teeth,
+            addendum: c.addendum,
+            tip_round: c.tip_round,
+        }
+    }
+}
+
+impl CutterRef {
+    fn to_cutter(self) -> gear_core::ring::Cutter {
+        gear_core::ring::Cutter {
+            teeth: self.teeth,
+            addendum: self.addendum,
+            tip_round: self.tip_round,
+        }
+    }
+}
+
+/// What the UI shows for a ring.
+#[derive(Serialize)]
+pub struct RingSummary {
+    pub teeth: u32,
+    pub transverse_module: f64,
+    pub transverse_pressure_angle: f64,
+    /// Pitch, base, tip and root radii, mm. The tip is **inside** the pitch
+    /// circle and the root outside it.
+    pub pitch_radius: f64,
+    pub base_radius: f64,
+    pub tip_radius: f64,
+    pub root_radius: f64,
+    /// Radius at which the flank hands over to the fillet, mm.
+    pub junction_radius: f64,
+    /// Whether the corner rounds meet before mid-space, leaving no root arc.
+    pub fully_filleted_root: bool,
+    /// The fewest teeth this design could have had and still cleared its own
+    /// base circle: `2 h_a cos β / (1 − cos α_t)`, rounded up.
+    ///
+    /// Reported because it is the constraint that actually bites on internal
+    /// gears, it moves with the addendum, pressure angle and helix, and a
+    /// designer meeting it by accident should be told which margin they are on.
+    pub smallest_tooth_count: u32,
+    pub clamps: Vec<String>,
+}
+
+fn ring_of(req: &RingRequest) -> gear_core::ring::Ring {
+    gear_core::ring::Ring::new(&req.params, &req.cutter.to_cutter())
+}
+
+fn smallest_tooth_count(params: &GearParams) -> u32 {
+    let beta = params.helix_angle.to_radians();
+    let alpha_t = (params.pressure_angle.to_radians().tan() / beta.cos()).atan();
+    let threshold = 2.0 * params.addendum * beta.cos() / (1.0 - alpha_t.cos());
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let out = threshold.ceil().max(1.0) as u32;
+    out
+}
+
+fn parse_ring(input: &str) -> Result<RingRequest, String> {
+    serde_json::from_str(input).map_err(|e| format!("bad ring request: {e}"))
+}
+
+fn solve_ring_impl(input: &str) -> Result<String, String> {
+    let req = parse_ring(input)?;
+    let g = ring_of(&req);
+    let summary = RingSummary {
+        teeth: g.teeth,
+        transverse_module: g.mt,
+        transverse_pressure_angle: g.alpha_t.to_degrees(),
+        pitch_radius: g.r,
+        base_radius: g.rb,
+        tip_radius: g.ra,
+        root_radius: g.rf,
+        junction_radius: g.involute_at(g.u_j).0,
+        fully_filleted_root: g.s_root != 0.0,
+        smallest_tooth_count: smallest_tooth_count(&req.params),
+        clamps: g.clamps.clone(),
+    };
+    serde_json::to_string(&summary).map_err(|e| format!("could not encode result: {e}"))
+}
+
+fn ring_profile_impl(input: &str, points_per_tooth: usize) -> Result<Vec<f64>, String> {
+    let req = parse_ring(input)?;
+    Ok(ring_of(&req)
+        .profile(points_per_tooth)
+        .into_iter()
+        .flatten()
+        .collect())
+}
+
+fn export_ring_dxf_impl(input: &str) -> Result<String, String> {
+    let req = parse_ring(input)?;
+    Ok(gear_io::ring_to_dxf(
+        &ring_of(&req),
+        &gear_io::DxfOptions {
+            chord_tolerance: req
+                .chord_tolerance
+                .unwrap_or(gear_core::outline::DEFAULT_CHORD_TOLERANCE),
+            reference_circles: req.reference_circles,
+        },
+    ))
+}
+
 fn parse(input: &str) -> Result<GearRequest, String> {
     serde_json::from_str(input).map_err(|e| format!("bad gear request: {e}"))
 }
@@ -324,6 +457,36 @@ pub fn solve_train(input: &str) -> Result<String, JsError> {
 /// which numbers are measured and which are estimates — see `docs/DESIGN.md`
 /// §6.1. Dropping that on the floor would present a class estimate with the
 /// same authority as a datasheet reading.
+/// Derived geometry for one internal gear. JSON in, JSON out.
+///
+/// # Errors
+///
+/// A malformed request.
+#[wasm_bindgen]
+pub fn solve_ring(input: &str) -> Result<String, JsError> {
+    solve_ring_impl(input).map_err(|e| JsError::new(&e))
+}
+
+/// A ring's closed outline as flat `[x, y, x, y, ...]`, for the viewport.
+///
+/// # Errors
+///
+/// A malformed request.
+#[wasm_bindgen]
+pub fn ring_profile(input: &str, points_per_tooth: usize) -> Result<Vec<f64>, JsError> {
+    ring_profile_impl(input, points_per_tooth).map_err(|e| JsError::new(&e))
+}
+
+/// A ring's bore as DXF.
+///
+/// # Errors
+///
+/// A malformed request.
+#[wasm_bindgen]
+pub fn export_ring_dxf(input: &str) -> Result<String, JsError> {
+    export_ring_dxf_impl(input).map_err(|e| JsError::new(&e))
+}
+
 #[wasm_bindgen]
 pub fn default_materials() -> Result<String, JsError> {
     default_materials_impl().map_err(|e| JsError::new(&e))
@@ -445,6 +608,37 @@ mod tests {
     /// A train with two kinds of stage in it, which is what the `kind` tag on
     /// each stage is for. The worm result has a different shape from the spur
     /// one, and both have to survive the same boundary.
+    /// A ring crosses the boundary: its own request shape, its own summary, an
+    /// outline the viewport can draw and a DXF the CAD can read.
+    #[test]
+    fn a_ring_crosses_the_boundary() {
+        let req = r#"{"params":{"teeth":60,"module":1.0,"pressure_angle":20.0,
+            "helix_angle":0.0,"profile_shift":0.0,"addendum":1.0,"dedendum":1.25,
+            "root_radius":0.38,"thickness_mod":1.0},
+            "cutter":{"teeth":20,"addendum":1.25,"tip_round":0.38}}"#;
+
+        let v: serde_json::Value = serde_json::from_str(&solve_ring_impl(req).unwrap()).unwrap();
+        let (tip, pitch, root) = (
+            v["tip_radius"].as_f64().unwrap(),
+            v["pitch_radius"].as_f64().unwrap(),
+            v["root_radius"].as_f64().unwrap(),
+        );
+        assert!(tip < pitch && pitch < root, "a ring's radii run inward");
+        assert!(v["junction_radius"].as_f64().unwrap() > tip);
+        // The constraint that actually bites on internal gears, reported.
+        assert_eq!(v["smallest_tooth_count"].as_u64().unwrap(), 34);
+
+        let outline = ring_profile_impl(req, 60).unwrap();
+        assert!(outline.len() > 200 && outline.len().is_multiple_of(2));
+
+        let dxf = export_ring_dxf_impl(req).unwrap();
+        assert!(dxf.contains("LWPOLYLINE"), "no polyline in the DXF");
+        assert!(
+            dxf.ends_with("EOF\r\n") || dxf.ends_with("EOF\n"),
+            "truncated DXF"
+        );
+    }
+
     #[test]
     fn a_mixed_train_crosses_the_boundary_with_both_shapes_intact() {
         let req = r#"{"train":{

@@ -6,5 +6,5 @@
 pub mod dxf;
 pub mod materials;
 
-pub use dxf::{gear_to_dxf, DxfOptions};
+pub use dxf::{gear_to_dxf, ring_to_dxf, DxfOptions};
 pub use materials::{default_library, from_toml, to_toml, MaterialError};
