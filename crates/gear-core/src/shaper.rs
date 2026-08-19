@@ -68,6 +68,64 @@ pub struct ShaperCut {
     pub kind: MeshKind,
 }
 
+/// Everything needed to describe one cut.
+#[derive(Clone, Copy, Debug)]
+pub struct CutParams {
+    /// Transverse module, mm — shared, since the pair must roll together.
+    pub module_t: f64,
+    /// Transverse pressure angle, radians. Shared.
+    pub alpha_t: f64,
+    /// The workpiece's pitch radius, mm.
+    pub workpiece_radius: f64,
+    /// The workpiece's tooth thickness at its pitch circle, as an arc, mm. The
+    /// cutter's tooth takes the remainder of the pitch, because one fills what
+    /// the other leaves.
+    pub workpiece_tooth: f64,
+    /// Teeth on the cutter.
+    pub cutter_teeth: u32,
+    /// The cutter's tip radius, mm.
+    pub cutter_tip_radius: f64,
+    /// The cutter's tip corner round, mm.
+    pub tip_round: f64,
+    pub kind: MeshKind,
+}
+
+impl ShaperCut {
+    /// Build a cut from the cutter and workpiece that make it.
+    ///
+    /// # Errors
+    ///
+    /// `None` if the cutter has no teeth, or its corner falls inside its own
+    /// base circle — which is not a cutter, it is a disc.
+    #[must_use]
+    pub fn new(p: &CutParams) -> Option<Self> {
+        if p.cutter_teeth == 0 || !p.module_t.is_finite() {
+            return None;
+        }
+        let cutter_radius = f64::from(p.cutter_teeth) * p.module_t / 2.0;
+        let corner_radius = p.cutter_tip_radius - p.tip_round;
+        if corner_radius.is_nan() || corner_radius <= 0.0 {
+            return None;
+        }
+        let cutter_tooth = std::f64::consts::PI * p.module_t - p.workpiece_tooth;
+        let angle = Self::corner_angle(
+            cutter_radius,
+            corner_radius,
+            cutter_tooth,
+            p.alpha_t,
+            p.tip_round,
+        )?;
+        Some(Self {
+            workpiece_radius: p.workpiece_radius,
+            cutter_radius,
+            corner_radius,
+            tip_round: p.tip_round,
+            phase: Self::phase_from(p.module_t, cutter_radius, angle),
+            kind: p.kind,
+        })
+    }
+}
+
 impl ShaperCut {
     /// `+1` for an external workpiece, `−1` for an internal one.
     fn sigma(&self) -> f64 {
