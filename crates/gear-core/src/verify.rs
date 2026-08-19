@@ -355,12 +355,14 @@ pub fn sdf_matches_polyline(g: &Gear, arc_points: usize, samples: usize) -> f64 
 /// How far a ring's generated profile sits from the boundary its cutter leaves.
 #[derive(Clone, Copy, Debug)]
 pub struct RingCutReport {
-    /// Worst distance, mm, by which the analytic profile claims material the
-    /// cutter would have removed. Positive is bad.
-    pub penetration: f64,
-    /// Worst distance, mm, by which it falls short of the cut — material left
-    /// on that the tool would not have left. Positive is bad.
-    pub deviation: f64,
+    /// Worst distance, mm, between the simulated cut and the analytic profile.
+    ///
+    /// A **distance**, not an angular gap at equal radius, because a ring's
+    /// fillet is stationary in radius at its crown — the two fillets meet there
+    /// — so radius is a useless coordinate in exactly the place the two curves
+    /// are closest. Comparing by it reported 18 µm of "error" that was entirely
+    /// the coordinate's fault.
+    pub worst_distance: f64,
     /// Radii that had a cutter point to compare against.
     pub samples: usize,
 }
@@ -387,6 +389,23 @@ pub struct RingCutReport {
 /// and the rolling, which is the point.
 #[must_use]
 pub fn ring_cut_envelope(ring: &crate::ring::Ring, radii: usize, phases: usize) -> Vec<(f64, f64)> {
+    // Two circular pitches either side. One is not enough: a cutter tooth's
+    // engagement with one space lasts longer than a pitch of travel, and cutting
+    // it short leaves the ring's flank near its tip ungenerated — which showed
+    // up as the envelope being 0.1 mm wide there. Four gives the same answer as
+    // two, so two is converged.
+    ring_cut_envelope_spans(ring, radii, phases, 2.0)
+}
+
+/// The same, sweeping `spans` circular pitches of travel either side of the
+/// deepest cut.
+#[must_use]
+pub fn ring_cut_envelope_spans(
+    ring: &crate::ring::Ring,
+    radii: usize,
+    phases: usize,
+    spans: f64,
+) -> Vec<(f64, f64)> {
     use crate::involute::inv;
     use std::f64::consts::PI;
 
@@ -441,16 +460,20 @@ pub fn ring_cut_envelope(ring: &crate::ring::Ring, radii: usize, phases: usize) 
     }
 
     // Sweep the cutter and keep the smallest angle reached at each radius.
-    let span = PI * ring.mt;
+    let span = spans * PI * ring.mt;
     let mut envelope = vec![f64::INFINITY; radii];
     for j in 0..=phases {
         #[allow(clippy::cast_precision_loss)]
         let s = -span + 2.0 * span * (j as f64 / phases as f64);
         let phi = s / cut.cutter_radius;
         let rotation = (s - cut.phase) / ring.r;
-        let (sin_t, cos_t) = (phi - theta_g).sin_cos();
+        // The corner sits at −θ_g from the cutter's tooth centreline, not +θ_g:
+        // it is on the flank *facing* the ring's tooth. Mirroring the tooth and
+        // turning the other way keeps the corner where `corner_centre_at` puts
+        // it while moving the flank to the side that actually does the cutting.
+        let (sin_t, cos_t) = (phi + theta_g).sin_cos();
         for &(px, py) in &boundary {
-            // rotate the cutter by (phi - theta_g), then place its centre
+            let px = -px;
             let x = px * cos_t + py * sin_t;
             let y = cut.centre_distance() + (py * cos_t - px * sin_t);
             let radius = f64::hypot(x, y);
@@ -491,45 +514,43 @@ pub fn ring_cut_envelope(ring: &crate::ring::Ring, radii: usize, phases: usize) 
 }
 
 /// Compare that envelope with the analytic profile.
+///
+/// Every simulated point is measured to the nearest point of a dense sampling of
+/// the analytic half-tooth. That is the whole comparison: two curves, one
+/// distance.
 #[must_use]
 pub fn check_ring_cut(ring: &crate::ring::Ring, radii: usize, phases: usize) -> RingCutReport {
-    let r_junction = ring.involute_at(ring.u_j).0;
-    let analytic = |radius: f64| {
-        if radius <= r_junction {
-            let u = (((radius / ring.rb).powi(2) - 1.0).max(0.0)).sqrt();
-            ring.involute_at(u).1
-        } else {
-            let (mut lo, mut hi) = (ring.s_j, ring.s_root);
-            for _ in 0..80 {
-                let mid = 0.5 * (lo + hi);
-                if ring.trochoid_at(mid).0 < radius {
-                    lo = mid;
-                } else {
-                    hi = mid;
-                }
-            }
-            ring.trochoid_at(0.5 * (lo + hi)).1
-        }
-    };
-
-    let (mut penetration, mut deviation, mut samples) = (0.0_f64, 0.0_f64, 0usize);
-    for (radius, cut_angle) in ring_cut_envelope(ring, radii, phases) {
-        let mine = analytic(radius);
-        if mine >= ring.half_pitch {
-            continue;
-        }
-        samples += 1;
-        let gap = radius * (mine - cut_angle);
-        if gap > 0.0 {
-            penetration = penetration.max(gap);
-        } else {
-            deviation = deviation.max(-gap);
+    // A dense analytic reference, section by section so none is starved.
+    const DENSE: usize = 3000;
+    let mut reference: Vec<(f64, f64)> = Vec::with_capacity(2 * DENSE);
+    for i in 0..=DENSE {
+        #[allow(clippy::cast_precision_loss)]
+        let t = i as f64 / DENSE as f64;
+        for (r, th) in [
+            ring.involute_at(ring.u_tip + (ring.u_j - ring.u_tip) * t),
+            ring.trochoid_at(ring.s_j + (ring.s_root - ring.s_j) * t),
+        ] {
+            reference.push((r * th.sin(), r * th.cos()));
         }
     }
 
+    let mut worst_distance = 0.0_f64;
+    let envelope = ring_cut_envelope(ring, radii, phases);
+    let samples = envelope.len();
+    for (radius, angle) in envelope {
+        if angle >= ring.half_pitch {
+            continue;
+        }
+        let (x, y) = (radius * angle.sin(), radius * angle.cos());
+        let near = reference
+            .iter()
+            .map(|&(rx, ry)| f64::hypot(x - rx, y - ry))
+            .fold(f64::INFINITY, f64::min);
+        worst_distance = worst_distance.max(near);
+    }
+
     RingCutReport {
-        penetration,
-        deviation,
+        worst_distance,
         samples,
     }
 }

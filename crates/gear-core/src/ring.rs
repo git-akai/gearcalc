@@ -724,44 +724,44 @@ mod tests {
         );
     }
 
-    /// **Milestone 8's gate, and it is not passing yet.**
+    /// **Milestone 8's gate: is this the shape that tool would leave?**
     ///
     /// The cut is simulated — the cutter swept through the rolling motion, its
     /// boundary transformed into the ring's frame, the envelope taken — and
-    /// compared with the analytic profile. It consults none of the ring's own
-    /// construction, which is the point.
+    /// compared with the analytic profile. It consults none of the ring's flank,
+    /// fillet or junction, which is the point: every other test here checks a
+    /// piece, and a construction can be right in every part and wrong in how the
+    /// parts are placed.
     ///
-    /// It has already earned its place: it found that `Cutter::default()` was
-    /// **not a tool**. A 0.38-module tip round on a 20-tooth cutter with a 1.25
-    /// addendum leaves a tip 0.377 mm wide, so the two corner rounds overlap and
-    /// the round's centre crosses the cutter's own centreline. 0.38 is the
-    /// *rack's* figure and does not carry over. `ShaperCut` now refuses such a
-    /// cutter and the default is 0.2.
+    /// # What it caught
     ///
-    /// **What it still reports is a real disagreement of about 0.1 mm** between
-    /// the simulated cut and the analytic flank, and it is not yet localised.
-    /// What is known, and what the next session should start from:
+    /// One fault in the geometry and two in itself, and the order matters.
     ///
-    /// - The *fillet* agrees: the simulation's corner-centre trajectory matches
-    ///   [`crate::shaper::ShaperCut::corner_centre_at`] exactly, at every phase
-    ///   tried.
-    /// - The *flank* does not. The simulated envelope sits consistently wider
-    ///   than the analytic flank — the cut leaves more tooth than the profile
-    ///   claims — by 0.143 mm at r = 20.78 falling to 0.113 mm at r = 22.28 on a
-    ///   43-tooth ring.
-    /// - It is **not** the sweep's discretisation: ten times the phases changes
-    ///   the figure in the fifth decimal.
-    /// - It is **not** a pure phase error either: neither the angular offset
-    ///   (0.0069 → 0.0051 rad) nor the arc offset is constant along the flank.
+    /// `Cutter::default()` **was not a tool**: a 0.38-module tip round on a
+    /// 20-tooth cutter with a 1.25 addendum leaves a tip 0.377 mm wide, so the
+    /// two corner rounds overlap. 0.38 is the *rack's* figure and does not carry
+    /// over. `ShaperCut` now refuses such a cutter.
     ///
-    /// So one of the two is wrong about where the cutter's *flank* sits relative
-    /// to its corner, and the corner is the one with independent confirmation.
-    /// Until that is settled this test asserts only what is established — that
-    /// the sweep reaches the whole profile — and the discrepancy is recorded in
-    /// DESIGN.md rather than tuned away.
+    /// Then a 0.1 mm disagreement that took some finding, because the obvious
+    /// check exonerated the wrong thing. The simulation's corner-centre
+    /// trajectory matched [`crate::shaper::ShaperCut::corner_centre_at`]
+    /// exactly — but that match is **invariant under mirroring the cutter's
+    /// tooth**, so it confirmed nothing about where the flank was. The corner
+    /// sits at `−θ_g` from the cutter's tooth centreline, on the flank *facing*
+    /// the ring's tooth, and the simulation had put it at `+θ_g`.
+    ///
+    /// What pointed at the simulation rather than the profile was that the
+    /// envelope was **not an involute of the ring's base circle**. Conjugate
+    /// action says it has to be, so `θ − inv α` must be constant along the
+    /// flank; it drifted. Once the flank moved to the right side it stopped
+    /// drifting, and now sits on `ψ_b` to 6e-5 rad.
+    ///
+    /// The other fault was the sweep spanning one circular pitch instead of two:
+    /// an engagement outlasts a pitch of travel, so the flank near the ring's
+    /// tip was never generated.
     #[test]
-    fn the_cut_simulation_reaches_the_whole_profile() {
-        for (teeth, cutter_teeth) in [(43u32, 20u32), (60, 20), (90, 25)] {
+    fn the_generated_profile_is_the_shape_the_cutter_would_leave() {
+        for (teeth, cutter_teeth) in [(43u32, 20u32), (60, 20), (60, 30), (90, 25)] {
             let g = Ring::new(
                 &GearParams {
                     teeth,
@@ -772,23 +772,20 @@ mod tests {
                     ..Cutter::default()
                 },
             );
+            let report = crate::verify::check_ring_cut(&g, 300, 12_000);
             assert!(
-                g.clamps.iter().all(|c| c.contains("fully filleted")),
-                "z={teeth}/{cutter_teeth}: {:?}",
-                g.clamps
+                report.samples > 250,
+                "z={teeth}/{cutter_teeth}: only {} radii were reached",
+                report.samples
             );
-            let envelope = crate::verify::ring_cut_envelope(&g, 40, 4000);
-            assert_eq!(
-                envelope.len(),
-                40,
-                "z={teeth}/{cutter_teeth}: the sweep missed some radii"
+            // The floor is the simulation's own discretisation — a radius bin is
+            // 7 µm wide and the envelope is a minimum over samples — so a couple
+            // of microns is as close as this can come.
+            assert!(
+                report.worst_distance < 5e-3,
+                "z={teeth}/{cutter_teeth}: the cut and the profile differ by {} mm",
+                report.worst_distance
             );
-            for &(_, angle) in &envelope {
-                assert!(
-                    angle > 0.0 && angle <= g.half_pitch,
-                    "z={teeth}/{cutter_teeth}: an envelope angle of {angle} is outside the tooth"
-                );
-            }
         }
     }
 

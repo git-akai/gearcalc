@@ -2412,6 +2412,8 @@ here. Revision 2 additions are marked ★.
 | ◆ Worm type: ZI against ZN and ZA | peak contact pressure, five worms from γ = 4.8° to 19.5°, everything but the flank type held fixed | ZN 0.9–14.8 % **below** ZI, ZA between them. The effective `α_n` is identical to 0.01° across all three, so nothing but contact stress moves |
 | ◆ **Worm backlash from one projection** | the derived `j_n = j_axial sin β_b1 + Δa sin α_n` against the two relations handbooks give separately — wheel turns by `j/r₂`, worm by `2π j/lead` — three worms | 1e-12 both, so one projection reproduces both rules |
 | ◆ Worm contact vs. face width | wheel face width 4 mm against 40 mm | **bit-identical** peak pressure — which is why a worm stage has no automatic face width from strength: a point contact has nothing for `σ_H ∝ 1/√b` to invert |
+| ▲ **The ring's profile is the shape its cutter leaves** | the cut simulated — cutter swept, boundary transformed, envelope taken — against the analytic profile, four ring/cutter pairs | **3.6 µm**, which is the simulation's own binning. Consults none of the ring's flank, fillet or junction |
+| ▲ The envelope is an involute of the ring's base circle | `θ − inv α` along the flank | constant on `ψ_b` to 6e-5 rad — the property that located the fault above |
 | ▲ The ring's outline against its own profile sampler | adaptive exact-arc outline vs. a dense per-section sampling, three ring sizes | every vertex within the 1e-3 mm asked for; two routes sharing only the section definitions |
 | ▲ A ring across the wasm boundary | JSON in, JSON out: summary, outline and DXF | radii run inward, the smallest tooth count comes back, the DXF carries a polyline |
 | ▲ **The ring's flank and fillet meet tangentially, not by crossing** | the residual over the fillet's travel, 43-tooth ring | bottoms out at 1e-6 rad and never changes sign — so a bracketed root-find is the wrong tool, and its failure is the signal. Solved in closed form from the line of action instead |
@@ -2444,26 +2446,37 @@ here. Revision 2 additions are marked ★.
 The marks record which round of review each check came from; they are kept only
 so a claim can be traced to the work that produced it.
 
-**Open, and not resolved.** The ring's cut simulation
-(`verify::check_ring_cut`) disagrees with the analytic profile by about 0.1 mm
-on the **flank**, and the cause is not yet found. What is established: the
-simulation's corner-centre trajectory matches `ShaperCut::corner_centre_at`
-exactly, so the *fillet* side agrees; the simulated envelope sits consistently
-wider than the analytic flank, by 0.143 mm at r = 20.78 falling to 0.113 mm at
-r = 22.28 on a 43-tooth ring; it is not the sweep's discretisation, since ten
-times the phases moves the figure in the fifth decimal; and it is not a pure
-phase error, since neither the angular offset (0.0069 → 0.0051 rad) nor the arc
-offset is constant along the flank. So one of the two is wrong about where the
-cutter's *flank* sits relative to its corner — and the corner is the one with
-independent confirmation. The gate is written and reports the number; it is not
-being tuned to pass.
+**Resolved.** The ring's cut simulation (`verify::check_ring_cut`) disagreed
+with the analytic profile by about 0.1 mm on the flank; the fault was the
+simulation's, twice over, and the analytic profile was right throughout.
 
-The simulation has already paid for itself: it found that the default shaper
-cutter was **not a tool**. A 0.38-module tip round on a 20-tooth cutter with a
-1.25 addendum leaves a tip 0.377 mm wide, so the two corner rounds overlap and
-the round's centre crosses the cutter's own tooth centreline. 0.38 is the
-*rack's* figure and does not carry over; `ShaperCut` now refuses such a cutter
-and the default round is 0.2.
+What pointed at the simulation was that its envelope was **not an involute of
+the ring's base circle**. Conjugate action says it must be, so `θ − inv α` has to
+be constant along the flank — and it drifted. That is a property the answer must
+have, checkable without knowing the answer, and it is what turned a symptom into
+a direction.
+
+The first fault: the sweep spanned one circular pitch of travel either side. An
+engagement outlasts a pitch, so the ring's flank near its tip was never
+generated. Two pitches converges; four gives the same figure.
+
+The second is the instructive one. **The corner sits at `−θ_g` from the cutter's
+tooth centreline — on the flank facing the ring's tooth — and the simulation had
+it at `+θ_g`.** The check that should have caught it did not: the simulation's
+corner-centre trajectory matched `ShaperCut::corner_centre_at` exactly, which
+looked like confirmation and was not, because that match is **invariant under
+mirroring the cutter's tooth**. It pinned the corner and said nothing about the
+flank. A check that cannot distinguish the two cases is not evidence for either.
+
+With both fixed, `θ − inv α` sits on `ψ_b` to 6e-5 rad along the whole flank and
+the two curves agree to **3.6 µm**, which is the simulation's own discretisation.
+
+One measurement lesson came out of the last step too: the comparison was first
+written as an angular gap at equal radius, and reported 18 µm of "error"
+concentrated at the fillet's crown. A ring's fillet is **stationary in radius**
+there — the two fillets meet — so radius is a useless coordinate exactly where
+the curves are closest. Measuring point-to-curve distance instead removed it
+entirely.
 
 **Not verified, and deliberately not quoted.** The mesh-phase coefficient of
 §4.10 — how far a commanded centre-distance change shifts the drive-flank phase.
