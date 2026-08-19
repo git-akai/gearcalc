@@ -287,6 +287,11 @@ pub struct RingSummary {
     pub junction_radius: f64,
     /// Whether the corner rounds meet before mid-space, leaving no root arc.
     pub fully_filleted_root: bool,
+    /// The lowest radius this cutter can generate as an involute, mm. Below it
+    /// the cutter's own involute has run out.
+    pub generation_limit: f64,
+    /// Whether the tip stays above that limit.
+    pub fully_generated: bool,
     /// The fewest teeth this design could have had and still cleared its own
     /// base circle: `2 h_a cos β / (1 − cos α_t)`, rounded up.
     ///
@@ -327,6 +332,8 @@ fn solve_ring_impl(input: &str) -> Result<String, String> {
         root_radius: g.rf,
         junction_radius: g.involute_at(g.u_j).0,
         fully_filleted_root: g.s_root != 0.0,
+        generation_limit: g.generation_limit(),
+        fully_generated: g.fully_generated(),
         smallest_tooth_count: smallest_tooth_count(&req.params),
         clamps: g.clamps.clone(),
     };

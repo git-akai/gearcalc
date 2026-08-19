@@ -314,6 +314,8 @@ export interface RingSummary {
   root_radius: number;
   junction_radius: number;
   fully_filleted_root: boolean;
+  generation_limit: number;
+  fully_generated: boolean;
   smallest_tooth_count: number;
   clamps: string[];
 }

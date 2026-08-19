@@ -518,6 +518,20 @@ pub fn ring_cut_envelope_spans(
 /// Every simulated point is measured to the nearest point of a dense sampling of
 /// the analytic half-tooth. That is the whole comparison: two curves, one
 /// distance.
+///
+/// # What it does not yet see
+///
+/// The simulated cutter is its involute flank, its tip corner round and its tip
+/// — **not its own fillet**, below its base circle. So the sweep cannot show
+/// what happens beneath [`crate::ring::Ring::generation_limit`], where the
+/// cutter's involute has run out and its fillet region is what passes. In that
+/// band the sweep has nothing to say and the agreement it reports is not
+/// evidence either way.
+///
+/// That band is small on ordinary designs — 0.08 mm on a 43-tooth ring cut by a
+/// 20-tooth cutter — and `Ring` flags it rather than pretending otherwise. But
+/// it is the honest edge of this gate, and closing it means giving the simulated
+/// cutter a fillet of its own.
 #[must_use]
 pub fn check_ring_cut(ring: &crate::ring::Ring, radii: usize, phases: usize) -> RingCutReport {
     // A dense analytic reference, section by section so none is starved.

@@ -236,7 +236,19 @@ sampled at the pitch circle where the backwards sign would also pass.
    Measurement over teeth and pins and the strength rating are *not* shown for a
    ring, with the reason on screen: they are external-gear constructions and the
    internal equivalents do not exist here yet.
-5. **Interference checks** a rack cutter never needs: involute (trimming),
+5. 🔶 **Interference checks.** The first is in: the **generation limit**, where
+   the cutter's own involute runs out and can generate no further down the
+   ring's flank — `√(r_b² + (a sin α_t)²)`, reported and flagged, and moved by
+   the one lever a designer has (a bigger cutter sits closer, so it reaches
+   further). It bites on ordinary designs: 0.08 mm of a 43-tooth ring's flank
+   cut by a 20-tooth cutter is not generated.
+
+   Still to do, and these are *mesh* conditions rather than generation ones, so
+   they want a ring paired with a pinion: involute (tip) interference, trochoid
+   interference, and radial-assembly clearance — the geometry behind the
+   `z_ring − z_pinion ≥ 10` rule of thumb. Milestone 9 needs all three.
+
+   Superseded plan: **Interference checks** a rack cutter never needs: involute (trimming),
    trochoid, and radial-assembly. The `z_ring − z_cutter ≥ 10` rule of thumb is
    a convention; the geometric condition behind it is what belongs here.
 6. ✅ **The gate** — `verify::check_ring_cut` simulates the cut and compares:

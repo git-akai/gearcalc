@@ -282,6 +282,18 @@
           <dd>
             {r.fully_filleted_root ? "fully filleted — no root arc" : "root arc between the fillets"}
           </dd>
+          <dt>Generated down to</dt>
+          <dd>
+            {mm(r.generation_limit)}
+            {#if !r.fully_generated}
+              <small class="warn">
+                below the tip: the cutter's own involute runs out there, so the flank near the tip
+                is not generated. A cutter with more teeth reaches further
+              </small>
+            {:else}
+              <small>past the tip, so the whole flank is generated</small>
+            {/if}
+          </dd>
           <dt>Smallest tooth count</dt>
           <dd>
             {r.smallest_tooth_count}
