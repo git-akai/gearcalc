@@ -3,6 +3,10 @@
 A browser tool for designing gears and geartrains: parameter calculation and
 optimisation, 2D profile visualisation, and DXF export.
 
+External, **internal** and **worm** gearing, with the mathematics derived rather
+than quoted — and the derivations checked against simulations that share no code
+with them.
+
 All mathematics is Rust, compiled to WebAssembly. TypeScript and Svelte do
 layout and event handling only.
 
@@ -36,7 +40,7 @@ and `wasm-bindgen-cli` together.
 ```bash
 nix develop              # or `direnv allow` once, for automatic entry
 
-cargo nextest run        # the full test suite, ~27 s
+cargo nextest run        # the full test suite, 247 tests, ~25 s
 cargo clippy --all-targets -- --deny warnings
 cargo fmt
 
@@ -53,8 +57,15 @@ cargo run --bin gear-cli -- sweep         # scan a grid for undercut and clamps
 cargo run --bin gear-cli -- materials     # the material library and its provenance
 cargo run --bin gear-cli -- strength 17 43 2.0   # a worked mesh: bending, contact, efficiency
 cargo run --bin gear-cli -- strength 17 43 2.0 '4340 Hardened Steel' 20   # the same, helical
+cargo run --bin gear-cli -- train                  # a geartrain, end to end
+cargo run --bin gear-cli -- train mixed            # ...with a worm stage in it
+cargo run --bin gear-cli -- worm 1 40 7 90         # a worm pair, both directions
+cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
 cargo run --release --bin gear-cli -- verify 100   # two-sided cutter check
 ```
+
+`gear-cli strength 17 43 2.0` is the project's regression canary: its figures
+have not moved since milestone 5, through every refactor since.
 
 ### A note on the material library
 
@@ -104,6 +115,28 @@ be tidied and must not be:
 3. **`theta` is not monotone** along the profile. Undercut gears are legitimately
    re-entrant. The correct invariant is monotone *radius*.
 
-Any change here must keep `cargo nextest run` green — in particular
-`profile_is_bounded_from_both_sides_by_the_cutter`, which checks 1080 gears
-against the cutter that would make them, from both sides at once.
+4. **A rack's figures do not carry to a pinion cutter.** A 0.38-module tip round
+   is comfortable on a rack, whose tooth is wide at its tip; on a 20-tooth shaper
+   with a 1.25 addendum the tip is 0.377 mm wide and two such rounds cannot both
+   live on it. `ShaperCut` refuses that tool rather than clamping it.
+
+Any change here must keep `cargo nextest run` green — in particular the two
+simulations, which are the ones that catch what self-consistent tests miss:
+`profile_is_bounded_from_both_sides_by_the_cutter`, which checks 1080 external
+gears against the cutter that would make them from both sides at once, and
+`the_generated_profile_is_the_shape_the_cutter_would_leave`, which does the same
+for an internal gear by sweeping a pinion cutter through the rolling motion and
+comparing the envelope it leaves.
+
+## Verification tooling
+
+Two scripts exist to check the Rust against something that shares no code with
+it, and both are run by hand rather than in CI:
+
+```bash
+python3 tools/validate_dxf.py <file.dxf> ...   # read an export back with ezdxf
+python3 tools/worm_flank_curvature.py          # worm flank curvature from the surface itself
+```
+
+The second also answers a design question — what choosing a ZI, ZN or ZA worm
+flank actually costs — and its answer is in `docs/DESIGN.md` §4.5.1.
