@@ -243,10 +243,23 @@ sampled at the pitch circle where the backwards sign would also pass.
    further). It bites on ordinary designs: 0.08 mm of a 43-tooth ring's flank
    cut by a 20-tooth cutter is not generated.
 
-   Still to do, and these are *mesh* conditions rather than generation ones, so
-   they want a ring paired with a pinion: involute (tip) interference, trochoid
-   interference, and radial-assembly clearance — the geometry behind the
-   `z_ring − z_pinion ≥ 10` rule of thumb. Milestone 9 needs all three.
+   `ring::mesh_with` now adds the two *mesh* conditions, both read off one
+   relation — conjugate points share a place on the line of action, and for an
+   internal pair the two distances differ by `a sin α_w` rather than summing to
+   it. **Involute interference**: the ring's tip cannot touch the pinion inside
+   its base circle. **Trochoid interference**: the pinion's tip cannot reach past
+   where the ring's flank ends.
+
+   The finding worth carrying: a **standard full-depth internal pair
+   interferes**. A 60-tooth ring on a 20-tooth pinion misses by 0.009 mm, and so
+   does every pinion from 20 to 40 teeth. The remedy is the ring's addendum —
+   0.8 clears it — not a rule about tooth differences.
+
+   **Radial assembly is deliberately absent.** Whether the pinion can go in
+   sideways is a *swept-motion* question, not a comparison of tip circles; a
+   first attempt as the latter gave a negative clearance for every meshing pair,
+   which is the signature of a formula that means nothing. It needs its own
+   derivation and belongs with the planetary stage that will ask.
 
    Superseded plan: **Interference checks** a rack cutter never needs: involute (trimming),
    trochoid, and radial-assembly. The `z_ring − z_cutter ≥ 10` rule of thumb is

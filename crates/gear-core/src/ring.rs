@@ -41,6 +41,7 @@
 use crate::involute::{inv, inv_from_roll};
 use crate::mesh::MeshKind;
 use crate::params::GearParams;
+use crate::profile::Gear;
 use crate::profile::Section;
 use crate::shaper::{CutParams, ShaperCut};
 use crate::solve::{brent, Tol};
@@ -469,6 +470,127 @@ impl Ring {
     }
 }
 
+// -------------------------------------------------------------------------- //
+//  meshing a ring with a pinion
+// -------------------------------------------------------------------------- //
+
+/// What an internal mesh does, and two of the ways it can foul.
+///
+/// **Radial assembly is not here**, deliberately. Whether the pinion can be
+/// brought in sideways rather than axially is a *swept-motion* question — the
+/// teeth have to pass each other on the way in — not a comparison of tip
+/// circles, and a first attempt at it as one produced a figure that was negative
+/// for every meshing pair, which is the signature of a formula that means
+/// nothing. It needs its own derivation and belongs with the planetary stage
+/// that will actually ask.
+///
+/// # The one relation everything here comes from
+///
+/// Conjugate points share a place on the line of action, and each member's
+/// distance from the pitch point along it is `√(r² − r_b²)`. For an **internal**
+/// pair the ring's tangency point lies beyond the pinion's, so the two distances
+/// differ by `a sin α_w` rather than summing to it:
+///
+/// ```text
+/// √(r_ring² − r_b2²) = a sin α_w + √(r_pinion² − r_b1²)
+/// ```
+///
+/// Read it forwards and it maps a pinion radius to the ring radius it touches;
+/// read it backwards and it does the reverse. Every check below is one of those
+/// two readings, asked at a tip.
+#[derive(Clone, Copy, Debug)]
+pub struct RingMesh {
+    /// Centre distance, mm — `r_ring − r_pinion` for standard gears.
+    pub centre_distance: f64,
+    /// Operating pressure angle, radians.
+    pub alpha_w: f64,
+    /// Transverse contact ratio.
+    pub contact_ratio: f64,
+    /// The ring radius the pinion's **tip** touches, mm. It is the deepest point
+    /// of the mesh, and it must stay clear of the ring's fillet.
+    pub ring_contact_at_pinion_tip: f64,
+    /// The pinion radius the ring's **tip** touches, mm — the shallowest point,
+    /// which must stay above whatever the pinion's own flank runs out at.
+    ///
+    /// Reported as the pinion's base radius when the tip cannot reach the
+    /// involute at all; [`Self::involute_interference`] is then set.
+    pub pinion_contact_at_ring_tip: f64,
+    /// The pinion's tip reaches past where the ring's flank ends and into its
+    /// fillet.
+    pub trochoid_interference: bool,
+    /// The ring's tip reaches below where the pinion's flank ends.
+    pub involute_interference: bool,
+}
+
+/// Mesh a ring with an external pinion at their nominal centre distance.
+///
+/// # Errors
+///
+/// `None` if the pair cannot mesh — different modules or pressure angles, a
+/// pinion no smaller than the ring, or a geometry that never reaches contact.
+#[must_use]
+pub fn mesh_with(ring: &Ring, pinion: &Gear) -> Option<RingMesh> {
+    if (ring.mt - pinion.mt).abs() > 1e-9 || (ring.alpha_t - pinion.alpha_t).abs() > 1e-9 {
+        return None;
+    }
+    let centre_distance = ring.r - pinion.r;
+    if centre_distance.is_nan() || centre_distance <= 0.0 {
+        return None;
+    }
+    // Standard centres, so the operating angle is the transverse one. A shifted
+    // pair moves this, and that belongs with the planetary stage that needs it.
+    let alpha_w = ring.alpha_t;
+    let along = centre_distance * alpha_w.sin();
+
+    // The relation, both ways round.
+    let ring_at = |r_pinion: f64| {
+        let t = (r_pinion * r_pinion - pinion.rb * pinion.rb)
+            .max(0.0)
+            .sqrt();
+        f64::hypot(ring.rb, along + t)
+    };
+    // Read backwards this can fail, and the failure is the answer rather than an
+    // error: a negative distance means the ring's tip would have to touch the
+    // pinion *inside its base circle*, where no involute exists. That is
+    // involute interference in its strongest form, and it is reported as a
+    // finding, not as "this pair cannot be described".
+    let pinion_at = |r_ring: f64| {
+        let t = (r_ring * r_ring - ring.rb * ring.rb).max(0.0).sqrt() - along;
+        (t >= 0.0).then(|| f64::hypot(pinion.rb, t))
+    };
+
+    let ring_contact_at_pinion_tip = ring_at(pinion.ra);
+    let reachable = pinion_at(ring.ra);
+    let pinion_contact_at_ring_tip = reachable.unwrap_or(pinion.rb);
+
+    // Contact ratio, from DESIGN §4.5's internal form. The path runs from where
+    // the ring's tip engages to where the pinion's does.
+    let base_pitch = std::f64::consts::PI * ring.mt * ring.alpha_t.cos();
+    let path = ((pinion.ra * pinion.ra - pinion.rb * pinion.rb)
+        .max(0.0)
+        .sqrt()
+        - (ring.ra * ring.ra - ring.rb * ring.rb).max(0.0).sqrt()
+        + along)
+        .max(0.0);
+    let contact_ratio = path / base_pitch;
+
+    // The ring's flank ends where its fillet begins; the pinion's ends where
+    // its own does. A tip reaching past either is the foul.
+    let ring_form = ring.involute_at(ring.u_j).0;
+    let trochoid_interference = ring_contact_at_pinion_tip > ring_form;
+    let involute_interference = reachable.is_none() || pinion_contact_at_ring_tip < pinion.r_j;
+
+    Some(RingMesh {
+        centre_distance,
+        alpha_w,
+        contact_ratio,
+        ring_contact_at_pinion_tip,
+        pinion_contact_at_ring_tip,
+        trochoid_interference,
+        involute_interference,
+    })
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -882,6 +1004,171 @@ mod tests {
             small.clamps.iter().any(|c| c.contains("not generated")),
             "{:?}",
             small.clamps
+        );
+    }
+
+    fn pinion(teeth: u32) -> Gear {
+        Gear::new(GearParams {
+            teeth,
+            ..Default::default()
+        })
+    }
+
+    /// The relation the whole mesh section rests on, checked at the one place
+    /// its answer is known independently: **the pitch point**. There the pinion
+    /// touches at its own pitch radius and the ring at its own, and the two
+    /// distances along the line of action differ by `a sin α_w`.
+    #[test]
+    fn the_conjugate_relation_holds_at_the_pitch_point() {
+        for (ring_teeth, pinion_teeth) in [(60u32, 20u32), (43, 17), (90, 40)] {
+            let g = ring(ring_teeth);
+            let p = pinion(pinion_teeth);
+            let m = mesh_with(&g, &p).unwrap();
+
+            let ring_side = (g.r * g.r - g.rb * g.rb).sqrt();
+            let pinion_side = (p.r * p.r - p.rb * p.rb).sqrt();
+            let along = m.centre_distance * m.alpha_w.sin();
+            assert!(
+                (ring_side - pinion_side - along).abs() < 1e-9,
+                "z={ring_teeth}/{pinion_teeth}: {ring_side} − {pinion_side} vs {along}"
+            );
+        }
+    }
+
+    /// An internal mesh has a **higher** contact ratio than the external pair of
+    /// the same teeth — one of the reasons planetary stages use them — and it
+    /// must still be above one or the mesh loses contact between teeth.
+    #[test]
+    fn an_internal_mesh_has_more_contact_than_the_external_pair_of_the_same_teeth() {
+        for (ring_teeth, pinion_teeth) in [(60u32, 20u32), (43, 17), (90, 40)] {
+            let internal = mesh_with(&ring(ring_teeth), &pinion(pinion_teeth))
+                .unwrap()
+                .contact_ratio;
+
+            let a = pinion(pinion_teeth);
+            let b = pinion(ring_teeth);
+            let m = crate::mesh::Mesh::new(&a, &b, crate::mesh::MeshKind::External).unwrap();
+            let external = crate::contact::ContactPath::new(&a, &b, &m)
+                .unwrap()
+                .contact_ratio;
+
+            assert!(
+                internal > external,
+                "z={ring_teeth}/{pinion_teeth}: internal {internal} against external {external}"
+            );
+            assert!(internal > 1.0 && internal < 3.0, "implausible {internal}");
+        }
+    }
+
+    /// **A standard full-depth internal pair interferes, and the fix is the one
+    /// the handbooks give: shorten the ring's tooth.**
+    ///
+    /// The condition is exact. The ring's tip can only touch the pinion's
+    /// involute while `√(r_a2² − r_b2²) ≥ a sin α_w`; below that the contact
+    /// would have to happen inside the pinion's base circle, where there is no
+    /// involute to touch. A 60-tooth ring on a 20-tooth pinion misses it by
+    /// 0.009 mm at a full addendum — which is why internal pairs are not built
+    /// full-depth, and part of where the rule of thumb about tooth differences
+    /// comes from.
+    #[test]
+    fn a_full_depth_internal_pair_interferes_and_a_shorter_ring_tooth_fixes_it() {
+        let full = mesh_with(&ring(60), &pinion(20)).unwrap();
+        assert!(
+            full.involute_interference,
+            "a standard full-depth 60/20 pair should interfere"
+        );
+
+        let shortened = Ring::new(
+            &GearParams {
+                teeth: 60,
+                addendum: 0.8,
+                ..Default::default()
+            },
+            &Cutter::default(),
+        );
+        assert!(
+            !mesh_with(&shortened, &pinion(20))
+                .unwrap()
+                .involute_interference,
+            "shortening the ring's tooth should clear it"
+        );
+
+        // And a full-depth ring interferes across the whole useful range of
+        // pinions, not at one tooth count — which is why the remedy is the
+        // ring's addendum rather than a rule about tooth differences.
+        assert!(
+            (20u32..=40).all(|z| {
+                mesh_with(&ring(60), &pinion(z))
+                    .unwrap()
+                    .involute_interference
+            }),
+            "a full-depth 60-tooth ring should interfere with every pinion here"
+        );
+        // Shortening the ring's tooth widens the set of pinions that mesh
+        // cleanly. Stated as a comparison rather than a threshold, because the
+        // threshold is what the computation is *for* — predicting it by hand is
+        // how the wrong expectations in this file's history got written.
+        let clear = |g: &Ring| {
+            (16u32..=40)
+                .filter(|&z| !mesh_with(g, &pinion(z)).unwrap().involute_interference)
+                .count()
+        };
+        assert!(
+            clear(&shortened) > clear(&ring(60)),
+            "a shorter ring tooth should clear more pinions: {} against {}",
+            clear(&shortened),
+            clear(&ring(60))
+        );
+    }
+
+    /// The two interference checks are about **tips reaching past flanks**, so
+    /// growing a tip must be what triggers them — not a coincidence of tooth
+    /// counts.
+    #[test]
+    fn a_taller_pinion_tooth_is_what_drives_it_into_the_rings_fillet() {
+        let g = ring(60);
+        let mut fouled = false;
+        for addendum in [1.0_f64, 1.4, 1.8, 2.2, 2.6] {
+            let p = Gear::new(GearParams {
+                teeth: 20,
+                addendum,
+                ..Default::default()
+            });
+            let Some(m) = mesh_with(&g, &p) else { continue };
+            if m.trochoid_interference {
+                fouled = true;
+            }
+            // The contact always moves deeper into the ring as the pinion grows.
+            assert!(
+                m.ring_contact_at_pinion_tip > g.r,
+                "contact should be outside the pitch circle"
+            );
+        }
+        assert!(
+            fouled,
+            "a tall enough pinion tooth must reach the ring's fillet"
+        );
+    }
+
+    /// A pair that cannot mesh says so rather than returning numbers.
+    #[test]
+    fn a_pair_that_cannot_mesh_is_refused() {
+        let g = ring(60);
+        assert!(
+            mesh_with(
+                &g,
+                &Gear::new(GearParams {
+                    teeth: 20,
+                    module: 2.0,
+                    ..Default::default()
+                })
+            )
+            .is_none(),
+            "different modules cannot mesh"
+        );
+        assert!(
+            mesh_with(&g, &pinion(60)).is_none(),
+            "a pinion the size of the ring has no centre distance"
         );
     }
 
