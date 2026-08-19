@@ -239,7 +239,13 @@ sampled at the pitch circle where the backwards sign would also pass.
 5. **Interference checks** a rack cutter never needs: involute (trimming),
    trochoid, and radial-assembly. The `z_ring − z_cutter ≥ 10` rule of thumb is
    a convention; the geometric condition behind it is what belongs here.
-6. **The gate** — `verify.rs`'s two-sided bound (penetration *and* deviation)
+6. 🔶 **The gate** — `verify::check_ring_cut` simulates the cut and compares.
+   Written, and **reporting a real 0.1 mm disagreement on the flank that is not
+   yet localised**; see the test's own documentation and DESIGN §12 for exactly
+   what is ruled out. It already found a genuine bug — the default cutter was
+   not a manufacturable tool — which is what a gate is for. Start here.
+
+   Superseded plan: `verify.rs`'s two-sided bound (penetration *and* deviation)
    against the shaper. The envelope test in `shaper.rs` is that idea applied to
    one curve; this applies it to the whole profile.
 

@@ -2444,6 +2444,27 @@ here. Revision 2 additions are marked ★.
 The marks record which round of review each check came from; they are kept only
 so a claim can be traced to the work that produced it.
 
+**Open, and not resolved.** The ring's cut simulation
+(`verify::check_ring_cut`) disagrees with the analytic profile by about 0.1 mm
+on the **flank**, and the cause is not yet found. What is established: the
+simulation's corner-centre trajectory matches `ShaperCut::corner_centre_at`
+exactly, so the *fillet* side agrees; the simulated envelope sits consistently
+wider than the analytic flank, by 0.143 mm at r = 20.78 falling to 0.113 mm at
+r = 22.28 on a 43-tooth ring; it is not the sweep's discretisation, since ten
+times the phases moves the figure in the fifth decimal; and it is not a pure
+phase error, since neither the angular offset (0.0069 → 0.0051 rad) nor the arc
+offset is constant along the flank. So one of the two is wrong about where the
+cutter's *flank* sits relative to its corner — and the corner is the one with
+independent confirmation. The gate is written and reports the number; it is not
+being tuned to pass.
+
+The simulation has already paid for itself: it found that the default shaper
+cutter was **not a tool**. A 0.38-module tip round on a 20-tooth cutter with a
+1.25 addendum leaves a tip 0.377 mm wide, so the two corner rounds overlap and
+the round's centre crosses the cutter's own tooth centreline. 0.38 is the
+*rack's* figure and does not carry over; `ShaperCut` now refuses such a cutter
+and the default round is 0.2.
+
 **Not verified, and deliberately not quoted.** The mesh-phase coefficient of
 §4.10 — how far a commanded centre-distance change shifts the drive-flank phase.
 A trial model was built and **rejected**: it failed to reproduce

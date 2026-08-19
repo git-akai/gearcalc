@@ -212,7 +212,16 @@ impl ShaperCut {
             return None;
         }
         let alpha_g = (base / corner_radius).acos();
-        Some(tooth / (2.0 * cutter_radius) + inv(alpha_t) - inv(alpha_g) - rho / base)
+        let angle = tooth / (2.0 * cutter_radius) + inv(alpha_t) - inv(alpha_g) - rho / base;
+        // A negative angle means the round's centre has crossed the cutter's own
+        // tooth centreline: the two corner rounds would overlap, so the tip is
+        // narrower than the rounds asked for and this is not a tool. Refused
+        // rather than clamped, because which of the round, the addendum and the
+        // tooth count to give up is the designer's call.
+        if angle < 0.0 {
+            return None;
+        }
+        Some(angle)
     }
 
     /// The travel at which the corner is at the workpiece's tooth centreline —
@@ -283,10 +292,19 @@ mod tests {
     use super::*;
     use crate::GearParams;
 
+    /// A gear whose cutter round is small enough to survive being turned into a
+    /// pinion cutter.
+    ///
+    /// The default 0.38 modules is the **rack's** figure: a rack tooth is wide
+    /// at its tip and takes it comfortably. A pinion cutter's tooth narrows
+    /// toward its tip, so below a few dozen teeth two 0.38 rounds no longer fit
+    /// on it and `ShaperCut` refuses the tool. That refusal is correct, and
+    /// these tests use a tool that exists.
     fn gear(teeth: u32, shift: f64) -> Gear {
         Gear::new(GearParams {
             teeth,
             profile_shift: shift,
+            root_radius: 0.15,
             ..Default::default()
         })
     }

@@ -347,3 +347,189 @@ pub fn sdf_matches_polyline(g: &Gear, arc_points: usize, samples: usize) -> f64 
     }
     worst
 }
+
+// -------------------------------------------------------------------------- //
+//  the same idea for a ring, whose cutter is a pinion
+// -------------------------------------------------------------------------- //
+
+/// How far a ring's generated profile sits from the boundary its cutter leaves.
+#[derive(Clone, Copy, Debug)]
+pub struct RingCutReport {
+    /// Worst distance, mm, by which the analytic profile claims material the
+    /// cutter would have removed. Positive is bad.
+    pub penetration: f64,
+    /// Worst distance, mm, by which it falls short of the cut — material left
+    /// on that the tool would not have left. Positive is bad.
+    pub deviation: f64,
+    /// Radii that had a cutter point to compare against.
+    pub samples: usize,
+}
+
+/// Simulate the cut and compare it with [`crate::ring::Ring`]'s analytic
+/// profile.
+///
+/// # Why this is the gate rather than another test
+///
+/// Everything the ring module does is *constructive*: an involute with a flipped
+/// sign, a trochoid from a rolling corner, a junction from the line of action, a
+/// phase from an offset involute. Each piece has been checked against something,
+/// but a construction can be right in every part and wrong in how the parts are
+/// placed. Simulating the cut asks the one question that covers all of it —
+/// **is this the shape that tool would leave?**
+///
+/// The cutter is swept through the rolling motion and every point of its
+/// boundary transformed into the ring's frame. At each radius the tooth's
+/// boundary is the *smallest* angle any cutter point ever reached, since
+/// anything beyond that was machined away. That envelope is what the analytic
+/// profile is compared against.
+///
+/// Nothing here consults `Ring`'s flank, fillet or junction — only the cutter
+/// and the rolling, which is the point.
+#[must_use]
+pub fn ring_cut_envelope(ring: &crate::ring::Ring, radii: usize, phases: usize) -> Vec<(f64, f64)> {
+    use crate::involute::inv;
+    use std::f64::consts::PI;
+
+    let cut = &ring.cut;
+    let r_bc = cut.cutter_radius * ring.alpha_t.cos();
+    let rho = cut.tip_round;
+    let r_tip = cut.corner_radius + rho;
+
+    // The cutter's tooth fills the ring's space, so its thickness is what the
+    // ring's tooth leaves over.
+    let ring_tooth = 2.0 * ring.r * (ring.psi_b + inv(ring.alpha_t));
+    let cutter_tooth = PI * ring.mt - ring_tooth;
+    let half_angle_at = |radius: f64| {
+        let alpha = (r_bc / radius).acos();
+        cutter_tooth / (2.0 * cut.cutter_radius) + inv(ring.alpha_t) - inv(alpha)
+    };
+    let t_g = (((cut.corner_radius / r_bc).powi(2) - 1.0).max(0.0)).sqrt();
+    let r_tan = r_bc * f64::hypot(1.0, t_g + rho / r_bc);
+    // The corner's centre sits on the offset involute at its OWN radius, not at
+    // the flank's tangency radius — the two differ by the round.
+    let theta_g = half_angle_at(cut.corner_radius) - rho / r_bc;
+
+    // One cutter tooth's boundary, on the flank that cuts this side: the
+    // involute up to where the round takes over, then the round, then the tip.
+    let polar = |radius: f64, angle: f64| (radius * angle.sin(), radius * angle.cos());
+    let mut boundary: Vec<(f64, f64)> = Vec::new();
+    const FLANK: usize = 600;
+    let r_low = r_bc * 1.000_001;
+    for i in 0..=FLANK {
+        #[allow(clippy::cast_precision_loss)]
+        let t = i as f64 / FLANK as f64;
+        let radius = r_low + (r_tan - r_low) * t;
+        boundary.push(polar(radius, half_angle_at(radius)));
+    }
+    let (cx, cy) = polar(cut.corner_radius, theta_g);
+    let (tx, ty) = polar(r_tan, half_angle_at(r_tan));
+    let start = (tx - cx).atan2(ty - cy);
+    let end = (0.0 - cx).atan2(r_tip - cy);
+    const ROUND: usize = 300;
+    for i in 0..=ROUND {
+        #[allow(clippy::cast_precision_loss)]
+        let t = i as f64 / ROUND as f64;
+        let a = start + (end - start) * t;
+        boundary.push((cx + rho * a.sin(), cy + rho * a.cos()));
+    }
+    const TIP: usize = 120;
+    let tip_angle = (cx + rho * end.sin()).atan2(cy + rho * end.cos());
+    for i in 0..=TIP {
+        #[allow(clippy::cast_precision_loss)]
+        let t = i as f64 / TIP as f64;
+        boundary.push(polar(r_tip, tip_angle * (1.0 - t)));
+    }
+
+    // Sweep the cutter and keep the smallest angle reached at each radius.
+    let span = PI * ring.mt;
+    let mut envelope = vec![f64::INFINITY; radii];
+    for j in 0..=phases {
+        #[allow(clippy::cast_precision_loss)]
+        let s = -span + 2.0 * span * (j as f64 / phases as f64);
+        let phi = s / cut.cutter_radius;
+        let rotation = (s - cut.phase) / ring.r;
+        let (sin_t, cos_t) = (phi - theta_g).sin_cos();
+        for &(px, py) in &boundary {
+            // rotate the cutter by (phi - theta_g), then place its centre
+            let x = px * cos_t + py * sin_t;
+            let y = cut.centre_distance() + (py * cos_t - px * sin_t);
+            let radius = f64::hypot(x, y);
+            if radius <= ring.ra || radius >= ring.rf {
+                continue;
+            }
+            // Every space is the same space: a cutter tooth several pitches
+            // round from the contact is cutting an identical one, so the angle
+            // folds into a single pitch. Without that fold the sweep only ever
+            // touches a sliver of the profile, which is how this was caught.
+            let pitch = 2.0 * ring.half_pitch;
+            let mut angle = (x.atan2(y) - rotation) % pitch;
+            if angle > ring.half_pitch {
+                angle -= pitch;
+            } else if angle < -ring.half_pitch {
+                angle += pitch;
+            }
+            let angle = angle.abs();
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let bin = (((radius - ring.ra) / (ring.rf - ring.ra)) * radii as f64) as usize;
+            let bin = bin.min(radii - 1);
+            if angle < envelope[bin] {
+                envelope[bin] = angle;
+            }
+        }
+    }
+
+    envelope
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| a.is_finite())
+        .map(|(bin, &a)| {
+            #[allow(clippy::cast_precision_loss)]
+            let radius = ring.ra + (ring.rf - ring.ra) * (bin as f64 + 0.5) / radii as f64;
+            (radius, a)
+        })
+        .collect()
+}
+
+/// Compare that envelope with the analytic profile.
+#[must_use]
+pub fn check_ring_cut(ring: &crate::ring::Ring, radii: usize, phases: usize) -> RingCutReport {
+    let r_junction = ring.involute_at(ring.u_j).0;
+    let analytic = |radius: f64| {
+        if radius <= r_junction {
+            let u = (((radius / ring.rb).powi(2) - 1.0).max(0.0)).sqrt();
+            ring.involute_at(u).1
+        } else {
+            let (mut lo, mut hi) = (ring.s_j, ring.s_root);
+            for _ in 0..80 {
+                let mid = 0.5 * (lo + hi);
+                if ring.trochoid_at(mid).0 < radius {
+                    lo = mid;
+                } else {
+                    hi = mid;
+                }
+            }
+            ring.trochoid_at(0.5 * (lo + hi)).1
+        }
+    };
+
+    let (mut penetration, mut deviation, mut samples) = (0.0_f64, 0.0_f64, 0usize);
+    for (radius, cut_angle) in ring_cut_envelope(ring, radii, phases) {
+        let mine = analytic(radius);
+        if mine >= ring.half_pitch {
+            continue;
+        }
+        samples += 1;
+        let gap = radius * (mine - cut_angle);
+        if gap > 0.0 {
+            penetration = penetration.max(gap);
+        } else {
+            deviation = deviation.max(-gap);
+        }
+    }
+
+    RingCutReport {
+        penetration,
+        deviation,
+        samples,
+    }
+}
