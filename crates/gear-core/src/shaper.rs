@@ -61,6 +61,37 @@ pub struct ShaperCut {
     pub corner_radius: f64,
     /// The cutter's tip corner round.
     pub tip_round: f64,
+    /// The cutter's own tooth thickness at its reference pitch circle, mm.
+    ///
+    /// Kept so that anything reconstructing the tool — the cut simulation above
+    /// all — can take it from the tool rather than inferring it from the
+    /// workpiece. Inferring it is what made that simulation unable to see a
+    /// misplaced cutter: it derived the same wrong tooth the model did, agreed
+    /// with itself to 2.7 µm, and said nothing. §12.
+    pub cutter_tooth: f64,
+    /// Operating pressure angle of the cut, radians.
+    ///
+    /// The reference angle when the cut is at reference centres; larger when the
+    /// tool sits further out. Every base-tangent length the ring's junction and
+    /// generation limit are built from is `a sin α_w`, so this is the angle those
+    /// relations need rather than `α_t`.
+    pub alpha_w: f64,
+    /// Centre distance the cut actually happens at, mm.
+    ///
+    /// Equal to `r_w + σ r_c` only when neither member is shifted. A shifted
+    /// workpiece is cut by the same tool placed further out or further in, and
+    /// that displacement is the whole of what its shift *is* for a shaper — see
+    /// [`crate::mesh::operating_geometry`].
+    pub centre_distance: f64,
+    /// The pitch radii the pair actually rolls on, mm.
+    ///
+    /// Rolling happens on the **operating** circles, whose radii are the
+    /// reference ones scaled by `a / a_ref`; the two coincide exactly when the
+    /// cut is at reference centres. A rack is the one case where a shift does
+    /// *not* move them, because a rack's pitch line is a machine setting rather
+    /// than a consequence of two tooth counts.
+    pub workpiece_operating_radius: f64,
+    pub cutter_operating_radius: f64,
     /// Lateral phase of the corner, in the same units and meaning as
     /// [`crate::profile::Gear::ac`] — arc length along the pitch circle.
     pub phase: f64,
@@ -77,10 +108,19 @@ pub struct CutParams {
     pub alpha_t: f64,
     /// The workpiece's pitch radius, mm.
     pub workpiece_radius: f64,
-    /// The workpiece's tooth thickness at its pitch circle, as an arc, mm. The
-    /// cutter's tooth takes the remainder of the pitch, because one fills what
-    /// the other leaves.
+    /// The workpiece's tooth thickness at its reference pitch circle, as an arc,
+    /// mm.
     pub workpiece_tooth: f64,
+    /// The **cutter's own** tooth thickness at its reference pitch circle, mm.
+    ///
+    /// Taken rather than derived as `π m_t − workpiece_tooth`, which is only the
+    /// cutter that would complement an *unshifted* workpiece at reference
+    /// centres. Deriving it meant a shifted workpiece was described as having
+    /// been cut by a thicker tool than exists, and — because the cut simulation
+    /// derived the cutter the same way — nothing could see it. §12.
+    pub cutter_tooth: f64,
+    /// Centre distance the cut happens at, mm.
+    pub centre_distance: f64,
     /// Teeth on the cutter.
     pub cutter_teeth: u32,
     /// The cutter's tip radius, mm.
@@ -107,20 +147,46 @@ impl ShaperCut {
         if corner_radius.is_nan() || corner_radius <= 0.0 {
             return None;
         }
-        let cutter_tooth = std::f64::consts::PI * p.module_t - p.workpiece_tooth;
         let angle = Self::corner_angle(
             cutter_radius,
             corner_radius,
-            cutter_tooth,
+            p.cutter_tooth,
             p.alpha_t,
             p.tip_round,
         )?;
+        // Rolling is on the operating circles, and both are the reference radii
+        // scaled by the same `a / a_ref` — so a shift enters the kinematics as
+        // one factor rather than as a second construction. The phase is an arc
+        // on those circles, so it scales with them.
+        let sigma = match p.kind {
+            MeshKind::External => 1.0,
+            MeshKind::Internal => -1.0,
+        };
+        let a_ref = p.workpiece_radius + sigma * cutter_radius;
+        if !a_ref.is_finite() || a_ref == 0.0 || !p.centre_distance.is_finite() {
+            return None;
+        }
+        let scale = p.centre_distance / a_ref;
+        if scale <= 0.0 {
+            return None;
+        }
+        // r_b1 + r_b2 = a cos α_w is what fixes the operating angle, and the
+        // base radii do not move: cos α_w = a_ref cos α_t / a.
+        let cos_aw = p.alpha_t.cos() / scale;
+        if !(-1.0..=1.0).contains(&cos_aw) {
+            return None;
+        }
         Some(Self {
             workpiece_radius: p.workpiece_radius,
             cutter_radius,
+            cutter_tooth: p.cutter_tooth,
+            alpha_w: cos_aw.acos(),
+            centre_distance: p.centre_distance,
+            workpiece_operating_radius: p.workpiece_radius * scale,
+            cutter_operating_radius: cutter_radius * scale,
             corner_radius,
             tip_round: p.tip_round,
-            phase: Self::phase_from(p.module_t, cutter_radius, angle),
+            phase: scale * Self::phase_from(p.module_t, cutter_radius, angle),
             kind: p.kind,
         })
     }
@@ -135,9 +201,10 @@ impl ShaperCut {
         }
     }
 
-    /// Centre distance between workpiece and cutter, mm.
+    /// Reference centre distance, mm — where the cut would sit with neither
+    /// member shifted.
     #[must_use]
-    pub fn centre_distance(&self) -> f64 {
+    pub fn reference_centre_distance(&self) -> f64 {
         self.workpiece_radius + self.sigma() * self.cutter_radius
     }
 
@@ -150,10 +217,10 @@ impl ShaperCut {
     #[must_use]
     pub fn corner_centre_at(&self, s: f64) -> (f64, f64) {
         let sigma = self.sigma();
-        let (sin_phi, cos_phi) = (s / self.cutter_radius).sin_cos();
+        let (sin_phi, cos_phi) = (s / self.cutter_operating_radius).sin_cos();
         (
             self.corner_radius * sin_phi,
-            self.centre_distance() - sigma * self.corner_radius * cos_phi,
+            self.centre_distance - sigma * self.corner_radius * cos_phi,
         )
     }
 
@@ -161,7 +228,10 @@ impl ShaperCut {
     /// tooth centreline)` — the same pair [`Gear::trochoid_at`] returns.
     #[must_use]
     pub fn trochoid_at(&self, s: f64) -> (f64, f64) {
-        let r = self.workpiece_radius;
+        // The pitch point sits on the OPERATING circle, and the workpiece turns
+        // by arc over that same radius. Identical to the reference radius
+        // whenever the cut is at reference centres.
+        let r = self.workpiece_operating_radius;
         let (cx, cy) = self.corner_centre_at(s);
         // From the pitch point to the corner centre; the fillet is a further ρ
         // along it, because the contact normal runs through the pitch point.
@@ -275,9 +345,20 @@ impl ShaperCut {
         let cutter_tooth = std::f64::consts::PI * g.mt - workpiece_tooth;
         let angle =
             Self::corner_angle(cutter_radius, corner_radius, cutter_tooth, g.alpha_t, g.rho)?;
+        // Reference centres, deliberately: this cutter stands in for a *rack*,
+        // and a rack's pitch line is a machine setting rather than a consequence
+        // of two tooth counts, so a shift does not move where it rolls. The
+        // operating radii are therefore the reference ones and the scale is 1,
+        // which is what keeps the `z_c → ∞` convergence a test of the curve
+        // rather than of the placement.
         Some(Self {
             workpiece_radius: g.r,
             cutter_radius,
+            cutter_tooth,
+            alpha_w: g.alpha_t,
+            centre_distance: centre,
+            workpiece_operating_radius: g.r,
+            cutter_operating_radius: cutter_radius,
             corner_radius,
             tip_round: g.rho,
             phase: Self::phase_from(g.mt, cutter_radius, angle),

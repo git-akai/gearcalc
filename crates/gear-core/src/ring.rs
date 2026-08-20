@@ -39,8 +39,8 @@
 //! and stops there.
 
 use crate::involute::{inv, inv_from_roll};
-use crate::mesh::MeshKind;
-use crate::params::GearParams;
+use crate::mesh::{operating_geometry, MeshKind};
+use crate::params::{guard, GearParams};
 use crate::profile::Gear;
 use crate::profile::Section;
 use crate::shaper::{CutParams, ShaperCut};
@@ -137,18 +137,57 @@ impl Ring {
         let rb = r * alpha_t.cos();
         let half_pitch = std::f64::consts::PI / f64::from(z);
 
-        // Tooth thickness at the pitch circle. `thickness_mod` moves it exactly
-        // as it does on an external gear — k = 1 is half the circular pitch —
-        // and the space takes the remainder, because a ring's tooth and its
-        // space are complements on the same circle.
-        let tooth = std::f64::consts::PI * mt * params.thickness_mod / 2.0;
+        // ---- thickness. It is the SPACE that takes the external formula.
+        //
+        // A ring's space is where the mating pinion's tooth goes, and it is
+        // generated the way a pinion's tooth is; the ring's tooth is whatever
+        // the pitch leaves over. So `thickness_mod` and the profile shift are
+        // applied to the space, using `Gear`'s expression unchanged — and the
+        // consequence is that a *larger* k or x makes a ring's tooth **thinner**,
+        // the opposite of an external gear.
+        //
+        // This is not a convention free to choose. `Mesh::new`'s internal
+        // relation flips gear 2's `x` and `x_s` together, and that is consistent
+        // only with this reading: measured against tooth thicknesses at the
+        // operating circles, the space reading gives exactly zero backlash at
+        // every k while the tooth reading is out by 0.63 mm at k = 1.2 (§12).
+        // The pair invariant is therefore `k₁ = k₂` for an internal mesh, where
+        // an external one needs `k₁ + k₂ = 2`.
+        let x = params.profile_shift;
+        let x_thick = x + params.thickness_shift();
+        let pitch = std::f64::consts::PI * mt;
+        let mut space = mt * (std::f64::consts::PI / 2.0 + 2.0 * x_thick * alpha_n.tan());
+        // Both ends are real limits: a space wider than the pitch leaves no
+        // tooth, and one of zero width leaves no space for the pinion.
+        // The same two limits `Gear` puts on a tooth, applied to the space —
+        // because on a ring the space is the thing generated like a tooth.
+        let space_max = guard::MAX_TOOTH_THICKNESS_FRACTION_OF_PITCH * pitch;
+        let space_min = guard::MIN_TOOTH_THICKNESS_MODULES * m;
+        if space > space_max {
+            space = space_max;
+            clamps.push(
+                "space width capped: profile shift or thickness modification too \
+                 positive, and a ring needs a tooth left over"
+                    .to_string(),
+            );
+        } else if space < space_min {
+            space = space_min;
+            clamps.push(
+                "space width raised: profile shift or thickness modification too \
+                 negative, and the mating pinion's tooth has to fit"
+                    .to_string(),
+            );
+        }
+        let tooth = pitch - space;
         let psi_p = tooth / (2.0 * r);
         // ...and the sign that makes it a ring: outward from the base circle the
         // tooth *gains* angle rather than losing it.
         let psi_b = psi_p - inv(alpha_t);
 
-        let mut ra = r - m * params.addendum;
-        let rf = r + m * params.dedendum;
+        // ---- radii. The whole form shifts **outward** by `x m`, which shortens
+        // a ring's tooth (it points inward) and deepens its space. Written as
+        // `Gear`'s two expressions with inward and outward exchanged.
+        let mut ra = r - m * (params.addendum - x);
 
         // The tip cannot dip below the base circle: there is no involute there
         // to cut it from.
@@ -163,14 +202,44 @@ impl Ring {
 
         let roll_at = |radius: f64| (((radius / rb).powi(2) - 1.0).max(0.0)).sqrt();
 
-        let cutter_radius = f64::from(cutter.teeth.max(1)) * mt / 2.0;
+        // ---- where the cutter sits.
+        //
+        // A shifted ring is cut by the *same* tool placed further out, and that
+        // displacement is what its shift means for a shaper. The distance is the
+        // internal relation between tool and workpiece, read through the shared
+        // `operating_geometry`: the cutter is member 1 (external, unshifted) and
+        // the ring is member 2, so the signed sums are `z_c − z_r` and `−x_thick`.
+        let cutter_teeth = cutter.teeth.max(1);
+        let cutter_radius = f64::from(cutter_teeth) * mt / 2.0;
+        // A standard cutter: `k = 1`, no shift of its own. A resharpened tool
+        // carries one, and it would enter the sums below exactly as the ring's
+        // does; nothing here assumes it is zero beyond this line.
+        let cutter_tooth = std::f64::consts::PI * mt / 2.0;
+        let sum_z = f64::from(cutter_teeth) - f64::from(z);
+        // Falls back to reference centres only when the shift takes the pair out
+        // of the involute domain, which `ShaperCut::new` then refuses anyway.
+        let a_cut = operating_geometry(mt, alpha_t, alpha_n, sum_z, -x_thick)
+            .map_or(r - cutter_radius, |(_, _, a)| a);
+        // ---- the root circle is where the cutter's tip reaches, not an input.
+        //
+        // `a_cut + r_tip` exactly, rather than `r + m(dedendum + x)`, which is
+        // that expression linearised: the two differ by 17 µm at x = 0.25 and
+        // 57 µm at x = 0.5, both well above the 3.6 µm the cut simulation
+        // resolves. A ring's dedendum is therefore **not** an input — it is the
+        // cutter's addendum seen from the other side, and having both invites
+        // them to disagree.
+        let cutter_tip_radius = cutter_radius + m * cutter.addendum;
+        let rf = a_cut + cutter_tip_radius;
+
         let cut = ShaperCut::new(&CutParams {
             module_t: mt,
             alpha_t,
             workpiece_radius: r,
             workpiece_tooth: tooth,
-            cutter_teeth: cutter.teeth.max(1),
-            cutter_tip_radius: cutter_radius + m * cutter.addendum,
+            cutter_tooth,
+            centre_distance: a_cut,
+            cutter_teeth,
+            cutter_tip_radius,
             tip_round: m * cutter.tip_round,
             kind: MeshKind::Internal,
         });
@@ -193,6 +262,11 @@ impl Ring {
             cut: cut.unwrap_or(ShaperCut {
                 workpiece_radius: r,
                 cutter_radius,
+                cutter_tooth,
+                alpha_w: alpha_t,
+                centre_distance: r - cutter_radius,
+                workpiece_operating_radius: r,
+                cutter_operating_radius: cutter_radius,
                 corner_radius: cutter_radius,
                 tip_round: 0.0,
                 phase: 0.0,
@@ -272,7 +346,7 @@ impl Ring {
         let t_g = (((self.cut.corner_radius / r_bc).powi(2) - 1.0).max(0.0)).sqrt();
         let t_tan = t_g + self.cut.tip_round / r_bc;
 
-        let along = self.cut.centre_distance() * self.alpha_t.sin() + r_bc * t_tan;
+        let along = self.cut.centre_distance * self.cut.alpha_w.sin() + r_bc * t_tan;
         let r_j = f64::hypot(self.rb, along);
         if !(r_j.is_finite() && r_j > self.ra && r_j < self.rf) {
             return None;
@@ -327,7 +401,7 @@ impl Ring {
     /// whether it bites.
     #[must_use]
     pub fn generation_limit(&self) -> f64 {
-        f64::hypot(self.rb, self.cut.centre_distance() * self.alpha_t.sin())
+        f64::hypot(self.rb, self.cut.centre_distance * self.cut.alpha_w.sin())
     }
 
     /// Whether the tip reaches down only as far as the cutter can generate.
@@ -954,6 +1028,75 @@ mod tests {
         }
     }
 
+    /// **A shifted ring is still the shape its cutter leaves** — because the
+    /// shift is *where the cutter sits*.
+    ///
+    /// A shaper cannot be displaced the way a rack can. A rack's pitch line is a
+    /// machine setting, so shifting it leaves the rolling alone; two pinions have
+    /// their ratio fixed by their tooth counts, so the pitch point is wherever
+    /// the centre distance puts it and the rolling circles move with it. One
+    /// factor `a / a_ref` carries all of that, and at zero shift it is exactly 1.
+    #[test]
+    fn a_shifted_ring_is_the_shape_its_cutter_leaves() {
+        for teeth in [43u32, 60] {
+            for x in [-0.4, -0.25, -0.1, 0.0, 0.1, 0.25, 0.5] {
+                let g = Ring::new(
+                    &GearParams {
+                        teeth,
+                        profile_shift: x,
+                        ..Default::default()
+                    },
+                    &Cutter::default(),
+                );
+                let report = crate::verify::check_ring_cut(&g, 400, 4_000);
+                assert!(
+                    report.worst_distance < 5e-3,
+                    "z={teeth} x={x}: cut and profile differ by {} mm",
+                    report.worst_distance
+                );
+            }
+        }
+    }
+
+    /// **...and the check can tell when it is not.**
+    ///
+    /// The point of this test is not the ring, it is the gate. The previous cut
+    /// simulation derived the cutter's tooth from the ring's — the same inference
+    /// the model made — so it agreed to 2.7 µm on a ring whose cutter was 0.44 mm
+    /// out of place, and reported nothing. That is the §12 trap exactly: a check
+    /// that cannot distinguish two cases is not evidence for either.
+    ///
+    /// So place the cutter where the old model put it, at reference centres, and
+    /// require the gate to *fail*. It comes out 13–66× the noise floor.
+    #[test]
+    fn a_cutter_at_the_wrong_centre_distance_is_visible_to_the_gate() {
+        for x in [0.1, 0.25, 0.5, -0.25] {
+            let good = Ring::new(
+                &GearParams {
+                    teeth: 43,
+                    profile_shift: x,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            );
+            let mut bad = good.clone();
+            let a_ref = bad.cut.reference_centre_distance();
+            bad.cut.phase *= a_ref / good.cut.centre_distance;
+            bad.cut.centre_distance = a_ref;
+            bad.cut.workpiece_operating_radius = bad.r;
+            bad.cut.cutter_operating_radius = bad.cut.cutter_radius;
+
+            let right = crate::verify::check_ring_cut(&good, 400, 4_000).worst_distance;
+            let wrong = crate::verify::check_ring_cut(&bad, 400, 4_000).worst_distance;
+            assert!(
+                wrong > 10.0 * right,
+                "x={x}: a cutter {:.4} mm out of place must be visible, but the \
+                 gate said {wrong} against {right}",
+                a_ref - good.cut.centre_distance
+            );
+        }
+    }
+
     /// **How far down a cutter can generate, and what moves it.**
     ///
     /// The limit is where the cutter's own involute runs out: its flank stops at
@@ -1261,32 +1404,97 @@ mod tests {
         }
     }
 
-    /// Thickness modification moves a ring's tooth the same way it moves an
-    /// external gear's, and the space takes the remainder.
+    /// **On a ring it is the space that thickness modification and profile shift
+    /// describe, so a larger k or x makes the tooth thinner.**
+    ///
+    /// The opposite of an external gear, and not a free choice: the space is
+    /// where the mating pinion's tooth goes, so the space is what is generated
+    /// like a tooth. `Mesh::new`'s internal relation flips gear 2's `x` and `x_s`
+    /// together and is consistent only with this reading — see
+    /// `an_internal_pair_has_zero_backlash_at_the_centre_distance_the_mesh_gives`,
+    /// which is the check that decides it.
     #[test]
-    fn thickness_modification_moves_the_tooth_and_the_space_together() {
-        let thin = Ring::new(
-            &GearParams {
-                teeth: 43,
-                thickness_mod: 0.8,
-                ..Default::default()
-            },
-            &Cutter::default(),
+    fn thickness_modification_and_shift_act_on_the_space_not_the_tooth() {
+        let of = |k: f64, x: f64| {
+            Ring::new(
+                &GearParams {
+                    teeth: 43,
+                    thickness_mod: k,
+                    profile_shift: x,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            )
+        };
+        let base = of(1.0, 0.0);
+        let pitch = 2.0 * base.r * base.half_pitch;
+        // k = 1, x = 0 is exactly half the circular pitch either way round, which
+        // is why the two readings agree there and nowhere else.
+        assert!((base.tooth_thickness_at(base.r) - pitch / 2.0).abs() < 1e-12);
+        assert!((base.space_width_at(base.r) - pitch / 2.0).abs() < 1e-12);
+
+        for (k, x) in [(1.2, 0.0), (1.0, 0.3), (1.1, 0.15)] {
+            let more = of(k, x);
+            assert!(
+                more.space_width_at(more.r) > base.space_width_at(base.r),
+                "k={k} x={x}: the space must widen"
+            );
+            assert!(
+                more.tooth_thickness_at(more.r) < base.tooth_thickness_at(base.r),
+                "k={k} x={x}: ...so the tooth must thin"
+            );
+            // ...and they still come to the circular pitch, as complements must.
+            assert!(
+                (more.tooth_thickness_at(more.r) + more.space_width_at(more.r) - pitch).abs()
+                    < 1e-12
+            );
+        }
+    }
+
+    /// A profile shift moves a ring's whole form **outward**: its tooth gets
+    /// shorter, because it points inward, and its space deeper.
+    #[test]
+    fn a_positive_shift_moves_a_rings_radii_outward() {
+        let of = |x: f64| {
+            Ring::new(
+                &GearParams {
+                    teeth: 43,
+                    profile_shift: x,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            )
+        };
+        let (lo, mid, hi) = (of(-0.25), of(0.0), of(0.25));
+        assert!(lo.ra < mid.ra && mid.ra < hi.ra, "tip radius rises with x");
+        assert!(lo.rf < mid.rf && mid.rf < hi.rf, "root radius too");
+        // The pitch and base circles are properties of the tooth count and the
+        // rack, and a shift leaves both exactly where they were.
+        assert_eq!(lo.r, hi.r);
+        assert_eq!(lo.rb, hi.rb);
+
+        // The tip is a bore, so it moves by exactly `x m`.
+        let m = 1.0;
+        assert!((hi.ra - mid.ra - 0.25 * m).abs() < 1e-12);
+
+        // The root is not: it is wherever the cutter's tip reaches, so what is
+        // constant is `r_f − a_cut`, the tool's own tip radius.
+        let tip_reach = |g: &Ring| g.rf - g.cut.centre_distance;
+        for g in [&lo, &mid, &hi] {
+            assert!(
+                (tip_reach(g) - tip_reach(&mid)).abs() < 1e-12,
+                "the root circle is the cutter's reach, at every shift"
+            );
+        }
+        // ...and that is *not* the linearised `r + m(dedendum + x)`. The gap is
+        // small but sits well above the 3.6 µm the cut simulation resolves, which
+        // is why the exact form is used.
+        let linearised = mid.r + m * (1.25 + 0.25);
+        let gap = (hi.rf - linearised).abs();
+        assert!(
+            (1e-5..5e-2).contains(&gap),
+            "expected a gap of order tens of µm between exact and linearised, got {gap}"
         );
-        let thick = Ring::new(
-            &GearParams {
-                teeth: 43,
-                thickness_mod: 1.2,
-                ..Default::default()
-            },
-            &Cutter::default(),
-        );
-        assert!(thick.tooth_thickness_at(thick.r) > thin.tooth_thickness_at(thin.r));
-        assert!(thick.space_width_at(thick.r) < thin.space_width_at(thin.r));
-        // k = 1 is exactly half the circular pitch, as on an external gear.
-        let even = ring(43);
-        let pitch = 2.0 * even.r * even.half_pitch;
-        assert!((even.tooth_thickness_at(even.r) - pitch / 2.0).abs() < 1e-12);
     }
 
     /// A ring whose addendum would reach inside its own base circle is clamped

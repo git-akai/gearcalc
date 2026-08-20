@@ -1910,6 +1910,46 @@ Tested as the complement it is: tooth plus space must come to the circular pitch
 at *every* radius across the flank, not only at the pitch circle where the
 thickness was set — which is where a backwards sign would also pass.
 
+#### A shift is *where the tool sits* — and on a ring it moves the space
+
+A ring's profile shift needs saying twice over, because both halves come out
+opposite to the external case.
+
+**What it moves.** The ring's *space* is what is generated like a tooth: it is
+where the mating pinion's tooth goes, and a pinion tooth is what cuts it. So
+`thickness_mod` and the shift take `Gear`'s expression **unchanged, applied to
+the space**, and the ring's tooth is whatever the circular pitch leaves over:
+
+```text
+e_ring = m_t (π/2 + 2(x + x_s) tan α_n)          s_ring = π m_t − e_ring
+```
+
+A larger `k` or `x` therefore makes a ring's tooth *thinner*. This is not a
+convention that could go either way: §4.4's relation flips gear 2's `x` and `x_s`
+together, and measured against tooth thicknesses at the operating circles the
+space reading gives exactly zero backlash at every `k` while the tooth reading is
+0.63 mm out at `k = 1.2` [verified]. It also fixes the pair invariant — an
+internal mesh wants **`k₁ = k₂`**, where an external one needs `k₁ + k₂ = 2`.
+
+**How it is realised.** A rack can simply be displaced: its pitch line is a
+machine setting, so shifting it leaves the rolling alone. Two pinions cannot —
+their ratio is fixed by their tooth counts, so the pitch point is wherever the
+centre distance puts it, and the rolling circles move with it. A shifted ring is
+cut by the *same* tool placed further out, at the centre distance §4.4's relation
+gives between tool and workpiece, and everything follows from one factor:
+
+```text
+scale = a_cut / a_ref        r′ = scale · r        phase′ = scale · phase
+```
+
+which is exactly 1 at zero shift, so the unshifted cut is untouched. Two
+consequences worth stating because both were wrong before (§12): the ring's root
+circle is `a_cut + r_tip`, where the cutter's tip actually reaches, and **not**
+the linearised `r + m(dedendum + x)` — so a ring has no dedendum input, it has a
+cutter. And the cut simulation must build its cutter from the *cutter*: deriving
+the tool's tooth from the ring's made it share the model's assumption, agree to
+2.7 µm on a ring whose cutter was 0.44 mm out of place, and report nothing.
+
 #### The tool: a rack is a shaper with infinitely many teeth
 
 An internal gear cannot be cut by a rack, so the fillet is swept by a corner
@@ -2496,6 +2536,11 @@ something independent.**
 | — | Involute inversion by series seed + Newton | **Diverges above ~60°**, inside the allowed pressure-angle range; needs safeguarding |
 | 4.7, 4.11 | Internal relative curvature written as its own branch beside the external one | **Wrong in two independent ways at once**, neither reachable. `r_b2` was scaled by `z₁ + z₂` where an internal pair needs `z₂ − z₁` (exactly 0.5× on a 17/51 pair), and `ρ₂ = r_b2 tan α_w − ξ` should be `+ ξ`. Together: −50 % at the pitch point of a 17/51, and a **negative** relative curvature on a 25/41 — which `contact_stress` would have reported as "no contact" for an ordinary internal mesh. Both were dead code only because `ContactPath::new` admitted no internal mesh, and both would have gone live with milestone 9. Fixed by making the sign a *value* rather than a branch: gear 2's tooth count, shift and radii are negative for a ring, and the external expressions then serve both kinds unchanged |
 | 4.7 | The two members' base radii reached by different routes | Gear 1's came from its own reference geometry, gear 2's through `a_w` and `α_w` — so `r_b1 + r_b2 = a_w cos α_w` held only to an ulp, and gear 2's carried the involute inversion's residual for no reason. A base radius is `m_t z / 2 · cos α_t` and owes nothing to the centre distance; both now take that route, and the identity is exact |
+| 4.11 | `thickness_mod` applied to a ring's **tooth**, as it is to an external gear's | Backwards. The ring's *space* is what is generated like a tooth — it is where the pinion's tooth goes — and `Mesh::new`'s internal relation flips gear 2's `x` and `x_s` together, which is consistent only with the space reading. Measured against tooth thicknesses at the operating circles, the space reading gives exactly zero backlash at every k while the tooth reading is **0.63 mm** out at k = 1.2. Consequence: a larger k or x makes a ring's tooth *thinner*, and the internal pair invariant is `k₁ = k₂` where an external one needs `k₁ + k₂ = 2` |
+| 4.11 | `Ring::new` ignored `profile_shift` entirely | Not a wrong formula but a missing one, and it had a visible face: the gear tab sends `profile_shift` for an internal gear, so the box was there and moved nothing. Every layer was individually happy, which is why only an end-to-end check found it |
+| 4.11 | A shifted ring cut by a cutter at **reference** centres | A shaper cannot be displaced the way a rack can. A rack's pitch line is a machine setting, so shifting it leaves the rolling alone; two pinions have their ratio fixed by their tooth counts, so the pitch point is wherever the centre distance puts it and the rolling circles move with it. The cutter was up to **0.44 mm** out of place at x = 0.5. One factor `a / a_ref` carries all of it, and is exactly 1 at zero shift |
+| 4.11 | **The cut simulation derived the cutter's tooth from the ring's** | So it shared the model's assumption and could not see the fault above: it reported 2.7 µm on a ring whose cutter was 0.44 mm out of place, unchanged from the unshifted case. The §12 trap in its purest form — *a check built from the thing under test measures nothing.* The cutter's tooth now comes from the cutter, and placing it at reference centres makes the gate fail by 13–66× its noise floor |
+| 4.11 | A ring's root radius from `r + m(dedendum + x)` | That is the exact relation linearised. A ring's root is wherever its cutter's tip *reaches*, `a_cut + r_tip`; the two differ by 17 µm at x = 0.25 and 57 µm at x = 0.5, both well above the 3.6 µm the cut simulation resolves. So a ring has **no dedendum input** — it is the cutter's addendum seen from the other side, and having both invites them to disagree. Its root-radius coefficient goes the same way: the fillet round is the cutter's own |
 
 Two process notes worth carrying forward:
 
@@ -2635,6 +2680,11 @@ here. Revision 2 additions are marked ★.
 | ◆ **Classical screw efficiency, derived** | the force balance at Σ = 90° vs. both published closed forms, four worms × five friction coefficients | 1e-14 in both directions |
 | ◆ Screw energy balance | `P_in − P_out` vs. `μ F_n \|v_s\|`, four shaft angles × four friction coefficients | 1e-13 relative — at any shaft angle, not only 90° |
 | ◆ Self-locking threshold | `η_back` at `μ = cos α_n tan γ`, four worms | **exactly zero** (< 1e-15), positive below, negative above |
+| ▣ **What a shift means on a ring, decided by measurement** | pinion tooth against ring space at the operating circles, at the `a_w` the mesh gives — eight pairs including shifted and thickness-modified, `k₁ = k₂` and `k₁ + k₂ = 2` | zero to 1e-11 mm under the *space* reading at every k; the *tooth* reading is 0.63 mm out at k = 1.2. Equal shifts and equal k each leave the centre distance exactly at its reference value |
+| ▣ **A shifted ring is the shape its cutter leaves** | the cut simulated from the tool alone — cutter's own tooth, operating rolling circles, operating centre distance — two ring sizes × shifts −0.4 … +0.5 | **2.5–2.7 µm**, the simulation's own binning, flat across the whole shift range |
+| ▣ …and the gate can see a misplaced cutter | the same rings with the cutter put back at reference centres, the placement the previous model used | **34–171 µm**, 13–66× the noise floor. The old simulation reported 2.7 µm for these and said nothing, because it derived the cutter the same wrong way the model did |
+| ▣ A ring's root radius, exact against linearised | `a_cut + r_tip` vs `r + m(dedendum + x)`, x = 0.25 and 0.5 | 16.7 µm and 57 µm apart. `r_f − a_cut` is constant at the tool's own tip radius, at every shift |
+| ▣ A shifted ring across the wasm boundary | JSON in, JSON out, through the shipped entry point | tip and root radii move outward; pitch and base radii **bit-identical**, since a shift cannot move them |
 | ▣ **The signed convention reproduces every internal relation** | the external expressions fed a negative `z₂`, against each hand-written internal branch: `α_w`, the efficiency tooth term, `\|a_w\|`, `\|r_b2\|` | identical to 1e-15, and the external case **bit-identical** — `gear-cli strength 17 43 2.0` unchanged in every figure, and the line-contact acceptance gate still exact |
 | ▣ `ρ₁ + ρ₂ = σ · a_w sin α_w` | swept 17 positions along the line of action, five pairs, both kinds | 1e-12 of `a_w`. The constant **sum** external, the constant **difference** internal, from one expression — and the sweep is the point: a ξ-sign error cancels at the pitch point |
 | ▣ Base radii against each gear's own | four pairs including shifted, both kinds | `assert_eq!` — bit-identical, so `r_b1 + r_b2 = a_w cos α_w` is exact rather than close |

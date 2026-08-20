@@ -414,10 +414,12 @@ pub fn ring_cut_envelope_spans(
     let rho = cut.tip_round;
     let r_tip = cut.corner_radius + rho;
 
-    // The cutter's tooth fills the ring's space, so its thickness is what the
-    // ring's tooth leaves over.
-    let ring_tooth = 2.0 * ring.r * (ring.psi_b + inv(ring.alpha_t));
-    let cutter_tooth = PI * ring.mt - ring_tooth;
+    // **The cutter's tooth comes from the cutter.** Deriving it as
+    // `π m_t − ring_tooth` — the tool that would complement an unshifted ring at
+    // reference centres — made this simulation share the model's assumption, so
+    // it agreed to 2.7 µm on a shifted ring whose cutter was 0.44 mm out of
+    // place. A check built from the thing under test measures nothing. §12.
+    let cutter_tooth = cut.cutter_tooth;
     let half_angle_at = |radius: f64| {
         let alpha = (r_bc / radius).acos();
         cutter_tooth / (2.0 * cut.cutter_radius) + inv(ring.alpha_t) - inv(alpha)
@@ -465,8 +467,10 @@ pub fn ring_cut_envelope_spans(
     for j in 0..=phases {
         #[allow(clippy::cast_precision_loss)]
         let s = -span + 2.0 * span * (j as f64 / phases as f64);
-        let phi = s / cut.cutter_radius;
-        let rotation = (s - cut.phase) / ring.r;
+        // Rolling is on the operating circles, which are the reference ones only
+        // when the cut sits at reference centres.
+        let phi = s / cut.cutter_operating_radius;
+        let rotation = (s - cut.phase) / cut.workpiece_operating_radius;
         // The corner sits at −θ_g from the cutter's tooth centreline, not +θ_g:
         // it is on the flank *facing* the ring's tooth. Mirroring the tooth and
         // turning the other way keeps the corner where `corner_centre_at` puts
@@ -475,7 +479,7 @@ pub fn ring_cut_envelope_spans(
         for &(px, py) in &boundary {
             let px = -px;
             let x = px * cos_t + py * sin_t;
-            let y = cut.centre_distance() + (py * cos_t - px * sin_t);
+            let y = cut.centre_distance + (py * cos_t - px * sin_t);
             let radius = f64::hypot(x, y);
             if radius <= ring.ra || radius >= ring.rf {
                 continue;

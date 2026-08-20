@@ -11,7 +11,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use gear_core::{inv, Gear, GearParams};
+use gear_core::{inv, inv_from_roll, Gear, GearParams};
 
 /// A grid spanning the awkward regions: tiny tooth counts, both signs of shift,
 /// sharp and rounded racks, both helix hands.
@@ -286,4 +286,78 @@ fn degenerate_input_is_clamped_and_reported() {
     assert!(g.clamps.any() && g.rho <= g.bd);
 
     assert!(g.ra.is_finite() && g.rf.is_finite() && g.rho.is_finite());
+}
+
+/// **A shifted internal pair has exactly zero backlash at the centre distance
+/// the mesh computes** — measured off the two real profiles, not from the
+/// relation that produced the centre distance.
+///
+/// This is the check that decides what a profile shift and a thickness
+/// modification *mean* on a ring. `Mesh::new` flips gear 2's `x` and `x_s`
+/// together, which is consistent only if both describe the ring's **space** —
+/// the place the pinion's tooth goes — rather than its tooth. Read the other way
+/// round the same pair comes out 0.63 mm from zero at `k = 1.2`, so this is not
+/// a convention that could be chosen either way.
+///
+/// It is also the reason the internal pair invariant is `k₁ = k₂` where an
+/// external one needs `k₁ + k₂ = 2`: equal thickness modifications are what
+/// leave the centre distance at its reference value.
+#[test]
+fn an_internal_pair_has_zero_backlash_at_the_centre_distance_the_mesh_gives() {
+    use gear_core::mesh::{Mesh, MeshKind};
+    use gear_core::ring::{Cutter, Ring};
+
+    let params = |teeth: u32, x: f64, k: f64| GearParams {
+        teeth,
+        profile_shift: x,
+        thickness_mod: k,
+        ..Default::default()
+    };
+
+    for (z1, z2, x1, x2, k1, k2) in [
+        (17u32, 51u32, 0.0, 0.0, 1.0, 1.0),
+        (17, 51, 0.3, 0.3, 1.0, 1.0), // equal shifts: reference centres
+        (17, 51, 0.0, 0.4, 1.0, 1.0),
+        (17, 51, -0.2, 0.25, 1.0, 1.0),
+        (17, 51, 0.0, 0.0, 1.15, 1.15), // equal k: reference centres
+        (17, 51, 0.0, 0.0, 1.2, 0.9),
+        (20, 60, 0.15, -0.1, 1.05, 1.1),
+        (25, 41, 0.0, 0.3, 1.0, 1.0),
+    ] {
+        let pinion = Gear::new(params(z1, x1, k1));
+        let ring = Ring::new(&params(z2, x2, k2), &Cutter::default());
+        // The mesh reads the ring through the same `Gear` arithmetic, because a
+        // ring's shift and thickness enter its space exactly as they enter an
+        // external gear's tooth.
+        let ring_as_gear = Gear::new(params(z2, x2, k2));
+        let mesh = Mesh::new(&pinion, &ring_as_gear, MeshKind::Internal).unwrap();
+
+        let (r1, r2) = mesh.operating_radii();
+        let r2 = r2.abs();
+        assert!(
+            (r2 - r1 - mesh.a_w).abs() < 1e-12,
+            "operating radii must differ by the centre distance for an internal pair"
+        );
+
+        // Pinion tooth against ring space, both at their own operating circle.
+        let u1 = (((r1 / pinion.rb).powi(2) - 1.0).max(0.0)).sqrt();
+        let tooth = 2.0 * r1 * (pinion.psi_b - inv_from_roll(u1));
+        let space = ring.space_width_at(r2);
+        assert!(
+            (space - tooth).abs() < 1e-11,
+            "z={z1}/{z2} x={x1}/{x2} k={k1}/{k2}: space {space} vs tooth {tooth}, \
+             backlash {} mm at a_w = {}",
+            space - tooth,
+            mesh.a_w
+        );
+
+        // Equal shifts and equal thickness modifications each leave the centre
+        // distance exactly where the reference geometry put it.
+        if (x1 - x2).abs() < 1e-15 && (k1 - k2).abs() < 1e-15 {
+            assert!(
+                (mesh.a_w - mesh.a_ref).abs() < 1e-12,
+                "z={z1}/{z2}: equal shifts must not move the centre distance"
+            );
+        }
+    }
 }

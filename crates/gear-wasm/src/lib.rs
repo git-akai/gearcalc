@@ -644,6 +644,28 @@ mod tests {
             dxf.ends_with("EOF\r\n") || dxf.ends_with("EOF\n"),
             "truncated DXF"
         );
+
+        // **A shifted ring must come back shifted.** The gear tab has always
+        // sent `profile_shift` for an internal gear and `Ring::new` used to drop
+        // it on the floor, so the box moved nothing — the sort of gap only an
+        // end-to-end check finds, because every layer was individually happy.
+        let shifted = req.replace("\"profile_shift\":0.0", "\"profile_shift\":0.3");
+        let w: serde_json::Value =
+            serde_json::from_str(&solve_ring_impl(&shifted).unwrap()).unwrap();
+        for key in ["tip_radius", "root_radius"] {
+            let (before, after) = (v[key].as_f64().unwrap(), w[key].as_f64().unwrap());
+            assert!(
+                after > before,
+                "{key} must move outward under a positive shift: {before} -> {after}"
+            );
+        }
+        // ...and the circles a shift cannot move stay put, exactly.
+        assert_eq!(v["pitch_radius"], w["pitch_radius"]);
+        assert_eq!(v["base_radius"], w["base_radius"]);
+        assert!(
+            ring_profile_impl(&shifted, 60).unwrap().len() > 200,
+            "a shifted ring still has an outline"
+        );
     }
 
     #[test]

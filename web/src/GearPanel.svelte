@@ -172,7 +172,7 @@
       </div>
     {/if}
     <div class="grid">
-      {#each FIELDS as f (f.key)}
+      {#each FIELDS.filter((f) => !(tab.internal && f.externalOnly)) as f (f.key)}
         <label class:invalid={errors[f.key]}>
           <span>{f.label}</span>
           <input
@@ -193,6 +193,7 @@
                 · pointed above {n(r.pointed)}{/if}</small
             >
           {:else if boundNote(f.key)}<small>{boundNote(f.key)}</small>
+          {:else if tab.internal && f.ringNote}<small>{f.ringNote}</small>
           {:else if f.note}<small>{f.note}</small>{/if}
         </label>
       {/each}

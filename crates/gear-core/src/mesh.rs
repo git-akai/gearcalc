@@ -71,6 +71,37 @@ impl MeshKind {
     }
 }
 
+/// The zero-backlash operating geometry of a rolling pair, from the signed sums
+/// alone: `(α_w, a_ref, a_w)`.
+///
+/// `sum_z` and `sum_x` are **signed** — gear 2 enters both with the sign of its
+/// kind (see [`MeshKind::sign`]) — and only their ratio reaches `α_w`, which is
+/// why one expression covers an external and an internal pair.
+///
+/// Free-standing rather than a method because two callers need it and neither is
+/// the other: [`Mesh::new`] builds a mesh from two gears, while
+/// [`crate::ring::Ring`] needs the centre distance its *shaper* rolls at before
+/// there is a mesh to speak of. A shifted ring is cut by a cutter sitting further
+/// out, and that distance is this same relation read between workpiece and tool.
+///
+/// `None` when the shifts drive `inv α_w` negative: the base circles would have
+/// to overlap and there is no such pair.
+#[must_use]
+pub fn operating_geometry(
+    mt: f64,
+    alpha_t: f64,
+    alpha_n: f64,
+    sum_z: f64,
+    sum_x: f64,
+) -> Option<(f64, f64, f64)> {
+    // A centre distance is a distance, so the reference one is the magnitude;
+    // `sum_z` keeps its sign for the radii that need it.
+    let a_ref = mt * sum_z.abs() / 2.0;
+    let inv_aw = inv(alpha_t) + 2.0 * sum_x * alpha_n.tan() / sum_z;
+    let alpha_w = inv_inverse(inv_aw)?;
+    Some((alpha_w, a_ref, a_ref * alpha_t.cos() / alpha_w.cos()))
+}
+
 /// Why a requested mesh has no real geometry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MeshError {
@@ -148,13 +179,8 @@ impl Mesh {
 
         let alpha_t = g1.alpha_t;
         let alpha_n = g1.alpha_n;
-        // A centre distance is a distance, so the reference one is the magnitude;
-        // `sz` keeps its sign for the radii below, where it is needed.
-        let a_ref = g1.mt * sz.abs() / 2.0;
-
-        let inv_aw = inv(alpha_t) + 2.0 * sx * alpha_n.tan() / sz;
-        let alpha_w = inv_inverse(inv_aw).ok_or(MeshError::OutsideInvoluteDomain)?;
-        let a_w = a_ref * alpha_t.cos() / alpha_w.cos();
+        let (alpha_w, a_ref, a_w) = operating_geometry(g1.mt, alpha_t, alpha_n, sz, sx)
+            .ok_or(MeshError::OutsideInvoluteDomain)?;
 
         Ok(Self {
             kind,

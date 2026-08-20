@@ -188,6 +188,16 @@ export interface FieldSpec {
   integer?: boolean;
   /** shown under the field */
   note?: string;
+  /**
+   * Not an input for an internal gear, and hidden there.
+   *
+   * A ring's root circle is wherever its cutter's tip reaches and its fillet
+   * round is the cutter's own, so both are properties of the tool rather than
+   * of the part. Showing a box that changes nothing is worse than showing none.
+   */
+  externalOnly?: boolean;
+  /** Replaces `note` for an internal gear, where the rule differs. */
+  ringNote?: string;
 }
 
 export const FIELDS: FieldSpec[] = [
@@ -197,14 +207,23 @@ export const FIELDS: FieldSpec[] = [
   { key: "helix_angle", label: "Helix angle", unit: "°", step: 1 },
   { key: "profile_shift", label: "Profile shift", unit: "module", step: 0.05 },
   { key: "addendum", label: "Addendum", unit: "module", step: 0.05 },
-  { key: "dedendum", label: "Dedendum", unit: "module", step: 0.05 },
-  { key: "root_radius", label: "Root radius coefficient", unit: "module", step: 0.01 },
+  { key: "dedendum", label: "Dedendum", unit: "module", step: 0.05, externalOnly: true },
+  {
+    key: "root_radius",
+    label: "Root radius coefficient",
+    unit: "module",
+    step: 0.01,
+    externalOnly: true,
+  },
   {
     key: "thickness_mod",
     label: "Tooth thickness modification",
     unit: "",
     step: 0.05,
     note: "1 is the standard rack; a meshing pair must sum to 2",
+    // On a ring it is the SPACE this describes, so a pinion and a ring that mesh
+    // want the SAME k rather than complementary ones.
+    ringNote: "1 is the standard rack; on a ring it widens the space, and a meshing pair matches",
   },
 ];
 
