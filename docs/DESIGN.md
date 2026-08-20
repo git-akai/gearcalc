@@ -1861,6 +1861,40 @@ places; it is cut by a different tool. That is the fact everything here follows
 from, and it is why `ring.rs` and `shaper.rs` exist rather than a flag on
 `Gear`.
 
+#### ...but the *meshing* relations are one sign, not a second set
+
+The distinction is worth stating precisely, because the two halves pull opposite
+ways. **Generation** is a different construction — a corner going round a circle
+rather than along a line — and no amount of sign-juggling turns one into the
+other. **Meshing** is the opposite: every relation an internal pair obeys is the
+external one with gear 2's tooth count, shift and radii carrying a minus sign.
+
+That is not a convenience; it is the same convention that lets Hertzian contact
+treat a concave body as a negative radius, which is why `hertz.rs` never needed
+an internal case. Carried through, `MeshKind` stops appearing in arithmetic at
+all — it survives only where it is genuinely a *validity* question (which helix
+hands mesh, whether the ring is big enough) and as the `σ = ±1` of the cut. One
+expression each then covers both kinds:
+
+```text
+Σx  = x₁ + σ x₂            Σz = z₁ + σ z₂          (the sums setting α_w; only
+                                                    their ratio is used, so the
+                                                    two sign flips cancel)
+r_b2 = σ · m_t z₂/2 · cos α_t                       (signed, hence concave)
+ρ₁  = r_b1 tan α_w + ξ     ρ₂ = r_b2 tan α_w − ξ
+ρ₁ + ρ₂ = σ · a_w sin α_w                           (constant SUM external,
+                                                     constant DIFFERENCE internal)
+1/ρ  = 1/ρ₁ + 1/ρ₂         η term = 1/z₁ + 1/(σ z₂)
+```
+
+Writing the internal cases out separately instead is what carried two wrong
+relations for two milestones (§12). Both were invisible: `ContactPath::new`
+refused internal meshes, so nothing could reach them, and one of the two faults
+cancels exactly at the pitch point — where any spot check would have been made.
+The lesson is the general one, in the specific: **a duplicated formula is a place
+where two answers can differ, and the copy that nothing exercises is the one that
+will be wrong.**
+
 #### The flank: one sign, and where it comes from
 
 The flank is still an involute of the ring's own base circle — the involute is
@@ -2460,6 +2494,8 @@ something independent.**
 | 4.10 | Read as an axial taper (beveloid) | It is an *angular* variation; the beveloid treatment was withdrawn entirely |
 | 4.10 | "No changes to the generator" (beveloid reading) | Did not survive the correction above |
 | — | Involute inversion by series seed + Newton | **Diverges above ~60°**, inside the allowed pressure-angle range; needs safeguarding |
+| 4.7, 4.11 | Internal relative curvature written as its own branch beside the external one | **Wrong in two independent ways at once**, neither reachable. `r_b2` was scaled by `z₁ + z₂` where an internal pair needs `z₂ − z₁` (exactly 0.5× on a 17/51 pair), and `ρ₂ = r_b2 tan α_w − ξ` should be `+ ξ`. Together: −50 % at the pitch point of a 17/51, and a **negative** relative curvature on a 25/41 — which `contact_stress` would have reported as "no contact" for an ordinary internal mesh. Both were dead code only because `ContactPath::new` admitted no internal mesh, and both would have gone live with milestone 9. Fixed by making the sign a *value* rather than a branch: gear 2's tooth count, shift and radii are negative for a ring, and the external expressions then serve both kinds unchanged |
+| 4.7 | The two members' base radii reached by different routes | Gear 1's came from its own reference geometry, gear 2's through `a_w` and `α_w` — so `r_b1 + r_b2 = a_w cos α_w` held only to an ulp, and gear 2's carried the involute inversion's residual for no reason. A base radius is `m_t z / 2 · cos α_t` and owes nothing to the centre distance; both now take that route, and the identity is exact |
 
 Two process notes worth carrying forward:
 
@@ -2599,6 +2635,11 @@ here. Revision 2 additions are marked ★.
 | ◆ **Classical screw efficiency, derived** | the force balance at Σ = 90° vs. both published closed forms, four worms × five friction coefficients | 1e-14 in both directions |
 | ◆ Screw energy balance | `P_in − P_out` vs. `μ F_n \|v_s\|`, four shaft angles × four friction coefficients | 1e-13 relative — at any shaft angle, not only 90° |
 | ◆ Self-locking threshold | `η_back` at `μ = cos α_n tan γ`, four worms | **exactly zero** (< 1e-15), positive below, negative above |
+| ▣ **The signed convention reproduces every internal relation** | the external expressions fed a negative `z₂`, against each hand-written internal branch: `α_w`, the efficiency tooth term, `\|a_w\|`, `\|r_b2\|` | identical to 1e-15, and the external case **bit-identical** — `gear-cli strength 17 43 2.0` unchanged in every figure, and the line-contact acceptance gate still exact |
+| ▣ `ρ₁ + ρ₂ = σ · a_w sin α_w` | swept 17 positions along the line of action, five pairs, both kinds | 1e-12 of `a_w`. The constant **sum** external, the constant **difference** internal, from one expression — and the sweep is the point: a ξ-sign error cancels at the pitch point |
+| ▣ Base radii against each gear's own | four pairs including shifted, both kinds | `assert_eq!` — bit-identical, so `r_b1 + r_b2 = a_w cos α_w` is exact rather than close |
+| ▣ An internal mesh is less curved than the external pair of the same teeth | three pairs × nine positions | strictly lower and positive throughout. A law rather than a number, and the cheapest independent check on gear 2's sign — flipping it inverts the comparison, which no self-consistent internal test would notice |
+| ▣ Size of the error the branch had been carrying | 17/51, 20/60, 25/41, swept | −50 % at the pitch point, −426 % worst, and sign-flipped on 25/41. The first probe of this put it at 9.9 %, having fed the *correct* `r_b2` into the old expression and so measured only one of the two faults — a reminder that a check built from the thing under test measures less than it looks |
 | ◆ Crossed-axis sliding at the pitch point | perpendicular axes, worm and wheel radii | `√(v₁²+v₂²)`, equal to the textbook `v₁/cos γ` to 1e-12; resolved on the worm axis it is exactly the wheel's pitch velocity |
 
 The marks record which round of review each check came from; they are kept only

@@ -26,7 +26,7 @@
 
 use crate::contact::ContactPath;
 use crate::hertz::elliptical_contact;
-use crate::mesh::{Mesh, MeshKind};
+use crate::mesh::Mesh;
 use crate::metrology::base_helix_angle;
 use crate::profile::Gear;
 use crate::solve::{brent, Tol};
@@ -834,11 +834,9 @@ pub fn contact_stress(
     load: &Load,
     e_star: f64,
 ) -> Option<ContactStress> {
-    // r_b1 + r_b2 = a_w cos α_w, so the two tangent lengths sum to a_w sin α_w
-    // and ρ₁ + ρ₂ is constant along the path — a useful invariant to test.
-    let sz = f64::from(mesh.z1) + f64::from(mesh.z2);
-    let rb1 = path.base_radius_1;
-    let rb2 = mesh.a_w * f64::from(mesh.z2) / sz * mesh.alpha_w.cos();
+    // The curvatures come from the mesh, which owns the operating geometry and
+    // the one signed relation both kinds obey — see `Mesh::curvature_radii`.
+    // Re-deriving `r_b2` here is what previously got an internal pair wrong.
 
     // F_bt is shared by both gears of the pair, so which gear the load was
     // quoted against does not survive into the answer.
@@ -849,18 +847,7 @@ pub fn contact_stress(
     let cos_bb = base_helix_angle(g1).cos();
 
     let at = |xi: f64| -> Option<(f64, f64)> {
-        let rho1 = rb1 * mesh.alpha_w.tan() + xi;
-        let rho2 = rb2 * mesh.alpha_w.tan() - xi;
-        if rho1 <= 0.0 || rho2 <= 0.0 {
-            return None;
-        }
-        let inv_rho_t = match mesh.kind {
-            MeshKind::External => 1.0 / rho1 + 1.0 / rho2,
-            MeshKind::Internal => 1.0 / rho1 - 1.0 / rho2,
-        };
-        if inv_rho_t <= 0.0 {
-            return None;
-        }
+        let inv_rho_t = mesh.relative_curvature(xi)?;
         // F_bn / L = (F_bt/cos β_b) / (b/cos β_b) = F_bt / b, and
         // 1/ρ_n = cos β_b / ρ_t. Written out rather than pre-cancelled so the
         // two plane changes stay visible.
@@ -928,6 +915,7 @@ pub fn min_face_width_contact(stress: f64, evaluated_at: f64, allowable: f64) ->
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use crate::mesh::MeshKind;
     use crate::GearParams;
 
     #[test]

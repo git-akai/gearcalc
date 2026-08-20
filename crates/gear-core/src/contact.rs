@@ -317,10 +317,9 @@ pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Gear, friction: f64, dri
     };
     let e1 = approach / path.base_pitch;
     let e2 = recess / path.base_pitch;
-    let z = match mesh.kind {
-        MeshKind::External => 1.0 / f64::from(mesh.z1) + 1.0 / f64::from(mesh.z2),
-        MeshKind::Internal => 1.0 / f64::from(mesh.z1) - 1.0 / f64::from(mesh.z2),
-    };
+    // `1/z₁ + 1/z₂` with gear 2 signed, so a ring's reciprocal subtracts without
+    // a case of its own — see `MeshKind::sign`.
+    let z = 1.0 / f64::from(mesh.z1) + 1.0 / mesh.signed_z2();
     let cos_bb = crate::metrology::base_helix_angle(g1).cos();
     1.0 - friction * std::f64::consts::PI * z * (e1 * e1 + e2 * e2) / (path.contact_ratio * cos_bb)
 }
@@ -433,12 +432,14 @@ pub fn sliding_at(path: &ContactPath, mesh: &Mesh, g1: &Gear, xi: f64, speed_1: 
         0.0,
     ];
 
-    // Signed about a shared axis: an external pair turns opposite ways.
-    let ratio = f64::from(mesh.z1) / f64::from(mesh.z2);
-    let speed_2 = match mesh.kind {
-        MeshKind::External => -speed_1 * ratio,
-        MeshKind::Internal => speed_1 * ratio,
-    };
+    // Signed about a shared axis: an external pair turns opposite ways, a ring
+    // the same way as its pinion. Gear 2's signed tooth count already says
+    // which, so the reversal is arithmetic rather than a case.
+    //
+    // The frame below still places gear 2 as an external mate. That is not yet
+    // exercised — [`ContactPath::new`] admits no internal mesh — and making it
+    // general belongs with the internal contact path, where it can be tested.
+    let speed_2 = -speed_1 * f64::from(mesh.z1) / mesh.signed_z2();
 
     let beta_b = crate::metrology::base_helix_angle(g1);
     let contact_line = [

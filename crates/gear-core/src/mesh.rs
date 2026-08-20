@@ -40,6 +40,37 @@ pub enum MeshKind {
     Internal,
 }
 
+impl MeshKind {
+    /// The sign gear 2's tooth count, shift and radii carry: `+1` external,
+    /// `−1` internal.
+    ///
+    /// **This is the whole of the difference between the two kinds**, and it is
+    /// returned as a number rather than matched on at each site so that every
+    /// relation below can be written once. A ring is a gear whose tooth count,
+    /// shift and radius of curvature are negative — the same convention that
+    /// lets Hertzian contact treat a concave surface as a negative radius, which
+    /// is why [`crate::hertz`] needed no internal case either.
+    ///
+    /// Writing the two kinds out separately instead is not merely repetition. It
+    /// is how this crate carried a wrong internal relative curvature, in two
+    /// independent ways at once: the hand-written branch scaled `r_b2` by
+    /// `z₁ + z₂` where an internal pair needs `z₂ − z₁`, and wrote
+    /// `ρ₂ = r_b2 tan α_w − ξ` where it needs `+ ξ`. Together they were wrong by
+    /// **50 % at the pitch point** of a 17/51 pair and by enough to return a
+    /// *negative* relative curvature on a 25/41 — reported as "no contact" for
+    /// an ordinary internal mesh. Neither was reachable, because
+    /// [`ContactPath::new`](crate::contact::ContactPath::new) admitted no
+    /// internal mesh; both would have gone live the moment it did.
+    /// See `docs/DESIGN.md` §12.
+    #[must_use]
+    pub const fn sign(self) -> f64 {
+        match self {
+            Self::External => 1.0,
+            Self::Internal => -1.0,
+        }
+    }
+}
+
 /// Why a requested mesh has no real geometry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MeshError {
@@ -64,6 +95,12 @@ pub struct Mesh {
     pub alpha_t: f64,
     /// Normal pressure angle.
     pub alpha_n: f64,
+    /// Transverse module, shared by both members.
+    ///
+    /// Kept so the reference geometry can be reached without the gears: a base
+    /// radius is `m_t z / 2 · cos α_t`, which owes nothing to the centre distance
+    /// and so nothing to the involute inversion that produces `alpha_w`.
+    pub mt: f64,
     /// Reference centre distance, before any profile shift.
     pub a_ref: f64,
     /// Zero-backlash operating pressure angle, radians.
@@ -100,19 +137,20 @@ impl Mesh {
             return Err(MeshError::RingTooSmall);
         }
 
-        // The sums are over the THICKNESS shift, x + x_s.
-        let sx = match kind {
-            MeshKind::External => x_thick(g1) + x_thick(g2),
-            MeshKind::Internal => x_thick(g2) - x_thick(g1),
-        };
-        let sz = match kind {
-            MeshKind::External => f64::from(p1.teeth) + f64::from(p2.teeth),
-            MeshKind::Internal => f64::from(p2.teeth) - f64::from(p1.teeth),
-        };
+        // The sums are over the THICKNESS shift, x + x_s, and gear 2 enters both
+        // with the sign of its kind. For an internal pair that makes each sum
+        // the negative of the difference the textbook writes — and since only
+        // the RATIO sx/sz reaches the operating pressure angle, the two negatives
+        // cancel and one expression serves both kinds.
+        let s = kind.sign();
+        let sx = x_thick(g1) + s * x_thick(g2);
+        let sz = f64::from(p1.teeth) + s * f64::from(p2.teeth);
 
         let alpha_t = g1.alpha_t;
         let alpha_n = g1.alpha_n;
-        let a_ref = g1.mt * sz / 2.0;
+        // A centre distance is a distance, so the reference one is the magnitude;
+        // `sz` keeps its sign for the radii below, where it is needed.
+        let a_ref = g1.mt * sz.abs() / 2.0;
 
         let inv_aw = inv(alpha_t) + 2.0 * sx * alpha_n.tan() / sz;
         let alpha_w = inv_inverse(inv_aw).ok_or(MeshError::OutsideInvoluteDomain)?;
@@ -122,6 +160,7 @@ impl Mesh {
             kind,
             alpha_t,
             alpha_n,
+            mt: g1.mt,
             a_ref,
             alpha_w,
             a_w,
@@ -163,17 +202,121 @@ impl Mesh {
     /// [`MeshError::CentreDistanceTooSmall`] if the base circles cannot reach.
     pub fn angular_backlash(&self, a_actual: f64, at_gear: Member) -> Result<f64, MeshError> {
         let j = self.backlash(a_actual)?;
-        let sz = f64::from(self.z1)
-            + match self.kind {
-                MeshKind::External => f64::from(self.z2),
-                MeshKind::Internal => -f64::from(self.z2),
-            };
-        // Operating pitch radius of the chosen member.
+        // Play is a magnitude at whichever member is asked, so both the tooth
+        // sum and the member's own count enter by magnitude. Which member turns
+        // which way is a kinematic question and not this one.
         let z = match at_gear {
             Member::First => f64::from(self.z1),
             Member::Second => f64::from(self.z2),
         };
-        Ok(j * sz.abs() / (a_actual * z))
+        Ok(j * self.tooth_sum().abs() / (a_actual * z))
+    }
+
+    /// Gear 2's tooth count, signed: negative when gear 2 is a ring.
+    ///
+    /// See [`MeshKind::sign`] for why the sign lives on the tooth count rather
+    /// than in a branch at each formula.
+    #[must_use]
+    pub fn signed_z2(&self) -> f64 {
+        self.kind.sign() * f64::from(self.z2)
+    }
+
+    /// `z₁ + z₂` with gear 2 signed — the tooth sum every relation is scaled by.
+    ///
+    /// Negative for an internal pair, where its magnitude is the `z₂ − z₁` the
+    /// textbooks write.
+    #[must_use]
+    pub fn tooth_sum(&self) -> f64 {
+        f64::from(self.z1) + self.signed_z2()
+    }
+
+    /// Operating pitch radii of the two members, mm — gear 2's **signed**.
+    ///
+    /// Gear 2's radius is negative for a ring, which is the same convention that
+    /// makes it a concave surface to [`crate::hertz`].
+    #[must_use]
+    pub fn operating_radii(&self) -> (f64, f64) {
+        let sz = self.tooth_sum().abs();
+        (
+            self.a_w * f64::from(self.z1) / sz,
+            self.a_w * self.signed_z2() / sz,
+        )
+    }
+
+    /// Base radii of the two members, mm — gear 2's **signed**.
+    ///
+    /// # Reached through the reference geometry, deliberately
+    ///
+    /// A base radius is `r cos α_t` *and* `r' cos α_w`; the two are equal because
+    /// a profile shift moves `r'` and `α_w` together and leaves the product
+    /// alone. They are not equally good to compute. `α_w` comes out of the
+    /// involute inversion, so the operating route carries that solve's residual
+    /// while `m_t z / 2 · cos α_t` carries none — and it is what
+    /// [`Gear::rb`](crate::Gear) itself is, bit for bit.
+    ///
+    /// An earlier revision reached gear 1's this way and gear 2's through `a_w`,
+    /// which left one pair of curvatures built from two different routes and
+    /// `r_b1 + r_b2 = a_w cos α_w` true only to an ulp. Both through the
+    /// reference geometry makes that identity exact, which is what
+    /// [`Self::curvature_radii`]'s constant-sum property rests on.
+    #[must_use]
+    pub fn base_radii(&self) -> (f64, f64) {
+        let c = self.alpha_t.cos();
+        let r = |z: f64| self.mt * z / 2.0 * c;
+        (r(f64::from(self.z1)), r(self.signed_z2()))
+    }
+
+    /// Radii of curvature of the two involutes at a position `ξ` on the line of
+    /// action, mm — gear 2's **signed**.
+    ///
+    /// `ξ` is measured from the pitch point, positive toward gear 1's tip.
+    ///
+    /// # The one relation, and the sign that carries the kind
+    ///
+    /// Each member's radius of curvature is the distance from the contact point
+    /// to its own base tangent point, so
+    ///
+    /// ```text
+    /// ρ₁ = r_b1 tan α_w + ξ            ρ₂ = r_b2 tan α_w − ξ
+    /// ```
+    ///
+    /// With `r_b2` signed this is **one pair of expressions for both kinds**, and
+    /// it reproduces each textbook relation exactly:
+    ///
+    /// ```text
+    /// ρ₁ + ρ₂ = a_w sin α_w            external — the sum is constant
+    /// ρ₂ − ρ₁ = a_w sin α_w            internal — the DIFFERENCE is constant
+    /// ```
+    ///
+    /// both of which are the single statement `ρ₁ + ρ₂ = σ · a_w sin α_w` in the
+    /// signed values. The internal case needs `ρ₂ = |r_b2| tan α_w + ξ` in
+    /// unsigned terms — note the `+ ξ` — and getting that from a hand-written
+    /// branch instead is what this crate previously got wrong.
+    #[must_use]
+    pub fn curvature_radii(&self, xi: f64) -> (f64, f64) {
+        let (rb1, rb2) = self.base_radii();
+        let t = self.alpha_w.tan();
+        (rb1 * t + xi, rb2 * t - xi)
+    }
+
+    /// Transverse relative curvature `1/ρ₁ + 1/ρ₂` at `ξ`, per mm.
+    ///
+    /// One expression for both kinds: gear 2's `ρ` is negative for a ring, so the
+    /// sum *is* the difference an internal pair needs. `None` where either flank
+    /// has run inside its base circle, or where the relative curvature is not
+    /// positive — an internal pair whose members are too close in size has no
+    /// contact to press.
+    #[must_use]
+    pub fn relative_curvature(&self, xi: f64) -> Option<f64> {
+        let (rho1, rho2) = self.curvature_radii(xi);
+        let s = self.kind.sign();
+        // Each ρ must be positive in its own sense: gear 1's outright, gear 2's
+        // after its sign is taken off.
+        if rho1 <= 0.0 || s * rho2 <= 0.0 {
+            return None;
+        }
+        let inv_rho = 1.0 / rho1 + 1.0 / rho2;
+        (inv_rho > 0.0).then_some(inv_rho)
     }
 
     /// Speed ratio, output over input, ignoring sign.
@@ -233,6 +376,166 @@ mod tests {
                 ..Default::default()
             }),
         )
+    }
+
+    /// **The one relation both kinds obey, in signed values.**
+    ///
+    /// Each member's radius of curvature is its distance from the contact point
+    /// to its own base tangent point, so the two must satisfy
+    ///
+    /// ```text
+    /// rho_1 + rho_2 = sigma . a_w sin(alpha_w)
+    /// ```
+    ///
+    /// at *every* position on the line of action — a constant sum for an
+    /// external pair and, once gear 2's is signed, the constant **difference**
+    /// an internal pair needs. This is the property that lets one expression
+    /// serve both, so it is asserted along the whole path rather than at the
+    /// pitch point, where a sign error in the `xi` term cancels.
+    #[test]
+    fn curvature_radii_obey_one_signed_relation_along_the_whole_path() {
+        for (kind, z1, z2) in [
+            (MeshKind::External, 17u32, 43u32),
+            (MeshKind::External, 13, 60),
+            (MeshKind::Internal, 17, 51),
+            (MeshKind::Internal, 20, 60),
+            (MeshKind::Internal, 31, 34),
+        ] {
+            let (a, b) = pair(z1, z2, 0.0, 0.0);
+            let m = Mesh::new(&a, &b, kind).unwrap();
+            let want = kind.sign() * m.a_w * m.alpha_w.sin();
+            for step in -8..=8 {
+                let xi = f64::from(step) * 0.35;
+                let (rho1, rho2) = m.curvature_radii(xi);
+                assert!(
+                    (rho1 + rho2 - want).abs() < 1e-12 * m.a_w,
+                    "{kind:?} {z1}/{z2} at xi={xi}: rho1+rho2 = {}, want {want}",
+                    rho1 + rho2
+                );
+            }
+        }
+    }
+
+    /// A ring's radius of curvature is **negative**, and that is the whole of
+    /// what makes it internal.
+    ///
+    /// Stated separately from the relation above because the relation would also
+    /// hold with both signs flipped, and it is the sign itself that
+    /// [`crate::hertz`] reads as "concave".
+    #[test]
+    fn only_a_ring_curves_the_other_way() {
+        let (p, r) = pair(17, 51, 0.0, 0.0);
+        let internal = Mesh::new(&p, &r, MeshKind::Internal).unwrap();
+        let (rho1, rho2) = internal.curvature_radii(0.0);
+        assert!(rho1 > 0.0, "the pinion is convex: {rho1}");
+        assert!(rho2 < 0.0, "the ring must be concave: {rho2}");
+        assert!(internal.signed_z2() < 0.0);
+        assert!(internal.tooth_sum() < 0.0);
+        // ...while the centre distance is a distance, and stays one.
+        assert!(internal.a_w > 0.0);
+        assert!((internal.a_w - 17.0).abs() < 1e-12);
+
+        let (a, b) = pair(17, 51, 0.0, 0.0);
+        let external = Mesh::new(&a, &b, MeshKind::External).unwrap();
+        let (e1, e2) = external.curvature_radii(0.0);
+        assert!(e1 > 0.0 && e2 > 0.0, "both flanks convex: {e1}, {e2}");
+    }
+
+    /// **The internal relative curvature, against the relation derived the other
+    /// way — and against the error that was there before.**
+    ///
+    /// DESIGN.md §4.11 gives the internal pair's conjugate relation with both
+    /// distances positive:
+    ///
+    /// ```text
+    /// rho_2 - rho_1 = a_w sin(alpha_w),     rho_2 = |r_b2| tan(alpha_w) + xi
+    /// ```
+    ///
+    /// Note the **plus** `xi`. The branch this replaced wrote `minus`, and also
+    /// scaled `r_b2` by `z1 + z2` where an internal pair needs `z2 - z1`. The two
+    /// errors cancel exactly at `xi = 0` and nowhere else, which is why this
+    /// sweeps and why the old check — made at the pitch point — passed.
+    #[test]
+    fn internal_relative_curvature_matches_the_conjugate_relation_off_the_pitch_point() {
+        for (z1, z2) in [(17u32, 51u32), (20, 60), (25, 41)] {
+            let (p, r) = pair(z1, z2, 0.0, 0.0);
+            let m = Mesh::new(&p, &r, MeshKind::Internal).unwrap();
+            let t = m.alpha_w.tan();
+            // Independently: base radii straight from each gear, positive, and
+            // the relation read as a difference.
+            let (rb1, rb2) = (p.rb, r.rb);
+            assert!(
+                ((rb2 - rb1) * t - m.a_w * m.alpha_w.sin()).abs() < 1e-12,
+                "the pair's own relation must hold first"
+            );
+
+            for step in -6..=6 {
+                let xi = f64::from(step) * 0.4;
+                let want = 1.0 / (rb1 * t + xi) - 1.0 / (rb2 * t + xi);
+                let got = m.relative_curvature(xi).unwrap();
+                assert!(
+                    (got - want).abs() < 1e-15 * want.abs(),
+                    "{z1}/{z2} at xi={xi}: {got} vs {want}"
+                );
+            }
+        }
+    }
+
+    /// **An internal mesh presses a convex flank against a concave one, so its
+    /// relative curvature is lower than the external pair of the same teeth.**
+    ///
+    /// A law rather than a number, and the cheapest independent check on the sign
+    /// convention: `1/ρ₁ − 1/ρ₂ < 1/ρ₁ + 1/ρ₂` for any positive pair, so a ring
+    /// must come out *softer* at every position on the path. Getting gear 2's
+    /// sign backwards inverts this, and no self-consistent test of the internal
+    /// pair alone would notice.
+    #[test]
+    fn an_internal_mesh_is_less_curved_than_the_external_pair_of_the_same_teeth() {
+        for (z1, z2) in [(17u32, 51u32), (20, 60), (25, 41)] {
+            let (a, b) = pair(z1, z2, 0.0, 0.0);
+            let internal = Mesh::new(&a, &b, MeshKind::Internal).unwrap();
+            let external = Mesh::new(&a, &b, MeshKind::External).unwrap();
+            for step in -4..=4 {
+                let xi = f64::from(step) * 0.4;
+                let (i, e) = (
+                    internal.relative_curvature(xi).unwrap(),
+                    external.relative_curvature(xi).unwrap(),
+                );
+                assert!(
+                    i > 0.0 && i < e,
+                    "{z1}/{z2} at xi={xi}: internal {i} should be positive and below external {e}"
+                );
+            }
+        }
+    }
+
+    /// A base radius owes nothing to the centre distance, so the two routes to
+    /// it must agree — and the reference route is the one that does not carry the
+    /// involute inversion's residual.
+    #[test]
+    fn base_radii_agree_with_each_gears_own() {
+        for (kind, z1, z2, x1, x2) in [
+            (MeshKind::External, 17u32, 43u32, 0.0, 0.0),
+            (MeshKind::External, 17, 43, 0.3, -0.15),
+            (MeshKind::Internal, 17, 51, 0.0, 0.0),
+            (MeshKind::Internal, 17, 51, 0.25, 0.4),
+        ] {
+            let (a, b) = pair(z1, z2, x1, x2);
+            let m = Mesh::new(&a, &b, kind).unwrap();
+            let (rb1, rb2) = m.base_radii();
+            assert_eq!(
+                rb1, a.rb,
+                "gear 1's base radius must be its own, bit for bit"
+            );
+            assert_eq!(rb2, kind.sign() * b.rb, "and gear 2's, up to its sign");
+            // r_b1 + r_b2 = a_w cos(alpha_w) is then exact rather than close.
+            assert!(
+                (rb1 + rb2 - kind.sign() * m.a_w * m.alpha_w.cos()).abs() < 1e-12,
+                "{kind:?} {z1}/{z2}: {} vs {}",
+                rb1 + rb2,
+                kind.sign() * m.a_w * m.alpha_w.cos()
+            );
+        }
     }
 
     #[test]
