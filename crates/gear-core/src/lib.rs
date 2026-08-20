@@ -26,6 +26,7 @@ pub mod mesh;
 pub mod metrology;
 pub mod outline;
 pub mod params;
+pub mod planetary;
 pub mod profile;
 pub mod ring;
 pub mod screw;

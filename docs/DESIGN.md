@@ -50,7 +50,11 @@ cd web && npm run dev             # the application
 
 ## What is next
 
-Milestone 9 (planetary stage) is the open work; §11 has the full list. Nothing is
+Milestone 9 (planetary stage) is the open work; §11 has the full list. The
+layout mathematics of §4.8 is **done** — `planetary.rs` holds the shift solve,
+its closed-form bracket, the ring search and the layout checks, drivable as
+`gear-cli planetary` — as is the shifted internal mesh it needed. What remains
+is radial assembly, the ring's bending model, and the stage itself. Nothing is
 blocked, and most of what it needs exists: internal geometry and its interference
 conditions (§4.11), the ring search's monotonicity and closed-form bracket
 (§4.8), and Pennestrì's efficiency method (§4.5.2). Two things it must supply
@@ -2541,6 +2545,9 @@ something independent.**
 | 4.11 | A shifted ring cut by a cutter at **reference** centres | A shaper cannot be displaced the way a rack can. A rack's pitch line is a machine setting, so shifting it leaves the rolling alone; two pinions have their ratio fixed by their tooth counts, so the pitch point is wherever the centre distance puts it and the rolling circles move with it. The cutter was up to **0.44 mm** out of place at x = 0.5. One factor `a / a_ref` carries all of it, and is exactly 1 at zero shift |
 | 4.11 | **The cut simulation derived the cutter's tooth from the ring's** | So it shared the model's assumption and could not see the fault above: it reported 2.7 µm on a ring whose cutter was 0.44 mm out of place, unchanged from the unshifted case. The §12 trap in its purest form — *a check built from the thing under test measures nothing.* The cutter's tooth now comes from the cutter, and placing it at reference centres makes the gate fail by 13–66× its noise floor |
 | 4.11 | A ring's root radius from `r + m(dedendum + x)` | That is the exact relation linearised. A ring's root is wherever its cutter's tip *reaches*, `a_cut + r_tip`; the two differ by 17 µm at x = 0.25 and 57 µm at x = 0.5, both well above the 3.6 µm the cut simulation resolves. So a ring has **no dedendum input** — it is the cutter's addendum seen from the other side, and having both invites them to disagree. Its root-radius coefficient goes the same way: the fillet round is the cutter's own |
+| 4.8 | `mesh_with` asserted standard centres for an internal pair | Fine as far as it went, but a planetary set needs the shifted case and the two would then have been separate constructions. Now both come from `mesh::operating_geometry`, the same relation the external mesh uses, and a standard pair is its value at zero shift — reached rather than asserted, and equal to `r_ring − r_pinion` to 1e-12 |
+| 4.8 | The planet-shift bracket evaluated **on** the involute domain's boundary | The endpoints are where `inv α_w = 0` exactly, and whether that arithmetic lands on zero or on −1e-17 depends on the tooth counts. On a 24/16 set with four planets the upper endpoint fell a hair outside a domain it was meant to sit on, so `z_ring = 57` was refused although its root is at +0.2485, comfortably inside — **a hole in a run that monotonicity says is contiguous**. Fixed by halving each endpoint toward a point known to be interior, which finds the last representable point in the domain and needs no tolerance: it stops when the answer becomes a number |
+| 4.8 | Contiguity checked on one configuration | The test swept 17/17 only, where the rounding above happens to fall the other way, so it passed while a neighbouring set had a gap. The property is about *all* sets; it is now asserted over eight, and as a **gap is a bug by construction** it needs no knowledge of the answers |
 
 Two process notes worth carrying forward:
 
@@ -2680,6 +2687,12 @@ here. Revision 2 additions are marked ★.
 | ◆ **Classical screw efficiency, derived** | the force balance at Σ = 90° vs. both published closed forms, four worms × five friction coefficients | 1e-14 in both directions |
 | ◆ Screw energy balance | `P_in − P_out` vs. `μ F_n \|v_s\|`, four shaft angles × four friction coefficients | 1e-13 relative — at any shaft angle, not only 90° |
 | ◆ Self-locking threshold | `η_back` at `μ = cos α_n tan γ`, four worms | **exactly zero** (< 1e-15), positive below, negative above |
+| ▣ **The ideal ring needs no planet shift** | `z_r = z_s + 2 z_p`, four sun/planet pairs | exactly 0 to 1e-12, and the common centre distance is the reference one. The sanity check the whole construction has to pass |
+| ▣ Common centre distance | every admissible `z_ring` for 17/17 | residual below 1e-12 mm throughout; **3.6e-15 mm** at the selected `z_r = 52`, in 4 Newton iterations |
+| ▣ `dg/dx_p` analytic vs central differences | four ring counts × five shifts | 6+ digits. The chain rule collapses to `da_w/dΣx = 2 a_w tan α_n / (Σz tan α_w)`, which carries its own sign — the internal mesh's centre distance *falls* as its shift sum rises, from the same expression |
+| ▣ Required planet shift monotone in `z_ring` | swept 40…70, 17/17 | strictly increasing wherever defined — which is what makes the ring search provably complete rather than a sample |
+| ▣ **The admissible run is contiguous, on eight sets** | sun/planet from 9/21 to 40/15, each swept to twice its ideal ring | no gaps, and the ideal ring is in every run. This is the check that found the domain-boundary rounding above; the single-configuration version had passed it |
+| ▣ The worked example of §4.8 | 17/17, three planets | reproduced to 5e-5: −0.6684, −0.4807, 0.0000, +0.2480, +0.6862, admissible set exactly 48…54. Independently re-derived in Python before the Rust existed, and again through `gear-cli planetary` |
 | ▣ **What a shift means on a ring, decided by measurement** | pinion tooth against ring space at the operating circles, at the `a_w` the mesh gives — eight pairs including shifted and thickness-modified, `k₁ = k₂` and `k₁ + k₂ = 2` | zero to 1e-11 mm under the *space* reading at every k; the *tooth* reading is 0.63 mm out at k = 1.2. Equal shifts and equal k each leave the centre distance exactly at its reference value |
 | ▣ **A shifted ring is the shape its cutter leaves** | the cut simulated from the tool alone — cutter's own tooth, operating rolling circles, operating centre distance — two ring sizes × shifts −0.4 … +0.5 | **2.5–2.7 µm**, the simulation's own binning, flat across the whole shift range |
 | ▣ …and the gate can see a misplaced cutter | the same rings with the cutter put back at reference centres, the placement the previous model used | **34–171 µm**, 13–66× the noise floor. The old simulation reported 2.7 µm for these and said nothing, because it derived the cutter the same wrong way the model did |

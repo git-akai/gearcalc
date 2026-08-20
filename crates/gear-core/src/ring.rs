@@ -83,6 +83,15 @@ pub struct Ring {
     pub mt: f64,
     /// Transverse pressure angle, radians.
     pub alpha_t: f64,
+    /// Normal pressure angle, radians. Equal to `alpha_t` for a spur ring.
+    pub alpha_n: f64,
+    /// The thickness shift `x + x_s`, acting on the **space**.
+    ///
+    /// One number rather than the shift and the thickness modification
+    /// separately, because only their sum ever reaches an answer — the same
+    /// reason `Mesh` sums them (§4.1). Positive widens the space and thins the
+    /// tooth; see [`Ring::new`].
+    pub x_thick: f64,
     /// Pitch radius, mm.
     pub r: f64,
     /// Base radius, mm. Smaller than the pitch radius, as ever.
@@ -248,6 +257,8 @@ impl Ring {
             teeth: z,
             mt,
             alpha_t,
+            alpha_n,
+            x_thick,
             r,
             rb,
             ra,
@@ -574,7 +585,8 @@ impl Ring {
 /// two readings, asked at a tip.
 #[derive(Clone, Copy, Debug)]
 pub struct RingMesh {
-    /// Centre distance, mm — `r_ring − r_pinion` for standard gears.
+    /// Zero-backlash centre distance, mm — `r_ring − r_pinion` for a standard
+    /// pair, larger when the ring is shifted further than its pinion.
     pub centre_distance: f64,
     /// Operating pressure angle, radians.
     pub alpha_w: f64,
@@ -596,24 +608,39 @@ pub struct RingMesh {
     pub involute_interference: bool,
 }
 
-/// Mesh a ring with an external pinion at their nominal centre distance.
+/// Mesh a ring with an external pinion at their zero-backlash centre distance.
+///
+/// Shifts on either member are carried, through the same
+/// [`operating_geometry`](crate::mesh::operating_geometry) the external mesh
+/// uses: the pinion is member 1 and the ring member 2, so the sums are
+/// `z_p − z_r` and `x_p − x_r`. A standard pair is the value of that at zero,
+/// where `α_w = α_t` and `a = r_ring − r_pinion` — not a separate case.
+///
+/// **The shifts enter through the space, not the tooth.** A ring's `x_thick`
+/// widens its space, so a ring shifted further than its pinion opens the mesh
+/// out and the pinion sits further from the ring's axis. That is why the sum is
+/// a difference and why it is this way round; see [`Ring::new`].
 ///
 /// # Errors
 ///
 /// `None` if the pair cannot mesh — different modules or pressure angles, a
-/// pinion no smaller than the ring, or a geometry that never reaches contact.
+/// pinion no smaller than the ring, a geometry that never reaches contact, or
+/// shifts that drive the operating pressure angle out of the involute domain.
 #[must_use]
 pub fn mesh_with(ring: &Ring, pinion: &Gear) -> Option<RingMesh> {
     if (ring.mt - pinion.mt).abs() > 1e-9 || (ring.alpha_t - pinion.alpha_t).abs() > 1e-9 {
         return None;
     }
-    let centre_distance = ring.r - pinion.r;
+    if pinion.params.teeth >= ring.teeth {
+        return None;
+    }
+    let sum_z = f64::from(pinion.params.teeth) - f64::from(ring.teeth);
+    let sum_x = (pinion.params.profile_shift + pinion.params.thickness_shift()) - ring.x_thick;
+    let (alpha_w, _, centre_distance) =
+        crate::mesh::operating_geometry(ring.mt, ring.alpha_t, ring.alpha_n, sum_z, sum_x)?;
     if centre_distance.is_nan() || centre_distance <= 0.0 {
         return None;
     }
-    // Standard centres, so the operating angle is the transverse one. A shifted
-    // pair moves this, and that belongs with the planetary stage that needs it.
-    let alpha_w = ring.alpha_t;
     let along = centre_distance * alpha_w.sin();
 
     // The relation, both ways round.
@@ -1176,6 +1203,124 @@ mod tests {
                 "z={ring_teeth}/{pinion_teeth}: {ring_side} − {pinion_side} vs {along}"
             );
         }
+    }
+
+    /// **A shifted internal pair has zero backlash at the centre distance
+    /// `mesh_with` returns**, measured from the two profiles rather than from
+    /// the relation that produced it.
+    ///
+    /// The same law `geometry_laws.rs` checks through `Mesh`, asked here through
+    /// the ring's own mesh — because these are two routes to one relation and a
+    /// disagreement between them would be invisible to either alone.
+    #[test]
+    fn a_shifted_internal_mesh_has_zero_backlash_at_its_own_centre_distance() {
+        for (zr, zp, xr, xp) in [
+            (60u32, 20u32, 0.0, 0.0),
+            (60, 20, 0.3, 0.0),
+            (60, 20, 0.0, 0.3),
+            (60, 20, 0.4, 0.4),
+            (43, 17, -0.2, 0.25),
+            (90, 40, 0.15, -0.1),
+        ] {
+            let g = Ring::new(
+                &GearParams {
+                    teeth: zr,
+                    profile_shift: xr,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            );
+            let p = Gear::new(GearParams {
+                teeth: zp,
+                profile_shift: xp,
+                ..Default::default()
+            });
+            let m = mesh_with(&g, &p).unwrap();
+
+            // Operating circles: the ring's is one centre distance beyond the
+            // pinion's, which is what makes the pair internal.
+            let sz = f64::from(zr) - f64::from(zp);
+            let rp = m.centre_distance * f64::from(zp) / sz;
+            let rr = m.centre_distance * f64::from(zr) / sz;
+            assert!((rr - rp - m.centre_distance).abs() < 1e-12);
+
+            let u = (((rp / p.rb).powi(2) - 1.0).max(0.0)).sqrt();
+            let tooth = 2.0 * rp * (p.psi_b - inv_from_roll(u));
+            let space = g.space_width_at(rr);
+            assert!(
+                (space - tooth).abs() < 1e-10,
+                "z={zr}/{zp} x={xr}/{xp}: backlash {} mm",
+                space - tooth
+            );
+        }
+    }
+
+    /// **A standard pair is the value of the shifted formula at zero, not a
+    /// separate case.**
+    ///
+    /// `mesh_with` used to assert `α_w = α_t` and `a = r_ring − r_pinion`
+    /// outright. Now it reaches both through the involute inversion, so they are
+    /// arrived at — and this is what says the general route did not move them.
+    #[test]
+    fn an_unshifted_internal_pair_still_meshes_at_the_difference_of_its_radii() {
+        for (zr, zp) in [(60u32, 20u32), (43, 17), (90, 40), (51, 17)] {
+            let (g, p) = (ring(zr), pinion(zp));
+            let m = mesh_with(&g, &p).unwrap();
+            assert!(
+                (m.centre_distance - (g.r - p.r)).abs() < 1e-12,
+                "z={zr}/{zp}: {} vs {}",
+                m.centre_distance,
+                g.r - p.r
+            );
+            assert!((m.alpha_w - g.alpha_t).abs() < 1e-12);
+        }
+    }
+
+    /// Shifting the **ring** further than its pinion opens the mesh out: its
+    /// space is wider, so the pinion sits further from the ring's axis.
+    ///
+    /// A direction rather than a number, because the number is not independently
+    /// known — the §12 rule about not predicting a threshold the computation can
+    /// find.
+    #[test]
+    fn shifting_the_ring_moves_the_pinion_outward() {
+        let mut last = f64::NEG_INFINITY;
+        for xr in [-0.3, -0.15, 0.0, 0.15, 0.3, 0.45] {
+            let g = Ring::new(
+                &GearParams {
+                    teeth: 60,
+                    profile_shift: xr,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            );
+            let a = mesh_with(&g, &pinion(20)).unwrap().centre_distance;
+            assert!(
+                a > last,
+                "x_ring={xr}: centre distance must rise, {a} <= {last}"
+            );
+            last = a;
+        }
+        // ...and shifting the pinion by the same amount as the ring puts it
+        // back: only the difference of the two shifts reaches the mesh.
+        let both = Ring::new(
+            &GearParams {
+                teeth: 60,
+                profile_shift: 0.3,
+                ..Default::default()
+            },
+            &Cutter::default(),
+        );
+        let shifted_pinion = Gear::new(GearParams {
+            teeth: 20,
+            profile_shift: 0.3,
+            ..Default::default()
+        });
+        let m = mesh_with(&both, &shifted_pinion).unwrap();
+        assert!(
+            (m.centre_distance - (both.r - shifted_pinion.r)).abs() < 1e-12,
+            "equal shifts must not move the centre distance"
+        );
     }
 
     /// An internal mesh has a **higher** contact ratio than the external pair of

@@ -9,6 +9,9 @@
 //! gear-cli strength [z1] [z2] [torque] [material] [helix]
 //!                             a worked mesh: bending, contact, efficiency
 //! gear-cli train              a two-stage geartrain, end to end
+//! gear-cli planetary [z_sun] [z_planet] [N] [x_sun] [x_ring]
+//!                             the ring counts that can be made to work, and
+//!                             the planet shift each of them needs
 //! ```
 
 mod diagram;
@@ -49,6 +52,13 @@ fn main() {
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.0),
             args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1e-3),
+        ),
+        Some("planetary") => planetary_report(
+            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
+            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(17),
+            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(3),
+            args.get(4).and_then(|s| s.parse().ok()).unwrap_or(0.0),
+            args.get(5).and_then(|s| s.parse().ok()).unwrap_or(0.0),
         ),
         Some("verify") => verify(
             args.get(1)
@@ -1049,5 +1059,96 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
     );
     for note in &r.notes {
         println!("  ! {note}");
+    }
+}
+
+/// The ring tooth counts a sun and planet pair admits, and what each costs in
+/// planet shift.
+///
+/// Prints every candidate rather than picking one, because the choice is a
+/// designer's: the geometric ideal needs no shift but rarely spaces the planets
+/// evenly, and the one that does costs a shift. Both facts are on the same row.
+fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_shift: f64) {
+    use gear_core::planetary::{ring_candidates, shift_bracket, solve, Rack, Set, Teeth};
+
+    let module = 1.0;
+    let set = Set {
+        rack: Rack::new(module, 20.0, 0.0),
+        teeth: Teeth {
+            sun,
+            planet,
+            ring: 0,
+        },
+        planets,
+        sun_shift,
+        ring_shift,
+        // A planet's tip diameter at a standard addendum, which is what the
+        // clearance column is measured against.
+        planet_tip_diameter: module * (f64::from(planet) + 2.0),
+    };
+
+    println!(
+        "planetary  z_sun {sun}  z_planet {planet}  N {planets}  \
+         x_sun {sun_shift}  x_ring {ring_shift}  module {module}  alpha 20 deg"
+    );
+    println!(
+        "ideal ring (needs no planet shift): {}",
+        Teeth::ideal_ring(sun, planet)
+    );
+
+    // Everything the involute domain admits, whatever shift it costs. The range
+    // is deliberately wide: this is the "what is possible" listing.
+    let all = ring_candidates(
+        &set,
+        (f64::NEG_INFINITY, f64::INFINITY),
+        4 * (sun + 2 * planet),
+    );
+    if all.is_empty() {
+        println!("\nno ring tooth count admits a solution for that sun and planet");
+        return;
+    }
+
+    println!(
+        "\n{:>6} {:>10} {:>12} {:>10} {:>9} {:>7} {:>7} {:>11}",
+        "z_ring", "x_planet", "c2c mm", "residual", "a_w sun", "even", "simult", "clearance"
+    );
+    for (ring, l) in &all {
+        let clearance = l
+            .planet_clearance
+            .map_or_else(|| "     n/a".to_string(), |c| format!("{c:8.3}"));
+        println!(
+            "{ring:>6} {:>10.4} {:>12.6} {:>10.1e} {:>9.3} {:>7} {:>7} {clearance:>11}",
+            l.planet_shift,
+            l.centre_distance,
+            l.residual,
+            l.alpha_w_sun.to_degrees(),
+            if l.equal_spacing { "yes" } else { "no" },
+            if l.simultaneous_meshing { "yes" } else { "no" },
+        );
+    }
+
+    // The bracket is why the list stops where it does, so say so with numbers.
+    let widest = all.last().map(|(z, _)| *z).unwrap_or(0);
+    let beyond = Set {
+        teeth: Teeth {
+            ring: widest + 1,
+            ..set.teeth
+        },
+        ..set
+    };
+    print!("\nwhy it stops: z_ring {} ", widest + 1);
+    match shift_bracket(&beyond) {
+        None => println!("has no admissible planet shift at all"),
+        Some((lo, hi)) => {
+            let inside = solve(&beyond).is_some();
+            println!(
+                "admits x_planet in [{lo:.4}, {hi:.4}] but {}",
+                if inside {
+                    "was excluded by the sweep limit"
+                } else {
+                    "no shift in it equalises the two centre distances"
+                }
+            );
+        }
     }
 }
