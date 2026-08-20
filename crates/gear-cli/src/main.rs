@@ -294,7 +294,7 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
         eprintln!("z={z1}/{z2} cannot mesh");
         return;
     };
-    let Some(path) = ContactPath::new(&g1, &g2, &mesh) else {
+    let Some(path) = ContactPath::new(&g1, g2.ra, &mesh) else {
         eprintln!("z={z1}/{z2} has no usable path of contact");
         return;
     };
@@ -359,7 +359,7 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
         (
             2,
             &g2,
-            reversed.and_then(|m| ContactPath::new(&g2, &g1, &m)),
+            reversed.and_then(|m| ContactPath::new(&g2, g1.ra, &m)),
         ),
     ] {
         let Some(p) = p else {
@@ -836,7 +836,7 @@ fn loadcase_report() {
             println!("{name}: mesh failed");
             continue;
         };
-        let Some(path) = ContactPath::new(&g1, &g2, &m) else {
+        let Some(path) = ContactPath::new(&g1, g2.ra, &m) else {
             println!("{name}: path failed");
             continue;
         };

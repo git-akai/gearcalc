@@ -10,7 +10,7 @@
 //! Positions along the line of action are measured as `ξ` from the **pitch
 //! point**, positive toward gear 1's tip.
 
-use crate::mesh::{Mesh, MeshKind};
+use crate::mesh::Mesh;
 use crate::profile::Gear;
 
 /// The path of contact for a meshing pair.
@@ -37,24 +37,54 @@ impl ContactPath {
     /// Build the contact path for a pair meshing at their zero-backlash centre
     /// distance.
     ///
-    /// Returns `None` for an internal mesh, which is not yet covered.
+    /// `tip_radius_2` is gear 2's tip radius. It is passed rather than read off a
+    /// [`Gear`] because gear 2 may be a **ring**, whose tip radius is *inside*
+    /// its pitch circle and comes from [`crate::ring::Ring`] — the one thing this
+    /// ever needed from gear 2, and the thing a `Gear` cannot supply for a ring.
+    ///
+    /// # One path, both kinds
+    ///
+    /// Each member's contact limit is its tip's distance from its own base
+    /// tangent point, measured against the pitch point's:
+    ///
+    /// ```text
+    /// recess   = T(r_a1, r_b1) − r′₁ sin α_w
+    /// approach = T(r_a2, r_b2) − r′₂ sin α_w        T(r_a, r_b) = sgn(r_b) √(r_a² − r_b²)
+    /// ```
+    ///
+    /// With gear 2's base and operating radii **signed** — negative for a ring,
+    /// per [`MeshKind::sign`](crate::mesh::MeshKind::sign) — that one pair of
+    /// expressions gives both kinds. The tangent length takes the sign of its own
+    /// base radius, which is what makes it work: a ring's geometry runs the other
+    /// way along the line of action, so its tip sits at a *smaller* tangent length
+    /// than the pitch point rather than a larger one, and the approach comes out
+    /// `|r′₂| sin α_w − T₂`.
+    ///
+    /// The sum is the classical path length either way — `T₁ + T₂ − a sin α_w`
+    /// external, `T₁ − T₂ + a sin α_w` internal — and it agrees with
+    /// [`crate::ring::mesh_with`]'s independently written form.
+    ///
+    /// Returns `None` when either end of the path is not reached, which is a mesh
+    /// whose teeth never touch.
     #[must_use]
-    pub fn new(g1: &Gear, g2: &Gear, mesh: &Mesh) -> Option<Self> {
-        if mesh.kind != MeshKind::External {
-            return None;
-        }
-        let sz = f64::from(mesh.z1) + f64::from(mesh.z2);
-        let r1 = mesh.a_w * f64::from(mesh.z1) / sz;
-        let r2 = mesh.a_w * f64::from(mesh.z2) / sz;
+    pub fn new(g1: &Gear, tip_radius_2: f64, mesh: &Mesh) -> Option<Self> {
+        let (r1, r2) = mesh.operating_radii();
+        let (rb1, rb2) = mesh.base_radii();
+        // The tangent length carries the sign of its base radius, so a ring's
+        // runs the other way. `r_b1` is always positive, so gear 1 is unaffected.
+        let tangent = |ra: f64, rb: f64| rb.signum() * (ra * ra - rb * rb).max(0.0).sqrt();
 
         // Each length is measured from the PITCH POINT, so each subtracts the
         // distance from its own gear's base tangent point to the pitch point —
-        // r' sin α_w, not the whole tangent length a_w sin α_w. Only their sum
-        // uses a_w, since r'_1 + r'_2 = a_w, which is why the familiar
+        // r′ sin α_w, not the whole tangent length a_w sin α_w. Only their sum
+        // uses a_w, since r′₁ + r′₂ = a_w, which is why the familiar
         // contact-ratio formula has a_w in it and this does not.
-        let recess = (g1.ra.powi(2) - g1.rb.powi(2)).sqrt() - r1 * mesh.alpha_w.sin();
-        let approach = (g2.ra.powi(2) - g2.rb.powi(2)).sqrt() - r2 * mesh.alpha_w.sin();
-        if recess <= 0.0 || approach <= 0.0 {
+        let sin_aw = mesh.alpha_w.sin();
+        let recess = tangent(g1.ra, rb1) - r1 * sin_aw;
+        let approach = tangent(tip_radius_2, rb2) - r2 * sin_aw;
+        // Both ends must be reached, and NaN is not a reach: `<= 0.0` is false
+        // for it, so finiteness is asked for rather than assumed.
+        if !recess.is_finite() || !approach.is_finite() || recess <= 0.0 || approach <= 0.0 {
             return None;
         }
         let base_pitch = std::f64::consts::PI * g1.mt * g1.alpha_t.cos();
@@ -435,10 +465,6 @@ pub fn sliding_at(path: &ContactPath, mesh: &Mesh, g1: &Gear, xi: f64, speed_1: 
     // Signed about a shared axis: an external pair turns opposite ways, a ring
     // the same way as its pinion. Gear 2's signed tooth count already says
     // which, so the reversal is arithmetic rather than a case.
-    //
-    // The frame below still places gear 2 as an external mate. That is not yet
-    // exercised — [`ContactPath::new`] admits no internal mesh — and making it
-    // general belongs with the internal contact path, where it can be tested.
     let speed_2 = -speed_1 * f64::from(mesh.z1) / mesh.signed_z2();
 
     let beta_b = crate::metrology::base_helix_angle(g1);
@@ -452,7 +478,15 @@ pub fn sliding_at(path: &ContactPath, mesh: &Mesh, g1: &Gear, xi: f64, speed_1: 
         [0.0, 0.0, 1.0],
         speed_1,
         speed_2,
-        [mesh.a_w, 0.0, 0.0],
+        // Gear 2's centre, from the signed operating radii: the pitch point
+        // stays at `+r′₁` and the sum `r′₁ + r′₂` puts the other axis where it
+        // belongs — `+a_w` for an external mate, `−a_w` for a ring, which
+        // encloses the pinion rather than sitting beside it. One expression, and
+        // it is the same signed convention `MeshKind::sign` sets up.
+        {
+            let (r1, r2) = mesh.operating_radii();
+            [r1 + r2, 0.0, 0.0]
+        },
         point,
         contact_line,
     )
@@ -546,6 +580,118 @@ mod tests {
         (a, b, m)
     }
 
+    /// A pinion inside a ring, with the ring's real tip radius.
+    ///
+    /// Internal pairs share the same helix hand, and the tip radius has to come
+    /// from [`crate::ring::Ring`] — a `Gear` of the same tooth count would put it
+    /// on the wrong side of the pitch circle.
+    fn internal_pair(zp: u32, zr: u32, beta: f64) -> (Gear, Gear, Mesh, ContactPath) {
+        let params = |teeth: u32| GearParams {
+            teeth,
+            helix_angle: beta,
+            ..Default::default()
+        };
+        let pinion = Gear::new(params(zp));
+        let wheel = Gear::new(params(zr));
+        let ring = crate::ring::Ring::new(&params(zr), &crate::ring::Cutter::default());
+        let m = Mesh::new(&pinion, &wheel, MeshKind::Internal).unwrap();
+        let path = ContactPath::new(&pinion, ring.ra, &m).unwrap();
+        (pinion, wheel, m, path)
+    }
+
+    /// **An internal mesh rolls without sliding at its pitch point too.**
+    ///
+    /// Pure rolling at the pitch point is a property of any conjugate pair, so
+    /// this is the cheapest check that the signed frame places the ring's axis
+    /// where it belongs. Get the sign wrong and the ring's centre lands beside
+    /// the pinion instead of enclosing it, and the two surface velocities stop
+    /// matching.
+    #[test]
+    fn an_internal_mesh_does_not_slide_at_its_pitch_point() {
+        for (zp, zr) in [(17u32, 51u32), (20, 60), (13, 43)] {
+            for beta in [0.0, 15.0, 30.0] {
+                let (a, _, m, path) = internal_pair(zp, zr, beta);
+                let s = sliding_at(&path, &m, &a, 0.0, 100.0);
+                let pitch_line = 100.0 * path.operating_radius_1;
+                assert!(
+                    s.magnitude() < 1e-12 * pitch_line,
+                    "z={zp}/{zr} beta={beta}: sliding {} at the pitch point",
+                    s.magnitude()
+                );
+            }
+        }
+    }
+
+    /// **...and it slides across its teeth, never along them.**
+    ///
+    /// Both bodies still turn about parallel axes, so both surface velocities are
+    /// `ω ẑ × r` and their difference has no axial part — whatever side the
+    /// material is on. The internal case of the measurement that corrected §4.5
+    /// and §4.7.
+    #[test]
+    fn an_internal_mesh_slides_across_its_teeth_and_never_along_them() {
+        for (zp, zr) in [(17u32, 51u32), (20, 60)] {
+            for beta in [0.0, 8.0, 20.0, 35.0] {
+                let (a, _, m, path) = internal_pair(zp, zr, beta);
+                let pitch_line = 100.0 * path.operating_radius_1;
+                for k in 0..11 {
+                    #[allow(clippy::cast_precision_loss)]
+                    let t = k as f64 / 10.0;
+                    let xi = -path.approach + (path.approach + path.recess) * t;
+                    let s = sliding_at(&path, &m, &a, xi, 100.0);
+                    assert!(
+                        s.lengthwise.abs() < 1e-12 * pitch_line,
+                        "z={zp}/{zr} beta={beta} xi={xi}: {} along the tooth",
+                        s.lengthwise
+                    );
+                }
+            }
+        }
+    }
+
+    /// **The efficiency closed form holds for an internal mesh**, against the
+    /// same numerical average that pinned the external one.
+    ///
+    /// The only thing that changes is that gear 2's base radius is negative, so
+    /// `1/r_b1 + 1/r_b2` *is* the difference an internal pair needs. That the
+    /// numeric side is written with the signed radius rather than a subtraction
+    /// is the point: if the sign convention were wrong, this would disagree.
+    #[test]
+    fn internal_efficiency_matches_a_numerical_average_of_the_instantaneous_loss() {
+        for (zp, zr) in [(17u32, 51u32), (20, 60), (13, 43)] {
+            for beta in [0.0, 12.0, 25.0] {
+                let (a, _, m, path) = internal_pair(zp, zr, beta);
+                let mu = 0.06;
+                let (rb1, rb2) = m.base_radii();
+
+                const N: usize = 200_000;
+                let span = path.approach + path.recess;
+                let mut sum = 0.0;
+                for i in 0..N {
+                    #[allow(clippy::cast_precision_loss)]
+                    let t = (i as f64 + 0.5) / N as f64;
+                    sum += (-path.approach + span * t).abs();
+                }
+                #[allow(clippy::cast_precision_loss)]
+                let mean_abs_xi = sum / N as f64;
+                let cos_bb = crate::metrology::base_helix_angle(&a).cos();
+                let numeric = 1.0 - mu * mean_abs_xi * (1.0 / rb1 + 1.0 / rb2) / cos_bb;
+
+                let closed = efficiency(&path, &m, &a, mu, Drive::Forward);
+                assert!(
+                    (closed - numeric).abs() < 1e-9,
+                    "z={zp}/{zr} beta={beta}: closed {closed} vs numeric {numeric}"
+                );
+                // An internal mesh loses less than the external pair of the same
+                // teeth, because the reciprocals subtract rather than add.
+                assert!(
+                    closed > 0.9 && closed < 1.0,
+                    "{closed} is not a plausible efficiency"
+                );
+            }
+        }
+    }
+
     /// A parallel-axis mesh rolls without sliding at its pitch point — spur and
     /// helical alike. Anything else means the two speeds were not the meshing
     /// pair they claim to be.
@@ -554,7 +700,7 @@ mod tests {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25)] {
             for beta in [0.0, 15.0, 30.0] {
                 let (a, b, m) = helical_pair(z1, z2, beta);
-                let path = ContactPath::new(&a, &b, &m).unwrap();
+                let path = ContactPath::new(&a, b.ra, &m).unwrap();
                 let s = sliding_at(&path, &m, &a, 0.0, 100.0);
                 let reference = 100.0 * path.operating_radius_1;
                 assert!(
@@ -580,7 +726,7 @@ mod tests {
         for (z1, z2) in [(17u32, 43u32), (19, 31)] {
             for beta in [0.0, 8.0, 20.0, 35.0] {
                 let (a, b, m) = helical_pair(z1, z2, beta);
-                let path = ContactPath::new(&a, &b, &m).unwrap();
+                let path = ContactPath::new(&a, b.ra, &m).unwrap();
                 for step in 0..=10 {
                     #[allow(clippy::cast_precision_loss)]
                     let t = step as f64 / 10.0;
@@ -609,7 +755,7 @@ mod tests {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25)] {
             for beta in [0.0, 12.0, 25.0] {
                 let (a, b, m) = helical_pair(z1, z2, beta);
-                let path = ContactPath::new(&a, &b, &m).unwrap();
+                let path = ContactPath::new(&a, b.ra, &m).unwrap();
                 let omega_1 = 100.0;
                 let omega_2 = omega_1 * f64::from(z1) / f64::from(z2);
                 for step in 0..=8 {
@@ -679,7 +825,7 @@ mod tests {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (19, 31)] {
             for beta in [0.0, 12.0, 25.0] {
                 let (a, b, m) = helical_pair(z1, z2, beta);
-                let path = ContactPath::new(&a, &b, &m).unwrap();
+                let path = ContactPath::new(&a, b.ra, &m).unwrap();
                 let mu = 0.06;
                 let omega_1 = 100.0;
 
@@ -718,7 +864,7 @@ mod tests {
     fn approach_and_recess_sum_to_the_standard_length_of_action() {
         for (z1, z2) in [(17u32, 17u32), (17, 43), (13, 60), (25, 25)] {
             let (a, b, m) = pair(z1, z2);
-            let path = ContactPath::new(&a, &b, &m).unwrap();
+            let path = ContactPath::new(&a, b.ra, &m).unwrap();
             let standard = (a.ra.powi(2) - a.rb.powi(2)).sqrt()
                 + (b.ra.powi(2) - b.rb.powi(2)).sqrt()
                 - m.a_w * m.alpha_w.sin();
@@ -735,7 +881,7 @@ mod tests {
     fn contact_ratio_is_in_the_usual_range_for_spur_gears() {
         for (z1, z2) in [(17u32, 17u32), (17, 43), (25, 25), (13, 60)] {
             let (a, b, m) = pair(z1, z2);
-            let path = ContactPath::new(&a, &b, &m).unwrap();
+            let path = ContactPath::new(&a, b.ra, &m).unwrap();
             assert!(
                 path.contact_ratio > 1.0 && path.contact_ratio < 2.0,
                 "z={z1}/{z2}: contact ratio {} outside (1, 2)",
@@ -748,7 +894,7 @@ mod tests {
     fn hpstc_lies_between_the_pitch_point_and_the_tip() {
         for (z1, z2) in [(17u32, 17u32), (17, 43), (25, 60)] {
             let (a, b, m) = pair(z1, z2);
-            let path = ContactPath::new(&a, &b, &m).unwrap();
+            let path = ContactPath::new(&a, b.ra, &m).unwrap();
             let h = path.highest_single_pair();
             assert!(h > 0.0, "HPSTC should be on the recess side, got {h}");
             assert!(h < path.tip(), "HPSTC must be inside the tip");
@@ -760,7 +906,7 @@ mod tests {
     #[test]
     fn load_fraction_is_one_in_the_single_pair_zone_and_ramps_outside() {
         let (a, b, m) = pair(17, 43);
-        let path = ContactPath::new(&a, &b, &m).unwrap();
+        let path = ContactPath::new(&a, b.ra, &m).unwrap();
         assert!((path.load_fraction(0.0, LoadSharing::LinearRamp) - 1.0).abs() < 1e-12);
         assert!((path.load_fraction(0.0, LoadSharing::None) - 1.0).abs() < 1e-12);
         // at the very ends of contact the tooth carries the least
@@ -798,7 +944,7 @@ mod tests {
                     ..Default::default()
                 });
                 let m = Mesh::new(&a, &b, MeshKind::External).unwrap();
-                let path = ContactPath::new(&a, &b, &m).unwrap();
+                let path = ContactPath::new(&a, b.ra, &m).unwrap();
                 let mu = 0.06;
 
                 // Instantaneous fractional loss is mu|xi|(1/rb1 + 1/rb2)/cos(beta_b);
@@ -831,7 +977,7 @@ mod tests {
     #[test]
     fn the_helical_efficiency_formula_reduces_exactly_at_zero_helix() {
         let (a, b, m) = pair(17, 43);
-        let path = ContactPath::new(&a, &b, &m).unwrap();
+        let path = ContactPath::new(&a, b.ra, &m).unwrap();
         assert!((crate::metrology::base_helix_angle(&a).cos() - 1.0).abs() < f64::EPSILON);
 
         // The loss carries the 1/cos(beta_b), so at a fixed transverse geometry
@@ -859,7 +1005,7 @@ mod tests {
     #[test]
     fn efficiency_is_unity_without_friction_and_falls_linearly_with_it() {
         let (a, b, m) = pair(17, 43);
-        let path = ContactPath::new(&a, &b, &m).unwrap();
+        let path = ContactPath::new(&a, b.ra, &m).unwrap();
         assert!((efficiency(&path, &m, &a, 0.0, Drive::Forward) - 1.0).abs() < 1e-15);
 
         let l1 = 1.0 - efficiency(&path, &m, &a, 0.05, Drive::Forward);
@@ -889,7 +1035,7 @@ mod tests {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25), (19, 31)] {
             for beta in [0.0, 15.0, 30.0] {
                 let (a, b, m) = helical_pair(z1, z2, beta);
-                let path = ContactPath::new(&a, &b, &m).unwrap();
+                let path = ContactPath::new(&a, b.ra, &m).unwrap();
                 let both = Directional::of(|d| efficiency(&path, &m, &a, 0.07, d));
                 assert_eq!(
                     both.forward, both.backward,
@@ -907,7 +1053,7 @@ mod tests {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25)] {
             let (a, b, m) = pair(z1, z2);
             let forward = efficiency(
-                &ContactPath::new(&a, &b, &m).unwrap(),
+                &ContactPath::new(&a, b.ra, &m).unwrap(),
                 &m,
                 &a,
                 0.07,
@@ -915,7 +1061,7 @@ mod tests {
             );
             let m_rev = Mesh::new(&b, &a, MeshKind::External).unwrap();
             let relabelled = efficiency(
-                &ContactPath::new(&b, &a, &m_rev).unwrap(),
+                &ContactPath::new(&b, a.ra, &m_rev).unwrap(),
                 &m_rev,
                 &b,
                 0.07,
@@ -932,7 +1078,7 @@ mod tests {
     #[test]
     fn sharing_never_raises_the_load() {
         let (a, b, m) = pair(19, 31);
-        let path = ContactPath::new(&a, &b, &m).unwrap();
+        let path = ContactPath::new(&a, b.ra, &m).unwrap();
         for i in 0..=200 {
             #[allow(clippy::cast_precision_loss)]
             let t = i as f64 / 200.0;

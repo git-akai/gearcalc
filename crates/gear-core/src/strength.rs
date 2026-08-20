@@ -1469,7 +1469,7 @@ mod tests {
     #[test]
     fn minimum_face_width_is_independent_of_the_face_width_used() {
         let (g1, g2, mesh) = pair(19, 31);
-        let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+        let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
         let sec = root_section(&g1, path.roll_at(path.highest_single_pair())).unwrap();
 
         let (mut bend, mut cont) = (Vec::new(), Vec::new());
@@ -1503,7 +1503,7 @@ mod tests {
     #[test]
     fn contact_stress_matches_the_half_width_route() {
         let (g1, g2, mesh) = pair(17, 43);
-        let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+        let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
         let load = Load::new(2.0, 8.0);
         let e_star = 113_000.0;
         let cs = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, e_star).unwrap();
@@ -1543,7 +1543,7 @@ mod tests {
                     ..Default::default()
                 });
                 let mesh = Mesh::new(&g1, &g2, MeshKind::External).unwrap();
-                let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+                let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
                 let load = Load::new(2.0, 10.0);
                 let e_star = 113_000.0;
                 let cs = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, e_star).unwrap();
@@ -1577,7 +1577,7 @@ mod tests {
     #[test]
     fn stress_rises_monotonically_with_lengthwise_curvature_and_returns_to_the_line() {
         let (g1, g2, mesh) = pair(17, 43);
-        let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+        let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
         let load = Load::new(2.0, 10.0);
         let e_star = 113_000.0;
 
@@ -1626,7 +1626,7 @@ mod tests {
     #[test]
     fn the_two_local_radii_sum_to_the_line_of_action() {
         let (g1, g2, mesh) = pair(17, 43);
-        let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+        let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
         let sz = f64::from(mesh.z1) + f64::from(mesh.z2);
         let rb2 = mesh.a_w * f64::from(mesh.z2) / sz * mesh.alpha_w.cos();
         let want = mesh.a_w * mesh.alpha_w.sin();
@@ -1799,7 +1799,7 @@ mod tests {
                 ..Default::default()
             });
             let mesh = Mesh::new(&g1, &g2, MeshKind::External).unwrap();
-            let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+            let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
             let cs = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 113_000.0).unwrap();
 
             // The transverse geometry itself changes with beta (m_t grows), so
@@ -1831,10 +1831,10 @@ mod tests {
     fn contact_stress_does_not_depend_on_which_gear_is_called_first() {
         for (za, zb) in [(17u32, 43u32), (13, 60), (25, 25), (43, 17), (60, 13)] {
             let (g1, g2, mesh) = pair(za, zb);
-            let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+            let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
 
             let m_rev = Mesh::new(&g2, &g1, MeshKind::External).unwrap();
-            let path_rev = ContactPath::new(&g2, &g1, &m_rev).unwrap();
+            let path_rev = ContactPath::new(&g2, g1.ra, &m_rev).unwrap();
 
             // Same physical mesh and same transmitted power, so the same load
             // along the line of action.
@@ -1868,7 +1868,7 @@ mod tests {
     #[test]
     fn contact_stress_is_worst_off_the_pitch_point_and_softens_with_a_softer_pair() {
         let (g1, g2, mesh) = pair(17, 43);
-        let path = ContactPath::new(&g1, &g2, &mesh).unwrap();
+        let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
         let load = Load::new(2.0, 8.0);
 
         let steel = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 113_000.0).unwrap();

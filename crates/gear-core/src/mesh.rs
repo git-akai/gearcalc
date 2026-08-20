@@ -58,10 +58,10 @@ impl MeshKind {
     /// `ρ₂ = r_b2 tan α_w − ξ` where it needs `+ ξ`. Together they were wrong by
     /// **50 % at the pitch point** of a 17/51 pair and by enough to return a
     /// *negative* relative curvature on a 25/41 — reported as "no contact" for
-    /// an ordinary internal mesh. Neither was reachable, because
-    /// [`ContactPath::new`](crate::contact::ContactPath::new) admitted no
-    /// internal mesh; both would have gone live the moment it did.
-    /// See `docs/DESIGN.md` §12.
+    /// an ordinary internal mesh. Neither was reachable at the time, because
+    /// [`ContactPath::new`](crate::contact::ContactPath::new) then admitted no
+    /// internal mesh; both would have gone live the moment it did, which it now
+    /// has. See `docs/DESIGN.md` §12.
     #[must_use]
     pub const fn sign(self) -> f64 {
         match self {

@@ -30,13 +30,18 @@
 //! space must come to the circular pitch at *every* radius, not only at the
 //! pitch circle where it was set.
 //!
-//! # What is not here yet
+//! # What is not here
 //!
-//! The fillet. It is swept by a pinion cutter and [`crate::shaper`] has the
-//! curve, but placing it needs the cutter's own tooth geometry to say where its
-//! tip corner sits — and that phase is what ties the fillet to the flank. Until
-//! it is derived rather than guessed, this module offers the flank and the radii
-//! and stops there.
+//! **Radial assembly** — whether a pinion can be brought in sideways past the
+//! ring's teeth. It is a swept-motion question rather than a comparison of tip
+//! circles, and §4.11 records what happened to the attempt that treated it as
+//! one. It belongs with the planetary set that actually asks.
+//!
+//! **A bending rating.** A ring's tooth widens outward and its fillet is
+//! shaper-cut, so neither the critical section nor the notch input is the one
+//! [`crate::strength`] measures on an external tooth. NASA TM-107012's inscribed
+//! parabola is the model, and it needs the cutter placed exactly — which is what
+//! the shifted cut above now provides.
 
 use crate::involute::{inv, inv_from_roll};
 use crate::mesh::{operating_geometry, MeshKind};
@@ -1205,6 +1210,106 @@ mod tests {
         }
     }
 
+    /// **The general contact path and the ring's own agree** — two routes to one
+    /// number, written independently.
+    ///
+    /// `mesh_with` computes the path length directly as `T₁ − T₂ + a sin α_w`.
+    /// [`crate::contact::ContactPath`] reaches it as `approach + recess` from
+    /// **signed** radii, using the same expressions it uses for an external pair.
+    /// Neither knows about the other, so agreement says the sign convention
+    /// reproduces the internal geometry rather than merely being self-consistent.
+    #[test]
+    fn the_general_contact_path_agrees_with_the_rings_own() {
+        for (zr, zp, xr, xp) in [
+            (60u32, 20u32, 0.0, 0.0),
+            (43, 17, 0.0, 0.0),
+            (90, 40, 0.0, 0.0),
+            (60, 20, 0.3, 0.0),
+            (60, 20, 0.0, 0.25),
+            (43, 17, -0.2, 0.15),
+        ] {
+            let p = |teeth: u32, x: f64| GearParams {
+                teeth,
+                profile_shift: x,
+                ..Default::default()
+            };
+            let g = Ring::new(&p(zr, xr), &Cutter::default());
+            let pin = Gear::new(p(zp, xp));
+            let mesh =
+                crate::mesh::Mesh::new(&pin, &Gear::new(p(zr, xr)), MeshKind::Internal).unwrap();
+            let path = crate::contact::ContactPath::new(&pin, g.ra, &mesh).unwrap();
+            let own = mesh_with(&g, &pin).unwrap();
+
+            assert!(
+                (path.alpha_w - own.alpha_w).abs() < 1e-12,
+                "z={zr}/{zp} x={xr}/{xp}: alpha_w {} vs {}",
+                path.alpha_w,
+                own.alpha_w
+            );
+            assert!(
+                (path.contact_ratio - own.contact_ratio).abs() < 1e-12,
+                "z={zr}/{zp} x={xr}/{xp}: contact ratio {} vs {}",
+                path.contact_ratio,
+                own.contact_ratio
+            );
+            // Both ends of the path are real, and the ring's tip is the shallow
+            // end — its approach comes from the pitch point *inward*.
+            assert!(path.approach > 0.0 && path.recess > 0.0);
+        }
+    }
+
+    /// **An internal mesh presses more gently than the external pair of the same
+    /// teeth**, and this is the first thing to ask `contact_stress` for an
+    /// internal path at all.
+    ///
+    /// Convex against concave gives a larger relative radius of curvature, so
+    /// less Hertzian pressure at the same load — one of the reasons a planetary
+    /// stage carries what it does. A law rather than a number, and the cheapest
+    /// check that the whole signed route reaches a stress instead of a NaN.
+    #[test]
+    fn an_internal_mesh_presses_more_gently_than_its_external_twin() {
+        use crate::contact::ContactPath;
+        use crate::mesh::Mesh;
+        use crate::strength::{contact_stress, Load, PARALLEL_AXES};
+
+        for (zr, zp) in [(60u32, 20u32), (43, 17), (90, 40)] {
+            let p = |teeth: u32| GearParams {
+                teeth,
+                ..Default::default()
+            };
+            let pin = Gear::new(p(zp));
+            let wheel = Gear::new(p(zr));
+            let g = Ring::new(&p(zr), &Cutter::default());
+            let load = Load::new(2.0, 10.0);
+            let e_star = 113_000.0;
+
+            let internal = {
+                let m = Mesh::new(&pin, &wheel, MeshKind::Internal).unwrap();
+                let path = ContactPath::new(&pin, g.ra, &m).unwrap();
+                contact_stress(&path, &m, &pin, PARALLEL_AXES, &load, e_star).unwrap()
+            };
+            let external = {
+                let m = Mesh::new(&pin, &wheel, MeshKind::External).unwrap();
+                let path = ContactPath::new(&pin, wheel.ra, &m).unwrap();
+                contact_stress(&path, &m, &pin, PARALLEL_AXES, &load, e_star).unwrap()
+            };
+
+            assert!(
+                internal.worst > 0.0 && internal.worst.is_finite(),
+                "z={zr}/{zp}: internal stress is {}",
+                internal.worst
+            );
+            assert!(
+                internal.worst < external.worst,
+                "z={zr}/{zp}: internal {} should be below external {}",
+                internal.worst,
+                external.worst
+            );
+            // ...and the relative radius is the reason, not the load.
+            assert!(internal.relative_radius > external.relative_radius);
+        }
+    }
+
     /// **A shifted internal pair has zero backlash at the centre distance
     /// `mesh_with` returns**, measured from the two profiles rather than from
     /// the relation that produced it.
@@ -1336,7 +1441,7 @@ mod tests {
             let a = pinion(pinion_teeth);
             let b = pinion(ring_teeth);
             let m = crate::mesh::Mesh::new(&a, &b, crate::mesh::MeshKind::External).unwrap();
-            let external = crate::contact::ContactPath::new(&a, &b, &m)
+            let external = crate::contact::ContactPath::new(&a, b.ra, &m)
                 .unwrap()
                 .contact_ratio;
 

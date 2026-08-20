@@ -185,7 +185,7 @@ pub fn solve_stage(
     let p = [stage.params(0), stage.params(1)];
     let g = [Gear::new(p[0]), Gear::new(p[1])];
     let mesh = Mesh::new(&g[0], &g[1], MeshKind::External).map_err(TrainError::Mesh)?;
-    let path = ContactPath::new(&g[0], &g[1], &mesh).ok_or(TrainError::NoContact)?;
+    let path = ContactPath::new(&g[0], g[1].ra, &mesh).ok_or(TrainError::NoContact)?;
 
     // Owned rather than borrowed, because a gear's own overrides may replace
     // properties of the library entry and the result is a different material.
