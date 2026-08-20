@@ -249,6 +249,67 @@ impl ShaperCut {
         (f64::hypot(fx, fy), fx.atan2(fy) - rotation)
     }
 
+    /// The fillet point **and its tangent**, in Cartesian workpiece coordinates.
+    ///
+    /// `(x, y)` with the tooth centred on `+y`, the same frame
+    /// [`crate::strength`] inscribes its parabola in, and the tangent is the
+    /// derivative with respect to travel `s` — not normalised, since only its
+    /// direction is used.
+    ///
+    /// # Analytic, deliberately
+    ///
+    /// A difference quotient would do for the *curvature* — which feeds an
+    /// empirical notch factor — but not for the tangent, which the critical
+    /// section is located by. So this differentiates the construction rather
+    /// than sampling it, and it comes out as the same rotating-frame pattern
+    /// [`crate::profile::Gear`]'s rack fillet uses:
+    ///
+    /// ```text
+    /// X = u cos φ − v sin φ        X′ = u′ cos φ − v′ sin φ − φ′ Y
+    /// Y = v cos φ + u sin φ        Y′ = u′ sin φ + v′ cos φ + φ′ X
+    /// ```
+    ///
+    /// with `(u, v)` the fillet point in the *fixed* frame and `φ` the
+    /// workpiece's own rotation. That the rack and the shaper share the pattern
+    /// is not a coincidence: both are a curve carried round by a rolling frame,
+    /// and only the curve differs — a corner going round a circle here, along a
+    /// line there.
+    #[must_use]
+    pub fn trochoid_point_and_tangent(&self, s: f64) -> ([f64; 2], [f64; 2]) {
+        let r = self.workpiece_operating_radius;
+        let sigma = self.sigma();
+        let rc = self.corner_radius;
+
+        // The corner centre and its velocity. `φ_c = s / r′_c`, so the cutter
+        // turns `1/r′_c` per unit travel.
+        let phi_c = s / self.cutter_operating_radius;
+        let (sin_c, cos_c) = phi_c.sin_cos();
+        let w = 1.0 / self.cutter_operating_radius;
+        let (cx, cy) = (rc * sin_c, self.centre_distance - sigma * rc * cos_c);
+        let (dcx, dcy) = (rc * w * cos_c, sigma * rc * w * sin_c);
+
+        // From the pitch point to the corner centre, then a further ρ along it.
+        let (dx, dy) = (cx, cy - r);
+        let d = f64::hypot(dx, dy);
+        let dd = (dx * dcx + dy * dcy) / d;
+        let k = 1.0 + self.tip_round / d;
+        let dk = -self.tip_round * dd / (d * d);
+
+        let (u, v) = (k * dx, r + k * dy);
+        let (du, dv) = (dk * dx + k * dcx, dk * dy + k * dcy);
+
+        // ...and into the workpiece frame, which has turned `(s − phase)/r`.
+        let phi = (s - self.phase) / r;
+        let dphi = 1.0 / r;
+        let (c, sn) = (phi.cos(), phi.sin());
+
+        let x = u * c - v * sn;
+        let y = v * c + u * sn;
+        let dxx = du * c - dv * sn - dphi * y;
+        let dyy = du * sn + dv * c + dphi * x;
+        ([x, y], [dxx, dyy])
+    }
+
     /// Where the cutter's tip-round centre sits, as an angle from the cutter's
     /// own tooth centreline.
     ///
@@ -372,6 +433,115 @@ impl ShaperCut {
 mod tests {
     use super::*;
     use crate::GearParams;
+
+    /// **The analytic tangent against a difference quotient.**
+    ///
+    /// The critical section is *located* by this tangent, so it has to be
+    /// differentiated rather than sampled — and a construction that claims to be
+    /// analytic should be checked against the thing it replaces.
+    #[test]
+    fn the_trochoid_tangent_matches_a_finite_difference() {
+        for kind in [MeshKind::External, MeshKind::Internal] {
+            for cutter_teeth in [15u32, 20, 40] {
+                let g = Gear::new(GearParams {
+                    teeth: 43,
+                    root_radius: 0.2,
+                    ..Default::default()
+                });
+                let Some(cut) = ShaperCut::equivalent_to_rack(&g, cutter_teeth, kind) else {
+                    continue;
+                };
+                let mut worst = 0.0_f64;
+                for i in 0..=20 {
+                    #[allow(clippy::cast_precision_loss)]
+                    let s = -0.6 + 1.2 * (i as f64 / 20.0);
+                    // Balanced, not guessed: a central difference's error is
+                    // truncation `~h²` plus cancellation `~ε|f|/h`, minimised
+                    // near `(ε|f|)^(1/3)` — about 1e-5 for coordinates of tens
+                    // of mm. At 1e-7 the cancellation alone is 1.4e-7, which is
+                    // the quotient's floor rather than the tangent's error.
+                    let h = 1e-5;
+                    let (a, _) = cut.trochoid_point_and_tangent(s - h);
+                    let (b, _) = cut.trochoid_point_and_tangent(s + h);
+                    let (_, t) = cut.trochoid_point_and_tangent(s);
+                    let numeric = [(b[0] - a[0]) / (2.0 * h), (b[1] - a[1]) / (2.0 * h)];
+                    // Compare directions, since only the direction is used.
+                    let na = f64::hypot(numeric[0], numeric[1]);
+                    let ta = f64::hypot(t[0], t[1]);
+                    let cross = (numeric[0] * t[1] - numeric[1] * t[0]).abs() / (na * ta);
+                    worst = worst.max(cross);
+                }
+                // 1.2e-9 is the quotient's measured floor at this `h`; the sharp
+                // check on the tangent itself is the rack limit below, where two
+                // independent analytic derivations meet.
+                assert!(
+                    worst < 1e-8,
+                    "{kind:?} z_c={cutter_teeth}: tangent direction off by {worst}"
+                );
+            }
+        }
+    }
+
+    /// The Cartesian point this returns is the polar one `trochoid_at` returns —
+    /// the two are the same construction expressed two ways, so a disagreement
+    /// would mean the derivative was taken of a different curve.
+    #[test]
+    fn the_tangent_and_the_polar_form_describe_one_curve() {
+        for kind in [MeshKind::External, MeshKind::Internal] {
+            let g = Gear::new(GearParams {
+                teeth: 43,
+                root_radius: 0.2,
+                ..Default::default()
+            });
+            let Some(cut) = ShaperCut::equivalent_to_rack(&g, 20, kind) else {
+                continue;
+            };
+            for i in 0..=10 {
+                #[allow(clippy::cast_precision_loss)]
+                let s = -0.5 + 1.0 * (i as f64 / 10.0);
+                let (radius, angle) = cut.trochoid_at(s);
+                let ([x, y], _) = cut.trochoid_point_and_tangent(s);
+                assert!((f64::hypot(x, y) - radius).abs() < 1e-12);
+                assert!((x.atan2(y) - angle).abs() < 1e-12);
+            }
+        }
+    }
+
+    /// **And in the `z_c → ∞` limit it is the rack's own analytic tangent.**
+    ///
+    /// The rack is the shaper's limit for the fillet *curve* (tested below), so
+    /// it must be the limit for the fillet's tangent too — and the rack's tangent
+    /// is derived independently, in `strength.rs`, from a different
+    /// parameterisation. Two analytic derivations meeting is worth more than
+    /// either meeting a difference quotient.
+    #[test]
+    fn the_trochoid_tangent_tends_to_the_racks() {
+        let g = Gear::new(GearParams {
+            teeth: 43,
+            root_radius: 0.2,
+            ..Default::default()
+        });
+        let mut previous = f64::INFINITY;
+        for cutter_teeth in [1_000u32, 10_000, 100_000] {
+            let cut = ShaperCut::equivalent_to_rack(&g, cutter_teeth, MeshKind::External).unwrap();
+            let mut worst = 0.0_f64;
+            for i in 0..=10 {
+                #[allow(clippy::cast_precision_loss)]
+                let s = -0.4 + 0.8 * (i as f64 / 10.0);
+                let (_, shaper) = cut.trochoid_point_and_tangent(s);
+                let (_, rack) = crate::strength::fillet_point_and_tangent(&g, s);
+                let ns = f64::hypot(shaper[0], shaper[1]);
+                let nr = f64::hypot(rack[0], rack[1]);
+                worst = worst.max((shaper[0] * rack[1] - shaper[1] * rack[0]).abs() / (ns * nr));
+            }
+            assert!(
+                worst < previous,
+                "z_c={cutter_teeth}: {worst} did not improve on {previous}"
+            );
+            previous = worst;
+        }
+        assert!(previous < 1e-4, "the limit is not reached: {previous}");
+    }
 
     /// A gear whose cutter round is small enough to survive being turned into a
     /// pinion cutter.

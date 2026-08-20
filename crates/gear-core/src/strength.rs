@@ -158,7 +158,7 @@ pub struct RootSection {
 /// ```
 ///
 /// with `u = k s`, `v = r − k b_c`, `φ = (s − a_c)/r`.
-fn fillet_point_and_tangent(g: &Gear, s: f64) -> ([f64; 2], [f64; 2]) {
+pub(crate) fn fillet_point_and_tangent(g: &Gear, s: f64) -> ([f64; 2], [f64; 2]) {
     let d = f64::hypot(s, g.bc);
     let k = 1.0 + g.rho / d;
     let dk = -g.rho * s / (d * d * d);
