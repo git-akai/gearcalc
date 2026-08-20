@@ -165,3 +165,172 @@ fn parabola_form_factor_converges_to_its_own_rack_limit() {
         );
     }
 }
+
+// ------------------------------------------------------------ internal ---
+
+/// `J = 1/(Y_F · Y_S)` for one gear of a 25-tooth-pinion pair, external and
+/// internal, loaded at the highest point of single-pair contact.
+///
+/// This is the quantity NASA TM-107012's Figure 8 plots. `σ_F = F_t/(b m)·Y_F·Y_S`
+/// and AGMA's `σ = W_t/(f m J)`, so the two are reciprocals of each other and
+/// comparable directly.
+fn j_factors(z: u32, cutter_teeth: u32) -> (Option<f64>, Option<f64>) {
+    use gear_core::contact::ContactPath;
+    use gear_core::mesh::{Mesh, MeshKind};
+    use gear_core::ring::{Cutter, Ring};
+    use gear_core::strength::{bending_section, ring_bending_section, StressConcentration};
+
+    let pinion = Gear::new(GearParams {
+        teeth: 25,
+        ..Default::default()
+    });
+    let params = GearParams {
+        teeth: z,
+        root_radius: 0.3,
+        ..Default::default()
+    };
+    let wheel = Gear::new(params);
+    let ring = Ring::new(
+        &params,
+        &Cutter {
+            teeth: cutter_teeth,
+            addendum: 1.25,
+            tip_round: 0.3,
+        },
+    );
+    let j = |s: Option<gear_core::strength::RootSection>| {
+        s.and_then(|s| s.bending_factor(StressConcentration::Iso6336))
+            .map(|f| 1.0 / f)
+    };
+
+    let external = Mesh::new(&pinion, &wheel, MeshKind::External)
+        .ok()
+        .and_then(|m| ContactPath::new(&pinion, wheel.ra, &m))
+        .and_then(|p| j(bending_section(&wheel, p.contact_ratio)));
+    let internal = Mesh::new(&pinion, &wheel, MeshKind::Internal)
+        .ok()
+        .and_then(|m| ContactPath::new(&pinion, ring.ra, &m))
+        .and_then(|p| j(ring_bending_section(&ring, p.contact_ratio, 0.0)));
+    (external, internal)
+}
+
+/// **What NASA TM-107012's Figure 8 says that survives the difference in setup**:
+/// an internal tooth is stronger than an external one of the same pitch, and the
+/// internal factor falls as tooth count rises.
+///
+/// Asserted as directions rather than values, per §12's rule about not predicting
+/// what the computation can find — and because this crate uses ISO 6336's `Y_S`
+/// where the paper uses an extrapolated Dolan–Broghamer, and omits the axial
+/// compression term the paper includes. Neither changes either direction.
+///
+/// # Why the *third* claim is not asserted here
+///
+/// The paper's figure also has the two factors approaching each other, and over
+/// its range they do. But its external gear is cut by the same 20-tooth shaper as
+/// its ring, while this crate's external gear is **rack**-cut. With the shaper
+/// held at 20 teeth the ring's fillet never tends to the rack's, so the two
+/// fillets do not approach a common shape and the gap has no reason to close —
+/// measured, it closes to z ≈ 150 and then widens again. Asserting it here would
+/// be asserting a property of the paper's setup against a different one.
+///
+/// The convergence that *is* real is the next test, where the shaper grows with
+/// the ring and both teeth genuinely become the same rack tooth.
+#[test]
+fn a_rings_tooth_is_stronger_than_an_external_one_and_they_converge() {
+    let counts = [30u32, 40, 50, 60, 80, 100, 150, 200, 250];
+    let mut previous_internal = f64::INFINITY;
+    for z in counts {
+        let (Some(external), Some(internal)) = j_factors(z, 20) else {
+            panic!("z={z}: no rating");
+        };
+        assert!(
+            internal > external,
+            "z={z}: an internal tooth must be the stronger, {internal} vs {external}"
+        );
+        assert!(
+            internal < previous_internal,
+            "z={z}: the internal factor must fall with tooth count, {internal} vs {previous_internal}"
+        );
+        previous_internal = internal;
+    }
+}
+
+/// **The sharp one: both teeth become the same rack tooth.**
+///
+/// Take the ring's tooth count *and* its shaper to infinity together and its
+/// tooth tends to a rack tooth — as a rack-cut external gear's does. So the two
+/// bending factors must converge, and they do so first order in `1/z`:
+///
+/// ```text
+/// z_ring    z_cutter    |J_int − J_ext|
+///    200         100        0.0251
+///  1 000         500        0.0041
+///  5 000       2 500        0.0008
+/// 20 000      10 000        0.0002
+/// ```
+///
+/// This is the acceptance gate for the whole internal construction, and it is
+/// independent in the way that matters: the internal route is a ring involute
+/// plus a shaper trochoid with the tooth pointing inward, the external route is a
+/// gear involute plus a rack trochoid pointing outward, and they share none of
+/// that geometry. Agreeing to 2e-4 is not something a sign error survives.
+#[test]
+fn a_huge_ring_cut_by_a_huge_shaper_rates_as_a_rack_tooth() {
+    let mut previous = f64::INFINITY;
+    for (z, cutter) in [
+        (200u32, 100u32),
+        (1_000, 500),
+        (5_000, 2_500),
+        (20_000, 10_000),
+    ] {
+        let (Some(external), Some(internal)) = j_factors(z, cutter) else {
+            panic!("z={z}: no rating");
+        };
+        let gap = (internal - external).abs();
+        assert!(
+            gap < previous,
+            "z={z}: the gap must keep closing, {gap} vs {previous}"
+        );
+        previous = gap;
+    }
+    assert!(
+        previous < 5e-4,
+        "the two constructions do not meet in the rack limit: {previous}"
+    );
+}
+
+/// A helical ring is **refused** rather than rated on its transverse section.
+///
+/// Rating a helical tooth on the transverse section and dividing by the normal
+/// module mixes planes and under-predicts by about `cos β` — the error §12
+/// records for external gears. A ring would need a virtual spur *ring* to avoid
+/// it, and that is not built yet, so the answer is no answer.
+#[test]
+fn a_helical_ring_is_refused_rather_than_rated_on_the_wrong_plane() {
+    use gear_core::ring::{Cutter, Ring};
+    use gear_core::strength::ring_bending_section;
+
+    for beta in [5.0, 15.0, 30.0] {
+        let ring = Ring::new(
+            &GearParams {
+                teeth: 60,
+                helix_angle: beta,
+                ..Default::default()
+            },
+            &Cutter::default(),
+        );
+        assert!(
+            ring_bending_section(&ring, 1.7, beta).is_none(),
+            "beta={beta}: a helical ring must not be rated on its transverse section"
+        );
+    }
+    // ...and the spur case, which is the same call at zero helix, does answer.
+    let ring = Ring::new(
+        &GearParams {
+            teeth: 60,
+            ..Default::default()
+        },
+        &Cutter::default(),
+    );
+    assert!(ring_bending_section(&ring, 1.7, 0.0).is_some());
+}

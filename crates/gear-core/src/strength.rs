@@ -240,12 +240,135 @@ fn flank_point_and_load_direction(g: &Gear, roll: f64) -> ([f64; 2], [f64; 2]) {
     (p, [dx / len, dy / len])
 }
 
+// ------------------------------------------------------- tooth outlines ---
+
+/// A tooth the critical-section construction can be run on.
+///
+/// The construction — inscribe the largest constant-strength parabola, find
+/// where it touches — is the same for an external tooth and a ring's. What
+/// differs is only *which two curves* it searches and which way the tooth
+/// points, and both of those are what this trait carries. So a ring's rating is
+/// a **value** of the general construction rather than a second copy of it, and
+/// the two cannot drift apart.
+///
+/// # The frame, which is the whole trick
+///
+/// Coordinates are **tooth-local**: `x` from the tooth centreline, and `y`
+/// increasing *toward the tip*. For an external gear that is the radius. For a
+/// ring, whose tooth points inward, it is the **negated** radius.
+///
+/// That one flip is enough, and it is worth seeing why. The tangency condition
+/// `X·Y′ + 2X′(y_v − Y) = 0` is odd in `y` — negate `Y`, `Y′` and `y_v` together
+/// and the whole expression changes sign, so its zero set is untouched. The
+/// moment arm `y_v − y_tangency` is a difference, so it flips with the frame and
+/// comes out positive either way. The root chord and the load angle only involve
+/// `x`. Nothing else in the construction reads an absolute `y`.
+pub trait ToothOutline {
+    /// Normal module, mm.
+    fn module(&self) -> f64;
+    /// Normal pressure angle, radians.
+    fn normal_pressure_angle(&self) -> f64;
+    /// Whether there is a tooth to rate at all.
+    fn is_usable(&self) -> bool;
+    /// Fillet parameter bracket, ordered `(lo, hi)`.
+    fn fillet_bracket(&self) -> (f64, f64);
+    /// Flank roll-parameter bracket, ordered `(lo, hi)`.
+    fn flank_bracket(&self) -> (f64, f64);
+    /// Fillet point and tangent at `s`, in the frame above.
+    fn fillet_at(&self, s: f64) -> ([f64; 2], [f64; 2]);
+    /// Flank point and tangent at roll `u`, in the frame above.
+    fn flank_at(&self, u: f64) -> ([f64; 2], [f64; 2]);
+    /// Flank point and load direction at roll `u`, in the frame above.
+    fn load_at(&self, u: f64) -> ([f64; 2], [f64; 2]);
+    /// Radius of curvature of the fillet at `s`, mm.
+    fn fillet_curvature(&self, s: f64) -> f64;
+    /// Radius of curvature of the involute flank at roll `u`, mm — `r_b u`.
+    fn flank_curvature(&self, u: f64) -> f64;
+}
+
+impl ToothOutline for Gear {
+    fn module(&self) -> f64 {
+        self.params.module
+    }
+    fn normal_pressure_angle(&self) -> f64 {
+        self.alpha_n
+    }
+    fn is_usable(&self) -> bool {
+        !self.severed && self.u_j.is_finite()
+    }
+    fn fillet_bracket(&self) -> (f64, f64) {
+        (self.s_j, 0.0)
+    }
+    fn flank_bracket(&self) -> (f64, f64) {
+        (self.u_j, self.u_tip)
+    }
+    fn fillet_at(&self, s: f64) -> ([f64; 2], [f64; 2]) {
+        fillet_point_and_tangent(self, s)
+    }
+    fn flank_at(&self, u: f64) -> ([f64; 2], [f64; 2]) {
+        flank_point_and_tangent(self, u)
+    }
+    fn load_at(&self, u: f64) -> ([f64; 2], [f64; 2]) {
+        flank_point_and_load_direction(self, u)
+    }
+    fn fillet_curvature(&self, s: f64) -> f64 {
+        fillet_curvature_radius(self, s)
+    }
+    fn flank_curvature(&self, u: f64) -> f64 {
+        self.rb * u
+    }
+}
+
+/// A ring's tooth, in the same frame — which for a ring means `y` negated,
+/// because its tooth points inward.
+impl ToothOutline for crate::ring::Ring {
+    fn module(&self) -> f64 {
+        // The transverse module is the normal one for the spur case, and a
+        // helical ring's bending is rated on its virtual spur section just as an
+        // external gear's is; that conversion belongs to the caller.
+        self.mt
+    }
+    fn normal_pressure_angle(&self) -> f64 {
+        self.alpha_n
+    }
+    fn is_usable(&self) -> bool {
+        self.u_j.is_finite() && self.u_tip.is_finite() && self.u_j > self.u_tip
+    }
+    fn fillet_bracket(&self) -> (f64, f64) {
+        (self.s_root.min(self.s_j), self.s_root.max(self.s_j))
+    }
+    fn flank_bracket(&self) -> (f64, f64) {
+        (self.u_tip, self.u_j)
+    }
+    fn fillet_at(&self, s: f64) -> ([f64; 2], [f64; 2]) {
+        flip_y(crate::ring::Ring::fillet_point_and_tangent(self, s))
+    }
+    fn flank_at(&self, u: f64) -> ([f64; 2], [f64; 2]) {
+        flip_y(crate::ring::Ring::flank_point_and_tangent(self, u))
+    }
+    fn load_at(&self, u: f64) -> ([f64; 2], [f64; 2]) {
+        flip_y(crate::ring::Ring::flank_point_and_load_direction(self, u))
+    }
+    fn fillet_curvature(&self, s: f64) -> f64 {
+        crate::ring::Ring::fillet_curvature_radius(self, s)
+    }
+    fn flank_curvature(&self, u: f64) -> f64 {
+        self.rb * u
+    }
+}
+
+/// Into the tooth-local frame for an inward-pointing tooth: negate `y` on both
+/// the point and the direction.
+fn flip_y((p, t): ([f64; 2], [f64; 2])) -> ([f64; 2], [f64; 2]) {
+    ([p[0], -p[1]], [t[0], -t[1]])
+}
+
 /// The critical root section for a load applied at a given roll parameter.
 ///
 /// Returns `None` when the gear has no usable flank — a severed tooth, or a
 /// fillet on which the 30° tangent does not exist.
 #[must_use]
-pub fn root_section(g: &Gear, load_roll: f64) -> Option<RootSection> {
+pub fn root_section<T: ToothOutline + ?Sized>(g: &T, load_roll: f64) -> Option<RootSection> {
     root_section_with(g, load_roll, CriticalSection::default())
 }
 
@@ -254,20 +377,25 @@ pub fn root_section(g: &Gear, load_roll: f64) -> Option<RootSection> {
 /// Returns `None` when the gear has no usable flank — a severed tooth, or a
 /// fillet on which the construction has no solution.
 #[must_use]
-pub fn root_section_with(g: &Gear, load_roll: f64, method: CriticalSection) -> Option<RootSection> {
-    if g.severed || !g.u_j.is_finite() || !load_roll.is_finite() {
+pub fn root_section_with<T: ToothOutline + ?Sized>(
+    g: &T,
+    load_roll: f64,
+    method: CriticalSection,
+) -> Option<RootSection> {
+    if !g.is_usable() || !load_roll.is_finite() {
         return None;
     }
 
     // The load has to be resolved first either way: the parabola's vertex sits
     // where the load line crosses the centreline.
-    let (load_point, dir) = flank_point_and_load_direction(g, load_roll);
+    let (load_point, dir) = g.load_at(load_roll);
     if dir[0].abs() < 1e-12 {
         return None;
     }
     let crossing = [0.0, load_point[1] + (-load_point[0] / dir[0]) * dir[1]];
     let vertex = crossing[1];
 
+    let (fillet_lo, fillet_hi) = g.fillet_bracket();
     let s = match method {
         // Along the fillet the tangent angle to the centreline sweeps from near
         // zero at the junction to 90° at the root circle, so this is monotone
@@ -276,11 +404,11 @@ pub fn root_section_with(g: &Gear, load_roll: f64, method: CriticalSection) -> O
             let target = TANGENT_ANGLE_DEG.to_radians().tan();
             brent(
                 |s| {
-                    let (_, t) = fillet_point_and_tangent(g, s);
+                    let (_, t) = g.fillet_at(s);
                     t[0].abs() - target * t[1].abs()
                 },
-                g.s_j,
-                0.0,
+                fillet_lo,
+                fillet_hi,
                 Tol::default(),
             )?
         }
@@ -289,30 +417,32 @@ pub fn root_section_with(g: &Gear, load_roll: f64, method: CriticalSection) -> O
         // eliminates p and leaves one equation:
         //     X·Y' + 2 X' (y_v − Y) = 0
         //
-        // Searched on the fillet first and then the flank, because which one it
-        // touches depends on the tooth: small and undercut teeth touch the
-        // fillet, larger ones the flank.
+        // Odd in y, so it is the same equation for a tooth pointing either way —
+        // see `ToothOutline`. Searched on the fillet first and then the flank,
+        // because which one it touches depends on the tooth: small and undercut
+        // teeth touch the fillet, larger ones the flank.
         CriticalSection::LewisParabola => {
             let condition = |q: [f64; 2], t: [f64; 2]| q[0] * t[1] + 2.0 * t[0] * (vertex - q[1]);
             let on_fillet = brent(
                 |s| {
-                    let (q, t) = fillet_point_and_tangent(g, s);
+                    let (q, t) = g.fillet_at(s);
                     condition(q, t)
                 },
-                g.s_j,
-                0.0,
+                fillet_lo,
+                fillet_hi,
                 Tol::default(),
             );
             match on_fillet {
                 Some(s) => s,
                 None => {
+                    let (flank_lo, flank_hi) = g.flank_bracket();
                     let u = brent(
                         |u| {
-                            let (q, t) = flank_point_and_tangent(g, u);
+                            let (q, t) = g.flank_at(u);
                             condition(q, t)
                         },
-                        g.u_j,
-                        g.u_tip,
+                        flank_lo,
+                        flank_hi,
                         Tol::default(),
                     )?;
                     return finish(g, method, u, true, load_point, dir, crossing, vertex);
@@ -327,8 +457,8 @@ pub fn root_section_with(g: &Gear, load_roll: f64, method: CriticalSection) -> O
 /// Assemble the result once the tangency parameter is known, whichever curve it
 /// was found on.
 #[allow(clippy::too_many_arguments)]
-fn finish(
-    g: &Gear,
+fn finish<T: ToothOutline + ?Sized>(
+    g: &T,
     method: CriticalSection,
     param: f64,
     on_flank: bool,
@@ -339,9 +469,9 @@ fn finish(
 ) -> Option<RootSection> {
     let s = param;
     let (tangency, raw_tangent) = if on_flank {
-        flank_point_and_tangent(g, param)
+        g.flank_at(param)
     } else {
-        fillet_point_and_tangent(g, param)
+        g.fillet_at(param)
     };
     let root_chord = 2.0 * tangency[0].abs();
     // Orient it up the tooth (towards the tip) so the direction is unambiguous.
@@ -361,9 +491,9 @@ fn finish(
     // direction's x-component is exactly that.
     let load_angle = load_dir[0].abs().clamp(-1.0, 1.0).acos();
 
-    let m = g.params.module;
-    let form_factor =
-        6.0 * (moment_arm / m) * load_angle.cos() / ((root_chord / m).powi(2) * g.alpha_n.cos());
+    let m = g.module();
+    let form_factor = 6.0 * (moment_arm / m) * load_angle.cos()
+        / ((root_chord / m).powi(2) * g.normal_pressure_angle().cos());
 
     Some(RootSection {
         s,
@@ -372,9 +502,9 @@ fn finish(
         notch_parameter: root_chord
             / (2.0
                 * if on_flank {
-                    g.rb * param
+                    g.flank_curvature(param)
                 } else {
-                    fillet_curvature_radius(g, s)
+                    g.fillet_curvature(s)
                 }),
         tangency_on_flank: on_flank,
         method,
@@ -382,7 +512,7 @@ fn finish(
         root_chord,
         moment_arm,
         load_angle,
-        fillet_curvature: fillet_curvature_radius(g, s),
+        fillet_curvature: g.fillet_curvature(s),
         form_factor,
         tangency,
         tangent_direction,
@@ -717,6 +847,71 @@ pub fn bending_section(g: &Gear, transverse_contact_ratio: f64) -> Option<RootSe
 
     let load_roll = v.u_tip - (eps_n - 1.0) * base_pitch / v.rb;
     root_section(&v, load_roll)
+}
+
+/// The critical section of a **ring's** tooth, loaded at its highest point of
+/// single-pair contact.
+///
+/// # The model, and where it comes from
+///
+/// Savage, Rubadeux & Coe, *Bending Strength Model for Internal Spur Gear Teeth*
+/// (NASA TM-107012 / ARL-TR-838, 1995). Its construction is the inscribed Lewis
+/// constant-strength parabola — the same one this crate already uses for an
+/// external tooth, and the paper explicitly prefers it to the straight-line
+/// tangent that earlier internal models used, for the reason
+/// [`CriticalSection::LewisParabola`] gives. So this shares the construction
+/// rather than reimplementing it: see [`ToothOutline`].
+///
+/// Two things the paper adds are handled differently here, both deliberately:
+///
+/// - **Its stress-concentration factor is an extrapolation of Dolan–Broghamer.**
+///   This crate uses ISO 6336's `Y_S` instead, for the reason
+///   [`StressConcentration`] sets out — it is written in the geometry we measure,
+///   and a ring's `s_Fn`, `h_Fe` and `ρ_F` come off the generated profile exactly
+///   as an external gear's do. So the notch factor needs no internal case at all.
+/// - **Its axial compression term is omitted**, as it is for external teeth. The
+///   radial component of the load compresses the tooth — the same sense either
+///   way round, since both teeth point away from their rim — so including it
+///   would relieve the stress by order 10 %. Leaving it out is the conservative
+///   direction and the consistent one; ISO omits it too. Do not compare a number
+///   from here to an AGMA `J` without saying so.
+///
+/// # The load point
+///
+/// The highest point of single-pair contact, one base pitch back from the far end
+/// of the path — measured from the ring's own tip, so it needs only this ring's
+/// geometry and the contact ratio, exactly as [`bending_section`] does. The one
+/// difference is the **sign**: a ring's tip is at its *smallest* roll parameter,
+/// so moving away from the tip means increasing `u` where an external gear
+/// decreases it.
+///
+/// # Errors
+///
+/// `None` for a helical ring — its bending would have to be rated on a virtual
+/// spur *ring*, and rating it on the transverse section instead is precisely the
+/// plane-mixing error `docs/DESIGN.md` §12 records for helical external gears. It
+/// is refused rather than approximated. Also `None` when the load point falls
+/// past the end of the generated flank, or the tooth has no usable form.
+#[must_use]
+pub fn ring_bending_section(
+    ring: &crate::ring::Ring,
+    transverse_contact_ratio: f64,
+    helix_angle_deg: f64,
+) -> Option<RootSection> {
+    if helix_angle_deg != 0.0 {
+        return None;
+    }
+    if !ring.is_usable() || !transverse_contact_ratio.is_finite() {
+        return None;
+    }
+    let base_pitch = std::f64::consts::PI * ring.mt * ring.alpha_t.cos();
+    // Away from the tip is **up** in roll for a ring, down for an external gear.
+    let load_roll = ring.u_tip + (transverse_contact_ratio - 1.0) * base_pitch / ring.rb;
+    // The load has to land on flank the cutter actually generated.
+    if !(ring.u_tip..=ring.u_j).contains(&load_roll) {
+        return None;
+    }
+    root_section(ring, load_roll)
 }
 
 /// The lengthwise relative curvature of a parallel-axis, uncrowned mesh:

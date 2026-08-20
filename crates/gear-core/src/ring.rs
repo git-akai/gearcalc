@@ -437,6 +437,82 @@ impl Ring {
         self.cut.trochoid_at(s)
     }
 
+    /// The fillet point and its tangent, Cartesian, tooth centred on `+y`.
+    ///
+    /// Straight through to [`ShaperCut::trochoid_point_and_tangent`], which
+    /// differentiates the construction analytically. Named here so a ring's
+    /// bending model reads its own geometry off the ring rather than reaching
+    /// into the cut.
+    #[must_use]
+    pub fn fillet_point_and_tangent(&self, s: f64) -> ([f64; 2], [f64; 2]) {
+        self.cut.trochoid_point_and_tangent(s)
+    }
+
+    /// The flank point and its tangent, Cartesian, tooth centred on `+y`.
+    ///
+    /// The same involute derivative an external gear's flank has, with the one
+    /// sign that makes it a ring: `dθ/du` is **positive** here, because a ring's
+    /// tooth gains angle outward where an external gear's loses it.
+    #[must_use]
+    pub fn flank_point_and_tangent(&self, u: f64) -> ([f64; 2], [f64; 2]) {
+        let root = f64::hypot(1.0, u);
+        let r = self.rb * root;
+        let th = self.psi_b + inv_from_roll(u);
+        let (st, ct) = th.sin_cos();
+
+        let dr = self.rb * u / root;
+        // Positive, where `Gear`'s is negative — the flipped `inv` term of the
+        // module documentation, differentiated.
+        let dth = (u * u) / (1.0 + u * u);
+        (
+            [r * st, r * ct],
+            [dr * st + r * ct * dth, dr * ct - r * st * dth],
+        )
+    }
+
+    /// The flank point and the direction of the load there.
+    ///
+    /// The load acts along the involute normal, which is the line from the
+    /// contact point to the base-circle tangency point. For a ring that tangency
+    /// sits `roll` radians **forward** around the base circle rather than back,
+    /// which is the same sign as above.
+    #[must_use]
+    pub fn flank_point_and_load_direction(&self, roll: f64) -> ([f64; 2], [f64; 2]) {
+        let (r, th) = self.involute_at(roll);
+        let p = [r * th.sin(), r * th.cos()];
+        let tangent_angle = self.psi_b + roll;
+        let t = [self.rb * tangent_angle.sin(), self.rb * tangent_angle.cos()];
+        let (dx, dy) = (p[0] - t[0], p[1] - t[1]);
+        let len = f64::hypot(dx, dy);
+        if len < f64::MIN_POSITIVE {
+            return (p, [1.0, 0.0]);
+        }
+        (p, [dx / len, dy / len])
+    }
+
+    /// Radius of curvature of the fillet at travel `s`, mm.
+    ///
+    /// A central difference on the **analytic** first derivative, exactly as the
+    /// rack-cut case does it and for the same reason: this feeds the empirical
+    /// notch factor rather than locating the section, so a difference is
+    /// proportionate here where it would not be for the tangent.
+    #[must_use]
+    pub fn fillet_curvature_radius(&self, s: f64) -> f64 {
+        let h = 1e-6 * self.mt.max(1e-9);
+        let (_, t0) = self.fillet_point_and_tangent(s - h);
+        let (_, t1) = self.fillet_point_and_tangent(s + h);
+        let (_, t) = self.fillet_point_and_tangent(s);
+        let ddx = (t1[0] - t0[0]) / (2.0 * h);
+        let ddy = (t1[1] - t0[1]) / (2.0 * h);
+        let speed = f64::hypot(t[0], t[1]);
+        let cross = (t[0] * ddy - t[1] * ddx).abs();
+        if cross < f64::MIN_POSITIVE {
+            f64::INFINITY
+        } else {
+            speed.powi(3) / cross
+        }
+    }
+
     /// The involute flank at roll parameter `u`, as `(radius, angle from the
     /// tooth centreline)`.
     ///
