@@ -121,8 +121,13 @@ pub struct CutParams {
     pub cutter_tooth: f64,
     /// Centre distance the cut happens at, mm.
     pub centre_distance: f64,
-    /// Teeth on the cutter.
-    pub cutter_teeth: u32,
+    /// The cutter's pitch radius, mm.
+    ///
+    /// Taken rather than derived from a tooth count so a **virtual** cutter can
+    /// be described: rating a helical ring means working on its virtual spur
+    /// section, where both members carry `z / cos³β` teeth and neither count is a
+    /// whole number.
+    pub cutter_radius: f64,
     /// The cutter's tip radius, mm.
     pub cutter_tip_radius: f64,
     /// The cutter's tip corner round, mm.
@@ -139,10 +144,10 @@ impl ShaperCut {
     /// base circle — which is not a cutter, it is a disc.
     #[must_use]
     pub fn new(p: &CutParams) -> Option<Self> {
-        if p.cutter_teeth == 0 || !p.module_t.is_finite() {
+        if !p.cutter_radius.is_finite() || p.cutter_radius <= 0.0 || !p.module_t.is_finite() {
             return None;
         }
-        let cutter_radius = f64::from(p.cutter_teeth) * p.module_t / 2.0;
+        let cutter_radius = p.cutter_radius;
         let corner_radius = p.cutter_tip_radius - p.tip_round;
         if corner_radius.is_nan() || corner_radius <= 0.0 {
             return None;

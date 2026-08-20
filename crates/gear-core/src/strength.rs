@@ -885,33 +885,43 @@ pub fn bending_section(g: &Gear, transverse_contact_ratio: f64) -> Option<RootSe
 /// so moving away from the tip means increasing `u` where an external gear
 /// decreases it.
 ///
+/// # Helical rings
+///
+/// Rated on the **virtual spur ring** — [`crate::ring::Ring::virtual_spur`] —
+/// exactly as [`bending_section`] rates a helical external gear on its virtual
+/// spur gear, and for the same reason: `F_t` is transverse while `m_n` is normal,
+/// and that pairing is only consistent if `Y_F` is measured on the normal
+/// section. The virtual contact ratio `ε_αn = ε_α / cos²β_b` goes with it. A spur
+/// ring is that construction at `β = 0`, where the virtual ring *is* the ring.
+///
 /// # Errors
 ///
-/// `None` for a helical ring — its bending would have to be rated on a virtual
-/// spur *ring*, and rating it on the transverse section instead is precisely the
-/// plane-mixing error `docs/DESIGN.md` §12 records for helical external gears. It
-/// is refused rather than approximated. Also `None` when the load point falls
-/// past the end of the generated flank, or the tooth has no usable form.
+/// `None` when the load point falls past the end of the generated flank, or the
+/// tooth has no usable form.
 #[must_use]
 pub fn ring_bending_section(
     ring: &crate::ring::Ring,
     transverse_contact_ratio: f64,
-    helix_angle_deg: f64,
 ) -> Option<RootSection> {
-    if helix_angle_deg != 0.0 {
+    if !transverse_contact_ratio.is_finite() {
         return None;
     }
-    if !ring.is_usable() || !transverse_contact_ratio.is_finite() {
+    let v = ring.virtual_spur();
+    if !v.is_usable() {
         return None;
     }
-    let base_pitch = std::f64::consts::PI * ring.mt * ring.alpha_t.cos();
+    // The virtual ring is a spur ring, so its transverse plane is the normal
+    // plane: `v.mt` is m_n and `v.alpha_t` is α_n.
+    let base_pitch = std::f64::consts::PI * v.mt * v.alpha_t.cos();
+    let cos_bb = ring.base_helix_angle().cos();
+    let eps_n = transverse_contact_ratio / (cos_bb * cos_bb);
     // Away from the tip is **up** in roll for a ring, down for an external gear.
-    let load_roll = ring.u_tip + (transverse_contact_ratio - 1.0) * base_pitch / ring.rb;
+    let load_roll = v.u_tip + (eps_n - 1.0) * base_pitch / v.rb;
     // The load has to land on flank the cutter actually generated.
-    if !(ring.u_tip..=ring.u_j).contains(&load_roll) {
+    if !(v.u_tip..=v.u_j).contains(&load_roll) {
         return None;
     }
-    root_section(ring, load_roll)
+    root_section(&v, load_roll)
 }
 
 /// The lengthwise relative curvature of a parallel-axis, uncrowned mesh:

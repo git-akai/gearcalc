@@ -175,6 +175,12 @@ fn parabola_form_factor_converges_to_its_own_rack_limit() {
 /// and AGMA's `σ = W_t/(f m J)`, so the two are reciprocals of each other and
 /// comparable directly.
 fn j_factors(z: u32, cutter_teeth: u32) -> (Option<f64>, Option<f64>) {
+    j_factors_at(z, cutter_teeth, 0.0)
+}
+
+/// The same at a helix angle, so the virtual-section route is exercised on both
+/// sides of the comparison.
+fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f64>) {
     use gear_core::contact::ContactPath;
     use gear_core::mesh::{Mesh, MeshKind};
     use gear_core::ring::{Cutter, Ring};
@@ -182,11 +188,16 @@ fn j_factors(z: u32, cutter_teeth: u32) -> (Option<f64>, Option<f64>) {
 
     let pinion = Gear::new(GearParams {
         teeth: 25,
+        helix_angle: beta,
         ..Default::default()
     });
     let params = GearParams {
         teeth: z,
         root_radius: 0.3,
+        // An internal pair shares its helix hand; an external one opposes it,
+        // which is what `Mesh::new` checks. The wheel below is built for the
+        // internal pairing and the external mesh is formed from its mirror.
+        helix_angle: beta,
         ..Default::default()
     };
     let wheel = Gear::new(params);
@@ -203,14 +214,18 @@ fn j_factors(z: u32, cutter_teeth: u32) -> (Option<f64>, Option<f64>) {
             .map(|f| 1.0 / f)
     };
 
-    let external = Mesh::new(&pinion, &wheel, MeshKind::External)
+    let mirrored = Gear::new(GearParams {
+        helix_angle: -beta,
+        ..params
+    });
+    let external = Mesh::new(&pinion, &mirrored, MeshKind::External)
         .ok()
-        .and_then(|m| ContactPath::new(&pinion, wheel.ra, &m))
-        .and_then(|p| j(bending_section(&wheel, p.contact_ratio)));
+        .and_then(|m| ContactPath::new(&pinion, mirrored.ra, &m))
+        .and_then(|p| j(bending_section(&mirrored, p.contact_ratio)));
     let internal = Mesh::new(&pinion, &wheel, MeshKind::Internal)
         .ok()
         .and_then(|m| ContactPath::new(&pinion, ring.ra, &m))
-        .and_then(|p| j(ring_bending_section(&ring, p.contact_ratio, 0.0)));
+        .and_then(|p| j(ring_bending_section(&ring, p.contact_ratio)));
     (external, internal)
 }
 
@@ -299,38 +314,112 @@ fn a_huge_ring_cut_by_a_huge_shaper_rates_as_a_rack_tooth() {
     );
 }
 
-/// A helical ring is **refused** rather than rated on its transverse section.
+/// **A helical ring is rated on its virtual spur section**, exactly as a helical
+/// external gear is — feature parity with the spur case, not a refusal.
 ///
-/// Rating a helical tooth on the transverse section and dividing by the normal
-/// module mixes planes and under-predicts by about `cos β` — the error §12
-/// records for external gears. A ring would need a virtual spur *ring* to avoid
-/// it, and that is not built yet, so the answer is no answer.
+/// Two things are asserted, and the second is the one that matters. The rating
+/// exists at every helix angle; and at `β = 0` the virtual ring *is* the ring, so
+/// the helical route must reproduce the spur answer **bit-identically** rather
+/// than merely closely. That is the check that the virtual construction is a
+/// generalisation and not a second model with the spur case bolted on.
 #[test]
-fn a_helical_ring_is_refused_rather_than_rated_on_the_wrong_plane() {
+fn a_helical_ring_is_rated_on_its_virtual_spur_section() {
     use gear_core::ring::{Cutter, Ring};
-    use gear_core::strength::ring_bending_section;
+    use gear_core::strength::{ring_bending_section, StressConcentration};
 
-    for beta in [5.0, 15.0, 30.0] {
-        let ring = Ring::new(
+    let of = |beta: f64| {
+        Ring::new(
             &GearParams {
                 teeth: 60,
                 helix_angle: beta,
                 ..Default::default()
             },
             &Cutter::default(),
+        )
+    };
+
+    // The spur case goes through the same virtual route; that it *is* the ring
+    // at zero helix is asserted on its own below.
+    let spur = ring_bending_section(&of(0.0), 1.7).unwrap();
+    let mut last = spur.form_factor;
+    for beta in [5.0, 15.0, 25.0, 35.0] {
+        let sec = ring_bending_section(&of(beta), 1.7)
+            .unwrap_or_else(|| panic!("beta={beta}: a helical ring must still be rated"));
+        assert!(
+            sec.form_factor > 0.0 && sec.form_factor.is_finite(),
+            "beta={beta}: Y_F is {}",
+            sec.form_factor
         );
         assert!(
-            ring_bending_section(&ring, 1.7, beta).is_none(),
-            "beta={beta}: a helical ring must not be rated on its transverse section"
+            sec.stress_correction(StressConcentration::Iso6336)
+                .is_some(),
+            "beta={beta}: the notch factor must be defined too"
+        );
+        // The virtual ring grows with helix (`z_n = z/cos³β`), and a bigger ring
+        // has a thicker root — so the form factor falls, as it does on an
+        // external gear.
+        assert!(
+            sec.form_factor < last,
+            "beta={beta}: Y_F {} should fall below {last}",
+            sec.form_factor
+        );
+        last = sec.form_factor;
+    }
+}
+
+/// The virtual spur ring at zero helix is the ring itself — by construction, not
+/// by a branch. The internal counterpart of the external identity DESIGN's
+/// appendix records.
+#[test]
+fn the_virtual_spur_ring_is_the_identity_at_zero_helix() {
+    use gear_core::ring::{Cutter, Ring};
+    for teeth in [43u32, 60, 90] {
+        let ring = Ring::new(
+            &GearParams {
+                teeth,
+                ..Default::default()
+            },
+            &Cutter::default(),
+        );
+        let v = ring.virtual_spur();
+        assert_eq!(v.r, ring.r, "z={teeth}: pitch radius");
+        assert_eq!(v.rb, ring.rb, "z={teeth}: base radius");
+        assert_eq!(v.ra, ring.ra, "z={teeth}: tip radius");
+        assert_eq!(v.rf, ring.rf, "z={teeth}: root radius");
+        assert_eq!(v.psi_b, ring.psi_b, "z={teeth}: tooth thickness");
+        assert_eq!(v.u_j, ring.u_j, "z={teeth}: junction");
+        assert_eq!(v.s_j, ring.s_j, "z={teeth}: junction travel");
+    }
+}
+
+/// **The rack limit holds at a helix angle too**, which is the check that the
+/// virtual spur *ring* is the right construction rather than merely a plausible
+/// one.
+///
+/// Grow the ring and its shaper together and both teeth become the same rack
+/// tooth in the normal plane — so the internal and external bending factors must
+/// converge, at any helix. Both sides reach it through their own virtual
+/// section, and those two virtualisations are independent: the external gear's
+/// comes from `Gear::virtual_spur`, the ring's from `Ring::virtual_spur` with the
+/// cutter scaled alongside.
+#[test]
+fn the_rack_limit_holds_at_a_helix_angle() {
+    for beta in [15.0, 30.0] {
+        let mut previous = f64::INFINITY;
+        for (z, cutter) in [(1_000u32, 500u32), (5_000, 2_500), (20_000, 10_000)] {
+            let (Some(external), Some(internal)) = j_factors_at(z, cutter, beta) else {
+                panic!("beta={beta} z={z}: no rating");
+            };
+            let gap = (internal - external).abs();
+            assert!(
+                gap < previous,
+                "beta={beta} z={z}: the gap must keep closing, {gap} vs {previous}"
+            );
+            previous = gap;
+        }
+        assert!(
+            previous < 2e-3,
+            "beta={beta}: the two constructions do not meet in the rack limit: {previous}"
         );
     }
-    // ...and the spur case, which is the same call at zero helix, does answer.
-    let ring = Ring::new(
-        &GearParams {
-            teeth: 60,
-            ..Default::default()
-        },
-        &Cutter::default(),
-    );
-    assert!(ring_bending_section(&ring, 1.7, 0.0).is_some());
 }

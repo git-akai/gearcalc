@@ -83,6 +83,15 @@ impl Default for Cutter {
 /// A ring gear's cross-section, so far as the involute goes.
 #[derive(Clone, Debug)]
 pub struct Ring {
+    /// The inputs this was built from, kept as [`crate::Gear`] keeps its own —
+    /// so a ring can produce its virtual spur section without being handed back
+    /// what it was made of.
+    pub params: GearParams,
+    /// ...and the tool, because the tool is part of the part (§4.11).
+    pub cutter: Cutter,
+    /// Tooth count, **rounded**. A virtual spur ring has a fractional one; the
+    /// geometry carries the exact value through `r` and `half_pitch`, and this
+    /// field is for replication and display.
     pub teeth: u32,
     /// Transverse module, mm.
     pub mt: f64,
@@ -139,17 +148,33 @@ impl Ring {
     /// external gear.
     #[must_use]
     pub fn new(params: &GearParams, cutter: &Cutter) -> Self {
+        Self::new_with_z(
+            params,
+            cutter,
+            f64::from(params.teeth.max(1)),
+            f64::from(cutter.teeth.max(1)),
+        )
+    }
+
+    /// The same, at an arbitrary — possibly fractional — tooth count for the ring
+    /// and its cutter.
+    ///
+    /// Exists for the **virtual spur ring**: rating a helical ring's bending means
+    /// working on its normal section, where both members carry `z / cos³β` teeth
+    /// and neither is a whole number. The same reason
+    /// [`crate::Gear`] builds its virtual gear from a non-integer `z`.
+    #[must_use]
+    pub fn new_with_z(params: &GearParams, cutter: &Cutter, z: f64, cutter_teeth: f64) -> Self {
         let mut clamps = Vec::new();
-        let z = params.teeth.max(1);
         let beta = params.helix_angle.to_radians();
         let alpha_n = params.pressure_angle.to_radians();
         let m = params.module;
         let mt = m / beta.cos();
         let alpha_t = (alpha_n.tan() / beta.cos()).atan();
 
-        let r = f64::from(z) * mt / 2.0;
+        let r = z * mt / 2.0;
         let rb = r * alpha_t.cos();
-        let half_pitch = std::f64::consts::PI / f64::from(z);
+        let half_pitch = std::f64::consts::PI / z;
 
         // ---- thickness. It is the SPACE that takes the external formula.
         //
@@ -223,13 +248,12 @@ impl Ring {
         // internal relation between tool and workpiece, read through the shared
         // `operating_geometry`: the cutter is member 1 (external, unshifted) and
         // the ring is member 2, so the signed sums are `z_c − z_r` and `−x_thick`.
-        let cutter_teeth = cutter.teeth.max(1);
-        let cutter_radius = f64::from(cutter_teeth) * mt / 2.0;
+        let cutter_radius = cutter_teeth * mt / 2.0;
         // A standard cutter: `k = 1`, no shift of its own. A resharpened tool
         // carries one, and it would enter the sums below exactly as the ring's
         // does; nothing here assumes it is zero beyond this line.
         let cutter_tooth = std::f64::consts::PI * mt / 2.0;
-        let sum_z = f64::from(cutter_teeth) - f64::from(z);
+        let sum_z = cutter_teeth - z;
         // Falls back to reference centres only when the shift takes the pair out
         // of the involute domain, which `ShaperCut::new` then refuses anyway.
         let a_cut = operating_geometry(mt, alpha_t, alpha_n, sum_z, -x_thick)
@@ -252,14 +276,18 @@ impl Ring {
             workpiece_tooth: tooth,
             cutter_tooth,
             centre_distance: a_cut,
-            cutter_teeth,
+            cutter_radius,
             cutter_tip_radius,
             tip_round: m * cutter.tip_round,
             kind: MeshKind::Internal,
         });
 
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let teeth = z.round().max(1.0) as u32;
         let mut ring = Self {
-            teeth: z,
+            params: *params,
+            cutter: *cutter,
+            teeth,
             mt,
             alpha_t,
             alpha_n,
@@ -435,6 +463,48 @@ impl Ring {
     #[must_use]
     pub fn trochoid_at(&self, s: f64) -> (f64, f64) {
         self.cut.trochoid_at(s)
+    }
+
+    /// The **virtual spur ring**: this ring's normal section, as a spur ring.
+    ///
+    /// Bending is rated on the normal section, so a helical ring has to be rated
+    /// on this rather than on its transverse form — measuring `Y_F` transversely
+    /// and dividing by `m_n` mixes planes and under-predicts by about `cos β`,
+    /// the error `docs/DESIGN.md` §12 records for external gears.
+    ///
+    /// The construction is ISO's, the same one [`crate::Gear::virtual_spur`]
+    /// uses: `z_n = z / cos³β` at the normal module and normal pressure angle.
+    /// **The cutter is virtualised the same way**, because a ring's form is its
+    /// tool's — and scaling both by the same factor leaves `z_c/z_r` unchanged, so
+    /// the virtual pair still rolls together and the cut stays conjugate.
+    ///
+    /// At `β = 0` this rebuilds the ring it was called on, by construction rather
+    /// than by a branch.
+    #[must_use]
+    pub fn virtual_spur(&self) -> Self {
+        let beta = self.params.helix_angle.to_radians();
+        let scale = beta.cos().powi(3);
+        let params = GearParams {
+            helix_angle: 0.0,
+            ..self.params
+        };
+        Self::new_with_z(
+            &params,
+            &self.cutter,
+            f64::from(self.params.teeth.max(1)) / scale,
+            f64::from(self.cutter.teeth.max(1)) / scale,
+        )
+    }
+
+    /// Base helix angle, radians — `sin β_b = sin β cos α_n`.
+    ///
+    /// The same relation [`crate::metrology::base_helix_angle`] gives an external
+    /// gear; it is a property of the reference rack, not of which side the
+    /// material is on.
+    #[must_use]
+    pub fn base_helix_angle(&self) -> f64 {
+        let beta = self.params.helix_angle.to_radians();
+        (beta.sin() * self.alpha_n.cos()).asin()
     }
 
     /// The fillet point and its tangent, Cartesian, tooth centred on `+y`.
