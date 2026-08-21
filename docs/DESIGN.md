@@ -1,7 +1,7 @@
 # Gear & geartrain design tool — architecture and mathematics
 
-**Status: milestones 0–9 complete and in CI; milestone 10 (crossed-axis spur) is
-the open work.** This document is the design of record and is current as of the head
+**Status: milestones 0–10 complete and in CI; milestone 11 (polish) is the open
+work.** This document is the design of record and is current as of the head
 of `main`. Where implementation contradicted the design, the design was corrected
 and the correction recorded — see §12.
 
@@ -16,7 +16,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Geometry core | involute + trochoid profile, undercut, severed teeth | rack simulation, both bounds, 1080 cases |
 | Internal gears | ring profile, **profile shift**, shaper-cut fillet at its true centre distance, junction, generation limit, mesh interference, **bending rating** | the cut simulated from the tool alone, 2.5–2.7 µm across shifts −0.4…+0.5; the bending model meeting the external one in the rack limit |
 | Planetary sets | common-centre-distance shift solve, ring search, layout checks, Willis kinematics, Pennestrì efficiency, backlash referral | the ideal ring needing exactly zero shift; a held carrier giving exactly `η₀`; the three classical ratios; play at two output shafts differing by exactly their ratio |
-| Crossed axes | screw gearing — lead angle, both efficiencies, self-locking, elliptical contact | the classical closed forms at Σ = 90°, and an energy balance at every Σ |
+| Crossed axes | screw gearing — lead angle, both efficiencies, self-locking, elliptical contact; **worm drives and crossed gear pairs from one stage**, differing only in which of diameter and helix angle is the input | the classical closed forms at Σ = 90°, an energy balance at every Σ, and a derived diameter reproducing `γ₁ = 90° − β₁` exactly |
 | Primitives | safeguarded `inv⁻¹`, Brent, bracketed Newton | textbook special cases |
 | Mesh | centre distance, exact backlash, contact path | direct tooth-thickness computation |
 | Contact | one Hertz formula, line contact its degenerate value | bit-identical to the line result at parallel axes |
@@ -53,7 +53,7 @@ cd web && npm run dev             # the application
 
 ## What is next
 
-Milestone 10 (crossed-axis spur) is the open work; §11 has the full list. The
+Milestone 11 (polish) is the open work; §11 has the full list. The
 layout mathematics of §4.8 is **done** — `planetary.rs` holds the shift solve,
 its closed-form bracket, the ring search and the layout checks, drivable as
 `gear-cli planetary` — as is the shifted internal mesh it needed. The ring's bending
@@ -776,6 +776,48 @@ arrive as a different `(κ₁, κ₂, direction)` triple rather than a rework.
 
 A **ZK** worm — ground with a conical wheel — is not in this family at all: its
 flank is not ruled, and it would need its own treatment.
+
+##### A worm drive and a crossed gear pair differ in one input, and nothing else
+
+§4.5.1 argued they are the same mathematics. Milestone 10 is where that was
+cashed, and it cost no new mathematics at all.
+
+A worm's pitch diameter is a **free choice**: nothing in its thread count fixes
+it, and it is what sets the lead angle, the efficiency and whether the drive can
+be back-driven. An ordinary gear's is not free — it follows from its tooth count
+and helix angle. So the two differ in which of `d` and `β` is the input:
+
+```text
+sin γ = z m_n / d        γ = 90° − β        ⟹      sin γ = cos β
+```
+
+Give the first member `d₁ = z₁ m_n / cos β₁` and the screw geometry returns
+`γ₁ = 90° − β₁` and `β₂ = Σ − β₁` [verified to 1e-9 over three tooth pairs × four
+shaft angles × three helix angles]. So one stage covers both, one result type,
+one solve — and the worm answers are **bit-identical**, since a given diameter is
+still a given diameter.
+
+**Two ends of the range are refused, and they are not symmetric.**
+
+- `sin γ ≥ 1` — the thread would wrap at 90° or more. Sized by diameter this is a
+  worm too thin for its starts; sized by helix angle it is `β₁ = 0`, a spur first
+  member, which has *no lead at all*. A crossed-axis **spur** pair is still
+  representable: label the helical member first at `β₁ = Σ` and its mate comes out
+  at `β₂ = 0`. Which member is "first" is a labelling choice, and that is the
+  labelling with a lead angle to speak of.
+- `β₁ = 90°` — the teeth run circumferentially and the pitch diameter is
+  unbounded: a disc, not a gear. This one has to be caught where the *helix angle*
+  is still known, because `cos 90°` is 6e-17 rather than zero, so a derived
+  diameter comes out merely enormous (2.8e17 mm on a 17-tooth member) and every
+  finiteness check downstream is satisfied. `sin γ₁` is then 6e-17, so the guard
+  at the *other* end sees nothing wrong either.
+
+**Where a crossed pair sits.** It slides hard at the pitch point — `1/cos γ₁`,
+which is 1.41 × the pitch line speed at 45° — so it is far less efficient than a
+parallel-axis mesh and far better than a worm of the same shaft angle. Swept over
+the helix split at Σ = 90° with μ = 0.06, efficiency peaks near the symmetric
+45°/45° division at about 88 % and falls away toward either extreme as the sliding
+ratio climbs [`gear-cli crossed`].
 
 ##### Decided: a worm stage reports no bending stress at all
 
@@ -2586,7 +2628,7 @@ On top of that:
 | Q | Resolution |
 |---|---|
 | Q1 | Output speed/torque are **outputs**. Only input speed and input torques are inputs. §4.9. |
-| Q2 | **Settled.** Crossed helical is unified with worm gearing as crossed-axis screw gearing (`screw.rs`, §4.5.1), and the contact section was unified before it (§4.7) so the crossed case is a parameter rather than a branch. A worm stage reports **no bending stress**, deliberately: the tooth whose form would be measured is not the tooth that is loaded, the load case differs in kind, and no standard rates worm bending, so nothing could check it. |
+| Q2 | **Settled, and now built.** Milestone 10 added no mathematics: a crossed gear pair is the worm stage sized the other way round (§4.5.1). Original resolution:  Crossed helical is unified with worm gearing as crossed-axis screw gearing (`screw.rs`, §4.5.1), and the contact section was unified before it (§4.7) so the crossed case is a parameter rather than a branch. A worm stage reports **no bending stress**, deliberately: the tooth whose form would be measured is not the tooth that is loaded, the load case differs in kind, and no standard rates worm bending, so nothing could check it. |
 | Q3 | Working depth = the depth at which the undercut question is asked. **Revision 1 was wrong**; corrected in §4.3, and it now reproduces the classical z=17 result. |
 | Q4 | JGMA 116-02 extracted and characterised (§4.6.1) — a banded lookup table. Tooth thickness tolerance deferred; nominal-only outputs, with `Option` fields left in place. |
 | Q5 | Two-pin and three-pin, odd and even, all four closed form and independently verified (§4.6). |
@@ -2657,7 +2699,7 @@ it can be validated in isolation.
 | 7 | ✅ **Worm stage** — the contact unification, screw-gear mathematics, the worm stage, and a train that holds both kinds | **met** — the unified contact model is bit-identical to line contact at its degenerate parameters and `gear-cli strength 17 43 2.0` is unchanged to the last digit; the self-locking threshold is exact (η_back is zero at `μ = cos α_n tan γ`, not merely small); a mixed train solves end to end in the CLI, across the wasm boundary and in the browser |
 | 8 | ✅ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | **met** — the cut simulated from the cutter and the rolling alone agrees with the analytic profile to **3.6 µm**; the rack is confirmed as the shaper's `z_c → ∞` limit, first order in `1/z_c`; the generation limit and both mesh interference conditions are derived rather than quoted. Radial assembly is **shelved** (§4.11) |
 | 9 | ✅ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency, the stage, the boundary and the UI | **met** — the ideal ring `z_s + 2z_p` needs **exactly** zero planet shift and the two centre distances agree to 1e-12; a held carrier gives **exactly** the product of its two mesh efficiencies; all six drive modes reproduce their classical ratios to 1e-12; play referred to two different output shafts differs by exactly their ratio; helical to parity with spur throughout. A set solves end to end in `gear-cli`, across the wasm boundary and in the browser, the three agreeing. Radial assembly is **shelved** with its findings recorded (§4.11) |
-| 10 | ⬜ **Crossed-axis spur** — reuse `screw.rs`, point-contact Hertz | Q2 revisited with the worm model in hand |
+| 10 | ✅ **Crossed-axis spur** — reuse `screw.rs`, point-contact Hertz | **met, and it really was a parameter rather than a branch.** A crossed gear pair *is* a `Screw` whose first member's diameter is derived from a helix angle instead of given: `sin γ = z m_n/d` and `γ = 90° − β` make `sin γ = cos β`, so nothing else changes. Verified to 1e-9 over three tooth pairs × four shaft angles × three helix angles, with the worm canary `gear-cli wormstage 1 40 7 2` **bit-identical**. No new kinematics, contact model, efficiency or wasm entry point |
 | 11 | ⬜ **Polish** — train import/export, confirmations, error surfacing, docs | — |
 
 Milestone 9 was where the *reuse* argument was tested rather than asserted, and
@@ -2906,6 +2948,9 @@ here. Revision 2 additions are marked ★.
 | ▣ Every law proved in the core shows up in the assembled stage | the same run | internal contact ratio above external (1.936 vs 1.566), internal relative radius the larger, internal contact stress below (245 vs 350 MPa), ring bending below sun (10.5 vs 15.9 MPa). Each was proved as a law in `ring.rs`; asserting them again here is what catches the two meshes being wired the wrong way round, which no amount of core testing would |
 | ▣ One `k` satisfies both invariants at once | k = 0.9, 1.0, 1.15 | the external pair sums to two and the internal pair matches, to 1e-15, from a single stored value — so a planetary set cannot be given inconsistent thickness modifications |
 | ▣ Helical parity | β = 10, 20, 30° | every figure a spur set reports, a helical one reports too, ring bending included; the planet-shift residual stays below 1e-12 |
+| ▣ **A crossed gear pair is a worm stage sized the other way** | a `Screw` built with `d₁ = z₁ m_n/cos β₁`, three tooth pairs × four shaft angles × three helix angles | `γ₁ = 90° − β₁` and `β₂ = Σ − β₁` to 1e-9, and the mate's diameter derived independently as `z₂ m_n/cos β₂` matching the crate's own. Handing the derived diameter *back* as a diameter reproduces the pair bit-identically |
+| ▣ The worm canary after the change | `gear-cli wormstage 1 40 7 2`, all twenty-odd figures | **bit-identical** — a given diameter is still a given diameter |
+| ▣ Where a crossed pair sits, as comparisons | Σ = 90°, μ = 0.06 | above a worm of the same shaft angle and below 95 %; efficiency falls monotonically as the shaft angle grows, since sliding grows with it. Both bounds computed rather than remembered |
 | ▣ **A pin is genuinely tangent to a ring's generated flank** | minimum distance from the pin centre to a dense sampling of `Ring::involute_at`, five rings including shifted and 25° | **2.5e-10 mm** against the pin's radius. Shares no algebra with the derivation, so it tests the `σ` signs rather than restating them — the external counterpart of the same check reads 3.8e-12 mm |
 | ▣ A larger pin sits deeper inside and higher outside | four pin sizes on a 60-tooth ring and a 60-tooth gear | monotone in opposite directions, with contact above the centre inside and below it outside. The cheapest check that the `d_p` sign is the right way round, since getting it backwards still produces a plausible number |
 | ▣ **The root trochoid against its best-fit circle** | least-squares circle through the generated fillet, 4 cutter sizes × 4 ring sizes, and 5 external sizes | best-fit radius **1.1–3.1 × ρ**, departing from any circle by 0.7–26 µm. `ρ_F` at the critical section is 1.47–2.52 × ρ external and 3.55–4.26 × on a ring — so an arc of the tool's own radius would be wrong by a factor, not a rounding |

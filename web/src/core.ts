@@ -453,6 +453,12 @@ export interface WormMember {
   material: string;
   material_overrides: Overrides;
 }
+/** How the first member's size is fixed — the only thing separating a worm drive
+ *  from a crossed gear pair. A worm's diameter is a free choice and its lead
+ *  angle follows; a gear's diameter follows from its tooth count and helix
+ *  angle. Same geometry, opposite input. Mirrors Rust's `FirstMemberSizing`. */
+export type FirstMemberSizing = { pitch_diameter: number } | { helix_angle: number };
+
 export interface WormStage {
   kind: "worm";
   module: number;
@@ -460,7 +466,7 @@ export interface WormStage {
   shaft_angle: number;
   friction: number;
   starts: number;
-  worm_pitch_diameter: number;
+  sizing: FirstMemberSizing;
   wheel_teeth: number;
   centre_distance: Auto<number>;
   clearance: number;
@@ -718,7 +724,7 @@ export function defaultWormStage(): WormStage {
     shaft_angle: 90,
     friction: 0.06,
     starts: 1,
-    worm_pitch_diameter: 7,
+    sizing: { pitch_diameter: 7 },
     wheel_teeth: 40,
     centre_distance: { auto: true, manual: 0 },
     clearance: 0.02,
@@ -729,6 +735,17 @@ export function defaultWormStage(): WormStage {
     wheel: member("Brass C360"),
   };
 }
+/** A crossed gear pair: the same stage as a worm drive, sized by helix angle
+ *  instead of by diameter. */
+export function defaultCrossedStage(): WormStage {
+  return {
+    ...defaultWormStage(),
+    starts: 17,
+    wheel_teeth: 23,
+    sizing: { helix_angle: 45 },
+  };
+}
+
 export function defaultPlanetaryStage(): PlanetaryStage {
   return {
     kind: "planetary",

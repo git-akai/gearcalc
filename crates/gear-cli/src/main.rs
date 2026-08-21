@@ -9,6 +9,8 @@
 //! gear-cli strength [z1] [z2] [torque] [material] [helix]
 //!                             a worked mesh: bending, contact, efficiency
 //! gear-cli train              a two-stage geartrain, end to end
+//! gear-cli crossed [z1] [z2] [shaft angle]
+//!                             a crossed gear pair, swept over the helix split
 //! gear-cli planetstage [z_sun] [z_planet] [z_ring] [N] [helix]
 //!                             a planetary stage, end to end
 //! gear-cli planetary [z_sun] [z_planet] [N] [x_sun] [x_ring]
@@ -31,6 +33,11 @@ fn main() {
         Some("loadcase") => loadcase_report(),
         Some("materials") => materials(),
         Some("train") => train_report(args.get(1).map(String::as_str) == Some("mixed")),
+        Some("crossed") => crossed_report(
+            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
+            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(23),
+            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(90.0),
+        ),
         Some("wormstage") => worm_stage_report(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(1),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(40),
@@ -1006,7 +1013,7 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
     let stage = WormStage {
         starts,
         wheel_teeth,
-        worm_pitch_diameter: worm_diameter,
+        sizing: gear_core::train::FirstMemberSizing::PitchDiameter(worm_diameter),
         wheel: WormMember {
             material: "Brass C360".into(),
             ..WormMember::default()
@@ -1275,5 +1282,67 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
         for note in &r.notes {
             println!("note: {note}");
         }
+    }
+}
+
+/// A crossed gear pair, swept over how the shaft angle divides between the two
+/// members.
+///
+/// The split is the design freedom a worm does not have: a worm's diameter is
+/// chosen and its lead angle follows, while two gears have their diameters fixed
+/// by tooth count and helix, so `β₁` is what there is to choose. Nothing else
+/// about the pair changes — it is the same screw geometry either way.
+fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
+    use gear_core::train::{solve_worm_stage, FirstMemberSizing, WormStage};
+
+    let lib = gear_io::default_library();
+    println!(
+        "crossed gear pair  z {z1}/{z2}  shaft angle {shaft_angle} deg  module 1  alpha 20 deg  \
+         mu 0.06"
+    );
+    println!(
+        "\n{:>7} {:>7} {:>9} {:>9} {:>10} {:>10} {:>11} {:>10}",
+        "beta1", "beta2", "d1 mm", "d2 mm", "a mm", "slide/v1", "eta fwd", "sigma_H"
+    );
+    let mut any = false;
+    for i in 0..=10 {
+        #[allow(clippy::cast_precision_loss)]
+        let beta1 = shaft_angle * (i as f64 / 10.0);
+        let stage = WormStage {
+            shaft_angle,
+            starts: z1,
+            wheel_teeth: z2,
+            sizing: FirstMemberSizing::HelixAngle(beta1),
+            ..WormStage::default()
+        };
+        let Ok(g) = stage.geometry() else {
+            println!("{beta1:>7.1} {:>7} — no such pair", shaft_angle - beta1);
+            continue;
+        };
+        match solve_worm_stage(&stage, 2.0, &lib) {
+            Err(e) => println!(
+                "{beta1:>7.1} {:>7.1}  {e}",
+                g.wheel_helix_angle.to_degrees()
+            ),
+            Ok(r) => {
+                any = true;
+                println!(
+                    "{beta1:>7.1} {:>7.1} {:>9.4} {:>9.4} {:>10.4} {:>10.4} {:>10.3} % {:>9.1}",
+                    g.wheel_helix_angle.to_degrees(),
+                    g.worm_pitch_diameter,
+                    g.wheel_pitch_diameter,
+                    g.centre_distance,
+                    g.sliding_ratio,
+                    r.efficiency.forward * 100.0,
+                    r.contact.max_pressure
+                );
+            }
+        }
+    }
+    if any {
+        println!(
+            "\nA worm is the same geometry with the first member's diameter chosen instead \
+             of its helix;\nthe split above is the freedom two gears have and a worm does not."
+        );
     }
 }

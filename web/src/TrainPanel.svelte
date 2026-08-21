@@ -2,6 +2,7 @@
   import {
     solveTrain,
     defaultStage,
+    defaultCrossedStage,
     defaultPlanetaryStage,
     defaultWormStage,
     outside,
@@ -36,6 +37,10 @@
   function addStage() {
     tab.train.stages.push(defaultStage());
     open[tab.train.stages.length - 1] = true;
+  }
+
+  function addCrossedStage() {
+    tab.train.stages.push(defaultCrossedStage());
   }
 
   function addPlanetaryStage() {
@@ -557,16 +562,47 @@
 
             <div class="gears">
               <div class="gear">
-                <h4>Worm</h4>
+                <h4>{"pitch_diameter" in stage.sizing ? "Worm" : "First gear"}</h4>
                 <label>
-                  <span>Starts</span>
+                  <span>{"pitch_diameter" in stage.sizing ? "Starts" : "Tooth count"}</span>
                   <input type="number" step="1" bind:value={stage.starts} />
                 </label>
                 <label>
-                  <span>Pitch diameter</span>
-                  <input type="number" step="0.5" bind:value={stage.worm_pitch_diameter} />
-                  <em>mm</em>
+                  <span>Sized by</span>
+                  <select
+                    value={"pitch_diameter" in stage.sizing ? "diameter" : "helix"}
+                    onchange={(e) => {
+                      // Swap which of the two is the input, seeding the new one
+                      // from the geometry so the pair does not jump.
+                      const g = wres;
+                      stage.sizing =
+                        e.currentTarget.value === "diameter"
+                          ? { pitch_diameter: g ? g.members[0].pitch_diameter : 7 }
+                          : { helix_angle: g ? 90 - g.lead_angle : 45 };
+                    }}
+                  >
+                    <option value="diameter">Pitch diameter — a worm</option>
+                    <option value="helix">Helix angle — a gear</option>
+                  </select>
+                  <small>
+                    a worm's diameter is a free choice and its lead angle follows; a gear's
+                    diameter follows from its teeth and helix. Same geometry, opposite input
+                  </small>
                 </label>
+                {#if "pitch_diameter" in stage.sizing}
+                  <label>
+                    <span>Pitch diameter</span>
+                    <input type="number" step="0.5" bind:value={stage.sizing.pitch_diameter} />
+                    <em>mm</em>
+                  </label>
+                {:else}
+                  <label>
+                    <span>Helix angle</span>
+                    <input type="number" step="1" bind:value={stage.sizing.helix_angle} />
+                    <em>°</em>
+                    <small>the mate takes the rest of the shaft angle</small>
+                  </label>
+                {/if}
                 <label>
                   <span>Length</span>
                   <input type="number" step="1" bind:value={stage.worm.face_width} />
@@ -962,6 +998,7 @@
 
   <button class="add" onclick={addStage}>+ Add spur stage</button>
   <button class="add" onclick={addWormStage}>+ Add worm stage</button>
+  <button class="add" onclick={addCrossedStage}>+ Add crossed gear stage</button>
   <button class="add" onclick={addPlanetaryStage}>+ Add planetary stage</button>
 </div>
 

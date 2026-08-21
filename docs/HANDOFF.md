@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–9 complete and in CI. 307 tests, ~27 s.**
+**Milestones 0–10 complete and in CI. 319 tests, ~26 s.**
 
 ```bash
 nix develop                       # or `direnv allow` once
@@ -38,7 +38,10 @@ helical throughout) · efficiency · automatic profile shift and altered addendu
 **Crossed axes.** `screw.rs`: lead angle `sin γ = z m_n/d` exact, both
 efficiencies from a force balance, self-locking, sliding as a vector, elliptical
 contact. The contact section was unified *first* — one Hertz formula with
-lengthwise curvature as its parameter, line contact its degenerate value.
+lengthwise curvature as its parameter, line contact its degenerate value. **Worm
+drives and crossed gear pairs are one stage**, differing only in whether the
+first member's diameter is given or derived from a helix angle: `sin γ = cos β`
+does the rest.
 
 **Internal gears.** `ring.rs` and `shaper.rs`: the ring's flank, its profile
 shift, a shaper-cut fillet **at the centre distance the shift puts the tool at**,
@@ -74,6 +77,7 @@ cargo run --bin gear-cli -- train                  # a two-stage train
 cargo run --bin gear-cli -- train mixed            # ...with a worm stage in it
 cargo run --bin gear-cli -- worm 1 40 7 90         # a worm pair, both directions
 cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
+cargo run --bin gear-cli -- crossed 17 23 90       # a crossed pair, swept over the split
 cargo run --bin gear-cli -- planetary 17 17 3      # every ring count that can work
 cargo run --bin gear-cli -- planetstage 24 18 60 3 # a planetary stage, six modes
 cargo run --release --bin gear-cli -- verify 100   # the two-sided cutter check
@@ -312,17 +316,6 @@ Known-approximate, documented at the call site rather than hidden:
 ---
 
 ## 6. Next
-
-### Milestone 10 — crossed-axis spur
-
-Cheap, and for a reason worth stating: `screw.rs` already carries crossed-axis
-kinematics and the general Hertz already takes a lengthwise curvature, so this is
-geometry and a stage rather than new mathematics. DESIGN §10 has it revisiting Q2
-with the worm model in hand.
-
-What to expect to be real work rather than wiring: the contact ratio of a crossed
-pair (the zone of action is not the parallel-axis one), and deciding what bending
-means when the two members touch at a point.
 
 ### Milestone 11 — polish
 

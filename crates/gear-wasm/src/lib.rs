@@ -827,7 +827,7 @@ mod tests {
                ]},
               {"kind":"worm",
                "module":1.0,"pressure_angle":20.0,"shaft_angle":90.0,"friction":0.06,
-               "starts":1,"worm_pitch_diameter":7.0,"wheel_teeth":40,
+               "starts":1,"sizing":{"pitch_diameter":7.0},"wheel_teeth":40,
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
                "axial_clearance":0.04,

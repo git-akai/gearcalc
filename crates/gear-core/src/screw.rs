@@ -149,6 +149,16 @@ pub enum ScrewError {
     /// Parallel axes. There is no sliding at the pitch point, so this model has
     /// nothing to say; see the module documentation.
     AxesAreParallel,
+    /// The first member's helix angle reaches 90°: its teeth would run
+    /// circumferentially and its pitch diameter is unbounded. That is a disc, not
+    /// a gear.
+    ///
+    /// The opposite end of [`Self::WormTooThin`], and it has to be caught where
+    /// the *helix angle* is still known: by the time a diameter has been derived
+    /// from it, `cos 90°` is 6e-17 rather than zero, so the diameter is merely
+    /// enormous — 2.8e17 mm on a 17-tooth member — and every check downstream
+    /// finds it perfectly finite.
+    FirstMemberIsADisc,
 }
 
 impl Screw {

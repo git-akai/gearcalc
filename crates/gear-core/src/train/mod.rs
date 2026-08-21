@@ -38,7 +38,8 @@ pub use planetary::{
 };
 pub use spur::{solve_stage, SpurStage, StageGear};
 pub use worm::{
-    solve_worm_stage, WormContact, WormMember, WormMemberResult, WormResult, WormStage,
+    solve_worm_stage, FirstMemberSizing, WormContact, WormMember, WormMemberResult, WormResult,
+    WormStage,
 };
 
 /// The three contact ratios.
@@ -175,12 +176,21 @@ impl std::fmt::Display for TrainError {
                 }
                 crate::screw::ScrewError::WormTooThin => write!(
                     f,
-                    "the worm is too thin for that many starts at that module: \
-                     the thread would have to wrap at ninety degrees or more"
+                    "the first member has no lead angle: sized by diameter, the worm \
+                     is too thin for that many starts at that module and its thread \
+                     would have to wrap at ninety degrees or more; sized by helix \
+                     angle, a zero helix makes it a spur gear, which has no lead at \
+                     all — put the helical member first and the spur one second"
                 ),
                 crate::screw::ScrewError::ShaftAngleImpossible => {
                     write!(f, "that shaft angle leaves the wheel with no lead angle")
                 }
+                crate::screw::ScrewError::FirstMemberIsADisc => write!(
+                    f,
+                    "the first member's helix angle reaches ninety degrees: its teeth \
+                     would run circumferentially and its pitch diameter is unbounded, \
+                     which is a disc rather than a gear"
+                ),
                 crate::screw::ScrewError::AxesAreParallel => write!(
                     f,
                     "parallel axes: a worm stage needs crossed shafts, and a \

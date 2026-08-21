@@ -91,8 +91,9 @@ pub struct WormStage {
     pub friction: f64,
     /// Starts on the worm.
     pub starts: u32,
-    /// The worm's pitch diameter, mm — the input that sets the lead angle.
-    pub worm_pitch_diameter: f64,
+    /// How the first member's size is fixed — the *only* thing that
+    /// distinguishes a worm drive from a crossed gear pair.
+    pub sizing: FirstMemberSizing,
     /// Teeth on the wheel.
     pub wheel_teeth: u32,
     /// Automatic uses the geometry's own centre distance plus `clearance`.
@@ -117,7 +118,7 @@ impl Default for WormStage {
             shaft_angle: 90.0,
             friction: 0.06,
             starts: 1,
-            worm_pitch_diameter: 7.0,
+            sizing: FirstMemberSizing::PitchDiameter(7.0),
             wheel_teeth: 40,
             centre_distance: Auto::automatic(0.0),
             clearance: 0.02,
@@ -207,20 +208,75 @@ pub struct WormResult {
     pub notes: Vec<String>,
 }
 
+/// How the first member's size is fixed.
+///
+/// **This is the whole of the difference between a worm drive and a crossed gear
+/// pair**, and it is worth being explicit about because the mathematics is
+/// otherwise identical — §4.5.1 argued they are one thing, and this is where that
+/// argument is cashed.
+///
+/// A worm's pitch diameter is a *free choice*: nothing in its thread count fixes
+/// it, and it is what sets the lead angle, the efficiency, and whether the drive
+/// can be back-driven at all. An ordinary gear's is not free — it follows from
+/// its tooth count and helix angle, `d = z m_n / cos β`. So the two differ in
+/// which of `d` and `β` is the input, and in nothing else:
+///
+/// ```text
+/// sin γ = z m_n / d        and      γ = 90° − β        so      sin γ = cos β
+/// ```
+///
+/// [verified: a `Screw` built with `d₁ = z₁ m_n / cos β₁` reports
+/// `γ₁ = 90° − β₁` exactly, and `β₂ = Σ − β₁`, over three tooth pairs × four
+/// shaft angles × three helix angles.]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum FirstMemberSizing {
+    /// A **worm**: the pitch diameter is given, and the lead angle follows.
+    PitchDiameter(f64),
+    /// A **gear**: the helix angle is given in degrees, and the pitch diameter
+    /// follows. `β = 0` makes the first member an ordinary spur gear crossed with
+    /// a helical one, which is what "crossed-axis spur" means.
+    HelixAngle(f64),
+}
+
 impl WormStage {
+    /// The first member's pitch diameter, mm — given, or derived from its helix
+    /// angle.
+    #[must_use]
+    pub fn first_pitch_diameter(&self) -> f64 {
+        match self.sizing {
+            FirstMemberSizing::PitchDiameter(d) => d,
+            FirstMemberSizing::HelixAngle(beta_deg) => {
+                f64::from(self.starts.max(1)) * self.module / beta_deg.to_radians().cos()
+            }
+        }
+    }
+
     /// The screw geometry this stage describes.
     ///
     /// # Errors
     ///
     /// [`TrainError::Screw`] if the pair cannot exist.
     pub fn geometry(&self) -> Result<Screw, TrainError> {
+        // Caught here rather than in `Screw::new`, because by then the helix
+        // angle has become a diameter and the information is gone: `cos 90°` is
+        // 6e-17, not zero, so the diameter comes out enormous rather than
+        // infinite and passes every finiteness check downstream.
+        if let FirstMemberSizing::HelixAngle(beta) = self.sizing {
+            if beta.abs() >= 90.0 {
+                return Err(TrainError::Screw(
+                    crate::screw::ScrewError::FirstMemberIsADisc,
+                ));
+            }
+        }
         Screw::new(&ScrewParams {
             normal_module: self.module,
             normal_pressure_angle: self.pressure_angle.to_radians(),
             shaft_angle: self.shaft_angle.to_radians(),
             starts: self.starts,
             wheel_teeth: self.wheel_teeth,
-            worm_pitch_diameter: self.worm_pitch_diameter,
+            worm_pitch_diameter: self.first_pitch_diameter(),
         })
         .map_err(TrainError::Screw)
     }
@@ -400,7 +456,7 @@ mod tests {
             let stage = WormStage {
                 starts,
                 wheel_teeth: teeth,
-                worm_pitch_diameter: d1,
+                sizing: FirstMemberSizing::PitchDiameter(d1),
                 axial_clearance: 0.04,
                 // isolate the axial term: no clearance on the centre distance
                 clearance: 0.0,
@@ -515,7 +571,7 @@ mod tests {
     fn self_locking_is_said_out_loud() {
         let r = solved(&WormStage {
             starts: 1,
-            worm_pitch_diameter: 25.0,
+            sizing: FirstMemberSizing::PitchDiameter(25.0),
             friction: 0.06,
             ..Default::default()
         });
@@ -532,7 +588,7 @@ mod tests {
         let err = solve_worm_stage(
             &WormStage {
                 starts: 9,
-                worm_pitch_diameter: 8.0,
+                sizing: FirstMemberSizing::PitchDiameter(8.0),
                 ..Default::default()
             },
             2.0,
@@ -554,5 +610,213 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(err, TrainError::UnknownMaterial(_)), "{err}");
+    }
+    /// **A crossed gear pair is this same stage, sized the other way.**
+    ///
+    /// Giving the first member a helix angle instead of a diameter must produce a
+    /// lead angle of exactly `90° − β₁`, and a second member at `β₂ = Σ − β₁`.
+    /// That is the whole of §4.5.1's claim that worm and crossed-helical gearing
+    /// are one thing, and it is checkable without knowing any answers.
+    #[test]
+    fn a_helix_angle_and_a_pitch_diameter_describe_the_same_pair() {
+        for (z1, z2) in [(17u32, 23u32), (20, 20), (1, 40)] {
+            for sigma in [45.0f64, 60.0, 90.0] {
+                for beta1 in [15.0f64, 30.0, 45.0] {
+                    if sigma - beta1 < 0.0 || sigma - beta1 > 89.0 {
+                        continue;
+                    }
+                    let by_angle = WormStage {
+                        shaft_angle: sigma,
+                        starts: z1,
+                        wheel_teeth: z2,
+                        sizing: FirstMemberSizing::HelixAngle(beta1),
+                        ..WormStage::default()
+                    };
+                    let Ok(a) = by_angle.geometry() else { continue };
+                    assert!(
+                        (a.lead_angle.to_degrees() - (90.0 - beta1)).abs() < 1e-9,
+                        "z={z1}/{z2} S={sigma} b={beta1}: lead angle {}",
+                        a.lead_angle.to_degrees()
+                    );
+                    assert!(
+                        (a.wheel_helix_angle.to_degrees() - (sigma - beta1)).abs() < 1e-9,
+                        "z={z1}/{z2} S={sigma} b={beta1}: wheel helix {}",
+                        a.wheel_helix_angle.to_degrees()
+                    );
+
+                    // ...and handing the derived diameter back as a diameter is
+                    // the same pair, which is what "sized the other way" means.
+                    let by_diameter = WormStage {
+                        sizing: FirstMemberSizing::PitchDiameter(by_angle.first_pitch_diameter()),
+                        ..by_angle.clone()
+                    };
+                    let b = by_diameter.geometry().unwrap();
+                    assert_eq!(a.lead_angle, b.lead_angle);
+                    assert_eq!(a.wheel_pitch_diameter, b.wheel_pitch_diameter);
+                    assert_eq!(a.centre_distance, b.centre_distance);
+                }
+            }
+        }
+    }
+
+    /// **A crossed-axis *spur* pair works, with the spur member second.**
+    ///
+    /// Put the helical member first at `β₁ = Σ` and the mate comes out at
+    /// `β₂ = 0` — an ordinary spur gear, crossed. Which member is "first" is a
+    /// labelling choice, and this is the labelling that has a lead angle to
+    /// speak of.
+    ///
+    /// The other order is genuinely not representable, and for a reason worth
+    /// stating rather than working around: at `β₁ = 0` the first member's lead
+    /// angle is exactly 90°, so its *lead* and *axial module* are infinite. Not a
+    /// numerical artefact — a spur gear is not a screw, and it has no lead. The
+    /// stage refuses that ordering and says so.
+    #[test]
+    fn a_crossed_axis_spur_pair_puts_the_spur_member_second() {
+        for sigma in [20.0f64, 30.0, 45.0, 60.0] {
+            let stage = WormStage {
+                shaft_angle: sigma,
+                starts: 17,
+                wheel_teeth: 23,
+                // The helical member takes the whole shaft angle...
+                sizing: FirstMemberSizing::HelixAngle(sigma),
+                ..WormStage::default()
+            };
+            let s = stage
+                .geometry()
+                .unwrap_or_else(|e| panic!("Sigma={sigma}: {e}"));
+            // ...leaving the mate a spur gear.
+            assert!(
+                s.wheel_helix_angle.abs() < 1e-9,
+                "Sigma={sigma}: wheel helix {}",
+                s.wheel_helix_angle.to_degrees()
+            );
+            // Its pitch diameter is then the plain `z m_n`, no helix correction.
+            assert!((s.wheel_pitch_diameter - 23.0).abs() < 1e-12);
+            // And everything reported stays finite — the singular quantities are
+            // the *first* member's, and the first member is the helical one.
+            assert!(s.lead.is_finite() && s.axial_module.is_finite());
+            assert!(s.sliding_ratio.is_finite() && s.centre_distance.is_finite());
+        }
+
+        // The other way round is refused, not fudged.
+        let backwards = WormStage {
+            shaft_angle: 30.0,
+            starts: 17,
+            wheel_teeth: 23,
+            sizing: FirstMemberSizing::HelixAngle(0.0),
+            ..WormStage::default()
+        };
+        assert!(
+            backwards.geometry().is_err(),
+            "a spur first member has no lead angle to report"
+        );
+    }
+
+    /// **A ninety-degree helix is a disc, not a gear**, and it has to be refused
+    /// where the helix angle is still known.
+    ///
+    /// `cos 90°` is 6e-17 rather than zero, so a derived pitch diameter comes out
+    /// *enormous* rather than infinite — 2.8e17 mm on a 17-tooth member — and
+    /// then `sin γ₁ = z m_n / d` is 6e-17, so the `WormTooThin` guard at the
+    /// other end of the range sees nothing wrong. Found by sweeping the helix
+    /// split in `gear-cli crossed` and reading the last row.
+    #[test]
+    fn a_ninety_degree_helix_is_refused_where_it_is_still_visible() {
+        for beta in [90.0f64, 91.0, 120.0, -90.0] {
+            let stage = WormStage {
+                shaft_angle: 90.0,
+                starts: 17,
+                wheel_teeth: 23,
+                sizing: FirstMemberSizing::HelixAngle(beta),
+                ..WormStage::default()
+            };
+            assert!(
+                stage.geometry().is_err(),
+                "beta={beta}: a disc is not a gear"
+            );
+        }
+        // Just inside is silly but representable — the project's standing rule is
+        // that a limit answers "could this exist", not "would anyone want it".
+        let stage = WormStage {
+            shaft_angle: 90.0,
+            starts: 17,
+            wheel_teeth: 23,
+            sizing: FirstMemberSizing::HelixAngle(89.0),
+            ..WormStage::default()
+        };
+        let g = stage.geometry().unwrap();
+        assert!(g.worm_pitch_diameter.is_finite() && g.worm_pitch_diameter > 0.0);
+    }
+
+    /// A crossed gear pair solves end to end, and reports what a worm stage
+    /// reports — the result shape is shared because the mathematics is.
+    #[test]
+    fn a_crossed_gear_pair_solves_end_to_end() {
+        let stage = WormStage {
+            shaft_angle: 90.0,
+            starts: 17,
+            wheel_teeth: 23,
+            sizing: FirstMemberSizing::HelixAngle(45.0),
+            ..WormStage::default()
+        };
+        let r = solve_worm_stage(&stage, 2.0, &super::super::test_library()).unwrap();
+        assert!((r.ratio - 23.0 / 17.0).abs() < 1e-12);
+        assert!(r.efficiency.forward > 0.0 && r.efficiency.forward < 1.0);
+        assert!(r.contact.max_pressure > 0.0);
+        assert!(!r.efficiency.self_locking());
+
+        // **Where a crossed pair sits, stated as comparisons rather than a
+        // threshold.** It slides hard at the pitch point — `1/cos γ₁`, which is
+        // 1.41 × the pitch line speed at 45° — so it is far worse than a
+        // parallel-axis mesh and far better than a worm of the same shaft angle.
+        // Both bounds are computed here rather than remembered.
+        let worm = solve_worm_stage(
+            &WormStage {
+                shaft_angle: 90.0,
+                starts: 1,
+                wheel_teeth: 40,
+                sizing: FirstMemberSizing::PitchDiameter(7.0),
+                ..WormStage::default()
+            },
+            2.0,
+            &super::super::test_library(),
+        )
+        .unwrap();
+        assert!(
+            r.efficiency.forward > worm.efficiency.forward,
+            "a crossed gear pair should beat a worm: {} vs {}",
+            r.efficiency.forward,
+            worm.efficiency.forward
+        );
+        assert!(
+            r.efficiency.forward < 0.95,
+            "...but it slides too much to approach a parallel-axis mesh: {}",
+            r.efficiency.forward
+        );
+
+        // ...and more shaft angle means more sliding means less efficiency.
+        let mut previous = f64::INFINITY;
+        for sigma in [20.0f64, 40.0, 60.0, 90.0] {
+            let e = solve_worm_stage(
+                &WormStage {
+                    shaft_angle: sigma,
+                    starts: 17,
+                    wheel_teeth: 23,
+                    sizing: FirstMemberSizing::HelixAngle(sigma / 2.0),
+                    ..WormStage::default()
+                },
+                2.0,
+                &super::super::test_library(),
+            )
+            .unwrap()
+            .efficiency
+            .forward;
+            assert!(
+                e < previous,
+                "Sigma={sigma}: {e} should be below {previous}"
+            );
+            previous = e;
+        }
     }
 }
