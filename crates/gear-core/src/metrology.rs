@@ -36,9 +36,12 @@ pub enum MeasurementError {
     PinBottomsOut,
     /// The pin is small enough to fall between the flanks entirely: its centre
     /// would sit inside the base circle, where there is no involute to touch.
+    ///
+    /// External gears only — a ring's space narrows *outward*, so there is no
+    /// pin too small to seat in one.
     PinTooSmall,
-    /// The pin is large enough that contact runs past the base circle on the
-    /// other side — there is no involute point where it could touch.
+    /// The pin is too large to seat: contact would run past the base circle, or —
+    /// in a ring, whose space narrows outward — the centre itself would.
     PinTooLarge,
 }
 
@@ -166,19 +169,72 @@ pub struct OverPins {
 /// [`MeasurementError::PinTooSmall`] if the pin centre would fall inside the
 /// base circle, [`MeasurementError::PinTooLarge`] if contact would.
 pub fn pin_geometry(g: &Gear, pin_diameter: f64) -> Result<(f64, f64), MeasurementError> {
-    let z = f64::from(g.params.teeth);
-    let bb = base_helix_angle(g);
-    let target = g.psi_b + pin_diameter / (2.0 * g.rb * bb.cos()) - std::f64::consts::PI / z;
-    let phi = inv_inverse(target).ok_or(MeasurementError::PinTooSmall)?;
-    let r_m = g.rb / phi.cos();
+    pin_seat(
+        g.psi_b,
+        g.rb,
+        f64::from(g.params.teeth),
+        base_helix_angle(g),
+        pin_diameter,
+        1.0,
+    )
+}
+
+/// Where a pin sits in a tooth space, for **either** kind of gear.
+///
+/// Returns `(pin centre radius, contact radius)`. `sigma` is `+1` for an external
+/// gear and `−1` for a ring — the same sign convention [`crate::mesh::MeshKind`]
+/// uses, and the whole of the difference between the two.
+///
+/// # One relation, read from either side
+///
+/// An involute's *offset* is another involute of the same base circle, so the
+/// perpendicular distance from a point to a flank is `r_b` times the difference
+/// of their origin angles. A pin resting on both flanks of a space has its centre
+/// on the bisector at `θ = π/z`, and its own origin angle is `θ ∓ inv φ` — minus
+/// for an external gear, plus for a ring, because a ring's tooth *gains* angle
+/// outward. Setting that distance to `d_p/2`:
+///
+/// ```text
+/// inv φ_M = σ ( ψ_b + d_p / (2 r_b cos β_b) − π/z )
+/// u_c     = tan φ_M − σ d_p / (2 r_b)
+/// ```
+///
+/// The signs say something physical. An external gear's space narrows *inward*,
+/// so a larger pin rides higher and touches **below** its own centre. A ring's
+/// space narrows *outward*, so a larger pin sits deeper — at smaller radius —
+/// and touches **above** its centre. Both fall out of `σ` rather than being
+/// separate cases.
+fn pin_seat(
+    psi_b: f64,
+    rb: f64,
+    teeth: f64,
+    beta_b: f64,
+    pin_diameter: f64,
+    sigma: f64,
+) -> Result<(f64, f64), MeasurementError> {
+    let target =
+        sigma * (psi_b + pin_diameter / (2.0 * rb * beta_b.cos()) - std::f64::consts::PI / teeth);
+    // A negative target means the pin centre would have to sit inside the base
+    // circle, where there is no involute to touch — but *which* pin fault that is
+    // depends on the kind. On an external gear the space narrows inward, so it is
+    // a pin too **small** to bridge the flanks; inside a ring the space narrows
+    // outward, so the same failure is a pin too **large** to reach a seat. Same
+    // arithmetic, opposite diagnosis, and reporting the external one for a ring
+    // sends the designer the wrong way.
+    let phi = inv_inverse(target).ok_or(if sigma > 0.0 {
+        MeasurementError::PinTooSmall
+    } else {
+        MeasurementError::PinTooLarge
+    })?;
+    let r_m = rb / phi.cos();
 
     // The contact point lies on the involute normal through the pin centre, at
-    // the pin's radius from it: unwrapped length r_b·tan φ minus d_p/2.
-    let u_contact = phi.tan() - pin_diameter / (2.0 * g.rb);
+    // the pin's radius from it: unwrapped length r_b·tan φ, less the pin.
+    let u_contact = phi.tan() - sigma * pin_diameter / (2.0 * rb);
     if u_contact <= 0.0 {
         return Err(MeasurementError::PinTooLarge);
     }
-    Ok((r_m, g.rb * f64::hypot(1.0, u_contact)))
+    Ok((r_m, rb * f64::hypot(1.0, u_contact)))
 }
 
 /// Measurement over two or three pins or balls.
@@ -254,3 +310,86 @@ impl std::fmt::Display for MeasurementError {
 }
 
 impl std::error::Error for MeasurementError {}
+
+// ------------------------------------------------------ internal gears ---
+
+/// Measurement **between** pins or balls, for a ring.
+///
+/// The internal counterpart of [`OverPins`]. The distinction is not cosmetic: on
+/// an external gear the pins stand proud and you measure *across their outer
+/// surfaces*, so the pin diameter **adds**; inside a ring they seat in opposing
+/// spaces and you measure *between their inner surfaces*, so it **subtracts**.
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct BetweenPins {
+    pub pin_diameter: f64,
+    /// Nominal measurement, mm.
+    pub nominal: f64,
+    /// Radius of the pin centres.
+    pub pin_centre_radius: f64,
+    /// Radius at which the pin touches the flank.
+    pub contact_radius: f64,
+    /// Space for the tolerance band once JGMA 1103-01 is available (§4.6), as on
+    /// [`OverPins`].
+    pub limits: Option<(f64, f64)>,
+}
+
+/// Measurement between two pins or balls seated in a ring's opposing spaces.
+///
+/// # Why two pins and not three
+///
+/// Three pins exist for an external gear because an odd tooth count leaves no
+/// space diametrically opposite, and a micrometer needs a stable flat datum;
+/// two adjacent pins provide one. Inside a bore neither problem arises — the
+/// odd-count offset is the same `cos(π/2z)` correction, and a bore gauge needs
+/// no datum — so three-pin internal measurement is not a practice anyone takes,
+/// and inventing its geometry would be describing a measurement rather than
+/// reporting one.
+///
+/// # Errors
+///
+/// [`MeasurementError`] when the pin cannot make a valid measurement: contact off
+/// the usable flank, or a pin so large it reaches the root circle.
+pub fn between_pins(
+    ring: &crate::ring::Ring,
+    pin_diameter: f64,
+) -> Result<BetweenPins, MeasurementError> {
+    let (r_m, contact_radius) = pin_seat(
+        ring.psi_b,
+        ring.rb,
+        f64::from(ring.teeth),
+        ring.base_helix_angle(),
+        pin_diameter,
+        -1.0,
+    )?;
+
+    // A ring's root circle is *outside* its teeth, so "bottoming out" is the pin
+    // reaching outward into the root rather than inward.
+    if r_m + pin_diameter / 2.0 >= ring.rf {
+        return Err(MeasurementError::PinBottomsOut);
+    }
+    // The usable flank runs from the tip — the ring's *smallest* radius — out to
+    // where the cutter handed over to the fillet.
+    let form_radius = ring.involute_at(ring.u_j).0;
+    if contact_radius < ring.ra || contact_radius > form_radius {
+        return Err(MeasurementError::PinContactOffFlank);
+    }
+
+    let z = f64::from(ring.teeth);
+    let pi = std::f64::consts::PI;
+    // Even tooth counts put a space exactly opposite; odd ones leave the nearest
+    // half a pitch away, which is the same correction an external gear takes.
+    let across = if ring.teeth.is_multiple_of(2) {
+        2.0 * r_m
+    } else {
+        2.0 * r_m * (pi / (2.0 * z)).cos()
+    };
+
+    Ok(BetweenPins {
+        pin_diameter,
+        nominal: across - pin_diameter,
+        pin_centre_radius: r_m,
+        contact_radius,
+        limits: None,
+    })
+}

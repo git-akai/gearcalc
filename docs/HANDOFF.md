@@ -55,9 +55,14 @@ backlash referred to the output shaft.
 backlash and cycle accumulation, efficiency and backlash reported in **both**
 drive directions.
 
+**Metrology.** Span over teeth and over-pins for external gears; **between-pins
+for rings**, from the same relation at the opposite sign. JGMA 116-02 tolerance
+tables.
+
 **Materials, export, UI.** An eight-material library with per-value provenance ·
 DXF with exact arcs for external *and* internal gears · gear tabs with an
-internal option, geartrain tabs with spur, worm and planetary stages.
+internal option and its own measurement, geartrain tabs with spur, worm and
+planetary stages.
 
 ### Driving it without a browser
 
@@ -286,6 +291,7 @@ these are the ones most likely to be stepped on again.
 | Mesh-phase coefficient setting the optimal λ | §4.10 | only the angular-profile-shift milestone |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
 | Worm contact ratio — the zone of action for a throated wheel | §4.5.1 | nothing |
+| Span over teeth for a ring — rare in practice, not derived; between-pins is done | §4.6 | nothing |
 | Worm profile drawing and DXF; a planetary set has no drawing either | §4.5.1, §8 | nothing |
 | `Driven By` as a train direction on a worm stage | §4.9 | nothing |
 | A coupled glass POM grade, if one is wanted back | §6.4 | nothing |

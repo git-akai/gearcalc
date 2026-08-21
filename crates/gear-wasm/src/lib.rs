@@ -232,6 +232,9 @@ fn summarise(g: &Gear, req: &GearRequest) -> GearSummary {
 #[derive(Deserialize)]
 pub struct RingRequest {
     pub params: GearParams,
+    /// Pin or ball diameter for the between-pins measurement, mm.
+    #[serde(default)]
+    pub pin_diameter: Option<f64>,
     #[serde(default)]
     pub cutter: CutterRef,
     #[serde(default)]
@@ -299,6 +302,10 @@ pub struct RingSummary {
     /// gears, it moves with the addendum, pressure angle and helix, and a
     /// designer meeting it by accident should be told which margin they are on.
     pub smallest_tooth_count: u32,
+    /// Measurement **between** two pins or balls, the internal counterpart of
+    /// the gear tab's over-pins. Two pins only, and
+    /// [`gear_core::metrology::between_pins`] says why.
+    pub between_pins: Maybe<PinsOut>,
     pub clamps: Vec<String>,
 }
 
@@ -335,6 +342,16 @@ fn solve_ring_impl(input: &str) -> Result<String, String> {
         generation_limit: g.generation_limit(),
         fully_generated: g.fully_generated(),
         smallest_tooth_count: smallest_tooth_count(&req.params),
+        between_pins: match req.pin_diameter {
+            Some(d) => Maybe::from(metrology::between_pins(&g, d).map(|p| PinsOut {
+                nominal: p.nominal,
+                pin_centre_radius: p.pin_centre_radius,
+                contact_radius: p.contact_radius,
+            })),
+            None => Maybe::Unavailable {
+                unavailable: "no pin diameter given".into(),
+            },
+        },
         clamps: g.clamps.clone(),
     };
     serde_json::to_string(&summary).map_err(|e| format!("could not encode result: {e}"))
@@ -644,6 +661,25 @@ mod tests {
             dxf.ends_with("EOF\r\n") || dxf.ends_with("EOF\n"),
             "truncated DXF"
         );
+
+        // **The between-pins measurement crosses too, and subtracts.**
+        let with_pin = req.replace(
+            r#""cutter":{"teeth":20,"addendum":1.25,"tip_round":0.38}"#,
+            r#""cutter":{"teeth":20,"addendum":1.25,"tip_round":0.38},"pin_diameter":1.8"#,
+        );
+        let p: serde_json::Value =
+            serde_json::from_str(&solve_ring_impl(&with_pin).unwrap()).unwrap();
+        let bp = &p["between_pins"];
+        let nominal = bp["nominal"]
+            .as_f64()
+            .expect("a 60-tooth ring admits a 1.8 mm pin");
+        let centre = bp["pin_centre_radius"].as_f64().unwrap();
+        // Between inner surfaces, so the pin *subtracts* — the opposite of the
+        // gear tab's over-pins, and the sign a reader should be able to check.
+        assert!((nominal - (2.0 * centre - 1.8)).abs() < 1e-9);
+        assert!(nominal < 2.0 * centre);
+        // ...and without a pin diameter it says so rather than inventing one.
+        assert!(v["between_pins"]["unavailable"].is_string());
 
         // **A shifted ring must come back shifted.** The gear tab has always
         // sent `profile_shift` for an internal gear and `Ring::new` used to drop

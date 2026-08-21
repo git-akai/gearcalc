@@ -840,6 +840,48 @@ Ravigneaux stages later.
 
 ### 4.6 Metrology
 
+#### Between pins, for a ring
+
+The internal counterpart of over-pins, and one relation rather than two. An
+involute's offset is another involute of the same base circle, so the
+perpendicular distance from a point to a flank is `r_b` times the difference of
+their origin angles. A pin resting on both flanks of a space has its centre on
+the bisector at `θ = π/z`, and its own origin angle is `θ ∓ inv φ` — minus for an
+external gear, plus for a ring, because a ring's tooth *gains* angle outward.
+Setting that distance to `d_p/2` gives both kinds at once:
+
+```text
+inv φ_M = σ ( ψ_b + d_p / (2 r_b cos β_b) − π/z )
+u_c     = tan φ_M − σ d_p / (2 r_b)
+M       = across − σ d_p                across = 2 r_M, or 2 r_M cos(π/2z) if z is odd
+```
+
+Every sign says something physical:
+
+- An external gear's space narrows **inward**, so a larger pin rides higher and
+  touches *below* its own centre. A ring's narrows **outward**, so a larger pin
+  sits deeper — at smaller radius — and touches *above* its centre. Both are `σ`.
+- The pin diameter **adds** outside and **subtracts** inside, because one is
+  measured across outer surfaces and the other between inner ones.
+- The same arithmetic failure means opposite things. A negative target puts the
+  pin centre inside the base circle: on an external gear that is a pin too
+  *small* to bridge the flanks, in a ring a pin too *large* to find a seat.
+  Reporting the external diagnosis for a ring sends the designer the wrong way,
+  so the error is chosen by `σ` too.
+
+**Two pins only.** Three exist for an external gear because an odd tooth count
+leaves no space diametrically opposite and a micrometer needs a stable flat
+datum; two adjacent pins provide one. Inside a bore neither problem arises — the
+odd-count offset is the same `cos(π/2z)` chord, and a bore gauge needs no datum —
+so a three-pin internal measurement is not a practice anyone takes, and
+inventing its geometry would be describing a measurement rather than reporting
+one.
+
+**Span over teeth has no internal equivalent here.** A base tangent length
+measured inside a ring is takeable in principle but rare, and it is not derived;
+the gear tab says so beside the number it does give.
+
+
 **Span measurement.** Derived from first principles — the span is a chord along
 the base tangent, so it is `(k−1)` base pitches plus one base tooth thickness:
 
@@ -2575,6 +2617,7 @@ not have to hunt for it.
 | `Driven By` on a worm stage — torque propagates worm→wheel; back-driving is reported, not modelled as a train direction | §4.9 | nothing |
 | **Equal load sharing between planets** is assumed — real sets need a floating member, and the remedy is a mesh-load factor of the kind §4.7 declines | §4.9 | nothing; it is stated in every planetary result's notes |
 | A planetary stage's own **profile drawing** — the viewport draws single gears, not a set | §8 | nothing |
+| Span over teeth for a ring — takeable in principle, rare in practice, not derived | §4.6 | nothing; between-pins is implemented and the gear tab says which is which |
 
 **Standing policy: no ISO/AGMA correction factors** — `Y_β`, `K_A`, `K_v`,
 `K_Fβ`, `K_Fα`, `Z_ε`, `Z_β` and relatives. Their validated bands are narrow
@@ -2863,6 +2906,8 @@ here. Revision 2 additions are marked ★.
 | ▣ Every law proved in the core shows up in the assembled stage | the same run | internal contact ratio above external (1.936 vs 1.566), internal relative radius the larger, internal contact stress below (245 vs 350 MPa), ring bending below sun (10.5 vs 15.9 MPa). Each was proved as a law in `ring.rs`; asserting them again here is what catches the two meshes being wired the wrong way round, which no amount of core testing would |
 | ▣ One `k` satisfies both invariants at once | k = 0.9, 1.0, 1.15 | the external pair sums to two and the internal pair matches, to 1e-15, from a single stored value — so a planetary set cannot be given inconsistent thickness modifications |
 | ▣ Helical parity | β = 10, 20, 30° | every figure a spur set reports, a helical one reports too, ring bending included; the planet-shift residual stays below 1e-12 |
+| ▣ **A pin is genuinely tangent to a ring's generated flank** | minimum distance from the pin centre to a dense sampling of `Ring::involute_at`, five rings including shifted and 25° | **2.5e-10 mm** against the pin's radius. Shares no algebra with the derivation, so it tests the `σ` signs rather than restating them — the external counterpart of the same check reads 3.8e-12 mm |
+| ▣ A larger pin sits deeper inside and higher outside | four pin sizes on a 60-tooth ring and a 60-tooth gear | monotone in opposite directions, with contact above the centre inside and below it outside. The cheapest check that the `d_p` sign is the right way round, since getting it backwards still produces a plausible number |
 | ▣ **The root trochoid against its best-fit circle** | least-squares circle through the generated fillet, 4 cutter sizes × 4 ring sizes, and 5 external sizes | best-fit radius **1.1–3.1 × ρ**, departing from any circle by 0.7–26 µm. `ρ_F` at the critical section is 1.47–2.52 × ρ external and 3.55–4.26 × on a ring — so an arc of the tool's own radius would be wrong by a factor, not a rounding |
 | ▣ A ring's fillet tends back toward the tool's round as the ring grows | 20-tooth shaper, z = 43 … 150 | monotone, which is the direction the rack limit requires |
 | ▣ **The rack limit holds at a helix angle too** | ring and cutter grown together at β = 15° and 30°, 1 000/500 → 20 000/10 000 | gaps **0.0037 → 0.0007 → 0.0002** at 15° and **0.0027 → 0.0005 → 0.0001** at 30°, the same first order in `1/z` as the spur case. Both sides reach it through their *own* virtualisation — `Gear::virtual_spur` against `Ring::virtual_spur` with the cutter scaled alongside — so the two constructions are independent and meeting is evidence |

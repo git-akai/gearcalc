@@ -73,6 +73,9 @@
   // request and its own summary rather than optional fields on the gear's.
   const ringRequest = $derived<RingRequest>({
     params: tab.params,
+    // The gear tab's pin box serves both kinds: over-pins outside, between-pins
+    // inside.
+    pin_diameter: tab.pinDiameter,
     cutter: tab.cutter,
     chord_tolerance: tab.chordTolerance,
     reference_circles: tab.referenceCircles,
@@ -309,11 +312,34 @@
             {#each r.clamps as c (c)}<li>{c}</li>{/each}
           </ul>
         {/if}
+        <h2>Measurement</h2>
+        <dl>
+          <dt>Between 2 pins, nominal</dt>
+          <dd>
+            {#if isUnavailable(r.between_pins)}
+              <span class="muted">{r.between_pins.unavailable}</span>
+            {:else}
+              {n(r.between_pins.nominal)} mm
+            {/if}
+          </dd>
+          {#if !isUnavailable(r.between_pins)}
+            <dt>Pin centre radius</dt>
+            <dd>{n(r.between_pins.pin_centre_radius)} mm</dd>
+            <dt>Contact radius</dt>
+            <dd>{n(r.between_pins.contact_radius)} mm</dd>
+          {/if}
+        </dl>
         <p class="muted">
-          Measurement over teeth and pins is not shown for an internal gear: span and over-pins are
-          external-gear constructions and this tool does not yet have their internal equivalents. A
-          strength rating is not shown here for any gear — bending and contact need a mesh and a
-          load, which belong to a stage; the geartrain tab rates rings, spur and helical alike.
+          Measured <em>between</em> the pins' inner surfaces, so the pin diameter subtracts — the
+          opposite of an external gear, where it is measured across their outer surfaces. Two pins
+          only: three exist so a micrometer has a flat datum on an odd-tooth external gear, and a
+          bore gauge needs none.
+        </p>
+        <p class="muted">
+          Span over teeth is not shown for an internal gear: it is an external-gear construction and
+          this tool does not yet have its internal equivalent. A strength rating is not shown here
+          for any gear — bending and contact need a mesh and a load, which belong to a stage; the
+          geartrain tab rates rings, spur and helical alike.
         </p>
       {/if}
     {:else if "error" in result}

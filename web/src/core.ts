@@ -319,11 +319,17 @@ export interface CutterRef {
 }
 export interface RingRequest {
   params: GearParams;
+  /** Pin or ball diameter for the between-pins measurement, mm. */
+  pin_diameter?: number | null;
   cutter: CutterRef;
   chord_tolerance: number;
   reference_circles: boolean;
 }
 export interface RingSummary {
+  /** Measurement between two pins — the internal counterpart of over-pins. The
+   *  pin diameter subtracts here, because it is measured between inner
+   *  surfaces rather than across outer ones. */
+  between_pins: Maybe<PinsOut>;
   teeth: number;
   transverse_module: number;
   transverse_pressure_angle: number;

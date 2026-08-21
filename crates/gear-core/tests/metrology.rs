@@ -314,3 +314,211 @@ fn cutter_tip_width_is_independent_of_helix_angle() {
         }
     }
 }
+
+// ------------------------------------------------------ internal gears ---
+
+/// **The pin is genuinely tangent to a ring's generated flank**, measured the
+/// same way the external check measures it: the minimum distance from the pin
+/// centre to a densely sampled flank must be the pin's radius.
+///
+/// This shares no algebra with `between_pins` — it samples `Ring::involute_at`
+/// and takes a minimum — so it tests the derivation rather than restating it. It
+/// is the check that would catch the sign of the `d_p` term being wrong, which is
+/// the one thing that distinguishes the internal relation from the external one.
+#[test]
+fn a_pin_is_genuinely_tangent_to_a_rings_generated_flank() {
+    use gear_core::metrology::between_pins;
+    use gear_core::ring::{Cutter, Ring};
+
+    let cases = [
+        (43u32, 0.0, 20.0, 1.7),
+        (60, 0.0, 20.0, 1.8),
+        (60, 0.3, 20.0, 1.8),
+        (43, -0.2, 20.0, 1.6),
+        (90, 0.0, 25.0, 1.9),
+    ];
+    let mut worst = 0.0_f64;
+    for (teeth, x, pressure_angle, dp) in cases {
+        let params = GearParams {
+            teeth,
+            profile_shift: x,
+            pressure_angle,
+            ..Default::default()
+        };
+        let ring = Ring::new(&params, &Cutter::default());
+        let m =
+            between_pins(&ring, dp).unwrap_or_else(|e| panic!("z={teeth} x={x} dp={dp}: {e:?}"));
+
+        // The pin centre lies on the tooth-space centreline, pi/z from the tooth
+        // centre — the same place it sits on an external gear.
+        let half = std::f64::consts::PI / f64::from(teeth);
+        let (px, py) = (
+            m.pin_centre_radius * half.sin(),
+            m.pin_centre_radius * half.cos(),
+        );
+
+        // Minimum distance to the ring's own flank, sampled.
+        const N: usize = 40_000;
+        let mut best = f64::INFINITY;
+        for i in 0..=N {
+            let u = ring.u_tip + (ring.u_j - ring.u_tip) * (i as f64 / N as f64);
+            let (r, th) = ring.involute_at(u);
+            best = best.min(f64::hypot(r * th.sin() - px, r * th.cos() - py));
+        }
+        let err = (best - dp / 2.0).abs();
+        assert!(
+            err < 1e-6,
+            "z={teeth} x={x} dp={dp}: pin centre is {best:.10} from the flank, expected {:.10}",
+            dp / 2.0
+        );
+        worst = worst.max(err);
+    }
+    println!("worst internal pin tangency error: {worst:.3e} mm");
+}
+
+/// **A larger pin sits *deeper* in a ring**, which is the opposite of an external
+/// gear — and the cheapest check that the sign of the `d_p` term is the right way
+/// round.
+///
+/// A ring's tooth widens outward, so its space narrows outward: a big pin cannot
+/// get as far out. On an external gear the space narrows inward and a big pin
+/// rides higher. Getting this backwards still produces a plausible number.
+#[test]
+fn a_bigger_pin_sits_deeper_in_a_ring_and_higher_in_a_gear() {
+    use gear_core::metrology::between_pins;
+    use gear_core::ring::{Cutter, Ring};
+
+    let ring = Ring::new(
+        &GearParams {
+            teeth: 60,
+            ..Default::default()
+        },
+        &Cutter::default(),
+    );
+    let mut previous = f64::INFINITY;
+    for dp in [1.4, 1.6, 1.8, 2.0] {
+        let m = between_pins(&ring, dp).unwrap();
+        assert!(
+            m.pin_centre_radius < previous,
+            "dp={dp}: pin centre radius {} should fall",
+            m.pin_centre_radius
+        );
+        // ...and the contact is *above* the centre, since the pin wedges outward.
+        assert!(m.contact_radius > m.pin_centre_radius);
+        previous = m.pin_centre_radius;
+    }
+
+    let g = Gear::new(GearParams {
+        teeth: 60,
+        ..Default::default()
+    });
+    let mut previous = f64::NEG_INFINITY;
+    for dp in [1.4, 1.6, 1.8, 2.0] {
+        let (r_m, contact) = pin_geometry(&g, dp).unwrap();
+        assert!(r_m > previous, "dp={dp}: external pin centre should rise");
+        assert!(contact < r_m, "an external pin touches below its centre");
+        previous = r_m;
+    }
+}
+
+/// The pin diameter **subtracts** for a ring and **adds** for an external gear,
+/// because one is measured between inner surfaces and the other across outer
+/// ones. Stated as a test because it is the kind of sign that survives review.
+#[test]
+fn the_pin_diameter_subtracts_inside_and_adds_outside() {
+    use gear_core::metrology::{between_pins, over_pins, PinCount};
+    use gear_core::ring::{Cutter, Ring};
+
+    let dp = 1.8;
+    let ring = Ring::new(
+        &GearParams {
+            teeth: 60,
+            ..Default::default()
+        },
+        &Cutter::default(),
+    );
+    let m = between_pins(&ring, dp).unwrap();
+    assert!((m.nominal - (2.0 * m.pin_centre_radius - dp)).abs() < 1e-12);
+    assert!(m.nominal < 2.0 * m.pin_centre_radius);
+
+    let g = Gear::new(GearParams {
+        teeth: 60,
+        ..Default::default()
+    });
+    let o = over_pins(&g, dp, PinCount::Two).unwrap();
+    assert!((o.nominal - (2.0 * o.pin_centre_radius + dp)).abs() < 1e-12);
+    assert!(o.nominal > 2.0 * o.pin_centre_radius);
+}
+
+/// An odd tooth count leaves no space diametrically opposite, so the measurement
+/// takes the same `cos(π/2z)` chord an external gear does — and comes out
+/// smaller than the even-count value it would otherwise have.
+#[test]
+fn an_odd_toothed_ring_measures_across_a_chord() {
+    use gear_core::metrology::between_pins;
+    use gear_core::ring::{Cutter, Ring};
+
+    let of = |teeth: u32| {
+        let ring = Ring::new(
+            &GearParams {
+                teeth,
+                ..Default::default()
+            },
+            &Cutter::default(),
+        );
+        between_pins(&ring, 1.8).map(|m| (m.nominal, m.pin_centre_radius))
+    };
+    let (odd, r_odd) = of(61).unwrap();
+    let half = std::f64::consts::PI / (2.0 * 61.0);
+    assert!((odd - (2.0 * r_odd * half.cos() - 1.8)).abs() < 1e-12);
+    // The chord is shorter than the diameter, so an odd ring measures less than
+    // the same pin circle would across a full diameter.
+    assert!(odd < 2.0 * r_odd - 1.8);
+}
+
+/// **The same arithmetic failure means opposite things inside and out.**
+///
+/// A negative involute target says the pin centre would have to sit inside the
+/// base circle. On an external gear that is a pin too *small* to bridge the
+/// flanks; inside a ring, whose space narrows outward, it is a pin too *large* to
+/// find a seat. Reporting the external diagnosis for a ring sends the designer
+/// to make the pin bigger, which is the wrong way.
+#[test]
+fn a_pin_that_cannot_seat_is_diagnosed_by_kind() {
+    use gear_core::metrology::{between_pins, MeasurementError};
+    use gear_core::ring::{Cutter, Ring};
+
+    // A small ring with a fat pin: no seat.
+    let ring = Ring::new(
+        &GearParams {
+            teeth: 9,
+            ..Default::default()
+        },
+        &Cutter::default(),
+    );
+    assert_eq!(
+        between_pins(&ring, 1.75).unwrap_err(),
+        MeasurementError::PinTooLarge,
+        "a ring's space narrows outward, so this is a pin too large"
+    );
+
+    // The external counterpart of the same arithmetic is a pin too small.
+    let g = Gear::new(GearParams {
+        teeth: 9,
+        ..Default::default()
+    });
+    assert_eq!(
+        pin_geometry(&g, 0.2).unwrap_err(),
+        MeasurementError::PinTooSmall
+    );
+
+    // And a sensible ring with a sensible pin measures.
+    let ring = Ring::new(
+        &GearParams {
+            teeth: 60,
+            ..Default::default()
+        },
+        &Cutter::default(),
+    );
+    assert!(between_pins(&ring, 1.75).is_ok());
+}
