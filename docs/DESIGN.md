@@ -2053,6 +2053,41 @@ internal pair the ring's tangency point lies beyond the cutter's, so the two
 `r_tan` — where the cutter's round meets its flank — comes from the same
 offset-involute fact.
 
+#### The root trochoid against a simple radius
+
+A fillet *looks* like a radius: drawings specify one, and the tool's tip round
+`ρ` is right there as an input. It is not one, and the gap is too large to shrug
+at — measured against a least-squares circle through the generated curve:
+
+| | best-fit `R/ρ` | departure from any circle |
+|---|---|---|
+| external, rack-cut, z = 17 … 150 | 3.11 … 1.24 | 26 … 3 µm |
+| ring, 20-tooth shaper, z = 43 … 150 | 1.71 … 2.12 | 5 … 8 µm |
+| ring, 50-tooth shaper, z = 60 … 150 | 1.10 … 1.41 | 0.7 … 3 µm |
+
+The fillet is the **envelope** of the corner as it sweeps, so it is flatter than
+the corner itself, and it is not a circular arc at all. Three things follow.
+
+**The tool's `ρ` is not `ρ_F`.** At the critical section the ratio is 1.47–2.52
+external and 3.55–4.26 on a ring [verified]. Since `q_s = s_Fn / 2ρ_F`, using the
+tool's round would inflate `q_s` — and `Y_S` with it — by that factor. This is
+why §4.7 reads the curvature off the generated curve rather than taking the
+input.
+
+**A bigger tool cuts a rounder fillet.** `R/ρ → 1` as the shaper approaches the
+ring's own size, because the corner's travel shortens relative to `ρ`. Read the
+other way, a *small* shaper on a large ring approaches the rack-cut case, which
+is the flattest of all. So "the fillet is about a radius `ρ`" is least true
+exactly where it is most often assumed.
+
+**A ring's fillet is the flatter, and that is part of why its tooth rates
+stronger.** Not the whole reason — the tooth is also wider at its base — but it
+is the part that reaches `Y_S`.
+
+None of this argues for modelling the fillet as an arc *anywhere*. It argues that
+the trochoid earns its place: an arc would be wrong by a factor, not by a
+rounding.
+
 #### Three geometries that are real, not faults
 
 **A fully filleted root.** The corner rounds from adjacent teeth can meet before
@@ -2667,6 +2702,8 @@ something independent.**
 | 4.11 | A shifted ring cut by a cutter at **reference** centres | A shaper cannot be displaced the way a rack can. A rack's pitch line is a machine setting, so shifting it leaves the rolling alone; two pinions have their ratio fixed by their tooth counts, so the pitch point is wherever the centre distance puts it and the rolling circles move with it. The cutter was up to **0.44 mm** out of place at x = 0.5. One factor `a / a_ref` carries all of it, and is exactly 1 at zero shift |
 | 4.11 | **The cut simulation derived the cutter's tooth from the ring's** | So it shared the model's assumption and could not see the fault above: it reported 2.7 µm on a ring whose cutter was 0.44 mm out of place, unchanged from the unshifted case. The §12 trap in its purest form — *a check built from the thing under test measures nothing.* The cutter's tooth now comes from the cutter, and placing it at reference centres makes the gate fail by 13–66× its noise floor |
 | 4.11 | A ring's root radius from `r + m(dedendum + x)` | That is the exact relation linearised. A ring's root is wherever its cutter's tip *reaches*, `a_cut + r_tip`; the two differ by 17 µm at x = 0.25 and 57 µm at x = 0.5, both well above the 3.6 µm the cut simulation resolves. So a ring has **no dedendum input** — it is the cutter's addendum seen from the other side, and having both invites them to disagree. Its root-radius coefficient goes the same way: the fillet round is the cutter's own |
+| 4.11 | `Ring::new` accepted a shaper **at least as large as the ring** | It arrives as a negative centre distance rather than an obvious error, so nothing objected: a 43-tooth ring "cut" by a 50-tooth shaper reported a root radius of 29.75 mm against a pitch radius of 21.5, and the only complaint was about the tip corner — a true statement of the wrong problem. `Mesh::new` and `mesh_with` both refuse that pairing; the constructor did not. Now clamped and named |
+| 4.11 | A ring's tooth was never checked for **running out of thickness** | A ring's tooth narrows *inward*, so its tip is its thinnest section — and where `ψ_b < 0`, which needs `π/2z < inv α_t` (about 105 teeth at 20°), it reaches zero *above* the base circle. Unclamped that is not a thin tooth but a **crossed** one: a 150-tooth ring at a 3-module addendum came out at −0.211 mm of tip thickness, and its outline is a self-intersecting polygon bound for a DXF. The limit is closed form through `inv⁻¹` — `inv α = −ψ_b` — and mirrors `Gear`'s pointed-tooth clamp rather than being a new kind of guard. Invisible on the tooth counts one would try first |
 | 4.8 | `mesh_with` asserted standard centres for an internal pair | Fine as far as it went, but a planetary set needs the shifted case and the two would then have been separate constructions. Now both come from `mesh::operating_geometry`, the same relation the external mesh uses, and a standard pair is its value at zero shift — reached rather than asserted, and equal to `r_ring − r_pinion` to 1e-12 |
 | 4.8 | The planet-shift bracket evaluated **on** the involute domain's boundary | The endpoints are where `inv α_w = 0` exactly, and whether that arithmetic lands on zero or on −1e-17 depends on the tooth counts. On a 24/16 set with four planets the upper endpoint fell a hair outside a domain it was meant to sit on, so `z_ring = 57` was refused although its root is at +0.2485, comfortably inside — **a hole in a run that monotonicity says is contiguous**. Fixed by halving each endpoint toward a point known to be interior, which finds the last representable point in the domain and needs no tolerance: it stops when the answer becomes a number |
 | 4.8 | Contiguity checked on one configuration | The test swept 17/17 only, where the rounding above happens to fall the other way, so it passed while a neighbouring set had a gap. The property is about *all* sets; it is now asserted over eight, and as a **gap is a bug by construction** it needs no knowledge of the answers |
@@ -2826,6 +2863,8 @@ here. Revision 2 additions are marked ★.
 | ▣ Every law proved in the core shows up in the assembled stage | the same run | internal contact ratio above external (1.936 vs 1.566), internal relative radius the larger, internal contact stress below (245 vs 350 MPa), ring bending below sun (10.5 vs 15.9 MPa). Each was proved as a law in `ring.rs`; asserting them again here is what catches the two meshes being wired the wrong way round, which no amount of core testing would |
 | ▣ One `k` satisfies both invariants at once | k = 0.9, 1.0, 1.15 | the external pair sums to two and the internal pair matches, to 1e-15, from a single stored value — so a planetary set cannot be given inconsistent thickness modifications |
 | ▣ Helical parity | β = 10, 20, 30° | every figure a spur set reports, a helical one reports too, ring bending included; the planet-shift residual stays below 1e-12 |
+| ▣ **The root trochoid against its best-fit circle** | least-squares circle through the generated fillet, 4 cutter sizes × 4 ring sizes, and 5 external sizes | best-fit radius **1.1–3.1 × ρ**, departing from any circle by 0.7–26 µm. `ρ_F` at the critical section is 1.47–2.52 × ρ external and 3.55–4.26 × on a ring — so an arc of the tool's own radius would be wrong by a factor, not a rounding |
+| ▣ A ring's fillet tends back toward the tool's round as the ring grows | 20-tooth shaper, z = 43 … 150 | monotone, which is the direction the rack limit requires |
 | ▣ **The rack limit holds at a helix angle too** | ring and cutter grown together at β = 15° and 30°, 1 000/500 → 20 000/10 000 | gaps **0.0037 → 0.0007 → 0.0002** at 15° and **0.0027 → 0.0005 → 0.0001** at 30°, the same first order in `1/z` as the spur case. Both sides reach it through their *own* virtualisation — `Gear::virtual_spur` against `Ring::virtual_spur` with the cutter scaled alongside — so the two constructions are independent and meeting is evidence |
 | ▣ The virtual spur ring is the identity at zero helix | pitch, base, tip and root radii, tooth thickness, junction radius and travel, three ring sizes | `assert_eq!` — **bit-identical**, by construction rather than by a branch. The internal counterpart of the external identity above |
 | ▣ A helical ring's form factor falls with helix angle | β = 0, 5, 15, 25, 35° | monotone, as the virtual ring grows with `1/cos³β` and a bigger ring has a thicker root — the same direction an external gear moves |

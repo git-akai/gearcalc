@@ -138,6 +138,58 @@ pub struct Gear {
     pub severed: bool,
 }
 
+/// Spread `n` points across a profile's sections in proportion to their arc
+/// length, so no section is starved.
+///
+/// Shared by [`Gear`] and [`crate::ring::Ring`]. The two have different section
+/// *geometry* — one's tooth points outward and the other's inward — but this
+/// distribution is the same arithmetic on both, and it was written twice: the
+/// ring's copy carried its own anonymous `MIN_SHARE`, `MIN_POINTS` and
+/// `LENGTH_SAMPLES` in a function body, so changing the named constants here
+/// would silently have left the ring on the old values. The values agreed; the
+/// arrangement was one edit away from not.
+///
+/// `sample` is asked for a section twice: once coarsely to measure its length,
+/// once at the share it earns. Joints are de-duplicated, so consecutive sections
+/// meet at a single point.
+pub(crate) fn allocate_by_arc_length(
+    sections: &[Section],
+    n: usize,
+    sample: impl Fn(Section, usize) -> Vec<(f64, f64)>,
+) -> Vec<(f64, f64)> {
+    // Arc length in polar coordinates: `√(dr² + (r̄ dθ)²)` along each step.
+    let lengths: Vec<f64> = sections
+        .iter()
+        .map(|&s| {
+            let pts = sample(s, search::LENGTH_SAMPLES);
+            pts.windows(2)
+                .map(|w| {
+                    let dr = w[1].0 - w[0].0;
+                    let dt = (w[1].0 + w[0].0) / 2.0 * (w[1].1 - w[0].1);
+                    f64::hypot(dr, dt)
+                })
+                .sum()
+        })
+        .collect();
+    let total: f64 = lengths.iter().sum();
+    let shares: Vec<f64> = lengths
+        .iter()
+        .map(|w| w.max(total * search::MIN_SECTION_SHARE))
+        .collect();
+    let share_total: f64 = shares.iter().sum();
+
+    let mut out: Vec<(f64, f64)> = Vec::new();
+    for (&section, share) in sections.iter().zip(&shares) {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let count = ((share / share_total) * n as f64) as usize;
+        let pts = sample(section, count.max(search::MIN_SECTION_POINTS));
+        // Consecutive sections share their joint; keep one copy of it.
+        let skip = usize::from(!out.is_empty());
+        out.extend_from_slice(&pts[skip..]);
+    }
+    out
+}
+
 impl Gear {
     #[must_use]
     pub fn new(params: GearParams) -> Self {
@@ -488,37 +540,16 @@ impl Gear {
         }
     }
 
-    fn sample_section(&self, section: Section, n: usize) -> (Vec<f64>, Vec<f64>) {
+    fn sample_section(&self, section: Section, n: usize) -> Vec<(f64, f64)> {
         let n = n.max(2);
         #[allow(clippy::cast_precision_loss)]
         let lerp = |a: f64, b: f64, i: usize| a + (b - a) * (i as f64 / (n - 1) as f64);
-        let mut rs = Vec::with_capacity(n);
-        let mut ts = Vec::with_capacity(n);
-        for i in 0..n {
-            let (r, t) = match section {
+        (0..n)
+            .map(|i| match section {
                 Section::TipArc => (self.ra, lerp(0.0, self.theta_a.max(0.0), i)),
                 Section::Involute => self.involute_at(lerp(self.u_tip, self.u_j, i)),
                 Section::Trochoid => self.trochoid_at(lerp(self.s_j, 0.0, i)),
                 Section::RootArc => (self.rf, lerp(self.theta0, self.half_pitch, i)),
-            };
-            rs.push(r);
-            ts.push(t);
-        }
-        (rs, ts)
-    }
-
-    fn section_lengths(&self) -> Vec<f64> {
-        self.sections()
-            .into_iter()
-            .map(|s| {
-                let (r, t) = self.sample_section(s, search::LENGTH_SAMPLES);
-                (1..r.len())
-                    .map(|i| {
-                        let dr = r[i] - r[i - 1];
-                        let dt = (r[i] + r[i - 1]) / 2.0 * (t[i] - t[i - 1]);
-                        f64::hypot(dr, dt)
-                    })
-                    .sum()
             })
             .collect()
     }
@@ -527,26 +558,9 @@ impl Gear {
     /// arc length so no section is starved of points.
     #[must_use]
     pub fn half_profile(&self, n: usize) -> (Vec<f64>, Vec<f64>) {
-        let lengths = self.section_lengths();
-        let total: f64 = lengths.iter().sum();
-        let shares: Vec<f64> = lengths
-            .iter()
-            .map(|w| w.max(total * search::MIN_SECTION_SHARE))
-            .collect();
-        let share_total: f64 = shares.iter().sum();
-
-        let mut rs = Vec::new();
-        let mut ts = Vec::new();
-        for (section, share) in self.sections().into_iter().zip(shares) {
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let count = ((share / share_total) * n as f64) as usize;
-            let (r, t) = self.sample_section(section, count.max(search::MIN_SECTION_POINTS));
-            // drop the duplicated joint
-            let skip = usize::from(!rs.is_empty());
-            rs.extend_from_slice(&r[skip..]);
-            ts.extend_from_slice(&t[skip..]);
-        }
-        (rs, ts)
+        allocate_by_arc_length(&self.sections(), n, |s, k| self.sample_section(s, k))
+            .into_iter()
+            .unzip()
     }
 
     /// The closed cross-section as `[x, y]` points, counter-clockwise, with the

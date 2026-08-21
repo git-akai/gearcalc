@@ -121,8 +121,6 @@ pub struct Ring {
     pub half_pitch: f64,
     /// Roll parameter at the tip — the *lower* end of the flank here.
     pub u_tip: f64,
-    /// Roll parameter at the root radius, where the flank would run out.
-    pub u_root: f64,
     /// Roll parameter where the flank hands over to the fillet.
     pub u_j: f64,
     /// Cutter travel at that same junction.
@@ -231,11 +229,30 @@ impl Ring {
 
         // The tip cannot dip below the base circle: there is no involute there
         // to cut it from.
-        let ra_min = rb * (1.0 + 1e-9);
+        let mut ra_min = rb * (1.0 + 1e-9);
+
+        // ...and on a large ring the tooth runs out of *thickness* first.
+        //
+        // A ring's tooth narrows **inward**, so its tip is its thinnest section.
+        // Thickness at roll `u` is `2 r (ψ_b + inv_from_roll(u))`, which reaches
+        // zero where `inv α = −ψ_b` — possible only when `ψ_b < 0`, and that
+        // happens once `π/2z < inv α_t`, about 105 teeth at 20°. Closed form
+        // through the same `inv⁻¹` everything else uses, and it mirrors `Gear`'s
+        // pointed-tooth clamp rather than being a new kind of guard.
+        //
+        // Unclamped this is not a thin tooth but a **crossed** one: a 150-tooth
+        // ring at a 3-module addendum came out at −0.211 mm of thickness, and its
+        // outline is a self-intersecting polygon that would go into a DXF.
+        if psi_b < 0.0 {
+            if let Some(alpha_point) = crate::involute::inv_inverse(-psi_b) {
+                ra_min = ra_min.max(rb / alpha_point.cos());
+            }
+        }
         if ra < ra_min {
             clamps.push(format!(
-                "tip radius raised to the base circle at {ra_min:.4} mm: a ring's \
-                 addendum cannot reach inside its own base circle"
+                "tip radius raised to {ra_min:.4} mm: below that a ring's tooth has \
+                 no thickness left — either its addendum reaches inside its own base \
+                 circle, or its flanks meet before they get there"
             ));
             ra = ra_min;
         }
@@ -249,6 +266,24 @@ impl Ring {
         // internal relation between tool and workpiece, read through the shared
         // `operating_geometry`: the cutter is member 1 (external, unshifted) and
         // the ring is member 2, so the signed sums are `z_c − z_r` and `−x_thick`.
+        // An internal pair needs the ring to have more teeth than its cutter, and
+        // `Mesh::new` and `mesh_with` both refuse the other way round. Here it
+        // arrives as a *centre distance*, `r − r_c`, which simply goes negative:
+        // a 43-tooth ring "cut" by a 50-tooth shaper reported a root radius of
+        // 29.75 mm against a pitch radius of 21.5, and the only complaint was
+        // about the tip corner. Clamped rather than refused, because `Ring::new`
+        // reports rather than fails and which of the two counts to give up is the
+        // designer's call.
+        let cutter_teeth = if cutter_teeth >= z {
+            let capped = (z - 1.0).max(1.0);
+            clamps.push(format!(
+                "cutter reduced to {capped:.0} teeth: a ring must have more teeth than \
+                 the shaper that cuts it, or there is no inside to cut from"
+            ));
+            capped
+        } else {
+            cutter_teeth
+        };
         let cutter_radius = cutter_teeth * mt / 2.0;
         // A standard cutter: `k = 1`, no shift of its own. A resharpened tool
         // carries one, and it would enter the sums below exactly as the ring's
@@ -300,7 +335,6 @@ impl Ring {
             psi_b,
             half_pitch,
             u_tip: roll_at(ra),
-            u_root: roll_at(rf),
             u_j: roll_at(rf),
             s_j: 0.0,
             s_root: 0.0,
@@ -646,37 +680,9 @@ impl Ring {
     /// arc length so no section is starved of points.
     #[must_use]
     pub fn half_profile(&self, n: usize) -> Vec<(f64, f64)> {
-        const LENGTH_SAMPLES: usize = 60;
-        const MIN_SHARE: f64 = 0.004;
-        const MIN_POINTS: usize = 3;
-
-        let sections = self.sections();
-        let lengths: Vec<f64> = sections
-            .iter()
-            .map(|&s| {
-                let pts = self.sample_section(s, LENGTH_SAMPLES);
-                (1..pts.len())
-                    .map(|i| {
-                        let dr = pts[i].0 - pts[i - 1].0;
-                        let dt = (pts[i].0 + pts[i - 1].0) / 2.0 * (pts[i].1 - pts[i - 1].1);
-                        f64::hypot(dr, dt)
-                    })
-                    .sum()
-            })
-            .collect();
-        let total: f64 = lengths.iter().sum();
-        let shares: Vec<f64> = lengths.iter().map(|w| w.max(total * MIN_SHARE)).collect();
-        let share_total: f64 = shares.iter().sum();
-
-        let mut out: Vec<(f64, f64)> = Vec::new();
-        for (&section, share) in sections.iter().zip(shares) {
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let count = ((share / share_total) * n as f64) as usize;
-            let pts = self.sample_section(section, count.max(MIN_POINTS));
-            let skip = usize::from(!out.is_empty());
-            out.extend_from_slice(&pts[skip..]);
-        }
-        out
+        crate::profile::allocate_by_arc_length(&self.sections(), n, |s, k| {
+            self.sample_section(s, k)
+        })
     }
 
     /// The closed cross-section, counter-clockwise, `per_tooth` points a tooth.
@@ -1721,7 +1727,7 @@ mod tests {
             assert!(g.ra < g.r, "z={teeth}: tip {} against pitch {}", g.ra, g.r);
             assert!(g.rf > g.r, "z={teeth}: root {} against pitch {}", g.rf, g.r);
             assert!(g.rb < g.ra, "z={teeth}: the tip must clear the base circle");
-            assert!(g.u_tip > 0.0 && g.u_root > g.u_tip);
+            assert!(g.u_tip > 0.0 && g.u_j > g.u_tip);
         }
     }
 
@@ -1892,6 +1898,101 @@ mod tests {
             (1e-5..5e-2).contains(&gap),
             "expected a gap of order tens of µm between exact and linearised, got {gap}"
         );
+    }
+
+    /// **A large ring's tooth runs out of thickness before it runs out of
+    /// involute**, and that has to be caught — unclamped it is not a thin tooth
+    /// but a *crossed* one, whose outline is a self-intersecting polygon.
+    ///
+    /// A ring's tooth narrows inward, so its tip is its thinnest section. The
+    /// limit exists only when `ψ_b < 0`, which needs `π/2z < inv α_t` — about 105
+    /// teeth at 20°, so it is a large-ring phenomenon and invisible on the sizes
+    /// one would test first.
+    #[test]
+    fn a_large_rings_tooth_is_never_allowed_to_cross_itself() {
+        // Below the threshold `ψ_b` is positive and the base circle binds first.
+        let small = ring(43);
+        assert!(small.psi_b > 0.0);
+        assert!(small.tooth_thickness_at(small.ra) > 0.0);
+
+        // Above it, pushing the addendum used to give negative thickness.
+        for addendum in [1.0, 2.0, 2.5, 3.0, 4.0, 8.0] {
+            let g = Ring::new(
+                &GearParams {
+                    teeth: 150,
+                    addendum,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            );
+            assert!(g.psi_b < 0.0, "150 teeth should be past the threshold");
+            let thickness = g.tooth_thickness_at(g.ra);
+            assert!(
+                thickness >= -1e-9,
+                "addendum={addendum}: tooth thickness {thickness} at the tip"
+            );
+            // The clamp is reported, not silent, once it bites.
+            if addendum > 2.5 {
+                assert!(
+                    g.clamps.iter().any(|c| c.contains("no thickness left")),
+                    "addendum={addendum}: the clamp must say so"
+                );
+            }
+        }
+    }
+
+    /// **A shaper at least as large as the ring is not a shaper.** It arrives as a
+    /// negative centre distance rather than an obvious error, and used to produce
+    /// a root radius half again the ring's own pitch radius while complaining only
+    /// about the tip corner.
+    #[test]
+    fn a_cutter_no_smaller_than_the_ring_is_clamped_and_reported() {
+        for cutter_teeth in [43u32, 50, 100] {
+            let g = Ring::new(
+                &GearParams {
+                    teeth: 43,
+                    ..Default::default()
+                },
+                &Cutter {
+                    teeth: cutter_teeth,
+                    ..Cutter::default()
+                },
+            );
+            assert!(
+                g.cut.centre_distance > 0.0,
+                "z_c={cutter_teeth}: centre distance {} is not a distance",
+                g.cut.centre_distance
+            );
+            // The root circle stays where a root circle could be: outside the
+            // pitch circle, and not by more than the tool could reach.
+            assert!(
+                g.rf > g.r && g.rf < g.r + 3.0,
+                "z_c={cutter_teeth}: root radius {} against pitch {}",
+                g.rf,
+                g.r
+            );
+            assert!(
+                g.clamps
+                    .iter()
+                    .any(|c| c.contains("more teeth than the shaper")),
+                "z_c={cutter_teeth}: the clamp must name the real problem"
+            );
+        }
+        // One fewer tooth than the ring is extreme but legal, and not clamped.
+        let ok = Ring::new(
+            &GearParams {
+                teeth: 43,
+                ..Default::default()
+            },
+            &Cutter {
+                teeth: 42,
+                ..Cutter::default()
+            },
+        );
+        assert!(!ok
+            .clamps
+            .iter()
+            .any(|c| c.contains("more teeth than the shaper")));
     }
 
     /// A ring whose addendum would reach inside its own base circle is clamped

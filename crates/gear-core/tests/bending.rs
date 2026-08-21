@@ -471,3 +471,74 @@ fn a_rings_rating_is_continuous_over_its_useful_range() {
         }
     }
 }
+
+/// **A generated root fillet is not a circle of the cutter's tip radius**, and
+/// the difference is far too large to shrug at.
+///
+/// This is worth pinning because the shortcut is tempting: a fillet *looks* like
+/// a radius, drawings specify it as one, and `ρ` is right there as an input. But
+/// the fillet is the **envelope** of the tool's corner as it sweeps, so it is
+/// flatter than the corner itself — and `ρ_F` is what `q_s = s_Fn/(2 ρ_F)` divides
+/// by, so using `ρ` instead would inflate `q_s`, and `Y_S` with it, by whatever
+/// the ratio happens to be.
+///
+/// Measured at the critical section:
+///
+/// ```text
+/// external, z = 17 … 150      ρ_F / ρ = 2.52 … 1.47
+/// ring,     z = 43 … 150      ρ_F / ρ = 4.26 … 3.55
+/// ```
+///
+/// A ring's is the flatter of the two, which is one of the reasons its tooth
+/// rates stronger. Both are bracketed loosely here: the point is the *order*, not
+/// the digits.
+#[test]
+fn a_generated_fillet_is_much_flatter_than_the_tool_that_cut_it() {
+    use gear_core::ring::{Cutter, Ring};
+    use gear_core::strength::{bending_section, ring_bending_section};
+
+    const RHO: f64 = 0.2;
+
+    for z in [17u32, 43, 60, 90, 150] {
+        let g = Gear::new(GearParams {
+            teeth: z,
+            root_radius: RHO,
+            ..Default::default()
+        });
+        let sec = bending_section(&g, 1.8).unwrap();
+        let ratio = sec.fillet_curvature / g.rho;
+        assert!(
+            (1.2..3.0).contains(&ratio),
+            "external z={z}: rho_F/rho = {ratio}, expected the fillet to be flatter \
+             than the tool but not unrecognisably so"
+        );
+    }
+
+    let mut previous = f64::INFINITY;
+    for z in [43u32, 60, 90, 150] {
+        let ring = Ring::new(
+            &GearParams {
+                teeth: z,
+                ..Default::default()
+            },
+            &Cutter {
+                teeth: 20,
+                addendum: 1.25,
+                tip_round: RHO,
+            },
+        );
+        let sec = ring_bending_section(&ring, 1.8).unwrap();
+        let ratio = sec.fillet_curvature / RHO;
+        assert!(
+            (2.5..6.0).contains(&ratio),
+            "ring z={z}: rho_F/rho = {ratio}"
+        );
+        // A bigger ring is closer to a rack, so its fillet tends back toward the
+        // tool's own round — a direction, not a number.
+        assert!(
+            ratio < previous,
+            "ring z={z}: {ratio} should be below {previous}"
+        );
+        previous = ratio;
+    }
+}

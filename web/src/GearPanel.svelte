@@ -310,9 +310,10 @@
           </ul>
         {/if}
         <p class="muted">
-          Measurement over teeth and pins, and the strength rating, are not shown for an internal
-          gear: they are external-gear constructions and this tool does not yet have their internal
-          equivalents.
+          Measurement over teeth and pins is not shown for an internal gear: span and over-pins are
+          external-gear constructions and this tool does not yet have their internal equivalents. A
+          strength rating is not shown here for any gear — bending and contact need a mesh and a
+          load, which belong to a stage; the geartrain tab rates rings, spur and helical alike.
         </p>
       {/if}
     {:else if "error" in result}
