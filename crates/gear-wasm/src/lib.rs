@@ -668,6 +668,94 @@ mod tests {
         );
     }
 
+    /// **A planetary stage crosses the boundary with nothing added for it.**
+    ///
+    /// `Stage` is a tagged enum and `Train` already carried a `Vec` of them, so
+    /// the new kind needed no entry point of its own. That is the claim worth
+    /// checking rather than assuming — "it should just work" is exactly what
+    /// turns out to be false at a serde boundary.
+    ///
+    /// The assertions look for the shape a planetary result has and no other kind
+    /// does: three shafts instead of two, a *solved* planet shift, and two meshes
+    /// each with their own answers.
+    #[test]
+    fn a_planetary_stage_crosses_the_boundary_with_its_own_shape() {
+        let req = r#"{"train":{
+            "input_speed": 3000.0,
+            "input_torque": 2.0,
+            "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
+            "stages": [
+              {"kind":"planetary",
+               "module":1.0,"pressure_angle":20.0,"helix_angle":0.0,
+               "friction_sun_planet":0.06,"friction_planet_ring":0.06,
+               "thickness_mod":1.0,"planets":3,
+               "arrangement":{"input":"sun","fixed":"ring"},
+               "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
+               "min_planet_clearance":0.3,
+               "cutter":{"teeth":20,"addendum":1.25,"tip_round":0.2},
+               "sun":{"teeth":24,"profile_shift":{"auto":false,"manual":0.0},"working_depth":1.0,"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"auto_face_from_bending":true,"auto_face_from_contact":true,"material":"4340 Hardened Steel"},
+               "planet":{"teeth":18,"profile_shift":{"auto":false,"manual":0.0},"working_depth":1.0,"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"auto_face_from_bending":true,"auto_face_from_contact":true,"material":"4340 Hardened Steel"},
+               "ring":{"teeth":60,"profile_shift":{"auto":false,"manual":0.0},"working_depth":1.0,"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"auto_face_from_bending":true,"auto_face_from_contact":true,"material":"4340 Hardened Steel"}
+              }
+            ]}}"#;
+
+        let out = solve_train_impl(req).expect("a planetary train should solve");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        let stage = &v["stages"][0];
+        assert_eq!(stage["kind"], "planetary");
+
+        // Ring held, sun driving: the classical 1 + z_r/z_s.
+        assert!((v["total_ratio"].as_f64().unwrap() - 3.5).abs() < 1e-12);
+        assert_eq!(stage["output"], "carrier");
+        assert_eq!(stage["arrangement"]["fixed"], "ring");
+
+        // Three shafts, the held one exactly still, and the torques balancing.
+        let speeds = stage["speeds"].as_array().unwrap();
+        assert_eq!(speeds.len(), 3);
+        assert_eq!(speeds[2].as_f64().unwrap(), 0.0, "the ring is held");
+        assert!((speeds[0].as_f64().unwrap() - 3000.0).abs() < 1e-9);
+        let sum: f64 = stage["torques"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t.as_f64().unwrap())
+            .sum();
+        assert!(sum.abs() < 1e-9, "torques must balance, got {sum}");
+
+        // The planet's shift is *solved*, not sent: 24 + 2x18 = 60 is the ideal
+        // ring, so it comes back as exactly zero with a closed residual.
+        assert!(stage["planet"]["profile_shift"].as_f64().unwrap().abs() < 1e-12);
+        assert!(stage["planet"]["shift_residual"].as_f64().unwrap() < 1e-12);
+        assert_eq!(stage["planet"]["fully_reversed"], true);
+        // Its reduced allowable carries provenance across, like every other
+        // material figure (§6.3).
+        assert_eq!(stage["planet"]["reversed_allowable"]["basis"], "derived");
+        assert!(stage["planet"]["reversed_allowable"]["note"].is_string());
+
+        // Two meshes with their own answers, and every member rated.
+        for mesh in ["sun_planet", "planet_ring"] {
+            assert!(
+                stage[mesh]["contact_ratios"]["transverse"]
+                    .as_f64()
+                    .unwrap()
+                    > 1.0
+            );
+            assert!(stage[mesh]["contact_stress"].as_f64().unwrap() > 0.0);
+        }
+        for who in ["sun", "ring"] {
+            assert!(
+                stage[who]["bending_stress"].as_f64().unwrap() > 0.0,
+                "{who} must be rated"
+            );
+        }
+        assert!(stage["planet"]["gear"]["bending_stress"].as_f64().unwrap() > 0.0);
+        assert_eq!(stage["equal_spacing"], true);
+        assert!(
+            stage["notes"].as_array().unwrap().len() >= 2,
+            "what the stage assumes has to come across too"
+        );
+    }
+
     #[test]
     fn a_mixed_train_crosses_the_boundary_with_both_shapes_intact() {
         let req = r#"{"train":{

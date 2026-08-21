@@ -53,8 +53,12 @@ cd web && npm run dev             # the application
 Milestone 9 (planetary stage) is the open work; §11 has the full list. The
 layout mathematics of §4.8 is **done** — `planetary.rs` holds the shift solve,
 its closed-form bracket, the ring search and the layout checks, drivable as
-`gear-cli planetary` — as is the shifted internal mesh it needed. What remains
-is radial assembly, the ring's bending model, and the stage itself. Nothing is
+`gear-cli planetary` — as is the shifted internal mesh it needed. The ring's bending
+model and the stage itself are done too — a planetary set solves end to end in
+all six arrangements, `gear-cli planetstage` drives it — so what remains is the
+wasm boundary and the UI. Radial assembly is **shelved** with its findings
+recorded (§4.11), and the set-level backlash referral is the one derivation still
+open. Nothing is
 blocked, and most of what it needs exists: internal geometry and its interference
 conditions (§4.11), the ring search's monotonicity and closed-form bracket
 (§4.8), and Pennestrì's efficiency method (§4.5.2). Two things it must supply
@@ -2047,15 +2051,73 @@ from 20 to 40 teeth. The remedy is the ring's addendum — 0.8 clears it — not
 rule about tooth differences, which is why "ten teeth between them" never quite
 explained anything.
 
-**Radial assembly is deliberately absent.** Whether the pinion can be brought in
-sideways is a *swept-motion* question — the teeth have to pass each other on the
-way in — not a comparison of tip circles. Written as the latter it gave a
-negative clearance for every meshing pair, which is the signature of a formula
-that means nothing. The tip circles do intersect at
-`cos θ₂ = (d² + r_a2² − r_a1²)/(2 d r_a2)` and its mate, which is the right place
-to start; the honest fallback is a swept overlap test of the two generated
-profiles, in the spirit of the cut simulation below. It belongs with the
-planetary stage that will actually ask.
+#### Radial assembly — attempted, understood, and shelved
+
+Whether a pinion can be brought into a ring **sideways** is a *swept-motion*
+question: the teeth have to pass each other on the way in. Written as a
+comparison of tip circles it gives a negative clearance for every meshing pair,
+which is the signature of a formula that means nothing.
+
+It was built and then withdrawn. The code is gone; what was learned is here,
+because the next person to attempt it will otherwise repeat all of it.
+
+**The window is closed form, and small.** The tip circles first touch at
+`r_a,ring − r_a,pinion`, which is `a_w − m(h_a1 + h_a2)`. Before that the pinion
+is wholly inside the ring's tip circle and nothing can foul, so only the last
+`m(h_a1 + h_a2)` of the approach needs examining. Within it the tip circles
+intersect at `cos θ₂ = (d² + r_a2² − r_a1²)/(2 d r_a2)`, which bounds the angular
+sector that can interfere.
+
+**Two rotations are free, and they are not alike.** The pinion's own rotation
+moves its teeth about its own axis, changing each point's angle about the ring's
+centre non-uniformly — nothing to solve. The ring's phase, equivalently *where
+around the ring you insert*, is different: the ring's boundary is non-decreasing
+in angle from `(r_a, 0)` at the tooth centreline to `(r_f, half-pitch)` at
+mid-space [verified], so each pinion point admits an **interval** of ring phases
+and forbids the complement. Union the forbidden intervals, look for a gap, and
+that rotation is answered exactly with no sampling at all. That part worked and
+is worth keeping.
+
+**What killed it.** At the operating position the pair is *in mesh*, so the set of
+admissible orientations has essentially zero width — it is the backlash, about
+5e-3 rad on an ordinary design. A fixed sweep of the pinion's rotation resolves
+`pitch / steps`; at 48 steps over a 20-tooth pinion that is 6.5e-3 rad, and the
+sweep steps straight over the window. **Every "blocked" verdict was sampling
+resolution rather than geometry.**
+
+The tell was dimensional: the thresholds came out as a *ratio* of tooth counts
+(blocked below about `z_pinion/z_ring ≈ 0.42`) and scaled with ring size, when a
+tooth-passing condition should depend mainly on the tooth *difference*. A result
+whose units are wrong is wrong however plausible its shape.
+
+**Two limit checks passed while it was unsound**, which is the part worth
+remembering. Growing the ring toward a rack made it clear; shortening the ring's
+addendum made it clear, monotonically. Both are correct behaviours and both were
+satisfied by a check that could not distinguish "blocked" from "under-resolved",
+because each moved the answer by a margin far larger than the resolution. A limit
+check confirms a *trend*; it says nothing about the resolution the answer was
+computed at.
+
+**One genuine geometric surprise, worth recording separately.** For an internal
+pair `a = r_ring − r_pinion`, so *increasing* the centre distance pushes the
+pinion further from the ring's axis and **deeper** toward its rim. Adding
+assembly clearance therefore makes radial assembly harder, not easier — the
+opposite of the external intuition, and it is why the first attempt to resolve
+the endpoint degeneracy by adding clearance made every case worse.
+
+**What a working version needs.** The rotation search has to be a *refinement*
+rather than a sweep — coarse pass, then bisect toward the admissible window, with
+the resolution driven by the width actually being resolved rather than a chosen
+step count. And the informative region is intermediate centre distance: near the
+operating position the answer is trivially yes, since that *is* the assembled
+position. Simply sampling more finely is not a fix; it moves the resolution
+threshold without revealing where it now sits.
+
+**Why it is shelved rather than pending.** It blocks nothing. The two *meshing*
+interference conditions above are what decide whether a pair runs, and they are
+derived and tested. Radial assembly is a manufacturability question, and planets
+are commonly installed axially in any case — which is part of why this was never
+guessed at in the first place.
 
 #### The gate
 
@@ -2421,7 +2483,7 @@ not have to hunt for it.
 | What the eccentric mechanism can physically follow | §4.10 | same |
 | A coupled glass POM grade, if one is wanted back in the library | §6.4 | nothing |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
-| Radial-assembly interference — a swept-motion condition, deliberately not guessed | §4.11 | milestone 9 |
+| Radial-assembly interference — **shelved**; attempted, diagnosed and withdrawn, with the findings kept | §4.11 | nothing |
 | The cut simulation cannot see below the generation limit: its cutter has no fillet | §4.11 | nothing; the band is 0.08 mm on ordinary designs and is flagged |
 | A worm stage reports no contact ratio — the zone of action for a throated wheel is not derived | §4.5.1 | nothing |
 | Worm profile drawing and DXF — the gear tab draws parallel-axis involutes | §4.5.1 | nothing |
@@ -2463,8 +2525,8 @@ it can be validated in isolation.
 | 5 | ✅ **Mesh & strength** — contact path, bending, load-to-stress path, efficiency, Hertz, face width | **met** — both bending constructions converge to their own closed-form rack limits; Hertz agrees with the contact-half-width route to 1e-12; efficiency matches a numerical average of the instantaneous loss to 1e-10; `b_min` is independent of the face width it was evaluated at |
 | 6 | ✅ **Spur stage** — stage solve, train accumulation, tooth cycles, `solve_train` across the wasm boundary, geartrain tabs and the stage accordion | **met** — a two-stage train computes end to end in `gear-cli` *and* in the browser, with `ε_β = 0` exactly for a spur stage; the UI's own numbers were checked against the CLI's in a headless render |
 | 7 | ✅ **Worm stage** — the contact unification, screw-gear mathematics, the worm stage, and a train that holds both kinds | **met** — the unified contact model is bit-identical to line contact at its degenerate parameters and `gear-cli strength 17 43 2.0` is unchanged to the last digit; the self-locking threshold is exact (η_back is zero at `μ = cos α_n tan γ`, not merely small); a mixed train solves end to end in the CLI, across the wasm boundary and in the browser |
-| 8 | ✅ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | **met** — the cut simulated from the cutter and the rolling alone agrees with the analytic profile to **3.6 µm**; the rack is confirmed as the shaper's `z_c → ∞` limit, first order in `1/z_c`; the generation limit and both mesh interference conditions are derived rather than quoted. Radial assembly is deliberately deferred (§4.11) |
-| 9 | ⬜ **Planetary stage** — ring tooth search, planet shift solve, layout checks, radial assembly, Pennestrì efficiency | common centre distance to 1e-12; all six drive modes |
+| 8 | ✅ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | **met** — the cut simulated from the cutter and the rolling alone agrees with the analytic profile to **3.6 µm**; the rack is confirmed as the shaper's `z_c → ∞` limit, first order in `1/z_c`; the generation limit and both mesh interference conditions are derived rather than quoted. Radial assembly is **shelved** (§4.11) |
+| 9 | ◐ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency, the stage itself | **core met** — common centre distance to 1e-12, the ideal ring needing exactly zero shift, a held carrier giving exactly `η₀`, and all six drive modes exact against their classical ratios. Radial assembly is **shelved** (§4.11); the wasm boundary and the UI are what remain |
 | 10 | ⬜ **Crossed-axis spur** — reuse `screw.rs`, point-contact Hertz | Q2 revisited with the worm model in hand |
 | 11 | ⬜ **Polish** — train import/export, confirmations, error surfacing, docs | — |
 
@@ -2556,6 +2618,7 @@ something independent.**
 | 4.7 | Figure 8's "the two factors approach each other" taken as a check | It is a property of the paper's setup, not of ours: TM-107012 cuts its external gear with the same 20-tooth shaper as its ring, while this crate's external gear is rack-cut. With the shaper held at 20 teeth the ring's fillet never tends to the rack's, so the gap closes only to z ≈ 150 and then widens. The real convergence is with the shaper growing too, where both teeth become the same rack tooth |
 | 4.7 | Helical rings left unrated, on the grounds that a virtual spur *ring* did not exist | A gap, not a decision — the stated intent is feature parity with spur gears. It exists now: `z_n = z/cos³β` at the normal module, **with the cutter virtualised the same way**, which leaves `z_c/z_r` unchanged so the virtual pair still rolls together and the cut stays conjugate. Needed a `Ring` buildable at a fractional tooth count, mirroring `Gear::build_with_z`, and a `CutParams` that takes the cutter's *radius* rather than a whole-number tooth count |
 | 4.9 | A planetary stage assumed to fit the train's two-member shape | It has three shafts, and its speeds come from its own kinematics rather than from a ratio applied to the previous stage. `solve_any` therefore needs a **speed** as well as a torque: which shaft is held is a kinematic question, and the efficiency depends on it. The train now carries the speed it has reached alongside the torque it has reached |
+| 4.5.2 | Reversing a planetary by handing its output shaft's torque back as the input | That torque is a **reaction**, opposite in sign to the shaft's speed, and a shaft that is now driving must have them agree. The wrong sign flips the rolling power, `η₀^w` takes the wrong branch, and the set reports an efficiency **above one** — 101.571 % in the running application. Every test drove forward with a positive torque and a positive speed, so none could see it; found by looking at the UI. Related: a shaft with `T ω ≤ 0` is absorbing power and is not an input at all, so naming it one is now refused rather than answered with `1/η₀` |
 
 Two process notes worth carrying forward:
 
@@ -2697,6 +2760,8 @@ here. Revision 2 additions are marked ★.
 | ◆ Self-locking threshold | `η_back` at `μ = cos α_n tan γ`, four worms | **exactly zero** (< 1e-15), positive below, negative above |
 | ▣ **The bending rating is continuous across the flank/fillet seam** | external gears swept z = 140…165, crossing it; rings swept z = 40…90 at three contact ratios | every quantity moves under 1 % per tooth on the external sweep and under 2 % on the ring sweep, with no refusals. `Y_S` steps 0.06 % across the seam against `Y_F`'s 0.03 % — the transition is invisible in the numbers |
 | ▣ `ρ_F` is the fillet's radius at any tooth size | 1000-tooth gear, section on the flank | equals the fillet's curvature at its junction to 1e-12, and the involute's curvature there is more than **ten times** larger — which is what made it useless as a notch radius |
+| ▣ **Efficiency at most one, both drive senses, all six arrangements** | four values of `η₀` × both signs of a driving input | at most one always, and strictly below it whenever the meshes lose anything. The test that was missing when a 101.571 % backward figure appeared on screen |
+| ▣ **The UI's own planetary numbers** | headless Chromium render against `gear-cli planetstage` | ratio 3.5000, forward 98.453 %, backward 98.443 %, `η₀` 97.834 %, common centre distance 21.0200 mm with a zero residual — identical in both |
 | ▣ **A planetary stage, end to end, in all six arrangements** | `gear-cli planetstage 24 18 60 3`, and the same through the test suite | the classical ratios exact to 1e-12 (3.5, −2.5, 1.4 and their reciprocals); a held carrier giving **exactly** the product of the two mesh efficiencies; the ideal ring `z_s + 2z_p` needing exactly zero planet shift with a zero residual and a 21.000000 mm common centre distance |
 | ▣ Every law proved in the core shows up in the assembled stage | the same run | internal contact ratio above external (1.936 vs 1.566), internal relative radius the larger, internal contact stress below (245 vs 350 MPa), ring bending below sun (10.5 vs 15.9 MPa). Each was proved as a law in `ring.rs`; asserting them again here is what catches the two meshes being wired the wrong way round, which no amount of core testing would |
 | ▣ One `k` satisfies both invariants at once | k = 0.9, 1.0, 1.15 | the external pair sums to two and the internal pair matches, to 1e-15, from a single stored value — so a planetary set cannot be given inconsistent thickness modifications |

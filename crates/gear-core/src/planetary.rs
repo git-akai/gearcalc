@@ -471,8 +471,9 @@ pub fn basic_ratio(teeth: Teeth) -> f64 {
 ///
 /// # Errors
 ///
-/// `None` when the same member is both driven and held, when the tooth counts
-/// make a relation degenerate, or when neither sign of the rolling power is
+/// `None` when the same member is both driven and held, when the named input is
+/// not actually driving (`T ω ≤ 0` — see above), when the tooth counts make a
+/// relation degenerate, or when neither sign of the rolling power is
 /// self-consistent.
 #[must_use]
 pub fn power(
@@ -490,6 +491,14 @@ pub fn power(
     );
     let i0 = basic_ratio(teeth);
     if !i0.is_finite() || !fixed_carrier_efficiency.is_finite() {
+        return None;
+    }
+    // **The named input has to be driving.** A shaft with `T ω < 0` is absorbing
+    // power, so calling it the input is a contradiction rather than a design —
+    // and the arithmetic says so plainly, returning `1/η₀ > 1`. Refused, because
+    // the fix is to name the shaft that is actually driving.
+    let input_power = input_torque * input_speed;
+    if !input_power.is_finite() || input_power <= 0.0 {
         return None;
     }
 
@@ -521,14 +530,7 @@ pub fn power(
         if rolling != 0.0 && rolling.signum() != w {
             continue;
         }
-        let input_power = (input_torque * input_speed).abs();
-        let efficiency = if input_power > 0.0 {
-            (torques[o] * speeds[o]).abs() / input_power
-        } else {
-            // No power in, so no loss to measure. The lossless kinematic answer
-            // is the honest one rather than a division by zero.
-            fixed_carrier_efficiency.powf(w).abs().min(1.0)
-        };
+        let efficiency = (torques[o] * speeds[o]).abs() / input_power;
         return Some(Power {
             speeds,
             torques,
@@ -752,6 +754,42 @@ mod tests {
                 p.efficiency >= eta0,
                 "eta0={eta0}: a carrier-output set should beat its meshes"
             );
+        }
+    }
+
+    /// **Efficiency never exceeds one in either drive sense** — the test that was
+    /// missing, and that a 101.571 % figure in the running application found.
+    ///
+    /// Reversing a set means the shaft that was the output now drives, so its
+    /// torque must have the same sign as its speed. Hand it the *reaction* torque
+    /// the forward solution left there and the rolling power comes out the wrong
+    /// way round, `η₀^w` takes the wrong branch, and the answer is above unity.
+    /// Every earlier test drove forward with a positive torque and a positive
+    /// speed, so none of them could see it.
+    #[test]
+    fn no_arrangement_is_efficient_above_one_in_either_direction() {
+        for a in arrangements() {
+            for eta0 in [1.0, 0.99, 0.97, 0.9] {
+                // Both senses of a genuinely driving input.
+                for (speed, torque) in [(1500.0, 3.0), (-1500.0, -3.0)] {
+                    let p = power(teeth(), a, speed, torque, eta0).unwrap();
+                    assert!(
+                        p.efficiency <= 1.0 + 1e-12,
+                        "{a:?} eta0={eta0} n={speed} T={torque}: efficiency {}",
+                        p.efficiency
+                    );
+                    if eta0 < 1.0 {
+                        assert!(p.efficiency < 1.0, "{a:?} eta0={eta0}: lossless at a loss");
+                    }
+                }
+                // ...and a shaft that absorbs power is not an input. Asking
+                // anyway used to return `1/η₀`, above one, which is the
+                // arithmetic saying the question was put the wrong way round.
+                assert!(
+                    power(teeth(), a, 1500.0, -3.0, eta0).is_none(),
+                    "{a:?}: a non-driving input must be refused"
+                );
+            }
         }
     }
 

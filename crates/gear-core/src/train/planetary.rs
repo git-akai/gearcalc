@@ -378,6 +378,14 @@ pub fn solve_planetary_stage(
     )
     .ok_or(TrainError::NoContact)?;
     // Driving backward: the output shaft becomes the input, the same shaft held.
+    //
+    // **Its torque has to be a driving one.** The forward solution leaves that
+    // shaft carrying a *reaction* torque, opposite in sign to its speed; passing
+    // that back in makes the rolling power come out the wrong way round, which
+    // picks the wrong branch of `η₀^w` and returns an efficiency **above one**.
+    // So the magnitude is carried over and the sign is taken from the speed,
+    // which is what "this shaft is now driving" means.
+    let out = forward.output.index_pub();
     let reversed = Arrangement {
         input: forward.output,
         fixed: stage.arrangement.fixed,
@@ -385,8 +393,8 @@ pub fn solve_planetary_stage(
     let backward = planetary::power(
         teeth,
         reversed,
-        forward.speeds[forward.output.index_pub()],
-        forward.torques[forward.output.index_pub()],
+        forward.speeds[out],
+        forward.torques[out].abs() * if forward.speeds[out] < 0.0 { -1.0 } else { 1.0 },
         eta0.backward,
     );
     let set_efficiency = Directional {

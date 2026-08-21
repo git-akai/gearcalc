@@ -2,6 +2,7 @@
   import {
     solveTrain,
     defaultStage,
+    defaultPlanetaryStage,
     defaultWormStage,
     outside,
     type Auto,
@@ -14,7 +15,7 @@
   let { tab }: { tab: TrainTab } = $props();
 
   let confirmingDelete = $state(false);
-  let open = $state<Record<number, boolean>>({ 0: true });
+    let open = $state<Record<number, boolean>>({ 0: true });
 
   // Every number on screen comes back from Rust. Nothing here computes a
   // result — the project rule — so this is the only place a value is produced.
@@ -35,6 +36,10 @@
   function addStage() {
     tab.train.stages.push(defaultStage());
     open[tab.train.stages.length - 1] = true;
+  }
+
+  function addPlanetaryStage() {
+    tab.train.stages.push(defaultPlanetaryStage());
   }
 
   function addWormStage() {
@@ -485,7 +490,7 @@
             >
           </div>
         {/if}
-      {:else}
+      {:else if stage.kind === "worm"}
         {@const wres = res && res.kind === "worm" ? res : null}
         <button class="head" onclick={() => (open[i] = !open[i])}>
           <span class="caret">{open[i] ? "▾" : "▸"}</span>
@@ -682,6 +687,265 @@
             >
           </div>
         {/if}
+      {:else}
+        {@const pres = res && res.kind === "planetary" ? res : null}
+        <button class="head" onclick={() => (open[i] = !open[i])}>
+          <span class="caret">{open[i] ? "▾" : "▸"}</span>
+          <strong>Stage {i + 1}</strong>
+          <span class="kind">planetary</span>
+          <span class="teeth">z {stage.sun.teeth} / {stage.planet.teeth} / {stage.ring.teeth}</span>
+          {#if pres}
+            <span class="ratio">{pres.ratio.toFixed(4)} : 1</span>
+          {/if}
+        </button>
+        {#if open[i]}
+          <div class="body">
+            <div class="grid">
+              <label>
+                <span>Normal module</span>
+                <input type="number" step="0.1" bind:value={stage.module} /><em>mm</em>
+              </label>
+              <label>
+                <span>Pressure angle</span>
+                <input type="number" step="0.5" bind:value={stage.pressure_angle} /><em>°</em>
+              </label>
+              <label>
+                <span>Helix angle</span>
+                <input type="number" step="1" bind:value={stage.helix_angle} /><em>°</em>
+              </label>
+              <label>
+                <span>Planets</span>
+                <input type="number" step="1" min="1" bind:value={stage.planets} /><em></em>
+              </label>
+              <label>
+                <span>Driven by</span>
+                <select bind:value={stage.arrangement.input}>
+                  <option value="sun">Sun</option>
+                  <option value="carrier">Carrier</option>
+                  <option value="ring">Ring</option>
+                </select>
+                <em></em>
+              </label>
+              <label>
+                <span>Held</span>
+                <select bind:value={stage.arrangement.fixed}>
+                  <option value="sun">Sun</option>
+                  <option value="carrier">Carrier</option>
+                  <option value="ring">Ring</option>
+                </select>
+                <small>the third shaft is the output; a set needs both named</small>
+              </label>
+              <label>
+                <span>Friction, sun–planet</span>
+                <input type="number" step="0.01" bind:value={stage.friction_sun_planet} /><em></em>
+              </label>
+              <label>
+                <span>Friction, planet–ring</span>
+                <input type="number" step="0.01" bind:value={stage.friction_planet_ring} /><em></em>
+              </label>
+              <label>
+                <span>Tooth thickness modification</span>
+                <input type="number" step="0.05" bind:value={stage.thickness_mod} /><em></em>
+                <small>the sun's; the planet takes 2 − k and the ring matches the planet</small>
+              </label>
+              <label>
+                <span>C2C clearance</span>
+                <input type="number" step="0.01" bind:value={stage.clearance} /><em>mm</em>
+              </label>
+              <label>
+                <span>Minimum planet clearance</span>
+                <input type="number" step="0.05" bind:value={stage.min_planet_clearance} /><em
+                  >mm</em
+                >
+              </label>
+            </div>
+
+            <h4>Ring cutter</h4>
+            <div class="grid">
+              <label>
+                <span>Cutter teeth</span>
+                <input type="number" step="1" min="1" bind:value={stage.cutter.teeth} /><em></em>
+                <small>a ring is shaped by a pinion, and its root and fillet are the tool's</small>
+              </label>
+              <label>
+                <span>Cutter addendum</span>
+                <input type="number" step="0.05" bind:value={stage.cutter.addendum} /><em>m</em>
+              </label>
+              <label>
+                <span>Cutter tip round</span>
+                <input type="number" step="0.02" bind:value={stage.cutter.tip_round} /><em>m</em>
+              </label>
+            </div>
+
+            {#each [["Sun", stage.sun], ["Planet", stage.planet], ["Ring", stage.ring]] as const as [label, g] (label)}
+              <h4>{label}</h4>
+              <div class="grid">
+                <label>
+                  <span>Tooth count</span>
+                  <input type="number" step="1" min="1" bind:value={g.teeth} /><em></em>
+                </label>
+                {#if label === "Planet"}
+                  <label>
+                    <span>Profile shift</span>
+                    <input
+                      type="number"
+                      value={pres ? pres.planet.profile_shift : 0}
+                      disabled
+                    /><em>module</em>
+                    <small>solved: it is what makes the two centre distances agree</small>
+                  </label>
+                {:else}
+                  <label>
+                    <span>Profile shift</span>
+                    <input type="number" step="0.05" bind:value={g.profile_shift.manual} /><em
+                      >module</em
+                    >
+                  </label>
+                {/if}
+                {#if label !== "Ring"}
+                  <label>
+                    <span>Addendum</span>
+                    <input type="number" step="0.05" bind:value={g.addendum.manual} /><em>m</em>
+                  </label>
+                  <label>
+                    <span>Dedendum</span>
+                    <input type="number" step="0.05" bind:value={g.dedendum} /><em>m</em>
+                  </label>
+                {:else}
+                  <label>
+                    <span>Addendum</span>
+                    <input type="number" step="0.05" bind:value={g.addendum.manual} /><em>m</em>
+                  </label>
+                {/if}
+                <label>
+                  <span>Face width</span>
+                  <input type="number" step="1" bind:value={g.face_width.manual} /><em>mm</em>
+                </label>
+                <label class="check">
+                  <input type="checkbox" bind:checked={g.face_width.auto} />
+                  <span>Automatic face width</span>
+                </label>
+                <label>
+                  <span>Material</span>
+                  <select bind:value={g.material}>
+                    {#each library.materials.material as m (m.name)}<option value={m.name}
+                      >{m.name}</option
+                    >{/each}
+                  </select>
+                  <em></em>
+                </label>
+              </div>
+            {/each}
+
+            {#if pres}
+              <h4>Results</h4>
+              <div class="grid readout">
+                <div>
+                  <span>Ratio</span><strong>{pres.ratio.toFixed(4)} : 1</strong>
+                  <small>{pres.arrangement.input} in, {pres.arrangement.fixed} held, {pres.output} out</small>
+                </div>
+                <div>
+                  <span>Common C2C</span><strong>{pres.centre_distance.toFixed(4)} mm</strong>
+                  <small>solve closed to {pres.planet.shift_residual.toExponential(1)} mm</small>
+                </div>
+                <div>
+                  <span>Efficiency</span>
+                  <strong>{(pres.efficiency.forward * 100).toFixed(3)} %</strong>
+                  <small>
+                    backward {(pres.efficiency.backward * 100).toFixed(3)} %; fixed-carrier η₀
+                    {(pres.fixed_carrier_efficiency.forward * 100).toFixed(3)} %
+                  </small>
+                </div>
+                <div>
+                  <span>Planet clearance</span>
+                  <strong>
+                    {pres.planet_clearance === null
+                      ? "n/a"
+                      : `${pres.planet_clearance.toFixed(3)} mm`}
+                  </strong>
+                  <small>
+                    {pres.planet_clearance === null
+                      ? "one planet has no neighbour"
+                      : pres.planet_clearance_ok
+                        ? "meets the minimum"
+                        : "below the minimum asked for"}
+                  </small>
+                </div>
+                <div>
+                  <span>Even spacing</span>
+                  <strong>{pres.equal_spacing ? "yes" : "no"}</strong>
+                  <small>simultaneous meshing {pres.simultaneous_meshing ? "yes" : "no"}</small>
+                </div>
+              </div>
+
+              <table>
+                <thead>
+                  <tr><th>mesh</th><th>ε_α</th><th>ε_β</th><th>η</th><th>σ_H</th><th>ρ</th></tr>
+                </thead>
+                <tbody>
+                  {#each [["sun–planet", pres.sun_planet], ["planet–ring", pres.planet_ring]] as const as [label, m] (label)}
+                    <tr>
+                      <td>{label}</td>
+                      <td>{m.contact_ratios.transverse.toFixed(3)}</td>
+                      <td>{m.contact_ratios.overlap.toFixed(3)}</td>
+                      <td>{(m.efficiency.forward * 100).toFixed(3)} %</td>
+                      <td>{m.contact_stress.toFixed(1)} MPa</td>
+                      <td>{m.relative_radius.toFixed(3)} mm</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>member</th><th>x</th><th>b mm</th><th>torque Nm</th><th>rpm</th><th>σ_F</th
+                    ><th>allowable</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each [["sun", pres.sun, 0], ["planet", pres.planet.gear, 1], ["ring", pres.ring, 2]] as const as [label, g, idx] (label)}
+                    <tr>
+                      <td>{label}</td>
+                      <td>{g.profile_shift.toFixed(4)}</td>
+                      <td>{g.face_width.toFixed(3)}</td>
+                      <td>{g.torque.toFixed(4)}</td>
+                      <td>{pres.speeds[idx].toFixed(1)}</td>
+                      <td>
+                        {g.bending_stress === null
+                          ? "—"
+                          : `${g.bending_stress.toFixed(1)} MPa`}
+                      </td>
+                      <td>
+                        {label === "planet"
+                          ? `${pres.planet.reversed_allowable.value.toFixed(1)} MPa`
+                          : `${g.material.fatigue_allowable.value.toFixed(1)} MPa`}
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+              <small>
+                The planet's allowable is the smaller because its bending is fully reversed —
+                driven on one flank by the sun and the other by the ring. It turns at
+                {pres.planet.speed_absolute.toFixed(1)} rpm, but what fatigues it is
+                {pres.planet.speed_relative.toFixed(1)} rpm relative to the carrier.
+              </small>
+
+              {#if pres.notes.length}
+                <ul class="notes">
+                  {#each pres.notes as n (n)}<li>{n}</li>{/each}
+                </ul>
+              {/if}
+            {/if}
+
+            <button
+              class="danger small"
+              onclick={() => removeStage(i)}
+              disabled={tab.train.stages.length === 1}>Remove stage</button
+            >
+          </div>
+        {/if}
 
       {/if}
     </section>
@@ -689,6 +953,7 @@
 
   <button class="add" onclick={addStage}>+ Add spur stage</button>
   <button class="add" onclick={addWormStage}>+ Add worm stage</button>
+  <button class="add" onclick={addPlanetaryStage}>+ Add planetary stage</button>
 </div>
 
 <style>

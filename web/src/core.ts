@@ -466,7 +466,52 @@ export interface WormStage {
 }
 
 /** A stage of either kind. The `kind` tag is what Rust's enum serialises as. */
-export type Stage = SpurStage | WormStage;
+/** Which shaft of a planetary set. Mirrors Rust's `planetary::Member`. */
+export type PlanetaryMember = "sun" | "carrier" | "ring";
+
+/** Which shaft drives and which is held.
+ *
+ *  Both are needed: naming only the driven shaft leaves the set undetermined,
+ *  since a sun-driven set behaves quite differently with the ring held than with
+ *  the carrier held. See DESIGN.md §8.1. */
+export interface Arrangement {
+  input: PlanetaryMember;
+  fixed: PlanetaryMember;
+}
+
+export interface Cutter {
+  teeth: number;
+  addendum: number;
+  tip_round: number;
+}
+
+export interface PlanetaryStage {
+  kind: "planetary";
+  module: number;
+  pressure_angle: number;
+  helix_angle: number;
+  friction_sun_planet: number;
+  friction_planet_ring: number;
+  /** `k` for the sun. The planet takes `2 - k` and the ring takes the planet's,
+   *  because an external pair must sum to two and an internal pair must match.
+   *  One input, three consistent values. */
+  thickness_mod: number;
+  planets: number;
+  arrangement: Arrangement;
+  clearance: number;
+  tolerance_plus: number;
+  tolerance_minus: number;
+  min_planet_clearance: number;
+  cutter: Cutter;
+  sun: StageGear;
+  /** The planet's `profile_shift` is ignored: it is solved, not chosen. */
+  planet: StageGear;
+  /** The ring's `dedendum` and `root_radius` are ignored — a ring's root circle
+   *  is where its cutter reaches. */
+  ring: StageGear;
+}
+
+export type Stage = SpurStage | WormStage | PlanetaryStage;
 
 export interface Train {
   input_speed: number;
@@ -557,7 +602,61 @@ export interface WormResult {
  * bending stress and two efficiencies — so this is a tagged union rather than
  * one interface with everything optional.
  */
-export type StageResult = SpurResult | WormResult;
+export interface MeshReport {
+  contact_ratios: ContactRatios;
+  efficiency: Directional<number>;
+  contact_stress: number;
+  relative_radius: number;
+  backlash: [Backlash, Backlash];
+}
+
+/** A material figure with its provenance, as Rust's `Value` serialises. */
+export interface ProvenancedValue {
+  value: number;
+  basis: string;
+  note: string | null;
+}
+
+export interface PlanetResult {
+  gear: GearResult;
+  profile_shift: number;
+  shift_residual: number;
+  speed_absolute: number;
+  speed_relative: number;
+  fully_reversed: boolean;
+  reversed_allowable: ProvenancedValue;
+  min_face_width_reversed: number | null;
+}
+
+export interface PlanetaryResult {
+  kind: "planetary";
+  arrangement: Arrangement;
+  output: PlanetaryMember;
+  ratio: number;
+  centre_distance_nominal: number;
+  centre_distance: number;
+  fixed_carrier_efficiency: Directional<number>;
+  efficiency: Directional<number>;
+  /** `[sun, carrier, ring]`. The held shaft is exactly zero. */
+  speeds: [number, number, number];
+  /** `[sun, carrier, ring]`. They sum to zero. */
+  torques: [number, number, number];
+  sun_planet: MeshReport;
+  planet_ring: MeshReport;
+  equal_spacing: boolean;
+  simultaneous_meshing: boolean;
+  planet_clearance: number | null;
+  planet_clearance_ok: boolean;
+  sun_coprime_with_planets: boolean;
+  ring_coprime_with_planets: boolean;
+  sun: GearResult;
+  planet: PlanetResult;
+  ring: GearResult;
+  planets: number;
+  notes: string[];
+}
+
+export type StageResult = SpurResult | WormResult | PlanetaryResult;
 
 export interface TrainResult {
   total_ratio: number;
@@ -622,6 +721,29 @@ export function defaultWormStage(): WormStage {
     wheel: member("Brass C360"),
   };
 }
+export function defaultPlanetaryStage(): PlanetaryStage {
+  return {
+    kind: "planetary",
+    module: 1,
+    pressure_angle: 20,
+    helix_angle: 0,
+    friction_sun_planet: 0.06,
+    friction_planet_ring: 0.06,
+    thickness_mod: 1,
+    planets: 3,
+    arrangement: { input: "sun", fixed: "ring" },
+    clearance: 0.02,
+    tolerance_plus: 0.02,
+    tolerance_minus: 0.02,
+    min_planet_clearance: 0.3,
+    cutter: { teeth: 20, addendum: 1.25, tip_round: 0.2 },
+    sun: defaultStageGear(24),
+    // Its shift is solved, so the input is left fixed at zero and locked.
+    planet: { ...defaultStageGear(18), profile_shift: { auto: false, manual: 0 } },
+    ring: { ...defaultStageGear(60), profile_shift: { auto: false, manual: 0 } },
+  };
+}
+
 export function defaultStage(): SpurStage {
   return {
     kind: "spur",
