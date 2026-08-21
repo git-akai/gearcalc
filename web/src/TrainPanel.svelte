@@ -876,6 +876,15 @@
                   <strong>{pres.equal_spacing ? "yes" : "no"}</strong>
                   <small>simultaneous meshing {pres.simultaneous_meshing ? "yes" : "no"}</small>
                 </div>
+                <div>
+                  <span>Output backlash</span>
+                  <strong>{pres.backlash.forward.nominal.toFixed(4)}°</strong>
+                  <small>
+                    {pres.backlash.forward.minimum.toFixed(4)} … {pres.backlash.forward.maximum.toFixed(
+                      4,
+                    )}° over tolerance; at the {pres.output} shaft
+                  </small>
+                </div>
               </div>
 
               <table>

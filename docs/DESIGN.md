@@ -1583,7 +1583,35 @@ Each stage's angular backlash divided by the ratio of everything downstream. A
 consequence worth surfacing in the UI: the **last** stage dominates, and backlash
 in the first stage is nearly free. Min/max propagate identically.
 
-**Tooth cycles.**
+**A planetary set's backlash, referred to its output shaft.** The two meshes sit
+at the same centre distance, since the set is coaxial. In the carrier's frame
+each mesh's play lets its members slip:
+
+```text
+r′_s(θ_s − θ_c) + r′_p1(θ_p − θ_c) = δ₁          sun–planet
+r′_p2(θ_p − θ_c) − r′_r(θ_r − θ_c) = δ₂          planet–ring
+```
+
+`r′_p1 ≠ r′_p2` in general — the two meshes have different operating pressure
+angles, so the planet's operating radius differs between them, and assuming one
+radius is the mistake waiting to be made. Eliminating the planet leaves a single
+constraint on the three shafts, which is Willis at zero play:
+
+```text
+z_s(θ_s − θ_c) + z_r(θ_r − θ_c) = Δ,    Δ = [(z_s+z_p) δ₁ − (z_r−z_p) δ₂] / a
+```
+
+Hold the two shafts that are not the output and the third moves by `|Δ| / Z`,
+with `Z` its own coefficient above: `z_s` at the sun, `z_s + z_r` at the carrier,
+`z_r` at the ring. The two plays are independent, so their extremes add.
+
+**The check that it is right** [verified]: the same play measured at two
+different output shafts must differ by *exactly* the ratio between them —
+`(z_s+z_r)/z_s = 1 + z_r/z_s` and its relatives — and those ratios come from
+§4.5.2's algebra, which shares none of this. It is the law the train-level test
+uses on a line of two-shaft stages, asked of one stage with three shafts.
+
+**Tooth cycles.****Tooth cycles.**
 
 - *Intermittent*: the actuation range is at the output, so work backwards —
   revolutions of gear *i* = `(range/360) × Π(ratios between i and output) ×
@@ -2760,6 +2788,7 @@ here. Revision 2 additions are marked ★.
 | ◆ Self-locking threshold | `η_back` at `μ = cos α_n tan γ`, four worms | **exactly zero** (< 1e-15), positive below, negative above |
 | ▣ **The bending rating is continuous across the flank/fillet seam** | external gears swept z = 140…165, crossing it; rings swept z = 40…90 at three contact ratios | every quantity moves under 1 % per tooth on the external sweep and under 2 % on the ring sweep, with no refusals. `Y_S` steps 0.06 % across the seam against `Y_F`'s 0.03 % — the transition is invisible in the numbers |
 | ▣ `ρ_F` is the fillet's radius at any tooth size | 1000-tooth gear, section on the flank | equals the fillet's curvature at its junction to 1e-12, and the involute's curvature there is more than **ten times** larger — which is what made it useless as a notch radius |
+| ▣ **A planetary's backlash referred to two different output shafts** | three sets, sun-output against carrier-output with the ring held | differ by **exactly** the kinematic ratio, to 1e-9 relative — and that ratio comes from §4.5.2's algebra, which shares none of the referral's. Zero clearance gives exactly zero play; more clearance opens both meshes and loosens the output |
 | ▣ **Efficiency at most one, both drive senses, all six arrangements** | four values of `η₀` × both signs of a driving input | at most one always, and strictly below it whenever the meshes lose anything. The test that was missing when a 101.571 % backward figure appeared on screen |
 | ▣ **The UI's own planetary numbers** | headless Chromium render against `gear-cli planetstage` | ratio 3.5000, forward 98.453 %, backward 98.443 %, `η₀` 97.834 %, common centre distance 21.0200 mm with a zero residual — identical in both |
 | ▣ **A planetary stage, end to end, in all six arrangements** | `gear-cli planetstage 24 18 60 3`, and the same through the test suite | the classical ratios exact to 1e-12 (3.5, −2.5, 1.4 and their reciprocals); a held carrier giving **exactly** the product of the two mesh efficiencies; the ideal ring `z_s + 2z_p` needing exactly zero planet shift with a zero residual and a 21.000000 mm common centre distance |

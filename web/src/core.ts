@@ -637,6 +637,8 @@ export interface PlanetaryResult {
   centre_distance: number;
   fixed_carrier_efficiency: Directional<number>;
   efficiency: Directional<number>;
+  /** Angular backlash at whichever shaft is the output, degrees. */
+  backlash: Directional<Backlash>;
   /** `[sun, carrier, ring]`. The held shaft is exactly zero. */
   speeds: [number, number, number];
   /** `[sun, carrier, ring]`. They sum to zero. */

@@ -750,10 +750,17 @@ mod tests {
         }
         assert!(stage["planet"]["gear"]["bending_stress"].as_f64().unwrap() > 0.0);
         assert_eq!(stage["equal_spacing"], true);
+        // What the stage *assumes* has to come across too — here, equal load
+        // sharing between planets, which no calculation can establish.
+        let notes = stage["notes"].as_array().unwrap();
         assert!(
-            stage["notes"].as_array().unwrap().len() >= 2,
-            "what the stage assumes has to come across too"
+            notes
+                .iter()
+                .any(|n| n.as_str().unwrap_or("").contains("share the load equally")),
+            "the load-sharing assumption must be reported: {notes:?}"
         );
+        // ...and the output-shaft backlash is a real figure now, not a placeholder.
+        assert!(stage["backlash"]["forward"]["nominal"].as_f64().unwrap() > 0.0);
     }
 
     #[test]

@@ -186,6 +186,10 @@ pub struct PlanetaryResult {
     /// Whole-set efficiency, driving forward and backward. Driving backward means
     /// the output shaft becomes the input with the same shaft held.
     pub efficiency: Directional<f64>,
+    /// Angular backlash at whichever shaft is the **output**, degrees: the
+    /// output shaft driving forward, the input shaft driving backward — the same
+    /// convention every other stage kind uses.
+    pub backlash: Directional<Backlash>,
     /// Speeds `[sun, carrier, ring]`, rpm. The held shaft is exactly zero.
     pub speeds: [f64; 3],
     /// Torques `[sun, carrier, ring]`, N·m. They sum to zero.
@@ -521,6 +525,54 @@ pub fn solve_planetary_stage(
         2.0 * layout.centre_distance * (std::f64::consts::PI / planets).sin() - planet_tip
     });
 
+    // ---- backlash, referred to whichever shaft is the output.
+    //
+    // Both meshes sit at the same centre distance, since the set is coaxial. In
+    // the carrier's frame each mesh's play lets its members slip:
+    //
+    //     r′_s(θ_s − θ_c) + r′_p1(θ_p − θ_c) = δ₁      sun–planet
+    //     r′_p2(θ_p − θ_c) − r′_r(θ_r − θ_c) = δ₂      planet–ring
+    //
+    // `r′_p1 ≠ r′_p2` in general — the two meshes have different operating
+    // pressure angles, so the planet's operating radius differs between them,
+    // and assuming one radius is the mistake waiting to be made here.
+    // Eliminating the planet leaves one constraint on the three shafts:
+    //
+    //     z_s(θ_s − θ_c) + z_r(θ_r − θ_c) = Δ,   Δ = [(z_s+z_p)δ₁ − (z_r−z_p)δ₂]/a
+    //
+    // which is Willis at Δ = 0. Hold the two shafts that are not the output and
+    // the third moves by `|Δ| / Z`, with `Z` its own coefficient above. The two
+    // plays are independent, so their extremes add.
+    //
+    // The check that this is right: the same play measured at two different
+    // output shafts must differ by exactly the ratio between them, and those
+    // ratios come from `planetary::power` by a route sharing none of this.
+    let zs = f64::from(teeth.sun);
+    let zp = f64::from(teeth.planet);
+    let zr = f64::from(teeth.ring);
+    let coefficient = |m: Member| match m {
+        Member::Sun => zs,
+        Member::Carrier => zs + zr,
+        Member::Ring => zr,
+    };
+    let referred = |at: Member, a: f64| -> f64 {
+        let j1 = sp_mesh.backlash(a).unwrap_or(0.0);
+        let j2 = pr_mesh.backlash(a).unwrap_or(0.0);
+        let delta = ((zs + zp) * j1.abs() + (zr - zp) * j2.abs()) / a;
+        (delta / coefficient(at)).to_degrees()
+    };
+    let backlash_at = |at: Member| Backlash {
+        nominal: referred(at, centre),
+        minimum: referred(at, centre - stage.tolerance_minus),
+        maximum: referred(at, centre + stage.tolerance_plus),
+    };
+    let set_backlash = Directional {
+        // Forward the output shaft is where the play shows; backward the shaft
+        // that was driving becomes the one being measured.
+        forward: backlash_at(forward.output),
+        backward: backlash_at(stage.arrangement.input),
+    };
+
     // ---- what the answer does not include.
     notes.push(format!(
         "the {} planets are assumed to share the load equally; real sets do not \
@@ -528,11 +580,6 @@ pub fn solve_planetary_stage(
          this project declines to apply on the designer's behalf",
         stage.planets
     ));
-    notes.push(
-        "angular backlash is reported per mesh; the figure referred to the output \
-         shaft needs a kinematic referral this stage does not yet derive"
-            .to_string(),
-    );
     if !layout.equal_spacing {
         notes.push(format!(
             "{} planets cannot be spaced evenly: (z_sun + z_ring) is not divisible by it",
@@ -599,6 +646,7 @@ pub fn solve_planetary_stage(
         centre_distance: centre,
         fixed_carrier_efficiency: eta0,
         efficiency: set_efficiency,
+        backlash: set_backlash,
         speeds: forward.speeds,
         torques: forward.torques,
         sun_planet: MeshReport {
@@ -835,6 +883,95 @@ mod tests {
                 "z={s}/{p}/{r}: ring {ring_s} vs sun {sun_s}"
             );
         }
+    }
+
+    /// **The backlash referral, against the kinematics.**
+    ///
+    /// The same play measured at two different output shafts must differ by
+    /// exactly the ratio between them — and those ratios come from
+    /// `planetary::power`, which shares none of the referral's algebra. That is
+    /// what makes this a check rather than a restatement.
+    ///
+    /// It is also the law the train-level test uses on a multi-stage train
+    /// ("backlash at the two ends differs by exactly the total ratio"), asked of
+    /// one stage with three shafts instead of a line of two-shaft ones.
+    #[test]
+    fn backlash_referred_to_two_shafts_differs_by_exactly_their_ratio() {
+        let lib = test_library();
+        for (s, p, r) in [(24u32, 18u32, 60u32), (17, 17, 52), (30, 15, 62)] {
+            // Ring held: the sun and the carrier are the two possible outputs.
+            let sun_in = PlanetaryStage {
+                arrangement: Arrangement {
+                    input: Member::Sun,
+                    fixed: Member::Ring,
+                },
+                ..stage_of(s, p, r, 0.0)
+            };
+            let carrier_in = PlanetaryStage {
+                arrangement: Arrangement {
+                    input: Member::Carrier,
+                    fixed: Member::Ring,
+                },
+                ..stage_of(s, p, r, 0.0)
+            };
+            let a = solve_planetary_stage(&sun_in, 3000.0, 2.0, &lib).unwrap();
+            let b = solve_planetary_stage(&carrier_in, 3000.0, 2.0, &lib).unwrap();
+
+            // `a` outputs at the carrier, `b` at the sun.
+            let at_carrier = a.backlash.forward.nominal;
+            let at_sun = b.backlash.forward.nominal;
+            assert!(at_carrier > 0.0 && at_sun > 0.0);
+            assert!(
+                (at_sun - at_carrier * a.ratio).abs() < 1e-9 * at_sun,
+                "z={s}/{p}/{r}: {at_sun} vs {at_carrier} x {}",
+                a.ratio
+            );
+            // ...and the shaft that turns faster carries the looser play.
+            assert!(at_sun > at_carrier);
+        }
+    }
+
+    /// Both meshes contribute, and more play in either loosens the output.
+    ///
+    /// A referral that dropped one mesh would still satisfy the ratio law above,
+    /// since that law is about *where* the play is measured rather than where it
+    /// came from — so it needs saying separately.
+    #[test]
+    fn both_meshes_contribute_to_the_output_backlash() {
+        let lib = test_library();
+        let base = stage_of(24, 18, 60, 0.0);
+        let tight = solve_planetary_stage(&base, 3000.0, 2.0, &lib).unwrap();
+
+        // More clearance opens both meshes, so the output must loosen.
+        let loose = PlanetaryStage {
+            clearance: base.clearance + 0.05,
+            ..base.clone()
+        };
+        let loose = solve_planetary_stage(&loose, 3000.0, 2.0, &lib).unwrap();
+        assert!(
+            loose.backlash.forward.nominal > tight.backlash.forward.nominal,
+            "{} should exceed {}",
+            loose.backlash.forward.nominal,
+            tight.backlash.forward.nominal
+        );
+
+        // And the tolerance band brackets the nominal, as it does everywhere else.
+        let b = &tight.backlash.forward;
+        assert!(b.minimum < b.nominal && b.nominal < b.maximum);
+
+        // At the zero-backlash centre distance there is no play at all.
+        let exact = PlanetaryStage {
+            clearance: 0.0,
+            tolerance_plus: 0.0,
+            tolerance_minus: 0.0,
+            ..base
+        };
+        let exact = solve_planetary_stage(&exact, 3000.0, 2.0, &lib).unwrap();
+        assert!(
+            exact.backlash.forward.nominal < 1e-12,
+            "zero clearance must give zero play, got {}",
+            exact.backlash.forward.nominal
+        );
     }
 
     /// The planet is the special case of §4.9: fully reversed, judged against a

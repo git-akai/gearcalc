@@ -317,22 +317,7 @@ impl StageResult {
         match self {
             Self::Spur(r) => r.backlash,
             Self::Worm(r) => r.backlash,
-            // A planetary reports backlash per mesh: the figure referred to the
-            // output shaft needs a kinematic referral the stage does not derive,
-            // so contributing a wrong one to the train's accumulation would be
-            // worse than contributing none.
-            Self::Planetary(_) => Directional {
-                forward: Backlash {
-                    nominal: 0.0,
-                    minimum: 0.0,
-                    maximum: 0.0,
-                },
-                backward: Backlash {
-                    nominal: 0.0,
-                    minimum: 0.0,
-                    maximum: 0.0,
-                },
-            },
+            Self::Planetary(r) => r.backlash,
         }
     }
 
