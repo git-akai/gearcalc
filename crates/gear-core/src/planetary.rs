@@ -346,10 +346,505 @@ pub fn ring_candidates(set: &Set, shift_range: (f64, f64), limit: u32) -> Vec<(u
     out
 }
 
+// ------------------------------------------------------------- kinematics ---
+
+/// One of the three shafts a planetary set presents.
+///
+/// The planets themselves are not on this list: they have no shaft of their own,
+/// and their speed is a consequence of the other three.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum Member {
+    Sun,
+    Carrier,
+    Ring,
+}
+
+impl Member {
+    /// Index into the `[sun, carrier, ring]` arrays below.
+    const fn index(self) -> usize {
+        match self {
+            Self::Sun => 0,
+            Self::Carrier => 1,
+            Self::Ring => 2,
+        }
+    }
+
+    /// The member that is neither of these two.
+    ///
+    /// A planetary set has three shafts and exactly two are chosen — one driven,
+    /// one held — so the third is not a choice at all.
+    fn other(a: Self, b: Self) -> Option<Self> {
+        [Self::Sun, Self::Carrier, Self::Ring]
+            .into_iter()
+            .find(|&m| m != a && m != b)
+            .filter(|_| a != b)
+    }
+}
+
+/// Which shaft drives and which is held.
+///
+/// **This is an addition to the specification's field list** (§8.1). The
+/// specification names only "Driven By", which picks one shaft of three and
+/// leaves the arrangement undetermined: a sun-driven set behaves quite
+/// differently with the ring held than with the carrier held. Naming the held
+/// shaft as well is what makes the six modes of §4.5.2 reachable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Arrangement {
+    pub input: Member,
+    pub fixed: Member,
+}
+
+/// What the three shafts do, and what it costs to make them do it.
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct Power {
+    /// Angular speeds `[sun, carrier, ring]`, in whatever unit the input was
+    /// given. The held shaft is exactly zero.
+    pub speeds: [f64; 3],
+    /// Torques `[sun, carrier, ring]`, in whatever unit the input was given.
+    /// They sum to zero — the set is in equilibrium, and the held shaft's torque
+    /// is the reaction it carries.
+    pub torques: [f64; 3],
+    /// Speed reduction, input over output. Negative when the output turns the
+    /// other way.
+    pub ratio: f64,
+    /// Mechanical efficiency, `|T_out ω_out| / |T_in ω_in|`.
+    pub efficiency: f64,
+    /// The member the other two leave over.
+    pub output: Member,
+    /// Sign of the rolling power — which way power crosses the meshes in the
+    /// carrier's frame. `+1` when the sun leads the carrier under a driving
+    /// torque, `−1` when it trails.
+    pub rolling_power_sign: f64,
+}
+
+/// The basic, carrier-fixed ratio `i₀ = −z_ring / z_sun`.
+///
+/// Negative because with the carrier held the sun and ring turn opposite ways —
+/// the planet reverses the sense once and the internal mesh does not reverse it
+/// again. Everything below is written in terms of this one number, which is what
+/// makes the six modes one piece of algebra rather than six.
+#[must_use]
+pub fn basic_ratio(teeth: Teeth) -> f64 {
+    -(f64::from(teeth.ring) / f64::from(teeth.sun))
+}
+
+/// Solve the whole set: speeds, torques, ratio and efficiency, in one go.
+///
+/// # The method
+///
+/// Pennestrì–Freudenstein, as §4.5.2 sets it out. Two linear relations carry
+/// everything:
+///
+/// ```text
+/// ω_s + (i₀ − 1) ω_c − i₀ ω_r = 0             Willis — kinematics
+/// T_s : T_c : T_r = 1 : −(1 − k) : −k         k = i₀ η₀^w — equilibrium with loss
+/// ```
+///
+/// The first is Willis's equation rearranged so all three speeds appear
+/// symmetrically; the second is torque equilibrium with the mesh loss folded in
+/// through `η₀^w`. Both are written once with the member's *index* selecting a
+/// coefficient, so no mode is a special case of any other.
+///
+/// **Efficiency must not be taken mesh by mesh in the fixed frame.** The meshes
+/// slide at their speeds relative to the *carrier*, not to ground, which is why
+/// `η₀` — the fixed-carrier efficiency — is the quantity that enters. A set whose
+/// two meshes are each 99 % efficient can be far worse than 98 % overall, and can
+/// self-lock; that is a real property of the arrangement, not an error.
+///
+/// # The sign of the rolling power
+///
+/// `w = sgn(T_s (ω_s − ω_c))` decides whether `η₀` multiplies or divides, and it
+/// depends on a torque that is itself being solved for. Rather than assume it,
+/// both values are tried and the self-consistent one kept — there are only two,
+/// and consistency picks between them.
+///
+/// # Errors
+///
+/// `None` when the same member is both driven and held, when the tooth counts
+/// make a relation degenerate, or when neither sign of the rolling power is
+/// self-consistent.
+#[must_use]
+pub fn power(
+    teeth: Teeth,
+    arrangement: Arrangement,
+    input_speed: f64,
+    input_torque: f64,
+    fixed_carrier_efficiency: f64,
+) -> Option<Power> {
+    let output = Member::other(arrangement.input, arrangement.fixed)?;
+    let (i, f, o) = (
+        arrangement.input.index(),
+        arrangement.fixed.index(),
+        output.index(),
+    );
+    let i0 = basic_ratio(teeth);
+    if !i0.is_finite() || !fixed_carrier_efficiency.is_finite() {
+        return None;
+    }
+
+    // Willis, with the held shaft at zero: one equation, one unknown.
+    let willis = [1.0, i0 - 1.0, -i0];
+    if willis[o].abs() < f64::MIN_POSITIVE {
+        return None;
+    }
+    let mut speeds = [0.0; 3];
+    speeds[i] = input_speed;
+    speeds[f] = 0.0;
+    speeds[o] = -willis[i] * input_speed / willis[o];
+
+    // ...then equilibrium, for each candidate sign of the rolling power.
+    for w in [1.0, -1.0] {
+        let k = i0 * fixed_carrier_efficiency.powf(w);
+        let shares = [1.0, -(1.0 - k), -k];
+        if shares[i].abs() < f64::MIN_POSITIVE {
+            continue;
+        }
+        let sun_torque = input_torque / shares[i];
+        let torques = [
+            sun_torque * shares[0],
+            sun_torque * shares[1],
+            sun_torque * shares[2],
+        ];
+        // The sign this branch assumed has to be the sign it produces.
+        let rolling = torques[0] * (speeds[0] - speeds[1]);
+        if rolling != 0.0 && rolling.signum() != w {
+            continue;
+        }
+        let input_power = (input_torque * input_speed).abs();
+        let efficiency = if input_power > 0.0 {
+            (torques[o] * speeds[o]).abs() / input_power
+        } else {
+            // No power in, so no loss to measure. The lossless kinematic answer
+            // is the honest one rather than a division by zero.
+            fixed_carrier_efficiency.powf(w).abs().min(1.0)
+        };
+        return Some(Power {
+            speeds,
+            torques,
+            ratio: input_speed / speeds[o],
+            efficiency,
+            output,
+            rolling_power_sign: w,
+        });
+    }
+    None
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    fn teeth() -> Teeth {
+        Teeth {
+            sun: 24,
+            planet: 18,
+            ring: 60,
+        }
+    }
+
+    /// Every arrangement of driven and held shaft, six in all.
+    fn arrangements() -> Vec<Arrangement> {
+        let all = [Member::Sun, Member::Carrier, Member::Ring];
+        let mut out = Vec::new();
+        for &input in &all {
+            for &fixed in &all {
+                if input != fixed {
+                    out.push(Arrangement { input, fixed });
+                }
+            }
+        }
+        assert_eq!(out.len(), 6);
+        out
+    }
+
+    /// **The three classical ratios, arrived at rather than written down.**
+    ///
+    /// Each falls out of the one Willis relation with a different shaft held, so
+    /// agreeing with the textbook forms says the relation is right — and none of
+    /// the three is a special case in the code.
+    #[test]
+    fn the_classical_ratios_come_out_of_one_relation() {
+        let t = teeth();
+        let (zs, zr) = (f64::from(t.sun), f64::from(t.ring));
+
+        // Ring held, sun driving: the reduction is 1 + z_r/z_s.
+        let p = power(
+            t,
+            Arrangement {
+                input: Member::Sun,
+                fixed: Member::Ring,
+            },
+            1000.0,
+            1.0,
+            1.0,
+        )
+        .unwrap();
+        assert_eq!(p.output, Member::Carrier);
+        assert!((p.ratio - (1.0 + zr / zs)).abs() < 1e-12, "{}", p.ratio);
+
+        // Sun held, ring driving: 1 + z_s/z_r.
+        let p = power(
+            t,
+            Arrangement {
+                input: Member::Ring,
+                fixed: Member::Sun,
+            },
+            1000.0,
+            1.0,
+            1.0,
+        )
+        .unwrap();
+        assert_eq!(p.output, Member::Carrier);
+        assert!((p.ratio - (1.0 + zs / zr)).abs() < 1e-12, "{}", p.ratio);
+
+        // Carrier held: the sun and ring turn opposite ways, ratio −z_r/z_s.
+        let p = power(
+            t,
+            Arrangement {
+                input: Member::Sun,
+                fixed: Member::Carrier,
+            },
+            1000.0,
+            1.0,
+            1.0,
+        )
+        .unwrap();
+        assert_eq!(p.output, Member::Ring);
+        assert!((p.ratio - (-zr / zs)).abs() < 1e-12, "{}", p.ratio);
+        assert!(p.ratio < 0.0, "a fixed carrier reverses the output");
+    }
+
+    /// A set built from lossless meshes is lossless, in **all six** arrangements
+    /// and exactly — so the loss term enters only through `η₀` and nothing else
+    /// leaks.
+    #[test]
+    fn a_lossless_set_is_lossless_in_every_arrangement() {
+        for a in arrangements() {
+            let p = power(teeth(), a, 1500.0, 3.0, 1.0).unwrap();
+            assert!(
+                (p.efficiency - 1.0).abs() < 1e-12,
+                "{a:?}: efficiency {}",
+                p.efficiency
+            );
+            // ...and the power balance closes exactly.
+            let out = p.torques[p.output.index()] * p.speeds[p.output.index()];
+            assert!((out.abs() - (3.0 * 1500.0f64).abs()).abs() < 1e-9, "{a:?}");
+        }
+    }
+
+    /// The three torques sum to zero in every arrangement — the set is in
+    /// equilibrium, and the held shaft's torque is the reaction it carries.
+    /// Getting this wrong is how a loss term ends up creating power.
+    #[test]
+    fn the_torques_are_in_equilibrium() {
+        for a in arrangements() {
+            for eta in [1.0, 0.98, 0.9] {
+                let p = power(teeth(), a, 1500.0, 3.0, eta).unwrap();
+                let sum: f64 = p.torques.iter().sum();
+                assert!(
+                    sum.abs() < 1e-9 * p.torques[0].abs().max(1.0),
+                    "{a:?} eta={eta}: torques sum to {sum}"
+                );
+            }
+        }
+    }
+
+    /// **Loss costs power, never makes it** — in every arrangement. The sign
+    /// convention that is easy to get backwards, and the one a planetary punishes
+    /// hardest, because `η₀` appears as a *power*.
+    #[test]
+    fn friction_never_pays() {
+        for a in arrangements() {
+            let ideal = power(teeth(), a, 1500.0, 3.0, 1.0).unwrap();
+            let mut last = ideal.efficiency;
+            for eta in [0.99, 0.97, 0.94, 0.9] {
+                let p = power(teeth(), a, 1500.0, 3.0, eta).unwrap();
+                assert!(
+                    p.efficiency <= 1.0,
+                    "{a:?} eta={eta}: efficiency {} exceeds one",
+                    p.efficiency
+                );
+                assert!(
+                    p.efficiency < last,
+                    "{a:?} eta={eta}: {} did not fall below {last}",
+                    p.efficiency
+                );
+                // The output speed is kinematic and loss cannot touch it.
+                assert!((p.ratio - ideal.ratio).abs() < 1e-12);
+                last = p.efficiency;
+            }
+        }
+    }
+
+    /// **With the carrier held, the answer must be exactly `η₀`.**
+    ///
+    /// A fixed-carrier set *is* two ordinary meshes in series — that is what
+    /// `η₀` means — so this is the one arrangement whose efficiency is known in
+    /// advance, and it comes out of the general algebra rather than being
+    /// short-circuited. `|k/i₀| = η₀^w` exactly, with nothing left over.
+    #[test]
+    fn a_held_carrier_gives_exactly_the_fixed_carrier_efficiency() {
+        for eta0 in [1.0, 0.99, 0.98, 0.9, 0.75] {
+            for input in [Member::Sun, Member::Ring] {
+                let p = power(
+                    teeth(),
+                    Arrangement {
+                        input,
+                        fixed: Member::Carrier,
+                    },
+                    1000.0,
+                    4.0,
+                    eta0,
+                )
+                .unwrap();
+                assert!(
+                    (p.efficiency - eta0).abs() < 1e-12,
+                    "{input:?} eta0={eta0}: got {}",
+                    p.efficiency
+                );
+            }
+        }
+    }
+
+    /// **And with the ring held, the published closed form.**
+    ///
+    /// `η = (1 − i₀ η₀) / (1 − i₀)` for a sun-in, carrier-out set — derived
+    /// independently of the code, which reaches it through the torque shares. Note
+    /// what it says: the answer is **above** `η₀`, because only part of the power
+    /// passes through the meshes at all. That is the result a mesh-by-mesh
+    /// calculation gets wrong in the optimistic direction for some arrangements
+    /// and the pessimistic direction for others.
+    #[test]
+    fn a_held_ring_matches_the_published_closed_form() {
+        let t = teeth();
+        let i0 = basic_ratio(t);
+        for eta0 in [1.0, 0.99, 0.98, 0.95] {
+            let p = power(
+                t,
+                Arrangement {
+                    input: Member::Sun,
+                    fixed: Member::Ring,
+                },
+                1000.0,
+                4.0,
+                eta0,
+            )
+            .unwrap();
+            let want = (1.0 - i0 * eta0) / (1.0 - i0);
+            assert!(
+                (p.efficiency - want).abs() < 1e-12,
+                "eta0={eta0}: {} vs {want}",
+                p.efficiency
+            );
+            assert!(
+                p.efficiency >= eta0,
+                "eta0={eta0}: a carrier-output set should beat its meshes"
+            );
+        }
+    }
+
+    /// **A coupled planetary is not as efficient as its meshes.**
+    ///
+    /// The result worth surfacing, and the reason §4.5.2 refuses a mesh-by-mesh
+    /// calculation: the meshes slide at their speeds relative to the *carrier*, so
+    /// as the ratio grows the recirculating power grows with it and the overall
+    /// efficiency falls well below `η₀` — from meshes that never change.
+    #[test]
+    fn a_high_ratio_set_loses_more_than_its_meshes_do() {
+        let eta0 = 0.98;
+        let mut previous = f64::INFINITY;
+        // Growing the sun against a fixed ring raises the carrier-output ratio.
+        for sun in [60u32, 40, 30, 24, 20, 18] {
+            let t = Teeth {
+                sun,
+                planet: 18,
+                ring: 60,
+            };
+            let p = power(
+                t,
+                Arrangement {
+                    input: Member::Carrier,
+                    fixed: Member::Ring,
+                },
+                1000.0,
+                5.0,
+                eta0,
+            )
+            .unwrap();
+            assert!(p.efficiency < 1.0);
+            assert!(
+                p.efficiency < previous,
+                "z_sun={sun}: efficiency {} did not fall below {previous}",
+                p.efficiency
+            );
+            previous = p.efficiency;
+        }
+        // Even so, a carrier-output set stays *above* its mesh product: it is the
+        // sun-or-ring-output arrangements that fall below. Stated as a comparison
+        // because the direction is the whole point.
+        let t = teeth();
+        let carrier_out = power(
+            t,
+            Arrangement {
+                input: Member::Sun,
+                fixed: Member::Ring,
+            },
+            1000.0,
+            5.0,
+            eta0,
+        )
+        .unwrap();
+        let ring_out = power(
+            t,
+            Arrangement {
+                input: Member::Sun,
+                fixed: Member::Carrier,
+            },
+            1000.0,
+            5.0,
+            eta0,
+        )
+        .unwrap();
+        assert!(
+            carrier_out.efficiency > ring_out.efficiency,
+            "{} vs {}",
+            carrier_out.efficiency,
+            ring_out.efficiency
+        );
+    }
+
+    /// The held shaft never turns, and the shaft that is neither driven nor held
+    /// is the one reported as the output.
+    #[test]
+    fn the_held_shaft_is_still_and_the_third_is_the_output() {
+        for a in arrangements() {
+            let p = power(teeth(), a, 1234.0, 7.0, 0.98).unwrap();
+            assert_eq!(p.speeds[a.fixed.index()], 0.0);
+            assert_eq!(p.speeds[a.input.index()], 1234.0);
+            assert_ne!(p.output, a.input);
+            assert_ne!(p.output, a.fixed);
+        }
+    }
+
+    /// Driving and holding the same shaft is not an arrangement.
+    #[test]
+    fn a_shaft_cannot_be_both_driven_and_held() {
+        for m in [Member::Sun, Member::Carrier, Member::Ring] {
+            assert!(power(
+                teeth(),
+                Arrangement { input: m, fixed: m },
+                1000.0,
+                1.0,
+                0.98
+            )
+            .is_none());
+        }
+    }
 
     fn rack() -> Rack {
         Rack::new(1.0, 20.0, 0.0)
