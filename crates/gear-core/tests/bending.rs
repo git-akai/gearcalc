@@ -423,3 +423,51 @@ fn the_rack_limit_holds_at_a_helix_angle() {
         );
     }
 }
+
+/// **A ring's rating is continuous too, and it is rated at all.**
+///
+/// A ring's tooth is short and wide, so the inscribed parabola touches its
+/// involute flank across most of the useful range — every count from 40 up, in
+/// this sweep. Under the earlier rule that withheld the correction on a flank
+/// tangency, that meant *no bending stress for almost any ring*, appearing and
+/// disappearing as the contact ratio moved the load point. Nothing physical
+/// happens at those tooth counts, so nothing may step.
+#[test]
+fn a_rings_rating_is_continuous_over_its_useful_range() {
+    use gear_core::ring::{Cutter, Ring};
+    use gear_core::strength::{ring_bending_section, StressConcentration};
+
+    for contact_ratio in [1.5, 1.7, 1.9] {
+        let mut previous: Option<f64> = None;
+        for z in 40..=90u32 {
+            let ring = Ring::new(
+                &GearParams {
+                    teeth: z,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            );
+            let sec = ring_bending_section(&ring, contact_ratio)
+                .unwrap_or_else(|| panic!("eps={contact_ratio} z={z}: no section"));
+            let factor = sec
+                .bending_factor(StressConcentration::Iso6336)
+                .unwrap_or_else(|| panic!("eps={contact_ratio} z={z}: no rating"));
+            // The notch radius is the fillet's, whichever curve the section
+            // landed on — so it stays a plausible fillet size rather than
+            // jumping to the involute's, which is tens of millimetres.
+            assert!(
+                sec.fillet_curvature > 0.0 && sec.fillet_curvature < 5.0,
+                "eps={contact_ratio} z={z}: rho_F = {}",
+                sec.fillet_curvature
+            );
+            if let Some(p) = previous {
+                let step = ((factor - p) / p).abs();
+                assert!(
+                    step < 0.02,
+                    "eps={contact_ratio} z={z}: the rating stepped by {step}"
+                );
+            }
+            previous = Some(factor);
+        }
+    }
+}

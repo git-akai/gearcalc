@@ -118,6 +118,10 @@ pub struct RootSection {
     /// the perpendicular to the tooth centreline.
     pub load_angle: f64,
     /// Radius of curvature of the fillet at the critical section, `ρ_F`.
+    ///
+    /// At the tangency when that is on the fillet; at the fillet's junction with
+    /// the flank when the tangency has climbed above it. Always a *fillet*
+    /// curvature, which is what makes it a notch radius.
     pub fillet_curvature: f64,
     /// Tooth form factor `Y_F`.
     pub form_factor: f64,
@@ -127,6 +131,10 @@ pub struct RootSection {
     pub method: CriticalSection,
     /// True when the inscribed parabola touched the involute flank rather than
     /// the fillet. Expected on larger teeth; see [`CriticalSection::LewisParabola`].
+    ///
+    /// It does **not** mean the rating is unavailable or approximate. The notch
+    /// is still the fillet and `ρ_F` is still read there — see
+    /// [`RootSection::stress_correction`] — so nothing steps across the seam.
     pub tangency_on_flank: bool,
     /// Parabola parameter `p` in `x² = 4p(y_v − y)`, for drawing the inscribed
     /// parabola. Only meaningful for [`CriticalSection::LewisParabola`].
@@ -272,6 +280,12 @@ pub trait ToothOutline {
     fn is_usable(&self) -> bool;
     /// Fillet parameter bracket, ordered `(lo, hi)`.
     fn fillet_bracket(&self) -> (f64, f64);
+    /// The fillet parameter where the fillet meets the involute flank.
+    ///
+    /// The notch does not stop existing when the critical section climbs above
+    /// it, so this is the fillet point nearest a flank tangency — see
+    /// [`RootSection::notch_parameter`].
+    fn fillet_junction(&self) -> f64;
     /// Flank roll-parameter bracket, ordered `(lo, hi)`.
     fn flank_bracket(&self) -> (f64, f64);
     /// Fillet point and tangent at `s`, in the frame above.
@@ -298,6 +312,9 @@ impl ToothOutline for Gear {
     }
     fn fillet_bracket(&self) -> (f64, f64) {
         (self.s_j, 0.0)
+    }
+    fn fillet_junction(&self) -> f64 {
+        self.s_j
     }
     fn flank_bracket(&self) -> (f64, f64) {
         (self.u_j, self.u_tip)
@@ -336,6 +353,9 @@ impl ToothOutline for crate::ring::Ring {
     }
     fn fillet_bracket(&self) -> (f64, f64) {
         (self.s_root.min(self.s_j), self.s_root.max(self.s_j))
+    }
+    fn fillet_junction(&self) -> f64 {
+        self.s_j
     }
     fn flank_bracket(&self) -> (f64, f64) {
         (self.u_tip, self.u_j)
@@ -491,6 +511,17 @@ fn finish<T: ToothOutline + ?Sized>(
     // direction's x-component is exactly that.
     let load_angle = load_dir[0].abs().clamp(-1.0, 1.0).acos();
 
+    // **The notch is the fillet, wherever the critical section ended up.**
+    //
+    // When the inscribed parabola touches the involute flank — which it does on
+    // any large tooth — the fillet has not stopped existing, and the stress
+    // concentration is still its. So `ρ_F` is read at the fillet point nearest
+    // the section, which is the junction. Reading the *involute's* own curvature
+    // instead is what used to happen, and it is not a notch radius at all: it
+    // jumps from 0.61 mm to 22.9 mm across a single tooth at z = 150→151, while
+    // the junction's runs smoothly through 0.6095, 0.6081, 0.6067.
+    let fillet_radius = g.fillet_curvature(if on_flank { g.fillet_junction() } else { s });
+
     let m = g.module();
     let form_factor = 6.0 * (moment_arm / m) * load_angle.cos()
         / ((root_chord / m).powi(2) * g.normal_pressure_angle().cos());
@@ -499,20 +530,14 @@ fn finish<T: ToothOutline + ?Sized>(
         s,
         // Curvature is a fillet property; on a flank tangency the involute's own
         // curvature is what the notch sees.
-        notch_parameter: root_chord
-            / (2.0
-                * if on_flank {
-                    g.flank_curvature(param)
-                } else {
-                    g.fillet_curvature(s)
-                }),
+        notch_parameter: root_chord / (2.0 * fillet_radius),
         tangency_on_flank: on_flank,
         method,
         parabola_p,
         root_chord,
         moment_arm,
         load_angle,
-        fillet_curvature: g.fillet_curvature(s),
+        fillet_curvature: fillet_radius,
         form_factor,
         tangency,
         tangent_direction,
@@ -601,18 +626,22 @@ pub const NOTCH_PARAMETER_RANGE: std::ops::Range<f64> = 1.0..8.0;
 impl RootSection {
     /// The stress correction factor `Y_S` under the chosen model.
     ///
-    /// Returns `None` when the correction has no meaning for this section:
-    /// [`StressConcentration::Iso6336`] is a *notch* factor, and its input `ρ_F`
-    /// is the notch radius. When the inscribed parabola touches the involute
-    /// flank there is no notch at the critical section, so the fit has no valid
-    /// input.
+    /// # It is always defined, and that took two goes to get right
     ///
-    /// This is not a formality. Evaluating it anyway substitutes the involute's
-    /// own curvature for `ρ_F`, which on a large tooth is enormous — `q_s` falls
-    /// from 1.81 to 0.048 across the seam at z=150→151 and the corrected factor
-    /// **jumps 17%** while `Y_F` itself moves by 0.03%. A design tool with a
-    /// cliff in the middle of its parameter space is worse than one that admits
-    /// the combination is undefined.
+    /// `ρ_F` is the *notch* radius, and the notch is the fillet. When the
+    /// inscribed parabola touches the involute flank — which it does on any large
+    /// tooth — the fillet has not gone anywhere, so `ρ_F` is read at the fillet
+    /// point nearest the section, which is the junction.
+    ///
+    /// An earlier revision read the **involute's** own curvature there instead,
+    /// which is not a notch radius at all: it jumps from 0.61 mm to 22.9 mm
+    /// across one tooth at z = 150→151, `q_s` falls from 1.81 to 0.048, and the
+    /// corrected factor moved 17 % while `Y_F` moved 0.03 %. The revision after
+    /// that refused the combination outright — but *that is still a
+    /// discontinuity*, a number becoming no number, and nothing physical happens
+    /// at 151 teeth to justify either. Reading the fillet's own curvature at the
+    /// junction runs smoothly through the seam: 0.6095, 0.6081, 0.6067, with
+    /// `q_s` at 1.805, 1.808, 1.808. See `docs/DESIGN.md` §12.
     ///
     /// The notch parameter is **clamped** into the range the fit is stated for
     /// before being used, so an out-of-range gear gets the value at the boundary
@@ -629,7 +658,6 @@ impl RootSection {
     pub fn stress_correction(&self, model: StressConcentration) -> Option<f64> {
         match model {
             StressConcentration::None => Some(1.0),
-            StressConcentration::Iso6336 if self.tangency_on_flank => None,
             StressConcentration::Iso6336 => {
                 let l = self.root_chord / self.moment_arm;
                 let q = self
@@ -1543,24 +1571,116 @@ mod tests {
         assert!(sec.notch_parameter > 10.0);
     }
 
-    /// The ISO correction is a notch factor. Where the parabola leaves the
-    /// fillet there is no notch, and the combination must say so rather than
-    /// substitute the involute's curvature — which produced a 17% cliff at
-    /// z=150→151 while the form factor moved 0.03%.
+    /// **The bending rating is continuous across the flank/fillet transition.**
+    ///
+    /// The inscribed parabola's tangency migrates up the fillet as a tooth grows
+    /// and eventually crosses onto the involute flank. Nothing physical happens
+    /// there — a 151-tooth gear is not stronger or weaker than a 150-tooth one by
+    /// any step — so nothing in the rating may jump either.
+    ///
+    /// What used to jump was `ρ_F`, because on a flank tangency it was read as
+    /// the *involute's* own radius of curvature. An involute is not a notch: that
+    /// number goes 0.61 mm → 22.9 mm across one tooth, `q_s` falls off the bottom
+    /// of the ISO fit's range, and the correction was refused outright rather
+    /// than reported wrong. Refusing is still a discontinuity — a number becomes
+    /// no number — and the answer was to stop asking the flank about a notch. The
+    /// notch is the fillet, and when the section climbs above it the nearest
+    /// fillet point is the junction.
+    ///
+    /// Swept across the seam, every quantity now moves by less than a percent per
+    /// tooth, and the transition is invisible in the numbers.
     #[test]
-    fn iso_correction_is_undefined_on_a_flank_tangency() {
+    fn the_rating_is_continuous_across_the_flank_fillet_transition() {
+        let of = |z: u32| {
+            let g = Gear::new(GearParams {
+                teeth: z,
+                ..Default::default()
+            });
+            let sec = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
+            let ys = sec
+                .stress_correction(StressConcentration::Iso6336)
+                .expect("the correction is defined on either side of the seam");
+            (
+                sec.tangency_on_flank,
+                sec.form_factor,
+                sec.notch_parameter,
+                ys,
+            )
+        };
+
+        // The seam is crossed somewhere in here, and the sweep must not care.
+        let counts: Vec<u32> = (140..=165).collect();
+        let mut seen_both = (false, false);
+        let mut previous: Option<(f64, f64, f64)> = None;
+        for &z in &counts {
+            let (on_flank, yf, qs, ys) = of(z);
+            if on_flank {
+                seen_both.1 = true;
+            } else {
+                seen_both.0 = true;
+            }
+            if let Some((pyf, pqs, pys)) = previous {
+                let step = |a: f64, b: f64| ((a - b) / b).abs();
+                assert!(
+                    step(yf, pyf) < 0.01,
+                    "z={z}: Y_F stepped by {}",
+                    step(yf, pyf)
+                );
+                assert!(
+                    step(qs, pqs) < 0.01,
+                    "z={z}: q_s stepped by {}",
+                    step(qs, pqs)
+                );
+                assert!(
+                    step(ys, pys) < 0.01,
+                    "z={z}: Y_S stepped by {}",
+                    step(ys, pys)
+                );
+            }
+            previous = Some((yf, qs, ys));
+        }
+        assert!(
+            seen_both.0 && seen_both.1,
+            "the sweep has to actually cross the seam to be testing anything"
+        );
+    }
+
+    /// `ρ_F` is a property of the **fillet**, at any tooth size.
+    ///
+    /// Stated on its own because it is the whole of the fix above: on a flank
+    /// tangency the reported fillet curvature must be the fillet's, at the
+    /// junction — not the involute's, which is larger by a factor of forty and
+    /// means nothing as a notch radius.
+    #[test]
+    fn the_notch_radius_is_always_the_fillets() {
         let g = Gear::new(GearParams {
             teeth: 1000,
             ..Default::default()
         });
         let sec = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
-        assert!(sec.tangency_on_flank);
+        assert!(sec.tangency_on_flank, "a 1000-tooth gear touches its flank");
+
+        // The fillet's own curvature at its junction with the flank.
+        let junction = g.fillet_curvature(g.fillet_junction());
+        assert!((sec.fillet_curvature - junction).abs() < 1e-12);
+        assert!(
+            (sec.notch_parameter - sec.root_chord / (2.0 * junction)).abs() < 1e-12,
+            "q_s must be built from that same radius"
+        );
+
+        // ...and it is nothing like the involute's curvature there.
+        let involute = g.flank_curvature(sec.s);
+        assert!(
+            involute > 10.0 * junction,
+            "the two should differ by an order of magnitude: {involute} vs {junction}"
+        );
+
+        // The correction is defined, and so is the whole factor.
         assert!(sec
             .stress_correction(StressConcentration::Iso6336)
-            .is_none());
-        assert!(sec.bending_factor(StressConcentration::Iso6336).is_none());
-        // the uncorrected factor is still perfectly well defined
-        assert!(sec.bending_factor(StressConcentration::None).is_some());
+            .is_some());
+        assert!(sec.bending_factor(StressConcentration::Iso6336).is_some());
+        assert!(sec.notch_parameter_in_range());
     }
 
     #[test]

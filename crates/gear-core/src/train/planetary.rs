@@ -539,16 +539,6 @@ pub fn solve_planetary_stage(
             ));
         }
     }
-    for (who, stress) in [("sun", sun_sf), ("planet", planet_sf), ("ring", ring_sf)] {
-        if stress.is_none() {
-            notes.push(format!(
-                "no bending stress for the {who}: the inscribed parabola touches its \
-                 involute flank rather than its fillet, so there is no notch for the \
-                 stress correction to read and a figure would be invented rather than \
-                 measured (§4.7)"
-            ));
-        }
-    }
     if ring.clamps.iter().any(|c| c.contains("tip radius raised")) {
         notes.push(
             "the ring's addendum was clamped at its base circle: it needs more teeth \
@@ -823,25 +813,19 @@ mod tests {
                 res.planet_ring.relative_radius > res.sun_planet.relative_radius,
                 "z={s}/{p}/{r}: internal relative radius should be the larger"
             );
-            // ...and a ring's tooth is the stronger, so where both figures exist
-            // it carries the less bending stress.
-            //
-            // A member can legitimately have none: when the inscribed parabola
-            // touches the involute flank rather than the fillet there is no notch
-            // for `Y_S` to read, and this crate declines to invent one (§4.7). A
-            // 62-tooth ring is such a case. That is the same `None` an external
-            // gear gives in the same situation, not a planetary-specific gap — and
-            // the stage says so in its notes rather than leaving a blank.
-            match (res.sun.bending_stress, res.ring.bending_stress) {
-                (Some(sun_s), Some(ring_s)) => assert!(
-                    ring_s < sun_s,
-                    "z={s}/{p}/{r}: ring {ring_s} vs sun {sun_s}"
-                ),
-                _ => assert!(
-                    res.notes.iter().any(|n| n.contains("no bending stress")),
-                    "z={s}/{p}/{r}: a missing bending figure must be explained"
-                ),
-            }
+            // ...and a ring's tooth is the stronger, so it carries the less
+            // bending stress. Every member is rated: a ring's critical section
+            // sits on its involute flank for most tooth counts, and that used to
+            // withhold the figure entirely — see
+            // `the_rating_is_continuous_across_the_flank_fillet_transition`.
+            let (sun_s, ring_s) = (
+                res.sun.bending_stress.expect("the sun is always rated"),
+                res.ring.bending_stress.expect("and so is the ring"),
+            );
+            assert!(
+                ring_s < sun_s,
+                "z={s}/{p}/{r}: ring {ring_s} vs sun {sun_s}"
+            );
         }
     }
 
