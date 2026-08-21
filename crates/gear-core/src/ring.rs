@@ -58,6 +58,7 @@ use crate::solve::{brent, Tol};
 /// depends on how many teeth its cutter had. Two rings with identical teeth,
 /// module and depth are *different parts* if they were shaped differently.
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Cutter {
     pub teeth: u32,
     /// Addendum, in modules — how far past its pitch circle the tool reaches.

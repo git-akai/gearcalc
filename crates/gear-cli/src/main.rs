@@ -9,6 +9,8 @@
 //! gear-cli strength [z1] [z2] [torque] [material] [helix]
 //!                             a worked mesh: bending, contact, efficiency
 //! gear-cli train              a two-stage geartrain, end to end
+//! gear-cli planetstage [z_sun] [z_planet] [z_ring] [N] [helix]
+//!                             a planetary stage, end to end
 //! gear-cli planetary [z_sun] [z_planet] [N] [x_sun] [x_ring]
 //!                             the ring counts that can be made to work, and
 //!                             the planet shift each of them needs
@@ -52,6 +54,13 @@ fn main() {
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.0),
             args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1e-3),
+        ),
+        Some("planetstage") => planetary_stage_report(
+            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(24),
+            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(18),
+            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(60),
+            args.get(4).and_then(|s| s.parse().ok()).unwrap_or(3),
+            args.get(5).and_then(|s| s.parse().ok()).unwrap_or(0.0),
         ),
         Some("planetary") => planetary_report(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
@@ -1149,6 +1158,122 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
                     "no shift in it equalises the two centre distances"
                 }
             );
+        }
+    }
+}
+
+/// A planetary stage, end to end, in all six arrangements.
+fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix: f64) {
+    use gear_core::planetary::{Arrangement, Member};
+    use gear_core::train::{solve_planetary_stage, PlanetaryStage, StageGear};
+
+    let lib = gear_io::default_library();
+    let base = PlanetaryStage {
+        helix_angle: helix,
+        planets,
+        sun: StageGear {
+            teeth: sun,
+            ..StageGear::default()
+        },
+        planet: StageGear {
+            teeth: planet,
+            ..StageGear::default()
+        },
+        ring: StageGear {
+            teeth: ring,
+            profile_shift: gear_core::Auto::fixed(0.0),
+            ..StageGear::default()
+        },
+        ..PlanetaryStage::default()
+    };
+
+    println!(
+        "planetary stage  z {sun}/{planet}/{ring}  N={planets}  helix {helix} deg  \
+         module {}  alpha {} deg",
+        base.module, base.pressure_angle
+    );
+    let all = [Member::Sun, Member::Carrier, Member::Ring];
+    let name = |m: Member| match m {
+        Member::Sun => "sun",
+        Member::Carrier => "carrier",
+        Member::Ring => "ring",
+    };
+
+    let mut shown = false;
+    for &input in &all {
+        for &fixed in &all {
+            if input == fixed {
+                continue;
+            }
+            let stage = PlanetaryStage {
+                arrangement: Arrangement { input, fixed },
+                ..base.clone()
+            };
+            match solve_planetary_stage(&stage, 3000.0, 2.0, &lib) {
+                Err(e) => println!("  {:>7} in, {:>7} held: {e}", name(input), name(fixed)),
+                Ok(r) => {
+                    if !shown {
+                        println!(
+                            "\ncommon centre distance {:.6} mm (residual {:.1e})  \
+                             planet shift {:+.4}",
+                            r.centre_distance_nominal,
+                            r.planet.shift_residual,
+                            r.planet.profile_shift
+                        );
+                        println!(
+                            "eps_a  sun-planet {:.3}   planet-ring {:.3}   \
+                             eta_0 {:.4}   even spacing {}   planet gap {}",
+                            r.sun_planet.contact_ratios.transverse,
+                            r.planet_ring.contact_ratios.transverse,
+                            r.fixed_carrier_efficiency.forward,
+                            r.equal_spacing,
+                            r.planet_clearance
+                                .map_or_else(|| "n/a".into(), |g| format!("{g:.3} mm"))
+                        );
+                        println!(
+                            "sigma_H  sun-planet {:.1} MPa   planet-ring {:.1} MPa",
+                            r.sun_planet.contact_stress, r.planet_ring.contact_stress
+                        );
+                        println!(
+                            "sigma_F  sun {}   planet {} (reversed, allowable {:.1} MPa)   ring {}",
+                            r.sun
+                                .bending_stress
+                                .map_or_else(|| "-".into(), |v| format!("{v:.1} MPa")),
+                            r.planet
+                                .gear
+                                .bending_stress
+                                .map_or_else(|| "-".into(), |v| format!("{v:.1} MPa")),
+                            r.planet.reversed_allowable.value,
+                            r.ring
+                                .bending_stress
+                                .map_or_else(|| "-".into(), |v| format!("{v:.1} MPa")),
+                        );
+                        println!(
+                            "\n{:>9} {:>9} {:>9} {:>12} {:>11}",
+                            "input", "held", "output", "ratio", "efficiency"
+                        );
+                        shown = true;
+                    }
+                    println!(
+                        "{:>9} {:>9} {:>9} {:>12.4} {:>10.3} %",
+                        name(input),
+                        name(fixed),
+                        name(r.output),
+                        r.ratio,
+                        r.efficiency.forward * 100.0
+                    );
+                }
+            }
+        }
+    }
+    if !shown {
+        return;
+    }
+    let stage = base;
+    if let Ok(r) = solve_planetary_stage(&stage, 3000.0, 2.0, &lib) {
+        println!();
+        for note in &r.notes {
+            println!("note: {note}");
         }
     }
 }

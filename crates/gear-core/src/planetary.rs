@@ -371,6 +371,13 @@ impl Member {
         }
     }
 
+    /// Index into the `[sun, carrier, ring]` arrays, for callers outside this
+    /// module that hold those arrays.
+    #[must_use]
+    pub const fn index_pub(self) -> usize {
+        self.index()
+    }
+
     /// The member that is neither of these two.
     ///
     /// A planetary set has three shafts and exactly two are chosen — one driven,

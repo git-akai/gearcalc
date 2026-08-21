@@ -132,6 +132,41 @@ pub enum Class {
     Polyamide,
 }
 
+/// Fraction of the one-directional bending allowable that survives a **fully
+/// reversed** load.
+///
+/// A planet gear is driven on one flank by the sun and on the other by the ring,
+/// so every tooth sees a complete stress reversal each turn rather than a
+/// released load (§4.9). ISO's convention for an alternating load is about 0.7,
+/// and unlike the `K` and `Z` families this is not a population-calibrated
+/// rating factor balanced against `σ_Flim` values this project does not have —
+/// it is the Goodman/Haigh statement that reversal doubles the stress range, and
+/// it applies to any material.
+///
+/// Named rather than written as a literal, and applied to the **allowable**
+/// rather than folded into the stress, so a reader sees the stress the tooth
+/// actually carries next to the smaller allowable it is judged against.
+pub const REVERSED_BENDING_FRACTION: f64 = 0.7;
+
+/// The bending allowable a fully reversed load leaves, MPa.
+///
+/// Carries its own provenance like every other material figure (§6.3): a derived
+/// value, with a note saying what it was derived from, so it cannot be mistaken
+/// for a datasheet reading.
+#[must_use]
+pub fn reversed_bending_allowable(m: &Material) -> Value {
+    Value {
+        value: m.fatigue_allowable.value * REVERSED_BENDING_FRACTION,
+        basis: Basis::Derived,
+        note: Some(format!(
+            "{REVERSED_BENDING_FRACTION} x the one-directional allowable of \
+             {:.1} MPa: a planet's bending is fully reversed, driven on one flank \
+             by the sun and the other by the ring",
+            m.fatigue_allowable.value
+        )),
+    }
+}
+
 /// One material property: its value, and how far it can be trusted.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

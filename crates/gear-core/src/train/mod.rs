@@ -29,9 +29,13 @@ use crate::contact::{Directional, Drive};
 use crate::material::{Material, MaterialLibrary};
 use crate::mesh::MeshError;
 
+mod planetary;
 mod spur;
 mod worm;
 
+pub use planetary::{
+    solve_planetary_stage, MeshReport, PlanetResult, PlanetaryResult, PlanetaryStage,
+};
 pub use spur::{solve_stage, SpurStage, StageGear};
 pub use worm::{
     solve_worm_stage, WormContact, WormMember, WormMemberResult, WormResult, WormStage,
@@ -243,6 +247,11 @@ pub(super) fn test_library() -> MaterialLibrary {
 pub enum Stage {
     Spur(SpurStage),
     Worm(WormStage),
+    // Boxed for the same reason `StageResult`'s variants are: a planetary stage
+    // carries three gears, a cutter and an arrangement where a spur stage carries
+    // two gears, so a `Vec<Stage>` would otherwise pay the largest of them for
+    // every stage whatever its kind. Invisible to readers and to serde.
+    Planetary(Box<PlanetaryStage>),
 }
 
 impl Default for Stage {
@@ -270,6 +279,7 @@ pub enum StageResult {
     // invisible to readers and to serde.
     Spur(Box<SpurResult>),
     Worm(Box<WormResult>),
+    Planetary(Box<PlanetaryResult>),
 }
 
 impl StageResult {
@@ -279,6 +289,7 @@ impl StageResult {
         match self {
             Self::Spur(r) => r.ratio,
             Self::Worm(r) => r.ratio,
+            Self::Planetary(r) => r.ratio,
         }
     }
 
@@ -292,6 +303,7 @@ impl StageResult {
         match self {
             Self::Spur(r) => r.efficiency,
             Self::Worm(r) => r.efficiency,
+            Self::Planetary(r) => r.efficiency,
         }
     }
 
@@ -305,6 +317,22 @@ impl StageResult {
         match self {
             Self::Spur(r) => r.backlash,
             Self::Worm(r) => r.backlash,
+            // A planetary reports backlash per mesh: the figure referred to the
+            // output shaft needs a kinematic referral the stage does not derive,
+            // so contributing a wrong one to the train's accumulation would be
+            // worse than contributing none.
+            Self::Planetary(_) => Directional {
+                forward: Backlash {
+                    nominal: 0.0,
+                    minimum: 0.0,
+                    maximum: 0.0,
+                },
+                backward: Backlash {
+                    nominal: 0.0,
+                    minimum: 0.0,
+                    maximum: 0.0,
+                },
+            },
         }
     }
 
@@ -313,7 +341,16 @@ impl StageResult {
     pub fn as_spur(&self) -> Option<&SpurResult> {
         match self {
             Self::Spur(r) => Some(r),
-            Self::Worm(_) => None,
+            _ => None,
+        }
+    }
+
+    /// The planetary result, if that is what this is.
+    #[must_use]
+    pub fn as_planetary(&self) -> Option<&PlanetaryResult> {
+        match self {
+            Self::Planetary(r) => Some(r),
+            _ => None,
         }
     }
 
@@ -322,7 +359,7 @@ impl StageResult {
     pub fn as_worm(&self) -> Option<&WormResult> {
         match self {
             Self::Worm(r) => Some(r),
-            Self::Spur(_) => None,
+            _ => None,
         }
     }
 
@@ -351,6 +388,19 @@ impl StageResult {
                     * (speeds[0] / 60.0 * std::f64::consts::TAU)
                     * (r.members[0].pitch_diameter / 2.0);
             }
+            // A planetary's speeds are not the train's two-member pattern — it
+            // has three shafts and its own kinematics already set them, so only
+            // the cycles are filled here. Sun and ring meet a planet `N` times
+            // per revolution; the planet is the special case of §4.9, and what
+            // fatigues it is its rotation **relative to the carrier**.
+            Self::Planetary(r) => {
+                let n = f64::from(r.planets.max(1));
+                r.sun.tooth_cycles = cycles[0] * n;
+                r.ring.tooth_cycles = cycles[0] * n;
+                let carrier_relative =
+                    (r.planet.speed_relative / r.speeds[0].abs().max(f64::MIN_POSITIVE)).abs();
+                r.planet.gear.tooth_cycles = cycles[0] * carrier_relative;
+            }
         }
     }
 }
@@ -362,6 +412,7 @@ impl StageResult {
 /// Whatever the stage kind reports.
 pub fn solve_any(
     stage: &Stage,
+    input_speed: f64,
     input_torque: f64,
     lib: &MaterialLibrary,
 ) -> Result<StageResult, TrainError> {
@@ -370,6 +421,11 @@ pub fn solve_any(
         Stage::Worm(s) => {
             solve_worm_stage(s, input_torque, lib).map(|r| StageResult::Worm(Box::new(r)))
         }
+        // A planetary needs a speed as well as a torque: its efficiency depends
+        // on which shaft is held, and that is a kinematic question. The train
+        // supplies the speed it has reached by this point.
+        Stage::Planetary(s) => solve_planetary_stage(s, input_speed, input_torque, lib)
+            .map(|r| StageResult::Planetary(Box::new(r))),
     }
 }
 
@@ -467,12 +523,14 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     }
 
     let mut torque = train.input_torque;
+    let mut speed = train.input_speed;
     let mut stages = Vec::with_capacity(train.stages.len());
     for stage in &train.stages {
-        let r = solve_any(stage, torque, lib)?;
+        let r = solve_any(stage, speed, torque, lib)?;
         // Forward is the direction a train propagates torque in; the backward
         // figure is reported, not applied.
         torque = torque * r.ratio() * r.efficiency().forward;
+        speed /= r.ratio();
         stages.push(r);
     }
 
@@ -577,7 +635,7 @@ mod tests {
     fn spur_input(s: &mut Stage) -> &mut SpurStage {
         match s {
             Stage::Spur(st) => st,
-            Stage::Worm(_) => panic!("this train's stages are all spur"),
+            _ => panic!("this train's stages are all spur"),
         }
     }
 
