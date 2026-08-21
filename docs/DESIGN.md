@@ -1,6 +1,6 @@
 # Gear & geartrain design tool — architecture and mathematics
 
-**Status: milestones 0–8 complete and in CI; milestone 9 (planetary stage) is
+**Status: milestones 0–9 complete and in CI; milestone 10 (crossed-axis spur) is
 the open work.** This document is the design of record and is current as of the head
 of `main`. Where implementation contradicted the design, the design was corrected
 and the correction recorded — see §12.
@@ -14,21 +14,22 @@ subscript `n` = normal plane, `t` = transverse.
 | | Built | Verified by |
 |---|---|---|
 | Geometry core | involute + trochoid profile, undercut, severed teeth | rack simulation, both bounds, 1080 cases |
-| Internal gears | ring profile, shaper-cut fillet, junction, generation limit, mesh interference | a simulation of the cut, agreeing to 3.6 µm |
+| Internal gears | ring profile, **profile shift**, shaper-cut fillet at its true centre distance, junction, generation limit, mesh interference, **bending rating** | the cut simulated from the tool alone, 2.5–2.7 µm across shifts −0.4…+0.5; the bending model meeting the external one in the rack limit |
+| Planetary sets | common-centre-distance shift solve, ring search, layout checks, Willis kinematics, Pennestrì efficiency, backlash referral | the ideal ring needing exactly zero shift; a held carrier giving exactly `η₀`; the three classical ratios; play at two output shafts differing by exactly their ratio |
 | Crossed axes | screw gearing — lead angle, both efficiencies, self-locking, elliptical contact | the classical closed forms at Σ = 90°, and an energy balance at every Σ |
 | Primitives | safeguarded `inv⁻¹`, Brent, bracketed Newton | textbook special cases |
 | Mesh | centre distance, exact backlash, contact path | direct tooth-thickness computation |
 | Contact | one Hertz formula, line contact its degenerate value | bit-identical to the line result at parallel axes |
 | Metrology | span, over-pins, cutter tip width, JGMA tables | independent pin-tangency check |
-| Strength | critical section, form factor, bending stress, Hertz, face width, helical | closed-form rack limits; the contact-half-width route; plane-change identities |
+| Strength | critical section, form factor, bending stress, Hertz, face width, helical, **internal** | closed-form rack limits; the contact-half-width route; plane-change identities; a huge ring and a huge external gear rating as the same rack tooth |
 | Efficiency | parallel-axis mesh loss from sliding along the path | numerical average of the instantaneous loss |
 | Automatic inputs | minimum profile shift, altered addendum, `Auto<T>` | the generator's own undercut flag; tip width measured off the result |
-| Geartrain core | spur/helical **and worm** stages, ratio, contact ratios, backlash, stresses, face width; train accumulation, both drive directions | a mixed train end to end; `ε_β = 0` exactly for spur; backlash at the two ends differing by exactly the total ratio |
+| Geartrain core | spur/helical, worm **and planetary** stages, ratio, contact ratios, backlash, stresses, face width; train accumulation, both drive directions | a mixed train end to end; `ε_β = 0` exactly for spur; backlash at the two ends differing by exactly the total ratio |
 | Materials | eight-material library, per-value provenance, TOML round-trip | primary datasheets; cross-family consistency laws |
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
-| UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur and worm** stages; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI |
+| UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm and planetary** stages; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI |
 
-247 tests, ~26 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+307 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -43,6 +44,8 @@ cargo run --bin gear-cli -- train            # a two-stage train, end to end
 cargo run --bin gear-cli -- train mixed      # ...with a worm stage in it
 cargo run --bin gear-cli -- worm 1 40 7 90   # a worm pair, both directions
 cargo run --bin gear-cli -- wormstage 1 40 7 2   # a worm stage, end to end
+cargo run --bin gear-cli -- planetary 17 17 3    # every ring count that can work
+cargo run --bin gear-cli -- planetstage 24 18 60 3  # a planetary stage, six modes
 cargo run --release --bin gear-cli -- bending   # the bending verification sheet
 cargo run --release --bin gear-cli -- verify 100  # the two-sided cutter check
 cd web && npm run dev             # the application
@@ -50,7 +53,7 @@ cd web && npm run dev             # the application
 
 ## What is next
 
-Milestone 9 (planetary stage) is the open work; §11 has the full list. The
+Milestone 10 (crossed-axis spur) is the open work; §11 has the full list. The
 layout mathematics of §4.8 is **done** — `planetary.rs` holds the shift solve,
 its closed-form bracket, the ring search and the layout checks, drivable as
 `gear-cli planetary` — as is the shifted internal mesh it needed. The ring's bending
@@ -170,19 +173,24 @@ gears/
 │   │   │                    limit, and internal gears its other sign
 │   │   ├── screw.rs         crossed-axis screw gearing — worm and crossed
 │   │   │                    helical, one module
+│   │   ├── planetary.rs     the planet-shift solve, the ring search, layout
+│   │   │                    checks, Willis kinematics and Pennestrì efficiency
 │   │   ├── train/           mod.rs   the vocabulary stages share, and the
 │   │   │                              train that strings them together
 │   │   │                    spur.rs  the parallel-axis stage
 │   │   │                    worm.rs  the crossed-axis stage
+│   │   │                    planetary.rs  the planetary stage
 │   │   ├── verify.rs        the two-sided rack check
 │   │   └── data/            jgma_116_02.csv        (beside src/, not in it)
 │   ├── gear-io/         DXF writer, TOML (de)serialisation
 │   │   └── data/            materials_default.toml   (TOML is I/O, so it lives here)
 │   ├── gear-wasm/       the #[wasm_bindgen] entry points, JSON in / JSON out.
-│   │                    Thin: seven of them, all pure functions.
+│   │                    Thin: eleven of them, all pure functions. A planetary
+│   │                    stage needed none of its own — `Stage` is a tagged
+│   │                    enum, so it crosses as a third kind.
 │   └── gear-cli/        dev-only harness: solve a file, dump numbers, sweep
 ├── web/                 Svelte + TS + Vite front end
-├── docs/                DESIGN.md, JGMA 116-02 1983.pdf
+├── docs/                DESIGN.md, HANDOFF.md, JGMA 116-02 1983.pdf
 └── handoff_inbound/     prior work, reference only
 ```
 
@@ -190,9 +198,9 @@ gears/
 development without touching the browser. Sweeps, regression dumps and
 "why is this number wrong" all happen there.
 
-Every module named by the milestones now exists. `train/` became a directory
-when the worm stage arrived and gave the split something to divide, exactly as
-planned.
+Every module named by the milestones now exists. `train/` became a directory when
+the worm stage arrived and gave the split something to divide, exactly as
+planned; the planetary stage joined it without changing the shape.
 
 **Each stage kind keeps its own result type.** A worm stage has no bending
 stress, no minimum face width from contact, and two efficiencies rather than
@@ -566,11 +574,11 @@ written, both lengths came out negative.)*
 
 Internal: `ε_α = [√(r_a1²−r_b1²) − √(r_a2²−r_b2²) + a_w sin α_w]/p_bt`.
 
-##### Overlap ratio and total contact ratio — planned, milestone 6
+##### Overlap ratio and total contact ratio
 
-`ε_β` is written above but **not yet computed**, for a simple reason: it needs a
-face width, and face width is not an input until the stage exists. It arrives
-with milestone 6, alongside material and torque.
+`ε_β` needs a face width, so it could not exist before the stage did — face width
+is not a property of a gear on its own. It arrived with milestone 6 and every
+stage kind reports all three, a planetary set once per mesh.
 
 ```
 ε_β = b sin β / (π m_n)          overlap (axial) contact ratio
@@ -1276,7 +1284,7 @@ real peak. It stays, with its own validated range reported per result
 (`notch_parameter_in_range`), which is the honest treatment of a fit that is
 load-bearing rather than decorative.
 
-#### Unifying the contact section — the plan for milestone 7
+#### Unifying the contact section — the decision taken *before* milestone 7
 
 Worm and crossed-helical stages contact at a **point** rather than a line, and
 the obvious implementation is a branch: line Hertz for parallel axes, elliptical
@@ -1430,16 +1438,15 @@ rewritten, not that the general form is wrong.
    must pass **before** any crossed-axis geometry is added.
 4. ✅ Sliding as a vector; same discipline — parallel-axis efficiency unchanged
    first, lengthwise component second. `contact::sliding_velocity`.
-5. 🔶 Then the worm geometry, lead angle `sin γ = z m_n/d`, and self-locking.
-   `screw.rs` — geometry, sliding and both drive directions are built and
-   verified; the worm **stage** (torque, face width, contact stress through the
-   train, and the UI) is what remains of milestone 7.
+5. ✅ Then the worm geometry, lead angle `sin γ = z m_n/d`, and self-locking.
+   `screw.rs` — geometry, sliding, both drive directions, and the worm **stage**
+   through the train and the UI.
 
 Steps 1–4 change no answer the tool currently gives. That is the point: the
 crossed-axis work should add a parameter, not a branch, and the way to be sure is
 to unify *before* there is anything new to get wrong.
 
-**Where step 5 landed so far.** `screw.rs` covers the pitch-point geometry and
+**Where step 5 landed.** `screw.rs` covers the pitch-point geometry and
 mechanics of a screw pair — worm drive and crossed-helical alike, as §4.5.1
 argued they should be. Three things are worth recording because they came out
 better than the plan assumed:
@@ -2165,9 +2172,9 @@ built with the cutter's parameters would do it.
 
 ## 5. Where closed form is genuinely impossible
 
-The complete list. Eight scalar solves, each monotone, each bracketed. The
-first six have an analytic derivative; the last two are bisections on a curve's
-own parameter. Everything else in this document is algebraic.
+The complete list. Nine scalar solves, each monotone, each bracketed. Three have
+an analytic derivative; the rest are bisections on a curve's own parameter.
+Everything else in this document is algebraic.
 
 | # | Solve | Method | Iterations |
 |---|---|---|---|
@@ -2176,6 +2183,7 @@ own parameter. Everything else in this document is algebraic.
 | 3 | Flank/fillet junction when undercut | Brent, bracketed by construction | ~40 |
 | 4 | Planet profile shift for common centre distance | Newton, **closed-form bracket** (§4.8) | 4 |
 | 5 | 30° tangent critical root section | Brent on the trochoid parameter | ~40 |
+| 5b | **Inscribed-parabola critical section** (§4.7, the default) | Brent on the fillet parameter, then on the flank's roll if the fillet has no solution — the tangency migrates from one curve to the other as a tooth grows | ~40 |
 | 6 | Contact ellipse aspect ratio `κ` (§4.7) | Brent in `ln κ`, bracket expanded to the representable floor | ~50 |
 | 7 | Cutter travel at a ring's flank/fillet junction (§4.11) | Brent on the trochoid's radius, monotone either side of the deepest cut | ~40 |
 | 8 | Cutter travel where a ring's fillet reaches mid-space (§4.11) | Brent on the trochoid's angle, bracketed by the junction | ~40 |
@@ -2184,6 +2192,15 @@ None is an optimiser, none can fail to converge, none has a tuning parameter.
 That is as close to closed form as involute geometry allows — the involute
 function is not algebraically invertible, and that single fact causes #1, #2 and
 #4.
+
+**#4 carries a guard, not a tolerance.** Its bracket ends sit *exactly* on the
+involute domain's boundary, where `inv α_w = 0`, and whether that arithmetic
+lands on zero or on −1e-17 depends on the tooth counts — so an endpoint can fall
+a hair outside a domain it is meant to touch, and a root sitting comfortably
+inside gets refused (§12). Each endpoint is therefore halved toward a point known
+to be interior until the residual is a number. There is nothing to choose: it
+stops when the answer exists, and the iteration bound is the same
+exhaust-the-mantissa bound `Tol` uses.
 
 **#6 is the one that had a tempting alternative**, and refusing it is the same
 decision as the rest of this section. Hertz's aspect-ratio relation has widely
@@ -2403,15 +2420,20 @@ tab creates a fresh default one.
 
 ### 8.1 Additions to the specification's field list
 
-Two things the spec does not list are added, both read-only outputs, both cheap
-once the data they need is present:
+Three things the spec does not list are added. Two are read-only outputs and cheap
+once the data they need is present; the third is an **input**, and it is added
+because without it the specification does not determine an answer:
 
 | Where | Output | Why |
 |---|---|---|
 | Stage, beside `Ratio` | **Contact ratios** — transverse `ε_α`, overlap `ε_β`, total `ε_γ` | The spec has helix-angle inputs but no way to see whether they bought full axial overlap. `ε_β < 1` is flagged: the gear is helical in form but still transfers load like a spur gear. §4.5 |
 | Stage, per gear | **Provenance marker** on each material property | The library ships estimates as well as measurements and must not present them alike. §6.1 |
+| Planetary stage, beside `Driven By` | **Held** — which shaft is grounded | The spec names only the driven shaft, which picks one of three and leaves the arrangement undetermined: a sun-driven set behaves quite differently with the ring held than with the carrier held, and the two are not variants of one answer. Naming the held shaft is what makes §4.5.2's six modes reachable, and the third shaft is then the output rather than a choice. |
 
-Both are outputs only, so §3.1 is untouched — nothing new becomes state.
+The first two are outputs, so §3.1 is untouched by them. The third *is* state, and
+deliberately: it is an input the specification omitted rather than a derived
+value, and inventing a default for it would be choosing a machine on the user's
+behalf.
 
 ### 8.2 Editable material properties
 
@@ -2491,7 +2513,7 @@ On top of that:
 | Q3 | Working depth = the depth at which the undercut question is asked. **Revision 1 was wrong**; corrected in §4.3, and it now reproduces the classical z=17 result. |
 | Q4 | JGMA 116-02 extracted and characterised (§4.6.1) — a banded lookup table. Tooth thickness tolerance deferred; nominal-only outputs, with `Option` fields left in place. |
 | Q5 | Two-pin and three-pin, odd and even, all four closed form and independently verified (§4.6). |
-| Q6 | Ring search is provably complete because required planet shift is strictly monotone in ring tooth count, with a closed-form bracket (§4.8). |
+| Q6 | Ring search is provably complete because required planet shift is strictly monotone in ring tooth count, with a closed-form bracket (§4.8). **Implemented and driven by `gear-cli planetary`**; the admissible counts come out as a contiguous run on every set tried, which is the property monotonicity guarantees and therefore the one worth asserting. |
 | Q7 | Gear Calculator is single-gear; mating-gear references dropped (§8). |
 
 **Applied corrections**: profile shift range `|x| ≤ 2` — **since withdrawn**
@@ -2516,6 +2538,8 @@ not have to hunt for it.
 | A worm stage reports no contact ratio — the zone of action for a throated wheel is not derived | §4.5.1 | nothing |
 | Worm profile drawing and DXF — the gear tab draws parallel-axis involutes | §4.5.1 | nothing |
 | `Driven By` on a worm stage — torque propagates worm→wheel; back-driving is reported, not modelled as a train direction | §4.9 | nothing |
+| **Equal load sharing between planets** is assumed — real sets need a floating member, and the remedy is a mesh-load factor of the kind §4.7 declines | §4.9 | nothing; it is stated in every planetary result's notes |
+| A planetary stage's own **profile drawing** — the viewport draws single gears, not a set | §8 | nothing |
 
 **Standing policy: no ISO/AGMA correction factors** — `Y_β`, `K_A`, `K_v`,
 `K_Fβ`, `K_Fα`, `Z_ε`, `Z_β` and relatives. Their validated bands are narrow
@@ -2554,9 +2578,16 @@ it can be validated in isolation.
 | 6 | ✅ **Spur stage** — stage solve, train accumulation, tooth cycles, `solve_train` across the wasm boundary, geartrain tabs and the stage accordion | **met** — a two-stage train computes end to end in `gear-cli` *and* in the browser, with `ε_β = 0` exactly for a spur stage; the UI's own numbers were checked against the CLI's in a headless render |
 | 7 | ✅ **Worm stage** — the contact unification, screw-gear mathematics, the worm stage, and a train that holds both kinds | **met** — the unified contact model is bit-identical to line contact at its degenerate parameters and `gear-cli strength 17 43 2.0` is unchanged to the last digit; the self-locking threshold is exact (η_back is zero at `μ = cos α_n tan γ`, not merely small); a mixed train solves end to end in the CLI, across the wasm boundary and in the browser |
 | 8 | ✅ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | **met** — the cut simulated from the cutter and the rolling alone agrees with the analytic profile to **3.6 µm**; the rack is confirmed as the shaper's `z_c → ∞` limit, first order in `1/z_c`; the generation limit and both mesh interference conditions are derived rather than quoted. Radial assembly is **shelved** (§4.11) |
-| 9 | ◐ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency, the stage itself | **core met** — common centre distance to 1e-12, the ideal ring needing exactly zero shift, a held carrier giving exactly `η₀`, and all six drive modes exact against their classical ratios. Radial assembly is **shelved** (§4.11); the wasm boundary and the UI are what remain |
+| 9 | ✅ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency, the stage, the boundary and the UI | **met** — the ideal ring `z_s + 2z_p` needs **exactly** zero planet shift and the two centre distances agree to 1e-12; a held carrier gives **exactly** the product of its two mesh efficiencies; all six drive modes reproduce their classical ratios to 1e-12; play referred to two different output shafts differs by exactly their ratio; helical to parity with spur throughout. A set solves end to end in `gear-cli`, across the wasm boundary and in the browser, the three agreeing. Radial assembly is **shelved** with its findings recorded (§4.11) |
 | 10 | ⬜ **Crossed-axis spur** — reuse `screw.rs`, point-contact Hertz | Q2 revisited with the worm model in hand |
 | 11 | ⬜ **Polish** — train import/export, confirmations, error surfacing, docs | — |
+
+Milestone 9 was where the *reuse* argument was tested rather than asserted, and
+it paid: the planetary stage needed no new wasm entry point, no second
+critical-section construction, no internal contact model and no separate
+efficiency path. What it did need was a signed convention that made a ring a
+negative tooth count — and putting that in place uncovered two wrong relations
+the duplication had been hiding (§12).
 
 Milestones 1–3 de-risk everything else: they prove the geometry is right, the
 mathematics is testable in Rust, and the wasm-to-Svelte pipeline works. I would

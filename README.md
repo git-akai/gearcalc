@@ -3,8 +3,8 @@
 A browser tool for designing gears and geartrains: parameter calculation and
 optimisation, 2D profile visualisation, and DXF export.
 
-External, **internal** and **worm** gearing, with the mathematics derived rather
-than quoted — and the derivations checked against simulations that share no code
+External, **internal**, **worm** and **planetary** gearing, with the mathematics
+derived rather than quoted — and the derivations checked against simulations that share no code
 with them.
 
 All mathematics is Rust, compiled to WebAssembly. TypeScript and Svelte do
@@ -40,7 +40,7 @@ and `wasm-bindgen-cli` together.
 ```bash
 nix develop              # or `direnv allow` once, for automatic entry
 
-cargo nextest run        # the full test suite, 247 tests, ~25 s
+cargo nextest run        # the full test suite, 307 tests, ~27 s
 cargo clippy --all-targets -- --deny warnings
 cargo fmt
 
@@ -61,6 +61,8 @@ cargo run --bin gear-cli -- train                  # a geartrain, end to end
 cargo run --bin gear-cli -- train mixed            # ...with a worm stage in it
 cargo run --bin gear-cli -- worm 1 40 7 90         # a worm pair, both directions
 cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
+cargo run --bin gear-cli -- planetary 17 17 3      # every ring count that can work
+cargo run --bin gear-cli -- planetstage 24 18 60 3 # a planetary stage, all six modes
 cargo run --release --bin gear-cli -- verify 100   # two-sided cutter check
 ```
 
