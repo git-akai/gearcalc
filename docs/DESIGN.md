@@ -29,7 +29,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm and planetary** stages; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI |
 
-322 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+325 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -705,6 +705,54 @@ So the architectural call is: build **one crossed-axis screw-gear model**
 (`screw.rs`) and let both the Worm Stage and a non-zero-axis-angle Spur Stage use
 it. That collapses most of Q2's cost — crossed helical becomes nearly free once
 the worm stage exists, which is why the milestone order puts worm before it.
+
+##### The two conventional proportions are shipped, as recommendations
+
+The specification asks for an automatic worm length and an automatic wormwheel
+face width. Both published rules are **proportions** — conventions rather than
+derivations — and an earlier revision refused them under §4.7's standing policy.
+That was the wrong call, and the distinction it missed is worth stating because
+it is what keeps the policy coherent:
+
+> §4.7 refuses published **rating** factors. The reason is that a factor
+> multiplies a stress, so one used outside its validated band silently moves the
+> number a designer sizes a part against. **A worm's length and a wheel's face
+> width enter no stress in this crate at all.** The contact is a point, and the
+> appendix records the measurement: the same mesh at 4 mm and at 40 mm of face
+> width gives a *bit-identical* peak pressure. A recommendation here informs a
+> choice and cannot distort an answer.
+
+So they are shipped, each with its source named on screen, each marked as a
+proportion rather than a derivation, and each editable:
+
+```text
+b₁ = (11 + c z₂) m_x,   c = 0.06 (z₁ < 4), 0.09 (z₁ ≥ 4)      DIN/ČSN practice
+b₂ = 2 m_x √(q + 1),    capped at 0.67 d₁,   q = d₁/m_x       BS 721
+```
+
+Both are written in the **axial** module, which is the module a worm's own pitch
+is measured in. The worm length is a function of the wheel's tooth count, which
+is what the specification asks for and what the physical picture says: a bigger
+wheel wraps further round the worm, so there must be more worm to wrap onto.
+More starts steepen the lead and spread the same wrap over more axial length,
+which is the step in `c`. On the wheel, the BS 721 cap is the operative statement
+for any ordinary `q` — past about two thirds of the worm's reference diameter the
+wheel's outer corners are beyond the thread they were widened to catch.
+
+**Not offered for a crossed gear pair.** These describe a worm carrying an
+enveloping wheel; a crossed pair is two helical gears touching at a point, with
+nothing wrapped round anything. §4.5.1 already makes the first member's sizing
+the definition of which machine a stage is, so that is what decides — the
+recommendation is `None`, the automatic toggle is not offered, and the result
+says why. Quoting a worm's proportions there would be shipping a convention
+outside the case it was written for, which is the thing the policy exists to
+refuse.
+
+They are tested as *behaviours* rather than as arithmetic, since a convention has
+no independent derivation to check against: the worm length is strictly monotone
+in the wheel's tooth count, both are homogeneous of degree one in the module, the
+cap binds at `q = 5` and does not at `q = 30`, and a wheel is never wider than
+the worm's own reference diameter across the range worm practice uses.
 
 ##### The worm is modelled as an involute helicoid (ZI)
 
@@ -2683,6 +2731,7 @@ not have to hunt for it.
 | The cut simulation cannot see below the generation limit: its cutter has no fillet | §4.11 | nothing; the band is 0.08 mm on ordinary designs and is flagged |
 | A worm stage reports no contact ratio — the zone of action for a throated wheel is not derived | §4.5.1 | nothing |
 | Worm profile drawing and DXF — the gear tab draws parallel-axis involutes | §4.5.1 | nothing |
+| ~~Automatic worm length and wormwheel face width, refused as proportions~~ | §4.5.1 | **closed** — shipped as recommendations with their sources named. They enter no stress, so a convention here informs a choice without distorting an answer; the reasoning is at the end of §4.5.1 |
 | `Driven By` on a worm stage — torque propagates worm→wheel; back-driving is reported, not modelled as a train direction | §4.9 | nothing |
 | **Equal load sharing between planets** is assumed — real sets need a floating member, and the remedy is a mesh-load factor of the kind §4.7 declines | §4.9 | nothing; it is stated in every planetary result's notes |
 | A planetary stage's own **profile drawing** — the viewport draws single gears, not a set | §8 | nothing |

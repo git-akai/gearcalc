@@ -603,11 +603,30 @@
                     <small>the mate takes the rest of the shaft angle</small>
                   </label>
                 {/if}
-                <label>
-                  <span>Length</span>
-                  <input type="number" step="1" bind:value={stage.worm.face_width} />
-                  <em>mm</em>
-                </label>
+                {#if wres && wres.members[0].recommended_face_width == null}
+                  <!-- No recommendation exists for a crossed pair, so there is
+                       nothing for an automatic toggle to take: showing one
+                       would lock the field to a value nothing computed. -->
+                  <label>
+                    <span>Length</span>
+                    <input type="number" step="1" bind:value={stage.worm.face_width.manual} />
+                    <em>mm</em>
+                  </label>
+                {:else}
+                  {@render autoNumber(
+                    "Length",
+                    stage.worm.face_width,
+                    wres?.members[0].recommended_face_width ?? undefined,
+                    1,
+                  )}
+                {/if}
+                {#if wres?.members[0].recommended_face_width != null}
+                  <p class="convention">
+                    automatic uses {wres.members[0].recommended_face_width?.toFixed(2)} mm —
+                    <code>(11 + 0.06 z₂) m_x</code> for one to three starts, DIN/ČSN practice. A
+                    proportion, not a derivation: it sizes the part and enters no stress here.
+                  </p>
+                {/if}
                 <label>
                   <span>Material</span>
                   <select bind:value={stage.worm.material}>
@@ -638,11 +657,27 @@
                   <span>Tooth count</span>
                   <input type="number" step="1" bind:value={stage.wheel_teeth} />
                 </label>
-                <label>
-                  <span>Face width</span>
-                  <input type="number" step="1" bind:value={stage.wheel.face_width} />
-                  <em>mm</em>
-                </label>
+                {#if wres && wres.members[1].recommended_face_width == null}
+                  <label>
+                    <span>Face width</span>
+                    <input type="number" step="1" bind:value={stage.wheel.face_width.manual} />
+                    <em>mm</em>
+                  </label>
+                {:else}
+                  {@render autoNumber(
+                    "Face width",
+                    stage.wheel.face_width,
+                    wres?.members[1].recommended_face_width ?? undefined,
+                    1,
+                  )}
+                {/if}
+                {#if wres?.members[1].recommended_face_width != null}
+                  <p class="convention">
+                    automatic uses {wres.members[1].recommended_face_width?.toFixed(2)} mm —
+                    <code>2 m_x √(q + 1)</code> capped at <code>0.67 d₁</code>, BS 721. A
+                    proportion, not a derivation: it sizes the part and enters no stress here.
+                  </p>
+                {/if}
                 <label>
                   <span>Material</span>
                   <select bind:value={stage.wheel.material}>
@@ -1132,6 +1167,18 @@
   .toggle.on {
     background: var(--selected);
     color: var(--fg);
+  }
+  /* The source of a shipped convention, next to the number it produced —
+     the project's rule is to say what a figure is where it is shown. */
+  .convention {
+    grid-column: 1 / -1;
+    margin: -0.1rem 0 0.4rem;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    color: var(--muted);
+  }
+  .convention code {
+    font-size: 0.72rem;
   }
   .out {
     display: grid;

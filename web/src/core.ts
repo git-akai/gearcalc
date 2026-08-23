@@ -481,7 +481,10 @@ export interface SpurStage {
 }
 
 export interface WormMember {
-  face_width: number;
+  /** Automatic takes the conventional proportion for this member; see
+   *  `recommended_face_width` on the result, and DESIGN §4.5.1 for what those
+   *  proportions are and are not. */
+  face_width: Auto<number>;
   material: string;
   material_overrides: Overrides;
 }
@@ -611,6 +614,11 @@ export interface WormMemberResult {
   speed: number;
   tooth_cycles: number;
   face_width: number;
+  /** What the conventional proportion asks for, mm — reported whether or not it
+   *  is what is in use, so a hand-set width can be read against it. Null for a
+   *  crossed gear pair, which has no enveloping wheel for the proportions to
+   *  describe. */
+  recommended_face_width: number | null;
   pitch_diameter: number;
   material: Material;
 }

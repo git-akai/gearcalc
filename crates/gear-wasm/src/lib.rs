@@ -1024,8 +1024,8 @@ mod tests {
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
                "axial_clearance":0.04,
-               "worm":{"face_width":10.0,"material":"4340 Hardened Steel"},
-               "wheel":{"face_width":10.0,"material":"Brass C360"}}
+               "worm":{"face_width":{"auto":false,"manual":10.0},"material":"4340 Hardened Steel"},
+               "wheel":{"face_width":{"auto":true,"manual":10.0},"material":"Brass C360"}}
             ]}}"#;
 
         let v: serde_json::Value = serde_json::from_str(&solve_train_impl(req).unwrap()).unwrap();

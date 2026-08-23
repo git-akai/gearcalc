@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–10 complete and in CI. 322 tests, ~26 s.** Milestone 11 is
+**Milestones 0–10 complete and in CI. 325 tests, ~26 s.** Milestone 11 is
 under way: the ring-drawing defect below is fixed, and the rim circle with it.
 
 ```bash
@@ -127,6 +127,14 @@ answers can silently disagree, and §12 is largely a record of exactly that.
 modern designs, they are only balanced as a complete set against `σ_Flim` values
 this project does not have, and they buy precision at the cost of accuracy.
 **`Y_S` is the deliberate exception** and the reasoning is in DESIGN §4.7.
+
+**The policy is about factors that multiply a stress, not about conventions as
+such.** A worm's length and a wormwheel's face width are shipped as
+recommendations from DIN/ČSN and BS 721, with their sources on screen — because
+neither enters any stress here: a point contact's peak pressure is bit-identical
+at 4 mm and 40 mm of face width. A convention that cannot move an answer informs
+a choice; one that multiplies a stress silently moves a number a part is sized
+against. That is the line, and DESIGN §4.5.1 states it where the formulas are.
 
 **Helical is not a lesser case: parity with spur throughout.** If a spur gear
 gets a number, the helical one does too — rated on its virtual spur section, not
@@ -345,7 +353,16 @@ Known-approximate, documented at the call site rather than hidden:
 
 ### Milestone 11 — polish
 
-Train import/export, confirmations, error surfacing, docs.
+Done so far: the ring-drawing defect and the default that caused it (§4 traps),
+the ring's rim circle, and the worm/wormwheel recommended proportions.
+
+Left: **train import/export** — the last unbuilt item of the original
+specification, and not polish; the TOML round-trips today through
+`toml::to_string_pretty` over all three stage kinds, so it needs a `gear-io`
+module, two wasm entry points, the buttons, a `gear-cli` command and a document
+wrapper carrying the tab's name (which is not part of `Train`). Then the silent
+`saveDxf` failure in `GearPanel.svelte`, the remaining UI tweaks, and a docs
+pass.
 
 ### After
 

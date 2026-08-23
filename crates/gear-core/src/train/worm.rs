@@ -42,24 +42,89 @@ use crate::mesh::Member;
 use crate::params::Auto;
 use crate::screw::{Screw, ScrewParams};
 
+/// The proportions a worm drive is conventionally given.
+///
+/// **These are conventions, not derivations, and they are shipped deliberately.**
+/// §4.7's standing policy refuses published *rating* factors, and the reason is
+/// specific: a correction factor multiplies a stress, so shipping one outside
+/// its validated band silently moves a number a designer will size a part
+/// against. These are a different kind of thing. A worm's length and a wheel's
+/// face width **enter no stress in this crate** — the contact is a point, and
+/// the appendix records the measurement: the same mesh at 4 mm and at 40 mm of
+/// face width gives a bit-identical peak pressure. So a recommendation here
+/// informs a choice and cannot distort an answer, which is what makes it
+/// admissible where a `K_v` is not.
+///
+/// They are reported *as* recommendations, with the source named on screen, and
+/// the input stays editable. See DESIGN.md §4.5.1.
+///
+/// # What they are for
+///
+/// A real worm drive has an enveloping wheel that wraps the worm, and both
+/// dimensions are about **covering the zone of action**: the worm must be long
+/// enough for the wheel to run off neither end, and the wheel wide enough to
+/// take the thread but not so wide that its outer corners hang past where the
+/// worm can touch. This crate models the pair as crossed-axis screw gearing
+/// with point contact and does not derive that zone (§4.5.1, open), so the
+/// proportions come from published practice rather than from our own geometry —
+/// which is exactly why each carries its source.
+pub mod proportions {
+    /// Recommended minimum worm length (thread length), mm.
+    ///
+    /// ```text
+    /// b₁ = (11 + c z₂) m_x,     c = 0.06 for z₁ < 4, 0.09 for z₁ ≥ 4
+    /// ```
+    ///
+    /// DIN/ČSN practice, as tabulated by MITcalc's worm-gear geometry
+    /// documentation. It is a **function of the wheel's tooth count**, which is
+    /// what the specification asks for: a bigger wheel wraps further round the
+    /// worm, so the worm must be longer to carry the contact. More starts steepen
+    /// the lead and stretch the same wrap over more axial length, which is the
+    /// step in `c`.
+    ///
+    /// Takes the **axial** module, because that is the module these proportions
+    /// are written in and the one the worm's own pitch is measured in.
+    #[must_use]
+    pub fn worm_length(axial_module: f64, wheel_teeth: u32, starts: u32) -> f64 {
+        let c = if starts < 4 { 0.06 } else { 0.09 };
+        (11.0 + c * f64::from(wheel_teeth)) * axial_module
+    }
+
+    /// Recommended wheel face width, mm — BS 721.
+    ///
+    /// ```text
+    /// b₂ = 2 m_x √(q + 1),   capped at 0.67 d₁,   q = d₁ / m_x
+    /// ```
+    ///
+    /// Two statements from the same source, and the cap is the operative one on
+    /// a slender worm: past about two thirds of the worm's reference diameter
+    /// the wheel's outer corners are beyond the thread they were widened to
+    /// catch, so the extra face carries nothing. `q`, the diameter quotient, is
+    /// how worm practice expresses the worm's slenderness.
+    #[must_use]
+    pub fn wheel_face_width(axial_module: f64, worm_pitch_diameter: f64) -> f64 {
+        let q = worm_pitch_diameter / axial_module;
+        let recommended = 2.0 * axial_module * (q + 1.0).sqrt();
+        recommended.min(0.67 * worm_pitch_diameter)
+    }
+}
+
 /// One member of a worm stage.
 ///
-/// Note what is *absent* against [`super::StageGear`]: no profile shift, no
-/// addendum, no automatic face width. The first two belong to a generated
-/// involute profile that a worm stage does not yet build; the third would need a
-/// strength model that the face width enters, and for a point contact it does
-/// not enter at all.
+/// Note what is *absent* against [`super::StageGear`]: no profile shift and no
+/// addendum. Both belong to a generated involute profile that a worm stage does
+/// not yet build.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WormMember {
     /// Face width of the wheel, or length of the worm, mm.
     ///
-    /// A plain input. The specification offers an automatic calculation for
-    /// each, and both published rules are proportions — `b₂ ≈ 2 m_x √(z₁+1)`
-    /// and its relatives — which is to say conventions rather than derivations.
-    /// §4.7's standing policy is that this project does not ship those, so the
-    /// field stays manual until there is something to derive it from.
-    pub face_width: f64,
+    /// Automatic takes the recommended proportion for this member — see
+    /// [`proportions`], and note what those are and are not. Unlike the spur
+    /// stage's automatic face width, this one is **not** a minimum derived from
+    /// a rating: nothing here is sized against a stress, because a point
+    /// contact's peak pressure does not depend on the face width at all.
+    pub face_width: Auto<f64>,
     /// Name of a material in the library.
     pub material: String,
     #[cfg_attr(feature = "serde", serde(default))]
@@ -69,7 +134,7 @@ pub struct WormMember {
 impl Default for WormMember {
     fn default() -> Self {
         Self {
-            face_width: 10.0,
+            face_width: Auto::automatic(10.0),
             material: "4340 Hardened Steel".to_string(),
             material_overrides: Overrides::default(),
         }
@@ -144,7 +209,18 @@ pub struct WormMemberResult {
     pub speed: f64,
     /// Tooth load cycles over the duty. Filled in by the train.
     pub tooth_cycles: f64,
+    /// The width in use, mm — the recommendation when automatic, the input
+    /// otherwise. For the worm this is a *length* along its axis.
     pub face_width: f64,
+    /// What the conventional proportion asks for, mm, whether or not it is what
+    /// is in use. Reported always, so a hand-set width can be read against it.
+    ///
+    /// A **convention with a named source**, not a derivation, and it sizes no
+    /// stress in this crate — see [`proportions`].
+    ///
+    /// `None` for a crossed gear pair: the proportions describe a worm carrying
+    /// an enveloping wheel, and there is neither.
+    pub recommended_face_width: Option<f64>,
     pub pitch_diameter: f64,
     /// The material as used, after any overrides.
     pub material: Material,
@@ -370,12 +446,49 @@ pub fn solve_worm_stage(
         ));
     }
 
+    // The two conventional proportions, in the axial module they are written
+    // in. They size the *part*, not the answer: nothing below reads a face
+    // width, which is what makes shipping a convention here honest (see
+    // `proportions`).
+    //
+    // **Only for a worm drive.** These describe a worm carrying an enveloping
+    // wheel, and a crossed gear pair has neither — its members are two helical
+    // gears touching at a point, with nothing wrapped round anything. §4.5.1
+    // makes the first member's sizing the definition of which machine this is,
+    // so that is what decides here. Offering the numbers anyway would be
+    // shipping a convention outside the case it was written for, which is the
+    // thing §4.7's policy exists to refuse.
+    let recommended = match stage.sizing {
+        FirstMemberSizing::PitchDiameter(_) => [
+            Some(proportions::worm_length(
+                s.axial_module,
+                stage.wheel_teeth,
+                stage.starts,
+            )),
+            Some(proportions::wheel_face_width(
+                s.axial_module,
+                s.worm_pitch_diameter,
+            )),
+        ],
+        FirstMemberSizing::HelixAngle(_) => [None, None],
+    };
+    if recommended[0].is_none() && (stage.worm.face_width.auto || stage.wheel.face_width.auto) {
+        notes.push(
+            "face widths left as entered: the published proportions are for a worm \
+             carrying an enveloping wheel, and a crossed gear pair has neither"
+                .into(),
+        );
+    }
+
     let members = [
         WormMemberResult {
             torque: input_torque,
             speed: 0.0,
             tooth_cycles: 0.0,
-            face_width: stage.worm.face_width,
+            face_width: recommended[0].map_or(stage.worm.face_width.manual, |r| {
+                stage.worm.face_width.resolve(r)
+            }),
+            recommended_face_width: recommended[0],
             pitch_diameter: s.worm_pitch_diameter,
             material: materials[0].clone(),
         },
@@ -383,7 +496,10 @@ pub fn solve_worm_stage(
             torque: output_torque,
             speed: 0.0,
             tooth_cycles: 0.0,
-            face_width: stage.wheel.face_width,
+            face_width: recommended[1].map_or(stage.wheel.face_width.manual, |r| {
+                stage.wheel.face_width.resolve(r)
+            }),
+            recommended_face_width: recommended[1],
             pitch_diameter: s.wheel_pitch_diameter,
             material: materials[1].clone(),
         },
@@ -538,14 +654,17 @@ mod tests {
         assert!((r.members[1].torque - expected).abs() < 1e-12 * expected);
     }
 
-    /// **Why there is no automatic face width here.** A point contact's peak
-    /// pressure does not depend on the face width at all, so `σ_H ∝ 1/√b` — the
-    /// relation a spur stage inverts to size a gear — has nothing to invert.
+    /// **Why the automatic face width here is a proportion and not a rating.**
+    /// A point contact's peak pressure does not depend on the face width at
+    /// all, so `σ_H ∝ 1/√b` — the relation a spur stage inverts to size a gear
+    /// — has nothing to invert. It is also what makes shipping a published
+    /// proportion admissible: the number informs a choice and cannot move an
+    /// answer, because no answer reads it.
     #[test]
     fn contact_pressure_does_not_depend_on_the_face_width() {
         let narrow = solved(&WormStage {
             wheel: WormMember {
-                face_width: 4.0,
+                face_width: Auto::fixed(4.0),
                 material: "Brass C360".into(),
                 ..Default::default()
             },
@@ -553,7 +672,7 @@ mod tests {
         });
         let wide = solved(&WormStage {
             wheel: WormMember {
-                face_width: 40.0,
+                face_width: Auto::fixed(40.0),
                 material: "Brass C360".into(),
                 ..Default::default()
             },
@@ -562,6 +681,122 @@ mod tests {
         assert_eq!(
             narrow.contact.max_pressure, wide.contact.max_pressure,
             "a ten-fold face width must change nothing about a point contact"
+        );
+    }
+
+    /// **The recommended proportions behave like the things they describe.**
+    ///
+    /// They are conventions, so there is no independent derivation to check
+    /// them against — which makes it the more important to assert what they
+    /// must *do* rather than the arithmetic they are. Each of these would catch
+    /// a transcription error without repeating the transcription.
+    #[test]
+    fn the_recommended_proportions_behave_as_lengths_of_a_worm_drive() {
+        use proportions::{wheel_face_width, worm_length};
+
+        // A bigger wheel wraps further round the worm, so it needs more worm to
+        // wrap onto. Strictly monotone in the wheel's tooth count.
+        let lengths: Vec<f64> = (10..80).map(|z| worm_length(2.0, z, 1)).collect();
+        assert!(
+            lengths.windows(2).all(|w| w[1] > w[0]),
+            "worm length must grow with the wheel it carries"
+        );
+
+        // More starts steepen the lead, so the same wrap is spread over more
+        // axial length.
+        assert!(worm_length(2.0, 40, 4) > worm_length(2.0, 40, 1));
+
+        // Both scale with the module: they are proportions, so doubling the
+        // whole drive doubles them exactly.
+        for (a, b) in [
+            (worm_length(1.0, 40, 2) * 2.0, worm_length(2.0, 40, 2)),
+            (
+                wheel_face_width(1.0, 7.0) * 2.0,
+                wheel_face_width(2.0, 14.0),
+            ),
+        ] {
+            assert!((a - b).abs() < 1e-12, "not homogeneous in the module");
+        }
+
+        // The BS 721 cap is the operative statement on a slender worm and not on
+        // a stout one, which is the whole reason it is written as a cap.
+        let slender = wheel_face_width(1.0, 5.0);
+        assert!(
+            (slender - 0.67 * 5.0).abs() < 1e-12,
+            "the cap must bind at q = 5: {slender}"
+        );
+        let stout = wheel_face_width(1.0, 30.0);
+        assert!(
+            stout < 0.67 * 30.0,
+            "the cap must not bind at q = 30: {stout}"
+        );
+
+        // A wheel wider than the worm's own diameter would hang past the thread
+        // at every proportion in the range worm practice uses.
+        for q in [6.0_f64, 8.0, 10.0, 14.0, 18.0, 25.0] {
+            let b2 = wheel_face_width(1.0, q);
+            assert!(b2 > 0.0 && b2 < q, "q={q}: face width {b2} against d1 {q}");
+        }
+    }
+
+    /// **The automatic width is the recommendation, and a hand-set one survives
+    /// untouched** — with the recommendation still reported beside it, so the
+    /// two can be read against each other.
+    #[test]
+    fn automatic_takes_the_recommendation_and_manual_is_left_alone() {
+        let auto = solved(&WormStage::default());
+        assert_eq!(
+            Some(auto.members[0].face_width),
+            auto.members[0].recommended_face_width,
+            "an automatic worm length is the recommendation"
+        );
+        assert_eq!(
+            Some(auto.members[1].face_width),
+            auto.members[1].recommended_face_width,
+            "an automatic wheel face width is the recommendation"
+        );
+
+        let manual = solved(&WormStage {
+            worm: WormMember {
+                face_width: Auto::fixed(3.5),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        assert!((manual.members[0].face_width - 3.5).abs() < 1e-12);
+        assert_eq!(
+            manual.members[0].recommended_face_width, auto.members[0].recommended_face_width,
+            "the recommendation is reported whether or not it is in use"
+        );
+    }
+
+    /// **A crossed gear pair gets no recommendation, and is told so.**
+    ///
+    /// The proportions describe a worm carrying an enveloping wheel. A crossed
+    /// pair is two helical gears touching at a point, so quoting them there
+    /// would be shipping a convention outside the case it was written for —
+    /// and quietly, since the number would look like any other.
+    #[test]
+    fn a_crossed_pair_is_not_given_a_worms_proportions() {
+        let crossed = solved(&WormStage {
+            starts: 17,
+            wheel_teeth: 23,
+            sizing: FirstMemberSizing::HelixAngle(45.0),
+            worm: WormMember {
+                face_width: Auto::automatic(6.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        assert!(crossed.members[0].recommended_face_width.is_none());
+        assert!(crossed.members[1].recommended_face_width.is_none());
+        // Automatic has nothing to take, so the entered width stands...
+        assert!((crossed.members[0].face_width - 6.0).abs() < 1e-12);
+        // ...and the result says why rather than leaving it to be noticed.
+        assert!(
+            crossed.notes.iter().any(|n| n.contains("enveloping wheel")),
+            "no note explaining the absent recommendation: {:?}",
+            crossed.notes
         );
     }
 
