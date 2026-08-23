@@ -105,9 +105,17 @@
 
   let confirmingDelete = $state(false);
 
+  let exportError = $state<string | null>(null);
+
   function saveDxf() {
     const r = tab.internal ? ringDxf(ringRequest) : dxf(request);
-    if ("error" in r) return;
+    if ("error" in r) {
+      // A click that silently does nothing is the worst of the three outcomes:
+      // the user cannot tell a refusal from a broken button.
+      exportError = r.error;
+      return;
+    }
+    exportError = null;
     const blob = new Blob([r.ok], { type: "application/dxf" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -251,6 +259,9 @@
       </label>
     </div>
     <button class="primary" onclick={saveDxf} disabled={!("ok" in result)}>Export DXF</button>
+    {#if exportError}
+      <p class="error">Export failed: {exportError}</p>
+    {/if}
   </section>
 
   <section class="results">

@@ -16,6 +16,8 @@ import init, {
   default_materials,
   import_materials,
   export_materials,
+  import_train,
+  export_train,
 } from "./wasm/gear_wasm.js";
 
 export interface GearParams {
@@ -400,6 +402,33 @@ export function ringProfile(req: RingRequest, pointsPerTooth: number): Float64Ar
 export function ringDxf(req: RingRequest): { ok: string } | { error: string } {
   try {
     return { ok: export_ring_dxf(JSON.stringify(req)) };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** A geartrain as it is exchanged: the tab's name, and the train's inputs.
+ *
+ *  The name is in the document because a `Train` has none and a tab does, and
+ *  recovering it from the filename would lose it to any rename. */
+export interface TrainDocument {
+  name: string;
+  train: Train;
+}
+
+/** Parse an exported geartrain. The TOML never touches TypeScript: the file is
+ *  handed to Rust as text, so exactly one parser exists. */
+export function importTrain(tomlText: string): { ok: TrainDocument } | { error: string } {
+  try {
+    return { ok: JSON.parse(import_train(tomlText)) as TrainDocument };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export function exportTrain(doc: TrainDocument): { ok: string } | { error: string } {
+  try {
+    return { ok: export_train(JSON.stringify(doc)) };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }

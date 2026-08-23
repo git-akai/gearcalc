@@ -12,10 +12,39 @@
     type MaterialValue,
   } from "./core";
   import { trains, library, type TrainTab } from "./state.svelte";
+  import { exportTrain } from "./core";
 
   let { tab }: { tab: TrainTab } = $props();
 
   let confirmingDelete = $state(false);
+  let exportError = $state<string | null>(null);
+  let picker: HTMLInputElement;
+
+  /** Export writes the inputs only — everything on screen below is recomputed
+   *  from them, so a file cannot disagree with the tab it came from. */
+  function saveTrain() {
+    const r = exportTrain({ name: tab.name, train: $state.snapshot(tab.train) });
+    if ("error" in r) {
+      exportError = r.error;
+      return;
+    }
+    exportError = null;
+    const url = URL.createObjectURL(new Blob([r.ok], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(tab.name || "geartrain").replace(/\s+/g, "_")}.toml`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function onPicked(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    trains.import(await file.text());
+    // Clear it, or re-picking the same file after fixing it fires nothing.
+    input.value = "";
+  }
     let open = $state<Record<number, boolean>>({ 0: true });
 
   // Every number on screen comes back from Rust. Nothing here computes a
@@ -136,11 +165,28 @@
 <header>
   <input class="title" bind:value={tab.name} aria-label="Geartrain name" />
   <div class="actions">
+    <button onclick={saveTrain}>Export</button>
+    <button onclick={() => picker.click()}>Import</button>
     <button onclick={() => trains.create()}>New</button>
     <button onclick={() => trains.copy(tab.id)}>Copy</button>
     <button class="danger" onclick={() => (confirmingDelete = true)}>Delete</button>
   </div>
 </header>
+
+<input
+  bind:this={picker}
+  type="file"
+  accept=".toml,text/plain"
+  onchange={onPicked}
+  hidden
+/>
+
+{#if trains.importError}
+  <p class="error">Import failed: {trains.importError}</p>
+{/if}
+{#if exportError}
+  <p class="error">Export failed: {exportError}</p>
+{/if}
 
 {#if confirmingDelete}
   <div class="confirm" role="alertdialog">

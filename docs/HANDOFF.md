@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–10 complete and in CI. 325 tests, ~26 s.** Milestone 11 is
+**Milestones 0–10 complete and in CI. 333 tests, ~26 s.** Milestone 11 is
 under way: the ring-drawing defect below is fixed, and the rim circle with it.
 
 ```bash
@@ -67,7 +67,8 @@ for rings**, from the same relation at the opposite sign. JGMA 116-02 tolerance
 tables.
 
 **Materials, export, UI.** An eight-material library with per-value provenance ·
-DXF with exact arcs for external *and* internal gears · gear tabs with an
+DXF with exact arcs for external *and* internal gears · **geartrains exported and
+imported as TOML**, inputs only, import making a new tab · gear tabs with an
 internal option and its own measurement, geartrain tabs with spur, worm and
 planetary stages.
 
@@ -79,6 +80,7 @@ cargo run --bin gear-cli -- materials              # the library, with each valu
 cargo run --bin gear-cli -- strength 17 43 2.0     # a worked mesh, end to end
 cargo run --bin gear-cli -- train                  # a two-stage train
 cargo run --bin gear-cli -- train mixed            # ...with a worm stage in it
+cargo run --bin gear-cli -- trainfile [path]       # a train to TOML and back, answers compared
 cargo run --bin gear-cli -- worm 1 40 7 90         # a worm pair, both directions
 cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
 cargo run --bin gear-cli -- crossed 17 23 90       # a crossed pair, swept over the split
@@ -356,13 +358,14 @@ Known-approximate, documented at the call site rather than hidden:
 Done so far: the ring-drawing defect and the default that caused it (§4 traps),
 the ring's rim circle, and the worm/wormwheel recommended proportions.
 
-Left: **train import/export** — the last unbuilt item of the original
-specification, and not polish; the TOML round-trips today through
-`toml::to_string_pretty` over all three stage kinds, so it needs a `gear-io`
-module, two wasm entry points, the buttons, a `gear-cli` command and a document
-wrapper carrying the tab's name (which is not part of `Train`). Then the silent
-`saveDxf` failure in `GearPanel.svelte`, the remaining UI tweaks, and a docs
-pass.
+**Train import/export is done** — the last unbuilt item of the original
+specification: `gear_io::train` (`{ name, train }`, inputs only, with a header
+comment), `import_train`/`export_train` at the boundary, Export and Import on the
+geartrain tab, and `gear-cli trainfile`. The round trip is checked as *answers*
+rather than as bytes, in the CLI, across the boundary and in the browser. The
+silent `saveDxf` failure is fixed too.
+
+Left: the remaining UI tweaks, and a docs pass.
 
 ### After
 

@@ -493,6 +493,17 @@ fn export_materials_impl(library_json: &str) -> Result<String, String> {
     gear_io::to_toml(&lib).map_err(|e| e.to_string())
 }
 
+fn import_train_impl(toml_text: &str) -> Result<String, String> {
+    let doc = gear_io::train::from_toml(toml_text).map_err(|e| e.to_string())?;
+    serde_json::to_string(&doc).map_err(|e| e.to_string())
+}
+
+fn export_train_impl(document_json: &str) -> Result<String, String> {
+    let doc: gear_io::TrainDocument =
+        serde_json::from_str(document_json).map_err(|e| e.to_string())?;
+    gear_io::train::to_toml(&doc).map_err(|e| e.to_string())
+}
+
 /// Derived results for a whole geartrain.
 ///
 /// The third of the three entry points DESIGN.md §1 planned. Like the others it
@@ -674,6 +685,37 @@ pub fn export_materials(library_json: &str) -> Result<String, JsError> {
     export_materials_impl(library_json).map_err(|e| JsError::new(&e))
 }
 
+/// Import a geartrain: TOML text in, `{ name, train }` JSON out.
+///
+/// The same arrangement as the material library, and for the same reason: the
+/// TOML never reaches TypeScript, so exactly one parser exists and it is the
+/// tested one. A malformed file comes back as the parser's own complaint, which
+/// names the line.
+///
+/// The train's **inputs** are what the file holds; everything derived is
+/// recomputed by `solve_train` once the tab exists. A stage may name a material
+/// this library does not have — that is not an import failure, and `solve_train`
+/// reports it by name.
+///
+/// # Errors
+///
+/// A document that is not a geartrain, or one with no stages.
+#[wasm_bindgen]
+pub fn import_train(toml_text: &str) -> Result<String, JsError> {
+    import_train_impl(toml_text).map_err(|e| JsError::new(&e))
+}
+
+/// Export a geartrain: `{ name, train }` JSON in, TOML text out, ready for a
+/// download.
+///
+/// # Errors
+///
+/// A malformed document, which would be a defect on this side of the boundary.
+#[wasm_bindgen]
+pub fn export_train(document_json: &str) -> Result<String, JsError> {
+    export_train_impl(document_json).map_err(|e| JsError::new(&e))
+}
+
 /// Version of the core, so the UI can show what it is actually running.
 #[wasm_bindgen]
 #[must_use]
@@ -689,6 +731,69 @@ mod tests {
     const REQ: &str = r#"{"params":{"module":1.0,"pressure_angle":20.0,"teeth":17,
         "profile_shift":0.2,"helix_angle":0.0,"addendum":1.0,"dedendum":1.25,
         "root_radius":0.38,"thickness_mod":1.0},"pin_diameter":1.75}"#;
+
+    /// **A geartrain survives the round trip to a file and back — as answers,
+    /// not just as bytes.**
+    ///
+    /// Comparing the two documents would only show that `serde` is consistent
+    /// with itself. What a user cares about is that the imported train *is* the
+    /// train they exported, so the check solves both and compares the results:
+    /// ratio, efficiency, backlash and every stage's numbers. A field silently
+    /// dropped on the way out reappears as a default, which looks like a value
+    /// rather than like a loss — and would move an answer here.
+    #[test]
+    fn a_geartrain_survives_export_and_import_as_the_same_answers() {
+        // Start from the defaults the UI hands out, so the tested path is the
+        // one a user actually takes, and give it one of every stage kind.
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let document = serde_json::json!({
+            "name": "Elevation drive",
+            "train": {
+                "input_speed": 12_000.0,
+                "input_torque": 0.25,
+                "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
+                "stages": [d["spur_stage"], d["worm_stage"], d["crossed_stage"], d["planetary_stage"]],
+            }
+        });
+
+        let toml_text = export_train_impl(&document.to_string()).unwrap();
+        let back: serde_json::Value =
+            serde_json::from_str(&import_train_impl(&toml_text).unwrap()).unwrap();
+        assert_eq!(back["name"].as_str(), Some("Elevation drive"));
+
+        let solve = |doc: &serde_json::Value| {
+            let req = serde_json::json!({ "train": doc["train"], "materials": null });
+            let out = solve_train_impl(&req.to_string()).unwrap();
+            serde_json::from_str::<serde_json::Value>(&out).unwrap()
+        };
+        assert_eq!(
+            solve(&document),
+            solve(&back),
+            "the imported train answers differently from the one exported"
+        );
+
+        // ...and the file a person opens says what it is.
+        assert!(toml_text.starts_with("# Geartrain."));
+        assert!(toml_text.contains("name = \"Elevation drive\""));
+    }
+
+    /// A file that is not a geartrain comes back as a reason, not a panic and
+    /// not a default-filled train — the UI shows the text verbatim.
+    #[test]
+    fn a_bad_geartrain_file_comes_back_as_a_reason() {
+        let e = import_train_impl("name = \"nothing here\"").unwrap_err();
+        assert!(e.contains("not valid"), "{e}");
+
+        let empty = serde_json::json!({
+            "name": "no stages",
+            "train": { "input_speed": 1.0, "input_torque": 1.0,
+                       "actuation": { "intermittent": { "range_degrees": 25.0, "actuations": 10 } },
+                       "stages": [] }
+        });
+        let text = export_train_impl(&empty.to_string()).unwrap();
+        let e = import_train_impl(&text).unwrap_err();
+        assert!(e.contains("no stages"), "{e}");
+    }
 
     /// **The tool the UI ships with is one that can cut.**
     ///

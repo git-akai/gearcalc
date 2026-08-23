@@ -9,6 +9,8 @@
 //! gear-cli strength [z1] [z2] [torque] [material] [helix]
 //!                             a worked mesh: bending, contact, efficiency
 //! gear-cli train              a two-stage geartrain, end to end
+//! gear-cli trainfile [path]   export a geartrain to TOML, read it back, and
+//!                             show that both solve to the same answers
 //! gear-cli crossed [z1] [z2] [shaft angle]
 //!                             a crossed gear pair, swept over the helix split
 //! gear-cli planetstage [z_sun] [z_planet] [z_ring] [N] [helix]
@@ -33,6 +35,7 @@ fn main() {
         Some("loadcase") => loadcase_report(),
         Some("materials") => materials(),
         Some("train") => train_report(args.get(1).map(String::as_str) == Some("mixed")),
+        Some("trainfile") => train_file_report(args.get(1).map(String::as_str)),
         Some("crossed") => crossed_report(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
             args.get(2).and_then(|s| s.parse().ok()).unwrap_or(23),
@@ -95,6 +98,132 @@ fn main() {
 }
 
 /// A two-stage geartrain, end to end — milestone 6's gate.
+/// Write a geartrain out as TOML, read it back, and solve both.
+///
+/// The point is the *comparison*, not the file: an export that loses a field
+/// produces a train that still solves, just to different numbers, and only
+/// putting the two answers side by side shows it. With a path, the file is left
+/// there to be looked at and hand-edited; without one it is written to a
+/// temporary file and removed.
+fn train_file_report(path: Option<&str>) {
+    use gear_core::params::Auto;
+    use gear_core::train::{
+        solve_train, Actuation, PlanetaryStage, SpurStage, Stage, StageGear, Train, WormStage,
+    };
+    use gear_io::TrainDocument;
+
+    let lib = gear_io::default_library();
+    let doc = TrainDocument {
+        name: "Elevation drive".to_string(),
+        train: Train {
+            input_speed: 3000.0,
+            input_torque: 2.0,
+            actuation: Actuation::Continuous {
+                operating_percent: 80.0,
+                runtime_hours: 1000.0,
+            },
+            stages: vec![
+                Stage::Spur(SpurStage {
+                    helix_angle: 15.0,
+                    gears: [
+                        StageGear {
+                            teeth: 17,
+                            face_width: Auto::automatic(0.0),
+                            ..StageGear::default()
+                        },
+                        StageGear {
+                            teeth: 43,
+                            ..StageGear::default()
+                        },
+                    ],
+                    ..SpurStage::default()
+                }),
+                Stage::Worm(WormStage::default()),
+                Stage::Planetary(Box::<PlanetaryStage>::default()),
+            ],
+        },
+    };
+
+    let text = match gear_io::train::to_toml(&doc) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("could not write the geartrain: {e}");
+            return;
+        }
+    };
+    let back = match gear_io::train::from_toml(&text) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("could not read it back: {e}");
+            return;
+        }
+    };
+
+    let written = path.unwrap_or("/tmp/gear-cli-train.toml");
+    if std::fs::write(written, &text).is_ok() {
+        println!(
+            "wrote {written}  ({} lines, {} bytes)",
+            text.lines().count(),
+            text.len()
+        );
+    }
+    if path.is_none() {
+        let _ = std::fs::remove_file(written);
+    }
+    println!("name   {:?} -> {:?}", doc.name, back.name);
+    println!(
+        "stages {} -> {}",
+        doc.train.stages.len(),
+        back.train.stages.len()
+    );
+
+    let (a, b) = (
+        solve_train(&doc.train, &lib),
+        solve_train(&back.train, &lib),
+    );
+    match (a, b) {
+        (Ok(a), Ok(b)) => {
+            println!("\n  quantity                 exported            re-imported   same");
+            let rows: [(&str, f64, f64); 5] = [
+                ("total ratio", a.total_ratio, b.total_ratio),
+                ("output speed rpm", a.output_speed, b.output_speed),
+                ("output torque Nm", a.output_torque, b.output_torque),
+                (
+                    "efficiency forward",
+                    a.total_efficiency.forward,
+                    b.total_efficiency.forward,
+                ),
+                (
+                    "backlash out deg",
+                    a.backlash.forward.nominal,
+                    b.backlash.forward.nominal,
+                ),
+            ];
+            let mut all = true;
+            for (name, x, y) in rows {
+                // Bit-identical or not at all: these come from the same
+                // arithmetic on numbers that either survived the file or did
+                // not. A tolerance here would hide exactly what is being asked.
+                let same = x.to_bits() == y.to_bits();
+                all &= same;
+                println!(
+                    "  {name:<22} {x:>16.9} {y:>16.9}   {}",
+                    if same { "yes" } else { "NO" }
+                );
+            }
+            println!(
+                "\n  {}",
+                if all {
+                    "the file is the train: every figure identical to the last bit"
+                } else {
+                    "SOMETHING WAS LOST IN THE FILE - see the rows marked NO"
+                }
+            );
+        }
+        (a, b) => println!("a train did not solve: {:?} / {:?}", a.err(), b.err()),
+    }
+}
+
 fn train_report(mixed: bool) {
     use gear_core::params::Auto;
     use gear_core::train::{

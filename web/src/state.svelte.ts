@@ -10,6 +10,7 @@ import {
   defaultTrain,
   type CutterRef,
   importLibrary,
+  importTrain,
   type ClassRef,
   type GearParams,
   type MaterialLibrary,
@@ -164,6 +165,28 @@ class Trains {
     if (!src) return;
     const t: TrainTab = { ...structuredClone($state.snapshot(src)), id: nextTrainId++ };
     this.tabs.splice(this.tabs.indexOf(src) + 1, 0, t);
+    this.select(t.id);
+  }
+
+  /** Set when the last import failed, so the panel can say why. */
+  importError = $state<string | null>(null);
+
+  /** Import creates a **new tab**, as the specification requires: reading a
+   *  file never overwrites what is open, and nothing is written back to it. The
+   *  file's own name for the train comes with it.
+   *
+   *  A train naming a material this library does not have still imports — the
+   *  file is valid and the library is a separate document. The solve says which
+   *  material is missing, where the user can act on it. */
+  import(text: string) {
+    const r = importTrain(text);
+    if ("error" in r) {
+      this.importError = r.error;
+      return;
+    }
+    const t: TrainTab = { id: nextTrainId++, name: r.ok.name, train: r.ok.train };
+    this.tabs.push(t);
+    this.importError = null;
     this.select(t.id);
   }
 

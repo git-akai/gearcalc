@@ -29,7 +29,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm and planetary** stages; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI |
 
-325 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+333 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -2564,6 +2564,26 @@ so `serde` gives both directions. **Inputs only** (outputs are derived), so file
 stay small, diffable and immune to going stale. Import creates a new tab; nothing
 is written back except by explicit export, per the spec.
 
+A geartrain document is `{ name, train }` — `gear_io::TrainDocument`. The name is
+in the file because a `Train` has none and a tab does, and recovering it from the
+filename would lose it to any rename or to a browser's download folder. A header
+comment says what the file is and that its numbers are inputs; TOML ignores it,
+and it is re-emitted on export rather than preserved.
+
+Two things are deliberately *not* checked on import. A stage names its materials
+by name, and the library holding them is a separate document, so an unknown
+material is not an import failure — the solve reports it by name, where the user
+can act on it, and refusing would lose a whole train over something a library
+import could supply a moment later. A train with **no stages** is refused,
+because it parses happily and then has nothing to solve.
+
+The round trip is checked as *answers*, not as bytes: `gear-cli trainfile` writes
+a three-stage train, reads it back, solves both and compares ratio, speed,
+torque, efficiency and backlash **bit for bit**. Comparing documents would only
+show that `serde` agrees with itself, whereas a silently dropped field comes back
+as a default — which looks like a value rather than like a loss, and moves an
+answer.
+
 **DXF export** — ASCII, hand-written (~150 lines):
 
 - the profile as a dense `LWPOLYLINE`, spacing derived from the **chord
@@ -2776,7 +2796,7 @@ it can be validated in isolation.
 | 8 | ✅ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | **met** — the cut simulated from the cutter and the rolling alone agrees with the analytic profile to **3.6 µm**; the rack is confirmed as the shaper's `z_c → ∞` limit, first order in `1/z_c`; the generation limit and both mesh interference conditions are derived rather than quoted. Radial assembly is **shelved** (§4.11) |
 | 9 | ✅ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency, the stage, the boundary and the UI | **met** — the ideal ring `z_s + 2z_p` needs **exactly** zero planet shift and the two centre distances agree to 1e-12; a held carrier gives **exactly** the product of its two mesh efficiencies; all six drive modes reproduce their classical ratios to 1e-12; play referred to two different output shafts differs by exactly their ratio; helical to parity with spur throughout. A set solves end to end in `gear-cli`, across the wasm boundary and in the browser, the three agreeing. Radial assembly is **shelved** with its findings recorded (§4.11) |
 | 10 | ✅ **Crossed-axis spur** — reuse `screw.rs`, point-contact Hertz | **met, and it really was a parameter rather than a branch.** A crossed gear pair *is* a `Screw` whose first member's diameter is derived from a helix angle instead of given: `sin γ = z m_n/d` and `γ = 90° − β` make `sin γ = cos β`, so nothing else changes. Verified to 1e-9 over three tooth pairs × four shaft angles × three helix angles, with the worm canary `gear-cli wormstage 1 40 7 2` **bit-identical**. No new kinematics, contact model, efficiency or wasm entry point |
-| 11 | ⬜ **Polish** — train import/export, confirmations, error surfacing, docs | — |
+| 11 | 🔶 **Polish** — train import/export, confirmations, error surfacing, docs | in progress — the ring-drawing defect and its cause are fixed (§12), the worm proportions are shipped (§4.5.1), and **train import/export is done**: `gear_io::train`, two wasm entry points, the buttons, `gear-cli trainfile`, and a round trip verified as identical *answers* in the CLI, across the boundary and in the browser. Confirmations were already in place. What is left is the remaining UI tweaks and a docs pass |
 
 Milestone 9 was where the *reuse* argument was tested rather than asserted, and
 it paid: the planetary stage needed no new wasm entry point, no second

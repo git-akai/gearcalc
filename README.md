@@ -40,7 +40,7 @@ and `wasm-bindgen-cli` together.
 ```bash
 nix develop              # or `direnv allow` once, for automatic entry
 
-cargo nextest run        # the full test suite, 325 tests, ~27 s
+cargo nextest run        # the full test suite, 333 tests, ~27 s
 cargo clippy --all-targets -- --deny warnings
 cargo fmt
 
@@ -58,6 +58,7 @@ cargo run --bin gear-cli -- materials     # the material library and its provena
 cargo run --bin gear-cli -- strength 17 43 2.0   # a worked mesh: bending, contact, efficiency
 cargo run --bin gear-cli -- strength 17 43 2.0 '4340 Hardened Steel' 20   # the same, helical
 cargo run --bin gear-cli -- train                  # a geartrain, end to end
+cargo run --bin gear-cli -- trainfile              # a geartrain to TOML and back
 cargo run --bin gear-cli -- train mixed            # ...with a worm stage in it
 cargo run --bin gear-cli -- worm 1 40 7 90         # a worm pair, both directions
 cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
