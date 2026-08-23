@@ -81,6 +81,26 @@ impl Default for Cutter {
     }
 }
 
+/// The root fillet a shaper cut, as the span of cutter travel that traced it.
+///
+/// The two travels are what the trochoid is read at; the radii and angles come
+/// from [`Ring::trochoid_at`] rather than being stored, so there is one place
+/// the curve is defined.
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Fillet {
+    /// Cutter travel at the flank/fillet junction.
+    pub s_j: f64,
+    /// Travel at which the fillet ends.
+    ///
+    /// Zero when a root arc follows — the deepest cut, at mid-space. Non-zero
+    /// when the fillets from the two flanks meet before they get there, which
+    /// leaves a **fully filleted root** with no flat at all. Common, and not a
+    /// fault: it simply means the cutter's tip is wide enough that its corner
+    /// rounds overlap.
+    pub s_root: f64,
+}
+
 /// A ring gear's cross-section, so far as the involute goes.
 #[derive(Clone, Debug)]
 pub struct Ring {
@@ -121,18 +141,21 @@ pub struct Ring {
     pub half_pitch: f64,
     /// Roll parameter at the tip — the *lower* end of the flank here.
     pub u_tip: f64,
-    /// Roll parameter where the flank hands over to the fillet.
+    /// Roll parameter where the flank hands over to the fillet — or, when no
+    /// fillet was cut, where the flank reaches the root circle.
     pub u_j: f64,
-    /// Cutter travel at that same junction.
-    pub s_j: f64,
-    /// Travel at which the fillet ends.
+    /// The trochoid the cutter's tip corner left, when it left one.
     ///
-    /// Zero when a root arc follows — the deepest cut, at mid-space. Non-zero
-    /// when the fillets from the two flanks meet before they get there, which
-    /// leaves a **fully filleted root** with no flat at all. Common, and not a
-    /// fault: it simply means the cutter's tip is wide enough that its corner
-    /// rounds overlap.
-    pub s_root: f64,
+    /// `None` in the two cases where nothing is generated: the corner rounds
+    /// overlap, so the tool is not a tool, or the cutter never reaches this
+    /// ring's flank. Both are reported in [`Self::clamps`].
+    ///
+    /// An `Option` rather than a pair of zeros, because **a zero-length fillet
+    /// is not a fillet**. Sampled as though it were one, it made every section
+    /// of the profile fall back to its minimum point count: a 600-point outline
+    /// came out with seven, the involute became two straight chords, and a ring
+    /// drew as a sharp-rooted polygon that looked deliberate. See §12.
+    pub fillet: Option<Fillet>,
     /// The cut that made this ring.
     pub cut: ShaperCut,
     /// Guards that altered the geometry.
@@ -336,8 +359,7 @@ impl Ring {
             half_pitch,
             u_tip: roll_at(ra),
             u_j: roll_at(rf),
-            s_j: 0.0,
-            s_root: 0.0,
+            fillet: None,
             cut: cut.unwrap_or(ShaperCut {
                 workpiece_radius: r,
                 cutter_radius,
@@ -361,8 +383,10 @@ impl Ring {
         match ring.solve_junction() {
             Some((u_j, s_j)) => {
                 ring.u_j = u_j;
-                ring.s_j = s_j;
-                ring.s_root = ring.solve_root_end();
+                ring.fillet = Some(Fillet {
+                    s_j,
+                    s_root: ring.solve_root_end(s_j),
+                });
                 if !ring.fully_generated() {
                     let limit = ring.generation_limit();
                     ring.clamps.push(format!(
@@ -372,7 +396,7 @@ impl Ring {
                         ring.ra
                     ));
                 }
-                if ring.s_root != 0.0 {
+                if ring.fillet.is_some_and(|f| f.s_root != 0.0) {
                     ring.clamps.push(
                         "fully filleted root: the corner rounds meet before mid-space, so \
                          there is no root arc"
@@ -451,12 +475,35 @@ impl Ring {
     /// The fillet is symmetric about mid-space, so two of them meeting there is
     /// the same statement as one of them reaching it. Monotone in `s`, so one
     /// bracketed step again.
-    fn solve_root_end(&self) -> f64 {
+    ///
+    /// Takes the junction travel rather than reading it back off `self`,
+    /// because it is called while the fillet is being built and there is
+    /// nothing to read yet.
+    fn solve_root_end(&self, s_j: f64) -> f64 {
         if self.trochoid_at(0.0).1 <= self.half_pitch {
             return 0.0;
         }
         let over = |s: f64| self.trochoid_at(s).1 - self.half_pitch;
-        brent(over, self.s_j, 0.0, Tol::default()).unwrap_or(0.0)
+        brent(over, s_j, 0.0, Tol::default()).unwrap_or(0.0)
+    }
+
+    /// A circle to draw the rim at, mm — `r + 2 m_t`, so the annulus is two
+    /// modules of material thick.
+    ///
+    /// **A drawing convention, not a design output.** A real ring's outside
+    /// diameter is the designer's: it carries the bolt circle, the press fit
+    /// and whatever the housing needs, none of which the tooth geometry knows
+    /// about. What this is for is that a ring drawn as an outline alone is
+    /// indistinguishable from an external gear — the teeth simply point the
+    /// other way — so the viewport shades the material *outside* the bore, and
+    /// needs somewhere to stop. Two modules is enough to read as a rim at any
+    /// tooth count, because it scales with the teeth it surrounds.
+    ///
+    /// It lives here rather than in the viewport because the DXF wants the same
+    /// circle on its construction layer, and two of them would be two.
+    #[must_use]
+    pub fn rim_radius(&self) -> f64 {
+        self.r + 2.0 * self.mt
     }
 
     /// The smallest radius at which this ring's flank is a **generated**
@@ -649,14 +696,31 @@ impl Ring {
     ///
     /// The same four an external gear has, in the same order — but the radius
     /// *climbs* through them rather than falling, because a ring's tooth points
-    /// inward. A fully filleted root drops the last one.
+    /// inward. A fully filleted root drops the last one, and a cut that
+    /// generated no fillet drops the third: the flank then runs to the root
+    /// circle and the space is flat from there.
     #[must_use]
     pub fn sections(&self) -> Vec<Section> {
-        let mut out = vec![Section::TipArc, Section::Involute, Section::Trochoid];
-        if self.trochoid_at(self.s_root).1 < self.half_pitch {
+        let mut out = vec![Section::TipArc, Section::Involute];
+        if self.fillet.is_some() {
+            out.push(Section::Trochoid);
+        }
+        if self.space_starts_at() < self.half_pitch {
             out.push(Section::RootArc);
         }
         out
+    }
+
+    /// The angle at which the flat of the tooth space begins: where the fillet
+    /// ends, or where the flank does when no fillet was cut.
+    ///
+    /// One place to ask, so the root arc cannot start somewhere the section
+    /// before it did not finish.
+    pub(crate) fn space_starts_at(&self) -> f64 {
+        self.fillet.map_or_else(
+            || self.involute_at(self.u_j).1,
+            |f| self.trochoid_at(f.s_root).1,
+        )
     }
 
     fn sample_section(&self, section: Section, n: usize) -> Vec<(f64, f64)> {
@@ -667,11 +731,14 @@ impl Ring {
             .map(|i| match section {
                 Section::TipArc => (self.ra, lerp(0.0, self.involute_at(self.u_tip).1, i)),
                 Section::Involute => self.involute_at(lerp(self.u_tip, self.u_j, i)),
-                Section::Trochoid => self.trochoid_at(lerp(self.s_j, self.s_root, i)),
-                Section::RootArc => (
-                    self.rf,
-                    lerp(self.trochoid_at(self.s_root).1, self.half_pitch, i),
+                // `sections()` asks for a fillet only where there is one. If it
+                // ever asked otherwise, the flank's end is where the space
+                // begins, which is the curve the fillet would have joined.
+                Section::Trochoid => self.fillet.map_or_else(
+                    || self.involute_at(self.u_j),
+                    |f| self.trochoid_at(lerp(f.s_j, f.s_root, i)),
                 ),
+                Section::RootArc => (self.rf, lerp(self.space_starts_at(), self.half_pitch, i)),
             })
             .collect()
     }
@@ -866,6 +933,16 @@ mod tests {
         )
     }
 
+    /// The fillet of a ring that is supposed to have one.
+    ///
+    /// Tests that walk the fillet are asserting something about a curve; if it
+    /// is missing entirely they should say so loudly rather than quietly assert
+    /// nothing, which is what reading two zeros off the ring used to do.
+    fn fillet_of(g: &Ring) -> Fillet {
+        g.fillet
+            .expect("this ring's cutter is supposed to generate a fillet")
+    }
+
     /// **The smallest ring is a function of the design, not a number.**
     ///
     /// A ring's tip sits at `r − h_a` and its base circle at `r cos α_t`, so the
@@ -946,8 +1023,9 @@ mod tests {
                 "z={teeth} should generate cleanly: {:?}",
                 g.clamps
             );
+            let f = g.fillet.expect("z={teeth} is cut with a fillet");
             let (r_flank, a_flank) = g.involute_at(g.u_j);
-            let (r_fillet, a_fillet) = g.trochoid_at(g.s_j);
+            let (r_fillet, a_fillet) = g.trochoid_at(f.s_j);
             assert!(
                 (r_flank - r_fillet).abs() < 1e-9,
                 "z={teeth}: radius {r_flank} against {r_fillet}"
@@ -972,6 +1050,7 @@ mod tests {
     #[test]
     fn the_profile_climbs_from_tip_to_root_without_turning_back() {
         let g = ring(43);
+        let f = fillet_of(&g);
         let mut radius = g.ra;
         let mut angle = 0.0_f64;
         for i in 0..=40 {
@@ -989,7 +1068,7 @@ mod tests {
         for i in 0..=40 {
             #[allow(clippy::cast_precision_loss)]
             let t = i as f64 / 40.0;
-            let (r, a) = g.trochoid_at(g.s_j + (g.s_root - g.s_j) * t);
+            let (r, a) = g.trochoid_at(f.s_j + (f.s_root - f.s_j) * t);
             assert!(
                 r >= radius - 1e-9,
                 "fillet turned back at {r} from {radius}"
@@ -1006,7 +1085,7 @@ mod tests {
             "the fillet ran past mid-space to {angle}, beyond {}",
             g.half_pitch
         );
-        if g.s_root == 0.0 {
+        if f.s_root == 0.0 {
             assert!(
                 (radius - g.rf).abs() < 1e-9,
                 "fillet reached {radius}, root {}",
@@ -1123,7 +1202,7 @@ mod tests {
         // root that is where the two fillets meet at mid-space, a hair *inside*
         // the root circle — the root circle is the cutter's reach, not the
         // part's boundary, and the two only coincide when a root arc exists.
-        let deepest = g.trochoid_at(g.s_root).0;
+        let deepest = g.trochoid_at(fillet_of(&g).s_root).0;
         assert!(
             (ring_max - deepest).abs() < 1e-9,
             "a ring's furthest point is where its fillet ends: {ring_max} against {deepest}"
@@ -1132,7 +1211,7 @@ mod tests {
             deepest <= g.rf + 1e-12,
             "and that cannot be beyond the root circle"
         );
-        if g.s_root != 0.0 {
+        if fillet_of(&g).s_root != 0.0 {
             assert!(
                 deepest < g.rf,
                 "a fully filleted root never reaches the root circle"

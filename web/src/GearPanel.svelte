@@ -265,6 +265,7 @@
           base={r.base_radius}
           tip={r.tip_radius}
           root={r.root_radius}
+          rim={r.rim_radius}
         />
         <h2>Geometry</h2>
         <dl>
@@ -281,10 +282,24 @@
           <dt>Root radius</dt>
           <dd>{mm(r.root_radius)} <small>outside it</small></dd>
           <dt>Flank / fillet junction</dt>
-          <dd>{mm(r.junction_radius)}</dd>
+          <dd>
+            {#if r.junction_radius === null}
+              <span class="warn">none — this cutter generated no fillet</span>
+            {:else}
+              {mm(r.junction_radius)}
+            {/if}
+          </dd>
           <dt>Root form</dt>
           <dd>
-            {r.fully_filleted_root ? "fully filleted — no root arc" : "root arc between the fillets"}
+            {#if r.root_form === "fully_filleted"}
+              fully filleted — no root arc
+            {:else if r.root_form === "root_arc"}
+              root arc between the fillets
+            {:else}
+              <span class="warn">
+                no fillet: the flank runs to the root circle, so the root is a sharp corner
+              </span>
+            {/if}
           </dd>
           <dt>Generated down to</dt>
           <dd>
@@ -581,6 +596,9 @@
     color: var(--warn);
   }
   .error {
+    color: var(--warn);
+  }
+  .warn {
     color: var(--warn);
   }
 </style>

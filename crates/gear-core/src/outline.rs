@@ -236,7 +236,11 @@ impl crate::ring::Ring {
         };
 
         let theta_tip = self.involute_at(self.u_tip).1;
-        let theta_root = self.trochoid_at(self.s_root).1;
+        // Where the flat of the space begins: the fillet's end, or the flank's
+        // when the cut generated no fillet. Asked of the ring rather than
+        // recomputed, so the arc cannot start where the curve before it did not
+        // finish.
+        let theta_root = self.space_starts_at();
         let root_arc = self.half_pitch - theta_root;
 
         let z = self.teeth;
@@ -258,13 +262,22 @@ impl crate::ring::Ring {
                 bulge: bulge_for(root_arc),
             });
 
-            // 2. fillet, minus side, climbing inward from the root
-            let fillet = |t: f64| self.trochoid_at(self.s_root + t * (self.s_j - self.s_root));
-            let f_minus = |t: f64| {
-                let (r, th) = fillet(t);
-                pt(r, -th)
+            // 2. fillet, minus side, climbing inward from the root. Absent when
+            //    the cut generated none: the flank then starts at the root
+            //    circle and there is no curve to walk.
+            let fillet = |t: f64| {
+                self.fillet.map_or_else(
+                    || self.involute_at(self.u_j),
+                    |f| self.trochoid_at(f.s_root + t * (f.s_j - f.s_root)),
+                )
             };
-            subdivide(&f_minus, 0.0, 1.0, tol, 0, &mut out);
+            if self.fillet.is_some() {
+                let f_minus = |t: f64| {
+                    let (r, th) = fillet(t);
+                    pt(r, -th)
+                };
+                subdivide(&f_minus, 0.0, 1.0, tol, 0, &mut out);
+            }
 
             // 3. flank, minus side, on inward to the tip
             let flank = |t: f64| self.involute_at(self.u_j + t * (self.u_tip - self.u_j));
@@ -289,11 +302,13 @@ impl crate::ring::Ring {
             subdivide(&l_plus, 1.0, 0.0, tol, 0, &mut out);
 
             // 6. fillet, plus side, out to where the root arc resumes
-            let f_plus = |t: f64| {
-                let (r, th) = fillet(t);
-                pt(r, th)
-            };
-            subdivide(&f_plus, 1.0, 0.0, tol, 0, &mut out);
+            if self.fillet.is_some() {
+                let f_plus = |t: f64| {
+                    let (r, th) = fillet(t);
+                    pt(r, th)
+                };
+                subdivide(&f_plus, 1.0, 0.0, tol, 0, &mut out);
+            }
 
             // 7. the run out to mid tooth-space opens the next tooth, so only
             //    its bulge is recorded here.
@@ -348,11 +363,10 @@ mod tests {
                 let t = i as f64 / DENSE as f64;
                 dense.push((g.ra, -g.involute_at(g.u_tip).1 * (1.0 - 2.0 * t)));
                 dense.push(g.involute_at(g.u_tip + (g.u_j - g.u_tip) * t));
-                dense.push(g.trochoid_at(g.s_j + (g.s_root - g.s_j) * t));
-                dense.push((
-                    g.rf,
-                    g.trochoid_at(g.s_root).1 + (g.half_pitch - g.trochoid_at(g.s_root).1) * t,
-                ));
+                let f = g.fillet.expect("this ring is cut with a fillet");
+                dense.push(g.trochoid_at(f.s_j + (f.s_root - f.s_j) * t));
+                let space = g.trochoid_at(f.s_root).1;
+                dense.push((g.rf, space + (g.half_pitch - space) * t));
             }
             let cartesian: Vec<(f64, f64)> = dense
                 .iter()

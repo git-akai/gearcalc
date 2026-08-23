@@ -9,12 +9,17 @@
     base,
     tip,
     root,
+    rim = null,
   }: {
     points: Float64Array | null;
     pitch: number;
     base: number;
     tip: number;
     root: number;
+    /** Set for a ring: the radius its rim is drawn out to, from Rust. The
+     *  outline is then the *bore*, and what is shaded is the material around
+     *  it. Omitted for an external gear, where the outline is the part. */
+    rim?: number | null;
   } = $props();
 
   let canvas: HTMLCanvasElement | undefined = $state();
@@ -57,7 +62,7 @@
     const c = canvas;
     if (!c || !points || points.length < 4) return;
     // referenced so the effect re-runs on view changes
-    void [zoom, panX, panY, showCircles, pitch, base, tip, root];
+    void [zoom, panX, panY, showCircles, pitch, base, tip, root, rim];
 
     const dpr = window.devicePixelRatio || 1;
     const w = c.clientWidth;
@@ -74,7 +79,10 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    const scale = ((Math.min(w, h) * 0.45) / Math.max(tip, 1e-9)) * zoom;
+    // Frame whatever the part actually reaches: a ring's tip radius is its
+    // *smallest*, so scaling by it drew the rim off the edge of the canvas.
+    const extent = Math.max(tip, root, rim ?? 0, 1e-9);
+    const scale = ((Math.min(w, h) * 0.45) / extent) * zoom;
     ctx.translate(w / 2 + panX, h / 2 + panY);
     ctx.scale(scale, -scale); // +y up, the way a drawing is read
     ctx.lineWidth = 1 / scale;
@@ -94,10 +102,24 @@
     ctx.moveTo(points[0], points[1]);
     for (let i = 2; i < points.length; i += 2) ctx.lineTo(points[i], points[i + 1]);
     ctx.closePath();
-    ctx.fillStyle = token("--flank", "#dbe3ec");
-    ctx.fill();
-    ctx.strokeStyle = token("--accent", "#2f5d8a");
-    ctx.stroke();
+
+    if (rim !== null) {
+      // A ring's material is *outside* its bore. Adding the rim circle to the
+      // same path and filling by the even-odd rule shades the annulus between
+      // the two, which is what makes a ring look like a ring rather than like
+      // an external gear with the teeth drawn the other way up.
+      ctx.moveTo(rim, 0);
+      ctx.arc(0, 0, rim, 0, Math.PI * 2);
+      ctx.fillStyle = token("--flank", "#dbe3ec");
+      ctx.fill("evenodd");
+      ctx.strokeStyle = token("--accent", "#2f5d8a");
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = token("--flank", "#dbe3ec");
+      ctx.fill();
+      ctx.strokeStyle = token("--accent", "#2f5d8a");
+      ctx.stroke();
+    }
   });
 </script>
 

@@ -29,7 +29,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
 | UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm and planetary** stages; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI |
 
-307 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+322 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -2174,6 +2174,21 @@ rounding.
 
 #### Three geometries that are real, not faults
 
+**A fourth is not.** A cutter whose corner rounds overlap generates *no fillet*
+— the flank runs to the root circle and the root is a sharp corner. That is a
+real shape, but it is not a real part, because no such tool exists: the round
+asked for does not fit the tip it is asked to sit on. `ShaperCut::new` refuses
+it (which of the round, the addendum and the tooth count to give up is the
+designer's call), and `Ring` then carries `fillet: None` rather than a fillet of
+zero length. **The `Option` is the point.** Zeros in those fields read as a curve
+everywhere that asked for one, and the consequences were silent: a `NaN` arc
+length that collapsed the sampled outline to seven points a tooth, a
+flank/fillet junction reported at exactly the root radius, and a bending
+rating searching an empty bracket. Absence is now a thing the type says, and
+every consumer answers it — the profile omits the section, the DXF omits it, the
+summary reports `root_form: no_fillet` with a null junction, and the strength
+model declines to rate a notch that is not there. §12.
+
 **A fully filleted root.** The corner rounds from adjacent teeth can meet before
 mid-space, leaving no flat at all. Common. The fillet is truncated exactly at
 mid-space and the condition reported. The outline's furthest point is then a hair
@@ -2512,6 +2527,18 @@ is written back except by explicit export, per the spec.
 In the browser the file is a Blob download; the same core call writes a file from
 `gear-cli`.
 
+**A ring also carries a rim circle**, `r + 2 m_t`, on the construction layer with
+the reference circles. A ring's outline is its *bore*, so an outline alone is
+indistinguishable from an external gear's — the teeth simply point the other way
+— and the viewport shades the material outside the bore rather than inside it,
+which needs somewhere to stop. Two modules reads as a rim at any tooth count
+because it scales with the teeth it surrounds. It is a **drawing convention with
+no engineering meaning**: a real ring's outside diameter carries the bolt circle,
+the press fit and whatever the housing needs, none of which the tooth geometry
+knows about. It is construction rather than profile geometry for exactly that
+reason, and `Ring::rim_radius` is its one home, so the drawing and the DXF cannot
+disagree about where the part ends.
+
 ---
 
 ## 8. UI structure
@@ -2799,6 +2826,9 @@ something independent.**
 | 4.7 | Figure 8's "the two factors approach each other" taken as a check | It is a property of the paper's setup, not of ours: TM-107012 cuts its external gear with the same 20-tooth shaper as its ring, while this crate's external gear is rack-cut. With the shaper held at 20 teeth the ring's fillet never tends to the rack's, so the gap closes only to z ≈ 150 and then widens. The real convergence is with the shaper growing too, where both teeth become the same rack tooth |
 | 4.7 | Helical rings left unrated, on the grounds that a virtual spur *ring* did not exist | A gap, not a decision — the stated intent is feature parity with spur gears. It exists now: `z_n = z/cos³β` at the normal module, **with the cutter virtualised the same way**, which leaves `z_c/z_r` unchanged so the virtual pair still rolls together and the cut stays conjugate. Needed a `Ring` buildable at a fractional tooth count, mirroring `Gear::build_with_z`, and a `CutParams` that takes the cutter's *radius* rather than a whole-number tooth count |
 | 4.9 | A planetary stage assumed to fit the train's two-member shape | It has three shafts, and its speeds come from its own kinematics rather than from a ratio applied to the previous stage. `solve_any` therefore needs a **speed** as well as a torque: which shaft is held is a kinematic question, and the efficiency depends on it. The train now carries the speed it has reached alongside the torque it has reached |
+| 4.11, 3 | **The gear tab's cutter default was written down in TypeScript as well as in Rust, and the two drifted.** | `defaultCutter()` carried `tip_round = 0.38` — the *rack's* figure — where `Cutter::default()` has held 0.2 all along, with a comment saying that a 20-tooth shaper's tip is 0.377 modules wide and cannot hold two 0.38 rounds. So every ring the UI built was cut by a tool that generates no fillet, and the viewport drew a sharp-rooted polygon with straight flanks. Nothing in Rust was wrong; nothing in Rust could see it either, because the wrong number lived only on the side that has no tests. **The fix is not the number.** Every default a fresh tab starts at is now served across the boundary by `gear_wasm::defaults`, so there is one home for them and the class of drift is closed rather than this instance of it |
+| 4.11 | A ring with no fillet was represented as one whose fillet has **zero length** | `s_j = s_root = 0` and a `Trochoid` section still in the list. Sampling it measured an arc length of `NaN`, which made the total `NaN`, every share `NaN`, and `(NaN) as usize` **zero** — so every section fell back to its minimum point count and a 600-point outline came back with **seven**: an involute drawn as two straight chords. The absent fillet is now `Option<Fillet>` and cannot be asked for as a curve, the root arc starts wherever the section before it finished, and the allocator drops a section of zero or non-finite length instead of letting one poison the rest |
+| 4.11 | The boundary test that was supposed to prove "an outline the viewport can draw" | Was built on the same 0.38 cutter, and asserted `outline.len() > 200` — which sixty teeth of seven-point rubbish clears comfortably. *A check built from the thing under test measures nothing*, in its second form: the fixture was the defect. It now asserts points **per tooth** against the number requested, and the standing gate in `geometry_laws.rs` states the two properties the drawing must have — that the points arrive at the density asked for, and that each flank chord stands at `√(r² − r_b²)` from the centre, which is what makes the curve an involute of its own base circle. Run against the pre-fix code, that gate fails with "asked for 600 points a tooth and got 13.0" |
 | 4.5.2 | Reversing a planetary by handing its output shaft's torque back as the input | That torque is a **reaction**, opposite in sign to the shaft's speed, and a shaft that is now driving must have them agree. The wrong sign flips the rolling power, `η₀^w` takes the wrong branch, and the set reports an efficiency **above one** — 101.571 % in the running application. Every test drove forward with a positive torque and a positive speed, so none could see it; found by looking at the UI. Related: a shaft with `T ω ≤ 0` is absorbing power and is not an input at all, so naming it one is now refused rather than answered with `1/η₀` |
 
 Two process notes worth carrying forward:

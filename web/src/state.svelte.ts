@@ -5,11 +5,10 @@
 // Rust on each change.
 
 import {
-  defaultParams,
+  defaults,
   defaultLibrary,
-  defaultCutter,
+  defaultTrain,
   type CutterRef,
-  defaultStage,
   importLibrary,
   type ClassRef,
   type GearParams,
@@ -43,23 +42,40 @@ export interface TrainTab {
 let nextId = 1;
 let nextTrainId = 1;
 
+// Every value here comes from the core — see `defaults()` in core.ts, and
+// DESIGN.md §12 for what happened when they were written down twice. That is
+// why a tab cannot be built before the core is loaded, and why the two lists
+// below start empty and are filled by `initialise`.
 function freshTab(name = "Gear"): GearTab {
+  const d = defaults().gear;
   return {
     id: nextId++,
     name,
-    params: { ...defaultParams },
-    pinDiameter: 1.75,
+    params: d.params,
+    pinDiameter: d.pin_diameter,
     toleranceClass: null,
-    chordTolerance: 0.001,
-    referenceCircles: true,
+    chordTolerance: d.chord_tolerance,
+    referenceCircles: d.reference_circles,
     internal: false,
-    cutter: defaultCutter(),
+    cutter: d.cutter,
   };
 }
 
 class Workspace {
-  tabs = $state<GearTab[]>([freshTab()]);
+  tabs = $state<GearTab[]>([]);
   selectedId = $state<number>(1);
+
+  /** The first tab, once the core can say what is in it.
+   *
+   *  Deliberately not `create()`: that also *selects*, and selecting switches
+   *  the main panel. Both lists are initialised at start-up, so whichever ran
+   *  second would decide which panel the app opened on. */
+  initialise() {
+    if (this.tabs.length > 0) return;
+    const t = freshTab();
+    this.tabs.push(t);
+    this.selectedId = t.id;
+  }
 
   get selected(): GearTab {
     return this.tabs.find((t) => t.id === this.selectedId) ?? this.tabs[0];
@@ -105,16 +121,7 @@ class Workspace {
 export const workspace = new Workspace();
 
 function freshTrain(name = "Geartrain"): TrainTab {
-  return {
-    id: nextTrainId++,
-    name,
-    train: {
-      input_speed: 30000,
-      input_torque: 0.1,
-      actuation: { intermittent: { range_degrees: 25, actuations: 1000 } },
-      stages: [defaultStage()],
-    },
-  };
+  return { id: nextTrainId++, name, train: defaultTrain() };
 }
 
 /** The geartrain tabs.
@@ -123,8 +130,17 @@ function freshTrain(name = "Geartrain"): TrainTab {
  *  union type: the two share no fields, and the sidebar shows them under
  *  separate headings anyway. */
 class Trains {
-  tabs = $state<TrainTab[]>([freshTrain()]);
+  tabs = $state<TrainTab[]>([]);
   selectedId = $state<number>(1);
+
+  /** The first tab, without switching to it — see `Workspace.initialise`. */
+  initialise() {
+    if (this.tabs.length > 0) return;
+    const t = freshTrain();
+    this.tabs.push(t);
+    this.selectedId = t.id;
+  }
+
   /** Which list the main panel is showing. */
   active = $state<"gear" | "train">("gear");
 

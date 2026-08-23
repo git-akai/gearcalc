@@ -10,7 +10,8 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–10 complete and in CI. 319 tests, ~26 s.**
+**Milestones 0–10 complete and in CI. 322 tests, ~26 s.** Milestone 11 is
+under way: the ring-drawing defect below is fixed, and the rim circle with it.
 
 ```bash
 nix develop                       # or `direnv allow` once
@@ -47,7 +48,10 @@ does the rest.
 shift, a shaper-cut fillet **at the centre distance the shift puts the tool at**,
 the flank/fillet tangency, the generation limit, two mesh interference
 conditions, and a bending rating. Verified by simulating the cut — 2.5–2.7 µm
-across shifts −0.4 … +0.5.
+across shifts −0.4 … +0.5. A cut that generates **no** fillet is `fillet: None`
+rather than a fillet of zero length, and every consumer answers it; the drawn
+outline is gated on density and on the involute law (§12). The viewport shades
+the rim rather than the bore, out to `Ring::rim_radius`.
 
 **Planetary sets.** `planetary.rs` and `train/planetary.rs`: the planet shift
 that makes the two centre distances agree, the ring search, layout checks, Willis
@@ -232,6 +236,28 @@ differently. `Ring::new` takes the cutter and keeps it.
 Things that looked reasonable, were wrong, and cost time. All are in DESIGN §12;
 these are the ones most likely to be stepped on again.
 
+- **A default written down in two languages is the same trap as a duplicated
+  formula, and worse, because only one side has tests.** The gear tab's cutter
+  carried the *rack's* 0.38 tip round in TypeScript while Rust held 0.2 — a
+  20-tooth shaper's tip is 0.377 modules wide and cannot hold two 0.38 rounds —
+  so every ring the UI drew was cut by a tool that generates no fillet. The core
+  was right throughout and could not see it. Defaults are now served from
+  `gear_wasm::defaults`, and a fresh tab cannot be built before the core loads.
+  **If you find yourself typing an engineering number into `.ts`, that is the
+  bug.**
+- **An absent thing is not a zero-length thing.** The missing fillet was stored
+  as `s_j = s_root = 0`, so everything downstream cheerfully asked for a curve
+  that was not there — and the failure was silent and *plausible*: a `NaN` arc
+  length collapsed a 600-point outline to seven, which draws as a polygon that
+  looks deliberate. `Ring::fillet` is an `Option` now. When something can be
+  absent, say so in the type, or every consumer has to remember.
+- **Assert the property, not a number the failure also satisfies.**
+  `outline.len() > 200` passed while sixty teeth returned seven points each. The
+  gate that catches it asserts points *per tooth* against the number requested,
+  and that each flank chord stands `√(r² − r_b²)` from the centre — the involute
+  law, checkable from the drawn points alone. Before trusting a new gate, run it
+  against the broken code: `git worktree add` a detached HEAD, copy the test in,
+  and watch it fail.
 - **A duplicated formula is a place where two answers can differ, and the copy
   nothing exercises is the one that is wrong.** The hand-written internal
   relative curvature was wrong two ways at once — 50 % at the pitch point of a

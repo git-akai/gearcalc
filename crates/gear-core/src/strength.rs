@@ -349,13 +349,20 @@ impl ToothOutline for crate::ring::Ring {
         self.alpha_n
     }
     fn is_usable(&self) -> bool {
-        self.u_j.is_finite() && self.u_tip.is_finite() && self.u_j > self.u_tip
+        // A ring whose cut generated no fillet has no notch, and the whole
+        // construction below is a search *along the fillet* for one. Rated
+        // without this it searched an empty bracket and answered anyway.
+        self.fillet.is_some()
+            && self.u_j.is_finite()
+            && self.u_tip.is_finite()
+            && self.u_j > self.u_tip
     }
     fn fillet_bracket(&self) -> (f64, f64) {
-        (self.s_root.min(self.s_j), self.s_root.max(self.s_j))
+        self.fillet
+            .map_or((0.0, 0.0), |f| (f.s_root.min(f.s_j), f.s_root.max(f.s_j)))
     }
     fn fillet_junction(&self) -> f64 {
-        self.s_j
+        self.fillet.map_or(0.0, |f| f.s_j)
     }
     fn flank_bracket(&self) -> (f64, f64) {
         (self.u_tip, self.u_j)

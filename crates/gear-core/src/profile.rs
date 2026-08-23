@@ -171,15 +171,32 @@ pub(crate) fn allocate_by_arc_length(
                 .sum()
         })
         .collect();
-    let total: f64 = lengths.iter().sum();
-    let shares: Vec<f64> = lengths
+    // A section of zero or non-finite length is not a section, and must not
+    // reach the shares: one `NaN` length makes `total` `NaN`, every share
+    // `NaN`, and `(NaN) as usize` **zero** — so every section silently falls
+    // back to `MIN_SECTION_POINTS` and a 600-point request returns seven. That
+    // is how a ring with no fillet came to draw as a straight-sided polygon
+    // (§12). Dropping the section is the honest reading: it earns no points
+    // because it has no length.
+    let live: Vec<(Section, f64)> = sections
         .iter()
-        .map(|w| w.max(total * search::MIN_SECTION_SHARE))
+        .zip(&lengths)
+        .filter(|(_, &w)| w.is_finite() && w > 0.0)
+        .map(|(&s, &w)| (s, w))
+        .collect();
+    if live.is_empty() {
+        return Vec::new();
+    }
+
+    let total: f64 = live.iter().map(|&(_, w)| w).sum();
+    let shares: Vec<f64> = live
+        .iter()
+        .map(|&(_, w)| w.max(total * search::MIN_SECTION_SHARE))
         .collect();
     let share_total: f64 = shares.iter().sum();
 
     let mut out: Vec<(f64, f64)> = Vec::new();
-    for (&section, share) in sections.iter().zip(&shares) {
+    for (&(section, _), share) in live.iter().zip(&shares) {
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let count = ((share / share_total) * n as f64) as usize;
         let pts = sample(section, count.max(search::MIN_SECTION_POINTS));

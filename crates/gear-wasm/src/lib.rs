@@ -274,6 +274,23 @@ impl CutterRef {
     }
 }
 
+/// How the space between two ring teeth closes.
+///
+/// Three cases rather than the two a boolean allowed: a cut that generates no
+/// fillet at all is not "a root arc between the fillets", and saying so put a
+/// description of a fillet next to a drawing that had none.
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RootForm {
+    /// The fillets from the two flanks meet before mid-space: no flat at all.
+    FullyFilleted,
+    /// A flat at the root circle between the two fillets.
+    RootArc,
+    /// No fillet was cut — the flank runs to the root circle. The reason is in
+    /// [`RingSummary::clamps`].
+    NoFillet,
+}
+
 /// What the UI shows for a ring.
 #[derive(Serialize)]
 pub struct RingSummary {
@@ -287,9 +304,15 @@ pub struct RingSummary {
     pub tip_radius: f64,
     pub root_radius: f64,
     /// Radius at which the flank hands over to the fillet, mm.
-    pub junction_radius: f64,
-    /// Whether the corner rounds meet before mid-space, leaving no root arc.
-    pub fully_filleted_root: bool,
+    ///
+    /// `None` when the cut generated no fillet: there is then no handover, and
+    /// reporting the root radius here said there was one.
+    pub junction_radius: Option<f64>,
+    /// How the tooth space closes.
+    pub root_form: RootForm,
+    /// Where a drawing shades the rim out to, mm. A convention with no
+    /// engineering meaning — see [`gear_core::ring::Ring::rim_radius`].
+    pub rim_radius: f64,
     /// The lowest radius this cutter can generate as an involute, mm. Below it
     /// the cutter's own involute has run out.
     pub generation_limit: f64,
@@ -337,8 +360,13 @@ fn solve_ring_impl(input: &str) -> Result<String, String> {
         base_radius: g.rb,
         tip_radius: g.ra,
         root_radius: g.rf,
-        junction_radius: g.involute_at(g.u_j).0,
-        fully_filleted_root: g.s_root != 0.0,
+        junction_radius: g.fillet.map(|_| g.involute_at(g.u_j).0),
+        rim_radius: g.rim_radius(),
+        root_form: match g.fillet {
+            None => RootForm::NoFillet,
+            Some(f) if f.s_root != 0.0 => RootForm::FullyFilleted,
+            Some(_) => RootForm::RootArc,
+        },
         generation_limit: g.generation_limit(),
         fully_generated: g.fully_generated(),
         smallest_tooth_count: smallest_tooth_count(&req.params),
@@ -511,6 +539,119 @@ pub fn export_ring_dxf(input: &str) -> Result<String, JsError> {
     export_ring_dxf_impl(input).map_err(|e| JsError::new(&e))
 }
 
+/// Everything a fresh tab starts at.
+///
+/// **These are engineering numbers, so they live here rather than in
+/// TypeScript.** They used to be written down in both places, and the two
+/// copies drifted: the gear tab's cutter carried `tip_round = 0.38`, which is
+/// the *rack's* figure. A 20-tooth shaper's tip is only 0.377 modules wide, so
+/// no such tool exists — every ring the UI built was cut by a cutter that
+/// generates no fillet, and the viewport drew the result as a straight-sided
+/// polygon. The core's own default has been 0.2 all along, with a comment
+/// saying why. See `docs/DESIGN.md` §12.
+///
+/// Serving them across the boundary is what makes that class of drift
+/// impossible rather than merely fixed.
+#[derive(Serialize)]
+pub struct Defaults {
+    pub gear: GearTabDefaults,
+    /// A fresh geartrain, with one spur stage in it.
+    pub train: gear_core::train::Train,
+    /// One of each stage kind, for the "add stage" menu.
+    pub spur_stage: gear_core::train::Stage,
+    pub worm_stage: gear_core::train::Stage,
+    /// A crossed gear pair: the worm stage sized by helix angle instead of by
+    /// diameter, which is the whole of the difference (§4.5.1).
+    pub crossed_stage: gear_core::train::Stage,
+    pub planetary_stage: gear_core::train::Stage,
+}
+
+/// What a new gear tab holds. The values are the specification's, and the
+/// tooth count is deliberately *not* the core's own default of 17.
+#[derive(Serialize)]
+pub struct GearTabDefaults {
+    pub params: GearParams,
+    pub cutter: CutterRef,
+    /// Pin or ball diameter for the over-pins measurement, mm.
+    pub pin_diameter: f64,
+    /// Export accuracy, mm.
+    pub chord_tolerance: f64,
+    pub reference_circles: bool,
+}
+
+fn defaults_impl() -> Result<String, String> {
+    use gear_core::train::{
+        Actuation, FirstMemberSizing, PlanetaryStage, SpurStage, Stage, Train, WormStage,
+    };
+
+    // The tab starts with an automatic face width, where the core's own
+    // default is a plain 10 mm. Both are right for their caller: the CLI and
+    // the tests want a fixed number they can reason about, and a designer
+    // opening the panel wants to see the width the rating asks for. Seeded at
+    // 5 mm so the field has something to fall back to when the toggle is
+    // turned off.
+    let ui_gear = |g: &gear_core::train::StageGear| gear_core::train::StageGear {
+        face_width: gear_core::params::Auto::automatic(5.0),
+        ..g.clone()
+    };
+    let spur = {
+        let d = SpurStage::default();
+        SpurStage {
+            gears: [ui_gear(&d.gears[0]), ui_gear(&d.gears[1])],
+            ..d
+        }
+    };
+    let planetary = {
+        let d = PlanetaryStage::default();
+        PlanetaryStage {
+            sun: ui_gear(&d.sun),
+            planet: ui_gear(&d.planet),
+            ring: ui_gear(&d.ring),
+            ..d
+        }
+    };
+
+    let defaults = Defaults {
+        gear: GearTabDefaults {
+            params: GearParams {
+                // The specification's default tooth count, not the core's.
+                teeth: 9,
+                ..GearParams::default()
+            },
+            cutter: CutterRef::default(),
+            pin_diameter: 1.75,
+            chord_tolerance: gear_core::outline::DEFAULT_CHORD_TOLERANCE,
+            reference_circles: true,
+        },
+        train: Train {
+            input_speed: 30_000.0,
+            input_torque: 0.1,
+            actuation: Actuation::default(),
+            stages: vec![Stage::Spur(spur.clone())],
+        },
+        spur_stage: Stage::Spur(spur),
+        worm_stage: Stage::Worm(WormStage::default()),
+        crossed_stage: Stage::Worm(WormStage {
+            starts: 17,
+            wheel_teeth: 23,
+            sizing: FirstMemberSizing::HelixAngle(45.0),
+            ..WormStage::default()
+        }),
+        planetary_stage: Stage::Planetary(Box::new(planetary)),
+    };
+    serde_json::to_string(&defaults).map_err(|e| format!("could not encode defaults: {e}"))
+}
+
+/// The values a fresh tab starts at, as JSON.
+///
+/// # Errors
+///
+/// Only if the defaults cannot be encoded, which would be a build-time defect.
+#[wasm_bindgen]
+pub fn defaults() -> Result<String, JsError> {
+    defaults_impl().map_err(|e| JsError::new(&e))
+}
+
 #[wasm_bindgen]
 pub fn default_materials() -> Result<String, JsError> {
     default_materials_impl().map_err(|e| JsError::new(&e))
@@ -548,6 +689,45 @@ mod tests {
     const REQ: &str = r#"{"params":{"module":1.0,"pressure_angle":20.0,"teeth":17,
         "profile_shift":0.2,"helix_angle":0.0,"addendum":1.0,"dedendum":1.25,
         "root_radius":0.38,"thickness_mod":1.0},"pin_diameter":1.75}"#;
+
+    /// **The tool the UI ships with is one that can cut.**
+    ///
+    /// A shaper's tip is narrow — 0.377 modules on a 20-tooth cutter at a 1.25
+    /// addendum — so it cannot carry two 0.38-module corner rounds, and asking
+    /// it to generates no fillet at all. That figure is the *rack's*, and for a
+    /// while it was the gear tab's default: every ring the UI drew had its
+    /// flank running to a sharp root.
+    ///
+    /// This asserts the property rather than the number, so a future default is
+    /// free to be different and not free to be uncuttable.
+    #[test]
+    fn the_shipped_cutter_generates_a_fillet() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let cutter = &d["gear"]["cutter"];
+
+        // At a tooth count that cutter can actually reach around.
+        let req = format!(
+            r#"{{"params":{{"teeth":60,"module":1.0,"pressure_angle":20.0,
+               "helix_angle":0.0,"profile_shift":0.0,"addendum":1.0,"dedendum":1.25,
+               "root_radius":0.38,"thickness_mod":1.0}},"cutter":{cutter}}}"#
+        );
+        let v: serde_json::Value = serde_json::from_str(&solve_ring_impl(&req).unwrap()).unwrap();
+
+        assert_ne!(
+            v["root_form"].as_str(),
+            Some("no_fillet"),
+            "the shipped cutter generates no fillet: {:?}",
+            v["clamps"]
+        );
+        let junction = v["junction_radius"]
+            .as_f64()
+            .expect("a generated fillet has a junction with the flank");
+        assert!(
+            junction > v["tip_radius"].as_f64().unwrap()
+                && junction < v["root_radius"].as_f64().unwrap(),
+            "the junction is on the tooth, between tip and root"
+        );
+    }
 
     #[test]
     fn round_trips_json() {
@@ -639,7 +819,7 @@ mod tests {
         let req = r#"{"params":{"teeth":60,"module":1.0,"pressure_angle":20.0,
             "helix_angle":0.0,"profile_shift":0.0,"addendum":1.0,"dedendum":1.25,
             "root_radius":0.38,"thickness_mod":1.0},
-            "cutter":{"teeth":20,"addendum":1.25,"tip_round":0.38}}"#;
+            "cutter":{"teeth":20,"addendum":1.25,"tip_round":0.2}}"#;
 
         let v: serde_json::Value = serde_json::from_str(&solve_ring_impl(req).unwrap()).unwrap();
         let (tip, pitch, root) = (
@@ -652,8 +832,21 @@ mod tests {
         // The constraint that actually bites on internal gears, reported.
         assert_eq!(v["smallest_tooth_count"].as_u64().unwrap(), 34);
 
+        // **At the density that was asked for.** `> 200` passed while the
+        // outline was collapsing to seven points a tooth, because 60 teeth of
+        // rubbish still clears 200: the number to assert is points *per tooth*
+        // against the number requested, not a total that any failure also meets.
         let outline = ring_profile_impl(req, 60).unwrap();
-        assert!(outline.len() > 200 && outline.len().is_multiple_of(2));
+        assert!(outline.len().is_multiple_of(2));
+        let per_tooth = outline.len() as f64 / 2.0 / 60.0;
+        assert!(
+            (50.0..=70.0).contains(&per_tooth),
+            "asked for 60 points a tooth and got {per_tooth}"
+        );
+        assert!(
+            outline.iter().all(|v| v.is_finite()),
+            "the viewport cannot draw a NaN"
+        );
 
         let dxf = export_ring_dxf_impl(req).unwrap();
         assert!(dxf.contains("LWPOLYLINE"), "no polyline in the DXF");
@@ -664,8 +857,8 @@ mod tests {
 
         // **The between-pins measurement crosses too, and subtracts.**
         let with_pin = req.replace(
-            r#""cutter":{"teeth":20,"addendum":1.25,"tip_round":0.38}"#,
-            r#""cutter":{"teeth":20,"addendum":1.25,"tip_round":0.38},"pin_diameter":1.8"#,
+            r#""cutter":{"teeth":20,"addendum":1.25,"tip_round":0.2}"#,
+            r#""cutter":{"teeth":20,"addendum":1.25,"tip_round":0.2},"pin_diameter":1.8"#,
         );
         let p: serde_json::Value =
             serde_json::from_str(&solve_ring_impl(&with_pin).unwrap()).unwrap();

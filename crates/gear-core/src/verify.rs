@@ -544,12 +544,18 @@ pub fn check_ring_cut(ring: &crate::ring::Ring, radii: usize, phases: usize) -> 
     for i in 0..=DENSE {
         #[allow(clippy::cast_precision_loss)]
         let t = i as f64 / DENSE as f64;
-        for (r, th) in [
-            ring.involute_at(ring.u_tip + (ring.u_j - ring.u_tip) * t),
-            ring.trochoid_at(ring.s_j + (ring.s_root - ring.s_j) * t),
-        ] {
-            reference.push((r * th.sin(), r * th.cos()));
-        }
+        reference.extend(
+            [
+                Some(ring.involute_at(ring.u_tip + (ring.u_j - ring.u_tip) * t)),
+                // Nothing to compare against where no fillet was cut; the flank
+                // reference above already runs to the root circle there.
+                ring.fillet
+                    .map(|f| ring.trochoid_at(f.s_j + (f.s_root - f.s_j) * t)),
+            ]
+            .into_iter()
+            .flatten()
+            .map(|(r, th)| (r * th.sin(), r * th.cos())),
+        );
     }
 
     let mut worst_distance = 0.0_f64;

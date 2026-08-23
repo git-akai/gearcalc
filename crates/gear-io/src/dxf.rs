@@ -113,9 +113,14 @@ pub fn gear_to_dxf(gear: &Gear, opts: &DxfOptions) -> String {
 /// business rather than the tooth geometry's.
 #[must_use]
 pub fn ring_to_dxf(ring: &Ring, opts: &DxfOptions) -> String {
+    // The rim circle joins the reference circles on the construction layer
+    // rather than the profile layer: it is where the *drawing* shades the
+    // material to, and a real ring's outside diameter is the designer's
+    // (`Ring::rim_radius`). Putting it on the profile layer would hand CAD a
+    // boundary nobody chose.
     outline_to_dxf(
         &ring.outline(opts.chord_tolerance),
-        &[ring.r, ring.rb, ring.ra, ring.rf],
+        &[ring.r, ring.rb, ring.ra, ring.rf, ring.rim_radius()],
         opts,
     )
 }
@@ -370,6 +375,58 @@ mod tests {
         assert!(
             !without.contains(LAYER_REFERENCE),
             "unused layer should not be declared"
+        );
+    }
+
+    /// **A ring's DXF carries the rim circle, and carries it as construction.**
+    ///
+    /// The outline a ring exports is its *bore*; the material is outside it,
+    /// and without something to say where it stops the file is indistinguishable
+    /// from an external gear's. The circle goes on the reference layer rather
+    /// than the profile layer because it is a drawing convention and not a
+    /// dimension anyone chose — CAD should be free to ignore or replace it.
+    #[test]
+    fn a_rings_dxf_carries_its_rim_as_a_construction_circle() {
+        use gear_core::ring::{Cutter, Ring};
+
+        let ring = Ring::new(
+            &GearParams {
+                teeth: 60,
+                ..GearParams::default()
+            },
+            &Cutter::default(),
+        );
+        let with = ring_to_dxf(&ring, &DxfOptions::default());
+        let radii: Vec<f64> = tags(&with)
+            .iter()
+            .filter(|(c, _)| *c == 40)
+            .filter_map(|(_, v)| v.trim().parse::<f64>().ok())
+            .collect();
+        assert!(
+            radii.iter().any(|r| (r - ring.rim_radius()).abs() < 1e-9),
+            "no circle at the rim radius {}: {radii:?}",
+            ring.rim_radius()
+        );
+        assert!(
+            ring.rim_radius() > ring.rf,
+            "the rim must lie outside the root circle, or it is inside the teeth"
+        );
+
+        // ...and it is construction, so turning the reference circles off
+        // leaves the bore alone in the file.
+        let without = ring_to_dxf(
+            &ring,
+            &DxfOptions {
+                reference_circles: false,
+                ..DxfOptions::default()
+            },
+        );
+        assert_eq!(
+            tags(&without)
+                .iter()
+                .filter(|(c, v)| *c == 0 && v == "CIRCLE")
+                .count(),
+            0
         );
     }
 

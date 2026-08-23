@@ -12,6 +12,7 @@ import init, {
   gear_profile,
   export_dxf,
   version,
+  defaults as wasm_defaults,
   default_materials,
   import_materials,
   export_materials,
@@ -162,17 +163,26 @@ export interface GearSummary {
 
 /** Defaults from the specification, which differ from gear-core's library
  *  default (a deliberately well-behaved z=17 reference gear). */
-export const defaultParams: GearParams = {
-  module: 1,
-  pressure_angle: 20,
-  teeth: 9,
-  profile_shift: 0,
-  helix_angle: 0,
-  addendum: 1,
-  dedendum: 1.25,
-  root_radius: 0.38,
-  thickness_mod: 1,
-};
+/** Everything a fresh tab starts at, as Rust holds it.
+ *
+ *  Not written down here. These are engineering numbers, and the one time they
+ *  were kept in both languages the two drifted: this file's cutter carried the
+ *  rack's 0.38 tip round, which no 20-tooth shaper can hold, so every ring the
+ *  UI drew had no fillet at all. See DESIGN.md §12. */
+export interface Defaults {
+  gear: {
+    params: GearParams;
+    cutter: CutterRef;
+    pin_diameter: number;
+    chord_tolerance: number;
+    reference_circles: boolean;
+  };
+  train: Train;
+  spur_stage: SpurStage;
+  worm_stage: WormStage;
+  crossed_stage: WormStage;
+  planetary_stage: PlanetaryStage;
+}
 
 // --------------------------------------------------------------------- //
 //  Field definitions — valid ranges declared once, as data, next to the
@@ -236,11 +246,25 @@ export function validate(f: FieldSpec, v: number, b: Bound | null): string | nul
 // --------------------------------------------------------------------- //
 
 let ready: Promise<void> | null = null;
+let cachedDefaults: Defaults | null = null;
 
 /** Load the core once. Safe to await repeatedly. */
 export function loadCore(): Promise<void> {
-  if (!ready) ready = init().then(() => undefined);
+  if (!ready) {
+    ready = init().then(() => {
+      cachedDefaults = JSON.parse(wasm_defaults()) as Defaults;
+    });
+  }
   return ready;
+}
+
+/** The defaults, as a fresh copy: everything handed out here is about to
+ *  become a tab's mutable state, so callers must not share one object. */
+export function defaults(): Defaults {
+  if (!cachedDefaults) {
+    throw new Error("the defaults were asked for before the core finished loading");
+  }
+  return structuredClone(cachedDefaults);
 }
 
 export function coreVersion(): string {
@@ -337,16 +361,24 @@ export interface RingSummary {
   base_radius: number;
   tip_radius: number;
   root_radius: number;
-  junction_radius: number;
-  fully_filleted_root: boolean;
+  /** null when the cut generated no fillet: there is then no handover. */
+  junction_radius: number | null;
+  root_form: "fully_filleted" | "root_arc" | "no_fillet";
+  /** Where the drawing shades the rim out to, mm. A convention, not a design
+   *  output — the real outside diameter is the designer's. */
+  rim_radius: number;
   generation_limit: number;
   fully_generated: boolean;
   smallest_tooth_count: number;
   clamps: string[];
 }
 
+export function defaultParams(): GearParams {
+  return defaults().gear.params;
+}
+
 export function defaultCutter(): CutterRef {
-  return { teeth: 20, addendum: 1.25, tip_round: 0.38 };
+  return defaults().gear.cutter;
 }
 
 export function solveRing(req: RingRequest): { ok: RingSummary } | { error: string } {
@@ -681,108 +713,27 @@ export interface TrainResult {
   stages: StageResult[];
 }
 
-/** Defaults from the specification. */
-export function defaultStageGear(teeth: number): StageGear {
-  return {
-    teeth,
-    profile_shift: { auto: true, manual: 0 },
-    working_depth: 1,
-    addendum: { auto: false, manual: 1 },
-    min_tip_width: 0.1,
-    dedendum: 1.25,
-    root_radius: 0.38,
-    face_width: { auto: true, manual: 5 },
-    auto_face_from_bending: true,
-    auto_face_from_contact: true,
-    material: "4340 Hardened Steel",
-    material_overrides: {
-      density: null,
-      elastic_modulus: null,
-      poissons_ratio: null,
-      ultimate_allowable: null,
-      fatigue_allowable: null,
-    },
-  };
+export function defaultWormStage(): WormStage {
+  return defaults().worm_stage;
 }
 
-export function defaultWormStage(): WormStage {
-  const member = (material: string): WormMember => ({
-    face_width: 10,
-    material,
-    material_overrides: {
-      density: null,
-      elastic_modulus: null,
-      poissons_ratio: null,
-      ultimate_allowable: null,
-      fatigue_allowable: null,
-    },
-  });
-  return {
-    kind: "worm",
-    module: 1,
-    pressure_angle: 20,
-    shaft_angle: 90,
-    friction: 0.06,
-    starts: 1,
-    sizing: { pitch_diameter: 7 },
-    wheel_teeth: 40,
-    centre_distance: { auto: true, manual: 0 },
-    clearance: 0.02,
-    tolerance_plus: 0.02,
-    tolerance_minus: 0.02,
-    axial_clearance: 0.04,
-    worm: member("4340 Hardened Steel"),
-    wheel: member("Brass C360"),
-  };
-}
 /** A crossed gear pair: the same stage as a worm drive, sized by helix angle
  *  instead of by diameter. */
 export function defaultCrossedStage(): WormStage {
-  return {
-    ...defaultWormStage(),
-    starts: 17,
-    wheel_teeth: 23,
-    sizing: { helix_angle: 45 },
-  };
+  return defaults().crossed_stage;
 }
 
 export function defaultPlanetaryStage(): PlanetaryStage {
-  return {
-    kind: "planetary",
-    module: 1,
-    pressure_angle: 20,
-    helix_angle: 0,
-    friction_sun_planet: 0.06,
-    friction_planet_ring: 0.06,
-    thickness_mod: 1,
-    planets: 3,
-    arrangement: { input: "sun", fixed: "ring" },
-    clearance: 0.02,
-    tolerance_plus: 0.02,
-    tolerance_minus: 0.02,
-    min_planet_clearance: 0.3,
-    cutter: { teeth: 20, addendum: 1.25, tip_round: 0.2 },
-    sun: defaultStageGear(24),
-    // Its shift is solved, so the input is left fixed at zero and locked.
-    planet: { ...defaultStageGear(18), profile_shift: { auto: false, manual: 0 } },
-    ring: { ...defaultStageGear(60), profile_shift: { auto: false, manual: 0 } },
-  };
+  return defaults().planetary_stage;
 }
 
 export function defaultStage(): SpurStage {
-  return {
-    kind: "spur",
-    module: 1,
-    pressure_angle: 20,
-    helix_angle: 0,
-    friction: 0.06,
-    thickness_mod: 1,
-    centre_distance: { auto: true, manual: 0 },
-    clearance: 0.02,
-    tolerance_plus: 0.02,
-    tolerance_minus: 0.02,
-    gears: [defaultStageGear(17), defaultStageGear(43)],
-  };
+  return defaults().spur_stage;
+}
+
+/** A fresh geartrain, one spur stage in it. */
+export function defaultTrain(): Train {
+  return defaults().train;
 }
 
 /** Solve a whole train. The library is omitted unless the user changed it, in
