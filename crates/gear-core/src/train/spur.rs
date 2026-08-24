@@ -67,10 +67,32 @@ impl Default for StageGear {
     }
 }
 
-/// A parallel-axis stage: spur when the helix angle is zero, helical otherwise.
+/// A stage of two gears on shafts at any angle.
 ///
-/// Crossed axes are milestone 10 and are not accepted here; the specification's
-/// "Axis Angle" input belongs with that work.
+/// Spur when nothing is angled, helical when the teeth are, and a **crossed
+/// gear pair** when the shafts are — one stage, as the specification has it,
+/// with the shaft angle as the input that distinguishes them. It is not three
+/// kinds of stage: the tooth counts, the module, the materials and the
+/// tolerances mean the same thing throughout, and only the *mesh* differs.
+///
+/// # The two helix angles come from the shaft angle
+///
+/// ```text
+/// β₁ = Σ/2 + β_add,     β₂ = Σ/2 − β_add
+/// ```
+///
+/// so `β₁ + β₂ = Σ` — the relation crossed-axis screw gearing runs on (§4.5.1)
+/// — and at `Σ = 0` it collapses to `β₁ = −β₂ = β_add`, a parallel helical pair
+/// with its two hands opposed. The parallel case is the shaft angle's zero
+/// rather than a separate construction, which is the specification's own
+/// reading: "Total Helix Angle = 0.5 × Axis Angle + Additional Helix Angle".
+///
+/// What *does* branch is the mesh, and it must: parallel axes touch along a
+/// line and lose power to sliding along the profile, while crossed axes touch
+/// at a point and slide lengthwise. Those are different mechanisms with
+/// different formulas and different results (§4.5.1), so a crossed stage
+/// answers with the screw result — no contact ratio, no bending, two
+/// efficiencies — and says so.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SpurStage {
@@ -78,8 +100,14 @@ pub struct SpurStage {
     pub module: f64,
     /// Normal pressure angle, degrees. Shared.
     pub pressure_angle: f64,
-    /// Total helix angle, degrees. Shared; gear 2 takes the opposite hand.
-    pub helix_angle: f64,
+    /// Shaft angle `Σ`, degrees. **Zero is a parallel-axis pair**; anything else
+    /// crosses the shafts.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub shaft_angle: f64,
+    /// Additional helix angle, degrees — what each gear carries *beyond* half
+    /// the shaft angle. Gear 2 takes it with the opposite sign, so at `Σ = 0`
+    /// this is the familiar shared helix angle with opposed hands.
+    pub additional_helix: f64,
     /// Coefficient of friction for the mesh.
     pub friction: f64,
     /// `k₁`. Gear 2 takes `2 − k₁` by construction.
@@ -99,7 +127,8 @@ impl Default for SpurStage {
         Self {
             module: 1.0,
             pressure_angle: 20.0,
-            helix_angle: 0.0,
+            shaft_angle: 0.0,
+            additional_helix: 0.0,
             friction: 0.06,
             thickness_mod: 1.0,
             centre_distance: Auto::automatic(0.0),
@@ -118,6 +147,23 @@ impl Default for SpurStage {
 }
 
 impl SpurStage {
+    /// The two gears' helix angles, degrees: `Σ/2 ± β_add`.
+    ///
+    /// One place to ask, so the pair cannot disagree about a shaft angle they
+    /// share — and so `β₁ + β₂ = Σ` holds by construction rather than by a test.
+    #[must_use]
+    pub fn helix_angles(&self) -> [f64; 2] {
+        let half = self.shaft_angle / 2.0;
+        [half + self.additional_helix, half - self.additional_helix]
+    }
+
+    /// Whether the shafts cross. The parallel case is the zero of the shaft
+    /// angle, and it is the *mesh* that differs, not the stage.
+    #[must_use]
+    pub fn is_crossed(&self) -> bool {
+        self.shaft_angle != 0.0
+    }
+
     /// `GearParams` for one gear, with the automatic values resolved.
     ///
     /// The two automatic calculations are ordered, and the order matters: the
@@ -132,11 +178,7 @@ impl SpurStage {
             pressure_angle: self.pressure_angle,
             teeth: g.teeth,
             // Opposite hands mesh; the stage stores the magnitude once.
-            helix_angle: if i == 0 {
-                self.helix_angle
-            } else {
-                -self.helix_angle
-            },
+            helix_angle: self.helix_angles()[i],
             profile_shift: g.profile_shift.manual,
             addendum: g.addendum.manual,
             dedendum: g.dedendum,
@@ -273,7 +315,7 @@ pub fn solve_stage(
 
     // --- contact ratios. eps_beta needs the face width, which is why it could
     // not exist before this milestone.
-    let beta = stage.helix_angle.to_radians();
+    let beta = stage.additional_helix.to_radians();
     let overlap = effective * beta.sin().abs() / (std::f64::consts::PI * stage.module);
     let contact_ratios = ContactRatios {
         transverse: path.contact_ratio,
@@ -300,7 +342,7 @@ pub fn solve_stage(
     });
 
     let mut notes = Vec::new();
-    if stage.helix_angle != 0.0 && !contact_ratios.has_full_axial_overlap() {
+    if stage.additional_helix != 0.0 && !contact_ratios.has_full_axial_overlap() {
         notes.push(format!(
             "overlap ratio {overlap:.3} is below 1: the stage is helical in form \
              but still transfers load like a spur gear"

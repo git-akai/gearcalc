@@ -190,7 +190,6 @@ export interface Defaults {
   train: Train;
   spur_stage: SpurStage;
   worm_stage: WormStage;
-  crossed_stage: WormStage;
   planetary_stage: PlanetaryStage;
 }
 
@@ -508,11 +507,18 @@ export interface StageGear {
   material_overrides: Overrides;
 }
 
+/** Two gears on shafts at any angle: spur, helical, or — once the shafts are
+ *  crossed — a crossed gear pair. One stage, as the specification has it, with
+ *  the axis angle as the input that tells them apart. */
 export interface SpurStage {
   kind: "spur";
   module: number;
   pressure_angle: number;
-  helix_angle: number;
+  /** Σ, degrees. Zero is a parallel-axis pair. */
+  shaft_angle: number;
+  /** What each gear carries beyond half the shaft angle; gear 2 takes it with
+   *  the opposite sign, so at Σ = 0 this is the shared helix angle. */
+  additional_helix: number;
   friction: number;
   thickness_mod: number;
   centre_distance: Auto<number>;
@@ -678,6 +684,8 @@ export interface WormResult {
   centre_distance: number;
   lead_angle: number;
   wheel_lead_angle: number;
+  /** Helix angle of the first member, degrees — `90° − γ₁`, from Rust. */
+  helix_angle: number;
   wheel_helix_angle: number;
   lead: number;
   axial_module: number;
@@ -765,12 +773,6 @@ export interface TrainResult {
 
 export function defaultWormStage(): WormStage {
   return defaults().worm_stage;
-}
-
-/** A crossed gear pair: the same stage as a worm drive, sized by helix angle
- *  instead of by diameter. */
-export function defaultCrossedStage(): WormStage {
-  return defaults().crossed_stage;
 }
 
 export function defaultPlanetaryStage(): PlanetaryStage {

@@ -38,8 +38,8 @@ pub use planetary::{
 };
 pub use spur::{solve_stage, SpurStage, StageGear};
 pub use worm::{
-    solve_worm_stage, FirstMemberSizing, WormContact, WormMember, WormMemberResult, WormResult,
-    WormStage,
+    solve_crossed_stage, solve_worm_stage, FirstMemberSizing, WormContact, WormMember,
+    WormMemberResult, WormResult, WormStage,
 };
 
 /// The three contact ratios.
@@ -412,6 +412,13 @@ pub fn solve_any(
     lib: &MaterialLibrary,
 ) -> Result<StageResult, TrainError> {
     match stage {
+        // One stage kind, two meshes. Crossing the shafts changes what the
+        // teeth do to each other — a line contact becomes a point, and the
+        // sliding changes direction — so a crossed pair answers with the screw
+        // result. The *inputs* stay one set, as the specification has them.
+        Stage::Spur(s) if s.is_crossed() => {
+            solve_crossed_stage(s, input_torque, lib).map(|r| StageResult::Worm(Box::new(r)))
+        }
         Stage::Spur(s) => solve_stage(s, input_torque, lib).map(|r| StageResult::Spur(Box::new(r))),
         Stage::Worm(s) => {
             solve_worm_stage(s, input_torque, lib).map(|r| StageResult::Worm(Box::new(r)))
@@ -751,7 +758,7 @@ mod tests {
 
         let helical = solve_stage(
             &SpurStage {
-                helix_angle: 20.0,
+                additional_helix: 20.0,
                 ..SpurStage::default()
             },
             2.0,

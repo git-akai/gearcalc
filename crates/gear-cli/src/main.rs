@@ -124,7 +124,7 @@ fn train_file_report(path: Option<&str>) {
             },
             stages: vec![
                 Stage::Spur(SpurStage {
-                    helix_angle: 15.0,
+                    additional_helix: 15.0,
                     gears: [
                         StageGear {
                             teeth: 17,
@@ -264,7 +264,7 @@ fn train_report(mixed: bool) {
                     ..SpurStage::default()
                 }),
                 Stage::Spur(SpurStage {
-                    helix_angle: 15.0,
+                    additional_helix: 15.0,
                     gears: [auto_width(13), auto_width(31)],
                     ..SpurStage::default()
                 }),
@@ -319,7 +319,7 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
         k + 1,
         st.gears[0].teeth,
         st.gears[1].teeth,
-        st.helix_angle,
+        st.additional_helix,
         s.ratio,
         s.centre_distance,
         if s.coprime { "  coprime" } else { "" }
@@ -329,7 +329,7 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
         s.contact_ratios.transverse,
         s.contact_ratios.overlap,
         s.contact_ratios.total,
-        if st.helix_angle != 0.0 && !s.contact_ratios.has_full_axial_overlap() {
+        if st.additional_helix != 0.0 && !s.contact_ratios.has_full_axial_overlap() {
             "   <- no full axial overlap"
         } else {
             ""

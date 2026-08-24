@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–10 complete and in CI. 333 tests, ~26 s.** Milestone 11 is
+**Milestones 0–10 complete and in CI. 335 tests, ~26 s.** Milestone 11 is
 under way: the ring-drawing defect below is fixed, and the rim circle with it.
 
 ```bash
@@ -38,7 +38,10 @@ helical throughout) · efficiency · automatic profile shift and altered addendu
 
 **Crossed axes.** `screw.rs`: lead angle `sin γ = z m_n/d` exact, both
 efficiencies from a force balance, self-locking, sliding as a vector, elliptical
-contact. The worm's length and the wheel's face width are **recommended** from
+contact. A crossed gear pair is **entered as a spur stage with an axis angle**,
+as the specification has it — `β₁ = Σ/2 + β_add`, `β₂ = Σ/2 − β_add`, so the
+parallel pair is the axis angle's zero — and solved by translating it into the
+screw stage it is. Three stage kinds, not four. The worm's length and the wheel's face width are **recommended** from
 published proportions (DIN/ČSN, BS 721) with the source on screen — admissible
 because they enter no stress here, and offered only for a worm drive, not for a
 crossed pair. The contact section was unified *first* — one Hertz formula with
@@ -274,6 +277,12 @@ these are the ones most likely to be stepped on again.
   law, checkable from the drawn points alone. Before trusting a new gate, run it
   against the broken code: `git worktree add` a detached HEAD, copy the test in,
   and watch it fail.
+- **An input that moves no number is a fault, not a convenience.** A ring's
+  profile shift box was connected to nothing for a whole milestone (§12), and
+  the same trap was one merge away from returning: a crossed pair is solved at
+  its pitch point, so shift, addendum, dedendum and root radius would have sat
+  on screen doing nothing. They are not offered there. When merging two things
+  into one form, check every field against what the *solve* actually reads.
 - **A duplicated formula is a place where two answers can differ, and the copy
   nothing exercises is the one that is wrong.** The hand-written internal
   relative curvature was wrong two ways at once — 50 % at the pitch point of a
@@ -376,7 +385,10 @@ geartrain tab, and `gear-cli trainfile`. The round trip is checked as *answers*
 rather than as bytes, in the CLI, across the boundary and in the browser. The
 silent `saveDxf` failure is fixed too.
 
-UI so far: the four reference circles read as **diameters** (computed in Rust,
+UI so far: the geartrain tab's three stage sections are one visual language —
+the planetary section was rebuilt on the **same gear card** the spur stage uses,
+so a sun, a planet, a ring and a spur gear are one definition rather than several
+that drift; the four reference circles read as **diameters** (computed in Rust,
 because doubling is arithmetic); the viewport **zooms about the cursor**; and
 every note sits in a slot holding all the notes that field could show, so the
 controls do not move when one appears — see DESIGN §8.0, and note that it was

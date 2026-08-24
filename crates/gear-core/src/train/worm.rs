@@ -254,6 +254,14 @@ pub struct WormResult {
     pub lead_angle: f64,
     /// Lead angle of the wheel, degrees.
     pub wheel_lead_angle: f64,
+    /// Helix angle of the first member, degrees — `90° − γ₁`.
+    ///
+    /// The same fact as the lead angle, from the other datum: a worm is
+    /// described by how far its thread advances, a gear by how far its tooth
+    /// leans. Both are reported because a crossed *gear* pair is entered by
+    /// helix angle and read that way, and converting between them on the far
+    /// side of the boundary is arithmetic.
+    pub helix_angle: f64,
     /// Helix angle of the wheel, degrees — an output, per the specification.
     pub wheel_helix_angle: f64,
     /// Lead, mm, and axial module, mm.
@@ -356,6 +364,71 @@ impl WormStage {
         })
         .map_err(TrainError::Screw)
     }
+}
+
+/// Solve a **crossed gear pair** — a [`super::SpurStage`] whose shafts are not
+/// parallel.
+///
+/// It is the same mesh as a worm drive and is solved by the same code, because
+/// it *is* the same thing: crossed-axis screw gearing. The only difference is
+/// which of the first member's diameter and helix angle is the input (§4.5.1),
+/// and a gear's diameter follows from its teeth, so the helix angle is what is
+/// given. That is the whole translation below.
+///
+/// Two things a crossed pair does not inherit from its parallel form, both
+/// because the contact is a point:
+///
+/// - **No automatic face width.** A point contact's peak pressure does not
+///   depend on the face width, and there is no bending model for a crossed
+///   pair, so nothing can size it. A width left automatic is used as entered
+///   and the result says so.
+/// - **No axial clearance.** That is a worm's float along its own axis; a gear
+///   pair has none, so the backlash comes from the centre distance alone.
+///
+/// # Errors
+///
+/// [`TrainError`] if the pair cannot exist or names a material the library does
+/// not have.
+pub fn solve_crossed_stage(
+    stage: &super::SpurStage,
+    input_torque: f64,
+    lib: &MaterialLibrary,
+) -> Result<WormResult, TrainError> {
+    let member = |g: &super::StageGear| WormMember {
+        // Fixed, not automatic: see above. `manual` is what the field holds
+        // whichever way its toggle is set, so this is the number on screen.
+        face_width: Auto::fixed(g.face_width.manual),
+        material: g.material.clone(),
+        material_overrides: g.material_overrides,
+    };
+
+    let equivalent = WormStage {
+        module: stage.module,
+        pressure_angle: stage.pressure_angle,
+        shaft_angle: stage.shaft_angle,
+        friction: stage.friction,
+        starts: stage.gears[0].teeth,
+        sizing: FirstMemberSizing::HelixAngle(stage.helix_angles()[0]),
+        wheel_teeth: stage.gears[1].teeth,
+        centre_distance: stage.centre_distance,
+        clearance: stage.clearance,
+        tolerance_plus: stage.tolerance_plus,
+        tolerance_minus: stage.tolerance_minus,
+        axial_clearance: 0.0,
+        worm: member(&stage.gears[0]),
+        wheel: member(&stage.gears[1]),
+    };
+
+    let mut result = solve_worm_stage(&equivalent, input_torque, lib)?;
+    if stage.gears.iter().any(|g| g.face_width.auto) {
+        result.notes.push(
+            "face width used as entered: a crossed pair touches at a point, so no rating \
+             sizes it — neither bending, which has no model for crossed axes, nor contact, \
+             whose peak pressure does not depend on the width at all"
+                .into(),
+        );
+    }
+    Ok(result)
 }
 
 /// Solve one worm stage, given the torque on the worm.
@@ -511,6 +584,7 @@ pub fn solve_worm_stage(
         centre_distance: centre,
         lead_angle: s.lead_angle.to_degrees(),
         wheel_lead_angle: s.wheel_lead_angle.to_degrees(),
+        helix_angle: s.worm_helix_angle.to_degrees(),
         wheel_helix_angle: s.wheel_helix_angle.to_degrees(),
         lead: s.lead,
         axial_module: s.axial_module,
@@ -982,6 +1056,94 @@ mod tests {
         };
         let g = stage.geometry().unwrap();
         assert!(g.worm_pitch_diameter.is_finite() && g.worm_pitch_diameter > 0.0);
+    }
+
+    /// **The merged stage is the same machine, to the last bit.**
+    ///
+    /// A crossed pair used to be entered as a worm stage sized by helix angle;
+    /// it is now a spur stage with a shaft angle, which is what the
+    /// specification asks for. That is a change of *input*, so the answer must
+    /// not move — and this compares the two routes rather than asserting
+    /// remembered numbers, so it keeps meaning something as the model changes.
+    #[test]
+    fn a_crossed_spur_stage_is_the_screw_stage_it_used_to_be_entered_as() {
+        use crate::params::Auto;
+        use crate::train::{SpurStage, StageGear};
+
+        let lib = super::super::test_library();
+        let gear = |teeth: u32| StageGear {
+            teeth,
+            face_width: Auto::fixed(8.0),
+            ..StageGear::default()
+        };
+        let spur = SpurStage {
+            shaft_angle: 90.0,
+            additional_helix: 0.0,
+            gears: [gear(17), gear(23)],
+            ..SpurStage::default()
+        };
+        let as_screw = WormStage {
+            shaft_angle: 90.0,
+            starts: 17,
+            wheel_teeth: 23,
+            sizing: FirstMemberSizing::HelixAngle(45.0),
+            axial_clearance: 0.0,
+            worm: WormMember {
+                face_width: Auto::fixed(8.0),
+                ..WormMember::default()
+            },
+            wheel: WormMember {
+                face_width: Auto::fixed(8.0),
+                material: "4340 Hardened Steel".into(),
+                ..WormMember::default()
+            },
+            ..WormStage::default()
+        };
+
+        let a = solve_crossed_stage(&spur, 2.0, &lib).unwrap();
+        let b = solve_worm_stage(&as_screw, 2.0, &lib).unwrap();
+        for (name, x, y) in [
+            ("ratio", a.ratio, b.ratio),
+            ("centre distance", a.centre_distance, b.centre_distance),
+            ("lead angle", a.lead_angle, b.lead_angle),
+            ("efficiency", a.efficiency.forward, b.efficiency.forward),
+            ("contact", a.contact.max_pressure, b.contact.max_pressure),
+            (
+                "backlash",
+                a.backlash.forward.nominal,
+                b.backlash.forward.nominal,
+            ),
+        ] {
+            assert_eq!(x.to_bits(), y.to_bits(), "{name}: {x} against {y}");
+        }
+
+        // The helix angles are what the shaft angle says they are, and they sum
+        // to it — the relation the screw model runs on.
+        let [b1, b2] = spur.helix_angles();
+        assert!((b1 - 45.0).abs() < 1e-12 && (b2 - 45.0).abs() < 1e-12);
+        assert!((b1 + b2 - spur.shaft_angle).abs() < 1e-12);
+    }
+
+    /// **A parallel stage is the shaft angle's zero, not a separate thing.**
+    ///
+    /// At `Σ = 0` the additional helix is the whole of each gear's helix and the
+    /// two hands are opposed, which is exactly what the stage did before it had
+    /// a shaft angle at all. Asserted on the geometry the mesh is built from,
+    /// so it holds whatever the solve does with it.
+    #[test]
+    fn a_parallel_stage_is_the_shaft_angles_zero() {
+        use crate::train::SpurStage;
+
+        for additional in [0.0_f64, 12.5, -30.0] {
+            let stage = SpurStage {
+                additional_helix: additional,
+                ..SpurStage::default()
+            };
+            let [b1, b2] = stage.helix_angles();
+            assert!((b1 - additional).abs() < 1e-12);
+            assert!((b2 + additional).abs() < 1e-12, "the hands must oppose");
+            assert!(!stage.is_crossed());
+        }
     }
 
     /// A crossed gear pair solves end to end, and reports what a worm stage

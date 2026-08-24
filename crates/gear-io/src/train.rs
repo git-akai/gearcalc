@@ -132,7 +132,7 @@ mod tests {
                 },
                 stages: vec![
                     Stage::Spur(SpurStage {
-                        helix_angle: 15.0,
+                        additional_helix: 15.0,
                         ..SpurStage::default()
                     }),
                     Stage::Worm(WormStage::default()),

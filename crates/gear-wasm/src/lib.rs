@@ -593,12 +593,11 @@ pub struct Defaults {
     pub gear: GearTabDefaults,
     /// A fresh geartrain, with one spur stage in it.
     pub train: gear_core::train::Train,
-    /// One of each stage kind, for the "add stage" menu.
+    /// One of each stage kind, for the "add stage" menu. Three, as the
+    /// specification lists them: a crossed gear pair is **not** a fourth — it is
+    /// a spur stage with its shafts at an angle (§4.5.1).
     pub spur_stage: gear_core::train::Stage,
     pub worm_stage: gear_core::train::Stage,
-    /// A crossed gear pair: the worm stage sized by helix angle instead of by
-    /// diameter, which is the whole of the difference (§4.5.1).
-    pub crossed_stage: gear_core::train::Stage,
     pub planetary_stage: gear_core::train::Stage,
 }
 
@@ -616,9 +615,7 @@ pub struct GearTabDefaults {
 }
 
 fn defaults_impl() -> Result<String, String> {
-    use gear_core::train::{
-        Actuation, FirstMemberSizing, PlanetaryStage, SpurStage, Stage, Train, WormStage,
-    };
+    use gear_core::train::{Actuation, PlanetaryStage, SpurStage, Stage, Train, WormStage};
 
     // The tab starts with an automatic face width, where the core's own
     // default is a plain 10 mm. Both are right for their caller: the CLI and
@@ -667,12 +664,6 @@ fn defaults_impl() -> Result<String, String> {
         },
         spur_stage: Stage::Spur(spur),
         worm_stage: Stage::Worm(WormStage::default()),
-        crossed_stage: Stage::Worm(WormStage {
-            starts: 17,
-            wheel_teeth: 23,
-            sizing: FirstMemberSizing::HelixAngle(45.0),
-            ..WormStage::default()
-        }),
         planetary_stage: Stage::Planetary(Box::new(planetary)),
     };
     serde_json::to_string(&defaults).map_err(|e| format!("could not encode defaults: {e}"))
@@ -771,13 +762,20 @@ mod tests {
         // Start from the defaults the UI hands out, so the tested path is the
         // one a user actually takes, and give it one of every stage kind.
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let crossed = {
+            let mut c = d["spur_stage"].clone();
+            c["shaft_angle"] = serde_json::json!(90.0);
+            c
+        };
         let document = serde_json::json!({
             "name": "Elevation drive",
             "train": {
                 "input_speed": 12_000.0,
                 "input_torque": 0.25,
                 "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
-                "stages": [d["spur_stage"], d["worm_stage"], d["crossed_stage"], d["planetary_stage"]],
+                // Every stage kind, and a crossed pair too — which is a spur
+                // stage with its shafts at an angle, not a kind of its own.
+                "stages": [d["spur_stage"], crossed, d["worm_stage"], d["planetary_stage"]],
             }
         });
 
@@ -1130,7 +1128,7 @@ mod tests {
             "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
             "stages": [
               {"kind":"spur",
-               "module":1.0,"pressure_angle":20.0,"helix_angle":0.0,"friction":0.06,
+               "module":1.0,"pressure_angle":20.0,"additional_helix":0.0,"friction":0.06,
                "thickness_mod":1.0,
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
@@ -1204,7 +1202,7 @@ mod tests {
             "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
             "stages": [
               {"kind":"spur",
-               "module":1.0,"pressure_angle":20.0,"helix_angle":0.0,"friction":0.06,
+               "module":1.0,"pressure_angle":20.0,"additional_helix":0.0,"friction":0.06,
                "thickness_mod":1.0,
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,

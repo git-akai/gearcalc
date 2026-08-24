@@ -1,8 +1,8 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import {
     solveTrain,
     defaultStage,
-    defaultCrossedStage,
     defaultPlanetaryStage,
     defaultWormStage,
     outside,
@@ -10,6 +10,8 @@
     type Overrides,
     type StageGear,
     type MaterialValue,
+    type GearResult,
+    type WormResult,
   } from "./core";
   import { trains, library, type TrainTab } from "./state.svelte";
   import { exportTrain } from "./core";
@@ -67,10 +69,6 @@
   function addStage() {
     tab.train.stages.push(defaultStage());
     open[tab.train.stages.length - 1] = true;
-  }
-
-  function addCrossedStage() {
-    tab.train.stages.push(defaultCrossedStage());
   }
 
   function addPlanetaryStage() {
@@ -166,6 +164,243 @@
       <small class:err={note.err} class:hidden={i !== notes.shown}>{note.text}</small>
     {/each}
   </span>
+{/snippet}
+
+<!-- One gear card, used by every stage that has gears. A sun, a planet, a ring
+     and a spur gear take the same inputs and produce the same readout, so they
+     are one definition rather than several that drift apart — which is what had
+     happened to the planetary section. What genuinely differs is passed in: a
+     ring's root belongs to its cutter, a planet's shift is solved rather than
+     chosen, and a member may have something of its own to report. -->
+<!-- What a crossed-axis mesh reports, whether it was entered as a worm drive or
+     as a gear pair with its shafts turned: the same mathematics answers both
+     (DESIGN §4.5.1), so it is one readout rather than two that drift. -->
+{#snippet screwReadout(r: WormResult)}
+<dl class="out">
+  <dt>Centre distance</dt>
+  <dd>
+    {r.centre_distance.toFixed(4)} mm
+    <small>nominal {r.centre_distance_nominal.toFixed(4)}</small>
+  </dd>
+  <dt>Mesh efficiency</dt>
+  <dd>
+    {pct(r.efficiency.forward)} % driven forward
+    · {pct(r.efficiency.backward)} % driven backward
+    {#if r.efficiency.backward <= 0}
+      <small class="warn">self-locking</small>
+    {/if}
+  </dd>
+  <dt>Self-locks at μ</dt>
+  <dd>{r.self_locking_friction.toFixed(4)}</dd>
+  <dt>Contact stress</dt>
+  <dd>
+    {r.contact.max_pressure.toFixed(1)} MPa
+    <small>
+      patch {r.contact.patch_length.toFixed(4)} × {r.contact.patch_width.toFixed(
+        4,
+      )} mm
+    </small>
+  </dd>
+  <dt>Sliding speed</dt>
+  <dd>{r.sliding_velocity.toFixed(1)} mm/s</dd>
+  <dt>Bending stress</dt>
+  <dd>
+    <small>
+      not reported for crossed axes — no accepted analytical model exists, and
+      deriving one from a parallel-axis calculation would be a convention rather
+      than a derivation (DESIGN §4.5.1)
+    </small>
+  </dd>
+  <dt>Flank type</dt>
+  <dd>
+    ZI (involute helicoid)
+    <small>a ZN worm's contact stress is 1–15 % lower, rising with lead angle</small>
+  </dd>
+</dl>
+{/snippet}
+
+{#snippet noExtra(_j: number)}{/snippet}
+
+{#snippet gearCard(
+  title: string,
+  gear: StageGear,
+  g: GearResult | undefined,
+  opts: {
+    /** "shaper" for a ring, whose root and fillet are the tool's rather than
+     *  inputs of its own; anything else is rack-generated. */
+    cut?: "rack" | "shaper";
+    /** Present when the shift is solved rather than offered — the planet's. */
+    solvedShift?: number;
+    /** False where nothing rates the face width — a crossed pair's contact is a
+     *  point, so no stress depends on it and none can size it. */
+    faceAuto?: boolean;
+    /** False where the tooth *form* does not reach the answer. A crossed pair
+     *  is solved at its pitch point, so its shift, addendum, dedendum and root
+     *  radius change nothing — and an input that moves no number is the fault
+     *  DESIGN §12 records, not a convenience. */
+    toothForm?: boolean;
+    /** A readout only this member has; given the member's position. */
+    extra?: Snippet<[number]>;
+    extraIndex?: number;
+  },
+)}
+<div class="gear">
+  <h4>{title}</h4>
+  <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
+    <span>Tooth count</span>
+    <input type="number" step="1" bind:value={gear.teeth} />
+  </label>
+  {#if opts.toothForm === false}
+    <p class="aside">
+      Tooth form is not an input here: a crossed pair is solved at its pitch
+      point, so a shift, an addendum or a root radius would change nothing.
+    </p>
+  {:else}
+    {#if opts.cut !== "shaper"}
+      <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
+        <span>Dedendum</span>
+        <input type="number" step="0.05" bind:value={gear.dedendum} />
+        {@render noteSlot(
+          notes(
+            g ? `${n(g.ranges.dedendum.min ?? 0)} to ${n(g.ranges.dedendum.max ?? 0)}` : null,
+            g ? outside(gear.dedendum, g.ranges.dedendum) : null,
+          ),
+        )}
+      </label>
+      <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
+        <span>Root radius</span>
+        <input type="number" step="0.01" bind:value={gear.root_radius} />
+        {@render noteSlot(
+          notes(
+            g ? `up to ${n(g.ranges.root_radius.max ?? 0)} · fillet must fit` : null,
+            g ? outside(gear.root_radius, g.ranges.root_radius) : null,
+          ),
+        )}
+      </label>
+    {:else}
+      <p class="aside">Root and fillet are the cutter's, below — a ring has no dedendum of its own.</p>
+    {/if}
+    {#if opts.solvedShift === undefined}
+      {@render autoNumber("Profile shift", gear.profile_shift, g?.profile_shift, 0.05)}
+      {#if gear.profile_shift.auto}
+        <label class="sub">
+          <span>Working tooth depth</span>
+          <input type="number" step="0.05" bind:value={gear.working_depth} />
+          <em>module</em>
+        </label>
+      {/if}
+    {:else}
+      <label>
+        <span>Profile shift</span>
+        <input type="number" value={Number(opts.solvedShift.toFixed(4))} disabled class="computed" />
+        <em>module</em>
+        {@render noteSlot(notes("solved: it is what makes the two centre distances agree", null))}
+      </label>
+    {/if}
+    {#if opts.solvedShift === undefined && !gear.profile_shift.auto}
+      {@const r = opts.cut === "shaper" ? undefined : g?.ranges.profile_shift}
+      <p class="hint">
+        <!-- The bounds shown here are the rack's — buildable range and undercut —
+             and a shaper-cut ring's are not those: what limits it is its own base
+             circle, its cutter's reach and the generation limit (DESIGN §4.11).
+             The core does not yet report those for a stage member, so the ring is
+             told what is missing rather than shown the wrong bound. -->
+        {@render noteSlot(
+          notes(
+            opts.cut === "shaper"
+              ? "a ring's bounds are its cutter's reach and its own base circle, not a rack's"
+              : r
+                ? `buildable ${n(r.bound.min ?? 0)} to ${n(r.bound.max ?? 0)} · undercut below ${n(r.undercut)}`
+                : null,
+            r ? outside(gear.profile_shift.manual, r.bound) : null,
+          ),
+        )}
+      </p>
+    {/if}
+    {@render autoNumber("Addendum", gear.addendum, g?.addendum, 0.05)}
+    {#if gear.addendum.auto}
+      <label class="sub">
+        <span>Minimum tip width</span>
+        <input type="number" step="0.02" bind:value={gear.min_tip_width} />
+        <em>mm</em>
+      </label>
+    {/if}
+  {/if}
+  {#if opts.faceAuto === false}
+    <label>
+      <span>Face width</span>
+      <input type="number" step="0.5" bind:value={gear.face_width.manual} />
+      <em>mm</em>
+      {@render noteSlot(
+        notes("nothing rates a crossed pair's face width, so nothing can size it", null),
+      )}
+    </label>
+  {:else}
+    {@render autoNumber("Face width", gear.face_width, g?.face_width, 0.5)}
+  {/if}
+  {#if gear.face_width.auto && opts.faceAuto !== false}
+    <div class="subtoggles">
+      <label class="check">
+        <input type="checkbox" bind:checked={gear.auto_face_from_bending} />
+        <span>from bending</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" bind:checked={gear.auto_face_from_contact} />
+        <span>from contact</span>
+      </label>
+    </div>
+  {/if}
+  <label>
+    <span>Material</span>
+    <select bind:value={gear.material}>
+      {#each library.materials.material as m (m.name)}
+        <option value={m.name}>{m.name}</option>
+      {/each}
+    </select>
+  </label>
+
+  {#if g}
+    <div class="props">
+      {@render property("Density", gear, "density", g.material.density, 10, "kg/m³")}
+      {@render property("Elastic modulus", gear, "elastic_modulus", g.material.elastic_modulus, 100, "MPa")}
+      {@render property("Poisson's ratio", gear, "poissons_ratio", g.material.poissons_ratio, 0.01, "")}
+      {@render property("Ultimate allowable", gear, "ultimate_allowable", g.material.ultimate_allowable, 10, "MPa")}
+      {@render property("Fatigue allowable", gear, "fatigue_allowable", g.material.fatigue_allowable, 10, "MPa")}
+    </div>
+    <dl class="out small">
+      <dt>Torque</dt>
+      <dd>{g.torque.toFixed(4)} Nm</dd>
+      <dt>Speed</dt>
+      <dd>{g.speed.toFixed(1)} rpm</dd>
+      <dt>Tooth cycles</dt>
+      <dd>{Math.ceil(g.tooth_cycles).toLocaleString()}</dd>
+      <dt>Bending stress</dt>
+      <dd>
+        {g.bending_stress === null
+          ? "—"
+          : `${g.bending_stress.toFixed(1)} MPa`}
+      </dd>
+      <dt>Contact stress</dt>
+      <dd>{g.contact_stress.toFixed(1)} MPa</dd>
+      <dt>Min face width</dt>
+      <dd>
+        {g.min_face_width_bending === null
+          ? "—"
+          : `${g.min_face_width_bending.toFixed(3)}`} /
+        {g.min_face_width_contact.toFixed(3)} mm
+        <small>bending / contact</small>
+      </dd>
+    </dl>
+    {#if g.clamps.length}
+      <ul class="notes">
+        {#each g.clamps as c (c)}<li>{c}</li>{/each}
+      </ul>
+    {/if}
+  {/if}
+  <!-- Outside the guard above: a crossed pair produces no per-gear rating, so
+       `g` is absent exactly when this readout is the only one there is. -->
+  {@render (opts.extra ?? noExtra)(opts.extraIndex ?? 0)}
+</div>
 {/snippet}
 
 {#snippet autoNumber(label: string, a: Auto<number>, computed: number | undefined, step: number)}
@@ -325,7 +560,6 @@
             5,
           )})</small
         >
-        <small>the same play, at a shaft turning the whole ratio faster</small>
       </dd>
     </dl>
   {/if}
@@ -336,14 +570,23 @@
     {@const res = "ok" in result ? result.ok.stages[i] : null}
     <section class="stage">
       {#if stage.kind === "spur"}
+        <!-- One stage, two meshes. Crossing the shafts turns a line contact
+             into a point one and changes what sliding costs, so the answer has
+             a different shape: `sres` when the shafts are parallel, the screw
+             result when they are not (DESIGN §4.5.1). The *inputs* below are
+             the same either way, which is what the specification asks for. -->
         {@const sres = res && res.kind === "spur" ? res : null}
+        {@const xres = res && res.kind === "worm" ? res : null}
         <button class="head" onclick={() => (open[i] = !open[i])}>
           <span class="caret">{open[i] ? "▾" : "▸"}</span>
           <strong>Stage {i + 1}</strong>
+          {#if stage.shaft_angle !== 0}
+            <span class="kind">crossed</span>
+          {/if}
           <span class="teeth">z {stage.gears[0].teeth} / {stage.gears[1].teeth}</span>
-          {#if sres}
-            <span class="ratio">{sres.ratio.toFixed(4)} : 1</span>
-            <span class="eff">{pct(sres.efficiency.forward)} %</span>
+          {#if sres ?? xres}
+            <span class="ratio">{(sres ?? xres)?.ratio.toFixed(4)} : 1</span>
+            <span class="eff">{pct((sres ?? xres)?.efficiency.forward ?? 0)} %</span>
           {/if}
         </button>
 
@@ -361,21 +604,49 @@
                 <em>°</em>
               </label>
               <label>
-                <span>Helix angle</span>
-                <input type="number" step="1" bind:value={stage.helix_angle} />
+                <span>Axis angle</span>
+                <input type="number" step="5" bind:value={stage.shaft_angle} />
                 <em>°</em>
+                {@render noteSlot(
+                  notes(
+                    stage.shaft_angle === 0
+                      ? "zero: the shafts are parallel"
+                      : "the shafts cross, so the teeth touch at a point — see the results below",
+                    null,
+                  ),
+                )}
+              </label>
+              <label>
+                <span>Additional helix angle</span>
+                <input type="number" step="1" bind:value={stage.additional_helix} />
+                <em>°</em>
+                {@render noteSlot(
+                  notes(
+                    `each gear carries ${n(stage.shaft_angle / 2 + stage.additional_helix)}° and ${n(
+                      stage.shaft_angle / 2 - stage.additional_helix,
+                    )}°, summing to the axis angle`,
+                    null,
+                  ),
+                )}
               </label>
               <label>
                 <span>Coefficient of friction</span>
                 <input type="number" step="0.01" bind:value={stage.friction} />
                 <em></em>
               </label>
-              <label>
-                <span>Tooth thickness mod.</span>
-                <input type="number" step="0.05" bind:value={stage.thickness_mod} />
-                <em>k₁</em>
-              </label>
-              {@render autoNumber("C2C distance", stage.centre_distance, sres?.centre_distance, 0.1)}
+              {#if stage.shaft_angle === 0}
+                <label>
+                  <span>Tooth thickness mod.</span>
+                  <input type="number" step="0.05" bind:value={stage.thickness_mod} />
+                  <em>k₁</em>
+                </label>
+              {/if}
+              {@render autoNumber(
+                "C2C distance",
+                stage.centre_distance,
+                (sres ?? xres)?.centre_distance,
+                0.1,
+              )}
               <label>
                 <span>C2C clearance</span>
                 <input
@@ -401,127 +672,47 @@
             <!-- Clearance is meaningless once the centre distance is set by hand:
                  the specification locks it to zero, and so does the solver. -->
 
+            <!-- A crossed pair rates as one mesh, not two teeth: there is no
+                 bending model and the point contact's pressure belongs to the
+                 pair. What is left that is per-member is what each shaft sees. -->
+            {#snippet crossedMember(j: number)}
+              {#if xres}
+                <dl class="out small">
+                  <dt>Pitch diameter</dt>
+                  <dd>{xres.members[j].pitch_diameter.toFixed(4)} mm</dd>
+                  <dt>Helix angle</dt>
+                  <dd>{n(j === 0 ? xres.helix_angle : xres.wheel_helix_angle)}°</dd>
+                  <dt>Torque</dt>
+                  <dd>{xres.members[j].torque.toFixed(4)} N·m</dd>
+                  <dt>Speed</dt>
+                  <dd>{xres.members[j].speed.toFixed(1)} rpm</dd>
+                  <dt>Tooth cycles</dt>
+                  <dd>{Math.ceil(xres.members[j].tooth_cycles).toLocaleString()}</dd>
+                </dl>
+              {/if}
+            {/snippet}
+
             <div class="gears">
               {#each stage.gears as gear, j (j)}
                 {@const g = sres?.gears[j]}
-                <div class="gear">
-                  <h4>Gear {gearNumber(i, j)}</h4>
-                  <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
-                    <span>Tooth count</span>
-                    <input type="number" step="1" bind:value={gear.teeth} />
-                  </label>
-                  <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
-                    <span>Dedendum</span>
-                    <input type="number" step="0.05" bind:value={gear.dedendum} />
-                    {@render noteSlot(
-                      notes(
-                        g ? `${n(g.ranges.dedendum.min ?? 0)} to ${n(g.ranges.dedendum.max ?? 0)}` : null,
-                        g ? outside(gear.dedendum, g.ranges.dedendum) : null,
-                      ),
-                    )}
-                  </label>
-                  <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
-                    <span>Root radius</span>
-                    <input type="number" step="0.01" bind:value={gear.root_radius} />
-                    {@render noteSlot(
-                      notes(
-                        g ? `up to ${n(g.ranges.root_radius.max ?? 0)} · fillet must fit` : null,
-                        g ? outside(gear.root_radius, g.ranges.root_radius) : null,
-                      ),
-                    )}
-                  </label>
-                  {@render autoNumber("Profile shift", gear.profile_shift, g?.profile_shift, 0.05)}
-                  {#if gear.profile_shift.auto}
-                    <label class="sub">
-                      <span>Working tooth depth</span>
-                      <input type="number" step="0.05" bind:value={gear.working_depth} />
-                      <em>module</em>
-                    </label>
-                  {/if}
-                  {#if !gear.profile_shift.auto}
-                    {@const r = g?.ranges.profile_shift}
-                    <p class="hint">
-                      {@render noteSlot(
-                        notes(
-                          r
-                            ? `buildable ${n(r.bound.min ?? 0)} to ${n(r.bound.max ?? 0)} · undercut below ${n(r.undercut)}`
-                            : null,
-                          r ? outside(gear.profile_shift.manual, r.bound) : null,
-                        ),
-                      )}
-                    </p>
-                  {/if}
-                  {@render autoNumber("Addendum", gear.addendum, g?.addendum, 0.05)}
-                  {#if gear.addendum.auto}
-                    <label class="sub">
-                      <span>Minimum tip width</span>
-                      <input type="number" step="0.02" bind:value={gear.min_tip_width} />
-                      <em>mm</em>
-                    </label>
-                  {/if}
-                  {@render autoNumber("Face width", gear.face_width, g?.face_width, 0.5)}
-                  {#if gear.face_width.auto}
-                    <div class="subtoggles">
-                      <label class="check">
-                        <input type="checkbox" bind:checked={gear.auto_face_from_bending} />
-                        <span>from bending</span>
-                      </label>
-                      <label class="check">
-                        <input type="checkbox" bind:checked={gear.auto_face_from_contact} />
-                        <span>from contact</span>
-                      </label>
-                    </div>
-                  {/if}
-                  <label>
-                    <span>Material</span>
-                    <select bind:value={gear.material}>
-                      {#each library.materials.material as m (m.name)}
-                        <option value={m.name}>{m.name}</option>
-                      {/each}
-                    </select>
-                  </label>
-
-                  {#if g}
-                    <div class="props">
-                      {@render property("Density", gear, "density", g.material.density, 10, "kg/m³")}
-                      {@render property("Elastic modulus", gear, "elastic_modulus", g.material.elastic_modulus, 100, "MPa")}
-                      {@render property("Poisson's ratio", gear, "poissons_ratio", g.material.poissons_ratio, 0.01, "")}
-                      {@render property("Ultimate allowable", gear, "ultimate_allowable", g.material.ultimate_allowable, 10, "MPa")}
-                      {@render property("Fatigue allowable", gear, "fatigue_allowable", g.material.fatigue_allowable, 10, "MPa")}
-                    </div>
-                    <dl class="out small">
-                      <dt>Torque</dt>
-                      <dd>{g.torque.toFixed(4)} Nm</dd>
-                      <dt>Speed</dt>
-                      <dd>{g.speed.toFixed(1)} rpm</dd>
-                      <dt>Tooth cycles</dt>
-                      <dd>{Math.ceil(g.tooth_cycles).toLocaleString()}</dd>
-                      <dt>Bending stress</dt>
-                      <dd>
-                        {g.bending_stress === null
-                          ? "—"
-                          : `${g.bending_stress.toFixed(1)} MPa`}
-                      </dd>
-                      <dt>Contact stress</dt>
-                      <dd>{g.contact_stress.toFixed(1)} MPa</dd>
-                      <dt>Min face width</dt>
-                      <dd>
-                        {g.min_face_width_bending === null
-                          ? "—"
-                          : `${g.min_face_width_bending.toFixed(3)}`} /
-                        {g.min_face_width_contact.toFixed(3)} mm
-                        <small>bending / contact</small>
-                      </dd>
-                    </dl>
-                    {#if g.clamps.length}
-                      <ul class="notes">
-                        {#each g.clamps as c (c)}<li>{c}</li>{/each}
-                      </ul>
-                    {/if}
-                  {/if}
-                </div>
+                {@render gearCard(`Gear ${gearNumber(i, j)}`, gear, g, {
+                  cut: "rack",
+                  faceAuto: stage.shaft_angle === 0,
+                  toothForm: stage.shaft_angle === 0,
+                  extra: xres ? crossedMember : undefined,
+                  extraIndex: j,
+                })}
               {/each}
             </div>
+
+            {#if xres}
+              {@render screwReadout(xres)}
+              {#if xres.notes.length}
+                <ul class="notes">
+                  {#each xres.notes as note (note)}<li>{note}</li>{/each}
+                </ul>
+              {/if}
+            {/if}
 
             {#if sres}
               <dl class="out">
@@ -535,7 +726,7 @@
                   ε<sub>α</sub> {sres.contact_ratios.transverse.toFixed(4)} · ε<sub>β</sub>
                   {sres.contact_ratios.overlap.toFixed(4)} · ε<sub>γ</sub>
                   {sres.contact_ratios.total.toFixed(4)}
-                  {#if stage.helix_angle !== 0 && sres.contact_ratios.overlap < 1}
+                  {#if stage.additional_helix !== 0 && sres.contact_ratios.overlap < 1}
                     <small class="warn">no full axial overlap</small>
                   {/if}
                 </dd>
@@ -748,25 +939,8 @@
                     1,
                   )}
                 {/if}
-                {#if wres?.members[1].recommended_face_width != null}
-                  <p class="convention">
-                    automatic uses {wres.members[1].recommended_face_width?.toFixed(2)} mm —
-                    <code>2 m_x √(q + 1)</code> capped at <code>0.67 d₁</code>, BS 721. A
-                    proportion, not a derivation: it sizes the part and enters no stress here.
-                  </p>
-                {/if}
-                <label>
-                  <span>Material</span>
-                  <select bind:value={stage.wheel.material}>
-                    {#each library.materials.material as m (m.name)}
-                      <option value={m.name}>{m.name}</option>
-                    {/each}
-                  </select>
-                </label>
                 {#if wres}
                   <dl class="out">
-                    <dt>Helix angle</dt>
-                    <dd>{wres.wheel_helix_angle.toFixed(4)}°</dd>
                     <dt>Pitch diameter</dt>
                     <dd>{wres.members[1].pitch_diameter.toFixed(4)} mm</dd>
                     <dt>Torque</dt>
@@ -781,46 +955,7 @@
             </div>
 
             {#if wres}
-              <dl class="out">
-                <dt>Centre distance</dt>
-                <dd>
-                  {wres.centre_distance.toFixed(4)} mm
-                  <small>nominal {wres.centre_distance_nominal.toFixed(4)}</small>
-                </dd>
-                <dt>Mesh efficiency</dt>
-                <dd>
-                  {pct(wres.efficiency.forward)} % driven forward
-                  · {pct(wres.efficiency.backward)} % driven backward
-                  {#if wres.efficiency.backward <= 0}
-                    <small class="warn">self-locking</small>
-                  {/if}
-                </dd>
-                <dt>Self-locks at μ</dt>
-                <dd>{wres.self_locking_friction.toFixed(4)}</dd>
-                <dt>Contact stress</dt>
-                <dd>
-                  {wres.contact.max_pressure.toFixed(1)} MPa
-                  <small>
-                    patch {wres.contact.patch_length.toFixed(4)} × {wres.contact.patch_width.toFixed(
-                      4,
-                    )} mm
-                  </small>
-                </dd>
-                <dt>Sliding speed</dt>
-                <dd>{wres.sliding_velocity.toFixed(1)} mm/s</dd>
-                <dt>Bending stress</dt>
-                <dd>
-                  <small
-                    >not reported — a worm wheel's tooth form and load case are not the ones this
-                    bending model measures (DESIGN §4.5.1)</small
-                  >
-                </dd>
-                <dt>Flank type</dt>
-                <dd>
-                  ZI (involute helicoid)
-                  <small>a ZN worm's contact stress is 1–15 % lower, rising with lead angle</small>
-                </dd>
-              </dl>
+              {@render screwReadout(wres)}
               {#if wres.notes.length}
                 <ul class="notes">
                   {#each wres.notes as n (n)}<li>{n}</li>{/each}
@@ -844,26 +979,49 @@
           <span class="teeth">z {stage.sun.teeth} / {stage.planet.teeth} / {stage.ring.teeth}</span>
           {#if pres}
             <span class="ratio">{pres.ratio.toFixed(4)} : 1</span>
+            <span class="eff">{pct(pres.efficiency.forward)} %</span>
           {/if}
         </button>
         {#if open[i]}
           <div class="body">
-            <div class="grid">
+            <div class="grid shared">
               <label>
                 <span>Normal module</span>
-                <input type="number" step="0.1" bind:value={stage.module} /><em>mm</em>
+                <input type="number" step="0.1" bind:value={stage.module} />
+                <em>mm</em>
               </label>
               <label>
                 <span>Pressure angle</span>
-                <input type="number" step="0.5" bind:value={stage.pressure_angle} /><em>°</em>
+                <input type="number" step="0.5" bind:value={stage.pressure_angle} />
+                <em>°</em>
               </label>
               <label>
                 <span>Helix angle</span>
-                <input type="number" step="1" bind:value={stage.helix_angle} /><em>°</em>
+                <input type="number" step="1" bind:value={stage.helix_angle} />
+                <em>°</em>
+              </label>
+              <label>
+                <span>Friction, sun–planet</span>
+                <input type="number" step="0.01" bind:value={stage.friction_sun_planet} />
+                <em></em>
+              </label>
+              <label>
+                <span>Friction, planet–ring</span>
+                <input type="number" step="0.01" bind:value={stage.friction_planet_ring} />
+                <em></em>
+              </label>
+              <label>
+                <span>Tooth thickness mod.</span>
+                <input type="number" step="0.05" bind:value={stage.thickness_mod} />
+                <em>k₁</em>
+                {@render noteSlot(
+                  notes("the sun's; the planet takes 2 − k, and the ring matches the planet", null),
+                )}
               </label>
               <label>
                 <span>Planets</span>
-                <input type="number" step="1" min="1" bind:value={stage.planets} /><em></em>
+                <input type="number" step="1" min="1" bind:value={stage.planets} />
+                <em></em>
               </label>
               <label>
                 <span>Driven by</span>
@@ -881,213 +1039,173 @@
                   <option value="carrier">Carrier</option>
                   <option value="ring">Ring</option>
                 </select>
-                <small>the third shaft is the output; a set needs both named</small>
-              </label>
-              <label>
-                <span>Friction, sun–planet</span>
-                <input type="number" step="0.01" bind:value={stage.friction_sun_planet} /><em></em>
-              </label>
-              <label>
-                <span>Friction, planet–ring</span>
-                <input type="number" step="0.01" bind:value={stage.friction_planet_ring} /><em></em>
-              </label>
-              <label>
-                <span>Tooth thickness modification</span>
-                <input type="number" step="0.05" bind:value={stage.thickness_mod} /><em></em>
-                <small>the sun's; the planet takes 2 − k and the ring matches the planet</small>
+                <em></em>
+                {@render noteSlot(
+                  notes("the third shaft is the output; a set needs both named", null),
+                )}
               </label>
               <label>
                 <span>C2C clearance</span>
-                <input type="number" step="0.01" bind:value={stage.clearance} /><em>mm</em>
+                <input type="number" step="0.01" bind:value={stage.clearance} />
+                <em>mm</em>
+              </label>
+              <label>
+                <span>C2C tolerance +</span>
+                <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
+                <em>mm</em>
+              </label>
+              <label>
+                <span>C2C tolerance −</span>
+                <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
+                <em>mm</em>
               </label>
               <label>
                 <span>Minimum planet clearance</span>
-                <input type="number" step="0.05" bind:value={stage.min_planet_clearance} /><em
-                  >mm</em
-                >
+                <input type="number" step="0.05" bind:value={stage.min_planet_clearance} />
+                <em>mm</em>
+                {@render noteSlot(notes("tip to tip, between neighbouring planets", null))}
               </label>
             </div>
 
             <h4>Ring cutter</h4>
-            <div class="grid">
+            <div class="grid shared">
               <label>
                 <span>Cutter teeth</span>
-                <input type="number" step="1" min="1" bind:value={stage.cutter.teeth} /><em></em>
-                <small>a ring is shaped by a pinion, and its root and fillet are the tool's</small>
+                <input type="number" step="1" min="1" bind:value={stage.cutter.teeth} />
+                <em></em>
+                {@render noteSlot(
+                  notes("a ring is shaped by a pinion; its root and fillet are the tool's", null),
+                )}
               </label>
               <label>
                 <span>Cutter addendum</span>
-                <input type="number" step="0.05" bind:value={stage.cutter.addendum} /><em>m</em>
+                <input type="number" step="0.05" bind:value={stage.cutter.addendum} />
+                <em>m</em>
               </label>
               <label>
                 <span>Cutter tip round</span>
-                <input type="number" step="0.02" bind:value={stage.cutter.tip_round} /><em>m</em>
+                <input type="number" step="0.02" bind:value={stage.cutter.tip_round} />
+                <em>m</em>
               </label>
             </div>
 
-            {#each [["Sun", stage.sun], ["Planet", stage.planet], ["Ring", stage.ring]] as const as [label, g] (label)}
-              <h4>{label}</h4>
-              <div class="grid">
-                <label>
-                  <span>Tooth count</span>
-                  <input type="number" step="1" min="1" bind:value={g.teeth} /><em></em>
-                </label>
-                {#if label === "Planet"}
-                  <label>
-                    <span>Profile shift</span>
-                    <input
-                      type="number"
-                      value={pres ? pres.planet.profile_shift : 0}
-                      disabled
-                    /><em>module</em>
-                    <small>solved: it is what makes the two centre distances agree</small>
-                  </label>
-                {:else}
-                  <label>
-                    <span>Profile shift</span>
-                    <input type="number" step="0.05" bind:value={g.profile_shift.manual} /><em
-                      >module</em
-                    >
-                  </label>
-                {/if}
-                {#if label !== "Ring"}
-                  <label>
-                    <span>Addendum</span>
-                    <input type="number" step="0.05" bind:value={g.addendum.manual} /><em>m</em>
-                  </label>
-                  <label>
-                    <span>Dedendum</span>
-                    <input type="number" step="0.05" bind:value={g.dedendum} /><em>m</em>
-                  </label>
-                {:else}
-                  <label>
-                    <span>Addendum</span>
-                    <input type="number" step="0.05" bind:value={g.addendum.manual} /><em>m</em>
-                  </label>
-                {/if}
-                <label>
-                  <span>Face width</span>
-                  <input type="number" step="1" bind:value={g.face_width.manual} /><em>mm</em>
-                </label>
-                <label class="check">
-                  <input type="checkbox" bind:checked={g.face_width.auto} />
-                  <span>Automatic face width</span>
-                </label>
-                <label>
-                  <span>Material</span>
-                  <select bind:value={g.material}>
-                    {#each library.materials.material as m (m.name)}<option value={m.name}
-                      >{m.name}</option
-                    >{/each}
-                  </select>
-                  <em></em>
-                </label>
-              </div>
-            {/each}
+            <!-- The planet alone is loaded on both flanks, once per revolution relative to
+                 its carrier, so it is rated against a **reversed** bending allowable
+                 derived from the material rather than the one-way figure the sun and ring
+                 use (DESIGN §4.9). Shown where the number it changes is shown. -->
+            {#snippet planetExtra(_j: number)}
+              {#if pres}
+                <dl class="out small">
+                  <dt>Bending</dt>
+                  <dd>
+                    {pres.planet.fully_reversed ? "fully reversed" : "one-way"}
+                    <small>allowable {pres.planet.reversed_allowable.value.toFixed(0)} MPa</small>
+                  </dd>
+                  <dt>Min face width</dt>
+                  <dd>
+                    {pres.planet.min_face_width_reversed === null
+                      ? "—"
+                      : `${pres.planet.min_face_width_reversed.toFixed(3)} mm`}
+                    <small>against that allowable</small>
+                  </dd>
+                  <dt>Speed</dt>
+                  <dd>
+                    {pres.planet.speed_absolute.toFixed(1)} rpm
+                    <small>{pres.planet.speed_relative.toFixed(1)} relative to the carrier</small>
+                  </dd>
+                </dl>
+              {/if}
+            {/snippet}
+
+            <div class="gears">
+              {@render gearCard("Sun", stage.sun, pres?.sun, { cut: "rack" })}
+              {@render gearCard("Planet", stage.planet, pres?.planet.gear, {
+                cut: "rack",
+                solvedShift: pres?.planet.profile_shift,
+                extra: planetExtra,
+              })}
+              <!-- A ring's root and fillet are its cutter's, so it has neither a
+                   dedendum nor a root radius of its own (DESIGN §4.11); the tool
+                   is a stage input, above. -->
+              {@render gearCard("Ring", stage.ring, pres?.ring, { cut: "shaper" })}
+            </div>
 
             {#if pres}
-              <h4>Results</h4>
-              <div class="grid readout">
-                <div>
-                  <span>Ratio</span><strong>{pres.ratio.toFixed(4)} : 1</strong>
-                  <small>{pres.arrangement.input} in, {pres.arrangement.fixed} held, {pres.output} out</small>
-                </div>
-                <div>
-                  <span>Common C2C</span><strong>{pres.centre_distance.toFixed(4)} mm</strong>
-                  <small>solve closed to {pres.planet.shift_residual.toExponential(1)} mm</small>
-                </div>
-                <div>
-                  <span>Efficiency</span>
-                  <strong>{(pres.efficiency.forward * 100).toFixed(3)} %</strong>
+              <dl class="out">
+                <dt>Ratio</dt>
+                <dd>
+                  {pres.ratio.toFixed(4)} : 1
+                  <small>{pres.arrangement.input} in · {pres.arrangement.fixed} held · {pres.output} out</small>
+                </dd>
+                <dt>Centre distance</dt>
+                <dd>
+                  {pres.centre_distance.toFixed(4)} mm
                   <small>
-                    backward {(pres.efficiency.backward * 100).toFixed(3)} %; fixed-carrier η₀
-                    {(pres.fixed_carrier_efficiency.forward * 100).toFixed(3)} %
+                    common to both meshes — the planet's shift is what makes them agree, to
+                    {pres.planet.shift_residual.toExponential(1)} mm
                   </small>
-                </div>
-                <div>
-                  <span>Planet clearance</span>
-                  <strong>
-                    {pres.planet_clearance === null
-                      ? "n/a"
-                      : `${pres.planet_clearance.toFixed(3)} mm`}
-                  </strong>
-                  <small>
-                    {pres.planet_clearance === null
-                      ? "one planet has no neighbour"
-                      : pres.planet_clearance_ok
-                        ? "meets the minimum"
-                        : "below the minimum asked for"}
-                  </small>
-                </div>
-                <div>
-                  <span>Even spacing</span>
-                  <strong>{pres.equal_spacing ? "yes" : "no"}</strong>
+                </dd>
+                <dt>Efficiency</dt>
+                <dd>
+                  {pct(pres.efficiency.forward)} % driven forward · {pct(pres.efficiency.backward)} %
+                  driven backward
+                  <small>fixed-carrier η₀ {pct(pres.fixed_carrier_efficiency.forward)} %</small>
+                </dd>
+                <dt>Backlash</dt>
+                <dd>
+                  {pres.backlash.forward.nominal.toFixed(5)}° at the {pres.output} shaft
+                  <small
+                    >({pres.backlash.forward.minimum.toFixed(5)} to {pres.backlash.forward.maximum.toFixed(
+                      5,
+                    )})</small
+                  >
+                </dd>
+                <dt>Planet clearance</dt>
+                <dd>
+                  {pres.planet_clearance === null
+                    ? "one planet has no neighbour"
+                    : `${pres.planet_clearance.toFixed(3)} mm`}
+                  {#if pres.planet_clearance !== null}
+                    <small class:warn={!pres.planet_clearance_ok}>
+                      {pres.planet_clearance_ok ? "meets the minimum" : "below the minimum asked for"}
+                    </small>
+                  {/if}
+                </dd>
+                <dt>Even spacing</dt>
+                <dd>
+                  {pres.equal_spacing ? "yes" : "no"}
                   <small>simultaneous meshing {pres.simultaneous_meshing ? "yes" : "no"}</small>
-                </div>
-                <div>
-                  <span>Output backlash</span>
-                  <strong>{pres.backlash.forward.nominal.toFixed(4)}°</strong>
-                  <small>
-                    {pres.backlash.forward.minimum.toFixed(4)} to {pres.backlash.forward.maximum.toFixed(
-                      4,
-                    )}° over tolerance; at the {pres.output} shaft
-                  </small>
-                </div>
-              </div>
+                </dd>
+                <dt>Coprime</dt>
+                <dd>
+                  sun {pres.sun_coprime_with_planets ? "yes" : "no"} · ring
+                  {pres.ring_coprime_with_planets ? "yes" : "no"}
+                  <small>with the planet count</small>
+                </dd>
+              </dl>
 
+              <!-- Two meshes, so the per-mesh figures a spur stage lists once are
+                   a short table here rather than a second and third readout. -->
               <table>
                 <thead>
-                  <tr><th>mesh</th><th>ε_α</th><th>ε_β</th><th>η</th><th>σ_H</th><th>ρ</th></tr>
+                  <tr>
+                    <th>mesh</th><th>ε<sub>α</sub></th><th>ε<sub>β</sub></th><th>η forward</th>
+                    <th>σ<sub>H</sub></th><th>ρ</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {#each [["sun–planet", pres.sun_planet], ["planet–ring", pres.planet_ring]] as const as [label, m] (label)}
                     <tr>
                       <td>{label}</td>
-                      <td>{m.contact_ratios.transverse.toFixed(3)}</td>
-                      <td>{m.contact_ratios.overlap.toFixed(3)}</td>
-                      <td>{(m.efficiency.forward * 100).toFixed(3)} %</td>
+                      <td>{m.contact_ratios.transverse.toFixed(4)}</td>
+                      <td>{m.contact_ratios.overlap.toFixed(4)}</td>
+                      <td>{pct(m.efficiency.forward)} %</td>
                       <td>{m.contact_stress.toFixed(1)} MPa</td>
                       <td>{m.relative_radius.toFixed(3)} mm</td>
                     </tr>
                   {/each}
                 </tbody>
               </table>
-
-              <table>
-                <thead>
-                  <tr>
-                    <th>member</th><th>x</th><th>b mm</th><th>torque Nm</th><th>rpm</th><th>σ_F</th
-                    ><th>allowable</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each [["sun", pres.sun, 0], ["planet", pres.planet.gear, 1], ["ring", pres.ring, 2]] as const as [label, g, idx] (label)}
-                    <tr>
-                      <td>{label}</td>
-                      <td>{g.profile_shift.toFixed(4)}</td>
-                      <td>{g.face_width.toFixed(3)}</td>
-                      <td>{g.torque.toFixed(4)}</td>
-                      <td>{pres.speeds[idx].toFixed(1)}</td>
-                      <td>
-                        {g.bending_stress === null
-                          ? "—"
-                          : `${g.bending_stress.toFixed(1)} MPa`}
-                      </td>
-                      <td>
-                        {label === "planet"
-                          ? `${pres.planet.reversed_allowable.value.toFixed(1)} MPa`
-                          : `${g.material.fatigue_allowable.value.toFixed(1)} MPa`}
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-              <small>
-                The planet's allowable is the smaller because its bending is fully reversed —
-                driven on one flank by the sun and the other by the ring. It turns at
-                {pres.planet.speed_absolute.toFixed(1)} rpm, but what fatigues it is
-                {pres.planet.speed_relative.toFixed(1)} rpm relative to the carrier.
-              </small>
 
               {#if pres.notes.length}
                 <ul class="notes">
@@ -1110,7 +1228,6 @@
 
   <button class="add" onclick={addStage}>+ Add spur stage</button>
   <button class="add" onclick={addWormStage}>+ Add worm stage</button>
-  <button class="add" onclick={addCrossedStage}>+ Add crossed gear stage</button>
   <button class="add" onclick={addPlanetaryStage}>+ Add planetary stage</button>
 </div>
 
@@ -1395,6 +1512,12 @@
   }
   /* See the note slot's own comment: candidates stack, the tallest sets the
      height, and nothing moves when the visible one changes. */
+  .aside {
+    grid-column: 1 / -1;
+    margin: 0 0 0.35rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
   .note {
     grid-column: 1 / -1;
     display: grid;

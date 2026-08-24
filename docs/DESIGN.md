@@ -30,7 +30,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Automatic proportions | the worm's length and the wheel's face width, as **recommendations** with their sources named | monotone in the wheel's teeth, homogeneous in the module, the BS 721 cap binding where it should |
 | UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm, crossed and planetary** stages, and geartrain import/export; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI; control positions measured to show notes do not move them |
 
-333 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+335 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -728,8 +728,45 @@ throated wheel. The consequences:
 
 So the architectural call is: build **one crossed-axis screw-gear model**
 (`screw.rs`) and let both the Worm Stage and a non-zero-axis-angle Spur Stage use
-it. That collapses most of Q2's cost — crossed helical becomes nearly free once
+it — which is now literally what happens: a crossed gear pair *is* a spur stage
+whose `shaft_angle` is not zero (see below). That collapses most of Q2's cost — crossed helical becomes nearly free once
 the worm stage exists, which is why the milestone order puts worm before it.
+
+##### A crossed gear pair is the spur stage with its shafts turned
+
+The specification lists three stage kinds — Spur, Worm, Planetary — and gives the
+**Spur Stage** an "Axis Angle" input with `Total Helix Angle = 0.5 × Axis Angle +
+Additional Helix Angle`. So a crossed gear pair is not a fourth kind; it is what
+that input does when it is not zero, and that is how it is entered:
+
+```text
+β₁ = Σ/2 + β_add,     β₂ = Σ/2 − β_add       so   β₁ + β₂ = Σ
+```
+
+`β₁ + β₂ = Σ` is the relation the screw model runs on, and at `Σ = 0` the pair
+collapses to `β₁ = −β₂ = β_add` — a parallel helical pair with opposed hands,
+which is exactly what the stage did before it had a shaft angle at all. **The
+parallel case is the shaft angle's zero, not a separate construction.**
+
+What does branch is the *mesh*, and it must. Parallel axes touch along a line and
+lose power to sliding along the profile; crossed axes touch at a point and slide
+lengthwise. Those are different mechanisms with different formulas, so a crossed
+stage answers with the screw result — no contact ratio, no bending, two
+efficiencies — and the panel says so. `solve_crossed_stage` is the translation
+and nothing more: it builds the `WormStage` the pair *is* (§4.5.1's whole point)
+and hands it to the same solver, which is why the merge left every number
+bit-identical to the crossed stage it replaced.
+
+Two inputs a crossed pair does **not** carry, both because it is solved at its
+pitch point:
+
+- **No tooth form.** Profile shift, addendum, dedendum and root radius change
+  nothing in the screw model, so they are not offered. An input that moves no
+  number is the fault §12 records — the ring's profile shift, present on screen
+  and connected to nothing — not a convenience.
+- **No automatic face width.** A point contact's peak pressure does not depend on
+  the face width and there is no bending model for crossed axes, so nothing can
+  size it. A width left automatic is used as entered, and the result says so.
 
 ##### The two conventional proportions are shipped, as recommendations
 
@@ -2648,7 +2685,8 @@ Main
 │                   + canvas viewport + [Export DXF]
 └── Geartrain tab → [Export] [Import] [New] [Copy] [Delete]
                     + train header (inputs; ratio/speed/torque as outputs)
-                    + [Add stage: Spur | Worm | Crossed | Planetary]
+                    + [Add stage: Spur | Worm | Planetary]  (a crossed pair is
+                      a spur stage with a non-zero axis angle, §4.5.1)
                     + one collapsible section per stage
 ```
 
@@ -2786,7 +2824,7 @@ On top of that:
 | Q | Resolution |
 |---|---|
 | Q1 | Output speed/torque are **outputs**. Only input speed and input torques are inputs. §4.9. |
-| Q2 | **Settled, and now built.** Milestone 10 added no mathematics: a crossed gear pair is the worm stage sized the other way round (§4.5.1). Original resolution:  Crossed helical is unified with worm gearing as crossed-axis screw gearing (`screw.rs`, §4.5.1), and the contact section was unified before it (§4.7) so the crossed case is a parameter rather than a branch. A worm stage reports **no bending stress**, deliberately: the tooth whose form would be measured is not the tooth that is loaded, the load case differs in kind, and no standard rates worm bending, so nothing could check it. |
+| Q2 | **Settled, built, and now entered the way the specification asks.** Milestone 10 added no mathematics: a crossed gear pair is the worm stage sized the other way round (§4.5.1), and it is now *entered* as a spur stage with a non-zero axis angle rather than as a stage kind of its own — three kinds, as the specification lists them. Original resolution:  Crossed helical is unified with worm gearing as crossed-axis screw gearing (`screw.rs`, §4.5.1), and the contact section was unified before it (§4.7) so the crossed case is a parameter rather than a branch. A worm stage reports **no bending stress**, deliberately: the tooth whose form would be measured is not the tooth that is loaded, the load case differs in kind, and no standard rates worm bending, so nothing could check it. |
 | Q3 | Working depth = the depth at which the undercut question is asked. **Revision 1 was wrong**; corrected in §4.3, and it now reproduces the classical z=17 result. |
 | Q4 | JGMA 116-02 extracted and characterised (§4.6.1) — a banded lookup table. Tooth thickness tolerance deferred; nominal-only outputs, with `Option` fields left in place. |
 | Q5 | Two-pin and three-pin, odd and even, all four closed form and independently verified (§4.6). |
