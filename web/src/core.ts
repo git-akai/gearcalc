@@ -145,10 +145,18 @@ export function boundFor(key: keyof GearParams, r: Ranges): Bound | null {
 
 export interface GearSummary {
   ranges: Ranges;
+  /** Radii, mm — what the viewport draws with. */
   pitch_radius: number;
   base_radius: number;
   tip_radius: number;
   root_radius: number;
+  /** The same circles as diameters, mm — how a gear is specified and gauged, so
+   *  this is what the panel shows. Doubled in Rust, not here: the rule is that
+   *  every number on screen is one Rust computed. */
+  pitch_diameter: number;
+  base_diameter: number;
+  tip_diameter: number;
+  root_diameter: number;
   tooth_thickness: number;
   fillet_radius: number;
   transverse_pressure_angle: number;
@@ -363,6 +371,11 @@ export interface RingSummary {
   base_radius: number;
   tip_radius: number;
   root_radius: number;
+  /** The same four as diameters, mm — what the panel shows. */
+  pitch_diameter: number;
+  base_diameter: number;
+  tip_diameter: number;
+  root_diameter: number;
   /** null when the cut generated no fillet: there is then no handover. */
   junction_radius: number | null;
   root_form: "fully_filleted" | "root_arc" | "no_fillet";

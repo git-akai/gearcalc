@@ -37,9 +37,37 @@
     panY = 0;
   }
 
+  /** Zoom by `factor` about a point given in pixels from the canvas centre, so
+   *  the feature under the cursor stays under it.
+   *
+   *  A screen point maps to the drawing through `screen = centre + pan +
+   *  scale · point`; holding one screen point fixed across a change of scale is
+   *  that relation solved for the new pan. Nothing about the gear is computed
+   *  here — this is the view transform, and it composes: zooming in and back
+   *  out about the same point returns to exactly where it started. */
+  function zoomAbout(cx: number, cy: number, factor: number) {
+    const before = zoom;
+    zoom = Math.min(50, Math.max(0.2, zoom * factor));
+    if (zoom === before) return;
+    // The pan that keeps the drawing point under the cursor where it is: with
+    // `cx = panX + s·x`, the same `x` at the new scale needs
+    // `panX' = cx − (cx − panX)·s'/s`. The y axis is flipped in the transform,
+    // but the flip cancels in that ratio, so both axes take the same form.
+    const growth = zoom / before;
+    panX = cx - (cx - panX) * growth;
+    panY = cy - (cy - panY) * growth;
+  }
+
   function onWheel(e: WheelEvent) {
     e.preventDefault();
-    zoom = Math.min(50, Math.max(0.2, zoom * Math.exp(-e.deltaY / 400)));
+    const c = canvas;
+    if (!c) return;
+    const rect = c.getBoundingClientRect();
+    zoomAbout(
+      e.clientX - rect.left - rect.width / 2,
+      e.clientY - rect.top - rect.height / 2,
+      Math.exp(-e.deltaY / 400),
+    );
   }
   function onDown(e: PointerEvent) {
     dragging = true;
@@ -120,6 +148,7 @@
       ctx.strokeStyle = token("--accent", "#2f5d8a");
       ctx.stroke();
     }
+
   });
 </script>
 

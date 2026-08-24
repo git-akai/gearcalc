@@ -127,10 +127,22 @@ pub struct GearSummary {
     /// is one more place a limit could be written down, and there is meant to be
     /// exactly one. See `gear_core::auto::admissible_ranges`.
     pub ranges: gear_core::auto::Ranges,
+    /// The four reference circles as **radii**, mm — what a drawing is built
+    /// from, and what the viewport scales by.
     pub pitch_radius: f64,
     pub base_radius: f64,
     pub tip_radius: f64,
     pub root_radius: f64,
+    /// ...and as **diameters**, mm, which is how a gear is specified, measured
+    /// and called out on a drawing.
+    ///
+    /// Both are served rather than one derived from the other on the far side,
+    /// because doubling a number is arithmetic and arithmetic belongs here: the
+    /// UI displays what Rust computed and nothing else (DESIGN §1).
+    pub pitch_diameter: f64,
+    pub base_diameter: f64,
+    pub tip_diameter: f64,
+    pub root_diameter: f64,
     pub tooth_thickness: f64,
     pub fillet_radius: f64,
     pub transverse_pressure_angle: f64,
@@ -198,6 +210,10 @@ fn summarise(g: &Gear, req: &GearRequest) -> GearSummary {
         base_radius: g.rb,
         tip_radius: g.ra,
         root_radius: g.rf,
+        pitch_diameter: 2.0 * g.r,
+        base_diameter: 2.0 * g.rb,
+        tip_diameter: 2.0 * g.ra,
+        root_diameter: 2.0 * g.rf,
         tooth_thickness: g.st,
         fillet_radius: g.rho,
         transverse_pressure_angle: g.alpha_t.to_degrees(),
@@ -298,11 +314,16 @@ pub struct RingSummary {
     pub transverse_module: f64,
     pub transverse_pressure_angle: f64,
     /// Pitch, base, tip and root radii, mm. The tip is **inside** the pitch
-    /// circle and the root outside it.
+    /// circle and the root outside it. These are what the viewport draws with.
     pub pitch_radius: f64,
     pub base_radius: f64,
     pub tip_radius: f64,
     pub root_radius: f64,
+    /// The same four as diameters, mm — how a ring is specified and gauged.
+    pub pitch_diameter: f64,
+    pub base_diameter: f64,
+    pub tip_diameter: f64,
+    pub root_diameter: f64,
     /// Radius at which the flank hands over to the fillet, mm.
     ///
     /// `None` when the cut generated no fillet: there is then no handover, and
@@ -360,6 +381,10 @@ fn solve_ring_impl(input: &str) -> Result<String, String> {
         base_radius: g.rb,
         tip_radius: g.ra,
         root_radius: g.rf,
+        pitch_diameter: 2.0 * g.r,
+        base_diameter: 2.0 * g.rb,
+        tip_diameter: 2.0 * g.ra,
+        root_diameter: 2.0 * g.rf,
         junction_radius: g.fillet.map(|_| g.involute_at(g.u_j).0),
         rim_radius: g.rim_radius(),
         root_form: match g.fillet {

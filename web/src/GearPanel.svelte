@@ -14,6 +14,8 @@
     type RingRequest,
     type Maybe,
     type PinsOut,
+    type FieldSpec,
+    type ShiftRange,
   } from "./core";
   import { workspace, type GearTab as Tab } from "./state.svelte";
   import Viewport from "./Viewport.svelte";
@@ -37,7 +39,7 @@
       case "dedendum":
         return r.dedendum.max === null
           ? null
-          : `${n(r.dedendum.min ?? 0)} … ${n(r.dedendum.max)} · the root circle must clear the axis`;
+          : `${n(r.dedendum.min ?? 0)} to ${n(r.dedendum.max)} · the root circle must clear the axis`;
       case "root_radius":
         return r.root_radius.max === null
           ? null
@@ -45,6 +47,41 @@
       default:
         return null;
     }
+  }
+
+  /** A field's note, and every note it could be showing instead.
+   *
+   *  All of them are rendered, stacked in one grid cell, with the ones that do
+   *  not apply hidden — so the slot is as tall as the tallest note the field
+   *  can produce *at this width*, and a note appearing or disappearing moves
+   *  nothing below it. The blank first candidate is what reserves the space on
+   *  a field that has no note at all right now: an error message arriving as
+   *  you type is exactly the case that used to shift the whole column.
+   *
+   *  Sized by the browser rather than by a line count written down here, so it
+   *  stays right at any window width and cannot be made stale by editing the
+   *  text of a note. */
+  type Note = { text: string; err?: boolean };
+
+  function notesFor(f: FieldSpec): { all: Note[]; shown: number } {
+    const all: Note[] = [{ text: "\u00a0" }];
+    const normal =
+      f.key === "profile_shift" && "ok" in result
+        ? shiftNote(result.ok.ranges.profile_shift)
+        : (boundNote(f.key) ?? (tab.internal && f.ringNote ? f.ringNote : (f.note ?? null)));
+    if (normal) all.push({ text: normal });
+    const err = errors[f.key];
+    if (err) all.push({ text: err, err: true });
+    return { all, shown: err ? all.length - 1 : normal ? 1 : 0 };
+  }
+
+  /** The profile shift's three bounds, as one line of text. */
+  function shiftNote(r: ShiftRange): string {
+    const pointed = r.pointed === null ? "" : ` · pointed above ${n(r.pointed)}`;
+    return (
+      `buildable ${n(r.bound.min ?? 0)} to ${n(r.bound.max ?? 0)} · ` +
+      `undercut below ${n(r.undercut)} (sharp rack ${n(r.sharp_rack_undercut)})${pointed}`
+    );
   }
 
   function onInput(key: string, text: string) {
@@ -184,6 +221,7 @@
     {/if}
     <div class="grid">
       {#each FIELDS.filter((f) => !(tab.internal && f.externalOnly)) as f (f.key)}
+        {@const notes = notesFor(f)}
         <label class:invalid={errors[f.key]}>
           <span>{f.label}</span>
           <input
@@ -193,19 +231,11 @@
             oninput={(e) => onInput(f.key, e.currentTarget.value)}
           />
           <em>{f.unit}</em>
-          {#if errors[f.key]}<small class="err">{errors[f.key]}</small>
-          {:else if f.key === "profile_shift" && "ok" in result}
-            {@const r = result.ok.ranges.profile_shift}
-            <small
-              >buildable {n(r.bound.min ?? 0)} … {n(r.bound.max ?? 0)} · undercut below {n(
-                r.undercut,
-              )}
-              <span class="ref">(sharp rack {n(r.sharp_rack_undercut)})</span>{#if r.pointed !== null}
-                · pointed above {n(r.pointed)}{/if}</small
-            >
-          {:else if boundNote(f.key)}<small>{boundNote(f.key)}</small>
-          {:else if tab.internal && f.ringNote}<small>{f.ringNote}</small>
-          {:else if f.note}<small>{f.note}</small>{/if}
+          <span class="note">
+            {#each notes.all as note, i (i)}
+              <small class:err={note.err} class:hidden={i !== notes.shown}>{note.text}</small>
+            {/each}
+          </span>
         </label>
       {/each}
     </div>
@@ -284,14 +314,14 @@
           <dd>{mm(r.transverse_module)}</dd>
           <dt>Transverse pressure angle</dt>
           <dd>{r.transverse_pressure_angle.toFixed(4)}°</dd>
-          <dt>Pitch radius</dt>
-          <dd>{mm(r.pitch_radius)}</dd>
-          <dt>Base radius</dt>
-          <dd>{mm(r.base_radius)}</dd>
-          <dt>Tip radius</dt>
-          <dd>{mm(r.tip_radius)} <small>inside the pitch circle</small></dd>
-          <dt>Root radius</dt>
-          <dd>{mm(r.root_radius)} <small>outside it</small></dd>
+          <dt>Pitch diameter</dt>
+          <dd>{mm(r.pitch_diameter)}</dd>
+          <dt>Base diameter</dt>
+          <dd>{mm(r.base_diameter)}</dd>
+          <dt>Tip diameter</dt>
+          <dd>{mm(r.tip_diameter)} <small>inside the pitch circle</small></dd>
+          <dt>Root diameter</dt>
+          <dd>{mm(r.root_diameter)} <small>outside it</small></dd>
           <dt>Flank / fillet junction</dt>
           <dd>
             {#if r.junction_radius === null}
@@ -390,10 +420,10 @@
 
       <h2>Geometry</h2>
       <dl>
-        <dt>Pitch radius</dt><dd>{mm(s.pitch_radius)}</dd>
-        <dt>Base radius</dt><dd>{mm(s.base_radius)}</dd>
-        <dt>Tip radius</dt><dd>{mm(s.tip_radius)}</dd>
-        <dt>Root radius</dt><dd>{mm(s.root_radius)}</dd>
+        <dt>Pitch diameter</dt><dd>{mm(s.pitch_diameter)}</dd>
+        <dt>Base diameter</dt><dd>{mm(s.base_diameter)}</dd>
+        <dt>Tip diameter</dt><dd>{mm(s.tip_diameter)}</dd>
+        <dt>Root diameter</dt><dd>{mm(s.root_diameter)}</dd>
         <dt>Tooth thickness</dt><dd>{mm(s.tooth_thickness)}</dd>
         <dt>Fillet radius</dt><dd>{mm(s.fillet_radius)}</dd>
         <dt>Transverse pressure angle</dt><dd>{s.transverse_pressure_angle.toFixed(4)}°</dd>
@@ -552,6 +582,19 @@
   }
   label small.err {
     color: var(--warn);
+  }
+  /* Every note a field can show, stacked in one cell: the slot takes the
+     height of the tallest, so nothing moves when the visible one changes. */
+  label .note {
+    grid-column: 1 / -1;
+    display: grid;
+  }
+  label .note small {
+    grid-area: 1 / 1;
+    grid-column: 1 / -1;
+  }
+  label .note small.hidden {
+    visibility: hidden;
   }
   input[type="number"],
   select {

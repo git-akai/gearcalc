@@ -45,7 +45,8 @@
     // Clear it, or re-picking the same file after fixing it fires nothing.
     input.value = "";
   }
-    let open = $state<Record<number, boolean>>({ 0: true });
+
+  let open = $state<Record<number, boolean>>({ 0: true });
 
   // Every number on screen comes back from Rust. Nothing here computes a
   // result — the project rule — so this is the only place a value is produced.
@@ -89,6 +90,18 @@
    *  stage 2 is gears 3 and 4, as the specification describes. */
   function gearNumber(stage: number, which: number): number {
     return stage * 2 + which + 1;
+  }
+
+  /** The candidates for one note slot: a blank to reserve the space, the note
+   *  itself when the stage has solved, and the out-of-range message when the
+   *  value is outside its bound. All are rendered; see the slot's comment. */
+  type Notes = { all: { text: string; err?: boolean }[]; shown: number };
+
+  function notes(range: string | null, bad: string | null): Notes {
+    const all: Notes["all"] = [{ text: "\u00a0" }];
+    if (range) all.push({ text: range });
+    if (bad) all.push({ text: bad, err: true });
+    return { all, shown: bad ? all.length - 1 : range ? 1 : 0 };
   }
 
   const pct = (v: number) => (100 * v).toFixed(3);
@@ -140,6 +153,19 @@
       >
     {/if}
   </label>
+{/snippet}
+
+<!-- Every note a control can show, stacked in one grid cell with the ones that
+     do not apply hidden. The slot is then as tall as the tallest of them at
+     this width, so a note arriving or leaving — a value going out of range, a
+     stage failing to solve — moves nothing below it. The blank candidate is
+     what reserves the space when there is no note at all. -->
+{#snippet noteSlot(notes: Notes)}
+  <span class="note">
+    {#each notes.all as note, i (i)}
+      <small class:err={note.err} class:hidden={i !== notes.shown}>{note.text}</small>
+    {/each}
+  </span>
 {/snippet}
 
 {#snippet autoNumber(label: string, a: Auto<number>, computed: number | undefined, step: number)}
@@ -286,7 +312,7 @@
       <dd>
         {result.ok.backlash.forward.nominal.toFixed(5)}°
         <small
-          >({result.ok.backlash.forward.minimum.toFixed(5)} – {result.ok.backlash.forward.maximum.toFixed(
+          >({result.ok.backlash.forward.minimum.toFixed(5)} to {result.ok.backlash.forward.maximum.toFixed(
             5,
           )})</small
         >
@@ -295,7 +321,7 @@
       <dd>
         {result.ok.backlash.backward.nominal.toFixed(5)}°
         <small
-          >({result.ok.backlash.backward.minimum.toFixed(5)} – {result.ok.backlash.backward.maximum.toFixed(
+          >({result.ok.backlash.backward.minimum.toFixed(5)} to {result.ok.backlash.backward.maximum.toFixed(
             5,
           )})</small
         >
@@ -387,22 +413,22 @@
                   <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
                     <span>Dedendum</span>
                     <input type="number" step="0.05" bind:value={gear.dedendum} />
-                    {#if g}
-                      {@const bad = outside(gear.dedendum, g.ranges.dedendum)}
-                      <small class:err={bad}>
-                        {bad ?? `${n(g.ranges.dedendum.min ?? 0)} … ${n(g.ranges.dedendum.max ?? 0)}`}
-                      </small>
-                    {/if}
+                    {@render noteSlot(
+                      notes(
+                        g ? `${n(g.ranges.dedendum.min ?? 0)} to ${n(g.ranges.dedendum.max ?? 0)}` : null,
+                        g ? outside(gear.dedendum, g.ranges.dedendum) : null,
+                      ),
+                    )}
                   </label>
                   <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
                     <span>Root radius</span>
                     <input type="number" step="0.01" bind:value={gear.root_radius} />
-                    {#if g}
-                      {@const bad = outside(gear.root_radius, g.ranges.root_radius)}
-                      <small class:err={bad}>
-                        {bad ?? `up to ${n(g.ranges.root_radius.max ?? 0)} · fillet must fit`}
-                      </small>
-                    {/if}
+                    {@render noteSlot(
+                      notes(
+                        g ? `up to ${n(g.ranges.root_radius.max ?? 0)} · fillet must fit` : null,
+                        g ? outside(gear.root_radius, g.ranges.root_radius) : null,
+                      ),
+                    )}
                   </label>
                   {@render autoNumber("Profile shift", gear.profile_shift, g?.profile_shift, 0.05)}
                   {#if gear.profile_shift.auto}
@@ -412,12 +438,17 @@
                       <em>module</em>
                     </label>
                   {/if}
-                  {#if g && !gear.profile_shift.auto}
-                    {@const r = g.ranges.profile_shift}
-                    {@const bad = outside(gear.profile_shift.manual, r.bound)}
-                    <p class="hint" class:err={bad}>
-                      {bad ??
-                        `buildable ${n(r.bound.min ?? 0)} … ${n(r.bound.max ?? 0)} · undercut below ${n(r.undercut)}`}
+                  {#if !gear.profile_shift.auto}
+                    {@const r = g?.ranges.profile_shift}
+                    <p class="hint">
+                      {@render noteSlot(
+                        notes(
+                          r
+                            ? `buildable ${n(r.bound.min ?? 0)} to ${n(r.bound.max ?? 0)} · undercut below ${n(r.undercut)}`
+                            : null,
+                          r ? outside(gear.profile_shift.manual, r.bound) : null,
+                        ),
+                      )}
                     </p>
                   {/if}
                   {@render autoNumber("Addendum", gear.addendum, g?.addendum, 0.05)}
@@ -518,7 +549,7 @@
                 <dd>
                   {sres.backlash.forward.nominal.toFixed(5)}° at gear {gearNumber(i, 1)}
                   <small
-                    >({sres.backlash.forward.minimum.toFixed(5)} – {sres.backlash.forward.maximum.toFixed(
+                    >({sres.backlash.forward.minimum.toFixed(5)} to {sres.backlash.forward.maximum.toFixed(
                       5,
                     )})</small
                   >
@@ -997,7 +1028,7 @@
                   <span>Output backlash</span>
                   <strong>{pres.backlash.forward.nominal.toFixed(4)}°</strong>
                   <small>
-                    {pres.backlash.forward.minimum.toFixed(4)} … {pres.backlash.forward.maximum.toFixed(
+                    {pres.backlash.forward.minimum.toFixed(4)} to {pres.backlash.forward.maximum.toFixed(
                       4,
                     )}° over tolerance; at the {pres.output} shaft
                   </small>
@@ -1361,6 +1392,20 @@
     font-size: 0.72rem;
     color: var(--muted);
     text-align: right;
+  }
+  /* See the note slot's own comment: candidates stack, the tallest sets the
+     height, and nothing moves when the visible one changes. */
+  .note {
+    grid-column: 1 / -1;
+    display: grid;
+  }
+  .note small {
+    grid-area: 1 / 1;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .note small.hidden {
+    visibility: hidden;
   }
   .err {
     color: var(--warn);
