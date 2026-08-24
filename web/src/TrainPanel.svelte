@@ -234,11 +234,6 @@
     /** False where nothing rates the face width — a crossed pair's contact is a
      *  point, so no stress depends on it and none can size it. */
     faceAuto?: boolean;
-    /** False where the tooth *form* does not reach the answer. A crossed pair
-     *  is solved at its pitch point, so its shift, addendum, dedendum and root
-     *  radius change nothing — and an input that moves no number is the fault
-     *  DESIGN §12 records, not a convenience. */
-    toothForm?: boolean;
     /** A readout only this member has; given the member's position. */
     extra?: Snippet<[number]>;
     extraIndex?: number;
@@ -250,81 +245,74 @@
     <span>Tooth count</span>
     <input type="number" step="1" bind:value={gear.teeth} />
   </label>
-  {#if opts.toothForm === false}
-    <p class="aside">
-      Tooth form is not an input here: a crossed pair is solved at its pitch
-      point, so a shift, an addendum or a root radius would change nothing.
-    </p>
+  {#if opts.cut !== "shaper"}
+    <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
+      <span>Dedendum</span>
+      <input type="number" step="0.05" bind:value={gear.dedendum} />
+      {@render noteSlot(
+        notes(
+          g ? `${n(g.ranges.dedendum.min ?? 0)} to ${n(g.ranges.dedendum.max ?? 0)}` : null,
+          g ? outside(gear.dedendum, g.ranges.dedendum) : null,
+        ),
+      )}
+    </label>
+    <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
+      <span>Root radius</span>
+      <input type="number" step="0.01" bind:value={gear.root_radius} />
+      {@render noteSlot(
+        notes(
+          g ? `up to ${n(g.ranges.root_radius.max ?? 0)} · fillet must fit` : null,
+          g ? outside(gear.root_radius, g.ranges.root_radius) : null,
+        ),
+      )}
+    </label>
   {:else}
-    {#if opts.cut !== "shaper"}
-      <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
-        <span>Dedendum</span>
-        <input type="number" step="0.05" bind:value={gear.dedendum} />
-        {@render noteSlot(
-          notes(
-            g ? `${n(g.ranges.dedendum.min ?? 0)} to ${n(g.ranges.dedendum.max ?? 0)}` : null,
-            g ? outside(gear.dedendum, g.ranges.dedendum) : null,
-          ),
-        )}
-      </label>
-      <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
-        <span>Root radius</span>
-        <input type="number" step="0.01" bind:value={gear.root_radius} />
-        {@render noteSlot(
-          notes(
-            g ? `up to ${n(g.ranges.root_radius.max ?? 0)} · fillet must fit` : null,
-            g ? outside(gear.root_radius, g.ranges.root_radius) : null,
-          ),
-        )}
-      </label>
-    {:else}
-      <p class="aside">Root and fillet are the cutter's, below — a ring has no dedendum of its own.</p>
-    {/if}
-    {#if opts.solvedShift === undefined}
-      {@render autoNumber("Profile shift", gear.profile_shift, g?.profile_shift, 0.05)}
-      {#if gear.profile_shift.auto}
-        <label class="sub">
-          <span>Working tooth depth</span>
-          <input type="number" step="0.05" bind:value={gear.working_depth} />
-          <em>module</em>
-        </label>
-      {/if}
-    {:else}
-      <label>
-        <span>Profile shift</span>
-        <input type="number" value={Number(opts.solvedShift.toFixed(4))} disabled class="computed" />
-        <em>module</em>
-        {@render noteSlot(notes("solved: it is what makes the two centre distances agree", null))}
-      </label>
-    {/if}
-    {#if opts.solvedShift === undefined && !gear.profile_shift.auto}
-      {@const r = opts.cut === "shaper" ? undefined : g?.ranges.profile_shift}
-      <p class="hint">
-        <!-- The bounds shown here are the rack's — buildable range and undercut —
-             and a shaper-cut ring's are not those: what limits it is its own base
-             circle, its cutter's reach and the generation limit (DESIGN §4.11).
-             The core does not yet report those for a stage member, so the ring is
-             told what is missing rather than shown the wrong bound. -->
-        {@render noteSlot(
-          notes(
-            opts.cut === "shaper"
-              ? "a ring's bounds are its cutter's reach and its own base circle, not a rack's"
-              : r
-                ? `buildable ${n(r.bound.min ?? 0)} to ${n(r.bound.max ?? 0)} · undercut below ${n(r.undercut)}`
-                : null,
-            r ? outside(gear.profile_shift.manual, r.bound) : null,
-          ),
-        )}
-      </p>
-    {/if}
-    {@render autoNumber("Addendum", gear.addendum, g?.addendum, 0.05)}
-    {#if gear.addendum.auto}
+    <p class="aside">Root and fillet are the cutter's, below — a ring has no dedendum of its own.</p>
+  {/if}
+  {#if opts.solvedShift === undefined}
+    {@render autoNumber("Profile shift", gear.profile_shift, g?.profile_shift, 0.05)}
+    {#if gear.profile_shift.auto}
       <label class="sub">
-        <span>Minimum tip width</span>
-        <input type="number" step="0.02" bind:value={gear.min_tip_width} />
-        <em>mm</em>
+        <span>Working tooth depth</span>
+        <input type="number" step="0.05" bind:value={gear.working_depth} />
+        <em>module</em>
       </label>
     {/if}
+  {:else}
+    <label>
+      <span>Profile shift</span>
+      <input type="number" value={Number(opts.solvedShift.toFixed(4))} disabled class="computed" />
+      <em>module</em>
+      {@render noteSlot(notes("solved: it is what makes the two centre distances agree", null))}
+    </label>
+  {/if}
+  {#if opts.solvedShift === undefined && !gear.profile_shift.auto}
+    {@const r = opts.cut === "shaper" ? undefined : g?.ranges.profile_shift}
+    <p class="hint">
+      <!-- The bounds shown here are the rack's — buildable range and undercut —
+           and a shaper-cut ring's are not those: what limits it is its own base
+           circle, its cutter's reach and the generation limit (DESIGN §4.11).
+           The core does not yet report those for a stage member, so the ring is
+           told what is missing rather than shown the wrong bound. -->
+      {@render noteSlot(
+        notes(
+          opts.cut === "shaper"
+            ? "a ring's bounds are its cutter's reach and its own base circle, not a rack's"
+            : r
+              ? `buildable ${n(r.bound.min ?? 0)} to ${n(r.bound.max ?? 0)} · undercut below ${n(r.undercut)}`
+              : null,
+          r ? outside(gear.profile_shift.manual, r.bound) : null,
+        ),
+      )}
+    </p>
+  {/if}
+  {@render autoNumber("Addendum", gear.addendum, g?.addendum, 0.05)}
+  {#if gear.addendum.auto}
+    <label class="sub">
+      <span>Minimum tip width</span>
+      <input type="number" step="0.02" bind:value={gear.min_tip_width} />
+      <em>mm</em>
+    </label>
   {/if}
   {#if opts.faceAuto === false}
     <label>
@@ -634,13 +622,28 @@
                 <input type="number" step="0.01" bind:value={stage.friction} />
                 <em></em>
               </label>
-              {#if stage.shaft_angle === 0}
-                <label>
-                  <span>Tooth thickness mod.</span>
-                  <input type="number" step="0.05" bind:value={stage.thickness_mod} />
-                  <em>k₁</em>
-                </label>
-              {/if}
+              <label>
+                <span>Tooth thickness mod.</span>
+                <input type="number" step="0.05" bind:value={stage.thickness_mod} />
+                <em>k₁</em>
+                <!-- One input where the specification had a pair, because the
+                     two are not independent: `k₁ + k₂ = 2` is what keeps the
+                     mesh at zero backlash (DESIGN §3.2), so storing both would
+                     be storing a constraint that can be broken. Which gear it
+                     applies to therefore has to be said. -->
+                {@render noteSlot(
+                  notes(
+                    `gear ${gearNumber(i, 0)}'s: above 1 its teeth thicken and gear ${gearNumber(
+                      i,
+                      1,
+                    )}'s thin by as much, since the pair must sum to 2` +
+                      (stage.shaft_angle === 0
+                        ? ""
+                        : " — it shapes the teeth here, but a crossed mesh is solved at its pitch point"),
+                    null,
+                  ),
+                )}
+              </label>
               {@render autoNumber(
                 "C2C distance",
                 stage.centre_distance,
@@ -692,13 +695,28 @@
               {/if}
             {/snippet}
 
+            <!-- A crossed pair's members are ordinary helical gears, so their
+                 tooth form is specified here as it is anywhere else — it is what
+                 will be cut. What it does *not* do is move this stage's figures,
+                 and saying which is which is the honesty required: the mesh is
+                 solved at its pitch point, so a shift reaches the answer only
+                 through the centre distance, which is an input of its own.
+                 DESIGN §4.5.1. -->
+            {#if stage.shaft_angle !== 0}
+              <p class="aside wide">
+                The tooth form below — shift, addendum, dedendum, root radius — describes the gears
+                that will be cut. A crossed mesh is solved at its pitch point, so it does not move
+                the figures in this stage: a profile shift reaches them only through the centre
+                distance, which is an input of its own.
+              </p>
+            {/if}
+
             <div class="gears">
               {#each stage.gears as gear, j (j)}
                 {@const g = sres?.gears[j]}
                 {@render gearCard(`Gear ${gearNumber(i, j)}`, gear, g, {
                   cut: "rack",
                   faceAuto: stage.shaft_angle === 0,
-                  toothForm: stage.shaft_angle === 0,
                   extra: xres ? crossedMember : undefined,
                   extraIndex: j,
                 })}
@@ -1015,7 +1033,12 @@
                 <input type="number" step="0.05" bind:value={stage.thickness_mod} />
                 <em>k₁</em>
                 {@render noteSlot(
-                  notes("the sun's; the planet takes 2 − k, and the ring matches the planet", null),
+                  notes(
+                    "the sun's: above 1 its teeth thicken and the planet's thin by as much " +
+                      "(2 − k), and the ring matches the planet — an internal mesh needs equal " +
+                      "k, not complementary",
+                    null,
+                  ),
                 )}
               </label>
               <label>
@@ -1293,9 +1316,16 @@
     grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
     gap: 0.4rem 1rem;
   }
+  /* The **input box** is the anchor, not the text after it. With an `auto`
+     trailing column the boxes shifted left or right by however wide a unit
+     happened to be — "module" against "°" — so nothing lined up down a column.
+     Every trailing column below is a fixed width, and where a row has two of
+     them (a material property carries a unit *and* a provenance marker) they
+     sum with their gap to the same width, so every box in a card shares an
+     edge. */
   label {
     display: grid;
-    grid-template-columns: 1fr 6rem auto;
+    grid-template-columns: 1fr 6rem 3.5rem;
     align-items: center;
     gap: 0.4rem;
     font-size: 0.85rem;
@@ -1485,7 +1515,9 @@
   /* More specific than `.gear label`, which would otherwise win and collapse
      the basis marker onto its own line. */
   .gear .prop {
-    grid-template-columns: 1fr 6.5rem 2.2rem auto;
+    /* 2.2 + 0.4 gap + 0.9 = 3.5rem, the same trailing width as a plain row, so
+       these boxes share the edge with the ones above them. */
+    grid-template-columns: 1fr 6.5rem 2.2rem 0.9rem;
     font-size: 0.78rem;
     margin-bottom: 0.15rem;
   }
@@ -1518,6 +1550,10 @@
     font-size: 0.72rem;
     color: var(--muted);
   }
+  .aside.wide {
+    margin: 0.2rem 0 0.5rem;
+    max-width: 60rem;
+  }
   .note {
     grid-column: 1 / -1;
     display: grid;
@@ -1537,7 +1573,7 @@
     border-color: var(--warn);
   }
   .gear label {
-    grid-template-columns: 1fr 6.5rem auto;
+    grid-template-columns: 1fr 6.5rem 3.5rem;
     margin-bottom: 0.25rem;
   }
   .notes {

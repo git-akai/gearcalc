@@ -757,16 +757,33 @@ and nothing more: it builds the `WormStage` the pair *is* (§4.5.1's whole point
 and hands it to the same solver, which is why the merge left every number
 bit-identical to the crossed stage it replaced.
 
-Two inputs a crossed pair does **not** carry, both because it is solved at its
-pitch point:
+A crossed stage is otherwise **the spur stage with things missing**, not a worm
+stage wearing a spur stage's clothes. Its members are ordinary helical gears, so
+they carry the same tooth form — profile shift and working depth, addendum,
+dedendum, root radius, and the pair's thickness modification — because that form
+is what will be cut, and a designer specifying a crossed pair is specifying those
+parts.
 
-- **No tooth form.** Profile shift, addendum, dedendum and root radius change
-  nothing in the screw model, so they are not offered. An input that moves no
-  number is the fault §12 records — the ring's profile shift, present on screen
-  and connected to nothing — not a convenience.
-- **No automatic face width.** A point contact's peak pressure does not depend on
-  the face width and there is no bending model for crossed axes, so nothing can
-  size it. A width left automatic is used as entered, and the result says so.
+What the form does *not* do here is move the stage's figures, and the panel says
+so once, above the gear cards. The mesh is solved at its pitch point, so:
+
+- **A profile shift reaches the answer only through the centre distance**, which
+  is an input of its own. The kinematics are fixed by the tooth counts and the
+  leads whatever the shift, and the contact geometry follows the operating
+  cylinders, which follow `a`. Setting `a` directly is therefore the whole of the
+  effect available.
+- **A thickness modification splits thickness between the two teeth without
+  opening the pair**, since `k₁ + k₂ = 2`. That is as true crossed as parallel;
+  what a crossed stage lacks is the *backlash from thinning* one alone, which
+  would need the normal-plane play derived for crossed axes.
+- **Nothing sizes the face width.** A point contact's peak pressure does not
+  depend on it and there is no bending model for crossed axes, so a width left
+  automatic is used as entered and the result says so.
+
+Making the first two reach the numbers means deriving a crossed mesh at a shifted
+centre distance and its zone of action — the same gap §4.5.1 already records for
+a throated wheel's contact ratio. It is listed in §10 rather than approximated
+here.
 
 ##### The two conventional proportions are shipped, as recommendations
 
@@ -2851,6 +2868,7 @@ not have to hunt for it.
 | Radial-assembly interference — **shelved**; attempted, diagnosed and withdrawn, with the findings kept | §4.11 | nothing |
 | The cut simulation cannot see below the generation limit: its cutter has no fillet | §4.11 | nothing; the band is 0.08 mm on ordinary designs and is flagged |
 | A worm stage reports no contact ratio — the zone of action for a throated wheel is not derived | §4.5.1 | nothing |
+| A crossed pair's tooth form does not reach its mesh figures — a shift would need the crossed mesh derived at a shifted centre distance, and thinning would need the normal-plane backlash | §4.5.1 | nothing; the form is still specified, and the panel says what it does and does not reach |
 | Worm profile drawing and DXF — the gear tab draws parallel-axis involutes | §4.5.1 | nothing |
 | ~~Automatic worm length and wormwheel face width, refused as proportions~~ | §4.5.1 | **closed** — shipped as recommendations with their sources named. They enter no stress, so a convention here informs a choice without distorting an answer; the reasoning is at the end of §4.5.1 |
 | `Driven By` on a worm stage — torque propagates worm→wheel; back-driving is reported, not modelled as a train direction | §4.9 | nothing |

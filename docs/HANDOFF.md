@@ -277,12 +277,16 @@ these are the ones most likely to be stepped on again.
   law, checkable from the drawn points alone. Before trusting a new gate, run it
   against the broken code: `git worktree add` a detached HEAD, copy the test in,
   and watch it fail.
-- **An input that moves no number is a fault, not a convenience.** A ring's
-  profile shift box was connected to nothing for a whole milestone (§12), and
-  the same trap was one merge away from returning: a crossed pair is solved at
-  its pitch point, so shift, addendum, dedendum and root radius would have sat
-  on screen doing nothing. They are not offered there. When merging two things
-  into one form, check every field against what the *solve* actually reads.
+- **An input that moves no number needs saying so — and the fix is not always to
+  hide it.** A ring's profile shift box was connected to nothing for a whole
+  milestone (§12). A crossed pair looks like the same case: it is solved at its
+  pitch point, so shift, addendum, dedendum and root radius reach none of its
+  figures. But they are not meaningless — they are the tooth that will be
+  **cut**, and a designer specifying a crossed pair is specifying those parts.
+  So they are offered, and the panel says once, plainly, what they do and do not
+  reach. The fault is the silence, not the field. When merging two forms, check
+  every field against what the solve reads, then decide whether it describes
+  something real anyway.
 - **A duplicated formula is a place where two answers can differ, and the copy
   nothing exercises is the one that is wrong.** The hand-written internal
   relative curvature was wrong two ways at once — 50 % at the pitch point of a
