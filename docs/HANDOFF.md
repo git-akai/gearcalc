@@ -23,8 +23,8 @@ cd web && npm run dev             # the application
 | Crate | Holds |
 |---|---|
 | `gear-core` | all mathematics. `serde` is its only dependency, deliberately |
-| `gear-io` | DXF writer, TOML material library |
-| `gear-wasm` | eleven entry points, JSON in / JSON out |
+| `gear-io` | DXF writer, TOML material library and geartrain document |
+| `gear-wasm` | fourteen entry points, JSON in / JSON out — including the UI's defaults, so they have one home |
 | `web` | Svelte 5 + TypeScript. Layout and event handling only |
 
 ### What works
@@ -38,7 +38,10 @@ helical throughout) · efficiency · automatic profile shift and altered addendu
 
 **Crossed axes.** `screw.rs`: lead angle `sin γ = z m_n/d` exact, both
 efficiencies from a force balance, self-locking, sliding as a vector, elliptical
-contact. The contact section was unified *first* — one Hertz formula with
+contact. The worm's length and the wheel's face width are **recommended** from
+published proportions (DIN/ČSN, BS 721) with the source on screen — admissible
+because they enter no stress here, and offered only for a worm drive, not for a
+crossed pair. The contact section was unified *first* — one Hertz formula with
 lengthwise curvature as its parameter, line contact its degenerate value. **Worm
 drives and crossed gear pairs are one stage**, differing only in whether the
 first member's diameter is given or derived from a helix angle: `sin γ = cos β`
@@ -102,7 +105,10 @@ that check has caught more than the test suite has in that area.
 
 **No engineering calculation in TypeScript.** If a number appears in the UI, Rust
 computed it. TypeScript formats. This is what keeps the Rust test suite
-meaningful — otherwise logic migrates to where nothing tests it.
+meaningful — otherwise logic migrates to where nothing tests it. **A default is
+one of those numbers**: they come from `gear_wasm::defaults`, and the reason is
+§12's — the one that was written down twice drifted, and only the side without
+tests was wrong. A diameter is another: it is `2 × radius` in Rust, not here.
 
 **Inputs are the only state.** Outputs are recomputed, never stored, so nothing
 can go stale. Shared-within-a-stage values live once on the stage; `k₂ = 2 − k₁`
@@ -348,6 +354,10 @@ Known-approximate, documented at the call site rather than hidden:
 - **A ring's flank below its generation limit is not a generated involute** —
   about 0.08 mm on ordinary designs. Flagged per part.
 - **Hardened 4340's fatigue allowable is the weakest number in the library.**
+- **A note slot is as tall as the tallest note that field can show *now*** (§8.0).
+  Every real message fits: the bound notes are the tall ones and validation
+  messages are short. A validation message longer than its field's bound note
+  would still move the controls when it appeared.
 
 ---
 
@@ -356,7 +366,8 @@ Known-approximate, documented at the call site rather than hidden:
 ### Milestone 11 — polish
 
 Done so far: the ring-drawing defect and the default that caused it (§4 traps),
-the ring's rim circle, and the worm/wormwheel recommended proportions.
+the ring's rim circle, the worm/wormwheel recommended proportions, geartrain
+import/export, and a first round of UI corrections.
 
 **Train import/export is done** — the last unbuilt item of the original
 specification: `gear_io::train` (`{ name, train }`, inputs only, with a header
@@ -365,7 +376,14 @@ geartrain tab, and `gear-cli trainfile`. The round trip is checked as *answers*
 rather than as bytes, in the CLI, across the boundary and in the browser. The
 silent `saveDxf` failure is fixed too.
 
-Left: the remaining UI tweaks, and a docs pass.
+UI so far: the four reference circles read as **diameters** (computed in Rust,
+because doubling is arithmetic); the viewport **zooms about the cursor**; and
+every note sits in a slot holding all the notes that field could show, so the
+controls do not move when one appears — see DESIGN §8.0, and note that it was
+verified by measuring `getBoundingClientRect()`, because screenshots here are
+not pixel-deterministic.
+
+Left: further UI work as it is asked for.
 
 ### After
 

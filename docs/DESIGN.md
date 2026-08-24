@@ -26,8 +26,9 @@ subscript `n` = normal plane, `t` = transverse.
 | Automatic inputs | minimum profile shift, altered addendum, `Auto<T>` | the generator's own undercut flag; tip width measured off the result |
 | Geartrain core | spur/helical, worm **and planetary** stages, ratio, contact ratios, backlash, stresses, face width; train accumulation, both drive directions | a mixed train end to end; `ε_β = 0` exactly for spur; backlash at the two ends differing by exactly the total ratio |
 | Materials | eight-material library, per-value provenance, TOML round-trip | primary datasheets; cross-family consistency laws |
-| Export | DXF with exact arcs, chord-tolerance sampling | `ezdxf`, an unrelated parser |
-| UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm and planetary** stages; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI |
+| Export | DXF with exact arcs, chord-tolerance sampling; **geartrains to and from TOML**, inputs only | `ezdxf`, an unrelated parser; a train's *answers* identical after a file round trip, in the CLI, across the boundary and in the browser |
+| Automatic proportions | the worm's length and the wheel's face width, as **recommendations** with their sources named | monotone in the wheel's teeth, homogeneous in the module, the BS 721 cap binding where it should |
+| UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm, crossed and planetary** stages, and geartrain import/export; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI; control positions measured to show notes do not move them |
 
 333 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
@@ -53,23 +54,25 @@ cd web && npm run dev             # the application
 
 ## What is next
 
-Milestone 11 (polish) is the open work; §11 has the full list. The
-layout mathematics of §4.8 is **done** — `planetary.rs` holds the shift solve,
-its closed-form bracket, the ring search and the layout checks, drivable as
-`gear-cli planetary` — as is the shifted internal mesh it needed. The ring's bending
-model and the stage itself are done too — a planetary set solves end to end in
-all six arrangements, `gear-cli planetstage` drives it — so what remains is the
-wasm boundary and the UI. Radial assembly is **shelved** with its findings
-recorded (§4.11), and the set-level backlash referral is the one derivation still
-open. Nothing is
-blocked, and most of what it needs exists: internal geometry and its interference
-conditions (§4.11), the ring search's monotonicity and closed-form bracket
-(§4.8), and Pennestrì's efficiency method (§4.5.2). Two things it must supply
-itself — the radial-assembly condition §4.11 deliberately leaves out, and the
-planet-shift solve that makes the two centre distances agree.
+**Milestone 11 (polish) is the open work, and most of it is done**: the ring
+drawing defect and the duplicated default behind it (§12), the ring's rim circle
+(§7), the worm drive's two conventional proportions (§4.5.1), geartrain
+import/export (§7) — the last unbuilt item of the original specification — and a
+first round of UI corrections (§8). What remains is further UI work as it is
+asked for, and keeping these documents at the head of `main`.
+
+The layout mathematics of §4.8 is **done** — `planetary.rs` holds the shift
+solve, its closed-form bracket, the ring search and the layout checks, drivable
+as `gear-cli planetary` — as is the shifted internal mesh it needed, the ring's
+bending model, and the stage itself in all six arrangements. Radial assembly is
+**shelved** with its findings recorded (§4.11).
 
 Two deferred decisions have written rationales: load sharing (§4.7) and the
-gear-rating standards (§6.2).
+gear-rating standards (§6.2). Two pieces of work remain unscheduled: the
+angularly varying profile shift of §4.10, blocked on the mesh-phase coefficient
+and on nothing else — its acceptance gate is already written — and a drawing for
+a planetary *set*, which needs the carrier and N planets placed where the
+viewport currently draws one gear.
 
 ---
 
@@ -185,9 +188,12 @@ gears/
 │   ├── gear-io/         DXF writer, TOML (de)serialisation
 │   │   └── data/            materials_default.toml   (TOML is I/O, so it lives here)
 │   ├── gear-wasm/       the #[wasm_bindgen] entry points, JSON in / JSON out.
-│   │                    Thin: eleven of them, all pure functions. A planetary
+│   │                    Thin: fourteen of them, all pure functions. A planetary
 │   │                    stage needed none of its own — `Stage` is a tagged
-│   │                    enum, so it crosses as a third kind.
+│   │                    enum, so it crosses as a third kind. Three are not
+│   │                    calculations at all: `defaults` (so a default is not
+│   │                    written down twice, §12) and the geartrain document's
+│   │                    two directions.
 │   └── gear-cli/        dev-only harness: solve a file, dump numbers, sweep
 ├── web/                 Svelte + TS + Vite front end
 ├── docs/                DESIGN.md, HANDOFF.md, JGMA 116-02 1983.pdf
@@ -233,6 +239,25 @@ inputs. Every test is `assert!(solve(x) ≈ expected)` with no setup.
 This matters because the spec has long derived chains (profile shift → centre
 distance → backlash → train backlash) and several bidirectional couplings.
 Pushing updates between fields is where this kind of application normally rots.
+
+### 3.1.1 …and the values state *starts* at are Rust's too
+
+A default is an engineering number — a module, a tooth count, a cutter's tip
+round — so it lives in `gear-wasm` and crosses the boundary through `defaults`,
+which the front end reads once the core is up. Nothing in TypeScript writes one
+down.
+
+This is not tidiness. The gear tab's cutter default was written down in both
+languages and the two drifted: TypeScript kept the *rack's* 0.38 tip round, which
+no 20-tooth shaper can hold, so every ring the UI built was cut by a tool that
+generates no fillet and the viewport drew a polygon (§12). Rust was right
+throughout and could not see it, because the wrong number lived only on the side
+that has no tests. One home makes that class of fault unrepresentable rather than
+fixed.
+
+The cost is that a tab cannot be built before the core has loaded, so both tab
+lists start empty and are filled once it is. That is the correct dependency made
+visible.
 
 ### 3.2 Shared-within-a-stage fields are stage fields
 
@@ -2618,9 +2643,12 @@ Sidebar (left, scrollable, collapsible)
 └── ▸ Geartrains   → one row per geartrain tab
 
 Main
-├── Gear tab      → parameter grid + canvas viewport + [Export DXF]
-└── Geartrain tab → train header (inputs; ratio/speed/torque as outputs)
-                    + [Add stage ▾: Spur | Worm | Planetary]
+├── Gear tab      → [Copy] [New] [Delete]
+│                   + parameter grid (external, or ring + its cutter)
+│                   + canvas viewport + [Export DXF]
+└── Geartrain tab → [Export] [Import] [New] [Copy] [Delete]
+                    + train header (inputs; ratio/speed/torque as outputs)
+                    + [Add stage: Spur | Worm | Crossed | Planetary]
                     + one collapsible section per stage
 ```
 
@@ -2629,8 +2657,43 @@ Per Q7 the Gear Calculator is **single-gear**: the "Coprime?" output and the
 dropped. Those remain in the Geartrain stages, where there is a mating gear.
 
 The viewport draws the profile with the first tooth centred up, with pan/zoom and
-toggleable reference circles. Deleting a tab confirms first; deleting the last
-tab creates a fresh default one.
+toggleable reference circles. **Zoom follows the cursor**: a screen point maps to
+the drawing through `screen = centre + pan + scale · point`, and holding one
+screen point fixed across a change of scale is that relation solved for the new
+pan, which composes — zooming in and back out about the same point returns
+exactly where it started. A ring is drawn as its bore with the material shaded
+*outward* to `Ring::rim_radius` (§7), because an outline alone does not say which
+side the metal is on. Deleting a tab confirms first; deleting the last tab
+creates a fresh default one.
+
+**The four reference circles are shown as diameters**, which is how a gear is
+specified, measured and called out; the radii cross the boundary too, because
+the viewport scales by them. Both are computed in Rust — doubling a number is
+arithmetic, and §1's rule is that the UI displays what Rust computed.
+
+### 8.0 Notes must not move the controls
+
+Every field's note — a bound, a clamp, a validation message — is rendered into a
+slot holding **all** the notes that field could be showing, stacked in one grid
+cell with the inactive ones hidden. The slot is then as tall as the tallest
+candidate at the current width, so a note appearing or disappearing shifts
+nothing below it, and a blank candidate reserves the space on a field that has no
+note at all. That last case is the one that used to jolt the column: a validation
+error arriving mid-keystroke added a line under the field being typed into.
+
+Two properties make this worth the indirection over a written-down line count:
+the browser does the measuring, so it stays right at any window width and cannot
+be made stale by editing the text of a note; and nothing is ever clipped, which a
+fixed height would eventually do.
+
+Checked by measurement rather than by eye — screenshots are not
+pixel-deterministic here. Every control on the gear tab reports the same
+`getBoundingClientRect().top` with and without an error note, and inside a
+geartrain's gear card the offsets are identical whether the stage solves or
+fails, which is the case where several notes vanish at once.
+
+Ranges read `1.000 to 4.050`, matching the `up to 0.448` used for one-sided
+bounds.
 
 ### 8.1 Additions to the specification's field list
 
@@ -2796,7 +2859,7 @@ it can be validated in isolation.
 | 8 | ✅ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | **met** — the cut simulated from the cutter and the rolling alone agrees with the analytic profile to **3.6 µm**; the rack is confirmed as the shaper's `z_c → ∞` limit, first order in `1/z_c`; the generation limit and both mesh interference conditions are derived rather than quoted. Radial assembly is **shelved** (§4.11) |
 | 9 | ✅ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency, the stage, the boundary and the UI | **met** — the ideal ring `z_s + 2z_p` needs **exactly** zero planet shift and the two centre distances agree to 1e-12; a held carrier gives **exactly** the product of its two mesh efficiencies; all six drive modes reproduce their classical ratios to 1e-12; play referred to two different output shafts differs by exactly their ratio; helical to parity with spur throughout. A set solves end to end in `gear-cli`, across the wasm boundary and in the browser, the three agreeing. Radial assembly is **shelved** with its findings recorded (§4.11) |
 | 10 | ✅ **Crossed-axis spur** — reuse `screw.rs`, point-contact Hertz | **met, and it really was a parameter rather than a branch.** A crossed gear pair *is* a `Screw` whose first member's diameter is derived from a helix angle instead of given: `sin γ = z m_n/d` and `γ = 90° − β` make `sin γ = cos β`, so nothing else changes. Verified to 1e-9 over three tooth pairs × four shaft angles × three helix angles, with the worm canary `gear-cli wormstage 1 40 7 2` **bit-identical**. No new kinematics, contact model, efficiency or wasm entry point |
-| 11 | 🔶 **Polish** — train import/export, confirmations, error surfacing, docs | in progress — the ring-drawing defect and its cause are fixed (§12), the worm proportions are shipped (§4.5.1), and **train import/export is done**: `gear_io::train`, two wasm entry points, the buttons, `gear-cli trainfile`, and a round trip verified as identical *answers* in the CLI, across the boundary and in the browser. Confirmations were already in place. What is left is the remaining UI tweaks and a docs pass |
+| 11 | 🔶 **Polish** — train import/export, confirmations, error surfacing, docs | in progress. **Train import/export is done** — `gear_io::train`, two entry points, the buttons, `gear-cli trainfile`, and a round trip verified as identical *answers* in the CLI, across the boundary and in the browser. Also done: the ring-drawing defect and the duplicated default behind it (§12), the ring's rim circle, the worm proportions (§4.5.1), diameters, cursor-anchored zoom and stable note slots (§8), and the DXF export failure that used to be silent. Confirmations were already in place. What remains is further UI work as it is asked for |
 
 Milestone 9 was where the *reuse* argument was tested rather than asserted, and
 it paid: the planetary stage needed no new wasm entry point, no second

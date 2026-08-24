@@ -1,7 +1,8 @@
 # Gears
 
 A browser tool for designing gears and geartrains: parameter calculation and
-optimisation, 2D profile visualisation, and DXF export.
+optimisation, 2D profile visualisation, DXF export, and geartrains saved to and
+loaded from human-readable TOML.
 
 External, **internal**, **worm** and **planetary** gearing, with the mathematics
 derived rather than quoted — and the derivations checked against simulations that share no code
@@ -12,7 +13,9 @@ layout and event handling only.
 
 > **Project rule: no engineering calculation in TypeScript.** If a number appears
 > in the UI, Rust computed it. TypeScript may format it for display and nothing
-> else. That is what keeps the Rust test suite meaningful.
+> else. That is what keeps the Rust test suite meaningful. Defaults count as
+> numbers: they cross the boundary from Rust, because the one that was written
+> down in both languages drifted — see DESIGN §12.
 
 The architecture, the mathematics behind every formula, and the verification log
 are in [`docs/DESIGN.md`](docs/DESIGN.md). Read that before changing anything in
@@ -25,7 +28,7 @@ needs.
 | Path | Role |
 |---|---|
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. Depends only on `serde`. |
-| `crates/gear-io` | File formats: DXF export, and the TOML material library. |
+| `crates/gear-io` | File formats: DXF export, and the TOML material library and geartrain documents. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
 | `web/` | Svelte 5 + TypeScript + Vite front end. |
