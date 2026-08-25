@@ -671,7 +671,12 @@ export interface WormMemberResult {
   material: Material;
 }
 export interface WormContact {
+  /** The worst of the pitch point and the two single-pair boundaries. */
   max_pressure: number;
+  /** What the pitch point alone would have said — kept so the difference is
+   *  visible rather than asserted. */
+  at_pitch_point: number;
+  worst_position: number;
   patch_length: number;
   patch_width: number;
   curvature_along: number;

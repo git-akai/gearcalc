@@ -722,6 +722,46 @@ impl CrossedPath {
         out
     }
 
+    /// The relative principal curvatures at a point of the path, 1/mm.
+    ///
+    /// The same call [`pitch_point_curvatures`] makes, with the **local** normal
+    /// radius of curvature in place of the pitch point's: each flank is a
+    /// cylinder of radius `ρ_n = |s − s_tangency|` across the tooth and nothing
+    /// along its ruling, and the skew between the rulings is a property of the
+    /// pair rather than of the point. So one Hertz formula serves the whole
+    /// path, as it already serves both mesh kinds (§4.7).
+    #[must_use]
+    pub fn curvatures_at(&self, screw: &Screw, s: f64) -> Option<(f64, f64)> {
+        let rho = [(s - self.tangency[0]).abs(), (s - self.tangency[1]).abs()];
+        if rho.iter().any(|r| !(r.is_finite() && *r > 0.0)) {
+            return None;
+        }
+        let skew = ruling_skew(
+            screw.shaft_angle,
+            screw.normal_pressure_angle,
+            screw.worm_helix_angle,
+        )?;
+        crate::hertz::relative_curvatures((1.0 / rho[0], 0.0), (1.0 / rho[1], 0.0), skew)
+    }
+
+    /// The two positions where one tooth pair carries the whole load.
+    ///
+    /// Beyond them the next pair has taken up and the load is shared, exactly as
+    /// on a parallel mesh — so these are where a rating is taken, not the ends of
+    /// the zone. **When `ε ≤ 1` they collapse onto the ends**, which is the right
+    /// answer rather than a special case: with nothing else in contact, one pair
+    /// carries everything everywhere, including where the relative curvature is
+    /// worst. A face too narrow therefore costs continuity *and* raises the
+    /// stress, and it is the same clamp that says so.
+    #[must_use]
+    pub fn single_pair_bounds(&self, screw: &Screw) -> [f64; 2] {
+        let pitch = screw.normal_base_pitch();
+        [
+            (self.zone[0] + pitch).min(self.zone[1]),
+            (self.zone[1] - pitch).max(self.zone[0]),
+        ]
+    }
+
     /// How far the contact point travels along each member's own axis over the
     /// zone, mm — what a face width has to cover.
     ///
@@ -870,14 +910,22 @@ pub fn pitch_point_curvatures(
     let (rho_n_2, beta_b_2) = flank_curvature(pitch_radius_2, beta_2, normal_pressure_angle)?;
     let _ = (beta_b_1, beta_b_2);
 
-    let (ruling_1, ruling_2) = rulings(shaft_angle, normal_pressure_angle, beta_1)?;
-
-    // The angle between two directions. `atan2` of the cross and dot rather than
-    // an `acos`, which loses its precision exactly where the rulings are nearly
-    // parallel — the case this whole model is built around.
-    let skew = norm(cross(ruling_1, ruling_2)).atan2(dot(ruling_1, ruling_2));
+    let skew = ruling_skew(shaft_angle, normal_pressure_angle, beta_1)?;
 
     crate::hertz::relative_curvatures((1.0 / rho_n_1, 0.0), (1.0 / rho_n_2, 0.0), skew)
+}
+
+/// The angle between the two flanks' rulings — zero for parallel axes, and the
+/// single parameter that turns a contact line into a contact ellipse.
+///
+/// `atan2` of the cross and dot rather than an `acos`, which loses its precision
+/// exactly where the rulings are nearly parallel — the case this whole model is
+/// built around. Shared by the pitch-point curvatures and by every point of the
+/// path, because it is a property of the *pair*: the rulings are fixed
+/// directions, so the skew does not vary along the contact.
+fn ruling_skew(shaft_angle: f64, alpha_n: f64, beta_1: f64) -> Option<f64> {
+    let (ruling_1, ruling_2) = rulings(shaft_angle, alpha_n, beta_1)?;
+    Some(norm(cross(ruling_1, ruling_2)).atan2(dot(ruling_1, ruling_2)))
 }
 
 /// The two flanks' rulings at the pitch point — their zero-curvature directions.

@@ -30,7 +30,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Automatic proportions | the worm's length and the wheel's face width, as **recommendations** with their sources named | monotone in the wheel's teeth, homogeneous in the module, the BS 721 cap binding where it should |
 | UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm, crossed and planetary** stages, and geartrain import/export; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI; control positions measured to show notes do not move them |
 
-343 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+344 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -751,18 +751,36 @@ radii and one operating pressure angle, all in a *common transverse plane*.
 Crossed axes have no common transverse plane, so no path is built — and every
 consumer of the path is exactly what a crossed stage does not report:
 
-| Missing from a crossed stage | What supplies it for a parallel one |
-|---|---|
-| Transverse and total contact ratio | `ContactPath::contact_ratio` |
-| Contact stress at the single-pair boundaries (it is rated at the pitch point only) | `contact_stress(path, …)`, which walks the path |
-| Bending stress | `bending_section(g, contact_ratio)` — the load's roll parameter comes off the path |
-| Automatic face width | inverting `σ_F(b)` and `σ_H(b)`, so it follows from the two above |
-| Efficiency from sliding | `contact::efficiency(path, …)`; the crossed stage uses a force balance instead |
+| Missing from a crossed stage | What supplies it for a parallel one | Since |
+|---|---|---|
+| Transverse and total contact ratio | `ContactPath::contact_ratio` | **done** — `CrossedPath`, reported by both stage kinds |
+| Contact stress at the single-pair boundaries (it was rated at the pitch point only) | `contact_stress(path, …)`, which walks the path | **done** — the rating walks the crossed path too |
+| Automatic face width | inverting `σ_F(b)` and `σ_H(b)` | **done, by a different constraint** — `ε ≥ 1`, since no stress here depends on `b` |
+| Bending stress | `bending_section(g, contact_ratio)` — the load's roll parameter comes off the path | **still not available, and now for a stated reason: see below** |
+| Efficiency from sliding | `contact::efficiency(path, …)`; the crossed stage uses a force balance instead | open |
 
 **One construction gates five branches.** That is the whole of the divergence,
 and it is worth stating because it makes the remaining work a single question
 rather than a list: *where does a crossed pair's contact point go, and where does
-it stop?*
+it stop?* Three of the five closed when that question was answered.
+
+**Bending did not, and the audit was wrong to imply it would.** The path supplies
+the load's *position along the profile*, which was one missing ingredient — but
+the model needs another. This crate's bending stress is
+
+```text
+σ_F = F_t / (b · m) · Y_F · Y_S
+```
+
+a cantilever loaded **across its whole face**. A crossed pair's load is a
+*point*. Spreading it over the full `b` would under-predict by whatever the real
+load-carrying width is, and choosing that width — an effective face, some
+multiple of the contact patch — is precisely a convention that multiplies a
+stress, which §4.7 refuses. So the obstacle was never only the load point; it is
+that a concentrated load on a wide tooth is a plate problem and the beam formula
+has no honest reading of it. That is why no standard rates it analytically
+either, and it is recorded here so the next reader does not re-derive the same
+dead end.
 
 Two things are already general and need nothing:
 

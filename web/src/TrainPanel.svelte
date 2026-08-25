@@ -221,9 +221,11 @@
   <dd>
     {r.contact.max_pressure.toFixed(1)} MPa
     <small>
-      patch {r.contact.patch_length.toFixed(4)} × {r.contact.patch_width.toFixed(
-        4,
-      )} mm
+      patch {r.contact.patch_length.toFixed(4)} × {r.contact.patch_width.toFixed(4)} mm ·
+      {Math.abs(r.contact.worst_position) < 1e-9
+        ? "worst at the pitch point"
+        : `worst ${r.contact.worst_position.toFixed(3)} mm along the path, where one tooth carries it alone`}
+      · the pitch point alone gives {r.contact.at_pitch_point.toFixed(1)}
     </small>
   </dd>
   <dt>Sliding speed</dt>

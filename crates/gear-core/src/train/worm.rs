@@ -40,7 +40,7 @@ use crate::contact::{Directional, Drive};
 use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
 use crate::mesh::Member;
 use crate::params::Auto;
-use crate::screw::{Screw, ScrewParams, ZoneLimit};
+use crate::screw::{CrossedPath, Screw, ScrewParams, ZoneLimit};
 
 /// The proportions a worm drive is conventionally given.
 ///
@@ -260,7 +260,22 @@ pub struct CrossedMesh {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct WormContact {
     /// Peak Hertzian pressure, MPa — **the** strength figure for this stage.
+    ///
+    /// The worst of the points a rating is taken at: the pitch point, and the
+    /// two boundaries of single-pair contact where one tooth carries the whole
+    /// load. Rated at the pitch point *alone* this came out 0.7–2.2 % low on
+    /// ordinary pairs and up to 27 % low on one whose face leaves `ε ≤ 1`.
+    ///
+    /// The relative radius peaks where the two roll lengths are equal and falls
+    /// away toward both ends of the zone, and the pitch point sits near that
+    /// peak — so it is close to the *least* severe place the mesh offers, not
+    /// the worst.
     pub max_pressure: f64,
+    /// What the pitch point alone would have said, MPa — the figure this
+    /// replaced, kept so the difference is visible rather than asserted.
+    pub at_pitch_point: f64,
+    /// Where the worst point sits on the path, mm from the pitch point.
+    pub worst_position: f64,
     /// The patch, mm. An ellipse, not a line.
     pub patch_length: f64,
     pub patch_width: f64,
@@ -554,12 +569,63 @@ pub fn solve_worm_stage(
     // Contact is rated on the wheel's torque: which torque is held fixed decides
     // which way friction moves the flank load, and only this direction is the
     // conservative one. See `Screw::normal_force`.
+    // The face widths, decided before anything that reads them. A crossed pair
+    // has no published proportion to take (§4.5.1), so its `recommended` is
+    // `None` on both members and the entered width stands.
+    let recommended = match stage.sizing {
+        FirstMemberSizing::PitchDiameter(_) => [
+            Some(proportions::worm_length(
+                s.axial_module,
+                stage.wheel_teeth,
+                stage.starts,
+            )),
+            Some(proportions::wheel_face_width(
+                s.axial_module,
+                s.worm_pitch_diameter,
+            )),
+        ],
+        FirstMemberSizing::HelixAngle(_) => [None, None],
+    };
+    let widths = [
+        recommended[0].map_or(stage.worm.face_width.manual, |r| {
+            stage.worm.face_width.resolve(r)
+        }),
+        recommended[1].map_or(stage.wheel.face_width.manual, |r| {
+            stage.wheel.face_width.resolve(r)
+        }),
+    ];
+
     let e_star = contact_modulus(&materials[0], &materials[1]);
     let (curvature_along, curvature_across) =
         s.contact_curvatures().ok_or(TrainError::NoContact)?;
-    let patch = s
+    let at_pitch = s
         .contact(output_torque, Member::Second, stage.friction, e_star)
         .ok_or(TrainError::NoContact)?;
+    // **Rated along the path, not at the pitch point.** The relative radius
+    // peaks where the two roll lengths are equal and falls toward both ends of
+    // the zone; the pitch point sits near that peak, so rating there alone took
+    // the mesh at close to its gentlest and flattered it.
+    // The points that matter are the two boundaries of single-pair contact,
+    // where one tooth carries everything; beyond them the next pair has taken
+    // up. Where `ε ≤ 1` those boundaries are the ends of the zone, so a face
+    // too narrow raises this figure as well as costing continuity.
+    let force = s.normal_force(output_torque, Member::Second, stage.friction);
+    let mut patch = at_pitch;
+    let mut worst_position = 0.0;
+    if let Some(path) = rating_path(&s, widths, None) {
+        for position in path.single_pair_bounds(&s) {
+            let Some((along, across)) = path.curvatures_at(&s, position) else {
+                continue;
+            };
+            let Some(here) = crate::hertz::elliptical_contact(along, across, force, e_star) else {
+                continue;
+            };
+            if here.max_pressure > patch.max_pressure {
+                patch = here;
+                worst_position = position;
+            }
+        }
+    }
 
     let backlash = Directional::of(|d| {
         let at = match d {
@@ -619,20 +685,6 @@ pub fn solve_worm_stage(
     // so that is what decides here. Offering the numbers anyway would be
     // shipping a convention outside the case it was written for, which is the
     // thing §4.7's policy exists to refuse.
-    let recommended = match stage.sizing {
-        FirstMemberSizing::PitchDiameter(_) => [
-            Some(proportions::worm_length(
-                s.axial_module,
-                stage.wheel_teeth,
-                stage.starts,
-            )),
-            Some(proportions::wheel_face_width(
-                s.axial_module,
-                s.worm_pitch_diameter,
-            )),
-        ],
-        FirstMemberSizing::HelixAngle(_) => [None, None],
-    };
     if recommended[0].is_none() && (stage.worm.face_width.auto || stage.wheel.face_width.auto) {
         notes.push(
             "face widths left as entered: the published proportions are for a worm \
@@ -646,9 +698,7 @@ pub fn solve_worm_stage(
             torque: input_torque,
             speed: 0.0,
             tooth_cycles: 0.0,
-            face_width: recommended[0].map_or(stage.worm.face_width.manual, |r| {
-                stage.worm.face_width.resolve(r)
-            }),
+            face_width: widths[0],
             recommended_face_width: recommended[0],
             pitch_diameter: s.worm_pitch_diameter,
             material: materials[0].clone(),
@@ -657,9 +707,7 @@ pub fn solve_worm_stage(
             torque: output_torque,
             speed: 0.0,
             tooth_cycles: 0.0,
-            face_width: recommended[1].map_or(stage.wheel.face_width.manual, |r| {
-                stage.wheel.face_width.resolve(r)
-            }),
+            face_width: widths[1],
             recommended_face_width: recommended[1],
             pitch_diameter: s.wheel_pitch_diameter,
             material: materials[1].clone(),
@@ -683,6 +731,8 @@ pub fn solve_worm_stage(
         sliding_velocity: 0.0,
         contact: WormContact {
             max_pressure: patch.max_pressure,
+            at_pitch_point: at_pitch.max_pressure,
+            worst_position,
             patch_length: 2.0 * patch.semi_major(),
             patch_width: 2.0 * patch.semi_minor(),
             curvature_along,
@@ -720,6 +770,21 @@ pub fn solve_worm_stage(
 /// is a lower bound on an enveloping one: a worm that clears `ε = 1` here clears
 /// it as built. That is an argument about the direction, not a computation, and
 /// it is said next to the number.
+/// The path of contact as the face widths in use leave it — what a rating walks.
+///
+/// Shares its assumptions with [`crossed_mesh`], which reports the same zone:
+/// one construction, asked twice for different things, rather than two that can
+/// disagree about where the teeth touch.
+fn rating_path(s: &Screw, face: [f64; 2], tips: Option<[f64; 2]>) -> Option<CrossedPath> {
+    let assumed = s.normal_module();
+    let tips = tips.unwrap_or([
+        s.worm_pitch_diameter / 2.0 + assumed,
+        s.wheel_pitch_diameter / 2.0 + assumed,
+    ]);
+    let path = s.path_of_contact(tips[0], tips[1])?;
+    Some(path.limited_by_face(s, face).map_or(path, |(z, _)| z))
+}
+
 fn crossed_mesh(
     s: &Screw,
     members: &[WormMemberResult; 2],
@@ -870,11 +935,17 @@ mod tests {
     }
 
     /// **Why the automatic face width here is a proportion and not a rating.**
-    /// A point contact's peak pressure does not depend on the face width at
-    /// all, so `σ_H ∝ 1/√b` — the relation a spur stage inverts to size a gear
-    /// — has nothing to invert. It is also what makes shipping a published
-    /// proportion admissible: the number informs a choice and cannot move an
-    /// answer, because no answer reads it.
+    /// A point contact's peak pressure does not depend on the face width, so
+    /// `σ_H ∝ 1/√b` — the relation a spur stage inverts to size a gear — has
+    /// nothing to invert.
+    ///
+    /// That holds *while the face is not what bounds the zone of action*, which
+    /// is the case here and on any sanely proportioned pair. Squeeze the face
+    /// until it cuts the zone and the pressure does move — **upward**, because
+    /// the pair loses the load sharing that kept the rating off the ends of the
+    /// path. Which is the other reason nothing sizes a face from contact here:
+    /// the relation runs the wrong way, and inverting it would ask for a
+    /// *narrower* gear. The next test is that one.
     #[test]
     fn contact_pressure_does_not_depend_on_the_face_width() {
         let narrow = solved(&WormStage {
@@ -1131,6 +1202,67 @@ mod tests {
         )
         .unwrap();
         assert!(!crossed.crossed.unwrap().tooth_height_assumed);
+    }
+
+    /// **The rating walks the path, and the pitch point is near its gentlest
+    /// place.**
+    ///
+    /// The relative radius peaks where the two roll lengths are equal, which the
+    /// pitch point is near, so a figure taken there alone is close to the least
+    /// severe the mesh offers.
+    /// Checked as an ordering rather than as a number — the rated pressure can
+    /// only be at or above what the pitch point says — and then as the
+    /// consequence that matters: squeeze the face until `ε` falls below 1, and
+    /// the same mesh rates **higher**, because with nothing else in contact the
+    /// one pair carries the load out to the ends of the zone.
+    #[test]
+    fn rating_along_the_path_is_never_kinder_than_the_pitch_point() {
+        use crate::params::Auto;
+        use crate::train::{SpurStage, StageGear};
+
+        let lib = super::super::test_library();
+        let crossed = |face: f64| SpurStage {
+            shaft_angle: 90.0,
+            gears: [
+                StageGear {
+                    teeth: 17,
+                    face_width: Auto::fixed(face),
+                    ..StageGear::default()
+                },
+                StageGear {
+                    teeth: 23,
+                    face_width: Auto::fixed(face),
+                    ..StageGear::default()
+                },
+            ],
+            ..SpurStage::default()
+        };
+
+        // Generous face: the teeth end the zone, the pair shares load, and the
+        // rating sits just above the pitch-point figure.
+        let wide = solve_crossed_stage(&crossed(20.0), 2.0, &lib).unwrap();
+        assert!(
+            wide.contact.max_pressure >= wide.contact.at_pitch_point,
+            "the path cannot be kinder than its gentlest point"
+        );
+        assert!(wide.crossed.unwrap().contact_ratio > 1.0);
+
+        // Squeeze it: ε falls below 1, load sharing goes, and the same mesh at
+        // the same torque rates higher.
+        let narrow = solve_crossed_stage(&crossed(0.8), 2.0, &lib).unwrap();
+        assert!(narrow.crossed.unwrap().contact_ratio < 1.0);
+        assert!(
+            narrow.contact.max_pressure > wide.contact.max_pressure,
+            "losing contact continuity should cost stress, not save it: {} against {}",
+            narrow.contact.max_pressure,
+            wide.contact.max_pressure
+        );
+        // ...and the pitch point itself has not moved, which is what shows the
+        // difference is the *place* being rated and not the load.
+        assert!(
+            (narrow.contact.at_pitch_point - wide.contact.at_pitch_point).abs() < 1e-9,
+            "the pitch-point figure is a property of the pair, not of the face"
+        );
     }
 
     /// A self-locking pair says so, rather than reporting a negative efficiency

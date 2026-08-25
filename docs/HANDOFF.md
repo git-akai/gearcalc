@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–10 complete and in CI. 343 tests, ~26 s.** Milestone 11 is
+**Milestones 0–10 complete and in CI. 344 tests, ~26 s.** Milestone 11 is
 under way: the ring-drawing defect below is fixed, and the rim circle with it.
 
 ```bash
@@ -42,7 +42,10 @@ contact, and **the path of contact** — the line tangent to both base cylinders
 whose direction two properties of an involute helicoid fix, with its zone,
 contact ratio and axial travel (§4.5.1). A crossed gear pair reports `ε` and
 sizes its face width from `ε = 1`; a worm reports `ε` too, as a floor with its
-assumed tooth height named, and keeps its proportion-sized face. A crossed gear pair is **entered as a spur stage with an axis angle**,
+assumed tooth height named, and keeps its proportion-sized face. **Contact is
+rated along that path** — at the two single-pair boundaries as well as the pitch
+point — which the pitch point alone under-stated by 0.7–2.2 %, and by up to 27 %
+where a narrow face has cost the pair its load sharing. A crossed gear pair is **entered as a spur stage with an axis angle**,
 as the specification has it — `β₁ = Σ/2 + β_add`, `β₂ = Σ/2 − β_add`, so the
 parallel pair is the axis angle's zero — and solved by translating it into the
 screw stage it is. Three stage kinds, not four. The worm's length and the wheel's face width are **recommended** from
@@ -359,7 +362,8 @@ these are the ones most likely to be stepped on again.
 | The cut simulation cannot see below the generation limit: its cutter has no fillet | §4.11 | nothing |
 | Mesh-phase coefficient setting the optimal λ | §4.10 | only the angular-profile-shift milestone |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
-| **The crossed-axis contact path** — derived, tested and **wired**: a crossed pair reports its contact ratio and sizes its face width from `ε ≥ 1`. Two of the five remain — contact rated *along* the path rather than at the pitch point, and bending, which now has a load point available | §4.5.1 | those two |
+| **Crossed-axis bending** — the path gave the load's position on the profile, but not its distribution *across the face*, and `σ_F = F_t/(b·m)·Y_F·Y_S` is a cantilever loaded across the whole of one. Choosing an effective width is a convention that multiplies a stress, so §4.7 refuses it. Recorded rather than left looking undone | §4.5.1 | nothing; it is stated on screen |
+| A crossed pair's efficiency still comes from the pitch-point force balance, not from sliding integrated along the path | §4.5.1 | nothing |
 | The **enveloping** (throated) wheel's zone of action — the cylindrical one is derived and reported as a floor | §4.5.1 | nothing |
 | Span over teeth for a ring — rare in practice, not derived; between-pins is done | §4.6 | nothing |
 | Worm profile drawing and DXF; a planetary set has no drawing either | §4.5.1, §8 | nothing |
@@ -423,6 +427,12 @@ Left: further UI work as it is asked for.
 
 ## 7. Working notes
 
+- **Having the load's position is not having the load.** The audit said the
+  contact path would unblock crossed-axis bending. It did not: the path gives
+  where on the *profile* the load acts, and the beam formula needs how it is
+  spread across the *face*. A point load on a wide tooth is a plate problem, and
+  picking an effective width is exactly the sort of convention that moves a
+  stress. Two missing ingredients looked like one until the formula was read.
 - **A phrase describing the real part is not a modelled property.** "The wheel
   is throated" was true of worm drives and false of this crate — nothing here
   throats anything — and it got used as the reason to withhold a number that the
