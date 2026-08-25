@@ -187,6 +187,10 @@
         {r.crossed.contact_ratio < 1
           ? "below 1: the pair loses contact between one tooth and the next"
           : `pairs in contact · ended by the ${r.crossed.limited_by === "face" ? "face width" : "teeth"}`}
+        {#if r.crossed.tooth_height_assumed}
+          · a floor: the tooth height is assumed at one module, and an enveloping
+          wheel wraps further than the cylinder this is figured on
+        {/if}
       </small>
     </dd>
     <dt>Contact travel</dt>

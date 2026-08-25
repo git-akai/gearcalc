@@ -226,13 +226,13 @@ pub struct WormMemberResult {
     pub material: Material,
 }
 
-/// What a crossed **gear** pair's path of contact says — absent for a worm.
+/// What the path of contact says about a crossed-axis mesh.
 ///
-/// A worm drive's wheel is throated, and the zone of action of a throated wheel
-/// is not derived here (§4.5.1); a cylindrical construction applied to it would
-/// be a number about a different part. So this is reported for the pair sized by
-/// helix angle and not for the one sized by diameter — the same line the
-/// conventional proportions are offered along, drawn for the same reason.
+/// Reported for a worm drive as well as for a crossed gear pair, because both
+/// are the same construction here: §4.5.1 takes **both flanks as involute
+/// helicoids on cylinders**, and that is where the stage's contact stress,
+/// efficiency and backlash already come from. See [`crossed_mesh`] for why a
+/// real worm's throated wheel makes this a floor rather than a wrong number.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CrossedMesh {
@@ -250,6 +250,9 @@ pub struct CrossedMesh {
     /// How far the contact point runs along each member's own axis, mm — what a
     /// face has to cover, and what a parallel pair does not have at all.
     pub axial_travel: [f64; 2],
+    /// True when the tooth height was **assumed** rather than given — a worm
+    /// stage has no addendum input. The figures above are then a lower bound.
+    pub tooth_height_assumed: bool,
 }
 
 /// The contact patch a worm mesh presses.
@@ -499,13 +502,10 @@ pub fn solve_crossed_stage(
     result.notes.extend(notes);
 
     // ...and the zone as the widths in use actually leave it.
-    if let Some(p) = path {
-        let widths = [result.members[0].face_width, result.members[1].face_width];
-        let bounded = p.limited_by_face(&screw, widths);
-        let (zone, limited_by) = match bounded {
-            Some((z, limit)) => (z, limit),
-            None => (p, ZoneLimit::Face),
-        };
+    // ...and the zone as the widths in use actually leave it. The tips are known
+    // here — a crossed pair carries its tooth form — so nothing is assumed.
+    result.crossed = crossed_mesh(&screw, &result.members, Some(tips));
+    if let Some(zone) = result.crossed {
         if zone.contact_ratio < 1.0 {
             result.notes.push(format!(
                 "contact ratio {:.3}: below 1 the pair loses contact between one tooth \
@@ -515,12 +515,6 @@ pub fn solve_crossed_stage(
                 zone.contact_ratio
             ));
         }
-        result.crossed = Some(CrossedMesh {
-            contact_ratio: zone.contact_ratio,
-            limited_by,
-            face_width_for_continuity: continuity,
-            axial_travel: zone.axial_travel(&screw),
-        });
     }
     Ok(result)
 }
@@ -682,8 +676,7 @@ pub fn solve_worm_stage(
         wheel_helix_angle: s.wheel_helix_angle.to_degrees(),
         lead: s.lead,
         axial_module: s.axial_module,
-        // A worm drive says nothing here; `solve_crossed_stage` fills it in.
-        crossed: None,
+        crossed: crossed_mesh(&s, &members, None),
         efficiency,
         self_locking_friction: threshold,
         sliding_ratio: s.sliding_ratio,
@@ -707,6 +700,58 @@ pub fn solve_worm_stage(
 /// The module documentation derives this; the short of it is that the axial
 /// slack and the centre-distance change are two displacements, and only their
 /// components along the common flank normal open a gap.
+/// The path of contact, as far as the geometry in hand allows it to be known.
+///
+/// `tips` are the two tip radii when the stage carries a tooth height — a
+/// crossed gear pair does. A **worm stage does not**: it has no addendum input,
+/// so a standard one-normal-module tooth is assumed, and that assumption is what
+/// makes the result a *floor* rather than a figure.
+///
+/// # Why a worm gets this at all
+///
+/// Every other number a worm stage reports — its contact stress, its efficiency,
+/// its backlash — comes from a model in which **both flanks are involute
+/// helicoids on cylinders** (§4.5.1). Withholding the one number that comes from
+/// the same construction, on the grounds that a real worm's wheel is throated,
+/// would be applying a standard to it that nothing else here is held to.
+///
+/// What throating does is *wrap* the wheel around the worm, engaging more of the
+/// thread. That can only lengthen the zone of action, so the cylindrical figure
+/// is a lower bound on an enveloping one: a worm that clears `ε = 1` here clears
+/// it as built. That is an argument about the direction, not a computation, and
+/// it is said next to the number.
+fn crossed_mesh(
+    s: &Screw,
+    members: &[WormMemberResult; 2],
+    tips: Option<[f64; 2]>,
+) -> Option<CrossedMesh> {
+    let radii = [
+        members[0].pitch_diameter / 2.0,
+        members[1].pitch_diameter / 2.0,
+    ];
+    // A standard tooth where the stage does not say: one **normal** module, the
+    // shorter of the two conventions a worm is cut to, so the assumption errs
+    // the same way the throating argument does.
+    let assumed = s.normal_module();
+    // Carried, not deduced: a crossed pair whose addendum happens to be one
+    // module produces the same tips as the assumption does, and asking the
+    // numbers which they were would answer wrongly exactly there.
+    let tooth_height_assumed = tips.is_none();
+    let tips = tips.unwrap_or([radii[0] + assumed, radii[1] + assumed]);
+    let path = s.path_of_contact(tips[0], tips[1])?;
+    let face = [members[0].face_width, members[1].face_width];
+    let (zone, limited_by) = path
+        .limited_by_face(s, face)
+        .unwrap_or((path, ZoneLimit::Face));
+    Some(CrossedMesh {
+        contact_ratio: zone.contact_ratio,
+        limited_by,
+        face_width_for_continuity: path.face_widths_for(s, 1.0),
+        axial_travel: zone.axial_travel(s),
+        tooth_height_assumed,
+    })
+}
+
 fn angular_backlash(s: &Screw, stage: &WormStage, delta: f64, at: Member) -> f64 {
     let alpha_n = stage.pressure_angle.to_radians();
     let beta_b1 = (s.worm_helix_angle.sin() * alpha_n.cos()).asin();
@@ -1035,15 +1080,57 @@ mod tests {
         assert!((wider.crossed.unwrap().contact_ratio - w.contact_ratio).abs() < 1e-12);
     }
 
-    /// **A worm drive reports none of it.** Its wheel is throated, and the zone
-    /// of action of a throated wheel is not derived here — a cylindrical one
-    /// would be a number about a different part. The same line the conventional
-    /// proportions are offered along.
+    /// **A worm drive reports the same path, and says what it assumed to.**
+    ///
+    /// Every other figure a worm stage gives comes from a model in which both
+    /// flanks are involute helicoids on cylinders, so withholding the one that
+    /// comes from the same construction would be holding it to a standard
+    /// nothing else here meets. What it *does* lack is a tooth height — there is
+    /// no addendum input — so the tips are assumed and the result says so.
+    ///
+    /// Its face width stays proportion-sized: BS 721 and DIN are worm-drive
+    /// conventions and answer a different question from continuity of contact.
+    /// Both numbers are reported, each labelled with what it is.
     #[test]
-    fn a_worm_drive_does_not_claim_a_crossed_pairs_contact_ratio() {
+    fn a_worm_drive_reports_the_path_as_a_floor_and_keeps_its_proportions() {
         let r = solved(&WormStage::default());
-        assert!(r.crossed.is_none());
+        let m = r.crossed.expect("the same construction serves a worm");
+        assert!(
+            m.tooth_height_assumed,
+            "a worm stage has no addendum, so the tips must be flagged as assumed"
+        );
+        assert!(m.contact_ratio > 0.0);
+        // The proportions still size the face; continuity is reported beside
+        // them rather than instead of them.
         assert!(r.members[0].recommended_face_width.is_some());
+        assert!(m.face_width_for_continuity.is_some());
+
+        // A crossed gear pair carries its own tooth height, so nothing is
+        // assumed there — the flag is what separates the two cases.
+        use crate::params::Auto;
+        use crate::train::{SpurStage, StageGear};
+        let crossed = solve_crossed_stage(
+            &SpurStage {
+                shaft_angle: 90.0,
+                gears: [
+                    StageGear {
+                        teeth: 17,
+                        face_width: Auto::fixed(6.0),
+                        ..StageGear::default()
+                    },
+                    StageGear {
+                        teeth: 23,
+                        face_width: Auto::fixed(6.0),
+                        ..StageGear::default()
+                    },
+                ],
+                ..SpurStage::default()
+            },
+            2.0,
+            &library(),
+        )
+        .unwrap();
+        assert!(!crossed.crossed.unwrap().tooth_height_assumed);
     }
 
     /// A self-locking pair says so, rather than reporting a negative efficiency

@@ -563,7 +563,8 @@ impl Screw {
     }
 
     /// Normal module, recovered from the pitch geometry it was built with.
-    fn normal_module(&self) -> f64 {
+    #[must_use]
+    pub fn normal_module(&self) -> f64 {
         self.axial_module * self.lead_angle.cos()
     }
 

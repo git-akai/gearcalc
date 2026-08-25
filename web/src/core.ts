@@ -677,9 +677,10 @@ export interface WormContact {
   curvature_along: number;
   curvature_across: number;
 }
-/** What a crossed *gear* pair's path of contact says. Absent for a worm drive,
- *  whose wheel is throated — a cylindrical zone of action would be a number
- *  about a different part. */
+/** What the path of contact says — for a worm drive as well as a crossed gear
+ *  pair, since both come from the same construction (§4.5.1 takes both flanks as
+ *  involute helicoids on cylinders, which is where the stage's other numbers
+ *  come from too). */
 export interface CrossedMesh {
   contact_ratio: number;
   limited_by: "tips" | "face";
@@ -687,6 +688,9 @@ export interface CrossedMesh {
    *  one, and the label has to travel with the number. */
   face_width_for_continuity: [number, number] | null;
   axial_travel: [number, number];
+  /** True when the tooth height was assumed rather than given: a worm stage has
+   *  no addendum input, so its figures are a floor. */
+  tooth_height_assumed: boolean;
 }
 
 export interface WormResult {
@@ -694,7 +698,7 @@ export interface WormResult {
   ratio: number;
   centre_distance_nominal: number;
   centre_distance: number;
-  /** Null for a worm drive; see `CrossedMesh`. */
+  /** Null only when the path could not be built at all. */
   crossed: CrossedMesh | null;
   lead_angle: number;
   wheel_lead_angle: number;

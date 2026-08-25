@@ -838,12 +838,37 @@ pair's face width can now be sized from.
 
 ##### What a crossed stage reports, and what kind of minimum its face width is
 
-The path is wired into the stage. A crossed **gear** pair reports its contact
-ratio, what ended the zone — the teeth or the face — and how far the contact
-point travels along each member's axis. A worm drive reports none of it, because
-its wheel is throated and a cylindrical zone of action would be a number about a
-different part; that is the same line the conventional proportions are offered
-along (above), drawn for the same reason.
+The path is wired into the stage. **Both** kinds report it: the contact ratio,
+what ended the zone — the teeth or the face — and how far the contact point
+travels along each member's axis.
+
+A first attempt withheld it from worm drives "because the wheel is throated".
+That was wrong, and worth recording as a correction rather than editing away.
+**Nothing here models a throated wheel.** §4.5.1 takes *both* flanks as involute
+helicoids on cylinders, and that is the model a worm stage's contact stress, its
+efficiency and its backlash all already come from; withholding the one number
+that comes from the same construction would have held it to a standard nothing
+else in the stage meets. The phrase was inherited from an open item written when
+**no** zone of action was derived for any crossed geometry — true then for a
+simpler reason, and carried forward as though throating were a modelled property.
+
+What throating actually does is *wrap* the wheel around the worm, engaging more
+thread, which can only lengthen the zone. So the cylindrical figure is a **lower
+bound** on an enveloping one: a worm that clears `ε = 1` here clears it as built.
+That is an argument about direction, not a computation, and it is said beside the
+number.
+
+A worm stage does lack one thing a crossed pair has — a **tooth height**, since
+it has no addendum input. One normal module is assumed, the shorter of the two
+conventions a worm is cut to, so the assumption errs the same way the throating
+argument does. That the height was assumed is carried on the result rather than
+deduced from the numbers: a crossed pair whose addendum happens to be one module
+produces the same tips as the assumption, and asking the values which they were
+would answer wrongly exactly there.
+
+The face width stays proportion-sized for a worm drive: BS 721 and DIN are
+worm-drive conventions and answer a different question from continuity of
+contact. Both figures are reported, each labelled with which it is.
 
 **Automatic face width means something different here, and the difference is
 labelled wherever the number appears.** A spur stage's automatic width inverts a
@@ -3013,7 +3038,7 @@ not have to hunt for it.
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
 | Radial-assembly interference — **shelved**; attempted, diagnosed and withdrawn, with the findings kept | §4.11 | nothing |
 | The cut simulation cannot see below the generation limit: its cutter has no fillet | §4.11 | nothing; the band is 0.08 mm on ordinary designs and is flagged |
-| A worm stage reports no contact ratio — the zone of action for a throated wheel is not derived | §4.5.1 | nothing |
+| The zone of action of an **enveloping** (throated) wheel is not derived. The cylindrical one now is, and a worm stage reports it as a floor with its assumed tooth height named | §4.5.1 | nothing |
 | A crossed pair's tooth form does not reach its mesh figures — a shift would need the crossed mesh derived at a shifted centre distance, and thinning would need the normal-plane backlash | §4.5.1 | nothing; the form is still specified, and the panel says what it does and does not reach |
 | Worm profile drawing and DXF — the gear tab draws parallel-axis involutes | §4.5.1 | nothing |
 | ~~Automatic worm length and wormwheel face width, refused as proportions~~ | §4.5.1 | **closed** — shipped as recommendations with their sources named. They enter no stress, so a convention here informs a choice without distorting an answer; the reasoning is at the end of §4.5.1 |
