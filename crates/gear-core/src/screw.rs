@@ -551,7 +551,7 @@ impl Screw {
         if length.is_nan() || length <= 0.0 {
             return None;
         }
-        let base_pitch = std::f64::consts::PI * self.normal_module() * alpha_n.cos();
+        let base_pitch = self.normal_base_pitch();
         Some(CrossedPath {
             normal: n,
             through: pitch,
@@ -566,9 +566,136 @@ impl Screw {
     fn normal_module(&self) -> f64 {
         self.axial_module * self.lead_angle.cos()
     }
+
+    /// `π m_n cos α_n` — the pitch the contact point advances by between one
+    /// tooth pair and the next, measured in the plane the contact is a point in.
+    #[must_use]
+    pub fn normal_base_pitch(&self) -> f64 {
+        std::f64::consts::PI * self.normal_module() * self.normal_pressure_angle.cos()
+    }
+}
+
+/// What ended the zone of action.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum ZoneLimit {
+    /// The teeth ran out: one member's tip left the path. Making a face wider
+    /// buys nothing from here.
+    Tips,
+    /// The **face** ran out. Unique to crossed axes, where the contact point
+    /// travels along the tooth as well as up it; a parallel pair's face width
+    /// does not bound its path at all.
+    Face,
 }
 
 impl CrossedPath {
+    /// The same path with each member's face width applied as a bound.
+    ///
+    /// A crossed pair's contact point travels `s · sin β_b` along each member's
+    /// own axis, so a face of width `b` centred on the pitch plane holds it only
+    /// while `|s| ≤ b / (2 sin β_b)`. Faces are taken as centred there: that is
+    /// the alignment the geometry is drawn at, and an offset one is a smaller
+    /// zone than this reports rather than a different construction.
+    ///
+    /// Returns `None` when the bounded zone closes entirely — a face so narrow
+    /// that the teeth never meet on it.
+    #[must_use]
+    pub fn limited_by_face(&self, screw: &Screw, face: [f64; 2]) -> Option<(Self, ZoneLimit)> {
+        let mut lo = self.zone[0];
+        let mut hi = self.zone[1];
+        let mut limit = ZoneLimit::Tips;
+        for (i, b) in face.iter().enumerate() {
+            let Some(half) = Self::half_span(screw, i, *b) else {
+                continue;
+            };
+            if half < hi {
+                hi = half;
+                limit = ZoneLimit::Face;
+            }
+            if -half > lo {
+                lo = -half;
+                limit = ZoneLimit::Face;
+            }
+        }
+        let length = hi - lo;
+        if length.is_nan() || length <= 0.0 {
+            return None;
+        }
+        Some((
+            Self {
+                zone: [lo, hi],
+                length,
+                contact_ratio: length / screw.normal_base_pitch(),
+                ..*self
+            },
+            limit,
+        ))
+    }
+
+    /// The face widths at which the contact ratio would be exactly `target`.
+    ///
+    /// **A geometric minimum, not a strength one.** It is the width that keeps
+    /// one tooth pair in contact until the next takes over; nothing about stress
+    /// enters it, which is the opposite of the spur stage's automatic width and
+    /// has to be said wherever the number is shown.
+    ///
+    /// The zone grows with the half-span `B` at slope 2 while both ends are the
+    /// face's, at slope 1 once one end has reached the teeth, and at slope 0 once
+    /// both have — so the width is closed form in three cases rather than solved.
+    ///
+    /// Returns `None` when the teeth themselves cannot reach `target`: no face
+    /// width buys what the tips do not have.
+    #[must_use]
+    pub fn face_widths_for(&self, screw: &Screw, target: f64) -> Option<[f64; 2]> {
+        let want = target * screw.normal_base_pitch();
+        if want.is_nan() || want <= 0.0 || want > self.length_from_tips() {
+            return None;
+        }
+        // The pitch point is inside the zone, so one end is positive and the
+        // other negative; `near` is whichever the face meets first.
+        let (near, far) = {
+            let (a, b) = (self.zone[1].abs(), self.zone[0].abs());
+            (a.min(b), a.max(b))
+        };
+        let half = if want <= 2.0 * near {
+            want / 2.0
+        } else if want <= near + far {
+            want - near
+        } else {
+            far
+        };
+        let mut out = [0.0; 2];
+        for (i, o) in out.iter_mut().enumerate() {
+            *o = 2.0 * half * Self::axial_rate(screw, i).abs();
+        }
+        Some(out)
+    }
+
+    /// The tip-bounded length, which face widths can only shorten.
+    fn length_from_tips(&self) -> f64 {
+        self.zone[1] - self.zone[0]
+    }
+
+    /// `sin β_b` for member `i` — how fast the contact point runs along that
+    /// member's axis per unit of travel along the path.
+    fn axial_rate(screw: &Screw, i: usize) -> f64 {
+        let beta = if i == 0 {
+            screw.worm_helix_angle
+        } else {
+            screw.shaft_angle - screw.worm_helix_angle
+        };
+        (beta.sin() * screw.normal_pressure_angle.cos())
+            .asin()
+            .sin()
+    }
+
+    /// Half the path a face of width `b` can hold, in path units.
+    fn half_span(screw: &Screw, i: usize, b: f64) -> Option<f64> {
+        let rate = Self::axial_rate(screw, i).abs();
+        (rate > f64::EPSILON && b.is_finite() && b > 0.0).then(|| b / (2.0 * rate))
+    }
+
     /// The radius each member's flank is at, at a parameter along the path.
     ///
     /// `r = √(r_b² + (ρ_n cos β_b)²)`, the same relation the zone is bounded by.
@@ -1461,6 +1588,75 @@ mod tests {
                 "a steeper helix needs more face width"
             );
             previous = travel[0];
+        }
+    }
+
+    /// **The face width the continuity of contact asks for, and what it means.**
+    ///
+    /// Sizing to `ε = 1` and then measuring the contact ratio back must return
+    /// exactly 1 — the two are inverses, and a sign or a factor of two in either
+    /// would show up here. Then the properties that make it a *bound* rather
+    /// than a rule: a wider face buys nothing once the teeth are what ends the
+    /// zone, and a narrower one costs contact ratio proportionally.
+    #[test]
+    fn a_face_width_sized_for_continuity_delivers_exactly_that_contact_ratio() {
+        let mn = 1.0;
+        for (sigma_deg, beta_deg) in [(90.0f64, 45.0f64), (60.0, 30.0), (30.0, 15.0)] {
+            let beta: f64 = beta_deg.to_radians();
+            let s = Screw::new(&ScrewParams {
+                normal_module: mn,
+                shaft_angle: sigma_deg.to_radians(),
+                starts: 17,
+                wheel_teeth: 23,
+                worm_pitch_diameter: 17.0 * mn / (std::f64::consts::FRAC_PI_2 - beta).sin(),
+                ..ScrewParams::default()
+            })
+            .expect("a buildable pair");
+            let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+            let path = s
+                .path_of_contact(r[0] + mn, r[1] + mn)
+                .expect("a path of contact");
+
+            for target in [1.0f64, 1.25, 1.5] {
+                let Some(face) = path.face_widths_for(&s, target) else {
+                    continue;
+                };
+                let (bounded, limit) = path
+                    .limited_by_face(&s, face)
+                    .expect("a face sized for contact keeps some");
+                assert!(
+                    (bounded.contact_ratio - target).abs() < 1e-12,
+                    "Σ={sigma_deg}° target {target}: got {}",
+                    bounded.contact_ratio
+                );
+                assert_eq!(limit, ZoneLimit::Face, "the face is what ends it here");
+            }
+
+            // Wide enough and the teeth are what end the zone; from there a
+            // wider face buys nothing at all.
+            let generous = [1e3, 1e3];
+            let (wide, limit) = path.limited_by_face(&s, generous).unwrap();
+            assert_eq!(limit, ZoneLimit::Tips);
+            assert!((wide.contact_ratio - path.contact_ratio).abs() < 1e-12);
+
+            // ...and no face width can buy more than the teeth have.
+            assert!(path
+                .face_widths_for(&s, path.contact_ratio * 1.01)
+                .is_none());
+
+            // Halving the face halves what is left of the path, while the face
+            // is what governs — the proportionality that makes ε ≥ 1 a real
+            // constraint on a crossed pair and no constraint at all on a
+            // parallel one.
+            let one = path.face_widths_for(&s, 1.0).unwrap();
+            let (half, _) = path
+                .limited_by_face(&s, [one[0] / 2.0, one[1] / 2.0])
+                .unwrap();
+            assert!(
+                (half.contact_ratio - 0.5).abs() < 1e-12,
+                "half the face should leave half the contact: {}",
+                half.contact_ratio
+            );
         }
     }
 

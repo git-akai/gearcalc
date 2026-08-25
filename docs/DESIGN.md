@@ -30,7 +30,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Automatic proportions | the worm's length and the wheel's face width, as **recommendations** with their sources named | monotone in the wheel's teeth, homogeneous in the module, the BS 721 cap binding where it should |
 | UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm, crossed and planetary** stages, and geartrain import/export; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI; control positions measured to show notes do not move them |
 
-340 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+343 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -833,11 +833,50 @@ breaking one deliberately):
 **And one thing the audit did not predict**: a crossed pair's face width *bounds
 its zone of action*, because the contact point travels `zone × sin β_b` along
 each member's axis while a parallel pair's does not travel at all. That is why a
-parallel pair's face width does not bound its path, and it means a crossed pair's
-face width could be sized from `ε ≥ 1` — the very thing §4.5.1 currently says
-nothing can size. `axial_travel` reports it; applying it as a bound, and wiring
-the path into the stage's reported figures, is the next step and is deliberately
-not in the same change as the derivation.
+parallel pair's face width does not bound its path — and it is what a crossed
+pair's face width can now be sized from.
+
+##### What a crossed stage reports, and what kind of minimum its face width is
+
+The path is wired into the stage. A crossed **gear** pair reports its contact
+ratio, what ended the zone — the teeth or the face — and how far the contact
+point travels along each member's axis. A worm drive reports none of it, because
+its wheel is throated and a cylindrical zone of action would be a number about a
+different part; that is the same line the conventional proportions are offered
+along (above), drawn for the same reason.
+
+**Automatic face width means something different here, and the difference is
+labelled wherever the number appears.** A spur stage's automatic width inverts a
+stress: `σ_F(b)` and `σ_H(b)` both fall as `b` grows, so there is a smallest `b`
+that keeps them under an allowable. A crossed pair has *no* stress that depends
+on its width — a point contact's peak pressure is bit-identical at 4 mm and
+40 mm — so nothing about strength can size it. What it has instead is a contact
+point that runs off the end of a face too narrow. So automatic takes the width at
+which one tooth pair hands over to the next exactly:
+
+```text
+ε = 1   ⟺   b = 2 B sin β_b,      B the half-span the zone needs
+```
+
+closed form in three cases, because the zone grows with the half-span at slope 2
+while both ends are the face's, at slope 1 once one end has reached the teeth,
+and at slope 0 once both have.
+
+Two consequences worth being plain about, both of which the panel says:
+
+- It is a **geometric** minimum, not a strength one. On the shipped 17/23 pair at
+  Σ = 90° it asks for 1.96 mm where the BS 721 proportion asks 4.69 mm for a
+  comparable worm wheel. Neither is wrong; they answer different questions, and a
+  reader seeing two "minimums" a factor of 2.4 apart is owed the reason.
+- `ε = 1` is a knife edge, and any margin above it — 1.1, 1.2 — is a convention
+  of the kind §4.7 refuses to ship silently. So automatic gives the `ε = 1`
+  width, `ε` is reported beside it, and the margin is the designer's. That is
+  the same arrangement as the spur stage's `b_min`, which is offered rather than
+  imposed.
+
+Below 1 the pair loses contact between one tooth and the next, which is a failure
+of *kind* rather than of margin — so it is said in the stage's notes rather than
+left to be read off a number.
 
 ##### A crossed gear pair is the spur stage with its shafts turned
 

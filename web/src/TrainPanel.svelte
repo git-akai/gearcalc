@@ -177,6 +177,27 @@
      (DESIGN §4.5.1), so it is one readout rather than two that drift. -->
 {#snippet screwReadout(r: WormResult)}
 <dl class="out">
+  {#if r.crossed}
+    <dt>Contact ratio</dt>
+    <dd>
+      <span class:warn={r.crossed.contact_ratio < 1}>
+        ε {r.crossed.contact_ratio.toFixed(4)}
+      </span>
+      <small>
+        {r.crossed.contact_ratio < 1
+          ? "below 1: the pair loses contact between one tooth and the next"
+          : `pairs in contact · ended by the ${r.crossed.limited_by === "face" ? "face width" : "teeth"}`}
+      </small>
+    </dd>
+    <dt>Contact travel</dt>
+    <dd>
+      {r.crossed.axial_travel[0].toFixed(3)} · {r.crossed.axial_travel[1].toFixed(3)} mm
+      <small>
+        along each member's own axis — what a face has to cover, and what a
+        parallel pair does not have at all
+      </small>
+    </dd>
+  {/if}
   <dt>Centre distance</dt>
   <dd>
     {r.centre_distance.toFixed(4)} mm
@@ -234,6 +255,8 @@
     /** False where nothing rates the face width — a crossed pair's contact is a
      *  point, so no stress depends on it and none can size it. */
     faceAuto?: boolean;
+    /** The width at which ε = 1, for a crossed pair. */
+    faceFromContinuity?: number;
     /** A readout only this member has; given the member's position. */
     extra?: Snippet<[number]>;
     extraIndex?: number;
@@ -315,14 +338,18 @@
     </label>
   {/if}
   {#if opts.faceAuto === false}
-    <label>
-      <span>Face width</span>
-      <input type="number" step="0.5" bind:value={gear.face_width.manual} />
-      <em>mm</em>
-      {@render noteSlot(
-        notes("nothing rates a crossed pair's face width, so nothing can size it", null),
-      )}
-    </label>
+    <!-- A crossed pair's automatic width is a **geometric** minimum: the width
+         at which one tooth pair hands over to the next (ε = 1). The spur
+         stage's inverts a stress instead, and the two must not read alike. -->
+    {@render autoNumber("Face width", gear.face_width, opts.faceFromContinuity, 0.5)}
+    {@render noteSlot(
+      notes(
+        opts.faceFromContinuity === undefined
+          ? "no width keeps contact continuous here — the teeth do not reach it at any width"
+          : `automatic is ${n(opts.faceFromContinuity)} mm, where contact stays continuous (ε = 1) — a geometric minimum, not a strength one`,
+        null,
+      ),
+    )}
   {:else}
     {@render autoNumber("Face width", gear.face_width, g?.face_width, 0.5)}
   {/if}
@@ -717,6 +744,7 @@
                 {@render gearCard(`Gear ${gearNumber(i, j)}`, gear, g, {
                   cut: "rack",
                   faceAuto: stage.shaft_angle === 0,
+                  faceFromContinuity: xres?.crossed?.face_width_for_continuity?.[j],
                   extra: xres ? crossedMember : undefined,
                   extraIndex: j,
                 })}

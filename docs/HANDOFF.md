@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–10 complete and in CI. 340 tests, ~26 s.** Milestone 11 is
+**Milestones 0–10 complete and in CI. 343 tests, ~26 s.** Milestone 11 is
 under way: the ring-drawing defect below is fixed, and the rim circle with it.
 
 ```bash
@@ -40,8 +40,9 @@ helical throughout) · efficiency · automatic profile shift and altered addendu
 efficiencies from a force balance, self-locking, sliding as a vector, elliptical
 contact, and **the path of contact** — the line tangent to both base cylinders
 whose direction two properties of an involute helicoid fix, with its zone,
-contact ratio and axial travel (§4.5.1). Derived and tested; not yet wired into
-what a stage reports. A crossed gear pair is **entered as a spur stage with an axis angle**,
+contact ratio and axial travel (§4.5.1). A crossed gear pair reports `ε` and
+sizes its face width from `ε = 1`; a worm drive reports neither, because its
+wheel is throated. A crossed gear pair is **entered as a spur stage with an axis angle**,
 as the specification has it — `β₁ = Σ/2 + β_add`, `β₂ = Σ/2 − β_add`, so the
 parallel pair is the axis angle's zero — and solved by translating it into the
 screw stage it is. Three stage kinds, not four. The worm's length and the wheel's face width are **recommended** from
@@ -141,6 +142,12 @@ answers can silently disagree, and §12 is largely a record of exactly that.
 modern designs, they are only balanced as a complete set against `σ_Flim` values
 this project does not have, and they buy precision at the cost of accuracy.
 **`Y_S` is the deliberate exception** and the reasoning is in DESIGN §4.7.
+
+**Two automatic face widths, and they mean different things.** A spur stage's
+inverts a stress; a crossed pair's is the width at which contact stays continuous
+(`ε = 1`), because no stress there depends on the width at all. Both are shown as
+minimums with the kind named — 1.96 mm from continuity against 4.69 mm from a
+worm proportion is not a contradiction, it is two questions.
 
 **The policy is about factors that multiply a stress, not about conventions as
 such.** A worm's length and a wormwheel's face width are shipped as
@@ -352,7 +359,7 @@ these are the ones most likely to be stepped on again.
 | The cut simulation cannot see below the generation limit: its cutter has no fillet | §4.11 | nothing |
 | Mesh-phase coefficient setting the optimal λ | §4.10 | only the angular-profile-shift milestone |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
-| **The crossed-axis contact path** — **derived and tested** (`screw::CrossedPath`); what remains is applying the face-width bound and wiring it into the stage's reported figures, which changes numbers on screen and so is its own step | §4.5.1 | contact ratio, contact along the path, bending, automatic face width and a sliding-based efficiency — all five wait on the wiring, not on the geometry |
+| **The crossed-axis contact path** — derived, tested and **wired**: a crossed pair reports its contact ratio and sizes its face width from `ε ≥ 1`. Two of the five remain — contact rated *along* the path rather than at the pitch point, and bending, which now has a load point available | §4.5.1 | those two |
 | Worm contact ratio — the zone of action for a **throated** wheel; a different and harder problem from the crossed cylindrical pair above | §4.5.1 | nothing |
 | Span over teeth for a ring — rare in practice, not derived; between-pins is done | §4.6 | nothing |
 | Worm profile drawing and DXF; a planetary set has no drawing either | §4.5.1, §8 | nothing |

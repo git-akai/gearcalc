@@ -40,7 +40,7 @@ use crate::contact::{Directional, Drive};
 use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
 use crate::mesh::Member;
 use crate::params::Auto;
-use crate::screw::{Screw, ScrewParams};
+use crate::screw::{Screw, ScrewParams, ZoneLimit};
 
 /// The proportions a worm drive is conventionally given.
 ///
@@ -226,6 +226,32 @@ pub struct WormMemberResult {
     pub material: Material,
 }
 
+/// What a crossed **gear** pair's path of contact says — absent for a worm.
+///
+/// A worm drive's wheel is throated, and the zone of action of a throated wheel
+/// is not derived here (§4.5.1); a cylindrical construction applied to it would
+/// be a number about a different part. So this is reported for the pair sized by
+/// helix angle and not for the one sized by diameter — the same line the
+/// conventional proportions are offered along, drawn for the same reason.
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct CrossedMesh {
+    /// Tooth pairs in contact. **Below 1 the drive loses contact between one
+    /// pair and the next**, which is a failure of kind rather than of margin.
+    pub contact_ratio: f64,
+    /// What ended the zone: the teeth, or the face they are cut on.
+    pub limited_by: ZoneLimit,
+    /// The face width at which `ε = 1`, per member, mm.
+    ///
+    /// A **geometric** minimum: it keeps contact continuous and says nothing
+    /// about stress. That is the opposite of the spur stage's automatic width,
+    /// which inverts a stress, and the difference has to travel with the number.
+    pub face_width_for_continuity: Option<[f64; 2]>,
+    /// How far the contact point runs along each member's own axis, mm — what a
+    /// face has to cover, and what a parallel pair does not have at all.
+    pub axial_travel: [f64; 2],
+}
+
 /// The contact patch a worm mesh presses.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -267,6 +293,9 @@ pub struct WormResult {
     /// Lead, mm, and axial module, mm.
     pub lead: f64,
     pub axial_module: f64,
+    /// The path of contact, for a crossed **gear** pair. `None` for a worm
+    /// drive: see [`CrossedMesh`].
+    pub crossed: Option<CrossedMesh>,
     /// Mesh efficiency in both drive directions.
     ///
     /// Unlike a parallel-axis stage these genuinely differ, and the backward one
@@ -402,7 +431,7 @@ pub fn solve_crossed_stage(
         material_overrides: g.material_overrides,
     };
 
-    let equivalent = WormStage {
+    let mut equivalent = WormStage {
         module: stage.module,
         pressure_angle: stage.pressure_angle,
         shaft_angle: stage.shaft_angle,
@@ -419,14 +448,79 @@ pub fn solve_crossed_stage(
         wheel: member(&stage.gears[1]),
     };
 
+    // --- the path of contact, which is what a crossed pair can now say.
+    //
+    // Its tips come from the tooth form the stage carries: this is the one place
+    // that form reaches an answer, which is why it is specified at all (§4.5.1).
+    let screw = equivalent.geometry()?;
+    let tips = {
+        let r = [
+            screw.worm_pitch_diameter / 2.0,
+            screw.wheel_pitch_diameter / 2.0,
+        ];
+        [
+            r[0] + stage.gears[0].addendum.manual * stage.module,
+            r[1] + stage.gears[1].addendum.manual * stage.module,
+        ]
+    };
+    let path = screw.path_of_contact(tips[0], tips[1]);
+
+    // **Automatic face width means continuity here, not strength.** The spur
+    // stage inverts a stress to size a face; a crossed pair has no stress that
+    // depends on its width at all, and what it does have is a contact point that
+    // runs off the end of a face too narrow. So automatic takes the width at
+    // which one tooth pair hands over to the next exactly — `ε = 1` — and the
+    // result says which kind of minimum it is wherever it shows the number.
+    let continuity = path.as_ref().and_then(|p| p.face_widths_for(&screw, 1.0));
+    let mut notes = Vec::new();
+    for (i, gear) in stage.gears.iter().enumerate() {
+        if !gear.face_width.auto {
+            continue;
+        }
+        match continuity {
+            Some(widths) => {
+                let m = if i == 0 {
+                    &mut equivalent.worm
+                } else {
+                    &mut equivalent.wheel
+                };
+                m.face_width = Auto::fixed(widths[i]);
+            }
+            None => notes.push(format!(
+                "gear {}'s face width used as entered: its teeth do not reach a full \
+                 contact ratio at any width, so there is no width that would keep \
+                 contact continuous",
+                i + 1
+            )),
+        }
+    }
+
     let mut result = solve_worm_stage(&equivalent, input_torque, lib)?;
-    if stage.gears.iter().any(|g| g.face_width.auto) {
-        result.notes.push(
-            "face width used as entered: a crossed pair touches at a point, so no rating \
-             sizes it — neither bending, which has no model for crossed axes, nor contact, \
-             whose peak pressure does not depend on the width at all"
-                .into(),
-        );
+    result.notes.extend(notes);
+
+    // ...and the zone as the widths in use actually leave it.
+    if let Some(p) = path {
+        let widths = [result.members[0].face_width, result.members[1].face_width];
+        let bounded = p.limited_by_face(&screw, widths);
+        let (zone, limited_by) = match bounded {
+            Some((z, limit)) => (z, limit),
+            None => (p, ZoneLimit::Face),
+        };
+        if zone.contact_ratio < 1.0 {
+            result.notes.push(format!(
+                "contact ratio {:.3}: below 1 the pair loses contact between one tooth \
+                 and the next, whatever the stresses say. A crossed pair's face width \
+                 bounds this where a parallel pair's does not — see the width for \
+                 continuity beside it",
+                zone.contact_ratio
+            ));
+        }
+        result.crossed = Some(CrossedMesh {
+            contact_ratio: zone.contact_ratio,
+            limited_by,
+            face_width_for_continuity: continuity,
+            axial_travel: zone.axial_travel(&screw),
+        });
     }
     Ok(result)
 }
@@ -588,6 +682,8 @@ pub fn solve_worm_stage(
         wheel_helix_angle: s.wheel_helix_angle.to_degrees(),
         lead: s.lead,
         axial_module: s.axial_module,
+        // A worm drive says nothing here; `solve_crossed_stage` fills it in.
+        crossed: None,
         efficiency,
         self_locking_friction: threshold,
         sliding_ratio: s.sliding_ratio,
@@ -872,6 +968,82 @@ mod tests {
             "no note explaining the absent recommendation: {:?}",
             crossed.notes
         );
+    }
+
+    /// **A crossed stage reports its contact ratio, and an automatic face width
+    /// is the width that keeps it at 1.**
+    ///
+    /// The two have to agree: size the face automatically, and the ratio that
+    /// comes back must be exactly 1. Everything else here is a comparison —
+    /// a hand-set face narrower than that gives less, a wider one gives what the
+    /// teeth allow and no more, and the number moves the way the geometry says.
+    #[test]
+    fn an_automatic_face_width_on_a_crossed_pair_buys_exactly_continuous_contact() {
+        use crate::params::Auto;
+        use crate::train::{SpurStage, StageGear};
+
+        let lib = super::super::test_library();
+        let gear = |teeth: u32, face: Auto<f64>| StageGear {
+            teeth,
+            face_width: face,
+            ..StageGear::default()
+        };
+        let stage = |face: Auto<f64>| SpurStage {
+            shaft_angle: 90.0,
+            gears: [gear(17, face), gear(23, face)],
+            ..SpurStage::default()
+        };
+
+        // Automatic: the width for ε = 1, and the ratio comes back as 1.
+        let auto = solve_crossed_stage(&stage(Auto::automatic(0.0)), 2.0, &lib).unwrap();
+        let m = auto.crossed.expect("a crossed pair has a path of contact");
+        assert!(
+            (m.contact_ratio - 1.0).abs() < 1e-9,
+            "automatic should buy exactly continuous contact, got {}",
+            m.contact_ratio
+        );
+        assert_eq!(m.limited_by, ZoneLimit::Face);
+        let sized = m.face_width_for_continuity.expect("a width for continuity");
+        for (i, (member, want)) in auto.members.iter().zip(sized).enumerate() {
+            assert!(
+                (member.face_width - want).abs() < 1e-9,
+                "member {i} should be sized to {want}"
+            );
+        }
+
+        // Half that face, half the contact — and the result says so out loud
+        // rather than leaving a number below 1 to be noticed.
+        let narrow = solve_crossed_stage(&stage(Auto::fixed(sized[0] / 2.0)), 2.0, &lib).unwrap();
+        let n = narrow.crossed.unwrap();
+        assert!(
+            (n.contact_ratio - 0.5).abs() < 1e-9,
+            "half the face should leave half the contact: {}",
+            n.contact_ratio
+        );
+        assert!(
+            narrow.notes.iter().any(|s| s.contains("loses contact")),
+            "a contact ratio below 1 must be said: {:?}",
+            narrow.notes
+        );
+
+        // Generous, and the teeth are what end it — a wider face buys nothing.
+        let wide = solve_crossed_stage(&stage(Auto::fixed(60.0)), 2.0, &lib).unwrap();
+        let w = wide.crossed.unwrap();
+        assert_eq!(w.limited_by, ZoneLimit::Tips);
+        assert!(w.contact_ratio > m.contact_ratio);
+        let wider = solve_crossed_stage(&stage(Auto::fixed(120.0)), 2.0, &lib).unwrap();
+        assert!((wider.crossed.unwrap().contact_ratio - w.contact_ratio).abs() < 1e-12);
+    }
+
+    /// **A worm drive reports none of it.** Its wheel is throated, and the zone
+    /// of action of a throated wheel is not derived here — a cylindrical one
+    /// would be a number about a different part. The same line the conventional
+    /// proportions are offered along.
+    #[test]
+    fn a_worm_drive_does_not_claim_a_crossed_pairs_contact_ratio() {
+        let r = solved(&WormStage::default());
+        assert!(r.crossed.is_none());
+        assert!(r.members[0].recommended_face_width.is_some());
     }
 
     /// A self-locking pair says so, rather than reporting a negative efficiency

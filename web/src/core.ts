@@ -677,11 +677,25 @@ export interface WormContact {
   curvature_along: number;
   curvature_across: number;
 }
+/** What a crossed *gear* pair's path of contact says. Absent for a worm drive,
+ *  whose wheel is throated — a cylindrical zone of action would be a number
+ *  about a different part. */
+export interface CrossedMesh {
+  contact_ratio: number;
+  limited_by: "tips" | "face";
+  /** The face width at which ε = 1 — a **geometric** minimum, not a strength
+   *  one, and the label has to travel with the number. */
+  face_width_for_continuity: [number, number] | null;
+  axial_travel: [number, number];
+}
+
 export interface WormResult {
   kind: "worm";
   ratio: number;
   centre_distance_nominal: number;
   centre_distance: number;
+  /** Null for a worm drive; see `CrossedMesh`. */
+  crossed: CrossedMesh | null;
   lead_angle: number;
   wheel_lead_angle: number;
   /** Helix angle of the first member, degrees — `90° − γ₁`, from Rust. */
