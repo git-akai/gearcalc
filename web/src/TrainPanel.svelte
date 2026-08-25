@@ -214,11 +214,10 @@
     {#if r.efficiency.backward <= 0}
       <small class="warn">self-locking</small>
     {/if}
-    {#if r.crossed?.parallel_axis_efficiency != null && r.efficiency.forward > r.crossed.parallel_axis_efficiency}
-      <small class="warn">
-        an upper bound: this counts sliding along the tooth trace, not up the profile, and
-        the same teeth with parallel shafts give {pct(r.crossed.parallel_axis_efficiency)} %
-        — crossing shafts can only add sliding
+    {#if r.crossed?.parallel_axis_efficiency != null}
+      <small>
+        the same teeth with parallel shafts would give {pct(r.crossed.parallel_axis_efficiency)} %
+        — crossing them is what the difference costs
       </small>
     {/if}
   </dd>

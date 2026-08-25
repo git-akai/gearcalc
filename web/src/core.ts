@@ -696,10 +696,9 @@ export interface CrossedMesh {
   /** True when the tooth height was assumed rather than given: a worm stage has
    *  no addendum input, so its figures are a floor. */
   tooth_height_assumed: boolean;
-  /** What the same teeth would give with their shafts parallel. Crossing shafts
-   *  can only add sliding, so a crossed efficiency above this is knowably short
-   *  — the model counts sliding along the trace, not up the profile. Null for a
-   *  worm, which has no parallel-axis counterpart. */
+  /** What the same teeth would give with their shafts parallel — the best the
+   *  pair can be, since crossing shafts adds sliding. Null for a worm, which has
+   *  no parallel-axis counterpart. */
   parallel_axis_efficiency: number | null;
 }
 

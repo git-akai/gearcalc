@@ -191,10 +191,14 @@
               pkgs.binaryen               # wasm-opt
               pkgs.nodejs                 # Svelte / Vite front end
 
-              # ezdxf reads exported DXF back with an implementation unrelated
-              # to ours, so tools/validate_dxf.py checks the geometry rather
-              # than only our agreement with ourselves.
-              (pkgs.python3.withPackages (ps: [ ps.ezdxf ]))
+              # Both verification scripts check the Rust against something that
+              # shares no code with it: ezdxf reads an exported DXF back with an
+              # unrelated implementation (tools/validate_dxf.py), and numpy
+              # builds the crossed flanks as parametric surfaces and
+              # differentiates them (tools/crossed_path.py). numpy is named
+              # here rather than taken from ezdxf's closure, which would make it
+              # vanish the day ezdxf stopped needing it.
+              (pkgs.python3.withPackages (ps: [ ps.ezdxf ps.numpy ]))
             ];
 
             RUST_BACKTRACE = "1";

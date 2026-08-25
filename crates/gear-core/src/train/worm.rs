@@ -261,38 +261,22 @@ pub struct CrossedMesh {
     /// True when the tooth height was **assumed** rather than given — a worm
     /// stage has no addendum input. The figures above are then a lower bound.
     pub tooth_height_assumed: bool,
-    /// What the same teeth would lose with their shafts brought **parallel**,
-    /// as an efficiency — available only where that pair exists, so `None` for a
-    /// worm drive, whose single-start thread is not a parallel-axis gear.
+    /// What the same teeth would lose with their shafts brought **parallel**, as
+    /// an efficiency — `None` for a worm drive, whose single-start thread is not
+    /// a parallel-axis gear.
     ///
-    /// Reported because of a law the crossed model does not obey: **crossing
-    /// shafts can only add sliding**, so a crossed pair cannot be more efficient
-    /// than the same teeth running parallel. Where it comes out that way, the
-    /// figure beside it is missing the profile sliding a parallel mesh loses to
-    /// — see [`CrossedMesh::omits_profile_sliding`].
+    /// Reported for comparison: crossing shafts adds sliding, so this is the
+    /// best the pair can be, and how far the crossed figure falls below it is
+    /// what the shaft angle costs.
+    ///
+    /// It was once a *check* — the crossed model omitted the profile sliding, so
+    /// beating this figure meant sliding had gone missing (§12). The friction
+    /// balance counts that sliding now, and the check has become worse than
+    /// useless: it is the **parallel** closed form that is approximate, first
+    /// order in `μ` where the balance is exact, so at a very small shaft angle
+    /// the crossed figure legitimately sits a hundredth of a point above and the
+    /// old test would accuse the better number.
     pub parallel_axis_efficiency: Option<f64>,
-}
-
-impl CrossedMesh {
-    /// Whether the reported efficiency is knowably short of the truth.
-    ///
-    /// The crossed model counts the sliding **along** the tooth trace, which is
-    /// what a screw pair's force balance is about, and not the sliding **up the
-    /// profile**, which is where a parallel mesh's whole loss comes from. As the
-    /// shaft angle falls the first vanishes and the second does not, so the
-    /// model tends to 100 % where the real pair tends to its parallel-axis
-    /// figure — measured at 99.988 % against 98.777 % at Σ = 0.1°, a step of
-    /// 1.2 points with nothing physical happening at the boundary.
-    ///
-    /// Rather than pick a shaft angle below which to warn — a threshold is a
-    /// convention, and this project does not ship those — the test is the law
-    /// itself: if the crossed figure beats the parallel one, sliding has gone
-    /// missing.
-    #[must_use]
-    pub fn omits_profile_sliding(&self, crossed_efficiency: f64) -> bool {
-        self.parallel_axis_efficiency
-            .is_some_and(|parallel| crossed_efficiency > parallel)
-    }
 }
 
 /// The contact patch a worm mesh presses.
@@ -581,19 +565,7 @@ pub fn solve_crossed_stage(
     // ...and the zone as the widths in use actually leave it. The tips are known
     // here — a crossed pair carries its tooth form — so nothing is assumed.
     result.crossed = crossed_mesh(&screw, &result.members, Some(tips), parallel);
-    if let Some(mesh) = result.crossed {
-        if mesh.omits_profile_sliding(result.efficiency.forward) {
-            result.notes.push(format!(
-                "efficiency {:.3} % counts the sliding along the tooth trace and not the \
-                 sliding up the profile. Crossing shafts can only add sliding, so a figure \
-                 above the {:.3} % these same teeth would give with parallel shafts is \
-                 knowably short: the profile loss does not vanish as the shafts come \
-                 parallel, and this model lets it. Read it as an upper bound",
-                100.0 * result.efficiency.forward,
-                100.0 * mesh.parallel_axis_efficiency.unwrap_or_default(),
-            ));
-        }
-    }
+
     if let Some(zone) = result.crossed {
         if zone.contact_ratio < 1.0 {
             result.notes.push(format!(
@@ -1453,29 +1425,23 @@ mod tests {
         };
         let r = solve_crossed_stage(&crossed, 2.0, &lib).unwrap();
         let m = r.crossed.expect("a path");
-        assert!(!m.omits_profile_sliding(r.efficiency.forward));
         assert!(
             r.efficiency.forward < m.parallel_axis_efficiency.unwrap(),
             "a crossed pair must still lose more than the same teeth parallel"
         );
     }
 
-    /// **Crossing shafts can only add sliding**, and where the model says
-    /// otherwise it says so out loud.
+    /// **Crossing shafts adds sliding, and the figures show it** — with one
+    /// exception that is the *other* formula's approximation, not this one's.
     ///
-    /// The crossed efficiency is a force balance about the sliding *along* the
-    /// tooth trace. A parallel mesh's whole loss is sliding *up the profile*,
-    /// which that balance does not carry — so as the shaft angle falls the
-    /// crossed figure tends to 100 % while the real pair tends to its
-    /// parallel-axis value. Measured at 99.988 % against 98.777 % at Σ = 0.1°.
-    ///
-    /// The test here is the law rather than a threshold: the same teeth with
-    /// parallel shafts are the *most* efficient that pair can be, so a crossed
-    /// figure above it is knowably short and the result must say so. At a large
-    /// shaft angle the lengthwise loss dominates, the law holds comfortably, and
-    /// nothing is said.
+    /// A crossed pair loses more than the same teeth running parallel, and by
+    /// more the further the shafts are turned. At a shaft angle small enough
+    /// that the two are the same mesh, the balance comes out a hundredth of a
+    /// point *above* the parallel closed form — because that closed form is
+    /// first order in `μ` and the balance is exact in it. `screw.rs` measures
+    /// that difference as O(μ²); here it is allowed for and bounded.
     #[test]
-    fn a_crossed_pair_cannot_beat_the_same_teeth_running_parallel() {
+    fn a_crossed_pair_loses_more_the_further_its_shafts_are_turned() {
         use crate::params::Auto;
         use crate::train::{SpurStage, StageGear};
 
@@ -1486,41 +1452,41 @@ mod tests {
             gears: [
                 StageGear {
                     teeth: 17,
-                    face_width: Auto::fixed(10.0),
+                    face_width: Auto::fixed(12.0),
                     ..StageGear::default()
                 },
                 StageGear {
                     teeth: 43,
-                    face_width: Auto::fixed(10.0),
+                    face_width: Auto::fixed(12.0),
                     ..StageGear::default()
                 },
             ],
             ..SpurStage::default()
         };
 
-        // A small shaft angle: the lengthwise loss has nearly gone, the profile
-        // loss has not, and the model is knowably short — so it says so.
-        let shallow = solve_crossed_stage(&stage(1.0), 2.0, &lib).unwrap();
-        let m = shallow.crossed.expect("a path of contact");
-        assert!(
-            m.omits_profile_sliding(shallow.efficiency.forward),
-            "at Σ = 1° the crossed figure {} should exceed the parallel {:?}",
-            shallow.efficiency.forward,
-            m.parallel_axis_efficiency
-        );
-        assert!(
-            shallow.notes.iter().any(|n| n.contains("upper bound")),
-            "and it must be said: {:?}",
-            shallow.notes
-        );
+        let mut previous = 1.0;
+        for sigma in [0.5f64, 2.0, 10.0, 45.0, 90.0] {
+            let r = solve_crossed_stage(&stage(sigma), 2.0, &lib).unwrap();
+            let parallel = r
+                .crossed
+                .expect("a path")
+                .parallel_axis_efficiency
+                .expect("a parallel counterpart");
+            assert!(
+                r.efficiency.forward < previous,
+                "Σ={sigma}°: turning the shafts further must cost more"
+            );
+            previous = r.efficiency.forward;
 
-        // A right angle: sliding along the trace dominates and the law holds
-        // with room to spare, so there is nothing to say.
-        let square = solve_crossed_stage(&stage(90.0), 2.0, &lib).unwrap();
-        let m = square.crossed.unwrap();
-        assert!(!m.omits_profile_sliding(square.efficiency.forward));
-        assert!(square.efficiency.forward < m.parallel_axis_efficiency.unwrap());
-        assert!(!square.notes.iter().any(|n| n.contains("upper bound")));
+            // Below the parallel figure everywhere the difference is physical,
+            // and above it by no more than that formula's own linearisation
+            // where the two are the same mesh.
+            assert!(
+                r.efficiency.forward < parallel + 2e-4,
+                "Σ={sigma}°: {} against the parallel {parallel}",
+                r.efficiency.forward
+            );
+        }
 
         // A worm has no parallel-axis counterpart — a one-start thread is not a
         // gear — so the comparison is absent rather than invented.

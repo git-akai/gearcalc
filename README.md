@@ -4,9 +4,9 @@ A browser tool for designing gears and geartrains: parameter calculation and
 optimisation, 2D profile visualisation, DXF export, and geartrains saved to and
 loaded from human-readable TOML.
 
-External, **internal**, **worm** and **planetary** gearing, with the mathematics
-derived rather than quoted — and the derivations checked against simulations that share no code
-with them.
+External, **internal**, **helical**, **crossed-axis**, **worm** and **planetary**
+gearing, with the mathematics derived rather than quoted — and the derivations
+checked against simulations that share no code with them.
 
 All mathematics is Rust, compiled to WebAssembly. TypeScript and Svelte do
 layout and event handling only.
@@ -20,8 +20,7 @@ layout and event handling only.
 The architecture, the mathematics behind every formula, and the verification log
 are in [`docs/DESIGN.md`](docs/DESIGN.md). Read that before changing anything in
 `gear-core`. [`docs/HANDOFF.md`](docs/HANDOFF.md) is the shorter route in: current
-state, the rules and why they are rules, the traps, and what the next milestone
-needs.
+state, the rules and why they are rules, the traps, and what is worth doing next.
 
 ## Layout
 
@@ -64,6 +63,7 @@ cargo run --bin gear-cli -- train                  # a geartrain, end to end
 cargo run --bin gear-cli -- trainfile              # a geartrain to TOML and back
 cargo run --bin gear-cli -- train mixed            # ...with a worm stage in it
 cargo run --bin gear-cli -- worm 1 40 7 90         # a worm pair, both directions
+cargo run --bin gear-cli -- crossed 17 23 90       # a crossed pair, every helix split
 cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
 cargo run --bin gear-cli -- planetary 17 17 3      # every ring count that can work
 cargo run --bin gear-cli -- planetstage 24 18 60 3 # a planetary stage, all six modes
@@ -106,7 +106,7 @@ nix build .#web          # deployable static site in ./result
 
 `gear-core::profile` is a port of a Python implementation that was validated to
 5e-4 mm against a full simulation of the generating rack, and the port reproduces
-it to 7.5e-14 mm over a 1188-case grid. Three things in it look like they could
+it to 7.5e-14 mm over a 1188-case grid. Four things in it look like they could
 be tidied and must not be:
 
 1. **The flank continues below the base circle** to its true intersection with the
@@ -120,7 +120,6 @@ be tidied and must not be:
    profile-shifted gear.
 3. **`theta` is not monotone** along the profile. Undercut gears are legitimately
    re-entrant. The correct invariant is monotone *radius*.
-
 4. **A rack's figures do not carry to a pinion cutter.** A 0.38-module tip round
    is comfortable on a rack, whose tooth is wide at its tip; on a 20-tooth shaper
    with a 1.25 addendum the tip is 0.377 mm wide and two such rounds cannot both
@@ -136,13 +135,22 @@ comparing the envelope it leaves.
 
 ## Verification tooling
 
-Two scripts exist to check the Rust against something that shares no code with
-it, and both are run by hand rather than in CI:
+Three scripts exist to check the Rust against something that shares no code with
+it, and all are run by hand rather than in CI:
 
 ```bash
 python3 tools/validate_dxf.py <file.dxf> ...   # read an export back with ezdxf
 python3 tools/worm_flank_curvature.py          # worm flank curvature from the surface itself
+python3 tools/crossed_path.py                  # a crossed pair's path of contact, from the surfaces
 ```
 
 The second also answers a design question — what choosing a ZI, ZN or ZA worm
 flank actually costs — and its answer is in `docs/DESIGN.md` §4.5.1.
+
+The third builds both crossed flanks as parametric surfaces and takes their
+normals by numerical differentiation, so the line of action, the contact ratio
+and conjugate action all come out of differential geometry with nothing about
+gears in the derivation. `gear-core` reaches the same line by a construction in
+lines and angles instead, and the two agree: for a 17/23 pair at 45°/45° with
+shafts at 90°, `gear-cli crossed 17 23 90` prints ε = 1.777921670 against the
+script's 1.777921669562.

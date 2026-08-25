@@ -1430,8 +1430,8 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
          mu 0.06"
     );
     println!(
-        "\n{:>7} {:>7} {:>9} {:>9} {:>10} {:>10} {:>11} {:>10}",
-        "beta1", "beta2", "d1 mm", "d2 mm", "a mm", "slide/v1", "eta fwd", "sigma_H"
+        "\n{:>7} {:>7} {:>9} {:>9} {:>10} {:>10} {:>11} {:>10} {:>13}",
+        "beta1", "beta2", "d1 mm", "d2 mm", "a mm", "slide/v1", "eta fwd", "sigma_H", "epsilon"
     );
     let mut any = false;
     for i in 0..=10 {
@@ -1456,14 +1456,18 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
             Ok(r) => {
                 any = true;
                 println!(
-                    "{beta1:>7.1} {:>7.1} {:>9.4} {:>9.4} {:>10.4} {:>10.4} {:>10.3} % {:>9.1}",
+                    "{beta1:>7.1} {:>7.1} {:>9.4} {:>9.4} {:>10.4} {:>10.4} {:>10.3} % {:>9.1} {:>13}",
                     g.wheel_helix_angle.to_degrees(),
                     g.worm_pitch_diameter,
                     g.wheel_pitch_diameter,
                     g.centre_distance,
                     g.sliding_ratio,
                     r.efficiency.forward * 100.0,
-                    r.contact.max_pressure
+                    r.contact.max_pressure,
+                    r.crossed.as_ref().map_or_else(
+                        || "—".to_string(),
+                        |c| format!("{:.9}", c.contact_ratio)
+                    )
                 );
             }
         }

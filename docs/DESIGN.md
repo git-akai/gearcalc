@@ -16,10 +16,10 @@ subscript `n` = normal plane, `t` = transverse.
 | Geometry core | involute + trochoid profile, undercut, severed teeth | rack simulation, both bounds, 1080 cases |
 | Internal gears | ring profile, **profile shift**, shaper-cut fillet at its true centre distance, junction, generation limit, mesh interference, **bending rating** | the cut simulated from the tool alone, 2.5–2.7 µm across shifts −0.4…+0.5; the bending model meeting the external one in the rack limit |
 | Planetary sets | common-centre-distance shift solve, ring search, layout checks, Willis kinematics, Pennestrì efficiency, backlash referral | the ideal ring needing exactly zero shift; a held carrier giving exactly `η₀`; the three classical ratios; play at two output shafts differing by exactly their ratio |
-| Crossed axes | screw gearing — lead angle, both efficiencies, self-locking, elliptical contact; **worm drives and crossed gear pairs from one stage**, differing only in which of diameter and helix angle is the input | the classical closed forms at Σ = 90°, an energy balance at every Σ, and a derived diameter reproducing `γ₁ = 90° − β₁` exactly |
+| Crossed axes | screw gearing — lead angle, self-locking, elliptical contact; **the path of contact**, its zone, contact ratio and axial travel; **one friction balance** giving both efficiencies along that path; worm drives and crossed gear pairs from one stage, differing only in which of diameter and helix angle is the input | the classical closed forms at Σ = 90°; the balance reproducing them at the pitch point to 1e-12, including the self-locking threshold, and the *parallel* model at its limit; a derived diameter reproducing `γ₁ = 90° − β₁` exactly |
 | Primitives | safeguarded `inv⁻¹`, Brent, bracketed Newton | textbook special cases |
 | Mesh | centre distance, exact backlash, contact path | direct tooth-thickness computation |
-| Contact | one Hertz formula, line contact its degenerate value | bit-identical to the line result at parallel axes |
+| Contact | one Hertz formula, line contact its degenerate value; crossed meshes rated **along the path** rather than at the pitch point | bit-identical to the line result at parallel axes; the flank load at the pitch point equal to the classical closed form |
 | Metrology | span, over-pins, cutter tip width, JGMA tables | independent pin-tangency check |
 | Strength | critical section, form factor, bending stress, Hertz, face width, helical, **internal** | closed-form rack limits; the contact-half-width route; plane-change identities; a huge ring and a huge external gear rating as the same rack tooth |
 | Efficiency | parallel-axis mesh loss from sliding along the path | numerical average of the instantaneous loss |
@@ -43,6 +43,8 @@ cargo run --bin gear-cli -- strength 17 43 2.0        # a worked mesh, end to en
 cargo run --bin gear-cli -- strength 17 43 2.0 '4340 Hardened Steel' 20  # helical
 cargo run --bin gear-cli -- train            # a two-stage train, end to end
 cargo run --bin gear-cli -- train mixed      # ...with a worm stage in it
+cargo run --bin gear-cli -- trainfile        # a train to TOML and back, answers compared
+cargo run --bin gear-cli -- crossed 17 23 90 # a crossed pair, swept over the helix split
 cargo run --bin gear-cli -- worm 1 40 7 90   # a worm pair, both directions
 cargo run --bin gear-cli -- wormstage 1 40 7 2   # a worm stage, end to end
 cargo run --bin gear-cli -- planetary 17 17 3    # every ring count that can work
@@ -54,25 +56,28 @@ cd web && npm run dev             # the application
 
 ## What is next
 
-**Milestone 11 (polish) is the open work, and most of it is done**: the ring
-drawing defect and the duplicated default behind it (§12), the ring's rim circle
-(§7), the worm drive's two conventional proportions (§4.5.1), geartrain
-import/export (§7) — the last unbuilt item of the original specification — and a
-first round of UI corrections (§8). What remains is further UI work as it is
-asked for, and keeping these documents at the head of `main`.
+**Milestone 11 (polish) is the open work, and its named scope is complete**:
+geartrain import/export — the last unbuilt item of the original specification —
+confirmations, error surfacing and docs. What has continued past it is the
+crossed-axis work that the §4.5.1 audit set out, and that is now finished too:
+the path of contact, the contact ratio, rating along the path, a face width sized
+from `ε ≥ 1`, and one friction balance containing both efficiency formulas.
 
-The layout mathematics of §4.8 is **done** — `planetary.rs` holds the shift
-solve, its closed-form bracket, the ring search and the layout checks, drivable
-as `gear-cli planetary` — as is the shifted internal mesh it needed, the ring's
-bending model, and the stage itself in all six arrangements. Radial assembly is
-**shelved** with its findings recorded (§4.11).
+What remains is UI work as it is asked for, and two pieces of mathematics that
+are stated rather than pending:
+
+- **Crossed-axis bending**, which is not available and will not be without a
+  convention that multiplies a stress — §4.5.1 says why, and it is the beam
+  formula's reading of a point load rather than a missing input.
+- **The enveloping (throated) wheel's zone of action.** The cylindrical one is
+  derived and a worm reports it as a floor.
 
 Two deferred decisions have written rationales: load sharing (§4.7) and the
-gear-rating standards (§6.2). Two pieces of work remain unscheduled: the
-angularly varying profile shift of §4.10, blocked on the mesh-phase coefficient
-and on nothing else — its acceptance gate is already written — and a drawing for
-a planetary *set*, which needs the carrier and N planets placed where the
-viewport currently draws one gear.
+gear-rating standards (§6.2). Two milestones remain unscheduled: the angularly
+varying profile shift of §4.10, blocked on the mesh-phase coefficient and on
+nothing else — its acceptance gate is written — and a drawing for a planetary
+*set*, which needs the carrier and N planets placed where the viewport draws one
+gear.
 
 ---
 
@@ -757,14 +762,16 @@ consumer of the path is exactly what a crossed stage does not report:
 | Contact stress at the single-pair boundaries (it was rated at the pitch point only) | `contact_stress(path, …)`, which walks the path | **done** — the rating walks the crossed path too |
 | Automatic face width | inverting `σ_F(b)` and `σ_H(b)` | **done, by a different constraint** — `ε ≥ 1`, since no stress here depends on `b` |
 | Bending stress | `bending_section(g, contact_ratio)` — the load's roll parameter comes off the path | **still not available, and now for a stated reason: see below** |
-| Efficiency from sliding | `contact::efficiency(path, …)`; the crossed stage uses a force balance instead | open — **measured, bounded and disclosed**; see below |
+| Efficiency from sliding | `contact::efficiency(path, …)`; the crossed stage used a pitch-point force balance instead | **done** — the unified friction balance, which contains both formulas |
 
-**One construction gates five branches.** That is the whole of the divergence,
-and it is worth stating because it makes the remaining work a single question
-rather than a list: *where does a crossed pair's contact point go, and where does
-it stop?* Three of the five closed when that question was answered.
+**One construction gated five branches.** That was the whole of the divergence,
+and stating it made the remaining work a single question rather than a list:
+*where does a crossed pair's contact point go, and where does it stop?* Three of
+the five closed the moment that was answered; the fourth — efficiency — needed a
+second derivation, the friction balance below, and closed too. Only bending is
+still unavailable, and for a reason the audit got wrong.
 
-**Bending did not, and the audit was wrong to imply it would.** The path supplies
+**Bending did not close, and the audit was wrong to imply it would.** The path supplies
 the load's *position along the profile*, which was one missing ingredient — but
 the model needs another. This crate's bending stress is
 
@@ -813,10 +820,28 @@ own parameterisation rather than assumed:
 At contact the normal is shared, so (1) applied to both members gives two linear
 conditions on one unit vector: **the contact normal has a fixed direction**,
 whatever the rotation. With the direction fixed, (2) says the contact points lie
-on the line with that direction tangent to both base cylinders. Four lines are
-tangent to both; **only one passes through the pitch point**, and that one is the
-mesh — checked, not assumed, and it comes out at an offset of 1e-14 mm while the
-other three sit 35–78 mm away.
+on the line with that direction tangent to both base cylinders. Eight lines are
+tangent to both — four tangency-sign combinations for each of the two normal
+directions — and **exactly two pass through the pitch point**, at an offset of
+1e-14 mm against 35–78 mm for the other six. Those two are the tooth's two
+**flanks**, drive and coast: mirror images, so anything measured as a length is
+the same on either. Which of the eight is which is checked, not assumed.
+
+That the constructed line is really where the flanks touch is a separate
+question, and it is asked separately: a tooth of each member is placed through
+the pitch point and each surface is asked for **its own** normal, by
+differentiating its own parameterisation. Both agree with the constructed
+direction to 1.2e-6°, the finite-difference floor. Two things had to be got right
+for that, and neither is decorative — a tooth has two flanks, and in mesh the
+driving flank of one member meets the *facing* flank of the other, so the mirror
+is compulsory; pair them wrongly and the answer is 2α_n out, which is a tooth's
+own flank angle and the way to recognise the mistake.
+
+All of this is `tools/crossed_path.py`, which shares no code with the crate. It
+also checks the finished construction end to end: for a 17/23 pair at 45°/45°
+with shafts at 90°, `gear-cli crossed 17 23 90` reports ε = 1.777921670 and the
+script, coming the whole way through differential geometry, reports
+1.777921669562.
 
 This is the parallel case's "the line of action is the common tangent to the two
 base circles", lifted into three dimensions. The parallel construction is
@@ -921,16 +946,17 @@ Below 1 the pair loses contact between one tooth and the next, which is a failur
 of *kind* rather than of margin — so it is said in the stage's notes rather than
 left to be read off a number.
 
-##### The efficiency is an upper bound, and the pair says so
+##### The efficiency *was* an upper bound — how that was found
 
-The one branch of the five still open, now with a number on it.
+The last of the five, and the measurement that started it. Kept because the
+defect is what the balance below was built to answer.
 
-A crossed mesh's efficiency is a force balance about the sliding **along** the
-tooth trace — the screw action, which is exactly right for a worm and is where
-the exact self-locking threshold comes from. A parallel mesh's whole loss is the
-sliding **up the profile**, which that balance does not carry. As the shaft angle
-falls the first vanishes and the second does not, so the model tends to 100 %
-where the real pair tends to its parallel-axis figure:
+A crossed mesh's efficiency **was** a force balance about the sliding **along**
+the tooth trace — the screw action, which is exactly right for a worm and is
+where the exact self-locking threshold comes from. A parallel mesh's whole loss
+is the sliding **up the profile**, which that balance did not carry. As the shaft
+angle falls the first vanishes and the second does not, so the model tended to
+100 % where the real pair tends to its parallel-axis figure:
 
 | Σ | crossed model | |
 |---|---|---|
@@ -941,8 +967,17 @@ where the real pair tends to its parallel-axis figure:
 | 0 | **98.777 %** | the parallel model, same teeth |
 
 A step of **1.2 points** across a boundary where nothing physical happens — the
-§12 trap in a new place, and reachable now that the axis angle is an ordinary
+§12 trap in a new place, and reachable once the axis angle became an ordinary
 input on an ordinary stage.
+
+For a while this was *disclosed* rather than fixed, by a law rather than a
+threshold: crossing shafts can only add sliding, so a crossed pair beating the
+same teeth run parallel meant sliding had gone missing. That disclosure is gone
+now — see §12, because it did not merely become redundant. It became **wrong**:
+with the balance counting the profile sliding, it is the parallel *closed form*
+that is the approximate one, and at a very small shaft angle the crossed figure
+legitimately sits a hundredth of a point above it. The check would have accused
+the better number.
 
 The fix is not a correction term. Coulomb friction acts on the *magnitude* of
 the total slip, so the two components do not add: `|v| = √(v_ℓ² + v_p²)`, and
@@ -3219,7 +3254,8 @@ it can be validated in isolation.
 | 8 | ✅ **Ring gear geometry** — internal profile, shaper trochoid, interference checks | **met** — the cut simulated from the cutter and the rolling alone agrees with the analytic profile to **3.6 µm**; the rack is confirmed as the shaper's `z_c → ∞` limit, first order in `1/z_c`; the generation limit and both mesh interference conditions are derived rather than quoted. Radial assembly is **shelved** (§4.11) |
 | 9 | ✅ **Planetary stage** — ring tooth search, planet shift solve, layout checks, Pennestrì efficiency, the stage, the boundary and the UI | **met** — the ideal ring `z_s + 2z_p` needs **exactly** zero planet shift and the two centre distances agree to 1e-12; a held carrier gives **exactly** the product of its two mesh efficiencies; all six drive modes reproduce their classical ratios to 1e-12; play referred to two different output shafts differs by exactly their ratio; helical to parity with spur throughout. A set solves end to end in `gear-cli`, across the wasm boundary and in the browser, the three agreeing. Radial assembly is **shelved** with its findings recorded (§4.11) |
 | 10 | ✅ **Crossed-axis spur** — reuse `screw.rs`, point-contact Hertz | **met, and it really was a parameter rather than a branch.** A crossed gear pair *is* a `Screw` whose first member's diameter is derived from a helix angle instead of given: `sin γ = z m_n/d` and `γ = 90° − β` make `sin γ = cos β`, so nothing else changes. Verified to 1e-9 over three tooth pairs × four shaft angles × three helix angles, with the worm canary `gear-cli wormstage 1 40 7 2` **bit-identical**. No new kinematics, contact model, efficiency or wasm entry point |
-| 11 | 🔶 **Polish** — train import/export, confirmations, error surfacing, docs | in progress. **Train import/export is done** — `gear_io::train`, two entry points, the buttons, `gear-cli trainfile`, and a round trip verified as identical *answers* in the CLI, across the boundary and in the browser. Also done: the ring-drawing defect and the duplicated default behind it (§12), the ring's rim circle, the worm proportions (§4.5.1), diameters, cursor-anchored zoom and stable note slots (§8), and the DXF export failure that used to be silent. Confirmations were already in place. What remains is further UI work as it is asked for |
+| 11 | ✅ **Polish** — train import/export, confirmations, error surfacing, docs | **met.** Geartrain import/export is the last item of the original specification: `gear_io::train`, two entry points, the buttons, `gear-cli trainfile`, and a round trip verified as identical *answers* in the CLI, across the boundary and in the browser. Confirmations were already in place; error surfacing gained the DXF failure that used to be silent. Also landed: the ring-drawing defect and the duplicated default behind it (§12), the ring's rim circle, the worm proportions, diameters, cursor-anchored zoom, stable note slots, the crossed pair merged into the spur stage (§4.5.1) |
+| — | ✅ **The crossed-axis audit and what it opened** (§4.5.1) | **met.** One construction — the path of contact — closed four of the five branches the audit named: contact ratio, rating along the path, a face width sized from `ε ≥ 1`, and, through a second derivation, one friction balance containing both efficiency formulas. Gated at both limits: the classical screw formula at the pitch point to 1e-12 including its self-locking threshold, and the parallel model at `Σ → 0` to a hundredth of a point, that residual measured as the *parallel* formula's own O(μ²) linearisation. Bending is closed with a reason rather than built |
 
 Milestone 9 was where the *reuse* argument was tested rather than asserted, and
 it paid: the planetary stage needed no new wasm entry point, no second
@@ -3291,6 +3327,8 @@ something independent.**
 | 4.7 | `Load` stored a force in a field named `normal_force` | The value was the **transverse** `F_bt = T/r_b` while the name asserted the normal plane. Numerically right for spur, but the name would have survived a refactor its meaning did not. Now stores torque, with each projection named at its point of use |
 | 4.7 | Helical contact used the transverse force, face width and curvature throughout | Three separate `cos β_b` factors were missing. They nearly cancel — the net is `√(cos β_b)` — so the error was small but the model was wrong in three places at once rather than right |
 | 4.7 | Helical bending measured `Y_F` on the transverse section and divided by `m_n` | Mixes planes; under-predicts by about `cos β` (6 % at 20°, 13 % at 30°). Now measured on the ISO virtual spur gear `z_n = z/cos³β` |
+| 4.5.1 | "Four lines are tangent to both base cylinders; **only one** passes through the pitch point" | Eight, and **two** pass — the tooth's two flanks, drive and coast. The count came from enumerating one normal direction and forgetting the other, and it was hidden because the two are mirror images, so every *length* the path yields is the same on either. It surfaced only when the scratch script was promoted to `tools/crossed_path.py` and the tangency check was added: floating-point noise was deciding which of the two flanks was returned, and the flank normals then came out 83° from it |
+| 4.5.1 | The flank tangency check compared the crate's normal against one flank of each member | A tooth has two, and in mesh the driving flank of one member meets the **facing** flank of the other. Pairing them wrongly puts the answer out by exactly `2α_n` — 40° here — which looks like a broken construction and is a broken comparison. Both faults were in the *checks*, not in the crate, and neither could have been found while the scripts lived in a temporary directory |
 | 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
 | 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
 | 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |
@@ -3321,6 +3359,12 @@ something independent.**
 | 4.11, 3 | **The gear tab's cutter default was written down in TypeScript as well as in Rust, and the two drifted.** | `defaultCutter()` carried `tip_round = 0.38` — the *rack's* figure — where `Cutter::default()` has held 0.2 all along, with a comment saying that a 20-tooth shaper's tip is 0.377 modules wide and cannot hold two 0.38 rounds. So every ring the UI built was cut by a tool that generates no fillet, and the viewport drew a sharp-rooted polygon with straight flanks. Nothing in Rust was wrong; nothing in Rust could see it either, because the wrong number lived only on the side that has no tests. **The fix is not the number.** Every default a fresh tab starts at is now served across the boundary by `gear_wasm::defaults`, so there is one home for them and the class of drift is closed rather than this instance of it |
 | 4.11 | A ring with no fillet was represented as one whose fillet has **zero length** | `s_j = s_root = 0` and a `Trochoid` section still in the list. Sampling it measured an arc length of `NaN`, which made the total `NaN`, every share `NaN`, and `(NaN) as usize` **zero** — so every section fell back to its minimum point count and a 600-point outline came back with **seven**: an involute drawn as two straight chords. The absent fillet is now `Option<Fillet>` and cannot be asked for as a curve, the root arc starts wherever the section before it finished, and the allocator drops a section of zero or non-finite length instead of letting one poison the rest |
 | 4.11 | The boundary test that was supposed to prove "an outline the viewport can draw" | Was built on the same 0.38 cutter, and asserted `outline.len() > 200` — which sixty teeth of seven-point rubbish clears comfortably. *A check built from the thing under test measures nothing*, in its second form: the fixture was the defect. It now asserts points **per tooth** against the number requested, and the standing gate in `geometry_laws.rs` states the two properties the drawing must have — that the points arrive at the density asked for, and that each flank chord stands at `√(r² − r_b²)` from the centre, which is what makes the curve an involute of its own base circle. Run against the pre-fix code, that gate fails with "asked for 600 points a tooth and got 13.0" |
+| 4.5.1 | "A worm stage reports no contact ratio — **the zone of action for a throated wheel** is not derived" | The phrase was true of worm *drives* and false of this crate: §4.5.1 takes both flanks as involute helicoids on **cylinders**, and nothing here throats anything. It had been written when no zone of action was derived for any crossed geometry — true then for a simpler reason — and was later leaned on to withhold the one number the cylindrical construction produces, while every other number in the same result came from that model unquestioned. A worm reports it now, as a floor, with its assumed tooth height named |
+| 4.5.1 | "The contact path unblocks crossed-axis bending" — the audit's own prediction | It gives the load's position along the *profile*. `σ_F = F_t/(b·m)·Y_F·Y_S` is a cantilever loaded across its whole *face*, and a crossed pair's load is a point. Two missing ingredients looked like one until the formula was read; choosing an effective width is a convention that multiplies a stress, so §4.7 refuses it and bending stays out with a reason rather than a gap |
+| 4.5.1 | A **disclosure that outlived its premise**, and then accused the better number | While the crossed efficiency omitted the profile sliding, a law disclosed it: crossing shafts can only add sliding, so beating the same teeth run parallel meant sliding had gone missing. Once the friction balance counted that sliding, the comparison inverted — the *parallel closed form* is the approximate one, first order in `μ` where the balance is exact — and at Σ ≤ 0.5° the check fired on a figure that was a hundredth of a point **better**. Removed. A warning is a claim, and it expires with the thing it warned about |
+| 4.5.1 | The friction balance's flank load, out by `z₂/z₁` — **forty on a worm** | `moment_per_force` returned a *power* where a *torque* was wanted. All four gates on the balance were on the **efficiency**, which is a ratio, so the factor cancelled and every one stayed green; on a stress it does not, and a cube root turned forty into a plausible-looking 3.4×. Caught by the canary, not by the suite. A gate on the load itself now compares it with the classical closed form, and re-breaking the code deliberately confirms it is the only test that fails |
+| 4.5.1 | "A narrow face pushes the rating 10–27 % past the pitch point" | Measured at 1.2 %, not 27 %. Losing load sharing does push the rating outward, but a face narrow enough to lose it has also cut the zone's ends off — and those ends were what made the path severe — so the two effects nearly cancel. The 10–27 % figure describes the zone's extremes, which are never rated because the load is shared there |
+| 4.5.1 | "Frictionless is lossless **to the last bit**" | To a few ulps. The answer is a ratio of two moments reached by different cancellations, so bit-exactness was never on offer; the assertion said more than the arithmetic could and failed on the first geometry that exercised it |
 | 4.5.2 | Reversing a planetary by handing its output shaft's torque back as the input | That torque is a **reaction**, opposite in sign to the shaft's speed, and a shaft that is now driving must have them agree. The wrong sign flips the rolling power, `η₀^w` takes the wrong branch, and the set reports an efficiency **above one** — 101.571 % in the running application. Every test drove forward with a positive torque and a positive speed, so none could see it; found by looking at the UI. Related: a shaft with `T ω ≤ 0` is absorbing power and is not an input at all, so naming it one is now refused rather than answered with `1/η₀` |
 
 Two process notes worth carrying forward:
@@ -3352,10 +3396,19 @@ here. Revision 2 additions are marked ★.
 | Planetary `dg/dx_p` analytic | vs. central differences | 6+ digits |
 | ◆ An involute helicoid's normal makes a fixed angle with its own axis | `n̂·â` over 4 helix angles × 2 base radii × 12 surface points, normals from the parameterisation by finite difference | spread ≤ 3e-8, mean equal to `sin β_b` — the property that makes the crossed contact normal's **direction** constant, and the path straight |
 | ◆ …and that normal is tangent to the base cylinder | axis-to-line distance, same grid | equal to `r_b` to 7e-8 mm |
-| ◆ Which of the four common tangent lines is the mesh | offset of the pitch point from each | the mesh branch **1e-14 mm**; the other three 34.9, 47.2 and 77.8 mm — chosen by measurement, not by convention |
+| ◆ Which common tangent line is the mesh | offset of the pitch point from all **eight** — four tangency-sign combinations × two normal directions | **two** pass, at 1e-14 mm, and they are the two *flanks* — drive and coast, mirror images. The other six miss by 34.9, 47.2 and 77.8 mm. Chosen by measurement, not by convention |
+| ◇ The two surfaces are actually **tangent** on that line | both flanks of both members placed through the pitch point, each normal taken from its own parameterisation, over hand × near/far flank × both branches | the matching pair agrees with the constructed normal to **1.2e-6°**, which is the finite-difference floor. The mismatched pairing comes out at exactly 2α_n = 40°, which is a tooth's own flank angle and a good way to recognise the error |
+| ◇ **The crate's construction against the surfaces** | `gear-cli crossed 17 23 90` at β = 45°/45° vs. `tools/crossed_path.py` | ε = 1.777921670 against 1.777921669562 — **4.4e-10**. Two routes to the same line: a construction in lines and angles, and differential geometry on the parametric flanks |
 | ◆ The path's roll lengths | vs. the classical `r sin α_t / cos β_b`, 4 crossed geometries | 1e-9 relative, and the two sum to the tangent length between the base cylinders |
 | ◆ Crossed contact ratio in the parallel limit | Σ = 2°, 0.5°, 0.1°, 0.01° against `ε_α / cos²β_b` | monotone in, 1e-4 by 0.01° — and **not** `ε_α`: the normal-plane path and the normal base pitch each carry a `cos β_b` the same way |
 | ◆ Those checks are not vacuous | the `n̂·â₂` sign deliberately flipped to the other branch | both path tests fail |
+| ◆ **Conjugate action, derived** | `ω₂/ω₁` from `v₁·n̂ = v₂·n̂` alone, at five points of the path × three geometries | `−z₁/z₂` to nine digits, *identical* along the path — the check on the whole frame before any friction enters |
+| ◆ Frictionless transmission | the friction balance at μ = 0, nine points × three geometries | 1 to within 2 ulps; not bit-exact, and not claimed as such |
+| ◆ **The balance contains the classical screw formula** | at the pitch point, μ = 0…0.15, three geometries, both directions | 1e-12 — and the self-locking friction reproduced *exactly*: zero at the threshold, positive below, negative above |
+| ◆ …and the classical **flank load** | same points, two torques | 1e-9 relative. Added after a `z₂/z₁` reached the load while every efficiency gate stayed green (§12) |
+| ◆ **The balance contains the parallel model** | path-averaged at Σ = 0.02° against the parallel closed form | 98.787 % against 98.777 %, the residual identified as that formula's O(μ²) linearisation by the gap/loss ratio falling linearly with μ (0.0153 → 0.00047 over μ = 0.12 → 0.003) |
+| ◆ The path quadrature | error against a 200 000-point reference, 64 → 512 samples | quarters as the step halves — second order, as a trapezium rule must be, so the count is a fact rather than a choice |
+| ◆ Wiring the balance in | every stage's efficiency, both directions, five geometries | every figure **falls**: more sliding counted, and sliding cannot repay |
 | Planetary Newton | from `x_p = 0`, z = 17/17/53 | 3.6e-15 mm in 4 iterations |
 | ★ `x_p` monotone in `z_ring` | swept z_r = 45…61 | strictly increasing where defined |
 | ★ `z_r = z_s + 2z_p` ⟹ `x_p = 0` | 17/17/51 | −0.000000 |
@@ -3514,7 +3567,10 @@ here. Revision 2 additions are marked ★.
 | ◆ Crossed-axis sliding at the pitch point | perpendicular axes, worm and wheel radii | `√(v₁²+v₂²)`, equal to the textbook `v₁/cos γ` to 1e-12; resolved on the worm axis it is exactly the wheel's pitch velocity |
 
 The marks record which round of review each check came from; they are kept only
-so a claim can be traced to the work that produced it.
+so a claim can be traced to the work that produced it. `◇` is the last round:
+the crossed-axis derivation promoted out of a scratch directory into
+`tools/crossed_path.py`, so the checks behind §4.5.1 can be re-run rather than
+only cited.
 
 **Resolved.** The ring's cut simulation (`verify::check_ring_cut`) disagreed
 with the analytic profile by about 0.1 mm on the flank; the fault was the
