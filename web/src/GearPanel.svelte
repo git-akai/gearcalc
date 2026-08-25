@@ -585,13 +585,15 @@
   }
   /* Every note a field can show, stacked in one cell: the slot takes the
      height of the tallest, so nothing moves when the visible one changes. */
+  /* A note belongs to the box above it, so it ends where that box ends: the
+     label and input columns only, right-aligned within them. */
   label .note {
-    grid-column: 1 / -1;
+    grid-column: 1 / 3;
     display: grid;
+    text-align: right;
   }
   label .note small {
     grid-area: 1 / 1;
-    grid-column: 1 / -1;
   }
   label .note small.hidden {
     visibility: hidden;

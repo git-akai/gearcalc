@@ -1316,6 +1316,16 @@
     grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
     gap: 0.4rem 1rem;
   }
+  /* A stage's shared inputs stack, not flow into columns. Wrapped into two or
+     three columns a field's note sat beside the *next* field's box, and the
+     column count changed with the window, so the same stage read differently at
+     two widths. One column reads the way the gear cards below it do. */
+  .grid.shared {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-width: 34rem;
+  }
   /* The **input box** is the anchor, not the text after it. With an `auto`
      trailing column the boxes shifted left or right by however wide a unit
      happened to be — "module" against "°" — so nothing lined up down a column.
@@ -1536,8 +1546,11 @@
     padding: 0.05rem 0.3rem;
     color: var(--muted);
   }
+  /* Outside a label's grid, so it is padded by the trailing column's width plus
+     its gap to finish on the same edge. */
   .hint {
     margin: -0.1rem 0 0.3rem;
+    padding-right: 3.9rem;
     font-size: 0.72rem;
     color: var(--muted);
     text-align: right;
@@ -1554,9 +1567,13 @@
     margin: 0.2rem 0 0.5rem;
     max-width: 60rem;
   }
+  /* A note belongs to the box above it, so it ends where that box ends: it
+     spans the label and input columns only, and is right-aligned within them.
+     Running it to the row's full width ended it past the unit, against nothing. */
   .note {
-    grid-column: 1 / -1;
+    grid-column: 1 / 3;
     display: grid;
+    text-align: right;
   }
   .note small {
     grid-area: 1 / 1;

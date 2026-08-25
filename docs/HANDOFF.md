@@ -349,7 +349,8 @@ these are the ones most likely to be stepped on again.
 | The cut simulation cannot see below the generation limit: its cutter has no fillet | §4.11 | nothing |
 | Mesh-phase coefficient setting the optimal λ | §4.10 | only the angular-profile-shift milestone |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
-| Worm contact ratio — the zone of action for a throated wheel | §4.5.1 | nothing |
+| **The crossed-axis contact path** — one construction gates five branches: contact ratio, contact at the single-pair boundaries, bending, automatic face width and a sliding-based efficiency. Audited, and the audit is the plan | §4.5.1 | everything a crossed pair does not report |
+| Worm contact ratio — the zone of action for a **throated** wheel; a different and harder problem from the crossed cylindrical pair above | §4.5.1 | nothing |
 | Span over teeth for a ring — rare in practice, not derived; between-pins is done | §4.6 | nothing |
 | Worm profile drawing and DXF; a planetary set has no drawing either | §4.5.1, §8 | nothing |
 | `Driven By` as a train direction on a worm stage | §4.9 | nothing |
@@ -412,6 +413,13 @@ Left: further UI work as it is asked for.
 
 ## 7. Working notes
 
+- **Audit a unification claim against the code, not the intention.** "One model
+  for both" decays quietly. The crossed-axis audit (DESIGN §4.5.1) found the
+  contact model genuinely unified — `PARALLEL_AXES` is a value, and the crossed
+  curvatures return exactly zero at `Σ = 0` — and the whole divergence one level
+  up, in a single missing object: `ContactPath` is built in a common transverse
+  plane, which crossed axes do not have. Five apparently separate gaps turned out
+  to be five consumers of it.
 - **Verify against something that shares no code.** The rack simulation, the
   pin-tangency measurement, `ezdxf`, the contact-half-width route, the AGM
   against Carlson's integrals, the numerical average of instantaneous loss, the

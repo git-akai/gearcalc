@@ -732,6 +732,66 @@ it — which is now literally what happens: a crossed gear pair *is* a spur stag
 whose `shaft_angle` is not zero (see below). That collapses most of Q2's cost — crossed helical becomes nearly free once
 the worm stage exists, which is why the milestone order puts worm before it.
 
+##### Audit: where the two mesh kinds actually branch
+
+Asked of the code rather than of the intention, because "one model for both" is
+the sort of claim that decays quietly. The finding is short: **the branch is not
+in the contact model, and there is only one of it.**
+
+The contact model *is* unified, and demonstrably: `strength::contact_stress`
+takes a lengthwise curvature and `PARALLEL_AXES` is its named zero; the crossed
+curvatures come from `screw::pitch_point_curvatures`, which is a free function
+precisely so it can be asked for `Σ = 0`, where its flat curvature returns
+exactly zero and the ellipse degenerates to the line result bit for bit. That
+was milestone 7's whole point and it holds.
+
+The branch is one level up, in **what the mesh knows about where the teeth
+touch**. `ContactPath::new` is built from a `Mesh`: two operating radii, two base
+radii and one operating pressure angle, all in a *common transverse plane*.
+Crossed axes have no common transverse plane, so no path is built — and every
+consumer of the path is exactly what a crossed stage does not report:
+
+| Missing from a crossed stage | What supplies it for a parallel one |
+|---|---|
+| Transverse and total contact ratio | `ContactPath::contact_ratio` |
+| Contact stress at the single-pair boundaries (it is rated at the pitch point only) | `contact_stress(path, …)`, which walks the path |
+| Bending stress | `bending_section(g, contact_ratio)` — the load's roll parameter comes off the path |
+| Automatic face width | inverting `σ_F(b)` and `σ_H(b)`, so it follows from the two above |
+| Efficiency from sliding | `contact::efficiency(path, …)`; the crossed stage uses a force balance instead |
+
+**One construction gates five branches.** That is the whole of the divergence,
+and it is worth stating because it makes the remaining work a single question
+rather than a list: *where does a crossed pair's contact point go, and where does
+it stop?*
+
+Two things are already general and need nothing:
+
+- `contact::sliding_velocity` takes member 2's axis as an argument and resolves
+  the slip into profile and lengthwise components. Only `sliding_at`, which
+  places a *parallel* mesh into that frame, is kind-specific. The crossed case
+  needs a different frame for the same function, which is what its documentation
+  said it would need when it was written.
+- The curvature route above.
+
+One is genuinely two constructions, and unifying it is not obviously a gain:
+backlash. `Mesh::backlash` is **exact** — `j_t = 2a′(inv α′ − inv α_w)`, measured
+off the real tooth thicknesses — while `worm::angular_backlash` builds the gap
+along the common flank normal and divides by the surface speed along it. The
+second is the more general *statement* and the first is the more exact *answer*;
+expressing the parallel case in the crossed form would trade exactness for
+uniformity, which is the wrong direction. The honest unification is the other
+way round, and it needs the shifted crossed mesh (§10).
+
+**What the missing construction would take.** Not the throated wheel, which is a
+different and harder problem and stays out of scope: both members of a crossed
+*gear* pair are involute helicoids on cylinders, contact traces a straight line
+in their common tangent plane, and each member's own transverse plane already
+yields `√(r_a² − r_b²) − r sin α_t` — the same expression `ContactPath` is built
+from. What is missing is the link between the two members' positions along that
+line, and the bound where either flank runs out. With it, `ContactPath` gains a
+crossed constructor and the five rows above stop being special cases; without
+it, each is absent and says so on screen.
+
 ##### A crossed gear pair is the spur stage with its shafts turned
 
 The specification lists three stage kinds — Spur, Worm, Planetary — and gives the
