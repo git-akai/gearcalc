@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–10 complete and in CI. 348 tests, ~26 s.** Milestone 11 is
+**Milestones 0–10 complete and in CI. 351 tests, ~26 s.** Milestone 11 is
 under way: the ring-drawing defect below is fixed, and the rim circle with it.
 
 ```bash
@@ -102,6 +102,13 @@ cargo run --bin gear-cli -- planetstage 24 18 60 3 # a planetary stage, six mode
 cargo run --release --bin gear-cli -- verify 100   # the two-sided cutter check
 python3 tools/worm_flank_curvature.py              # ZI vs ZN vs ZA, from the surface
 ```
+
+**The worm canary moved, once, deliberately.** `wormstage 1 40 7 2` went
+68.691 → 68.430 % forward and 55.254 → 54.417 % backward when the friction
+balance replaced the pitch-point formula (§4.5.1). Its old figures were the same
+balance sampled at the one point on the path where the term now added is zero;
+they were not more correct. Everything downstream followed: wheel torque
+54.9531 → 54.7441 N·m, flank load 3510.8 → 3505.8 MPa.
 
 `gear-cli strength 17 43 2.0` is the regression canary. Its numbers — `σ_F`
 69.2 / 63.4 MPa, `σ_H` 692.7 MPa, ρ 1.723 mm, η 98.741 % — have survived every
@@ -363,7 +370,7 @@ these are the ones most likely to be stepped on again.
 | Mesh-phase coefficient setting the optimal λ | §4.10 | only the angular-profile-shift milestone |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
 | **Crossed-axis bending** — the path gave the load's position on the profile, but not its distribution *across the face*, and `σ_F = F_t/(b·m)·Y_F·Y_S` is a cantilever loaded across the whole of one. Choosing an effective width is a convention that multiplies a stress, so §4.7 refuses it. Recorded rather than left looking undone | §4.5.1 | nothing; it is stated on screen |
-| A crossed pair's *reported* efficiency is still the pitch-point formula, so it is an upper bound, disclosed by a law rather than a threshold. **The unified balance now exists** (`contact::Contact`, §4.5.1): it reproduces the classical formula at the pitch point to 1e-12 and the parallel model at its limit to 0.01 points. What remains is wiring it in, which moves the headline figure of every worm and crossed stage | §4.5.1 | nothing |
+| ~~A crossed pair's efficiency counts only the sliding along the trace~~ | §4.5.1 | **closed** — the unified friction balance is derived, gated and wired: every stage's efficiency is the path average in both directions, and the self-locking threshold moves with it |
 | The **enveloping** (throated) wheel's zone of action — the cylindrical one is derived and reported as a floor | §4.5.1 | nothing |
 | Span over teeth for a ring — rare in practice, not derived; between-pins is done | §4.6 | nothing |
 | Worm profile drawing and DXF; a planetary set has no drawing either | §4.5.1, §8 | nothing |
@@ -427,6 +434,12 @@ Left: further UI work as it is asked for.
 
 ## 7. Working notes
 
+- **A ratio hides a factor; a magnitude does not.** The friction balance was
+  gated four ways and every gate was on the *efficiency*, which is a ratio — so
+  a `z₂/z₁` in the wrong place cancelled and all four stayed green while the
+  flank load came out forty times over. A cube root then turned forty into a
+  plausible 3.4× on the stress. If a model produces both a ratio and a
+  magnitude, gate the magnitude too; the ratio cannot see its own scale.
 - **Prefer a law to a threshold when disclosing a model's limit.** The crossed
   efficiency is short by an amount that grows as the shaft angle falls. Warning
   "below 5°" would have been a convention; the test used instead is that

@@ -557,28 +557,36 @@ impl Contact {
         Some(sub(v1, v2))
     }
 
-    /// Instantaneous efficiency, driving member 1.
+    /// The force pressing the flanks together, N, for a torque quoted on member
+    /// 2 — **at this point of the path**, not at the pitch point.
     ///
-    /// The flanks press along `n̂` and rub along the slip, so the force member 1
-    /// applies is `F(n̂ + μ v̂)` — one vector, of which the classical formula's
-    /// `cos α_n` and `μ tan γ` are components at one particular point. The
-    /// torques follow by moments about each axis and `F` cancels, so this is
-    /// geometry and `μ` alone.
-    ///
-    /// At `μ = 0` it returns **exactly** 1: conjugate surfaces transmit without
-    /// loss, and that it comes out to the last bit rather than to a tolerance is
-    /// the check that the frame, the signs and the ratio are all right.
+    /// The same balance the efficiency comes from, so the friction that carries
+    /// part of the load is already in it. The moment arm is the one at *this*
+    /// contact, which is why a rating taken along the path should take its force
+    /// from here too: the alternative is a stress evaluated at one place with a
+    /// load computed at another.
     #[must_use]
-    pub fn efficiency(&self, friction: f64) -> Option<f64> {
-        let k = self.speed_ratio()?;
+    pub fn normal_force(&self, torque_on_2: f64, friction: f64, drive: Drive) -> Option<f64> {
+        let arm = self.moment_per_force(friction, drive)?[1];
+        (arm.abs() > f64::EPSILON).then(|| 1000.0 * torque_on_2 / arm.abs())
+    }
+
+    /// The **torques** about each axis per unit normal force, mm.
+    ///
+    /// Torques, not powers: the efficiency below turns them into powers with the
+    /// speed ratio, and [`Self::normal_force`] must not have that ratio in it.
+    /// Conflating the two put a factor of `z₂/z₁` into a flank load — forty on a
+    /// worm, which a cube root flattered into a plausible-looking 3.4× on the
+    /// stress rather than an obvious one.
+    fn moment_per_force(&self, friction: f64, drive: Drive) -> Option<[f64; 2]> {
         let slip = self.slip()?;
         let speed = norm(slip);
 
-        // Signed so that driving member 1 takes a positive torque. Left to the
-        // caller this would be an easy thing to get backwards, and it flips the
-        // friction term's sense rather than merely the answer's.
         let mut normal = self.normal;
         if dot(cross(self.point, normal), self.axis_1) < 0.0 {
+            normal = scale(normal, -1.0);
+        }
+        if matches!(drive, Drive::Backward) {
             normal = scale(normal, -1.0);
         }
         let force = if speed > f64::EPSILON {
@@ -586,9 +594,46 @@ impl Contact {
         } else {
             normal
         };
+        Some([
+            dot(cross(self.point, force), self.axis_1),
+            dot(cross(sub(self.point, self.centre_2), force), self.axis_2),
+        ])
+    }
 
-        let input = dot(cross(self.point, force), self.axis_1);
-        let output = dot(cross(sub(self.point, self.centre_2), force), self.axis_2) * k;
+    /// Instantaneous efficiency, in either direction of drive.
+    ///
+    /// The flanks press along `n̂` and rub along the slip, so the force is
+    /// `F(±n̂ + μ v̂)` — one vector, of which the classical formula's `cos α_n`
+    /// and `μ tan γ` are components at one particular point. The torques follow
+    /// by moments about each axis and `F` cancels, so this is geometry and `μ`
+    /// alone.
+    ///
+    /// # What reverses when the power does
+    ///
+    /// **The loaded flank, and nothing else.** Turn the same pair the same way
+    /// and let the load overhaul the drive: the rotations are unchanged, so the
+    /// *slip is unchanged*, and friction still opposes it in the same
+    /// direction. What changes is which flank does the pushing, and with it the
+    /// sign of the normal force. So back-driving is `−n̂ + μ v̂` and the ratio
+    /// taken the other way up — which is exactly the sign the classical screw
+    /// balance flips, and where its self-locking condition comes from: when the
+    /// friction term outweighs the normal one, the output torque changes sign
+    /// and the drive cannot be back-driven at all.
+    ///
+    /// At `μ = 0` it returns 1 to within a few ulps in both directions:
+    /// conjugate surfaces transmit without loss, and that it *arrives* rather
+    /// than being asserted is the check that the frame, the signs and the
+    /// derived ratio are all right.
+    #[must_use]
+    pub fn efficiency(&self, friction: f64, drive: Drive) -> Option<f64> {
+        let [torque_1, torque_2] = self.moment_per_force(friction, drive)?;
+        // Power, which is where the speed ratio belongs and nowhere else.
+        // Power, which is where the speed ratio belongs and nowhere else.
+        let k = self.speed_ratio()?;
+        let (input, output) = match drive {
+            Drive::Forward => (torque_1, torque_2 * k),
+            Drive::Backward => (torque_2 * k, torque_1),
+        };
         (input.abs() > f64::EPSILON).then(|| output / input)
     }
 }

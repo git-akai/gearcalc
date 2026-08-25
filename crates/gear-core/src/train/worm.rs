@@ -36,6 +36,14 @@
 //! rather than two rules, and it holds at any shaft angle.
 
 use super::{solve_stage, Backlash, TrainError};
+
+/// Quadrature points for the path-averaged friction balance.
+///
+/// Not a tuning parameter: the trapezium rule is second order and a test
+/// asserts that the error quarters as the step halves, which fixes what any
+/// count is worth. At this one the residual is below 1e-9 in efficiency —
+/// four orders under the last digit anything reports.
+const PATH_SAMPLES: usize = 2048;
 use crate::contact::{Directional, Drive};
 use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
 use crate::mesh::Member;
@@ -295,13 +303,19 @@ pub struct WormContact {
     ///
     /// The worst of the points a rating is taken at: the pitch point, and the
     /// two boundaries of single-pair contact where one tooth carries the whole
-    /// load. Rated at the pitch point *alone* this came out 0.7–2.2 % low on
-    /// ordinary pairs and up to 27 % low on one whose face leaves `ε ≤ 1`.
+    /// load. Rated at the pitch point *alone* this came out 0.7–2.2 % low.
     ///
     /// The relative radius peaks where the two roll lengths are equal and falls
     /// away toward both ends of the zone, and the pitch point sits near that
     /// peak — so it is close to the *least* severe place the mesh offers, not
     /// the worst.
+    ///
+    /// The **ends** of the zone are 10–27 % worse than the pitch point, and the
+    /// rating deliberately does not use them: with `ε > 1` a second pair is in
+    /// contact there and the load is shared. Losing that sharing does push the
+    /// rating outward — but a face narrow enough to lose it has also cut the
+    /// zone's ends off, which pulls it back in, so the two effects nearly
+    /// cancel and the net is about a further 0.5 %.
     pub max_pressure: f64,
     /// What the pitch point alone would have said, MPa — the figure this
     /// replaced, kept so the difference is visible rather than asserted.
@@ -622,16 +636,9 @@ pub fn solve_worm_stage(
         (stage.centre_distance.manual, 0.0)
     };
 
-    let efficiency = Directional::of(|d| s.efficiency(stage.friction, d));
-    let threshold = s.self_locking_friction();
-    let output_torque = input_torque * s.ratio * efficiency.forward;
-
-    // Contact is rated on the wheel's torque: which torque is held fixed decides
-    // which way friction moves the flank load, and only this direction is the
-    // conservative one. See `Screw::normal_force`.
-    // The face widths, decided before anything that reads them. A crossed pair
-    // has no published proportion to take (§4.5.1), so its `recommended` is
-    // `None` on both members and the entered width stands.
+    // The face widths, decided before anything that reads them — the path is
+    // one of those things now, since a face narrow enough to cut the zone
+    // changes what the mesh does as well as how long it does it for.
     let recommended = match stage.sizing {
         FirstMemberSizing::PitchDiameter(_) => [
             Some(proportions::worm_length(
@@ -655,6 +662,31 @@ pub fn solve_worm_stage(
         }),
     ];
 
+    // **Efficiency from the friction balance along the path, not at the pitch
+    // point.** The pitch point is the one place with no sliding up the profile,
+    // so a figure taken only there counts the sliding along the trace and
+    // nothing else — which is why it tended to 100 % as the shafts came parallel
+    // while the real pair keeps its profile loss (§4.5.1). The balance contains
+    // the classical formula exactly: at the pitch point the two agree to 1e-12,
+    // including the friction at which back-driving stops.
+    //
+    // Every figure this moves, it moves **down**: more sliding is counted, and
+    // sliding cannot repay. See the canary note in DESIGN §4.5.1.
+    let path = rating_path(&s, widths, None);
+    let efficiency = Directional::of(|d| {
+        path.and_then(|p| p.efficiency(&s, stage.friction, d, PATH_SAMPLES))
+            .unwrap_or_else(|| s.efficiency(stage.friction, d))
+    });
+    // Quoted beside that efficiency, so it has to be the friction at which *it*
+    // reaches zero rather than the pitch point's.
+    let threshold = path
+        .and_then(|p| p.self_locking_friction(&s, PATH_SAMPLES))
+        .unwrap_or_else(|| s.self_locking_friction());
+    let output_torque = input_torque * s.ratio * efficiency.forward;
+
+    // Contact is rated on the wheel's torque: which torque is held fixed decides
+    // which way friction moves the flank load, and only this direction is the
+    // conservative one. See `Screw::normal_force`.
     let e_star = contact_modulus(&materials[0], &materials[1]);
     let (curvature_along, curvature_across) =
         s.contact_curvatures().ok_or(TrainError::NoContact)?;
@@ -669,12 +701,19 @@ pub fn solve_worm_stage(
     // where one tooth carries everything; beyond them the next pair has taken
     // up. Where `ε ≤ 1` those boundaries are the ends of the zone, so a face
     // too narrow raises this figure as well as costing continuity.
-    let force = s.normal_force(output_torque, Member::Second, stage.friction);
     let mut patch = at_pitch;
     let mut worst_position = 0.0;
-    if let Some(path) = rating_path(&s, widths, None) {
+    if let Some(path) = path {
         for position in path.single_pair_bounds(&s) {
+            let contact = path.contact_at(&s, position);
             let Some((along, across)) = path.curvatures_at(&s, position) else {
+                continue;
+            };
+            // The force at *this* contact, not at the pitch point: a stress
+            // evaluated in one place with a load computed in another is two
+            // answers wearing one number.
+            let Some(force) = contact.normal_force(output_torque, stage.friction, Drive::Forward)
+            else {
                 continue;
             };
             let Some(here) = crate::hertz::elliptical_contact(along, across, force, e_star) else {
@@ -1319,11 +1358,105 @@ mod tests {
             narrow.contact.max_pressure,
             wide.contact.max_pressure
         );
-        // ...and the pitch point itself has not moved, which is what shows the
-        // difference is the *place* being rated and not the load.
+        // ...and it is the *place* being rated that did it, not the load. The
+        // load moved too — a narrower face engages only the middle of the zone,
+        // which slides less, which delivers more torque — so the two figures
+        // are compared as a ratio, which divides the load out: the same mesh
+        // rated at its worst against rated at its pitch point.
+        let severity = |r: &WormResult| r.contact.max_pressure / r.contact.at_pitch_point;
+        // The margin is small, and the reason is worth knowing: a narrow face
+        // cuts the zone's *ends* off, and those ends are what made the path
+        // severe. So losing the sharing pushes the rating outward while the
+        // shortened zone pulls it back in, and the net is slight — 1.012
+        // against 1.007. Asserted as the ordering, since the two effects fight
+        // and a margin would be a guess about which wins by how much.
         assert!(
-            (narrow.contact.at_pitch_point - wide.contact.at_pitch_point).abs() < 1e-9,
-            "the pitch-point figure is a property of the pair, not of the face"
+            severity(&narrow) > severity(&wide),
+            "losing load sharing should move the rating further from the pitch \
+             point: {} against {}",
+            severity(&narrow),
+            severity(&wide)
+        );
+    }
+
+    /// **Counting more sliding can only cost efficiency**, and the stage's
+    /// figure is now the path average rather than the pitch point.
+    ///
+    /// The pitch point is the one place on the path with no sliding up the
+    /// profile, so averaging over the path can only find more of it. That the
+    /// stage's number is at or below the classical one — in **both** directions,
+    /// across worms and crossed pairs — is the law this integration has to obey,
+    /// and it is asserted rather than the numbers it produced.
+    ///
+    /// The self-locking threshold moves with it, and must: quoted beside an
+    /// efficiency, it has to be the friction at which *that* efficiency reaches
+    /// zero. More sliding means locking at less friction, so the threshold falls
+    /// too — and the pair reported as self-locking is the one whose reported
+    /// backward efficiency is not positive.
+    #[test]
+    fn the_stage_counts_all_the_sliding_and_can_only_lose_by_it() {
+        use crate::params::Auto;
+        use crate::train::{SpurStage, StageGear};
+
+        let lib = super::super::test_library();
+
+        for stage in [
+            WormStage::default(),
+            WormStage {
+                starts: 2,
+                wheel_teeth: 40,
+                sizing: FirstMemberSizing::PitchDiameter(12.0),
+                ..WormStage::default()
+            },
+        ] {
+            let r = solve_worm_stage(&stage, 2.0, &lib).unwrap();
+            let classical = r.crossed.map(|_| ()).map(|()| {
+                let s = stage.geometry().unwrap();
+                Directional::of(|d| s.efficiency(stage.friction, d))
+            });
+            let classical = classical.expect("a screw geometry");
+            for drive in Drive::BOTH {
+                assert!(
+                    r.efficiency.get(drive) <= classical.get(drive),
+                    "{drive:?}: the path average {} should not beat the pitch point {}",
+                    r.efficiency.get(drive),
+                    classical.get(drive)
+                );
+            }
+            // The threshold is the friction at which the *reported* backward
+            // efficiency reaches zero, so it moves down with it.
+            assert!(r.self_locking_friction <= stage.geometry().unwrap().self_locking_friction());
+            assert_eq!(
+                r.efficiency.self_locking(),
+                r.efficiency.backward <= 0.0,
+                "self-locking is what the reported figure says, not a second opinion"
+            );
+        }
+
+        // ...and the same for a crossed gear pair, where the term being added is
+        // the whole of a parallel mesh's loss.
+        let crossed = SpurStage {
+            shaft_angle: 60.0,
+            gears: [
+                StageGear {
+                    teeth: 17,
+                    face_width: Auto::fixed(12.0),
+                    ..StageGear::default()
+                },
+                StageGear {
+                    teeth: 43,
+                    face_width: Auto::fixed(12.0),
+                    ..StageGear::default()
+                },
+            ],
+            ..SpurStage::default()
+        };
+        let r = solve_crossed_stage(&crossed, 2.0, &lib).unwrap();
+        let m = r.crossed.expect("a path");
+        assert!(!m.omits_profile_sliding(r.efficiency.forward));
+        assert!(
+            r.efficiency.forward < m.parallel_axis_efficiency.unwrap(),
+            "a crossed pair must still lose more than the same teeth parallel"
         );
     }
 

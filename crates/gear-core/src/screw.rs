@@ -780,7 +780,13 @@ impl CrossedPath {
     /// `samples` is a quadrature count, not a tuning parameter: the integrand is
     /// smooth and a convergence test fixes what is enough.
     #[must_use]
-    pub fn efficiency(&self, screw: &Screw, friction: f64, samples: usize) -> Option<f64> {
+    pub fn efficiency(
+        &self,
+        screw: &Screw,
+        friction: f64,
+        drive: Drive,
+        samples: usize,
+    ) -> Option<f64> {
         let steps = samples.max(2);
         #[allow(clippy::cast_precision_loss)]
         let width = (self.zone[1] - self.zone[0]) / steps as f64;
@@ -788,7 +794,7 @@ impl CrossedPath {
         for k in 0..=steps {
             #[allow(clippy::cast_precision_loss)]
             let s = self.zone[0] + width * k as f64;
-            let eta = self.contact_at(screw, s).efficiency(friction)?;
+            let eta = self.contact_at(screw, s).efficiency(friction, drive)?;
             // Trapezium: the ends are half-weighted because they are the ends,
             // not because the integrand does anything special there.
             let weight = if k == 0 || k == steps { 0.5 } else { 1.0 };
@@ -796,6 +802,32 @@ impl CrossedPath {
         }
         #[allow(clippy::cast_precision_loss)]
         Some(1.0 - loss / steps as f64)
+    }
+
+    /// The friction at which this pair stops being back-driveable, from the same
+    /// average the efficiency comes from.
+    ///
+    /// [`Screw::self_locking_friction`] is the closed form for the *pitch
+    /// point*; along the path there is more sliding, so the drive locks at a
+    /// slightly **lower** friction than the pitch point alone would say. The two
+    /// must not be mixed: a threshold quoted beside an efficiency has to be the
+    /// friction at which *that* efficiency reaches zero, or a pair reads as
+    /// self-locking while its stated threshold says otherwise.
+    ///
+    /// Backward efficiency falls monotonically with friction — more rubbing can
+    /// only make overhauling harder — so this is one bracketed step between zero
+    /// and the pitch-point threshold, which the path average is always inside.
+    #[must_use]
+    pub fn self_locking_friction(&self, screw: &Screw, samples: usize) -> Option<f64> {
+        let ceiling = screw.self_locking_friction();
+        if !(ceiling.is_finite() && ceiling > 0.0) {
+            return None;
+        }
+        let backward = |mu: f64| {
+            self.efficiency(screw, mu, Drive::Backward, samples)
+                .unwrap_or(f64::NAN)
+        };
+        crate::solve::brent(backward, 0.0, ceiling, crate::solve::Tol::default())
     }
 
     /// The two positions where one tooth pair carries the whole load.
@@ -1745,7 +1777,9 @@ mod tests {
                 //    bit-exact, and it should not be claimed as such — the ratio
                 //    is of two moments computed by different cancellations, so a
                 //    couple of ulps survive. Two, measured.
-                let free = contact.efficiency(0.0).expect("an efficiency");
+                let free = contact
+                    .efficiency(0.0, Drive::Forward)
+                    .expect("an efficiency");
                 assert!(
                     (free - 1.0).abs() <= 4.0 * f64::EPSILON,
                     "Σ={sigma_deg}° at s={at}: conjugate surfaces lose nothing, got {free}"
@@ -1762,7 +1796,7 @@ mod tests {
             for mu in [0.0, 0.02, 0.06, 0.15] {
                 let balance = path
                     .contact_at(&s, 0.0)
-                    .efficiency(mu)
+                    .efficiency(mu, Drive::Forward)
                     .expect("an efficiency");
                 let classical = s.efficiency(mu, Drive::Forward);
                 assert!(
@@ -1770,6 +1804,121 @@ mod tests {
                     "Σ={sigma_deg}° μ={mu}: balance {balance} against classical {classical}"
                 );
             }
+        }
+    }
+
+    /// **The flank load at the pitch point is the classical one too.**
+    ///
+    /// The gates on this balance covered the efficiency, which is a *ratio* — so
+    /// a factor of `z₂/z₁` slipped into the force and every one of them stayed
+    /// green. It reached the flank load forty times over on a worm, and a cube
+    /// root turned that into a plausible-looking 3.4× on the stress rather than
+    /// an obvious one. Only the number itself catches that, so here it is
+    /// against the closed form it must reproduce.
+    #[test]
+    fn the_balance_gives_the_classical_flank_load_at_the_pitch_point() {
+        let mn = 1.0;
+        for (starts, teeth, sigma_deg, beta_deg) in [
+            (17u32, 23u32, 90.0f64, 45.0f64),
+            (17, 43, 30.0, 25.0),
+            (1, 40, 90.0, 82.0),
+        ] {
+            let beta = beta_deg.to_radians();
+            let s = Screw::new(&ScrewParams {
+                normal_module: mn,
+                shaft_angle: sigma_deg.to_radians(),
+                starts,
+                wheel_teeth: teeth,
+                worm_pitch_diameter: f64::from(starts) * mn
+                    / (std::f64::consts::FRAC_PI_2 - beta).sin(),
+                ..ScrewParams::default()
+            })
+            .expect("a buildable pair");
+            let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+            let path = s
+                .path_of_contact(r[0] + mn, r[1] + mn)
+                .expect("a path of contact");
+            let pitch = path.contact_at(&s, 0.0);
+
+            for mu in [0.0, 0.06, 0.15] {
+                for torque in [1.0, 54.7] {
+                    let balance = pitch
+                        .normal_force(torque, mu, Drive::Forward)
+                        .expect("a force");
+                    let classical = s.normal_force(torque, crate::mesh::Member::Second, mu);
+                    assert!(
+                        (balance - classical).abs() < 1e-9 * classical,
+                        "Σ={sigma_deg}° μ={mu} T={torque}: {balance} N against {classical} N"
+                    );
+                }
+            }
+        }
+    }
+
+    /// **Back-driving, and the self-locking threshold it has to reproduce.**
+    ///
+    /// Reversing the power reverses the loaded flank and nothing else: the
+    /// rotations are the same, so the slip is the same and friction opposes it
+    /// the same way. That single sign is the whole of the difference, and it has
+    /// to give back the classical backward efficiency — and with it the friction
+    /// at which the drive stops being back-driveable, which is the model's
+    /// sharpest result and the one most easily lost.
+    #[test]
+    fn back_driving_reproduces_the_classical_formula_and_its_locking_threshold() {
+        let mn = 1.0;
+        for (starts, teeth, sigma_deg, beta_deg) in [
+            (17u32, 23u32, 90.0f64, 45.0f64),
+            (17, 43, 30.0, 25.0),
+            (1, 40, 90.0, 82.0),
+        ] {
+            let beta = beta_deg.to_radians();
+            let s = Screw::new(&ScrewParams {
+                normal_module: mn,
+                shaft_angle: sigma_deg.to_radians(),
+                starts,
+                wheel_teeth: teeth,
+                worm_pitch_diameter: f64::from(starts) * mn
+                    / (std::f64::consts::FRAC_PI_2 - beta).sin(),
+                ..ScrewParams::default()
+            })
+            .expect("a buildable pair");
+            let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+            let path = s
+                .path_of_contact(r[0] + mn, r[1] + mn)
+                .expect("a path of contact");
+            let pitch = path.contact_at(&s, 0.0);
+
+            for mu in [0.0, 0.02, 0.06, 0.15] {
+                let balance = pitch
+                    .efficiency(mu, Drive::Backward)
+                    .expect("an efficiency");
+                let classical = s.efficiency(mu, Drive::Backward);
+                assert!(
+                    (balance - classical).abs() < 1e-12,
+                    "Σ={sigma_deg}° μ={mu} backward: {balance} against {classical}"
+                );
+            }
+
+            // **The threshold, not merely the sign.** `self_locking_friction` is
+            // where the classical backward efficiency reaches zero; the balance
+            // must reach zero at the same friction, and be positive just below
+            // it and negative just above.
+            let threshold = s.self_locking_friction();
+            let at = |mu: f64| {
+                pitch
+                    .efficiency(mu, Drive::Backward)
+                    .expect("an efficiency")
+            };
+            assert!(
+                at(threshold).abs() < 1e-12,
+                "Σ={sigma_deg}°: backward efficiency at the threshold is {}",
+                at(threshold)
+            );
+            assert!(
+                at(threshold * 0.99) > 0.0,
+                "just below it still back-drives"
+            );
+            assert!(at(threshold * 1.01) < 0.0, "just above it does not");
         }
     }
 
@@ -1826,7 +1975,10 @@ mod tests {
 
         let mut previous = f64::INFINITY;
         for mu in [0.12f64, 0.06, 0.03, 0.01, 0.003] {
-            let balance = 1.0 - path.efficiency(&s, mu, 2000).expect("an efficiency");
+            let balance = 1.0
+                - path
+                    .efficiency(&s, mu, Drive::Forward, 2000)
+                    .expect("an efficiency");
             let closed = 1.0 - parallel_efficiency(&parallel_path, &mesh, &g1, mu, Drive::Forward);
             let share = (balance - closed).abs() / closed;
             assert!(
@@ -1842,7 +1994,9 @@ mod tests {
 
         // ...and at an ordinary μ they are the same number to a hundredth of a
         // point, where the pitch-point formula is 1.2 points away.
-        let balance = path.efficiency(&s, 0.06, 2000).expect("an efficiency");
+        let balance = path
+            .efficiency(&s, 0.06, Drive::Forward, 2000)
+            .expect("an efficiency");
         let closed = parallel_efficiency(&parallel_path, &mesh, &g1, 0.06, Drive::Forward);
         assert!(
             (balance - closed).abs() < 2e-4,
@@ -1875,9 +2029,15 @@ mod tests {
             .path_of_contact(r[0] + mn, r[1] + mn)
             .expect("a path of contact");
 
-        let reference = path.efficiency(&s, 0.06, 200_000).expect("an efficiency");
+        let reference = path
+            .efficiency(&s, 0.06, Drive::Forward, 200_000)
+            .expect("an efficiency");
         let error = |samples: usize| {
-            (path.efficiency(&s, 0.06, samples).expect("an efficiency") - reference).abs()
+            (path
+                .efficiency(&s, 0.06, Drive::Forward, samples)
+                .expect("an efficiency")
+                - reference)
+                .abs()
         };
 
         let mut previous = error(64);

@@ -30,7 +30,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Automatic proportions | the worm's length and the wheel's face width, as **recommendations** with their sources named | monotone in the wheel's teeth, homogeneous in the module, the BS 721 cap binding where it should |
 | UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm, crossed and planetary** stages, and geartrain import/export; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI; control positions measured to show notes do not move them |
 
-348 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+351 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -987,9 +987,47 @@ one.
 So the two efficiency models are one model at two geometries, and the 1.2-point
 step at the boundary is 0.01 points of the *other* formula's linearisation.
 
-**Not yet what a stage reports.** Wiring it in changes the headline figure of
-every worm and crossed stage, which deserves its own measured pass; the balance
-is in the core, gated, and the pitch-point formula still feeds the panel.
+##### Wired in, and what it moved
+
+Every stage's efficiency is now the path average, in both directions, and the
+self-locking threshold with it — quoted beside an efficiency, a threshold has to
+be the friction at which *that* efficiency reaches zero, or a pair reads as
+self-locking while its own stated threshold says otherwise.
+
+Everything it moved, it moved **down**, which is the law it had to obey: the
+pitch point is the one place with no sliding up the profile, so averaging over
+the path can only find more of it, and sliding cannot repay.
+
+| | forward | backward |
+|---|---|---|
+| worm 1/40 d=7 — **the canary** | 68.691 → **68.430 %** | 55.254 → **54.417 %** |
+| worm 2/40 | 81.109 → 80.878 % | 77.601 → 77.197 % |
+| crossed 17/23 at 90° | 87.996 → 87.930 % | same |
+| crossed 17/43 at 30° | 96.566 → 96.329 % | 96.484 → 96.243 % |
+| crossed 17/43 at 10° | 98.770 → 98.228 % | 98.711 → 98.168 % |
+
+The canary's other figures follow from that: the wheel torque falls with the
+efficiency, 54.9531 → 54.7441 N·m, and the flank load with it, 3510.8 → 3505.8
+MPa. **The parallel-axis canary is untouched**, as it must be — nothing about a
+parallel mesh changed.
+
+The old numbers were not more correct; they were the same balance sampled at one
+point, and the point they were sampled at is the only one on the path where the
+term now added is zero.
+
+One inconsistency the wiring exposed and closed: the rating walks the path, so
+its **load** must come from the same place as its stress. It was still being
+taken from the pitch point — a stress evaluated in one place with a force
+computed in another. `Contact::normal_force` is that force at the rated point,
+and the difference is 0.02 % on the canary.
+
+That fix arrived with a factor of `z₂/z₁` in it — forty on a worm — because
+`moment_per_force` returned a *power* where a *torque* was wanted. **Every gate
+stayed green**: they were all on the efficiency, which is a ratio, and the
+factor cancelled. On the stress it did not, and a cube root turned forty into a
+plausible-looking 3.4×. The gate that closes it compares the flank load itself
+against the classical closed form, and re-breaking the code deliberately
+confirms that this new test is the only one that fails.
 
 Until then the figure is disclosed rather than quietly wrong, and the test for
 "wrong" is a **law rather than a threshold**: crossing shafts can only add
