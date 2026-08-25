@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–10 complete and in CI. 345 tests, ~26 s.** Milestone 11 is
+**Milestones 0–10 complete and in CI. 348 tests, ~26 s.** Milestone 11 is
 under way: the ring-drawing defect below is fixed, and the rim circle with it.
 
 ```bash
@@ -363,7 +363,7 @@ these are the ones most likely to be stepped on again.
 | Mesh-phase coefficient setting the optimal λ | §4.10 | only the angular-profile-shift milestone |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
 | **Crossed-axis bending** — the path gave the load's position on the profile, but not its distribution *across the face*, and `σ_F = F_t/(b·m)·Y_F·Y_S` is a cantilever loaded across the whole of one. Choosing an effective width is a convention that multiplies a stress, so §4.7 refuses it. Recorded rather than left looking undone | §4.5.1 | nothing; it is stated on screen |
-| A crossed pair's efficiency counts sliding along the trace and not up the profile, so it is an **upper bound** — 99.988 % at Σ = 0.1° against the parallel 98.777 %. Disclosed by a law (a crossed pair cannot beat the same teeth parallel) rather than a threshold. The fix is the force balance rebuilt with friction along the *total* slip, which reduces to both existing models at their limits | §4.5.1 | nothing |
+| A crossed pair's *reported* efficiency is still the pitch-point formula, so it is an upper bound, disclosed by a law rather than a threshold. **The unified balance now exists** (`contact::Contact`, §4.5.1): it reproduces the classical formula at the pitch point to 1e-12 and the parallel model at its limit to 0.01 points. What remains is wiring it in, which moves the headline figure of every worm and crossed stage | §4.5.1 | nothing |
 | The **enveloping** (throated) wheel's zone of action — the cylindrical one is derived and reported as a floor | §4.5.1 | nothing |
 | Span over teeth for a ring — rare in practice, not derived; between-pins is done | §4.6 | nothing |
 | Worm profile drawing and DXF; a planetary set has no drawing either | §4.5.1, §8 | nothing |

@@ -496,6 +496,107 @@ pub fn sliding_at(path: &ContactPath, mesh: &Mesh, g1: &Gear, xi: f64, speed_1: 
 /// the same arithmetic to find where a crossed pair's tooth traces point;
 /// deliberately not a public vector type, because two modules wanting a cross
 /// product is not a reason to invent one.
+/// One contact, as a force balance sees it: where the flanks touch, which way
+/// they press, and where the two axes are.
+///
+/// **This is the model both efficiency formulas are cases of.** The classical
+/// screw balance is this at a crossed pair's pitch point, where the slip is
+/// purely lengthwise; the parallel-axis loss integral is this along a parallel
+/// mesh's path, where the slip is purely across the profile. Neither is a
+/// branch of the other — they are the same balance at different geometry, and
+/// each is recovered here to the precision it deserves (see the tests).
+///
+/// Nothing is assumed about the kinematics: the speed ratio comes out of the
+/// requirement that the surfaces neither separate nor interpenetrate, and it
+/// falls out as the tooth-count ratio, identically at every point of the path.
+#[derive(Clone, Copy, Debug)]
+pub struct Contact {
+    /// Where the flanks touch, in member 1's frame.
+    pub point: [f64; 3],
+    /// The common flank normal, unit. Its sign is fixed here, not by the
+    /// caller: the one that makes driving member 1 take a positive torque.
+    pub normal: [f64; 3],
+    /// Member 1's axis through the origin, unit.
+    pub axis_1: [f64; 3],
+    /// Member 2's axis, unit...
+    pub axis_2: [f64; 3],
+    /// ...through this point.
+    pub centre_2: [f64; 3],
+}
+
+impl Contact {
+    /// `ω₂/ω₁`, from the surfaces neither separating nor overlapping.
+    ///
+    /// Both surface velocities must have the same component along the common
+    /// normal, which is one equation in the ratio. That it comes out as the
+    /// tooth-count ratio — and the *same* at every point of the path — is
+    /// conjugate action, and it is a check on the whole frame rather than
+    /// something this has to be told.
+    #[must_use]
+    pub fn speed_ratio(&self) -> Option<f64> {
+        let numerator = dot(cross(self.axis_1, self.point), self.normal);
+        let denominator = dot(
+            cross(self.axis_2, sub(self.point, self.centre_2)),
+            self.normal,
+        );
+        (denominator.abs() > f64::EPSILON).then(|| numerator / denominator)
+    }
+
+    /// Member 1's surface sliding over member 2's, per unit `ω₁`, mm.
+    ///
+    /// The whole vector, not a component: Coulomb friction acts on its
+    /// **magnitude**, so a model that keeps only the lengthwise part — as the
+    /// pitch-point balance does — loses the profile sliding entirely, and that
+    /// is the term whose absence makes a crossed pair look better than the same
+    /// teeth running parallel (§4.5.1).
+    #[must_use]
+    pub fn slip(&self) -> Option<[f64; 3]> {
+        let k = self.speed_ratio()?;
+        let v1 = cross(self.axis_1, self.point);
+        let v2 = scale(cross(self.axis_2, sub(self.point, self.centre_2)), k);
+        Some(sub(v1, v2))
+    }
+
+    /// Instantaneous efficiency, driving member 1.
+    ///
+    /// The flanks press along `n̂` and rub along the slip, so the force member 1
+    /// applies is `F(n̂ + μ v̂)` — one vector, of which the classical formula's
+    /// `cos α_n` and `μ tan γ` are components at one particular point. The
+    /// torques follow by moments about each axis and `F` cancels, so this is
+    /// geometry and `μ` alone.
+    ///
+    /// At `μ = 0` it returns **exactly** 1: conjugate surfaces transmit without
+    /// loss, and that it comes out to the last bit rather than to a tolerance is
+    /// the check that the frame, the signs and the ratio are all right.
+    #[must_use]
+    pub fn efficiency(&self, friction: f64) -> Option<f64> {
+        let k = self.speed_ratio()?;
+        let slip = self.slip()?;
+        let speed = norm(slip);
+
+        // Signed so that driving member 1 takes a positive torque. Left to the
+        // caller this would be an easy thing to get backwards, and it flips the
+        // friction term's sense rather than merely the answer's.
+        let mut normal = self.normal;
+        if dot(cross(self.point, normal), self.axis_1) < 0.0 {
+            normal = scale(normal, -1.0);
+        }
+        let force = if speed > f64::EPSILON {
+            add(normal, scale(slip, friction / speed))
+        } else {
+            normal
+        };
+
+        let input = dot(cross(self.point, force), self.axis_1);
+        let output = dot(cross(sub(self.point, self.centre_2), force), self.axis_2) * k;
+        (input.abs() > f64::EPSILON).then(|| output / input)
+    }
+}
+
+pub(crate) fn add(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+}
+
 pub(crate) fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     [
         a[1] * b[2] - a[2] * b[1],

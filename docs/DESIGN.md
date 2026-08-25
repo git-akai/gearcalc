@@ -30,7 +30,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Automatic proportions | the worm's length and the wheel's face width, as **recommendations** with their sources named | monotone in the wheel's teeth, homogeneous in the module, the BS 721 cap binding where it should |
 | UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm, crossed and planetary** stages, and geartrain import/export; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI; control positions measured to show notes do not move them |
 
-345 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+348 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -948,11 +948,48 @@ The fix is not a correction term. Coulomb friction acts on the *magnitude* of
 the total slip, so the two components do not add: `|v| = √(v_ℓ² + v_p²)`, and
 multiplying the two efficiencies would over-count. What it needs is the force
 balance rebuilt with friction along the **total** slip direction and integrated
-over the path — which reduces to the classical screw formula where the profile
-component is zero, and to `contact::efficiency` where the lengthwise one is. That
-is the honest unification and it is a piece of work in its own right; doing it
-badly would cost the exact self-locking threshold, which is the model's strongest
-result.
+over the path.
+
+##### The unified balance — derived, and containing both models
+
+`contact::Contact` is that balance, and it is one statement:
+
+```text
+F = F_n (n̂ + μ v̂)          the flanks press along the normal and rub along the slip
+T₁ = (r × F)·â₁            moments about each axis; F_n cancels in the ratio
+T₂ = ((r − o₂) × F)·â₂
+η  = T₂ ω₂ / T₁ ω₁
+```
+
+Nothing about the kinematics is told to it. The speed ratio comes out of the
+surfaces neither separating nor overlapping — `v₁·n̂ = v₂·n̂`, one equation — and
+falls out as **−z₁/z₂ to nine digits, identically at every point of the path**.
+That is conjugate action arriving as a consequence, and it is the check that the
+frame is right before any friction is added.
+
+Four properties, in the order they were established:
+
+| | |
+|---|---|
+| Frictionless is lossless | at every point, to within a few ulps — the answer is a ratio of two moments reached by different cancellations, so bit-exactness is not on offer and is not claimed |
+| The speed ratio is derived | −z₁/z₂, the same at every point of the path |
+| **At the pitch point it *is* the classical screw formula** | to 1e-12 over μ = 0…0.15, from a 45° crossed pair to an 82° worm. The `cos α_n` and `μ tan γ` of the handbook formula are components of `n̂ + μ v̂` at one particular point |
+| **Its parallel limit is the other model** | averaged along the path at Σ = 0.02° it gives 98.787 % where the parallel closed form gives 98.777 % — and the pitch-point formula says 99.998 % |
+
+That last 0.01-point residual is the **parallel formula's** own linearisation,
+not an error here: its loss is first order in `μ` while this balance is exact in
+`μ`, so the difference is second order. Measured as that shape rather than
+accepted as a tolerance — the gap as a fraction of the loss falls with `μ`
+(0.0153, 0.0083, 0.0043, 0.0015, 0.00047 at μ = 0.12 … 0.003), which is the
+signature of an O(μ²) difference and says which of the two is the approximate
+one.
+
+So the two efficiency models are one model at two geometries, and the 1.2-point
+step at the boundary is 0.01 points of the *other* formula's linearisation.
+
+**Not yet what a stage reports.** Wiring it in changes the headline figure of
+every worm and crossed stage, which deserves its own measured pass; the balance
+is in the core, gated, and the pitch-point formula still feeds the panel.
 
 Until then the figure is disclosed rather than quietly wrong, and the test for
 "wrong" is a **law rather than a threshold**: crossing shafts can only add

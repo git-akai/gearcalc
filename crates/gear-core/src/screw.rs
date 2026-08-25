@@ -744,6 +744,60 @@ impl CrossedPath {
         crate::hertz::relative_curvatures((1.0 / rho[0], 0.0), (1.0 / rho[1], 0.0), skew)
     }
 
+    /// One contact of this pair, at a position along the path.
+    ///
+    /// The line of action *is* the common normal — the same fact for a crossed
+    /// pair as for a parallel one — so the path's own direction serves as both.
+    #[must_use]
+    pub fn contact_at(&self, screw: &Screw, s: f64) -> crate::contact::Contact {
+        crate::contact::Contact {
+            point: [
+                self.through[0] + s * self.normal[0],
+                self.through[1] + s * self.normal[1],
+                self.through[2] + s * self.normal[2],
+            ],
+            normal: self.normal,
+            axis_1: [0.0, 0.0, 1.0],
+            axis_2: [0.0, screw.shaft_angle.sin(), screw.shaft_angle.cos()],
+            centre_2: [screw.centre_distance, 0.0, 0.0],
+        }
+    }
+
+    /// Mesh efficiency from the friction balance, averaged along the zone.
+    ///
+    /// **This is the model the pitch-point formula is a single sample of.** It
+    /// carries the sliding *up the profile* as well as *along the trace*, which
+    /// is the term whose absence lets a crossed pair look better than the same
+    /// teeth running parallel (§4.5.1) — and it converges on the parallel-axis
+    /// figure as the shafts come parallel, where the pitch-point formula
+    /// converges on 1.
+    ///
+    /// Uniform in `s` is uniform in time: the contact point advances along the
+    /// path at a constant rate, `r_b/cos β_b` per radian. Load sharing is not
+    /// modelled, here as elsewhere (§4.7) — the average is over the path a
+    /// single pair traverses.
+    ///
+    /// `samples` is a quadrature count, not a tuning parameter: the integrand is
+    /// smooth and a convergence test fixes what is enough.
+    #[must_use]
+    pub fn efficiency(&self, screw: &Screw, friction: f64, samples: usize) -> Option<f64> {
+        let steps = samples.max(2);
+        #[allow(clippy::cast_precision_loss)]
+        let width = (self.zone[1] - self.zone[0]) / steps as f64;
+        let mut loss = 0.0;
+        for k in 0..=steps {
+            #[allow(clippy::cast_precision_loss)]
+            let s = self.zone[0] + width * k as f64;
+            let eta = self.contact_at(screw, s).efficiency(friction)?;
+            // Trapezium: the ends are half-weighted because they are the ends,
+            // not because the integrand does anything special there.
+            let weight = if k == 0 || k == steps { 0.5 } else { 1.0 };
+            loss += weight * (1.0 - eta);
+        }
+        #[allow(clippy::cast_precision_loss)]
+        Some(1.0 - loss / steps as f64)
+    }
+
     /// The two positions where one tooth pair carries the whole load.
     ///
     /// Beyond them the next pair has taken up and the load is shared, exactly as
@@ -1638,6 +1692,211 @@ mod tests {
             );
             previous = travel[0];
         }
+    }
+
+    /// **The friction balance contains both efficiency models**, and this is the
+    /// evidence for each.
+    ///
+    /// Four properties, in the order they were established:
+    ///
+    /// 1. **Frictionless is lossless**, at every point of the path and not
+    ///    merely at the pitch point — to within a few ulps, which is what the
+    ///    arithmetic allows: the answer is a ratio of two moments reached by
+    ///    different cancellations. Conjugate surfaces transmit perfectly, and
+    ///    that this comes out of the geometry is what says the frame, the signs
+    ///    and the derived speed ratio are all right.
+    /// 2. **The speed ratio is derived, not told.** It falls out of the surfaces
+    ///    neither separating nor overlapping, as the tooth-count ratio, and is
+    ///    the same at every point — which is conjugate action rather than an
+    ///    assumption.
+    /// 3. **At the pitch point it *is* the classical screw formula**, to the last
+    ///    bit, across geometries from a 45° crossed pair to an 82° worm.
+    /// 4. Its parallel limit is the other model's, and that is the next test.
+    #[test]
+    fn the_friction_balance_contains_the_classical_screw_formula() {
+        let mn = 1.0;
+        for (starts, teeth, sigma_deg, beta_deg) in [
+            (17u32, 23u32, 90.0f64, 45.0f64),
+            (17, 43, 30.0, 25.0),
+            (1, 40, 90.0, 82.0),
+        ] {
+            let beta = beta_deg.to_radians();
+            let s = Screw::new(&ScrewParams {
+                normal_module: mn,
+                shaft_angle: sigma_deg.to_radians(),
+                starts,
+                wheel_teeth: teeth,
+                worm_pitch_diameter: f64::from(starts) * mn
+                    / (std::f64::consts::FRAC_PI_2 - beta).sin(),
+                ..ScrewParams::default()
+            })
+            .expect("a buildable pair");
+            let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+            let path = s
+                .path_of_contact(r[0] + mn, r[1] + mn)
+                .expect("a path of contact");
+
+            let expected_ratio = -f64::from(starts) / f64::from(teeth);
+            for k in 0..=8 {
+                let at = path.zone[0] + (path.zone[1] - path.zone[0]) * f64::from(k) / 8.0;
+                let contact = path.contact_at(&s, at);
+
+                // 1. frictionless: lossless to the arithmetic's own limit. Not
+                //    bit-exact, and it should not be claimed as such — the ratio
+                //    is of two moments computed by different cancellations, so a
+                //    couple of ulps survive. Two, measured.
+                let free = contact.efficiency(0.0).expect("an efficiency");
+                assert!(
+                    (free - 1.0).abs() <= 4.0 * f64::EPSILON,
+                    "Σ={sigma_deg}° at s={at}: conjugate surfaces lose nothing, got {free}"
+                );
+                // 2. the ratio, derived
+                let ratio = contact.speed_ratio().expect("a ratio");
+                assert!(
+                    (ratio - expected_ratio).abs() < 1e-9,
+                    "Σ={sigma_deg}° at s={at}: ratio {ratio} against {expected_ratio}"
+                );
+            }
+
+            // 3. at the pitch point, the classical formula — to the last bit.
+            for mu in [0.0, 0.02, 0.06, 0.15] {
+                let balance = path
+                    .contact_at(&s, 0.0)
+                    .efficiency(mu)
+                    .expect("an efficiency");
+                let classical = s.efficiency(mu, Drive::Forward);
+                assert!(
+                    (balance - classical).abs() < 1e-12,
+                    "Σ={sigma_deg}° μ={mu}: balance {balance} against classical {classical}"
+                );
+            }
+        }
+    }
+
+    /// **...and its parallel limit is the other model**, which is what makes it
+    /// one model rather than two.
+    ///
+    /// As the shafts come parallel the pitch-point formula tends to 100 % — it
+    /// has only the sliding along the trace, and that vanishes — while the real
+    /// pair keeps its profile sliding. Averaged along the path, the balance goes
+    /// where the parallel-axis closed form is: 98.787 % against 98.777 % at
+    /// Σ = 0.02°, where the pitch-point figure says 99.998 %.
+    ///
+    /// The 0.01-point residual is the **parallel formula's** own linearisation,
+    /// not an error here: its loss is first order in `μ` and this balance is
+    /// exact in `μ`, so the gap is second order. Asserted as that shape — the
+    /// gap as a fraction of the loss falls with `μ` — rather than as a
+    /// tolerance, because a tolerance would hide which of the two is
+    /// approximate.
+    #[test]
+    fn the_friction_balance_meets_the_parallel_model_at_its_limit() {
+        use crate::contact::{efficiency as parallel_efficiency, ContactPath};
+        use crate::mesh::{Mesh, MeshKind};
+        use crate::{Gear, GearParams};
+
+        let (mn, beta_add) = (1.0, 20.0f64);
+        let (z1, z2) = (17u32, 43u32);
+        let sigma = 0.02f64.to_radians();
+        let beta_1 = sigma / 2.0 + beta_add.to_radians();
+        let s = Screw::new(&ScrewParams {
+            normal_module: mn,
+            shaft_angle: sigma,
+            starts: z1,
+            wheel_teeth: z2,
+            worm_pitch_diameter: f64::from(z1) * mn / (std::f64::consts::FRAC_PI_2 - beta_1).sin(),
+            ..ScrewParams::default()
+        })
+        .expect("a buildable pair");
+        let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+        let path = s
+            .path_of_contact(r[0] + mn, r[1] + mn)
+            .expect("a path of contact");
+
+        // the same teeth, parallel
+        let gear = |z: u32, b: f64| {
+            Gear::new(GearParams {
+                teeth: z,
+                helix_angle: b,
+                ..Default::default()
+            })
+        };
+        let (g1, g2) = (gear(z1, beta_add), gear(z2, -beta_add));
+        let mesh = Mesh::new(&g1, &g2, MeshKind::External).expect("a mesh");
+        let parallel_path = ContactPath::new(&g1, g2.ra, &mesh).expect("a path");
+
+        let mut previous = f64::INFINITY;
+        for mu in [0.12f64, 0.06, 0.03, 0.01, 0.003] {
+            let balance = 1.0 - path.efficiency(&s, mu, 2000).expect("an efficiency");
+            let closed = 1.0 - parallel_efficiency(&parallel_path, &mesh, &g1, mu, Drive::Forward);
+            let share = (balance - closed).abs() / closed;
+            assert!(
+                share < previous,
+                "μ={mu}: the gap should shrink against the loss, {share} after {previous}"
+            );
+            previous = share;
+        }
+        assert!(
+            previous < 1e-3,
+            "at small μ the two must agree to their shared first order: {previous}"
+        );
+
+        // ...and at an ordinary μ they are the same number to a hundredth of a
+        // point, where the pitch-point formula is 1.2 points away.
+        let balance = path.efficiency(&s, 0.06, 2000).expect("an efficiency");
+        let closed = parallel_efficiency(&parallel_path, &mesh, &g1, 0.06, Drive::Forward);
+        assert!(
+            (balance - closed).abs() < 2e-4,
+            "{balance} against {closed}"
+        );
+        assert!(s.efficiency(0.06, Drive::Forward) - closed > 1e-2);
+    }
+
+    /// **The quadrature's count is a fact about the integrand, not a choice.**
+    ///
+    /// The trapezium rule is second order, so halving the step should quarter
+    /// the error — asserted, because a count that merely *looks* converged is
+    /// how a tuning parameter gets in. With that confirmed, the error at a given
+    /// count is predictable, and a few hundred samples put it far below any
+    /// digit this crate reports.
+    #[test]
+    fn the_path_average_has_converged() {
+        let mn = 1.0;
+        let s = Screw::new(&ScrewParams {
+            normal_module: mn,
+            shaft_angle: 90.0f64.to_radians(),
+            starts: 17,
+            wheel_teeth: 23,
+            worm_pitch_diameter: 17.0 * mn / (45.0f64.to_radians()).cos(),
+            ..ScrewParams::default()
+        })
+        .expect("a buildable pair");
+        let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+        let path = s
+            .path_of_contact(r[0] + mn, r[1] + mn)
+            .expect("a path of contact");
+
+        let reference = path.efficiency(&s, 0.06, 200_000).expect("an efficiency");
+        let error = |samples: usize| {
+            (path.efficiency(&s, 0.06, samples).expect("an efficiency") - reference).abs()
+        };
+
+        let mut previous = error(64);
+        for samples in [128, 256, 512] {
+            let here = error(samples);
+            let ratio = previous / here;
+            assert!(
+                (3.0..5.0).contains(&ratio),
+                "{samples} samples: the error fell by {ratio}, not the four a \
+                 second-order rule gives — the integrand is not what is assumed"
+            );
+            previous = here;
+        }
+        // ...and at that order, this is comfortably below anything reported.
+        assert!(
+            error(2048) < 1e-9,
+            "2048 samples still leaves {}",
+            error(2048)
+        );
     }
 
     /// **The face width the continuity of contact asks for, and what it means.**
