@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–10 complete and in CI. 344 tests, ~26 s.** Milestone 11 is
+**Milestones 0–10 complete and in CI. 345 tests, ~26 s.** Milestone 11 is
 under way: the ring-drawing defect below is fixed, and the rim circle with it.
 
 ```bash
@@ -363,7 +363,7 @@ these are the ones most likely to be stepped on again.
 | Mesh-phase coefficient setting the optimal λ | §4.10 | only the angular-profile-shift milestone |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
 | **Crossed-axis bending** — the path gave the load's position on the profile, but not its distribution *across the face*, and `σ_F = F_t/(b·m)·Y_F·Y_S` is a cantilever loaded across the whole of one. Choosing an effective width is a convention that multiplies a stress, so §4.7 refuses it. Recorded rather than left looking undone | §4.5.1 | nothing; it is stated on screen |
-| A crossed pair's efficiency still comes from the pitch-point force balance, not from sliding integrated along the path | §4.5.1 | nothing |
+| A crossed pair's efficiency counts sliding along the trace and not up the profile, so it is an **upper bound** — 99.988 % at Σ = 0.1° against the parallel 98.777 %. Disclosed by a law (a crossed pair cannot beat the same teeth parallel) rather than a threshold. The fix is the force balance rebuilt with friction along the *total* slip, which reduces to both existing models at their limits | §4.5.1 | nothing |
 | The **enveloping** (throated) wheel's zone of action — the cylindrical one is derived and reported as a floor | §4.5.1 | nothing |
 | Span over teeth for a ring — rare in practice, not derived; between-pins is done | §4.6 | nothing |
 | Worm profile drawing and DXF; a planetary set has no drawing either | §4.5.1, §8 | nothing |
@@ -427,6 +427,12 @@ Left: further UI work as it is asked for.
 
 ## 7. Working notes
 
+- **Prefer a law to a threshold when disclosing a model's limit.** The crossed
+  efficiency is short by an amount that grows as the shaft angle falls. Warning
+  "below 5°" would have been a convention; the test used instead is that
+  crossing shafts can only *add* sliding, so a crossed pair beating the same
+  teeth run parallel is the model admitting it lost some. No number chosen, and
+  it stays right if the model changes.
 - **Having the load's position is not having the load.** The audit said the
   contact path would unblock crossed-axis bending. It did not: the path gives
   where on the *profile* the load acts, and the beam formula needs how it is

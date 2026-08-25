@@ -214,6 +214,13 @@
     {#if r.efficiency.backward <= 0}
       <small class="warn">self-locking</small>
     {/if}
+    {#if r.crossed?.parallel_axis_efficiency != null && r.efficiency.forward > r.crossed.parallel_axis_efficiency}
+      <small class="warn">
+        an upper bound: this counts sliding along the tooth trace, not up the profile, and
+        the same teeth with parallel shafts give {pct(r.crossed.parallel_axis_efficiency)} %
+        — crossing shafts can only add sliding
+      </small>
+    {/if}
   </dd>
   <dt>Self-locks at μ</dt>
   <dd>{r.self_locking_friction.toFixed(4)}</dd>

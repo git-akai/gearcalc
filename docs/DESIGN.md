@@ -30,7 +30,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Automatic proportions | the worm's length and the wheel's face width, as **recommendations** with their sources named | monotone in the wheel's teeth, homogeneous in the module, the BS 721 cap binding where it should |
 | UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm, crossed and planetary** stages, and geartrain import/export; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI; control positions measured to show notes do not move them |
 
-344 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+345 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -757,7 +757,7 @@ consumer of the path is exactly what a crossed stage does not report:
 | Contact stress at the single-pair boundaries (it was rated at the pitch point only) | `contact_stress(path, …)`, which walks the path | **done** — the rating walks the crossed path too |
 | Automatic face width | inverting `σ_F(b)` and `σ_H(b)` | **done, by a different constraint** — `ε ≥ 1`, since no stress here depends on `b` |
 | Bending stress | `bending_section(g, contact_ratio)` — the load's roll parameter comes off the path | **still not available, and now for a stated reason: see below** |
-| Efficiency from sliding | `contact::efficiency(path, …)`; the crossed stage uses a force balance instead | open |
+| Efficiency from sliding | `contact::efficiency(path, …)`; the crossed stage uses a force balance instead | open — **measured, bounded and disclosed**; see below |
 
 **One construction gates five branches.** That is the whole of the divergence,
 and it is worth stating because it makes the remaining work a single question
@@ -920,6 +920,46 @@ Two consequences worth being plain about, both of which the panel says:
 Below 1 the pair loses contact between one tooth and the next, which is a failure
 of *kind* rather than of margin — so it is said in the stage's notes rather than
 left to be read off a number.
+
+##### The efficiency is an upper bound, and the pair says so
+
+The one branch of the five still open, now with a number on it.
+
+A crossed mesh's efficiency is a force balance about the sliding **along** the
+tooth trace — the screw action, which is exactly right for a worm and is where
+the exact self-locking threshold comes from. A parallel mesh's whole loss is the
+sliding **up the profile**, which that balance does not carry. As the shaft angle
+falls the first vanishes and the second does not, so the model tends to 100 %
+where the real pair tends to its parallel-axis figure:
+
+| Σ | crossed model | |
+|---|---|---|
+| 90° | 85.338 % | the lengthwise loss dominates |
+| 30° | 96.255 % | |
+| 5° | 99.385 % | |
+| 0.1° | **99.988 %** | |
+| 0 | **98.777 %** | the parallel model, same teeth |
+
+A step of **1.2 points** across a boundary where nothing physical happens — the
+§12 trap in a new place, and reachable now that the axis angle is an ordinary
+input on an ordinary stage.
+
+The fix is not a correction term. Coulomb friction acts on the *magnitude* of
+the total slip, so the two components do not add: `|v| = √(v_ℓ² + v_p²)`, and
+multiplying the two efficiencies would over-count. What it needs is the force
+balance rebuilt with friction along the **total** slip direction and integrated
+over the path — which reduces to the classical screw formula where the profile
+component is zero, and to `contact::efficiency` where the lengthwise one is. That
+is the honest unification and it is a piece of work in its own right; doing it
+badly would cost the exact self-locking threshold, which is the model's strongest
+result.
+
+Until then the figure is disclosed rather than quietly wrong, and the test for
+"wrong" is a **law rather than a threshold**: crossing shafts can only add
+sliding, so a crossed pair cannot be more efficient than the same teeth running
+parallel. Where the model says otherwise it has lost sliding, and it says so —
+naming the parallel figure, and calling its own an upper bound. At a large shaft
+angle the law holds with room to spare and nothing is said.
 
 ##### A crossed gear pair is the spur stage with its shafts turned
 
