@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–10 complete and in CI. 335 tests, ~26 s.** Milestone 11 is
+**Milestones 0–10 complete and in CI. 340 tests, ~26 s.** Milestone 11 is
 under way: the ring-drawing defect below is fixed, and the rim circle with it.
 
 ```bash
@@ -38,7 +38,10 @@ helical throughout) · efficiency · automatic profile shift and altered addendu
 
 **Crossed axes.** `screw.rs`: lead angle `sin γ = z m_n/d` exact, both
 efficiencies from a force balance, self-locking, sliding as a vector, elliptical
-contact. A crossed gear pair is **entered as a spur stage with an axis angle**,
+contact, and **the path of contact** — the line tangent to both base cylinders
+whose direction two properties of an involute helicoid fix, with its zone,
+contact ratio and axial travel (§4.5.1). Derived and tested; not yet wired into
+what a stage reports. A crossed gear pair is **entered as a spur stage with an axis angle**,
 as the specification has it — `β₁ = Σ/2 + β_add`, `β₂ = Σ/2 − β_add`, so the
 parallel pair is the axis angle's zero — and solved by translating it into the
 screw stage it is. Three stage kinds, not four. The worm's length and the wheel's face width are **recommended** from
@@ -349,7 +352,7 @@ these are the ones most likely to be stepped on again.
 | The cut simulation cannot see below the generation limit: its cutter has no fillet | §4.11 | nothing |
 | Mesh-phase coefficient setting the optimal λ | §4.10 | only the angular-profile-shift milestone |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
-| **The crossed-axis contact path** — one construction gates five branches: contact ratio, contact at the single-pair boundaries, bending, automatic face width and a sliding-based efficiency. Audited, and the audit is the plan | §4.5.1 | everything a crossed pair does not report |
+| **The crossed-axis contact path** — **derived and tested** (`screw::CrossedPath`); what remains is applying the face-width bound and wiring it into the stage's reported figures, which changes numbers on screen and so is its own step | §4.5.1 | contact ratio, contact along the path, bending, automatic face width and a sliding-based efficiency — all five wait on the wiring, not on the geometry |
 | Worm contact ratio — the zone of action for a **throated** wheel; a different and harder problem from the crossed cylindrical pair above | §4.5.1 | nothing |
 | Span over teeth for a ring — rare in practice, not derived; between-pins is done | §4.6 | nothing |
 | Worm profile drawing and DXF; a planetary set has no drawing either | §4.5.1, §8 | nothing |

@@ -396,6 +396,278 @@ impl Screw {
     }
 }
 
+/// Where a crossed pair's contact point goes, and where it stops.
+///
+/// This is the crossed-axis answer to [`crate::contact::ContactPath`], and the
+/// construction that the §4.5.1 audit identified as the one thing gating five
+/// otherwise separate gaps.
+///
+/// # It is a straight line, and which one is forced
+///
+/// Two properties of an involute helicoid decide it, both measured from the
+/// surface's own parameterisation rather than assumed (the verification log):
+///
+/// 1. **Its normal makes a fixed angle with its own axis**, `n̂·â = sin β_b`,
+///    everywhere on the flank.
+/// 2. **That normal is a line tangent to the base cylinder.**
+///
+/// At contact the normal is shared, so (1) applied to both members gives two
+/// linear conditions on one unit vector — the contact normal has a **fixed
+/// direction**, whatever the rotation. With the direction fixed, (2) says the
+/// contact points lie on a line with that direction tangent to both base
+/// cylinders. There are four such lines and only one passes through the pitch
+/// point; that one is the mesh.
+///
+/// It is the same statement as the parallel case's "the line of action is the
+/// common tangent to the two base circles", lifted into three dimensions — which
+/// is why the parallel construction is not a special case here but a
+/// *degeneracy*: at `Σ = 0` the two conditions on `n̂` collapse into one, the
+/// line becomes a plane, and contact spreads from a point to a line. That is the
+/// physics, and it is why this returns `None` there rather than pretending.
+///
+/// # What is measured along it
+///
+/// A point of the line at distance `ρ_n` from a member's tangency point is on
+/// that member's flank at normal-plane radius of curvature `ρ_n`, hence at
+/// radius `r = √(r_b² + (ρ_n cos β_b)²)`. The two roll lengths at the pitch
+/// point come out as `r sin α_t / cos β_b` for each member and sum to the
+/// tangent length between the two base cylinders — checked to 1e-6 mm against
+/// the classical values, which is what confirms the line is the right one.
+///
+/// The zone of action is then where **both** members are still on flank they
+/// have: `ρ_n ≤ √(r_a² − r_b²) / cos β_b`. The contact ratio is that length over
+/// the **normal** base pitch `π m_n cos α_n`, because the contact point advances
+/// along this line at `r_b/cos β_b` per radian of its member's rotation.
+///
+/// # What it does not yet bound
+///
+/// **The face width.** A crossed pair's contact point travels lengthwise across
+/// the tooth as well as up the flank, so a face too narrow cuts the zone short —
+/// unlike a parallel pair, where the face width does not bound the path at all.
+/// [`Self::axial_travel`] reports how far it travels on each member so a caller
+/// can say so; using it to *bound* the zone is the next step, and it is what
+/// would let a crossed pair's face width be sized from `ε ≥ 1` rather than
+/// entered by hand.
+#[derive(Clone, Copy, Debug)]
+pub struct CrossedPath {
+    /// Direction of the common normal — the line's own direction, unit.
+    pub normal: [f64; 3],
+    /// A point on the line: the pitch point, which is always on it.
+    pub through: [f64; 3],
+    /// Where each member's base cylinder is tangent to the line, as a parameter
+    /// along it measured from [`Self::through`].
+    pub tangency: [f64; 2],
+    /// The zone of action as an interval of the same parameter.
+    pub zone: [f64; 2],
+    /// Length of the zone, mm, in the normal plane.
+    pub length: f64,
+    /// Tooth pairs in contact: the zone over the normal base pitch.
+    pub contact_ratio: f64,
+}
+
+impl Screw {
+    /// The path of contact, or `None` for parallel axes — see [`CrossedPath`].
+    ///
+    /// `tip_radius_1` and `tip_radius_2` bound the flanks. They are the only
+    /// inputs beyond the pitch geometry, and they are what makes the zone finite.
+    #[must_use]
+    pub fn path_of_contact(&self, tip_radius_1: f64, tip_radius_2: f64) -> Option<CrossedPath> {
+        let (r1, r2) = (
+            self.worm_pitch_diameter / 2.0,
+            self.wheel_pitch_diameter / 2.0,
+        );
+        let beta_1 = self.worm_helix_angle;
+        let beta_2 = self.shaft_angle - beta_1;
+        let alpha_n = self.normal_pressure_angle;
+        let bb = |beta: f64| (beta.sin() * alpha_n.cos()).asin();
+        let (bb1, bb2) = (bb(beta_1), bb(beta_2));
+        let base = |r: f64, beta: f64| {
+            let alpha_t = (alpha_n.tan() / beta.cos()).atan();
+            r * alpha_t.cos()
+        };
+        let (rb1, rb2) = (base(r1, beta_1), base(r2, beta_2));
+
+        // 1. The direction. `n·ẑ = sin β_b1` and `n·â₂ = −sin β_b2`; the second
+        //    needs a shaft angle to solve for, which is the parallel degeneracy.
+        let (sin_sigma, cos_sigma) = self.shaft_angle.sin_cos();
+        if sin_sigma.abs() < f64::EPSILON {
+            return None;
+        }
+        let nz = bb1.sin();
+        let ny = (-bb2.sin() - nz * cos_sigma) / sin_sigma;
+        let nx2 = 1.0 - ny * ny - nz * nz;
+        if nx2 <= 0.0 {
+            return None;
+        }
+        let n = [nx2.sqrt(), ny, nz];
+
+        // 2. The line: with the direction fixed, tangency to each base cylinder
+        //    is one linear equation on a point of it. Four sign combinations are
+        //    tangent to both; the mesh is the one through the pitch point, and
+        //    that is asked rather than assumed.
+        let axis_1 = [0.0, 0.0, 1.0];
+        let axis_2 = [0.0, sin_sigma, cos_sigma];
+        let centre_2 = [self.centre_distance, 0.0, 0.0];
+        let pitch = [r1, 0.0, 0.0];
+
+        let mut best: Option<(f64, [f64; 3])> = None;
+        for s1 in [1.0, -1.0] {
+            for s2 in [1.0, -1.0] {
+                let Some(p) = tangent_line(n, axis_1, axis_2, centre_2, s1 * rb1, s2 * rb2) else {
+                    continue;
+                };
+                let v = sub(pitch, p);
+                let off = norm(sub(v, scale(n, dot(v, n))));
+                if best.is_none_or(|(b, _)| off < b) {
+                    best = Some((off, p));
+                }
+            }
+        }
+        let (offset, point) = best?;
+        // The pitch point is on the line exactly, so a residual here is not a
+        // tolerance to widen — it means no branch was the mesh. Stated the way
+        // round that refuses a NaN rather than letting one through a `<`.
+        if offset.is_nan() || offset >= 1e-6 * self.centre_distance.max(1.0) {
+            return None;
+        }
+
+        // 3. Parameters, measured from the pitch point.
+        let origin = dot(sub(pitch, point), n);
+        let t1 = foot(point, n, [0.0; 3], axis_1)? - origin;
+        let t2 = foot(point, n, centre_2, axis_2)? - origin;
+
+        // 4. The zone: both members still on flank they have.
+        let reach = |ra: f64, rb: f64, bb: f64| {
+            let t = (ra * ra - rb * rb).max(0.0).sqrt() / bb.cos();
+            (t.is_finite() && t > 0.0).then_some(t)
+        };
+        let (h1, h2) = (
+            reach(tip_radius_1, rb1, bb1)?,
+            reach(tip_radius_2, rb2, bb2)?,
+        );
+        let lo = (t1 - h1).max(t2 - h2);
+        let hi = (t1 + h1).min(t2 + h2);
+        let length = hi - lo;
+        if length.is_nan() || length <= 0.0 {
+            return None;
+        }
+        let base_pitch = std::f64::consts::PI * self.normal_module() * alpha_n.cos();
+        Some(CrossedPath {
+            normal: n,
+            through: pitch,
+            tangency: [t1, t2],
+            zone: [lo, hi],
+            length,
+            contact_ratio: length / base_pitch,
+        })
+    }
+
+    /// Normal module, recovered from the pitch geometry it was built with.
+    fn normal_module(&self) -> f64 {
+        self.axial_module * self.lead_angle.cos()
+    }
+}
+
+impl CrossedPath {
+    /// The radius each member's flank is at, at a parameter along the path.
+    ///
+    /// `r = √(r_b² + (ρ_n cos β_b)²)`, the same relation the zone is bounded by.
+    #[must_use]
+    pub fn radii_at(&self, s: f64, screw: &Screw) -> [f64; 2] {
+        let alpha_n = screw.normal_pressure_angle;
+        let beta = [
+            screw.worm_helix_angle,
+            screw.shaft_angle - screw.worm_helix_angle,
+        ];
+        let r = [
+            screw.worm_pitch_diameter / 2.0,
+            screw.wheel_pitch_diameter / 2.0,
+        ];
+        let mut out = [0.0; 2];
+        for i in 0..2 {
+            let alpha_t = (alpha_n.tan() / beta[i].cos()).atan();
+            let rb = r[i] * alpha_t.cos();
+            let bb = (beta[i].sin() * alpha_n.cos()).asin();
+            let rho_t = (s - self.tangency[i]).abs() * bb.cos();
+            out[i] = f64::hypot(rb, rho_t);
+        }
+        out
+    }
+
+    /// How far the contact point travels along each member's own axis over the
+    /// zone, mm — what a face width has to cover.
+    ///
+    /// A parallel pair's face width does not bound its path; a crossed pair's
+    /// does, because the point runs lengthwise as well as up the flank. Reported
+    /// rather than applied: see [`CrossedPath`]'s last section.
+    #[must_use]
+    pub fn axial_travel(&self, screw: &Screw) -> [f64; 2] {
+        let axis_2 = [0.0, screw.shaft_angle.sin(), screw.shaft_angle.cos()];
+        let along = self.normal;
+        [
+            (self.length * along[2]).abs(),
+            (self.length * dot(along, axis_2)).abs(),
+        ]
+    }
+}
+
+/// A point of the line with direction `n` tangent to both cylinders.
+///
+/// Tangency to a cylinder is one linear equation on the point — the signed
+/// distance from the axis to the line — and fixing the point's position *along*
+/// `n` supplies the third. Solved directly; there is nothing to iterate.
+fn tangent_line(
+    n: [f64; 3],
+    axis_1: [f64; 3],
+    axis_2: [f64; 3],
+    centre_2: [f64; 3],
+    rb1: f64,
+    rb2: f64,
+) -> Option<[f64; 3]> {
+    let c1 = cross(n, axis_1);
+    let c2 = cross(n, axis_2);
+    let (m1, m2) = (norm(c1), norm(c2));
+    if m1 < f64::EPSILON || m2 < f64::EPSILON {
+        return None;
+    }
+    let u1 = scale(c1, 1.0 / m1);
+    let u2 = scale(c2, 1.0 / m2);
+    solve3([u1, u2, n], [rb1, rb2 + dot(centre_2, u2), 0.0])
+}
+
+/// Where the line `p + s n` comes nearest an axis — the tangency point's `s`.
+fn foot(p: [f64; 3], n: [f64; 3], axis_point: [f64; 3], axis_dir: [f64; 3]) -> Option<f64> {
+    let w = sub(p, axis_point);
+    let d = dot(n, axis_dir);
+    let denom = 1.0 - d * d;
+    (denom.abs() > f64::EPSILON).then(|| -(dot(w, n) - dot(w, axis_dir) * d) / denom)
+}
+
+/// Three equations, three unknowns, by Cramer's rule. Small and exact enough:
+/// the rows here are two unit vectors and a third that is nearly orthogonal to
+/// both, so the determinant is not near zero unless the axes are parallel — the
+/// case the caller has already refused.
+fn solve3(rows: [[f64; 3]; 3], rhs: [f64; 3]) -> Option<[f64; 3]> {
+    let det = |m: [[f64; 3]; 3]| {
+        m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+            - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+            + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
+    };
+    let d = det(rows);
+    if d.abs() < 1e-12 {
+        return None;
+    }
+    let mut out = [0.0; 3];
+    for k in 0..3 {
+        let mut m = rows;
+        for i in 0..3 {
+            m[i][k] = rhs[i];
+        }
+        out[k] = det(m) / d;
+    }
+    Some(out)
+}
+
 /// Which flank carries the load — that is, which way the drive is being pushed.
 #[derive(Clone, Copy, Debug)]
 enum Flank {
@@ -990,6 +1262,222 @@ mod tests {
     /// A worm drive's efficiency is dominated by the lead angle, not by the
     /// friction coefficient — which is the design fact the number exists to
     /// show.
+    /// **The path of contact, against the two things that fix it.**
+    ///
+    /// The pitch point must lie on the line — that is what picks the mesh out of
+    /// the four lines tangent to both base cylinders — and the roll length from
+    /// each member's tangency point to the pitch point must be that member's
+    /// own `r sin α_t / cos β_b`, the classical normal-plane radius of curvature.
+    /// Neither is arranged by the construction: it solves for tangency and knows
+    /// nothing of `α_t`.
+    #[test]
+    fn the_path_of_contact_passes_through_the_pitch_point_at_the_classical_roll() {
+        for (starts, teeth, sigma_deg, beta_deg) in [
+            (17u32, 23u32, 90.0, 45.0),
+            (17, 23, 60.0, 30.0),
+            (11, 37, 45.0, 25.0),
+            (1, 40, 90.0, 82.0),
+        ] {
+            let beta = beta_deg * std::f64::consts::PI / 180.0;
+            let mn = 1.0;
+            let d1 = f64::from(starts) * mn / (90.0f64.to_radians() - beta).sin();
+            let s = Screw::new(&ScrewParams {
+                normal_module: mn,
+                shaft_angle: sigma_deg * std::f64::consts::PI / 180.0,
+                starts,
+                wheel_teeth: teeth,
+                worm_pitch_diameter: d1,
+                ..ScrewParams::default()
+            })
+            .expect("a buildable pair");
+
+            let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+            let betas = [s.worm_helix_angle, s.shaft_angle - s.worm_helix_angle];
+            let path = s
+                .path_of_contact(r[0] + mn, r[1] + mn)
+                .expect("a crossed pair has a path of contact");
+
+            for i in 0..2 {
+                let alpha_n = s.normal_pressure_angle;
+                let alpha_t = (alpha_n.tan() / betas[i].cos()).atan();
+                let bb = (betas[i].sin() * alpha_n.cos()).asin();
+                let classical = r[i] * alpha_t.sin() / bb.cos();
+                let measured = path.tangency[i].abs();
+                assert!(
+                    (measured - classical).abs() < 1e-9 * classical,
+                    "Σ={sigma_deg} β={beta_deg} member {i}: roll {measured} against {classical}"
+                );
+            }
+            // ...and the two roll lengths span the tangent between the cylinders.
+            let span = (path.tangency[1] - path.tangency[0]).abs();
+            let sum = path.tangency[0].abs() + path.tangency[1].abs();
+            assert!(
+                (span - sum).abs() < 1e-9 * span,
+                "the pitch point must lie between the two tangency points"
+            );
+        }
+    }
+
+    /// **The contact ratio is the zone over the normal base pitch, and its
+    /// parallel limit is `ε_α / cos²β_b`.**
+    ///
+    /// Not `ε_α`: the contact point of a *point* contact advances along the line
+    /// of action in the **normal** plane, and the normal base pitch is
+    /// `p_bt cos β_b` while the normal-plane path is `p_t / cos β_b`. The two
+    /// factors compound rather than cancelling, and the limit is checked against
+    /// the classical transverse ratio computed here from tip radii alone.
+    ///
+    /// This is also the check that the construction survives a shaft angle
+    /// approaching its own degeneracy: at `Σ = 0` there is no line, but the limit
+    /// from above is a number, and it is the right one.
+    #[test]
+    fn the_contact_ratio_approaches_the_parallel_pairs_normal_plane_value() {
+        let (mn, alpha_n) = (1.0, 20.0f64.to_radians());
+        let beta_add = 20.0f64.to_radians();
+        let (z1, z2) = (17u32, 43u32);
+
+        // The classical parallel figures, at Σ = 0 where β₁ = −β₂ = β_add.
+        let mt = mn / beta_add.cos();
+        let alpha_t = (alpha_n.tan() / beta_add.cos()).atan();
+        let (r1, r2) = (f64::from(z1) * mt / 2.0, f64::from(z2) * mt / 2.0);
+        let (rb1, rb2) = (r1 * alpha_t.cos(), r2 * alpha_t.cos());
+        let (ra1, ra2) = (r1 + mn, r2 + mn);
+        let path_t = (ra1 * ra1 - rb1 * rb1).sqrt() + (ra2 * ra2 - rb2 * rb2).sqrt()
+            - (r1 + r2) * alpha_t.sin();
+        let eps_alpha = path_t / (std::f64::consts::PI * mt * alpha_t.cos());
+        let bb = (beta_add.sin() * alpha_n.cos()).asin();
+        let expected = eps_alpha / (bb.cos() * bb.cos());
+
+        let mut last = f64::INFINITY;
+        for sigma_deg in [2.0f64, 0.5, 0.1, 0.01] {
+            let sigma = sigma_deg.to_radians();
+            let beta_1 = sigma / 2.0 + beta_add;
+            let d1 = f64::from(z1) * mn / (std::f64::consts::FRAC_PI_2 - beta_1).sin();
+            let s = Screw::new(&ScrewParams {
+                normal_module: mn,
+                normal_pressure_angle: alpha_n,
+                shaft_angle: sigma,
+                starts: z1,
+                wheel_teeth: z2,
+                worm_pitch_diameter: d1,
+            })
+            .expect("a buildable pair");
+            let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+            let path = s
+                .path_of_contact(r[0] + mn, r[1] + mn)
+                .expect("a path of contact");
+            let err = (path.contact_ratio - expected).abs();
+            assert!(
+                err < last || err < 1e-4,
+                "Σ={sigma_deg}°: ε={} against {expected}, and not closing",
+                path.contact_ratio
+            );
+            last = err;
+        }
+        assert!(
+            last < 1e-4,
+            "the limit is {expected}, and the closest reached was off by {last}"
+        );
+    }
+
+    /// A shorter tooth is in contact for less of the turn, and a pair whose tips
+    /// do not reach has no contact at all. Comparisons, not remembered numbers.
+    #[test]
+    fn the_zone_shrinks_with_the_teeth_that_make_it() {
+        let s = Screw::new(&ScrewParams {
+            shaft_angle: 90.0f64.to_radians(),
+            starts: 17,
+            wheel_teeth: 23,
+            worm_pitch_diameter: 17.0 / (45.0f64.to_radians()).cos(),
+            ..ScrewParams::default()
+        })
+        .expect("a buildable pair");
+        let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+
+        let mut previous = 0.0;
+        for addendum in [0.4f64, 0.7, 1.0, 1.3] {
+            let path = s
+                .path_of_contact(r[0] + addendum, r[1] + addendum)
+                .expect("a path of contact");
+            assert!(
+                path.contact_ratio > previous,
+                "a taller tooth must stay in contact longer: {addendum} gave {}",
+                path.contact_ratio
+            );
+            previous = path.contact_ratio;
+        }
+        // Tips that stop short of the pitch point cannot reach each other.
+        assert!(s.path_of_contact(r[0] * 0.2, r[1] * 0.2).is_none());
+    }
+
+    /// **The face width a crossed pair needs is a consequence, not a rule.**
+    ///
+    /// The contact point runs along each member's axis as it crosses the zone,
+    /// by `zone × sin β_b` — property (1) of [`CrossedPath`] read as a
+    /// projection. A parallel pair has no such travel, which is exactly why its
+    /// face width does not bound its path and a crossed pair's does. Asserted
+    /// against `sin β_b` computed here, and against the ordering that a steeper
+    /// helix demands more face.
+    #[test]
+    fn the_contact_point_travels_along_the_axis_by_the_base_helix() {
+        let mn = 1.0;
+        let mut previous = 0.0;
+        for beta_deg in [20.0f64, 35.0, 45.0, 60.0] {
+            let beta = beta_deg.to_radians();
+            let s = Screw::new(&ScrewParams {
+                normal_module: mn,
+                shaft_angle: 90.0f64.to_radians(),
+                starts: 17,
+                wheel_teeth: 23,
+                worm_pitch_diameter: 17.0 * mn / (std::f64::consts::FRAC_PI_2 - beta).sin(),
+                ..ScrewParams::default()
+            })
+            .expect("a buildable pair");
+            let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+            let path = s
+                .path_of_contact(r[0] + mn, r[1] + mn)
+                .expect("a path of contact");
+            let travel = path.axial_travel(&s);
+
+            let alpha_n = s.normal_pressure_angle;
+            for (i, member_beta) in [s.worm_helix_angle, s.shaft_angle - s.worm_helix_angle]
+                .into_iter()
+                .enumerate()
+            {
+                let bb = (member_beta.sin() * alpha_n.cos()).asin();
+                let expected = path.length * bb.sin().abs();
+                assert!(
+                    (travel[i] - expected).abs() < 1e-9 * expected.max(1e-9),
+                    "β={beta_deg}° member {i}: travel {} against {expected}",
+                    travel[i]
+                );
+                assert!(
+                    travel[i] < path.length,
+                    "the axial travel cannot exceed the path that produced it"
+                );
+            }
+            assert!(
+                travel[0] > previous,
+                "a steeper helix needs more face width"
+            );
+            previous = travel[0];
+        }
+    }
+
+    /// Parallel axes have no line of action — they have a *plane* of it, and the
+    /// contact is a line rather than a point. Refused rather than answered
+    /// wrongly; `Screw::new` refuses `Σ = 0` for the same reason.
+    #[test]
+    fn parallel_axes_have_no_line_of_action() {
+        let mut s = Screw::new(&ScrewParams {
+            shaft_angle: 90.0f64.to_radians(),
+            ..ScrewParams::default()
+        })
+        .expect("a buildable pair");
+        s.shaft_angle = 0.0;
+        assert!(s.path_of_contact(10.0, 20.0).is_none());
+    }
+
     #[test]
     fn efficiency_rises_with_the_lead_angle() {
         let mu = 0.05;

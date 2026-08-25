@@ -30,7 +30,7 @@ subscript `n` = normal plane, `t` = transverse.
 | Automatic proportions | the worm's length and the wheel's face width, as **recommendations** with their sources named | monotone in the wheel's teeth, homogeneous in the module, the BS 721 cap binding where it should |
 | UI | gear tabs with an **internal** option, parameter grid, viewport, DXF download; geartrain tabs with **spur, worm, crossed and planetary** stages, and geartrain import/export; editable material properties | end-to-end through the real wasm; headless renders checked against the CLI; control positions measured to show notes do not move them |
 
-335 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
+340 tests, ~27 s. `nix flake check` covers build, clippy `--deny warnings`, fmt
 and tests; CI additionally typechecks the front end and re-reads an exported DXF
 with `ezdxf`.
 
@@ -782,15 +782,62 @@ expressing the parallel case in the crossed form would trade exactness for
 uniformity, which is the wrong direction. The honest unification is the other
 way round, and it needs the shifted crossed mesh (§10).
 
-**What the missing construction would take.** Not the throated wheel, which is a
-different and harder problem and stays out of scope: both members of a crossed
-*gear* pair are involute helicoids on cylinders, contact traces a straight line
-in their common tangent plane, and each member's own transverse plane already
-yields `√(r_a² − r_b²) − r sin α_t` — the same expression `ContactPath` is built
-from. What is missing is the link between the two members' positions along that
-line, and the bound where either flank runs out. With it, `ContactPath` gains a
-crossed constructor and the five rows above stop being special cases; without
-it, each is absent and says so on screen.
+**The missing construction, derived.** It is `screw::CrossedPath`, and it came
+out of two properties of an involute helicoid, both *measured* from the surface's
+own parameterisation rather than assumed:
+
+1. its normal makes a fixed angle with its own axis — `n̂·â = sin β_b`,
+   everywhere on the flank (spread below 3e-8 over four helix angles and two
+   base radii, at the finite-difference floor);
+2. that normal is a line **tangent to the base cylinder** (axis-to-line distance
+   equal to `r_b` to 7e-8 mm over the same grid).
+
+At contact the normal is shared, so (1) applied to both members gives two linear
+conditions on one unit vector: **the contact normal has a fixed direction**,
+whatever the rotation. With the direction fixed, (2) says the contact points lie
+on the line with that direction tangent to both base cylinders. Four lines are
+tangent to both; **only one passes through the pitch point**, and that one is the
+mesh — checked, not assumed, and it comes out at an offset of 1e-14 mm while the
+other three sit 35–78 mm away.
+
+This is the parallel case's "the line of action is the common tangent to the two
+base circles", lifted into three dimensions. The parallel construction is
+therefore not a special case of it but a **degeneracy**: at `Σ = 0` the two
+conditions on `n̂` collapse into one, the line becomes a plane, and contact
+spreads from a point to a line. `path_of_contact` returns `None` there rather
+than pretending, exactly as `Screw::new` refuses `Σ = 0`.
+
+What is measured along the line:
+
+```text
+r(s)   = √(r_b² + (ρ_n cos β_b)²)        ρ_n = |s − s_tangency|
+zone   = both members with ρ_n ≤ √(r_a² − r_b²)/cos β_b
+ε      = zone length / (π m_n cos α_n)   — the NORMAL base pitch
+travel = zone length · sin β_b           — along each member's own axis
+```
+
+Three checks, each of which fails if the branch or a sign is wrong (verified by
+breaking one deliberately):
+
+- The roll length from each member's tangency point to the pitch point comes out
+  as that member's **classical** `r sin α_t / cos β_b`, to 1e-9 relative, over
+  four geometries — and the construction knows nothing of `α_t`.
+- The two roll lengths **sum** to the tangent length between the base cylinders,
+  which is what puts the pitch point between them.
+- As `Σ → 0` the contact ratio converges on `ε_α / cos²β_b`. **Not `ε_α`**: a
+  point contact advances along the line of action in the *normal* plane, where
+  the path is `p_t / cos β_b` and the base pitch is `p_bt cos β_b`, so the two
+  factors compound rather than cancelling. The limit is approached from above and
+  reached to 1e-4 by `Σ = 0.01°`.
+
+**And one thing the audit did not predict**: a crossed pair's face width *bounds
+its zone of action*, because the contact point travels `zone × sin β_b` along
+each member's axis while a parallel pair's does not travel at all. That is why a
+parallel pair's face width does not bound its path, and it means a crossed pair's
+face width could be sized from `ε ≥ 1` — the very thing §4.5.1 currently says
+nothing can size. `axial_travel` reports it; applying it as a bound, and wiring
+the path into the stage's reported figures, is the next step and is deliberately
+not in the same change as the derivation.
 
 ##### A crossed gear pair is the spur stage with its shafts turned
 
@@ -3106,6 +3153,12 @@ here. Revision 2 additions are marked ★.
 | ★ Cutter radius effect | same, ρ=0.38 | z_min drops 18 → 13 |
 | ★ Over-pins `r_M` | min distance from pin centre to generated involute, 4 gears | equals `d_p/2` to 3e-10 mm |
 | Planetary `dg/dx_p` analytic | vs. central differences | 6+ digits |
+| ◆ An involute helicoid's normal makes a fixed angle with its own axis | `n̂·â` over 4 helix angles × 2 base radii × 12 surface points, normals from the parameterisation by finite difference | spread ≤ 3e-8, mean equal to `sin β_b` — the property that makes the crossed contact normal's **direction** constant, and the path straight |
+| ◆ …and that normal is tangent to the base cylinder | axis-to-line distance, same grid | equal to `r_b` to 7e-8 mm |
+| ◆ Which of the four common tangent lines is the mesh | offset of the pitch point from each | the mesh branch **1e-14 mm**; the other three 34.9, 47.2 and 77.8 mm — chosen by measurement, not by convention |
+| ◆ The path's roll lengths | vs. the classical `r sin α_t / cos β_b`, 4 crossed geometries | 1e-9 relative, and the two sum to the tangent length between the base cylinders |
+| ◆ Crossed contact ratio in the parallel limit | Σ = 2°, 0.5°, 0.1°, 0.01° against `ε_α / cos²β_b` | monotone in, 1e-4 by 0.01° — and **not** `ε_α`: the normal-plane path and the normal base pitch each carry a `cos β_b` the same way |
+| ◆ Those checks are not vacuous | the `n̂·â₂` sign deliberately flipped to the other branch | both path tests fail |
 | Planetary Newton | from `x_p = 0`, z = 17/17/53 | 3.6e-15 mm in 4 iterations |
 | ★ `x_p` monotone in `z_ring` | swept z_r = 45…61 | strictly increasing where defined |
 | ★ `z_r = z_s + 2z_p` ⟹ `x_p = 0` | 17/17/51 | −0.000000 |
