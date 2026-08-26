@@ -86,11 +86,12 @@ contact ratio {ratio}: below 1 the pair loses contact between one tooth and \
 the next, whatever the stresses say. A crossed pair's face width bounds this \
 where a parallel pair's does not — see the width for continuity beside it"""
 self_locking = """\
-self-locking at mu = {friction}: the wheel cannot back-drive the worm (the \
-threshold is {threshold})"""
+self-locking at a static mu of {friction}: the wheel cannot break the worm away \
+at all, so it cannot back-drive it (the threshold is {threshold})"""
 near_self_locking = """\
-close to self-locking: mu = {friction} against a threshold of {threshold}, so \
-back-driving depends on a friction coefficient nobody measured"""
+close to self-locking: a static mu of {friction} against a threshold of \
+{threshold}, so whether it back-drives depends on a friction coefficient nobody \
+measured"""
 low_mesh_efficiency = """\
 mesh efficiency {percent} % — most of the input becomes heat, and a worm drive \
 is usually limited by that rather than by stress"""
@@ -217,7 +218,6 @@ train_c2c_tolerance_6 = "C2C tolerance −"
 train_cannot_be_back_driven = "cannot be back-driven"
 train_carrier = "Carrier"
 train_centre_distance = "Centre distance"
-train_coefficient_friction = "Coefficient of friction"
 train_contact_ratio = "Contact ratio"
 train_contact_stress = "Contact stress"
 train_contact_travel = "Contact travel"
@@ -235,8 +235,6 @@ train_export = "Export"
 train_face_width = "Face width"
 train_flank_type = "Flank type"
 train_forward = "η forward"
-train_friction_planet_ring = "Friction, planet–ring"
-train_friction_sun_planet = "Friction, sun–planet"
 train_from_bending = "from bending"
 train_from_contact = "from contact"
 train_held = "Held"
@@ -331,3 +329,9 @@ train_c2c_distance = "C2C distance"
 train_automatic = "Automatic"
 train_auto = "auto"
 train_addendum = "Addendum"
+train_sliding_friction = "Sliding friction"
+train_static_friction = "Static friction"
+train_sliding_friction_sun_planet = "Sliding friction, sun–planet"
+train_static_friction_sun_planet = "Static friction, sun–planet"
+train_sliding_friction_planet_ring = "Sliding friction, planet–ring"
+train_static_friction_planet_ring = "Static friction, planet–ring"

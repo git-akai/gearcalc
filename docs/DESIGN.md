@@ -3491,6 +3491,60 @@ state, so adding them later is additive.
 
 ---
 
+## 11.4 Two friction coefficients, because there are two questions
+
+Whether a drive turns at all and how well it turns once it is are different
+events, and they are governed by different coefficients. Every stage now carries
+both — a **sliding** coefficient and a **static** one, defaulting to 0.06 and
+0.16 — and the rule joining them is one function, `Directional::once_moving`:
+
+```text
+delivered = if efficiency(μ_static) > 0 { efficiency(μ_sliding) } else { 0 }
+```
+
+**The static figure is never itself reported.** It is not a more conservative
+efficiency to be preferred; it is the answer to a question about breaking away,
+and its only job is the sign. A drive that breaks away thereafter runs on the
+sliding coefficient, which is the whole of what the model used to compute; a
+drive that does not never moves, so the sliding figure describes a motion that
+does not happen, and the honest answer is zero.
+
+### Where it bites, and why it is applied where it does not
+
+Only a worm sits near its own threshold. A parallel-axis mesh is a couple of per
+cent from unity in both directions, so no plausible static coefficient reaches
+it, and `a_parallel_stage_passes_the_breakaway_rule_untouched` holds that over
+`μ_s` from 0 to 0.9. It is applied there anyway, for the same reason
+`PARALLEL_AXES` is a named zero rather than an `if`: the rule is general, the
+geometry decides whether it bites, and a stage kind that skipped it would be the
+one place a reader has to remember why.
+
+For a planetary set that means the whole Willis solve runs twice — `η₀` on the
+sliding coefficients and again on the static ones — to produce a sign that will
+always be positive. That is the price of not having an exception.
+
+### What it changed
+
+**The default worm drive is now self-locking**, which is the answer a handbook
+would give: one start at 8.2° of lead, threshold `μ = cos α_n tan γ = 0.1327`,
+against a static coefficient of 0.16. `gear-cli wormstage 1 40 7 2` reports
+68.369 % forward — unchanged, since forward runs on the sliding coefficient — and
+**0.000 % backward** where it used to say 54.293 %. The old figure was the
+efficiency of a back-driving motion that a steady torque cannot start.
+
+The note that says so was quoting the wrong number, and that surfaced here rather
+than being noticed: it named the *sliding* coefficient as the one self-locking
+the drive, which is the input a reader would then have gone and changed to no
+effect. It quotes the static one now, and the "close to self-locking" test
+compares against it too.
+
+**What this model does not say.** It answers what a steady torque does. A
+self-locking drive can still creep under vibration, because the vibration is
+doing the breaking away — that is a dynamic question, and nothing here addresses
+it.
+
+---
+
 ## 11.5 Words, and where they are not
 
 `gear-core` holds no English. It emits a `Note` — a stable key naming what
@@ -3595,6 +3649,8 @@ something independent.**
 | 11.5 | The string catalogue read from a plain module variable in the front end | Not reactive, so the **sidebar** — which draws before the core finishes loading — kept the fallback and rendered `ui.sidebar_gears` where "Gears" belonged. Every panel looked right because every panel renders later, which is exactly how a bug survives a look at the screen |
 | 4.3 | `working_depth` defaulting to a fixed 1 module | The control exists to expose the classical rule's hidden assumption, and it shipped defaulting *to* that assumption. It follows the gear's own dedendum now, which is the depth the `undercut` flag answers about — the two agree by construction instead of by coincidence. Every automatic shift previously clamped at zero moved, and nothing in the suite noticed |
 | 4.5.1 | "What a crossed stage lacks is the *backlash from thinning* one alone, which would need the normal-plane play derived for crossed axes" | Recorded as a gap; it is an **answer**. The play is derived (§4.4), and `k₁ + k₂ = 2` means thickness is only ever moved between two teeth and never removed from the pair, so what it contributes is exactly zero. A missing derivation and a derivation that returns zero read the same in a document and are not the same thing |
+| 11.4 | One friction coefficient per mesh | Breaking away and running are different events with different coefficients. Every efficiency in the model was the sliding one, so a worm that cannot be started was reported as back-driving at 54 % — the efficiency of a motion that does not happen |
+| 11.4 | The self-locking note quoting the sliding coefficient | It named the input a reader would go and change to no effect. Whether the drive locks is decided by the **static** coefficient, and the note now says which number it means |
 | 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
 | 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
 | 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |

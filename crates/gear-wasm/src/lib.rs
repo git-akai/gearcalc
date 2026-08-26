@@ -1070,7 +1070,8 @@ mod tests {
             "stages": [
               {"kind":"planetary",
                "module":1.0,"pressure_angle":20.0,"helix_angle":0.0,
-               "friction_sun_planet":0.06,"friction_planet_ring":0.06,
+               "sliding_friction_sun_planet":0.06,"static_friction_sun_planet":0.16,
+               "sliding_friction_planet_ring":0.06,"static_friction_planet_ring":0.16,
                "thickness_mod":1.0,"planets":3,
                "arrangement":{"input":"sun","fixed":"ring"},
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
@@ -1156,7 +1157,7 @@ mod tests {
             "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
             "stages": [
               {"kind":"spur",
-               "module":1.0,"pressure_angle":20.0,"additional_helix":0.0,"friction":0.06,
+               "module":1.0,"pressure_angle":20.0,"additional_helix":0.0,"sliding_friction":0.06,"static_friction":0.16,
                "thickness_mod":1.0,
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
@@ -1175,7 +1176,7 @@ mod tests {
                   "material":"4340 Hardened Steel"}
                ]},
               {"kind":"worm",
-               "module":1.0,"pressure_angle":20.0,"shaft_angle":90.0,"friction":0.06,
+               "module":1.0,"pressure_angle":20.0,"shaft_angle":90.0,"sliding_friction":0.06,"static_friction":0.16,
                "thickness_mod":1.0,
                "starts":1,"sizing":{"pitch_diameter":7.0},"wheel_teeth":40,
                "centre_distance":{"auto":true,"manual":0.0},
@@ -1213,7 +1214,15 @@ mod tests {
         let spur_eff = &v["stages"][0]["efficiency"];
         assert_eq!(spur_eff["forward"], spur_eff["backward"]);
         // And the train reports both totals, plus backlash at each end.
-        assert!(v["total_efficiency"]["backward"].as_f64().unwrap() > 0.0);
+        //
+        // **The total backward efficiency is zero**, and that is the answer
+        // rather than a missing one: a one-start worm at 8° of lead self-locks
+        // against the *static* coefficient (threshold 0.1327 against 0.16), so
+        // the train cannot be back-driven at all. It used to read as a positive
+        // number because the whole model ran on the sliding coefficient, which
+        // is the friction of a motion that never starts.
+        assert_eq!(v["total_efficiency"]["backward"].as_f64().unwrap(), 0.0);
+        assert!(v["total_efficiency"]["forward"].as_f64().unwrap() > 0.0);
         assert!(v["backlash"]["forward"]["nominal"].as_f64().unwrap() > 0.0);
         assert!(v["backlash"]["backward"]["nominal"].as_f64().unwrap() > 0.0);
         // The sliding speed could only be filled once the shaft line was known.
@@ -1231,7 +1240,7 @@ mod tests {
             "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
             "stages": [
               {"kind":"spur",
-               "module":1.0,"pressure_angle":20.0,"additional_helix":0.0,"friction":0.06,
+               "module":1.0,"pressure_angle":20.0,"additional_helix":0.0,"sliding_friction":0.06,"static_friction":0.16,
                "thickness_mod":1.0,
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,

@@ -243,6 +243,51 @@ impl Directional<f64> {
     pub fn self_locking(&self) -> bool {
         self.backward <= 0.0
     }
+
+    /// What the drive actually delivers, given what the *same* drive does with
+    /// its **static** coefficients.
+    ///
+    /// # Two coefficients, two different questions
+    ///
+    /// Breaking away and running are not the same event. Whether a drive turns
+    /// at all is decided at rest, against static friction; how well it does once
+    /// turning is decided against sliding friction, which is lower. So the
+    /// static figure is not a *worse* answer to be preferred conservatively — it
+    /// answers a different question, and its only job is the sign:
+    ///
+    /// - `at_rest > 0` — it breaks away, and thereafter runs on the sliding
+    ///   coefficient. The static number itself is then discarded; it never was
+    ///   the efficiency of anything that moves.
+    /// - `at_rest ≤ 0` — it never starts, so it delivers **nothing**, and the
+    ///   sliding figure describes a motion that does not happen.
+    ///
+    /// This is why a worm can be quoted as self-locking and still creep under
+    /// vibration: the vibration is doing the breaking away, and the model here
+    /// says only what a steady torque does.
+    ///
+    /// # Applied to every stage kind, and firing for one
+    ///
+    /// A parallel-axis mesh is nowhere near the threshold — its efficiency is a
+    /// few per cent from unity in both directions — so this passes the sliding
+    /// figure through untouched and always will. It is applied there anyway
+    /// rather than branching on stage kind, which is the same reason
+    /// `PARALLEL_AXES` is a named zero and not an `if`: the rule is general and
+    /// the geometry decides whether it bites.
+    #[must_use]
+    pub fn once_moving(self, at_rest: &Self) -> Self {
+        Self {
+            forward: if at_rest.forward > 0.0 {
+                self.forward
+            } else {
+                0.0
+            },
+            backward: if at_rest.backward > 0.0 {
+                self.backward
+            } else {
+                0.0
+            },
+        }
+    }
 }
 
 /// Mesh efficiency, as a fraction — `0.98` means 98 %.

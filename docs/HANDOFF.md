@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–11 complete and in CI. 374 tests, ~26 s.**
+**Milestones 0–11 complete and in CI. 376 tests, ~26 s.**
 
 Milestone 11's named scope — geartrain import/export, confirmations, error
 surfacing, docs — is done, and geartrain import/export was the last unbuilt item
@@ -130,7 +130,7 @@ it will be refused by name and line rather than loaded with a field defaulted.
 stage gained `thickness_mod`. `gear_io::train`'s module docs carry the edits that
 bring an old file forward.
 
-**The worm canary has moved three times, all deliberately.**
+**The worm canary has moved four times, all deliberately.**
 `wormstage 1 40 7 2`:
 
 1. *Efficiency*, when the friction balance replaced the pitch-point formula
@@ -151,6 +151,12 @@ bring an old file forward.
    the part it loses is where the balance was doing comparatively well.
    **Backlash did not move**, which is the check that the two centre distances
    stayed in their own lanes.
+4. *Backward efficiency to zero*, when static friction arrived: 54.293 → 0.000 %.
+   One start at 8.2° of lead has a threshold of `μ = 0.1327` and the static
+   coefficient defaults to 0.16, so a steady torque on the wheel cannot break the
+   worm away at all. **Forward is unchanged at 68.369 %** — it runs on the
+   sliding coefficient like everything else, which is the check that the two
+   coefficients stayed in their own lanes.
 
 `gear-cli strength 17 43 2.0` is the regression canary. Its numbers — `σ_F`
 69.2 / 63.4 MPa, `σ_H` 692.7 MPa, ρ 1.723 mm, η 98.741 % — have survived every
@@ -296,6 +302,15 @@ four are in play differing by `cos α_t`, `cos α_w`, `cos β_b`.
 `PARALLEL_AXES` is a named zero, and at it the elliptical patch's peak pressure
 is *exactly* zero. Line contact is a degenerate value, not a branch.
 
+**Two friction coefficients, because there are two questions.** Whether a drive
+turns at all is decided at rest against a **static** coefficient; how well it
+turns once moving is decided against the **sliding** one. `Directional::once_moving`
+is the whole rule, and the static figure is never itself reported — its only job
+is the sign. Applied to every stage kind although only a worm is ever near its
+threshold, for the same reason `PARALLEL_AXES` is a named zero: the rule is
+general and the geometry decides whether it bites. The default worm drive is
+self-locking now, which is the answer a handbook gives.
+
 **A control that exposes an assumption must not default to it.** A stage's
 `working_depth` — the depth the undercut question is asked at — follows its own
 dedendum rather than the classical 1 module. The whole point of the field is that
@@ -439,6 +454,12 @@ these are the ones most likely to be stepped on again.
   power algebra, including two exact closed forms, and a backward efficiency of
   101.571 % survived all of them — because every one drove forward with a
   positive torque and a positive speed. It was found by looking at the UI.
+- **A number quoted in a warning is the number the reader will go and change.**
+  The self-locking note named the *sliding* coefficient as the one locking the
+  drive. Once static friction decided it, that made the note point at an input
+  with no effect on what it was warning about — a wrong signpost is worse than
+  none, because it gets followed. When the thing deciding something moves, check
+  what the message about it says.
 - **A default that changes every answer can pass a full suite.** Moving
   `working_depth` from 1 module to the dedendum moved every automatic profile
   shift, contact ratio, face width and bending stress in `gear-cli train`, and

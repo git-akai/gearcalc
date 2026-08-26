@@ -523,7 +523,9 @@ export interface SpurStage {
   /** What each gear carries beyond half the shaft angle; gear 2 takes it with
    *  the opposite sign, so at Σ = 0 this is the shared helix angle. */
   additional_helix: number;
-  friction: number;
+  sliding_friction: number;
+  /** Static coefficient, for breaking away — see `Directional::once_moving`. */
+  static_friction: number;
   thickness_mod: number;
   centre_distance: Auto<number>;
   clearance: number;
@@ -551,7 +553,9 @@ export interface WormStage {
   module: number;
   pressure_angle: number;
   shaft_angle: number;
-  friction: number;
+  sliding_friction: number;
+  /** Static coefficient, for breaking away — see `Directional::once_moving`. */
+  static_friction: number;
   /** `k₁`; the wheel takes `2 − k₁`. Describes the parts cut and moves no
    *  figure this stage reports — see `WormStage::thickness_mod`. */
   thickness_mod: number;
@@ -592,8 +596,10 @@ export interface PlanetaryStage {
   module: number;
   pressure_angle: number;
   helix_angle: number;
-  friction_sun_planet: number;
-  friction_planet_ring: number;
+  sliding_friction_sun_planet: number;
+  static_friction_sun_planet: number;
+  sliding_friction_planet_ring: number;
+  static_friction_planet_ring: number;
   /** `k` for the sun. The planet takes `2 - k` and the ring takes the planet's,
    *  because an external pair must sum to two and an internal pair must match.
    *  One input, three consistent values. */

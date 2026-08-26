@@ -33,6 +33,11 @@
 //!   behaviour.
 //! - A worm stage gained `thickness_mod`, which a pre-existing file will not
 //!   have. `thickness_mod = 1.0` is the standard tooth.
+//! - `friction` became `sliding_friction`, and every stage gained a
+//!   `static_friction` beside it (`static_friction_sun_planet` and
+//!   `static_friction_planet_ring` on a planetary set). Rename the field and add
+//!   `static_friction = 0.16` — or the sliding value, to keep a pre-existing
+//!   file's answers, since one coefficient throughout is what it used to mean.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go

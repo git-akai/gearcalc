@@ -57,9 +57,23 @@ pub struct PlanetaryStage {
     /// the external pair the opposite, which is what the meshes require.
     pub helix_angle: f64,
     /// Coefficient of friction, sun-to-planet.
-    pub friction_sun_planet: f64,
+    pub sliding_friction_sun_planet: f64,
+    /// Coefficient of **static** friction, for breaking away.
+    ///
+    /// Whether a drive turns at all is decided at rest and against this; how
+    /// well it does once turning is decided against the sliding coefficient,
+    /// which is lower. See [`Directional::once_moving`] — the static figure's
+    /// only job is the sign, and it is never itself reported as an efficiency.
+    pub static_friction_sun_planet: f64,
     /// ...and planet-to-ring.
-    pub friction_planet_ring: f64,
+    pub sliding_friction_planet_ring: f64,
+    /// Coefficient of **static** friction, for breaking away.
+    ///
+    /// Whether a drive turns at all is decided at rest and against this; how
+    /// well it does once turning is decided against the sliding coefficient,
+    /// which is lower. See [`Directional::once_moving`] — the static figure's
+    /// only job is the sign, and it is never itself reported as an efficiency.
+    pub static_friction_planet_ring: f64,
     /// `k` for the **sun**. The planet takes `2 − k` (external pair) and the ring
     /// takes the planet's (internal pair), so all three follow from this one.
     pub thickness_mod: f64,
@@ -93,8 +107,10 @@ impl Default for PlanetaryStage {
             module: 1.0,
             pressure_angle: 20.0,
             helix_angle: 0.0,
-            friction_sun_planet: 0.06,
-            friction_planet_ring: 0.06,
+            sliding_friction_sun_planet: 0.06,
+            static_friction_sun_planet: 0.16,
+            sliding_friction_planet_ring: 0.06,
+            static_friction_planet_ring: 0.16,
             thickness_mod: 1.0,
             planets: 3,
             arrangement: Arrangement {
@@ -368,11 +384,23 @@ pub fn solve_planetary_stage(
     ];
 
     // ---- kinematics and efficiency.
-    let sp_eff =
-        Directional::of(|d| efficiency(&sp_path, &sp_mesh, &sun, stage.friction_sun_planet, d));
-    let pr_eff =
-        Directional::of(|d| efficiency(&pr_path, &pr_mesh, &planet, stage.friction_planet_ring, d));
-    let eta0 = Directional::of(|d| sp_eff.get(d) * pr_eff.get(d));
+    //
+    // `eta0` twice: once on the sliding coefficients, once on the static ones.
+    // A set is nowhere near its own threshold, so the second only ever confirms
+    // the first — it is computed anyway so no stage kind is the exception
+    // (`Directional::once_moving`).
+    let sun_planet = |mu: f64| Directional::of(|d| efficiency(&sp_path, &sp_mesh, &sun, mu, d));
+    let planet_ring = |mu: f64| Directional::of(|d| efficiency(&pr_path, &pr_mesh, &planet, mu, d));
+    let combined =
+        |sp: &Directional<f64>, pr: &Directional<f64>| Directional::of(|d| sp.get(d) * pr.get(d));
+
+    let sp_eff = sun_planet(stage.sliding_friction_sun_planet);
+    let pr_eff = planet_ring(stage.sliding_friction_planet_ring);
+    let eta0 = combined(&sp_eff, &pr_eff);
+    let eta0_at_rest = combined(
+        &sun_planet(stage.static_friction_sun_planet),
+        &planet_ring(stage.static_friction_planet_ring),
+    );
 
     let forward = planetary::power(
         teeth,
@@ -402,10 +430,34 @@ pub fn solve_planetary_stage(
         forward.torques[out].abs() * if forward.speeds[out] < 0.0 { -1.0 } else { 1.0 },
         eta0.backward,
     );
+    // The same two solves on the static basic efficiency, for the sign only.
+    // A set is a train of parallel meshes and never sits near its threshold, so
+    // this confirms rather than decides — but it is the rule every stage kind
+    // obeys, and a stage that skipped it would be the one place a reader has to
+    // remember why.
+    let at_rest = Directional {
+        forward: planetary::power(
+            teeth,
+            stage.arrangement,
+            input_speed,
+            input_torque,
+            eta0_at_rest.forward,
+        )
+        .map_or(0.0, |p| p.efficiency),
+        backward: planetary::power(
+            teeth,
+            reversed,
+            forward.speeds[out],
+            forward.torques[out].abs() * if forward.speeds[out] < 0.0 { -1.0 } else { 1.0 },
+            eta0_at_rest.backward,
+        )
+        .map_or(0.0, |b| b.efficiency),
+    };
     let set_efficiency = Directional {
         forward: forward.efficiency,
         backward: backward.map_or(0.0, |b| b.efficiency),
-    };
+    }
+    .once_moving(&at_rest);
 
     // ---- loads. Each mesh carries its member's torque divided among N planets.
     let planets = f64::from(stage.planets.max(1));

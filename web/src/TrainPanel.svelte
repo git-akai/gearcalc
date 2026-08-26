@@ -322,6 +322,16 @@
            module — what this used to be — asks whether it is undercut within a
            module of depth, and the two part company at 18 teeth and 22. -->
       {@render autoNumber("ui.train_working_tooth_depth", gear.working_depth, gear.dedendum, 0.05)}
+      <!-- It used to sit indented under the shift, which said "this belongs to
+           that" without words. The indent went when it became an `auto` field
+           like its neighbours, so the note says it instead. -->
+      {@render noteSlot(
+        notes(
+          "the depth the undercut question is asked at, and the only thing it reaches is " +
+            "the automatic profile shift above. Automatic is this gear's dedendum",
+          null,
+        ),
+      )}
     {/if}
   {:else}
     <label>
@@ -678,9 +688,22 @@
                 )}
               </label>
               <label>
-                <span>{t("ui.train_coefficient_friction")}</span>
-                <input type="number" step="0.01" bind:value={stage.friction} />
+                <span>{t("ui.train_sliding_friction")}</span>
+                <input type="number" step="0.01" bind:value={stage.sliding_friction} />
                 <em></em>
+              </label>
+              <label>
+                <span>{t("ui.train_static_friction")}</span>
+                <input type="number" step="0.01" bind:value={stage.static_friction} />
+                <em></em>
+                {@render noteSlot(
+                  notes(
+                    "breaking away is decided at rest and against this; how well it runs " +
+                      "once turning is decided against the sliding value. A drive that " +
+                      "cannot break away delivers nothing, whatever the sliding figure says",
+                    null,
+                  ),
+                )}
               </label>
               <label>
                 <span>{t("ui.train_tooth_thickness_mod")}</span>
@@ -869,9 +892,22 @@
                 <em>°</em>
               </label>
               <label>
-                <span>{t("ui.train_coefficient_friction")}</span>
-                <input type="number" step="0.01" bind:value={stage.friction} />
+                <span>{t("ui.train_sliding_friction")}</span>
+                <input type="number" step="0.01" bind:value={stage.sliding_friction} />
                 <em></em>
+              </label>
+              <label>
+                <span>{t("ui.train_static_friction")}</span>
+                <input type="number" step="0.01" bind:value={stage.static_friction} />
+                <em></em>
+                {@render noteSlot(
+                  notes(
+                    "breaking away is decided at rest and against this; how well it runs " +
+                      "once turning is decided against the sliding value. A drive that " +
+                      "cannot break away delivers nothing, whatever the sliding figure says",
+                    null,
+                  ),
+                )}
               </label>
               <label>
                 <span>{t("ui.train_tooth_thickness_mod")}</span>
@@ -1087,14 +1123,31 @@
                 <em>°</em>
               </label>
               <label>
-                <span>{t("ui.train_friction_sun_planet")}</span>
-                <input type="number" step="0.01" bind:value={stage.friction_sun_planet} />
+                <span>{t("ui.train_sliding_friction_sun_planet")}</span>
+                <input type="number" step="0.01" bind:value={stage.sliding_friction_sun_planet} />
                 <em></em>
               </label>
               <label>
-                <span>{t("ui.train_friction_planet_ring")}</span>
-                <input type="number" step="0.01" bind:value={stage.friction_planet_ring} />
+                <span>{t("ui.train_static_friction_sun_planet")}</span>
+                <input type="number" step="0.01" bind:value={stage.static_friction_sun_planet} />
                 <em></em>
+              </label>
+              <label>
+                <span>{t("ui.train_sliding_friction_planet_ring")}</span>
+                <input type="number" step="0.01" bind:value={stage.sliding_friction_planet_ring} />
+                <em></em>
+              </label>
+              <label>
+                <span>{t("ui.train_static_friction_planet_ring")}</span>
+                <input type="number" step="0.01" bind:value={stage.static_friction_planet_ring} />
+                <em></em>
+                {@render noteSlot(
+                  notes(
+                    "breaking away is decided at rest and against these; a set is never " +
+                      "near its own threshold, so they confirm rather than decide",
+                    null,
+                  ),
+                )}
               </label>
               <label>
                 <span>{t("ui.train_tooth_thickness_mod")}</span>
@@ -1384,7 +1437,12 @@
     padding: 0.75rem;
     margin-bottom: 1rem;
     display: grid;
-    grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+    /* Two equal halves, so the results start at the middle of the box — the
+       same split the gear cards below use, and for the same reason: a reader
+       scanning down the page finds the same edge in both. Equal fractions
+       rather than a fixed input width, so it reflows with the window like
+       everything else. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
     gap: 0.4rem 2rem;
   }
@@ -1414,6 +1472,15 @@
     flex-direction: column;
     gap: 0.4rem;
     max-width: 34rem;
+  }
+  /* The boxes sit further right than a gear card's, toward the middle of the
+     stage. A stage's field names are the long ones — "Minimum planet
+     clearance", "Static friction, planet–ring" — and with the narrow label
+     column they wrapped while the box floated close enough to read as part of
+     the name. Only the shared block: the gear cards below are half as wide and
+     their own column is right for them. */
+  .grid.shared > label {
+    grid-template-columns: 1fr 9rem 3.5rem;
   }
   /* The **input box** is the anchor, not the text after it. With an `auto`
      trailing column the boxes shifted left or right by however wide a unit

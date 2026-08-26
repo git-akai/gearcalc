@@ -188,7 +188,14 @@ pub struct WormStage {
     pub shaft_angle: f64,
     /// Coefficient of friction for the mesh. **Not** optional in the way it is
     /// for a spur stage: a worm's whole character comes from it.
-    pub friction: f64,
+    pub sliding_friction: f64,
+    /// Coefficient of **static** friction, for breaking away.
+    ///
+    /// Whether a drive turns at all is decided at rest and against this; how
+    /// well it does once turning is decided against the sliding coefficient,
+    /// which is lower. See [`Directional::once_moving`] — the static figure's
+    /// only job is the sign, and it is never itself reported as an efficiency.
+    pub static_friction: f64,
     /// `k₁`. The wheel takes `2 − k₁` by construction, as in a spur stage.
     ///
     /// # What it reaches, and why that is not a gap
@@ -232,7 +239,8 @@ impl Default for WormStage {
             module: 1.0,
             pressure_angle: 20.0,
             shaft_angle: 90.0,
-            friction: 0.06,
+            sliding_friction: 0.06,
+            static_friction: 0.16,
             thickness_mod: 1.0,
             starts: 1,
             sizing: FirstMemberSizing::PitchDiameter(7.0),
@@ -527,7 +535,8 @@ pub fn solve_crossed_stage(
         module: stage.module,
         pressure_angle: stage.pressure_angle,
         shaft_angle: stage.shaft_angle,
-        friction: stage.friction,
+        sliding_friction: stage.sliding_friction,
+        static_friction: stage.static_friction,
         thickness_mod: stage.thickness_mod,
         starts: stage.gears[0].teeth,
         sizing: FirstMemberSizing::HelixAngle(stage.helix_angles()[0]),
@@ -695,10 +704,19 @@ pub fn solve_worm_stage(
     // Every figure this moves, it moves **down**: more sliding is counted, and
     // sliding cannot repay. See the canary note in DESIGN §4.5.1.
     let path = rating_path(&s, widths, None, centre);
-    let efficiency = Directional::of(|d| {
-        path.and_then(|p| p.efficiency(&s, stage.friction, d, PATH_SAMPLES))
-            .unwrap_or_else(|| s.efficiency(stage.friction, d))
-    });
+    // **Two coefficients, and only one of them is an efficiency.** The static
+    // one decides whether the drive breaks away at all; the sliding one decides
+    // how well it runs once it has. This is the stage kind the rule is *for* —
+    // a worm is the only mesh here that sits near its own threshold — but the
+    // rule lives in `Directional::once_moving` and every stage applies it.
+    let with = |mu: f64| {
+        Directional::of(|d| {
+            path.and_then(|p| p.efficiency(&s, mu, d, PATH_SAMPLES))
+                .unwrap_or_else(|| s.efficiency(mu, d))
+        })
+    };
+    let at_rest = with(stage.static_friction);
+    let efficiency = with(stage.sliding_friction).once_moving(&at_rest);
     // Quoted beside that efficiency, so it has to be the friction at which *it*
     // reaches zero rather than the pitch point's.
     let threshold = path
@@ -713,7 +731,12 @@ pub fn solve_worm_stage(
     let (curvature_along, curvature_across) =
         s.contact_curvatures().ok_or(TrainError::NoContact)?;
     let at_pitch = s
-        .contact(output_torque, Member::Second, stage.friction, e_star)
+        .contact(
+            output_torque,
+            Member::Second,
+            stage.sliding_friction,
+            e_star,
+        )
         .ok_or(TrainError::NoContact)?;
     // **Rated along the path, not at the pitch point.** The relative radius
     // peaks where the two roll lengths are equal and falls toward both ends of
@@ -734,7 +757,8 @@ pub fn solve_worm_stage(
             // The force at *this* contact, not at the pitch point: a stress
             // evaluated in one place with a load computed in another is two
             // answers wearing one number.
-            let Some(force) = contact.normal_force(output_torque, stage.friction, Drive::Forward)
+            let Some(force) =
+                contact.normal_force(output_torque, stage.sliding_friction, Drive::Forward)
             else {
                 continue;
             };
@@ -773,16 +797,20 @@ pub fn solve_worm_stage(
     });
 
     let mut notes = Vec::new();
+    // **Against the static coefficient, because that is what decides it.**
+    // Whether the wheel can turn the worm at all is a question about breaking
+    // away; the sliding coefficient answers a different one, and quoting it here
+    // named the wrong number for the reader to go and change.
     if efficiency.self_locking() {
         notes.push(
             Note::new(key::STAGE_SELF_LOCKING)
-                .number("friction", stage.friction, 3)
+                .number("friction", stage.static_friction, 3)
                 .number("threshold", threshold, 4),
         );
-    } else if stage.friction > 0.8 * threshold {
+    } else if stage.static_friction > 0.8 * threshold {
         notes.push(
             Note::new(key::STAGE_NEAR_SELF_LOCKING)
-                .number("friction", stage.friction, 3)
+                .number("friction", stage.static_friction, 3)
                 .number("threshold", threshold, 4),
         );
     }
@@ -1504,7 +1532,7 @@ mod tests {
             let r = solve_worm_stage(&stage, 2.0, &lib).unwrap();
             let classical = r.crossed.map(|_| ()).map(|()| {
                 let s = stage.geometry().unwrap();
-                Directional::of(|d| s.efficiency(stage.friction, d))
+                Directional::of(|d| s.efficiency(stage.sliding_friction, d))
             });
             let classical = classical.expect("a screw geometry");
             for drive in Drive::BOTH {
@@ -1637,7 +1665,7 @@ mod tests {
         let r = solved(&WormStage {
             starts: 1,
             sizing: FirstMemberSizing::PitchDiameter(25.0),
-            friction: 0.06,
+            sliding_friction: 0.06,
             ..Default::default()
         });
         assert!(r.efficiency.self_locking());
@@ -2039,6 +2067,111 @@ mod tests {
             "halving the clearance moved the shortfall by {halving}×, not 2× — \
              the residual is not the second-order term it is documented as"
         );
+    }
+
+    /// **Breaking away is a different question from running, and the static
+    /// coefficient answers it.**
+    ///
+    /// The whole content of the two-coefficient model. A drive that cannot break
+    /// away delivers nothing; one that can then runs on its *sliding*
+    /// coefficient, and the static figure is discarded — it never was the
+    /// efficiency of anything that moved.
+    ///
+    /// Asserted as the three cases the rule has, and against the geometry's own
+    /// threshold rather than against remembered numbers, so it keeps meaning
+    /// something if the default worm changes.
+    #[test]
+    fn a_drive_that_cannot_break_away_delivers_nothing() {
+        let stage = |sliding: f64, statik: f64| WormStage {
+            sliding_friction: sliding,
+            static_friction: statik,
+            ..WormStage::default()
+        };
+        let threshold = solved(&stage(0.06, 0.06)).self_locking_friction;
+        assert!(threshold > 0.0 && threshold < 0.3, "{threshold}");
+
+        // 1. Both coefficients below it: back-drives, and the figure is the
+        //    sliding one — the static coefficient changes nothing but the sign
+        //    it was consulted for.
+        let free = solved(&stage(0.06, threshold * 0.5));
+        assert!(free.efficiency.backward > 0.0);
+        let alone = solved(&stage(0.06, 0.06));
+        assert!(
+            (free.efficiency.backward - alone.efficiency.backward).abs() < 1e-12,
+            "the static coefficient must not leak into the number: {} against {}",
+            free.efficiency.backward,
+            alone.efficiency.backward
+        );
+
+        // 2. Static above it, sliding below: it never starts, so **zero** — not
+        //    the sliding figure, which describes a motion that does not happen.
+        let stuck = solved(&stage(0.06, threshold * 1.2));
+        assert_eq!(stuck.efficiency.backward, 0.0);
+        assert!(
+            stuck.efficiency.forward > 0.0,
+            "forward is unaffected: it is not the direction near the threshold"
+        );
+        assert!(
+            (stuck.efficiency.forward - alone.efficiency.forward).abs() < 1e-12,
+            "and forward runs on the sliding coefficient like anything else"
+        );
+
+        // 3. Both above: still zero, and by the same route.
+        assert_eq!(
+            solved(&stage(threshold * 1.2, threshold * 1.2))
+                .efficiency
+                .backward,
+            0.0
+        );
+
+        // The note names the coefficient that decided it, so a reader knows
+        // which input to go and change.
+        let notes = &stuck.notes;
+        let locked = notes
+            .iter()
+            .find(|n| n.is(key::STAGE_SELF_LOCKING))
+            .expect("self-locking must be said out loud");
+        assert_eq!(
+            locked.values["friction"],
+            format!("{:.3}", threshold * 1.2),
+            "the note quotes the static coefficient, not the sliding one"
+        );
+    }
+
+    /// **A parallel-axis stage obeys the same rule and is never touched by it.**
+    ///
+    /// The reason it is applied everywhere rather than to worms alone: the rule
+    /// is general, and the geometry decides whether it bites. A spur mesh sits a
+    /// couple of per cent from unity in both directions, so no plausible static
+    /// coefficient reaches it — asserted over a range wide enough to include
+    /// dry steel on steel.
+    #[test]
+    fn a_parallel_stage_passes_the_breakaway_rule_untouched() {
+        use crate::train::spur::solve_stage;
+        use crate::train::SpurStage;
+
+        let lib = super::super::test_library();
+        let reference = solve_stage(&SpurStage::default(), 2.0, &lib).expect("a stage");
+        for statik in [0.0_f64, 0.06, 0.16, 0.5, 0.9] {
+            let r = solve_stage(
+                &SpurStage {
+                    static_friction: statik,
+                    ..SpurStage::default()
+                },
+                2.0,
+                &lib,
+            )
+            .expect("a stage");
+            assert_eq!(
+                r.efficiency.forward.to_bits(),
+                reference.efficiency.forward.to_bits(),
+                "static μ {statik} moved a parallel stage"
+            );
+            assert_eq!(
+                r.efficiency.backward.to_bits(),
+                reference.efficiency.backward.to_bits()
+            );
+        }
     }
 
     /// **A worm stage is rated where it runs, too.**

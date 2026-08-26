@@ -735,7 +735,8 @@ mod tests {
         let lib = library();
         let mut lossless = two_stage();
         for s in &mut lossless.stages {
-            spur_input(s).friction = 0.0;
+            spur_input(s).sliding_friction = 0.0;
+            spur_input(s).static_friction = 0.0;
         }
         let ideal = solve_train(&lossless, &lib).unwrap();
         let real = solve_train(&two_stage(), &lib).unwrap();

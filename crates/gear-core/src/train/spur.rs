@@ -118,7 +118,14 @@ pub struct SpurStage {
     /// this is the familiar shared helix angle with opposed hands.
     pub additional_helix: f64,
     /// Coefficient of friction for the mesh.
-    pub friction: f64,
+    pub sliding_friction: f64,
+    /// Coefficient of **static** friction, for breaking away.
+    ///
+    /// Whether a drive turns at all is decided at rest and against this; how
+    /// well it does once turning is decided against the sliding coefficient,
+    /// which is lower. See [`Directional::once_moving`] — the static figure's
+    /// only job is the sign, and it is never itself reported as an efficiency.
+    pub static_friction: f64,
     /// `k₁`. Gear 2 takes `2 − k₁` by construction.
     pub thickness_mod: f64,
     /// Automatic uses the zero-backlash centre distance plus `clearance`.
@@ -138,7 +145,8 @@ impl Default for SpurStage {
             pressure_angle: 20.0,
             shaft_angle: 0.0,
             additional_helix: 0.0,
-            friction: 0.06,
+            sliding_friction: 0.06,
+            static_friction: 0.16,
             thickness_mod: 1.0,
             centre_distance: Auto::automatic(0.0),
             clearance: 0.02,
@@ -392,7 +400,15 @@ pub fn solve_stage(
         centre_distance_nominal: mesh.a_w,
         centre_distance: centre,
         contact_ratios,
-        efficiency: Directional::of(|d| efficiency(&path, &operating, &g[0], stage.friction, d)),
+        // Breaking away is decided at rest, running is decided sliding — one
+        // rule, applied to every stage kind (`Directional::once_moving`). A
+        // parallel-axis mesh is never near the threshold, so this passes the
+        // sliding figure through and always will; it is here so there is no
+        // stage kind the rule has to be remembered for.
+        efficiency: {
+            let with = |mu: f64| Directional::of(|d| efficiency(&path, &operating, &g[0], mu, d));
+            with(stage.sliding_friction).once_moving(&with(stage.static_friction))
+        },
         backlash,
         coprime: gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
         gears: [gears[0].clone(), gears[1].clone()],

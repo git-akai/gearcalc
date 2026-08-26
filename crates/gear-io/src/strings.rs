@@ -453,7 +453,7 @@ mod tests {
         ] {
             let stage = gear_core::train::WormStage {
                 starts,
-                friction,
+                sliding_friction: friction,
                 ..Default::default()
             };
             if let Ok(r) = gear_core::train::solve_worm_stage(&stage, 2.0, &lib) {
@@ -541,9 +541,13 @@ mod tests {
 
         // A screw pair entered by helix angle with automatic widths, which has
         // no enveloping wheel and so no published proportion to take.
+        // Static coefficients either side of the default worm's 0.1327
+        // threshold, so both the self-locking note and the "close to it" one
+        // get their turn.
         for friction in [0.06_f64, 0.115, 0.12, 0.125] {
             let stage = gear_core::train::WormStage {
-                friction,
+                sliding_friction: friction,
+                static_friction: friction,
                 sizing: gear_core::train::FirstMemberSizing::HelixAngle(45.0),
                 worm: gear_core::train::WormMember {
                     face_width: gear_core::params::Auto::automatic(6.0),
@@ -561,7 +565,8 @@ mod tests {
             // ...and a worm sitting just under its self-locking threshold.
             if let Ok(r) = gear_core::train::solve_worm_stage(
                 &gear_core::train::WormStage {
-                    friction,
+                    sliding_friction: friction,
+                    static_friction: friction,
                     ..Default::default()
                 },
                 2.0,
