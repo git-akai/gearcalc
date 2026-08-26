@@ -2603,10 +2603,52 @@ tip envelope's departure from a circle at all three eccentricities. They were
 derived before any of this code existed, which is what makes them worth gating
 against.
 
-**Not built, deliberately:** inspection data over the revolution (span and
-over-pins as ranges), and the commanded `a_w(θ)` profile with its best-fit
-sinusoid residual — that needs a mate, and the feature is scoped to the gear tab
-for now. Nothing here prevents a geartrain stage later.
+#### The commanded centre distance
+
+`Eccentric::centre_profile(mate, kind, at)` is the ideal `a_w(θ)`, sampled at the
+**tooth positions** — one per tooth, which is where contact actually is and where
+the discrete shifts the gear was cut at land exactly on the continuous `x(θ)`.
+No sample count to choose and nothing interpolated.
+
+**It is not a second derivation.** `mesh::operating_geometry` takes a *signed*
+tooth sum and shift sum, with member 2 carrying the kind's sign, and that one
+expression is already the whole difference between an external and an internal
+pair (§4.11). The profile asks it once per tooth. The arrangement — which member
+the eccentric gear is — decides only which slot carries the sign, and the
+arithmetic never asks what kind of mesh it is. All three cases are gated
+**bit-identically** against building the mesh the ordinary way at each tooth's
+shift:
+
+| | | |
+|---|---|---|
+| external pair | 24 / 43 | `a` 33.2423 … 33.7435 |
+| eccentric pinion in a fixed ring | 24 / 60 | `a` 17.7344 … 18.2386, phase π — an internal centre distance *shrinks* where the pinion's tooth thickens |
+| eccentric ring round a fixed pinion | 60 / 24 | the same range, since `x(θ)` is symmetric about its mean and only its sign flips |
+
+**What a simple crank costs.** `a_w(θ)` is not sinusoidal even though `x(θ)` is —
+it passes through `inv⁻¹` and a cosine — so the profile also reports the
+best-fit pure sinusoid and what the difference costs. The fit is exact rather
+than optimised: equally spaced samples make the first Fourier coefficient *be*
+the least-squares sinusoid. For the 24/43 pair at `Δx` = 0.25 the residual is
+3.7 µm of centre distance and **−2.6 to +2.6 µm of backlash**; internal, 7.4 µm
+and −4.9 to +5.1. Negative is not slack but interference, and the error grows
+faster than the eccentricity causing it, which is what makes it a design limit
+rather than a rounding note.
+
+#### Ranges, and what is not built
+
+`Eccentric::span` and `Eccentric::distinct` are the framework for anything that
+varies around the revolution: ask a per-tooth question once per *answer* rather
+than once per position, and get `[lo, hi]` back. A concentric gear's two ends are
+the **same bits**, so a caller can report a range unconditionally and have an
+ordinary gear read as a single number with no flag to check.
+
+**Inspection data over the revolution is not built** — span and over-pins return
+`Option`s rather than numbers, so they want `distinct()` and their own reduction
+rather than `span`. The framework is there for them; the outputs are not. Neither
+is any gear-tab surface for the centre-distance profile, deliberately: it is core
+only for now, and it is shaped so a stage supplies its mate the same way every
+other stage function does.
 
 #### Operating mode: the centre distance is commanded, not floating
 

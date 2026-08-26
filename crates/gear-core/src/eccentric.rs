@@ -40,6 +40,8 @@
 //! z-fold replication it replaces — gated, not hoped for. `λ` has no effect
 //! there either, since there is nothing for it to correct towards.
 
+use crate::involute::inv;
+use crate::mesh::{operating_geometry, Member, MeshError, MeshKind};
 use crate::params::GearParams;
 use crate::profile::Gear;
 
@@ -142,6 +144,36 @@ impl Eccentric {
     #[must_use]
     pub fn distinct_teeth(&self) -> usize {
         self.teeth.len()
+    }
+
+    /// Every distinct tooth, once each.
+    ///
+    /// The unit of work for anything that varies around the revolution: ask a
+    /// per-tooth question once per *answer* rather than once per position, since
+    /// teeth `k` and `z − k` are the same gear. A concentric gear yields one.
+    ///
+    /// This is what an output becoming a range is built on — [`Self::span`] for
+    /// the scalar case, and this directly for anything that is not a scalar.
+    /// The measurements over teeth and pins are the obvious next customers: they
+    /// return `Option`s rather than numbers, so they want the iterator and their
+    /// own reduction rather than `span`.
+    pub fn distinct(&self) -> impl Iterator<Item = &Gear> + '_ {
+        self.teeth.iter()
+    }
+
+    /// The smallest and largest a per-tooth quantity takes around the
+    /// revolution.
+    ///
+    /// `[v, v]` for a concentric gear, with both ends the *same bits* — which is
+    /// what lets a caller report a range unconditionally and have an ordinary
+    /// gear read as a single number.
+    #[must_use]
+    pub fn span(&self, of: impl Fn(&Gear) -> f64) -> [f64; 2] {
+        let (lo, hi) = self.teeth.iter().fold((f64::MAX, f64::MIN), |(l, h), g| {
+            let v = of(g);
+            (l.min(v), h.max(v))
+        });
+        [lo, hi]
     }
 
     /// The tooth at position `k`, and where it is seated.
@@ -310,15 +342,10 @@ impl Eccentric {
         let (drive_pitch, drive_index) = errors(1.0);
         let (coast_pitch, coast_index) = errors(-1.0);
 
-        let span = |f: fn(&Gear) -> f64| {
-            self.teeth
-                .iter()
-                .fold((f64::MAX, f64::MIN), |(l, h), g| (l.min(f(g)), h.max(f(g))))
-        };
-        let (ra_lo, ra_hi) = span(|g| g.ra);
-        let (rf_lo, rf_hi) = span(|g| g.rf);
-        let (st_lo, st_hi) = span(|g| 2.0 * g.r * g.psi_p);
-        let (sb_lo, sb_hi) = span(|g| 2.0 * g.rb * g.psi_b);
+        let tip_radius = self.span(|g| g.ra);
+        let root_radius = self.span(|g| g.rf);
+        let tooth_thickness = self.span(|g| 2.0 * g.r * g.psi_p);
+        let base_thickness = self.span(|g| 2.0 * g.rb * g.psi_b);
 
         let e = p.module * p.angular_shift.abs();
         Variation {
@@ -329,15 +356,183 @@ impl Eccentric {
             } else {
                 0.0
             },
-            tip_radius: [ra_lo, ra_hi],
-            root_radius: [rf_lo, rf_hi],
-            tooth_thickness: [st_lo, st_hi],
-            base_thickness: [sb_lo, sb_hi],
+            tip_radius,
+            root_radius,
+            tooth_thickness,
+            base_thickness,
             drive_pitch_error: drive_pitch,
             coast_pitch_error: coast_pitch,
             drive_index_error: drive_index,
             coast_index_error: coast_index,
         }
+    }
+}
+
+/// The centre distance an eccentric mesh wants, around one revolution.
+///
+/// Sampled at the **tooth positions**, one per tooth: that is where contact
+/// actually is, and it is where the discrete shifts the gear was cut at land
+/// exactly on the continuous `x(θ)` the mechanism is tracking. No sample count
+/// to choose, and nothing interpolated.
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CentreProfile {
+    /// The zero-backlash centre distance at each tooth position, mm, starting at
+    /// `θ = 0` and going round.
+    pub commanded: Vec<f64>,
+    /// Smallest and largest of the above, mm.
+    pub range: [f64; 2],
+    /// The best-fit pure sinusoid: mean, amplitude, phase in radians.
+    ///
+    /// What a **simple eccentric or crank** can actually deliver. `a_w(θ)` is
+    /// not sinusoidal even though `x(θ)` is — it passes through `inv⁻¹` and a
+    /// cosine on the way — so a mechanism built that way tracks this instead,
+    /// and the difference is the next two fields.
+    ///
+    /// Exact rather than fitted: the samples are equally spaced, so the first
+    /// Fourier coefficient *is* the least-squares sinusoid, with no optimiser
+    /// and no starting guess.
+    pub sinusoid: [f64; 3],
+    /// The largest departure of the ideal from that sinusoid, mm of centre
+    /// distance.
+    pub sinusoid_error: f64,
+    /// What that departure costs, as backlash at the pitch circle, mm —
+    /// smallest and largest around the revolution.
+    ///
+    /// **The number an engineer building the mechanism actually needs**, and the
+    /// reason the centre-distance error is not the end of the story. Negative is
+    /// not slack but *interference*: the mechanism has brought the axes closer
+    /// than the teeth at that position allow.
+    pub sinusoid_backlash: [f64; 2],
+}
+
+impl Eccentric {
+    /// The centre distance this gear's mesh wants at each tooth position.
+    ///
+    /// `at` says which member the eccentric gear is. That matters only for an
+    /// **internal** mesh, where the ring is member 2 by the same convention
+    /// [`Mesh::new`](crate::mesh::Mesh::new) uses — so an eccentric ring is
+    /// `Member::Second` and an eccentric pinion running in a fixed ring is
+    /// `Member::First`. For an external pair the two are the same answer.
+    ///
+    /// # One relation, both kinds
+    ///
+    /// `mesh::operating_geometry` takes a **signed** tooth sum and shift sum,
+    /// with member 2 carrying the kind's sign, and that one expression is the
+    /// whole of the difference between an external and an internal mesh (§4.11).
+    /// Nothing here re-derives it: the arrangement decides which slot carries
+    /// the sign, and the arithmetic below never asks which kind it is.
+    ///
+    /// # Errors
+    ///
+    /// [`MeshError::Incompatible`] if the two cannot mesh at all, and
+    /// [`MeshError::CentreDistanceTooSmall`] if some position drives the base
+    /// circles into each other — which for this feature means the eccentricity
+    /// is larger than the pair can absorb.
+    pub fn centre_profile(
+        &self,
+        mate: &Gear,
+        kind: MeshKind,
+        at: Member,
+    ) -> Result<CentreProfile, MeshError> {
+        let g = &self.mean;
+        if (g.params.module - mate.params.module).abs() > 1e-12
+            || (g.params.pressure_angle - mate.params.pressure_angle).abs() > 1e-12
+        {
+            return Err(MeshError::Incompatible);
+        }
+
+        // Which slot carries the kind's sign. The *only* place the arrangement
+        // enters; everything below is one expression for both kinds.
+        let sigma = kind.sign();
+        let (sign_e, sign_m) = match at {
+            Member::First => (1.0, sigma),
+            Member::Second => (sigma, 1.0),
+        };
+        let z_sum = sign_e * g.z + sign_m * mate.z;
+        let x_mate = mate.params.profile_shift + mate.params.thickness_shift();
+
+        let commanded = (0..self.which.len())
+            .map(|k| {
+                let (tooth, _) = self.tooth(k);
+                let x_e = tooth.params.profile_shift + tooth.params.thickness_shift();
+                let x_sum = sign_e * x_e + sign_m * x_mate;
+                operating_geometry(g.mt, g.alpha_t, g.alpha_n, z_sum, x_sum)
+                    .map(|(_, _, a_w)| a_w)
+                    .ok_or(MeshError::CentreDistanceTooSmall)
+            })
+            .collect::<Result<Vec<f64>, MeshError>>()?;
+
+        let n = commanded.len();
+        #[allow(clippy::cast_precision_loss)]
+        let count = n as f64;
+        let angle = |k: usize| {
+            #[allow(clippy::cast_precision_loss)]
+            let kf = k as f64;
+            std::f64::consts::TAU * kf / count
+        };
+
+        // The least-squares sinusoid over equally spaced samples is the first
+        // Fourier coefficient, exactly.
+        // Anchored on the first sample rather than summed outright: for a flat
+        // profile every `a_k − a_0` is exactly zero, so the mean comes out
+        // exactly `a_0` where `Σa/n` would land an ulp away. Mathematically the
+        // same number, and it is the third time in this module that grouping the
+        // cancellation first is what separates an answer from a residual.
+        let anchor = commanded[0];
+        let mean = anchor + commanded.iter().map(|a| a - anchor).sum::<f64>() / count;
+        // Projected onto the **deviation from the mean**, not the raw values.
+        // `Σ mean·cos θ_k` is zero mathematically and about 1e-15 of the mean in
+        // practice, which is enough to give a *concentric* gear a 4e-15 mm
+        // sinusoid amplitude — a rounding residual dressed as a measurement, for
+        // the second time in this module. Subtracting first makes every term
+        // exactly zero when the samples are.
+        let (mut c, mut s) = (0.0, 0.0);
+        for (k, a) in commanded.iter().enumerate() {
+            let (sin, cos) = angle(k).sin_cos();
+            c += (a - mean) * cos;
+            s += (a - mean) * sin;
+        }
+        let (c, s) = (2.0 * c / count, 2.0 * s / count);
+        let amplitude = c.hypot(s);
+        let phase = s.atan2(c);
+
+        let mut error = 0.0_f64;
+        let mut play = [f64::MAX, f64::MIN];
+        for (k, &ideal) in commanded.iter().enumerate() {
+            let fit = mean + amplitude * (angle(k) - phase).cos();
+            error = error.max((ideal - fit).abs());
+            // What the mechanism's departure costs, by the §4.4 law: the ideal
+            // is the zero-backlash distance at this position, the fit is where
+            // the machine actually puts the axes.
+            let a_ref = g.mt * z_sum.abs() / 2.0;
+            let cos_actual = a_ref * g.alpha_t.cos() / fit;
+            let alpha_actual = if (-1.0..=1.0).contains(&cos_actual) {
+                cos_actual.acos()
+            } else {
+                return Err(MeshError::CentreDistanceTooSmall);
+            };
+            let cos_ideal = a_ref * g.alpha_t.cos() / ideal;
+            let alpha_ideal = if (-1.0..=1.0).contains(&cos_ideal) {
+                cos_ideal.acos()
+            } else {
+                return Err(MeshError::CentreDistanceTooSmall);
+            };
+            let j = 2.0 * fit * (inv(alpha_actual) - inv(alpha_ideal));
+            play[0] = play[0].min(j);
+            play[1] = play[1].max(j);
+        }
+
+        let (lo, hi) = commanded
+            .iter()
+            .fold((f64::MAX, f64::MIN), |(l, h), &a| (l.min(a), h.max(a)));
+        Ok(CentreProfile {
+            commanded,
+            range: [lo, hi],
+            sinusoid: [mean, amplitude, phase],
+            sinusoid_error: error,
+            sinusoid_backlash: play,
+        })
     }
 }
 
@@ -628,6 +823,198 @@ mod tests {
             ] {
                 assert_eq!(span[0].to_bits(), span[1].to_bits());
             }
+        }
+    }
+
+    /// **The profile is `Mesh`'s own answer, tooth by tooth — bit for bit.**
+    ///
+    /// The centre-distance profile is not a second derivation of the operating
+    /// geometry; it is the existing one asked once per tooth. This holds it to
+    /// that by building the mesh the ordinary way at each tooth's shift and
+    /// demanding the *same number*, for all three arrangements: an external
+    /// pair, an eccentric pinion inside a fixed ring, and an eccentric ring
+    /// around a fixed pinion.
+    ///
+    /// Bit-identical rather than close, because "one relation, both kinds" is
+    /// the claim and a tolerance would let a second one through.
+    #[test]
+    fn every_sample_is_the_mesh_the_ordinary_way() {
+        use crate::mesh::Mesh;
+
+        let ecc = |z: u32| {
+            Eccentric::new(GearParams {
+                teeth: z,
+                angular_shift: 0.25,
+                ..Default::default()
+            })
+        };
+        let plain = |z: u32| {
+            Gear::new(GearParams {
+                teeth: z,
+                ..Default::default()
+            })
+        };
+
+        for (name, e, mate, kind, at) in [
+            (
+                "external",
+                ecc(24),
+                plain(43),
+                MeshKind::External,
+                Member::First,
+            ),
+            (
+                "eccentric pinion in a ring",
+                ecc(24),
+                plain(60),
+                MeshKind::Internal,
+                Member::First,
+            ),
+            (
+                "eccentric ring round a pinion",
+                ecc(60),
+                plain(24),
+                MeshKind::Internal,
+                Member::Second,
+            ),
+        ] {
+            let profile = e.centre_profile(&mate, kind, at).expect("a meshable pair");
+            for k in 0..profile.commanded.len() {
+                let (tooth, _) = e.tooth(k);
+                // The ring is member 2, whichever gear that is — the same
+                // convention `Mesh::new` is written to.
+                let mesh = match at {
+                    Member::First => Mesh::new(tooth, &mate, kind),
+                    Member::Second => Mesh::new(&mate, tooth, kind),
+                }
+                .expect("a meshable pair");
+                assert_eq!(
+                    profile.commanded[k].to_bits(),
+                    mesh.a_w.to_bits(),
+                    "{name}, tooth {k}: {} against Mesh's {}",
+                    profile.commanded[k],
+                    mesh.a_w
+                );
+            }
+        }
+    }
+
+    /// **The range framework holds an ordinary gear to one number.**
+    ///
+    /// `span` is what every output that varies around the revolution is built
+    /// on, and the property that makes it safe to use unconditionally is that a
+    /// concentric gear's two ends are the *same bits*. A caller can then report
+    /// a range for every gear and have an ordinary one read as a single value,
+    /// with no flag to check. Gated here rather than left to each customer, so
+    /// the measurements over teeth and pins can be added without re-proving it.
+    #[test]
+    fn a_range_over_an_ordinary_gear_is_one_number_twice() {
+        let flat = Eccentric::new(GearParams {
+            teeth: 31,
+            profile_shift: 0.3,
+            ..Default::default()
+        });
+        assert_eq!(flat.distinct().count(), 1);
+        for of in [
+            (|g: &Gear| g.ra) as fn(&Gear) -> f64,
+            |g: &Gear| g.rf,
+            |g: &Gear| g.psi_b,
+            |g: &Gear| 2.0 * g.r * g.psi_p,
+        ] {
+            let [lo, hi] = flat.span(of);
+            assert_eq!(lo.to_bits(), hi.to_bits());
+        }
+
+        // ...and an eccentric one visits every distinct tooth, so a range built
+        // this way cannot miss an extreme.
+        let ecc = Eccentric::new(GearParams {
+            teeth: 31,
+            angular_shift: 0.3,
+            ..Default::default()
+        });
+        assert_eq!(ecc.distinct().count(), 16);
+        let [lo, hi] = ecc.span(|g| g.params.profile_shift);
+        let seen = ecc
+            .distinct()
+            .map(|g| g.params.profile_shift)
+            .fold((f64::MAX, f64::MIN), |(l, h), v| (l.min(v), h.max(v)));
+        assert_eq!(lo.to_bits(), seen.0.to_bits());
+        assert_eq!(hi.to_bits(), seen.1.to_bits());
+    }
+
+    /// A concentric gear commands one centre distance and never moves off it —
+    /// so the whole feature costs an ordinary pair nothing, here as everywhere.
+    #[test]
+    fn an_ordinary_gear_commands_a_constant_centre_distance() {
+        use crate::mesh::Mesh;
+
+        let flat = Eccentric::new(GearParams {
+            teeth: 24,
+            profile_shift: 0.2,
+            ..Default::default()
+        });
+        let mate = Gear::new(GearParams {
+            teeth: 43,
+            profile_shift: -0.1,
+            ..Default::default()
+        });
+        let p = flat
+            .centre_profile(&mate, MeshKind::External, Member::First)
+            .unwrap();
+        let mesh = Mesh::new(flat.mean(), &mate, MeshKind::External).unwrap();
+        for a in &p.commanded {
+            assert_eq!(a.to_bits(), mesh.a_w.to_bits());
+        }
+        assert_eq!(p.range[0].to_bits(), p.range[1].to_bits());
+        assert_eq!(p.sinusoid[1], 0.0, "a flat profile has no amplitude");
+        assert_eq!(p.sinusoid_error, 0.0);
+        assert_eq!(p.sinusoid_backlash, [0.0, 0.0]);
+    }
+
+    /// **`a_w(θ)` is not sinusoidal, even though `x(θ)` is** — and that is the
+    /// whole reason the residual is worth reporting.
+    ///
+    /// It passes through `inv⁻¹` and a cosine on the way, so a mechanism built
+    /// as a simple crank cannot track it. The departure grows faster than the
+    /// eccentricity that causes it, which is what makes it a design limit rather
+    /// than a rounding note: doubling `Δx` more than doubles the error.
+    #[test]
+    fn a_simple_crank_cannot_follow_the_ideal_profile() {
+        let mate = Gear::new(GearParams {
+            teeth: 43,
+            ..Default::default()
+        });
+        let at = |shift: f64| {
+            Eccentric::new(GearParams {
+                teeth: 24,
+                angular_shift: shift,
+                ..Default::default()
+            })
+            .centre_profile(&mate, MeshKind::External, Member::First)
+            .expect("a meshable pair")
+        };
+
+        let mut previous: Option<(f64, f64)> = None;
+        for shift in [0.05_f64, 0.10, 0.20, 0.40] {
+            let p = at(shift);
+            assert!(
+                p.sinusoid_error > 0.0,
+                "Δx={shift}: the ideal is not a sinusoid, so a fit must leave something"
+            );
+            // The backlash it costs straddles zero: a crank runs wide over part
+            // of the revolution and tight over the rest, and the tight half is
+            // interference rather than slack.
+            assert!(p.sinusoid_backlash[0] < 0.0 && p.sinusoid_backlash[1] > 0.0);
+            if let Some((was_shift, was_error)) = previous {
+                let growth = p.sinusoid_error / was_error;
+                let doubling = shift / was_shift;
+                assert!(
+                    growth > doubling,
+                    "Δx {was_shift}→{shift}: the error grew {growth}×, which is not \
+                     faster than the {doubling}× eccentricity that caused it"
+                );
+            }
+            previous = Some((shift, p.sinusoid_error));
         }
     }
 

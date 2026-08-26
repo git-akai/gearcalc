@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–11 complete and in CI. 386 tests, ~26 s.**
+**Milestones 0–11 complete and in CI. 389 tests, ~26 s.**
 
 Milestone 11's named scope — geartrain import/export, confirmations, error
 surfacing, docs — is done, and geartrain import/export was the last unbuilt item
@@ -302,6 +302,13 @@ four are in play differing by `cos α_t`, `cos α_w`, `cos β_b`.
 `PARALLEL_AXES` is a named zero, and at it the elliptical patch's peak pressure
 is *exactly* zero. Line contact is a degenerate value, not a branch.
 
+**The eccentric centre-distance profile is `Mesh`'s own answer, asked once per
+tooth.** `operating_geometry`'s signed tooth and shift sums already cover both
+mesh kinds, so the arrangement decides only which slot carries the sign and the
+arithmetic never asks what kind it is. External, eccentric-pinion-in-a-ring and
+eccentric-ring-round-a-pinion are all gated bit-identically against building the
+mesh the ordinary way.
+
 **An eccentric gear is an ordinary gear with `Δx = 0`.** `eccentric.rs` assembles
 a gear tooth by tooth — which shift each is cut at, where each is seated — and
 every gear in the crate is drawn through it, on screen and in the DXF alike. A
@@ -469,6 +476,15 @@ these are the ones most likely to be stepped on again.
   power algebra, including two exact closed forms, and a backward efficiency of
   101.571 % survived all of them — because every one drove forward with a
   positive torque and a positive speed. It was found by looking at the UI.
+- **Group the cancellation first — three times in one module.** `(seat + ψ) −
+  ideal` against `(seat − ideal) + ψ`; projecting a Fourier coefficient onto the
+  raw samples against onto their deviation from the mean; a mean summed outright
+  against one anchored on the first sample. Each cost a *concentric* gear a
+  nonzero answer — 8e-15 mm of pitch error, then 4e-15 mm of sinusoid amplitude,
+  then 1e-30 — where the true value is exactly zero. When a quantity must vanish
+  in a degenerate case, arrange the arithmetic so the terms cancel *before* they
+  meet anything large, and assert the exact zero rather than a tolerance: the
+  tolerance is what hides it.
 - **A second way of drawing the same thing is a second answer.** The DXF had its
   own outline generator, replicating one tooth `z` times. An eccentric gear would
   have looked right on screen and **exported concentric** — the worst split,
@@ -655,7 +671,7 @@ of DESIGN.md, which records that the audit was wrong to promise it.
 
 | Item | Note |
 |---|---|
-| An eccentric gear's inspection data and its commanded `a_w(θ)` | §4.10. The gear itself is built; ranges over the revolution for span and over-pins are not, and the centre-distance profile needs a mate the gear tab does not have |
+| An eccentric gear's inspection data, and any UI for it | §4.10. The gear and its commanded `a_w(θ)` are built and gated; span and over-pins as ranges are not, and neither is a gear-tab surface for the centre-distance profile. `Eccentric::span`/`distinct` are the framework both would use |
 | A planetary set's drawing | the viewport draws single gears; a set needs the carrier and N planets placed |
 | A worm's profile drawing, and its DXF | §8. A crossed pair draws as its two helical gears already |
 | The enveloping wheel's zone of action | would turn a worm's `ε` from a floor into the number |
