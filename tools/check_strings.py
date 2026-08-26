@@ -40,9 +40,14 @@ def catalogue_ui_keys(text):
 
 
 def used_keys(paths):
+    """Any `"ui.…"` literal, not only the ones inside a `t(` call.
+
+    Keys travel as arguments too -- `autoNumber("ui.train_addendum", …)` renders
+    through `t` one level down -- and scanning only for `t("…")` reported five
+    live labels as orphans. A key is a key wherever it is written."""
     used = set()
     for p in paths:
-        for m in re.finditer(r'\bt\(\s*"(ui\.[A-Za-z0-9_]+)"', p.read_text()):
+        for m in re.finditer(r'"(ui\.[A-Za-z0-9_]+)"', p.read_text()):
             used.add(m.group(1))
     return used
 

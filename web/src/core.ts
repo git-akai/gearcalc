@@ -499,7 +499,7 @@ export interface Overrides {
 export interface StageGear {
   teeth: number;
   profile_shift: Auto<number>;
-  working_depth: number;
+  working_depth: Auto<number>;
   addendum: Auto<number>;
   min_tip_width: number;
   dedendum: number;
@@ -552,6 +552,9 @@ export interface WormStage {
   pressure_angle: number;
   shaft_angle: number;
   friction: number;
+  /** `k₁`; the wheel takes `2 − k₁`. Describes the parts cut and moves no
+   *  figure this stage reports — see `WormStage::thickness_mod`. */
+  thickness_mod: number;
   starts: number;
   sizing: FirstMemberSizing;
   wheel_teeth: number;

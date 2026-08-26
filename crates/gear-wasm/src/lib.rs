@@ -1076,9 +1076,9 @@ mod tests {
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
                "min_planet_clearance":0.3,
                "cutter":{"teeth":20,"addendum":1.25,"tip_round":0.2},
-               "sun":{"teeth":24,"profile_shift":{"auto":false,"manual":0.0},"working_depth":1.0,"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"auto_face_from_bending":true,"auto_face_from_contact":true,"material":"4340 Hardened Steel"},
-               "planet":{"teeth":18,"profile_shift":{"auto":false,"manual":0.0},"working_depth":1.0,"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"auto_face_from_bending":true,"auto_face_from_contact":true,"material":"4340 Hardened Steel"},
-               "ring":{"teeth":60,"profile_shift":{"auto":false,"manual":0.0},"working_depth":1.0,"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"auto_face_from_bending":true,"auto_face_from_contact":true,"material":"4340 Hardened Steel"}
+               "sun":{"teeth":24,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"auto_face_from_bending":true,"auto_face_from_contact":true,"material":"4340 Hardened Steel"},
+               "planet":{"teeth":18,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"auto_face_from_bending":true,"auto_face_from_contact":true,"material":"4340 Hardened Steel"},
+               "ring":{"teeth":60,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"auto_face_from_bending":true,"auto_face_from_contact":true,"material":"4340 Hardened Steel"}
               }
             ]}}"#;
 
@@ -1161,13 +1161,13 @@ mod tests {
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
                "gears":[
-                 {"teeth":17,"profile_shift":{"auto":true,"manual":0.0},"working_depth":1.0,
+                 {"teeth":17,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":0.0},
                   "auto_face_from_bending":true,"auto_face_from_contact":true,
                   "material":"4340 Hardened Steel"},
-                 {"teeth":43,"profile_shift":{"auto":true,"manual":0.0},"working_depth":1.0,
+                 {"teeth":43,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":0.0},
@@ -1176,6 +1176,7 @@ mod tests {
                ]},
               {"kind":"worm",
                "module":1.0,"pressure_angle":20.0,"shaft_angle":90.0,"friction":0.06,
+               "thickness_mod":1.0,
                "starts":1,"sizing":{"pitch_diameter":7.0},"wheel_teeth":40,
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
@@ -1235,13 +1236,13 @@ mod tests {
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
                "gears":[
-                 {"teeth":17,"profile_shift":{"auto":true,"manual":0.0},"working_depth":1.0,
+                 {"teeth":17,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":0.0},
                   "auto_face_from_bending":true,"auto_face_from_contact":true,
                   "material":"4340 Hardened Steel"},
-                 {"teeth":43,"profile_shift":{"auto":true,"manual":0.0},"working_depth":1.0,
+                 {"teeth":43,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":0.0},

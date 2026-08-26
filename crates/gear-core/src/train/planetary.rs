@@ -287,10 +287,10 @@ pub fn solve_planetary_stage(
 
     // ---- shifts. The sun's and ring's are inputs; the planet's is solved.
     let sun_base = stage.params(Member::Sun, teeth.sun, 0.0, stage.sun.addendum.manual);
-    let sun_shift = stage
-        .sun
-        .profile_shift
-        .resolve(automatic_profile_shift(&sun_base, stage.sun.working_depth));
+    let sun_shift = stage.sun.profile_shift.resolve(automatic_profile_shift(
+        &sun_base,
+        stage.sun.working_depth.resolve(stage.sun.dedendum),
+    ));
     let ring_shift = stage.ring.profile_shift.manual;
 
     // Thickness shifts, since only `x + x_s` reaches the answer (§4.1).
@@ -619,7 +619,7 @@ pub fn solve_planetary_stage(
             min_face_width_contact: min_face_width_contact(sigma_h, width, allow),
             clamps,
             material: material.clone(),
-            ranges: admissible_ranges(params, input.working_depth),
+            ranges: admissible_ranges(params, input.working_depth.resolve(input.dedendum)),
         }
     };
 

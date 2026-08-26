@@ -20,6 +20,25 @@
 //! kept at the top of the file rather than recovered from the filename, which a
 //! browser download and a subsequent rename would both destroy.
 //!
+//! # The shape can change, and a file written before it does will be refused
+//!
+//! Loudly, by the parser, naming the field and the line — which is the only
+//! behaviour worth having: a document read with a field quietly defaulted is a
+//! document that describes a different gearbox. Two changes so far:
+//!
+//! - `working_depth` became `Auto` (`{ auto, manual }`) when its default moved
+//!   from a fixed module to the gear's own dedendum. A file written before that
+//!   has `working_depth = 1.0`; `working_depth = { auto = false, manual = 1.0 }`
+//!   preserves what it meant, and `{ auto = true, manual = 1.0 }` takes the new
+//!   behaviour.
+//! - A worm stage gained `thickness_mod`, which a pre-existing file will not
+//!   have. `thickness_mod = 1.0` is the standard tooth.
+//!
+//! No compatibility shim, deliberately. Accepting both shapes means carrying two
+//! readers for one format and testing both forever, and the thing that would go
+//! wrong — a file loading with a field defaulted rather than read — is exactly
+//! what a refusal prevents.
+//!
 //! # What is *not* checked on import
 //!
 //! A stage names its materials by name, and the library that has them is the

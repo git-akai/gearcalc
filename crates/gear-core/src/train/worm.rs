@@ -189,6 +189,22 @@ pub struct WormStage {
     /// Coefficient of friction for the mesh. **Not** optional in the way it is
     /// for a spur stage: a worm's whole character comes from it.
     pub friction: f64,
+    /// `k₁`. The wheel takes `2 − k₁` by construction, as in a spur stage.
+    ///
+    /// # What it reaches, and why that is not a gap
+    ///
+    /// The teeth that get **cut**, and nothing this stage reports. That is not a
+    /// missing model: `k₁ + k₂ = 2` means a thickness modification *moves*
+    /// thickness between the two members without opening the pair, so the
+    /// backlash it contributes is **exactly zero** — structurally, not
+    /// approximately. §4.5.1 used to record this as something a crossed stage
+    /// could not yet answer for want of the normal-plane play; that play is
+    /// derived now (§4.4), and the answer it gives is zero.
+    ///
+    /// It is offered because a designer specifying this pair is specifying those
+    /// parts, and a stage document that could not record them would be
+    /// describing a drive nobody could make.
+    pub thickness_mod: f64,
     /// Starts on the worm.
     pub starts: u32,
     /// How the first member's size is fixed — the *only* thing that
@@ -217,6 +233,7 @@ impl Default for WormStage {
             pressure_angle: 20.0,
             shaft_angle: 90.0,
             friction: 0.06,
+            thickness_mod: 1.0,
             starts: 1,
             sizing: FirstMemberSizing::PitchDiameter(7.0),
             wheel_teeth: 40,
@@ -511,6 +528,7 @@ pub fn solve_crossed_stage(
         pressure_angle: stage.pressure_angle,
         shaft_angle: stage.shaft_angle,
         friction: stage.friction,
+        thickness_mod: stage.thickness_mod,
         starts: stage.gears[0].teeth,
         sizing: FirstMemberSizing::HelixAngle(stage.helix_angles()[0]),
         wheel_teeth: stage.gears[1].teeth,

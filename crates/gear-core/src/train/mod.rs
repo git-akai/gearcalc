@@ -748,6 +748,86 @@ mod tests {
         );
     }
 
+    /// **An automatic profile shift asks about the depth the tooth actually
+    /// has.**
+    ///
+    /// `working_depth` is the depth the undercut question is asked at, and it
+    /// now follows the **dedendum** by default instead of sitting at a fixed
+    /// module. The two are different questions — "is the flank undercut within a
+    /// module of depth?" against "is it undercut at all?" — and at α = 20° with
+    /// a sharp rack they part company at 18 teeth and 22 (§4.3). Following the
+    /// dedendum also means a gear cut shallower is asked about its own depth
+    /// rather than about a convention.
+    ///
+    /// Gated because nothing did: when the default moved, every figure in
+    /// `gear-cli train` moved with it and the suite stayed green. Asserted as
+    /// the law rather than the numbers — a deeper cut can only need more shift
+    /// to stay clear of undercut — plus the one identity that pins it, which is
+    /// that fixing `working_depth` at the dedendum's value reproduces automatic
+    /// exactly.
+    #[test]
+    fn an_automatic_profile_shift_follows_the_dedendum() {
+        let lib = library();
+        let shift_of = |dedendum: f64, working: Auto<f64>| {
+            let stage = SpurStage {
+                gears: [
+                    StageGear {
+                        teeth: 15,
+                        dedendum,
+                        working_depth: working,
+                        profile_shift: Auto::automatic(0.0),
+                        ..Default::default()
+                    },
+                    StageGear {
+                        teeth: 43,
+                        dedendum,
+                        working_depth: working,
+                        ..Default::default()
+                    },
+                ],
+                ..Default::default()
+            };
+            solve_stage(&stage, 2.0, &lib)
+                .expect("a solvable stage")
+                .gears[0]
+                .profile_shift
+        };
+
+        // Deeper teeth, more shift. A law: undercut is a question about how far
+        // down the flank has to stay clean.
+        let mut previous = f64::NEG_INFINITY;
+        for dedendum in [1.0_f64, 1.25, 1.5, 1.9] {
+            let x = shift_of(dedendum, Auto::automatic(0.0));
+            assert!(
+                x > previous,
+                "dedendum {dedendum}: a deeper cut cannot need less shift — \
+                 {x} against {previous}"
+            );
+            previous = x;
+        }
+
+        // ...and automatic *is* the dedendum, not something near it.
+        for dedendum in [1.0_f64, 1.25, 1.9] {
+            let automatic = shift_of(dedendum, Auto::automatic(0.0));
+            let named = shift_of(dedendum, Auto::fixed(dedendum));
+            assert!(
+                (automatic - named).abs() < 1e-12,
+                "dedendum {dedendum}: automatic gave {automatic}, the dedendum \
+                 by hand gave {named}"
+            );
+        }
+
+        // The old default is still reachable and still different, so this is a
+        // change of default rather than a loss of the control.
+        let classical = shift_of(1.25, Auto::fixed(1.0));
+        let now = shift_of(1.25, Auto::automatic(0.0));
+        assert!(
+            now > classical + 1e-6,
+            "asking a module deep should ask for less shift than asking 1.25 \
+             deep: {classical} against {now}"
+        );
+    }
+
     /// **A parallel stage is rated where it runs, not where it was designed.**
     ///
     /// `Mesh::a_w` is the **zero-backlash** centre distance — where the profile

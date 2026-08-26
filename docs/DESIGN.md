@@ -435,6 +435,23 @@ flank undercut within 1 module of depth?"*, not *"is the flank undercut at all?"
 Answering the latter needs 22 teeth. That is exactly the hidden assumption this
 control is meant to expose.
 
+**And a control that exposes an assumption should not default to it.** A stage's
+`working_depth` follows its **own dedendum**, and is `Auto` so it can be told
+otherwise — it defaulted to a fixed 1 module until then, which is to say it
+shipped the assumption it exists to reveal. The dedendum is the depth the profile
+generator's own `undercut` flag answers about, so following it makes the two
+agree by construction rather than by coincidence:
+`a_gear_at_the_minimum_shift_is_on_the_edge_of_undercut` could only ever be
+written by passing `p.dedendum` in by hand, which was the model saying what its
+default should be. A gear cut shallower is now asked about the depth it has.
+
+It moves every automatic shift that was previously clamped at zero: on
+`gear-cli train`, gear 1 of stage 1 goes `x = 0 → 0.0057` and of stage 2
+`0 → 0.1586`, with contact ratios and face widths following. Nothing caught that
+when it landed, so `an_automatic_profile_shift_follows_the_dedendum` now gates
+the law (deeper teeth cannot need less shift) and the identity (automatic is the
+dedendum, not something near it).
+
 **A second hidden assumption, which the same formula also exposes.** The
 classical rule additionally assumes a **sharp-cornered rack**. With a real cutter
 tip radius the straight flank ends higher up, so there is less undercut — at
@@ -1277,9 +1294,16 @@ so once, above the gear cards. The mesh is solved at its pitch point, so:
   cylinders, which follow `a`. Setting `a` directly is therefore the whole of the
   effect available.
 - **A thickness modification splits thickness between the two teeth without
-  opening the pair**, since `k₁ + k₂ = 2`. That is as true crossed as parallel;
-  what a crossed stage lacks is the *backlash from thinning* one alone, which
-  would need the normal-plane play derived for crossed axes.
+  opening the pair**, since `k₁ + k₂ = 2`. That is as true crossed as parallel.
+  An earlier revision called the rest of this a gap — "what a crossed stage lacks
+  is the *backlash from thinning* one alone, which would need the normal-plane
+  play derived for crossed axes". **That play is derived** (§4.4), and the answer
+  it gives is that there is nothing to report: the invariant means thickness is
+  only ever *moved* between two teeth, never removed from the pair, so the
+  backlash it contributes is exactly zero. The worm stage carries `thickness_mod`
+  now for the same reason the crossed one does — it describes the parts that get
+  cut, and a stage document that could not record them would be describing a
+  drive nobody could make.
 - **Nothing sizes the face width.** A point contact's peak pressure does not
   depend on it and there is no bending model for crossed axes, so a width left
   automatic is used as entered and the result says so.
@@ -3569,6 +3593,8 @@ something independent.**
 | 4.5.1 | A crossed pair's face width clipped symmetrically about the path's own origin | The face is centred on its **gear**. Those coincide only at the zero-backlash distance; away from it the contact has slid along the shafts, and at `Σ = 0.5°` with 20 µm of clearance a 12 mm face has `ε = 0.860` where the model reported 1.664 |
 | 11.5 | Notes as `Vec<String>`, and code matching on their text | Four places branched on a *sentence* — the planetary solve on `"tip radius raised"`, the range test on `"cutter depth"`, two ring tests on `"base circle"` — every one of which would go quietly false on a rewording and all of them on a translation. A note that anything acts on needs an identity, not prose |
 | 11.5 | The string catalogue read from a plain module variable in the front end | Not reactive, so the **sidebar** — which draws before the core finishes loading — kept the fallback and rendered `ui.sidebar_gears` where "Gears" belonged. Every panel looked right because every panel renders later, which is exactly how a bug survives a look at the screen |
+| 4.3 | `working_depth` defaulting to a fixed 1 module | The control exists to expose the classical rule's hidden assumption, and it shipped defaulting *to* that assumption. It follows the gear's own dedendum now, which is the depth the `undercut` flag answers about — the two agree by construction instead of by coincidence. Every automatic shift previously clamped at zero moved, and nothing in the suite noticed |
+| 4.5.1 | "What a crossed stage lacks is the *backlash from thinning* one alone, which would need the normal-plane play derived for crossed axes" | Recorded as a gap; it is an **answer**. The play is derived (§4.4), and `k₁ + k₂ = 2` means thickness is only ever moved between two teeth and never removed from the pair, so what it contributes is exactly zero. A missing derivation and a derivation that returns zero read the same in a document and are not the same thing |
 | 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
 | 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
 | 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |

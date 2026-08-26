@@ -63,6 +63,16 @@ pub struct MinimumShift {
 /// | 1.00 module | 17.10 → **18 teeth**, the classical rule |
 /// | 1.25 module, a full standard dedendum | 21.37 → **22 teeth** |
 ///
+/// **A stage's `working_depth` follows its own dedendum**, and is `Auto` so it
+/// can be told otherwise. It used to be a fixed 1 module — the classical rule —
+/// and the two ask different questions, as the table shows. The dedendum is the
+/// one the profile generator answers, so following it makes the automatic shift
+/// and the `undercut` flag agree by construction rather than by coincidence:
+/// `a_gear_at_the_minimum_shift_is_on_the_edge_of_undercut` could only be
+/// written by passing `p.dedendum` in by hand, which was the model telling us
+/// what its default should be. A gear cut shallower is now asked about the depth
+/// it actually has instead of about a convention.
+///
 /// And with a real cutter tip radius the answer moves the other way: at
 /// `ρ = 0.38` (the ISO 53 basic rack), `h_w = 1`, α = 20°, the threshold falls to
 /// 12.82 — **13 teeth**. Two assumptions buried in one piece of conventional

@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–11 complete and in CI. 373 tests, ~26 s.**
+**Milestones 0–11 complete and in CI. 374 tests, ~26 s.**
 
 Milestone 11's named scope — geartrain import/export, confirmations, error
 surfacing, docs — is done, and geartrain import/export was the last unbuilt item
@@ -123,6 +123,12 @@ The last two share no code with the crate — that is their whole purpose. `cros
 line of action through differential geometry; the crate reaches it through a
 construction in lines and angles. On a 17/23 pair at 45°/45°, shafts at 90°,
 they give ε = 1.777921670 and 1.777921669562.
+
+**The geartrain file format changed twice this pass**, and a file written before
+it will be refused by name and line rather than loaded with a field defaulted.
+`working_depth` became `Auto` when its default moved to the dedendum, and a worm
+stage gained `thickness_mod`. `gear_io::train`'s module docs carry the edits that
+bring an old file forward.
 
 **The worm canary has moved three times, all deliberately.**
 `wormstage 1 40 7 2`:
@@ -290,6 +296,14 @@ four are in play differing by `cos α_t`, `cos α_w`, `cos β_b`.
 `PARALLEL_AXES` is a named zero, and at it the elliptical patch's peak pressure
 is *exactly* zero. Line contact is a degenerate value, not a branch.
 
+**A control that exposes an assumption must not default to it.** A stage's
+`working_depth` — the depth the undercut question is asked at — follows its own
+dedendum rather than the classical 1 module. The whole point of the field is that
+"17 teeth at 20°" answers *is it undercut within a module?* and not *is it
+undercut at all?*, and it spent a milestone defaulting to the first. Following
+the dedendum also makes the automatic shift agree with the profile generator's
+own `undercut` flag by construction.
+
 **A stage is rated where it runs, not where it was designed.** The zero-backlash
 centre distance is where the profile shifts put the pair; a real one runs at that
 plus its assembly clearance, and every contact quantity belongs to the second —
@@ -425,6 +439,19 @@ these are the ones most likely to be stepped on again.
   power algebra, including two exact closed forms, and a backward efficiency of
   101.571 % survived all of them — because every one drove forward with a
   positive torque and a positive speed. It was found by looking at the UI.
+- **A default that changes every answer can pass a full suite.** Moving
+  `working_depth` from 1 module to the dedendum moved every automatic profile
+  shift, contact ratio, face width and bending stress in `gear-cli train`, and
+  374 tests stayed green: the automatic shift had gates on its *bounds* and none
+  on its value. Before changing a default, ask what would fail — and if the
+  answer is nothing, that is the finding, not the reassurance.
+- **A missing derivation and a derivation that returns zero read the same in a
+  document.** §4.5.1 recorded a crossed pair's backlash-from-thinning as
+  something it could not yet answer. It could: `k₁ + k₂ = 2` means thickness is
+  only ever moved between two teeth, so the contribution is exactly zero. The
+  note had been true when written and became a description of a gap that had
+  closed underneath it. Prose about what a model cannot do needs re-reading when
+  the model changes.
 - **A sentence cannot do a symbol's job.** Four places matched on a message's
   *text* to decide something — the planetary solve on `"tip radius raised"`, the
   admissible-range test on `"cutter depth"`, two ring tests on `"base circle"`.

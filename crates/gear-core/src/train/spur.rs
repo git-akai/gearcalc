@@ -30,7 +30,15 @@ pub struct StageGear {
     /// Automatic uses [`minimum_profile_shift`] at `working_depth`.
     pub profile_shift: Auto<f64>,
     /// Depth, in modules, at which the undercut question is asked.
-    pub working_depth: f64,
+    ///
+    /// **Automatic is the gear's own dedendum**, which makes this ask the same
+    /// question the profile generator answers: *is the flank undercut at all?*
+    /// A fixed 1 module — the classical rule, and what this used to default to —
+    /// asks a narrower one, *is it undercut within a module of depth?*, and the
+    /// two have different answers: at α = 20° with a sharp rack they part at 18
+    /// teeth and 22 (§4.3). Following the dedendum rather than naming a number
+    /// also means a gear cut shallower is asked about the depth it actually has.
+    pub working_depth: Auto<f64>,
     /// Automatic uses [`addendum_for_tip_width`] at `min_tip_width`.
     pub addendum: Auto<f64>,
     /// Minimum transverse tooth tip width, mm.
@@ -54,7 +62,7 @@ impl Default for StageGear {
         Self {
             teeth: 17,
             profile_shift: Auto::automatic(0.0),
-            working_depth: 1.0,
+            working_depth: Auto::automatic(1.0),
             addendum: Auto::fixed(1.0),
             min_tip_width: 0.1,
             dedendum: 1.25,
@@ -192,9 +200,10 @@ impl SpurStage {
             },
         };
 
-        let x = g
-            .profile_shift
-            .resolve(automatic_profile_shift(&base, g.working_depth));
+        let x = g.profile_shift.resolve(automatic_profile_shift(
+            &base,
+            g.working_depth.resolve(g.dedendum),
+        ));
         let with_shift = GearParams {
             profile_shift: x,
             ..base
@@ -327,7 +336,12 @@ pub fn solve_stage(
             min_face_width_contact: min_face_width_contact(cs.worst, effective, allow),
             clamps: g[i].clamps.notes.clone(),
             material: materials[i].clone(),
-            ranges: admissible_ranges(&p[i], stage.gears[i].working_depth),
+            ranges: admissible_ranges(
+                &p[i],
+                stage.gears[i]
+                    .working_depth
+                    .resolve(stage.gears[i].dedendum),
+            ),
         });
     }
 

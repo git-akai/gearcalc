@@ -177,8 +177,18 @@
 <!-- What a crossed-axis mesh reports, whether it was entered as a worm drive or
      as a gear pair with its shafts turned: the same mathematics answers both
      (DESIGN §4.5.1), so it is one readout rather than two that drift. -->
-{#snippet screwReadout(r: WormResult)}
+{#snippet screwReadout(r: WormResult, members: [string, string])}
+<!-- Ordered to match the spur stage's shared readout — centre distance,
+     contact ratio, efficiency, backlash — with what only a screw pair has
+     following on. The backlash lives here rather than on the two member cards
+     for the same reason it does there: it is one gap seen from two ends, not a
+     property either member owns. -->
 <dl class="out">
+  <dt>{t("ui.train_centre_distance")}</dt>
+  <dd>
+    {r.centre_distance.toFixed(4)} mm
+    <small>nominal {r.centre_distance_nominal.toFixed(4)}</small>
+  </dd>
   {#if r.crossed}
     <dt>{t("ui.train_contact_ratio")}</dt>
     <dd>
@@ -195,17 +205,7 @@
         {/if}
       </small>
     </dd>
-    <dt>{t("ui.train_contact_travel")}</dt>
-    <dd>
-      {r.crossed.axial_travel[0].toFixed(3)} · {r.crossed.axial_travel[1].toFixed(3)} mm
-      <small>{t("ui.train_along_each_member_s_own_axis")}</small>
-    </dd>
   {/if}
-  <dt>{t("ui.train_centre_distance")}</dt>
-  <dd>
-    {r.centre_distance.toFixed(4)} mm
-    <small>nominal {r.centre_distance_nominal.toFixed(4)}</small>
-  </dd>
   <dt>{t("ui.train_mesh_efficiency")}</dt>
   <dd>
     {pct(r.efficiency.forward)} % driven forward
@@ -219,6 +219,14 @@
         — crossing them is what the difference costs
       </small>
     {/if}
+  </dd>
+  <dt>{t("ui.train_backlash")}</dt>
+  <dd>
+    {r.backlash.forward.nominal.toFixed(5)}° at {members[1]}
+    <small
+      >({r.backlash.forward.minimum.toFixed(5)} to {r.backlash.forward.maximum.toFixed(5)})</small
+    >
+    · {r.backlash.backward.nominal.toFixed(5)}° at {members[0]}
   </dd>
   <dt>{t("ui.train_self_locks_at")}</dt>
   <dd>{r.self_locking_friction.toFixed(4)}</dd>
@@ -244,6 +252,13 @@
     ZI (involute helicoid)
     <small>{t("ui.train_zn_worm_s_contact_stress_1")}</small>
   </dd>
+  {#if r.crossed}
+    <dt>{t("ui.train_contact_travel")}</dt>
+    <dd>
+      {r.crossed.axial_travel[0].toFixed(3)} · {r.crossed.axial_travel[1].toFixed(3)} mm
+      <small>{t("ui.train_along_each_member_s_own_axis")}</small>
+    </dd>
+  {/if}
 </dl>
 {/snippet}
 
@@ -300,13 +315,13 @@
     <p class="aside">{t("ui.train_root_fillet_are_cutter_s_below")}</p>
   {/if}
   {#if opts.solvedShift === undefined}
-    {@render autoNumber("Profile shift", gear.profile_shift, g?.profile_shift, 0.05)}
+    {@render autoNumber("ui.train_profile_shift", gear.profile_shift, g?.profile_shift, 0.05)}
     {#if gear.profile_shift.auto}
-      <label class="sub">
-        <span>{t("ui.train_working_tooth_depth")}</span>
-        <input type="number" step="0.05" bind:value={gear.working_depth} />
-        <em>{t("ui.train_module")}</em>
-      </label>
+      <!-- Automatic is the gear's own dedendum, which asks the same question the
+           profile generator answers: is the flank undercut *at all*? A fixed 1
+           module — what this used to be — asks whether it is undercut within a
+           module of depth, and the two part company at 18 teeth and 22. -->
+      {@render autoNumber("ui.train_working_tooth_depth", gear.working_depth, gear.dedendum, 0.05)}
     {/if}
   {:else}
     <label>
@@ -336,7 +351,7 @@
       )}
     </p>
   {/if}
-  {@render autoNumber("Addendum", gear.addendum, g?.addendum, 0.05)}
+  {@render autoNumber("ui.train_addendum", gear.addendum, g?.addendum, 0.05)}
   {#if gear.addendum.auto}
     <label class="sub">
       <span>{t("ui.train_minimum_tip_width")}</span>
@@ -348,7 +363,7 @@
     <!-- A crossed pair's automatic width is a **geometric** minimum: the width
          at which one tooth pair hands over to the next (ε = 1). The spur
          stage's inverts a stress instead, and the two must not read alike. -->
-    {@render autoNumber("Face width", gear.face_width, opts.faceFromContinuity, 0.5)}
+    {@render autoNumber("ui.train_face_width", gear.face_width, opts.faceFromContinuity, 0.5)}
     {@render noteSlot(
       notes(
         opts.faceFromContinuity === undefined
@@ -358,7 +373,7 @@
       ),
     )}
   {:else}
-    {@render autoNumber("Face width", gear.face_width, g?.face_width, 0.5)}
+    {@render autoNumber("ui.train_face_width", gear.face_width, g?.face_width, 0.5)}
   {/if}
   {#if gear.face_width.auto && opts.faceAuto !== false}
     <div class="subtoggles">
@@ -425,9 +440,13 @@
 </div>
 {/snippet}
 
-{#snippet autoNumber(label: string, a: Auto<number>, computed: number | undefined, step: number)}
+<!-- `key` rather than a label, so these read from the catalogue like every
+     other piece of chrome. Passing the English through as an argument is how
+     five labels stayed hard-coded through the extraction that caught the other
+     185: they are not markup, so nothing scanning markup could see them. -->
+{#snippet autoNumber(key: string, a: Auto<number>, computed: number | undefined, step: number)}
   <label class="auto">
-    <span>{label}</span>
+    <span>{t(key)}</span>
     {#if a.auto}
       <input
         type="number"
@@ -439,8 +458,13 @@
     {:else}
       <input type="number" {step} bind:value={a.manual} />
     {/if}
-    <button class="toggle" class:on={a.auto} onclick={() => (a.auto = !a.auto)} title="Automatic">
-      auto
+    <button
+      class="toggle"
+      class:on={a.auto}
+      onclick={() => (a.auto = !a.auto)}
+      title={t("ui.train_automatic")}
+    >
+      {t("ui.train_auto")}
     </button>
   </label>
 {/snippet}
@@ -486,7 +510,7 @@
 {/if}
 
 <section class="train">
-  <div class="grid">
+  <div class="grid shared">
     <label>
       <span>{t("ui.train_input_speed_peak")}</span>
       <input type="number" step="100" bind:value={tab.train.input_speed} />
@@ -543,48 +567,50 @@
     {/if}
   </div>
 
-  {#if "error" in result}
-    <p class="error">{result.error}</p>
-  {:else}
-    <dl class="out">
-      <dt>{t("ui.train_total_ratio")}</dt>
-      <dd>
+  <div class="summary">
+    {#if "error" in result}
+      <p class="error">{result.error}</p>
+    {:else}
+      <dl class="out">
+        <dt>{t("ui.train_total_ratio")}</dt>
+        <dd>
         {result.ok.total_ratio >= 1
           ? `${result.ok.total_ratio.toFixed(4)} : 1`
           : `1 : ${(1 / result.ok.total_ratio).toFixed(4)}`}
-      </dd>
-      <dt>{t("ui.train_output_speed")}</dt>
-      <dd>{result.ok.output_speed.toFixed(1)} rpm</dd>
-      <dt>{t("ui.train_output_torque")}</dt>
-      <dd>{result.ok.output_torque.toFixed(4)} Nm</dd>
-      <dt>{t("ui.train_total_efficiency")}</dt>
-      <dd>
+        </dd>
+        <dt>{t("ui.train_output_speed")}</dt>
+        <dd>{result.ok.output_speed.toFixed(1)} rpm</dd>
+        <dt>{t("ui.train_output_torque")}</dt>
+        <dd>{result.ok.output_torque.toFixed(4)} Nm</dd>
+        <dt>{t("ui.train_total_efficiency")}</dt>
+        <dd>
         {pct(result.ok.total_efficiency.forward)} % driven forward
         · {pct(result.ok.total_efficiency.backward)} % driven backward
         {#if result.ok.total_efficiency.backward <= 0}
           <small class="warn">{t("ui.train_cannot_be_back_driven")}</small>
         {/if}
-      </dd>
-      <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
-      <dd>
+        </dd>
+        <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
+        <dd>
         {result.ok.backlash.forward.nominal.toFixed(5)}°
         <small
           >({result.ok.backlash.forward.minimum.toFixed(5)} to {result.ok.backlash.forward.maximum.toFixed(
             5,
           )})</small
         >
-      </dd>
-      <dt>{t("ui.train_backlash_at_input_shaft")}</dt>
-      <dd>
-        {result.ok.backlash.backward.nominal.toFixed(5)}°
-        <small
-          >({result.ok.backlash.backward.minimum.toFixed(5)} to {result.ok.backlash.backward.maximum.toFixed(
-            5,
-          )})</small
-        >
-      </dd>
-    </dl>
-  {/if}
+        </dd>
+        <dt>{t("ui.train_backlash_at_input_shaft")}</dt>
+        <dd>
+          {result.ok.backlash.backward.nominal.toFixed(5)}°
+          <small
+            >({result.ok.backlash.backward.minimum.toFixed(5)} to {result.ok.backlash.backward.maximum.toFixed(
+              5,
+            )})</small
+          >
+        </dd>
+      </dl>
+      {/if}
+  </div>
 </section>
 
 <div class="stages">
@@ -679,7 +705,7 @@
                 )}
               </label>
               {@render autoNumber(
-                "C2C distance",
+                "ui.train_c2c_distance",
                 stage.centre_distance,
                 (sres ?? xres)?.centre_distance,
                 0.1,
@@ -754,7 +780,7 @@
             </div>
 
             {#if xres}
-              {@render screwReadout(xres)}
+              {@render screwReadout(xres, [`gear ${gearNumber(i, 0)}`, `gear ${gearNumber(i, 1)}`])}
               {#if xres.notes.length}
                 <ul class="notes">
                   {#each xres.notes as n (n.key)}<li>{note(n)}</li>{/each}
@@ -847,7 +873,27 @@
                 <input type="number" step="0.01" bind:value={stage.friction} />
                 <em></em>
               </label>
-              {@render autoNumber("C2C distance", stage.centre_distance, wres?.centre_distance, 0.1)}
+              <label>
+                <span>{t("ui.train_tooth_thickness_mod")}</span>
+                <input type="number" step="0.05" bind:value={stage.thickness_mod} />
+                <em>{t("ui.train_k")}</em>
+                <!-- The same single input the spur stage has, and for the same
+                     reason: `k₁ + k₂ = 2` is what keeps the mesh at zero
+                     backlash, so storing both would be storing a breakable
+                     constraint. What it reaches differs, and the note says so —
+                     the pair's play is unchanged *because* of that invariant,
+                     which is an answer rather than a gap. -->
+                {@render noteSlot(
+                  notes(
+                    "the worm's: above 1 its thread thickens and the wheel's teeth thin by " +
+                      "as much, since the pair must sum to 2. It describes the parts cut and " +
+                      "moves nothing below — thickness shifted between two teeth cannot open " +
+                      "the pair",
+                    null,
+                  ),
+                )}
+              </label>
+              {@render autoNumber("ui.train_c2c_distance", stage.centre_distance, wres?.centre_distance, 0.1)}
               <label>
                 <span>{t("ui.train_c2c_clearance")}</span>
                 <input
@@ -926,7 +972,7 @@
                   </label>
                 {:else}
                   {@render autoNumber(
-                    "Length",
+                    "ui.train_length",
                     stage.worm.face_width,
                     wres?.members[0].recommended_face_width ?? undefined,
                     1,
@@ -957,8 +1003,6 @@
                     <dd>{wres.members[0].torque.toFixed(4)} N·m</dd>
                     <dt>{t("ui.train_speed")}</dt>
                     <dd>{wres.members[0].speed.toFixed(1)} rpm</dd>
-                    <dt>{t("ui.train_backlash")}</dt>
-                    <dd>{wres.backlash.backward.nominal.toFixed(5)}°</dd>
                   </dl>
                 {/if}
               </div>
@@ -977,7 +1021,7 @@
                   </label>
                 {:else}
                   {@render autoNumber(
-                    "Face width",
+                    "ui.train_face_width",
                     stage.wheel.face_width,
                     wres?.members[1].recommended_face_width ?? undefined,
                     1,
@@ -991,15 +1035,13 @@
                     <dd>{wres.members[1].torque.toFixed(4)} N·m</dd>
                     <dt>{t("ui.train_speed")}</dt>
                     <dd>{wres.members[1].speed.toFixed(1)} rpm</dd>
-                    <dt>{t("ui.train_backlash")}</dt>
-                    <dd>{wres.backlash.forward.nominal.toFixed(5)}°</dd>
                   </dl>
                 {/if}
               </div>
             </div>
 
             {#if wres}
-              {@render screwReadout(wres)}
+              {@render screwReadout(wres, [t("ui.train_the_worm"), t("ui.train_the_wheel")])}
               {#if wres.notes.length}
                 <ul class="notes">
                   {#each wres.notes as n (n.key)}<li>{note(n)}</li>{/each}
@@ -1068,6 +1110,27 @@
                 )}
               </label>
               <label>
+                <span>{t("ui.train_c2c_clearance")}</span>
+                <input type="number" step="0.01" bind:value={stage.clearance} />
+                <em>{t("ui.train_mm")}</em>
+              </label>
+              <label>
+                <span>{t("ui.train_c2c_tolerance")}</span>
+                <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
+                <em>{t("ui.train_mm")}</em>
+              </label>
+              <label>
+                <span>{t("ui.train_c2c_tolerance_6")}</span>
+                <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
+                <em>{t("ui.train_mm")}</em>
+              </label>
+              <label>
+                <span>{t("ui.train_minimum_planet_clearance")}</span>
+                <input type="number" step="0.05" bind:value={stage.min_planet_clearance} />
+                <em>{t("ui.train_mm")}</em>
+                {@render noteSlot(notes("tip to tip, between neighbouring planets", null))}
+              </label>
+              <label>
                 <span>{t("ui.train_planets")}</span>
                 <input type="number" step="1" min="1" bind:value={stage.planets} />
                 <em></em>
@@ -1092,27 +1155,6 @@
                 {@render noteSlot(
                   notes("the third shaft is the output; a set needs both named", null),
                 )}
-              </label>
-              <label>
-                <span>{t("ui.train_c2c_clearance")}</span>
-                <input type="number" step="0.01" bind:value={stage.clearance} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              <label>
-                <span>{t("ui.train_c2c_tolerance")}</span>
-                <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              <label>
-                <span>{t("ui.train_c2c_tolerance_6")}</span>
-                <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              <label>
-                <span>{t("ui.train_minimum_planet_clearance")}</span>
-                <input type="number" step="0.05" bind:value={stage.min_planet_clearance} />
-                <em>{t("ui.train_mm")}</em>
-                {@render noteSlot(notes("tip to tip, between neighbouring planets", null))}
               </label>
             </div>
 
@@ -1331,11 +1373,32 @@
     border-radius: 3px;
     margin-bottom: 0.75rem;
   }
+  /* Inputs on the left, stacked; what they produce beside them, also stacked.
+     The same shape as a gear card and its readout, without the border or the
+     heading — this is the whole train, so there is nothing to tell it apart
+     from. Falls back to one column when there is no room for two, which is the
+     only place the two are allowed to sit above each other. */
   .train {
     border: 1px solid var(--rule);
     border-radius: 4px;
     padding: 0.75rem;
     margin-bottom: 1rem;
+    display: grid;
+    grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.4rem 2rem;
+  }
+  @media (max-width: 52rem) {
+    .train {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .train .summary {
+    min-width: 0;
+  }
+  /* No top margin here: it is beside the inputs, not below them. */
+  .train .summary .out {
+    margin-top: 0;
   }
   .grid {
     display: grid;
