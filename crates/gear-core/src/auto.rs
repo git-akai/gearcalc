@@ -483,6 +483,7 @@ pub fn addendum_for_tip_width(g: &Gear, min_tip_width: f64) -> Option<f64> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use crate::note::key;
 
     /// The tooth-count thresholds in the design document, reproduced from the
     /// formula rather than quoted. These are the numbers the control exists to
@@ -709,7 +710,11 @@ mod tests {
                 .clamps
                 .notes
                 .iter()
-                .any(|n| n.contains("cutter depth") || n.contains("tooth thickness"))
+                .any(|n| {
+                    n.is(key::CLAMP_DEDENDUM_RAISED)
+                        || n.is(key::CLAMP_TOOTH_THICKNESS_RAISED)
+                        || n.is(key::CLAMP_TOOTH_THICKNESS_CAPPED)
+                })
             };
             let eps = 0.01;
             assert!(
@@ -796,7 +801,7 @@ mod tests {
                     ..p
                 });
                 assert!(
-                    capped.clamps.notes.iter().any(|n| n.contains("pointed")),
+                    capped.clamps.fired(key::CLAMP_TIP_CAPPED_POINTED),
                     "z={teeth}: no pointed-tooth cap past {pointed}"
                 );
             }

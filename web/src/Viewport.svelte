@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from "./core";
   // Draws what the core produced. It computes no geometry: the profile arrives
   // as a flat [x0, y0, x1, y1, ...] array and the reference radii as numbers.
   // Only view transform lives here.
@@ -163,8 +164,8 @@
   ></canvas>
   <div class="bar">
     <label><input type="checkbox" bind:checked={showCircles} /> Reference circles</label>
-    <span class="hint">drag to pan · scroll to zoom</span>
-    <button onclick={reset}>Reset view</button>
+    <span class="hint">{t("ui.viewport_drag_pan_scroll_zoom")}</span>
+    <button onclick={reset}>{t("ui.viewport_reset_view")}</button>
   </div>
 </div>
 

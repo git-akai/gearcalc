@@ -1,6 +1,6 @@
 <script lang="ts">
   import { workspace, trains, library } from "./state.svelte";
-  import { exportLibrary } from "./core";
+  import { exportLibrary, t } from "./core";
 
   let { version }: { version: string | null } = $props();
 
@@ -31,15 +31,13 @@
 </script>
 
 <aside>
-  <h1>Gears</h1>
+  <h1>{t("ui.sidebar_gears")}</h1>
 
   <section class="library">
-    <h2>Materials</h2>
+    <h2>{t("ui.sidebar_materials")}</h2>
     <div class="row">
-      <button onclick={() => picker.click()}>Import</button>
-      <button onclick={saveLibrary} disabled={library.materials.material.length === 0}>
-        Export
-      </button>
+      <button onclick={() => picker.click()}>{t("ui.sidebar_import_library")}</button>
+      <button onclick={saveLibrary} disabled={library.materials.material.length === 0}>{t("ui.sidebar_export")}</button>
     </div>
     <input
       bind:this={picker}
@@ -57,7 +55,7 @@
   </section>
 
   <section>
-    <h2>Gears</h2>
+    <h2>{t("ui.sidebar_gears")}</h2>
     <ul>
       {#each workspace.tabs as tab (tab.id)}
         <li>
@@ -76,7 +74,7 @@
   </section>
 
   <section>
-    <h2>Geartrains</h2>
+    <h2>{t("ui.sidebar_geartrains")}</h2>
     <ul>
       {#each trains.tabs as tab (tab.id)}
         <li>

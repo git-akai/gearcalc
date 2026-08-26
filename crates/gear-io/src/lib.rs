@@ -5,6 +5,7 @@
 
 pub mod dxf;
 pub mod materials;
+pub mod strings;
 pub mod train;
 
 pub use dxf::{gear_to_dxf, ring_to_dxf, DxfOptions};

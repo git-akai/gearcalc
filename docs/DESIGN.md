@@ -3467,6 +3467,73 @@ state, so adding them later is additive.
 
 ---
 
+## 11.5 Words, and where they are not
+
+`gear-core` holds no English. It emits a `Note` — a stable key naming what
+happened, and the values a sentence would need — and every word lives in
+`crates/gear-io/data/strings_en.toml`, one file per language.
+
+**The division is not "text on one side".** Values arrive **already formatted**,
+because rounding is engineering: whether a contact ratio is worth three decimals
+or one is a judgement about what the number means, and it belongs next to the
+model. A locale may decide how `1.234` is written; it may not decide whether the
+fourth digit is worth printing. `Note::number` takes the decimals explicitly and
+has no default, so that choice is made every time and is readable at the call
+site.
+
+The catalogue reaches the browser through `gear_wasm::strings`, the same door
+`gear_wasm::defaults` uses and for the same reason §12 records: the one value
+that was written down in two languages drifted, and only the side without tests
+was wrong. A string catalogue is that trap with two hundred more entries.
+
+### What it fixed on the way
+
+`Vec<String>` had a second cost beyond the words. A consumer that wanted to *act*
+on a note had nothing to match on but its text, and four places did:
+
+| where | matched on | would have broken when |
+|---|---|---|
+| the planetary solve | `"tip radius raised"` | the ring clamp was reworded |
+| `auto.rs`'s range test | `"cutter depth"` | either clamp was reworded |
+| two ring tests | `"base circle"`, `"not generated"` | ditto |
+
+All four are `Note::is(key)` now, and the keys are constants — a typo in a key is
+otherwise invisible, since the catalogue simply has no message for it and renders
+the key, which looks like a deliberate identifier.
+
+### What is checked
+
+Three checks, and between them they close both directions:
+
+| | |
+|---|---|
+| every key the core can emit has a message | against `note::key::ALL`, so it cannot drift by someone adding a note and forgetting the words |
+| every message is a key the core can emit | the half nobody writes, and the one that stops a catalogue accumulating sentences for notes deleted years ago. `[ui]` is exempt and is the only exemption |
+| every placeholder is a value the core supplies | learned by **firing every note** through the real solvers rather than by declaring a table, since a table is a second copy of the same thing and the copy nobody exercises is the one that goes wrong |
+
+The third needs the sweep to actually reach every key or it is checking an empty
+set — so that is asserted too, and it found two notes that **nothing can fire**:
+`clamp.ring_fully_filleted` (searched over ~11 000 ring and cutter combinations)
+and `stage.ring_addendum_clamped`. Both are named in `UNFIRED` with their
+evidence rather than deleted on suspicion; HANDOFF §5 carries them.
+
+`[ui]` has no `Note` behind it, so nothing in Rust can see whether a label is
+still on screen. `tools/check_strings.py` does that half, both ways.
+
+### How the extraction was accepted
+
+Not by review. 185 strings came out of the Svelte in one mechanical pass, which
+is the kind of change that is 99 % right and silently wrong in one place — so
+the gate was the **rendered DOM**: the page's visible text, dumped before and
+after on both tabs, required byte-identical. It immediately caught what no
+typecheck would have. `t()` first read a plain module variable, and the
+catalogue arrives with the wasm — so the sidebar, which draws before the core
+finishes loading, took the fallback and never learned the real text had arrived.
+Every panel looked correct because every panel renders later. The catalogue lives
+in `$state` in a `.svelte.ts` module now.
+
+---
+
 ## 12. Corrections made during implementation
 
 Every one of these was a claim in an earlier revision of this document that
@@ -3500,6 +3567,8 @@ something independent.**
 | 4.4 | Every contact quantity rated at the **zero-backlash** centre distance | A pair runs at that plus its assembly clearance, and the path, the operating pressure angle, the curvature and every stress belong to where it runs. `ε` was over by 1.2 % and bending under by the same, on every parallel stage ever solved. The clearance was being treated as a tolerance to ignore when it is the reason the stage reports backlash at all |
 | 4.5.1 | `path_of_contact` returning `None` at any centre distance but the nominal | Not a refusal, a **missing branch rule**: it identified the mesh by asking which tangent line passes through the pitch point, and none does once the centres move. Which flanks face each other is not a function of centre distance, so the branch is settled at the nominal distance and carried |
 | 4.5.1 | A crossed pair's face width clipped symmetrically about the path's own origin | The face is centred on its **gear**. Those coincide only at the zero-backlash distance; away from it the contact has slid along the shafts, and at `Σ = 0.5°` with 20 µm of clearance a 12 mm face has `ε = 0.860` where the model reported 1.664 |
+| 11.5 | Notes as `Vec<String>`, and code matching on their text | Four places branched on a *sentence* — the planetary solve on `"tip radius raised"`, the range test on `"cutter depth"`, two ring tests on `"base circle"` — every one of which would go quietly false on a rewording and all of them on a translation. A note that anything acts on needs an identity, not prose |
+| 11.5 | The string catalogue read from a plain module variable in the front end | Not reactive, so the **sidebar** — which draws before the core finishes loading — kept the fallback and rendered `ui.sidebar_gears` where "Gears" belonged. Every panel looked right because every panel renders later, which is exactly how a bug survives a look at the screen |
 | 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
 | 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
 | 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |

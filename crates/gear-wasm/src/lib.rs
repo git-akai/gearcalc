@@ -150,7 +150,7 @@ pub struct GearSummary {
     pub undercut: bool,
     pub severed: bool,
     /// Guards that altered the requested geometry. Empty is the normal case.
-    pub clamps: Vec<String>,
+    pub clamps: Vec<gear_core::note::Note>,
 
     pub span: Maybe<SpanOut>,
     pub over_two_pins: Maybe<PinsOut>,
@@ -350,7 +350,7 @@ pub struct RingSummary {
     /// the gear tab's over-pins. Two pins only, and
     /// [`gear_core::metrology::between_pins`] says why.
     pub between_pins: Maybe<PinsOut>,
-    pub clamps: Vec<String>,
+    pub clamps: Vec<gear_core::note::Note>,
 }
 
 fn ring_of(req: &RingRequest) -> gear_core::ring::Ring {
@@ -505,6 +505,22 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
 
 fn default_materials_impl() -> Result<String, String> {
     serde_json::to_string(&gear_io::default_library()).map_err(|e| e.to_string())
+}
+
+/// Every word the application shows, as `{ "section.key": "text" }`.
+///
+/// The catalogue crosses the boundary whole rather than the core rendering
+/// sentences on this side, because a note's *words* are a display decision and
+/// its *values* are not. The core sends `{ key, values }` with the numbers
+/// already rounded; the front end picks a language and fills in the blanks.
+///
+/// This is `defaults()` again, for the same reason DESIGN §12 gives: the one
+/// value that was written down in both languages drifted, and only the side
+/// without tests was wrong. A string catalogue is that trap with thirty more
+/// entries.
+fn strings_impl() -> Result<String, String> {
+    serde_json::to_string(gear_io::strings::Catalogue::english().messages())
+        .map_err(|e| e.to_string())
 }
 
 fn import_materials_impl(toml_text: &str) -> Result<String, String> {
@@ -677,6 +693,16 @@ fn defaults_impl() -> Result<String, String> {
 #[wasm_bindgen]
 pub fn defaults() -> Result<String, JsError> {
     defaults_impl().map_err(|e| JsError::new(&e))
+}
+
+/// The string catalogue, as JSON. See [`strings_impl`].
+///
+/// # Errors
+///
+/// Only if the catalogue cannot be encoded, which would be a build-time defect.
+#[wasm_bindgen]
+pub fn strings() -> Result<String, JsError> {
+    strings_impl().map_err(|e| JsError::new(&e))
 }
 
 #[wasm_bindgen]
@@ -1108,14 +1134,16 @@ mod tests {
         assert!(stage["planet"]["gear"]["bending_stress"].as_f64().unwrap() > 0.0);
         assert_eq!(stage["equal_spacing"], true);
         // What the stage *assumes* has to come across too — here, equal load
-        // sharing between planets, which no calculation can establish.
+        // sharing between planets, which no calculation can establish. Crossing
+        // as a key and its values, not as a sentence: the words are the string
+        // catalogue's business and the front end renders them, so what has to
+        // survive the boundary is the identity of the note and the number in it.
         let notes = stage["notes"].as_array().unwrap();
-        assert!(
-            notes
-                .iter()
-                .any(|n| n.as_str().unwrap_or("").contains("share the load equally")),
-            "the load-sharing assumption must be reported: {notes:?}"
-        );
+        let sharing = notes
+            .iter()
+            .find(|n| n["key"] == "stage.planets_share_load_equally")
+            .unwrap_or_else(|| panic!("the load-sharing assumption must be reported: {notes:?}"));
+        assert_eq!(sharing["values"]["planets"], "3");
         // ...and the output-shaft backlash is a real figure now, not a placeholder.
         assert!(stage["backlash"]["forward"]["nominal"].as_f64().unwrap() > 0.0);
     }

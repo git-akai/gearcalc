@@ -11,6 +11,7 @@ use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_s
 use crate::contact::{efficiency, ContactPath, Directional, Drive};
 use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
 use crate::mesh::{Member, Mesh, MeshKind};
+use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
 use crate::profile::Gear;
 use crate::strength::{
@@ -360,16 +361,16 @@ pub fn solve_stage(
 
     let mut notes = Vec::new();
     if stage.additional_helix != 0.0 && !contact_ratios.has_full_axial_overlap() {
-        notes.push(format!(
-            "overlap ratio {overlap:.3} is below 1: the stage is helical in form \
-             but still transfers load like a spur gear"
-        ));
+        notes.push(Note::new(key::STAGE_OVERLAP_BELOW_ONE).number("ratio", overlap, 3));
     }
     if path.contact_ratio < 1.0 {
-        notes.push(format!(
-            "transverse contact ratio {:.3} is below 1: the mesh loses contact between teeth",
-            path.contact_ratio
-        ));
+        notes.push(
+            Note::new(key::STAGE_TRANSVERSE_CONTACT_RATIO_BELOW_ONE).number(
+                "ratio",
+                path.contact_ratio,
+                3,
+            ),
+        );
     }
 
     Ok(SpurResult {

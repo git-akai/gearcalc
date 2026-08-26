@@ -16,6 +16,8 @@
     type PinsOut,
     type FieldSpec,
     type ShiftRange,
+    note,
+    t,
   } from "./core";
   import { workspace, type GearTab as Tab } from "./state.svelte";
   import Viewport from "./Viewport.svelte";
@@ -170,9 +172,9 @@
 <header>
   <input class="title" bind:value={tab.name} aria-label="Gear name" />
   <div class="actions">
-    <button onclick={() => workspace.copy(tab.id)}>Copy</button>
-    <button onclick={() => workspace.create()}>New</button>
-    <button class="danger" onclick={() => (confirmingDelete = true)}>Delete</button>
+    <button onclick={() => workspace.copy(tab.id)}>{t("ui.gear_copy")}</button>
+    <button onclick={() => workspace.create()}>{t("ui.gear_new")}</button>
+    <button class="danger" onclick={() => (confirmingDelete = true)}>{t("ui.gear_delete")}</button>
   </div>
 </header>
 
@@ -184,38 +186,38 @@
       onclick={() => {
         workspace.remove(tab.id);
         confirmingDelete = false;
-      }}>Delete</button
+      }}>{t("ui.gear_delete_confirm")}</button
     >
-    <button onclick={() => (confirmingDelete = false)}>Cancel</button>
+    <button onclick={() => (confirmingDelete = false)}>{t("ui.gear_cancel")}</button>
   </div>
 {/if}
 
 <div class="columns">
   <section class="inputs">
-    <h2>Parameters</h2>
+    <h2>{t("ui.gear_parameters")}</h2>
     <div class="grid">
       <label class="check">
         <input type="checkbox" bind:checked={tab.internal} />
-        <span>Internal (ring) gear</span>
-        <small>the teeth point inward: the tip circle is inside the pitch circle</small>
+        <span>{t("ui.gear_internal_ring_gear")}</span>
+        <small>{t("ui.gear_teeth_point_inward_tip_circle_inside")}</small>
       </label>
     </div>
     {#if tab.internal}
       <div class="grid">
         <label>
-          <span>Cutter teeth</span>
+          <span>{t("ui.gear_cutter_teeth")}</span>
           <input type="number" step="1" min="1" bind:value={tab.cutter.teeth} />
-          <small>a ring is shaped by a pinion, and its fillet depends on which one</small>
+          <small>{t("ui.gear_ring_shaped_by_pinion_its_fillet")}</small>
         </label>
         <label>
-          <span>Cutter addendum</span>
+          <span>{t("ui.gear_cutter_addendum")}</span>
           <input type="number" step="0.05" bind:value={tab.cutter.addendum} />
-          <em>m</em>
+          <em>{t("ui.gear_m")}</em>
         </label>
         <label>
-          <span>Cutter tip round</span>
+          <span>{t("ui.gear_cutter_tip_round")}</span>
           <input type="number" step="0.02" bind:value={tab.cutter.tip_round} />
-          <em>m</em>
+          <em>{t("ui.gear_m")}</em>
         </label>
       </div>
     {/if}
@@ -240,16 +242,16 @@
       {/each}
     </div>
 
-    <h2>Measurement</h2>
+    <h2>{t("ui.gear_measurement")}</h2>
     <div class="grid">
       <label>
-        <span>Pin / ball diameter</span>
+        <span>{t("ui.gear_pin_ball_diameter")}</span>
         <input type="number" step="0.05" bind:value={tab.pinDiameter} />
-        <em>mm</em>
+        <em>{t("ui.gear_mm")}</em>
       </label>
       {#if "ok" in result}
         <label>
-          <span>Tolerance class</span>
+          <span>{t("ui.gear_tolerance_class")}</span>
           <select
             value={result.ok.tolerance && !isUnavailable(result.ok.tolerance)
               ? `${result.ok.tolerance.class.scale}:${result.ok.tolerance.class.grade}`
@@ -267,7 +269,7 @@
                 {c.grade}
               </option>
             {:else}
-              <option value="">none available</option>
+              <option value="">{t("ui.gear_none_available")}</option>
             {/each}
           </select>
           <em></em>
@@ -275,20 +277,20 @@
       {/if}
     </div>
 
-    <h2>Export</h2>
+    <h2>{t("ui.gear_export")}</h2>
     <div class="grid">
       <label>
-        <span>Chord tolerance</span>
+        <span>{t("ui.gear_chord_tolerance")}</span>
         <input type="number" step="0.0005" min="0" bind:value={tab.chordTolerance} />
-        <em>mm</em>
-        <small>maximum deviation of the exported outline from the true curve</small>
+        <em>{t("ui.gear_mm")}</em>
+        <small>{t("ui.gear_maximum_deviation_exported_outline_from_true")}</small>
       </label>
       <label class="check">
         <input type="checkbox" bind:checked={tab.referenceCircles} />
-        <span>Include reference circles</span>
+        <span>{t("ui.gear_include_reference_circles")}</span>
       </label>
     </div>
-    <button class="primary" onclick={saveDxf} disabled={!("ok" in result)}>Export DXF</button>
+    <button class="primary" onclick={saveDxf} disabled={!("ok" in result)}>{t("ui.gear_export_dxf")}</button>
     {#if exportError}
       <p class="error">Export failed: {exportError}</p>
     {/if}
@@ -308,69 +310,61 @@
           root={r.root_radius}
           rim={r.rim_radius}
         />
-        <h2>Geometry</h2>
+        <h2>{t("ui.gear_geometry")}</h2>
         <dl>
-          <dt>Transverse module</dt>
+          <dt>{t("ui.gear_transverse_module")}</dt>
           <dd>{mm(r.transverse_module)}</dd>
-          <dt>Transverse pressure angle</dt>
+          <dt>{t("ui.gear_transverse_pressure_angle")}</dt>
           <dd>{r.transverse_pressure_angle.toFixed(4)}°</dd>
-          <dt>Pitch diameter</dt>
+          <dt>{t("ui.gear_pitch_diameter")}</dt>
           <dd>{mm(r.pitch_diameter)}</dd>
-          <dt>Base diameter</dt>
+          <dt>{t("ui.gear_base_diameter")}</dt>
           <dd>{mm(r.base_diameter)}</dd>
-          <dt>Tip diameter</dt>
-          <dd>{mm(r.tip_diameter)} <small>inside the pitch circle</small></dd>
-          <dt>Root diameter</dt>
-          <dd>{mm(r.root_diameter)} <small>outside it</small></dd>
-          <dt>Flank / fillet junction</dt>
+          <dt>{t("ui.gear_tip_diameter")}</dt>
+          <dd>{mm(r.tip_diameter)} <small>{t("ui.gear_inside_pitch_circle")}</small></dd>
+          <dt>{t("ui.gear_root_diameter")}</dt>
+          <dd>{mm(r.root_diameter)} <small>{t("ui.gear_outside")}</small></dd>
+          <dt>{t("ui.gear_flank_fillet_junction")}</dt>
           <dd>
             {#if r.junction_radius === null}
-              <span class="warn">none — this cutter generated no fillet</span>
+              <span class="warn">{t("ui.gear_none_this_cutter_generated_no_fillet")}</span>
             {:else}
               {mm(r.junction_radius)}
             {/if}
           </dd>
-          <dt>Root form</dt>
+          <dt>{t("ui.gear_root_form")}</dt>
           <dd>
             {#if r.root_form === "fully_filleted"}
               fully filleted — no root arc
             {:else if r.root_form === "root_arc"}
               root arc between the fillets
             {:else}
-              <span class="warn">
-                no fillet: the flank runs to the root circle, so the root is a sharp corner
-              </span>
+              <span class="warn">{t("ui.gear_no_fillet_flank_runs_root_circle")}</span>
             {/if}
           </dd>
-          <dt>Generated down to</dt>
+          <dt>{t("ui.gear_generated_down")}</dt>
           <dd>
             {mm(r.generation_limit)}
             {#if !r.fully_generated}
-              <small class="warn">
-                below the tip: the cutter's own involute runs out there, so the flank near the tip
-                is not generated. A cutter with more teeth reaches further
-              </small>
+              <small class="warn">{t("ui.gear_below_tip_cutter_s_own_involute")}</small>
             {:else}
-              <small>past the tip, so the whole flank is generated</small>
+              <small>{t("ui.gear_past_tip_so_whole_flank_generated")}</small>
             {/if}
           </dd>
-          <dt>Smallest tooth count</dt>
+          <dt>{t("ui.gear_smallest_tooth_count")}</dt>
           <dd>
             {r.smallest_tooth_count}
-            <small>
-              below this the tip would reach inside the base circle; it moves with the addendum,
-              pressure angle and helix
-            </small>
+            <small>{t("ui.gear_below_this_tip_would_reach_inside")}</small>
           </dd>
         </dl>
         {#if r.clamps.length}
           <ul class="notes">
-            {#each r.clamps as c (c)}<li>{c}</li>{/each}
+            {#each r.clamps as c (c.key)}<li>{note(c)}</li>{/each}
           </ul>
         {/if}
-        <h2>Measurement</h2>
+        <h2>{t("ui.gear_measurement")}</h2>
         <dl>
-          <dt>Between 2 pins, nominal</dt>
+          <dt>{t("ui.gear_between_2_pins_nominal")}</dt>
           <dd>
             {#if isUnavailable(r.between_pins)}
               <span class="muted">{r.between_pins.unavailable}</span>
@@ -379,24 +373,19 @@
             {/if}
           </dd>
           {#if !isUnavailable(r.between_pins)}
-            <dt>Pin centre radius</dt>
+            <dt>{t("ui.gear_pin_centre_radius")}</dt>
             <dd>{n(r.between_pins.pin_centre_radius)} mm</dd>
-            <dt>Contact radius</dt>
+            <dt>{t("ui.gear_contact_radius")}</dt>
             <dd>{n(r.between_pins.contact_radius)} mm</dd>
           {/if}
         </dl>
         <p class="muted">
-          Measured <em>between</em> the pins' inner surfaces, so the pin diameter subtracts — the
+          Measured <em>{t("ui.gear_between")}</em> the pins' inner surfaces, so the pin diameter subtracts — the
           opposite of an external gear, where it is measured across their outer surfaces. Two pins
           only: three exist so a micrometer has a flat datum on an odd-tooth external gear, and a
           bore gauge needs none.
         </p>
-        <p class="muted">
-          Span over teeth is not shown for an internal gear: it is an external-gear construction and
-          this tool does not yet have its internal equivalent. A strength rating is not shown here
-          for any gear — bending and contact need a mesh and a load, which belong to a stage; the
-          geartrain tab rates rings, spur and helical alike.
-        </p>
+        <p class="muted">{t("ui.gear_span_over_teeth_not_shown_for")}</p>
       {/if}
     {:else if "error" in result}
       <p class="error">{result.error}</p>
@@ -412,36 +401,36 @@
 
       {#if s.undercut || s.severed || s.clamps.length}
         <ul class="notes">
-          {#if s.undercut}<li>Undercut.</li>{/if}
-          {#if s.severed}<li>Tooth severed by undercut — profile truncated at the centreline.</li>{/if}
-          {#each s.clamps as c}<li>Clamped: {c}</li>{/each}
+          {#if s.undercut}<li>{t("ui.gear_undercut")}</li>{/if}
+          {#if s.severed}<li>{t("ui.gear_severed")}</li>{/if}
+          {#each s.clamps as c}<li>{t("ui.gear_clamped")} {note(c)}</li>{/each}
         </ul>
       {/if}
 
-      <h2>Geometry</h2>
+      <h2>{t("ui.gear_geometry")}</h2>
       <dl>
-        <dt>Pitch diameter</dt><dd>{mm(s.pitch_diameter)}</dd>
-        <dt>Base diameter</dt><dd>{mm(s.base_diameter)}</dd>
-        <dt>Tip diameter</dt><dd>{mm(s.tip_diameter)}</dd>
-        <dt>Root diameter</dt><dd>{mm(s.root_diameter)}</dd>
-        <dt>Tooth thickness</dt><dd>{mm(s.tooth_thickness)}</dd>
-        <dt>Fillet radius</dt><dd>{mm(s.fillet_radius)}</dd>
-        <dt>Transverse pressure angle</dt><dd>{s.transverse_pressure_angle.toFixed(4)}°</dd>
-        <dt>Cutter tip width</dt><dd>{mm(s.cutter_tip_width)}</dd>
+        <dt>{t("ui.gear_pitch_diameter")}</dt><dd>{mm(s.pitch_diameter)}</dd>
+        <dt>{t("ui.gear_base_diameter")}</dt><dd>{mm(s.base_diameter)}</dd>
+        <dt>{t("ui.gear_tip_diameter")}</dt><dd>{mm(s.tip_diameter)}</dd>
+        <dt>{t("ui.gear_root_diameter")}</dt><dd>{mm(s.root_diameter)}</dd>
+        <dt>{t("ui.gear_tooth_thickness")}</dt><dd>{mm(s.tooth_thickness)}</dd>
+        <dt>{t("ui.gear_fillet_radius")}</dt><dd>{mm(s.fillet_radius)}</dd>
+        <dt>{t("ui.gear_transverse_pressure_angle")}</dt><dd>{s.transverse_pressure_angle.toFixed(4)}°</dd>
+        <dt>{t("ui.gear_cutter_tip_width")}</dt><dd>{mm(s.cutter_tip_width)}</dd>
       </dl>
 
-      <h2>Measurement over teeth</h2>
+      <h2>{t("ui.gear_measurement_over_teeth")}</h2>
       <dl>
         {#if isUnavailable(s.span)}
-          <dt>Span</dt><dd class="na">{s.span.unavailable}</dd>
+          <dt>{t("ui.gear_span")}</dt><dd class="na">{s.span.unavailable}</dd>
         {:else}
-          <dt>Teeth spanned</dt><dd>{s.span.teeth_spanned}</dd>
-          <dt>Nominal</dt><dd>{mm(s.span.nominal)}</dd>
-          <dt>Contact radius</dt><dd>{mm(s.span.contact_radius)}</dd>
+          <dt>{t("ui.gear_teeth_spanned")}</dt><dd>{s.span.teeth_spanned}</dd>
+          <dt>{t("ui.gear_nominal")}</dt><dd>{mm(s.span.nominal)}</dd>
+          <dt>{t("ui.gear_contact_radius")}</dt><dd>{mm(s.span.contact_radius)}</dd>
         {/if}
       </dl>
 
-      <h2>Measurement over pins</h2>
+      <h2>{t("ui.gear_measurement_over_pins")}</h2>
       <dl>
         {#each pinRows as row (row.label)}
           {#if isUnavailable(row.value)}
@@ -452,18 +441,18 @@
         {/each}
       </dl>
 
-      <h2>Composite error, JGMA 116-02</h2>
+      <h2>{t("ui.gear_composite_error_jgma_116_02")}</h2>
       <dl>
         {#if isUnavailable(s.tolerance)}
-          <dt>Tolerance</dt><dd class="na">{s.tolerance.unavailable}</dd>
+          <dt>{t("ui.gear_tolerance")}</dt><dd class="na">{s.tolerance.unavailable}</dd>
         {:else}
-          <dt>Class</dt>
+          <dt>{t("ui.gear_class")}</dt>
           <dd>
             {s.tolerance.class.scale === "fine" ? "Fine" : "Standard"}
             {s.tolerance.class.grade}
           </dd>
-          <dt>Tooth-to-tooth, max</dt><dd>{um(s.tolerance.tooth_to_tooth)}</dd>
-          <dt>Total, max</dt><dd>{um(s.tolerance.total)}</dd>
+          <dt>{t("ui.gear_tooth_tooth_max")}</dt><dd>{um(s.tolerance.tooth_to_tooth)}</dd>
+          <dt>{t("ui.gear_total_max")}</dt><dd>{um(s.tolerance.total)}</dd>
         {/if}
       </dl>
     {/if}

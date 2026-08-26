@@ -3,6 +3,7 @@
 // Project rule: no engineering calculation lives on this side of the boundary.
 // Everything here either forwards inputs to Rust or formats what Rust returned.
 
+import { setCatalogue, type Note } from "./strings.svelte";
 import init, {
   solve_gear,
   solve_ring,
@@ -13,6 +14,7 @@ import init, {
   export_dxf,
   version,
   defaults as wasm_defaults,
+  strings as wasm_strings,
   default_materials,
   import_materials,
   export_materials,
@@ -163,7 +165,7 @@ export interface GearSummary {
   cutter_tip_width: number;
   undercut: boolean;
   severed: boolean;
-  clamps: string[];
+  clamps: Note[];
   span: Maybe<SpanOut>;
   over_two_pins: Maybe<PinsOut>;
   over_three_pins: Maybe<PinsOut>;
@@ -262,10 +264,12 @@ export function loadCore(): Promise<void> {
   if (!ready) {
     ready = init().then(() => {
       cachedDefaults = JSON.parse(wasm_defaults()) as Defaults;
+      setCatalogue(JSON.parse(wasm_strings()) as Record<string, string>);
     });
   }
   return ready;
 }
+
 
 /** The defaults, as a fresh copy: everything handed out here is about to
  *  become a tab's mutable state, so callers must not share one object. */
@@ -384,7 +388,7 @@ export interface RingSummary {
   generation_limit: number;
   fully_generated: boolean;
   smallest_tooth_count: number;
-  clamps: string[];
+  clamps: Note[];
 }
 
 export function defaultParams(): GearParams {
@@ -641,7 +645,7 @@ export interface GearResult {
   contact_stress: number;
   min_face_width_bending: number | null;
   min_face_width_contact: number;
-  clamps: string[];
+  clamps: Note[];
   material: Material;
   ranges: Ranges;
 }
@@ -655,7 +659,7 @@ export interface SpurResult {
   backlash: Directional<Backlash>;
   coprime: boolean;
   gears: [GearResult, GearResult];
-  notes: string[];
+  notes: Note[];
 }
 export interface WormMemberResult {
   torque: number;
@@ -723,7 +727,7 @@ export interface WormResult {
   contact: WormContact;
   backlash: Directional<Backlash>;
   members: [WormMemberResult, WormMemberResult];
-  notes: string[];
+  notes: Note[];
 }
 
 /**
@@ -784,7 +788,7 @@ export interface PlanetaryResult {
   planet: PlanetResult;
   ring: GearResult;
   planets: number;
-  notes: string[];
+  notes: Note[];
 }
 
 export type StageResult = SpurResult | WormResult | PlanetaryResult;
@@ -828,3 +832,9 @@ export function solveTrain(
     return { error: e instanceof Error ? e.message : String(e) };
   }
 }
+
+// The words live in `strings.svelte.ts` — it has to be a rune module, because
+// the catalogue arrives after the first render. Re-exported here so a component
+// still reaches everything through one door.
+export { t, note } from "./strings.svelte";
+export type { Note } from "./strings.svelte";

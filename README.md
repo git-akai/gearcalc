@@ -32,6 +32,7 @@ state, the rules and why they are rules, the traps, and what is worth doing next
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
 | `web/` | Svelte 5 + TypeScript + Vite front end. |
 | `docs/` | Design document, handoff, the initial specification, and the JGMA 116-02 tables. |
+| `crates/gear-io/data/strings_en.toml` | **Every word the application shows.** Notes and labels alike, one file per language. |
 | `handoff_inbound/` | Prior Python work. **Reference only** — do not build on it. |
 
 ## Getting started
@@ -42,7 +43,7 @@ and `wasm-bindgen-cli` together.
 ```bash
 nix develop              # or `direnv allow` once, for automatic entry
 
-cargo nextest run        # the full test suite, 361 tests, ~27 s
+cargo nextest run        # the full test suite, 373 tests, ~27 s
 cargo clippy --all-targets -- --deny warnings
 cargo fmt
 
@@ -72,6 +73,28 @@ cargo run --release --bin gear-cli -- verify 100   # two-sided cutter check
 
 `gear-cli strength 17 43 2.0` is the project's regression canary: its figures
 have not moved since milestone 5, through every refactor since.
+
+### Translating it
+
+`crates/gear-io/data/strings_en.toml` is the whole of the user-facing language:
+the notes the solve generates and the labels the application draws around them.
+Nothing in it changes an answer, so it can be translated or proof-read without
+reading a line of Rust. Copy it to `strings_<code>.toml` and replace the values,
+never the keys.
+
+The core never holds a sentence. It emits `{ key, values }` — see
+`gear_core::note` — with the numbers **already formatted**, because how many
+decimals a quantity deserves is a judgement about the quantity and belongs next
+to the model. The catalogue reaches the browser through `gear_wasm::strings`,
+the same door the defaults use and for the same reason (DESIGN §12).
+
+Three checks keep it honest, and between them they cover both directions:
+
+| | |
+|---|---|
+| `gear_io::strings` tests | every key the core can emit has a message, every message is a key it can emit, and every placeholder is a value it supplies — the last learned by *firing every note*, not by declaring a table |
+| `tools/check_strings.py` | the same both-ways check for the `[ui]` section, which has no `Note` behind it and so is invisible to Rust |
+| the rendered DOM | the extraction of 185 UI strings was accepted only once the page's visible text came back **byte-identical** on both tabs |
 
 ### A note on the material library
 
@@ -142,6 +165,7 @@ it, and all are run by hand rather than in CI:
 python3 tools/validate_dxf.py <file.dxf> ...   # read an export back with ezdxf
 python3 tools/worm_flank_curvature.py          # worm flank curvature from the surface itself
 python3 tools/crossed_path.py                  # a crossed pair's path of contact, from the surfaces
+python3 tools/check_strings.py                 # every UI message is used, and every used one exists
 ```
 
 The second also answers a design question — what choosing a ZI, ZN or ZA worm

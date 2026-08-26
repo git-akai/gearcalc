@@ -128,12 +128,22 @@ impl<T: Copy> Auto<T> {
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Clamps {
-    pub notes: Vec<String>,
+    pub notes: Vec<crate::note::Note>,
 }
 
 impl Clamps {
-    pub fn push(&mut self, note: impl Into<String>) {
-        self.notes.push(note.into());
+    pub fn push(&mut self, note: crate::note::Note) {
+        self.notes.push(note);
+    }
+
+    /// Whether a named guard fired.
+    ///
+    /// Consumers that need to *act* on a clamp ask this. The planetary solve
+    /// used to search the text instead — a sentence doing a symbol's job, and
+    /// one improved wording away from silently doing nothing.
+    #[must_use]
+    pub fn fired(&self, key: &str) -> bool {
+        self.notes.iter().any(|n| n.is(key))
     }
 
     #[must_use]

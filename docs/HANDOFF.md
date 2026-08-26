@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–11 complete and in CI. 361 tests, ~26 s.**
+**Milestones 0–11 complete and in CI. 373 tests, ~26 s.**
 
 Milestone 11's named scope — geartrain import/export, confirmations, error
 surfacing, docs — is done, and geartrain import/export was the last unbuilt item
@@ -32,7 +32,7 @@ cd web && npm run dev             # the application
 |---|---|
 | `gear-core` | all mathematics. `serde` is its only dependency, deliberately |
 | `gear-io` | DXF writer, TOML material library and geartrain document |
-| `gear-wasm` | fourteen entry points, JSON in / JSON out — including the UI's defaults, so they have one home |
+| `gear-wasm` | fifteen entry points, JSON in / JSON out — including the UI's defaults and every word it shows, so each has one home |
 | `web` | Svelte 5 + TypeScript. Layout and event handling only |
 
 ### What works
@@ -162,6 +162,16 @@ meaningful — otherwise logic migrates to where nothing tests it. **A default i
 one of those numbers**: they come from `gear_wasm::defaults`, and the reason is
 §12's — the one that was written down twice drifted, and only the side without
 tests was wrong. A diameter is another: it is `2 × radius` in Rust, not here.
+
+**No English in `gear-core`, and no engineering in the catalogue.** The core
+emits a `Note` — a key and the values a sentence needs — and every word lives in
+`crates/gear-io/data/strings_en.toml`, one file per language, reaching the
+browser through `gear_wasm::strings` exactly as the defaults do. The division is
+not "text on one side": **rounding stays in the core**, because how many decimals
+a quantity deserves is a judgement about the quantity, and a translator may
+decide how `1.234` is written but not whether the fourth digit is worth printing.
+`Note::number` takes the decimals explicitly so that choice is made every time
+and readable at the call site.
 
 **Inputs are the only state.** Outputs are recomputed, never stored, so nothing
 can go stale. Shared-within-a-stage values live once on the stage; `k₂ = 2 − k₁`
@@ -415,6 +425,20 @@ these are the ones most likely to be stepped on again.
   power algebra, including two exact closed forms, and a backward efficiency of
   101.571 % survived all of them — because every one drove forward with a
   positive torque and a positive speed. It was found by looking at the UI.
+- **A sentence cannot do a symbol's job.** Four places matched on a message's
+  *text* to decide something — the planetary solve on `"tip radius raised"`, the
+  admissible-range test on `"cutter depth"`, two ring tests on `"base circle"`.
+  Every one of them would have gone quietly false the first time someone
+  improved the wording, and all of them the moment anything was translated. If
+  code branches on a note, the note needs an identity: `Note::is(key)`, checked
+  by the compiler.
+- **A module-level variable is not reactive, and the thing that catches it is the
+  component that renders early.** The string catalogue arrives with the wasm, so
+  a plain `let` handed the sidebar — which draws before the core finishes — its
+  fallback and never told it the real text had come. Every panel looked right
+  because every panel renders later. The fix is `$state` in a `.svelte.ts`
+  module; the lesson is that "it works on screen" means "it works on the parts of
+  the screen you looked at".
 - **Two models that meet at a boundary must be *tested* at it, or the boundary is
   where the error hides.** A crossed pair's backlash counted the gap on one flank
   where a separation opens both — a plain factor of two, reaching the UI as a
@@ -485,6 +509,7 @@ the number would have been.
 | **Crossed-axis bending** | §4.5.1 | *Decided, not pending.* The path gives the load's position along the profile; `σ_F = F_t/(b·m)·Y_F·Y_S` is a cantilever loaded across its whole **face**, and a crossed pair's load is a point. An effective width is a convention that multiplies a stress, which §4.7 refuses — so the stage says it is not rated and why |
 | Equal planet load sharing is assumed | §4.9 | *Decided.* The remedy is a mesh-load factor of the kind §4.7 declines; said in every planetary result's notes |
 | Radial assembly — attempted, diagnosed, **shelved** with its findings | §4.11 | |
+| Two notes nothing can fire | §12 | `clamp.ring_fully_filleted` was searched for over ~11 000 ring/cutter combinations and never fired — `ShaperCut` already refuses a tool whose rounds overlap, which may shadow it entirely. `stage.ring_addendum_clamped` needs a planetary ring whose tip clamps, and the set solves its own ring addendum. Both are live code with live messages, so neither is deleted on suspicion; they are named in `strings.rs`'s `UNFIRED` with their evidence |
 | The **enveloping** (throated) wheel's zone of action | §4.5.1 | The cylindrical one is derived; a worm reports it as a floor, with its assumed tooth height named |
 | Mesh-phase coefficient setting the optimal λ | §4.10 | The only thing blocking the angular-profile-shift milestone |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
@@ -600,6 +625,12 @@ of DESIGN.md, which records that the audit was wrong to promise it.
   up, in a single missing object: `ContactPath` is built in a common transverse
   plane, which crossed axes do not have. Five apparently separate gaps turned out
   to be five consumers of it.
+- **When a refactor must not change what a user sees, diff what a user sees.**
+  Pulling 185 strings out of the Svelte and into a catalogue is the kind of
+  mechanical change that is 99 % right and silently wrong in one place. The gate
+  was the rendered DOM: dump the page's visible text before and after, on both
+  tabs, and require it byte-identical. It caught the reactivity bug above
+  immediately, which no typecheck would have.
 - **Verify against something that shares no code.** The rack simulation, the
   pin-tangency measurement, `ezdxf`, the contact-half-width route, the AGM
   against Carlson's integrals, the numerical average of instantaneous loss, the

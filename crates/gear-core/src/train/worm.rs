@@ -73,6 +73,7 @@ const PATH_SAMPLES: usize = 2048;
 use crate::contact::{Directional, Drive};
 use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
 use crate::mesh::Member;
+use crate::note::{key, Note};
 use crate::params::Auto;
 use crate::screw::{CrossedPath, Screw, ScrewParams, ZoneLimit};
 
@@ -392,7 +393,7 @@ pub struct WormResult {
     /// because the ratio between the lever arms *is* the gear ratio.
     pub backlash: Directional<Backlash>,
     pub members: [WormMemberResult; 2],
-    pub notes: Vec<String>,
+    pub notes: Vec<Note>,
 }
 
 /// How the first member's size is fixed.
@@ -565,12 +566,10 @@ pub fn solve_crossed_stage(
                 };
                 m.face_width = Auto::fixed(widths[i]);
             }
-            None => notes.push(format!(
-                "gear {}'s face width used as entered: its teeth do not reach a full \
-                 contact ratio at any width, so there is no width that would keep \
-                 contact continuous",
-                i + 1
-            )),
+            None => notes.push(
+                Note::new(key::STAGE_CROSSED_FACE_WIDTH_AS_ENTERED)
+                    .text("member", (i + 1).to_string()),
+            ),
         }
     }
 
@@ -605,13 +604,13 @@ pub fn solve_crossed_stage(
 
     if let Some(zone) = result.crossed {
         if zone.contact_ratio < 1.0 {
-            result.notes.push(format!(
-                "contact ratio {:.3}: below 1 the pair loses contact between one tooth \
-                 and the next, whatever the stresses say. A crossed pair's face width \
-                 bounds this where a parallel pair's does not — see the width for \
-                 continuity beside it",
-                zone.contact_ratio
-            ));
+            result.notes.push(
+                Note::new(key::STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE).number(
+                    "ratio",
+                    zone.contact_ratio,
+                    3,
+                ),
+            );
         }
     }
     Ok(result)
@@ -757,23 +756,23 @@ pub fn solve_worm_stage(
 
     let mut notes = Vec::new();
     if efficiency.self_locking() {
-        notes.push(format!(
-            "self-locking at mu = {:.3}: the wheel cannot back-drive the worm \
-             (the threshold is {threshold:.4})",
-            stage.friction
-        ));
+        notes.push(
+            Note::new(key::STAGE_SELF_LOCKING)
+                .number("friction", stage.friction, 3)
+                .number("threshold", threshold, 4),
+        );
     } else if stage.friction > 0.8 * threshold {
-        notes.push(format!(
-            "close to self-locking: mu = {:.3} against a threshold of {threshold:.4}, \
-             so back-driving depends on a friction coefficient nobody measured",
-            stage.friction
-        ));
+        notes.push(
+            Note::new(key::STAGE_NEAR_SELF_LOCKING)
+                .number("friction", stage.friction, 3)
+                .number("threshold", threshold, 4),
+        );
     }
     if efficiency.forward < 0.5 {
-        notes.push(format!(
-            "mesh efficiency {:.1} % — most of the input becomes heat, and a \
-             worm drive is usually limited by that rather than by stress",
-            efficiency.forward * 100.0
+        notes.push(Note::new(key::STAGE_LOW_MESH_EFFICIENCY).number(
+            "percent",
+            efficiency.forward * 100.0,
+            1,
         ));
     }
 
@@ -790,11 +789,7 @@ pub fn solve_worm_stage(
     // shipping a convention outside the case it was written for, which is the
     // thing §4.7's policy exists to refuse.
     if recommended[0].is_none() && (stage.worm.face_width.auto || stage.wheel.face_width.auto) {
-        notes.push(
-            "face widths left as entered: the published proportions are for a worm \
-             carrying an enveloping wheel, and a crossed gear pair has neither"
-                .into(),
-        );
+        notes.push(Note::new(key::STAGE_PROPORTIONS_NOT_APPLICABLE));
     }
 
     let members = [
@@ -1232,7 +1227,10 @@ mod tests {
         assert!((crossed.members[0].face_width - 6.0).abs() < 1e-12);
         // ...and the result says why rather than leaving it to be noticed.
         assert!(
-            crossed.notes.iter().any(|n| n.contains("enveloping wheel")),
+            crossed
+                .notes
+                .iter()
+                .any(|n| n.is(key::STAGE_PROPORTIONS_NOT_APPLICABLE)),
             "no note explaining the absent recommendation: {:?}",
             crossed.notes
         );
@@ -1311,7 +1309,10 @@ mod tests {
             "with the contact centred, half the face is exactly half the contact"
         );
         assert!(
-            narrow.notes.iter().any(|s| s.contains("loses contact")),
+            narrow
+                .notes
+                .iter()
+                .any(|s| s.is(key::STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE)),
             "a contact ratio below 1 must be said: {:?}",
             narrow.notes
         );
@@ -1623,7 +1624,9 @@ mod tests {
         });
         assert!(r.efficiency.self_locking());
         assert!(
-            r.notes.iter().any(|n| n.contains("self-locking")),
+            r.notes
+                .iter()
+                .any(|n| n.is(key::STAGE_SELF_LOCKING) || n.is(key::STAGE_NEAR_SELF_LOCKING)),
             "notes: {:?}",
             r.notes
         );

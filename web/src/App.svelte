@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { loadCore, coreVersion } from "./core";
+  import { loadCore, coreVersion, t } from "./core";
   import { workspace, trains, library } from "./state.svelte";
   import Sidebar from "./Sidebar.svelte";
   import GearPanel from "./GearPanel.svelte";
@@ -31,7 +31,7 @@
     {#if failed}
       <p class="error">The calculation core failed to load: {failed}</p>
     {:else if !loaded}
-      <p class="muted">Loading core…</p>
+      <p class="muted">{t("ui.app_loading_core")}</p>
     {:else}
       {#if trains.active === "train"}
         {#key trains.selected.id}

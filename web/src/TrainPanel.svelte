@@ -12,6 +12,8 @@
     type MaterialValue,
     type GearResult,
     type WormResult,
+    note,
+    t,
   } from "./core";
   import { trains, library, type TrainTab } from "./state.svelte";
   import { exportTrain } from "./core";
@@ -178,7 +180,7 @@
 {#snippet screwReadout(r: WormResult)}
 <dl class="out">
   {#if r.crossed}
-    <dt>Contact ratio</dt>
+    <dt>{t("ui.train_contact_ratio")}</dt>
     <dd>
       <span class:warn={r.crossed.contact_ratio < 1}>
         ε {r.crossed.contact_ratio.toFixed(4)}
@@ -193,26 +195,23 @@
         {/if}
       </small>
     </dd>
-    <dt>Contact travel</dt>
+    <dt>{t("ui.train_contact_travel")}</dt>
     <dd>
       {r.crossed.axial_travel[0].toFixed(3)} · {r.crossed.axial_travel[1].toFixed(3)} mm
-      <small>
-        along each member's own axis — what a face has to cover, and what a
-        parallel pair does not have at all
-      </small>
+      <small>{t("ui.train_along_each_member_s_own_axis")}</small>
     </dd>
   {/if}
-  <dt>Centre distance</dt>
+  <dt>{t("ui.train_centre_distance")}</dt>
   <dd>
     {r.centre_distance.toFixed(4)} mm
     <small>nominal {r.centre_distance_nominal.toFixed(4)}</small>
   </dd>
-  <dt>Mesh efficiency</dt>
+  <dt>{t("ui.train_mesh_efficiency")}</dt>
   <dd>
     {pct(r.efficiency.forward)} % driven forward
     · {pct(r.efficiency.backward)} % driven backward
     {#if r.efficiency.backward <= 0}
-      <small class="warn">self-locking</small>
+      <small class="warn">{t("ui.train_self_locking")}</small>
     {/if}
     {#if r.crossed?.parallel_axis_efficiency != null}
       <small>
@@ -221,9 +220,9 @@
       </small>
     {/if}
   </dd>
-  <dt>Self-locks at μ</dt>
+  <dt>{t("ui.train_self_locks_at")}</dt>
   <dd>{r.self_locking_friction.toFixed(4)}</dd>
-  <dt>Contact stress</dt>
+  <dt>{t("ui.train_contact_stress")}</dt>
   <dd>
     {r.contact.max_pressure.toFixed(1)} MPa
     <small>
@@ -234,20 +233,16 @@
       · the pitch point alone gives {r.contact.at_pitch_point.toFixed(1)}
     </small>
   </dd>
-  <dt>Sliding speed</dt>
+  <dt>{t("ui.train_sliding_speed")}</dt>
   <dd>{r.sliding_velocity.toFixed(1)} mm/s</dd>
-  <dt>Bending stress</dt>
+  <dt>{t("ui.train_bending_stress")}</dt>
   <dd>
-    <small>
-      not reported for crossed axes — no accepted analytical model exists, and
-      deriving one from a parallel-axis calculation would be a convention rather
-      than a derivation (DESIGN §4.5.1)
-    </small>
+    <small>{t("ui.train_not_reported_for_crossed_axes_no")}</small>
   </dd>
-  <dt>Flank type</dt>
+  <dt>{t("ui.train_flank_type")}</dt>
   <dd>
     ZI (involute helicoid)
-    <small>a ZN worm's contact stress is 1–15 % lower, rising with lead angle</small>
+    <small>{t("ui.train_zn_worm_s_contact_stress_1")}</small>
   </dd>
 </dl>
 {/snippet}
@@ -277,12 +272,12 @@
 <div class="gear">
   <h4>{title}</h4>
   <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
-    <span>Tooth count</span>
+    <span>{t("ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={gear.teeth} />
   </label>
   {#if opts.cut !== "shaper"}
     <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
-      <span>Dedendum</span>
+      <span>{t("ui.train_dedendum")}</span>
       <input type="number" step="0.05" bind:value={gear.dedendum} />
       {@render noteSlot(
         notes(
@@ -292,7 +287,7 @@
       )}
     </label>
     <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
-      <span>Root radius</span>
+      <span>{t("ui.train_root_radius")}</span>
       <input type="number" step="0.01" bind:value={gear.root_radius} />
       {@render noteSlot(
         notes(
@@ -302,22 +297,22 @@
       )}
     </label>
   {:else}
-    <p class="aside">Root and fillet are the cutter's, below — a ring has no dedendum of its own.</p>
+    <p class="aside">{t("ui.train_root_fillet_are_cutter_s_below")}</p>
   {/if}
   {#if opts.solvedShift === undefined}
     {@render autoNumber("Profile shift", gear.profile_shift, g?.profile_shift, 0.05)}
     {#if gear.profile_shift.auto}
       <label class="sub">
-        <span>Working tooth depth</span>
+        <span>{t("ui.train_working_tooth_depth")}</span>
         <input type="number" step="0.05" bind:value={gear.working_depth} />
-        <em>module</em>
+        <em>{t("ui.train_module")}</em>
       </label>
     {/if}
   {:else}
     <label>
-      <span>Profile shift</span>
+      <span>{t("ui.train_profile_shift")}</span>
       <input type="number" value={Number(opts.solvedShift.toFixed(4))} disabled class="computed" />
-      <em>module</em>
+      <em>{t("ui.train_module")}</em>
       {@render noteSlot(notes("solved: it is what makes the two centre distances agree", null))}
     </label>
   {/if}
@@ -344,9 +339,9 @@
   {@render autoNumber("Addendum", gear.addendum, g?.addendum, 0.05)}
   {#if gear.addendum.auto}
     <label class="sub">
-      <span>Minimum tip width</span>
+      <span>{t("ui.train_minimum_tip_width")}</span>
       <input type="number" step="0.02" bind:value={gear.min_tip_width} />
-      <em>mm</em>
+      <em>{t("ui.train_mm")}</em>
     </label>
   {/if}
   {#if opts.faceAuto === false}
@@ -369,16 +364,16 @@
     <div class="subtoggles">
       <label class="check">
         <input type="checkbox" bind:checked={gear.auto_face_from_bending} />
-        <span>from bending</span>
+        <span>{t("ui.train_from_bending")}</span>
       </label>
       <label class="check">
         <input type="checkbox" bind:checked={gear.auto_face_from_contact} />
-        <span>from contact</span>
+        <span>{t("ui.train_from_contact")}</span>
       </label>
     </div>
   {/if}
   <label>
-    <span>Material</span>
+    <span>{t("ui.train_material")}</span>
     <select bind:value={gear.material}>
       {#each library.materials.material as m (m.name)}
         <option value={m.name}>{m.name}</option>
@@ -395,32 +390,32 @@
       {@render property("Fatigue allowable", gear, "fatigue_allowable", g.material.fatigue_allowable, 10, "MPa")}
     </div>
     <dl class="out small">
-      <dt>Torque</dt>
+      <dt>{t("ui.train_torque")}</dt>
       <dd>{g.torque.toFixed(4)} Nm</dd>
-      <dt>Speed</dt>
+      <dt>{t("ui.train_speed")}</dt>
       <dd>{g.speed.toFixed(1)} rpm</dd>
-      <dt>Tooth cycles</dt>
+      <dt>{t("ui.train_tooth_cycles")}</dt>
       <dd>{Math.ceil(g.tooth_cycles).toLocaleString()}</dd>
-      <dt>Bending stress</dt>
+      <dt>{t("ui.train_bending_stress")}</dt>
       <dd>
         {g.bending_stress === null
           ? "—"
           : `${g.bending_stress.toFixed(1)} MPa`}
       </dd>
-      <dt>Contact stress</dt>
+      <dt>{t("ui.train_contact_stress")}</dt>
       <dd>{g.contact_stress.toFixed(1)} MPa</dd>
-      <dt>Min face width</dt>
+      <dt>{t("ui.train_min_face_width")}</dt>
       <dd>
         {g.min_face_width_bending === null
           ? "—"
           : `${g.min_face_width_bending.toFixed(3)}`} /
         {g.min_face_width_contact.toFixed(3)} mm
-        <small>bending / contact</small>
+        <small>{t("ui.train_bending_contact")}</small>
       </dd>
     </dl>
     {#if g.clamps.length}
       <ul class="notes">
-        {#each g.clamps as c (c)}<li>{c}</li>{/each}
+        {#each g.clamps as c (c.key)}<li>{note(c)}</li>{/each}
       </ul>
     {/if}
   {/if}
@@ -453,11 +448,11 @@
 <header>
   <input class="title" bind:value={tab.name} aria-label="Geartrain name" />
   <div class="actions">
-    <button onclick={saveTrain}>Export</button>
-    <button onclick={() => picker.click()}>Import</button>
-    <button onclick={() => trains.create()}>New</button>
-    <button onclick={() => trains.copy(tab.id)}>Copy</button>
-    <button class="danger" onclick={() => (confirmingDelete = true)}>Delete</button>
+    <button onclick={saveTrain}>{t("ui.train_export")}</button>
+    <button onclick={() => picker.click()}>{t("ui.train_import")}</button>
+    <button onclick={() => trains.create()}>{t("ui.train_new")}</button>
+    <button onclick={() => trains.copy(tab.id)}>{t("ui.train_copy")}</button>
+    <button class="danger" onclick={() => (confirmingDelete = true)}>{t("ui.train_delete")}</button>
   </div>
 </header>
 
@@ -484,27 +479,27 @@
       onclick={() => {
         trains.remove(tab.id);
         confirmingDelete = false;
-      }}>Delete</button
+      }}>{t("ui.train_delete_confirm")}</button
     >
-    <button onclick={() => (confirmingDelete = false)}>Cancel</button>
+    <button onclick={() => (confirmingDelete = false)}>{t("ui.train_cancel")}</button>
   </div>
 {/if}
 
 <section class="train">
   <div class="grid">
     <label>
-      <span>Input speed, peak</span>
+      <span>{t("ui.train_input_speed_peak")}</span>
       <input type="number" step="100" bind:value={tab.train.input_speed} />
-      <em>rpm</em>
+      <em>{t("ui.train_rpm")}</em>
     </label>
     <label>
-      <span>Input torque, peak</span>
+      <span>{t("ui.train_input_torque_peak")}</span>
       <input type="number" step="0.01" bind:value={tab.train.input_torque} />
-      <em>Nm</em>
+      <em>{t("ui.train_nm")}</em>
     </label>
 
     <div class="mode">
-      <span>Actuation</span>
+      <span>{t("ui.train_actuation")}</span>
       <div class="segmented">
         <button class:on={mode === "intermittent"} onclick={() => setMode("intermittent")}>
           Intermittent
@@ -517,33 +512,33 @@
 
     {#if "intermittent" in tab.train.actuation}
       <label>
-        <span>Actuation range</span>
+        <span>{t("ui.train_actuation_range")}</span>
         <input
           type="number"
           step="1"
           bind:value={tab.train.actuation.intermittent.range_degrees}
         />
-        <em>° at output</em>
+        <em>{t("ui.train_at_output")}</em>
       </label>
       <label>
-        <span>Actuation count</span>
+        <span>{t("ui.train_actuation_count")}</span>
         <input type="number" step="100" bind:value={tab.train.actuation.intermittent.actuations} />
         <em></em>
       </label>
     {:else if "continuous" in tab.train.actuation}
       <label>
-        <span>Operating speed</span>
+        <span>{t("ui.train_operating_speed")}</span>
         <input
           type="number"
           step="5"
           bind:value={tab.train.actuation.continuous.operating_percent}
         />
-        <em>% of peak</em>
+        <em>{t("ui.train_peak")}</em>
       </label>
       <label>
-        <span>Runtime</span>
+        <span>{t("ui.train_runtime")}</span>
         <input type="number" step="100" bind:value={tab.train.actuation.continuous.runtime_hours} />
-        <em>hours</em>
+        <em>{t("ui.train_hours")}</em>
       </label>
     {/if}
   </div>
@@ -552,25 +547,25 @@
     <p class="error">{result.error}</p>
   {:else}
     <dl class="out">
-      <dt>Total ratio</dt>
+      <dt>{t("ui.train_total_ratio")}</dt>
       <dd>
         {result.ok.total_ratio >= 1
           ? `${result.ok.total_ratio.toFixed(4)} : 1`
           : `1 : ${(1 / result.ok.total_ratio).toFixed(4)}`}
       </dd>
-      <dt>Output speed</dt>
+      <dt>{t("ui.train_output_speed")}</dt>
       <dd>{result.ok.output_speed.toFixed(1)} rpm</dd>
-      <dt>Output torque</dt>
+      <dt>{t("ui.train_output_torque")}</dt>
       <dd>{result.ok.output_torque.toFixed(4)} Nm</dd>
-      <dt>Total efficiency</dt>
+      <dt>{t("ui.train_total_efficiency")}</dt>
       <dd>
         {pct(result.ok.total_efficiency.forward)} % driven forward
         · {pct(result.ok.total_efficiency.backward)} % driven backward
         {#if result.ok.total_efficiency.backward <= 0}
-          <small class="warn">cannot be back-driven</small>
+          <small class="warn">{t("ui.train_cannot_be_back_driven")}</small>
         {/if}
       </dd>
-      <dt>Backlash at the output shaft</dt>
+      <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
       <dd>
         {result.ok.backlash.forward.nominal.toFixed(5)}°
         <small
@@ -579,7 +574,7 @@
           )})</small
         >
       </dd>
-      <dt>Backlash at the input shaft</dt>
+      <dt>{t("ui.train_backlash_at_input_shaft")}</dt>
       <dd>
         {result.ok.backlash.backward.nominal.toFixed(5)}°
         <small
@@ -608,7 +603,7 @@
           <span class="caret">{open[i] ? "▾" : "▸"}</span>
           <strong>Stage {i + 1}</strong>
           {#if stage.shaft_angle !== 0}
-            <span class="kind">crossed</span>
+            <span class="kind">{t("ui.train_crossed")}</span>
           {/if}
           <span class="teeth">z {stage.gears[0].teeth} / {stage.gears[1].teeth}</span>
           {#if sres ?? xres}
@@ -621,17 +616,17 @@
           <div class="body">
             <div class="grid shared">
               <label>
-                <span>Normal module</span>
+                <span>{t("ui.train_normal_module")}</span>
                 <input type="number" step="0.1" bind:value={stage.module} />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>Pressure angle</span>
+                <span>{t("ui.train_pressure_angle")}</span>
                 <input type="number" step="0.5" bind:value={stage.pressure_angle} />
                 <em>°</em>
               </label>
               <label>
-                <span>Axis angle</span>
+                <span>{t("ui.train_axis_angle")}</span>
                 <input type="number" step="5" bind:value={stage.shaft_angle} />
                 <em>°</em>
                 {@render noteSlot(
@@ -644,7 +639,7 @@
                 )}
               </label>
               <label>
-                <span>Additional helix angle</span>
+                <span>{t("ui.train_additional_helix_angle")}</span>
                 <input type="number" step="1" bind:value={stage.additional_helix} />
                 <em>°</em>
                 {@render noteSlot(
@@ -657,14 +652,14 @@
                 )}
               </label>
               <label>
-                <span>Coefficient of friction</span>
+                <span>{t("ui.train_coefficient_friction")}</span>
                 <input type="number" step="0.01" bind:value={stage.friction} />
                 <em></em>
               </label>
               <label>
-                <span>Tooth thickness mod.</span>
+                <span>{t("ui.train_tooth_thickness_mod")}</span>
                 <input type="number" step="0.05" bind:value={stage.thickness_mod} />
-                <em>k₁</em>
+                <em>{t("ui.train_k")}</em>
                 <!-- One input where the specification had a pair, because the
                      two are not independent: `k₁ + k₂ = 2` is what keeps the
                      mesh at zero backlash (DESIGN §3.2), so storing both would
@@ -690,7 +685,7 @@
                 0.1,
               )}
               <label>
-                <span>C2C clearance</span>
+                <span>{t("ui.train_c2c_clearance")}</span>
                 <input
                   type="number"
                   step="0.01"
@@ -698,17 +693,17 @@
                   disabled={!stage.centre_distance.auto}
                   class:computed={!stage.centre_distance.auto}
                 />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>C2C tolerance +</span>
+                <span>{t("ui.train_c2c_tolerance")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>C2C tolerance −</span>
+                <span>{t("ui.train_c2c_tolerance_2")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
             </div>
             <!-- Clearance is meaningless once the centre distance is set by hand:
@@ -720,15 +715,15 @@
             {#snippet crossedMember(j: number)}
               {#if xres}
                 <dl class="out small">
-                  <dt>Pitch diameter</dt>
+                  <dt>{t("ui.train_pitch_diameter")}</dt>
                   <dd>{xres.members[j].pitch_diameter.toFixed(4)} mm</dd>
-                  <dt>Helix angle</dt>
+                  <dt>{t("ui.train_helix_angle")}</dt>
                   <dd>{n(j === 0 ? xres.helix_angle : xres.wheel_helix_angle)}°</dd>
-                  <dt>Torque</dt>
+                  <dt>{t("ui.train_torque")}</dt>
                   <dd>{xres.members[j].torque.toFixed(4)} N·m</dd>
-                  <dt>Speed</dt>
+                  <dt>{t("ui.train_speed")}</dt>
                   <dd>{xres.members[j].speed.toFixed(1)} rpm</dd>
-                  <dt>Tooth cycles</dt>
+                  <dt>{t("ui.train_tooth_cycles")}</dt>
                   <dd>{Math.ceil(xres.members[j].tooth_cycles).toLocaleString()}</dd>
                 </dl>
               {/if}
@@ -742,12 +737,7 @@
                  through the centre distance, which is an input of its own.
                  DESIGN §4.5.1. -->
             {#if stage.shaft_angle !== 0}
-              <p class="aside wide">
-                The tooth form below — shift, addendum, dedendum, root radius — describes the gears
-                that will be cut. A crossed mesh is solved at its pitch point, so it does not move
-                the figures in this stage: a profile shift reaches them only through the centre
-                distance, which is an input of its own.
-              </p>
+              <p class="aside wide">{t("ui.train_tooth_form_below_shift_addendum_dedendum")}</p>
             {/if}
 
             <div class="gears">
@@ -767,34 +757,34 @@
               {@render screwReadout(xres)}
               {#if xres.notes.length}
                 <ul class="notes">
-                  {#each xres.notes as note (note)}<li>{note}</li>{/each}
+                  {#each xres.notes as n (n.key)}<li>{note(n)}</li>{/each}
                 </ul>
               {/if}
             {/if}
 
             {#if sres}
               <dl class="out">
-                <dt>Centre distance</dt>
+                <dt>{t("ui.train_centre_distance")}</dt>
                 <dd>
                   {sres.centre_distance.toFixed(4)} mm
                   <small>nominal {sres.centre_distance_nominal.toFixed(4)}</small>
                 </dd>
-                <dt>Contact ratio</dt>
+                <dt>{t("ui.train_contact_ratio")}</dt>
                 <dd>
                   ε<sub>α</sub> {sres.contact_ratios.transverse.toFixed(4)} · ε<sub>β</sub>
                   {sres.contact_ratios.overlap.toFixed(4)} · ε<sub>γ</sub>
                   {sres.contact_ratios.total.toFixed(4)}
                   {#if stage.additional_helix !== 0 && sres.contact_ratios.overlap < 1}
-                    <small class="warn">no full axial overlap</small>
+                    <small class="warn">{t("ui.train_no_full_axial_overlap")}</small>
                   {/if}
                 </dd>
-                <dt>Mesh efficiency</dt>
+                <dt>{t("ui.train_mesh_efficiency")}</dt>
                 <dd>
                   {pct(sres.efficiency.forward)} % driven forward
                   · {pct(sres.efficiency.backward)} % driven backward
-                  <small>equal, as a parallel-axis mesh must be</small>
+                  <small>{t("ui.train_equal_as_parallel_axis_mesh_must")}</small>
                 </dd>
-                <dt>Backlash</dt>
+                <dt>{t("ui.train_backlash")}</dt>
                 <dd>
                   {sres.backlash.forward.nominal.toFixed(5)}° at gear {gearNumber(i, 1)}
                   <small
@@ -804,12 +794,12 @@
                   >
                   · {sres.backlash.backward.nominal.toFixed(5)}° at gear {gearNumber(i, 0)}
                 </dd>
-                <dt>Coprime</dt>
+                <dt>{t("ui.train_coprime")}</dt>
                 <dd>{sres.coprime ? "yes" : "no"}</dd>
               </dl>
               {#if sres.notes.length}
                 <ul class="notes">
-                  {#each sres.notes as n (n)}<li>{n}</li>{/each}
+                  {#each sres.notes as n (n.key)}<li>{note(n)}</li>{/each}
                 </ul>
               {/if}
             {/if}
@@ -817,7 +807,7 @@
             <button
               class="danger small"
               onclick={() => removeStage(i)}
-              disabled={tab.train.stages.length === 1}>Remove stage</button
+              disabled={tab.train.stages.length === 1}>{t("ui.train_remove_stage")}</button
             >
           </div>
         {/if}
@@ -826,7 +816,7 @@
         <button class="head" onclick={() => (open[i] = !open[i])}>
           <span class="caret">{open[i] ? "▾" : "▸"}</span>
           <strong>Stage {i + 1}</strong>
-          <span class="kind">worm</span>
+          <span class="kind">{t("ui.train_worm")}</span>
           <span class="teeth">z {stage.starts} / {stage.wheel_teeth}</span>
           {#if wres}
             <span class="ratio">{wres.ratio.toFixed(4)} : 1</span>
@@ -838,28 +828,28 @@
           <div class="body">
             <div class="grid shared">
               <label>
-                <span>Normal module</span>
+                <span>{t("ui.train_normal_module")}</span>
                 <input type="number" step="0.1" bind:value={stage.module} />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>Pressure angle</span>
+                <span>{t("ui.train_pressure_angle")}</span>
                 <input type="number" step="0.5" bind:value={stage.pressure_angle} />
                 <em>°</em>
               </label>
               <label>
-                <span>Axis angle</span>
+                <span>{t("ui.train_axis_angle")}</span>
                 <input type="number" step="1" bind:value={stage.shaft_angle} />
                 <em>°</em>
               </label>
               <label>
-                <span>Coefficient of friction</span>
+                <span>{t("ui.train_coefficient_friction")}</span>
                 <input type="number" step="0.01" bind:value={stage.friction} />
                 <em></em>
               </label>
               {@render autoNumber("C2C distance", stage.centre_distance, wres?.centre_distance, 0.1)}
               <label>
-                <span>C2C clearance</span>
+                <span>{t("ui.train_c2c_clearance")}</span>
                 <input
                   type="number"
                   step="0.01"
@@ -867,22 +857,22 @@
                   disabled={!stage.centre_distance.auto}
                   class:computed={!stage.centre_distance.auto}
                 />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>C2C tolerance +</span>
+                <span>{t("ui.train_c2c_tolerance")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>C2C tolerance −</span>
+                <span>{t("ui.train_c2c_tolerance_4")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>Worm axial clearance</span>
+                <span>{t("ui.train_worm_axial_clearance")}</span>
                 <input type="number" step="0.01" bind:value={stage.axial_clearance} />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
             </div>
 
@@ -894,7 +884,7 @@
                   <input type="number" step="1" bind:value={stage.starts} />
                 </label>
                 <label>
-                  <span>Sized by</span>
+                  <span>{t("ui.train_sized_by")}</span>
                   <select
                     value={"pitch_diameter" in stage.sizing ? "diameter" : "helix"}
                     onchange={(e) => {
@@ -907,22 +897,22 @@
                           : { helix_angle: g ? 90 - g.lead_angle : 45 };
                     }}
                   >
-                    <option value="diameter">Pitch diameter — a worm</option>
-                    <option value="helix">Helix angle — a gear</option>
+                    <option value="diameter">{t("ui.train_pitch_diameter_worm")}</option>
+                    <option value="helix">{t("ui.train_helix_angle_gear")}</option>
                   </select>
                 </label>
                 {#if "pitch_diameter" in stage.sizing}
                   <label>
-                    <span>Pitch diameter</span>
+                    <span>{t("ui.train_pitch_diameter")}</span>
                     <input type="number" step="0.5" bind:value={stage.sizing.pitch_diameter} />
-                    <em>mm</em>
+                    <em>{t("ui.train_mm")}</em>
                   </label>
                 {:else}
                   <label>
-                    <span>Helix angle</span>
+                    <span>{t("ui.train_helix_angle")}</span>
                     <input type="number" step="1" bind:value={stage.sizing.helix_angle} />
                     <em>°</em>
-                    <small>the mate takes the rest of the shaft angle</small>
+                    <small>{t("ui.train_mate_takes_rest_shaft_angle")}</small>
                   </label>
                 {/if}
                 {#if wres && wres.members[0].recommended_face_width == null}
@@ -930,9 +920,9 @@
                        nothing for an automatic toggle to take: showing one
                        would lock the field to a value nothing computed. -->
                   <label>
-                    <span>Length</span>
+                    <span>{t("ui.train_length")}</span>
                     <input type="number" step="1" bind:value={stage.worm.face_width.manual} />
-                    <em>mm</em>
+                    <em>{t("ui.train_mm")}</em>
                   </label>
                 {:else}
                   {@render autoNumber(
@@ -950,7 +940,7 @@
                   </p>
                 {/if}
                 <label>
-                  <span>Material</span>
+                  <span>{t("ui.train_material")}</span>
                   <select bind:value={stage.worm.material}>
                     {#each library.materials.material as m (m.name)}
                       <option value={m.name}>{m.name}</option>
@@ -959,31 +949,31 @@
                 </label>
                 {#if wres}
                   <dl class="out">
-                    <dt>Lead angle</dt>
+                    <dt>{t("ui.train_lead_angle")}</dt>
                     <dd>{wres.lead_angle.toFixed(4)}°</dd>
-                    <dt>Lead</dt>
+                    <dt>{t("ui.train_lead")}</dt>
                     <dd>{wres.lead.toFixed(4)} mm</dd>
-                    <dt>Torque</dt>
+                    <dt>{t("ui.train_torque")}</dt>
                     <dd>{wres.members[0].torque.toFixed(4)} N·m</dd>
-                    <dt>Speed</dt>
+                    <dt>{t("ui.train_speed")}</dt>
                     <dd>{wres.members[0].speed.toFixed(1)} rpm</dd>
-                    <dt>Backlash</dt>
+                    <dt>{t("ui.train_backlash")}</dt>
                     <dd>{wres.backlash.backward.nominal.toFixed(5)}°</dd>
                   </dl>
                 {/if}
               </div>
 
               <div class="gear">
-                <h4>Wormwheel</h4>
+                <h4>{t("ui.train_wormwheel")}</h4>
                 <label>
-                  <span>Tooth count</span>
+                  <span>{t("ui.train_tooth_count")}</span>
                   <input type="number" step="1" bind:value={stage.wheel_teeth} />
                 </label>
                 {#if wres && wres.members[1].recommended_face_width == null}
                   <label>
-                    <span>Face width</span>
+                    <span>{t("ui.train_face_width")}</span>
                     <input type="number" step="1" bind:value={stage.wheel.face_width.manual} />
-                    <em>mm</em>
+                    <em>{t("ui.train_mm")}</em>
                   </label>
                 {:else}
                   {@render autoNumber(
@@ -995,13 +985,13 @@
                 {/if}
                 {#if wres}
                   <dl class="out">
-                    <dt>Pitch diameter</dt>
+                    <dt>{t("ui.train_pitch_diameter")}</dt>
                     <dd>{wres.members[1].pitch_diameter.toFixed(4)} mm</dd>
-                    <dt>Torque</dt>
+                    <dt>{t("ui.train_torque")}</dt>
                     <dd>{wres.members[1].torque.toFixed(4)} N·m</dd>
-                    <dt>Speed</dt>
+                    <dt>{t("ui.train_speed")}</dt>
                     <dd>{wres.members[1].speed.toFixed(1)} rpm</dd>
-                    <dt>Backlash</dt>
+                    <dt>{t("ui.train_backlash")}</dt>
                     <dd>{wres.backlash.forward.nominal.toFixed(5)}°</dd>
                   </dl>
                 {/if}
@@ -1012,7 +1002,7 @@
               {@render screwReadout(wres)}
               {#if wres.notes.length}
                 <ul class="notes">
-                  {#each wres.notes as n (n)}<li>{n}</li>{/each}
+                  {#each wres.notes as n (n.key)}<li>{note(n)}</li>{/each}
                 </ul>
               {/if}
             {/if}
@@ -1020,7 +1010,7 @@
             <button
               class="danger small"
               onclick={() => removeStage(i)}
-              disabled={tab.train.stages.length === 1}>Remove stage</button
+              disabled={tab.train.stages.length === 1}>{t("ui.train_remove_stage")}</button
             >
           </div>
         {/if}
@@ -1029,7 +1019,7 @@
         <button class="head" onclick={() => (open[i] = !open[i])}>
           <span class="caret">{open[i] ? "▾" : "▸"}</span>
           <strong>Stage {i + 1}</strong>
-          <span class="kind">planetary</span>
+          <span class="kind">{t("ui.train_planetary")}</span>
           <span class="teeth">z {stage.sun.teeth} / {stage.planet.teeth} / {stage.ring.teeth}</span>
           {#if pres}
             <span class="ratio">{pres.ratio.toFixed(4)} : 1</span>
@@ -1040,34 +1030,34 @@
           <div class="body">
             <div class="grid shared">
               <label>
-                <span>Normal module</span>
+                <span>{t("ui.train_normal_module")}</span>
                 <input type="number" step="0.1" bind:value={stage.module} />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>Pressure angle</span>
+                <span>{t("ui.train_pressure_angle")}</span>
                 <input type="number" step="0.5" bind:value={stage.pressure_angle} />
                 <em>°</em>
               </label>
               <label>
-                <span>Helix angle</span>
+                <span>{t("ui.train_helix_angle")}</span>
                 <input type="number" step="1" bind:value={stage.helix_angle} />
                 <em>°</em>
               </label>
               <label>
-                <span>Friction, sun–planet</span>
+                <span>{t("ui.train_friction_sun_planet")}</span>
                 <input type="number" step="0.01" bind:value={stage.friction_sun_planet} />
                 <em></em>
               </label>
               <label>
-                <span>Friction, planet–ring</span>
+                <span>{t("ui.train_friction_planet_ring")}</span>
                 <input type="number" step="0.01" bind:value={stage.friction_planet_ring} />
                 <em></em>
               </label>
               <label>
-                <span>Tooth thickness mod.</span>
+                <span>{t("ui.train_tooth_thickness_mod")}</span>
                 <input type="number" step="0.05" bind:value={stage.thickness_mod} />
-                <em>k₁</em>
+                <em>{t("ui.train_k")}</em>
                 {@render noteSlot(
                   notes(
                     "the sun's: above 1 its teeth thicken and the planet's thin by as much " +
@@ -1078,25 +1068,25 @@
                 )}
               </label>
               <label>
-                <span>Planets</span>
+                <span>{t("ui.train_planets")}</span>
                 <input type="number" step="1" min="1" bind:value={stage.planets} />
                 <em></em>
               </label>
               <label>
-                <span>Driven by</span>
+                <span>{t("ui.train_driven_by")}</span>
                 <select bind:value={stage.arrangement.input}>
-                  <option value="sun">Sun</option>
-                  <option value="carrier">Carrier</option>
-                  <option value="ring">Ring</option>
+                  <option value="sun">{t("ui.train_sun")}</option>
+                  <option value="carrier">{t("ui.train_carrier")}</option>
+                  <option value="ring">{t("ui.train_ring")}</option>
                 </select>
                 <em></em>
               </label>
               <label>
-                <span>Held</span>
+                <span>{t("ui.train_held")}</span>
                 <select bind:value={stage.arrangement.fixed}>
-                  <option value="sun">Sun</option>
-                  <option value="carrier">Carrier</option>
-                  <option value="ring">Ring</option>
+                  <option value="sun">{t("ui.train_sun")}</option>
+                  <option value="carrier">{t("ui.train_carrier")}</option>
+                  <option value="ring">{t("ui.train_ring")}</option>
                 </select>
                 <em></em>
                 {@render noteSlot(
@@ -1104,32 +1094,32 @@
                 )}
               </label>
               <label>
-                <span>C2C clearance</span>
+                <span>{t("ui.train_c2c_clearance")}</span>
                 <input type="number" step="0.01" bind:value={stage.clearance} />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>C2C tolerance +</span>
+                <span>{t("ui.train_c2c_tolerance")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>C2C tolerance −</span>
+                <span>{t("ui.train_c2c_tolerance_6")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>Minimum planet clearance</span>
+                <span>{t("ui.train_minimum_planet_clearance")}</span>
                 <input type="number" step="0.05" bind:value={stage.min_planet_clearance} />
-                <em>mm</em>
+                <em>{t("ui.train_mm")}</em>
                 {@render noteSlot(notes("tip to tip, between neighbouring planets", null))}
               </label>
             </div>
 
-            <h4>Ring cutter</h4>
+            <h4>{t("ui.train_ring_cutter")}</h4>
             <div class="grid shared">
               <label>
-                <span>Cutter teeth</span>
+                <span>{t("ui.train_cutter_teeth")}</span>
                 <input type="number" step="1" min="1" bind:value={stage.cutter.teeth} />
                 <em></em>
                 {@render noteSlot(
@@ -1137,14 +1127,14 @@
                 )}
               </label>
               <label>
-                <span>Cutter addendum</span>
+                <span>{t("ui.train_cutter_addendum")}</span>
                 <input type="number" step="0.05" bind:value={stage.cutter.addendum} />
-                <em>m</em>
+                <em>{t("ui.train_m")}</em>
               </label>
               <label>
-                <span>Cutter tip round</span>
+                <span>{t("ui.train_cutter_tip_round")}</span>
                 <input type="number" step="0.02" bind:value={stage.cutter.tip_round} />
-                <em>m</em>
+                <em>{t("ui.train_m")}</em>
               </label>
             </div>
 
@@ -1155,19 +1145,19 @@
             {#snippet planetExtra(_j: number)}
               {#if pres}
                 <dl class="out small">
-                  <dt>Bending</dt>
+                  <dt>{t("ui.train_bending")}</dt>
                   <dd>
                     {pres.planet.fully_reversed ? "fully reversed" : "one-way"}
                     <small>allowable {pres.planet.reversed_allowable.value.toFixed(0)} MPa</small>
                   </dd>
-                  <dt>Min face width</dt>
+                  <dt>{t("ui.train_min_face_width")}</dt>
                   <dd>
                     {pres.planet.min_face_width_reversed === null
                       ? "—"
                       : `${pres.planet.min_face_width_reversed.toFixed(3)} mm`}
-                    <small>against that allowable</small>
+                    <small>{t("ui.train_against_that_allowable")}</small>
                   </dd>
-                  <dt>Speed</dt>
+                  <dt>{t("ui.train_speed")}</dt>
                   <dd>
                     {pres.planet.speed_absolute.toFixed(1)} rpm
                     <small>{pres.planet.speed_relative.toFixed(1)} relative to the carrier</small>
@@ -1191,12 +1181,12 @@
 
             {#if pres}
               <dl class="out">
-                <dt>Ratio</dt>
+                <dt>{t("ui.train_ratio")}</dt>
                 <dd>
                   {pres.ratio.toFixed(4)} : 1
                   <small>{pres.arrangement.input} in · {pres.arrangement.fixed} held · {pres.output} out</small>
                 </dd>
-                <dt>Centre distance</dt>
+                <dt>{t("ui.train_centre_distance")}</dt>
                 <dd>
                   {pres.centre_distance.toFixed(4)} mm
                   <small>
@@ -1204,13 +1194,13 @@
                     {pres.planet.shift_residual.toExponential(1)} mm
                   </small>
                 </dd>
-                <dt>Efficiency</dt>
+                <dt>{t("ui.train_efficiency")}</dt>
                 <dd>
                   {pct(pres.efficiency.forward)} % driven forward · {pct(pres.efficiency.backward)} %
                   driven backward
                   <small>fixed-carrier η₀ {pct(pres.fixed_carrier_efficiency.forward)} %</small>
                 </dd>
-                <dt>Backlash</dt>
+                <dt>{t("ui.train_backlash")}</dt>
                 <dd>
                   {pres.backlash.forward.nominal.toFixed(5)}° at the {pres.output} shaft
                   <small
@@ -1219,7 +1209,7 @@
                     )})</small
                   >
                 </dd>
-                <dt>Planet clearance</dt>
+                <dt>{t("ui.train_planet_clearance")}</dt>
                 <dd>
                   {pres.planet_clearance === null
                     ? "one planet has no neighbour"
@@ -1230,16 +1220,16 @@
                     </small>
                   {/if}
                 </dd>
-                <dt>Even spacing</dt>
+                <dt>{t("ui.train_even_spacing")}</dt>
                 <dd>
                   {pres.equal_spacing ? "yes" : "no"}
                   <small>simultaneous meshing {pres.simultaneous_meshing ? "yes" : "no"}</small>
                 </dd>
-                <dt>Coprime</dt>
+                <dt>{t("ui.train_coprime")}</dt>
                 <dd>
                   sun {pres.sun_coprime_with_planets ? "yes" : "no"} · ring
                   {pres.ring_coprime_with_planets ? "yes" : "no"}
-                  <small>with the planet count</small>
+                  <small>{t("ui.train_with_planet_count")}</small>
                 </dd>
               </dl>
 
@@ -1248,7 +1238,7 @@
               <table>
                 <thead>
                   <tr>
-                    <th>mesh</th><th>ε<sub>α</sub></th><th>ε<sub>β</sub></th><th>η forward</th>
+                    <th>{t("ui.train_mesh")}</th><th>ε<sub>α</sub></th><th>ε<sub>β</sub></th><th>{t("ui.train_forward")}</th>
                     <th>σ<sub>H</sub></th><th>ρ</th>
                   </tr>
                 </thead>
@@ -1268,7 +1258,7 @@
 
               {#if pres.notes.length}
                 <ul class="notes">
-                  {#each pres.notes as n (n)}<li>{n}</li>{/each}
+                  {#each pres.notes as n (n.key)}<li>{note(n)}</li>{/each}
                 </ul>
               {/if}
             {/if}
@@ -1276,7 +1266,7 @@
             <button
               class="danger small"
               onclick={() => removeStage(i)}
-              disabled={tab.train.stages.length === 1}>Remove stage</button
+              disabled={tab.train.stages.length === 1}>{t("ui.train_remove_stage")}</button
             >
           </div>
         {/if}
@@ -1285,9 +1275,9 @@
     </section>
   {/each}
 
-  <button class="add" onclick={addStage}>+ Add spur stage</button>
-  <button class="add" onclick={addWormStage}>+ Add worm stage</button>
-  <button class="add" onclick={addPlanetaryStage}>+ Add planetary stage</button>
+  <button class="add" onclick={addStage}>{t("ui.train_add_spur_stage")}</button>
+  <button class="add" onclick={addWormStage}>{t("ui.train_add_worm_stage")}</button>
+  <button class="add" onclick={addPlanetaryStage}>{t("ui.train_add_planetary_stage")}</button>
 </div>
 
 <style>

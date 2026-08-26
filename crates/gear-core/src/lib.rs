@@ -24,6 +24,7 @@ pub mod jgma;
 pub mod material;
 pub mod mesh;
 pub mod metrology;
+pub mod note;
 pub mod outline;
 pub mod params;
 pub mod planetary;

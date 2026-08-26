@@ -107,7 +107,7 @@ pub struct GearResult {
     /// ...and against contact.
     pub min_face_width_contact: f64,
     /// Guards that altered this gear's geometry.
-    pub clamps: Vec<String>,
+    pub clamps: Vec<crate::note::Note>,
     /// The material as used, after any overrides — what the numbers were
     /// actually computed from, rather than what the library holds.
     pub material: Material,
@@ -146,7 +146,7 @@ pub struct SpurResult {
     pub coprime: bool,
     pub gears: [GearResult; 2],
     /// Anything the stage had to say about the design.
-    pub notes: Vec<String>,
+    pub notes: Vec<crate::note::Note>,
 }
 
 /// Why a stage could not be solved.

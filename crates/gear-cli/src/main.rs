@@ -25,6 +25,17 @@ mod matrix;
 
 use gear_core::{Gear, GearParams};
 
+/// The English catalogue, for turning a [`Note`](gear_core::note::Note) into a
+/// sentence.
+///
+/// The harness has no locale to choose from and does not want one — it exists to
+/// show what the core computed. Built per call rather than cached: this is a
+/// development tool printing a handful of lines, and a `OnceLock` here would be
+/// machinery in place of a parse that costs nothing.
+fn words() -> gear_io::strings::Catalogue {
+    gear_io::strings::Catalogue::english()
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
@@ -358,7 +369,7 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
         );
     }
     for n in &s.notes {
-        println!("  note: {n}");
+        println!("  note: {}", words().render(n));
     }
 }
 
@@ -398,7 +409,7 @@ fn print_worm_stage(k: usize, st: &gear_core::train::WormStage, s: &gear_core::t
     }
     println!("  bending not reported, flank type ZI - see DESIGN.md 4.5.1");
     for n in &s.notes {
-        println!("  note: {n}");
+        println!("  note: {}", words().render(n));
     }
 }
 
@@ -662,7 +673,7 @@ fn show(p: GearParams) {
     if g.clamps.any() {
         println!("  clamps:");
         for n in &g.clamps.notes {
-            println!("    - {n}");
+            println!("    - {}", words().render(n));
         }
     }
     let pts = g.profile(400);
@@ -1203,7 +1214,7 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
         ""
     );
     for note in &r.notes {
-        println!("  ! {note}");
+        println!("  ! {}", words().render(note));
     }
 }
 
@@ -1409,7 +1420,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
     if let Ok(r) = solve_planetary_stage(&stage, 3000.0, 2.0, &lib) {
         println!();
         for note in &r.notes {
-            println!("note: {note}");
+            println!("note: {}", words().render(note));
         }
     }
 }

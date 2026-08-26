@@ -96,9 +96,9 @@ fn the_geometric_bounds_are_exactly_where_the_generator_starts_clamping() {
 
     for p in cases {
         let r = admissible_ranges(&p, 1.0);
-        let clamped = |q: GearParams, needle: &str| {
-            Gear::new(q).clamps.notes.iter().any(|n| n.contains(needle))
-        };
+        // By key, not by wording: a clamp is a named event, and searching its
+        // sentence would make this test a hostage to how the sentence reads.
+        let clamped = |q: GearParams, key: &str| Gear::new(q).clamps.fired(key);
         let eps = 0.01;
 
         // Addendum: below its floor the tip sinks into the root.
@@ -124,7 +124,7 @@ fn the_geometric_bounds_are_exactly_where_the_generator_starts_clamping() {
                     dedendum: hi - eps,
                     ..p
                 },
-                "root radius"
+                "clamp.dedendum_capped"
             ),
             "clamped inside the dedendum ceiling"
         );
@@ -134,7 +134,7 @@ fn the_geometric_bounds_are_exactly_where_the_generator_starts_clamping() {
                     dedendum: hi + eps,
                     ..p
                 },
-                "root radius"
+                "clamp.dedendum_capped"
             ),
             "no clamp above the dedendum ceiling"
         );
@@ -147,7 +147,7 @@ fn the_geometric_bounds_are_exactly_where_the_generator_starts_clamping() {
                     root_radius: rr - eps,
                     ..p
                 },
-                "fillet capped"
+                "clamp.fillet_capped"
             ),
             "clamped inside the fillet cap"
         );
@@ -157,7 +157,7 @@ fn the_geometric_bounds_are_exactly_where_the_generator_starts_clamping() {
                     root_radius: rr + eps,
                     ..p
                 },
-                "fillet capped"
+                "clamp.fillet_capped"
             ),
             "no clamp above the fillet cap"
         );

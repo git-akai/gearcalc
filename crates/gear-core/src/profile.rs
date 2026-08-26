@@ -28,6 +28,7 @@
 //!   fillet on every profile-shifted gear.
 
 use crate::involute::{inv, inv_from_roll};
+use crate::note::{key, Note};
 use crate::params::{guard, Clamps, GearParams};
 use crate::solve::{brent, newton_bracketed, Tol};
 
@@ -277,9 +278,10 @@ impl Gear {
         let mut an = params.pressure_angle.to_radians();
         if an <= guard::MIN_PRESSURE_ANGLE_DEG.to_radians() {
             an = guard::MIN_PRESSURE_ANGLE_DEG.to_radians();
-            clamps.push(format!(
-                "pressure angle raised to {} deg",
-                guard::MIN_PRESSURE_ANGLE_DEG
+            clamps.push(Note::new(key::CLAMP_PRESSURE_ANGLE_RAISED).number(
+                "degrees",
+                guard::MIN_PRESSURE_ANGLE_DEG,
+                1,
             ));
         }
         let beta = params.helix_angle.to_radians();
@@ -295,11 +297,11 @@ impl Gear {
         let mut bd = m * (params.dedendum - x);
         if bd < guard::MIN_CUTTER_DEPTH_MODULES * m {
             bd = guard::MIN_CUTTER_DEPTH_MODULES * m;
-            clamps.push("dedendum raised: cutter depth was <= 0");
+            clamps.push(Note::new(key::CLAMP_DEDENDUM_RAISED));
         }
         if bd > guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r {
             bd = guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r;
-            clamps.push("dedendum capped: root radius would be <= 0");
+            clamps.push(Note::new(key::CLAMP_DEDENDUM_CAPPED));
         }
         let rf = r - bd;
 
@@ -310,15 +312,11 @@ impl Gear {
             guard::MAX_TOOTH_THICKNESS_FRACTION_OF_PITCH * 2.0 * r * std::f64::consts::PI / z;
         if st <= guard::MIN_TOOTH_THICKNESS_MODULES * m {
             st = guard::MIN_TOOTH_THICKNESS_MODULES * m;
-            clamps.push(
-                "tooth thickness raised: profile shift or thickness modification too negative",
-            );
+            clamps.push(Note::new(key::CLAMP_TOOTH_THICKNESS_RAISED));
         }
         if st > st_max {
             st = st_max;
-            clamps.push(
-                "tooth thickness capped: profile shift or thickness modification too positive",
-            );
+            clamps.push(Note::new(key::CLAMP_TOOTH_THICKNESS_CAPPED));
         }
         let psi_p = st / (2.0 * r);
         let psi_b = psi_p + inv(alpha_t);
@@ -338,7 +336,7 @@ impl Gear {
             (guard::FILLET_FRACTION_OF_MAX * bd).min(guard::FILLET_FRACTION_OF_MAX * rho_fit);
         if rho > rho_cap {
             rho = rho_cap.max(guard::MIN_FILLET_MODULES * m);
-            clamps.push(format!("fillet capped to {rho:.4} (tooth space too tight)"));
+            clamps.push(Note::new(key::CLAMP_FILLET_CAPPED).number("radius", rho, 4));
         }
         let rho = rho.max(guard::MIN_FILLET_MODULES * m);
         let bc = bd - rho;
@@ -359,7 +357,7 @@ impl Gear {
             let ra_point = rb * f64::hypot(1.0, u_point);
             if ra > ra_point {
                 ra = ra_point;
-                clamps.push(format!("tip capped at pointed-tooth radius {ra:.4}"));
+                clamps.push(Note::new(key::CLAMP_TIP_CAPPED_POINTED).number("radius", ra, 4));
             }
         }
         let ra = ra.max(rb * (1.0 + guard::TIP_ABOVE_BASE_FRACTION));
@@ -536,8 +534,7 @@ impl Gear {
         self.r_j = self.ra;
         self.theta_a = 0.0;
         self.u_tip = f64::NAN;
-        self.clamps
-            .push("tooth severed by undercut: profile truncated at the centreline");
+        self.clamps.push(Note::new(key::CLAMP_TOOTH_SEVERED));
     }
 
     // ---------------------------------------------------------------- //

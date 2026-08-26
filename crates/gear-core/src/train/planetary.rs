@@ -34,6 +34,7 @@ use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_s
 use crate::contact::{efficiency, ContactPath, Directional};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{Member as MeshMember, Mesh, MeshKind};
+use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
 use crate::planetary::{self, Arrangement, Member, Rack, Teeth};
 use crate::profile::Gear;
@@ -215,7 +216,7 @@ pub struct PlanetaryResult {
     /// tooth cycles, and the stage's inputs are not in reach by then.
     pub planets: u32,
     /// Anything the stage had to say — including what it did not model.
-    pub notes: Vec<String>,
+    pub notes: Vec<Note>,
 }
 
 impl PlanetaryStage {
@@ -574,32 +575,24 @@ pub fn solve_planetary_stage(
     };
 
     // ---- what the answer does not include.
-    notes.push(format!(
-        "the {} planets are assumed to share the load equally; real sets do not \
-         without a floating member, and the usual remedy is a mesh-load factor \
-         this project declines to apply on the designer's behalf",
-        stage.planets
-    ));
+    notes.push(Note::new(key::STAGE_PLANETS_SHARE_LOAD_EQUALLY).count("planets", stage.planets));
     if !layout.equal_spacing {
-        notes.push(format!(
-            "{} planets cannot be spaced evenly: (z_sun + z_ring) is not divisible by it",
-            stage.planets
-        ));
+        notes.push(Note::new(key::STAGE_PLANETS_NOT_EVENLY_SPACED).count("planets", stage.planets));
     }
     if let Some(gap) = clearance {
         if gap < stage.min_planet_clearance {
-            notes.push(format!(
-                "adjacent planets clear by {gap:.3} mm, below the {:.3} mm asked for",
-                stage.min_planet_clearance
-            ));
+            notes.push(
+                Note::new(key::STAGE_PLANET_CLEARANCE_BELOW_MINIMUM)
+                    .number("gap", gap, 3)
+                    .number("minimum", stage.min_planet_clearance, 3),
+            );
         }
     }
-    if ring.clamps.iter().any(|c| c.contains("tip radius raised")) {
-        notes.push(
-            "the ring's addendum was clamped at its base circle: it needs more teeth \
-             or a shorter addendum"
-                .to_string(),
-        );
+    // Asked by key. This used to search the clamp's *text* for "tip radius
+    // raised", which is a sentence doing a symbol's job — one rewording, or one
+    // translation, from silently doing nothing.
+    if ring.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_RAISED)) {
+        notes.push(Note::new(key::STAGE_RING_ADDENDUM_CLAMPED));
     }
 
     let gear_result = |member: Member,
@@ -610,7 +603,7 @@ pub fn solve_planetary_stage(
                        sigma_f: Option<f64>,
                        sigma_h: f64,
                        material: &Material,
-                       clamps: Vec<String>|
+                       clamps: Vec<Note>|
      -> GearResult {
         let allow = material.fatigue_allowable.value;
         GearResult {
