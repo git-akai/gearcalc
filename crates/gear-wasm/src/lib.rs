@@ -152,6 +152,10 @@ pub struct GearSummary {
     /// Guards that altered the requested geometry. Empty is the normal case.
     pub clamps: Vec<gear_core::note::Note>,
 
+    /// What varies around the revolution. Every field is zero for an ordinary
+    /// gear, so it crosses unconditionally rather than behind a flag.
+    pub variation: gear_core::eccentric::Variation,
+
     pub span: Maybe<SpanOut>,
     pub over_two_pins: Maybe<PinsOut>,
     pub over_three_pins: Maybe<PinsOut>,
@@ -221,6 +225,9 @@ fn summarise(g: &Gear, req: &GearRequest) -> GearSummary {
         undercut: g.undercut,
         severed: g.severed,
         clamps: g.clamps.notes.clone(),
+        // Built from the same params the gear was, so the two cannot describe
+        // different gears. Zero throughout for an ordinary one.
+        variation: gear_core::eccentric::Eccentric::new(g.params).variation(),
         span: Maybe::from(metrology::best_span(g).map(|s| SpanOut {
             teeth_spanned: s.teeth_spanned,
             nominal: s.nominal,

@@ -2369,7 +2369,7 @@ uses on a line of two-shaft stages, asked of one stage with three shafts.
   allowable bending stress by ISO convention — and its rotation counts **relative
   to the carrier**. Easy to get silently wrong; called out in both code and UI.
 
-### 4.10 Angularly varying profile shift (planned)
+### 4.10 Angularly varying profile shift
 
 A purely **2D** variation: the profile shift varies with angular position about
 the axis, maximum at 0° and minimum at 180°, as a hob moving radially in and out
@@ -2562,13 +2562,51 @@ one: the cutting process has to be *corrected*, not merely offset.
    tip-envelope centre offset annotated.
 5. **DXF**: one closed polyline for the whole gear, as now.
 
-#### Scoping
+#### Built, as `eccentric.rs`
 
-Still its own milestone, after the geometry core and test suite are proven — but
-now a small one, since it needs no new mathematics. The work is per-tooth
-assembly, the indexing offset, per-tooth clamp reporting, and the range outputs.
-Nothing in milestones 0–9 is affected, and no structural accommodation is needed
-now beyond what §3 already provides.
+`Eccentric` is the assembly: which shift each tooth is cut at, and where each
+tooth is seated. `Gear` is used unchanged, because per-tooth constant `x` is the
+specification rather than an approximation of it.
+
+**One outline path, and an ordinary gear is `Δx = 0`.** Both drawing routes —
+the screen's point budget and the DXF's chord tolerance — go through it, and a
+concentric gear comes out **bit-identical** to the z-fold replication that
+preceded it, gated by writing the old algorithm out in the test and comparing
+`to_bits()`. It also costs the same: distinct shifts are deduplicated, so a
+concentric gear generates one tooth and an eccentric one ⌈z/2⌉+1.
+
+The DXF route was the one that could have gone wrong quietly. It had its own
+generator that replicated a single tooth `z` times, so an eccentric gear would
+have drawn correctly on screen and **exported as a concentric one**. Both are
+held to the same eccentricity now.
+
+*What was found on the way, and is not obvious:*
+
+- **`cos(τ − t)` is not bit-identical to `cos t`**, so teeth `k` and `z − k`
+  would each have generated their own gear — correct, but ⌈z/2⌉+1 becomes z. The
+  angle is folded to the near half of the revolution instead, which makes the
+  mirror pairing structural rather than a hope about floating point.
+- **`(seat + ψ) − ideal` and `(seat − ideal) + ψ` are not the same arithmetic.**
+  The first adds ψ to something near 2π and subtracts it back, at a cost of a few
+  ulps that differ from tooth to tooth — enough to make a *concentric* gear
+  report 8e-15 mm of pitch error, which is a rounding residual wearing the
+  clothes of a measurement.
+- **The teeth sample the envelope; they are not the envelope.** The tip radii
+  span `2e` only when a tooth actually sits at 180°, which needs an even tooth
+  count. At z = 31 the realised spread is 0.7979 mm against 0.8. Both are
+  reported, so the difference is a fact rather than a surprise.
+
+Every figure this section tabulates is reproduced by the implementation to the
+digits quoted — the pitch errors at λ = 0, 0.5 and 1 (62.6 / 31.3 / 0.000 µm
+drive, 62.6 / 93.9 / 125.2 coast), the 339 µm of base-thickness spread, and the
+tip envelope's departure from a circle at all three eccentricities. They were
+derived before any of this code existed, which is what makes them worth gating
+against.
+
+**Not built, deliberately:** inspection data over the revolution (span and
+over-pins as ranges), and the commanded `a_w(θ)` profile with its best-fit
+sinusoid residual — that needs a mate, and the feature is scoped to the gear tab
+for now. Nothing here prevents a geartrain stage later.
 
 #### Operating mode: the centre distance is commanded, not floating
 

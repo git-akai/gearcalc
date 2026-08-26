@@ -117,12 +117,19 @@ impl Gear {
             DEFAULT_CHORD_TOLERANCE
         };
 
-        let z = self.params.teeth;
-        let pitch = 2.0 * std::f64::consts::PI / f64::from(z);
-        let mut out: Vec<Vertex> = Vec::new();
+        crate::eccentric::Eccentric::new(self.params).outline_adaptive(tol)
+    }
 
-        for k in 0..z {
-            let base = pitch * f64::from(k);
+    /// One tooth's vertices, seated at `base`, appended to `out`.
+    ///
+    /// Split out so an **eccentric** gear can seat each tooth at its own angle
+    /// and take it from its own [`Gear`] — see [`crate::eccentric`]. The loop
+    /// above is the concentric case of exactly that, and the DXF path had been
+    /// the one place the two could disagree: it replicated a single tooth `z`
+    /// times, so an eccentric gear would have exported as a concentric one, and
+    /// silently.
+    pub(crate) fn tooth_outline(&self, tol: f64, base: f64, out: &mut Vec<Vertex>) {
+        {
             // Polar to cartesian in the tooth's own frame: theta is measured
             // from the tooth centreline.
             let pt = |r: f64, th: f64| {
@@ -146,16 +153,19 @@ impl Gear {
                     let (r, th) = self.trochoid_at(self.s_j + t * (0.0 - self.s_j));
                     pt(r, -th)
                 };
-                subdivide(&fillet_up, 1.0, 0.0, tol, 0, &mut out);
+                subdivide(&fillet_up, 1.0, 0.0, tol, 0, out);
                 let fillet_down = |t: f64| {
                     let (r, th) = self.trochoid_at(self.s_j + t * (0.0 - self.s_j));
                     pt(r, th)
                 };
-                subdivide(&fillet_down, 0.0, 1.0, tol, 0, &mut out);
+                subdivide(&fillet_down, 0.0, 1.0, tol, 0, out);
                 if let Some(last) = out.last_mut() {
                     last.bulge = bulge_for(self.half_pitch - self.theta0);
                 }
-                continue;
+                // A severed tooth is drawn and done; there is no flank to
+                // follow. `return` rather than `continue` now that this is one
+                // tooth rather than an iteration.
+                return;
             }
 
             // 1. root arc, from mid tooth-space up to where the fillet begins
@@ -173,7 +183,7 @@ impl Gear {
                 let (r, th) = fillet(t);
                 pt(r, -th)
             };
-            subdivide(&f_minus, 1.0, 0.0, tol, 0, &mut out);
+            subdivide(&f_minus, 1.0, 0.0, tol, 0, out);
 
             // 3. flank, minus side: u from the junction out to the tip
             let flank = |t: f64| self.involute_at(self.u_j + t * (self.u_tip - self.u_j));
@@ -181,7 +191,7 @@ impl Gear {
                 let (r, th) = flank(t);
                 pt(r, -th)
             };
-            subdivide(&l_minus, 0.0, 1.0, tol, 0, &mut out);
+            subdivide(&l_minus, 0.0, 1.0, tol, 0, out);
 
             // 4. tip arc, across the tooth. Exact.
             if let Some(last) = out.last_mut() {
@@ -195,14 +205,14 @@ impl Gear {
                 let (r, th) = flank(t);
                 pt(r, th)
             };
-            subdivide(&l_plus, 1.0, 0.0, tol, 0, &mut out);
+            subdivide(&l_plus, 1.0, 0.0, tol, 0, out);
 
             // 6. fillet, plus side, down to the root circle
             let f_plus = |t: f64| {
                 let (r, th) = fillet(t);
                 pt(r, th)
             };
-            subdivide(&f_plus, 0.0, 1.0, tol, 0, &mut out);
+            subdivide(&f_plus, 0.0, 1.0, tol, 0, out);
 
             // 7. root arc out to mid tooth-space is the next tooth's opening
             //    segment, so only the bulge is recorded here.
@@ -210,8 +220,6 @@ impl Gear {
                 last.bulge = bulge_for(self.half_pitch - self.theta0);
             }
         }
-
-        out
     }
 }
 

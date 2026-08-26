@@ -34,6 +34,35 @@ pub struct GearParams {
     /// This is *not* separate geometry — it is exactly an extra thickness-only
     /// profile shift, `x_s = π(k−1)/(4 tan αₙ)`. See [`GearParams::thickness_shift`].
     pub thickness_mod: f64,
+    /// Amplitude of an **angularly varying** profile shift, in modules.
+    ///
+    /// `x(θ) = profile_shift + angular_shift · cos θ`, maximum at 0° and minimum
+    /// at 180° — what a hob moving radially in and out once per revolution
+    /// produces. It makes the tip and root envelopes eccentric by
+    /// `e = module · angular_shift` while the pitch and base circles stay on the
+    /// axis, so the body moves eccentrically at a constant ratio (§4.10).
+    ///
+    /// **Zero is an ordinary gear**, and not by a branch: every tooth then takes
+    /// the same shift and the whole construction collapses onto the single-`x`
+    /// one it extends, bit for bit.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub angular_shift: f64,
+    /// `λ`, how far the indexing compensates for the varying tooth thickness.
+    ///
+    /// A gear with varying tooth thickness cannot be exactly conjugate in both
+    /// directions — uniform spacing on both flanks forces uniform thickness, in
+    /// two lines of algebra (§4.10) — so the unavoidable error can only be
+    /// distributed. Tooth `k` is seated at `2πk/z + λ(ψ_b,ref − ψ_b,k)`, which
+    /// scales the drive-flank error by `|1 − λ|` and the coast-flank error by
+    /// `|1 + λ|`.
+    ///
+    /// `0` is the minimax optimum and what a plain radial hob oscillation gives;
+    /// `1` is exactly conjugate forward and twice the error in reverse, and needs
+    /// the radial motion synchronised with a differential rotation of the work.
+    /// It has no effect at all when [`Self::angular_shift`] is zero, since every
+    /// tooth then has the same seat to correct towards.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub index_offset: f64,
 }
 
 impl Default for GearParams {
@@ -48,6 +77,8 @@ impl Default for GearParams {
             dedendum: 1.25,
             root_radius: 0.38,
             thickness_mod: 1.0,
+            angular_shift: 0.0,
+            index_offset: 0.0,
         }
     }
 }

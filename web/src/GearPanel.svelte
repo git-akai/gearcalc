@@ -419,6 +419,58 @@
         <dt>{t("ui.gear_cutter_tip_width")}</dt><dd>{mm(s.cutter_tip_width)}</dd>
       </dl>
 
+      <!-- Only when the gear actually varies. Every field below is zero for an
+           ordinary one, so this is a question of what is worth reading rather
+           than of what the core computed. -->
+      {#if tab.params.angular_shift !== 0}
+        <h2>{t("ui.gear_eccentricity")}</h2>
+        <dl>
+          <dt>{t("ui.gear_envelope_eccentricity")}</dt>
+          <dd>
+            {mm(s.variation.eccentricity)}
+            <small>{t("ui.gear_tip_root_envelopes_pitch_base_circles")}</small>
+          </dd>
+          <dt>{t("ui.gear_departure_from_a_circle")}</dt>
+          <dd>
+            {n(s.variation.circle_departure)} mm
+            <small>{t("ui.gear_envelope_limacon_not_circle_e_2ro")}</small>
+          </dd>
+          <dt>{t("ui.gear_tip_diameter")}</dt>
+          <dd>
+            {n(2 * s.variation.tip_radius[0])} to {n(2 * s.variation.tip_radius[1])} mm
+            <small>{t("ui.gear_what_teeth_reach_short_2e_odd")}</small>
+          </dd>
+          <dt>{t("ui.gear_root_diameter")}</dt>
+          <dd>
+            {n(2 * s.variation.root_radius[0])} to {n(2 * s.variation.root_radius[1])} mm
+          </dd>
+          <dt>{t("ui.gear_tooth_thickness")}</dt>
+          <dd>
+            {n(s.variation.tooth_thickness[0])} to {n(s.variation.tooth_thickness[1])} mm
+            <small>
+              at the base circle {n(s.variation.base_thickness[0])} to {n(
+                s.variation.base_thickness[1],
+              )} mm
+            </small>
+          </dd>
+          <dt>{t("ui.gear_pitch_error_drive")}</dt>
+          <dd>
+            {um(1e3 * s.variation.drive_pitch_error)}
+            <small>
+              accumulated {um(1e3 * s.variation.drive_index_error)} · scales |1 − λ|
+            </small>
+          </dd>
+          <dt>{t("ui.gear_pitch_error_coast")}</dt>
+          <dd>
+            {um(1e3 * s.variation.coast_pitch_error)}
+            <small>
+              accumulated {um(1e3 * s.variation.coast_index_error)} · scales |1 + λ| — reversing the
+              drive makes these the driving flanks
+            </small>
+          </dd>
+        </dl>
+      {/if}
+
       <h2>{t("ui.gear_measurement_over_teeth")}</h2>
       <dl>
         {#if isUnavailable(s.span)}

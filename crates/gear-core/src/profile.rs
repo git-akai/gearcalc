@@ -581,36 +581,7 @@ impl Gear {
     /// first tooth centred on +X.
     #[must_use]
     pub fn profile(&self, per_tooth: usize) -> Vec<[f64; 2]> {
-        let (r, th) = self.half_profile((per_tooth / 2).max(8));
-
-        // mirror the half-tooth, then repeat around
-        let mut r_full: Vec<f64> = r.iter().rev().copied().collect();
-        let mut th_full: Vec<f64> = th.iter().rev().map(|t| -t).collect();
-        r_full.extend_from_slice(&r[1..]);
-        th_full.extend_from_slice(&th[1..]);
-
-        // A virtual spur gear has a fractional tooth count and exists only to be
-        // measured; replicating it `params.teeth` times would draw a shape whose
-        // teeth do not close. Catch that in development rather than emitting a
-        // plausible-looking wrong outline.
-        debug_assert!(
-            (self.z - f64::from(self.params.teeth)).abs() < 1e-12,
-            "profile() called on a virtual gear (z = {}); it exists to be measured, not drawn",
-            self.z
-        );
-        let z = self.params.teeth;
-        let mut out = Vec::with_capacity(r_full.len() * z as usize + 1);
-        for k in 0..z {
-            let base = 2.0 * std::f64::consts::PI * f64::from(k) / f64::from(z);
-            for (rr, tt) in r_full.iter().zip(&th_full) {
-                let a = base + tt;
-                out.push([rr * a.cos(), rr * a.sin()]);
-            }
-        }
-        if let Some(&first) = out.first() {
-            out.push(first);
-        }
-        out
+        crate::eccentric::Eccentric::new(self.params).outline(per_tooth)
     }
 }
 

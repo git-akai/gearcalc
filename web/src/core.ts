@@ -32,6 +32,10 @@ export interface GearParams {
   dedendum: number;
   root_radius: number;
   thickness_mod: number;
+  /** Amplitude of an angularly varying profile shift, in modules. 0 = ordinary. */
+  angular_shift: number;
+  /** λ, how far the indexing compensates. No effect when the amplitude is 0. */
+  index_offset: number;
 }
 
 export interface ClassRef {
@@ -145,8 +149,26 @@ export function boundFor(key: keyof GearParams, r: Ranges): Bound | null {
   }
 }
 
+/** What varies around an eccentric gear's revolution. Zero throughout for an
+ *  ordinary one — see `gear_core::eccentric::Variation`. */
+export interface Variation {
+  eccentricity: number;
+  circle_departure: number;
+  /** [smallest, largest] radius, mm. */
+  tip_radius: [number, number];
+  root_radius: [number, number];
+  tooth_thickness: [number, number];
+  base_thickness: [number, number];
+  /** Base-tangent pitch error, mm. Drive scales |1 − λ|, coast |1 + λ|. */
+  drive_pitch_error: number;
+  coast_pitch_error: number;
+  drive_index_error: number;
+  coast_index_error: number;
+}
+
 export interface GearSummary {
   ranges: Ranges;
+  variation: Variation;
   /** Radii, mm — what the viewport draws with. */
   pitch_radius: number;
   base_radius: number;
@@ -245,6 +267,28 @@ export const FIELDS: FieldSpec[] = [
     // On a ring it is the SPACE this describes, so a pinion and a ring that mesh
     // want the SAME k rather than complementary ones.
     ringNote: "1 is the standard rack; on a ring it widens the space, and a meshing pair matches",
+  },
+  {
+    key: "angular_shift",
+    label: "Angular shift amplitude",
+    unit: "module",
+    step: 0.05,
+    externalOnly: true,
+    note:
+      "the profile shift varies with angle, x(θ) = x + Δx cos θ — the tip and root " +
+      "run eccentric by m·Δx while the pitch and base circles stay on the axis, so the " +
+      "body moves eccentrically at a constant ratio. Zero is an ordinary gear",
+  },
+  {
+    key: "index_offset",
+    label: "Index compensation λ",
+    unit: "",
+    step: 0.1,
+    externalOnly: true,
+    note:
+      "a varying tooth thickness cannot be conjugate both ways, so the error is only " +
+      "distributed: drive scales |1 − λ| and coast |1 + λ|. 0 is the minimax and what a " +
+      "plain radial hob gives; 1 is exact forward and twice the error in reverse",
   },
 ];
 
@@ -527,6 +571,10 @@ export interface SpurStage {
   /** Static coefficient, for breaking away — see `Directional::once_moving`. */
   static_friction: number;
   thickness_mod: number;
+  /** Amplitude of an angularly varying profile shift, in modules. 0 = ordinary. */
+  angular_shift: number;
+  /** λ, how far the indexing compensates. No effect when the amplitude is 0. */
+  index_offset: number;
   centre_distance: Auto<number>;
   clearance: number;
   tolerance_plus: number;
@@ -559,6 +607,10 @@ export interface WormStage {
   /** `k₁`; the wheel takes `2 − k₁`. Describes the parts cut and moves no
    *  figure this stage reports — see `WormStage::thickness_mod`. */
   thickness_mod: number;
+  /** Amplitude of an angularly varying profile shift, in modules. 0 = ordinary. */
+  angular_shift: number;
+  /** λ, how far the indexing compensates. No effect when the amplitude is 0. */
+  index_offset: number;
   starts: number;
   sizing: FirstMemberSizing;
   wheel_teeth: number;
@@ -604,6 +656,10 @@ export interface PlanetaryStage {
    *  because an external pair must sum to two and an internal pair must match.
    *  One input, three consistent values. */
   thickness_mod: number;
+  /** Amplitude of an angularly varying profile shift, in modules. 0 = ordinary. */
+  angular_shift: number;
+  /** λ, how far the indexing compensates. No effect when the amplitude is 0. */
+  index_offset: number;
   planets: number;
   arrangement: Arrangement;
   clearance: number;

@@ -720,6 +720,8 @@ fn dump() {
                             pressure_angle: an,
                             teeth: z,
                             profile_shift: x,
+                            angular_shift: 0.0,
+                            index_offset: 0.0,
                             helix_angle: beta,
                             addendum: 1.0,
                             dedendum: 1.25,

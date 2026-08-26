@@ -17,6 +17,7 @@
 
 pub mod auto;
 pub mod contact;
+pub mod eccentric;
 pub mod elliptic;
 pub mod hertz;
 pub mod involute;

@@ -191,6 +191,11 @@ impl SpurStage {
     pub(super) fn params(&self, i: usize) -> GearParams {
         let g = &self.gears[i];
         let base = GearParams {
+            // A stage member is concentric: the eccentric feature is the gear
+            // tab's, and `..Default::default()` here would silently invent one
+            // the day a stage grew the input.
+            angular_shift: 0.0,
+            index_offset: 0.0,
             module: self.module,
             pressure_angle: self.pressure_angle,
             teeth: g.teeth,

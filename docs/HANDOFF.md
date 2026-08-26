@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–11 complete and in CI. 378 tests, ~26 s.**
+**Milestones 0–11 complete and in CI. 386 tests, ~26 s.**
 
 Milestone 11's named scope — geartrain import/export, confirmations, error
 surfacing, docs — is done, and geartrain import/export was the last unbuilt item
@@ -302,6 +302,13 @@ four are in play differing by `cos α_t`, `cos α_w`, `cos β_b`.
 `PARALLEL_AXES` is a named zero, and at it the elliptical patch's peak pressure
 is *exactly* zero. Line contact is a degenerate value, not a branch.
 
+**An eccentric gear is an ordinary gear with `Δx = 0`.** `eccentric.rs` assembles
+a gear tooth by tooth — which shift each is cut at, where each is seated — and
+every gear in the crate is drawn through it, on screen and in the DXF alike. A
+concentric one comes out bit-identical to the z-fold replication it replaced and
+still generates one tooth, not `z`. `Gear` itself did not change: per-tooth
+constant `x` is the specification, not an approximation of it.
+
 **A loaded flank sits halfway, and that closed §4.10's blocker.** Backlash is how
 far a member can turn *between* its flanks; `Mesh::loaded_flank_phase` is where
 it sits when one of them is loaded, and it is exactly half — because moving the
@@ -462,6 +469,12 @@ these are the ones most likely to be stepped on again.
   power algebra, including two exact closed forms, and a backward efficiency of
   101.571 % survived all of them — because every one drove forward with a
   positive torque and a positive speed. It was found by looking at the UI.
+- **A second way of drawing the same thing is a second answer.** The DXF had its
+  own outline generator, replicating one tooth `z` times. An eccentric gear would
+  have looked right on screen and **exported concentric** — the worst split,
+  since the file is what gets made. Both routes go through one assembly now.
+  Wherever a shape is produced twice, ask what would happen if only one of them
+  learned something.
 - **An identity is not evidence.** The mesh-phase coefficient's acceptance gate
   was "reproduce the backlash law". The answer turned out to *be* the backlash
   law halved, so it passes that gate by construction and the gate proves nothing
@@ -642,7 +655,7 @@ of DESIGN.md, which records that the audit was wrong to promise it.
 
 | Item | Note |
 |---|---|
-| Angular profile shift (eccentric gear) | §4.10. **Unblocked** — the mesh-phase coefficient is closed (`Mesh::loaded_flank_phase`). Scoped to the gear tab, without inspection data, and as an *extension* of the concentric gear rather than a branch: `Δx = 0` must come out bit-identical to today |
+| An eccentric gear's inspection data and its commanded `a_w(θ)` | §4.10. The gear itself is built; ranges over the revolution for span and over-pins are not, and the centre-distance profile needs a mate the gear tab does not have |
 | A planetary set's drawing | the viewport draws single gears; a set needs the carrier and N planets placed |
 | A worm's profile drawing, and its DXF | §8. A crossed pair draws as its two helical gears already |
 | The enveloping wheel's zone of action | would turn a worm's `ε` from a floor into the number |
