@@ -466,6 +466,53 @@ pub struct CrossedPath {
 }
 
 impl Screw {
+    /// Direction of the common flank normal, unit — or `None` for parallel
+    /// axes, which have a *plane* of normals rather than one.
+    ///
+    /// Two properties of an involute helicoid fix it (§4.5.1): the normal makes
+    /// a fixed angle with its own member's axis, `n̂·â = sin β_b`. Applied to
+    /// both members that is two linear conditions on one unit vector, so the
+    /// direction is determined — and determined by `β_b1`, `β_b2` and `Σ`
+    /// **alone**.
+    ///
+    /// # What is not in the argument list, and why that matters
+    ///
+    /// The centre distance. Separating the axes therefore *slides* the line of
+    /// action without turning it, so what a crossed pair loses to a centre
+    /// distance error is exactly linear in that error. A parallel pair does not
+    /// behave that way: at `Σ = 0` the two conditions collapse into one, the
+    /// freed rotation **is** the operating pressure angle, and it moves with the
+    /// centres. That is the same degeneracy that turns a point contact into a
+    /// line, seen from the other side.
+    ///
+    /// # One normal, and everything projected onto it
+    ///
+    /// The path of contact is built on this, and so is backlash: a displacement
+    /// opens a gap only through its component along `n̂`, so the two
+    /// displacements a stage knows about — the centre line, and a worm's float
+    /// along its own axis — are projections of this same vector rather than two
+    /// formulas that can drift apart. `n̂ₓ` comes out `sin α_n` at every shaft
+    /// angle and `n̂_z` is `sin β_b1` by construction.
+    #[must_use]
+    pub fn contact_normal(&self) -> Option<[f64; 3]> {
+        let alpha_n = self.normal_pressure_angle;
+        let bb = |beta: f64| (beta.sin() * alpha_n.cos()).asin();
+        let bb1 = bb(self.worm_helix_angle);
+        let bb2 = bb(self.shaft_angle - self.worm_helix_angle);
+
+        let (sin_sigma, cos_sigma) = self.shaft_angle.sin_cos();
+        if sin_sigma.abs() < f64::EPSILON {
+            return None;
+        }
+        let nz = bb1.sin();
+        let ny = (-bb2.sin() - nz * cos_sigma) / sin_sigma;
+        let nx2 = 1.0 - ny * ny - nz * nz;
+        if nx2 <= 0.0 {
+            return None;
+        }
+        Some([nx2.sqrt(), ny, nz])
+    }
+
     /// The path of contact, or `None` for parallel axes — see [`CrossedPath`].
     ///
     /// `tip_radius_1` and `tip_radius_2` bound the flanks. They are the only
@@ -479,27 +526,18 @@ impl Screw {
         let beta_1 = self.worm_helix_angle;
         let beta_2 = self.shaft_angle - beta_1;
         let alpha_n = self.normal_pressure_angle;
-        let bb = |beta: f64| (beta.sin() * alpha_n.cos()).asin();
-        let (bb1, bb2) = (bb(beta_1), bb(beta_2));
         let base = |r: f64, beta: f64| {
             let alpha_t = (alpha_n.tan() / beta.cos()).atan();
             r * alpha_t.cos()
         };
         let (rb1, rb2) = (base(r1, beta_1), base(r2, beta_2));
+        let bb = |beta: f64| (beta.sin() * alpha_n.cos()).asin();
+        let (bb1, bb2) = (bb(beta_1), bb(beta_2));
 
-        // 1. The direction. `n·ẑ = sin β_b1` and `n·â₂ = −sin β_b2`; the second
-        //    needs a shaft angle to solve for, which is the parallel degeneracy.
+        // 1. The direction — `Screw::contact_normal`, which the backlash
+        //    projection uses too. It owes nothing to the centre distance.
+        let n = self.contact_normal()?;
         let (sin_sigma, cos_sigma) = self.shaft_angle.sin_cos();
-        if sin_sigma.abs() < f64::EPSILON {
-            return None;
-        }
-        let nz = bb1.sin();
-        let ny = (-bb2.sin() - nz * cos_sigma) / sin_sigma;
-        let nx2 = 1.0 - ny * ny - nz * nz;
-        if nx2 <= 0.0 {
-            return None;
-        }
-        let n = [nx2.sqrt(), ny, nz];
 
         // 2. The line: with the direction fixed, tangency to each base cylinder
         //    is one linear equation on a point of it. Four sign combinations are
@@ -2125,6 +2163,106 @@ mod tests {
                 "half the face should leave half the contact: {}",
                 half.contact_ratio
             );
+        }
+    }
+
+    /// **The contact normal leans on the line of centres by exactly `α_n`, at
+    /// every shaft angle.**
+    ///
+    /// `n̂ₓ` comes out `sin α_n` though the construction that produces it
+    /// mentions only `β_b1`, `β_b2` and `Σ`. That identity is the whole
+    /// numerator of a crossed stage's centre-distance backlash, so it is worth a
+    /// gate of its own — and it is worth one because it *looks* like an
+    /// approximation. `sin α_n` is the parallel pair's value, and meeting it
+    /// again at `Σ = 120°` invites the reading that a small-angle form has been
+    /// used everywhere. It has not.
+    #[test]
+    fn the_contact_normal_leans_on_the_centre_line_by_exactly_the_normal_pressure_angle() {
+        let mut checked = 0;
+        for alpha_deg in [14.5_f64, 20.0, 25.0] {
+            let alpha_n = alpha_deg.to_radians();
+            for sigma_deg in [5.0_f64, 30.0, 60.0, 90.0, 120.0] {
+                for frac in [0.2_f64, 0.5, 0.8] {
+                    for (z1, z2) in [(1_u32, 40_u32), (17, 23), (5, 61)] {
+                        let sigma = sigma_deg.to_radians();
+                        let beta_1 = sigma * frac;
+                        let mn = 1.0;
+                        let d1 = f64::from(z1) * mn / (std::f64::consts::FRAC_PI_2 - beta_1).sin();
+                        let Ok(s) = Screw::new(&ScrewParams {
+                            normal_module: mn,
+                            normal_pressure_angle: alpha_n,
+                            shaft_angle: sigma,
+                            starts: z1,
+                            wheel_teeth: z2,
+                            worm_pitch_diameter: d1,
+                        }) else {
+                            continue;
+                        };
+                        let n = s.contact_normal().expect("crossed shafts have a normal");
+                        assert!(
+                            (n[0].abs() - alpha_n.sin()).abs() < 1e-12,
+                            "α_n={alpha_deg}° Σ={sigma_deg}° β₁={:.3}°: the normal leans \
+                             {} against sin α_n {}",
+                            beta_1.to_degrees(),
+                            n[0].abs(),
+                            alpha_n.sin()
+                        );
+                        // ...and the worm-axis component is `sin β_b1`, which is
+                        // what the axial-float half of backlash projects onto.
+                        let bb1 = (beta_1.sin() * alpha_n.cos()).asin();
+                        assert!((n[2].abs() - bb1.sin()).abs() < 1e-12);
+                        checked += 1;
+                    }
+                }
+            }
+        }
+        assert!(checked > 100, "only {checked} pairs were buildable");
+    }
+
+    /// **Moving the centres slides the line of action without turning it.**
+    ///
+    /// The property that makes a crossed pair's backlash exactly linear in a
+    /// centre-distance error, where a parallel pair's is not. Asserted against a
+    /// mutated centre distance rather than left to the signature, because a
+    /// later reader adding `self.centre_distance` to the direction would be
+    /// making a change that looks harmless and silently turns the linear law
+    /// into a wrong nonlinear one.
+    ///
+    /// `path_of_contact` cannot be used for this: it chooses its branch by
+    /// asking which line passes through the pitch point, and at a displaced
+    /// centre distance none of them does. That is correct for the path and is
+    /// exactly why the direction has its own accessor.
+    #[test]
+    fn the_centre_distance_slides_the_line_of_action_without_turning_it() {
+        let (mn, alpha_n) = (1.0, 20.0_f64.to_radians());
+        for sigma_deg in [5.0_f64, 30.0, 90.0] {
+            let sigma = sigma_deg.to_radians();
+            let beta_1 = sigma / 2.0 + 20.0_f64.to_radians();
+            let d1 = f64::from(17_u32) * mn / (std::f64::consts::FRAC_PI_2 - beta_1).sin();
+            let build = || {
+                Screw::new(&ScrewParams {
+                    normal_module: mn,
+                    normal_pressure_angle: alpha_n,
+                    shaft_angle: sigma,
+                    starts: 17,
+                    wheel_teeth: 43,
+                    worm_pitch_diameter: d1,
+                })
+                .expect("a buildable pair")
+            };
+            let reference = build().contact_normal().expect("a normal");
+            for delta in [0.05_f64, 0.5, 5.0] {
+                let mut s = build();
+                s.centre_distance += delta;
+                let moved = s.contact_normal().expect("a normal");
+                for k in 0..3 {
+                    assert!(
+                        (moved[k] - reference[k]).abs() < 1e-15,
+                        "Σ={sigma_deg}° Δa={delta}: the normal turned, {moved:?} \
+                         against {reference:?}"
+                    );
+                }
+            }
         }
     }
 

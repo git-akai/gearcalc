@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–11 complete and in CI. 351 tests, ~26 s.**
+**Milestones 0–11 complete and in CI. 357 tests, ~26 s.**
 
 Milestone 11's named scope — geartrain import/export, confirmations, error
 surfacing, docs — is done, and geartrain import/export was the last unbuilt item
@@ -124,12 +124,21 @@ line of action through differential geometry; the crate reaches it through a
 construction in lines and angles. On a 17/23 pair at 45°/45°, shafts at 90°,
 they give ε = 1.777921670 and 1.777921669562.
 
-**The worm canary moved, once, deliberately.** `wormstage 1 40 7 2` went
-68.691 → 68.430 % forward and 55.254 → 54.417 % backward when the friction
-balance replaced the pitch-point formula (§4.5.1). Its old figures were the same
-balance sampled at the one point on the path where the term now added is zero;
-they were not more correct. Everything downstream followed: wheel torque
-54.9531 → 54.7441 N·m, flank load 3510.8 → 3505.8 MPa.
+**The worm canary has moved twice, both times deliberately.**
+`wormstage 1 40 7 2`:
+
+1. *Efficiency*, when the friction balance replaced the pitch-point formula
+   (§4.5.1): 68.691 → 68.430 % forward, 55.254 → 54.417 % backward. The old
+   figures were the same balance sampled at the one point on the path where the
+   term now added is zero; they were not more correct. Everything downstream
+   followed — wheel torque 54.9531 → 54.7441 N·m, flank load 3510.8 → 3505.8 MPa.
+2. *Backlash*, when the centre-distance term stopped counting one flank of two
+   (§12): at the wheel 0.13427 → 0.15512° nominal, max 0.15512 → 0.19683°, at the
+   worm 5.37081 → 6.20497°. The **minimum is unchanged at 0.11342°**, and that is
+   the arithmetic confirming itself: at `clearance − tol₋ = 0` the centre-distance
+   term vanishes and only the axial float is left, which was right all along. The
+   new nominal landing exactly on the old maximum is the same coincidence — one
+   is `2 × 0.02`, the other was `1 × 0.04`.
 
 `gear-cli strength 17 43 2.0` is the regression canary. Its numbers — `σ_F`
 69.2 / 63.4 MPa, `σ_H` 692.7 MPa, ρ 1.723 mm, η 98.741 % — have survived every
@@ -265,6 +274,26 @@ four are in play differing by `cos α_t`, `cos α_w`, `cos β_b`.
 `PARALLEL_AXES` is a named zero, and at it the elliptical patch's peak pressure
 is *exactly* zero. Line contact is a degenerate value, not a branch.
 
+**Backlash is one conversion and two numerators, and the split is stated.**
+`mesh::angular_play(j_n, z, p_bn)` is the shared sentence — a flank advances one
+normal base pitch per tooth along the common normal — and both stage kinds are
+held to it, including an internal mesh, whose transverse form carries a signed
+tooth sum and whose normal form carries nothing about the mate at all. The
+*gaps* differ and stay different: a crossed pair's line of action cannot rotate
+when the centres move, so its backlash is exactly linear in the error, while a
+parallel pair's rotates — the freed rotation **is** the operating pressure
+angle — so its exact involute law is not a refinement of the crossed one but a
+different geometry. They agree to first order, gated by watching the shortfall
+halve as the clearance does.
+
+**One normal, and everything projected onto it.** `Screw::contact_normal` is a
+single vector fixed by `β_b1`, `β_b2` and `Σ`. The path of contact is built on
+it, and so is backlash: the centre line's projection is `n̂ₓ` and a worm's axial
+float projects on `n̂_z`. Those were `sin α_n` and `sin β_b1` written out by hand
+next to the construction that already had them. `n̂ₓ = sin α_n` at *every* shaft
+angle is an identity, not a small-angle reading, and it has its own gate because
+it does not look like one.
+
 **Efficiency is one force balance, not a formula per axis angle.**
 `contact::Contact` — a point, a normal, two axes — resolves `F = F_n(±n̂ + μv̂)`
 into a moment about each shaft. It *contains* both formulas it replaced: the
@@ -369,6 +398,24 @@ these are the ones most likely to be stepped on again.
   power algebra, including two exact closed forms, and a backward efficiency of
   101.571 % survived all of them — because every one drove forward with a
   positive torque and a positive speed. It was found by looking at the UI.
+- **Two models that meet at a boundary must be *tested* at it, or the boundary is
+  where the error hides.** A crossed pair's backlash counted the gap on one flank
+  where a separation opens both — a plain factor of two, reaching the UI as a
+  **50 % step** the moment the shaft angle left zero. Every crossed backlash test
+  held the crossed model against itself; the parallel model, which has the exact
+  involute law and its own tests, was never asked. Dropping the factor again
+  fails **only** the two new gates, out of 355. Wherever two models are supposed
+  to be one model's two regimes, the gate is that they agree in the limit — and
+  the honest form of that gate watches the disagreement *vanish with the
+  parameter*, so no tolerance gets chosen.
+- **"These two are genuinely different constructions" is a claim with a scope,
+  and the scope is usually narrower than the sentence.** §4.5.1 had judged
+  backlash not worth unifying, and it was right about the *numerators*: the
+  parallel law is exact and the crossed one linear, and they differ because the
+  geometry does. It was wrong about everything else — the conversion from gap to
+  angle was one law living in two places, and the copy nothing checked is the one
+  that got the wrong numerator. When you decline to unify, name which part you
+  are declining.
 - **A gate on a *ratio* cannot see a scale error.** `moment_per_force` returned a
   power where a torque was wanted, putting a factor `z₂/z₁` — 40× on a worm — into
   every flank load, and 3.42× into a stress through the cube root. All four
@@ -421,6 +468,7 @@ the number would have been.
 | **Crossed-axis bending** | §4.5.1 | *Decided, not pending.* The path gives the load's position along the profile; `σ_F = F_t/(b·m)·Y_F·Y_S` is a cantilever loaded across its whole **face**, and a crossed pair's load is a point. An effective width is a convention that multiplies a stress, which §4.7 refuses — so the stage says it is not rated and why |
 | Equal planet load sharing is assumed | §4.9 | *Decided.* The remedy is a mesh-load factor of the kind §4.7 declines; said in every planetary result's notes |
 | Radial assembly — attempted, diagnosed, **shelved** with its findings | §4.11 | |
+| A crossed pair's contact point **slides along the axes** with a centre-distance error, and nothing says when it leaves the face | §4.4 | Measured at `≈ 2.58 Δa / sin Σ` mm for a 17/43 pair: 0.05 mm at `Σ = 90°`, 30 mm at `Σ = 0.1°`. Below a few degrees the pair at its working centre distance is not in contact, and the stage still reports a backlash and a stress for it. The rating is built at the nominal centre distance, so this is a *note* that is missing, not a number that is wrong |
 | The **enveloping** (throated) wheel's zone of action | §4.5.1 | The cylindrical one is derived; a worm reports it as a floor, with its assumed tooth height named |
 | Mesh-phase coefficient setting the optimal λ | §4.10 | The only thing blocking the angular-profile-shift milestone |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
@@ -522,6 +570,13 @@ of DESIGN.md, which records that the audit was wrong to promise it.
   re-reading against the code each time they are leaned on; this one had been
   written when nothing at all was derived, which made it true for a reason that
   had since expired.
+- **An audit scoped by a construction reports silence as agreement.** The
+  crossed-axis audit asked "where is the contact path missing?" and found five
+  branches. Backlash does not use a contact path, so nothing in the sweep pointed
+  at it — and it was the branch actually carrying a bug. Scoping a sweep by a
+  *mechanism* silently excludes everything that reaches the same answer another
+  way. Scope it by the **output** instead: every number a crossed stage reports,
+  and where each one comes from.
 - **Audit a unification claim against the code, not the intention.** "One model
   for both" decays quietly. The crossed-axis audit (DESIGN §4.5.1) found the
   contact model genuinely unified — `PARALLEL_AXES` is a value, and the crossed

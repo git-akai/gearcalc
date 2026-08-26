@@ -585,6 +585,67 @@ Nominal/max/min from `a′ = a + c`, `a + c + tol₊`, `a + c − tol₋`.
 tooth, so an axial clearance `δ` contributes `j_θ,wheel = 2δ / (m_x z_wheel)`
 radians, combined with the centre-distance term above.
 
+**One conversion, two numerators.** Everything above happens in the transverse
+plane, and a crossed pair has none. What both have is the common flank normal,
+and the shared sentence is `mesh::angular_play`:
+
+```
+j_θ,i = 2π j_n / (z_i p_bn)
+```
+
+— a member's flank advances along the normal by one normal base pitch per tooth.
+The transverse form `j_t |z₁+z₂| / (a′ z_i)` is the same number, bridged by
+`cos α_t cos β_b = cos α_n cos β`, and a test holds them equal for external and
+internal meshes alike rather than forcing one to call the other.
+
+The **gap** is where the two kinds of mesh differ, and where the crossed model
+had a plain error (§12):
+
+```
+crossed:   j_n = j_axial · (â₁·n̂) + 2 Δa · (x̂·n̂) = j_axial sin β_b1 + 2 Δa sin α_n
+parallel:  j_n = 2 a′ ( inv α′ − inv α_w ) · cos α′ cos β_b
+```
+
+Three things to say about the crossed line.
+
+- **The two displacements are not the same kind.** A centre distance above
+  nominal separates the axes, and a separation opens **both** flanks, so it is
+  counted twice; a worm's axial float is a rigid-body slide that opens one flank
+  exactly as far as it closes the other, so it is counted once. Reading both as
+  "a gap along `n̂`" and giving them one coefficient is what put a factor of two
+  in the crossed term.
+- **`sin α_n` is an identity, not a small-angle reading.** The contact normal's
+  component along the line of centres is `sin α_n` at *every* shaft angle —
+  gated in `screw.rs` over 117 pairs spanning `α_n` 14.5…25°, `Σ` 5…120°, and
+  three helix splits, and measured off the surfaces themselves by
+  `tools/crossed_path.py`. Both terms are now projections of the one
+  `Screw::contact_normal` rather than its components written out again.
+- **The crossed law is exactly linear and the parallel one is not**, and that is
+  geometry rather than approximation. `contact_normal` is fixed by `β_b1`,
+  `β_b2` and `Σ`, so moving the centres *slides* a crossed line of action without
+  turning it. At `Σ = 0` the two conditions on `n̂` collapse into one and the
+  freed rotation **is** the operating pressure angle — the same degeneracy that
+  turns a point contact into a line. So the exact involute law exists for
+  parallel axes precisely because that freedom does.
+
+The two meet where they must. Gated by watching the shortfall vanish *with the
+error* rather than against a chosen tolerance: halve the clearance and the
+relative gap between the crossed and parallel figures halves, from 0.83 % at
+80 µm to 0.052 % at 5 µm. At the default 20 µm they stand 0.21 % apart, and the
+step at `Σ = 0` is the degeneracy rather than a seam in the code.
+
+**Where the crossed figure stops describing a real mesh.** Measured while chasing
+the above, and recorded because it bounds how much the 0.21 % is worth arguing
+about. Since the line of action slides without turning, a centre-distance error
+`Δa` moves the contact point **along the axes** by roughly `2.58 Δa / sin Σ` mm
+for the 17/43 pair — 0.05 mm at `Σ = 90°`, 3 mm at `Σ = 1°`, 30 mm at
+`Σ = 0.1°`. Below a few degrees that is off any real face, so a near-parallel
+crossed pair at its working centre distance **is not in contact at all** and its
+backlash figure describes a mesh that is not happening. The region where the two
+laws would visibly disagree is therefore the region where the crossed one has
+already stopped applying, which is why the residual is a curiosity rather than a
+choice between answers. Nothing reports this yet; it is in §5 of HANDOFF.md.
+
 ### 4.5 Contact ratio, efficiency, and crossed axes
 
 **Path of contact** (external), from the pitch point:
@@ -763,13 +824,25 @@ consumer of the path is exactly what a crossed stage does not report:
 | Automatic face width | inverting `σ_F(b)` and `σ_H(b)` | **done, by a different constraint** — `ε ≥ 1`, since no stress here depends on `b` |
 | Bending stress | `bending_section(g, contact_ratio)` — the load's roll parameter comes off the path | **still not available, and now for a stated reason: see below** |
 | Efficiency from sliding | `contact::efficiency(path, …)`; the crossed stage used a pitch-point force balance instead | **done** — the unified friction balance, which contains both formulas |
+| **Backlash** — *not in the audit's sweep, and the branch that was actually wrong* | `mesh::angular_play` shared; the gap left to each geometry | **done, and it took a bug with it.** The audit asked where the contact path was missing; backlash does not use one, so it was never looked at |
 
-**One construction gated five branches.** That was the whole of the divergence,
-and stating it made the remaining work a single question rather than a list:
-*where does a crossed pair's contact point go, and where does it stop?* Three of
-the five closed the moment that was answered; the fourth — efficiency — needed a
-second derivation, the friction balance below, and closed too. Only bending is
-still unavailable, and for a reason the audit got wrong.
+**One construction gated five branches.** Stating it made the remaining work a
+single question rather than a list: *where does a crossed pair's contact point
+go, and where does it stop?* Three of the five closed the moment that was
+answered; the fourth — efficiency — needed a second derivation, the friction
+balance below, and closed too. Only bending is still unavailable, and for a
+reason the audit got wrong.
+
+**But it was not the whole of the divergence, and saying so was the audit's own
+worst error.** There was a sixth branch, and it was the one carrying a real
+mistake: **backlash**. It escaped because the audit's question was about the
+*contact path*, and backlash does not use one — so nothing in the sweep pointed
+at it, and the paragraph above then read as a clean bill. The centre-distance
+term counted the gap on one flank where a separation opens both, which the UI
+showed as a 50 % step in backlash the moment the shaft angle left zero. §4.4 and
+§12 carry it. The lesson is about the shape of an audit rather than about
+backlash: **an audit scoped by a construction finds the branches that use that
+construction, and reports silence everywhere else as agreement.**
 
 **Bending did not close, and the audit was wrong to imply it would.** The path supplies
 the load's *position along the profile*, which was one missing ingredient — but
@@ -798,14 +871,46 @@ Two things are already general and need nothing:
   said it would need when it was written.
 - The curvature route above.
 
-One is genuinely two constructions, and unifying it is not obviously a gain:
-backlash. `Mesh::backlash` is **exact** — `j_t = 2a′(inv α′ − inv α_w)`, measured
-off the real tooth thicknesses — while `worm::angular_backlash` builds the gap
-along the common flank normal and divides by the surface speed along it. The
-second is the more general *statement* and the first is the more exact *answer*;
-expressing the parallel case in the crossed form would trade exactness for
-uniformity, which is the wrong direction. The honest unification is the other
-way round, and it needs the shifted crossed mesh (§10).
+One was judged genuinely two constructions, and **that judgment was wrong in the
+way that matters**: backlash. `Mesh::backlash` is exact —
+`j_t = 2a′(inv α′ − inv α_w)`, measured off the real tooth thicknesses — while
+`worm::angular_backlash` builds the gap along the common flank normal. The
+earlier reading was that the second is the more general *statement* and the first
+the more exact *answer*, so unifying them would trade exactness for uniformity.
+That is still true of the **numerators**. It was never true of the rest, and
+leaving the two apart on the strength of it let a plain factor of two live in the
+crossed numerator for a milestone — the centre-distance term counted the gap on
+one flank where a separation opens both. Nothing caught it, because every crossed
+backlash test held the crossed model against itself and the parallel model was
+never asked. See §12, and the gate is now §4.4.
+
+What is shared, and now shared in code:
+
+- **The conversion.** `mesh::angular_play(j_n, z, p_bn) = 2π j_n / (z p_bn)`. A
+  member's flank advances along the common normal by one normal base pitch per
+  tooth, so this sentence is the same for every mesh in the crate. The parallel
+  form `j_t |z₁+z₂| / (a′ z)` is the same number in its own transverse plane —
+  the bridge is `cos α_t cos β_b = cos α_n cos β` — and a test holds the two
+  together rather than forcing one to call the other. That test also runs an
+  **internal** mesh, where the transverse form carries a signed tooth sum and a
+  signed centre distance and the normal form carries neither.
+- **The normal.** `Screw::contact_normal` is one vector, and both displacements a
+  crossed stage knows about are projections of it: the centre line gives `n̂ₓ`,
+  the worm's own axis gives `n̂_z`. They used to be `sin α_n` and `sin β_b1`
+  written out by hand beside the path construction that already had them.
+
+What is *not* shared, because the geometry differs:
+
+- **The numerator.** A crossed pair's line of action cannot rotate when the
+  centres move — `contact_normal` is fixed by `β_b1`, `β_b2` and `Σ`, none of
+  which the centre distance touches — so its backlash is exactly linear in the
+  error. A parallel pair's line does rotate: at `Σ = 0` the constraint
+  degenerates, and **the freed rotation is the operating pressure angle**. That
+  is the same degeneracy that turns a point contact into a line, met from the
+  other side, and it is why the exact involute law exists at all. The two agree
+  to first order and part company by 0.21 % at the default clearance — a step at
+  `Σ = 0` that is the physics, not a seam. §4.4 gates the meeting by watching the
+  shortfall halve when the error does, so no tolerance is chosen.
 
 **The missing construction, derived.** It is `screw::CrossedPath`, and it came
 out of two properties of an involute helicoid, both *measured* from the surface's
@@ -3329,6 +3434,9 @@ something independent.**
 | 4.7 | Helical bending measured `Y_F` on the transverse section and divided by `m_n` | Mixes planes; under-predicts by about `cos β` (6 % at 20°, 13 % at 30°). Now measured on the ISO virtual spur gear `z_n = z/cos³β` |
 | 4.5.1 | "Four lines are tangent to both base cylinders; **only one** passes through the pitch point" | Eight, and **two** pass — the tooth's two flanks, drive and coast. The count came from enumerating one normal direction and forgetting the other, and it was hidden because the two are mirror images, so every *length* the path yields is the same on either. It surfaced only when the scratch script was promoted to `tools/crossed_path.py` and the tangency check was added: floating-point noise was deciding which of the two flanks was returned, and the flank normals then came out 83° from it |
 | 4.5.1 | The flank tangency check compared the crate's normal against one flank of each member | A tooth has two, and in mesh the driving flank of one member meets the **facing** flank of the other. Pairing them wrongly puts the answer out by exactly `2α_n` — 40° here — which looks like a broken construction and is a broken comparison. Both faults were in the *checks*, not in the crate, and neither could have been found while the scripts lived in a temporary directory |
+| 4.4 | A crossed pair's centre-distance backlash as `Δa · sin α_n` | **Half the answer.** A separation opens *both* flanks and lost motion is the sum of the gaps a member can travel across, so the term is `2 Δa sin α_n`. It reached the UI as a **50 % step** in backlash the moment the shaft angle left zero — the parallel stage had the exact involute law, the crossed stage had half of its first-order form, and moving `Σ` from 0 to anything crossed between them |
+| 4.4 | ...and the reason it survived | The module derivation wrote both displacements as one gap along `n̂` — `j_n = j_axial sin β_b1 + Δa sin α_n` — which reads as a single tidy projection and is two different physical quantities. A worm's axial float is a **rigid-body slide** (opens one flank as far as it closes the other: counted once); a centre-distance error is a **separation** (opens both: counted twice). One coefficient for both hid the factor. The test that existed, `axial_slack_reproduces_the_two_handbook_relations`, deliberately zeroed the clearance to isolate the axial term, so it constrained the half that was right |
+| 4.5.1 | "Unifying backlash is not obviously a gain... expressing the parallel case in the crossed form would trade exactness for uniformity" | True of the **numerators** and false of everything else, and acting on it as though it settled the question is what left the error unguarded for a milestone. The *conversion* from gap to angle was one law with two homes, and the second home had no check against the first. Every crossed backlash test held the crossed model against itself; the parallel model — which has the exact law and its own tests — was never asked |
 | 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
 | 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
 | 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |
@@ -3399,6 +3507,11 @@ here. Revision 2 additions are marked ★.
 | ◆ Which common tangent line is the mesh | offset of the pitch point from all **eight** — four tangency-sign combinations × two normal directions | **two** pass, at 1e-14 mm, and they are the two *flanks* — drive and coast, mirror images. The other six miss by 34.9, 47.2 and 77.8 mm. Chosen by measurement, not by convention |
 | ◇ The two surfaces are actually **tangent** on that line | both flanks of both members placed through the pitch point, each normal taken from its own parameterisation, over hand × near/far flank × both branches | the matching pair agrees with the constructed normal to **1.2e-6°**, which is the finite-difference floor. The mismatched pairing comes out at exactly 2α_n = 40°, which is a tooth's own flank angle and a good way to recognise the error |
 | ◇ **The crate's construction against the surfaces** | `gear-cli crossed 17 23 90` at β = 45°/45° vs. `tools/crossed_path.py` | ε = 1.777921670 against 1.777921669562 — **4.4e-10**. Two routes to the same line: a construction in lines and angles, and differential geometry on the parametric flanks |
+| ◇ The contact normal leans on the line of centres by exactly `α_n` | `n̂ₓ` vs `sin α_n` over the 117 buildable pairs of `α_n` 14.5/20/25° × `Σ` 5…120° × three helix splits × three tooth pairs | **1e-12**. An identity that looks like an approximation, and the whole numerator of a crossed stage's centre-distance backlash. Independently `n̂ₓ = sin α_n` off the surfaces in `tools/crossed_path.py`, at every shaft angle |
+| ◇ Moving the centres does not turn the line of action | `contact_normal` at `Δa` = 0.05, 0.5, 5 mm, three shaft angles | bit-identical. The property that makes a crossed pair's backlash exactly linear where a parallel pair's is not; asserted rather than left to the signature, because adding the centre distance back into the direction looks harmless |
+| ◇ **The crossed backlash meets the parallel law** | the two solvers at `Σ = 0` and `Σ = 0.001°`, clearance swept 80 → 5 µm | the shortfall falls *with the error* — 0.83 % → 0.052 %, halving when the clearance halves — so the residual is the parallel law's second-order term and the agreement is first order. No tolerance chosen. **This is the gate that did not exist while the factor of two did** |
+| ◇ The parallel backlash is the shared law in its own plane | `Mesh::angular_backlash` vs `angular_play(j_t cos α′ cos β_b, z, p_bn)`, 4 helix angles × 3 pairs × 4 centre distances × both members | 1e-14 relative — and the same for an **internal** mesh, where the transverse form carries a signed tooth sum and the normal form carries nothing about the mate at all |
+| ◇ None of the four is vacuous | each re-broken on purpose: the factor dropped, the `n̂·â₂` sign flipped, the centre distance fed into the direction | each fails, and the dropped factor fails **only** the two new gates out of 355 tests — which is the measurement of how unguarded it had been |
 | ◆ The path's roll lengths | vs. the classical `r sin α_t / cos β_b`, 4 crossed geometries | 1e-9 relative, and the two sum to the tangent length between the base cylinders |
 | ◆ Crossed contact ratio in the parallel limit | Σ = 2°, 0.5°, 0.1°, 0.01° against `ε_α / cos²β_b` | monotone in, 1e-4 by 0.01° — and **not** `ε_α`: the normal-plane path and the normal base pitch each carry a `cos β_b` the same way |
 | ◆ Those checks are not vacuous | the `n̂·â₂` sign deliberately flipped to the other branch | both path tests fail |

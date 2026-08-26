@@ -143,6 +143,26 @@ pub struct Mesh {
     pub z2: u32,
 }
 
+/// Angular play at one member, radians, from a gap measured along the common
+/// flank normal.
+///
+/// **This is the whole of backlash that is not the gap itself**, and it is the
+/// same sentence for every mesh in this crate: a member's flank advances along
+/// the common normal by one normal base pitch per tooth, so a full turn advances
+/// it by `z · p_bn`, and a gap of `j_n` is taken up by `2π j_n / (z p_bn)`.
+///
+/// Nothing here knows the shaft angle, the hand, or whether the mate is a ring.
+/// Those all live in the *gap*, which is where they belong: a displacement
+/// projected onto the common normal. Parallel and crossed axes differ in how the
+/// gap is found and **not at all** in how it becomes an angle — which is why
+/// this is one function rather than a formula written once per stage kind. The
+/// parallel form `j_t |z₁+z₂| / (a′ z)` is the same number in its own transverse
+/// plane, and a test holds the two together.
+#[must_use]
+pub fn angular_play(normal_gap: f64, teeth: u32, normal_base_pitch: f64) -> f64 {
+    2.0 * std::f64::consts::PI * normal_gap / (f64::from(teeth) * normal_base_pitch)
+}
+
 impl Mesh {
     /// Build the operating geometry of a pair.
     ///
@@ -388,6 +408,89 @@ impl std::error::Error for MeshError {}
 mod tests {
     use super::*;
     use crate::GearParams;
+
+    /// **The parallel backlash and the shared law are one law.**
+    ///
+    /// `Mesh::angular_backlash` works in its own transverse plane —
+    /// `j_t |z₁+z₂| / (a′ z)` — and [`angular_play`] works along the common
+    /// normal. They are the same number, and this holds them together, so the
+    /// crossed stage calling `angular_play` is not a second opinion.
+    ///
+    /// The bridge is the identity `cos α_t cos β_b = cos α_n cos β`, which is
+    /// what makes the transverse and normal routes agree exactly rather than
+    /// nearly. Written as a test rather than as a refactor because the
+    /// transverse form is the *exact* one for parallel axes — it carries the
+    /// involute law `2a′(inv α′ − inv α_w)`, second-order term and all — and
+    /// converting it into the normal plane to make one call site would trade
+    /// that exactness for a uniformity the equality already gives free.
+    #[test]
+    fn the_parallel_backlash_is_the_shared_law_in_its_own_plane() {
+        for beta_deg in [0.0_f64, 12.0, 20.0, 30.0] {
+            let beta = beta_deg.to_radians();
+            let g = |z: u32, hand: f64| {
+                Gear::new(GearParams {
+                    teeth: z,
+                    helix_angle: hand * beta_deg,
+                    ..Default::default()
+                })
+            };
+            for (z1, z2) in [(17_u32, 43_u32), (25, 25), (13, 97)] {
+                let (a, b) = (g(z1, 1.0), g(z2, -1.0));
+                let mesh = Mesh::new(&a, &b, MeshKind::External).unwrap();
+                let alpha_n = mesh.alpha_n;
+                let beta_b = (beta.sin() * alpha_n.cos()).asin();
+                let m_n = mesh.mt * beta.cos();
+                let p_bn = std::f64::consts::PI * m_n * alpha_n.cos();
+
+                for delta in [1e-6_f64, 0.01, 0.05, 0.2] {
+                    let a_actual = mesh.a_w + delta;
+                    let alpha_op = mesh.pressure_angle_at(a_actual).unwrap();
+                    // The same gap, read along the common normal instead.
+                    let j_n = mesh.backlash(a_actual).unwrap() * alpha_op.cos() * beta_b.cos();
+                    for (member, z) in [(Member::First, z1), (Member::Second, z2)] {
+                        let transverse = mesh.angular_backlash(a_actual, member).unwrap();
+                        let normal = angular_play(j_n, z, p_bn);
+                        assert!(
+                            (transverse - normal).abs() < 1e-14 * transverse.abs().max(1e-9),
+                            "β={beta_deg}° z={z1}/{z2} Δa={delta}: {transverse} in the \
+                             transverse plane against {normal} along the normal"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// The same equality for an **internal** mesh, where the transverse form
+    /// carries a signed tooth sum and a signed centre distance and the normal
+    /// form carries neither — it sees only one member's own tooth count and
+    /// pitch. If the two still agree, the shared law is genuinely kind-blind.
+    #[test]
+    fn the_shared_law_does_not_need_to_know_the_mate_is_a_ring() {
+        let ring = |z: u32| {
+            Gear::new(GearParams {
+                teeth: z,
+                ..Default::default()
+            })
+        };
+        for (z1, z2) in [(17_u32, 51_u32), (25, 41)] {
+            let mesh = Mesh::new(&ring(z1), &ring(z2), MeshKind::Internal).unwrap();
+            let p_bn = std::f64::consts::PI * mesh.mt * mesh.alpha_n.cos();
+            for delta in [0.01_f64, 0.05] {
+                let a_actual = mesh.a_w + delta;
+                let alpha_op = mesh.pressure_angle_at(a_actual).unwrap();
+                let j_n = mesh.backlash(a_actual).unwrap() * alpha_op.cos();
+                for (member, z) in [(Member::First, z1), (Member::Second, z2)] {
+                    let transverse = mesh.angular_backlash(a_actual, member).unwrap();
+                    let normal = angular_play(j_n, z, p_bn);
+                    assert!(
+                        (transverse - normal).abs() < 1e-14 * transverse.abs().max(1e-9),
+                        "ring {z1}/{z2} Δa={delta}: {transverse} against {normal}"
+                    );
+                }
+            }
+        }
+    }
 
     fn pair(z1: u32, z2: u32, x1: f64, x2: f64) -> (Gear, Gear) {
         (

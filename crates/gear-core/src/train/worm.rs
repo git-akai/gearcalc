@@ -12,28 +12,54 @@
 //! *stage*: materials, face widths, torque, backlash and the notes a designer
 //! needs to see.
 //!
-//! # Backlash comes out of one projection
+//! # Backlash comes out of one projection — and two kinds of displacement
 //!
 //! Two things open a gap between the flanks: axial slack in the worm, and a
-//! centre distance larger than nominal. Both are displacements, and what matters
-//! is their component along the common flank normal `n̂`:
+//! centre distance larger than nominal. Both are displacements, and both matter
+//! only through their component along the common flank normal `n̂` — the very
+//! same `n̂` the path of contact is built on ([`crate::screw::Screw::contact_normal`]),
+//! projected rather than re-derived:
 //!
 //! ```text
-//! j_n = j_axial · sin β_b1   +   Δa · sin α_n
+//! j_n = j_axial · (â₁·n̂)   +   2 Δa · (x̂·n̂)
+//!     = j_axial · sin β_b1  +   2 Δa · sin α_n
 //! ```
 //!
-//! — the worm's axis direction and the centre line, each projected onto `n̂`.
-//! Closing that gap takes a rotation of either member, and the rotation is the
-//! gap divided by how fast that member's surface moves along `n̂`:
+//! **The two are not the same kind of displacement, and the factor of two is
+//! where that shows.** A centre distance above nominal *separates the axes*, and
+//! a separation opens **both** flanks by the same amount; lost motion is the sum
+//! of the gaps a member can travel across, so it counts twice. The worm's axial
+//! float is a *rigid-body slide* along its own axis: it opens one flank exactly
+//! as far as it closes the other, so running from one end of the float to the
+//! other is lost once. Writing both as "a gap along `n̂`" and giving them one
+//! coefficient is what left a factor of two in this model for a milestone
+//! (DESIGN §12).
 //!
-//! ```text
-//! θ₁ = j_n / (r₁ cos α_n sin γ₁),    θ₂ = j_n / (r₂ cos α_n sin γ₂)
-//! ```
+//! `sin α_n` there is an identity, not a small-angle reading: the contact
+//! normal's component along the line of centres is `sin α_n` at **every** shaft
+//! angle, which `screw.rs` gates and `tools/crossed_path.py` measures off the
+//! surfaces.
 //!
-//! At a right-angle drive that reduces to the two relations the handbooks give
-//! separately — the wheel turns by `j_axial/r₂`, and the worm by
-//! `2π j_axial/lead` — which is the check the tests make. It is one projection
-//! rather than two rules, and it holds at any shaft angle.
+//! Closing the gap takes a rotation, and that conversion is
+//! [`crate::mesh::angular_play`] — the law every mesh in this crate shares. It
+//! is the same number as the `j_n / (r cos α_n sin γ)` this module used to
+//! write for itself, since `r sin γ = z m_n / 2` exactly; the point of calling
+//! the shared one is that a law with two homes is a law with two answers, and
+//! the home nothing checks is the one that is wrong.
+//!
+//! At a right-angle drive the axial half reduces to the two relations the
+//! handbooks give separately — the wheel turns by `j_axial/r₂`, and the worm by
+//! `2π j_axial/lead` — which is the check the tests make.
+//!
+//! ## Where this law stops, and where the parallel one takes over
+//!
+//! A crossed pair's backlash is **exactly linear** in the centre-distance error,
+//! because its line of action cannot rotate when the centres move. A parallel
+//! pair's is not: at `Σ = 0` the constraint on `n̂` degenerates, the freed
+//! rotation *is* the operating pressure angle, and `j_t = 2a′(inv α′ − inv α_w)`
+//! carries the difference. The two agree to first order — gated both ways in the
+//! tests below — and part company by 0.21 % at the default clearance. That step
+//! at `Σ = 0` is the degeneracy, not a seam in the code.
 
 use super::{solve_stage, Backlash, TrainError};
 
@@ -891,15 +917,39 @@ fn crossed_mesh(
 }
 
 fn angular_backlash(s: &Screw, stage: &WormStage, delta: f64, at: Member) -> f64 {
-    let alpha_n = stage.pressure_angle.to_radians();
-    let beta_b1 = (s.worm_helix_angle.sin() * alpha_n.cos()).asin();
-
-    let gap = stage.axial_clearance * beta_b1.sin() + delta.max(0.0) * alpha_n.sin();
-    let (radius, lead) = match at {
-        Member::First => (s.worm_pitch_diameter / 2.0, s.lead_angle),
-        Member::Second => (s.wheel_pitch_diameter / 2.0, s.wheel_lead_angle),
+    // One normal, and both displacements projected onto it — the same vector the
+    // path of contact is built on, rather than its components written out again.
+    let Some(n) = s.contact_normal() else {
+        return 0.0;
     };
-    gap / (radius * alpha_n.cos() * lead.sin())
+
+    // **Two displacements, and they are not the same kind of thing.** Reading
+    // them as one gap is what kept a factor of two wrong here (§12).
+    //
+    // A centre distance above nominal *separates the axes*, and a separation
+    // opens **both** flanks by the same amount. Lost motion is the sum of the
+    // gaps a member can travel across, so the factor is two — the same "a tooth
+    // has two flanks" the path construction turns on.
+    //
+    // A worm's axial float is a **rigid-body slide** along its own axis, not a
+    // separation: it opens one flank exactly as far as it closes the other, so
+    // running from one end of the float to the other is lost once, not twice.
+    //
+    // `n[0]` is the centre line's projection and comes out `sin α_n` at every
+    // shaft angle; `n[2]` is the worm axis's and is `sin β_b1`. Neither is a
+    // small-angle reading — see `Screw::contact_normal`.
+    let separation = 2.0 * delta.max(0.0) * n[0].abs();
+    let slide = stage.axial_clearance * n[2].abs();
+
+    let teeth = match at {
+        Member::First => stage.starts,
+        Member::Second => stage.wheel_teeth,
+    };
+    // The gap becomes an angle by the law every mesh here shares. `r cos α_n
+    // sin γ` is the same number — `r sin γ = z m_n / 2` exactly — but writing it
+    // that way made this the second home of a law the parallel mesh already had,
+    // and the second home is the one that got the wrong numerator.
+    crate::mesh::angular_play(separation + slide, teeth, s.normal_base_pitch())
 }
 
 #[cfg(test)]
@@ -1767,6 +1817,143 @@ mod tests {
             assert!((b2 + additional).abs() < 1e-12, "the hands must oppose");
             assert!(!stage.is_crossed());
         }
+    }
+
+    /// **The crossed backlash law and the parallel one meet where the shafts
+    /// straighten — and the gate is the meeting, not a number.**
+    ///
+    /// This is the check that was missing while the crossed centre-distance term
+    /// counted one flank where two open, and a factor of two sat in the model
+    /// for a milestone (§12): every crossed backlash test held the crossed model
+    /// against itself, and the parallel model — which has the exact involute law
+    /// and its own tests — was never asked.
+    ///
+    /// They are **not the same law** and must not be forced to be. A parallel
+    /// pair's line of action rotates as the centres separate, so its backlash is
+    /// exactly `2a′(inv α′ − inv α_w)` and nonlinear in the error. A crossed
+    /// pair's line cannot rotate (`Screw::contact_normal`), so its backlash is
+    /// exactly linear. What must hold is that they agree to **first order**, and
+    /// the way to test that without picking a tolerance out of the air is to
+    /// watch the shortfall vanish *with the error*: halve the clearance and the
+    /// relative gap must halve too.
+    #[test]
+    fn the_crossed_backlash_meets_the_parallel_law_at_its_limit() {
+        use crate::params::Auto;
+        use crate::train::spur::solve_stage;
+        use crate::train::{SpurStage, StageGear};
+
+        let lib = super::super::test_library();
+        let stage = |sigma: f64, clearance: f64| SpurStage {
+            shaft_angle: sigma,
+            additional_helix: 20.0,
+            clearance,
+            gears: [
+                StageGear {
+                    teeth: 17,
+                    face_width: Auto::fixed(8.0),
+                    ..StageGear::default()
+                },
+                StageGear {
+                    teeth: 43,
+                    face_width: Auto::fixed(8.0),
+                    ..StageGear::default()
+                },
+            ],
+            ..SpurStage::default()
+        };
+
+        let mut last = f64::INFINITY;
+        for clearance in [0.08_f64, 0.04, 0.02, 0.01, 0.005] {
+            let parallel = solve_stage(&stage(0.0, clearance), 2.0, &lib)
+                .expect("a parallel pair")
+                .backlash
+                .forward
+                .nominal;
+            // As close to parallel as the screw model will go. The pair is still
+            // crossed, so it is still the crossed law answering.
+            let crossed = solve_crossed_stage(&stage(0.001, clearance), 2.0, &lib)
+                .expect("a crossed pair")
+                .backlash
+                .forward
+                .nominal;
+
+            assert!(
+                parallel > 0.0 && crossed > 0.0,
+                "clearance {clearance}: {parallel} and {crossed}"
+            );
+            let gap = (parallel - crossed) / parallel;
+            assert!(
+                gap > 0.0,
+                "clearance {clearance}: the crossed figure must sit just below the \
+                 parallel one, since the parallel law's second-order term only adds. \
+                 Got {crossed} against {parallel}"
+            );
+            assert!(
+                gap < last,
+                "clearance {clearance}: the shortfall is {gap} and did not fall \
+                 from {last} — the two laws are not meeting"
+            );
+            last = gap;
+        }
+        // ...and the agreement is real rather than merely improving: at 5 µm of
+        // clearance the two laws sit 0.052 % apart, which is the parallel law's
+        // second-order term and nothing else. The bound is loose because the
+        // *trend* above is the gate; this only catches a model that converges
+        // on the wrong number.
+        assert!(
+            last < 1e-3,
+            "the closest the two laws came was {last} apart, relative"
+        );
+    }
+
+    /// The other half of the same story: the shortfall above is **second order**,
+    /// so it must fall by half when the clearance does. A first-order error —
+    /// the factor of two that was there — would not move at all.
+    #[test]
+    fn the_shortfall_at_the_limit_is_second_order_in_the_error() {
+        use crate::params::Auto;
+        use crate::train::spur::solve_stage;
+        use crate::train::{SpurStage, StageGear};
+
+        let lib = super::super::test_library();
+        let stage = |sigma: f64, clearance: f64| SpurStage {
+            shaft_angle: sigma,
+            additional_helix: 20.0,
+            clearance,
+            gears: [
+                StageGear {
+                    teeth: 17,
+                    face_width: Auto::fixed(8.0),
+                    ..StageGear::default()
+                },
+                StageGear {
+                    teeth: 43,
+                    face_width: Auto::fixed(8.0),
+                    ..StageGear::default()
+                },
+            ],
+            ..SpurStage::default()
+        };
+        let shortfall = |clearance: f64| {
+            let parallel = solve_stage(&stage(0.0, clearance), 2.0, &lib)
+                .expect("a parallel pair")
+                .backlash
+                .forward
+                .nominal;
+            let crossed = solve_crossed_stage(&stage(0.001, clearance), 2.0, &lib)
+                .expect("a crossed pair")
+                .backlash
+                .forward
+                .nominal;
+            (parallel - crossed) / parallel
+        };
+        let (coarse, fine) = (shortfall(0.04), shortfall(0.02));
+        let halving = coarse / fine;
+        assert!(
+            (halving - 2.0).abs() < 0.05,
+            "halving the clearance moved the shortfall by {halving}×, not 2× — \
+             the residual is not the second-order term it is documented as"
+        );
     }
 
     /// A crossed gear pair solves end to end, and reports what a worm stage
