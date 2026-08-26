@@ -910,10 +910,6 @@
                     <option value="diameter">Pitch diameter — a worm</option>
                     <option value="helix">Helix angle — a gear</option>
                   </select>
-                  <small>
-                    a worm's diameter is a free choice and its lead angle follows; a gear's
-                    diameter follows from its teeth and helix. Same geometry, opposite input
-                  </small>
                 </label>
                 {#if "pitch_diameter" in stage.sizing}
                   <label>

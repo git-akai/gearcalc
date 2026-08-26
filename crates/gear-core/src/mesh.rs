@@ -228,6 +228,41 @@ impl Mesh {
         Ok(c.acos())
     }
 
+    /// The same pair described at an **operating** centre distance.
+    ///
+    /// `a_w` and `alpha_w` are this type's "the distance and angle the pair runs
+    /// at"; at construction they are the *zero-backlash* pair, which is where the
+    /// profile shifts put it. A real pair runs at that plus its assembly
+    /// clearance, and every contact quantity — the path, the operating radii, the
+    /// relative curvature and so the Hertz stress — is a property of where it
+    /// actually runs. This is how that distance reaches them, without threading
+    /// it through six signatures and without a second signed-curvature relation
+    /// for it to disagree with.
+    ///
+    /// `a_ref`, `alpha_t`, `mt` and the tooth counts are the *cut* geometry and
+    /// do not move, so [`Self::base_radii`] is invariant across this — the base
+    /// cylinders are the gears, not the assembly.
+    ///
+    /// # The one thing this is not for
+    ///
+    /// **Backlash.** [`Self::backlash`] measures play *against* `alpha_w` as the
+    /// zero-backlash reference, so asking an operating mesh for it returns zero
+    /// by construction — correctly, since a pair has no play against itself.
+    /// Keep the design mesh for that and use this for contact. A test holds both
+    /// halves of that sentence.
+    ///
+    /// # Errors
+    ///
+    /// [`MeshError::CentreDistanceTooSmall`] if the base circles cannot reach —
+    /// the same condition [`Self::pressure_angle_at`] refuses.
+    pub fn at(&self, a_actual: f64) -> Result<Self, MeshError> {
+        Ok(Self {
+            a_w: a_actual,
+            alpha_w: self.pressure_angle_at(a_actual)?,
+            ..*self
+        })
+    }
+
     /// Transverse circumferential backlash at an actual centre distance, mm.
     ///
     /// Positive is play; negative means the teeth interfere. Exact — see the
@@ -408,6 +443,54 @@ impl std::error::Error for MeshError {}
 mod tests {
     use super::*;
     use crate::GearParams;
+
+    /// **The operating mesh is the same pair, moved — and it is not the mesh to
+    /// ask about backlash.**
+    ///
+    /// Both halves matter. The cut geometry must survive the move, or contact
+    /// would be rated against base cylinders that do not exist; and the design
+    /// mesh must stay the reference for play, or a stage that rated at its
+    /// operating distance would report no backlash at all. That second half is
+    /// the footgun this type now carries, so it is written down as a test.
+    #[test]
+    fn an_operating_mesh_keeps_the_cut_geometry_and_gives_up_the_backlash_reference() {
+        let g = |z: u32, x: f64, hand: f64| {
+            Gear::new(GearParams {
+                teeth: z,
+                profile_shift: x,
+                helix_angle: hand * 12.0,
+                ..Default::default()
+            })
+        };
+        for (z1, z2, x1, x2) in [(17_u32, 43_u32, 0.0, 0.0), (23, 31, 0.3, -0.1)] {
+            let design = Mesh::new(&g(z1, x1, 1.0), &g(z2, x2, -1.0), MeshKind::External).unwrap();
+            for delta in [0.02_f64, 0.2, 1.0] {
+                let a = design.a_w + delta;
+                let running = design.at(a).unwrap();
+
+                // The gears did not change, so neither did their base cylinders.
+                let (b1, b2) = design.base_radii();
+                let (r1, r2) = running.base_radii();
+                assert_eq!(b1.to_bits(), r1.to_bits());
+                assert_eq!(b2.to_bits(), r2.to_bits());
+                // `a cos α` is the same invariant said another way.
+                assert!(
+                    (running.a_w * running.alpha_w.cos() - design.a_w * design.alpha_w.cos()).abs()
+                        < 1e-12
+                );
+
+                // What did change: it runs wider, at a larger pressure angle,
+                // on larger operating radii.
+                assert!(running.alpha_w > design.alpha_w);
+                assert!(running.operating_radii().0 > design.operating_radii().0);
+
+                // And the play it reports against itself is nothing, which is
+                // why backlash keeps the design mesh.
+                assert!(running.backlash(a).unwrap().abs() < 1e-12);
+                assert!(design.backlash(a).unwrap() > 0.0);
+            }
+        }
+    }
 
     /// **The parallel backlash and the shared law are one law.**
     ///

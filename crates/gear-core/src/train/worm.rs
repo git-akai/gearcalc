@@ -537,7 +537,12 @@ pub fn solve_crossed_stage(
             r[1] + stage.gears[1].addendum.manual * stage.module,
         ]
     };
-    let path = screw.path_of_contact(tips[0], tips[1]);
+    // At the centre distance the pair will run at, not the zero-backlash one:
+    // an automatic face is sized for the machine that gets built. On a crossed
+    // pair that is not a refinement — the contact slides bodily along the shafts
+    // with a centre-distance error, so a face centred on the nominal contact can
+    // miss it entirely (§4.4).
+    let path = screw.path_of_contact_at(tips[0], tips[1], operating_centre(&screw, &equivalent));
 
     // **Automatic face width means continuity here, not strength.** The spur
     // stage inverts a stress to size a face; a crossed pair has no stress that
@@ -590,7 +595,13 @@ pub fn solve_crossed_stage(
 
     // ...and the zone as the widths in use actually leave it. The tips are known
     // here — a crossed pair carries its tooth form — so nothing is assumed.
-    result.crossed = crossed_mesh(&screw, &result.members, Some(tips), parallel);
+    result.crossed = crossed_mesh(
+        &screw,
+        &result.members,
+        Some(tips),
+        parallel,
+        result.centre_distance,
+    );
 
     if let Some(zone) = result.crossed {
         if zone.contact_ratio < 1.0 {
@@ -628,11 +639,7 @@ pub fn solve_worm_stage(
         })
         .collect::<Result<_, _>>()?;
 
-    let (centre, _clearance) = if stage.centre_distance.auto {
-        (s.centre_distance + stage.clearance, stage.clearance)
-    } else {
-        (stage.centre_distance.manual, 0.0)
-    };
+    let centre = operating_centre(&s, stage);
 
     // The face widths, decided before anything that reads them — the path is
     // one of those things now, since a face narrow enough to cut the zone
@@ -670,7 +677,7 @@ pub fn solve_worm_stage(
     //
     // Every figure this moves, it moves **down**: more sliding is counted, and
     // sliding cannot repay. See the canary note in DESIGN §4.5.1.
-    let path = rating_path(&s, widths, None);
+    let path = rating_path(&s, widths, None, centre);
     let efficiency = Directional::of(|d| {
         path.and_then(|p| p.efficiency(&s, stage.friction, d, PATH_SAMPLES))
             .unwrap_or_else(|| s.efficiency(stage.friction, d))
@@ -821,7 +828,7 @@ pub fn solve_worm_stage(
         wheel_helix_angle: s.wheel_helix_angle.to_degrees(),
         lead: s.lead,
         axial_module: s.axial_module,
-        crossed: crossed_mesh(&s, &members, None, None),
+        crossed: crossed_mesh(&s, &members, None, None, centre),
         efficiency,
         self_locking_friction: threshold,
         sliding_ratio: s.sliding_ratio,
@@ -872,13 +879,34 @@ pub fn solve_worm_stage(
 /// Shares its assumptions with [`crossed_mesh`], which reports the same zone:
 /// one construction, asked twice for different things, rather than two that can
 /// disagree about where the teeth touch.
-fn rating_path(s: &Screw, face: [f64; 2], tips: Option<[f64; 2]>) -> Option<CrossedPath> {
+/// The centre distance the pair actually runs at.
+///
+/// Nominal plus the assembly clearance when the centre distance is automatic,
+/// and the number as entered when it is not — the specification's rule, and the
+/// one both the rating and the backlash have to agree on. One home for it
+/// because a stage asks twice: once inside the solve, and once before it, to
+/// size an automatic face for the pair **as built** rather than for the
+/// zero-backlash one nobody assembles.
+fn operating_centre(s: &Screw, stage: &WormStage) -> f64 {
+    if stage.centre_distance.auto {
+        s.centre_distance + stage.clearance
+    } else {
+        stage.centre_distance.manual
+    }
+}
+
+fn rating_path(
+    s: &Screw,
+    face: [f64; 2],
+    tips: Option<[f64; 2]>,
+    centre: f64,
+) -> Option<CrossedPath> {
     let assumed = s.normal_module();
     let tips = tips.unwrap_or([
         s.worm_pitch_diameter / 2.0 + assumed,
         s.wheel_pitch_diameter / 2.0 + assumed,
     ]);
-    let path = s.path_of_contact(tips[0], tips[1])?;
+    let path = s.path_of_contact_at(tips[0], tips[1], centre)?;
     Some(path.limited_by_face(s, face).map_or(path, |(z, _)| z))
 }
 
@@ -887,6 +915,7 @@ fn crossed_mesh(
     members: &[WormMemberResult; 2],
     tips: Option<[f64; 2]>,
     parallel_axis_efficiency: Option<f64>,
+    centre: f64,
 ) -> Option<CrossedMesh> {
     let radii = [
         members[0].pitch_diameter / 2.0,
@@ -901,7 +930,7 @@ fn crossed_mesh(
     // numbers which they were would answer wrongly exactly there.
     let tooth_height_assumed = tips.is_none();
     let tips = tips.unwrap_or([radii[0] + assumed, radii[1] + assumed]);
-    let path = s.path_of_contact(tips[0], tips[1])?;
+    let path = s.path_of_contact_at(tips[0], tips[1], centre)?;
     let face = [members[0].face_width, members[1].face_width];
     let (zone, limited_by) = path
         .limited_by_face(s, face)
@@ -1250,14 +1279,36 @@ mod tests {
             );
         }
 
-        // Half that face, half the contact — and the result says so out loud
-        // rather than leaving a number below 1 to be noticed.
+        // Half that face, about half the contact — and slightly less than half,
+        // which is the point. The face is centred on its own gear and the
+        // contact is not quite centred on the face, because the pair runs at its
+        // nominal centre distance *plus the clearance* and that slides the
+        // contact along the shafts (§4.4). Trimming a face symmetrically about
+        // an asymmetric contact loses a little more than half.
         let narrow = solve_crossed_stage(&stage(Auto::fixed(sized[0] / 2.0)), 2.0, &lib).unwrap();
         let n = narrow.crossed.unwrap();
         assert!(
-            (n.contact_ratio - 0.5).abs() < 1e-9,
-            "half the face should leave half the contact: {}",
+            n.contact_ratio < 0.5 && n.contact_ratio > 0.45,
+            "half the face should leave a little under half the contact: {}",
             n.contact_ratio
+        );
+
+        // ...and it is *exactly* half once the clearance is taken away, which
+        // pins the shortfall on the slide rather than on the arithmetic.
+        let tight = |face: Auto<f64>| SpurStage {
+            clearance: 0.0,
+            ..stage(face)
+        };
+        let centred = solve_crossed_stage(&tight(Auto::automatic(0.0)), 2.0, &lib).unwrap();
+        let width = centred
+            .crossed
+            .expect("a path")
+            .face_width_for_continuity
+            .expect("a width for continuity");
+        let halved = solve_crossed_stage(&tight(Auto::fixed(width[0] / 2.0)), 2.0, &lib).unwrap();
+        assert!(
+            (halved.crossed.unwrap().contact_ratio - 0.5).abs() < 1e-9,
+            "with the contact centred, half the face is exactly half the contact"
         );
         assert!(
             narrow.notes.iter().any(|s| s.contains("loses contact")),
@@ -1502,12 +1553,20 @@ mod tests {
             gears: [
                 StageGear {
                     teeth: 17,
-                    face_width: Auto::fixed(12.0),
+                    // Wide enough that the **tips** end the zone at every shaft
+                    // angle below, which is what makes this a like-for-like
+                    // comparison. A 12 mm face is not: near the parallel limit a
+                    // centre-distance error slides the contact several
+                    // millimetres along the shafts, the face cuts the zone
+                    // short, and comparing a partly engaged pair against a fully
+                    // engaged one measures the truncation rather than the
+                    // sliding. That effect has its own test below.
+                    face_width: Auto::fixed(60.0),
                     ..StageGear::default()
                 },
                 StageGear {
                     teeth: 43,
-                    face_width: Auto::fixed(12.0),
+                    face_width: Auto::fixed(60.0),
                     ..StageGear::default()
                 },
             ],
@@ -1517,9 +1576,14 @@ mod tests {
         let mut previous = 1.0;
         for sigma in [0.5f64, 2.0, 10.0, 45.0, 90.0] {
             let r = solve_crossed_stage(&stage(sigma), 2.0, &lib).unwrap();
-            let parallel = r
-                .crossed
-                .expect("a path")
+            let mesh = r.crossed.expect("a path");
+            assert_eq!(
+                mesh.limited_by,
+                ZoneLimit::Tips,
+                "Σ={sigma}°: the face is cutting the zone, so this is not a \
+                 like-for-like comparison"
+            );
+            let parallel = mesh
                 .parallel_axis_efficiency
                 .expect("a parallel counterpart");
             assert!(
@@ -1954,6 +2018,140 @@ mod tests {
             "halving the clearance moved the shortfall by {halving}×, not 2× — \
              the residual is not the second-order term it is documented as"
         );
+    }
+
+    /// **A worm stage is rated where it runs, too.**
+    ///
+    /// The crossed path above reaches the operating centre distance through
+    /// `solve_crossed_stage`, which overrides it; a plain worm stage reaches it
+    /// through `solve_worm_stage` itself, and that is a second call site with a
+    /// second chance to be left on the nominal. Gated separately for exactly
+    /// that reason — reverting either one alone must fail something.
+    ///
+    /// Asserted as a direction, not a figure: opening the centre distance
+    /// separates the base cylinders along the line of action, which can only
+    /// **shorten** the zone, so more clearance is less contact.
+    ///
+    /// The efficiency is asserted only to *move*, because its direction is not a
+    /// law. A shorter zone is less sliding to pay for, but which end it loses
+    /// decides whether that helps: a near-parallel pair loses the ends, where
+    /// profile sliding is worst, and gets better (0.98786 → 0.98801 at
+    /// `Σ = 0.5°`); a worm loses path where the balance was doing comparatively
+    /// well and gets worse (68.430 → 67.525 % from zero to 0.3 mm). Asserting a
+    /// direction here would be asserting one of those two cases.
+    #[test]
+    fn a_worm_stage_is_rated_at_the_centre_distance_it_runs_at() {
+        let stage = |clearance: f64| WormStage {
+            clearance,
+            ..WormStage::default()
+        };
+        let mut previous: Option<(f64, f64)> = None;
+        for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
+            let r = solved(&stage(clearance));
+            let eps = r.crossed.expect("a path of contact").contact_ratio;
+            let eta = r.efficiency.forward;
+            if let Some((was_eps, was_eta)) = previous {
+                assert!(
+                    eps < was_eps,
+                    "clearance {clearance}: opening the centres can only shorten \
+                     the zone — ε {eps} against {was_eps}"
+                );
+                assert!(
+                    (eta - was_eta).abs() > 1e-9,
+                    "clearance {clearance}: the rating did not move, so the centre \
+                     distance is not reaching it"
+                );
+            }
+            previous = Some((eps, eta));
+        }
+    }
+
+    /// **A centre-distance error slides a crossed pair's contact along the
+    /// shafts, and near the parallel limit it slides clean off the face.**
+    ///
+    /// The effect the model could not see while every path was built at the
+    /// zero-backlash centre distance. A crossed pair's line of action cannot
+    /// turn when the centres move (§4.4), so it *translates* instead — and the
+    /// translation grows roughly as `1/sin Σ`, without bound. A 20 µm clearance
+    /// is nothing at 90° and several millimetres at half a degree.
+    ///
+    /// Asserted as the trend and its consequence rather than as millimetres:
+    /// with the clearance the near-parallel pair is **face-limited and below
+    /// ε = 1**, and taking the clearance away restores it. That is a designer's
+    /// question — will these teeth touch as built — answered where it used to
+    /// silently report the contact ratio of a pair nobody assembled.
+    #[test]
+    fn a_centre_distance_error_slides_a_crossed_pairs_contact_off_its_face() {
+        use crate::params::Auto;
+        use crate::train::{SpurStage, StageGear};
+
+        let lib = super::super::test_library();
+        let stage = |sigma: f64, clearance: f64| SpurStage {
+            shaft_angle: sigma,
+            additional_helix: 20.0,
+            clearance,
+            gears: [
+                StageGear {
+                    teeth: 17,
+                    face_width: Auto::fixed(12.0),
+                    ..StageGear::default()
+                },
+                StageGear {
+                    teeth: 43,
+                    face_width: Auto::fixed(12.0),
+                    ..StageGear::default()
+                },
+            ],
+            ..SpurStage::default()
+        };
+        let mesh = |sigma: f64, clearance: f64| {
+            solve_crossed_stage(&stage(sigma, clearance), 2.0, &lib)
+                .expect("a crossed pair")
+                .crossed
+                .expect("a path of contact")
+        };
+
+        // At a right angle the same clearance costs almost nothing...
+        let square = mesh(90.0, 0.02);
+        assert_eq!(square.limited_by, ZoneLimit::Tips);
+        assert!(square.contact_ratio > 1.5);
+
+        // ...and near the parallel limit it takes the mesh apart.
+        let near = mesh(0.5, 0.02);
+        assert_eq!(
+            near.limited_by,
+            ZoneLimit::Face,
+            "the contact should have slid past the face"
+        );
+        assert!(
+            near.contact_ratio < 1.0,
+            "a pair whose contact has left the face cannot be continuous: {}",
+            near.contact_ratio
+        );
+
+        // The clearance is the whole of it: take it away and the same teeth on
+        // the same face are tip-limited again, with contact to spare.
+        let centred = mesh(0.5, 0.0);
+        assert_eq!(centred.limited_by, ZoneLimit::Tips);
+        assert!(
+            centred.contact_ratio > 1.5 * near.contact_ratio,
+            "{} against {}",
+            centred.contact_ratio,
+            near.contact_ratio
+        );
+
+        // And it is monotone in the shaft angle, which is the `1/sin Σ` showing
+        // through without a number being written down.
+        let mut previous = 0.0;
+        for sigma in [0.5f64, 1.0, 5.0, 30.0, 90.0] {
+            let eps = mesh(sigma, 0.02).contact_ratio;
+            assert!(
+                eps > previous,
+                "Σ={sigma}°: straightening the shafts must cost more contact, \
+                 not less — {eps} against {previous}"
+            );
+            previous = eps;
+        }
     }
 
     /// A crossed gear pair solves end to end, and reports what a worm stage

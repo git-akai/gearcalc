@@ -748,6 +748,52 @@ mod tests {
         );
     }
 
+    /// **A parallel stage is rated where it runs, not where it was designed.**
+    ///
+    /// `Mesh::a_w` is the **zero-backlash** centre distance — where the profile
+    /// shifts put the pair — and a real one runs at that plus its assembly
+    /// clearance. Every contact quantity belongs to the second: the path
+    /// shortens, the operating pressure angle opens, the relative curvature
+    /// grows. Rating at `a_w` was rating a pair nobody assembles, and the
+    /// clearance is not a detail to round away — it is the reason the stage has
+    /// any backlash to report at all.
+    ///
+    /// The direction is the law and is asserted as one: separating the centres
+    /// can only shorten the path of contact. Everything downstream follows —
+    /// less load sharing, so more bending stress — which is why the numbers
+    /// moved when this landed (DESIGN §4.4).
+    ///
+    /// Backlash is deliberately *not* in this test's scope: it measures play
+    /// against the zero-backlash reference and keeps the design mesh. That
+    /// division is gated in `mesh.rs`.
+    #[test]
+    fn a_parallel_stage_is_rated_at_the_centre_distance_it_runs_at() {
+        let lib = library();
+        let stage = |clearance: f64| SpurStage {
+            clearance,
+            ..SpurStage::default()
+        };
+        let mut previous: Option<(f64, f64)> = None;
+        for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
+            let r = solve_stage(&stage(clearance), 2.0, &lib).unwrap();
+            let eps = r.contact_ratios.transverse;
+            let bending = r.gears[0].bending_stress.expect("a rateable tooth");
+            if let Some((was_eps, was_bending)) = previous {
+                assert!(
+                    eps < was_eps,
+                    "clearance {clearance}: separating the centres can only \
+                     shorten the path — ε {eps} against {was_eps}"
+                );
+                assert!(
+                    bending > was_bending,
+                    "clearance {clearance}: a shorter path is less load sharing, \
+                     so the tooth carries more — {bending} against {was_bending}"
+                );
+            }
+            previous = Some((eps, bending));
+        }
+    }
+
     #[test]
     fn a_spur_stage_has_exactly_zero_overlap_and_a_helical_one_does_not() {
         let lib = library();

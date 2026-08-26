@@ -463,6 +463,14 @@ pub struct CrossedPath {
     pub length: f64,
     /// Tooth pairs in contact: the zone over the normal base pitch.
     pub contact_ratio: f64,
+    /// The centre distance this path was built at, mm.
+    ///
+    /// Carried because it is generally **not** the pair's zero-backlash one, and
+    /// because everything read off the path — the contact point in space, the
+    /// moment arms of the force balance — needs the same one the line was placed
+    /// with. A path that remembered its geometry and then asked the `Screw` for
+    /// the centre distance would be two answers again.
+    pub centre_distance: f64,
 }
 
 impl Screw {
@@ -519,6 +527,43 @@ impl Screw {
     /// inputs beyond the pitch geometry, and they are what makes the zone finite.
     #[must_use]
     pub fn path_of_contact(&self, tip_radius_1: f64, tip_radius_2: f64) -> Option<CrossedPath> {
+        self.path_of_contact_at(tip_radius_1, tip_radius_2, self.centre_distance)
+    }
+
+    /// The same path at an **operating** centre distance, which is generally not
+    /// the zero-backlash one a stage is designed around.
+    ///
+    /// # Why this is not simply the above with a different number in it
+    ///
+    /// The branch. Eight lines are tangent to both base cylinders and two of them
+    /// are the mesh — the tooth's drive flank and its coast flank — and
+    /// [`Self::path_of_contact`] tells them from the other six by asking which
+    /// passes through the pitch point. **At any other centre distance none of
+    /// them does**, so that question has no answer there and the construction
+    /// used to return `None` rather than a path.
+    ///
+    /// Which branch is the mesh is a fact about *which flanks face each other*,
+    /// not about how far apart the shafts are, so it is settled once at the
+    /// zero-backlash distance and carried. That is also the only reading that
+    /// stays continuous: the geometry does not swap flanks because a bearing
+    /// bore went 20 µm wide.
+    ///
+    /// # What moves, and what does not
+    ///
+    /// The direction does not — see [`Self::contact_normal`]. The base cylinders
+    /// do not, so each member's *reach* along the line is unchanged. What moves
+    /// is where the line sits: the two tangency points separate, which shortens
+    /// the zone and with it the contact ratio, and the whole contact slides
+    /// **along the axes**. A parallel pair has no equivalent of that last one —
+    /// there the line of action turns instead, which is the same degeneracy seen
+    /// from the other side (§4.4).
+    #[must_use]
+    pub fn path_of_contact_at(
+        &self,
+        tip_radius_1: f64,
+        tip_radius_2: f64,
+        centre_distance: f64,
+    ) -> Option<CrossedPath> {
         let (r1, r2) = (
             self.worm_pitch_diameter / 2.0,
             self.wheel_pitch_diameter / 2.0,
@@ -538,43 +583,29 @@ impl Screw {
         //    projection uses too. It owes nothing to the centre distance.
         let n = self.contact_normal()?;
         let (sin_sigma, cos_sigma) = self.shaft_angle.sin_cos();
-
-        // 2. The line: with the direction fixed, tangency to each base cylinder
-        //    is one linear equation on a point of it. Four sign combinations are
-        //    tangent to both; the mesh is the one through the pitch point, and
-        //    that is asked rather than assumed.
         let axis_1 = [0.0, 0.0, 1.0];
         let axis_2 = [0.0, sin_sigma, cos_sigma];
-        let centre_2 = [self.centre_distance, 0.0, 0.0];
         let pitch = [r1, 0.0, 0.0];
 
-        let mut best: Option<(f64, [f64; 3])> = None;
-        for s1 in [1.0, -1.0] {
-            for s2 in [1.0, -1.0] {
-                let Some(p) = tangent_line(n, axis_1, axis_2, centre_2, s1 * rb1, s2 * rb2) else {
-                    continue;
-                };
-                let v = sub(pitch, p);
-                let off = norm(sub(v, scale(n, dot(v, n))));
-                if best.is_none_or(|(b, _)| off < b) {
-                    best = Some((off, p));
-                }
-            }
-        }
-        let (offset, point) = best?;
-        // The pitch point is on the line exactly, so a residual here is not a
-        // tolerance to widen — it means no branch was the mesh. Stated the way
-        // round that refuses a NaN rather than letting one through a `<`.
-        if offset.is_nan() || offset >= 1e-6 * self.centre_distance.max(1.0) {
-            return None;
-        }
+        // 2. The branch, settled at the zero-backlash distance where the pitch
+        //    point can arbitrate, and carried to the distance actually asked for.
+        let (s1, s2) = self.mesh_branch(n, rb1, rb2)?;
+        let centre_2 = [centre_distance, 0.0, 0.0];
+        let point = tangent_line(n, axis_1, axis_2, centre_2, s1 * rb1, s2 * rb2)?;
 
-        // 3. Parameters, measured from the pitch point.
+        // 3. Parameters, measured from the pitch point — or, once the centres
+        //    have moved off nominal and it is no longer on the line, from the
+        //    point of the line nearest it. Identical at nominal, continuous
+        //    away from it, and it keeps `tangency` and `zone` comparable across
+        //    centre distances.
         let origin = dot(sub(pitch, point), n);
+        let through = sub(point, scale(n, -origin));
         let t1 = foot(point, n, [0.0; 3], axis_1)? - origin;
         let t2 = foot(point, n, centre_2, axis_2)? - origin;
 
-        // 4. The zone: both members still on flank they have.
+        // 4. The zone: both members still on flank they have. The reach owes
+        //    nothing to the centre distance — it is tip against base — so this
+        //    is where a centre distance error shows, through `t1` and `t2`.
         let reach = |ra: f64, rb: f64, bb: f64| {
             let t = (ra * ra - rb * rb).max(0.0).sqrt() / bb.cos();
             (t.is_finite() && t > 0.0).then_some(t)
@@ -592,12 +623,47 @@ impl Screw {
         let base_pitch = self.normal_base_pitch();
         Some(CrossedPath {
             normal: n,
-            through: pitch,
+            through,
             tangency: [t1, t2],
             zone: [lo, hi],
             length,
             contact_ratio: length / base_pitch,
+            centre_distance,
         })
+    }
+
+    /// Which of the tangent lines is the mesh, as the two signs that pick it.
+    ///
+    /// Asked at the zero-backlash centre distance, always: that is the one place
+    /// the pitch point lies on the line, and so the one place the question can be
+    /// answered rather than assumed. Both flanks satisfy it — they are mirror
+    /// images and every length is the same on either — so the first found is
+    /// taken.
+    fn mesh_branch(&self, n: [f64; 3], rb1: f64, rb2: f64) -> Option<(f64, f64)> {
+        let (sin_sigma, cos_sigma) = self.shaft_angle.sin_cos();
+        let axis_1 = [0.0, 0.0, 1.0];
+        let axis_2 = [0.0, sin_sigma, cos_sigma];
+        let centre_2 = [self.centre_distance, 0.0, 0.0];
+        let pitch = [self.worm_pitch_diameter / 2.0, 0.0, 0.0];
+
+        let mut best: Option<(f64, (f64, f64))> = None;
+        for s1 in [1.0, -1.0] {
+            for s2 in [1.0, -1.0] {
+                let Some(p) = tangent_line(n, axis_1, axis_2, centre_2, s1 * rb1, s2 * rb2) else {
+                    continue;
+                };
+                let v = sub(pitch, p);
+                let off = norm(sub(v, scale(n, dot(v, n))));
+                if best.is_none_or(|(b, _)| off < b) {
+                    best = Some((off, (s1, s2)));
+                }
+            }
+        }
+        let (offset, signs) = best?;
+        // The pitch point is on the line exactly, so a residual here is not a
+        // tolerance to widen — it means no branch was the mesh. Stated the way
+        // round that refuses a NaN rather than letting one through a `<`.
+        (!offset.is_nan() && offset < 1e-6 * self.centre_distance.max(1.0)).then_some(signs)
     }
 
     /// Normal module, recovered from the pitch geometry it was built with.
@@ -648,12 +714,17 @@ impl CrossedPath {
             let Some(half) = Self::half_span(screw, i, *b) else {
                 continue;
             };
-            if half < hi {
-                hi = half;
+            // The face is centred on its own gear, which is `axial_centre` and
+            // not the origin of this parameter. They coincide only at the
+            // zero-backlash centre distance; anywhere else the contact has slid
+            // along the shafts and the face may no longer be under it.
+            let centre = self.axial_centre(screw, i).unwrap_or(0.0);
+            if centre + half < hi {
+                hi = centre + half;
                 limit = ZoneLimit::Face;
             }
-            if -half > lo {
-                lo = -half;
+            if centre - half > lo {
+                lo = centre - half;
                 limit = ZoneLimit::Face;
             }
         }
@@ -704,9 +775,24 @@ impl CrossedPath {
         } else {
             far
         };
+        // The interval the face has to cover, in this parameter. Chosen about
+        // the pitch point's own place on the line, as centred as the zone allows.
+        let interval = if self.zone[1].abs() <= self.zone[0].abs() {
+            [half - want, half]
+        } else {
+            [-half, want - half]
+        };
         let mut out = [0.0; 2];
         for (i, o) in out.iter_mut().enumerate() {
-            *o = 2.0 * half * Self::axial_rate(screw, i).abs();
+            // Measured from *that member's* mid-plane. At the zero-backlash
+            // centre distance this is `2 · half · rate` as it always was; once
+            // the contact has slid along the shafts the face has to be wider to
+            // still be under it, and by different amounts on the two members.
+            let centre = self.axial_centre(screw, i).unwrap_or(0.0);
+            let reach = (interval[1] - centre)
+                .abs()
+                .max((interval[0] - centre).abs());
+            *o = 2.0 * reach * Self::axial_rate(screw, i).abs();
         }
         Some(out)
     }
@@ -733,6 +819,36 @@ impl CrossedPath {
     fn half_span(screw: &Screw, i: usize, b: f64) -> Option<f64> {
         let rate = Self::axial_rate(screw, i).abs();
         (rate > f64::EPSILON && b.is_finite() && b > 0.0).then(|| b / (2.0 * rate))
+    }
+
+    /// Where each member's own **mid-plane** sits, as a parameter along the path.
+    ///
+    /// A face width is centred on its gear, not on the mesh, so this is the point
+    /// a face of width `b` reaches `±b/2·rate` either side of. At the
+    /// zero-backlash centre distance both come out zero — the pitch point is on
+    /// the line and lies in both mid-planes at once, which is why it could be
+    /// left implicit until now.
+    ///
+    /// Away from that distance they **separate**, and that separation is a
+    /// crossed pair's whole answer to a centre-distance error: the contact slides
+    /// bodily along both shafts. It is not a small effect near the parallel
+    /// limit — roughly `Δa / sin Σ` in shape — so a pair that is fine at 90° can
+    /// have its contact pushed clean off the face at 1°. A parallel pair has no
+    /// counterpart: there the line of action turns instead (§4.4).
+    #[must_use]
+    pub fn axial_centre(&self, screw: &Screw, i: usize) -> Option<f64> {
+        let axis = if i == 0 {
+            [0.0, 0.0, 1.0]
+        } else {
+            [0.0, screw.shaft_angle.sin(), screw.shaft_angle.cos()]
+        };
+        let origin = if i == 0 {
+            [0.0; 3]
+        } else {
+            [self.centre_distance, 0.0, 0.0]
+        };
+        let rate = dot(self.normal, axis);
+        (rate.abs() > f64::EPSILON).then(|| -dot(sub(self.through, origin), axis) / rate)
     }
 
     /// The radius each member's flank is at, at a parameter along the path.
@@ -797,7 +913,7 @@ impl CrossedPath {
             normal: self.normal,
             axis_1: [0.0, 0.0, 1.0],
             axis_2: [0.0, screw.shaft_angle.sin(), screw.shaft_angle.cos()],
-            centre_2: [screw.centre_distance, 0.0, 0.0],
+            centre_2: [self.centre_distance, 0.0, 0.0],
         }
     }
 

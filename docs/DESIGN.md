@@ -634,17 +634,77 @@ relative gap between the crossed and parallel figures halves, from 0.83 % at
 80 µm to 0.052 % at 5 µm. At the default 20 µm they stand 0.21 % apart, and the
 step at `Σ = 0` is the degeneracy rather than a seam in the code.
 
-**Where the crossed figure stops describing a real mesh.** Measured while chasing
-the above, and recorded because it bounds how much the 0.21 % is worth arguing
-about. Since the line of action slides without turning, a centre-distance error
-`Δa` moves the contact point **along the axes** by roughly `2.58 Δa / sin Σ` mm
-for the 17/43 pair — 0.05 mm at `Σ = 90°`, 3 mm at `Σ = 1°`, 30 mm at
+**Where the crossed figure stops describing a real mesh — and how the model came
+to say so.** Since the line of action slides without turning, a centre-distance
+error `Δa` moves the contact point **along the axes** by roughly `2.58 Δa / sin Σ`
+mm for the 17/43 pair — 0.05 mm at `Σ = 90°`, 3 mm at `Σ = 1°`, 30 mm at
 `Σ = 0.1°`. Below a few degrees that is off any real face, so a near-parallel
-crossed pair at its working centre distance **is not in contact at all** and its
-backlash figure describes a mesh that is not happening. The region where the two
-laws would visibly disagree is therefore the region where the crossed one has
-already stopped applying, which is why the residual is a curiosity rather than a
-choice between answers. Nothing reports this yet; it is in §5 of HANDOFF.md.
+crossed pair at its working centre distance **is not in contact at all**. The
+region where the crossed and parallel backlash laws would visibly disagree is
+therefore the region where the crossed one has stopped applying, which is why the
+0.21 % is a curiosity rather than a choice between answers.
+
+That used to be a paragraph in a document and nothing on screen. It is the model
+now: see *The centre distance the pair runs at*, below.
+
+### 4.4.1 The centre distance the pair runs at
+
+`Mesh::a_w` is the **zero-backlash** centre distance — where the profile shifts
+put the pair. A real one runs at that plus its assembly clearance. Everything
+about contact is a property of the second: the path of contact, the operating
+pressure angle, the operating radii, the relative curvature, the Hertz stress,
+and the sliding integral that gives efficiency. Only **backlash** belongs to the
+first, because it measures play *against* the zero-backlash reference — ask an
+operating mesh for its backlash and it correctly answers zero.
+
+Rating at `a_w` was rating a pair nobody assembles, and the clearance is not a
+detail to round away: it is the reason there is any backlash to report at all.
+
+**Two roads to the same place, and the difference is the geometry, not the code.**
+
+| | how the distance enters | why |
+|---|---|---|
+| Parallel | `Mesh::at(a)` re-describes the pair | the line of action **turns**: `cos α′ = a_w cos α_w / a′`, and the operating radii follow. `a_ref`, `α_t`, `m_t` and the tooth counts are the *cut* geometry and do not move, so `base_radii()` is invariant across it |
+| Crossed | `Screw::path_of_contact_at(…, a)` takes it | the line of action **cannot turn** (§4.4), so there is nothing to re-describe. It slides, and the construction just places it further out |
+
+The crossed road needed one thing the nominal construction did not have. Eight
+lines are tangent to both base cylinders, two are the mesh, and
+`path_of_contact` tells them apart by asking which passes through the pitch
+point — a question with **no answer** at any other centre distance, which is why
+it used to return `None` there. Which branch is the mesh is a fact about which
+flanks face each other, not about how far apart the shafts are, so it is settled
+once at the zero-backlash distance and carried (`Screw::mesh_branch`). That is
+also the only reading that stays continuous: a mesh does not swap flanks because
+a bearing bore went 20 µm wide.
+
+**What it changed.** All in the same direction, because separating the centres
+can only shorten the path:
+
+| | at `a_w` | at `a_w + 0.02` |
+|---|---|---|
+| spur stage ε | 1.6211 | 1.6013 |
+| its `σ_F` | 81.1 MPa | 82.1 MPa |
+| worm `η` forward | 68.430 % | 68.369 % |
+| crossed ε at `Σ = 90°` | 1.8506 | 1.8307 |
+
+Bending rises because a shorter path is less load sharing. Efficiency has **no
+fixed direction** — a shorter zone is less sliding to pay for, but which end it
+loses decides whether that helps: a near-parallel pair loses the ends, where
+profile sliding is worst, and improves; a worm loses path where the balance was
+doing comparatively well, and does not. Only `ε` moves lawfully, so only `ε` is
+asserted as a direction.
+
+**And the face is centred on its gear, not on the mesh.** Once the contact has
+slid, a face width symmetric about the *nominal* contact is no longer symmetric
+about the real one. `CrossedPath::axial_centre` is where each member's own
+mid-plane meets the path — zero for both at the zero-backlash distance, which is
+why it could stay implicit until now — and the face is clipped and sized about
+that. The consequence is the design fact that motivated all of this: at
+`Σ = 0.5°` with a 12 mm face and 20 µm of clearance, `ε` falls from 1.664 to
+**0.860** and the zone is reported `Face`-limited. Take the clearance away and the
+same teeth on the same face are tip-limited with contact to spare. A designer now
+gets *"these teeth will not touch as built"* where the model used to report a
+healthy contact ratio for a mesh that was not happening.
 
 ### 4.5 Contact ratio, efficiency, and crossed axes
 
@@ -3437,6 +3497,9 @@ something independent.**
 | 4.4 | A crossed pair's centre-distance backlash as `Δa · sin α_n` | **Half the answer.** A separation opens *both* flanks and lost motion is the sum of the gaps a member can travel across, so the term is `2 Δa sin α_n`. It reached the UI as a **50 % step** in backlash the moment the shaft angle left zero — the parallel stage had the exact involute law, the crossed stage had half of its first-order form, and moving `Σ` from 0 to anything crossed between them |
 | 4.4 | ...and the reason it survived | The module derivation wrote both displacements as one gap along `n̂` — `j_n = j_axial sin β_b1 + Δa sin α_n` — which reads as a single tidy projection and is two different physical quantities. A worm's axial float is a **rigid-body slide** (opens one flank as far as it closes the other: counted once); a centre-distance error is a **separation** (opens both: counted twice). One coefficient for both hid the factor. The test that existed, `axial_slack_reproduces_the_two_handbook_relations`, deliberately zeroed the clearance to isolate the axial term, so it constrained the half that was right |
 | 4.5.1 | "Unifying backlash is not obviously a gain... expressing the parallel case in the crossed form would trade exactness for uniformity" | True of the **numerators** and false of everything else, and acting on it as though it settled the question is what left the error unguarded for a milestone. The *conversion* from gap to angle was one law with two homes, and the second home had no check against the first. Every crossed backlash test held the crossed model against itself; the parallel model — which has the exact law and its own tests — was never asked |
+| 4.4 | Every contact quantity rated at the **zero-backlash** centre distance | A pair runs at that plus its assembly clearance, and the path, the operating pressure angle, the curvature and every stress belong to where it runs. `ε` was over by 1.2 % and bending under by the same, on every parallel stage ever solved. The clearance was being treated as a tolerance to ignore when it is the reason the stage reports backlash at all |
+| 4.5.1 | `path_of_contact` returning `None` at any centre distance but the nominal | Not a refusal, a **missing branch rule**: it identified the mesh by asking which tangent line passes through the pitch point, and none does once the centres move. Which flanks face each other is not a function of centre distance, so the branch is settled at the nominal distance and carried |
+| 4.5.1 | A crossed pair's face width clipped symmetrically about the path's own origin | The face is centred on its **gear**. Those coincide only at the zero-backlash distance; away from it the contact has slid along the shafts, and at `Σ = 0.5°` with 20 µm of clearance a 12 mm face has `ε = 0.860` where the model reported 1.664 |
 | 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
 | 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
 | 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |
@@ -3512,6 +3575,11 @@ here. Revision 2 additions are marked ★.
 | ◇ **The crossed backlash meets the parallel law** | the two solvers at `Σ = 0` and `Σ = 0.001°`, clearance swept 80 → 5 µm | the shortfall falls *with the error* — 0.83 % → 0.052 %, halving when the clearance halves — so the residual is the parallel law's second-order term and the agreement is first order. No tolerance chosen. **This is the gate that did not exist while the factor of two did** |
 | ◇ The parallel backlash is the shared law in its own plane | `Mesh::angular_backlash` vs `angular_play(j_t cos α′ cos β_b, z, p_bn)`, 4 helix angles × 3 pairs × 4 centre distances × both members | 1e-14 relative — and the same for an **internal** mesh, where the transverse form carries a signed tooth sum and the normal form carries nothing about the mate at all |
 | ◇ None of the four is vacuous | each re-broken on purpose: the factor dropped, the `n̂·â₂` sign flipped, the centre distance fed into the direction | each fails, and the dropped factor fails **only** the two new gates out of 355 tests — which is the measurement of how unguarded it had been |
+| ◈ A stage is rated where it runs | clearance swept 0 → 0.3 mm, parallel and worm stages | `ε` falls monotonically on both, and the bending stress rises with it — a shorter path is less load sharing. Efficiency is asserted only to *move*, since its direction is not a law |
+| ◈ Three call sites, three gates | the parallel path, the worm rating path and the crossed override each reverted to the nominal distance in turn | each fails something on its own. The first attempt gated only the crossed override, and reverting the worm path passed all 359 |
+| ◈ An operating mesh keeps the cut geometry | `base_radii()` across `Δa` = 0.02, 0.2, 1.0 mm, shifted and helical pairs | **bit-identical**, and `a cos α` invariant to 1e-12 — the base cylinders are the gears, not the assembly |
+| ◈ ...and gives up the backlash reference | `Mesh::at(a).backlash(a)` | **zero** to 1e-12, while the design mesh reports play. The footgun this type now carries, written down as a test rather than as a warning |
+| ◈ The slide is what takes the mesh apart | `Σ = 0.5°`, 12 mm face, clearance 0.02 against 0 | `ε` 0.860 `Face`-limited against 1.664 `Tips`-limited, and monotone in `Σ` — the `1/sin Σ` showing through without a number being written down |
 | ◆ The path's roll lengths | vs. the classical `r sin α_t / cos β_b`, 4 crossed geometries | 1e-9 relative, and the two sum to the tangent length between the base cylinders |
 | ◆ Crossed contact ratio in the parallel limit | Σ = 2°, 0.5°, 0.1°, 0.01° against `ε_α / cos²β_b` | monotone in, 1e-4 by 0.01° — and **not** `ε_α`: the normal-plane path and the normal base pitch each carry a `cos β_b` the same way |
 | ◆ Those checks are not vacuous | the `n̂·â₂` sign deliberately flipped to the other branch | both path tests fail |
@@ -3680,7 +3748,9 @@ here. Revision 2 additions are marked ★.
 | ◆ Crossed-axis sliding at the pitch point | perpendicular axes, worm and wheel radii | `√(v₁²+v₂²)`, equal to the textbook `v₁/cos γ` to 1e-12; resolved on the worm axis it is exactly the wheel's pitch velocity |
 
 The marks record which round of review each check came from; they are kept only
-so a claim can be traced to the work that produced it. `◇` is the last round:
+so a claim can be traced to the work that produced it. `◈` is the last round —
+bringing the operating centre distance into the contact model — and `◇` the one
+before it:
 the crossed-axis derivation promoted out of a scratch directory into
 `tools/crossed_path.py`, so the checks behind §4.5.1 can be re-run rather than
 only cited.

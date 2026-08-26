@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–11 complete and in CI. 357 tests, ~26 s.**
+**Milestones 0–11 complete and in CI. 361 tests, ~26 s.**
 
 Milestone 11's named scope — geartrain import/export, confirmations, error
 surfacing, docs — is done, and geartrain import/export was the last unbuilt item
@@ -124,7 +124,7 @@ line of action through differential geometry; the crate reaches it through a
 construction in lines and angles. On a 17/23 pair at 45°/45°, shafts at 90°,
 they give ε = 1.777921670 and 1.777921669562.
 
-**The worm canary has moved twice, both times deliberately.**
+**The worm canary has moved three times, all deliberately.**
 `wormstage 1 40 7 2`:
 
 1. *Efficiency*, when the friction balance replaced the pitch-point formula
@@ -139,6 +139,12 @@ they give ε = 1.777921670 and 1.777921669562.
    term vanishes and only the axial float is left, which was right all along. The
    new nominal landing exactly on the old maximum is the same coincidence — one
    is `2 × 0.02`, the other was `1 × 0.04`.
+3. *Efficiency again*, when the rating moved to the centre distance the pair runs
+   at rather than its zero-backlash one: 68.430 → 68.369 % forward,
+   54.417 → 54.293 % backward. The clearance shortens the zone, and for a worm
+   the part it loses is where the balance was doing comparatively well.
+   **Backlash did not move**, which is the check that the two centre distances
+   stayed in their own lanes.
 
 `gear-cli strength 17 43 2.0` is the regression canary. Its numbers — `σ_F`
 69.2 / 63.4 MPa, `σ_H` 692.7 MPa, ρ 1.723 mm, η 98.741 % — have survived every
@@ -273,6 +279,17 @@ four are in play differing by `cos α_t`, `cos α_w`, `cos β_b`.
 **Contact is one formula.** `contact_stress` takes a lengthwise curvature;
 `PARALLEL_AXES` is a named zero, and at it the elliptical patch's peak pressure
 is *exactly* zero. Line contact is a degenerate value, not a branch.
+
+**A stage is rated where it runs, not where it was designed.** The zero-backlash
+centre distance is where the profile shifts put the pair; a real one runs at that
+plus its assembly clearance, and every contact quantity belongs to the second —
+the path, the operating pressure angle, the relative curvature, the stresses and
+the efficiency integral. Only **backlash** keeps the design mesh, because it
+measures play *against* the zero-backlash reference. Parallel axes reach it by
+`Mesh::at`, which re-describes the pair at a distance; crossed axes by
+`Screw::path_of_contact_at`, which takes one — because there the line of action
+slides rather than turning, so there is nothing to re-describe. Both are gated,
+and reverting either alone fails something.
 
 **Backlash is one conversion and two numerators, and the split is stated.**
 `mesh::angular_play(j_n, z, p_bn)` is the shared sentence — a flank advances one
@@ -468,7 +485,6 @@ the number would have been.
 | **Crossed-axis bending** | §4.5.1 | *Decided, not pending.* The path gives the load's position along the profile; `σ_F = F_t/(b·m)·Y_F·Y_S` is a cantilever loaded across its whole **face**, and a crossed pair's load is a point. An effective width is a convention that multiplies a stress, which §4.7 refuses — so the stage says it is not rated and why |
 | Equal planet load sharing is assumed | §4.9 | *Decided.* The remedy is a mesh-load factor of the kind §4.7 declines; said in every planetary result's notes |
 | Radial assembly — attempted, diagnosed, **shelved** with its findings | §4.11 | |
-| A crossed pair's contact point **slides along the axes** with a centre-distance error, and nothing says when it leaves the face | §4.4 | Measured at `≈ 2.58 Δa / sin Σ` mm for a 17/43 pair: 0.05 mm at `Σ = 90°`, 30 mm at `Σ = 0.1°`. Below a few degrees the pair at its working centre distance is not in contact, and the stage still reports a backlash and a stress for it. The rating is built at the nominal centre distance, so this is a *note* that is missing, not a number that is wrong |
 | The **enveloping** (throated) wheel's zone of action | §4.5.1 | The cylindrical one is derived; a worm reports it as a floor, with its assumed tooth height named |
 | Mesh-phase coefficient setting the optimal λ | §4.10 | The only thing blocking the angular-profile-shift milestone |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |

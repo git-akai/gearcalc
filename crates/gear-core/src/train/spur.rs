@@ -227,7 +227,6 @@ pub fn solve_stage(
     let p = [stage.params(0), stage.params(1)];
     let g = [Gear::new(p[0]), Gear::new(p[1])];
     let mesh = Mesh::new(&g[0], &g[1], MeshKind::External).map_err(TrainError::Mesh)?;
-    let path = ContactPath::new(&g[0], g[1].ra, &mesh).ok_or(TrainError::NoContact)?;
 
     // Owned rather than borrowed, because a gear's own overrides may replace
     // properties of the library entry and the result is a different material.
@@ -247,6 +246,23 @@ pub fn solve_stage(
     } else {
         (stage.centre_distance.manual, 0.0)
     };
+
+    // --- the pair as it actually runs.
+    //
+    // `mesh` is the **zero-backlash** pair, which is where the profile shifts put
+    // it; `operating` is that plus the assembly clearance, which is where the
+    // teeth actually touch. Everything about contact — the path, the operating
+    // radii, the relative curvature, the Hertz stress and the efficiency
+    // integral — belongs to the second, and only backlash belongs to the first,
+    // which measures play *against* the zero-backlash reference. Rating at
+    // `mesh` was rating a pair nobody builds: the clearance is not a tolerance
+    // to be ignored, it is the reason there is any backlash to report.
+    //
+    // A crossed stage reaches the same place by a different road (§4.4): its line
+    // of action slides instead of turning, so `Screw::path_of_contact_at` takes
+    // the distance rather than the pair being re-described at it.
+    let operating = mesh.at(centre).map_err(TrainError::Mesh)?;
+    let path = ContactPath::new(&g[0], g[1].ra, &operating).ok_or(TrainError::NoContact)?;
     let _ = clearance;
 
     // --- face width. `b_min` does not depend on the `b` it was measured at
@@ -260,8 +276,9 @@ pub fn solve_stage(
         bending_section(&g[0], path.contact_ratio).ok_or(TrainError::NoRootSection)?,
         bending_section(&g[1], path.contact_ratio).ok_or(TrainError::NoRootSection)?,
     ];
-    let probe_contact = contact_stress(&path, &mesh, &g[0], PARALLEL_AXES, &probe_load, e_star)
-        .ok_or(TrainError::NoContact)?;
+    let probe_contact =
+        contact_stress(&path, &operating, &g[0], PARALLEL_AXES, &probe_load, e_star)
+            .ok_or(TrainError::NoContact)?;
 
     let mut widths = [0.0_f64; 2];
     for i in 0..2 {
@@ -286,7 +303,7 @@ pub fn solve_stage(
     let effective = widths[0].min(widths[1]);
 
     let load = Load::new(input_torque, effective);
-    let cs = contact_stress(&path, &mesh, &g[0], PARALLEL_AXES, &load, e_star)
+    let cs = contact_stress(&path, &operating, &g[0], PARALLEL_AXES, &load, e_star)
         .ok_or(TrainError::NoContact)?;
 
     let mut gears = Vec::with_capacity(2);
@@ -360,7 +377,7 @@ pub fn solve_stage(
         centre_distance_nominal: mesh.a_w,
         centre_distance: centre,
         contact_ratios,
-        efficiency: Directional::of(|d| efficiency(&path, &mesh, &g[0], stage.friction, d)),
+        efficiency: Directional::of(|d| efficiency(&path, &operating, &g[0], stage.friction, d)),
         backlash,
         coprime: gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
         gears: [gears[0].clone(), gears[1].clone()],
