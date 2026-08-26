@@ -9,6 +9,8 @@ import {
   defaultLibrary,
   defaultTrain,
   type CutterRef,
+  type GearKind,
+  type MateRef,
   importLibrary,
   importTrain,
   type ClassRef,
@@ -28,10 +30,13 @@ export interface GearTab {
   /** Export accuracy, mm. */
   chordTolerance: number;
   referenceCircles: boolean;
-  /** An internal (ring) gear rather than an external one. */
-  internal: boolean;
+  /** Which of the three kinds this tab holds. */
+  kind: GearKind;
   /** The pinion cutter that shapes it, used only when internal. */
   cutter: CutterRef;
+  /** What an eccentric gear runs against, for its commanded centre distance.
+   *  Carried for every tab so switching kinds does not lose it. */
+  mate: MateRef;
 }
 
 export interface TrainTab {
@@ -57,8 +62,9 @@ function freshTab(name = "Gear"): GearTab {
     toleranceClass: null,
     chordTolerance: d.chord_tolerance,
     referenceCircles: d.reference_circles,
-    internal: false,
+    kind: "external",
     cutter: d.cutter,
+    mate: { teeth: 43, profile_shift: 0, internal: false },
   };
 }
 

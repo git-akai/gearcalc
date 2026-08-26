@@ -39,6 +39,28 @@ pub struct GearRequest {
     /// Depth, in modules, at which the undercut question is asked.
     #[serde(default = "one")]
     pub working_depth: f64,
+    /// What this gear runs against, when the answer depends on it.
+    ///
+    /// Only an **eccentric** gear has such an answer today — the centre distance
+    /// its mesh commands around a revolution — and a concentric one has nothing
+    /// that varies for a mate to be needed for. Absent means "do not ask".
+    #[serde(default)]
+    pub mate: Option<MateRef>,
+}
+
+/// The gear on the other side, as far as a commanded centre distance needs it.
+///
+/// Not a whole [`GearParams`]: a mate shares this gear's module, pressure angle
+/// and helix by definition — a pair that did not could not mesh — so sending
+/// them again would be sending a constraint that can be broken.
+#[derive(Deserialize)]
+pub struct MateRef {
+    pub teeth: u32,
+    #[serde(default)]
+    pub profile_shift: f64,
+    /// The mate is a ring, and this gear runs inside it.
+    #[serde(default)]
+    pub internal: bool,
 }
 
 fn one() -> f64 {
@@ -155,6 +177,12 @@ pub struct GearSummary {
     /// What varies around the revolution. Every field is zero for an ordinary
     /// gear, so it crosses unconditionally rather than behind a flag.
     pub variation: gear_core::eccentric::Variation,
+    /// The centre distance this gear's mesh commands around a revolution.
+    ///
+    /// Needs a mate, so it is `Unavailable` with the reason when none was sent —
+    /// which is every concentric gear, since a concentric one commands a
+    /// constant and there is nothing to profile.
+    pub centre_profile: Maybe<gear_core::eccentric::CentreProfile>,
 
     pub span: Maybe<SpanOut>,
     pub over_two_pins: Maybe<PinsOut>,
@@ -228,6 +256,7 @@ fn summarise(g: &Gear, req: &GearRequest) -> GearSummary {
         // Built from the same params the gear was, so the two cannot describe
         // different gears. Zero throughout for an ordinary one.
         variation: gear_core::eccentric::Eccentric::new(g.params).variation(),
+        centre_profile: centre_profile(req),
         span: Maybe::from(metrology::best_span(g).map(|s| SpanOut {
             teeth_spanned: s.teeth_spanned,
             nominal: s.nominal,
@@ -528,6 +557,46 @@ fn default_materials_impl() -> Result<String, String> {
 fn strings_impl() -> Result<String, String> {
     serde_json::to_string(gear_io::strings::Catalogue::english().messages())
         .map_err(|e| e.to_string())
+}
+
+/// The commanded centre distance, when there is a mate to command it against.
+///
+/// The mate is built as an ordinary gear from the shared module, pressure angle
+/// and helix — which is what makes a pair a pair — plus its own tooth count and
+/// shift. The eccentric gear is always member 1 here: the tab offers an
+/// eccentric *external* gear, so the ring, when there is one, is the mate.
+fn centre_profile(req: &GearRequest) -> Maybe<gear_core::eccentric::CentreProfile> {
+    use gear_core::mesh::{Member, MeshKind};
+
+    let Some(mate) = &req.mate else {
+        return Maybe::Unavailable {
+            unavailable: "no mate given".into(),
+        };
+    };
+    if req.params.angular_shift == 0.0 {
+        return Maybe::Unavailable {
+            unavailable: "a concentric gear commands one centre distance, not a profile".into(),
+        };
+    }
+    let other = Gear::new(GearParams {
+        teeth: mate.teeth,
+        profile_shift: mate.profile_shift,
+        angular_shift: 0.0,
+        index_offset: 0.0,
+        ..req.params
+    });
+    let kind = if mate.internal {
+        MeshKind::Internal
+    } else {
+        MeshKind::External
+    };
+    Maybe::from(
+        gear_core::eccentric::Eccentric::new(req.params).centre_profile(
+            &other,
+            kind,
+            Member::First,
+        ),
+    )
 }
 
 fn import_materials_impl(toml_text: &str) -> Result<String, String> {
@@ -975,6 +1044,74 @@ mod tests {
     /// one, and both have to survive the same boundary.
     /// A ring crosses the boundary: its own request shape, its own summary, an
     /// outline the viewport can draw and a DXF the CAD can read.
+    /// **An eccentric gear crosses whole, and a concentric one says why it has
+    /// no profile rather than sending a flat one.**
+    ///
+    /// The boundary is where a feature stops being the core's and starts being
+    /// the application's, and the two things worth checking are that the
+    /// variation arrives and that the *absence* of a centre-distance profile is
+    /// explained rather than silent. A concentric gear commands one distance;
+    /// profiling a constant would be an answer to a question nobody asked.
+    #[test]
+    fn an_eccentric_gear_crosses_the_boundary_with_its_variation_and_profile() {
+        let req = |shift: f64, mate: &str| {
+            format!(
+                r#"{{"params":{{"module":1.0,"pressure_angle":20.0,"teeth":24,
+                   "profile_shift":0.0,"helix_angle":0.0,"addendum":1.0,"dedendum":1.25,
+                   "root_radius":0.38,"thickness_mod":1.0,"angular_shift":{shift},
+                   "index_offset":0.0}}{mate}}}"#
+            )
+        };
+        let parse = |s: &str| -> serde_json::Value {
+            serde_json::from_str(&solve_gear_impl(s).expect("a solvable gear")).unwrap()
+        };
+
+        // With a mate: the profile crosses, and its range straddles the fit.
+        let v = parse(&req(0.25, r#","mate":{"teeth":43,"profile_shift":0.0}"#));
+        assert!((v["variation"]["eccentricity"].as_f64().unwrap() - 0.25).abs() < 1e-12);
+        assert!(v["variation"]["drive_pitch_error"].as_f64().unwrap() > 0.0);
+        let p = &v["centre_profile"];
+        assert_eq!(
+            p["commanded"].as_array().unwrap().len(),
+            24,
+            "one per tooth"
+        );
+        let (lo, hi) = (
+            p["range"][0].as_f64().unwrap(),
+            p["range"][1].as_f64().unwrap(),
+        );
+        assert!(lo < hi && (hi - lo) > 0.4, "{lo} to {hi}");
+        // A crank leaves interference on one side and slack on the other.
+        assert!(p["sinusoid_backlash"][0].as_f64().unwrap() < 0.0);
+        assert!(p["sinusoid_backlash"][1].as_f64().unwrap() > 0.0);
+
+        // Without one: everything else still crosses, and the profile says why.
+        let v = parse(&req(0.25, ""));
+        assert!(v["variation"]["eccentricity"].as_f64().unwrap() > 0.0);
+        assert!(
+            v["centre_profile"]["unavailable"]
+                .as_str()
+                .unwrap()
+                .contains("mate"),
+            "{:?}",
+            v["centre_profile"]
+        );
+
+        // Concentric, with a mate: the variation is zero throughout and the
+        // profile is refused for the right reason.
+        let v = parse(&req(0.0, r#","mate":{"teeth":43,"profile_shift":0.0}"#));
+        assert_eq!(v["variation"]["eccentricity"].as_f64().unwrap(), 0.0);
+        assert_eq!(v["variation"]["drive_pitch_error"].as_f64().unwrap(), 0.0);
+        assert!(
+            v["centre_profile"]["unavailable"]
+                .as_str()
+                .unwrap()
+                .contains("concentric"),
+            "{:?}",
+            v["centre_profile"]
+        );
+    }
+
     #[test]
     fn a_ring_crosses_the_boundary() {
         let req = r#"{"params":{"teeth":60,"module":1.0,"pressure_angle":20.0,

@@ -2645,10 +2645,25 @@ ordinary gear read as a single number with no flag to check.
 
 **Inspection data over the revolution is not built** — span and over-pins return
 `Option`s rather than numbers, so they want `distinct()` and their own reduction
-rather than `span`. The framework is there for them; the outputs are not. Neither
-is any gear-tab surface for the centre-distance profile, deliberately: it is core
-only for now, and it is shaped so a stage supplies its mate the same way every
-other stage function does.
+rather than `span`. The framework is there for them; the outputs are not. #### On the gear tab
+
+The internal/external switch is a **kind** with three values — external, internal
+(ring), external eccentric — and the fields follow it: a `FieldSpec` names the
+kinds it applies to rather than carrying an `externalOnly` boolean, so adding a
+fourth kind later is a list entry.
+
+An eccentric gear also asks for its **mate**: a tooth count, a shift, and whether
+it is a ring. Not a whole `GearParams` — a mate shares this gear's module,
+pressure angle and helix by definition, so sending them again would be sending a
+constraint that can be broken. The mate rides on the gear request and the profile
+comes back as a `Maybe`, so a concentric gear is told *why* it has no profile
+("a concentric gear commands one centre distance, not a profile") rather than
+being handed a flat one.
+
+**Only the eccentric gear is offered as a kind, not the eccentric ring.** The
+core supports both — `centre_profile` takes which member the eccentric gear is —
+and the tab does not, which is a UI decision rather than a limit. A stage will
+reach the other arrangement the same way.
 
 #### Operating mode: the centre distance is commanded, not floating
 

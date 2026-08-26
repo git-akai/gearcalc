@@ -51,6 +51,9 @@ export interface GearRequest {
   tolerance_class?: ClassRef | null;
   chord_tolerance?: number;
   reference_circles?: boolean;
+  /** What this gear runs against — only an eccentric gear has an answer that
+   *  depends on it. */
+  mate?: MateRef;
 }
 
 /** A value, or the reason there isn't one. Mirrors the Rust `Maybe`. */
@@ -169,6 +172,7 @@ export interface Variation {
 export interface GearSummary {
   ranges: Ranges;
   variation: Variation;
+  centre_profile: Maybe<CentreProfile>;
   /** Radii, mm — what the viewport draws with. */
   pitch_radius: number;
   base_radius: number;
@@ -223,6 +227,38 @@ export interface Defaults {
 //  so a range cannot drift between the two.
 // --------------------------------------------------------------------- //
 
+/** What kind of gear a tab holds.
+ *
+ *  Three cases rather than a boolean, because an eccentric gear is a third
+ *  thing to *enter* even though it is the concentric one's `Δx = 0` everywhere
+ *  below the boundary. The core has no such enum and does not want one. */
+export type GearKind = "external" | "internal" | "eccentric";
+
+/** The gear on the other side, as far as a commanded centre distance needs it.
+ *
+ *  Not a whole `GearParams`: a mate shares this gear's module, pressure angle
+ *  and helix by definition, so sending them again would be sending a constraint
+ *  that can be broken. */
+export interface MateRef {
+  teeth: number;
+  profile_shift: number;
+  /** The mate is a ring, and this gear runs inside it. */
+  internal: boolean;
+}
+
+/** The centre distance an eccentric mesh commands around one revolution. */
+export interface CentreProfile {
+  /** One per tooth, from θ = 0 round. */
+  commanded: number[];
+  range: [number, number];
+  /** Best-fit pure sinusoid: mean, amplitude, phase in radians. */
+  sinusoid: [number, number, number];
+  /** Largest departure of the ideal from that sinusoid, mm. */
+  sinusoid_error: number;
+  /** What that departure costs as backlash, mm — negative is interference. */
+  sinusoid_backlash: [number, number];
+}
+
 export interface FieldSpec {
   key: keyof GearParams;
   label: string;
@@ -238,7 +274,8 @@ export interface FieldSpec {
    * round is the cutter's own, so both are properties of the tool rather than
    * of the part. Showing a box that changes nothing is worse than showing none.
    */
-  externalOnly?: boolean;
+  /** The kinds this field applies to. Absent means all of them. */
+  kinds?: GearKind[];
   /** Replaces `note` for an internal gear, where the rule differs. */
   ringNote?: string;
 }
@@ -250,13 +287,19 @@ export const FIELDS: FieldSpec[] = [
   { key: "helix_angle", label: "Helix angle", unit: "°", step: 1 },
   { key: "profile_shift", label: "Profile shift", unit: "module", step: 0.05 },
   { key: "addendum", label: "Addendum", unit: "module", step: 0.05 },
-  { key: "dedendum", label: "Dedendum", unit: "module", step: 0.05, externalOnly: true },
+  {
+    key: "dedendum",
+    label: "Dedendum",
+    unit: "module",
+    step: 0.05,
+    kinds: ["external", "eccentric"],
+  },
   {
     key: "root_radius",
     label: "Root radius coefficient",
     unit: "module",
     step: 0.01,
-    externalOnly: true,
+    kinds: ["external", "eccentric"],
   },
   {
     key: "thickness_mod",
@@ -271,9 +314,9 @@ export const FIELDS: FieldSpec[] = [
   {
     key: "angular_shift",
     label: "Angular shift amplitude",
+    kinds: ["eccentric"],
     unit: "module",
     step: 0.05,
-    externalOnly: true,
     note:
       "the profile shift varies with angle, x(θ) = x + Δx cos θ — the tip and root " +
       "run eccentric by m·Δx while the pitch and base circles stay on the axis, so the " +
@@ -282,9 +325,9 @@ export const FIELDS: FieldSpec[] = [
   {
     key: "index_offset",
     label: "Index compensation λ",
+    kinds: ["eccentric"],
     unit: "",
     step: 0.1,
-    externalOnly: true,
     note:
       "a varying tooth thickness cannot be conjugate both ways, so the error is only " +
       "distributed: drive scales |1 − λ| and coast |1 + λ|. 0 is the minimax and what a " +

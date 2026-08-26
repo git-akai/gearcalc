@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–11 complete and in CI. 389 tests, ~26 s.**
+**Milestones 0–11 complete and in CI. 391 tests, ~26 s.**
 
 Milestone 11's named scope — geartrain import/export, confirmations, error
 surfacing, docs — is done, and geartrain import/export was the last unbuilt item
@@ -671,7 +671,7 @@ of DESIGN.md, which records that the audit was wrong to promise it.
 
 | Item | Note |
 |---|---|
-| An eccentric gear's inspection data, and any UI for it | §4.10. The gear and its commanded `a_w(θ)` are built and gated; span and over-pins as ranges are not, and neither is a gear-tab surface for the centre-distance profile. `Eccentric::span`/`distinct` are the framework both would use |
+| An eccentric gear's inspection data | §4.10. Span and over-pins as ranges over the revolution are not built; they return `Option`s so they want `Eccentric::distinct` and their own reduction rather than `span`. An **eccentric ring** is supported by the core and not offered as a tab kind |
 | A planetary set's drawing | the viewport draws single gears; a set needs the carrier and N planets placed |
 | A worm's profile drawing, and its DXF | §8. A crossed pair draws as its two helical gears already |
 | The enveloping wheel's zone of action | would turn a worm's `ε` from a floor into the number |

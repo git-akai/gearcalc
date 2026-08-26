@@ -70,7 +70,7 @@
     const normal =
       f.key === "profile_shift" && "ok" in result
         ? shiftNote(result.ok.ranges.profile_shift)
-        : (boundNote(f.key) ?? (tab.internal && f.ringNote ? f.ringNote : (f.note ?? null)));
+        : (boundNote(f.key) ?? (internal && f.ringNote ? f.ringNote : (f.note ?? null)));
     if (normal) all.push({ text: normal });
     const err = errors[f.key];
     if (err) all.push({ text: err, err: true });
@@ -104,6 +104,9 @@
     tolerance_class: tab.toleranceClass,
     chord_tolerance: tab.chordTolerance,
     reference_circles: tab.referenceCircles,
+    // Sent only when it can mean something. A concentric gear commands one
+    // centre distance and the core says so rather than profiling a constant.
+    mate: tab.kind === "eccentric" ? tab.mate : undefined,
   });
 
   const result = $derived(solve(request));
@@ -119,7 +122,11 @@
     chord_tolerance: tab.chordTolerance,
     reference_circles: tab.referenceCircles,
   });
-  const ring = $derived(tab.internal ? solveRing(ringRequest) : null);
+  // The ring path is unchanged; `internal` is now one of three kinds rather
+  // than a boolean, and this is the only place that difference is spent.
+  const internal = $derived(tab.kind === "internal");
+  const eccentric = $derived(tab.kind === "eccentric");
+  const ring = $derived(internal ? solveRing(ringRequest) : null);
 
   // Kept as a typed array rather than an inline tuple list: destructuring a
   // mixed tuple inside {#each} widens both members to their union and loses the
@@ -133,7 +140,7 @@
       : [],
   );
   const outline = $derived(
-    tab.internal
+    internal
       ? ring && "ok" in ring
         ? ringProfile(ringRequest, 600)
         : null
@@ -147,7 +154,7 @@
   let exportError = $state<string | null>(null);
 
   function saveDxf() {
-    const r = tab.internal ? ringDxf(ringRequest) : dxf(request);
+    const r = internal ? ringDxf(ringRequest) : dxf(request);
     if ("error" in r) {
       // A click that silently does nothing is the worst of the three outcomes:
       // the user cannot tell a refusal from a broken button.
@@ -159,7 +166,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const kind = tab.internal ? "ring" : "gear";
+    const kind = internal ? "ring" : "gear";
     a.download = `${(tab.name || kind).replace(/\s+/g, "_")}_m${tab.params.module}_z${tab.params.teeth}.dxf`;
     a.click();
     URL.revokeObjectURL(url);
@@ -196,13 +203,25 @@
   <section class="inputs">
     <h2>{t("ui.gear_parameters")}</h2>
     <div class="grid">
-      <label class="check">
-        <input type="checkbox" bind:checked={tab.internal} />
-        <span>{t("ui.gear_internal_ring_gear")}</span>
-        <small>{t("ui.gear_teeth_point_inward_tip_circle_inside")}</small>
+      <label class="wide">
+        <span>{t("ui.gear_kind")}</span>
+        <select bind:value={tab.kind}>
+          <option value="external">{t("ui.gear_kind_external")}</option>
+          <option value="internal">{t("ui.gear_kind_internal")}</option>
+          <option value="eccentric">{t("ui.gear_kind_eccentric")}</option>
+        </select>
+        <small>
+          {#if internal}
+            {t("ui.gear_teeth_point_inward_tip_circle_inside")}
+          {:else if eccentric}
+            {t("ui.gear_kind_eccentric_note")}
+          {:else}
+            {t("ui.gear_kind_external_note")}
+          {/if}
+        </small>
       </label>
     </div>
-    {#if tab.internal}
+    {#if internal}
       <div class="grid">
         <label>
           <span>{t("ui.gear_cutter_teeth")}</span>
@@ -221,8 +240,27 @@
         </label>
       </div>
     {/if}
+    {#if eccentric}
+      <div class="grid">
+        <label>
+          <span>{t("ui.gear_mate_teeth")}</span>
+          <input type="number" step="1" min="1" bind:value={tab.mate.teeth} />
+          <small>{t("ui.gear_mate_shares_module_angle_helix")}</small>
+        </label>
+        <label>
+          <span>{t("ui.gear_mate_profile_shift")}</span>
+          <input type="number" step="0.05" bind:value={tab.mate.profile_shift} />
+          <em>{t("ui.gear_m")}</em>
+        </label>
+        <label class="check">
+          <input type="checkbox" bind:checked={tab.mate.internal} />
+          <span>{t("ui.gear_mate_is_a_ring")}</span>
+          <small>{t("ui.gear_mate_ring_runs_inside")}</small>
+        </label>
+      </div>
+    {/if}
     <div class="grid">
-      {#each FIELDS.filter((f) => !(tab.internal && f.externalOnly)) as f (f.key)}
+      {#each FIELDS.filter((f) => !f.kinds || f.kinds.includes(tab.kind)) as f (f.key)}
         {@const notes = notesFor(f)}
         <label class:invalid={errors[f.key]}>
           <span>{f.label}</span>
@@ -297,7 +335,7 @@
   </section>
 
   <section class="results">
-    {#if tab.internal}
+    {#if internal}
       {#if ring && "error" in ring}
         <p class="error">{ring.error}</p>
       {:else if ring && "ok" in ring}
@@ -469,6 +507,40 @@
             </small>
           </dd>
         </dl>
+
+        <h2>{t("ui.gear_commanded_centre_distance")}</h2>
+        {#if isUnavailable(s.centre_profile)}
+          <p class="aside">{s.centre_profile.unavailable}</p>
+        {:else}
+          {@const p = s.centre_profile}
+          <dl>
+            <dt>{t("ui.gear_centre_distance")}</dt>
+            <dd>
+              {n(p.range[0])} to {n(p.range[1])} mm
+              <small>{t("ui.gear_zero_backlash_at_each_tooth")}</small>
+            </dd>
+            <dt>{t("ui.gear_best_fit_sinusoid")}</dt>
+            <dd>
+              {n(p.sinusoid[0])} ± {n(p.sinusoid[1])} mm
+              <small>
+                phase {((180 / Math.PI) * p.sinusoid[2]).toFixed(1)}° — what a simple crank can
+                deliver
+              </small>
+            </dd>
+            <dt>{t("ui.gear_departure_from_that_sinusoid")}</dt>
+            <dd>
+              {um(1e3 * p.sinusoid_error)}
+              <small>{t("ui.gear_ideal_not_sinusoidal_inv_cosine")}</small>
+            </dd>
+            <dt>{t("ui.gear_backlash_a_crank_leaves")}</dt>
+            <dd>
+              <span class:warn={p.sinusoid_backlash[0] < 0}>
+                {um(1e3 * p.sinusoid_backlash[0])} to {um(1e3 * p.sinusoid_backlash[1])}
+              </span>
+              <small>{t("ui.gear_negative_is_interference_not_slack")}</small>
+            </dd>
+          </dl>
+        {/if}
       {/if}
 
       <h2>{t("ui.gear_measurement_over_teeth")}</h2>
@@ -612,6 +684,12 @@
     gap: 0.5rem;
     font-size: 0.85rem;
   }
+  /* A select holding words, not a number, needs the room the number column does
+     not: "Internal (ring)" was arriving as "Internal (rin". It takes the unit
+     column's width as well, since a kind has no unit to print. */
+  label.wide {
+    grid-template-columns: 1fr 10.5rem;
+  }
   label.check {
     grid-template-columns: auto 1fr;
   }
@@ -663,9 +741,15 @@
     font-size: 0.75rem;
   }
 
+  /* The label column is `max-content`, so a name never wraps. It was `1fr`
+     against an `auto` value column, which is fine while the values are short
+     numbers and falls apart once one of them carries an explanatory `small`:
+     the value column then wants the whole row and squeezes the labels into two
+     and three lines. Sizing the labels to their own longest and giving the rest
+     to the values is the way round that reads. */
   dl {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: max-content 1fr;
     gap: 0.15rem 1rem;
     margin: 0;
     font-size: 0.85rem;
