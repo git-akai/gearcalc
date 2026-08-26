@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–11 complete and in CI. 376 tests, ~26 s.**
+**Milestones 0–11 complete and in CI. 378 tests, ~26 s.**
 
 Milestone 11's named scope — geartrain import/export, confirmations, error
 surfacing, docs — is done, and geartrain import/export was the last unbuilt item
@@ -302,6 +302,14 @@ four are in play differing by `cos α_t`, `cos α_w`, `cos β_b`.
 `PARALLEL_AXES` is a named zero, and at it the elliptical patch's peak pressure
 is *exactly* zero. Line contact is a degenerate value, not a branch.
 
+**A loaded flank sits halfway, and that closed §4.10's blocker.** Backlash is how
+far a member can turn *between* its flanks; `Mesh::loaded_flank_phase` is where
+it sits when one of them is loaded, and it is exactly half — because moving the
+centres is a displacement along the mirror axis of the two lines of action, so
+both flanks open equally. Half of an exact law, so exact. Kept as its own named
+function rather than a `/ 2.0` at the call site: a factor of two between two
+nearly-identical quantities is precisely what went wrong once already (§12).
+
 **Two friction coefficients, because there are two questions.** Whether a drive
 turns at all is decided at rest against a **static** coefficient; how well it
 turns once moving is decided against the **sliding** one. `Directional::once_moving`
@@ -454,6 +462,12 @@ these are the ones most likely to be stepped on again.
   power algebra, including two exact closed forms, and a backward efficiency of
   101.571 % survived all of them — because every one drove forward with a
   positive torque and a positive speed. It was found by looking at the UI.
+- **An identity is not evidence.** The mesh-phase coefficient's acceptance gate
+  was "reproduce the backlash law". The answer turned out to *be* the backlash
+  law halved, so it passes that gate by construction and the gate proves nothing
+  about it. What proves something is the outline measurement, which shares no
+  code with either. When a derivation satisfies its own acceptance test
+  trivially, the test has stopped being one.
 - **A number quoted in a warning is the number the reader will go and change.**
   The self-locking note named the *sliding* coefficient as the one locking the
   drive. Once static friction decided it, that made the note point at an input
@@ -559,7 +573,6 @@ the number would have been.
 | Radial assembly — attempted, diagnosed, **shelved** with its findings | §4.11 | |
 | Two notes nothing can fire | §12 | `clamp.ring_fully_filleted` was searched for over ~11 000 ring/cutter combinations and never fired — `ShaperCut` already refuses a tool whose rounds overlap, which may shadow it entirely. `stage.ring_addendum_clamped` needs a planetary ring whose tip clamps, and the set solves its own ring addendum. Both are live code with live messages, so neither is deleted on suspicion; they are named in `strings.rs`'s `UNFIRED` with their evidence |
 | The **enveloping** (throated) wheel's zone of action | §4.5.1 | The cylindrical one is derived; a worm reports it as a floor, with its assumed tooth height named |
-| Mesh-phase coefficient setting the optimal λ | §4.10 | The only thing blocking the angular-profile-shift milestone |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
 | The cut simulation cannot see below the generation limit: its cutter has no fillet | §4.11 | 0.08 mm on ordinary designs, flagged per part |
 | Span over teeth for a ring | §4.6 | Rare in practice, not derived; between-pins is done and the tab says which is which |
@@ -629,7 +642,7 @@ of DESIGN.md, which records that the audit was wrong to promise it.
 
 | Item | Note |
 |---|---|
-| Angular profile shift | §4.10. Blocked on the mesh-phase coefficient; the acceptance gate for any replacement model is already written — it must first reproduce `j_t = 2a′(inv α′ − inv α_w)` |
+| Angular profile shift (eccentric gear) | §4.10. **Unblocked** — the mesh-phase coefficient is closed (`Mesh::loaded_flank_phase`). Scoped to the gear tab, without inspection data, and as an *extension* of the concentric gear rather than a branch: `Δx = 0` must come out bit-identical to today |
 | A planetary set's drawing | the viewport draws single gears; a set needs the carrier and N planets placed |
 | A worm's profile drawing, and its DXF | §8. A crossed pair draws as its two helical gears already |
 | The enveloping wheel's zone of action | would turn a worm's `ε` from a floor into the number |

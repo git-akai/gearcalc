@@ -578,3 +578,156 @@ pub fn check_ring_cut(ring: &crate::ring::Ring, radii: usize, phases: usize) -> 
         samples,
     }
 }
+
+// ---------------------------------------------------------------------------
+// The loaded flank's phase, measured off the generated outlines
+// ---------------------------------------------------------------------------
+
+/// A gear's tooth half-width against radius, read off its **drawn outline**.
+///
+/// Above the fillet an external tooth's outline is two involute flanks and a tip
+/// arc, so at any radius in that band the largest angular departure from the
+/// tooth centreline *is* the tooth's half-width there. Below the fillet the root
+/// arc reaches mid-space and would report the space as material, which is why
+/// the band starts at the base circle and the caller stays inside it.
+///
+/// Nothing here knows what an involute is. It reads points.
+fn halfwidth_table(outline: &[[f64; 2]], teeth: u32, bins: usize) -> (f64, f64, Vec<f64>) {
+    let pitch = std::f64::consts::TAU / f64::from(teeth);
+    let (mut lo, mut hi) = (f64::MAX, 0.0_f64);
+    for p in outline {
+        let r = p[0].hypot(p[1]);
+        lo = lo.min(r);
+        hi = hi.max(r);
+    }
+    let mut table = vec![0.0_f64; bins];
+    for p in outline {
+        let r = p[0].hypot(p[1]);
+        let th = p[1].atan2(p[0]);
+        let d = (th - (th / pitch).round() * pitch).abs();
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let i = (((r - lo) / (hi - lo)) * (bins - 1) as f64).round() as usize;
+        let i = i.min(bins - 1);
+        table[i] = table[i].max(d);
+    }
+    // A bin no point landed in takes its neighbour's value, so the lookup is
+    // defined across the band rather than reading zero where the sampling was
+    // sparse.
+    for i in 1..bins {
+        if table[i] == 0.0 {
+            table[i] = table[i - 1];
+        }
+    }
+    (lo, hi, table)
+}
+
+/// Whether a point in the gear's own frame is inside its material, by the table
+/// above. Points outside the band are reported outside.
+fn inside(point: [f64; 2], teeth: u32, band: (f64, f64), table: &[f64], from: f64) -> bool {
+    let r = point[0].hypot(point[1]);
+    if r < from || r > band.1 {
+        return false;
+    }
+    let pitch = std::f64::consts::TAU / f64::from(teeth);
+    let th = point[1].atan2(point[0]);
+    let d = (th - (th / pitch).round() * pitch).abs();
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let i = ((((r - band.0) / (band.1 - band.0)) * (table.len() - 1) as f64).round() as usize)
+        .min(table.len() - 1);
+    d < table[i]
+}
+
+/// The rotation that brings an external pair's flanks into contact at centre
+/// distance `a`, radians at gear 2 — measured by **placing the two drawn
+/// outlines** and closing them until they touch.
+///
+/// This exists to check [`crate::mesh::Mesh::loaded_flank_phase`] against
+/// something that shares no code with it. That quantity is derived from the
+/// backlash law, which comes from tooth thicknesses and `inv α`; this comes from
+/// points on a curve and a containment test. If the two agree, the symmetry
+/// argument behind the derivation — that a centre-distance change opens both
+/// flanks equally, so loading one takes up half the play — is not an assumption
+/// either of them makes.
+///
+/// Gear 1 sits at the origin with a tooth centred on the line of centres; gear 2
+/// at `[a, 0]`, rotated until first contact. Returns `None` if the pair never
+/// touches within the search, which for a sane pair means the inputs are wrong.
+///
+/// `sign` picks which flank is loaded: `+1` closes one way, `-1` the other. The
+/// two answers straddle the zero-backlash position by half the play each, which
+/// is the whole content of the claim and is why the caller asks for both.
+#[must_use]
+pub fn contact_phase_from_outlines(
+    g1: &Gear,
+    g2: &Gear,
+    a: f64,
+    sign: f64,
+    per_tooth: usize,
+) -> Option<f64> {
+    let o1 = g1.profile(per_tooth);
+    let o2 = g2.profile(per_tooth);
+    // The table's radial resolution is the floor on what this can resolve — a
+    // bin is a band of radius over which the half-width is taken as constant,
+    // and the flank's slope turns that into an angular error. Tied to the point
+    // count so asking for a finer measurement actually gets one.
+    let (lo1, hi1, table) = halfwidth_table(&o1, g1.params.teeth, per_tooth.max(64) * 8);
+    // Stay above the fillet, where the outline is flank and tip only.
+    let from = g1.rb.max(lo1 + 0.05 * (hi1 - lo1));
+
+    // Only gear 2's teeth that can reach gear 1 matter, and only their flanks.
+    // Everything else is thousands of points that can never touch.
+    // Whatever gear 2 does, a local point at radius `r` can come no closer to
+    // gear 1's centre than `a - r`, so anything that cannot reach gear 1's tip
+    // can never touch it whatever the rotation. That is most of the outline.
+    let candidates: Vec<[f64; 2]> = o2
+        .iter()
+        .filter(|p| {
+            let r = p[0].hypot(p[1]);
+            r > g2.rb && a - r < hi1
+        })
+        .copied()
+        .collect();
+    if candidates.is_empty() {
+        return None;
+    }
+
+    let touches = |phi: f64| {
+        let (s, c) = phi.sin_cos();
+        candidates.iter().any(|p| {
+            let x = a + c * p[0] - s * p[1];
+            let y = c * p[1] + s * p[0];
+            inside([x, y], g1.params.teeth, (lo1, hi1), &table, from)
+        })
+    };
+
+    // Where gear 2 can sit at all, found rather than assumed. Both gears are
+    // drawn with a tooth centred on their own zero, and whether that leaves a
+    // tooth or a space pointing at the mate depends on the tooth count's
+    // **parity** — so the free placement is scanned for over one pitch instead
+    // of being reasoned about. Over a pitch a meshing pair interferes almost
+    // everywhere; the free band is the play, and it is what this is measuring.
+    let pitch = std::f64::consts::TAU / f64::from(g2.params.teeth);
+    const SCAN: usize = 400;
+    #[allow(clippy::cast_precision_loss)]
+    let free_seed = (0..=SCAN)
+        .map(|i| pitch * (i as f64 / SCAN as f64) - pitch / 2.0)
+        .find(|phi| !touches(*phi))?;
+
+    // ...then closed from there until it interferes. **Half** a pitch, not a
+    // whole one: a whole pitch is a symmetry of the gear and maps it onto
+    // itself, so it would report the starting placement again and bracket
+    // nothing. Half is far more than any play.
+    let (mut free, mut hit) = (free_seed, free_seed + sign * pitch / 2.0);
+    if !touches(hit) {
+        return None;
+    }
+    for _ in 0..60 {
+        let mid = 0.5 * (free + hit);
+        if touches(mid) {
+            hit = mid;
+        } else {
+            free = mid;
+        }
+    }
+    Some(0.5 * (free + hit))
+}

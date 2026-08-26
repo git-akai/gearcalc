@@ -276,6 +276,48 @@ impl Mesh {
         Ok(2.0 * a_actual * (inv(ap) - inv(self.alpha_w)))
     }
 
+    /// How far a member turns when the centres move to `a_actual` with **one
+    /// flank kept in contact**, radians.
+    ///
+    /// # A different question from backlash, and exactly half the answer
+    ///
+    /// Backlash is how far a member can turn *between* its two flanks. This is
+    /// where it sits when one of them is loaded — which is what a driven gear
+    /// does, and what an eccentric pair's commanded centre distance moves
+    /// (§4.10). The two are related by a symmetry rather than by a convention:
+    ///
+    /// > The drive and coast lines of action are the two common tangents to the
+    /// > base circles, and they are **mirror images about the line of centres**.
+    /// > A change in centre distance is a displacement *along* that line — along
+    /// > the mirror axis — so whatever gap it opens on one flank it opens
+    /// > equally on the other. Total play is the sum of the two, so taking up
+    /// > one of them is exactly half.
+    ///
+    /// Half of an exact law, so exact: no small-angle step enters, and it
+    /// carries the involute law's second-order term with it. In the rack limit
+    /// it reduces to `δ tan α` per flank, which is the §4.1 thickness relation
+    /// and the one §4.10 leans on.
+    ///
+    /// Positive for `a_actual` above the zero-backlash distance, in the sense
+    /// that the loaded member has *retreated* — the flank it is riding on has
+    /// moved away from it.
+    ///
+    /// # Why it is a function and not `angular_backlash(…) / 2.0` at the call
+    /// site
+    ///
+    /// Because a factor of two between two nearly-identical quantities is the
+    /// thing that goes wrong. It went wrong once already — the crossed-axis
+    /// backlash counted one flank where a separation opens both (§12) — and the
+    /// only defence that worked was making the two quantities separate, named,
+    /// and separately gated.
+    ///
+    /// # Errors
+    ///
+    /// [`MeshError::CentreDistanceTooSmall`] if the base circles cannot reach.
+    pub fn loaded_flank_phase(&self, a_actual: f64, at_gear: Member) -> Result<f64, MeshError> {
+        Ok(self.angular_backlash(a_actual, at_gear)? / 2.0)
+    }
+
     /// Angular backlash seen at gear 1 or gear 2, radians.
     ///
     /// # Errors
@@ -490,6 +532,145 @@ mod tests {
                 assert!(design.backlash(a).unwrap() > 0.0);
             }
         }
+    }
+
+    /// **The loaded flank sits exactly halfway, and the outlines say so
+    /// too.**
+    ///
+    /// The acceptance gate §4.10 asks for, met twice. The first half is
+    /// arithmetic — the phase is half the backlash by construction, so it
+    /// reproduces `j_t = 2a′(inv α′ − inv α_w)` because it *is* that law — and
+    /// arithmetic that cannot fail is not evidence. The second half is the
+    /// measurement: place the two **drawn outlines** at a centre distance and
+    /// close them until they touch, once on each flank. If the derivation is
+    /// right the two contact positions straddle the zero-backlash placement by
+    /// the same amount, and that amount is the phase.
+    ///
+    /// `verify::contact_phase_from_outlines` shares no code with any of this. It
+    /// reads points off a curve and asks whether one is inside another; the
+    /// backlash law comes from tooth thicknesses and `inv α`. The symmetry the
+    /// derivation rests on — that moving along the line of centres opens both
+    /// flanks equally, because it is a displacement along their mirror axis —
+    /// is an assumption neither of them makes.
+    ///
+    /// The tolerance is the outline's own discretisation, not a fudge: the
+    /// contact search resolves to about a chord of the drawn flank, and the
+    /// residual falls as the point count rises.
+    #[test]
+    fn the_loaded_flank_sits_halfway_and_the_outlines_agree() {
+        // The outline is an inscribed polyline and the half-width table bins by
+        // radius, so a measured play is always a little *under* the true one.
+        // The residual is a resolution, not a percentage: it sits near 1.3e-4
+        // rad at this point count whatever the play, and falls as the count
+        // rises (1.0e-4 at three times as many points).
+        const POINTS: usize = 2700;
+        const FLOOR: f64 = 2e-4;
+
+        let g = |z: u32| {
+            Gear::new(GearParams {
+                teeth: z,
+                ..Default::default()
+            })
+        };
+        let contact = |a: &Gear, b: &Gear, at: f64, sign: f64| {
+            crate::verify::contact_phase_from_outlines(a, b, at, sign, POINTS)
+                .expect("the outlines must reach each other")
+        };
+
+        for (z1, z2) in [(17_u32, 43_u32), (23, 31)] {
+            let (a, b) = (g(z1), g(z2));
+            let mesh = Mesh::new(&a, &b, MeshKind::External).unwrap();
+            let mut seated: Option<f64> = None;
+
+            for delta in [0.10_f64, 0.30, 0.60] {
+                let at = mesh.a_w + delta;
+                let drive = contact(&a, &b, at, 1.0);
+                let coast = contact(&a, &b, at, -1.0);
+
+                // 1. The play the drawn teeth leave is the law's, approached
+                //    from below as the drawing gets finer.
+                let law = mesh.angular_backlash(at, Member::Second).unwrap();
+                let measured = drive - coast;
+                assert!(
+                    measured <= law && law - measured < FLOOR,
+                    "z {z1}/{z2} Δa {delta}: outlines give {measured} rad of play \
+                     against the law's {law}"
+                );
+
+                // 2. **The seated placement does not move.** This is the
+                //    derivation's whole content, and the part that is not
+                //    arithmetic: if a centre-distance change opened the two
+                //    flanks by different amounts, the midpoint between them
+                //    would drift as `a` grew. It is a displacement along their
+                //    mirror axis, so it cannot — and the measurement agrees to
+                //    machine precision rather than to a tolerance.
+                let midpoint = 0.5 * (drive + coast);
+                match seated {
+                    None => seated = Some(midpoint),
+                    Some(was) => assert!(
+                        (midpoint - was).abs() < 1e-12,
+                        "z {z1}/{z2} Δa {delta}: the seated placement moved from \
+                         {was} to {midpoint}, so the flanks did not open equally"
+                    ),
+                }
+
+                // 3. ...so each flank sits one derived phase away from it.
+                let phase = mesh.loaded_flank_phase(at, Member::Second).unwrap();
+                for (name, side) in [("drive", drive - midpoint), ("coast", midpoint - coast)] {
+                    assert!(
+                        (phase - side).abs() < FLOOR,
+                        "z {z1}/{z2} Δa {delta}: the {name} flank measured {side} rad \
+                         from seated, against a derived phase of {phase}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The halves are halves: no small-angle step enters, and the exact law's
+    /// second-order term is carried through rather than linearised away.
+    #[test]
+    fn the_phase_is_half_of_the_exact_law_not_of_its_linearisation() {
+        let g = |z: u32| {
+            Gear::new(GearParams {
+                teeth: z,
+                helix_angle: 15.0 * f64::from(i32::from(z == 17)),
+                ..Default::default()
+            })
+        };
+        let (a, b) = (
+            Gear::new(GearParams {
+                teeth: 17,
+                helix_angle: 15.0,
+                ..Default::default()
+            }),
+            Gear::new(GearParams {
+                teeth: 43,
+                helix_angle: -15.0,
+                ..Default::default()
+            }),
+        );
+        let _ = g;
+        let mesh = Mesh::new(&a, &b, MeshKind::External).unwrap();
+        for delta in [1e-6_f64, 0.05, 0.5] {
+            let at = mesh.a_w + delta;
+            for member in [Member::First, Member::Second] {
+                let phase = mesh.loaded_flank_phase(at, member).unwrap();
+                let play = mesh.angular_backlash(at, member).unwrap();
+                assert!((2.0 * phase - play).abs() < 1e-15 * play);
+            }
+        }
+        // And the rack limit §4.10 leans on: per flank, `δ tan α`.
+        let small = 1e-7;
+        let phase = mesh
+            .loaded_flank_phase(mesh.a_w + small, Member::Second)
+            .unwrap();
+        let r2 = mesh.a_w * f64::from(mesh.z2) / f64::from(mesh.z1 + mesh.z2);
+        let rack = small * mesh.alpha_w.tan() / r2;
+        assert!(
+            (phase - rack).abs() < 1e-6 * rack,
+            "the rack limit gives {rack}, the phase {phase}"
+        );
     }
 
     /// **The parallel backlash and the shared law are one law.**

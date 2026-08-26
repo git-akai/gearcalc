@@ -2615,13 +2615,40 @@ contribution and the centre-distance contribution cancel, leaving uniform total
 phase. That is a well-posed one-dimensional problem, and exposing λ (as agreed)
 remains right — but its *default* should be computed, not set to 1.
 
-**I have not closed the coefficient.** I built a quick involute mesh model to
-pin it down and it failed its own validation check against the §4.4 backlash law,
-so nothing from it is quoted here and no number for the optimal λ appears in this
-document. Deriving it properly belongs in this milestone, and the acceptance test
-is already available and trustworthy: **any mesh-phase model must first reproduce
-`j_t = 2a′(inv α′ − inv α_w)`**, which is verified to 3e-16. That check is what
-caught the bad model, and it should gate the real one.
+**Closed.** The first attempt was a quick involute mesh model, and it failed its
+own validation against the §4.4 backlash law — 10–25 % out and worsening with
+`Δa` — so nothing from it was ever quoted. The answer turned out not to need a
+model at all, only a symmetry:
+
+> The drive and coast lines of action are the two common tangents to the base
+> circles, and they are **mirror images about the line of centres**. A change in
+> centre distance is a displacement *along* that line — along the mirror axis —
+> so whatever gap it opens on one flank it opens equally on the other. The total
+> play is the sum of the two, so loading one takes up exactly **half**.
+
+So the mesh-phase coefficient is half the backlash, and being half of an exact
+law it is exact: no small-angle step enters and the involute law's second-order
+term is carried through. `Mesh::loaded_flank_phase` is that, and in the rack
+limit it reduces to `δ tan α` per flank — the §4.1 thickness relation this
+section already leaned on.
+
+**Gated twice, because half of an arithmetic identity is not evidence.** The
+acceptance test §4.10 asked for is met by construction — the phase *is* the
+backlash law halved, so of course it reproduces it — and a check that cannot fail
+proves nothing. The real one places the two **drawn outlines** at a centre
+distance and closes them until they touch, once on each flank
+(`verify::contact_phase_from_outlines`). It shares no code with any of the above:
+it reads points off a curve and asks whether one lies inside another, where the
+backlash law comes from tooth thicknesses and `inv α`. Two results:
+
+| | |
+|---|---|
+| The seated placement **does not move** as `a` grows | the midpoint between the two contacts holds to **3.4e-16 rad** across `Δa` = 0.1, 0.3, 0.6 mm and every point count tried. This is the symmetry itself, measured, and it is exact rather than close |
+| The play the drawn teeth leave is the law's | approached from below — an inscribed polyline draws a slightly thin tooth — and converging: 1.3e-4 rad short at 2700 points a tooth, 1.0e-4 at 8100 |
+
+The `λ` default therefore follows from a derivation rather than a guess. It is
+still **exposed and not defaulted** in the UI, per the operating decision: the
+computed optimum is shown beside both error figures and the designer chooses.
 
 This does not affect anything else in the document — §4.4 itself is unaffected,
 and no other feature depends on the mesh-phase model.
@@ -3388,9 +3415,8 @@ not have to hunt for it.
 
 | Open item | Where | Blocks |
 |---|---|---|
-| Mesh-phase coefficient that sets the optimal λ | §4.10, appendix | only the angular-profile-shift milestone |
-| Sinusoidal `x(θ)`, or another interpolation? | §4.10 | same |
-| What the eccentric mechanism can physically follow | §4.10 | same |
+| Sinusoidal `x(θ)`, or another interpolation? | §4.10 | deferred by decision: the tool reports the ideal `a_w(θ)` and the residual a best-fit sinusoid leaves, and the `x(θ)` optimisation waits until a mechanism is chosen |
+| What the eccentric mechanism can physically follow | §4.10 | same — reporting both is what unblocks the milestone without it |
 | A coupled glass POM grade, if one is wanted back in the library | §6.4 | nothing |
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
 | Radial-assembly interference — **shelved**; attempted, diagnosed and withdrawn, with the findings kept | §4.11 | nothing |
@@ -3731,6 +3757,9 @@ here. Revision 2 additions are marked ★.
 | ◈ An operating mesh keeps the cut geometry | `base_radii()` across `Δa` = 0.02, 0.2, 1.0 mm, shifted and helical pairs | **bit-identical**, and `a cos α` invariant to 1e-12 — the base cylinders are the gears, not the assembly |
 | ◈ ...and gives up the backlash reference | `Mesh::at(a).backlash(a)` | **zero** to 1e-12, while the design mesh reports play. The footgun this type now carries, written down as a test rather than as a warning |
 | ◈ The slide is what takes the mesh apart | `Σ = 0.5°`, 12 mm face, clearance 0.02 against 0 | `ε` 0.860 `Face`-limited against 1.664 `Tips`-limited, and monotone in `Σ` — the `1/sin Σ` showing through without a number being written down |
+| ◉ **The loaded flank sits exactly halfway** | the seated placement between the two drawn outlines' contacts, `Δa` = 0.1/0.3/0.6 mm × two pairs × four point counts | holds to **3.4e-16 rad** — it does not move with the centre distance at all. That is the mirror symmetry the mesh-phase derivation rests on, measured rather than argued, and it is exact |
+| ◉ ...and the play they leave is the law's | the same contacts against `j_t = 2a′(inv α′ − inv α_w)` | short by 1.3e-4 rad at 2700 points a tooth and 1.0e-4 at 8100 — one-sided, since an inscribed polyline draws a thin tooth, and convergent. The outline route shares no code with the law: points on a curve against tooth thicknesses and `inv α` |
+| ◉ Neither is vacuous | the half replaced by a 1/2.2 | both fail, along with the arithmetic gate |
 | ◆ The path's roll lengths | vs. the classical `r sin α_t / cos β_b`, 4 crossed geometries | 1e-9 relative, and the two sum to the tangent length between the base cylinders |
 | ◆ Crossed contact ratio in the parallel limit | Σ = 2°, 0.5°, 0.1°, 0.01° against `ε_α / cos²β_b` | monotone in, 1e-4 by 0.01° — and **not** `ε_α`: the normal-plane path and the normal base pitch each carry a `cos β_b` the same way |
 | ◆ Those checks are not vacuous | the `n̂·â₂` sign deliberately flipped to the other branch | both path tests fail |
@@ -3899,7 +3928,8 @@ here. Revision 2 additions are marked ★.
 | ◆ Crossed-axis sliding at the pitch point | perpendicular axes, worm and wheel radii | `√(v₁²+v₂²)`, equal to the textbook `v₁/cos γ` to 1e-12; resolved on the worm axis it is exactly the wheel's pitch velocity |
 
 The marks record which round of review each check came from; they are kept only
-so a claim can be traced to the work that produced it. `◈` is the last round —
+so a claim can be traced to the work that produced it. `◉` is the last round —
+closing the mesh-phase coefficient that had blocked §4.10 — `◈` the one before —
 bringing the operating centre distance into the contact model — and `◇` the one
 before it:
 the crossed-axis derivation promoted out of a scratch directory into
