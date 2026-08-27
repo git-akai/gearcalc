@@ -16,10 +16,11 @@
     type PinsOut,
     type FieldSpec,
     type ShiftRange,
+    type GearKind,
     note,
     t,
   } from "./core";
-  import { workspace, type GearTab as Tab } from "./state.svelte";
+  import { setKind, workspace, type GearTab as Tab } from "./state.svelte";
   import Viewport from "./Viewport.svelte";
 
   let { tab }: { tab: Tab } = $props();
@@ -205,7 +206,10 @@
     <div class="grid">
       <label class="wide">
         <span>{t("ui.gear_kind")}</span>
-        <select bind:value={tab.kind}>
+        <select
+          value={tab.kind}
+          onchange={(e) => setKind(tab, e.currentTarget.value as GearKind)}
+        >
           <option value="external">{t("ui.gear_kind_external")}</option>
           <option value="internal">{t("ui.gear_kind_internal")}</option>
           <option value="eccentric">{t("ui.gear_kind_eccentric")}</option>
@@ -240,27 +244,28 @@
         </label>
       </div>
     {/if}
-    {#if eccentric}
-      <div class="grid">
-        <label>
-          <span>{t("ui.gear_mate_teeth")}</span>
-          <input type="number" step="1" min="1" bind:value={tab.mate.teeth} />
-          <small>{t("ui.gear_mate_shares_module_angle_helix")}</small>
-        </label>
-        <label>
-          <span>{t("ui.gear_mate_profile_shift")}</span>
-          <input type="number" step="0.05" bind:value={tab.mate.profile_shift} />
-          <em>{t("ui.gear_m")}</em>
-        </label>
-        <label class="check">
-          <input type="checkbox" bind:checked={tab.mate.internal} />
-          <span>{t("ui.gear_mate_is_a_ring")}</span>
-          <small>{t("ui.gear_mate_ring_runs_inside")}</small>
-        </label>
-      </div>
-    {/if}
     <div class="grid">
       {#each FIELDS.filter((f) => !f.kinds || f.kinds.includes(tab.kind)) as f (f.key)}
+        <!-- The mate is what the commanded centre distance is commanded
+             *against*, so it sits with the eccentricity it belongs to rather
+             than above the gear's own parameters. -->
+        {#if f.key === "angular_shift"}
+          <label>
+            <span>{t("ui.gear_mate_teeth")}</span>
+            <input type="number" step="1" min="1" bind:value={tab.mate.teeth} />
+            <small>{t("ui.gear_mate_shares_module_angle_helix")}</small>
+          </label>
+          <label>
+            <span>{t("ui.gear_mate_profile_shift")}</span>
+            <input type="number" step="0.05" bind:value={tab.mate.profile_shift} />
+            <em>{t("ui.gear_m")}</em>
+          </label>
+          <label class="check">
+            <input type="checkbox" bind:checked={tab.mate.internal} />
+            <span>{t("ui.gear_mate_is_a_ring")}</span>
+            <small>{t("ui.gear_mate_ring_runs_inside")}</small>
+          </label>
+        {/if}
         {@const notes = notesFor(f)}
         <label class:invalid={errors[f.key]}>
           <span>{f.label}</span>
@@ -460,7 +465,7 @@
       <!-- Only when the gear actually varies. Every field below is zero for an
            ordinary one, so this is a question of what is worth reading rather
            than of what the core computed. -->
-      {#if tab.params.angular_shift !== 0}
+      {#if eccentric}
         <h2>{t("ui.gear_eccentricity")}</h2>
         <dl>
           <dt>{t("ui.gear_envelope_eccentricity")}</dt>

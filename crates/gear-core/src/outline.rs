@@ -139,15 +139,16 @@ impl Gear {
         &self,
         base: f64,
         side: f64,
-        root: Option<&dyn Fn(f64) -> f64>,
+        displace: Option<&dyn Fn(f64, f64) -> f64>,
         tol: f64,
         out: &mut Vec<Vertex>,
     ) {
         let pt = |r: f64, th: f64| {
             let a = base + th;
+            let r = r + displace.map_or(0.0, |d| d(r, a));
             (r * a.cos(), r * a.sin())
         };
-        let Some(radius) = root else {
+        if displace.is_none() {
             if side < 0.0 {
                 let s = pt(self.rf, -self.half_pitch);
                 out.push(Vertex {
@@ -159,11 +160,12 @@ impl Gear {
                 last.bulge = bulge_for(self.half_pitch - self.theta0);
             }
             return;
-        };
-        // `t` runs from the fillet junction out to mid tooth-space.
+        }
+        // `t` runs from the fillet junction out to mid tooth-space. The radius
+        // is the tooth's own; `pt` applies the tool's displacement.
         let curve = |t: f64| {
             let th = side * (self.theta0 + t * (self.half_pitch - self.theta0));
-            pt(radius(base + th), th)
+            pt(self.rf, th)
         };
         if side < 0.0 {
             let s = curve(1.0);
@@ -178,20 +180,25 @@ impl Gear {
         &self,
         tol: f64,
         base: f64,
-        root: Option<&dyn Fn(f64) -> f64>,
+        displace: Option<&dyn Fn(f64, f64) -> f64>,
         out: &mut Vec<Vertex>,
     ) {
         {
             // Polar to cartesian in the tooth's own frame: theta is measured
             // from the tooth centreline.
+            // The single place polar becomes cartesian for a tooth, which is
+            // why the tool's radial motion is applied here rather than to each
+            // section: a flank point takes zero displacement and a root point
+            // takes all of it, and neither has to be identified.
             let pt = |r: f64, th: f64| {
                 let a = base + th;
+                let r = r + displace.map_or(0.0, |d| d(r, a));
                 (r * a.cos(), r * a.sin())
             };
 
             if self.severed {
                 // No flank and no tip arc: fillet and root arc only.
-                self.emit_root(base, -1.0, root, tol, out);
+                self.emit_root(base, -1.0, displace, tol, out);
                 out.push(Vertex::line(
                     pt(self.rf, -self.theta0).0,
                     pt(self.rf, -self.theta0).1,
@@ -206,7 +213,7 @@ impl Gear {
                     pt(r, th)
                 };
                 subdivide(&fillet_down, 0.0, 1.0, tol, 0, out);
-                self.emit_root(base, 1.0, root, tol, out);
+                self.emit_root(base, 1.0, displace, tol, out);
                 // A severed tooth is drawn and done; there is no flank to
                 // follow. `return` rather than `continue` now that this is one
                 // tooth rather than an iteration.
@@ -214,7 +221,7 @@ impl Gear {
             }
 
             // 1. root, from mid tooth-space up to where the fillet begins.
-            self.emit_root(base, -1.0, root, tol, out);
+            self.emit_root(base, -1.0, displace, tol, out);
 
             // 2. fillet, minus side: s runs s_j -> 0 as the fillet descends to
             //    the root, so traverse it backwards here.
@@ -256,7 +263,7 @@ impl Gear {
 
             // 7. root arc out to mid tooth-space is the next tooth's opening
             //    segment, so only the bulge is recorded here.
-            self.emit_root(base, 1.0, root, tol, out);
+            self.emit_root(base, 1.0, displace, tol, out);
         }
     }
 }

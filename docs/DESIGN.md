@@ -2609,6 +2609,27 @@ held to the same eccentricity now.
   The gate is a *trend*, not a tolerance: refine the sampling and a curve's
   largest radial jump falls with it, while a step does not move. Doubling the
   points must nearly halve the jump, on both outlines.
+- **...and the fillet moves with it, or the root kinks.** Correcting only the
+  flat root was the first attempt and it left a notch at the bottom of every
+  tooth space: the root arc spans about 0.005 rad, so absorbing 0.05 mm inside it
+  is a dive of 9 mm/rad where the envelope's own slope is 0.4. The fillet is cut
+  by the same tip corner at the same moving radius and nothing constrains its
+  shape, so the correction is spread across it — ten times the span, and gentle.
+  The **flank** is untouched, because constant ratio requires it to be one
+  involute at one shift and that is the whole feature.
+
+  `w = t²(3 − 2t)` rather than `t`, so the displacement is stationary at both
+  ends: it leaves the flank junction without kinking the involute and meets its
+  neighbour's half at mid-space with the same slope. Gated as a trend again —
+  a **kink keeps its angle** however finely the curve is sampled, while a smooth
+  curve's turning angle falls with the spacing.
+
+  `t` is parametrised on **radius**, not angle. The flank continues below the
+  base circle to its true intersection with the trochoid and is re-entrant down
+  there, so a flank point can sit at a larger angle than the junction does and
+  would take a displacement it must never have. Radius is the invariant that
+  stays monotone (§4.2), so radius is what measures how far down the fillet a
+  point is.
 
 *What was found on the way, and is not obvious:*
 
@@ -3804,6 +3825,9 @@ something independent.**
 | 11.4 | The self-locking note quoting the sliding coefficient | It named the input a reader would go and change to no effect. Whether the drive locks is decided by the **static** coefficient, and the note now says which number it means |
 | 4.10 | Each tooth of an eccentric gear built as its own gear, tool and all | `Gear::new` caps the cutter tip round per tooth, so the high side got a 0.2375-module tool and the low side 0.3800 — a different hob for each tooth. The fillet collapsed on the high teeth and the trochoid's extent jumped sixfold between neighbours. One gear, one tool: the tightest tooth's |
 | 4.10 | ...and each tooth's root drawn at its own radius | A radial **step at every mid-space**, up to 0.13 mm, which no hob can leave. The root is the gear's, not the tooth's: it runs from the fillet junction to the envelope `r − m(h_f − x(θ))`, continuous at both ends |
+| 4.10 | The root correction applied to the flat root alone | It has 0.005 rad to absorb 0.05 mm in, a dive of 9 mm/rad against the envelope's own 0.4 — a notch at the bottom of every tooth space. Spread across the fillet, which the same tool corner cuts at the same moving radius and which nothing constrains |
+| 4.10 | ...and parametrised on **angle** | The flank is re-entrant below the base circle, so a flank point can sit at a larger angle than the fillet junction and take a displacement it must never have. Radius is the monotone invariant (§4.2) and is what measures position along the profile |
+| 8.0 | A gear tab's type-specific inputs left set when the type changed | Switching an eccentric gear back to external left its shift amplitude in place, so the gear stayed eccentric with no control on screen to say so — and the eccentricity outputs keyed on that *value* rather than on the type, so they stayed too. Changing type now returns every field the new type does not use to its default, read from `FIELDS` rather than from a second list |
 | 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
 | 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
 | 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |

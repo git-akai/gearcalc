@@ -476,6 +476,12 @@ these are the ones most likely to be stepped on again.
   power algebra, including two exact closed forms, and a backward efficiency of
   101.571 % survived all of them — because every one drove forward with a
   positive torque and a positive speed. It was found by looking at the UI.
+- **A hidden input is still an input.** The gear tab's type-specific fields kept
+  their values when the type changed, so an eccentric gear switched back to
+  external stayed eccentric with no control on screen to say so — and the
+  outputs keyed on the *value* rather than the type, so they stayed too. Two
+  halves of one mistake: state that outlives its control, and a readout that
+  asks "is this non-zero?" where it meant "is this that kind of thing?".
 - **Assembling a thing out of things gives each piece its own everything.** An
   eccentric gear is built tooth by tooth from `Gear`s, and `Gear::new` caps the
   cutter tip round to what *that tooth's* space allows — so the gear came out cut

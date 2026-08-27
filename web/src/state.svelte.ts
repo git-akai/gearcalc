@@ -9,6 +9,7 @@ import {
   defaultLibrary,
   defaultTrain,
   type CutterRef,
+  FIELDS,
   type GearKind,
   type MateRef,
   importLibrary,
@@ -123,6 +124,30 @@ class Workspace {
       this.selectedId = this.tabs[Math.min(i, this.tabs.length - 1)].id;
     }
   }
+}
+
+/** Change a tab's type, returning every field the new type does not use to its
+ *  default.
+ *
+ *  **Why this is not just `tab.kind = kind`.** A type-specific input left behind
+ *  keeps acting: switching an eccentric gear back to external left its shift
+ *  amplitude set, so the gear stayed eccentric with no control on screen to say
+ *  so. Which fields belong to which type is already written down once, in
+ *  `FIELDS`, so this reads that rather than listing them again — a second list
+ *  would be the thing that goes stale when a fourth type arrives.
+ *
+ *  The cutter and the mate are not reset: they are separate objects rather than
+ *  gear parameters, they reach no answer unless their type is active, and a
+ *  designer who set a cutter, looked at the gear as an external one and came
+ *  back would not thank us for having cleared it. */
+export function setKind(tab: GearTab, kind: GearKind) {
+  const fallback = defaults().gear.params;
+  for (const f of FIELDS) {
+    if (f.kinds && !f.kinds.includes(kind)) {
+      tab.params = { ...tab.params, [f.key]: fallback[f.key] };
+    }
+  }
+  tab.kind = kind;
 }
 
 export const workspace = new Workspace();

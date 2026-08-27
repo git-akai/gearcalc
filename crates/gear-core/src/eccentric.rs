@@ -225,33 +225,64 @@ impl Eccentric {
         self.mean.rf + p.module * (p.angular_shift * angle.cos())
     }
 
-    /// The root radius under tooth `k` at an absolute angle, mm.
+    /// How far a point of tooth `k` is displaced radially by the tool's motion,
+    /// mm — `tt` is its angle from the tooth's own centreline.
     ///
-    /// Blended from the tooth's own `rf` at the fillet junction to the envelope
-    /// at mid-space, so the root **leaves the fillet where the fillet ends** and
-    /// **arrives at the envelope by mid-space** — continuous at both, and
-    /// therefore continuous all the way round.
+    /// # What is being corrected
     ///
-    /// The blend is linear in angle and is an **interpolation, not a
-    /// derivation**: the true surface is the envelope of a tool corner under
-    /// rolling *and* radial motion, which §4.10 scoped out. What it replaces is
-    /// a radial step of up to 0.13 mm at every mid-space, which no hob can
-    /// leave.
+    /// A tooth's own root radius is `r − m(h_f − x_k)`, and neighbours have
+    /// different `x`, so leaving each tooth's root at its own radius put a
+    /// radial **step at every mid-space**, up to 0.13 mm. No hob can leave that:
+    /// it is one edge sweeping past, and what it leaves is the envelope
+    /// `r − m(h_f − x(θ))`.
     ///
-    /// One rule, and both outlines use it — the screen's and the export's. They
-    /// had been two ways of drawing a gear once already (§12).
-    fn root_radius(&self, k: usize, angle: f64) -> f64 {
-        let (g, seat) = self.tooth(k);
-        let span = g.half_pitch - g.theta0;
-        let w = if span > 0.0 {
-            (((angle - seat).abs() - g.theta0) / span).clamp(0.0, 1.0)
+    /// # Why the fillet moves and the flank does not
+    ///
+    /// The **flank** is untouchable: constant ratio requires it to be one
+    /// involute of one base circle at one shift (§4.10), and that is the whole
+    /// feature. So the displacement is zero at the flank/fillet junction and
+    /// stays zero over the flank and the tip.
+    ///
+    /// The **fillet** is not constrained by anything, and it is cut by the same
+    /// tip corner that cuts the root — at a radial position that is already
+    /// moving. Correcting only the flat root was the first attempt and it left a
+    /// visible notch: the root arc spans about 0.005 rad, so taking up 0.05 mm
+    /// inside it means a dive of 9 mm/rad where the envelope's own slope is 0.4.
+    /// Spread over the fillet as well the span is ten times longer and the
+    /// correction is gentle.
+    ///
+    /// `w = t²(3 − 2t)` rather than `t`, so the displacement is **stationary at
+    /// both ends**: it leaves the flank junction without kinking the involute,
+    /// and meets its neighbour's half at mid-space with the same slope.
+    ///
+    /// Still an **interpolation, not a derivation** — the true surface is the
+    /// envelope of a tool corner under rolling *and* radial motion, which §4.10
+    /// scoped out. What it has to be is zero at the flank, tangent there, and
+    /// through the envelope at mid-space; it is all three.
+    ///
+    /// Exactly `0.0` for a concentric gear, where `root_at` returns that tooth's
+    /// own `rf` to the bit — so every point is `r + 0.0` and nothing moves.
+    fn displacement(&self, k: usize, r: f64, angle: f64) -> f64 {
+        let (g, _) = self.tooth(k);
+        // **Parametrised on radius, not on angle.** `θ` is not monotone along a
+        // profile — the flank continues *below the base circle* to its true
+        // intersection with the trochoid (§4.2) and is re-entrant down there, so
+        // a flank point can sit at a larger angle than the junction does and
+        // would take a displacement it must never have. Radius is the invariant
+        // that does stay monotone, which is why it is the one that measures how
+        // far down the fillet a point is.
+        let junction_r = g.trochoid_at(g.s_j).0;
+        let span = junction_r - g.rf;
+        let t = if span > 0.0 {
+            ((junction_r - r) / span).clamp(0.0, 1.0)
         } else {
             1.0
         };
-        g.rf + w * (self.root_at(angle) - g.rf)
+        let w = t * t * (3.0 - 2.0 * t);
+        w * (self.root_at(angle) - g.rf)
     }
 
-    /// The tooth at position `k`, and where it is seated.
+    /// The tooth at position `k`, and where it is seated.    /// The tooth at position `k`, and where it is seated.
     #[must_use]
     pub fn tooth(&self, k: usize) -> (&Gear, f64) {
         let i = k % self.which.len();
@@ -293,30 +324,13 @@ impl Eccentric {
         for (k, &i) in self.which.iter().enumerate() {
             let (r_full, th_full) = &halves[i];
             let base = self.seat[k];
-            let rf = self.teeth[i].rf;
             for (rr, tt) in r_full.iter().zip(th_full) {
                 let a = base + tt;
-                // The root arc is emitted at exactly the tooth's own `rf`, which
-                // is what marks it: every other point on the outline is on a
-                // generated curve. Those take the envelope instead — see
-                // `root_at` — blended in from the fillet junction so the root
-                // *leaves the fillet where the fillet ends* and *arrives at the
-                // envelope by mid-space*, which is what makes it continuous at
-                // both.
-                //
-                // The blend is linear in angle and is an **interpolation, not a
-                // derivation**: the true surface is the envelope of a tool
-                // corner under rolling *and* radial motion, and deriving that is
-                // the work §4.10 scoped out. What it replaces is a step of up to
-                // 0.13 mm, which no hob can leave.
-                //
-                // For a concentric gear `root_at` returns that same `rf` to the
-                // bit, so the whole expression is `rf + w·0.0` and nothing moves.
-                let rr = if *rr == rf {
-                    self.root_radius(k, a)
-                } else {
-                    *rr
-                };
+                // Every point is displaced by the tool's own motion — zero over
+                // the flank and the tip, growing across the fillet, full at
+                // mid-space. No section needs identifying: the rule is a
+                // function of where the point sits.
+                let rr = rr + self.displacement(k, *rr, a);
                 out.push([rr * a.cos(), rr * a.sin()]);
             }
         }
@@ -345,9 +359,10 @@ impl Eccentric {
         let varying = self.mean.params.angular_shift != 0.0;
         let mut out = Vec::new();
         for (k, &i) in self.which.iter().enumerate() {
-            let root = |a: f64| self.root_radius(k, a);
-            let root: Option<&dyn Fn(f64) -> f64> = if varying { Some(&root) } else { None };
-            self.teeth[i].tooth_outline(chord_tolerance, self.seat[k], root, &mut out);
+            let displace = |r: f64, a: f64| self.displacement(k, r, a);
+            let displace: Option<&dyn Fn(f64, f64) -> f64> =
+                if varying { Some(&displace) } else { None };
+            self.teeth[i].tooth_outline(chord_tolerance, self.seat[k], displace, &mut out);
         }
         out
     }
@@ -1226,6 +1241,84 @@ mod tests {
                      against {previous} at ten times that"
                 );
                 previous = jump;
+            }
+        }
+    }
+
+    /// **The root has no kink in it either.**
+    ///
+    /// Continuity in *value* was the first defect and is gated above. This is
+    /// continuity in **slope**, which was the second: correcting only the flat
+    /// root left it diving out of the fillet at 9 mm/rad where the envelope's
+    /// own slope is 0.4, because the root arc spans about 0.005 rad and had to
+    /// absorb 0.05 mm inside it. On screen that is a notch at the bottom of
+    /// every tooth space.
+    ///
+    /// Gated the same way and for the same reason: a **kink keeps its angle**
+    /// however finely the curve is sampled, while a smooth curve's turning angle
+    /// falls with the spacing. Doubling the points must nearly halve it. No
+    /// threshold is chosen, and a kink cannot hide under one.
+    ///
+    /// Measured over the region the correction touches — the fillet, the root,
+    /// and a little flank either side of the junction between them. Not the tip,
+    /// where the outline has a genuine corner that is the tooth rather than a
+    /// defect; and **not merely below the base circle**, which was the first
+    /// window and let a linear ramp through: its kink is at the *flank* junction,
+    /// which sits above it.
+    #[test]
+    fn the_root_leaves_the_fillet_without_a_kink() {
+        // A zero-length segment has no direction: consecutive teeth both emit
+        // the mid-space point, so the seam carries a duplicate vertex whose
+        // "turn" is whatever the last bits say.
+        let turning = |o: &[[f64; 2]], below: f64| {
+            let mut worst = 0.0_f64;
+            for w in o.windows(3) {
+                if w[1][0].hypot(w[1][1]) >= below {
+                    continue;
+                }
+                let (ax, ay) = (w[1][0] - w[0][0], w[1][1] - w[0][1]);
+                let (bx, by) = (w[2][0] - w[1][0], w[2][1] - w[1][1]);
+                if ax.hypot(ay) < 1e-9 || bx.hypot(by) < 1e-9 {
+                    continue;
+                }
+                worst = worst.max((ax * by - ay * bx).atan2(ax * bx + ay * by).abs());
+            }
+            worst
+        };
+
+        for (teeth, shift, amplitude) in
+            [(24_u32, 0.0_f64, 0.4_f64), (24, 0.6, 0.4), (40, -0.3, 0.5)]
+        {
+            let e = Eccentric::new(GearParams {
+                teeth,
+                profile_shift: shift,
+                angular_shift: amplitude,
+                ..Default::default()
+            });
+            // **No tooth may be undercut here.** An undercut profile is
+            // genuinely re-entrant and has a real corner where the flank turns
+            // back — physics, not a defect, and it would hold this test's
+            // turning angle open for ever. Asserted rather than assumed, since
+            // a case that drifted across the undercut boundary would look like
+            // the fix had broken.
+            assert!(
+                e.distinct().all(|g| !g.undercut),
+                "z={teeth} x={shift} Δx={amplitude}: an undercut tooth has a corner of its own"
+            );
+            // Just past the flank/fillet junction, so the junction itself is
+            // inside the window.
+            let junction = e.mean().trochoid_at(e.mean().s_j).0;
+            let below = junction * 1.02;
+            let mut previous = f64::MAX;
+            for n in [600_usize, 1200, 2400, 4800] {
+                let turn = turning(&e.outline(n), below);
+                assert!(
+                    turn < 0.6 * previous,
+                    "z={teeth} x={shift} Δx={amplitude}: at {n} points a tooth the root \
+                     still turns {turn} rad against {previous} at half that — there is \
+                     a kink in it, not a curve"
+                );
+                previous = turn;
             }
         }
     }
