@@ -284,6 +284,64 @@ impl Eccentric {
     ///
     /// Exactly `0.0` for a concentric gear, where `root_at` returns that tooth's
     /// own `rf` to the bit — so every point is `r + 0.0` and nothing moves.
+    /// How far tooth `k`'s root has to reach on one side to meet its
+    /// neighbour, as an angle from the tooth's own centreline.
+    ///
+    /// # Why this is not half a pitch
+    ///
+    /// It is half a pitch only when the teeth are **evenly seated**. The
+    /// indexing offset λ moves each tooth by `λ(ψ̄ − ψ_k)`, and neighbours move
+    /// by different amounts — so the space between two teeth is a pitch *plus*
+    /// the difference of their offsets. Drawing every tooth exactly one ideal
+    /// pitch wide then leaves an angular **gap** wherever the seats spread and
+    /// an overlap wherever they close: at λ = 1 on a Δx = 1 gear that is 0.009
+    /// rad, and the outline simply jumps across it.
+    ///
+    /// A tooth owns its flanks and its fillet; the space between two teeth is
+    /// whatever is left over, and the root has to fill exactly that. So the
+    /// reach is to the **midpoint between the two seats**, which is half a pitch
+    /// plus half the offset difference.
+    ///
+    /// Written as that difference rather than from the seats themselves, so a
+    /// concentric gear — where every `ψ_k` is the same — gets exactly `0.0` and
+    /// the root is left where it was, to the bit.
+    pub fn reach(&self, k: usize, side: f64) -> f64 {
+        let n = self.which.len();
+        let psi = |j: usize| self.tooth(j % n).0.psi_b;
+        let (a, b) = if side < 0.0 {
+            ((k + n - 1) % n, k)
+        } else {
+            (k, (k + 1) % n)
+        };
+        let spread = self.mean.params.index_offset * (psi(a) - psi(b)) / 2.0;
+        self.tooth(k).0.half_pitch + spread
+    }
+
+    /// A point of tooth `k`, corrected for the tool's motion and for where its
+    /// neighbours actually sit: `(radius, angle from the tooth's centreline)`.
+    ///
+    /// Both outlines go through this, and a concentric gear comes out of it
+    /// unchanged to the bit.
+    fn corrected(&self, k: usize, r: f64, tt: f64) -> (f64, f64) {
+        let (g, seat) = self.tooth(k);
+        // The root arc is emitted at exactly the tooth's own `rf` — every other
+        // point is on a generated curve — and it is the only part that stretches
+        // to meet a neighbour. The tooth's own flanks and fillet do not move.
+        let tt = if r == g.rf {
+            let reach = self.reach(k, tt);
+            let span = g.half_pitch - g.theta0;
+            let along = if span > 0.0 {
+                (tt.abs() - g.theta0) / span
+            } else {
+                1.0
+            };
+            tt.signum() * (g.theta0 + along * (reach - g.theta0))
+        } else {
+            tt
+        };
+        (r + self.displacement(k, r, seat + tt), tt)
+    }
+
     fn displacement(&self, k: usize, r: f64, angle: f64) -> f64 {
         let (g, _) = self.tooth(k);
         // **Parametrised on radius, not on angle.** `θ` is not monotone along a
@@ -379,12 +437,11 @@ impl Eccentric {
             let (r_full, th_full) = &halves[i];
             let base = self.seat[k];
             for (rr, tt) in r_full.iter().zip(th_full) {
+                // Corrected for the tool's motion and for where the neighbours
+                // actually sit. No section needs identifying: the rules are
+                // functions of where the point is.
+                let (rr, tt) = self.corrected(k, *rr, *tt);
                 let a = base + tt;
-                // Every point is displaced by the tool's own motion — zero over
-                // the flank and the tip, growing across the fillet, full at
-                // mid-space. No section needs identifying: the rule is a
-                // function of where the point sits.
-                let rr = rr + self.displacement(k, *rr, a);
                 out.push([rr * a.cos(), rr * a.sin()]);
             }
         }
@@ -413,8 +470,8 @@ impl Eccentric {
         let varying = self.mean.params.angular_shift != 0.0;
         let mut out = Vec::new();
         for (k, &i) in self.which.iter().enumerate() {
-            let displace = |r: f64, a: f64| self.displacement(k, r, a);
-            let displace: Option<&dyn Fn(f64, f64) -> f64> =
+            let displace = |r: f64, tt: f64| self.corrected(k, r, tt);
+            let displace: Option<&dyn Fn(f64, f64) -> (f64, f64)> =
                 if varying { Some(&displace) } else { None };
             self.teeth[i].tooth_outline(chord_tolerance, self.seat[k], displace, &mut out);
         }
@@ -1394,13 +1451,25 @@ mod tests {
                 .fold(0.0_f64, f64::max)
         };
 
-        for (shift, amplitude, teeth) in
-            [(0.5_f64, 0.5_f64, 24_u32), (0.0, 0.25, 24), (0.0, 0.6, 40)]
-        {
+        // The last case carries a **non-zero λ**, without which none of these
+        // sees the indexing at all: λ moves each tooth by a different amount, so
+        // the space between two of them is no longer a pitch, and a tooth drawn
+        // one ideal pitch wide leaves a gap. Every earlier case here had λ = 0,
+        // which is exactly why the gap survived them.
+        for (shift, amplitude, teeth, lambda) in [
+            (0.5_f64, 0.5_f64, 24_u32, 0.0_f64),
+            (0.0, 0.25, 24, 0.0),
+            (0.0, 0.6, 40, 0.0),
+            (0.2, 1.0, 23, 1.0),
+        ] {
             let e = Eccentric::new(GearParams {
                 teeth,
+                pressure_angle: 25.0,
                 profile_shift: shift,
+                addendum: 0.8,
+                dedendum: 1.0,
                 angular_shift: amplitude,
+                index_offset: lambda,
                 ..Default::default()
             });
 
@@ -1410,13 +1479,21 @@ mod tests {
                 let jump = radial_jump(&e.outline(n));
                 assert!(
                     jump < 0.6 * previous,
-                    "z={teeth} Δx={amplitude}: {n} points a tooth still jump {jump} mm \
+                    "z={teeth} Δx={amplitude} λ={lambda}: {n} points a tooth jump {jump} mm \
                      against {previous} at half that — the root is stepping, not curving"
                 );
                 previous = jump;
             }
 
-            // Export: the same, against its chord tolerance.
+            // Export: the same, against its chord tolerance — but only where
+            // the teeth are evenly seated. An adaptive polyline puts a long
+            // chord along any nearly-straight run, and a steep one covers a lot
+            // of radius inside its tolerance, so this measure reads a working
+            // subdivider as a step. The seam that λ breaks is checked exactly
+            // instead, in `the_root_of_one_tooth_meets_the_next`.
+            if lambda != 0.0 {
+                continue;
+            }
             let mut previous = f64::MAX;
             for tol in [1e-2_f64, 1e-3, 1e-4] {
                 let jump = radial_jump(
@@ -1427,10 +1504,56 @@ mod tests {
                 );
                 assert!(
                     jump < 0.6 * previous,
-                    "z={teeth} Δx={amplitude}: at {tol} mm the export still jumps {jump} \
+                    "z={teeth} Δx={amplitude} λ={lambda}: at {tol} mm the export jumps {jump} \
                      against {previous} at ten times that"
                 );
                 previous = jump;
+            }
+        }
+    }
+
+    /// **One tooth's root meets the next where the two actually sit.**
+    ///
+    /// A tooth is drawn one *ideal* pitch wide, and the indexing offset λ moves
+    /// each tooth by `λ(ψ̄ − ψ_k)` — a different amount for each. So the space
+    /// between two teeth is a pitch **plus the difference of their offsets**, and
+    /// drawing both to the ideal width leaves an angular gap wherever the seats
+    /// spread and an overlap wherever they close. At λ = 1 on a Δx = 1 gear that
+    /// is 0.009 rad, and the outline jumps across it.
+    ///
+    /// Exact rather than sampled, because it can be: the two reaches are angles,
+    /// and they either meet or they do not. Every earlier continuity check here
+    /// ran at λ = 0, which is the one value that hides this.
+    #[test]
+    fn the_root_of_one_tooth_meets_the_next() {
+        for lambda in [0.0_f64, 0.5, 1.0, -1.0, 2.0] {
+            let e = Eccentric::new(GearParams {
+                pressure_angle: 25.0,
+                teeth: 23,
+                profile_shift: 0.2,
+                addendum: 0.8,
+                dedendum: 1.0,
+                angular_shift: 1.0,
+                index_offset: lambda,
+                ..Default::default()
+            });
+            for k in 0..23_usize {
+                let (_, seat) = e.tooth(k);
+                let (_, next) = e.tooth((k + 1) % 23);
+                // Both reaches are measured from their own tooth, so they meet
+                // only if each is half the *actual* space between the two.
+                let from_here = seat + e.reach(k, 1.0);
+                let from_there = next - e.reach((k + 1) % 23, -1.0);
+                // The wrap at k = z − 1 crosses zero, so compare modulo a turn.
+                let gap = (from_here - from_there + std::f64::consts::PI)
+                    .rem_euclid(std::f64::consts::TAU)
+                    - std::f64::consts::PI;
+                assert!(
+                    gap.abs() < 1e-12,
+                    "λ={lambda}: tooth {k}'s root ends at {from_here} and tooth {}'s \
+                     begins at {from_there} — {gap} rad of nothing between them",
+                    (k + 1) % 23
+                );
             }
         }
     }

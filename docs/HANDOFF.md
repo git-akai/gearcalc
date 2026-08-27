@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–11 complete and in CI. 394 tests, ~26 s.**
+**Milestones 0–11 complete and in CI. 398 tests, ~26 s.**
 
 Milestone 11's named scope — geartrain import/export, confirmations, error
 surfacing, docs — is done, and geartrain import/export was the last unbuilt item
@@ -476,6 +476,17 @@ these are the ones most likely to be stepped on again.
   power algebra, including two exact closed forms, and a backward efficiency of
   101.571 % survived all of them — because every one drove forward with a
   positive torque and a positive speed. It was found by looking at the UI.
+- **A test that never leaves a control at its default never tests the control.**
+  Every continuity check on the eccentric gear ran at λ = 0 — the indexing
+  offset's default — and λ = 0 is the one value at which the teeth *are* evenly
+  seated. The defect it hid was structural: each tooth was drawn one ideal pitch
+  wide while λ, by design, seats them unevenly. When a feature has a knob, some
+  case has to turn it.
+- **When an invariant is exact, test it exactly.** The seam above is two angles
+  that either meet or do not; sampling the outline and watching a trend was the
+  wrong instrument, and it also mis-read a working adaptive subdivider as a step
+  (a long chord along a steep, nearly-straight run covers a lot of radius inside
+  its tolerance). Trend tests are for what only sampling can see.
 - **Sort a guard rail by whose property it guards.** Three root defects in the
   eccentric gear were one mistake: `Gear::new`'s guards are gear-level decisions,
   and assembling a gear out of `Gear`s takes them per tooth. The fix is not to

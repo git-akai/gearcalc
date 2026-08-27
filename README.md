@@ -43,7 +43,7 @@ and `wasm-bindgen-cli` together.
 ```bash
 nix develop              # or `direnv allow` once, for automatic entry
 
-cargo nextest run        # the full test suite, 397 tests, ~27 s
+cargo nextest run        # the full test suite, 398 tests, ~27 s
 cargo clippy --all-targets -- --deny warnings
 cargo fmt
 

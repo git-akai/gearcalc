@@ -139,13 +139,13 @@ impl Gear {
         &self,
         base: f64,
         side: f64,
-        displace: Option<&dyn Fn(f64, f64) -> f64>,
+        displace: Option<&dyn Fn(f64, f64) -> (f64, f64)>,
         tol: f64,
         out: &mut Vec<Vertex>,
     ) {
         let pt = |r: f64, th: f64| {
+            let (r, th) = displace.map_or((r, th), |d| d(r, th));
             let a = base + th;
-            let r = r + displace.map_or(0.0, |d| d(r, a));
             (r * a.cos(), r * a.sin())
         };
         if displace.is_none() {
@@ -180,7 +180,7 @@ impl Gear {
         &self,
         tol: f64,
         base: f64,
-        displace: Option<&dyn Fn(f64, f64) -> f64>,
+        displace: Option<&dyn Fn(f64, f64) -> (f64, f64)>,
         out: &mut Vec<Vertex>,
     ) {
         {
@@ -191,8 +191,8 @@ impl Gear {
             // section: a flank point takes zero displacement and a root point
             // takes all of it, and neither has to be identified.
             let pt = |r: f64, th: f64| {
+                let (r, th) = displace.map_or((r, th), |d| d(r, th));
                 let a = base + th;
-                let r = r + displace.map_or(0.0, |d| d(r, a));
                 (r * a.cos(), r * a.sin())
             };
 

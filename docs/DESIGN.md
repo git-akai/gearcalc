@@ -2628,6 +2628,24 @@ tool's position, which moves the tip envelope, the root envelope and the tooth
 thickness — exactly the three things §4.10 says it should, and none of the
 things constant ratio depends on.
 
+*And one more, which only λ reveals:*
+
+- **A tooth is drawn one *ideal* pitch wide, and λ does not leave the teeth
+  ideally spaced.** The indexing offset moves tooth `k` by `λ(ψ̄ − ψ_k)`, a
+  different amount for each, so the space between two teeth is a pitch **plus the
+  difference of their offsets**. Drawing both to the ideal width leaves an
+  angular gap wherever the seats spread and an overlap wherever they close — at
+  λ = 1 on a Δx = 1 gear, 0.009 rad, which the outline simply jumps across.
+
+  A tooth owns its flanks and its fillet; the space between two is whatever is
+  left, and the root fills exactly that. So the root reaches to the **midpoint
+  between the two seats** rather than to half a pitch. Written as the offset
+  *difference* so a concentric gear gets exactly zero and is untouched.
+
+  Every continuity check written before this ran at λ = 0, which is the one value
+  that hides it. The gate is now **exact rather than sampled**, because it can
+  be: the two reaches are angles and they either meet or they do not.
+
 *Two defects the first cut of this had, both in the root:*
 
 - **One hob has one tip radius.** `Gear::new` caps the cutter's tip round to what
@@ -3877,6 +3895,7 @@ something independent.**
 | 4.10 | ...and parametrised on **angle** | The flank is re-entrant below the base circle, so a flank point can sit at a larger angle than the fillet junction and take a displacement it must never have. Radius is the monotone invariant (§4.2) and is what measures position along the profile |
 | 8.0 | A gear tab's type-specific inputs left set when the type changed | Switching an eccentric gear back to external left its shift amplitude in place, so the gear stayed eccentric with no control on screen to say so — and the eccentricity outputs keyed on that *value* rather than on the type, so they stayed too. Changing type now returns every field the new type does not use to its default, read from `FIELDS` rather than from a second list |
 | 4.10 | Only the cutter *tip round* shared across the teeth | The **depth** is a tool setting too. `Gear::new` raises the cutter depth when it would go non-positive, which pinned four teeth to one root radius while their neighbours followed the envelope — a flat spot and a corner on the high side at positive shift, and the low side at negative. Both settings are the tool's and are settled once; what is a fact about *one tooth* is reported instead |
+| 4.10 | Each tooth drawn one **ideal** pitch wide | λ seats the teeth unevenly by construction — that is what it is for — so the space between two of them is a pitch plus the difference of their offsets. Every tooth drawn to the ideal width left a gap of 0.009 rad at λ = 1, and every continuity check written before it ran at λ = 0, the one value that hides it |
 | 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
 | 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
 | 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |
