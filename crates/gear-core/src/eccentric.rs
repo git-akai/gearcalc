@@ -103,15 +103,41 @@ impl Eccentric {
             });
             which.push(at);
         }
-        let teeth: Vec<Gear> = shifts
-            .iter()
-            .map(|&x| {
-                Gear::new(GearParams {
-                    profile_shift: x,
-                    ..params
-                })
+        let build = |x: f64, root_radius: f64| {
+            Gear::new(GearParams {
+                profile_shift: x,
+                root_radius,
+                ..params
             })
+        };
+        let mut teeth: Vec<Gear> = shifts
+            .iter()
+            .map(|&x| build(x, params.root_radius))
             .collect();
+
+        // **One hob has one tip radius.** `Gear::new` caps the cutter's tip
+        // round to what the tooth space will hold, and a tooth space narrows as
+        // the shift rises — so building each tooth on its own invents a
+        // *different tool for each one*, 0.2375 modules on the high side against
+        // 0.3800 on the low. That is not a tool; it is an artifact of assembling
+        // a gear out of gears.
+        //
+        // The real tool is the tightest tooth's. Teeth that would have taken a
+        // larger round are rebuilt on it, and the tooth that set it keeps its
+        // `fillet_capped` clamp, so the reason is still on the record.
+        //
+        // The rebuild happens only when the teeth **disagree**, which a
+        // concentric gear's never do — it has one tooth. So this costs an
+        // ordinary gear nothing and cannot move it.
+        let tool = teeth.iter().fold(f64::MAX, |m, g| m.min(g.rho));
+        if teeth.iter().any(|g| g.rho != tool) {
+            let shared = tool / params.module;
+            for (t, &x) in teeth.iter_mut().zip(&shifts) {
+                if t.rho != tool {
+                    *t = build(x, shared);
+                }
+            }
+        }
 
         // Seats. `ψ_b` is the angular half-thickness at the base circle — the
         // seat of the flank — and the correction is towards the mean tooth's.
@@ -176,6 +202,55 @@ impl Eccentric {
         [lo, hi]
     }
 
+    /// The root radius the tool leaves at an absolute angle, mm.
+    ///
+    /// # Why the root is not the tooth's
+    ///
+    /// A tooth's own root radius is `r − m(h_f − x_k)`, and neighbouring teeth
+    /// have different `x` — so drawing each tooth's root at its own radius puts
+    /// a **radial step at every mid-space**, up to 0.13 mm on a module-1 gear.
+    /// No hob can leave that: it is one edge sweeping past, and what it leaves
+    /// is the envelope `r − m(h_f − x(θ))`, smooth all the way round.
+    ///
+    /// The flanks are a different matter and stay with their teeth — constant
+    /// ratio *requires* each to be one involute at one shift (§4.10), and that
+    /// is what makes the feature possible. Nothing constrains the root, which is
+    /// why it is free to be continuous.
+    ///
+    /// Written as an offset from the **mean** tooth rather than from each
+    /// tooth's own, so two neighbours compute the same bits at the angle they
+    /// share, and so a concentric gear's offset is exactly zero.
+    fn root_at(&self, angle: f64) -> f64 {
+        let p = self.mean.params;
+        self.mean.rf + p.module * (p.angular_shift * angle.cos())
+    }
+
+    /// The root radius under tooth `k` at an absolute angle, mm.
+    ///
+    /// Blended from the tooth's own `rf` at the fillet junction to the envelope
+    /// at mid-space, so the root **leaves the fillet where the fillet ends** and
+    /// **arrives at the envelope by mid-space** — continuous at both, and
+    /// therefore continuous all the way round.
+    ///
+    /// The blend is linear in angle and is an **interpolation, not a
+    /// derivation**: the true surface is the envelope of a tool corner under
+    /// rolling *and* radial motion, which §4.10 scoped out. What it replaces is
+    /// a radial step of up to 0.13 mm at every mid-space, which no hob can
+    /// leave.
+    ///
+    /// One rule, and both outlines use it — the screen's and the export's. They
+    /// had been two ways of drawing a gear once already (§12).
+    fn root_radius(&self, k: usize, angle: f64) -> f64 {
+        let (g, seat) = self.tooth(k);
+        let span = g.half_pitch - g.theta0;
+        let w = if span > 0.0 {
+            (((angle - seat).abs() - g.theta0) / span).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        g.rf + w * (self.root_at(angle) - g.rf)
+    }
+
     /// The tooth at position `k`, and where it is seated.
     #[must_use]
     pub fn tooth(&self, k: usize) -> (&Gear, f64) {
@@ -218,8 +293,30 @@ impl Eccentric {
         for (k, &i) in self.which.iter().enumerate() {
             let (r_full, th_full) = &halves[i];
             let base = self.seat[k];
+            let rf = self.teeth[i].rf;
             for (rr, tt) in r_full.iter().zip(th_full) {
                 let a = base + tt;
+                // The root arc is emitted at exactly the tooth's own `rf`, which
+                // is what marks it: every other point on the outline is on a
+                // generated curve. Those take the envelope instead — see
+                // `root_at` — blended in from the fillet junction so the root
+                // *leaves the fillet where the fillet ends* and *arrives at the
+                // envelope by mid-space*, which is what makes it continuous at
+                // both.
+                //
+                // The blend is linear in angle and is an **interpolation, not a
+                // derivation**: the true surface is the envelope of a tool
+                // corner under rolling *and* radial motion, and deriving that is
+                // the work §4.10 scoped out. What it replaces is a step of up to
+                // 0.13 mm, which no hob can leave.
+                //
+                // For a concentric gear `root_at` returns that same `rf` to the
+                // bit, so the whole expression is `rf + w·0.0` and nothing moves.
+                let rr = if *rr == rf {
+                    self.root_radius(k, a)
+                } else {
+                    *rr
+                };
                 out.push([rr * a.cos(), rr * a.sin()]);
             }
         }
@@ -241,9 +338,16 @@ impl Eccentric {
     /// [`Self::outline`] is: one assembly, and the ordinary gear is its `Δx = 0`.
     #[must_use]
     pub fn outline_adaptive(&self, chord_tolerance: f64) -> Vec<crate::outline::Vertex> {
+        // A constant root is a circle and stays an exact arc in the export; a
+        // varying one is not a circle, so it is subdivided like a flank. The
+        // rule for *where* it runs is `root_radius`, shared with the screen
+        // outline — one root, two consumers.
+        let varying = self.mean.params.angular_shift != 0.0;
         let mut out = Vec::new();
         for (k, &i) in self.which.iter().enumerate() {
-            self.teeth[i].tooth_outline(chord_tolerance, self.seat[k], &mut out);
+            let root = |a: f64| self.root_radius(k, a);
+            let root: Option<&dyn Fn(f64) -> f64> = if varying { Some(&root) } else { None };
+            self.teeth[i].tooth_outline(chord_tolerance, self.seat[k], root, &mut out);
         }
         out
     }
@@ -1016,6 +1120,143 @@ mod tests {
             }
             previous = Some((shift, p.sinusoid_error));
         }
+    }
+
+    /// **One hob has one tip radius.**
+    ///
+    /// `Gear::new` caps the cutter's tip round to what the tooth space will
+    /// hold, and a space narrows as the shift rises — so building each tooth on
+    /// its own gives the high side a *different tool* from the low side, 0.2375
+    /// modules against 0.3800 on a gear that asks for 0.38. That is not a tool.
+    /// It showed as a fillet that collapsed on the high teeth, and as the
+    /// trochoid's own extent jumping sixfold between two neighbours.
+    #[test]
+    fn every_tooth_is_cut_by_the_same_tool() {
+        for (shift, amplitude) in [(0.5_f64, 0.5_f64), (0.0, 0.25), (0.6, 0.5), (-0.3, 0.4)] {
+            let e = Eccentric::new(GearParams {
+                teeth: 24,
+                profile_shift: shift,
+                angular_shift: amplitude,
+                ..Default::default()
+            });
+            let first = e.mean().rho;
+            for (k, g) in e.distinct().enumerate() {
+                assert_eq!(
+                    g.rho.to_bits(),
+                    e.tooth(0).0.rho.to_bits(),
+                    "x={shift} Δx={amplitude}: tooth {k} was cut by a {} tool where \
+                     tooth 0 had {}",
+                    g.rho,
+                    e.tooth(0).0.rho
+                );
+            }
+            let _ = first;
+
+            // ...and the trochoid's extent then varies smoothly rather than in
+            // steps: it can only grow as the tooth gets deeper.
+            let mut previous = 0.0_f64;
+            for k in 0..=(24 / 2) {
+                let (g, _) = e.tooth(k);
+                let extent = g.s_j.abs();
+                assert!(
+                    extent >= previous,
+                    "tooth {k}: the fillet shrank as the tooth deepened, {extent} \
+                     against {previous}"
+                );
+                previous = extent;
+            }
+        }
+    }
+
+    /// **The root runs continuously round the gear, on screen and in the
+    /// export.**
+    ///
+    /// Each tooth's own root radius is `r − m(h_f − x_k)`, and neighbours have
+    /// different `x` — so drawing each tooth's root at its own radius left a
+    /// radial **step** at every mid-space, up to 0.13 mm. No hob can leave that.
+    ///
+    /// The property that separates a continuous curve from a stepped one is not
+    /// a tolerance but a *trend*: refine the sampling and a curve's largest jump
+    /// falls with it, while a step does not move at all. That is what is
+    /// asserted, so no threshold is chosen and the check cannot be satisfied by
+    /// a step small enough to sneak under one.
+    #[test]
+    fn the_root_runs_continuously_round_an_eccentric_gear() {
+        let radial_jump = |points: &[[f64; 2]]| {
+            points
+                .windows(2)
+                .map(|w| (w[0][0].hypot(w[0][1]) - w[1][0].hypot(w[1][1])).abs())
+                .fold(0.0_f64, f64::max)
+        };
+
+        for (shift, amplitude, teeth) in
+            [(0.5_f64, 0.5_f64, 24_u32), (0.0, 0.25, 24), (0.0, 0.6, 40)]
+        {
+            let e = Eccentric::new(GearParams {
+                teeth,
+                profile_shift: shift,
+                angular_shift: amplitude,
+                ..Default::default()
+            });
+
+            // Screen: doubling the points must nearly halve the largest jump.
+            let mut previous = f64::MAX;
+            for n in [600_usize, 1200, 2400, 4800] {
+                let jump = radial_jump(&e.outline(n));
+                assert!(
+                    jump < 0.6 * previous,
+                    "z={teeth} Δx={amplitude}: {n} points a tooth still jump {jump} mm \
+                     against {previous} at half that — the root is stepping, not curving"
+                );
+                previous = jump;
+            }
+
+            // Export: the same, against its chord tolerance.
+            let mut previous = f64::MAX;
+            for tol in [1e-2_f64, 1e-3, 1e-4] {
+                let jump = radial_jump(
+                    &e.outline_adaptive(tol)
+                        .iter()
+                        .map(|v| [v.x, v.y])
+                        .collect::<Vec<_>>(),
+                );
+                assert!(
+                    jump < 0.6 * previous,
+                    "z={teeth} Δx={amplitude}: at {tol} mm the export still jumps {jump} \
+                     against {previous} at ten times that"
+                );
+                previous = jump;
+            }
+        }
+    }
+
+    /// A concentric gear's root is a genuine circle, so the export keeps it as
+    /// an **exact arc** rather than subdividing it. The other half of the root
+    /// change: it must not cost an ordinary gear its exactness.
+    #[test]
+    fn an_ordinary_gear_keeps_its_root_as_an_arc() {
+        let flat = Eccentric::new(GearParams {
+            teeth: 24,
+            ..Default::default()
+        })
+        .outline_adaptive(1e-3);
+        let arcs = flat.iter().filter(|v| v.bulge != 0.0).count();
+        // Three arcs a tooth: the tip, and the root either side of it — the
+        // root is emitted as two halves, one leading into the tooth and one
+        // trailing out, meeting the neighbour's at mid-space.
+        assert_eq!(arcs, 72, "an ordinary gear's tip and root are still arcs");
+
+        // An eccentric one keeps its tip arcs and gives up its root ones, since
+        // a varying root is not a circle at all.
+        let ecc = Eccentric::new(GearParams {
+            teeth: 24,
+            angular_shift: 0.25,
+            ..Default::default()
+        })
+        .outline_adaptive(1e-3);
+        // One left: the tip. Both root halves gave up their arcs, since a
+        // varying root is not a circle at all.
+        assert_eq!(ecc.iter().filter(|v| v.bulge != 0.0).count(), 24);
     }
 
     /// **Both ways of drawing a gear see the eccentricity.**

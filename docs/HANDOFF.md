@@ -10,7 +10,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–11 complete and in CI. 391 tests, ~26 s.**
+**Milestones 0–11 complete and in CI. 394 tests, ~26 s.**
 
 Milestone 11's named scope — geartrain import/export, confirmations, error
 surfacing, docs — is done, and geartrain import/export was the last unbuilt item
@@ -476,6 +476,18 @@ these are the ones most likely to be stepped on again.
   power algebra, including two exact closed forms, and a backward efficiency of
   101.571 % survived all of them — because every one drove forward with a
   positive torque and a positive speed. It was found by looking at the UI.
+- **Assembling a thing out of things gives each piece its own everything.** An
+  eccentric gear is built tooth by tooth from `Gear`s, and `Gear::new` caps the
+  cutter tip round to what *that tooth's* space allows — so the gear came out cut
+  by a different hob for every tooth. Nothing was wrong with any single tooth;
+  the error was in what they shared and did not. When a construction is
+  per-piece, list what is a property of the **whole** — the tool, the root
+  surface, the datum — and check each is actually shared.
+- **Test the trend, not the tolerance.** A stepped root and a coarsely sampled
+  curve look identical at one sampling. What separates them is that refining the
+  sampling shrinks a curve's largest jump and leaves a step exactly where it was.
+  Asserting that halving happens needs no threshold and cannot be satisfied by a
+  step small enough to sneak under one.
 - **Group the cancellation first — three times in one module.** `(seat + ψ) −
   ideal` against `(seat − ideal) + ψ`; projecting a Fourier coefficient onto the
   raw samples against onto their deviation from the mean; a mean summed outright

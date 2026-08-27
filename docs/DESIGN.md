@@ -2580,6 +2580,36 @@ generator that replicated a single tooth `z` times, so an eccentric gear would
 have drawn correctly on screen and **exported as a concentric one**. Both are
 held to the same eccentricity now.
 
+*Two defects the first cut of this had, both in the root:*
+
+- **One hob has one tip radius.** `Gear::new` caps the cutter's tip round to what
+  the tooth space will hold, and a space narrows as the shift rises — so building
+  each tooth on its own gave the high side a *different tool* from the low side,
+  0.2375 modules against 0.3800 on a gear asking for 0.38. That is not a tool; it
+  is an artifact of assembling a gear out of gears. It showed as a fillet that
+  collapsed on the high teeth, and as the trochoid's own extent jumping sixfold
+  between two neighbours (`s_j` −0.054 against −0.330). The tool is the tightest
+  tooth's, and the tooth that set it keeps its `fillet_capped` clamp so the reason
+  stays on the record. The rebuild happens only when the teeth disagree, which a
+  concentric gear's never do.
+- **The root belongs to the gear, not to the tooth.** A tooth's own root radius
+  is `r − m(h_f − x_k)`, so drawing each tooth's root at its own radius left a
+  radial **step at every mid-space**, up to 0.13 mm. No hob can leave that: it is
+  one edge sweeping past. The root now runs from the tooth's `rf` at the fillet
+  junction to the envelope `r − m(h_f − x(θ))` at mid-space, continuous at both
+  and so continuous all the way round. The blend is linear in angle and is an
+  **interpolation, not a derivation** — the true surface is the envelope of a
+  tool corner under rolling *and* radial motion, which this section scoped out —
+  and it is one rule used by both outlines, the screen's and the export's.
+
+  In the export a constant root stays an exact arc, because it is genuinely a
+  circle; a varying one is not a circle at all and is subdivided like a flank.
+  Three arcs a tooth become one.
+
+  The gate is a *trend*, not a tolerance: refine the sampling and a curve's
+  largest radial jump falls with it, while a step does not move. Doubling the
+  points must nearly halve the jump, on both outlines.
+
 *What was found on the way, and is not obvious:*
 
 - **`cos(τ − t)` is not bit-identical to `cos t`**, so teeth `k` and `z − k`
@@ -3772,6 +3802,8 @@ something independent.**
 | 4.5.1 | "What a crossed stage lacks is the *backlash from thinning* one alone, which would need the normal-plane play derived for crossed axes" | Recorded as a gap; it is an **answer**. The play is derived (§4.4), and `k₁ + k₂ = 2` means thickness is only ever moved between two teeth and never removed from the pair, so what it contributes is exactly zero. A missing derivation and a derivation that returns zero read the same in a document and are not the same thing |
 | 11.4 | One friction coefficient per mesh | Breaking away and running are different events with different coefficients. Every efficiency in the model was the sliding one, so a worm that cannot be started was reported as back-driving at 54 % — the efficiency of a motion that does not happen |
 | 11.4 | The self-locking note quoting the sliding coefficient | It named the input a reader would go and change to no effect. Whether the drive locks is decided by the **static** coefficient, and the note now says which number it means |
+| 4.10 | Each tooth of an eccentric gear built as its own gear, tool and all | `Gear::new` caps the cutter tip round per tooth, so the high side got a 0.2375-module tool and the low side 0.3800 — a different hob for each tooth. The fillet collapsed on the high teeth and the trochoid's extent jumped sixfold between neighbours. One gear, one tool: the tightest tooth's |
+| 4.10 | ...and each tooth's root drawn at its own radius | A radial **step at every mid-space**, up to 0.13 mm, which no hob can leave. The root is the gear's, not the tooth's: it runs from the fillet junction to the envelope `r − m(h_f − x(θ))`, continuous at both ends |
 | 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
 | 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
 | 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |

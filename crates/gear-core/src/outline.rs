@@ -128,7 +128,59 @@ impl Gear {
     /// the one place the two could disagree: it replicated a single tooth `z`
     /// times, so an eccentric gear would have exported as a concentric one, and
     /// silently.
-    pub(crate) fn tooth_outline(&self, tol: f64, base: f64, out: &mut Vec<Vertex>) {
+    /// The root on one side of a tooth: `side` −1 leads into it, +1 trails out.
+    ///
+    /// A **constant** root radius is genuinely a circle, so it stays a single
+    /// exact arc — a bulge — as it always was. A varying one is not a circle at
+    /// all and is subdivided like a flank. That is not a caller's choice but the
+    /// curve's: `root` is `None` exactly when there is nothing varying to
+    /// follow.
+    fn emit_root(
+        &self,
+        base: f64,
+        side: f64,
+        root: Option<&dyn Fn(f64) -> f64>,
+        tol: f64,
+        out: &mut Vec<Vertex>,
+    ) {
+        let pt = |r: f64, th: f64| {
+            let a = base + th;
+            (r * a.cos(), r * a.sin())
+        };
+        let Some(radius) = root else {
+            if side < 0.0 {
+                let s = pt(self.rf, -self.half_pitch);
+                out.push(Vertex {
+                    x: s.0,
+                    y: s.1,
+                    bulge: bulge_for(self.half_pitch - self.theta0),
+                });
+            } else if let Some(last) = out.last_mut() {
+                last.bulge = bulge_for(self.half_pitch - self.theta0);
+            }
+            return;
+        };
+        // `t` runs from the fillet junction out to mid tooth-space.
+        let curve = |t: f64| {
+            let th = side * (self.theta0 + t * (self.half_pitch - self.theta0));
+            pt(radius(base + th), th)
+        };
+        if side < 0.0 {
+            let s = curve(1.0);
+            out.push(Vertex::line(s.0, s.1));
+            subdivide(&curve, 1.0, 0.0, tol, 0, out);
+        } else {
+            subdivide(&curve, 0.0, 1.0, tol, 0, out);
+        }
+    }
+
+    pub(crate) fn tooth_outline(
+        &self,
+        tol: f64,
+        base: f64,
+        root: Option<&dyn Fn(f64) -> f64>,
+        out: &mut Vec<Vertex>,
+    ) {
         {
             // Polar to cartesian in the tooth's own frame: theta is measured
             // from the tooth centreline.
@@ -139,12 +191,7 @@ impl Gear {
 
             if self.severed {
                 // No flank and no tip arc: fillet and root arc only.
-                let start = pt(self.rf, -self.half_pitch);
-                out.push(Vertex {
-                    x: start.0,
-                    y: start.1,
-                    bulge: bulge_for(self.half_pitch - self.theta0),
-                });
+                self.emit_root(base, -1.0, root, tol, out);
                 out.push(Vertex::line(
                     pt(self.rf, -self.theta0).0,
                     pt(self.rf, -self.theta0).1,
@@ -159,22 +206,15 @@ impl Gear {
                     pt(r, th)
                 };
                 subdivide(&fillet_down, 0.0, 1.0, tol, 0, out);
-                if let Some(last) = out.last_mut() {
-                    last.bulge = bulge_for(self.half_pitch - self.theta0);
-                }
+                self.emit_root(base, 1.0, root, tol, out);
                 // A severed tooth is drawn and done; there is no flank to
                 // follow. `return` rather than `continue` now that this is one
                 // tooth rather than an iteration.
                 return;
             }
 
-            // 1. root arc, from mid tooth-space up to where the fillet begins
-            let start = pt(self.rf, -self.half_pitch);
-            out.push(Vertex {
-                x: start.0,
-                y: start.1,
-                bulge: bulge_for(self.half_pitch - self.theta0),
-            });
+            // 1. root, from mid tooth-space up to where the fillet begins.
+            self.emit_root(base, -1.0, root, tol, out);
 
             // 2. fillet, minus side: s runs s_j -> 0 as the fillet descends to
             //    the root, so traverse it backwards here.
@@ -216,9 +256,7 @@ impl Gear {
 
             // 7. root arc out to mid tooth-space is the next tooth's opening
             //    segment, so only the bulge is recorded here.
-            if let Some(last) = out.last_mut() {
-                last.bulge = bulge_for(self.half_pitch - self.theta0);
-            }
+            self.emit_root(base, 1.0, root, tol, out);
         }
     }
 }
