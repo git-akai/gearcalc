@@ -361,6 +361,19 @@ mod tests {
             .notes,
         );
 
+        // Eccentric gears, whose per-tooth troubles are reported by the
+        // assembly rather than by any one `Gear` — a tooth that is undercut or
+        // pointed while its neighbours are not.
+        for (shift, amplitude) in [(0.0_f64, 0.3_f64), (-1.0, 0.3), (1.4, 0.3), (0.5, 0.5)] {
+            let e = gear_core::eccentric::Eccentric::new(GearParams {
+                teeth: 24,
+                profile_shift: shift,
+                angular_shift: amplitude,
+                ..Default::default()
+            });
+            record(&e.troubled_teeth().notes);
+        }
+
         // Rings, which have guard rails of their own and none in common with an
         // external gear: the cutter can be too big, too blunt, or unable to
         // reach the flank at all.

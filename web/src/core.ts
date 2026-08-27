@@ -169,9 +169,17 @@ export interface Variation {
   coast_index_error: number;
 }
 
+/** Teeth that came out other than as drawn, and why. */
+export interface Trouble {
+  /** Positions round the gear, counting from θ = 0. */
+  teeth: number[];
+  notes: Note[];
+}
+
 export interface GearSummary {
   ranges: Ranges;
   variation: Variation;
+  troubled_teeth: Trouble;
   centre_profile: Maybe<CentreProfile>;
   /** Radii, mm — what the viewport draws with. */
   pitch_radius: number;

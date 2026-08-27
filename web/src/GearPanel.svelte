@@ -467,6 +467,18 @@
            than of what the core computed. -->
       {#if eccentric}
         <h2>{t("ui.gear_eccentricity")}</h2>
+        {#if s.troubled_teeth.teeth.length}
+          <!-- A guard on a tool *setting* is shared, so it trips for the whole
+               gear or not at all; these are the ones true of one tooth and not
+               its neighbour, and they break the envelope where they land. -->
+          <ul class="notes">
+            <li>
+              {s.troubled_teeth.teeth.length} of {tab.params.teeth} teeth are not as drawn
+              — {s.troubled_teeth.teeth.join(", ")}, counting from θ = 0
+            </li>
+            {#each s.troubled_teeth.notes as n (n.key)}<li>{note(n)}</li>{/each}
+          </ul>
+        {/if}
         <dl>
           <dt>{t("ui.gear_envelope_eccentricity")}</dt>
           <dd>

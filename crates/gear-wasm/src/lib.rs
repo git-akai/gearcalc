@@ -177,6 +177,9 @@ pub struct GearSummary {
     /// What varies around the revolution. Every field is zero for an ordinary
     /// gear, so it crosses unconditionally rather than behind a flag.
     pub variation: gear_core::eccentric::Variation,
+    /// Teeth that came out other than as drawn, and why. Empty is the normal
+    /// case, for an ordinary gear and for a buildable eccentric one alike.
+    pub troubled_teeth: gear_core::eccentric::Trouble,
     /// The centre distance this gear's mesh commands around a revolution.
     ///
     /// Needs a mate, so it is `Unavailable` with the reason when none was sent —
@@ -256,6 +259,7 @@ fn summarise(g: &Gear, req: &GearRequest) -> GearSummary {
         // Built from the same params the gear was, so the two cannot describe
         // different gears. Zero throughout for an ordinary one.
         variation: gear_core::eccentric::Eccentric::new(g.params).variation(),
+        troubled_teeth: gear_core::eccentric::Eccentric::new(g.params).troubled_teeth(),
         centre_profile: centre_profile(req),
         span: Maybe::from(metrology::best_span(g).map(|s| SpanOut {
             teeth_spanned: s.teeth_spanned,

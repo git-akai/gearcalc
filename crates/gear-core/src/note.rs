@@ -68,8 +68,11 @@ pub mod key {
     pub const CLAMP_RING_TIP_RAISED: &str = "clamp.ring_tip_raised";
     /// `clamp.tip_capped_pointed`
     pub const CLAMP_TIP_CAPPED_POINTED: &str = "clamp.tip_capped_pointed";
+
     /// `clamp.tooth_severed`
     pub const CLAMP_TOOTH_SEVERED: &str = "clamp.tooth_severed";
+    /// `clamp.tooth_undercut`
+    pub const CLAMP_TOOTH_UNDERCUT: &str = "clamp.tooth_undercut";
     /// `clamp.tooth_thickness_capped`
     pub const CLAMP_TOOTH_THICKNESS_CAPPED: &str = "clamp.tooth_thickness_capped";
     /// `clamp.tooth_thickness_raised`
@@ -116,6 +119,8 @@ pub mod key {
         CLAMP_RING_TIP_RAISED,
         CLAMP_TIP_CAPPED_POINTED,
         CLAMP_TOOTH_SEVERED,
+        CLAMP_TOOTH_SEVERED,
+        CLAMP_TOOTH_UNDERCUT,
         CLAMP_TOOTH_THICKNESS_CAPPED,
         CLAMP_TOOTH_THICKNESS_RAISED,
         STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE,

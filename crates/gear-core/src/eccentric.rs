@@ -42,6 +42,7 @@
 
 use crate::involute::inv;
 use crate::mesh::{operating_geometry, Member, MeshError, MeshKind};
+use crate::note::{key, Note};
 use crate::params::GearParams;
 use crate::profile::Gear;
 
@@ -103,39 +104,60 @@ impl Eccentric {
             });
             which.push(at);
         }
-        let build = |x: f64, root_radius: f64| {
+        let build = |x: f64, root_radius: f64, dedendum: f64| {
             Gear::new(GearParams {
                 profile_shift: x,
                 root_radius,
+                dedendum,
                 ..params
             })
         };
         let mut teeth: Vec<Gear> = shifts
             .iter()
-            .map(|&x| build(x, params.root_radius))
+            .map(|&x| build(x, params.root_radius, params.dedendum))
             .collect();
 
-        // **One hob has one tip radius.** `Gear::new` caps the cutter's tip
-        // round to what the tooth space will hold, and a tooth space narrows as
-        // the shift rises — so building each tooth on its own invents a
-        // *different tool for each one*, 0.2375 modules on the high side against
-        // 0.3800 on the low. That is not a tool; it is an artifact of assembling
-        // a gear out of gears.
+        // **One hob, one setting.** This is the whole of what makes an eccentric
+        // gear an eccentric gear rather than a ring of unrelated ones, and it is
+        // where every guard rail in `Gear::new` becomes a trap: those guards are
+        // *gear-level* decisions, and applying them tooth by tooth lets
+        // neighbours be built to different rules. Every such difference is a
+        // step around the gear.
         //
-        // The real tool is the tightest tooth's. Teeth that would have taken a
-        // larger round are rebuilt on it, and the tooth that set it keeps its
-        // `fillet_capped` clamp, so the reason is still on the record.
+        // Two of the settings are the tool's and must be shared:
+        //
+        // - **The tip round.** `Gear::new` caps it to what the tooth space will
+        //   hold, and a space narrows as the shift rises — so per-tooth building
+        //   gave 0.2375 modules on the high side against 0.3800 on the low.
+        // - **The depth.** `Gear::new` raises the cutter depth when it would go
+        //   non-positive, which happens as the shift approaches the dedendum. On
+        //   the high side that pinned four teeth to the same root radius while
+        //   their neighbours followed the envelope — a flat spot and then a
+        //   corner, exactly where the shift is most extreme.
+        //
+        // The tool that can cut every tooth is the one the *most demanding*
+        // tooth needs: the smallest round and the greatest depth. Set once and
+        // used by all, which is what a hob does. Teeth that set a limit keep
+        // their clamps, so the reason stays on the record.
+        //
+        // What is **not** shared is what is genuinely a fact about a tooth
+        // rather than about the tool: a tooth with too much shift comes to a
+        // point, and one with too little is undercut. Those are reported per
+        // tooth (see `clamped_teeth`) rather than smoothed away.
         //
         // The rebuild happens only when the teeth **disagree**, which a
         // concentric gear's never do — it has one tooth. So this costs an
         // ordinary gear nothing and cannot move it.
-        let tool = teeth.iter().fold(f64::MAX, |m, g| m.min(g.rho));
-        if teeth.iter().any(|g| g.rho != tool) {
-            let shared = tool / params.module;
+        let round = teeth.iter().fold(f64::MAX, |m, g| m.min(g.rho)) / params.module;
+        let depth = teeth.iter().zip(&shifts).fold(f64::MIN, |m: f64, (g, &x)| {
+            m.max((g.r - g.rf) / params.module + x)
+        });
+        let settled = |g: &Gear, x: f64| {
+            g.rho / params.module == round && (g.r - g.rf) / params.module + x == depth
+        };
+        if !teeth.iter().zip(&shifts).all(|(g, &x)| settled(g, x)) {
             for (t, &x) in teeth.iter_mut().zip(&shifts) {
-                if t.rho != tool {
-                    *t = build(x, shared);
-                }
+                *t = build(x, round, depth);
             }
         }
 
@@ -287,6 +309,38 @@ impl Eccentric {
     pub fn tooth(&self, k: usize) -> (&Gear, f64) {
         let i = k % self.which.len();
         (&self.teeth[self.which[i]], self.seat[i])
+    }
+
+    /// Which teeth came out other than as drawn, and why.
+    ///
+    /// Empty for an ordinary gear whose inputs are buildable, and empty for an
+    /// eccentric one too — the tool settings are shared, so a guard that trips
+    /// on a *setting* trips for the whole gear or not at all. What lands here is
+    /// only what is true of one tooth and not its neighbour.
+    #[must_use]
+    pub fn troubled_teeth(&self) -> Trouble {
+        let mut teeth = Vec::new();
+        let mut notes: Vec<Note> = Vec::new();
+        for k in 0..self.which.len() {
+            let (g, _) = self.tooth(k);
+            let mut its: Vec<Note> = g.clamps.notes.clone();
+            if g.severed {
+                its.push(Note::new(key::CLAMP_TOOTH_SEVERED));
+            } else if g.undercut {
+                its.push(Note::new(key::CLAMP_TOOTH_UNDERCUT));
+            }
+            if its.is_empty() {
+                continue;
+            }
+            #[allow(clippy::cast_possible_truncation)]
+            teeth.push(k as u32);
+            for n in its {
+                if !notes.iter().any(|m| m.key == n.key) {
+                    notes.push(n);
+                }
+            }
+        }
+        Trouble { teeth, notes }
     }
 
     /// The whole outline, closed, as `[x, y]` in the gear's own frame.
@@ -485,6 +539,22 @@ impl Eccentric {
             coast_index_error: coast_index,
         }
     }
+}
+
+/// Teeth that are not the gear that was asked for, and why.
+///
+/// A guard rail that is genuinely about **one tooth** — a tooth with too much
+/// shift comes to a point, one with too little is undercut — cannot be shared
+/// away like a tool setting, and smoothing it over would be inventing geometry.
+/// It is reported instead, with the positions, because "some of your teeth are
+/// not what you drew" is only useful if it says which.
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Trouble {
+    /// Positions round the gear, counting from `θ = 0`.
+    pub teeth: Vec<u32>,
+    /// What happened, each reason once.
+    pub notes: Vec<Note>,
 }
 
 /// The centre distance an eccentric mesh wants, around one revolution.
@@ -1135,6 +1205,126 @@ mod tests {
             }
             previous = Some((shift, p.sinusoid_error));
         }
+    }
+
+    /// **The envelopes are envelopes: no tooth's tip or root leaves them.**
+    ///
+    /// The audit's own gate, and the one that caught the third root defect. The
+    /// tip and root radii are `r ± m(h + x(θ))` — smooth in `θ` — so every
+    /// tooth's must sit on that curve exactly. A tooth whose *tool setting* was
+    /// clamped on its own does not: four teeth had their cutter depth raised to
+    /// the same floor while their neighbours followed the envelope, which is a
+    /// flat spot and then a corner, on the high side at positive shift and the
+    /// low side at negative. Sharing the setting is what closes it, and this is
+    /// what says so.
+    ///
+    /// **The tip is exempt where a tooth is genuinely pointed**, which is a fact
+    /// about that tooth and not about the tool — its tip really is lower than
+    /// the envelope, and inventing the envelope's value there would be drawing a
+    /// gear that cannot be made. Those teeth are reported instead.
+    #[test]
+    fn no_tooth_leaves_the_envelope_it_belongs_to() {
+        for (shift, amplitude) in [
+            (0.0_f64, 0.3_f64),
+            (0.6, 0.3),
+            (1.0, 0.3),
+            (-0.6, 0.3),
+            (0.5, 0.5),
+        ] {
+            let p = GearParams {
+                teeth: 24,
+                profile_shift: shift,
+                angular_shift: amplitude,
+                ..Default::default()
+            };
+            let e = Eccentric::new(p);
+            let (first, seat0) = e.tooth(0);
+            let pointed = |g: &Gear| g.clamps.fired(key::CLAMP_TIP_CAPPED_POINTED);
+
+            for k in 0..24_usize {
+                let (g, seat) = e.tooth(k);
+                let step = p.module * p.angular_shift * (seat.cos() - seat0.cos());
+                assert!(
+                    (g.rf - (first.rf + step)).abs() < 1e-12,
+                    "x={shift} Δx={amplitude}: tooth {k}'s root is {} where the \
+                     envelope is {} — its cutter depth is not the gear's",
+                    g.rf,
+                    first.rf + step
+                );
+                if !pointed(g) && !pointed(first) {
+                    assert!(
+                        (g.ra - (first.ra + step)).abs() < 1e-12,
+                        "x={shift} Δx={amplitude}: tooth {k}'s tip is {} where the \
+                         envelope is {}",
+                        g.ra,
+                        first.ra + step
+                    );
+                }
+            }
+        }
+    }
+
+    /// **A tooth that is not the gear that was asked for says which tooth it
+    /// is.**
+    ///
+    /// The other half of the audit. A guard on a *tool setting* is shared, so it
+    /// trips for the whole gear or not at all; a guard on **one tooth** — too
+    /// much shift and it comes to a point, too little and it is undercut —
+    /// cannot be shared away, and smoothing it over would be drawing geometry
+    /// that cannot be cut. It is reported with its position instead.
+    #[test]
+    fn the_teeth_that_are_not_as_drawn_are_named() {
+        let at = |shift: f64| {
+            Eccentric::new(GearParams {
+                teeth: 24,
+                profile_shift: shift,
+                angular_shift: 0.3,
+                ..Default::default()
+            })
+            .troubled_teeth()
+        };
+
+        // A buildable gear has nothing to report, eccentric or not. Not the
+        // default one: z = 17 at zero shift is the textbook marginal-undercut
+        // case, and reporting it is the feature working.
+        assert!(at(0.2).teeth.is_empty());
+        assert!(Eccentric::new(GearParams {
+            teeth: 30,
+            ..Default::default()
+        })
+        .troubled_teeth()
+        .teeth
+        .is_empty());
+        assert!(!Eccentric::new(GearParams::default())
+            .troubled_teeth()
+            .teeth
+            .is_empty());
+
+        // Too much shift: the high teeth come to a point, and they are the ones
+        // named — positions near θ = 0, not a bare count.
+        let high = at(1.4);
+        assert!(!high.teeth.is_empty());
+        assert!(
+            high.notes
+                .iter()
+                .any(|n| n.is(key::CLAMP_TIP_CAPPED_POINTED)),
+            "{:?}",
+            high.notes
+        );
+        assert!(
+            high.teeth.iter().all(|&k| k <= 6 || k >= 18),
+            "the pointed teeth are the tall half, within a quarter turn of θ = 0: {:?}",
+            high.teeth
+        );
+
+        // Too little: the low teeth are undercut, and those sit near θ = 180°.
+        let low = at(-1.0);
+        assert!(low.notes.iter().any(|n| n.is(key::CLAMP_TOOTH_UNDERCUT)));
+        assert!(
+            low.teeth.iter().any(|&k| (6..=18).contains(&k)),
+            "the undercut teeth are the short ones, near θ = 180°: {:?}",
+            low.teeth
+        );
     }
 
     /// **One hob has one tip radius.**

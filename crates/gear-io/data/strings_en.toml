@@ -42,6 +42,7 @@ tooth_thickness_capped = "tooth thickness capped: profile shift or thickness mod
 fillet_capped = "fillet capped to {radius} (tooth space too tight)"
 tip_capped_pointed = "tip capped at pointed-tooth radius {radius}"
 tooth_severed = "tooth severed by undercut: profile truncated at the centreline"
+tooth_undercut = "undercut: the cutter has removed part of the flank near the root"
 cutter_no_tip_corner = "the cutter has no usable tip corner; no fillet generated"
 
 ring_space_capped = """\

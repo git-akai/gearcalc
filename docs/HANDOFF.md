@@ -476,6 +476,15 @@ these are the ones most likely to be stepped on again.
   power algebra, including two exact closed forms, and a backward efficiency of
   101.571 % survived all of them — because every one drove forward with a
   positive torque and a positive speed. It was found by looking at the UI.
+- **Sort a guard rail by whose property it guards.** Three root defects in the
+  eccentric gear were one mistake: `Gear::new`'s guards are gear-level decisions,
+  and assembling a gear out of `Gear`s takes them per tooth. The fix is not to
+  chase each symptom but to ask, of every guard, *whose property is this?* The
+  tool's — tip round, cutter depth — is settled once for the whole gear by the
+  tooth that demands most. One tooth's — pointed, undercut — cannot be shared
+  away and is reported with its position, because smoothing it would draw
+  geometry that cannot be cut. I fixed the tip round alone the first time and the
+  depth came back a week later wearing a different symptom.
 - **A hidden input is still an input.** The gear tab's type-specific fields kept
   their values when the type changed, so an eccentric gear switched back to
   external stayed eccentric with no control on screen to say so — and the
