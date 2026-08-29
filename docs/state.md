@@ -173,7 +173,7 @@ been. They are not a backlog.
 | Span over teeth for a ring | Takeable in principle, rare in practice, not derived. Between-pins is done and the tab says which is which |
 | A crossed pair's tooth form reaching its mesh figures | Would need the crossed mesh derived at a shifted centre distance. The form is still specified, and the panel says what it does and does not reach |
 | Worm profile drawing and DXF | A crossed pair draws as its two helical gears already |
-| A planetary **set's** drawing | The viewport draws single gears; a set needs the carrier and N planets placed |
+| A planetary **set's** drawing | The viewport draws single gears; a set needs the carrier and N planets placed. **Not planned** — nothing depends on it, and the set's numbers are all reported without it |
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
 | `Driven By` as a train direction on a worm stage | Back-driving is reported, not modelled as a train direction |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
@@ -217,5 +217,4 @@ are named in `strings.rs`'s `UNFIRED` with their evidence.
 
 Not a queue with a head; this is what a next session would pick from.
 
-- **A planetary set's drawing.**
 - **Further UI work**, as it is asked for.
