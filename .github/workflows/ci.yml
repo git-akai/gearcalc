@@ -1,8 +1,16 @@
-name: Test
+name: Test and deploy
 
 on:
   pull_request:
   push:
+  workflow_dispatch:
+
+# One deploy at a time, and a queued one waits rather than cancelling: the
+# published site should end up at the newest commit that passed, not at whichever
+# job happened to survive a race.
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   tests:
@@ -69,3 +77,42 @@ jobs:
             python3 tools/validate_dxf.py /tmp/gear17.dxf \
               --root 7.45 --tip 9.7 --base 7.987387276680222 --pitch 8.5 --teeth 17
           '
+
+      # ---- and, on `main` only, hand the site to the deploy job -------------
+      #
+      # Packaged **here** rather than in `deploy` so the site is the one these
+      # checks just passed, byte for byte, and so the ~5 minute nix build is not
+      # paid for twice. `result` is a symlink into the read-only store, which the
+      # upload cannot tar: `-L` dereferences it and the `chmod` makes the copy
+      # writable.
+      - name: Package the site
+        if: github.ref == 'refs/heads/main'
+        run: cp -rL result public && chmod -R u+w public
+
+      - name: Upload the site
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  # A separate job only because `deploy-pages` wants permissions the test job has
+  # no business holding — it publishes, so it can write Pages and mint an OIDC
+  # token, and nothing that runs project code should be able to.
+  #
+  # `needs: tests` is the point of merging the two workflows: the site cannot
+  # move unless `nix flake check`, the four consistency checks, the typecheck and
+  # the independent DXF read have all passed on that commit.
+  deploy:
+    needs: tests
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

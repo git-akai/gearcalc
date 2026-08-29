@@ -17,6 +17,10 @@ target/
 result
 result-*
 
+# Where the deploy workflow stages the site: a dereferenced, writable copy of
+# `result`, because the upload cannot tar a symlink into the read-only store.
+/public/
+
 # direnv
 .direnv/
 
