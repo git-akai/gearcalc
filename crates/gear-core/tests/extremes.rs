@@ -13,14 +13,15 @@
 #![allow(clippy::unwrap_used)]
 
 use gear_core::auto::admissible_ranges;
-use gear_core::{Gear, GearParams};
+use gear_core::gear::Gear;
+use gear_core::{GearParams, Tooth};
 
 /// Finite, ordered radii and a closed outline — the minimum for a gear to be a
 /// gear at all.
 fn is_constructible(p: GearParams) -> bool {
-    let g = Gear::new(p);
+    let g = Tooth::new(p);
     let finite = [g.r, g.rb, g.ra, g.rf, g.st].iter().all(|v| v.is_finite());
-    let outline = g.profile(120);
+    let outline = Gear::new(p).profile(120);
     let closed = outline.len() > 8 && outline.first() == outline.last();
     finite && g.ra > g.rf && g.rf > 0.0 && closed
 }
@@ -98,17 +99,17 @@ fn the_geometric_bounds_are_exactly_where_the_generator_starts_clamping() {
         let r = admissible_ranges(&p, 1.0);
         // By key, not by wording: a clamp is a named event, and searching its
         // sentence would make this test a hostage to how the sentence reads.
-        let clamped = |q: GearParams, key: &str| Gear::new(q).clamps.fired(key);
+        let clamped = |q: GearParams, key: &str| Tooth::new(q).clamps.fired(key);
         let eps = 0.01;
 
         // Addendum: below its floor the tip sinks into the root.
         let lo = r.addendum.min.unwrap();
         assert!(
-            Gear::new(GearParams {
+            Tooth::new(GearParams {
                 addendum: lo + eps,
                 ..p
             })
-            .ra > Gear::new(GearParams {
+            .ra > Tooth::new(GearParams {
                 addendum: lo + eps,
                 ..p
             })

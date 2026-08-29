@@ -12,11 +12,11 @@
 //! them.
 
 use gear_core::strength::{root_section_with, CriticalSection, RootSection};
-use gear_core::{Gear, GearParams};
+use gear_core::{GearParams, Tooth};
 use std::fmt::Write as _;
 
 /// One tooth in tooth coordinates: `y` along the centreline, `x` across it.
-fn tooth_outline(g: &Gear, n: usize) -> Vec<[f64; 2]> {
+fn tooth_outline(g: &Tooth, n: usize) -> Vec<[f64; 2]> {
     let (r, th) = g.half_profile(n);
     let mut pts: Vec<[f64; 2]> = r
         .iter()
@@ -54,7 +54,7 @@ fn path_of(pts: &[[f64; 2]]) -> String {
 /// downward and a gear tooth is read pointing up.
 #[allow(clippy::too_many_lines)]
 pub fn tooth_diagram(p: GearParams, width: f64) -> String {
-    let g = Gear::new(p);
+    let g = Tooth::new(p);
     let outline = tooth_outline(&g, 900);
     let Some(sec) = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle) else {
         return format!(
@@ -222,7 +222,7 @@ pub fn tooth_diagram(p: GearParams, width: f64) -> String {
 
 /// A caption of the numbers behind one diagram.
 pub fn tooth_caption(p: GearParams) -> String {
-    let g = Gear::new(p);
+    let g = Tooth::new(p);
     let parabola = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola);
     match root_section_with(&g, g.u_tip, CriticalSection::TangentAngle) {
         Some(RootSection {
@@ -266,7 +266,7 @@ pub fn form_factor_chart(width: f64, height: f64) -> String {
         let pts: Vec<[f64; 2]> = teeth
             .iter()
             .filter_map(|&z| {
-                let g = Gear::new(GearParams {
+                let g = Tooth::new(GearParams {
                     teeth: z,
                     profile_shift: x,
                     ..Default::default()

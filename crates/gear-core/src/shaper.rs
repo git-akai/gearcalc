@@ -6,12 +6,12 @@
 //! curve milestone 8 needs.
 //!
 //! It is new, but it is not *separate*. A rack is a shaper with infinitely many
-//! teeth, so this module is the general construction and [`crate::profile`]'s
+//! teeth, so this module is the general construction and [`crate::tooth`]'s
 //! trochoid is its limit — measured, not asserted: the tests here drive the
 //! cutter's tooth count up and watch the difference fall away as `1/z_c`.
 //!
 //! ```text
-//! external gear, rack cutter     z_c → ∞      profile::Gear::trochoid_at
+//! external gear, rack cutter     z_c → ∞      profile::Tooth::trochoid_at
 //! external gear, shaper          z_c finite   here, MeshKind::External
 //! internal gear, shaper          z_c finite   here, MeshKind::Internal
 //! ```
@@ -30,7 +30,7 @@
 //! F = P + (1 + ρ/|C − P|)(C − P)
 //! ```
 //!
-//! `profile::Gear::trochoid_at` is that expression with `C − P = (s, −b_c)`, the
+//! `profile::Tooth::trochoid_at` is that expression with `C − P = (s, −b_c)`, the
 //! rack's corner centre. Here `C` goes round a circle instead. Nothing else
 //! differs.
 //!
@@ -45,13 +45,13 @@
 use crate::involute::inv;
 use crate::mesh::MeshKind;
 use crate::params::guard;
-use crate::profile::Gear;
 use crate::solve::{brent, Tol};
+use crate::tooth::Tooth;
 
 /// A workpiece being cut by a pinion-shaped cutter.
 ///
 /// Radii are transverse and in mm; the workpiece frame matches
-/// [`crate::profile::Gear`]'s, with a tooth centred on `+y` and angles measured
+/// [`crate::tooth::Tooth`]'s, with a tooth centred on `+y` and angles measured
 /// from it.
 #[derive(Clone, Copy, Debug)]
 pub struct ShaperCut {
@@ -95,7 +95,7 @@ pub struct ShaperCut {
     pub workpiece_operating_radius: f64,
     pub cutter_operating_radius: f64,
     /// Lateral phase of the corner, in the same units and meaning as
-    /// [`crate::profile::Gear::ac`] — arc length along the pitch circle.
+    /// [`crate::tooth::Tooth::ac`] — arc length along the pitch circle.
     pub phase: f64,
     /// External or internal workpiece.
     pub kind: MeshKind,
@@ -152,7 +152,7 @@ impl ShaperCut {
         let cutter_radius = p.cutter_radius;
 
         // **The round is capped, not refused.** A tip round too large for the
-        // tool's own tip is the same guard `Gear::new` meets on an external gear
+        // tool's own tip is the same guard `Tooth::new` meets on an external gear
         // — and there it caps the round to what fits and says so. Refusing here
         // instead made one input give a fillet on an external gear and *no
         // fillet at all* on a ring: a discontinuity in kind, at a point where
@@ -234,7 +234,7 @@ impl ShaperCut {
     }
 
     /// The trochoid fillet at pitch-line travel `s`, as `(radius, angle from the
-    /// tooth centreline)` — the same pair [`Gear::trochoid_at`] returns.
+    /// tooth centreline)` — the same pair [`Tooth::trochoid_at`] returns.
     #[must_use]
     pub fn trochoid_at(&self, s: f64) -> (f64, f64) {
         // The pitch point sits on the OPERATING circle, and the workpiece turns
@@ -271,7 +271,7 @@ impl ShaperCut {
     /// empirical notch factor — but not for the tangent, which the critical
     /// section is located by. So this differentiates the construction rather
     /// than sampling it, and it comes out as the same rotating-frame pattern
-    /// [`crate::profile::Gear`]'s rack fillet uses:
+    /// [`crate::tooth::Tooth`]'s rack fillet uses:
     ///
     /// ```text
     /// X = u cos φ − v sin φ        X′ = u′ cos φ − v′ sin φ − φ′ Y
@@ -333,7 +333,7 @@ impl ShaperCut {
     /// c″  = r_c ω² ( −sin φ_c , σ cos φ_c )
     /// ```
     ///
-    /// The rolling itself is [`rolling_curvature_radius`](crate::profile::rolling_curvature_radius),
+    /// The rolling itself is [`rolling_curvature_radius`](crate::tooth::rolling_curvature_radius),
     /// shared with the rack — one formula rather than the two central
     /// differences this replaced.
     #[must_use]
@@ -365,7 +365,7 @@ impl ShaperCut {
             ddk * dy + 2.0 * dk * dc[1] + k * ddc[1],
         ];
 
-        crate::profile::rolling_curvature_radius(q, dq, ddq, 1.0 / r)
+        crate::tooth::rolling_curvature_radius(q, dq, ddq, 1.0 / r)
     }
 
     /// Where the cutter's tip-round centre sits, as an angle from the cutter's
@@ -425,7 +425,7 @@ impl ShaperCut {
     /// Returns the requested round untouched where it fits, which is the
     /// ordinary case and is bit-identical to what came before. Where it does
     /// not, the answer is `FILLET_FRACTION_OF_MAX` of the boundary, exactly as
-    /// `Gear::new` backs off from its own geometric maximum — sitting on the
+    /// `Tooth::new` backs off from its own geometric maximum — sitting on the
     /// limit leaves a zero-width tip flat, which is legal and numerically
     /// awkward.
     fn largest_tip_round(p: &CutParams) -> f64 {
@@ -449,7 +449,7 @@ impl ShaperCut {
         // reaches the tip radius, where the corner has no radius left at all.
         let boundary = brent(angle_at, floor, p.cutter_tip_radius, Tol::default()).unwrap_or(floor);
 
-        // `min(asked, 0.95 × boundary)`, which is `Gear::new`'s rule written the
+        // `min(asked, 0.95 × boundary)`, which is `Tooth::new`'s rule written the
         // same way — and written the same way *deliberately*. Backing off only
         // once the ask crosses the boundary would drop the realised round by the
         // 5 % margin at that instant, which is a step in the very quantity this
@@ -471,7 +471,7 @@ impl ShaperCut {
         std::f64::consts::PI * module_t / 2.0 - cutter_radius * corner_angle
     }
 
-    /// The cutter that a rack-generated [`Gear`] would be, if the rack had
+    /// The cutter that a rack-generated [`Tooth`] would be, if the rack had
     /// `cutter_teeth` teeth instead of infinitely many.
     ///
     /// Everything is matched to the rack it replaces: the same pitch circle, the
@@ -482,7 +482,7 @@ impl ShaperCut {
     ///
     /// `None` if the cutter is too small to reach the workpiece's root.
     #[must_use]
-    pub fn equivalent_to_rack(g: &Gear, cutter_teeth: u32, kind: MeshKind) -> Option<Self> {
+    pub fn equivalent_to_rack(g: &Tooth, cutter_teeth: u32, kind: MeshKind) -> Option<Self> {
         if cutter_teeth == 0 {
             return None;
         }
@@ -544,7 +544,7 @@ mod tests {
     fn the_trochoid_tangent_matches_a_finite_difference() {
         for kind in [MeshKind::External, MeshKind::Internal] {
             for cutter_teeth in [15u32, 20, 40] {
-                let g = Gear::new(GearParams {
+                let g = Tooth::new(GearParams {
                     teeth: 43,
                     root_radius: 0.2,
                     ..Default::default()
@@ -589,7 +589,7 @@ mod tests {
     #[test]
     fn the_tangent_and_the_polar_form_describe_one_curve() {
         for kind in [MeshKind::External, MeshKind::Internal] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth: 43,
                 root_radius: 0.2,
                 ..Default::default()
@@ -617,7 +617,7 @@ mod tests {
     /// either meeting a difference quotient.
     #[test]
     fn the_trochoid_tangent_tends_to_the_racks() {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 43,
             root_radius: 0.2,
             ..Default::default()
@@ -652,8 +652,8 @@ mod tests {
     /// toward its tip, so below a few dozen teeth two 0.38 rounds no longer fit
     /// on it and `ShaperCut` refuses the tool. That refusal is correct, and
     /// these tests use a tool that exists.
-    fn gear(teeth: u32, shift: f64) -> Gear {
-        Gear::new(GearParams {
+    fn gear(teeth: u32, shift: f64) -> Tooth {
+        Tooth::new(GearParams {
             teeth,
             profile_shift: shift,
             root_radius: 0.15,

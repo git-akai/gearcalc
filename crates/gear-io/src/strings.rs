@@ -304,7 +304,7 @@ mod tests {
     /// exhaustive, only true.
     fn observed_values() -> BTreeMap<String, Vec<String>> {
         use gear_core::params::GearParams;
-        use gear_core::profile::Gear;
+        use gear_core::tooth::Tooth;
 
         let mut seen: BTreeMap<String, Vec<String>> = BTreeMap::new();
         let mut record = |notes: &[Note]| {
@@ -320,7 +320,7 @@ mod tests {
             for shift in [-0.9_f64, -0.4, 0.0, 0.6, 1.4] {
                 for thickness in [0.2_f64, 1.0, 1.9] {
                     for root in [0.05_f64, 0.38, 0.9] {
-                        let g = Gear::new(GearParams {
+                        let g = Tooth::new(GearParams {
                             teeth,
                             profile_shift: shift,
                             thickness_mod: thickness,
@@ -339,7 +339,7 @@ mod tests {
         for dedendum in [1.25_f64, 6.0] {
             for thickness in [0.05_f64, 1.0, 2.5] {
                 record(
-                    &Gear::new(GearParams {
+                    &Tooth::new(GearParams {
                         teeth: 6,
                         dedendum,
                         thickness_mod: thickness,
@@ -353,7 +353,7 @@ mod tests {
 
         // A pressure angle below the floor, which nothing above reaches.
         record(
-            &Gear::new(GearParams {
+            &Tooth::new(GearParams {
                 pressure_angle: 0.5,
                 ..Default::default()
             })
@@ -361,11 +361,11 @@ mod tests {
             .notes,
         );
 
-        // Eccentric gears, whose per-tooth troubles are reported by the
-        // assembly rather than by any one `Gear` — a tooth that is undercut or
+        // Gear gears, whose per-tooth troubles are reported by the
+        // assembly rather than by any one `Tooth` — a tooth that is undercut or
         // pointed while its neighbours are not.
         for (shift, amplitude) in [(0.0_f64, 0.3_f64), (-1.0, 0.3), (1.4, 0.3), (0.5, 0.5)] {
-            let e = gear_core::eccentric::Eccentric::new(GearParams {
+            let e = gear_core::gear::Gear::new(GearParams {
                 teeth: 24,
                 profile_shift: shift,
                 angular_shift: amplitude,
@@ -627,7 +627,7 @@ mod tests {
         // nothing can fire has to be named in `UNFIRED` with its evidence.
         {
             use gear_core::note::Explain;
-            let g = |p| gear_core::Gear::new(p);
+            let g = |p| gear_core::Tooth::new(p);
             let d = gear_core::GearParams::default();
             let mut err = |n: gear_core::note::Note| record(std::slice::from_ref(&n));
 

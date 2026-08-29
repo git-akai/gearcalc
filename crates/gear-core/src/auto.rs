@@ -10,8 +10,8 @@
 
 use crate::involute::{inv, inv_from_roll};
 use crate::params::GearParams;
-use crate::profile::{Gear, POINTED_TOOTH_MAX_ROLL};
 use crate::solve::{brent, Tol};
+use crate::tooth::{Tooth, POINTED_TOOTH_MAX_ROLL};
 
 /// The smallest profile shift that avoids undercut at a stated depth.
 ///
@@ -175,7 +175,7 @@ pub struct ShiftRange {
 
 /// How far the extreme teeth of an eccentric gear are shifted from the nominal:
 /// `+Δx` at θ = 0, and `Δx·cos(2π⌊z/2⌋/z) ≤ 0` at the far tooth — the same
-/// folding [`crate::eccentric::Eccentric::new`] applies so that mirror-pair
+/// folding [`crate::gear::Gear::new`] applies so that mirror-pair
 /// teeth share a shift. `(0.0, 0.0)` for a concentric gear, so every `+ off`
 /// downstream is `+ 0.0` and the concentric answer is unchanged to the bit.
 fn shift_offsets(p: &GearParams) -> (f64, f64) {
@@ -476,7 +476,7 @@ fn tighter(a: Bound, b: Bound) -> Bound {
 ///   as easy to get wrong, since the plausible `w_tip/(2 cos α_t)` silently
 ///   shrinks every profile-shifted fillet.
 ///
-/// # Eccentric gears
+/// # Gear gears
 ///
 /// A gear whose shift varies (`angular_shift ≠ 0`) is cut across `x̄ ± Δx`, and
 /// every tooth of it must be buildable — so the shift-dependent bounds close in
@@ -675,7 +675,7 @@ fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
 /// reported in the normal plane so that it stays helix-independent. They measure
 /// different things: that one is the rack's tip, this one is the gear's.
 #[must_use]
-pub fn addendum_for_tip_width(g: &Gear, min_tip_width: f64) -> Option<f64> {
+pub fn addendum_for_tip_width(g: &Tooth, min_tip_width: f64) -> Option<f64> {
     // s(u) in terms of the involute roll parameter: r' = r_b sqrt(1+u^2).
     let width = |u: f64| 2.0 * g.rb * f64::hypot(1.0, u) * (g.psi_b - inv_from_roll(u));
 
@@ -782,11 +782,11 @@ mod tests {
             };
             let x = minimum_profile_shift(&p, p.dedendum).with_cutter_radius;
 
-            let just_under = Gear::new(GearParams {
+            let just_under = Tooth::new(GearParams {
                 profile_shift: x - 1e-4,
                 ..p
             });
-            let just_over = Gear::new(GearParams {
+            let just_over = Tooth::new(GearParams {
                 profile_shift: x + 1e-4,
                 ..p
             });
@@ -811,10 +811,10 @@ mod tests {
                     teeth,
                     ..Default::default()
                 };
-                let g = Gear::new(base);
+                let g = Tooth::new(base);
                 let h_a = addendum_for_tip_width(&g, want).unwrap();
 
-                let sized = Gear::new(GearParams {
+                let sized = Tooth::new(GearParams {
                     addendum: h_a,
                     ..base
                 });
@@ -834,9 +834,9 @@ mod tests {
             teeth: 17,
             ..Default::default()
         };
-        let g = Gear::new(base);
+        let g = Tooth::new(base);
         let h_a = addendum_for_tip_width(&g, 0.0).unwrap();
-        let pointed = Gear::new(GearParams {
+        let pointed = Tooth::new(GearParams {
             addendum: h_a,
             ..base
         });
@@ -847,7 +847,7 @@ mod tests {
 
         // ...and asking for more addendum than that is refused by the generator's
         // own cap, so the two agree on where "pointed" is.
-        let past = Gear::new(GearParams {
+        let past = Tooth::new(GearParams {
             addendum: h_a + 0.5,
             ..base
         });
@@ -938,7 +938,7 @@ mod tests {
             assert!(lo < hi, "empty range for {p:?}");
 
             let clamps = |x: f64| {
-                Gear::new(GearParams {
+                Tooth::new(GearParams {
                     profile_shift: x,
                     ..p
                 })
@@ -973,7 +973,7 @@ mod tests {
     /// bit.
     #[test]
     fn an_eccentric_gears_shift_window_is_where_every_tooth_builds() {
-        use crate::eccentric::Eccentric;
+        use crate::gear::Gear;
 
         // Concentric first: the window must be the single-gear one, exactly.
         for p in [
@@ -995,7 +995,7 @@ mod tests {
         }
 
         let a_tooth_is_thin = |p: &GearParams, x: f64| {
-            Eccentric::new(GearParams {
+            Gear::new(GearParams {
                 profile_shift: x,
                 ..*p
             })
@@ -1174,7 +1174,7 @@ mod tests {
             if let Some(pointed) = r.pointed {
                 assert!(pointed > r.bound.min.unwrap() && pointed <= r.bound.max.unwrap());
                 // Just past it the generator caps the tip, and says so.
-                let capped = Gear::new(GearParams {
+                let capped = Tooth::new(GearParams {
                     profile_shift: (pointed + 0.02).min(r.bound.max.unwrap()),
                     ..p
                 });
@@ -1236,7 +1236,7 @@ mod tests {
 
     #[test]
     fn an_unreachable_tip_width_is_refused_rather_than_approximated() {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 17,
             ..Default::default()
         });

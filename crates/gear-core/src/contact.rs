@@ -11,7 +11,7 @@
 //! point**, positive toward gear 1's tip.
 
 use crate::mesh::Mesh;
-use crate::profile::Gear;
+use crate::tooth::Tooth;
 
 /// The path of contact for a meshing pair.
 #[derive(Clone, Copy, Debug)]
@@ -38,9 +38,9 @@ impl ContactPath {
     /// distance.
     ///
     /// `tip_radius_2` is gear 2's tip radius. It is passed rather than read off a
-    /// [`Gear`] because gear 2 may be a **ring**, whose tip radius is *inside*
+    /// [`Tooth`] because gear 2 may be a **ring**, whose tip radius is *inside*
     /// its pitch circle and comes from [`crate::ring::Ring`] — the one thing this
-    /// ever needed from gear 2, and the thing a `Gear` cannot supply for a ring.
+    /// ever needed from gear 2, and the thing a `Tooth` cannot supply for a ring.
     ///
     /// # One path, both kinds
     ///
@@ -67,7 +67,7 @@ impl ContactPath {
     /// Returns `None` when either end of the path is not reached, which is a mesh
     /// whose teeth never touch.
     #[must_use]
-    pub fn new(g1: &Gear, tip_radius_2: f64, mesh: &Mesh) -> Option<Self> {
+    pub fn new(g1: &Tooth, tip_radius_2: f64, mesh: &Mesh) -> Option<Self> {
         let (r1, r2) = mesh.operating_radii();
         let (rb1, rb2) = mesh.base_radii();
         // The tangent length carries the sign of its base radius, so a ring's
@@ -386,7 +386,7 @@ impl Directional<f64> {
 /// lengthwise component is not zero, it dominates, and it is why a worm drive
 /// can self-lock.
 #[must_use]
-pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Gear, friction: f64, drive: Drive) -> f64 {
+pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Tooth, friction: f64, drive: Drive) -> f64 {
     // Reversing the drive moves the load onto the mirror flank, where the path
     // of contact is traversed the other way round: what was approach is recess.
     // That the loss comes out the same is the symmetry result, not an assumption
@@ -504,7 +504,7 @@ pub fn sliding_velocity(
 /// (milestone 7, step 5); what is fixed now is that it will build a different
 /// `axis_2` for the *same* function, not call a different one.
 #[must_use]
-pub fn sliding_at(path: &ContactPath, mesh: &Mesh, g1: &Gear, xi: f64, speed_1: f64) -> Sliding {
+pub fn sliding_at(path: &ContactPath, mesh: &Mesh, g1: &Tooth, xi: f64, speed_1: f64) -> Sliding {
     let along_action = [path.alpha_w.sin(), path.alpha_w.cos(), 0.0];
     let point = [
         path.operating_radius_1 + xi * along_action[0],
@@ -748,12 +748,12 @@ mod tests {
     use crate::mesh::MeshKind;
     use crate::GearParams;
 
-    fn pair(z1: u32, z2: u32) -> (Gear, Gear, Mesh) {
-        let a = Gear::new(GearParams {
+    fn pair(z1: u32, z2: u32) -> (Tooth, Tooth, Mesh) {
+        let a = Tooth::new(GearParams {
             teeth: z1,
             ..Default::default()
         });
-        let b = Gear::new(GearParams {
+        let b = Tooth::new(GearParams {
             teeth: z2,
             ..Default::default()
         });
@@ -761,13 +761,13 @@ mod tests {
         (a, b, m)
     }
 
-    fn helical_pair(z1: u32, z2: u32, beta: f64) -> (Gear, Gear, Mesh) {
-        let a = Gear::new(GearParams {
+    fn helical_pair(z1: u32, z2: u32, beta: f64) -> (Tooth, Tooth, Mesh) {
+        let a = Tooth::new(GearParams {
             teeth: z1,
             helix_angle: beta,
             ..Default::default()
         });
-        let b = Gear::new(GearParams {
+        let b = Tooth::new(GearParams {
             teeth: z2,
             helix_angle: -beta,
             ..Default::default()
@@ -779,16 +779,16 @@ mod tests {
     /// A pinion inside a ring, with the ring's real tip radius.
     ///
     /// Internal pairs share the same helix hand, and the tip radius has to come
-    /// from [`crate::ring::Ring`] — a `Gear` of the same tooth count would put it
+    /// from [`crate::ring::Ring`] — a `Tooth` of the same tooth count would put it
     /// on the wrong side of the pitch circle.
-    fn internal_pair(zp: u32, zr: u32, beta: f64) -> (Gear, Gear, Mesh, ContactPath) {
+    fn internal_pair(zp: u32, zr: u32, beta: f64) -> (Tooth, Tooth, Mesh, ContactPath) {
         let params = |teeth: u32| GearParams {
             teeth,
             helix_angle: beta,
             ..Default::default()
         };
-        let pinion = Gear::new(params(zp));
-        let wheel = Gear::new(params(zr));
+        let pinion = Tooth::new(params(zp));
+        let wheel = Tooth::new(params(zr));
         let ring = crate::ring::Ring::cut_by(&params(zr), &crate::ring::Cutter::default());
         let m = Mesh::new(&pinion, &wheel, MeshKind::Internal).unwrap();
         let path = ContactPath::new(&pinion, ring.ra, &m).unwrap();
@@ -1129,12 +1129,12 @@ mod tests {
     fn efficiency_matches_a_numerical_average_of_the_instantaneous_loss() {
         for (z1, z2) in [(17u32, 17u32), (17, 43), (13, 60), (25, 25), (19, 31)] {
             for beta in [0.0, 12.0, 25.0] {
-                let a = Gear::new(crate::GearParams {
+                let a = Tooth::new(crate::GearParams {
                     teeth: z1,
                     helix_angle: beta,
                     ..Default::default()
                 });
-                let b = Gear::new(crate::GearParams {
+                let b = Tooth::new(crate::GearParams {
                     teeth: z2,
                     helix_angle: -beta,
                     ..Default::default()
@@ -1182,7 +1182,7 @@ mod tests {
         // ratio falls with beta, and that outweighs this factor.
         let mut previous = 0.0;
         for beta in [0.0, 15.0, 30.0] {
-            let g = Gear::new(crate::GearParams {
+            let g = Tooth::new(crate::GearParams {
                 teeth: 17,
                 helix_angle: beta,
                 ..Default::default()

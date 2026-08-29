@@ -28,8 +28,8 @@ use crate::contact::ContactPath;
 use crate::hertz::elliptical_contact;
 use crate::mesh::Mesh;
 use crate::metrology::base_helix_angle;
-use crate::profile::Gear;
 use crate::solve::{brent, Tol};
+use crate::tooth::Tooth;
 
 /// How the critical root section is located.
 ///
@@ -171,7 +171,7 @@ pub struct RootSection {
 /// the closed-form curvature below is what such a difference converges on. That
 /// gate is the whole reason the analytic second derivative is trustworthy, and
 /// an integration test cannot reach a crate-private function.
-pub fn fillet_point_and_tangent(g: &Gear, s: f64) -> ([f64; 2], [f64; 2]) {
+pub fn fillet_point_and_tangent(g: &Tooth, s: f64) -> ([f64; 2], [f64; 2]) {
     let d = f64::hypot(s, g.bc);
     let k = 1.0 + g.rho / d;
     let dk = -g.rho * s / (d * d * d);
@@ -209,7 +209,7 @@ pub fn fillet_point_and_tangent(g: &Gear, s: f64) -> ([f64; 2], [f64; 2]) {
 ///
 /// Public for the same reason as [`fillet_point_and_tangent`]: the gate holding
 /// the two against each other lives in `tests/`.
-pub fn fillet_curvature_radius(g: &Gear, s: f64) -> f64 {
+pub fn fillet_curvature_radius(g: &Tooth, s: f64) -> f64 {
     let d = f64::hypot(s, g.bc);
     let (d3, d5) = (d.powi(3), d.powi(5));
     let k = 1.0 + g.rho / d;
@@ -220,7 +220,7 @@ pub fn fillet_curvature_radius(g: &Gear, s: f64) -> f64 {
     let dq = [dk * s + k, -dk * g.bc];
     let ddq = [ddk * s + 2.0 * dk, -ddk * g.bc];
 
-    crate::profile::rolling_curvature_radius(q, dq, ddq, 1.0 / g.r)
+    crate::tooth::rolling_curvature_radius(q, dq, ddq, 1.0 / g.r)
 }
 
 /// A point on the involute flank and its tangent, in tooth coordinates.
@@ -229,7 +229,7 @@ pub fn fillet_curvature_radius(g: &Gear, s: f64) -> f64 {
 /// anything but a small or undercut tooth the largest inscribed parabola touches
 /// the *flank*. For the rack limit that tangency sits 0.54 module above where
 /// the fillet ends, so a fillet-only search finds nothing at all.
-fn flank_point_and_tangent(g: &Gear, u: f64) -> ([f64; 2], [f64; 2]) {
+fn flank_point_and_tangent(g: &Tooth, u: f64) -> ([f64; 2], [f64; 2]) {
     let root = f64::hypot(1.0, u);
     let r = g.rb * root;
     let th = g.psi_b - (u - u.atan());
@@ -248,7 +248,7 @@ fn flank_point_and_tangent(g: &Gear, u: f64) -> ([f64; 2], [f64; 2]) {
 /// The load acts along the involute normal, which is the line from the contact
 /// point to the base-circle tangency point — that is what "the line of action"
 /// means, and it is exact rather than an approximation to the pressure angle.
-fn flank_point_and_load_direction(g: &Gear, roll: f64) -> ([f64; 2], [f64; 2]) {
+fn flank_point_and_load_direction(g: &Tooth, roll: f64) -> ([f64; 2], [f64; 2]) {
     let (r, th) = g.involute_at(roll);
     let p = [r * th.sin(), r * th.cos()];
     // The generating tangent point sits `roll` radians back around the base
@@ -315,7 +315,7 @@ pub trait ToothOutline {
     fn flank_curvature(&self, u: f64) -> f64;
 }
 
-impl ToothOutline for Gear {
+impl ToothOutline for Tooth {
     fn module(&self) -> f64 {
         self.params.module
     }
@@ -574,7 +574,7 @@ fn finish<T: ToothOutline + ?Sized>(
 /// point of single-pair contact, and tip loading is both the conservative choice
 /// and the one the classical tabulated factors assume.
 #[must_use]
-pub fn tip_load_section(g: &Gear) -> Option<RootSection> {
+pub fn tip_load_section(g: &Tooth) -> Option<RootSection> {
     root_section(g, g.u_tip)
 }
 
@@ -761,7 +761,7 @@ impl Load {
     /// `F_t = 2000 T / d = 1000 T / r`. The 1000 converts N·m to N·mm, because
     /// every length in this crate is millimetres.
     #[must_use]
-    pub fn tangential(&self, g: &Gear) -> f64 {
+    pub fn tangential(&self, g: &Tooth) -> f64 {
         1000.0 * self.torque / g.r
     }
 
@@ -773,7 +773,7 @@ impl Load {
     /// line of action are the same force, which is why contact stress — a
     /// property of the pair — is built on it.
     #[must_use]
-    pub fn transverse_line_of_action(&self, g: &Gear) -> f64 {
+    pub fn transverse_line_of_action(&self, g: &Tooth) -> f64 {
         1000.0 * self.torque / g.rb
     }
 
@@ -785,7 +785,7 @@ impl Load {
     /// line is inclined at the base helix angle, so the transverse force is only
     /// its projection.
     #[must_use]
-    pub fn normal_to_flank(&self, g: &Gear) -> f64 {
+    pub fn normal_to_flank(&self, g: &Tooth) -> f64 {
         self.transverse_line_of_action(g) / base_helix_angle(g).cos()
     }
 
@@ -798,7 +798,7 @@ impl Load {
     /// Face width is carried across unchanged, since a `Load` describes what is
     /// being carried rather than by what.
     #[must_use]
-    pub fn across_mesh(&self, from: &Gear, to: &Gear) -> Self {
+    pub fn across_mesh(&self, from: &Tooth, to: &Tooth) -> Self {
         Self {
             torque: self.torque * to.rb / from.rb,
             face_width: self.face_width,
@@ -820,7 +820,7 @@ impl Load {
 /// `m_n` is the **normal** module, and that pairing is deliberate — it is ISO
 /// 6336-3's, and it is only consistent if `Y_F` is measured on the *normal*
 /// section. So `section` must come from the virtual spur gear,
-/// [`Gear::virtual_spur`], which is what [`bending_section`] returns.
+/// [`Tooth::virtual_spur`], which is what [`bending_section`] returns.
 ///
 /// Measuring `Y_F` on the transverse section and dividing by `m_n` — which an
 /// earlier revision did — mixes the two planes and under-predicts the stress by
@@ -846,7 +846,7 @@ impl Load {
 #[must_use]
 pub fn bending_stress(
     section: &RootSection,
-    g: &Gear,
+    g: &Tooth,
     load: &Load,
     model: StressConcentration,
 ) -> Option<f64> {
@@ -859,7 +859,7 @@ pub fn bending_stress(
 ///
 /// One formula for spur and helical alike. The tooth bends as its **normal**
 /// section, so both the form and the load point are taken on the virtual spur
-/// gear ([`Gear::virtual_spur`]); for a spur gear that is the gear itself, by
+/// gear ([`Tooth::virtual_spur`]); for a spur gear that is the gear itself, by
 /// construction rather than by a branch.
 ///
 /// # Locating the load point without the mate
@@ -887,7 +887,7 @@ pub fn bending_stress(
 ///
 /// `transverse_contact_ratio` is `ε_α` from [`ContactPath::contact_ratio`].
 #[must_use]
-pub fn bending_section(g: &Gear, transverse_contact_ratio: f64) -> Option<RootSection> {
+pub fn bending_section(g: &Tooth, transverse_contact_ratio: f64) -> Option<RootSection> {
     let v = g.virtual_spur();
     // The virtual gear is a spur gear, so its transverse plane is the normal
     // plane: `v.mt` is m_n and `v.alpha_t` is α_n.
@@ -1084,7 +1084,7 @@ pub struct ContactStress {
 pub fn contact_stress(
     path: &ContactPath,
     mesh: &Mesh,
-    g1: &Gear,
+    g1: &Tooth,
     lengthwise_curvature: f64,
     load: &Load,
     e_star: f64,
@@ -1175,7 +1175,7 @@ mod tests {
 
     #[test]
     fn analytic_tangent_matches_a_finite_difference() {
-        let g = Gear::new(GearParams::default());
+        let g = Tooth::new(GearParams::default());
         let h = 1e-7;
         let mut worst = 0.0_f64;
         for i in 1..20 {
@@ -1210,7 +1210,7 @@ mod tests {
                 ..Default::default()
             },
         ] {
-            let g = Gear::new(p);
+            let g = Tooth::new(p);
             let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
             let (_, t) = fillet_point_and_tangent(&g, sec.s);
             let angle = (t[0].abs()).atan2(t[1].abs()).to_degrees();
@@ -1225,7 +1225,7 @@ mod tests {
     #[test]
     fn tangency_point_lies_on_the_fillet_between_root_and_junction() {
         for teeth in [9u32, 17, 30, 60] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth,
                 ..Default::default()
             });
@@ -1245,7 +1245,7 @@ mod tests {
     /// base-circle tangent point — that is what makes it the line of action.
     #[test]
     fn load_line_is_tangent_to_the_base_circle() {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 23,
             ..Default::default()
         });
@@ -1263,7 +1263,7 @@ mod tests {
     fn form_factor_falls_as_tooth_count_rises() {
         let mut last = f64::INFINITY;
         for teeth in [12u32, 17, 25, 40, 80, 150] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth,
                 ..Default::default()
             });
@@ -1278,7 +1278,7 @@ mod tests {
         let mut last_chord = 0.0_f64;
         let mut last_yf = f64::INFINITY;
         for xi in [-4i32, -2, 0, 2, 4] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth: 20,
                 profile_shift: f64::from(xi) * 0.1,
                 ..Default::default()
@@ -1312,7 +1312,7 @@ mod tests {
                 ..Default::default()
             },
         ] {
-            let g = Gear::new(p);
+            let g = Tooth::new(p);
             let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
             let d = sec.tangent_direction;
             assert!(
@@ -1337,7 +1337,7 @@ mod tests {
 
     #[test]
     fn stress_correction_can_be_switched_off_for_comparison() {
-        let g = Gear::new(GearParams::default());
+        let g = Tooth::new(GearParams::default());
         let sec = root_section(&g, g.u_tip).unwrap();
         assert!((sec.stress_correction(StressConcentration::None).unwrap() - 1.0).abs() < 1e-15);
         assert!(
@@ -1353,7 +1353,7 @@ mod tests {
     fn sharper_fillets_raise_the_stress_correction() {
         let mut last = 0.0_f64;
         for root_radius in [0.38_f64, 0.30, 0.20, 0.10, 0.05] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 root_radius,
                 ..Default::default()
             });
@@ -1370,7 +1370,7 @@ mod tests {
 
     #[test]
     fn notch_parameter_is_the_ratio_the_iso_fit_expects() {
-        let g = Gear::new(GearParams::default());
+        let g = Tooth::new(GearParams::default());
         let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
         let want = sec.root_chord / (2.0 * sec.fillet_curvature);
         assert!((sec.notch_parameter - want).abs() < 1e-12);
@@ -1403,7 +1403,7 @@ mod tests {
                 ..Default::default()
             },
         ] {
-            let g = Gear::new(p);
+            let g = Tooth::new(p);
             let sec = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
             let pp = sec.parabola_p.unwrap();
             let vertex = sec.load_line_crossing[1];
@@ -1434,7 +1434,7 @@ mod tests {
     #[test]
     fn parabola_is_consistently_more_conservative() {
         for teeth in [9u32, 17, 60, 300, 1000] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth,
                 ..Default::default()
             });
@@ -1458,7 +1458,7 @@ mod tests {
     /// no solution at all on large teeth.
     #[test]
     fn parabola_touches_the_fillet_on_small_teeth_and_the_flank_on_large() {
-        let small = Gear::new(GearParams {
+        let small = Tooth::new(GearParams {
             teeth: 17,
             ..Default::default()
         });
@@ -1466,7 +1466,7 @@ mod tests {
             root_section_with(&small, small.u_tip, CriticalSection::LewisParabola).unwrap();
         assert!(!small_sec.tangency_on_flank, "z=17 should touch the fillet");
 
-        let large = Gear::new(GearParams {
+        let large = Tooth::new(GearParams {
             teeth: 1000,
             ..Default::default()
         });
@@ -1479,7 +1479,7 @@ mod tests {
     /// That is the property the cantilever model is meant to have.
     #[test]
     fn only_the_parabola_moves_with_the_load_point() {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 20,
             ..Default::default()
         });
@@ -1506,7 +1506,7 @@ mod tests {
     /// `large_teeth_with_a_sharp_cutter_leave_the_stated_range`.
     #[test]
     fn notch_parameter_is_clamped_for_the_fit_but_reported_raw() {
-        let g = Gear::new(GearParams::default());
+        let g = Tooth::new(GearParams::default());
         let base = root_section(&g, g.u_tip).unwrap();
 
         let mut sharp = base;
@@ -1554,7 +1554,7 @@ mod tests {
     fn ordinary_gears_keep_the_notch_parameter_in_range() {
         for root_radius in [0.38_f64, 0.2, 0.05, 0.005] {
             for teeth in [9u32, 17, 60] {
-                let g = Gear::new(GearParams {
+                let g = Tooth::new(GearParams {
                     teeth,
                     root_radius,
                     ..Default::default()
@@ -1577,7 +1577,7 @@ mod tests {
     /// a caller must be told about rather than have silently corrected.
     #[test]
     fn large_teeth_with_a_sharp_cutter_leave_the_stated_range() {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 300,
             root_radius: 0.05,
             ..Default::default()
@@ -1614,7 +1614,7 @@ mod tests {
     #[test]
     fn the_rating_is_continuous_across_the_flank_fillet_transition() {
         let of = |z: u32| {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth: z,
                 ..Default::default()
             });
@@ -1675,7 +1675,7 @@ mod tests {
     /// means nothing as a notch radius.
     #[test]
     fn the_notch_radius_is_always_the_fillets() {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 1000,
             ..Default::default()
         });
@@ -1707,7 +1707,7 @@ mod tests {
 
     #[test]
     fn a_severed_tooth_has_no_root_section() {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 3,
             profile_shift: -0.5,
             ..Default::default()
@@ -1718,12 +1718,12 @@ mod tests {
 
     // ------------------------------------------------------------ load ----
 
-    fn pair(z1: u32, z2: u32) -> (Gear, Gear, Mesh) {
-        let a = Gear::new(GearParams {
+    fn pair(z1: u32, z2: u32) -> (Tooth, Tooth, Mesh) {
+        let a = Tooth::new(GearParams {
             teeth: z1,
             ..Default::default()
         });
-        let b = Gear::new(GearParams {
+        let b = Tooth::new(GearParams {
             teeth: z2,
             ..Default::default()
         });
@@ -1737,7 +1737,7 @@ mod tests {
     #[test]
     fn the_force_projections_are_mutually_consistent() {
         for beta in [0.0, 15.0, 30.0] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth: 23,
                 module: 2.0,
                 helix_angle: beta,
@@ -1793,7 +1793,7 @@ mod tests {
 
     #[test]
     fn bending_stress_scales_the_way_the_cantilever_model_says() {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 25,
             ..Default::default()
         });
@@ -1879,12 +1879,12 @@ mod tests {
     fn the_general_form_is_bit_identical_to_line_contact_at_parallel_axes() {
         for (z1, z2) in [(17u32, 43u32), (13, 60), (25, 25), (19, 31)] {
             for beta in [0.0, 15.0, 30.0] {
-                let g1 = Gear::new(GearParams {
+                let g1 = Tooth::new(GearParams {
                     teeth: z1,
                     helix_angle: beta,
                     ..Default::default()
                 });
-                let g2 = Gear::new(GearParams {
+                let g2 = Tooth::new(GearParams {
                     teeth: z2,
                     helix_angle: -beta,
                     ..Default::default()
@@ -1994,7 +1994,7 @@ mod tests {
     /// be the identity there — otherwise every spur result would shift.
     #[test]
     fn the_virtual_spur_gear_of_a_spur_gear_is_itself() {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 25,
             ..Default::default()
         });
@@ -2016,7 +2016,7 @@ mod tests {
     #[test]
     fn the_virtual_spur_gear_has_the_iso_tooth_count_and_the_normal_rack() {
         for beta in [10.0, 20.0, 30.0, 45.0] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth: 30,
                 helix_angle: beta,
                 ..Default::default()
@@ -2047,7 +2047,7 @@ mod tests {
     fn the_normal_section_is_what_bends_and_it_differs_from_the_transverse_one() {
         let mut previous = 0.0;
         for beta in [0.0, 15.0, 30.0] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth: 20,
                 helix_angle: beta,
                 ..Default::default()
@@ -2074,7 +2074,7 @@ mod tests {
     #[test]
     fn the_bending_load_point_uses_the_virtual_contact_ratio() {
         for beta in [0.0, 15.0, 30.0] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth: 20,
                 helix_angle: beta,
                 ..Default::default()
@@ -2109,7 +2109,7 @@ mod tests {
     #[test]
     fn the_virtual_contact_ratio_relation_barely_moves_the_answer() {
         for (beta, spread) in [(10.0, 0.0004), (20.0, 0.0012), (30.0, 0.0020)] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth: 17,
                 helix_angle: beta,
                 ..Default::default()
@@ -2135,12 +2135,12 @@ mod tests {
     fn helical_contact_stress_falls_by_the_square_root_of_the_base_helix_cosine() {
         let load = Load::new(2.0, 8.0);
         for beta in [10.0, 20.0, 30.0] {
-            let g1 = Gear::new(GearParams {
+            let g1 = Tooth::new(GearParams {
                 teeth: 17,
                 helix_angle: beta,
                 ..Default::default()
             });
-            let g2 = Gear::new(GearParams {
+            let g2 = Tooth::new(GearParams {
                 teeth: 43,
                 helix_angle: -beta,
                 ..Default::default()

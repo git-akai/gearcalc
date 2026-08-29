@@ -18,10 +18,10 @@
 //!
 //! Only the involute flank and the trochoid fillet are polygonal, and those are
 //! the two curves with no exact arc representation. Their accuracy is set by the
-//! chord tolerance passed to [`gear_core::Gear::outline`].
+//! chord tolerance passed to [`gear_core::Tooth::outline`].
 
 use gear_core::ring::Ring;
-use gear_core::{Gear, Vertex};
+use gear_core::{Tooth, Vertex};
 
 /// Layer names. Geometry and construction aids are separated so the reference
 /// circles can be switched off in CAD without touching the profile.
@@ -98,9 +98,12 @@ impl Writer {
 /// Millimetres, with the first tooth centred on +X and the gear axis at the
 /// origin, matching the on-screen view.
 #[must_use]
-pub fn gear_to_dxf(gear: &Gear, opts: &DxfOptions) -> String {
+pub fn gear_to_dxf(gear: &Tooth, opts: &DxfOptions) -> String {
     outline_to_dxf(
-        &gear.outline(opts.chord_tolerance),
+        // Through the assembly: drawing a whole gear is `Gear`'s job, and this
+        // is the export path an eccentric gear once slipped through as a
+        // concentric one (`docs/corrections.md`).
+        &gear_core::gear::Gear::new(gear.params).outline(opts.chord_tolerance),
         &[gear.r, gear.rb, gear.ra, gear.rf],
         opts,
     )
@@ -270,7 +273,7 @@ mod tests {
 
     #[test]
     fn structure_is_well_formed() {
-        let g = Gear::new(GearParams::default());
+        let g = Tooth::new(GearParams::default());
         let dxf = gear_to_dxf(&g, &DxfOptions::default());
         let t = tags(&dxf);
 
@@ -297,11 +300,11 @@ mod tests {
 
     #[test]
     fn polyline_is_closed_and_carries_every_vertex() {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 9,
             ..Default::default()
         });
-        let want = g.outline(1e-3);
+        let want = gear_core::gear::Gear::new(g.params).outline(1e-3);
         let dxf = gear_to_dxf(
             &g,
             &DxfOptions {
@@ -343,7 +346,7 @@ mod tests {
 
     #[test]
     fn reference_circles_are_optional_and_on_their_own_layer() {
-        let g = Gear::new(GearParams::default());
+        let g = Tooth::new(GearParams::default());
         let with = gear_to_dxf(
             &g,
             &DxfOptions {
@@ -432,11 +435,11 @@ mod tests {
 
     #[test]
     fn bulges_are_written_only_where_the_geometry_is_circular() {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 12,
             ..Default::default()
         });
-        let outline = g.outline(1e-3);
+        let outline = gear_core::gear::Gear::new(g.params).outline(1e-3);
         let dxf = gear_to_dxf(
             &g,
             &DxfOptions {

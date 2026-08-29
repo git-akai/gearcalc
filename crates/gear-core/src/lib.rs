@@ -9,17 +9,17 @@
 //! `docs/corrections.md`.
 //!
 //! ```
-//! use gear_core::{Gear, GearParams};
+//! use gear_core::{Tooth, GearParams};
 //!
-//! let g = Gear::new(GearParams { teeth: 17, profile_shift: 0.2, ..Default::default() });
+//! let g = Tooth::new(GearParams { teeth: 17, profile_shift: 0.2, ..Default::default() });
 //! assert!(!g.undercut);
 //! let outline = g.profile(400);        // closed cross-section, CCW
 //! ```
 
 pub mod auto;
 pub mod contact;
-pub mod eccentric;
 pub mod elliptic;
+pub mod gear;
 pub mod hertz;
 pub mod involute;
 pub mod jgma;
@@ -30,12 +30,12 @@ pub mod note;
 pub mod outline;
 pub mod params;
 pub mod planetary;
-pub mod profile;
 pub mod ring;
 pub mod screw;
 pub mod shaper;
 pub mod solve;
 pub mod strength;
+pub mod tooth;
 pub mod train;
 pub mod verify;
 
@@ -44,4 +44,4 @@ pub use material::{Material, MaterialLibrary};
 pub use mesh::{Mesh, MeshError, MeshKind};
 pub use outline::Vertex;
 pub use params::{Auto, Clamps, GearParams};
-pub use profile::{Gear, Section};
+pub use tooth::{Section, Tooth};

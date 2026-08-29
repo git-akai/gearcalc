@@ -1,4 +1,11 @@
-//! Involute gear cross-section generation.
+//! One tooth's form: the involute flank, the trochoid fillet, and where they
+//! meet.
+//!
+//! A `Tooth` is the shape a single tooth takes at a single profile shift, cut by
+//! a single [`Rack`]. It is **not** a gear — assembling teeth into one, seating
+//! them, and settling the tool they share is [`crate::gear::Gear`]'s job, and
+//! keeping that separate is what stops a gear-level decision being taken per
+//! tooth.
 //!
 //! A port of the validated `handoff_inbound/gear.py`, which was checked to
 //! 5e-4 mm against a full simulation of the generating rack. Geometry is
@@ -21,7 +28,7 @@
 //! - The flank continues **below the base circle** to its true intersection with
 //!   the trochoid. Clamping it at the base circle and bridging the remainder —
 //!   the obvious-looking approach — leaves a visible 0.3 mm step on undercut
-//!   gears. [`Gear::with_flank_clamped_at_base`] reproduces that fault deliberately, as a
+//!   gears. [`Tooth::with_flank_clamped_at_base`] reproduces that fault deliberately, as a
 //!   negative test fixture.
 //! - The fillet fit cap is `ρ_max = w_tip·cos α_t / (2(1 − sin α_t))`. The
 //!   plausible-looking `w_tip / (2 cos α_t)` is wrong and silently shrinks the
@@ -80,10 +87,10 @@ pub enum Section {
 ///
 /// # Why the tool is a value rather than something a tooth works out
 ///
-/// It used to be the second. [`Gear::new`] derived its own depth and tip round
+/// It used to be the second. [`Tooth::new`] derived its own depth and tip round
 /// from the parameters and **clamped both** when they did not fit — which is a
 /// gear-level decision, taken inside something that is also used as *one tooth*
-/// of an eccentric gear. [`crate::eccentric::Eccentric`] then had to undo it:
+/// of an eccentric gear. [`crate::gear::Gear`] then had to undo it:
 /// settle a tool across the teeth and rebuild them to it. Twice, the undoing was
 /// incomplete, and both times it reached the drawn geometry
 /// (`docs/corrections.md`).
@@ -117,9 +124,9 @@ pub struct Rack {
 /// A generated gear cross-section.
 ///
 /// Every field is in millimetres or radians. Construction never fails: degenerate
-/// input is clamped and recorded in [`Gear::clamps`].
+/// input is clamped and recorded in [`Tooth::clamps`].
 #[derive(Clone, Debug)]
-pub struct Gear {
+pub struct Tooth {
     pub params: GearParams,
     pub clamps: Clamps,
 
@@ -178,7 +185,7 @@ pub struct Gear {
     /// Tooth count used for the tooth **form**.
     ///
     /// Normally `params.teeth`. For a virtual spur gear built by
-    /// [`Gear::virtual_spur`] it is the fractional ISO count `z / cos³β`, which
+    /// [`Tooth::virtual_spur`] it is the fractional ISO count `z / cos³β`, which
     /// is why it is an `f64` while `params.teeth` stays a whole number — a real
     /// gear has an integer tooth count, a virtual one need not.
     pub z: f64,
@@ -190,7 +197,7 @@ pub struct Gear {
 /// Spread `n` points across a profile's sections in proportion to their arc
 /// length, so no section is starved.
 ///
-/// Shared by [`Gear`] and [`crate::ring::Ring`]. The two have different section
+/// Shared by [`Tooth`] and [`crate::ring::Ring`]. The two have different section
 /// *geometry* — one's tooth points outward and the other's inward — but this
 /// distribution is the same arithmetic on both, and it was written twice: the
 /// ring's copy carried its own anonymous `MIN_SHARE`, `MIN_POINTS` and
@@ -256,7 +263,7 @@ pub(crate) fn allocate_by_arc_length(
     out
 }
 
-impl Gear {
+impl Tooth {
     #[must_use]
     pub fn new(params: GearParams) -> Self {
         Self::build(params, false)
@@ -286,9 +293,9 @@ impl Gear {
     /// and two from the radius of curvature of the pitch ellipse that section
     /// cuts.
     ///
-    /// The count is fractional, which is exactly why [`Gear::z`] exists. Nothing
+    /// The count is fractional, which is exactly why [`Tooth::z`] exists. Nothing
     /// else in the construction cares: the tooth *form* is a continuous function
-    /// of `z`. What is **not** meaningful on the result is [`Gear::profile`],
+    /// of `z`. What is **not** meaningful on the result is [`Tooth::profile`],
     /// which replicates a whole number of teeth around a real gear — this object
     /// exists to be measured, not drawn.
     ///
@@ -318,9 +325,9 @@ impl Gear {
 
     /// This tooth's form, cut by a tool that has **already been settled**.
     ///
-    /// The difference from [`Gear::new`] is what is *absent*: no depth clamp and
+    /// The difference from [`Tooth::new`] is what is *absent*: no depth clamp and
     /// no tip-round cap, because neither is this tooth's to make. Whoever owns
-    /// the whole gear settles the tool once — [`crate::eccentric::Eccentric`]
+    /// the whole gear settles the tool once — [`crate::gear::Gear`]
     /// does, by taking what the most demanding tooth needs — and every tooth is
     /// then cut by the same one, which is what a hob does and what the type now
     /// says.
@@ -331,7 +338,7 @@ impl Gear {
     /// asking raises.
     ///
     /// The entry point an assembly uses to settle a shared tool before building
-    /// anything — see [`crate::eccentric::Eccentric::new`].
+    /// anything — see [`crate::gear::Gear::new`].
     #[must_use]
     pub fn tool_wanted_by(params: &GearParams) -> (Rack, Vec<Note>) {
         let z = f64::from(params.teeth.max(1));
@@ -579,7 +586,7 @@ impl Gear {
     /// a valid simple closed curve, and the condition is reported rather than
     /// silently producing a self-intersecting outline.
     ///
-    /// Any code touching the flank must check [`Gear::severed`] first — `u_j`
+    /// Any code touching the flank must check [`Tooth::severed`] first — `u_j`
     /// and `u_tip` are NaN in this state and there are only two sections.
     fn check_severed(&mut self) {
         let n = search::SEVER_SCAN_SAMPLES;
@@ -651,13 +658,6 @@ impl Gear {
         allocate_by_arc_length(&self.sections(), n, |s, k| self.sample_section(s, k))
             .into_iter()
             .unzip()
-    }
-
-    /// The closed cross-section as `[x, y]` points, counter-clockwise, with the
-    /// first tooth centred on +X.
-    #[must_use]
-    pub fn profile(&self, per_tooth: usize) -> Vec<[f64; 2]> {
-        crate::eccentric::Eccentric::new(self.params).outline(per_tooth)
     }
 }
 
@@ -749,7 +749,7 @@ fn transverse_thickness(
 impl Rack {
     /// The tool a single tooth asks for, and the clamps that asking raised.
     ///
-    /// This is the settling [`Gear::new`] used to do inline. It is a free
+    /// This is the settling [`Tooth::new`] used to do inline. It is a free
     /// function on the *tool* now so that an assembly can ask every tooth what
     /// it wants **before** building any of them, and hand one answer to all —
     /// which is what removes the build-settle-rebuild dance that twice failed to

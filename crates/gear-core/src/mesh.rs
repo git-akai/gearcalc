@@ -29,7 +29,7 @@
 //! needing a special case.
 
 use crate::involute::{inv, inv_inverse};
-use crate::profile::Gear;
+use crate::tooth::Tooth;
 
 /// Whether the second member is an external gear or an internal (ring) gear.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -170,7 +170,7 @@ impl Mesh {
     ///
     /// Returns [`MeshError`] when the pair cannot mesh, or when the requested
     /// shifts put the operating pressure angle outside the involute domain.
-    pub fn new(g1: &Gear, g2: &Gear, kind: MeshKind) -> Result<Self, MeshError> {
+    pub fn new(g1: &Tooth, g2: &Tooth, kind: MeshKind) -> Result<Self, MeshError> {
         let (p1, p2) = (&g1.params, &g2.params);
         // The rack is a property of each gear; the hand is a property of the
         // pair, so only the second knows what `kind` means. Gear 2's helix
@@ -374,7 +374,7 @@ impl Mesh {
     /// alone. They are not equally good to compute. `α_w` comes out of the
     /// involute inversion, so the operating route carries that solve's residual
     /// while `m_t z / 2 · cos α_t` carries none — and it is what
-    /// [`Gear::rb`](crate::Gear) itself is, bit for bit.
+    /// [`Tooth::rb`](crate::Tooth) itself is, bit for bit.
     ///
     /// An earlier revision reached gear 1's this way and gear 2's through `a_w`,
     /// which left one pair of curvatures built from two different routes and
@@ -459,7 +459,7 @@ pub enum MeshSide {
 ///
 /// Thickness quantities take this; radial quantities take plain `x`. Keeping the
 /// distinction in one named function is what stops the two being confused.
-fn x_thick(g: &Gear) -> f64 {
+fn x_thick(g: &Tooth) -> f64 {
     g.params.profile_shift + g.params.thickness_shift()
 }
 
@@ -513,7 +513,7 @@ mod tests {
     #[test]
     fn an_operating_mesh_keeps_the_cut_geometry_and_gives_up_the_backlash_reference() {
         let g = |z: u32, x: f64, hand: f64| {
-            Gear::new(GearParams {
+            Tooth::new(GearParams {
                 teeth: z,
                 profile_shift: x,
                 helix_angle: hand * 12.0,
@@ -583,12 +583,12 @@ mod tests {
         const FLOOR: f64 = 2e-4;
 
         let g = |z: u32| {
-            Gear::new(GearParams {
+            Tooth::new(GearParams {
                 teeth: z,
                 ..Default::default()
             })
         };
-        let contact = |a: &Gear, b: &Gear, at: f64, sign: f64| {
+        let contact = |a: &Tooth, b: &Tooth, at: f64, sign: f64| {
             crate::verify::contact_phase_from_outlines(a, b, at, sign, POINTS)
                 .expect("the outlines must reach each other")
         };
@@ -648,19 +648,19 @@ mod tests {
     #[test]
     fn the_phase_is_half_of_the_exact_law_not_of_its_linearisation() {
         let g = |z: u32| {
-            Gear::new(GearParams {
+            Tooth::new(GearParams {
                 teeth: z,
                 helix_angle: 15.0 * f64::from(i32::from(z == 17)),
                 ..Default::default()
             })
         };
         let (a, b) = (
-            Gear::new(GearParams {
+            Tooth::new(GearParams {
                 teeth: 17,
                 helix_angle: 15.0,
                 ..Default::default()
             }),
-            Gear::new(GearParams {
+            Tooth::new(GearParams {
                 teeth: 43,
                 helix_angle: -15.0,
                 ..Default::default()
@@ -708,7 +708,7 @@ mod tests {
         for beta_deg in [0.0_f64, 12.0, 20.0, 30.0] {
             let beta = beta_deg.to_radians();
             let g = |z: u32, hand: f64| {
-                Gear::new(GearParams {
+                Tooth::new(GearParams {
                     teeth: z,
                     helix_angle: hand * beta_deg,
                     ..Default::default()
@@ -748,7 +748,7 @@ mod tests {
     #[test]
     fn the_shared_law_does_not_need_to_know_the_mate_is_a_ring() {
         let ring = |z: u32| {
-            Gear::new(GearParams {
+            Tooth::new(GearParams {
                 teeth: z,
                 ..Default::default()
             })
@@ -772,14 +772,14 @@ mod tests {
         }
     }
 
-    fn pair(z1: u32, z2: u32, x1: f64, x2: f64) -> (Gear, Gear) {
+    fn pair(z1: u32, z2: u32, x1: f64, x2: f64) -> (Tooth, Tooth) {
         (
-            Gear::new(GearParams {
+            Tooth::new(GearParams {
                 teeth: z1,
                 profile_shift: x1,
                 ..Default::default()
             }),
-            Gear::new(GearParams {
+            Tooth::new(GearParams {
                 teeth: z2,
                 profile_shift: x2,
                 ..Default::default()
@@ -996,11 +996,11 @@ mod tests {
     #[test]
     fn paired_thickness_modification_does_not_move_the_centre_distance() {
         let plain = Mesh::new(
-            &Gear::new(GearParams {
+            &Tooth::new(GearParams {
                 teeth: 17,
                 ..Default::default()
             }),
-            &Gear::new(GearParams {
+            &Tooth::new(GearParams {
                 teeth: 23,
                 ..Default::default()
             }),
@@ -1009,12 +1009,12 @@ mod tests {
         .unwrap();
         for k in [0.6_f64, 0.9, 1.3, 1.7] {
             let m = Mesh::new(
-                &Gear::new(GearParams {
+                &Tooth::new(GearParams {
                     teeth: 17,
                     thickness_mod: k,
                     ..Default::default()
                 }),
-                &Gear::new(GearParams {
+                &Tooth::new(GearParams {
                     teeth: 23,
                     thickness_mod: 2.0 - k,
                     ..Default::default()
@@ -1036,11 +1036,11 @@ mod tests {
     #[test]
     fn unpaired_thickness_modification_appears_as_backlash() {
         let plain = Mesh::new(
-            &Gear::new(GearParams {
+            &Tooth::new(GearParams {
                 teeth: 17,
                 ..Default::default()
             }),
-            &Gear::new(GearParams {
+            &Tooth::new(GearParams {
                 teeth: 23,
                 ..Default::default()
             }),
@@ -1049,12 +1049,12 @@ mod tests {
         .unwrap();
         // thin gear 1 only: k < 1 removes material, so there is play
         let thin = Mesh::new(
-            &Gear::new(GearParams {
+            &Tooth::new(GearParams {
                 teeth: 17,
                 thickness_mod: 0.9,
                 ..Default::default()
             }),
-            &Gear::new(GearParams {
+            &Tooth::new(GearParams {
                 teeth: 23,
                 ..Default::default()
             }),
@@ -1067,11 +1067,11 @@ mod tests {
 
     #[test]
     fn internal_mesh_centre_distance_is_the_difference() {
-        let sun = Gear::new(GearParams {
+        let sun = Tooth::new(GearParams {
             teeth: 17,
             ..Default::default()
         });
-        let ring = Gear::new(GearParams {
+        let ring = Tooth::new(GearParams {
             teeth: 51,
             ..Default::default()
         });
@@ -1081,11 +1081,11 @@ mod tests {
 
     #[test]
     fn impossible_pairs_are_rejected_rather_than_fudged() {
-        let a = Gear::new(GearParams {
+        let a = Tooth::new(GearParams {
             teeth: 17,
             ..Default::default()
         });
-        let b = Gear::new(GearParams {
+        let b = Tooth::new(GearParams {
             teeth: 23,
             module: 2.0,
             ..Default::default()
@@ -1095,11 +1095,11 @@ mod tests {
             MeshError::Incompatible
         );
 
-        let small = Gear::new(GearParams {
+        let small = Tooth::new(GearParams {
             teeth: 40,
             ..Default::default()
         });
-        let ring = Gear::new(GearParams {
+        let ring = Tooth::new(GearParams {
             teeth: 20,
             ..Default::default()
         });
@@ -1109,12 +1109,12 @@ mod tests {
         );
 
         // Large negative shifts push the operating pressure angle below zero.
-        let a = Gear::new(GearParams {
+        let a = Tooth::new(GearParams {
             teeth: 17,
             profile_shift: -1.9,
             ..Default::default()
         });
-        let b = Gear::new(GearParams {
+        let b = Tooth::new(GearParams {
             teeth: 23,
             profile_shift: -1.9,
             ..Default::default()

@@ -17,7 +17,7 @@
 use gear_core::jgma;
 use gear_core::metrology::{self, PinCount};
 use gear_core::note::{Explain, Note};
-use gear_core::{Gear, GearParams};
+use gear_core::{GearParams, Tooth};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -254,16 +254,16 @@ pub struct GearSummary {
 
     /// What varies around the revolution. Every field is zero for an ordinary
     /// gear, so it crosses unconditionally rather than behind a flag.
-    pub variation: gear_core::eccentric::Variation,
+    pub variation: gear_core::gear::Variation,
     /// Teeth that came out other than as drawn, and why. Empty is the normal
     /// case, for an ordinary gear and for a buildable eccentric one alike.
-    pub per_tooth_clamps: gear_core::eccentric::PerToothClamps,
+    pub per_tooth_clamps: gear_core::gear::PerToothClamps,
     /// The centre distance this gear's mesh commands around a revolution.
     ///
     /// Needs a mate, so it is `Unavailable` with the reason when none was sent —
     /// which is every concentric gear, since a concentric one commands a
     /// constant and there is nothing to profile.
-    pub centre_profile: Maybe<gear_core::eccentric::CentreProfile>,
+    pub centre_profile: Maybe<gear_core::gear::CentreProfile>,
 
     pub span: Maybe<SpanOut>,
     pub over_two_pins: Maybe<PinsOut>,
@@ -274,18 +274,14 @@ pub struct GearSummary {
     pub tolerance: Maybe<ToleranceOut>,
 }
 
-fn summarise(
-    ecc: &gear_core::eccentric::Eccentric,
-    req: &GearRequest,
-    params: GearParams,
-) -> GearSummary {
+fn summarise(ecc: &gear_core::gear::Gear, req: &GearRequest, params: GearParams) -> GearSummary {
     // The mean tooth is quoted from, but it is cut by the **shared** tool: an
     // eccentric gear's teeth are rebuilt to the greatest depth any of them needs
-    // and the smallest tip round any of them allows, and `Eccentric::mean`
+    // and the smallest tip round any of them allows, and `Gear::mean`
     // carries the same. So `fillet_radius`, `cutter_tip_width` and the root
     // radius describe a tooth the gear actually has rather than the one the raw
     // inputs would have produced. For a concentric gear the mean *is*
-    // `Gear::new(params)`, bit for bit.
+    // `Tooth::new(params)`, bit for bit.
     let g = ecc.mean();
     let eccentric = ecc.distinct_teeth() > 1;
     let pitch_diameter = 2.0 * g.r;
@@ -623,9 +619,9 @@ fn parse(input: &str) -> Result<GearRequest, String> {
 /// The mate, built as an ordinary gear from the shared module, pressure angle
 /// and helix plus its own tooth count and shift — and its mesh kind. `None`
 /// when no mate was sent.
-fn eccentric_mate(req: &GearRequest) -> Option<(Gear, gear_core::mesh::MeshKind)> {
+fn eccentric_mate(req: &GearRequest) -> Option<(Tooth, gear_core::mesh::MeshKind)> {
     let mate = req.mate.as_ref()?;
-    let g = Gear::new(GearParams {
+    let g = Tooth::new(GearParams {
         teeth: mate.teeth,
         profile_shift: mate.profile_shift,
         angular_shift: 0.0,
@@ -651,7 +647,7 @@ fn resolved_params(req: &GearRequest) -> Result<GearParams, String> {
         "a centre-distance throw is commanded against a mate — set the mate's tooth count"
             .to_string()
     })?;
-    let magnitude = gear_core::eccentric::amplitude_for_throw(
+    let magnitude = gear_core::gear::amplitude_for_throw(
         req.params,
         &mate,
         kind,
@@ -676,17 +672,17 @@ fn solve_gear_impl(input: &str) -> Result<String, String> {
     let req = parse(input)?;
     let params = resolved_params(&req)?;
     // One construction for both kinds: a concentric gear is the `Δx = 0`
-    // degenerate of the eccentric assembly, and its `mean` is `Gear::new`
+    // degenerate of the eccentric assembly, and its `mean` is `Tooth::new`
     // verbatim. Building it here means every scalar the summary quotes is a
     // tooth the gear actually has.
-    let ecc = gear_core::eccentric::Eccentric::new(params);
+    let ecc = gear_core::gear::Gear::new(params);
     serde_json::to_string(&summarise(&ecc, &req, params))
         .map_err(|e| format!("could not encode result: {e}"))
 }
 
 fn gear_profile_impl(input: &str, points_per_tooth: usize) -> Result<Vec<f64>, String> {
     let req = parse(input)?;
-    Ok(Gear::new(resolved_params(&req)?)
+    Ok(gear_core::gear::Gear::new(resolved_params(&req)?)
         .profile(points_per_tooth)
         .into_iter()
         .flat_map(|p| [p[0], p[1]])
@@ -695,7 +691,7 @@ fn gear_profile_impl(input: &str, points_per_tooth: usize) -> Result<Vec<f64>, S
 
 fn export_dxf_impl(input: &str) -> Result<String, String> {
     let req = parse(input)?;
-    let g = Gear::new(resolved_params(&req)?);
+    let g = Tooth::new(resolved_params(&req)?);
     Ok(gear_io::gear_to_dxf(
         &g,
         &gear_io::DxfOptions {
@@ -779,10 +775,7 @@ fn strings_impl() -> Result<String, String> {
 /// *external* gear, so the ring, when there is one, is the mate. `params` is
 /// already resolved — its `angular_shift` is the amplitude in force, whether it
 /// was entered directly or solved from a centre-distance throw.
-fn centre_profile(
-    params: GearParams,
-    req: &GearRequest,
-) -> Maybe<gear_core::eccentric::CentreProfile> {
+fn centre_profile(params: GearParams, req: &GearRequest) -> Maybe<gear_core::gear::CentreProfile> {
     use gear_core::mesh::MeshSide;
 
     let Some((other, kind)) = eccentric_mate(req) else {
@@ -795,8 +788,7 @@ fn centre_profile(
             unavailable: Note::new("ui.gear_concentric_has_no_profile"),
         };
     }
-    match gear_core::eccentric::Eccentric::new(params).centre_profile(&other, kind, MeshSide::First)
-    {
+    match gear_core::gear::Gear::new(params).centre_profile(&other, kind, MeshSide::First) {
         Ok(p) => Maybe::Value(p),
         // `inv α_w < 0` at some tooth: no centre distance puts that tooth in the
         // mate's space at zero backlash. The shift term carries `1/Σz`, and for
@@ -1391,7 +1383,7 @@ mod tests {
     /// **An eccentric gear's scalars describe a tooth it actually has, and the
     /// per-position measurements say they vary rather than quoting the mean.**
     ///
-    /// The summary is quoted from `Eccentric::mean`, which is cut by the same
+    /// The summary is quoted from `Gear::mean`, which is cut by the same
     /// shared tool as the teeth — so `fillet_radius` and `cutter_tip_width` are
     /// the real tool's, not the 0.38-module rack the raw inputs name. Span and
     /// over-pins vary around the revolution and their ranged form is not built
@@ -1444,7 +1436,7 @@ mod tests {
             .unwrap()
             .is_empty());
 
-        // A concentric gear is untouched: mean is `Gear::new(params)` verbatim,
+        // A concentric gear is untouched: mean is `Tooth::new(params)` verbatim,
         // and its span and pins are still measured.
         let con = parse(
             r#"{"params":{"module":1.0,"pressure_angle":25.0,"teeth":23,

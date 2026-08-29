@@ -26,7 +26,7 @@
 //! deletes the containment test, which was the least trustworthy step in the
 //! suite.
 
-use crate::profile::Gear;
+use crate::tooth::Tooth;
 
 /// Exact signed distance from a point to one cutter tooth. Negative is inside.
 ///
@@ -39,7 +39,7 @@ use crate::profile::Gear;
 /// Coordinates are the rack frame: `y` measured from the gear centre, `x` along
 /// the rack's travel.
 #[must_use]
-pub fn cutter_sdf(g: &Gear, px: f64, py: f64, shift: f64) -> f64 {
+pub fn cutter_sdf(g: &Tooth, px: f64, py: f64, shift: f64) -> f64 {
     let (ca, sa) = (g.alpha_t.cos(), g.alpha_t.sin());
     let pitch = std::f64::consts::PI * g.mt;
     let yb = g.rf + g.rho; // the eroded wedge's base = the tip-round centre line
@@ -74,7 +74,7 @@ pub fn cutter_sdf(g: &Gear, px: f64, py: f64, shift: f64) -> f64 {
 /// reports a large false deviation. That single mistake hid two real failure
 /// modes in the original suite.
 #[must_use]
-pub fn rack_travel_range(g: &Gear) -> (f64, f64) {
+pub fn rack_travel_range(g: &Tooth) -> (f64, f64) {
     let at = g.alpha_t;
     let tau = |u: f64| u * g.rb - g.r * at.sin();
     let mut bounds = vec![g.s_j - g.ac, -g.ac, 0.0, g.r * g.half_pitch];
@@ -126,7 +126,7 @@ pub struct CutReport {
     clippy::cast_sign_loss,
     clippy::cast_precision_loss
 )]
-pub fn check_cut(g: &Gear, profile_points: usize) -> CutReport {
+pub fn check_cut(g: &Tooth, profile_points: usize) -> CutReport {
     let (r, th) = g.half_profile(profile_points);
     // +theta side only; the other is its mirror
     let px: Vec<f64> = r.iter().zip(&th).map(|(r, t)| r * t.sin()).collect();
@@ -234,7 +234,7 @@ const COPY_MARGIN: i32 = 3;
 /// being measured.
 #[must_use]
 #[allow(clippy::cast_precision_loss)]
-pub fn fillet_envelope_error(g: &Gear, fillet_points: usize, path_points: usize) -> f64 {
+pub fn fillet_envelope_error(g: &Tooth, fillet_points: usize, path_points: usize) -> f64 {
     let mut pts = Vec::with_capacity(fillet_points);
     for i in 0..fillet_points {
         let t = i as f64 / (fillet_points - 1) as f64;
@@ -285,7 +285,7 @@ pub fn fillet_envelope_error(g: &Gear, fillet_points: usize, path_points: usize)
 /// used by [`check_cut`].
 #[must_use]
 #[allow(clippy::cast_precision_loss)]
-pub fn sdf_matches_polyline(g: &Gear, arc_points: usize, samples: usize) -> f64 {
+pub fn sdf_matches_polyline(g: &Tooth, arc_points: usize, samples: usize) -> f64 {
     let (ca, sa) = (g.alpha_t.cos(), g.alpha_t.sin());
     let pitch = std::f64::consts::PI * g.mt;
     let top = g.r
@@ -658,14 +658,16 @@ fn inside(point: [f64; 2], teeth: u32, band: (f64, f64), table: &[f64], from: f6
 /// is the whole content of the claim and is why the caller asks for both.
 #[must_use]
 pub fn contact_phase_from_outlines(
-    g1: &Gear,
-    g2: &Gear,
+    g1: &Tooth,
+    g2: &Tooth,
     a: f64,
     sign: f64,
     per_tooth: usize,
 ) -> Option<f64> {
-    let o1 = g1.profile(per_tooth);
-    let o2 = g2.profile(per_tooth);
+    // Through the assembly, because drawing a whole gear is the assembly's
+    // job — a `Tooth` is one tooth's form and no longer pretends otherwise.
+    let o1 = crate::gear::Gear::new(g1.params).profile(per_tooth);
+    let o2 = crate::gear::Gear::new(g2.params).profile(per_tooth);
     // The table's radial resolution is the floor on what this can resolve — a
     // bin is a band of radius over which the half-width is taken as constant,
     // and the flank's slope turns that into an angular error. Tied to the point

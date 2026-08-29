@@ -691,7 +691,7 @@ mod tests {
     use super::*;
     use crate::material::Overrides;
     use crate::params::Auto;
-    use crate::profile::Gear;
+    use crate::tooth::Tooth;
 
     fn library() -> MaterialLibrary {
         super::test_library()
@@ -1086,7 +1086,7 @@ mod tests {
             let r = solve_spur_stage(&stage, 2.0, &library()).unwrap();
 
             for i in 0..2 {
-                let built = Gear::new(stage.params(i));
+                let built = Tooth::new(stage.params(i));
                 let got = 2.0 * built.ra * built.theta_a;
                 assert!(
                     (got - want).abs() < 1e-9,

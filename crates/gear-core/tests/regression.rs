@@ -16,7 +16,7 @@
 // so a future refactor is compared against it rather than against a rounding.
 #![allow(clippy::excessive_precision, clippy::approx_constant)]
 
-use gear_core::{Gear, GearParams};
+use gear_core::{GearParams, Tooth};
 
 struct Fixture {
     params: GearParams,
@@ -246,7 +246,7 @@ fn close(got: f64, want: f64, what: &str, p: &GearParams) {
 #[test]
 fn matches_the_reference_implementation() {
     for f in fixtures() {
-        let g = Gear::new(f.params);
+        let g = Tooth::new(f.params);
         close(g.rb, f.rb, "base radius", &f.params);
         close(g.ra, f.ra, "tip radius", &f.params);
         close(g.rf, f.rf, "root radius", &f.params);
@@ -282,7 +282,7 @@ fn legacy_clamp_still_shows_the_junction_step_it_was_kept_to_demonstrate() {
             ..Default::default()
         };
 
-        let fixed = Gear::new(p);
+        let fixed = Tooth::new(p);
         let (r_fl, th_fl) = fixed.involute_at(fixed.u_j);
         let (r_tr, th_tr) = fixed.trochoid_at(fixed.s_j);
         let gap_fixed = f64::hypot(
@@ -290,7 +290,7 @@ fn legacy_clamp_still_shows_the_junction_step_it_was_kept_to_demonstrate() {
             r_fl * th_fl.cos() - r_tr * th_tr.cos(),
         );
 
-        let legacy = Gear::with_flank_clamped_at_base(p);
+        let legacy = Tooth::with_flank_clamped_at_base(p);
         let (r_fl, th_fl) = legacy.involute_at(legacy.u_j);
         let (r_tr, th_tr) = legacy.trochoid_at(legacy.s_j);
         let gap_legacy = f64::hypot(

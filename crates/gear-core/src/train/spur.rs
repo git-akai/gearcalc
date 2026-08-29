@@ -13,11 +13,11 @@ use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
-use crate::profile::Gear;
 use crate::strength::{
     bending_section, bending_stress, contact_stress, min_face_width_bending,
     min_face_width_contact, Load, StressConcentration, PARALLEL_AXES,
 };
+use crate::tooth::Tooth;
 
 /// One gear of a stage.
 ///
@@ -233,7 +233,7 @@ impl SpurStage {
         };
 
         let addendum = if g.addendum.auto {
-            addendum_for_tip_width(&Gear::new(with_shift), g.min_tip_width)
+            addendum_for_tip_width(&Tooth::new(with_shift), g.min_tip_width)
                 .unwrap_or(with_shift.addendum)
         } else {
             g.addendum.manual
@@ -258,7 +258,7 @@ pub fn solve_spur_stage(
     lib: &MaterialLibrary,
 ) -> Result<SpurResult, TrainError> {
     let p = [stage.params(0), stage.params(1)];
-    let g = [Gear::new(p[0]), Gear::new(p[1])];
+    let g = [Tooth::new(p[0]), Tooth::new(p[1])];
     let mesh = Mesh::new(&g[0], &g[1], MeshKind::External).map_err(TrainError::Mesh)?;
 
     // Owned rather than borrowed, because a gear's own overrides may replace

@@ -14,7 +14,7 @@ use gear_core::metrology::{
     best_span, cutter_tip_width, over_pins, pin_geometry, span_over_teeth, MeasurementError,
     PinCount,
 };
-use gear_core::{inv, Gear, GearParams};
+use gear_core::{inv, GearParams, Tooth};
 
 mod common;
 use common::{Grid, MODULES, PRESSURE_ANGLES, THICKNESS_MODS};
@@ -55,7 +55,7 @@ fn grid() -> Vec<GearParams> {
 fn span_reduces_to_the_textbook_formula() {
     let mut worst = 0.0_f64;
     for p in grid() {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         let z = f64::from(p.teeth);
         let an = p.pressure_angle.to_radians();
         let x_thick = p.profile_shift + p.thickness_shift();
@@ -92,7 +92,7 @@ fn span_reduces_to_the_textbook_formula() {
 #[test]
 fn consecutive_spans_differ_by_one_base_pitch() {
     for p in grid() {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         let pbn = std::f64::consts::PI * p.module * p.pressure_angle.to_radians().cos();
         for k in 2..=6u32 {
             let d = span_over_teeth(&g, k + 1).nominal - span_over_teeth(&g, k).nominal;
@@ -108,7 +108,7 @@ fn consecutive_spans_differ_by_one_base_pitch() {
 #[test]
 fn best_span_lands_on_the_usable_flank() {
     for p in grid() {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         match best_span(&g) {
             Ok(s) => {
                 assert!(s.teeth_spanned >= 1 && s.teeth_spanned <= p.teeth);
@@ -135,7 +135,7 @@ fn best_span_lands_on_the_usable_flank() {
 ///
 /// Deliberately independent of the over-pins derivation: it samples the flank
 /// the profile generator actually produces.
-fn distance_to_flank(g: &Gear, px: f64, py: f64) -> f64 {
+fn distance_to_flank(g: &Tooth, px: f64, py: f64) -> f64 {
     let n = 400_000;
     let (lo, hi) = (0.0_f64, g.u_tip.max(0.1));
     let mut best = f64::INFINITY;
@@ -171,7 +171,7 @@ fn pin_is_genuinely_tangent_to_the_generated_flank() {
             pressure_angle,
             ..Default::default()
         };
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         let (r_m, _) = pin_geometry(&g, dp).unwrap();
 
         // The pin centre lies on the tooth-space centreline, pi/z from the
@@ -197,7 +197,7 @@ fn pin_is_genuinely_tangent_to_the_generated_flank() {
 #[test]
 fn two_and_three_pin_agree_on_the_pin_centre_circle() {
     for teeth in [12u32, 13, 20, 21, 31, 44] {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth,
             ..Default::default()
         });
@@ -228,7 +228,7 @@ fn two_and_three_pin_agree_on_the_pin_centre_circle() {
 
 #[test]
 fn unusable_pins_are_rejected_rather_than_measured() {
-    let g = Gear::new(GearParams {
+    let g = Tooth::new(GearParams {
         teeth: 17,
         ..Default::default()
     });
@@ -260,7 +260,7 @@ fn backlash_matches_a_direct_tooth_thickness_computation() {
         (23, 23, 0.0, 0.0, 1.0, 14.5, 0.0),
     ] {
         let mk = |z: u32, x: f64, k: f64, hel: f64| {
-            Gear::new(GearParams {
+            Tooth::new(GearParams {
                 teeth: z,
                 profile_shift: x,
                 thickness_mod: k,
@@ -307,13 +307,13 @@ fn backlash_matches_a_direct_tooth_thickness_computation() {
 fn cutter_tip_width_is_independent_of_helix_angle() {
     for teeth in [12u32, 17, 40] {
         for x in [-0.2_f64, 0.0, 0.4] {
-            let at_zero = cutter_tip_width(&Gear::new(GearParams {
+            let at_zero = cutter_tip_width(&Tooth::new(GearParams {
                 teeth,
                 profile_shift: x,
                 ..Default::default()
             }));
             for helix_angle in [10.0_f64, 25.0, -35.0] {
-                let w = cutter_tip_width(&Gear::new(GearParams {
+                let w = cutter_tip_width(&Tooth::new(GearParams {
                     teeth,
                     profile_shift: x,
                     helix_angle,
@@ -421,7 +421,7 @@ fn a_bigger_pin_sits_deeper_in_a_ring_and_higher_in_a_gear() {
         previous = m.pin_centre_radius;
     }
 
-    let g = Gear::new(GearParams {
+    let g = Tooth::new(GearParams {
         teeth: 60,
         ..Default::default()
     });
@@ -454,7 +454,7 @@ fn the_pin_diameter_subtracts_inside_and_adds_outside() {
     assert!((m.nominal - (2.0 * m.pin_centre_radius - dp)).abs() < 1e-12);
     assert!(m.nominal < 2.0 * m.pin_centre_radius);
 
-    let g = Gear::new(GearParams {
+    let g = Tooth::new(GearParams {
         teeth: 60,
         ..Default::default()
     });
@@ -516,7 +516,7 @@ fn a_pin_that_cannot_seat_is_diagnosed_by_kind() {
     );
 
     // The external counterpart of the same arithmetic is a pin too small.
-    let g = Gear::new(GearParams {
+    let g = Tooth::new(GearParams {
         teeth: 9,
         ..Default::default()
     });

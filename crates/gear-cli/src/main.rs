@@ -23,7 +23,7 @@
 mod diagram;
 mod matrix;
 
-use gear_core::{Gear, GearParams};
+use gear_core::{GearParams, Tooth};
 
 /// The English catalogue, for turning a [`Note`](gear_core::note::Note) into a
 /// sentence.
@@ -436,12 +436,12 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
     };
 
     // Meshing helical gears have equal and opposite hands.
-    let g1 = Gear::new(GearParams {
+    let g1 = Tooth::new(GearParams {
         teeth: z1,
         helix_angle: helix,
         ..Default::default()
     });
-    let g2 = Gear::new(GearParams {
+    let g2 = Tooth::new(GearParams {
         teeth: z2,
         helix_angle: -helix,
         ..Default::default()
@@ -648,7 +648,7 @@ fn materials() {
 }
 
 fn show(p: GearParams) {
-    let g = Gear::new(p);
+    let g = Tooth::new(p);
     println!(
         "module {}  z {}  alpha {}  x {:+}  beta {}  k {}",
         p.module, p.teeth, p.pressure_angle, p.profile_shift, p.helix_angle, p.thickness_mod
@@ -676,7 +676,7 @@ fn show(p: GearParams) {
             println!("    - {}", words().render(n));
         }
     }
-    let pts = g.profile(400);
+    let pts = gear_core::gear::Gear::new(g.params).profile(400);
     println!("  profile points {:12}", pts.len());
 }
 
@@ -689,7 +689,7 @@ fn sweep() {
         for xi in -6..=10i32 {
             for alpha in [14.5_f64, 20.0, 25.0] {
                 for beta in [0.0_f64, 20.0] {
-                    let g = Gear::new(GearParams {
+                    let g = Tooth::new(GearParams {
                         teeth: z,
                         profile_shift: f64::from(xi) * 0.1,
                         pressure_angle: alpha,
@@ -715,7 +715,7 @@ fn dump() {
             for an in [14.5_f64, 20.0, 25.0] {
                 for beta in [0.0_f64, 20.0, -30.0] {
                     for rr in [0.0_f64, 0.38] {
-                        let g = Gear::new(GearParams {
+                        let g = Tooth::new(GearParams {
                             module: 1.0,
                             pressure_angle: an,
                             teeth: z,
@@ -772,7 +772,7 @@ fn verify(limit: usize) {
                             root_radius: rr,
                             ..Default::default()
                         };
-                        let g = Gear::new(p);
+                        let g = Tooth::new(p);
                         let rep = check_cut(&g, 150);
                         let env = fillet_envelope_error(&g, 150, 4000);
                         let sdf = sdf_matches_polyline(&g, 400, 4000);
@@ -808,7 +808,7 @@ fn verify(limit: usize) {
 
 /// Write a DXF to stdout, for inspecting or importing into CAD.
 fn dxf(teeth: u32, x: f64, tol: f64) {
-    let g = Gear::new(GearParams {
+    let g = Tooth::new(GearParams {
         teeth,
         profile_shift: x,
         ..Default::default()
@@ -989,7 +989,7 @@ fn loadcase_report() {
             profile_shift: -x,
             ..Default::default()
         };
-        let (g1, g2) = (Gear::new(p1), Gear::new(p2));
+        let (g1, g2) = (Tooth::new(p1), Tooth::new(p2));
         let Ok(m) = Mesh::new(&g1, &g2, MeshKind::External) else {
             println!("{name}: mesh failed");
             continue;

@@ -37,12 +37,12 @@ use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
 use crate::planetary::{self, Arrangement, PlanetaryShaft, Rack, Teeth};
-use crate::profile::Gear;
 use crate::ring::{Cutter, Ring};
 use crate::strength::{
     bending_section, bending_stress, contact_stress, min_face_width_bending,
     min_face_width_contact, ring_bending_section, Load, StressConcentration, PARALLEL_AXES,
 };
+use crate::tooth::Tooth;
 use crate::train::StageGear;
 
 /// A planetary stage as its inputs describe it.
@@ -364,7 +364,7 @@ pub fn solve_planetary_stage(
     let addendum_of = |member: PlanetaryShaft, g: &StageGear, teeth: u32, shift: f64| -> f64 {
         let with_shift = stage.params(member, teeth, shift, g.addendum.manual);
         if g.addendum.auto {
-            addendum_for_tip_width(&Gear::new(with_shift), g.min_tip_width)
+            addendum_for_tip_width(&Tooth::new(with_shift), g.min_tip_width)
                 .unwrap_or(with_shift.addendum)
         } else {
             g.addendum.manual
@@ -394,12 +394,12 @@ pub fn solve_planetary_stage(
         stage.ring.addendum.manual,
     );
 
-    let sun = Gear::new(sun_params);
-    let planet = Gear::new(planet_params);
+    let sun = Tooth::new(sun_params);
+    let planet = Tooth::new(planet_params);
     let ring = Ring::cut_by(&ring_params, &stage.cutter);
-    // The mesh reads the ring through `Gear` arithmetic: a ring's shift enters
+    // The mesh reads the ring through `Tooth` arithmetic: a ring's shift enters
     // its space exactly as an external gear's enters its tooth (docs/reference.md#internal-gears).
-    let ring_as_gear = Gear::new(ring_params);
+    let ring_as_gear = Tooth::new(ring_params);
 
     // ---- the two meshes.
     let sp_mesh = Mesh::new(&sun, &planet, MeshKind::External).map_err(TrainError::Mesh)?;

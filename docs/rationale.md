@@ -548,12 +548,12 @@ simulation of the naive process would converge on flanks that are not involutes
 at all.
 
 **One hob, one setting.** An eccentric gear is assembled out of `Gear`s and a
-`Gear` is a whole gear, so every guard in `Gear::new` is a gear-level decision
+`Gear` is a whole gear, so every guard in `Tooth::new` is a gear-level decision
 being taken per tooth. Whatever is a property of the *tool* must be settled once,
 by the tooth that demands most; whatever is a property of *one tooth* cannot be
 shared away and must be reported.
 
-**And the summary is one of the pieces.** `Eccentric::mean` is the gear every
+**And the summary is one of the pieces.** `Gear::mean` is the gear every
 scalar is quoted from and the one the root envelope is built on, so it is rebuilt
 with the same tool.
 

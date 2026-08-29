@@ -1275,17 +1275,17 @@ mod tests {
     fn parallel_axes_return_the_line_contact_the_verified_path_already_gives() {
         use crate::contact::ContactPath;
         use crate::mesh::{Mesh, MeshKind};
-        use crate::profile::Gear;
         use crate::strength::{contact_stress, Load, PARALLEL_AXES};
+        use crate::tooth::Tooth;
         use crate::GearParams;
 
         for (z1, z2, beta_deg) in [(17u32, 43u32, 0.0), (17, 43, 20.0), (13, 60, 30.0)] {
-            let g1 = Gear::new(GearParams {
+            let g1 = Tooth::new(GearParams {
                 teeth: z1,
                 helix_angle: beta_deg,
                 ..Default::default()
             });
-            let g2 = Gear::new(GearParams {
+            let g2 = Tooth::new(GearParams {
                 teeth: z2,
                 helix_angle: -beta_deg,
                 ..Default::default()
@@ -2116,7 +2116,7 @@ mod tests {
     fn the_friction_balance_meets_the_parallel_model_at_its_limit() {
         use crate::contact::{efficiency as parallel_efficiency, ContactPath};
         use crate::mesh::{Mesh, MeshKind};
-        use crate::{Gear, GearParams};
+        use crate::{GearParams, Tooth};
 
         let (mn, beta_add) = (1.0, 20.0f64);
         let (z1, z2) = (17u32, 43u32);
@@ -2138,7 +2138,7 @@ mod tests {
 
         // the same teeth, parallel
         let gear = |z: u32, b: f64| {
-            Gear::new(GearParams {
+            Tooth::new(GearParams {
                 teeth: z,
                 helix_angle: b,
                 ..Default::default()

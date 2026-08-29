@@ -219,7 +219,7 @@ impl Clamps {
     }
 }
 
-/// Limits for the guard rails in [`crate::profile`].
+/// Limits for the guard rails in [`crate::tooth`].
 ///
 /// Named and gathered so they are auditable in one place rather than scattered
 /// as bare literals through the geometry. They are tolerances on *degeneracy*,

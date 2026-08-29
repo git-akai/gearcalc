@@ -18,7 +18,7 @@
 //! 4. **Divergence map.** Where in the space the choice actually matters.
 
 use gear_core::strength::{root_section_with, CriticalSection, StressConcentration};
-use gear_core::{Gear, GearParams};
+use gear_core::{GearParams, Tooth};
 
 /// One cell of the matrix.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,7 +40,7 @@ impl Model {
     /// The bending factor this model predicts, or `None` where the geometry has
     /// no root section at all.
     pub fn evaluate(self, p: GearParams) -> Option<f64> {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         root_section_with(&g, g.u_tip, self.section)
             .and_then(|s| s.bending_factor(self.concentration))
     }

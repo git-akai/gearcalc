@@ -90,6 +90,8 @@ worth keeping because each was a model change rather than a fix:
 | Path | Role |
 |---|---|
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. `serde` and `ts-rs`, both optional and both about the shape a type takes when it leaves. |
+| `gear-core/src/tooth.rs` | `Tooth` — one tooth's form, at one shift, cut by one `Rack`. Not a gear. |
+| `gear-core/src/gear.rs` | `Gear` — the assembly, and the only place a gear is drawn. An ordinary gear is `Δx = 0`. |
 | `crates/gear-io` | File formats: DXF export, the TOML material library and geartrain documents, and the string catalogue. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
@@ -163,7 +165,7 @@ been. They are not a backlog.
 
 | Item | Note |
 |---|---|
-| Inspection data for an eccentric gear as **ranges** | Span and over-pins vary around the revolution. `Eccentric::distinct` is the unit of work; they return `Option`s, so they want their own reduction rather than `extremes` |
+| Inspection data for an eccentric gear as **ranges** | Span and over-pins vary around the revolution. `Gear::distinct` is the unit of work; they return `Option`s, so they want their own reduction rather than `extremes` |
 | An **eccentric ring** as a tab kind | The core supports it — `centre_profile` takes which member the eccentric gear is — and the tab does not. A UI decision rather than a limit |
 | The **enveloping** (throated) wheel's zone of action | The cylindrical one is derived and a worm reports it as a floor, with its assumed tooth height named |
 | Tooth thickness tolerance (JGMA 1103-01) | Unavailable. Min/max on span and over-pins only; the result types carry the space |
@@ -217,13 +219,4 @@ Not a queue with a head; this is what a next session would pick from.
 - **Inspection data for an eccentric gear**, which is the largest named gap and
   has its framework already built.
 - **A planetary set's drawing.**
-- **Renaming `Gear` to `ToothForm`.** The structural half of that split is done —
-  `Gear::cut_by` takes a settled `Rack`, so a tooth cannot clamp a tool it does
-  not own — and what is left is cosmetic: `Gear` still names both a whole gear
-  and one tooth of an eccentric one. 223 call sites, mechanical, and worth doing
-  only if the name starts costing someone.
-- **Moving the whole-gear methods off `Gear`.** `Gear::profile` and
-  `Gear::outline` build an `Eccentric` from `self.params`, so `profile.rs` and
-  `outline.rs` depend on the module that depends on them. ~43 call sites, and it
-  would break that circularity.
 - **Further UI work**, as it is asked for.

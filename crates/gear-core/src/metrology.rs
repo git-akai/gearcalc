@@ -13,14 +13,14 @@
 //! change rather than a redesign.
 
 use crate::involute::{inv, inv_inverse};
-use crate::profile::Gear;
+use crate::tooth::Tooth;
 
 /// Base helix angle: `sin β_b = sin β · cos α_n`.
 ///
 /// The angle of the helix measured on the base cylinder, which is what projects
 /// a transverse base-circle arc into the normal plane.
 #[must_use]
-pub fn base_helix_angle(g: &Gear) -> f64 {
+pub fn base_helix_angle(g: &Tooth) -> f64 {
     (g.beta.sin() * g.alpha_n.cos()).asin()
 }
 
@@ -74,7 +74,7 @@ pub struct Span {
 /// thickness modification are handled without a special case, since both are
 /// already inside `s_t`.
 #[must_use]
-pub fn span_over_teeth(g: &Gear, k: u32) -> Span {
+pub fn span_over_teeth(g: &Tooth, k: u32) -> Span {
     let z = f64::from(g.params.teeth);
     let bb = base_helix_angle(g);
     let nominal = bb.cos()
@@ -106,7 +106,7 @@ pub fn span_over_teeth(g: &Gear, k: u32) -> Span {
 /// # Errors
 ///
 /// [`MeasurementError::NoValidSpan`] when no `k` contacts the usable flank.
-pub fn best_span(g: &Gear) -> Result<Span, MeasurementError> {
+pub fn best_span(g: &Tooth) -> Result<Span, MeasurementError> {
     if g.severed {
         return Err(MeasurementError::NoValidSpan);
     }
@@ -168,7 +168,7 @@ pub struct OverPins {
 ///
 /// [`MeasurementError::PinTooSmall`] if the pin centre would fall inside the
 /// base circle, [`MeasurementError::PinTooLarge`] if contact would.
-pub fn pin_geometry(g: &Gear, pin_diameter: f64) -> Result<(f64, f64), MeasurementError> {
+pub fn pin_geometry(g: &Tooth, pin_diameter: f64) -> Result<(f64, f64), MeasurementError> {
     pin_seat(
         g.psi_b,
         g.rb,
@@ -250,7 +250,7 @@ fn pin_seat(
 /// Returns [`MeasurementError`] when the pin cannot make a valid measurement:
 /// contact off the usable flank, or the pin bottoming out on the root diameter.
 pub fn over_pins(
-    g: &Gear,
+    g: &Tooth,
     pin_diameter: f64,
     pin_count: PinCount,
 ) -> Result<OverPins, MeasurementError> {
@@ -289,7 +289,7 @@ pub fn over_pins(
 /// normal plane so it is independent of helix angle, which is what a
 /// normal-module tool definition implies.
 #[must_use]
-pub fn cutter_tip_width(g: &Gear) -> f64 {
+pub fn cutter_tip_width(g: &Tooth) -> f64 {
     let p = &g.params;
     std::f64::consts::PI * p.module
         - g.st * g.beta.cos()

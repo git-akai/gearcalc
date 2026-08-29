@@ -1,6 +1,6 @@
 //! The gear outline as a CAD-ready closed path.
 //!
-//! Two things distinguish this from [`Gear::profile`], which returns plain
+//! Two things distinguish this from [`Tooth::profile`], which returns plain
 //! points:
 //!
 //! 1. **Point spacing follows from a stated chord tolerance**, not a chosen
@@ -19,7 +19,7 @@
 //! Only the involute flank and the trochoid fillet are approximated, and those
 //! are the two curves that genuinely have no arc representation.
 
-use crate::profile::Gear;
+use crate::tooth::Tooth;
 
 /// A vertex of a closed polyline that may bow into a circular arc.
 ///
@@ -60,7 +60,7 @@ pub const DEFAULT_CHORD_TOLERANCE: f64 = 1e-3;
 ///
 /// Below roughly this, double precision cannot resolve the difference between
 /// the chord and the curve, so subdividing further only multiplies vertices.
-const MIN_RELATIVE_TOLERANCE: f64 = 1e-12;
+pub(crate) const MIN_RELATIVE_TOLERANCE: f64 = 1e-12;
 
 /// Split a parametric curve until every chord is within `tolerance` of it.
 ///
@@ -98,32 +98,11 @@ fn bulge_for(theta: f64) -> f64 {
     (theta / 4.0).tan()
 }
 
-impl Gear {
-    /// The closed outline, accurate to `chord_tolerance` millimetres.
-    ///
-    /// Counter-clockwise, first tooth centred on +X, with the tip and root arcs
-    /// exact.
-    ///
-    /// A non-positive or non-finite tolerance falls back to
-    /// [`DEFAULT_CHORD_TOLERANCE`] rather than erroring, since this is an export
-    /// setting rather than a physical quantity. A finite but unreachably tight
-    /// one is floored at what double precision can actually resolve — asking for
-    /// 1e-18 mm otherwise costs a millionfold more vertices and buys nothing.
-    #[must_use]
-    pub fn outline(&self, chord_tolerance: f64) -> Vec<Vertex> {
-        let tol = if chord_tolerance.is_finite() && chord_tolerance > 0.0 {
-            chord_tolerance.max(MIN_RELATIVE_TOLERANCE * self.ra)
-        } else {
-            DEFAULT_CHORD_TOLERANCE
-        };
-
-        crate::eccentric::Eccentric::new(self.params).outline_adaptive(tol)
-    }
-
+impl Tooth {
     /// One tooth's vertices, seated at `base`, appended to `out`.
     ///
     /// Split out so an **eccentric** gear can seat each tooth at its own angle
-    /// and take it from its own [`Gear`] — see [`crate::eccentric`]. The loop
+    /// and take it from its own [`Tooth`] — see [`crate::gear`]. The loop
     /// above is the concentric case of exactly that, and the DXF path had been
     /// the one place the two could disagree: it replicated a single tooth `z`
     /// times, so an eccentric gear would have exported as a concentric one, and
@@ -469,8 +448,8 @@ mod tests {
             },
             &Cutter::default(),
         );
-        let coarse = g.outline(1e-2).len();
-        let fine = g.outline(1e-5).len();
+        let coarse = crate::gear::Gear::new(g.params).outline(1e-2).len();
+        let fine = crate::gear::Gear::new(g.params).outline(1e-5).len();
         assert!(
             fine > coarse,
             "a tighter tolerance should add vertices: {fine} against {coarse}"
@@ -479,8 +458,8 @@ mod tests {
 
     /// Reconstruct a bulged segment and measure how far the real profile strays
     /// from it. This is the property the whole module exists to provide.
-    fn worst_deviation(g: &Gear, tol: f64) -> f64 {
-        let v = g.outline(tol);
+    fn worst_deviation(g: &Tooth, tol: f64) -> f64 {
+        let v = crate::gear::Gear::new(g.params).outline(tol);
         let mut worst = 0.0_f64;
         for i in 0..v.len() {
             let a = v[i];
@@ -501,7 +480,7 @@ mod tests {
 
     #[test]
     fn tighter_tolerance_gives_shorter_chords() {
-        let g = Gear::new(GearParams::default());
+        let g = Tooth::new(GearParams::default());
         let coarse = worst_deviation(&g, 1e-2);
         let fine = worst_deviation(&g, 1e-4);
         assert!(fine < coarse, "{fine} !< {coarse}");
@@ -509,10 +488,10 @@ mod tests {
 
     #[test]
     fn vertex_count_grows_as_tolerance_tightens() {
-        let g = Gear::new(GearParams::default());
-        let a = g.outline(1e-2).len();
-        let b = g.outline(1e-4).len();
-        let c = g.outline(1e-6).len();
+        let g = Tooth::new(GearParams::default());
+        let a = crate::gear::Gear::new(g.params).outline(1e-2).len();
+        let b = crate::gear::Gear::new(g.params).outline(1e-4).len();
+        let c = crate::gear::Gear::new(g.params).outline(1e-6).len();
         assert!(a < b && b < c, "{a} {b} {c}");
     }
 
@@ -535,8 +514,8 @@ mod tests {
                 ..Default::default()
             },
         ] {
-            let g = Gear::new(p);
-            for v in g.outline(1e-3) {
+            let g = Tooth::new(p);
+            for v in crate::gear::Gear::new(g.params).outline(1e-3) {
                 let r = f64::hypot(v.x, v.y);
                 assert!(
                     r >= g.rf - 1e-9 && r <= g.ra + 1e-9,
@@ -552,11 +531,11 @@ mod tests {
     #[test]
     fn outline_has_one_period_per_tooth() {
         for teeth in [5u32, 9, 17, 31] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth,
                 ..Default::default()
             });
-            let v = g.outline(1e-3);
+            let v = crate::gear::Gear::new(g.params).outline(1e-3);
             assert!(
                 v.len().is_multiple_of(teeth as usize),
                 "z={teeth}: {} vertices is not a whole number of teeth",
@@ -569,8 +548,8 @@ mod tests {
     /// else — otherwise a bulge would be silently faking a curve.
     #[test]
     fn only_the_tip_and_root_arcs_carry_a_bulge() {
-        let g = Gear::new(GearParams::default());
-        for v in g.outline(1e-3) {
+        let g = Tooth::new(GearParams::default());
+        for v in crate::gear::Gear::new(g.params).outline(1e-3) {
             if v.bulge.abs() > 1e-12 {
                 let r = f64::hypot(v.x, v.y);
                 assert!(
@@ -585,10 +564,12 @@ mod tests {
 
     #[test]
     fn a_nonsense_tolerance_falls_back_to_the_default() {
-        let g = Gear::new(GearParams::default());
-        let want = g.outline(DEFAULT_CHORD_TOLERANCE).len();
+        let g = Tooth::new(GearParams::default());
+        let want = crate::gear::Gear::new(g.params)
+            .outline(DEFAULT_CHORD_TOLERANCE)
+            .len();
         for t in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-            let v = g.outline(t);
+            let v = crate::gear::Gear::new(g.params).outline(t);
             assert_eq!(
                 v.len(),
                 want,
@@ -601,9 +582,9 @@ mod tests {
     /// the floor was added this case took 45 seconds and would have hung the UI.
     #[test]
     fn an_unreachable_tolerance_stays_bounded() {
-        let g = Gear::new(GearParams::default());
+        let g = Tooth::new(GearParams::default());
         let t0 = std::time::Instant::now();
-        let n = g.outline(1e-18).len();
+        let n = crate::gear::Gear::new(g.params).outline(1e-18).len();
         let elapsed = t0.elapsed();
         assert!(elapsed.as_secs() < 2, "took {elapsed:?} for {n} vertices");
     }

@@ -12,7 +12,7 @@
 #![allow(clippy::unwrap_used)]
 
 use gear_core::strength::{root_section_with, CriticalSection, TANGENT_ANGLE_DEG};
-use gear_core::{Gear, GearParams};
+use gear_core::{GearParams, Tooth};
 
 mod common;
 use common::Grid;
@@ -57,7 +57,7 @@ fn form_factor_converges_to_the_rack_limit() {
 
         let mut previous_gap = f64::INFINITY;
         for teeth in [60u32, 250, 1000, 4000] {
-            let g = Gear::new(GearParams {
+            let g = Tooth::new(GearParams {
                 teeth,
                 pressure_angle: alpha,
                 root_radius: rho,
@@ -75,7 +75,7 @@ fn form_factor_converges_to_the_rack_limit() {
 
         // At four thousand teeth the gear is a rack to within a fraction of a
         // percent, and every ingredient must match, not just the result.
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 4000,
             pressure_angle: alpha,
             root_radius: rho,
@@ -135,7 +135,7 @@ fn parabola_rack_limit(alpha_deg: f64, ha: f64, hf: f64) -> (f64, f64, f64) {
 fn parabola_form_factor_converges_to_its_own_rack_limit() {
     for alpha in [20.0_f64, 25.0] {
         let (want_s, want_h, want_y) = parabola_rack_limit(alpha, 1.0, 1.25);
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: 4000,
             pressure_angle: alpha,
             ..Default::default()
@@ -189,7 +189,7 @@ fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f6
     use gear_core::ring::{Cutter, Ring};
     use gear_core::strength::{bending_section, ring_bending_section, StressConcentration};
 
-    let pinion = Gear::new(GearParams {
+    let pinion = Tooth::new(GearParams {
         teeth: 25,
         helix_angle: beta,
         ..Default::default()
@@ -203,7 +203,7 @@ fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f6
         helix_angle: beta,
         ..Default::default()
     };
-    let wheel = Gear::new(params);
+    let wheel = Tooth::new(params);
     let ring = Ring::cut_by(
         &params,
         &Cutter {
@@ -217,7 +217,7 @@ fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f6
             .map(|f| 1.0 / f)
     };
 
-    let mirrored = Gear::new(GearParams {
+    let mirrored = Tooth::new(GearParams {
         helix_angle: -beta,
         ..params
     });
@@ -407,7 +407,7 @@ fn the_virtual_spur_ring_is_the_identity_at_zero_helix() {
 /// tooth in the normal plane — so the internal and external bending factors must
 /// converge, at any helix. Both sides reach it through their own virtual
 /// section, and those two virtualisations are independent: the external gear's
-/// comes from `Gear::virtual_spur`, the ring's from `Ring::virtual_spur` with the
+/// comes from `Tooth::virtual_spur`, the ring's from `Ring::virtual_spur` with the
 /// cutter scaled alongside.
 #[test]
 fn the_rack_limit_holds_at_a_helix_angle() {
@@ -507,7 +507,7 @@ fn a_generated_fillet_is_much_flatter_than_the_tool_that_cut_it() {
     const RHO: f64 = 0.2;
 
     for z in [17u32, 43, 60, 90, 150] {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             teeth: z,
             root_radius: RHO,
             ..Default::default()
@@ -576,7 +576,7 @@ fn the_closed_form_fillet_curvature_is_what_a_difference_converges_on() {
         .root_radius(&[0.1, 0.25, 0.38])
         .build()
     {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         if g.severed || !g.s_j.is_finite() {
             continue;
         }

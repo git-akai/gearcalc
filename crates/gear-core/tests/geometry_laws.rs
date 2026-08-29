@@ -11,7 +11,8 @@
 
 #![allow(clippy::unwrap_used)]
 
-use gear_core::{inv, inv_from_roll, Gear, GearParams};
+use gear_core::gear::Gear;
+use gear_core::{inv, inv_from_roll, GearParams, Tooth};
 
 mod common;
 use common::{
@@ -34,7 +35,7 @@ fn grid() -> Vec<GearParams> {
 fn flank_and_fillet_meet_exactly() {
     let mut worst = 0.0_f64;
     for p in grid() {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         if g.severed {
             continue; // no flank exists
         }
@@ -56,7 +57,7 @@ fn flank_and_fillet_meet_exactly() {
 #[test]
 fn radius_is_monotone_and_theta_stays_in_the_half_pitch() {
     for p in grid() {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         let (r, th) = g.half_profile(600);
         for w in r.windows(2) {
             assert!(
@@ -81,7 +82,7 @@ fn radius_is_monotone_and_theta_stays_in_the_half_pitch() {
 fn involute_tooth_thickness_law_holds_on_the_flank() {
     let mut worst = 0.0_f64;
     for p in grid() {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         if g.severed {
             continue;
         }
@@ -114,7 +115,7 @@ fn involute_tooth_thickness_law_holds_on_the_flank() {
 #[test]
 fn fillet_cap_guarantees_a_nonnegative_root_arc() {
     for p in grid() {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         assert!(
             g.theta0 <= g.half_pitch + 1e-9,
             "root arc is negative ({} > {}) at z={} x={} rho={}",
@@ -141,8 +142,8 @@ fn profile_is_closed_and_has_one_period_per_tooth() {
             ..Default::default()
         },
     ] {
-        let g = Gear::new(p);
-        let pts = g.profile(400);
+        let g = Tooth::new(p);
+        let pts = Gear::new(p).profile(400);
         let first = pts.first().unwrap();
         let last = pts.last().unwrap();
         assert!((first[0] - last[0]).abs() < 1e-15 && (first[1] - last[1]).abs() < 1e-15);
@@ -181,8 +182,8 @@ fn thickness_modification_equals_an_equivalent_profile_shift() {
                     thickness_mod: 1.0,
                     ..Default::default()
                 };
-                let a = Gear::new(modified);
-                let b = Gear::new(equivalent);
+                let a = Tooth::new(modified);
+                let b = Tooth::new(equivalent);
                 assert!(
                     (a.st - b.st).abs() < 1e-14,
                     "k={k} a={pressure_angle}: st {} vs {}",
@@ -198,9 +199,9 @@ fn thickness_modification_equals_an_equivalent_profile_shift() {
 /// dimension untouched — that separation is the rule the implementation rests on.
 #[test]
 fn thickness_modification_leaves_radial_dimensions_alone() {
-    let base = Gear::new(GearParams::default());
+    let base = Tooth::new(GearParams::default());
     for k in [0.7_f64, 1.0, 1.3] {
-        let g = Gear::new(GearParams {
+        let g = Tooth::new(GearParams {
             thickness_mod: k,
             ..Default::default()
         });
@@ -253,14 +254,14 @@ fn paired_thickness_modifications_cancel() {
 #[test]
 fn degenerate_input_is_clamped_and_reported() {
     // pressure angle of zero: no involute exists
-    let g = Gear::new(GearParams {
+    let g = Tooth::new(GearParams {
         pressure_angle: 0.0,
         ..Default::default()
     });
     assert!(g.clamps.any() && g.rb > 0.0);
 
     // dedendum deeper than the pitch radius
-    let g = Gear::new(GearParams {
+    let g = Tooth::new(GearParams {
         teeth: 4,
         dedendum: 40.0,
         ..Default::default()
@@ -271,7 +272,7 @@ fn degenerate_input_is_clamped_and_reported() {
     );
 
     // fillet far larger than the tooth space
-    let g = Gear::new(GearParams {
+    let g = Tooth::new(GearParams {
         root_radius: 20.0,
         ..Default::default()
     });
@@ -316,12 +317,12 @@ fn an_internal_pair_has_zero_backlash_at_the_centre_distance_the_mesh_gives() {
         (20, 60, 0.15, -0.1, 1.05, 1.1),
         (25, 41, 0.0, 0.3, 1.0, 1.0),
     ] {
-        let pinion = Gear::new(params(z1, x1, k1));
+        let pinion = Tooth::new(params(z1, x1, k1));
         let ring = Ring::cut_by(&params(z2, x2, k2), &Cutter::default());
-        // The mesh reads the ring through the same `Gear` arithmetic, because a
+        // The mesh reads the ring through the same `Tooth` arithmetic, because a
         // ring's shift and thickness enter its space exactly as they enter an
         // external gear's tooth.
-        let ring_as_gear = Gear::new(params(z2, x2, k2));
+        let ring_as_gear = Tooth::new(params(z2, x2, k2));
         let mesh = Mesh::new(&pinion, &ring_as_gear, MeshKind::Internal).unwrap();
 
         let (r1, r2) = mesh.operating_radii();
@@ -517,12 +518,12 @@ fn every_length_scales_with_the_module_and_every_angle_is_invariant() {
         .thickness_mod(&[0.8, 1.0, 1.2])
         .build()
     {
-        let unit = Gear::new(GearParams {
+        let unit = Tooth::new(GearParams {
             module: 1.0,
             ..base
         });
         for &m in MODULES {
-            let g = Gear::new(GearParams { module: m, ..base });
+            let g = Tooth::new(GearParams { module: m, ..base });
 
             // Lengths: exactly `m` times the unit gear's.
             for (name, got, want) in [

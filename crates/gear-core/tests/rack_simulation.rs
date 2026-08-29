@@ -10,7 +10,7 @@
 #![allow(clippy::unwrap_used)]
 
 use gear_core::verify::{check_cut, fillet_envelope_error, sdf_matches_polyline};
-use gear_core::{Gear, GearParams};
+use gear_core::{GearParams, Tooth};
 
 /// No gear point may lie inside the cutter, at any phase. Exactly zero, not
 /// "small" — any positive value is material the tool would have removed.
@@ -51,7 +51,7 @@ fn profile_is_bounded_from_both_sides_by_the_cutter() {
     let mut worst_dev_case = String::new();
 
     for p in &cases {
-        let g = Gear::new(*p);
+        let g = Tooth::new(*p);
         let rep = check_cut(&g, 150);
         assert!(
             rep.penetration <= PENETRATION_LIMIT,
@@ -92,7 +92,7 @@ fn profile_is_bounded_from_both_sides_by_the_cutter() {
 fn fillet_is_the_tip_round_envelope() {
     let mut worst = 0.0_f64;
     for p in grid().into_iter().step_by(7) {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         let e = fillet_envelope_error(&g, 150, 20_000);
         assert!(
             e < 1e-6,
@@ -113,7 +113,7 @@ fn fillet_is_the_tip_round_envelope() {
 fn analytic_cutter_distance_matches_an_independent_polyline() {
     let mut worst = 0.0_f64;
     for p in grid().into_iter().step_by(11) {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         worst = worst.max(sdf_matches_polyline(&g, 400, 4000));
     }
     println!("worst analytic-vs-polyline disagreement: {worst:.3e} mm");
@@ -151,7 +151,7 @@ fn phase_resolution_has_converged() {
             ..Default::default()
         },
     ] {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         let coarse = check_cut(&g, 100);
         let fine = check_cut(&g, 300);
         // Both must satisfy the bound, and refining must not reveal a much
@@ -190,7 +190,7 @@ fn travel_padding_is_sufficient() {
             ..Default::default()
         },
     ] {
-        let g = Gear::new(p);
+        let g = Tooth::new(p);
         let (lo, hi) = gear_core::verify::rack_travel_range(&g);
         // The generating features must sit strictly inside the padded range.
         assert!(

@@ -2,7 +2,7 @@
 //!
 //! A ring's tooth points **inward**: its tip circle is smaller than its pitch
 //! circle and its root circle larger, which is the reverse of everything in
-//! [`crate::profile`]. The flank is still an involute of the ring's own base
+//! [`crate::tooth`]. The flank is still an involute of the ring's own base
 //! circle — the involute is self-conjugate, so it does not care which side the
 //! material is on — but it is used the other way round, and that shows up as a
 //! single sign.
@@ -25,7 +25,7 @@
 //! ```
 //!
 //! In the profile that is one character: [`Ring::involute_at`] adds
-//! `inv_from_roll(u)` where [`crate::profile::Gear::involute_at`] subtracts it.
+//! `inv_from_roll(u)` where [`crate::tooth::Tooth::involute_at`] subtracts it.
 //! It is checked here as the complement it is, rather than asserted — tooth plus
 //! space must come to the circular pitch at *every* radius, not only at the
 //! pitch circle where it was set.
@@ -47,10 +47,10 @@ use crate::involute::{inv, inv_from_roll};
 use crate::mesh::{operating_geometry, MeshKind};
 use crate::note::{key, Note};
 use crate::params::{guard, GearParams};
-use crate::profile::Gear;
-use crate::profile::Section;
 use crate::shaper::{CutParams, ShaperCut};
 use crate::solve::{brent, Tol};
+use crate::tooth::Section;
+use crate::tooth::Tooth;
 
 /// The pinion cutter a ring is shaped with.
 ///
@@ -115,7 +115,7 @@ pub struct Fillet {
 /// A ring gear's cross-section, so far as the involute goes.
 #[derive(Clone, Debug)]
 pub struct Ring {
-    /// The inputs this was built from, kept as [`crate::Gear`] keeps its own —
+    /// The inputs this was built from, kept as [`crate::Tooth`] keeps its own —
     /// so a ring can produce its virtual spur section without being handed back
     /// what it was made of.
     pub params: GearParams,
@@ -195,7 +195,7 @@ impl Ring {
     /// Exists for the **virtual spur ring**: rating a helical ring's bending means
     /// working on its normal section, where both members carry `z / cos³β` teeth
     /// and neither is a whole number. The same reason
-    /// [`crate::Gear`] builds its virtual gear from a non-integer `z`.
+    /// [`crate::Tooth`] builds its virtual gear from a non-integer `z`.
     #[must_use]
     pub fn cut_by_at_virtual_z(
         params: &GearParams,
@@ -219,7 +219,7 @@ impl Ring {
         // A ring's space is where the mating pinion's tooth goes, and it is
         // generated the way a pinion's tooth is; the ring's tooth is whatever
         // the pitch leaves over. So `thickness_mod` and the profile shift are
-        // applied to the space, using `Gear`'s expression unchanged — and the
+        // applied to the space, using `Tooth`'s expression unchanged — and the
         // consequence is that a *larger* k or x makes a ring's tooth **thinner**,
         // the opposite of an external gear.
         //
@@ -236,7 +236,7 @@ impl Ring {
         let mut space = mt * (std::f64::consts::PI / 2.0 + 2.0 * x_thick * alpha_n.tan());
         // Both ends are real limits: a space wider than the pitch leaves no
         // tooth, and one of zero width leaves no space for the pinion.
-        // The same two limits `Gear` puts on a tooth, applied to the space —
+        // The same two limits `Tooth` puts on a tooth, applied to the space —
         // because on a ring the space is the thing generated like a tooth.
         let space_max = guard::MAX_TOOTH_THICKNESS_FRACTION_OF_PITCH * pitch;
         let space_min = guard::MIN_TOOTH_THICKNESS_MODULES * m;
@@ -255,7 +255,7 @@ impl Ring {
 
         // ---- radii. The whole form shifts **outward** by `x m`, which shortens
         // a ring's tooth (it points inward) and deepens its space. Written as
-        // `Gear`'s two expressions with inward and outward exchanged.
+        // `Tooth`'s two expressions with inward and outward exchanged.
         let mut ra = r - m * (params.addendum - x);
 
         // The tip cannot dip below the base circle: there is no involute there
@@ -268,7 +268,7 @@ impl Ring {
         // Thickness at roll `u` is `2 r (ψ_b + inv_from_roll(u))`, which reaches
         // zero where `inv α = −ψ_b` — possible only when `ψ_b < 0`, and that
         // happens once `π/2z < inv α_t`, about 105 teeth at 20°. Closed form
-        // through the same `inv⁻¹` everything else uses, and it mirrors `Gear`'s
+        // through the same `inv⁻¹` everything else uses, and it mirrors `Tooth`'s
         // pointed-tooth clamp rather than being a new kind of guard.
         //
         // Unclamped this is not a thin tooth but a **crossed** one: a 150-tooth
@@ -343,7 +343,7 @@ impl Ring {
         });
 
         // The tool caps its own round where the tip cannot hold what was asked
-        // for, exactly as `Gear::new` does on an external gear. Say so: a
+        // for, exactly as `Tooth::new` does on an external gear. Say so: a
         // substituted tool that goes unmentioned is the same fault as a
         // clamped input that goes unmentioned, and this one changes the fillet
         // the part is rated on.
@@ -559,7 +559,7 @@ impl Ring {
     /// and dividing by `m_n` mixes planes and under-predicts by about `cos β`,
     /// the error `docs/corrections.md` records for external gears.
     ///
-    /// The construction is ISO's, the same one [`crate::Gear::virtual_spur`]
+    /// The construction is ISO's, the same one [`crate::Tooth::virtual_spur`]
     /// uses: `z_n = z / cos³β` at the normal module and normal pressure angle.
     /// **The cutter is virtualised the same way**, because a ring's form is its
     /// tool's — and scaling both by the same factor leaves `z_c/z_r` unchanged, so
@@ -618,7 +618,7 @@ impl Ring {
         let (st, ct) = th.sin_cos();
 
         let dr = self.rb * u / root;
-        // Positive, where `Gear`'s is negative — the flipped `inv` term of the
+        // Positive, where `Tooth`'s is negative — the flipped `inv` term of the
         // module documentation, differentiated.
         let dth = (u * u) / (1.0 + u * u);
         (
@@ -739,9 +739,7 @@ impl Ring {
     /// arc length so no section is starved of points.
     #[must_use]
     pub fn half_profile(&self, n: usize) -> Vec<(f64, f64)> {
-        crate::profile::allocate_by_arc_length(&self.sections(), n, |s, k| {
-            self.sample_section(s, k)
-        })
+        crate::tooth::allocate_by_arc_length(&self.sections(), n, |s, k| self.sample_section(s, k))
     }
 
     /// The closed cross-section, counter-clockwise, `per_tooth` points a tooth.
@@ -844,7 +842,7 @@ pub struct RingMesh {
 /// pinion no smaller than the ring, a geometry that never reaches contact, or
 /// shifts that drive the operating pressure angle out of the involute domain.
 #[must_use]
-pub fn mesh_with(ring: &Ring, pinion: &Gear) -> Option<RingMesh> {
+pub fn mesh_with(ring: &Ring, pinion: &Tooth) -> Option<RingMesh> {
     // The *transverse* rack, since a ring carries its own `mt` and `alpha_t`
     // rather than a `GearParams`. Same tolerance as `GearParams::same_rack_as`,
     // from the same place, so the two cannot drift apart again.
@@ -917,7 +915,7 @@ pub fn mesh_with(ring: &Ring, pinion: &Gear) -> Option<RingMesh> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::profile::Gear;
+    use crate::tooth::Tooth;
 
     fn ring(teeth: u32) -> Ring {
         Ring::cut_by(
@@ -1178,7 +1176,7 @@ mod tests {
     #[test]
     fn the_outline_is_a_bore_where_an_external_gears_is_a_disc() {
         let g = ring(60);
-        let external = Gear::new(GearParams {
+        let external = Tooth::new(GearParams {
             teeth: 60,
             ..Default::default()
         });
@@ -1187,7 +1185,7 @@ mod tests {
             .iter()
             .map(|[x, y]| f64::hypot(*x, *y))
             .fold(0.0_f64, f64::max);
-        let ext_max = external
+        let ext_max = crate::gear::Gear::new(external.params)
             .profile(120)
             .iter()
             .map(|[x, y]| f64::hypot(*x, *y))
@@ -1411,8 +1409,8 @@ mod tests {
         );
     }
 
-    fn pinion(teeth: u32) -> Gear {
-        Gear::new(GearParams {
+    fn pinion(teeth: u32) -> Tooth {
+        Tooth::new(GearParams {
             teeth,
             ..Default::default()
         })
@@ -1463,9 +1461,9 @@ mod tests {
                 ..Default::default()
             };
             let g = Ring::cut_by(&p(zr, xr), &Cutter::default());
-            let pin = Gear::new(p(zp, xp));
+            let pin = Tooth::new(p(zp, xp));
             let mesh =
-                crate::mesh::Mesh::new(&pin, &Gear::new(p(zr, xr)), MeshKind::Internal).unwrap();
+                crate::mesh::Mesh::new(&pin, &Tooth::new(p(zr, xr)), MeshKind::Internal).unwrap();
             let path = crate::contact::ContactPath::new(&pin, g.ra, &mesh).unwrap();
             let own = mesh_with(&g, &pin).unwrap();
 
@@ -1506,8 +1504,8 @@ mod tests {
                 teeth,
                 ..Default::default()
             };
-            let pin = Gear::new(p(zp));
-            let wheel = Gear::new(p(zr));
+            let pin = Tooth::new(p(zp));
+            let wheel = Tooth::new(p(zr));
             let g = Ring::cut_by(&p(zr), &Cutter::default());
             let load = Load::new(2.0, 10.0);
             let e_star = 113_000.0;
@@ -1564,7 +1562,7 @@ mod tests {
                 },
                 &Cutter::default(),
             );
-            let p = Gear::new(GearParams {
+            let p = Tooth::new(GearParams {
                 teeth: zp,
                 profile_shift: xp,
                 ..Default::default()
@@ -1645,7 +1643,7 @@ mod tests {
             },
             &Cutter::default(),
         );
-        let shifted_pinion = Gear::new(GearParams {
+        let shifted_pinion = Tooth::new(GearParams {
             teeth: 20,
             profile_shift: 0.3,
             ..Default::default()
@@ -1751,7 +1749,7 @@ mod tests {
         let g = ring(60);
         let mut fouled = false;
         for addendum in [1.0_f64, 1.4, 1.8, 2.2, 2.6] {
-            let p = Gear::new(GearParams {
+            let p = Tooth::new(GearParams {
                 teeth: 20,
                 addendum,
                 ..Default::default()
@@ -1779,7 +1777,7 @@ mod tests {
         assert!(
             mesh_with(
                 &g,
-                &Gear::new(GearParams {
+                &Tooth::new(GearParams {
                     teeth: 20,
                     module: 2.0,
                     ..Default::default()
@@ -1836,7 +1834,7 @@ mod tests {
     #[test]
     fn a_rings_tooth_widens_outward_where_an_external_gears_narrows() {
         let g = ring(43);
-        let external = Gear::new(GearParams {
+        let external = Tooth::new(GearParams {
             teeth: 43,
             ..Default::default()
         });
@@ -1869,7 +1867,7 @@ mod tests {
     fn the_involute_itself_is_the_same_curve_as_an_external_gears() {
         for teeth in [31u32, 43] {
             let g = ring(teeth);
-            let external = Gear::new(GearParams {
+            let external = Tooth::new(GearParams {
                 teeth,
                 ..Default::default()
             });
