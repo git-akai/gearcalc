@@ -570,6 +570,53 @@ Validity, all closed form: `r_form < r_b/cos φ < r_a` and `r_M − d_p/2 > r_f`
 Three pins are external only — inside a bore neither the odd-count problem nor
 the datum problem arises.
 
+**The four cases above are one measurement over different seats.** The pins are
+equal circles at known places and the caliper reads the distance between two
+parallel planes touching them, so:
+
+```text
+2 pins    |P_a − P_b| + d_p                          b the space nearest half a turn
+3 pins    |P_1·n - P_3·n| + d_p    n perpendicular to (P_2 − P_1)
+```
+
+Both parities are values of that, and the published forms come back bit for bit.
+Written this way it needs no seat to equal any other, which is what lets it
+measure a gear whose teeth differ.
+
+### Inspection data around the revolution
+
+Every measurement is made of **flank seats** — where a flank's involute begins on
+the base circle:
+
+```text
+flank(k, ±1) = seat_k ± ψ_b,k        seat_k = 2πk/z + λ(ψ̄ − ψ_k)
+```
+
+A span reads the distance between two of them; a pin sits between two. An evenly
+cut gear has one `ψ_b` and evenly spaced seats, so both collapse to a formula in
+`z` and that one angle — which is what the published forms are.
+
+```text
+span      W  = r_b cos β_b [ 2π(k−1)/z + (1+λ) ψ_j + (1−λ) ψ_{j+k−1} ]
+space     h_k = [ 2π/z + λ(ψ_k − ψ_{k+1}) − ψ_k − ψ_{k+1} ] / 2
+```
+
+**λ reaches a span**, where it reaches neither the flanks nor the commanded
+centre distance: a span is measured between flanks of *different* teeth, and the
+indexing offset is exactly what moves one relative to another.
+
+Each is written from the **pitch and the ψ**, not as a difference of two
+accumulated seats. The two are the same arithmetic and not the same floating
+point, and the ulp between them reaches the screen as a range on a gear that has
+none.
+
+One `k` and one pin diameter serve the whole revolution — a caliper is set once
+and carried round — so the admissible counts are intersected over every starting
+position rather than chosen per tooth. Each measurement is reported at the datum
+tooth with the `[smallest, largest]` it takes around the revolution; **an evenly
+cut gear's two ends are the same bits**, so a caller reports a range
+unconditionally and an ordinary gear reads as one number.
+
 Only **nominal** values are produced. Min/max need a tooth thickness tolerance
 that is not available; the result types carry the space for it.
 

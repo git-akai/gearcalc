@@ -426,6 +426,82 @@ impl Gear {
         (&self.teeth[self.which[i]], self.seat[i])
     }
 
+    /// How many teeth the gear has.
+    #[must_use]
+    pub fn teeth(&self) -> usize {
+        self.seat.len()
+    }
+
+    /// Where one flank sits, as an angle on the base circle.
+    ///
+    /// This is the quantity every inspection measurement is really made of: a
+    /// span reads the distance between two of them, and a pin seats between two.
+    /// `side` is `+1` for the flank on the increasing-angle side of the tooth
+    /// and `−1` for the other.
+    ///
+    /// ```text
+    /// flank(k, ±1) = seat_k ± ψ_b,k
+    /// ```
+    ///
+    /// An evenly cut gear has one `ψ_b` and evenly spaced seats, so every
+    /// measurement collapses to a formula in `z` and that one angle. On a gear
+    /// whose teeth differ, it does not — and this is what the formulas were
+    /// written in terms of all along.
+    #[must_use]
+    pub fn flank_seat(&self, k: usize, side: f64) -> f64 {
+        let (t, seat) = self.tooth(k);
+        seat + side * t.psi_b
+    }
+
+    /// Half the angular width of the space **after** tooth `k`, at the base
+    /// circle.
+    ///
+    /// What a pin sits in. Bounded by two *different* teeth once they differ, so
+    /// it has no expression in `z` and a single `ψ_b`:
+    ///
+    /// ```text
+    /// h_k = [ 2π/z + λ(ψ_k − ψ_{k+1}) − ψ_k − ψ_{k+1} ] / 2
+    /// ```
+    ///
+    /// which is `π/z − ψ_b` exactly when the teeth agree, and carries λ when
+    /// they do not — the indexing offset moves the seats, so it moves the spaces
+    /// between them.
+    ///
+    /// Written from the **pitch** and the two `ψ` rather than as a difference of
+    /// two accumulated seats. The two are the same arithmetic and not the same
+    /// floating point: `τ(k+1)/z − τk/z` is an ulp or two off `τ/z`, which is
+    /// enough to give an evenly cut gear a measurement that varies around a
+    /// revolution it is constant on (`docs/corrections.md`).
+    #[must_use]
+    pub fn space_half_angle(&self, k: usize) -> f64 {
+        let z = self.seat.len();
+        let (a, b) = (self.tooth(k).0.psi_b, self.tooth(k + 1).0.psi_b);
+        let lam = self.mean.params.index_offset;
+        #[allow(clippy::cast_precision_loss)]
+        let pitch = std::f64::consts::TAU / z as f64;
+        (pitch + lam * (a - b) - a - b) / 2.0
+    }
+
+    /// How far the centre of the space after tooth `b` sits from the centre of
+    /// the space after tooth `a`, as an angle.
+    ///
+    /// A pin measurement is a distance between two seats, so this — rather than
+    /// either centre on its own — is what it is made of. Grouped for the same
+    /// reason [`Self::space_half_angle`] is: the pitch term is exact in the
+    /// index difference, and every `ψ` term is a difference that vanishes
+    /// exactly when the teeth agree.
+    #[must_use]
+    pub fn space_centre_delta(&self, a: usize, b: usize) -> f64 {
+        let z = self.seat.len();
+        let psi = |k: usize| self.tooth(k).0.psi_b;
+        let lam = self.mean.params.index_offset;
+        #[allow(clippy::cast_precision_loss)]
+        let pitch = std::f64::consts::TAU * (b as f64 - a as f64) / z as f64;
+        let spread = lam * ((psi(a) + psi(a + 1)) - (psi(b) + psi(b + 1))) + (psi(a) - psi(a + 1))
+            - (psi(b) - psi(b + 1));
+        pitch + spread / 2.0
+    }
+
     /// Which teeth came out other than as drawn, and why.
     ///
     /// Empty for an ordinary gear whose inputs are buildable, and empty for an

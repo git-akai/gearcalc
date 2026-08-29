@@ -9,4 +9,9 @@
  * them, and a field on the wire that no one reads is a field that can go wrong
  * unnoticed.
  */
-export type PinsOut = { nominal: number, };
+export type PinsOut = { nominal: number, 
+/**
+ * `[smallest, largest]` around the revolution — identical ends for an
+ * ordinary gear, as [`SpanOut::around`].
+ */
+around: [number, number], };

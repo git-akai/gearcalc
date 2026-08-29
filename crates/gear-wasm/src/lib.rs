@@ -170,6 +170,11 @@ pub struct SpanOut {
     pub teeth_spanned: u32,
     pub nominal: f64,
     pub contact_radius: f64,
+    /// `[smallest, largest]` around the revolution. **The two ends are the same
+    /// bits for an ordinary gear**, so the front end can render a range
+    /// unconditionally and an evenly cut gear reads as one number with no flag
+    /// to check.
+    pub around: [f64; 2],
 }
 
 /// A measurement over (or between) pins.
@@ -187,6 +192,9 @@ pub struct SpanOut {
 )]
 pub struct PinsOut {
     pub nominal: f64,
+    /// `[smallest, largest]` around the revolution — identical ends for an
+    /// ordinary gear, as [`SpanOut::around`].
+    pub around: [f64; 2],
 }
 
 #[derive(Serialize)]
@@ -283,7 +291,6 @@ fn summarise(ecc: &gear_core::gear::Gear, req: &GearRequest, params: GearParams)
     // inputs would have produced. For a concentric gear the mean *is*
     // `Tooth::new(params)`, bit for bit.
     let g = ecc.mean();
-    let eccentric = ecc.distinct_teeth() > 1;
     let pitch_diameter = 2.0 * g.r;
     let available = jgma::available_classes(g.params.module, pitch_diameter);
 
@@ -314,27 +321,31 @@ fn summarise(ecc: &gear_core::gear::Gear, req: &GearRequest, params: GearParams)
         },
     };
 
-    // Span and over-pins vary around the revolution on an eccentric gear — a
-    // metrologist reads a different value at every angular position — and the
-    // ranged form is not built (docs/reference.md#angularly-varying-profile-shift). One number would read as *the*
-    // span, so it is withheld with the reason rather than quoted at the mean.
+    // Span and over-pins **vary around the revolution** on an eccentric gear — a
+    // metrologist reads a different value at every angular position — so each
+    // crosses as a value *and* the range it takes. The two ends are the same
+    // bits for an ordinary gear, so nothing branches on which kind this is: the
+    // range is always there, and an evenly cut gear's is a point.
     //
-    // A **catalogue key**, not a sentence. `Maybe::Unavailable` has always
-    // carried English from this crate; the front end runs every reason through
-    // `t()`, which returns its argument unchanged when there is no message for
-    // it, so a key resolves and the reasons not yet moved still render as they
-    // are. That is the migration path for the rest of them, and for the error
-    // enums (docs/rationale.md#no-english-in-gear-core-and-no-engineering-in-the-catalogue).
-    let varies = Note::new("ui.gear_measurement_varies");
-
-    let pins = |count| match (eccentric, req.pin_diameter) {
-        (true, _) => Maybe::Unavailable {
-            unavailable: varies.clone(),
-        },
-        (false, Some(d)) => {
-            Maybe::from(metrology::over_pins(g, d, count).map(|p| PinsOut { nominal: p.nominal }))
-        }
-        (false, None) => Maybe::Unavailable {
+    // These were withheld entirely until the ranged form existed, on the
+    // reasoning that one number would read as *the* span. That was right, and
+    // the answer to it is the range rather than the silence.
+    let pins = |count| match req.pin_diameter {
+        Some(d) => Maybe::from(metrology::over_pins_at(ecc, d, count, 0).map(|p| {
+            let mut lo = f64::MAX;
+            let mut hi = f64::MIN;
+            for start in 0..ecc.teeth() {
+                if let Ok(m) = metrology::over_pins_at(ecc, d, count, start) {
+                    lo = lo.min(m.nominal);
+                    hi = hi.max(m.nominal);
+                }
+            }
+            PinsOut {
+                nominal: p.nominal,
+                around: [lo, hi],
+            }
+        })),
+        None => Maybe::Unavailable {
             unavailable: Note::new("ui.gear_no_pin_diameter"),
         },
     };
@@ -372,17 +383,12 @@ fn summarise(ecc: &gear_core::gear::Gear, req: &GearRequest, params: GearParams)
         variation: ecc.variation(),
         per_tooth_clamps: ecc.per_tooth_clamps(),
         centre_profile: centre_profile(params, req),
-        span: if eccentric {
-            Maybe::Unavailable {
-                unavailable: varies.clone(),
-            }
-        } else {
-            Maybe::from(metrology::best_span(g).map(|s| SpanOut {
-                teeth_spanned: s.teeth_spanned,
-                nominal: s.nominal,
-                contact_radius: s.contact_radius,
-            }))
-        },
+        span: Maybe::from(metrology::best_span_around(ecc).map(|(s, around)| SpanOut {
+            teeth_spanned: s.teeth_spanned,
+            nominal: s.nominal,
+            contact_radius: s.contact_radius,
+            around,
+        })),
         over_two_pins: pins(PinCount::Two),
         over_three_pins: pins(PinCount::Three),
         available_classes: available.into_iter().map(ClassRef::from_class).collect(),
@@ -577,7 +583,11 @@ fn solve_ring_impl(input: &str) -> Result<String, String> {
         smallest_tooth_count: smallest_tooth_count(&req.params),
         between_pins: match req.pin_diameter {
             Some(d) => {
-                Maybe::from(metrology::between_pins(&g, d).map(|p| PinsOut { nominal: p.nominal }))
+                Maybe::from(metrology::between_pins(&g, d).map(|p| PinsOut {
+                    nominal: p.nominal,
+                    // A ring has one tooth form, so its measurement is a point.
+                    around: [p.nominal, p.nominal],
+                }))
             }
             None => Maybe::Unavailable {
                 unavailable: Note::new("ui.gear_no_pin_diameter"),
@@ -1413,11 +1423,22 @@ mod tests {
         );
         let root = ecc["root_radius"].as_f64().unwrap();
         assert!(lo <= root && root <= hi, "{lo} ≤ {root} ≤ {hi}");
+        // **The inspection data is a range now, not a silence.** It used to be
+        // withheld entirely, on the reasoning that one number would read as
+        // *the* span — right about the number and wrong about the remedy, which
+        // is the range rather than nothing.
         for m in ["span", "over_two_pins", "over_three_pins"] {
-            assert_eq!(
-                ecc[m]["unavailable"]["key"], "ui.gear_measurement_varies",
-                "{m}: {:?}",
+            let around = &ecc[m]["around"];
+            let (lo, hi) = (around[0].as_f64().unwrap(), around[1].as_f64().unwrap());
+            assert!(
+                lo < hi,
+                "{m}: an eccentric gear's measurement does not vary — {:?}",
                 ecc[m]
+            );
+            let nominal = ecc[m]["nominal"].as_f64().unwrap();
+            assert!(
+                lo <= nominal && nominal <= hi,
+                "{m}: {lo} ≤ {nominal} ≤ {hi}"
             );
         }
 

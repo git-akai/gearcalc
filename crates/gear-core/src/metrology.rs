@@ -126,6 +126,95 @@ pub fn best_span(g: &Tooth) -> Result<Span, MeasurementError> {
     best.ok_or(MeasurementError::NoValidSpan)
 }
 
+/// Span over `k` teeth starting at tooth `j`, on a gear whose teeth may differ.
+///
+/// # The span is a distance between two flank seats, and always was
+///
+/// A span is a chord along a common tangent to the base circle, and the distance
+/// between two involutes of one base circle measured along any such tangent is
+/// `r_b` times the difference of their origin angles — whichever tangent. So the
+/// reading is
+///
+/// ```text
+/// W = r_b cos β_b · [ flank(j+k−1, +1) − flank(j, −1) ]
+/// ```
+///
+/// and with `flank(i, ±1) = seat_i ± ψ_i` and `seat_i = 2πi/z + λ(ψ̄ − ψ_i)`
+/// that is
+///
+/// ```text
+/// W = r_b cos β_b · [ 2π(k−1)/z + (1+λ) ψ_j + (1−λ) ψ_{j+k−1} ]
+/// ```
+///
+/// Two things fall out that are worth stating. The evenly cut gear is this with
+/// every `ψ` equal, which gives back `2π(k−1)/z + 2ψ_b` and so
+/// [`span_over_teeth`] exactly — a **value**, not a limit. And **λ reaches a
+/// span**, where it reaches neither the flanks nor the commanded centre
+/// distance: a span is measured between flanks of *different teeth*, and the
+/// indexing offset is precisely what moves one relative to another.
+///
+/// # Where the caliper sits
+///
+/// The value does not depend on which common tangent is used, but the *contact
+/// radii* do — the faces slide along the flanks as the caliper turns. There is
+/// therefore a family of placements, and validity is that **some** placement
+/// puts both contacts on usable flank. Since a contact radius rises with its
+/// unwrapped length and the two lengths sum to the span, that is an
+/// intersection of two intervals and needs no search.
+#[must_use]
+pub fn span_over_teeth_at(gear: &crate::gear::Gear, j: usize, k: u32) -> Option<Span> {
+    if k == 0 {
+        return None;
+    }
+    let z = gear.teeth();
+    let last = (j + k as usize - 1) % z;
+    let mean = gear.mean();
+    let bb = base_helix_angle(mean);
+
+    // **Grouped so the cancellation happens first.** Taking the difference of two
+    // *accumulated* seats — `flank_seat(last) − flank_seat(j)` — is arithmetically
+    // the same and numerically is not: `τ·k/z − τ/z` and `τ(k−1)/z` differ by an
+    // ulp or two, which is enough to give an evenly cut gear two different ends
+    // to a range whose true width is exactly zero. The mean-seat term `ψ̄` cancels
+    // outright, and the λ term is a difference of two `ψ` that is *exactly* zero
+    // when the teeth agree (`docs/corrections.md`).
+    let lam = mean.params.index_offset;
+    let (psi_first, psi_last) = (gear.tooth(j).0.psi_b, gear.tooth(last).0.psi_b);
+    let sweep = std::f64::consts::TAU * f64::from(k - 1) / z as f64
+        + lam * (psi_first - psi_last)
+        + psi_first
+        + psi_last;
+    let nominal = mean.rb * bb.cos() * sweep;
+    if !nominal.is_finite() || nominal <= 0.0 {
+        return None;
+    }
+
+    // The two unwrapped lengths sum to the span; each contact radius rises with
+    // its own. So the placements that keep a contact on usable flank are an
+    // interval in that length, and both must hold at once.
+    let total = sweep;
+    let roll_at = |radius: f64| ((radius / mean.rb).powi(2) - 1.0).max(0.0).sqrt();
+    let usable = |t: &Tooth| (roll_at(t.r_j), roll_at(t.ra));
+    let (a_lo, a_hi) = usable(gear.tooth(j).0);
+    let (b_lo, b_hi) = usable(gear.tooth(last).0);
+    // `u_a ∈ [a_lo, a_hi]` and `total − u_a ∈ [b_lo, b_hi]`.
+    let lo = a_lo.max(total - b_hi);
+    let hi = a_hi.min(total - b_lo);
+    if lo > hi {
+        return None;
+    }
+    // Report the placement nearest the symmetric one, which is what a
+    // metrologist centres on and what an evenly cut gear gives exactly.
+    let u_a = (total / 2.0).clamp(lo, hi);
+
+    Some(Span {
+        teeth_spanned: k,
+        nominal,
+        contact_radius: mean.rb * f64::hypot(1.0, u_a),
+        limits: None,
+    })
+}
+
 /// How many pins the measurement uses, and hence which geometry applies.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PinCount {
@@ -170,9 +259,8 @@ pub struct OverPins {
 /// base circle, [`MeasurementError::PinTooLarge`] if contact would.
 pub fn pin_geometry(g: &Tooth, pin_diameter: f64) -> Result<(f64, f64), MeasurementError> {
     pin_seat(
-        g.psi_b,
+        std::f64::consts::PI / f64::from(g.params.teeth) - g.psi_b,
         g.rb,
-        f64::from(g.params.teeth),
         base_helix_angle(g),
         pin_diameter,
         1.0,
@@ -205,15 +293,20 @@ pub fn pin_geometry(g: &Tooth, pin_diameter: f64) -> Result<(f64, f64), Measurem
 /// and touches **above** its centre. Both fall out of `σ` rather than being
 /// separate cases.
 fn pin_seat(
-    psi_b: f64,
+    half_space: f64,
     rb: f64,
-    teeth: f64,
     beta_b: f64,
     pin_diameter: f64,
     sigma: f64,
 ) -> Result<(f64, f64), MeasurementError> {
-    let target =
-        sigma * (psi_b + pin_diameter / (2.0 * rb * beta_b.cos()) - std::f64::consts::PI / teeth);
+    // `half_space` is half the angular width of the space **at the base circle**,
+    // which is what the pin actually sits in. For an evenly cut gear that is
+    // `π/z − ψ_b` — the tooth taken out of the pitch — and it was written that
+    // way here. Taken as an argument instead, because on a gear whose teeth are
+    // not all the same thickness a space is bounded by two *different* teeth and
+    // has no expression in `z` and one `ψ_b`. The evenly cut gear is the value
+    // where the two teeth agree.
+    let target = sigma * (pin_diameter / (2.0 * rb * beta_b.cos()) - half_space);
     // A negative target means the pin centre would have to sit inside the base
     // circle, where there is no involute to touch — but *which* pin fault that is
     // depends on the kind. On an external gear the space narrows inward, so it is
@@ -264,13 +357,49 @@ pub fn over_pins(
     }
 
     let z = f64::from(g.params.teeth);
-    let even = g.params.teeth.is_multiple_of(2);
     let pi = std::f64::consts::PI;
-    let nominal = match (pin_count, even) {
-        (PinCount::Two, true) => 2.0 * r_m + pin_diameter,
-        (PinCount::Two, false) => 2.0 * r_m * (pi / (2.0 * z)).cos() + pin_diameter,
-        (PinCount::Three, true) => 2.0 * r_m * (pi / z).cos() + pin_diameter,
-        (PinCount::Three, false) => r_m * (1.0 + (pi / z).cos()) + pin_diameter,
+
+    // **One measurement, not four.** The four cases — two pins or three, odd `z`
+    // or even — were a `match` returning four expressions, each correct and each
+    // a separate place to be wrong. They are the same measurement taken over
+    // different seats, so what they share is geometry rather than arithmetic:
+    // the pins are equal-diameter circles at known places, and the caliper reads
+    // the distance between two parallel planes touching them.
+    //
+    // A space sits at `(2j+1)π/z` from the first tooth's centreline, so seat `j`
+    // has that angular position and a radius of `r_m`.
+    let at = |j: f64| {
+        let c = (2.0 * j + 1.0) * pi / z;
+        [r_m * c.cos(), r_m * c.sin()]
+    };
+    let dot = |a: [f64; 2], b: [f64; 2]| a[0] * b[0] + a[1] * b[1];
+    let unit = |v: [f64; 2]| {
+        let n = f64::hypot(v[0], v[1]);
+        [v[0] / n, v[1] / n]
+    };
+
+    let nominal = match pin_count {
+        // Across two pins: the planes are perpendicular to the line joining the
+        // centres, so the reading is that distance plus one pin. The seat
+        // nearest half a turn away is exactly opposite for even `z` and half a
+        // pitch off it for odd, which `round` picks — so the parity is a value
+        // of the expression rather than a branch on it.
+        PinCount::Two => {
+            let (a, b) = (at(0.0), at((z / 2.0).round()));
+            f64::hypot(a[0] - b[0], a[1] - b[1]) + pin_diameter
+        }
+        // Two **adjacent** pins make the datum: equal diameters, so the plane
+        // resting on them is parallel to the line joining their centres. The
+        // third seat is the one nearest opposite their bisector — exactly
+        // opposite for odd `z`, half a pitch off for even.
+        PinCount::Three => {
+            let (p1, p2) = (at(0.0), at(1.0));
+            let p3 = at(((z + 1.0) / 2.0).round());
+            let along = [p2[0] - p1[0], p2[1] - p1[1]];
+            let n = unit([along[1], -along[0]]);
+            let n = if dot(n, p1) < 0.0 { [-n[0], -n[1]] } else { n };
+            (dot(p1, n) - dot(p3, n)).abs() + pin_diameter
+        }
     };
 
     Ok(OverPins {
@@ -279,6 +408,146 @@ pub fn over_pins(
         nominal,
         pin_centre_radius: r_m,
         contact_radius,
+        limits: None,
+    })
+}
+
+/// The span a metrologist would use, and how far it varies around the
+/// revolution.
+///
+/// One `k` for the whole gear — a caliper is set once and carried round — so the
+/// admissible counts are intersected over every starting tooth rather than
+/// chosen per tooth. The `k` picked is the one whose contact lands nearest the
+/// pitch circle, averaged over the revolution, which is [`best_span`]'s rule
+/// read across all the positions instead of one.
+///
+/// Returns the span at each starting tooth's `[smallest, largest]`. An evenly
+/// cut gear's two ends are the **same bits**, so a caller can report a range
+/// unconditionally and have an ordinary gear read as a single number.
+///
+/// # Errors
+///
+/// [`MeasurementError::NoValidSpan`] when no `k` is measurable at *every*
+/// position. That is stricter than asking per tooth, and deliberately: a span
+/// that can only be taken at some angular positions is not a measurement of the
+/// gear.
+pub fn best_span_around(gear: &crate::gear::Gear) -> Result<(Span, [f64; 2]), MeasurementError> {
+    let z = gear.teeth();
+    let mean = gear.mean();
+    let mut best: Option<(Span, [f64; 2], f64)> = None;
+
+    for k in 1..=gear.mean().params.teeth {
+        let mut lo = f64::MAX;
+        let mut hi = f64::MIN;
+        let mut worst_offset = 0.0_f64;
+        let mut at_first = None;
+        let mut every = true;
+        for j in 0..z {
+            match span_over_teeth_at(gear, j, k) {
+                Some(s) => {
+                    lo = lo.min(s.nominal);
+                    hi = hi.max(s.nominal);
+                    worst_offset = worst_offset.max((s.contact_radius - mean.r).abs());
+                    if j == 0 {
+                        at_first = Some(s);
+                    }
+                }
+                None => {
+                    every = false;
+                    break;
+                }
+            }
+        }
+        if !every {
+            continue;
+        }
+        let Some(s) = at_first else { continue };
+        let better = best.as_ref().is_none_or(|(_, _, w)| worst_offset < *w);
+        if better {
+            best = Some((s, [lo, hi], worst_offset));
+        }
+    }
+
+    best.map(|(s, range, _)| (s, range))
+        .ok_or(MeasurementError::NoValidSpan)
+}
+
+/// Measurement over pins at one angular position, on a gear whose teeth may
+/// differ.
+///
+/// The seats are read from the gear rather than assumed identical: a pin sits in
+/// the space bounded by two *different* teeth, so its centre radius is that
+/// space's own. The reading is then the same plane-to-plane geometry
+/// [`over_pins`] uses, which is why that one already generalises — it was
+/// written in vectors rather than in `z`.
+///
+/// `start` chooses which space the first pin sits in, so sweeping it is what
+/// makes the measurement a range.
+///
+/// # Errors
+///
+/// The same as [`over_pins`], for whichever seat cannot take the pin.
+pub fn over_pins_at(
+    gear: &crate::gear::Gear,
+    pin_diameter: f64,
+    pin_count: PinCount,
+    start: usize,
+) -> Result<OverPins, MeasurementError> {
+    let z = gear.teeth();
+    let mean = gear.mean();
+    let bb = base_helix_angle(mean);
+
+    // Where the pin in the space after tooth `i` sits: its own centre radius,
+    // and the angle its centre sits at.
+    // The index is deliberately **not** wrapped here. `Gear` wraps it for the
+    // tooth lookups, and wrapping it first would turn an offset of one space
+    // into one of `z − 1` — the same angle, and not the same `cos`. That last
+    // ulp reaches the screen as a range on a gear that has none.
+    let seat = |i: usize| -> Result<([f64; 2], f64), MeasurementError> {
+        let (r_m, contact) = pin_seat(gear.space_half_angle(i), mean.rb, bb, pin_diameter, 1.0)?;
+        let t = gear.tooth(i).0;
+        if r_m - pin_diameter / 2.0 <= t.rf {
+            return Err(MeasurementError::PinBottomsOut);
+        }
+        if contact < t.r_j || contact > t.ra {
+            return Err(MeasurementError::PinContactOffFlank);
+        }
+        // Relative to the first pin's space, so every angle in the measurement
+        // is a *difference* and the pitch terms cancel exactly.
+        let c = gear.space_centre_delta(start, i);
+        Ok(([r_m * c.cos(), r_m * c.sin()], contact))
+    };
+
+    let dot = |a: [f64; 2], b: [f64; 2]| a[0] * b[0] + a[1] * b[1];
+    // The space nearest half a turn away, and the one nearest opposite a pair's
+    // bisector — integer arithmetic, so the parity is a value of the expression
+    // rather than a branch on it, and there is no float to truncate.
+    let half = z.div_ceil(2);
+    let opposite_pair = (z + 1).div_ceil(2);
+
+    let (p1, contact) = seat(start)?;
+    let nominal = match pin_count {
+        PinCount::Two => {
+            let (p2, _) = seat(start + half)?;
+            f64::hypot(p1[0] - p2[0], p1[1] - p2[1]) + pin_diameter
+        }
+        PinCount::Three => {
+            let (p2, _) = seat(start + 1)?;
+            let (p3, _) = seat(start + opposite_pair)?;
+            let along = [p2[0] - p1[0], p2[1] - p1[1]];
+            let n = f64::hypot(along[1], -along[0]);
+            let n = [along[1] / n, -along[0] / n];
+            let n = if dot(n, p1) < 0.0 { [-n[0], -n[1]] } else { n };
+            (dot(p1, n) - dot(p3, n)).abs() + pin_diameter
+        }
+    };
+
+    Ok(OverPins {
+        pin_diameter,
+        pin_count,
+        nominal,
+        pin_centre_radius: f64::hypot(p1[0], p1[1]),
+        contact_radius: contact,
         limits: None,
     })
 }
@@ -376,9 +645,8 @@ pub fn between_pins(
     pin_diameter: f64,
 ) -> Result<BetweenPins, MeasurementError> {
     let (r_m, contact_radius) = pin_seat(
-        ring.psi_b,
+        std::f64::consts::PI / f64::from(ring.teeth) - ring.psi_b,
         ring.rb,
-        f64::from(ring.teeth),
         ring.base_helix_angle(),
         pin_diameter,
         -1.0,

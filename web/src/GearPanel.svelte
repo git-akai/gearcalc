@@ -132,6 +132,14 @@
   }
 
   const n = (v: number) => v.toFixed(3);
+  /** What a measurement takes around the revolution, where that is more than one
+   *  value.
+   *
+   *  The two ends are the same bits for an ordinary gear — Rust guarantees it,
+   *  rather than this side testing a kind — so the comparison is exact and an
+   *  evenly cut gear simply shows nothing extra. */
+  const around = (r: [number, number]) =>
+    r[0] === r[1] ? "" : " · " + t("ui.gear_measurement_around", { lo: n(r[0]), hi: n(r[1]) });
   const request = $derived<GearRequest>({
     params: tab.params,
     pin_diameter: tab.pinDiameter > 0 ? tab.pinDiameter : undefined,
@@ -670,7 +678,7 @@
           <dt>{t("ui.gear_span")}</dt><dd class="na">{note(s.span.unavailable)}</dd>
         {:else}
           <dt>{t("ui.gear_teeth_spanned")}</dt><dd>{s.span.teeth_spanned}</dd>
-          <dt>{t("ui.gear_nominal")}</dt><dd>{mm(s.span.nominal)}</dd>
+          <dt>{t("ui.gear_nominal")}</dt><dd>{mm(s.span.nominal)}{around(s.span.around)}</dd>
           <dt>{t("ui.gear_contact_radius")}</dt><dd>{mm(s.span.contact_radius)}</dd>
         {/if}
       </dl>
@@ -681,7 +689,7 @@
           {#if isUnavailable(row.value)}
             <dt>{row.label}</dt><dd class="na">{note(row.value.unavailable)}</dd>
           {:else}
-            <dt>{row.label}</dt><dd>{mm(row.value.nominal)}</dd>
+            <dt>{row.label}</dt><dd>{mm(row.value.nominal)}{around(row.value.around)}</dd>
           {/if}
         {/each}
       </dl>

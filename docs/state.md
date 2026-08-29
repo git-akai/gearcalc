@@ -132,7 +132,9 @@ efficiency in all six arrangements, and backlash referred to the output shaft.
 
 **Eccentric gears.** A gear whose profile shift varies with angular position, at
 a genuinely constant transmission ratio. One hob, one setting; the root belongs
-to the gear; the commanded centre distance and what a simple crank leaves.
+to the gear; the commanded centre distance and what a simple crank leaves; and
+inspection data — span and over-pins — as the range it takes around the
+revolution, verified against a caliper reading off the drawn teeth.
 
 **Trains.** Spur/helical, worm and planetary stages in one train; torque,
 backlash and cycle accumulation; efficiency and backlash in **both** drive
@@ -165,7 +167,6 @@ been. They are not a backlog.
 
 | Item | Note |
 |---|---|
-| Inspection data for an eccentric gear as **ranges** | Span and over-pins vary around the revolution. `Gear::distinct` is the unit of work; they return `Option`s, so they want their own reduction rather than `extremes` |
 | An **eccentric ring** as a tab kind | The core supports it — `centre_profile` takes which member the eccentric gear is — and the tab does not. A UI decision rather than a limit |
 | The **enveloping** (throated) wheel's zone of action | The cylindrical one is derived and a worm reports it as a floor, with its assumed tooth height named |
 | Tooth thickness tolerance (JGMA 1103-01) | Unavailable. Min/max on span and over-pins only; the result types carry the space |
@@ -216,7 +217,5 @@ are named in `strings.rs`'s `UNFIRED` with their evidence.
 
 Not a queue with a head; this is what a next session would pick from.
 
-- **Inspection data for an eccentric gear**, which is the largest named gap and
-  has its framework already built.
 - **A planetary set's drawing.**
 - **Further UI work**, as it is asked for.

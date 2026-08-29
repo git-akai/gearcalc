@@ -243,6 +243,9 @@ whose units are wrong is wrong however plausible.
 | [reference.md#internal-gears](reference.md#internal-gears) | A tip round too large for a shaper's tip **refused** the tool | The same guard caps it on an external gear. So one input gave a fillet outside and *no fillet at all* inside — a jump in kind at a point where nothing physical happens. Capped now, by the same rule and with the same note |
 | [reference.md#internal-gears](reference.md#internal-gears) | ...and the first cap was not monotone | Backing off by the 5 % margin only once the ask crossed the boundary dropped the realised round *at* that instant. `min(asked, 0.95 × max)` rather than `if asked > max { 0.95 × max }` — a clamp has to be continuous in what it clamps |
 
+| [reference.md#metrology](reference.md#metrology) | A span and a pin measurement taken as a difference of two **accumulated** seats | `t(k+1)/z - tk/z` is an ulp or two off `t/z`, which gave an evenly cut gear a measurement that varied around a revolution it is constant on — and reached the screen as "11.258 to 11.258 around the revolution". Grouped on the pitch and the `psi` differences, which vanish exactly when the teeth agree. The third time this module has met *group the cancellation first* |
+| [reference.md#metrology](reference.md#metrology) | ...and the pin index wrapped **before** the difference was taken | An offset of one space became one of `z - 1` — the same angle, and not the same `cos`. `Gear` wraps for its own lookups, so the caller must not |
+
 ---
 
 ## Process notes

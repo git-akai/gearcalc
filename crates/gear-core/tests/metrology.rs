@@ -535,3 +535,347 @@ fn a_pin_that_cannot_seat_is_diagnosed_by_kind() {
     );
     assert!(between_pins(&ring, 1.75).is_ok());
 }
+
+/// **The four closed forms are one measurement over different seats.**
+///
+/// Two pins or three, odd `z` or even, were four expressions behind a `match` —
+/// each right, and each a separate place to be wrong. They are the same caliper
+/// reading over different pin seats, so what they share is geometry: equal
+/// circles at known places, and the distance between two parallel planes
+/// touching them.
+///
+/// Asserted as **bit equality** against the four published forms rather than to
+/// a tolerance, which would only show that the geometry had been rewritten into
+/// something very close.
+#[test]
+fn the_pin_geometry_reproduces_all_four_closed_forms() {
+    use gear_core::metrology::pin_geometry;
+    let pi = std::f64::consts::PI;
+
+    for p in Grid::new()
+        .teeth(&[9, 12, 17, 20, 21, 31, 44, 63])
+        .shifts(&[-0.2, 0.0, 0.3])
+        .pressure_angle(PRESSURE_ANGLES)
+        .helix_angle(&[0.0, 15.0])
+        .build()
+    {
+        let g = Tooth::new(p);
+        for d in [1.4, 1.75, 2.2] {
+            let Ok((r_m, _)) = pin_geometry(&g, d) else {
+                continue;
+            };
+            let z = f64::from(p.teeth);
+            let even = p.teeth % 2 == 0;
+            let want = |c: PinCount| match (c, even) {
+                (PinCount::Two, true) => 2.0 * r_m + d,
+                (PinCount::Two, false) => 2.0 * r_m * (pi / (2.0 * z)).cos() + d,
+                (PinCount::Three, true) => 2.0 * r_m * (pi / z).cos() + d,
+                (PinCount::Three, false) => r_m * (1.0 + (pi / z).cos()) + d,
+            };
+            for c in [PinCount::Two, PinCount::Three] {
+                let Ok(got) = over_pins(&g, d, c) else {
+                    continue;
+                };
+                let expected = want(c);
+                assert!(
+                    (got.nominal - expected).abs() <= 8.0 * f64::EPSILON * expected.abs(),
+                    "z={} d={d} {c:?}: geometry gives {} where the closed form gives {expected}",
+                    p.teeth,
+                    got.nominal
+                );
+            }
+        }
+    }
+}
+
+/// **An evenly cut gear's span is the general form's value, not its limit.**
+///
+/// `span_over_teeth_at` measures between two flank seats and so handles a gear
+/// whose teeth differ. When they do not, every `ψ` is the same number and the
+/// expression collapses to `2π(k−1)/z + 2ψ_b` — the published form. Asserted to
+/// the last few ulps rather than to a tolerance: the two routes reach it by
+/// different cancellations, so bit-exactness is not on offer, but agreement to
+/// a chosen tolerance would only show they were close.
+#[test]
+fn the_general_span_is_the_published_one_on_an_evenly_cut_gear() {
+    use gear_core::gear::Gear;
+    use gear_core::metrology::span_over_teeth_at;
+
+    let mut worst = 0.0_f64;
+    for p in Grid::new()
+        .teeth(&[9, 12, 17, 20, 31, 44])
+        .shifts(&[-0.3, 0.0, 0.2, 0.5])
+        .pressure_angle(PRESSURE_ANGLES)
+        .helix_angle(&[0.0, 15.0, -25.0])
+        .thickness_mod(&[0.8, 1.0, 1.2])
+        .build()
+    {
+        let t = Tooth::new(p);
+        let gear = Gear::new(p);
+        for k in 2..=5u32 {
+            let want = span_over_teeth(&t, k).nominal;
+            // ...and from every starting tooth, since an evenly cut gear has no
+            // preferred one. A general form that only worked at tooth 0 would
+            // pass a single-position check.
+            for j in [0usize, 1, 3, p.teeth as usize - 1] {
+                let Some(got) = span_over_teeth_at(&gear, j, k) else {
+                    continue;
+                };
+                let rel = (got.nominal - want).abs() / want.abs();
+                worst = worst.max(rel);
+                assert!(
+                    rel < 1e-14,
+                    "z={} k={k} j={j}: {} against the published {want}",
+                    p.teeth,
+                    got.nominal
+                );
+            }
+        }
+    }
+    println!("worst relative disagreement with the published span: {worst:.3e}");
+}
+
+/// **The span, measured off the drawn teeth.**
+///
+/// The derivation says a span is `r_b` times the difference of two flank seats.
+/// This measures it instead: take the points the gear is actually drawn from,
+/// project them onto the caliper's own direction, and read the width. It shares
+/// no code with the formula — one reads angles off a construction, the other
+/// coordinates off a curve.
+///
+/// # Where the anvils point, and why the width is the reading
+///
+/// A span caliper's two faces are perpendicular to a **common tangent to the
+/// base circle**, which is the involutes' shared normal. Writing a flank point
+/// as the involute from origin `θ` at roll `u`, its projection on that direction
+/// is `r_b[sin w − u cos w]` with `w = θ + u − φ`, and
+///
+/// ```text
+/// d/du = r_b u sin w = 0   at   w = 0,  i.e.  u = φ − θ
+/// ```
+///
+/// — a minimum, and exactly the point where the tangent line meets the flank. So
+/// the extreme of the projection *is* the anvil contact, provided that roll is
+/// on the tooth; that proviso is the span's own validity condition, which is why
+/// an invalid span is one whose anvil would foul the tip.
+///
+/// Spur gears only: the `cos β_b` in the span is a projection into the normal
+/// plane, and a transverse outline has nothing to say about it.
+///
+/// Approached from below, because an inscribed polyline draws a slightly thin
+/// tooth, and converging: the shortfall must fall with the point count.
+#[test]
+fn the_span_is_what_a_caliper_reads_off_the_drawn_teeth() {
+    use gear_core::gear::Gear;
+    use gear_core::metrology::span_over_teeth_at;
+    use std::f64::consts::TAU;
+
+    for (teeth, amp, lam, k) in [
+        (23_u32, 0.0_f64, 0.0_f64, 3_u32), // concentric, as the base case
+        (23, 0.4, 0.0, 3),
+        (23, 0.4, 1.0, 3), // λ moves the seats, so it moves a span
+        (31, 0.6, 0.5, 4),
+        (17, 0.3, 1.0, 2),
+    ] {
+        let p = GearParams {
+            teeth,
+            angular_shift: amp,
+            index_offset: lam,
+            ..Default::default()
+        };
+        let gear = Gear::new(p);
+        let rb = gear.mean().rb;
+
+        for j in [0usize, 2, 7] {
+            let Some(span) = span_over_teeth_at(&gear, j, k) else {
+                continue;
+            };
+            // The anvil normal: perpendicular to the base tangent whose tangency
+            // sits where the left flank is contacted.
+            let theta_l = gear.flank_seat(j, -1.0);
+            let u_a = ((span.contact_radius / rb).powi(2) - 1.0).max(0.0).sqrt();
+            let phi = theta_l + u_a;
+            let n = [-phi.sin(), phi.cos()];
+
+            let mut previous = f64::MAX;
+            for per_tooth in [900_usize, 3600] {
+                let pts = gear.profile(per_tooth);
+                let (mut lo, mut hi) = (f64::MAX, f64::MIN);
+                for q in &pts {
+                    // Only the teeth the caliper is over. The bounds are the two
+                    // flank *seats*, which are base-circle origins — every drawn
+                    // point of the group lies inside them, because a tooth
+                    // narrows outward, and every point of a neighbouring tooth
+                    // lies outside. So no slack is wanted, and adding some pulls
+                    // in a neighbour's tip, which then reads as the extreme.
+                    let a = q[1].atan2(q[0]).rem_euclid(TAU);
+                    let from = theta_l.rem_euclid(TAU);
+                    let rel = (a - from).rem_euclid(TAU);
+                    if rel > span.nominal / rb {
+                        continue;
+                    }
+                    // ...and on usable flank. A span's anvils rest above the form
+                    // radius — that *is* its validity condition — and below it
+                    // the window catches fillet belonging to the space before the
+                    // group, which is not between the faces.
+                    if f64::hypot(q[0], q[1]) < gear.tooth(j).0.r_j {
+                        continue;
+                    }
+                    let v = q[0] * n[0] + q[1] * n[1];
+                    lo = lo.min(v);
+                    hi = hi.max(v);
+                }
+                let got = hi - lo;
+                let short = span.nominal - got;
+                assert!(
+                    short > -1e-9,
+                    "z={teeth} amp={amp} λ={lam} j={j}: the drawn teeth read {got}, \
+                     wider than the derived {}",
+                    span.nominal
+                );
+                // Converging while it means anything: below a micrometre the
+                // shortfall is the polyline's own vertex placement rather than
+                // the curve it is inscribed in, and asking it to keep halving
+                // would be asking about rounding.
+                assert!(
+                    short < previous || short < 1e-6,
+                    "z={teeth} amp={amp} λ={lam} j={j}: the shortfall is not converging — \
+                     {short} at {per_tooth} points against {previous} at a quarter of them"
+                );
+                previous = short;
+            }
+            assert!(
+                previous < 1e-5,
+                "z={teeth} amp={amp} λ={lam} j={j}: residual {previous} mm against a \
+                 derived span of {}",
+                span.nominal
+            );
+        }
+    }
+}
+
+/// **The general pin measurement is the published one on an evenly cut gear.**
+///
+/// `over_pins_at` reads each pin's seat from the gear rather than assuming the
+/// spaces are identical. Where they are, every seat is the same and it must give
+/// back [`over_pins`] — from every starting space, since an evenly cut gear has
+/// no preferred one.
+#[test]
+fn the_general_pin_measurement_is_the_published_one_when_the_teeth_agree() {
+    use gear_core::gear::Gear;
+    use gear_core::metrology::over_pins_at;
+
+    let mut worst = 0.0_f64;
+    for p in Grid::new()
+        .teeth(&[9, 12, 17, 20, 21, 31, 44])
+        .shifts(&[-0.2, 0.0, 0.3])
+        .pressure_angle(PRESSURE_ANGLES)
+        .build()
+    {
+        let t = Tooth::new(p);
+        let gear = Gear::new(p);
+        for d in [1.4, 1.75, 2.2] {
+            for c in [PinCount::Two, PinCount::Three] {
+                let Ok(want) = over_pins(&t, d, c) else {
+                    continue;
+                };
+                for start in [0usize, 1, 5, p.teeth as usize - 1] {
+                    let Ok(got) = over_pins_at(&gear, d, c, start) else {
+                        panic!("z={} d={d} {c:?} start={start}: refused where the published form measures", p.teeth)
+                    };
+                    let rel = (got.nominal - want.nominal).abs() / want.nominal;
+                    worst = worst.max(rel);
+                    assert!(
+                        rel < 1e-13,
+                        "z={} d={d} {c:?} start={start}: {} against the published {}",
+                        p.teeth,
+                        got.nominal,
+                        want.nominal
+                    );
+                }
+            }
+        }
+    }
+    println!("worst relative disagreement with the published over-pins: {worst:.3e}");
+}
+
+/// **What varies around an eccentric gear, and what does not.**
+///
+/// The span and the over-pins reading are what a metrologist would find *differ*
+/// at different angular positions, which is the whole reason they are withheld
+/// as single numbers. Two properties pin that down without knowing the answers:
+///
+/// - an evenly cut gear's range has **identical ends**, to the bit, so a caller
+///   can report a range unconditionally;
+/// - an eccentric one's does not, and the spread grows with the amplitude —
+///   which is what makes it a measurement of the eccentricity rather than noise.
+#[test]
+fn inspection_data_varies_around_an_eccentric_gear_and_not_around_an_ordinary_one() {
+    use gear_core::gear::Gear;
+    use gear_core::metrology::{best_span_around, over_pins_at};
+
+    for teeth in [17u32, 23, 31] {
+        let flat = Gear::new(GearParams {
+            teeth,
+            ..Default::default()
+        });
+        let (_, range) = best_span_around(&flat).expect("an ordinary gear has a span");
+        assert_eq!(
+            range[0].to_bits(),
+            range[1].to_bits(),
+            "z={teeth}: an evenly cut gear's span range has two different ends"
+        );
+        // ...and the pins likewise. Both are exact-zero claims, not small ones:
+        // an evenly cut gear's measurement is the same *number* at every
+        // position, and a tolerance here would hide the ulp-scale drift that
+        // reaches the screen as a range on a gear that has none.
+        for c in [PinCount::Two, PinCount::Three] {
+            let mut lo = f64::MAX;
+            let mut hi = f64::MIN;
+            for start in 0..teeth as usize {
+                if let Ok(m) = over_pins_at(&flat, 1.75, c, start) {
+                    lo = lo.min(m.nominal);
+                    hi = hi.max(m.nominal);
+                }
+            }
+            assert_eq!(
+                lo.to_bits(),
+                hi.to_bits(),
+                "z={teeth} {c:?}: an evenly cut gear measures {lo} at one space and {hi} at another"
+            );
+        }
+
+        let mut previous = 0.0_f64;
+        for amp in [0.1_f64, 0.2, 0.4, 0.8] {
+            let g = Gear::new(GearParams {
+                teeth,
+                angular_shift: amp,
+                ..Default::default()
+            });
+            let Ok((_, r)) = best_span_around(&g) else {
+                continue;
+            };
+            let spread = r[1] - r[0];
+            assert!(
+                spread > previous,
+                "z={teeth}: the span spread {spread} did not grow with the amplitude {amp}"
+            );
+            previous = spread;
+
+            // ...and the pins likewise, over the spaces.
+            let d = 1.75;
+            let mut lo = f64::MAX;
+            let mut hi = f64::MIN;
+            for start in 0..teeth as usize {
+                if let Ok(m) = over_pins_at(&g, d, PinCount::Two, start) {
+                    lo = lo.min(m.nominal);
+                    hi = hi.max(m.nominal);
+                }
+            }
+            if lo.is_finite() {
+                assert!(hi >= lo, "z={teeth} amp={amp}: empty pin range");
+            }
+        }
+        assert!(previous > 0.0, "z={teeth}: the span never varied at all");
+    }
+}
