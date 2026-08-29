@@ -17,6 +17,9 @@ layout and event handling only.
 > numbers: they cross the boundary from Rust, because the one that was written
 > down in both languages drifted — see docs/corrections.md.
 
+**Published at <https://git-akai.github.io/gearcalc/>**, from `main`, and only
+when every check has passed on that commit — see `docs/state.md`.
+
 ## The documents
 
 Four, split by what you came for. Nothing appears in two of them.

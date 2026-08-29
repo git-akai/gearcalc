@@ -30,6 +30,27 @@ tools/check_strings.py            # every ui message is used, and every use has 
 cd web && npm run check           # typecheck the front end
 ```
 
+## Where it is published
+
+<https://git-akai.github.io/gearcalc/>, from `main`, by `.github/workflows/ci.yml`.
+
+The deploy is `needs: tests`, so the site cannot move unless every check passed
+on that commit. The site is **packaged in the tests job** rather than rebuilt in
+the deploy one, so what is published is byte for byte what those checks ran
+against; `deploy` is a separate job only because publishing needs permissions
+nothing running project code should hold.
+
+Nothing about the build is Pages-specific. `base: "./"` makes every asset
+relative and the wasm resolves through `new URL(…, import.meta.url)`, so the
+site works at any subpath — and it fetches nothing external, so a static host is
+all it ever needs.
+
+```bash
+nix build .#web                   # the deployable site, in ./result
+cp -rL result public              # what CI hands to the upload; `result` is a
+chmod -R u+w public               # symlink into the read-only store
+```
+
 ## Driving the mathematics without a browser
 
 ```bash
