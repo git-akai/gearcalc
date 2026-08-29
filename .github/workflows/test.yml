@@ -35,6 +35,24 @@ jobs:
       # rather than a code one.
       - run: nix build .#web -L
 
+      # Every pointer from the code into the documents resolves to a heading
+      # that exists. 389 of these went unchecked until the documents were
+      # restructured, at which point every one of them would have broken
+      # silently.
+      - name: Documentation pointers resolve
+        run: nix develop --command tools/check_doc_links.py
+
+      # Every `ui.` message is used and every use has a message. The Rust side
+      # checks itself; this is the half no `Note` stands behind.
+      - name: The string catalogue is complete
+        run: nix develop --command tools/check_strings.py
+
+      # The committed TypeScript in `web/src/wire` is generated from the Rust
+      # types. Regenerating it and requiring no diff is what stops it becoming a
+      # third copy of the boundary that drifts like the hand-written one did.
+      - name: The generated bindings are up to date
+        run: nix develop --command tools/check_bindings.sh
+
       # Types are stripped by the bundler without being checked, so a type
       # error would otherwise only surface at runtime in the browser.
       - name: Typecheck the front end

@@ -21,27 +21,20 @@ const PENETRATION_LIMIT: f64 = 1e-12;
 /// `phase_resolution_has_converged`.
 const DEVIATION_LIMIT: f64 = 1e-3;
 
+mod common;
+use common::{Grid, PRESSURE_ANGLES};
+
+/// The cutter check's grid. Kept at its own tooth counts and shifts — this is
+/// the expensive test in the suite and the product is 1 080 cases — but drawn
+/// through the shared builder so the axes are named and the cost is visible.
 fn grid() -> Vec<GearParams> {
-    let mut v = Vec::new();
-    for teeth in [3u32, 5, 8, 9, 11, 13, 17, 23, 31, 47] {
-        for xi in [-5i32, -2, 0, 2, 5, 9] {
-            for pressure_angle in [14.5_f64, 20.0, 25.0] {
-                for helix_angle in [0.0_f64, 20.0] {
-                    for root_radius in [0.0_f64, 0.25, 0.38] {
-                        v.push(GearParams {
-                            teeth,
-                            profile_shift: f64::from(xi) * 0.1,
-                            pressure_angle,
-                            helix_angle,
-                            root_radius,
-                            ..Default::default()
-                        });
-                    }
-                }
-            }
-        }
-    }
-    v
+    Grid::new()
+        .teeth(&[3, 5, 8, 9, 11, 13, 17, 23, 31, 47])
+        .shifts(&[-0.5, -0.2, 0.0, 0.2, 0.5, 0.9])
+        .pressure_angle(PRESSURE_ANGLES)
+        .helix_angle(&[0.0, 20.0])
+        .root_radius(&[0.0, 0.25, 0.38])
+        .build()
 }
 
 #[test]

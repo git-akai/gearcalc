@@ -7,7 +7,7 @@
 //! a measurement — and returning a plausible number for one is worse than
 //! returning nothing.
 //!
-//! Per DESIGN.md §4.6, only **nominal** values are produced. Minimum and maximum
+//! Per docs/reference.md#metrology, only **nominal** values are produced. Minimum and maximum
 //! need a tooth thickness tolerance from JGMA 1103-01, which is not available;
 //! the result types carry the space for it so adding the data later is a data
 //! change rather than a redesign.
@@ -296,6 +296,22 @@ pub fn cutter_tip_width(g: &Gear) -> f64 {
         - 2.0 * p.module * (p.dedendum - p.profile_shift) * g.alpha_n.tan()
 }
 
+impl crate::note::Explain for MeasurementError {
+    /// Why the measurement cannot be taken, as a key and its values.
+    fn note(&self) -> crate::note::Note {
+        use crate::note::key;
+        crate::note::Note::new(match self {
+            Self::NoValidSpan => key::ERROR_MEASURE_NO_VALID_SPAN,
+            Self::PinContactOffFlank => key::ERROR_MEASURE_PIN_OFF_FLANK,
+            Self::PinBottomsOut => key::ERROR_MEASURE_PIN_BOTTOMS_OUT,
+            Self::PinTooSmall => key::ERROR_MEASURE_PIN_TOO_SMALL,
+            Self::PinTooLarge => key::ERROR_MEASURE_PIN_TOO_LARGE,
+        })
+    }
+}
+
+/// English, for the CLI and for `Debug`. **Not** what the browser renders — see
+/// [`MeasurementError::note`].
 impl std::fmt::Display for MeasurementError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -321,6 +337,11 @@ impl std::error::Error for MeasurementError {}
 /// spaces and you measure *between their inner surfaces*, so it **subtracts**.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct BetweenPins {
     pub pin_diameter: f64,
     /// Nominal measurement, mm.
@@ -329,7 +350,7 @@ pub struct BetweenPins {
     pub pin_centre_radius: f64,
     /// Radius at which the pin touches the flank.
     pub contact_radius: f64,
-    /// Space for the tolerance band once JGMA 1103-01 is available (§4.6), as on
+    /// Space for the tolerance band once JGMA 1103-01 is available (docs/reference.md#metrology), as on
     /// [`OverPins`].
     pub limits: Option<(f64, f64)>,
 }

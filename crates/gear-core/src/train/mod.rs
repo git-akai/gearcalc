@@ -13,13 +13,13 @@
 //!
 //! # What is state and what is not
 //!
-//! Per `docs/DESIGN.md` §3.1 the input structs here are the *only* state. Every
+//! Per `docs/rationale.md#inputs-are-the-only-state` the input structs here are the *only* state. Every
 //! result is recomputed from them, so nothing can go stale. Two consequences are
 //! visible in the shapes below:
 //!
 //! - Values shared across a stage — normal module, pressure angle, helix angle —
 //!   are stored **once on the stage**, not per gear, so the two cannot disagree
-//!   (§3.2).
+//!   (docs/rationale.md#inputs-are-the-only-state).
 //! - Tooth thickness modification is stored as `k₁` alone, with `k₂ = 2 − k₁`
 //!   derived, because a meshing pair must sum to 2. The invariant is unwritable
 //!   rather than merely tested.
@@ -36,7 +36,7 @@ mod worm;
 pub use planetary::{
     solve_planetary_stage, MeshReport, PlanetResult, PlanetaryResult, PlanetaryStage,
 };
-pub use spur::{solve_stage, SpurStage, StageGear};
+pub use spur::{solve_spur_stage, SpurStage, StageGear};
 pub use worm::{
     solve_crossed_stage, solve_worm_stage, FirstMemberSizing, WormContact, WormMember,
     WormMemberResult, WormResult, WormStage,
@@ -45,6 +45,11 @@ pub use worm::{
 /// The three contact ratios.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct ContactRatios {
     /// Transverse, `ε_α` — profile overlap.
     pub transverse: f64,
@@ -70,6 +75,11 @@ impl ContactRatios {
 /// Angular backlash at one gear, in degrees.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Backlash {
     pub nominal: f64,
     pub minimum: f64,
@@ -79,6 +89,11 @@ pub struct Backlash {
 /// What a stage does to one of its gears.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct GearResult {
     /// The shift in force, after any automatic calculation.
     pub profile_shift: f64,
@@ -94,7 +109,7 @@ pub struct GearResult {
     ///
     /// One cycle per revolution for a simple gear: a given tooth meets the mate
     /// once per turn. Sun and ring gears in a planetary stage see `N_planets`
-    /// per revolution, and a planet is a special case again — DESIGN.md §4.9.
+    /// per revolution, and a planet is a special case again — docs/reference.md#trains.
     pub tooth_cycles: f64,
     /// Tooth root bending stress, MPa. `None` where the stress correction is
     /// undefined for this section — see [`crate::strength::bending_stress`].
@@ -115,13 +130,18 @@ pub struct GearResult {
     ///
     /// Computed from the **resolved** parameters, so an automatic profile shift
     /// or addendum is already folded in. The UI bounds its fields by these
-    /// rather than by constants — see `docs/DESIGN.md` §4.3.1.
+    /// rather than by constants — see `docs/reference.md#input-ranges`.
     pub ranges: Ranges,
 }
 
 /// Everything a parallel-axis stage produces.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct SpurResult {
     /// `z₂ / z₁`.
     pub ratio: f64,
@@ -166,6 +186,28 @@ pub enum TrainError {
     Empty,
 }
 
+impl crate::note::Explain for TrainError {
+    /// Why the stage could not be solved, as a key and its values.
+    ///
+    /// The nested cases delegate rather than restating: a mesh that will not
+    /// mesh says so once, wherever it is asked.
+    fn note(&self) -> crate::note::Note {
+        use crate::note::{key, Note};
+        match self {
+            Self::Mesh(e) => e.note(),
+            Self::Screw(e) => e.note(),
+            Self::NoContact => Note::new(key::ERROR_TRAIN_NO_CONTACT),
+            Self::UnknownMaterial(n) => {
+                Note::new(key::ERROR_TRAIN_UNKNOWN_MATERIAL).text("name", n.clone())
+            }
+            Self::NoRootSection => Note::new(key::ERROR_TRAIN_NO_ROOT_SECTION),
+            Self::Empty => Note::new(key::ERROR_TRAIN_EMPTY),
+        }
+    }
+}
+
+/// English, for the CLI and for `Debug`. **Not** what the browser renders — see
+/// [`TrainError::note`].
 impl std::fmt::Display for TrainError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -211,10 +253,10 @@ impl std::error::Error for TrainError {}
 /// dependency on `gear-io`. Shared by every stage kind's tests.
 #[cfg(test)]
 pub(super) fn test_library() -> MaterialLibrary {
-    use crate::material::{Basis, Class, Measure, Value};
+    use crate::material::{Basis, Family, Measure, Value};
     let steel = Material {
         name: "4340 Hardened Steel".into(),
-        class: Class::Steel,
+        class: Family::Steel,
         grade: "test".into(),
         condition: "test".into(),
         source: "test".into(),
@@ -231,7 +273,7 @@ pub(super) fn test_library() -> MaterialLibrary {
     };
     let bronze = Material {
         name: "Brass C360".into(),
-        class: Class::Brass,
+        class: Family::Brass,
         elastic_modulus: Value::datasheet(97_000.0),
         poissons_ratio: Value::datasheet(0.321),
         ultimate_allowable: Value::datasheet(310.0),
@@ -253,6 +295,11 @@ pub(super) fn test_library() -> MaterialLibrary {
 /// file says what each stage is rather than relying on position.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 #[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
 pub enum Stage {
     Spur(SpurStage),
@@ -280,6 +327,11 @@ impl Default for Stage {
 /// result having to pretend to be the same shape.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 #[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
 pub enum StageResult {
     // Both variants are boxed. A result carries material records, admissible
@@ -386,7 +438,7 @@ impl StageResult {
             // A planetary's speeds are not the train's two-member pattern — it
             // has three shafts and its own kinematics already set them, so only
             // the cycles are filled here. Sun and ring meet a planet `N` times
-            // per revolution; the planet is the special case of §4.9, and what
+            // per revolution; the planet is the special case of docs/reference.md#trains, and what
             // fatigues it is its rotation **relative to the carrier**.
             Self::Planetary(r) => {
                 let n = f64::from(r.planets.max(1));
@@ -419,7 +471,9 @@ pub fn solve_any(
         Stage::Spur(s) if s.is_crossed() => {
             solve_crossed_stage(s, input_torque, lib).map(|r| StageResult::Worm(Box::new(r)))
         }
-        Stage::Spur(s) => solve_stage(s, input_torque, lib).map(|r| StageResult::Spur(Box::new(r))),
+        Stage::Spur(s) => {
+            solve_spur_stage(s, input_torque, lib).map(|r| StageResult::Spur(Box::new(r)))
+        }
         Stage::Worm(s) => {
             solve_worm_stage(s, input_torque, lib).map(|r| StageResult::Worm(Box::new(r)))
         }
@@ -434,6 +488,11 @@ pub fn solve_any(
 /// How the train is used, which is what turns a ratio into a tooth count.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum Actuation {
     /// A limited sweep, repeated. The range is measured **at the output**, so
@@ -464,6 +523,11 @@ impl Default for Actuation {
 /// A whole geartrain.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Train {
     /// Peak input speed, rpm.
     pub input_speed: f64,
@@ -476,6 +540,11 @@ pub struct Train {
 /// What a train produces.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct TrainResult {
     /// Product of the stage ratios.
     pub total_ratio: f64,
@@ -552,7 +621,7 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
         let speed_in = train.input_speed / upstream;
         let speeds = [speed_in, speed_in / ratios[k]];
 
-        // The reduction between each member and the output. Member 0 of a stage
+        // The reduction between each member and the output. MeshSide 0 of a stage
         // sits before that stage's own mesh, member 1 after it.
         let cycles = [0usize, 1].map(|i| {
             let to_output: f64 = if i == 0 {
@@ -756,7 +825,7 @@ mod tests {
     /// now follows the **dedendum** by default instead of sitting at a fixed
     /// module. The two are different questions — "is the flank undercut within a
     /// module of depth?" against "is it undercut at all?" — and at α = 20° with
-    /// a sharp rack they part company at 18 teeth and 22 (§4.3). Following the
+    /// a sharp rack they part company at 18 teeth and 22 (docs/reference.md#automatic-values). Following the
     /// dedendum also means a gear cut shallower is asked about its own depth
     /// rather than about a convention.
     ///
@@ -788,7 +857,7 @@ mod tests {
                 ],
                 ..Default::default()
             };
-            solve_stage(&stage, 2.0, &lib)
+            solve_spur_stage(&stage, 2.0, &lib)
                 .expect("a solvable stage")
                 .gears[0]
                 .profile_shift
@@ -842,7 +911,7 @@ mod tests {
     /// The direction is the law and is asserted as one: separating the centres
     /// can only shorten the path of contact. Everything downstream follows —
     /// less load sharing, so more bending stress — which is why the numbers
-    /// moved when this landed (DESIGN §4.4).
+    /// moved when this landed (docs/reference.md#centre-distance-and-backlash).
     ///
     /// Backlash is deliberately *not* in this test's scope: it measures play
     /// against the zero-backlash reference and keeps the design mesh. That
@@ -856,7 +925,7 @@ mod tests {
         };
         let mut previous: Option<(f64, f64)> = None;
         for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
-            let r = solve_stage(&stage(clearance), 2.0, &lib).unwrap();
+            let r = solve_spur_stage(&stage(clearance), 2.0, &lib).unwrap();
             let eps = r.contact_ratios.transverse;
             let bending = r.gears[0].bending_stress.expect("a rateable tooth");
             if let Some((was_eps, was_bending)) = previous {
@@ -878,12 +947,12 @@ mod tests {
     #[test]
     fn a_spur_stage_has_exactly_zero_overlap_and_a_helical_one_does_not() {
         let lib = library();
-        let spur = solve_stage(&SpurStage::default(), 2.0, &lib).unwrap();
+        let spur = solve_spur_stage(&SpurStage::default(), 2.0, &lib).unwrap();
         assert_eq!(spur.contact_ratios.overlap, 0.0, "must be exactly zero");
         assert_eq!(spur.contact_ratios.total, spur.contact_ratios.transverse);
         assert!(!spur.contact_ratios.has_full_axial_overlap());
 
-        let helical = solve_stage(
+        let helical = solve_spur_stage(
             &SpurStage {
                 additional_helix: 20.0,
                 ..SpurStage::default()
@@ -939,7 +1008,7 @@ mod tests {
                 g.auto_face_from_bending = bending;
                 g.auto_face_from_contact = contact;
             }
-            solve_stage(&s, 2.0, &lib).unwrap().gears[0].face_width
+            solve_spur_stage(&s, 2.0, &lib).unwrap().gears[0].face_width
         };
         let b = auto_both(true, false);
         let c = auto_both(false, true);
@@ -1014,7 +1083,7 @@ mod tests {
                 g.addendum = Auto::automatic(1.0);
                 g.min_tip_width = want;
             }
-            let r = solve_stage(&stage, 2.0, &library()).unwrap();
+            let r = solve_spur_stage(&stage, 2.0, &library()).unwrap();
 
             for i in 0..2 {
                 let built = Gear::new(stage.params(i));
@@ -1034,10 +1103,10 @@ mod tests {
     #[test]
     fn a_manual_centre_distance_ignores_the_clearance() {
         let lib = library();
-        let auto = solve_stage(&SpurStage::default(), 2.0, &lib).unwrap();
+        let auto = solve_spur_stage(&SpurStage::default(), 2.0, &lib).unwrap();
 
         // The same distance, set by hand, with a clearance that must be ignored.
-        let manual = solve_stage(
+        let manual = solve_spur_stage(
             &SpurStage {
                 centre_distance: Auto::fixed(auto.centre_distance_nominal),
                 clearance: 0.5,
@@ -1068,7 +1137,7 @@ mod tests {
                 g.auto_face_from_bending = false;
                 g.material_overrides = o;
             }
-            solve_stage(&s, 2.0, &lib).unwrap()
+            solve_spur_stage(&s, 2.0, &lib).unwrap()
         };
 
         let base = auto_width(Overrides::default());
@@ -1106,7 +1175,7 @@ mod tests {
                     ..Default::default()
                 };
             }
-            solve_stage(&s, 2.0, &lib).unwrap().gears[0].contact_stress
+            solve_spur_stage(&s, 2.0, &lib).unwrap().gears[0].contact_stress
         };
         let base = at(None);
         let quarter = at(Some(190_000.0 / 4.0));
@@ -1120,7 +1189,7 @@ mod tests {
     fn an_unknown_material_is_named_rather_than_swallowed() {
         let mut s = SpurStage::default();
         s.gears[0].material = "unobtainium".into();
-        let e = solve_stage(&s, 2.0, &library()).unwrap_err();
+        let e = solve_spur_stage(&s, 2.0, &library()).unwrap_err();
         assert!(matches!(e, TrainError::UnknownMaterial(ref n) if n == "unobtainium"));
         assert!(e.to_string().contains("unobtainium"));
     }

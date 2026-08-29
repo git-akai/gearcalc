@@ -67,7 +67,7 @@ pub struct ShaperCut {
     /// all — can take it from the tool rather than inferring it from the
     /// workpiece. Inferring it is what made that simulation unable to see a
     /// misplaced cutter: it derived the same wrong tooth the model did, agreed
-    /// with itself to 2.7 µm, and said nothing. §12.
+    /// with itself to 2.7 µm, and said nothing. docs/corrections.md.
     pub cutter_tooth: f64,
     /// Operating pressure angle of the cut, radians.
     ///
@@ -117,7 +117,7 @@ pub struct CutParams {
     /// cutter that would complement an *unshifted* workpiece at reference
     /// centres. Deriving it meant a shifted workpiece was described as having
     /// been cut by a thicker tool than exists, and — because the cut simulation
-    /// derived the cutter the same way — nothing could see it. §12.
+    /// derived the cutter the same way — nothing could see it. docs/corrections.md.
     pub cutter_tooth: f64,
     /// Centre distance the cut happens at, mm.
     pub centre_distance: f64,
@@ -163,11 +163,7 @@ impl ShaperCut {
         // scaled by the same `a / a_ref` — so a shift enters the kinematics as
         // one factor rather than as a second construction. The phase is an arc
         // on those circles, so it scales with them.
-        let sigma = match p.kind {
-            MeshKind::External => 1.0,
-            MeshKind::Internal => -1.0,
-        };
-        let a_ref = p.workpiece_radius + sigma * cutter_radius;
+        let a_ref = p.workpiece_radius + p.kind.sign() * cutter_radius;
         if !a_ref.is_finite() || a_ref == 0.0 || !p.centre_distance.is_finite() {
             return None;
         }
@@ -198,19 +194,11 @@ impl ShaperCut {
 }
 
 impl ShaperCut {
-    /// `+1` for an external workpiece, `−1` for an internal one.
-    fn sigma(&self) -> f64 {
-        match self.kind {
-            MeshKind::External => 1.0,
-            MeshKind::Internal => -1.0,
-        }
-    }
-
     /// Reference centre distance, mm — where the cut would sit with neither
     /// member shifted.
     #[must_use]
     pub fn reference_centre_distance(&self) -> f64 {
-        self.workpiece_radius + self.sigma() * self.cutter_radius
+        self.workpiece_radius + self.kind.sign() * self.cutter_radius
     }
 
     /// The cutter's tip-round centre, in the fixed frame, at pitch-line travel
@@ -221,7 +209,7 @@ impl ShaperCut {
     /// `s / r_c` at that point.
     #[must_use]
     pub fn corner_centre_at(&self, s: f64) -> (f64, f64) {
-        let sigma = self.sigma();
+        let sigma = self.kind.sign();
         let (sin_phi, cos_phi) = (s / self.cutter_operating_radius).sin_cos();
         (
             self.corner_radius * sin_phi,
@@ -282,7 +270,7 @@ impl ShaperCut {
     #[must_use]
     pub fn trochoid_point_and_tangent(&self, s: f64) -> ([f64; 2], [f64; 2]) {
         let r = self.workpiece_operating_radius;
-        let sigma = self.sigma();
+        let sigma = self.kind.sign();
         let rc = self.corner_radius;
 
         // The corner centre and its velocity. `φ_c = s / r′_c`, so the cutter
@@ -313,6 +301,55 @@ impl ShaperCut {
         let dxx = du * c - dv * sn - dphi * y;
         let dyy = du * sn + dv * c + dphi * x;
         ([x, y], [dxx, dyy])
+    }
+
+    /// Radius of curvature of the generated fillet at cutter travel `s`, mm.
+    ///
+    /// Closed form, and the same construction as
+    /// [`trochoid_point_and_tangent`](Self::trochoid_point_and_tangent) carried
+    /// one derivative further — the corner centre runs on a *circle* here where
+    /// the rack's runs on a line, so it has a centripetal term the rack's does
+    /// not:
+    ///
+    /// ```text
+    /// c   = ( r_c sin φ_c , a − σ r_c cos φ_c )        φ_c = s / r′_c
+    /// c′  = r_c ω ( cos φ_c , σ sin φ_c )              ω   = 1 / r′_c
+    /// c″  = r_c ω² ( −sin φ_c , σ cos φ_c )
+    /// ```
+    ///
+    /// The rolling itself is [`rolling_curvature_radius`](crate::profile::rolling_curvature_radius),
+    /// shared with the rack — one formula rather than the two central
+    /// differences this replaced.
+    #[must_use]
+    pub fn trochoid_curvature_radius(&self, s: f64) -> f64 {
+        let r = self.workpiece_operating_radius;
+        let sigma = self.kind.sign();
+        let rc = self.corner_radius;
+
+        let w = 1.0 / self.cutter_operating_radius;
+        let (sin_c, cos_c) = (s * w).sin_cos();
+        let c = [rc * sin_c, self.centre_distance - sigma * rc * cos_c];
+        let dc = [rc * w * cos_c, sigma * rc * w * sin_c];
+        let ddc = [-rc * w * w * sin_c, sigma * rc * w * w * cos_c];
+
+        // From the pitch point to the corner centre, then a further ρ along it.
+        let (dx, dy) = (c[0], c[1] - r);
+        let d = f64::hypot(dx, dy);
+        let dd = (dx * dc[0] + dy * dc[1]) / d;
+        let ddd = (dc[0] * dc[0] + dx * ddc[0] + dc[1] * dc[1] + dy * ddc[1] - dd * dd) / d;
+
+        let k = 1.0 + self.tip_round / d;
+        let dk = -self.tip_round * dd / (d * d);
+        let ddk = -self.tip_round * (ddd * d - 2.0 * dd * dd) / d.powi(3);
+
+        let q = [k * dx, r + k * dy];
+        let dq = [dk * dx + k * dc[0], dk * dy + k * dc[1]];
+        let ddq = [
+            ddk * dx + 2.0 * dk * dc[0] + k * ddc[0],
+            ddk * dy + 2.0 * dk * dc[1] + k * ddc[1],
+        ];
+
+        crate::profile::rolling_curvature_radius(q, dq, ddq, 1.0 / r)
     }
 
     /// Where the cutter's tip-round centre sits, as an angle from the cutter's
@@ -388,10 +425,7 @@ impl ShaperCut {
             return None;
         }
         let cutter_radius = f64::from(cutter_teeth) * g.mt / 2.0;
-        let sigma = match kind {
-            MeshKind::External => 1.0,
-            MeshKind::Internal => -1.0,
-        };
+        let sigma = kind.sign();
         let centre = g.r + sigma * cutter_radius;
         // Reach the same *depth* the rack does. A ring's dedendum goes outward,
         // so its root is one dedendum beyond the pitch circle rather than one

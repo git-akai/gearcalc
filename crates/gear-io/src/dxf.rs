@@ -389,7 +389,7 @@ mod tests {
     fn a_rings_dxf_carries_its_rim_as_a_construction_circle() {
         use gear_core::ring::{Cutter, Ring};
 
-        let ring = Ring::new(
+        let ring = Ring::cut_by(
             &GearParams {
                 teeth: 60,
                 ..GearParams::default()

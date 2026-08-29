@@ -1,6 +1,6 @@
 // The words, and nothing else.
 //
-// Per DESIGN.md §12 the catalogue comes from Rust — `gear_wasm::strings` — for
+// Per docs/corrections.md the catalogue comes from Rust — `gear_wasm::strings` — for
 // the same reason the defaults do. This module only holds it and fills in the
 // blanks.
 //

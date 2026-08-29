@@ -4,7 +4,7 @@
 `gear-core`'s `screw.rs` builds a crossed pair's line of action as a *construction
 in lines*: the contact normal has a fixed direction, fixed by two properties of
 an involute helicoid, and the line of action is the one line with that direction
-tangent to both base cylinders. That is DESIGN.md 4.5.1, and it shares no code
+tangent to both base cylinders. That is docs/reference.md#crossed-axes, and it shares no code
 with what this script does.
 
 Here the two flanks are built as parametric surfaces from their own definition --

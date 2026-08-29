@@ -16,36 +16,63 @@
 
 use gear_core::jgma;
 use gear_core::metrology::{self, PinCount};
+use gear_core::note::{Explain, Note};
 use gear_core::{Gear, GearParams};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 /// Everything the UI asks about one gear.
 #[derive(Deserialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct GearRequest {
     pub params: GearParams,
     /// Pin or ball diameter for the over-pins measurement, mm.
     #[serde(default)]
+    #[cfg_attr(feature = "typescript", ts(optional))]
     pub pin_diameter: Option<f64>,
     /// Tolerance class, as `{ "scale": "fine" | "standard", "grade": n }`.
     #[serde(default)]
+    #[cfg_attr(feature = "typescript", ts(optional))]
     pub tolerance_class: Option<ClassRef>,
     /// Maximum deviation of the exported outline from the true curve, mm.
     #[serde(default)]
+    #[cfg_attr(feature = "typescript", ts(optional))]
     pub chord_tolerance: Option<f64>,
     /// Include the pitch, base, tip and root circles in the DXF.
-    #[serde(default = "yes")]
-    pub reference_circles: bool,
+    ///
+    /// `None` is "not stated", which is not the same as `false` — and saying so
+    /// in the type is what lets the generated TypeScript describe the request a
+    /// caller actually builds. [`REFERENCE_CIRCLES_BY_DEFAULT`] is the value.
+    #[serde(default)]
+    #[cfg_attr(feature = "typescript", ts(optional))]
+    pub reference_circles: Option<bool>,
     /// Depth, in modules, at which the undercut question is asked.
-    #[serde(default = "one")]
-    pub working_depth: f64,
+    ///
+    /// `None` takes [`WORKING_DEPTH_BY_DEFAULT`]. Optional for the same reason:
+    /// the gear tab has no control for it, so it is genuinely absent.
+    #[serde(default)]
+    #[cfg_attr(feature = "typescript", ts(optional))]
+    pub working_depth: Option<f64>,
     /// What this gear runs against, when the answer depends on it.
     ///
     /// Only an **eccentric** gear has such an answer today — the centre distance
     /// its mesh commands around a revolution — and a concentric one has nothing
     /// that varies for a mate to be needed for. Absent means "do not ask".
     #[serde(default)]
+    #[cfg_attr(feature = "typescript", ts(optional))]
     pub mate: Option<MateRef>,
+    /// Size the eccentricity by the **centre-distance throw** instead of the
+    /// angular-shift amplitude: the amplitude is then solved so the commanded
+    /// centre distance's best-fit sinusoid has this half-amplitude, mm. Signed —
+    /// the sign carries to `angular_shift` (which end runs thick). Needs the
+    /// mate. Absent leaves `params.angular_shift` as the input.
+    #[serde(default)]
+    #[cfg_attr(feature = "typescript", ts(optional))]
+    pub eccentric_throw: Option<f64>,
 }
 
 /// The gear on the other side, as far as a commanded centre distance needs it.
@@ -54,6 +81,11 @@ pub struct GearRequest {
 /// and helix by definition — a pair that did not could not mesh — so sending
 /// them again would be sending a constraint that can be broken.
 #[derive(Deserialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct MateRef {
     pub teeth: u32,
     #[serde(default)]
@@ -63,15 +95,21 @@ pub struct MateRef {
     pub internal: bool,
 }
 
-fn one() -> f64 {
-    1.0
-}
+/// The depth the undercut question is asked at when a request does not say.
+///
+/// One module — the classical rule's own assumption, and the gear tab has no
+/// control for it. A *stage* does, and follows its own dedendum instead (docs/reference.md#automatic-values).
+const WORKING_DEPTH_BY_DEFAULT: f64 = 1.0;
 
-fn yes() -> bool {
-    true
-}
+/// Reference circles go into a drawing unless a request says otherwise.
+const REFERENCE_CIRCLES_BY_DEFAULT: bool = true;
 
 #[derive(Clone, Deserialize, Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct ClassRef {
     pub scale: String,
     pub grade: u8,
@@ -100,38 +138,63 @@ impl ClassRef {
 
 /// A value, or the reason there is not one.
 #[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 #[serde(untagged)]
 pub enum Maybe<T> {
     Value(T),
-    Unavailable { unavailable: String },
+    Unavailable { unavailable: gear_core::note::Note },
 }
 
 impl<T> Maybe<T> {
-    fn from<E: std::fmt::Display>(r: Result<T, E>) -> Self {
+    fn from<E: gear_core::note::Explain>(r: Result<T, E>) -> Self {
         match r {
             Ok(v) => Self::Value(v),
             Err(e) => Self::Unavailable {
-                unavailable: e.to_string(),
+                unavailable: e.note(),
             },
         }
     }
 }
 
 #[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct SpanOut {
     pub teeth_spanned: u32,
     pub nominal: f64,
     pub contact_radius: f64,
 }
 
+/// A measurement over (or between) pins.
+///
+/// The nominal figure only. `metrology::OverPins` also carries the pin centre
+/// and contact radii — they are how the measurement is *derived*, and how its
+/// tangency is verified against the generated flank — but nothing displays
+/// them, and a field on the wire that no one reads is a field that can go wrong
+/// unnoticed.
 #[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct PinsOut {
     pub nominal: f64,
-    pub pin_centre_radius: f64,
-    pub contact_radius: f64,
 }
 
 #[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct ToleranceOut {
     pub class: ClassRef,
     pub tooth_to_tooth: f64,
@@ -142,6 +205,11 @@ pub struct ToleranceOut {
 ///
 /// Lengths are millimetres, angles degrees, composite errors micrometres.
 #[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct GearSummary {
     /// Every bound on this gear's inputs.
     ///
@@ -160,7 +228,7 @@ pub struct GearSummary {
     ///
     /// Both are served rather than one derived from the other on the far side,
     /// because doubling a number is arithmetic and arithmetic belongs here: the
-    /// UI displays what Rust computed and nothing else (DESIGN §1).
+    /// UI displays what Rust computed and nothing else (docs/rationale.md#the-stack).
     pub pitch_diameter: f64,
     pub base_diameter: f64,
     pub tip_diameter: f64,
@@ -169,17 +237,27 @@ pub struct GearSummary {
     pub fillet_radius: f64,
     pub transverse_pressure_angle: f64,
     pub cutter_tip_width: f64,
+    /// Whether **any** tooth is undercut / severed — for a concentric gear that
+    /// is its only tooth; for an eccentric one the short teeth can while the mean
+    /// does not, and `per_tooth_clamps` names which and where.
     pub undercut: bool,
     pub severed: bool,
-    /// Guards that altered the requested geometry. Empty is the normal case.
+    /// Tool-level guards that altered the requested geometry — for an eccentric
+    /// gear the shared cutter's, with per-tooth clamps in `per_tooth_clamps`.
+    /// Empty is the normal case.
     pub clamps: Vec<gear_core::note::Note>,
+
+    /// The angular-shift amplitude in force, modules. Normally the input; when
+    /// the eccentricity was sized by a centre-distance throw instead, this is
+    /// the value solved for — the field the UI shows in place of the throw.
+    pub angular_shift: f64,
 
     /// What varies around the revolution. Every field is zero for an ordinary
     /// gear, so it crosses unconditionally rather than behind a flag.
     pub variation: gear_core::eccentric::Variation,
     /// Teeth that came out other than as drawn, and why. Empty is the normal
     /// case, for an ordinary gear and for a buildable eccentric one alike.
-    pub troubled_teeth: gear_core::eccentric::Trouble,
+    pub per_tooth_clamps: gear_core::eccentric::PerToothClamps,
     /// The centre distance this gear's mesh commands around a revolution.
     ///
     /// Needs a mate, so it is `Unavailable` with the reason when none was sent —
@@ -196,7 +274,20 @@ pub struct GearSummary {
     pub tolerance: Maybe<ToleranceOut>,
 }
 
-fn summarise(g: &Gear, req: &GearRequest) -> GearSummary {
+fn summarise(
+    ecc: &gear_core::eccentric::Eccentric,
+    req: &GearRequest,
+    params: GearParams,
+) -> GearSummary {
+    // The mean tooth is quoted from, but it is cut by the **shared** tool: an
+    // eccentric gear's teeth are rebuilt to the greatest depth any of them needs
+    // and the smallest tip round any of them allows, and `Eccentric::mean`
+    // carries the same. So `fillet_radius`, `cutter_tip_width` and the root
+    // radius describe a tooth the gear actually has rather than the one the raw
+    // inputs would have produced. For a concentric gear the mean *is*
+    // `Gear::new(params)`, bit for bit.
+    let g = ecc.mean();
+    let eccentric = ecc.distinct_teeth() > 1;
     let pitch_diameter = 2.0 * g.r;
     let available = jgma::available_classes(g.params.module, pitch_diameter);
 
@@ -214,33 +305,54 @@ fn summarise(g: &Gear, req: &GearRequest) -> GearSummary {
                 total: e.total,
             }),
             None => Maybe::Unavailable {
-                unavailable: format!(
-                    "JGMA 116-02 has no {c} entry for module {} at {pitch_diameter:.3} mm",
-                    g.params.module
-                ),
+                unavailable: Note::new("ui.gear_tolerance_no_entry")
+                    .text("class", c.to_string())
+                    .number("module", g.params.module, 3)
+                    .number("diameter", pitch_diameter, 3),
             },
         },
         None => Maybe::Unavailable {
-            unavailable: format!(
-                "JGMA 116-02 does not cover module {} at {pitch_diameter:.3} mm",
-                g.params.module
-            ),
+            unavailable: Note::new("ui.gear_tolerance_not_covered")
+                .number("module", g.params.module, 3)
+                .number("diameter", pitch_diameter, 3),
         },
     };
 
-    let pins = |count| match req.pin_diameter {
-        Some(d) => Maybe::from(metrology::over_pins(g, d, count).map(|p| PinsOut {
-            nominal: p.nominal,
-            pin_centre_radius: p.pin_centre_radius,
-            contact_radius: p.contact_radius,
-        })),
-        None => Maybe::Unavailable {
-            unavailable: "no pin diameter given".to_string(),
+    // Span and over-pins vary around the revolution on an eccentric gear — a
+    // metrologist reads a different value at every angular position — and the
+    // ranged form is not built (docs/reference.md#angularly-varying-profile-shift). One number would read as *the*
+    // span, so it is withheld with the reason rather than quoted at the mean.
+    //
+    // A **catalogue key**, not a sentence. `Maybe::Unavailable` has always
+    // carried English from this crate; the front end runs every reason through
+    // `t()`, which returns its argument unchanged when there is no message for
+    // it, so a key resolves and the reasons not yet moved still render as they
+    // are. That is the migration path for the rest of them, and for the error
+    // enums (docs/rationale.md#no-english-in-gear-core-and-no-engineering-in-the-catalogue).
+    let varies = Note::new("ui.gear_measurement_varies");
+
+    let pins = |count| match (eccentric, req.pin_diameter) {
+        (true, _) => Maybe::Unavailable {
+            unavailable: varies.clone(),
+        },
+        (false, Some(d)) => {
+            Maybe::from(metrology::over_pins(g, d, count).map(|p| PinsOut { nominal: p.nominal }))
+        }
+        (false, None) => Maybe::Unavailable {
+            unavailable: Note::new("ui.gear_no_pin_diameter"),
         },
     };
 
     GearSummary {
-        ranges: gear_core::auto::admissible_ranges(&g.params, req.working_depth),
+        // Bounds on the input fields, against the resolved params — the mean
+        // shift and the amplitude in force (solved, if the eccentricity was
+        // sized by a throw), but the dedendum and root radius as typed, not the
+        // shared cutter's. `admissible_ranges` closes the shift-dependent bounds
+        // onto the swept interval from that amplitude (docs/reference.md#angularly-varying-profile-shift).
+        ranges: gear_core::auto::admissible_ranges(
+            &params,
+            req.working_depth.unwrap_or(WORKING_DEPTH_BY_DEFAULT),
+        ),
         pitch_radius: g.r,
         base_radius: g.rb,
         tip_radius: g.ra,
@@ -253,19 +365,28 @@ fn summarise(g: &Gear, req: &GearRequest) -> GearSummary {
         fillet_radius: g.rho,
         transverse_pressure_angle: g.alpha_t.to_degrees(),
         cutter_tip_width: metrology::cutter_tip_width(g),
-        undercut: g.undercut,
-        severed: g.severed,
+        // "Is this gear undercut / severed?" — **any** tooth, not the mean one.
+        // A concentric gear has one distinct tooth, so this is `g.undercut`
+        // unchanged; an eccentric gear's short teeth can undercut while the mean
+        // does not, and `per_tooth_clamps` says which and where.
+        undercut: ecc.distinct().any(|t| t.undercut),
+        severed: ecc.distinct().any(|t| t.severed),
         clamps: g.clamps.notes.clone(),
-        // Built from the same params the gear was, so the two cannot describe
-        // different gears. Zero throughout for an ordinary one.
-        variation: gear_core::eccentric::Eccentric::new(g.params).variation(),
-        troubled_teeth: gear_core::eccentric::Eccentric::new(g.params).troubled_teeth(),
-        centre_profile: centre_profile(req),
-        span: Maybe::from(metrology::best_span(g).map(|s| SpanOut {
-            teeth_spanned: s.teeth_spanned,
-            nominal: s.nominal,
-            contact_radius: s.contact_radius,
-        })),
+        angular_shift: params.angular_shift,
+        variation: ecc.variation(),
+        per_tooth_clamps: ecc.per_tooth_clamps(),
+        centre_profile: centre_profile(params, req),
+        span: if eccentric {
+            Maybe::Unavailable {
+                unavailable: varies.clone(),
+            }
+        } else {
+            Maybe::from(metrology::best_span(g).map(|s| SpanOut {
+                teeth_spanned: s.teeth_spanned,
+                nominal: s.nominal,
+                contact_radius: s.contact_radius,
+            }))
+        },
         over_two_pins: pins(PinCount::Two),
         over_three_pins: pins(PinCount::Three),
         available_classes: available.into_iter().map(ClassRef::from_class).collect(),
@@ -286,21 +407,34 @@ fn summarise(g: &Gear, req: &GearRequest) -> GearSummary {
 /// rating yet, and it has something an external gear does not — the cutter that
 /// shaped it, without which its fillet is undefined.
 #[derive(Deserialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct RingRequest {
     pub params: GearParams,
     /// Pin or ball diameter for the between-pins measurement, mm.
     #[serde(default)]
+    #[cfg_attr(feature = "typescript", ts(optional))]
     pub pin_diameter: Option<f64>,
     #[serde(default)]
     pub cutter: CutterRef,
     #[serde(default)]
+    #[cfg_attr(feature = "typescript", ts(optional))]
     pub chord_tolerance: Option<f64>,
-    #[serde(default = "yes")]
-    pub reference_circles: bool,
+    #[serde(default)]
+    #[cfg_attr(feature = "typescript", ts(optional))]
+    pub reference_circles: Option<bool>,
 }
 
 /// The pinion cutter, as the UI sends it.
 #[derive(Clone, Copy, Deserialize, Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct CutterRef {
     pub teeth: u32,
     /// Addendum, in modules.
@@ -336,6 +470,11 @@ impl CutterRef {
 /// fillet at all is not "a root arc between the fillets", and saying so put a
 /// description of a fillet next to a drawing that had none.
 #[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 #[serde(rename_all = "snake_case")]
 pub enum RootForm {
     /// The fillets from the two flanks meet before mid-space: no flat at all.
@@ -349,6 +488,11 @@ pub enum RootForm {
 
 /// What the UI shows for a ring.
 #[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct RingSummary {
     pub teeth: u32,
     pub transverse_module: f64,
@@ -394,7 +538,7 @@ pub struct RingSummary {
 }
 
 fn ring_of(req: &RingRequest) -> gear_core::ring::Ring {
-    gear_core::ring::Ring::new(&req.params, &req.cutter.to_cutter())
+    gear_core::ring::Ring::cut_by(&req.params, &req.cutter.to_cutter())
 }
 
 fn smallest_tooth_count(params: &GearParams) -> u32 {
@@ -436,13 +580,11 @@ fn solve_ring_impl(input: &str) -> Result<String, String> {
         fully_generated: g.fully_generated(),
         smallest_tooth_count: smallest_tooth_count(&req.params),
         between_pins: match req.pin_diameter {
-            Some(d) => Maybe::from(metrology::between_pins(&g, d).map(|p| PinsOut {
-                nominal: p.nominal,
-                pin_centre_radius: p.pin_centre_radius,
-                contact_radius: p.contact_radius,
-            })),
+            Some(d) => {
+                Maybe::from(metrology::between_pins(&g, d).map(|p| PinsOut { nominal: p.nominal }))
+            }
             None => Maybe::Unavailable {
-                unavailable: "no pin diameter given".into(),
+                unavailable: Note::new("ui.gear_no_pin_diameter"),
             },
         },
         clamps: g.clamps.clone(),
@@ -467,7 +609,9 @@ fn export_ring_dxf_impl(input: &str) -> Result<String, String> {
             chord_tolerance: req
                 .chord_tolerance
                 .unwrap_or(gear_core::outline::DEFAULT_CHORD_TOLERANCE),
-            reference_circles: req.reference_circles,
+            reference_circles: req
+                .reference_circles
+                .unwrap_or(REFERENCE_CIRCLES_BY_DEFAULT),
         },
     ))
 }
@@ -476,15 +620,73 @@ fn parse(input: &str) -> Result<GearRequest, String> {
     serde_json::from_str(input).map_err(|e| format!("bad gear request: {e}"))
 }
 
+/// The mate, built as an ordinary gear from the shared module, pressure angle
+/// and helix plus its own tooth count and shift — and its mesh kind. `None`
+/// when no mate was sent.
+fn eccentric_mate(req: &GearRequest) -> Option<(Gear, gear_core::mesh::MeshKind)> {
+    let mate = req.mate.as_ref()?;
+    let g = Gear::new(GearParams {
+        teeth: mate.teeth,
+        profile_shift: mate.profile_shift,
+        angular_shift: 0.0,
+        index_offset: 0.0,
+        ..req.params
+    });
+    let kind = if mate.internal {
+        gear_core::mesh::MeshKind::Internal
+    } else {
+        gear_core::mesh::MeshKind::External
+    };
+    Some((g, kind))
+}
+
+/// `req.params`, with `angular_shift` solved from `eccentric_throw` when that is
+/// the input. One downstream inversion at the boundary — every entry point runs
+/// it, and everything past it is built from `angular_shift` exactly as before.
+fn resolved_params(req: &GearRequest) -> Result<GearParams, String> {
+    let Some(target) = req.eccentric_throw else {
+        return Ok(req.params);
+    };
+    let (mate, kind) = eccentric_mate(req).ok_or_else(|| {
+        "a centre-distance throw is commanded against a mate — set the mate's tooth count"
+            .to_string()
+    })?;
+    let magnitude = gear_core::eccentric::amplitude_for_throw(
+        req.params,
+        &mate,
+        kind,
+        gear_core::mesh::MeshSide::First,
+        target.abs(),
+    )
+    .map_err(|_| {
+        format!(
+            "a centre-distance throw of {:.4} mm is not reachable with this mate — a larger \
+             tooth-count difference or a mean shift nearer zero each raise the throw a pair \
+             can deliver",
+            target.abs()
+        )
+    })?;
+    Ok(GearParams {
+        angular_shift: magnitude.copysign(target),
+        ..req.params
+    })
+}
+
 fn solve_gear_impl(input: &str) -> Result<String, String> {
     let req = parse(input)?;
-    let g = Gear::new(req.params);
-    serde_json::to_string(&summarise(&g, &req)).map_err(|e| format!("could not encode result: {e}"))
+    let params = resolved_params(&req)?;
+    // One construction for both kinds: a concentric gear is the `Δx = 0`
+    // degenerate of the eccentric assembly, and its `mean` is `Gear::new`
+    // verbatim. Building it here means every scalar the summary quotes is a
+    // tooth the gear actually has.
+    let ecc = gear_core::eccentric::Eccentric::new(params);
+    serde_json::to_string(&summarise(&ecc, &req, params))
+        .map_err(|e| format!("could not encode result: {e}"))
 }
 
 fn gear_profile_impl(input: &str, points_per_tooth: usize) -> Result<Vec<f64>, String> {
     let req = parse(input)?;
-    Ok(Gear::new(req.params)
+    Ok(Gear::new(resolved_params(&req)?)
         .profile(points_per_tooth)
         .into_iter()
         .flat_map(|p| [p[0], p[1]])
@@ -493,14 +695,16 @@ fn gear_profile_impl(input: &str, points_per_tooth: usize) -> Result<Vec<f64>, S
 
 fn export_dxf_impl(input: &str) -> Result<String, String> {
     let req = parse(input)?;
-    let g = Gear::new(req.params);
+    let g = Gear::new(resolved_params(&req)?);
     Ok(gear_io::gear_to_dxf(
         &g,
         &gear_io::DxfOptions {
             chord_tolerance: req
                 .chord_tolerance
                 .unwrap_or(gear_core::outline::DEFAULT_CHORD_TOLERANCE),
-            reference_circles: req.reference_circles,
+            reference_circles: req
+                .reference_circles
+                .unwrap_or(REFERENCE_CIRCLES_BY_DEFAULT),
         },
     ))
 }
@@ -526,12 +730,18 @@ pub fn export_dxf(input: &str) -> Result<String, JsError> {
 
 /// A geartrain, plus optionally the material library to rate it against.
 #[derive(Deserialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct TrainRequest {
     pub train: gear_core::train::Train,
     /// The library to use. Omitted means the one the tool ships with, which is
     /// the common case — the UI only sends this once the user has imported or
     /// edited a library of their own.
     #[serde(default)]
+    #[cfg_attr(feature = "typescript", ts(optional))]
     pub materials: Option<gear_core::MaterialLibrary>,
 }
 
@@ -554,7 +764,7 @@ fn default_materials_impl() -> Result<String, String> {
 /// its *values* are not. The core sends `{ key, values }` with the numbers
 /// already rounded; the front end picks a language and fills in the blanks.
 ///
-/// This is `defaults()` again, for the same reason DESIGN §12 gives: the one
+/// This is `defaults()` again, for the same reason docs/corrections.md gives: the one
 /// value that was written down in both languages drifted, and only the side
 /// without tests was wrong. A string catalogue is that trap with thirty more
 /// entries.
@@ -565,42 +775,41 @@ fn strings_impl() -> Result<String, String> {
 
 /// The commanded centre distance, when there is a mate to command it against.
 ///
-/// The mate is built as an ordinary gear from the shared module, pressure angle
-/// and helix — which is what makes a pair a pair — plus its own tooth count and
-/// shift. The eccentric gear is always member 1 here: the tab offers an
-/// eccentric *external* gear, so the ring, when there is one, is the mate.
-fn centre_profile(req: &GearRequest) -> Maybe<gear_core::eccentric::CentreProfile> {
-    use gear_core::mesh::{Member, MeshKind};
+/// The eccentric gear is always member 1 here: the tab offers an eccentric
+/// *external* gear, so the ring, when there is one, is the mate. `params` is
+/// already resolved — its `angular_shift` is the amplitude in force, whether it
+/// was entered directly or solved from a centre-distance throw.
+fn centre_profile(
+    params: GearParams,
+    req: &GearRequest,
+) -> Maybe<gear_core::eccentric::CentreProfile> {
+    use gear_core::mesh::MeshSide;
 
-    let Some(mate) = &req.mate else {
+    let Some((other, kind)) = eccentric_mate(req) else {
         return Maybe::Unavailable {
-            unavailable: "no mate given".into(),
+            unavailable: Note::new("ui.gear_no_mate"),
         };
     };
-    if req.params.angular_shift == 0.0 {
+    if params.angular_shift == 0.0 {
         return Maybe::Unavailable {
-            unavailable: "a concentric gear commands one centre distance, not a profile".into(),
+            unavailable: Note::new("ui.gear_concentric_has_no_profile"),
         };
     }
-    let other = Gear::new(GearParams {
-        teeth: mate.teeth,
-        profile_shift: mate.profile_shift,
-        angular_shift: 0.0,
-        index_offset: 0.0,
-        ..req.params
-    });
-    let kind = if mate.internal {
-        MeshKind::Internal
-    } else {
-        MeshKind::External
-    };
-    Maybe::from(
-        gear_core::eccentric::Eccentric::new(req.params).centre_profile(
-            &other,
-            kind,
-            Member::First,
-        ),
-    )
+    match gear_core::eccentric::Eccentric::new(params).centre_profile(&other, kind, MeshSide::First)
+    {
+        Ok(p) => Maybe::Value(p),
+        // `inv α_w < 0` at some tooth: no centre distance puts that tooth in the
+        // mate's space at zero backlash. The shift term carries `1/Σz`, and for
+        // an internal pair `Σz` is the tooth-count *difference* — so a close
+        // count amplifies the amplitude and this is where it bites first. Say
+        // what relieves it rather than leaving the reader to guess.
+        Err(gear_core::mesh::MeshError::OutsideInvoluteDomain) => Maybe::Unavailable {
+            unavailable: Note::new("ui.gear_eccentricity_exceeds_mate"),
+        },
+        Err(e) => Maybe::Unavailable {
+            unavailable: e.note(),
+        },
+    }
 }
 
 fn import_materials_impl(toml_text: &str) -> Result<String, String> {
@@ -627,7 +836,7 @@ fn export_train_impl(document_json: &str) -> Result<String, String> {
 
 /// Derived results for a whole geartrain.
 ///
-/// The third of the three entry points DESIGN.md §1 planned. Like the others it
+/// The third of the three entry points docs/rationale.md#the-stack planned. Like the others it
 /// is JSON in, JSON out, with no state held across the boundary: the UI owns the
 /// inputs and this recomputes everything from them on each change.
 #[wasm_bindgen]
@@ -638,8 +847,8 @@ pub fn solve_train(input: &str) -> Result<String, JsError> {
 /// The material library the tool ships with, as JSON.
 ///
 /// Includes each value's `basis` and `note`, because the UI is expected to show
-/// which numbers are measured and which are estimates — see `docs/DESIGN.md`
-/// §6.1. Dropping that on the floor would present a class estimate with the
+/// which numbers are measured and which are estimates — see `docs/rationale.md#material-data-ships-estimates-deliberately`
+/// . Dropping that on the floor would present a class estimate with the
 /// same authority as a datasheet reading.
 /// Derived geometry for one internal gear. JSON in, JSON out.
 ///
@@ -680,18 +889,23 @@ pub fn export_ring_dxf(input: &str) -> Result<String, JsError> {
 /// no such tool exists — every ring the UI built was cut by a cutter that
 /// generates no fillet, and the viewport drew the result as a straight-sided
 /// polygon. The core's own default has been 0.2 all along, with a comment
-/// saying why. See `docs/DESIGN.md` §12.
+/// saying why. See `docs/corrections.md`.
 ///
 /// Serving them across the boundary is what makes that class of drift
 /// impossible rather than merely fixed.
 #[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct Defaults {
     pub gear: GearTabDefaults,
     /// A fresh geartrain, with one spur stage in it.
     pub train: gear_core::train::Train,
     /// One of each stage kind, for the "add stage" menu. Three, as the
     /// specification lists them: a crossed gear pair is **not** a fourth — it is
-    /// a spur stage with its shafts at an angle (§4.5.1).
+    /// a spur stage with its shafts at an angle (docs/reference.md#crossed-axes).
     pub spur_stage: gear_core::train::Stage,
     pub worm_stage: gear_core::train::Stage,
     pub planetary_stage: gear_core::train::Stage,
@@ -700,6 +914,11 @@ pub struct Defaults {
 /// What a new gear tab holds. The values are the specification's, and the
 /// tooth count is deliberately *not* the core's own default of 17.
 #[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
 pub struct GearTabDefaults {
     pub params: GearParams,
     pub cutter: CutterRef,
@@ -980,14 +1199,23 @@ mod tests {
             "profile_shift":0.0,"helix_angle":0.0,"addendum":1.0,"dedendum":1.25,
             "root_radius":0.38,"thickness_mod":1.0}}"#;
         let v: serde_json::Value = serde_json::from_str(&solve_gear_impl(no_pin).unwrap()).unwrap();
-        assert!(v["over_two_pins"]["unavailable"].is_string());
+        // The reason is a **note** — a key and its values — rather than a
+        // sentence, so the assertion names the key. Matching prose is what
+        // `docs/corrections.md` records four places doing wrongly.
+        assert_eq!(
+            v["over_two_pins"]["unavailable"]["key"],
+            "ui.gear_no_pin_diameter"
+        );
 
         // a pin that cannot measure this gear says why
         let bad_pin = REQ.replace("1.75", "0.05");
         let v: serde_json::Value =
             serde_json::from_str(&solve_gear_impl(&bad_pin).unwrap()).unwrap();
-        let msg = v["over_two_pins"]["unavailable"].as_str().unwrap();
-        assert!(msg.contains("too small"), "unhelpful message: {msg}");
+        assert_eq!(
+            v["over_two_pins"]["unavailable"]["key"], "error.measure_pin_too_small",
+            "{:?}",
+            v["over_two_pins"]
+        );
     }
 
     #[test]
@@ -1092,11 +1320,8 @@ mod tests {
         // Without one: everything else still crosses, and the profile says why.
         let v = parse(&req(0.25, ""));
         assert!(v["variation"]["eccentricity"].as_f64().unwrap() > 0.0);
-        assert!(
-            v["centre_profile"]["unavailable"]
-                .as_str()
-                .unwrap()
-                .contains("mate"),
+        assert_eq!(
+            v["centre_profile"]["unavailable"]["key"], "ui.gear_no_mate",
             "{:?}",
             v["centre_profile"]
         );
@@ -1106,14 +1331,130 @@ mod tests {
         let v = parse(&req(0.0, r#","mate":{"teeth":43,"profile_shift":0.0}"#));
         assert_eq!(v["variation"]["eccentricity"].as_f64().unwrap(), 0.0);
         assert_eq!(v["variation"]["drive_pitch_error"].as_f64().unwrap(), 0.0);
-        assert!(
-            v["centre_profile"]["unavailable"]
-                .as_str()
-                .unwrap()
-                .contains("concentric"),
+        assert_eq!(
+            v["centre_profile"]["unavailable"]["key"], "ui.gear_concentric_has_no_profile",
             "{:?}",
             v["centre_profile"]
         );
+    }
+
+    /// **Sizing by the centre-distance throw is the profile read backwards, and
+    /// nothing downstream can tell.**
+    ///
+    /// Send a throw instead of an amplitude; `angular_shift` comes back solved,
+    /// the geometry is built from it as always, and the commanded centre
+    /// distance's own sinusoid confirms the throw it was asked for. An
+    /// unreachable throw is a request error, like any bad input.
+    #[test]
+    fn the_eccentricity_can_be_sized_by_the_centre_distance_throw() {
+        let base = r#""module":1.0,"pressure_angle":20.0,"teeth":24,"profile_shift":0.1,
+            "helix_angle":0.0,"addendum":1.0,"dedendum":1.25,"root_radius":0.38,
+            "thickness_mod":1.0,"angular_shift":0.0,"index_offset":0.0"#;
+
+        let req = format!(
+            r#"{{"params":{{{base}}},"mate":{{"teeth":43,"profile_shift":0.0}},
+               "eccentric_throw":0.2}}"#
+        );
+        let v: serde_json::Value =
+            serde_json::from_str(&solve_gear_impl(&req).expect("a solvable gear")).unwrap();
+
+        let dx = v["angular_shift"].as_f64().unwrap();
+        assert!(dx > 0.0, "the amplitude was solved: {dx}");
+        // The commanded centre distance it was sized from has that throw.
+        assert!(
+            (v["centre_profile"]["sinusoid"]["amplitude"]
+                .as_f64()
+                .unwrap()
+                - 0.2)
+                .abs()
+                < 1e-6,
+            "{:?}",
+            v["centre_profile"]["sinusoid"]
+        );
+        // And the geometry followed: eccentricity is `m·Δx`.
+        assert!((v["variation"]["eccentricity"].as_f64().unwrap() - dx).abs() < 1e-9);
+
+        // The sign carries through.
+        let neg = req.replace("\"eccentric_throw\":0.2", "\"eccentric_throw\":-0.2");
+        let v: serde_json::Value = serde_json::from_str(&solve_gear_impl(&neg).unwrap()).unwrap();
+        assert!(v["angular_shift"].as_f64().unwrap() < 0.0);
+
+        // No mate, and an out-of-reach throw, are request errors.
+        let no_mate = format!(r#"{{"params":{{{base}}},"eccentric_throw":0.2}}"#);
+        assert!(solve_gear_impl(&no_mate).unwrap_err().contains("mate"));
+        let too_big = req.replace("\"eccentric_throw\":0.2", "\"eccentric_throw\":50.0");
+        assert!(solve_gear_impl(&too_big)
+            .unwrap_err()
+            .contains("not reachable"));
+    }
+
+    /// **An eccentric gear's scalars describe a tooth it actually has, and the
+    /// per-position measurements say they vary rather than quoting the mean.**
+    ///
+    /// The summary is quoted from `Eccentric::mean`, which is cut by the same
+    /// shared tool as the teeth — so `fillet_radius` and `cutter_tip_width` are
+    /// the real tool's, not the 0.38-module rack the raw inputs name. Span and
+    /// over-pins vary around the revolution and their ranged form is not built
+    /// (docs/reference.md#angularly-varying-profile-shift), so they are withheld with the reason.
+    #[test]
+    fn an_eccentric_gears_summary_is_a_tooth_it_has() {
+        let parse = |s: &str| -> serde_json::Value {
+            serde_json::from_str(&solve_gear_impl(s).expect("a solvable gear")).unwrap()
+        };
+        // The reported case: high shift against a shallow dedendum forces the
+        // shared cutter deeper and its tip round smaller.
+        let ecc = parse(
+            r#"{"params":{"module":1.0,"pressure_angle":25.0,"teeth":23,
+               "profile_shift":0.2,"helix_angle":0.0,"addendum":0.8,"dedendum":1.0,
+               "root_radius":0.38,"thickness_mod":1.0,"angular_shift":1.0,
+               "index_offset":1.0},"pin_diameter":1.8}"#,
+        );
+        let fillet = ecc["fillet_radius"].as_f64().unwrap();
+        assert!(
+            fillet < 0.1,
+            "fillet radius {fillet} is the raw 0.38 rack, not the shared tool"
+        );
+        // The root radius sits inside the range the variation reports.
+        let (lo, hi) = (
+            ecc["variation"]["root_radius"][0].as_f64().unwrap(),
+            ecc["variation"]["root_radius"][1].as_f64().unwrap(),
+        );
+        let root = ecc["root_radius"].as_f64().unwrap();
+        assert!(lo <= root && root <= hi, "{lo} ≤ {root} ≤ {hi}");
+        for m in ["span", "over_two_pins", "over_three_pins"] {
+            assert_eq!(
+                ecc[m]["unavailable"]["key"], "ui.gear_measurement_varies",
+                "{m}: {:?}",
+                ecc[m]
+            );
+        }
+
+        // `undercut` is "any tooth": the mean here (x = 0, z = 24) is not
+        // undercut, but the short teeth at x ≈ −0.5 are — and `per_tooth_clamps`
+        // names them.
+        let short = parse(
+            r#"{"params":{"module":1.0,"pressure_angle":20.0,"teeth":24,
+               "profile_shift":0.0,"helix_angle":0.0,"addendum":1.0,"dedendum":1.25,
+               "root_radius":0.38,"thickness_mod":1.0,"angular_shift":0.5,
+               "index_offset":0.0}}"#,
+        );
+        assert_eq!(short["undercut"].as_bool(), Some(true));
+        assert!(!short["per_tooth_clamps"]["teeth"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+
+        // A concentric gear is untouched: mean is `Gear::new(params)` verbatim,
+        // and its span and pins are still measured.
+        let con = parse(
+            r#"{"params":{"module":1.0,"pressure_angle":25.0,"teeth":23,
+               "profile_shift":0.2,"helix_angle":0.0,"addendum":0.8,"dedendum":1.0,
+               "root_radius":0.38,"thickness_mod":1.0},"pin_diameter":1.8}"#,
+        );
+        assert!((con["fillet_radius"].as_f64().unwrap() - 0.38).abs() < 0.05);
+        assert!(con["span"]["nominal"].as_f64().unwrap() > 0.0);
+        assert!(con["over_two_pins"]["nominal"].as_f64().unwrap() > 0.0);
+        assert_eq!(con["undercut"].as_bool(), Some(false));
     }
 
     #[test]
@@ -1168,16 +1509,25 @@ mod tests {
         let nominal = bp["nominal"]
             .as_f64()
             .expect("a 60-tooth ring admits a 1.8 mm pin");
-        let centre = bp["pin_centre_radius"].as_f64().unwrap();
         // Between inner surfaces, so the pin *subtracts* — the opposite of the
         // gear tab's over-pins, and the sign a reader should be able to check.
+        // The pin centre radius comes from the crate rather than the wire: it is
+        // where the measurement is derived, and the wire carries the nominal
+        // alone now.
+        let centre =
+            gear_core::metrology::between_pins(&ring_of(&parse_ring(&with_pin).unwrap()), 1.8)
+                .unwrap()
+                .pin_centre_radius;
         assert!((nominal - (2.0 * centre - 1.8)).abs() < 1e-9);
         assert!(nominal < 2.0 * centre);
         // ...and without a pin diameter it says so rather than inventing one.
-        assert!(v["between_pins"]["unavailable"].is_string());
+        assert_eq!(
+            v["between_pins"]["unavailable"]["key"],
+            "ui.gear_no_pin_diameter"
+        );
 
         // **A shifted ring must come back shifted.** The gear tab has always
-        // sent `profile_shift` for an internal gear and `Ring::new` used to drop
+        // sent `profile_shift` for an internal gear and `Ring::cut_by` used to drop
         // it on the floor, so the box moved nothing — the sort of gap only an
         // end-to-end check finds, because every layer was individually happy.
         let shifted = req.replace("\"profile_shift\":0.0", "\"profile_shift\":0.3");
@@ -1260,7 +1610,7 @@ mod tests {
         assert!(stage["planet"]["shift_residual"].as_f64().unwrap() < 1e-12);
         assert_eq!(stage["planet"]["fully_reversed"], true);
         // Its reduced allowable carries provenance across, like every other
-        // material figure (§6.3).
+        // material figure (docs/reference.md#materials).
         assert_eq!(stage["planet"]["reversed_allowable"]["basis"], "derived");
         assert!(stage["planet"]["reversed_allowable"]["note"].is_string());
 

@@ -3,7 +3,114 @@
 // Project rule: no engineering calculation lives on this side of the boundary.
 // Everything here either forwards inputs to Rust or formats what Rust returned.
 
-import { setCatalogue, type Note } from "./strings.svelte";
+import { setCatalogue, t, type Note } from "./strings.svelte";
+import type {
+  Actuation,
+  Arrangement,
+  Auto,
+  Backlash,
+  Basis,
+  Bound,
+  CentreProfile,
+  ClassRef,
+  ContactRatios,
+  CrossedMesh,
+  Cutter,
+  CutterRef,
+  Defaults,
+  Directional,
+  FirstMemberSizing,
+  GearParams,
+  GearRequest,
+  GearResult,
+  GearSummary,
+  MateRef,
+  Value,
+  Material,
+  MaterialLibrary,
+  Maybe,
+  Measure,
+  MeshReport,
+  Overrides,
+  PerToothClamps,
+  PinsOut,
+  PlanetResult,
+  PlanetaryResult,
+  PlanetaryStage,
+  Ranges,
+  RingRequest,
+  RingSummary,
+  ShiftRange,
+  SpanOut,
+  SpurResult,
+  SpurStage,
+  Stage,
+  StageGear,
+  StageResult,
+  ToleranceOut,
+  Train,
+  TrainResult,
+  Variation,
+  WormContact,
+  WormMember,
+  WormMemberResult,
+  WormResult,
+  WormStage,
+} from "./wire";
+export type {
+  Actuation,
+  Arrangement,
+  Auto,
+  Backlash,
+  Basis,
+  Bound,
+  CentreProfile,
+  ClassRef,
+  ContactRatios,
+  CrossedMesh,
+  Cutter,
+  CutterRef,
+  Defaults,
+  Directional,
+  FirstMemberSizing,
+  GearParams,
+  GearRequest,
+  GearResult,
+  GearSummary,
+  MateRef,
+  Value,
+  Material,
+  MaterialLibrary,
+  Maybe,
+  Measure,
+  MeshReport,
+  Overrides,
+  PerToothClamps,
+  PinsOut,
+  PlanetResult,
+  PlanetaryResult,
+  PlanetaryStage,
+  Ranges,
+  RingRequest,
+  RingSummary,
+  ShiftRange,
+  SpanOut,
+  SpurResult,
+  SpurStage,
+  Stage,
+  StageGear,
+  StageResult,
+  ToleranceOut,
+  Train,
+  TrainResult,
+  Variation,
+  WormContact,
+  WormMember,
+  WormMemberResult,
+  WormResult,
+  WormStage,
+} from "./wire";
+
 import init, {
   solve_gear,
   solve_ring,
@@ -22,106 +129,31 @@ import init, {
   export_train,
 } from "./wasm/gear_wasm.js";
 
-export interface GearParams {
-  module: number;
-  pressure_angle: number;
-  teeth: number;
-  profile_shift: number;
-  helix_angle: number;
-  addendum: number;
-  dedendum: number;
-  root_radius: number;
-  thickness_mod: number;
-  /** Amplitude of an angularly varying profile shift, in modules. 0 = ordinary. */
-  angular_shift: number;
-  /** λ, how far the indexing compensates. No effect when the amplitude is 0. */
-  index_offset: number;
-}
-
-export interface ClassRef {
-  scale: "fine" | "standard";
-  grade: number;
-}
-
-export interface GearRequest {
-  params: GearParams;
-  /** Depth, in modules, at which the undercut question is asked. */
-  working_depth?: number;
-  pin_diameter?: number | null;
-  tolerance_class?: ClassRef | null;
-  chord_tolerance?: number;
-  reference_circles?: boolean;
-  /** What this gear runs against — only an eccentric gear has an answer that
-   *  depends on it. */
-  mate?: MateRef;
-}
-
-/** A value, or the reason there isn't one. Mirrors the Rust `Maybe`. */
-export type Maybe<T> = T | { unavailable: string };
-
-export function isUnavailable<T>(v: Maybe<T>): v is { unavailable: string } {
+/** Narrow a `Maybe` to its "there is no value" arm.
+ *
+ *  The predicate names the arm's own shape rather than restating it: the reason
+ *  is a `Note` now — a key and its values, like every other message the core
+ *  emits — and a predicate written as `{ unavailable: string }` would silently
+ *  stop narrowing the moment that changed, which is exactly what it did. */
+export function isUnavailable<T>(v: Maybe<T>): v is { unavailable: Note } {
   return v !== null && typeof v === "object" && "unavailable" in v;
 }
 
-export interface SpanOut {
-  teeth_spanned: number;
-  nominal: number;
-  contact_radius: number;
-}
-export interface PinsOut {
-  nominal: number;
-  pin_centre_radius: number;
-  contact_radius: number;
-}
-export interface ToleranceOut {
-  class: ClassRef;
-  tooth_to_tooth: number;
-  total: number;
-}
-
-/** A bound on one input, mirroring Rust's `Bound`. */
-export interface Bound {
-  min: number | null;
-  max: number | null;
-  exclusive_min: boolean;
-  exclusive_max: boolean;
-}
-
-/** The profile shifts this gear can be built at, plus the design thresholds
- *  inside them. Every number here is computed in Rust; this side only compares
- *  and formats. */
-export interface ShiftRange {
-  bound: Bound;
-  undercut: number;
-  sharp_rack_undercut: number;
-  pointed: number | null;
-}
-
-/** Every bound on a gear's inputs — including the ones that do not vary.
+/** Why `v` is outside `b`, or null if it is inside. Comparison only.
  *
- *  There are deliberately no numeric limits anywhere in this file: a limit
- *  written here would be a second place it could be changed, and a second place
- *  it could be wrong. Rust decides them all. */
-export interface Ranges {
-  module: Bound;
-  pressure_angle: Bound;
-  teeth: Bound;
-  helix_angle: Bound;
-  thickness_mod: Bound;
-  profile_shift: ShiftRange;
-  addendum: Bound;
-  dedendum: Bound;
-  root_radius: Bound;
-}
-
-/** Why `v` is outside `b`, or null if it is inside. Comparison only. */
+ *  The four sentences are the catalogue's. `gear_core::auto::Bound` used to
+ *  produce the same English independently — the same value written down in two
+ *  languages that docs/corrections.md is largely about — and this is the copy that was
+ *  ever shown, so it is the one that survived. */
 export function outside(v: number, b: Bound): string | null {
-  if (!Number.isFinite(v)) return "must be a number";
+  if (!Number.isFinite(v)) return t("ui.validation_not_a_number");
   if (b.min !== null && (b.exclusive_min ? v <= b.min : v < b.min)) {
-    return `must be ${b.exclusive_min ? "greater than" : "at least"} ${b.min}`;
+    const key = b.exclusive_min ? "ui.validation_greater_than" : "ui.validation_at_least";
+    return t(key, { bound: String(b.min) });
   }
   if (b.max !== null && (b.exclusive_max ? v >= b.max : v > b.max)) {
-    return `must be ${b.exclusive_max ? "less than" : "at most"} ${b.max}`;
+    const key = b.exclusive_max ? "ui.validation_less_than" : "ui.validation_at_most";
+    return t(key, { bound: String(b.max) });
   }
   return null;
 }
@@ -147,86 +179,11 @@ export function boundFor(key: keyof GearParams, r: Ranges): Bound | null {
       return r.dedendum;
     case "root_radius":
       return r.root_radius;
+    case "angular_shift":
+      return r.angular_shift;
     default:
       return null;
   }
-}
-
-/** What varies around an eccentric gear's revolution. Zero throughout for an
- *  ordinary one — see `gear_core::eccentric::Variation`. */
-export interface Variation {
-  eccentricity: number;
-  circle_departure: number;
-  /** [smallest, largest] radius, mm. */
-  tip_radius: [number, number];
-  root_radius: [number, number];
-  tooth_thickness: [number, number];
-  base_thickness: [number, number];
-  /** Base-tangent pitch error, mm. Drive scales |1 − λ|, coast |1 + λ|. */
-  drive_pitch_error: number;
-  coast_pitch_error: number;
-  drive_index_error: number;
-  coast_index_error: number;
-}
-
-/** Teeth that came out other than as drawn, and why. */
-export interface Trouble {
-  /** Positions round the gear, counting from θ = 0. */
-  teeth: number[];
-  notes: Note[];
-}
-
-export interface GearSummary {
-  ranges: Ranges;
-  variation: Variation;
-  troubled_teeth: Trouble;
-  centre_profile: Maybe<CentreProfile>;
-  /** Radii, mm — what the viewport draws with. */
-  pitch_radius: number;
-  base_radius: number;
-  tip_radius: number;
-  root_radius: number;
-  /** The same circles as diameters, mm — how a gear is specified and gauged, so
-   *  this is what the panel shows. Doubled in Rust, not here: the rule is that
-   *  every number on screen is one Rust computed. */
-  pitch_diameter: number;
-  base_diameter: number;
-  tip_diameter: number;
-  root_diameter: number;
-  tooth_thickness: number;
-  fillet_radius: number;
-  transverse_pressure_angle: number;
-  cutter_tip_width: number;
-  undercut: boolean;
-  severed: boolean;
-  clamps: Note[];
-  span: Maybe<SpanOut>;
-  over_two_pins: Maybe<PinsOut>;
-  over_three_pins: Maybe<PinsOut>;
-  available_classes: ClassRef[];
-  tolerance: Maybe<ToleranceOut>;
-}
-
-/** Defaults from the specification, which differ from gear-core's library
- *  default (a deliberately well-behaved z=17 reference gear). */
-/** Everything a fresh tab starts at, as Rust holds it.
- *
- *  Not written down here. These are engineering numbers, and the one time they
- *  were kept in both languages the two drifted: this file's cutter carried the
- *  rack's 0.38 tip round, which no 20-tooth shaper can hold, so every ring the
- *  UI drew had no fillet at all. See DESIGN.md §12. */
-export interface Defaults {
-  gear: {
-    params: GearParams;
-    cutter: CutterRef;
-    pin_diameter: number;
-    chord_tolerance: number;
-    reference_circles: boolean;
-  };
-  train: Train;
-  spur_stage: SpurStage;
-  worm_stage: WormStage;
-  planetary_stage: PlanetaryStage;
 }
 
 // --------------------------------------------------------------------- //
@@ -242,38 +199,16 @@ export interface Defaults {
  *  below the boundary. The core has no such enum and does not want one. */
 export type GearKind = "external" | "internal" | "eccentric";
 
-/** The gear on the other side, as far as a commanded centre distance needs it.
- *
- *  Not a whole `GearParams`: a mate shares this gear's module, pressure angle
- *  and helix by definition, so sending them again would be sending a constraint
- *  that can be broken. */
-export interface MateRef {
-  teeth: number;
-  profile_shift: number;
-  /** The mate is a ring, and this gear runs inside it. */
-  internal: boolean;
-}
-
-/** The centre distance an eccentric mesh commands around one revolution. */
-export interface CentreProfile {
-  /** One per tooth, from θ = 0 round. */
-  commanded: number[];
-  range: [number, number];
-  /** Best-fit pure sinusoid: mean, amplitude, phase in radians. */
-  sinusoid: [number, number, number];
-  /** Largest departure of the ideal from that sinusoid, mm. */
-  sinusoid_error: number;
-  /** What that departure costs as backlash, mm — negative is interference. */
-  sinusoid_backlash: [number, number];
-}
-
 export interface FieldSpec {
   key: keyof GearParams;
+  /** Catalogue key for the field's name. Not the name: an input label is a word
+   *  the application shows, so it belongs with the other words. */
   label: string;
+  /** Catalogue key for the unit, or "" where the field is a bare number. */
   unit: string;
   step: number;
   integer?: boolean;
-  /** shown under the field */
+  /** Catalogue key for the note shown under the field. */
   note?: string;
   /**
    * Not an input for an internal gear, and hidden there.
@@ -284,69 +219,68 @@ export interface FieldSpec {
    */
   /** The kinds this field applies to. Absent means all of them. */
   kinds?: GearKind[];
-  /** Replaces `note` for an internal gear, where the rule differs. */
+  /** Catalogue key replacing `note` for an internal gear, where the rule
+   *  differs. */
   ringNote?: string;
 }
 
 export const FIELDS: FieldSpec[] = [
-  { key: "module", label: "Normal module", unit: "mm", step: 0.1 },
-  { key: "pressure_angle", label: "Pressure angle", unit: "°", step: 0.5 },
-  { key: "teeth", label: "Tooth count", unit: "", step: 1, integer: true },
-  { key: "helix_angle", label: "Helix angle", unit: "°", step: 1 },
-  { key: "profile_shift", label: "Profile shift", unit: "module", step: 0.05 },
-  { key: "addendum", label: "Addendum", unit: "module", step: 0.05 },
+  { key: "module", label: "ui.gear_field_module", unit: "ui.gear_mm", step: 0.1 },
+  { key: "pressure_angle", label: "ui.gear_field_pressure_angle", unit: "ui.gear_deg", step: 0.5 },
+  { key: "teeth", label: "ui.gear_field_teeth", unit: "", step: 1, integer: true },
+  { key: "helix_angle", label: "ui.gear_field_helix_angle", unit: "ui.gear_deg", step: 1 },
+  { key: "profile_shift", label: "ui.gear_field_profile_shift", unit: "ui.gear_m", step: 0.05 },
+  { key: "addendum", label: "ui.gear_field_addendum", unit: "ui.gear_m", step: 0.05 },
   {
     key: "dedendum",
-    label: "Dedendum",
-    unit: "module",
+    label: "ui.gear_field_dedendum",
+    unit: "ui.gear_m",
     step: 0.05,
     kinds: ["external", "eccentric"],
   },
   {
     key: "root_radius",
-    label: "Root radius coefficient",
-    unit: "module",
+    label: "ui.gear_field_root_radius",
+    unit: "ui.gear_m",
     step: 0.01,
     kinds: ["external", "eccentric"],
   },
   {
     key: "thickness_mod",
-    label: "Tooth thickness modification",
+    label: "ui.gear_field_thickness_mod",
     unit: "",
     step: 0.05,
-    note: "1 is the standard rack; a meshing pair must sum to 2",
+    note: "ui.gear_note_thickness_mod",
     // On a ring it is the SPACE this describes, so a pinion and a ring that mesh
     // want the SAME k rather than complementary ones.
-    ringNote: "1 is the standard rack; on a ring it widens the space, and a meshing pair matches",
+    ringNote: "ui.gear_note_thickness_mod_ring",
   },
   {
     key: "angular_shift",
-    label: "Angular shift amplitude",
+    label: "ui.gear_field_angular_shift",
     kinds: ["eccentric"],
-    unit: "module",
+    unit: "ui.gear_m",
     step: 0.05,
-    note:
-      "the profile shift varies with angle, x(θ) = x + Δx cos θ — the tip and root " +
-      "run eccentric by m·Δx while the pitch and base circles stay on the axis, so the " +
-      "body moves eccentrically at a constant ratio. Zero is an ordinary gear",
+    note: "ui.gear_note_angular_shift",
   },
   {
     key: "index_offset",
-    label: "Index compensation λ",
+    label: "ui.gear_field_index_offset",
     kinds: ["eccentric"],
     unit: "",
     step: 0.1,
-    note:
-      "a varying tooth thickness cannot be conjugate both ways, so the error is only " +
-      "distributed: drive scales |1 − λ| and coast |1 + λ|. 0 is the minimax and what a " +
-      "plain radial hob gives; 1 is exact forward and twice the error in reverse",
+    note: "ui.gear_note_index_offset",
   },
 ];
 
 /** Why a value is not acceptable, given the bound Rust returned. */
 export function validate(f: FieldSpec, v: number, b: Bound | null): string | null {
-  if (f.integer && !Number.isInteger(v)) return "must be a whole number";
-  return b === null ? (Number.isFinite(v) ? null : "must be a number") : outside(v, b);
+  if (f.integer && !Number.isInteger(v)) return t("ui.validation_not_a_whole_number");
+  return b === null
+    ? Number.isFinite(v)
+      ? null
+      : t("ui.validation_not_a_number")
+    : outside(v, b);
 }
 
 // --------------------------------------------------------------------- //
@@ -407,85 +341,10 @@ export function dxf(req: GearRequest): { ok: string } | { error: string } {
 //  Materials
 // --------------------------------------------------------------------- //
 
-/** How far a published value can be trusted. Mirrors the Rust `Basis`. */
-export type Basis = "overridden" | "datasheet" | "derived" | "chart" | "estimated";
-
-/** What the ultimate allowable measures. Glass-filled grades have no yield. */
-export type Measure = "yield" | "break";
-
 export type MaterialClass = "steel" | "brass" | "pom" | "polyamide";
 
 /** One property: its value and its provenance. One number, because an entry
  *  describes a material in one state — the `condition` field names it. */
-export interface MaterialValue {
-  value: number;
-  basis: Basis;
-  note?: string;
-}
-
-export interface Material {
-  name: string;
-  class: MaterialClass;
-  grade: string;
-  condition: string;
-  source: string;
-  density: MaterialValue;
-  elastic_modulus: MaterialValue;
-  poissons_ratio: MaterialValue;
-  ultimate_allowable: MaterialValue;
-  ultimate_measure: Measure;
-  fatigue_allowable: MaterialValue;
-}
-
-/** The array is named `material` because that is what the TOML calls it, and
- *  the two formats are kept in step deliberately. */
-export interface MaterialLibrary {
-  material: Material[];
-}
-
-/** The pinion cutter that shapes a ring. Without one its fillet is undefined. */
-export interface CutterRef {
-  teeth: number;
-  addendum: number;
-  tip_round: number;
-}
-export interface RingRequest {
-  params: GearParams;
-  /** Pin or ball diameter for the between-pins measurement, mm. */
-  pin_diameter?: number | null;
-  cutter: CutterRef;
-  chord_tolerance: number;
-  reference_circles: boolean;
-}
-export interface RingSummary {
-  /** Measurement between two pins — the internal counterpart of over-pins. The
-   *  pin diameter subtracts here, because it is measured between inner
-   *  surfaces rather than across outer ones. */
-  between_pins: Maybe<PinsOut>;
-  teeth: number;
-  transverse_module: number;
-  transverse_pressure_angle: number;
-  pitch_radius: number;
-  base_radius: number;
-  tip_radius: number;
-  root_radius: number;
-  /** The same four as diameters, mm — what the panel shows. */
-  pitch_diameter: number;
-  base_diameter: number;
-  tip_diameter: number;
-  root_diameter: number;
-  /** null when the cut generated no fillet: there is then no handover. */
-  junction_radius: number | null;
-  root_form: "fully_filleted" | "root_arc" | "no_fillet";
-  /** Where the drawing shades the rim out to, mm. A convention, not a design
-   *  output — the real outside diameter is the designer's. */
-  rim_radius: number;
-  generation_limit: number;
-  fully_generated: boolean;
-  smallest_tooth_count: number;
-  clamps: Note[];
-}
-
 export function defaultParams(): GearParams {
   return defaults().gear.params;
 }
@@ -571,293 +430,8 @@ export function exportLibrary(lib: MaterialLibrary): { ok: string } | { error: s
 //  Geartrains
 // --------------------------------------------------------------------- //
 
-/** A value the solver can work out, or that you set. Mirrors Rust's `Auto<T>`. */
-export interface Auto<T> {
-  auto: boolean;
-  manual: T;
-}
-
-export type Actuation =
-  | { intermittent: { range_degrees: number; actuations: number } }
-  | { continuous: { operating_percent: number; runtime_hours: number } };
-
-/** Per-use replacements for a material's properties. `null` means "as the
- *  library says". These live in the input state, not in the library. */
-export interface Overrides {
-  density: number | null;
-  elastic_modulus: number | null;
-  poissons_ratio: number | null;
-  ultimate_allowable: number | null;
-  fatigue_allowable: number | null;
-}
-
-export interface StageGear {
-  teeth: number;
-  profile_shift: Auto<number>;
-  working_depth: Auto<number>;
-  addendum: Auto<number>;
-  min_tip_width: number;
-  dedendum: number;
-  root_radius: number;
-  face_width: Auto<number>;
-  auto_face_from_bending: boolean;
-  auto_face_from_contact: boolean;
-  material: string;
-  material_overrides: Overrides;
-}
-
-/** Two gears on shafts at any angle: spur, helical, or — once the shafts are
- *  crossed — a crossed gear pair. One stage, as the specification has it, with
- *  the axis angle as the input that tells them apart. */
-export interface SpurStage {
-  kind: "spur";
-  module: number;
-  pressure_angle: number;
-  /** Σ, degrees. Zero is a parallel-axis pair. */
-  shaft_angle: number;
-  /** What each gear carries beyond half the shaft angle; gear 2 takes it with
-   *  the opposite sign, so at Σ = 0 this is the shared helix angle. */
-  additional_helix: number;
-  sliding_friction: number;
-  /** Static coefficient, for breaking away — see `Directional::once_moving`. */
-  static_friction: number;
-  thickness_mod: number;
-  /** Amplitude of an angularly varying profile shift, in modules. 0 = ordinary. */
-  angular_shift: number;
-  /** λ, how far the indexing compensates. No effect when the amplitude is 0. */
-  index_offset: number;
-  centre_distance: Auto<number>;
-  clearance: number;
-  tolerance_plus: number;
-  tolerance_minus: number;
-  gears: [StageGear, StageGear];
-}
-
-export interface WormMember {
-  /** Automatic takes the conventional proportion for this member; see
-   *  `recommended_face_width` on the result, and DESIGN §4.5.1 for what those
-   *  proportions are and are not. */
-  face_width: Auto<number>;
-  material: string;
-  material_overrides: Overrides;
-}
-/** How the first member's size is fixed — the only thing separating a worm drive
- *  from a crossed gear pair. A worm's diameter is a free choice and its lead
- *  angle follows; a gear's diameter follows from its tooth count and helix
- *  angle. Same geometry, opposite input. Mirrors Rust's `FirstMemberSizing`. */
-export type FirstMemberSizing = { pitch_diameter: number } | { helix_angle: number };
-
-export interface WormStage {
-  kind: "worm";
-  module: number;
-  pressure_angle: number;
-  shaft_angle: number;
-  sliding_friction: number;
-  /** Static coefficient, for breaking away — see `Directional::once_moving`. */
-  static_friction: number;
-  /** `k₁`; the wheel takes `2 − k₁`. Describes the parts cut and moves no
-   *  figure this stage reports — see `WormStage::thickness_mod`. */
-  thickness_mod: number;
-  /** Amplitude of an angularly varying profile shift, in modules. 0 = ordinary. */
-  angular_shift: number;
-  /** λ, how far the indexing compensates. No effect when the amplitude is 0. */
-  index_offset: number;
-  starts: number;
-  sizing: FirstMemberSizing;
-  wheel_teeth: number;
-  centre_distance: Auto<number>;
-  clearance: number;
-  tolerance_plus: number;
-  tolerance_minus: number;
-  axial_clearance: number;
-  worm: WormMember;
-  wheel: WormMember;
-}
-
-/** A stage of either kind. The `kind` tag is what Rust's enum serialises as. */
-/** Which shaft of a planetary set. Mirrors Rust's `planetary::Member`. */
+/** Which shaft of a planetary set. Mirrors Rust's `planetary::PlanetaryShaft`. */
 export type PlanetaryMember = "sun" | "carrier" | "ring";
-
-/** Which shaft drives and which is held.
- *
- *  Both are needed: naming only the driven shaft leaves the set undetermined,
- *  since a sun-driven set behaves quite differently with the ring held than with
- *  the carrier held. See DESIGN.md §8.1. */
-export interface Arrangement {
-  input: PlanetaryMember;
-  fixed: PlanetaryMember;
-}
-
-export interface Cutter {
-  teeth: number;
-  addendum: number;
-  tip_round: number;
-}
-
-export interface PlanetaryStage {
-  kind: "planetary";
-  module: number;
-  pressure_angle: number;
-  helix_angle: number;
-  sliding_friction_sun_planet: number;
-  static_friction_sun_planet: number;
-  sliding_friction_planet_ring: number;
-  static_friction_planet_ring: number;
-  /** `k` for the sun. The planet takes `2 - k` and the ring takes the planet's,
-   *  because an external pair must sum to two and an internal pair must match.
-   *  One input, three consistent values. */
-  thickness_mod: number;
-  /** Amplitude of an angularly varying profile shift, in modules. 0 = ordinary. */
-  angular_shift: number;
-  /** λ, how far the indexing compensates. No effect when the amplitude is 0. */
-  index_offset: number;
-  planets: number;
-  arrangement: Arrangement;
-  clearance: number;
-  tolerance_plus: number;
-  tolerance_minus: number;
-  min_planet_clearance: number;
-  cutter: Cutter;
-  sun: StageGear;
-  /** The planet's `profile_shift` is ignored: it is solved, not chosen. */
-  planet: StageGear;
-  /** The ring's `dedendum` and `root_radius` are ignored — a ring's root circle
-   *  is where its cutter reaches. */
-  ring: StageGear;
-}
-
-export type Stage = SpurStage | WormStage | PlanetaryStage;
-
-export interface Train {
-  input_speed: number;
-  input_torque: number;
-  actuation: Actuation;
-  stages: Stage[];
-}
-
-export interface ContactRatios {
-  transverse: number;
-  overlap: number;
-  total: number;
-}
-/** A quantity reported for both drive directions — see Rust's `Directional`. */
-export interface Directional<T> {
-  forward: T;
-  backward: T;
-}
-export interface Backlash {
-  nominal: number;
-  minimum: number;
-  maximum: number;
-}
-export interface GearResult {
-  profile_shift: number;
-  addendum: number;
-  face_width: number;
-  torque: number;
-  speed: number;
-  tooth_cycles: number;
-  bending_stress: number | null;
-  contact_stress: number;
-  min_face_width_bending: number | null;
-  min_face_width_contact: number;
-  clamps: Note[];
-  material: Material;
-  ranges: Ranges;
-}
-export interface SpurResult {
-  kind: "spur";
-  ratio: number;
-  centre_distance_nominal: number;
-  centre_distance: number;
-  contact_ratios: ContactRatios;
-  efficiency: Directional<number>;
-  backlash: Directional<Backlash>;
-  coprime: boolean;
-  gears: [GearResult, GearResult];
-  notes: Note[];
-}
-export interface WormMemberResult {
-  torque: number;
-  speed: number;
-  tooth_cycles: number;
-  face_width: number;
-  /** What the conventional proportion asks for, mm — reported whether or not it
-   *  is what is in use, so a hand-set width can be read against it. Null for a
-   *  crossed gear pair, which has no enveloping wheel for the proportions to
-   *  describe. */
-  recommended_face_width: number | null;
-  pitch_diameter: number;
-  material: Material;
-}
-export interface WormContact {
-  /** The worst of the pitch point and the two single-pair boundaries. */
-  max_pressure: number;
-  /** What the pitch point alone would have said — kept so the difference is
-   *  visible rather than asserted. */
-  at_pitch_point: number;
-  worst_position: number;
-  patch_length: number;
-  patch_width: number;
-  curvature_along: number;
-  curvature_across: number;
-}
-/** What the path of contact says — for a worm drive as well as a crossed gear
- *  pair, since both come from the same construction (§4.5.1 takes both flanks as
- *  involute helicoids on cylinders, which is where the stage's other numbers
- *  come from too). */
-export interface CrossedMesh {
-  contact_ratio: number;
-  limited_by: "tips" | "face";
-  /** The face width at which ε = 1 — a **geometric** minimum, not a strength
-   *  one, and the label has to travel with the number. */
-  face_width_for_continuity: [number, number] | null;
-  axial_travel: [number, number];
-  /** True when the tooth height was assumed rather than given: a worm stage has
-   *  no addendum input, so its figures are a floor. */
-  tooth_height_assumed: boolean;
-  /** What the same teeth would give with their shafts parallel — the best the
-   *  pair can be, since crossing shafts adds sliding. Null for a worm, which has
-   *  no parallel-axis counterpart. */
-  parallel_axis_efficiency: number | null;
-}
-
-export interface WormResult {
-  kind: "worm";
-  ratio: number;
-  centre_distance_nominal: number;
-  centre_distance: number;
-  /** Null only when the path could not be built at all. */
-  crossed: CrossedMesh | null;
-  lead_angle: number;
-  wheel_lead_angle: number;
-  /** Helix angle of the first member, degrees — `90° − γ₁`, from Rust. */
-  helix_angle: number;
-  wheel_helix_angle: number;
-  lead: number;
-  axial_module: number;
-  efficiency: Directional<number>;
-  self_locking_friction: number;
-  sliding_ratio: number;
-  sliding_velocity: number;
-  contact: WormContact;
-  backlash: Directional<Backlash>;
-  members: [WormMemberResult, WormMemberResult];
-  notes: Note[];
-}
-
-/**
- * What a stage produced. Each kind keeps its own shape — a worm stage has no
- * bending stress and two efficiencies — so this is a tagged union rather than
- * one interface with everything optional.
- */
-export interface MeshReport {
-  contact_ratios: ContactRatios;
-  efficiency: Directional<number>;
-  contact_stress: number;
-  relative_radius: number;
-  backlash: [Backlash, Backlash];
-}
 
 /** A material figure with its provenance, as Rust's `Value` serialises. */
 export interface ProvenancedValue {
@@ -866,67 +440,19 @@ export interface ProvenancedValue {
   note: string | null;
 }
 
-export interface PlanetResult {
-  gear: GearResult;
-  profile_shift: number;
-  shift_residual: number;
-  speed_absolute: number;
-  speed_relative: number;
-  fully_reversed: boolean;
-  reversed_allowable: ProvenancedValue;
-  min_face_width_reversed: number | null;
-}
-
-export interface PlanetaryResult {
-  kind: "planetary";
-  arrangement: Arrangement;
-  output: PlanetaryMember;
-  ratio: number;
-  centre_distance_nominal: number;
-  centre_distance: number;
-  fixed_carrier_efficiency: Directional<number>;
-  efficiency: Directional<number>;
-  /** Angular backlash at whichever shaft is the output, degrees. */
-  backlash: Directional<Backlash>;
-  /** `[sun, carrier, ring]`. The held shaft is exactly zero. */
-  speeds: [number, number, number];
-  /** `[sun, carrier, ring]`. They sum to zero. */
-  torques: [number, number, number];
-  sun_planet: MeshReport;
-  planet_ring: MeshReport;
-  equal_spacing: boolean;
-  simultaneous_meshing: boolean;
-  planet_clearance: number | null;
-  planet_clearance_ok: boolean;
-  sun_coprime_with_planets: boolean;
-  ring_coprime_with_planets: boolean;
-  sun: GearResult;
-  planet: PlanetResult;
-  ring: GearResult;
-  planets: number;
-  notes: Note[];
-}
-
-export type StageResult = SpurResult | WormResult | PlanetaryResult;
-
-export interface TrainResult {
-  total_ratio: number;
-  output_speed: number;
-  output_torque: number;
-  total_efficiency: Directional<number>;
-  backlash: Directional<Backlash>;
-  stages: StageResult[];
-}
-
-export function defaultWormStage(): WormStage {
+// A default stage arrives **tagged** — Rust's `Stage` is an internally tagged
+// enum, so the object carries its own `kind`. These used to be declared as the
+// bare stage bodies, which typechecked only because TypeScript lets a wider
+// value through; the tag was really there and the type said it was not.
+export function defaultWormStage(): Stage {
   return defaults().worm_stage;
 }
 
-export function defaultPlanetaryStage(): PlanetaryStage {
+export function defaultPlanetaryStage(): Stage {
   return defaults().planetary_stage;
 }
 
-export function defaultStage(): SpurStage {
+export function defaultSpurStage(): Stage {
   return defaults().spur_stage;
 }
 

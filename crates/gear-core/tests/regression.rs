@@ -269,7 +269,7 @@ fn matches_the_reference_implementation() {
     }
 }
 
-/// The negative fixture. `with_legacy_clamp` reproduces the pre-fix behaviour —
+/// The negative fixture. `with_flank_clamped_at_base` reproduces the pre-fix behaviour —
 /// the flank clamped at the base circle with a gap left to the fillet — and this
 /// test exists to prove the suite still detects that fault. If this ever stops
 /// showing a large gap, the detection has broken, not the bug.
@@ -290,7 +290,7 @@ fn legacy_clamp_still_shows_the_junction_step_it_was_kept_to_demonstrate() {
             r_fl * th_fl.cos() - r_tr * th_tr.cos(),
         );
 
-        let legacy = Gear::with_legacy_clamp(p);
+        let legacy = Gear::with_flank_clamped_at_base(p);
         let (r_fl, th_fl) = legacy.involute_at(legacy.u_j);
         let (r_tr, th_tr) = legacy.trochoid_at(legacy.s_j);
         let gap_legacy = f64::hypot(

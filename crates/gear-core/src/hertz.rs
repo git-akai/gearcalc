@@ -21,7 +21,7 @@
 //!
 //! Written this way there is **no major-axis branch**: the two conditions are
 //! the same expression with the arguments exchanged, which is the property
-//! DESIGN.md §4.7 requires of the unified contact model and the reason
+//! docs/reference.md#contact-stress requires of the unified contact model and the reason
 //! [`crate::elliptic`] exists.
 //!
 //! # The one solve
@@ -36,7 +36,7 @@
 //!
 //! `g` is monotone from `g(0) = 0` to `g(1) = 1` and has no closed inverse. The
 //! published closed forms for it are **fits** — Hamrock–Dowson's
-//! `κ ≈ 1.0339(R_y/R_x)^0.636` and its relatives — so §5's rule excludes them,
+//! `κ ≈ 1.0339(R_y/R_x)^0.636` and its relatives — so docs/rationale.md#where-closed-form-is-impossible's rule excludes them,
 //! and this is the sixth bracketed scalar solve rather than a correlation. It
 //! is done in `ln κ`, so the tolerance is relative: near the line-contact limit
 //! `g(κ) ≈ κ² ln(2/κ)`, and a solve with an absolute tolerance would lose the
@@ -218,7 +218,7 @@ pub fn elliptical_contact(
 /// to `(Δ₁ + Δ₂)²`, whose square root is that sum to the last bit, so the
 /// flatter relative curvature comes back as **exactly zero** rather than as a
 /// rounding-sized positive number. Parallel cylinders therefore reach line
-/// contact exactly, which is the property the whole §4.7 unification rests on —
+/// contact exactly, which is the property the whole docs/reference.md#contact-stress unification rests on —
 /// with the `cos 2ψ` form the same case would arrive as an ellipse a few
 /// hundred metres long, and while that is harmless in the `max`, "harmless"
 /// is not the claim being made.

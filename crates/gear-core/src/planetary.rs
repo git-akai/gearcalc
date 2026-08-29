@@ -38,8 +38,8 @@
 //!
 //! Radial assembly — whether a planet can be brought in sideways past the ring's
 //! teeth. It is a swept-motion question, not a comparison of tip circles, and
-//! `docs/DESIGN.md` §4.11 records what happened to the attempt that treated it as
-//! one. Efficiency is §4.5.2 and belongs with the stage.
+//! `docs/reference.md#internal-gears` records what happened to the attempt that treated it as
+//! one. Efficiency is docs/reference.md#planetary-sets and belongs with the stage.
 
 use crate::mesh::operating_geometry;
 use crate::solve::{newton_bracketed, Tol};
@@ -48,7 +48,7 @@ use crate::solve::{newton_bracketed, Tol};
 ///
 /// All three members are cut by it, so the module, both pressure angles and the
 /// helix live here once rather than three times — the same reason a stage owns
-/// them rather than its gears (§3.2).
+/// them rather than its gears (docs/rationale.md#inputs-are-the-only-state).
 #[derive(Clone, Copy, Debug)]
 pub struct Rack {
     /// Transverse module, mm.
@@ -109,6 +109,11 @@ impl Teeth {
 /// A solved planetary layout.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Layout {
     /// The planet thickness shift that makes the two centre distances agree.
     pub planet_shift: f64,
@@ -354,14 +359,19 @@ pub fn ring_candidates(set: &Set, shift_range: (f64, f64), limit: u32) -> Vec<(u
 /// and their speed is a consequence of the other three.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
-pub enum Member {
+pub enum PlanetaryShaft {
     Sun,
     Carrier,
     Ring,
 }
 
-impl Member {
+impl PlanetaryShaft {
     /// Index into the `[sun, carrier, ring]` arrays below.
     const fn index(self) -> usize {
         match self {
@@ -392,21 +402,31 @@ impl Member {
 
 /// Which shaft drives and which is held.
 ///
-/// **This is an addition to the specification's field list** (§8.1). The
+/// **This is an addition to the specification's field list** (docs/rationale.md#additions-to-the-specifications-field-list). The
 /// specification names only "Driven By", which picks one shaft of three and
 /// leaves the arrangement undetermined: a sun-driven set behaves quite
 /// differently with the ring held than with the carrier held. Naming the held
-/// shaft as well is what makes the six modes of §4.5.2 reachable.
+/// shaft as well is what makes the six modes of docs/reference.md#planetary-sets reachable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Arrangement {
-    pub input: Member,
-    pub fixed: Member,
+    pub input: PlanetaryShaft,
+    pub fixed: PlanetaryShaft,
 }
 
 /// What the three shafts do, and what it costs to make them do it.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Power {
     /// Angular speeds `[sun, carrier, ring]`, in whatever unit the input was
     /// given. The held shaft is exactly zero.
@@ -421,7 +441,7 @@ pub struct Power {
     /// Mechanical efficiency, `|T_out ω_out| / |T_in ω_in|`.
     pub efficiency: f64,
     /// The member the other two leave over.
-    pub output: Member,
+    pub output: PlanetaryShaft,
     /// Sign of the rolling power — which way power crosses the meshes in the
     /// carrier's frame. `+1` when the sun leads the carrier under a driving
     /// torque, `−1` when it trails.
@@ -443,7 +463,7 @@ pub fn basic_ratio(teeth: Teeth) -> f64 {
 ///
 /// # The method
 ///
-/// Pennestrì–Freudenstein, as §4.5.2 sets it out. Two linear relations carry
+/// Pennestrì–Freudenstein, as docs/reference.md#planetary-sets sets it out. Two linear relations carry
 /// everything:
 ///
 /// ```text
@@ -483,7 +503,7 @@ pub fn power(
     input_torque: f64,
     fixed_carrier_efficiency: f64,
 ) -> Option<Power> {
-    let output = Member::other(arrangement.input, arrangement.fixed)?;
+    let output = PlanetaryShaft::other(arrangement.input, arrangement.fixed)?;
     let (i, f, o) = (
         arrangement.input.index(),
         arrangement.fixed.index(),
@@ -558,7 +578,11 @@ mod tests {
 
     /// Every arrangement of driven and held shaft, six in all.
     fn arrangements() -> Vec<Arrangement> {
-        let all = [Member::Sun, Member::Carrier, Member::Ring];
+        let all = [
+            PlanetaryShaft::Sun,
+            PlanetaryShaft::Carrier,
+            PlanetaryShaft::Ring,
+        ];
         let mut out = Vec::new();
         for &input in &all {
             for &fixed in &all {
@@ -585,45 +609,45 @@ mod tests {
         let p = power(
             t,
             Arrangement {
-                input: Member::Sun,
-                fixed: Member::Ring,
+                input: PlanetaryShaft::Sun,
+                fixed: PlanetaryShaft::Ring,
             },
             1000.0,
             1.0,
             1.0,
         )
         .unwrap();
-        assert_eq!(p.output, Member::Carrier);
+        assert_eq!(p.output, PlanetaryShaft::Carrier);
         assert!((p.ratio - (1.0 + zr / zs)).abs() < 1e-12, "{}", p.ratio);
 
         // Sun held, ring driving: 1 + z_s/z_r.
         let p = power(
             t,
             Arrangement {
-                input: Member::Ring,
-                fixed: Member::Sun,
+                input: PlanetaryShaft::Ring,
+                fixed: PlanetaryShaft::Sun,
             },
             1000.0,
             1.0,
             1.0,
         )
         .unwrap();
-        assert_eq!(p.output, Member::Carrier);
+        assert_eq!(p.output, PlanetaryShaft::Carrier);
         assert!((p.ratio - (1.0 + zs / zr)).abs() < 1e-12, "{}", p.ratio);
 
         // Carrier held: the sun and ring turn opposite ways, ratio −z_r/z_s.
         let p = power(
             t,
             Arrangement {
-                input: Member::Sun,
-                fixed: Member::Carrier,
+                input: PlanetaryShaft::Sun,
+                fixed: PlanetaryShaft::Carrier,
             },
             1000.0,
             1.0,
             1.0,
         )
         .unwrap();
-        assert_eq!(p.output, Member::Ring);
+        assert_eq!(p.output, PlanetaryShaft::Ring);
         assert!((p.ratio - (-zr / zs)).abs() < 1e-12, "{}", p.ratio);
         assert!(p.ratio < 0.0, "a fixed carrier reverses the output");
     }
@@ -699,12 +723,12 @@ mod tests {
     #[test]
     fn a_held_carrier_gives_exactly_the_fixed_carrier_efficiency() {
         for eta0 in [1.0, 0.99, 0.98, 0.9, 0.75] {
-            for input in [Member::Sun, Member::Ring] {
+            for input in [PlanetaryShaft::Sun, PlanetaryShaft::Ring] {
                 let p = power(
                     teeth(),
                     Arrangement {
                         input,
-                        fixed: Member::Carrier,
+                        fixed: PlanetaryShaft::Carrier,
                     },
                     1000.0,
                     4.0,
@@ -736,8 +760,8 @@ mod tests {
             let p = power(
                 t,
                 Arrangement {
-                    input: Member::Sun,
-                    fixed: Member::Ring,
+                    input: PlanetaryShaft::Sun,
+                    fixed: PlanetaryShaft::Ring,
                 },
                 1000.0,
                 4.0,
@@ -795,7 +819,7 @@ mod tests {
 
     /// **A coupled planetary is not as efficient as its meshes.**
     ///
-    /// The result worth surfacing, and the reason §4.5.2 refuses a mesh-by-mesh
+    /// The result worth surfacing, and the reason docs/reference.md#planetary-sets refuses a mesh-by-mesh
     /// calculation: the meshes slide at their speeds relative to the *carrier*, so
     /// as the ratio grows the recirculating power grows with it and the overall
     /// efficiency falls well below `η₀` — from meshes that never change.
@@ -813,8 +837,8 @@ mod tests {
             let p = power(
                 t,
                 Arrangement {
-                    input: Member::Carrier,
-                    fixed: Member::Ring,
+                    input: PlanetaryShaft::Carrier,
+                    fixed: PlanetaryShaft::Ring,
                 },
                 1000.0,
                 5.0,
@@ -836,8 +860,8 @@ mod tests {
         let carrier_out = power(
             t,
             Arrangement {
-                input: Member::Sun,
-                fixed: Member::Ring,
+                input: PlanetaryShaft::Sun,
+                fixed: PlanetaryShaft::Ring,
             },
             1000.0,
             5.0,
@@ -847,8 +871,8 @@ mod tests {
         let ring_out = power(
             t,
             Arrangement {
-                input: Member::Sun,
-                fixed: Member::Carrier,
+                input: PlanetaryShaft::Sun,
+                fixed: PlanetaryShaft::Carrier,
             },
             1000.0,
             5.0,
@@ -879,7 +903,11 @@ mod tests {
     /// Driving and holding the same shaft is not an arrangement.
     #[test]
     fn a_shaft_cannot_be_both_driven_and_held() {
-        for m in [Member::Sun, Member::Carrier, Member::Ring] {
+        for m in [
+            PlanetaryShaft::Sun,
+            PlanetaryShaft::Carrier,
+            PlanetaryShaft::Ring,
+        ] {
             assert!(power(
                 teeth(),
                 Arrangement { input: m, fixed: m },
@@ -1054,7 +1082,7 @@ mod tests {
         }
     }
 
-    /// The worked example of DESIGN.md §4.8, to the digits recorded there.
+    /// The worked example of docs/reference.md#planetary-sets, to the digits recorded there.
     #[test]
     fn the_worked_example_reproduces() {
         for (ring, want) in [
@@ -1134,7 +1162,7 @@ mod tests {
         }
 
         // Which of them a designer wants is a *second* question, and the one
-        // §4.8's worked example answers: only 52 also spaces three planets
+        // docs/reference.md#planetary-sets's worked example answers: only 52 also spaces three planets
         // evenly. Keeping the two apart is deliberate — the search reports what
         // is possible, and the layout checks say what is desirable.
         let even: Vec<u32> = found

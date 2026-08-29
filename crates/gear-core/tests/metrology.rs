@@ -16,24 +16,22 @@ use gear_core::metrology::{
 };
 use gear_core::{inv, Gear, GearParams};
 
+mod common;
+use common::{Grid, MODULES, PRESSURE_ANGLES, THICKNESS_MODS};
+
+/// Tooth counts a measurement is actually taken on — enough teeth for a span to
+/// exist, up to where the pin leaves the flank. The module and the thickness
+/// modification are turned here where they were not before: both move a span
+/// and an over-pins figure directly, which is the whole subject of this file.
 fn grid() -> Vec<GearParams> {
-    let mut v = Vec::new();
-    for teeth in [9u32, 12, 17, 20, 21, 31, 44, 63] {
-        for xi in [-3i32, 0, 2, 5] {
-            for pressure_angle in [14.5_f64, 20.0, 25.0] {
-                for helix_angle in [0.0_f64, 15.0, -25.0] {
-                    v.push(GearParams {
-                        teeth,
-                        profile_shift: f64::from(xi) * 0.1,
-                        pressure_angle,
-                        helix_angle,
-                        ..Default::default()
-                    });
-                }
-            }
-        }
-    }
-    v
+    Grid::new()
+        .teeth(&[9, 12, 17, 20, 21, 31, 44, 63])
+        .shifts(&[-0.3, 0.0, 0.2, 0.5])
+        .pressure_angle(PRESSURE_ANGLES)
+        .helix_angle(&[0.0, 15.0, -25.0])
+        .module(&[MODULES[0], MODULES[3]])
+        .thickness_mod(&[THICKNESS_MODS[0], THICKNESS_MODS[1]])
+        .build()
 }
 
 // --------------------------------------------------------------------- //
@@ -42,6 +40,17 @@ fn grid() -> Vec<GearParams> {
 
 /// The general derivation must reproduce the standard formula
 /// `W_k = m cos αₙ [π(k−0.5) + z inv α_t] + 2 x m sin αₙ` exactly.
+///
+/// # ...and `x` there is the **thickness** shift, which is a stronger claim
+///
+/// The textbook form is written for an unmodified rack, and this test only ever
+/// ran on one, because `thickness_mod` was fixed at 1 in every grid the crate
+/// had. Turning that axis makes the identity fail — correctly, and informatively:
+/// a span is a *thickness* measurement, so it takes `x + x_s` where a radial
+/// quantity takes `x` alone (docs/reference.md#tooth-thickness-and-its-equivalent-shift). Substituting it is not a repair to keep the
+/// test green; it is the assertion the test should always have made, since it
+/// checks that a thickness modification enters the span **exactly** as an
+/// equivalent profile shift rather than merely closely.
 #[test]
 fn span_reduces_to_the_textbook_formula() {
     let mut worst = 0.0_f64;
@@ -49,6 +58,7 @@ fn span_reduces_to_the_textbook_formula() {
         let g = Gear::new(p);
         let z = f64::from(p.teeth);
         let an = p.pressure_angle.to_radians();
+        let x_thick = p.profile_shift + p.thickness_shift();
         for k in 2..=5u32 {
             let got = span_over_teeth(&g, k).nominal;
             // The textbook form is stated for spur gears; the helical case is
@@ -59,18 +69,21 @@ fn span_reduces_to_the_textbook_formula() {
             let want = p.module
                 * an.cos()
                 * (std::f64::consts::PI * (f64::from(k) - 0.5) + z * inv(g.alpha_t))
-                + 2.0 * p.profile_shift * p.module * an.sin();
-            let d = (got - want).abs();
+                + 2.0 * x_thick * p.module * an.sin();
+            // Relative, because the module axis spans 0.5 to 12 mm and an
+            // absolute tolerance would be a different claim at each end.
+            let d = (got - want).abs() / want.abs().max(f64::MIN_POSITIVE);
             worst = worst.max(d);
             assert!(
-                d < 1e-12,
-                "z={} x={} k={k}: {got} vs {want}",
+                d < 1e-14,
+                "z={} x={} k_thick={} k={k}: {got} vs {want}",
                 p.teeth,
-                p.profile_shift
+                p.profile_shift,
+                p.thickness_mod
             );
         }
     }
-    println!("worst span disagreement with the textbook form: {worst:.3e} mm");
+    println!("worst relative span disagreement with the textbook form: {worst:.3e}");
 }
 
 /// A span is a chord along the base tangent, so consecutive spans must differ by
@@ -345,7 +358,7 @@ fn a_pin_is_genuinely_tangent_to_a_rings_generated_flank() {
             pressure_angle,
             ..Default::default()
         };
-        let ring = Ring::new(&params, &Cutter::default());
+        let ring = Ring::cut_by(&params, &Cutter::default());
         let m =
             between_pins(&ring, dp).unwrap_or_else(|e| panic!("z={teeth} x={x} dp={dp}: {e:?}"));
 
@@ -388,7 +401,7 @@ fn a_bigger_pin_sits_deeper_in_a_ring_and_higher_in_a_gear() {
     use gear_core::metrology::between_pins;
     use gear_core::ring::{Cutter, Ring};
 
-    let ring = Ring::new(
+    let ring = Ring::cut_by(
         &GearParams {
             teeth: 60,
             ..Default::default()
@@ -430,7 +443,7 @@ fn the_pin_diameter_subtracts_inside_and_adds_outside() {
     use gear_core::ring::{Cutter, Ring};
 
     let dp = 1.8;
-    let ring = Ring::new(
+    let ring = Ring::cut_by(
         &GearParams {
             teeth: 60,
             ..Default::default()
@@ -459,7 +472,7 @@ fn an_odd_toothed_ring_measures_across_a_chord() {
     use gear_core::ring::{Cutter, Ring};
 
     let of = |teeth: u32| {
-        let ring = Ring::new(
+        let ring = Ring::cut_by(
             &GearParams {
                 teeth,
                 ..Default::default()
@@ -489,7 +502,7 @@ fn a_pin_that_cannot_seat_is_diagnosed_by_kind() {
     use gear_core::ring::{Cutter, Ring};
 
     // A small ring with a fat pin: no seat.
-    let ring = Ring::new(
+    let ring = Ring::cut_by(
         &GearParams {
             teeth: 9,
             ..Default::default()
@@ -513,7 +526,7 @@ fn a_pin_that_cannot_seat_is_diagnosed_by_kind() {
     );
 
     // And a sensible ring with a sensible pin measures.
-    let ring = Ring::new(
+    let ring = Ring::cut_by(
         &GearParams {
             teeth: 60,
             ..Default::default()

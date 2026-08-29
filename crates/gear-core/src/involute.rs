@@ -2,7 +2,7 @@
 //!
 //! `inv α = tan α − α` is the backbone of involute gear geometry. It has no
 //! algebraic inverse, and that single fact is the reason three of the five
-//! transcendental solves in this crate exist (DESIGN.md §5).
+//! transcendental solves in this crate exist (docs/rationale.md#where-closed-form-is-impossible).
 
 use crate::solve::{newton_bracketed, Tol};
 
@@ -35,8 +35,8 @@ const ALPHA_MAX: f64 = std::f64::consts::FRAC_PI_2 - 1e-12;
 /// Returns `None` when `v < 0`. That is not an error case to paper over — `inv α`
 /// is non-negative for `α ≥ 0`, so a negative argument means the caller asked for
 /// a centre distance smaller than the base circles permit. Planetary ring-gear
-/// searches request exactly this for most candidate tooth counts (DESIGN.md
-/// §4.8), and the honest answer is "impossible", not a NaN.
+/// searches request exactly this for most candidate tooth counts (docs/reference.md#primitives
+/// docs/reference.md#planetary-sets), and the honest answer is "impossible", not a NaN.
 ///
 /// # Method
 ///
@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn inv_inverse_does_not_diverge_where_the_bare_series_does() {
-        // 75° is where seed-plus-unbracketed-Newton runs away (DESIGN.md §4.0).
+        // 75° is where seed-plus-unbracketed-Newton runs away (docs/reference.md#primitives).
         let a = 75_f64.to_radians();
         let back = inv_inverse(inv(a)).unwrap();
         assert!((back - a).abs() < 1e-12, "got {}°", back.to_degrees());

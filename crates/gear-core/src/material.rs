@@ -6,7 +6,7 @@
 //! The rest of this crate holds itself to closed form and no fitted constants.
 //! Material data cannot meet that bar, and pretending otherwise would be the
 //! more dangerous choice. The survey behind this module (recorded in
-//! `docs/DESIGN.md` §6) found that:
+//! `docs/reference.md#materials`) found that:
 //!
 //! - density, elastic modulus and tensile strength are published for every
 //!   material here, on primary manufacturer or standards datasheets;
@@ -56,6 +56,11 @@
 /// basis in a material is `max()` over its properties.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum Basis {
     /// Supplied by the user, replacing whatever the library held.
@@ -108,6 +113,11 @@ impl Basis {
 /// its own source instead of silently relabelled.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum Measure {
     /// Stress at yield: permanent deformation begins.
@@ -120,11 +130,16 @@ pub enum Measure {
 ///
 /// Carried because several conventions are per-family rather than per-material
 /// — the uniform fatigue fraction applied across the polyamides, and the
-/// reversed-bending penalty a planet gear takes (§4.9).
+/// reversed-bending penalty a planet gear takes (docs/reference.md#trains).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
-pub enum Class {
+pub enum Family {
     Steel,
     Brass,
     /// Polyoxymethylene / acetal.
@@ -137,7 +152,7 @@ pub enum Class {
 ///
 /// A planet gear is driven on one flank by the sun and on the other by the ring,
 /// so every tooth sees a complete stress reversal each turn rather than a
-/// released load (§4.9). ISO's convention for an alternating load is about 0.7,
+/// released load (docs/reference.md#trains). ISO's convention for an alternating load is about 0.7,
 /// and unlike the `K` and `Z` families this is not a population-calibrated
 /// rating factor balanced against `σ_Flim` values this project does not have —
 /// it is the Goodman/Haigh statement that reversal doubles the stress range, and
@@ -150,7 +165,7 @@ pub const REVERSED_BENDING_FRACTION: f64 = 0.7;
 
 /// The bending allowable a fully reversed load leaves, MPa.
 ///
-/// Carries its own provenance like every other material figure (§6.3): a derived
+/// Carries its own provenance like every other material figure (docs/reference.md#materials): a derived
 /// value, with a note saying what it was derived from, so it cannot be mistaken
 /// for a datasheet reading.
 #[must_use]
@@ -170,6 +185,11 @@ pub fn reversed_bending_allowable(m: &Material) -> Value {
 /// One material property: its value, and how far it can be trusted.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Value {
     pub value: f64,
     pub basis: Basis,
@@ -197,14 +217,19 @@ impl Value {
 /// A material, as the calculator sees it.
 ///
 /// Lengths are millimetres and stresses megapascals throughout the crate, but
-/// **density is SI** (kg/m³) per the unit rule in `docs/DESIGN.md` §6: SI
+/// **density is SI** (kg/m³) per the unit rule in `docs/reference.md#materials`: SI
 /// internally except where the domain's own convention is unambiguous.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Material {
     /// Display name, and the key the library is looked up by.
     pub name: String,
-    pub class: Class,
+    pub class: Family,
     /// The specific product or condition the numbers describe. A generic name
     /// like "PA6" is not a material; some particular grade was measured, and
     /// this says which.
@@ -267,11 +292,16 @@ impl Material {
 /// library file. `None` means "whatever the library says".
 ///
 /// These live in the **input** state rather than in the library, which is what
-/// keeps `docs/DESIGN.md` §3.1 intact: the library stays the shipped reference,
+/// keeps `docs/rationale.md#inputs-are-the-only-state` intact: the library stays the shipped reference,
 /// outputs stay a pure function of inputs, and nothing is written back except by
 /// an explicit export.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Overrides {
     pub density: Option<f64>,
     pub elastic_modulus: Option<f64>,
@@ -325,6 +355,11 @@ impl Material {
 /// A set of materials, in presentation order.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct MaterialLibrary {
     #[cfg_attr(feature = "serde", serde(rename = "material", default))]
     pub materials: Vec<Material>,
@@ -369,7 +404,7 @@ mod tests {
     fn steel() -> Material {
         Material {
             name: "test steel".into(),
-            class: Class::Steel,
+            class: Family::Steel,
             grade: "test".into(),
             condition: "test".into(),
             source: "test".into(),

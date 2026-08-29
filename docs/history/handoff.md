@@ -1,3 +1,20 @@
+> **Superseded, and kept for provenance only.**
+>
+> This handoff has been replaced by four documents, each with one job:
+> [`reference.md`](../reference.md) states what the tool computes,
+> [`rationale.md`](../rationale.md) why each model is the one chosen,
+> [`corrections.md`](../corrections.md) what was once wrong and how it surfaced,
+> and [`state.md`](../state.md) what is built and what is not.
+>
+> **Nothing points here, and nothing should.** It is not maintained, its section
+> numbers no longer resolve, and where it disagrees with the four it is wrong. It
+> survives because it contains reasoning that was expensive to reach and that the
+> replacements condense rather than repeat — the JGMA two-scale argument, the
+> material survey, the crossed-path derivation, the λ minimax proof — and because
+> deleting an argument nobody remembers needing is how it gets rediscovered.
+
+---
+
 # Handoff
 
 Where the project stands, what is decided, and what to be careful of.
@@ -10,7 +27,7 @@ wins and this file is stale.
 
 ## 1. State
 
-**Milestones 0–11 complete and in CI. 398 tests, ~26 s.**
+**Milestones 0–11 complete and in CI. 409 tests, ~26 s.**
 
 Milestone 11's named scope — geartrain import/export, confirmations, error
 surfacing, docs — is done, and geartrain import/export was the last unbuilt item
@@ -316,6 +333,30 @@ concentric one comes out bit-identical to the z-fold replication it replaced and
 still generates one tooth, not `z`. `Gear` itself did not change: per-tooth
 constant `x` is the specification, not an approximation of it.
 
+**The eccentricity has two faces, and only one is stored.** `Δx` (angular-shift
+amplitude) or the **centre-distance throw** — the second solved from the first by
+`amplitude_for_throw`, a bracketed inversion of `centre_profile().sinusoid[1]`
+(the throw rises monotone in `Δx` from zero until the mesh runs out of involute).
+`Δx` stays the one field everything is built from; the wasm `resolved_params`
+fills it in once and every entry point runs that, so the geometry, the ranges,
+`Variation` — none of them know which was shown. The tab carries `eccentricThrow:
+number | null`; `null` is amplitude-driven. Needs the mate.
+
+**λ reaches none of the commanded centre distance**, and that is gated exactly.
+The indexing offset moves a tooth *rigidly*, so it decides when a tooth arrives
+and not how thick it is; zero backlash is set by the thickness, which is the
+shift the tooth was cut at. Scaling the shift by `(1 − λ)` here looked like the
+fix for a close tooth-count internal mate and instead made λ = 1 report **zero
+throw at every amplitude** — see §12, and §4 below for the testing gap that let
+it through.
+
+**A close tooth-count internal mate genuinely limits the eccentricity.**
+`operating_geometry`'s shift term carries `1/Σz`, and for an internal pair `Σz`
+is the tooth-count *difference* — so a 24-in-26 pair runs at a 1 mm centre
+distance and even `Δx = 0.05` is 5 % of it. Past a modest amplitude no operating
+pressure angle exists and the pair is refused, correctly. What was wrong was the
+*name*: `CentreDistanceTooSmall` for what is `OutsideInvoluteDomain`.
+
 **A loaded flank sits halfway, and that closed §4.10's blocker.** Backlash is how
 far a member can turn *between* its flanks; `Mesh::loaded_flank_phase` is where
 it sits when one of them is loaded, and it is exactly half — because moving the
@@ -482,6 +523,19 @@ these are the ones most likely to be stepped on again.
   seated. The defect it hid was structural: each tooth was drawn one ideal pitch
   wide while λ, by design, seats them unevenly. When a feature has a knob, some
   case has to turn it.
+- **...and turning it in one context does not cover the others.** λ was well
+  swept on a lone gear after the above — and every `centre_profile` test, the
+  place λ meets a *mate*, still left it at its default. So a change that made λ
+  scale the shift there passed the whole suite while reporting zero
+  centre-distance throw at λ = 1, which is the entire output of that feature.
+  The gate is now an **exact** one — the profile is bit-identical at every λ —
+  because "λ does not reach this" is an invariant, not a trend. Ask of a control
+  not "is it tested?" but "is it turned in each context it reaches?"
+- **Deriving a law to explain a refusal is how you get two bugs.** The refusal
+  above was real geometry: a close tooth-count internal pair runs at a tiny
+  centre distance and cannot absorb much eccentricity. Inventing a plausible
+  reading of λ to make it go away kept the refusal *and* broke the working case.
+  When a model refuses, first check whether it is right to.
 - **When an invariant is exact, test it exactly.** The seam above is two angles
   that either meet or do not; sampling the outline and watching a trend was the
   wrong instrument, and it also mis-read a working adaptive subdivider as a step
@@ -509,6 +563,20 @@ these are the ones most likely to be stepped on again.
   the error was in what they shared and did not. When a construction is
   per-piece, list what is a property of the **whole** — the tool, the root
   surface, the datum — and check each is actually shared.
+- **The summary is one of the pieces.** The fix above shares a cutter across the
+  teeth by raising the depth to what the deepest tooth needs and rebuilding them
+  — but `Eccentric::mean`, the gear every scalar is quoted from and the one
+  `root_at` builds the root envelope on, kept the raw dedendum. So the drawn root
+  stood `m·(depth − dedendum)` proud of the teeth and poked out past the fillets
+  — 0.25 mm on `α=25° z=23 x=0.2 Δx=1 addendum=0.8 dedendum=1.0`, visible on the
+  shallow high side. Every trend test passed: a uniform radial offset of the
+  whole root is perfectly smooth, no step and no kink. The gate that catches it
+  is `root_at(seat_k) == teeth[k].rf` at λ = 0, exact. When a construction shares
+  a setting across its pieces, the object that *summarises* them is a piece too —
+  and so was `gear_wasm::solve_gear`, which built its summary from
+  `Gear::new(params)` and reported the 0.38-module rack as the fillet where the
+  shared tool is 0.05. It goes through `Eccentric::new(params).mean()` now, the
+  one construction for both kinds.
 - **Test the trend, not the tolerance.** A stepped root and a coarsely sampled
   curve look identical at one sampling. What separates them is that refining the
   sampling shrinks a curve's largest jump and leaves a step exactly where it was.
@@ -622,6 +690,13 @@ these are the ones most likely to be stepped on again.
 - **A green local test run does not imply a green build.** `git add` before
   `nix build`; flakes only see tracked files.
 - **Typechecking is not running unless you run it.** `cd web && npm run check`.
+- **A check that a key is used says nothing about text that never became a key.**
+  `check_strings.py` reported "all used, all present" while the same input bound
+  was worded two different ways on two tabs, because both copies were hard-coded
+  in Svelte and neither went through `t()`. Prose outside the catalogue is
+  invisible to every gate this project has — which is why it is all in the
+  catalogue now (~80 strings, DESIGN §11.5), and why the one class still outside
+  it is named there rather than left to be rediscovered.
 - **Run the app.** Two real defects this session were found on screen and by
   nothing else.
 
@@ -635,6 +710,7 @@ the number would have been.
 
 | Item | Where | Note |
 |---|---|---|
+| The error enums still render English from `gear-core` | §11.5 | `MeshError`, `MeasurementError` and `TrainError` have `Display` impls that write sentences, and those sentences reach the screen. They never went through `Note`. The last place the "no English in `gear-core`" rule is broken, and it is broken in the messages shown when something has gone wrong. Give each variant a key and a `values` map, as `Note` has |
 | **Crossed-axis bending** | §4.5.1 | *Decided, not pending.* The path gives the load's position along the profile; `σ_F = F_t/(b·m)·Y_F·Y_S` is a cantilever loaded across its whole **face**, and a crossed pair's load is a point. An effective width is a convention that multiplies a stress, which §4.7 refuses — so the stage says it is not rated and why |
 | Equal planet load sharing is assumed | §4.9 | *Decided.* The remedy is a mesh-load factor of the kind §4.7 declines; said in every planetary result's notes |
 | Radial assembly — attempted, diagnosed, **shelved** with its findings | §4.11 | |
@@ -643,6 +719,8 @@ the number would have been.
 | Tooth thickness tolerance (JGMA 1103-01, unavailable) | §4.6 | min/max on span and over-pins only |
 | The cut simulation cannot see below the generation limit: its cutter has no fillet | §4.11 | 0.08 mm on ordinary designs, flagged per part |
 | Span over teeth for a ring | §4.6 | Rare in practice, not derived; between-pins is done and the tab says which is which |
+| An eccentric gear's span and over-pins as **ranges** | §4.10 | Vary around the revolution; `solve_gear` withholds the single value with that reason. `Eccentric::distinct` is the unit of work — they return `Option`s so they want their own reduction rather than `span` |
+| An eccentric gear's `angular_shift` has no bound of its own | §8 | `admissible_ranges` now closes the shift/addendum/dedendum/root-radius windows onto the swept interval `x̄ ± Δx`, but `Δx` itself is only bounded indirectly (a large one collapses the shift window). A direct `angular_shift` bound would need a new `Ranges` field and the wire mirror in `core.ts` |
 | Worm profile drawing and DXF; a planetary set has no drawing either | §4.5.1, §8 | |
 | A ring's own bounds are not reported for a stage member | §4.11 | The gear card shows a rack's buildable range, which is not a ring's — so it shows nothing there and says so |
 | `Driven By` as a train direction on a worm stage | §4.9 | |

@@ -9,6 +9,11 @@
 /// module. `profile_shift` likewise.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct GearParams {
     /// Normal module, mm.
     pub module: f64,
@@ -40,7 +45,7 @@ pub struct GearParams {
     /// at 180° — what a hob moving radially in and out once per revolution
     /// produces. It makes the tip and root envelopes eccentric by
     /// `e = module · angular_shift` while the pitch and base circles stay on the
-    /// axis, so the body moves eccentrically at a constant ratio (§4.10).
+    /// axis, so the body moves eccentrically at a constant ratio (docs/reference.md#angularly-varying-profile-shift).
     ///
     /// **Zero is an ordinary gear**, and not by a branch: every tooth then takes
     /// the same shift and the whole construction collapses onto the single-`x`
@@ -51,7 +56,7 @@ pub struct GearParams {
     ///
     /// A gear with varying tooth thickness cannot be exactly conjugate in both
     /// directions — uniform spacing on both flanks forces uniform thickness, in
-    /// two lines of algebra (§4.10) — so the unavoidable error can only be
+    /// two lines of algebra (docs/reference.md#angularly-varying-profile-shift) — so the unavoidable error can only be
     /// distributed. Tooth `k` is seated at `2πk/z + λ(ψ_b,ref − ψ_b,k)`, which
     /// scales the drive-flank error by `|1 − λ|` and the coast-flank error by
     /// `|1 + λ|`.
@@ -99,6 +104,27 @@ impl GearParams {
         let an = self.pressure_angle.to_radians();
         std::f64::consts::PI * (self.thickness_mod - 1.0) / (4.0 * an.tan())
     }
+
+    /// Whether these two gears were cut by the same rack, so that they *could*
+    /// mesh.
+    ///
+    /// The helix is deliberately **not** here. Whether two hands mesh depends on
+    /// the kind of pair — external gears take opposite hands and an internal
+    /// pair the same — so it is a question about the mesh rather than about
+    /// either gear, and it belongs where the kind is known
+    /// ([`crate::mesh::Mesh::new`]). What every mesh needs alike is the rack:
+    /// the same module and the same pressure angle, or the teeth are simply not
+    /// the same size.
+    ///
+    /// One function because there were three, each with its own tolerance and
+    /// none with a stated reason for differing (`docs/corrections.md`). A
+    /// duplicated condition is a place two answers can differ, and here two of
+    /// them already did.
+    #[must_use]
+    pub fn same_rack_as(&self, other: &Self) -> bool {
+        (self.module - other.module).abs() < compat::SAME_RACK
+            && (self.pressure_angle - other.pressure_angle).abs() < compat::SAME_RACK
+    }
 }
 
 /// A value the solver can work out for you, or that you can set yourself.
@@ -106,13 +132,18 @@ impl GearParams {
 /// The specification has about a dozen of these — profile shift, altered
 /// addendum, centre distance, face width — all with the same shape: a toggle,
 /// and a field that is locked while the toggle is on. One generic covers them
-/// all (`docs/DESIGN.md` §3.3).
+/// all (`docs/rationale.md#inputs-are-the-only-state`).
 ///
 /// `manual` is kept even while `auto` is set, so turning automatic *off* leaves
 /// the field showing the last value rather than jumping to a stale one. It is
 /// the UI's job to seed `manual` from the solved value when the toggle flips.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Auto<T> {
     pub auto: bool,
     pub manual: T,
@@ -158,6 +189,11 @@ impl<T: Copy> Auto<T> {
 /// geometry may not be the geometry that was asked for.
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Clamps {
     pub notes: Vec<crate::note::Note>,
 }
@@ -221,4 +257,28 @@ pub(crate) mod guard {
     /// How far above the base circle the tip radius is forced to sit, as a
     /// fraction of the base radius. Below the base circle there is no involute.
     pub const TIP_ABOVE_BASE_FRACTION: f64 = 1e-9;
+}
+
+/// How nearly two gears must agree before they are taken to be the same rack.
+///
+/// # Why these are gathered, and why there is only one of each
+///
+/// Three places asked "can these two mesh?" and each answered with its own bare
+/// literal: `1e-12` on module and pressure angle in [`crate::mesh::Mesh::new`],
+/// `1e-9` on the transverse module and pressure angle in
+/// [`crate::ring::mesh_with`], `1e-12` again on an eccentric gear's mate. They
+/// disagreed with each other, and no reason was written down anywhere for the
+/// disagreement — which is the same arrangement `guard` above exists to avoid.
+///
+/// The values are **degeneracy tolerances, not design ones**: two gears whose
+/// modules differ by anything a designer could mean do not mesh at all, so the
+/// only job here is to admit values that arrived by different arithmetic —
+/// `m_n/cos β` computed twice, a pressure angle round-tripped through degrees.
+/// A handful of ulps on a quantity of order one is what that costs, and the
+/// tolerance is generous against it by orders of magnitude.
+pub mod compat {
+    /// A length or a dimensionless coefficient, absolute. Modules are of order
+    /// 1 mm and pressure angles of order 20°, so an absolute tolerance is the
+    /// same claim at both.
+    pub const SAME_RACK: f64 = 1e-9;
 }

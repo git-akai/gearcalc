@@ -14,6 +14,9 @@
 use gear_core::strength::{root_section_with, CriticalSection, TANGENT_ANGLE_DEG};
 use gear_core::{Gear, GearParams};
 
+mod common;
+use common::Grid;
+
 /// Closed-form critical section of a rack-cut tooth: `(s_Fn/m, h_Fe/m, Y_F)`.
 ///
 /// Straight flanks at `α` to the centreline, circular fillet of radius `ρ`
@@ -201,7 +204,7 @@ fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f6
         ..Default::default()
     };
     let wheel = Gear::new(params);
-    let ring = Ring::new(
+    let ring = Ring::cut_by(
         &params,
         &Cutter {
             teeth: cutter_teeth,
@@ -233,7 +236,7 @@ fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f6
 /// an internal tooth is stronger than an external one of the same pitch, and the
 /// internal factor falls as tooth count rises.
 ///
-/// Asserted as directions rather than values, per §12's rule about not predicting
+/// Asserted as directions rather than values, per docs/corrections.md's rule about not predicting
 /// what the computation can find — and because this crate uses ISO 6336's `Y_S`
 /// where the paper uses an extrapolated Dolan–Broghamer, and omits the axial
 /// compression term the paper includes. Neither changes either direction.
@@ -328,7 +331,7 @@ fn a_helical_ring_is_rated_on_its_virtual_spur_section() {
     use gear_core::strength::{ring_bending_section, StressConcentration};
 
     let of = |beta: f64| {
-        Ring::new(
+        Ring::cut_by(
             &GearParams {
                 teeth: 60,
                 helix_angle: beta,
@@ -374,7 +377,7 @@ fn a_helical_ring_is_rated_on_its_virtual_spur_section() {
 fn the_virtual_spur_ring_is_the_identity_at_zero_helix() {
     use gear_core::ring::{Cutter, Ring};
     for teeth in [43u32, 60, 90] {
-        let ring = Ring::new(
+        let ring = Ring::cut_by(
             &GearParams {
                 teeth,
                 ..Default::default()
@@ -444,7 +447,7 @@ fn a_rings_rating_is_continuous_over_its_useful_range() {
     for contact_ratio in [1.5, 1.7, 1.9] {
         let mut previous: Option<f64> = None;
         for z in 40..=90u32 {
-            let ring = Ring::new(
+            let ring = Ring::cut_by(
                 &GearParams {
                     teeth: z,
                     ..Default::default()
@@ -520,7 +523,7 @@ fn a_generated_fillet_is_much_flatter_than_the_tool_that_cut_it() {
 
     let mut previous = f64::INFINITY;
     for z in [43u32, 60, 90, 150] {
-        let ring = Ring::new(
+        let ring = Ring::cut_by(
             &GearParams {
                 teeth: z,
                 ..Default::default()
@@ -544,5 +547,72 @@ fn a_generated_fillet_is_much_flatter_than_the_tool_that_cut_it() {
             "ring z={z}: {ratio} should be below {previous}"
         );
         previous = ratio;
+    }
+}
+
+/// **The fillet's curvature is the analytic derivative, not a difference of
+/// one.**
+///
+/// Both fillets used to differentiate their own analytic tangent numerically,
+/// with a step of `1e-6` modules written out twice. The closed form has to
+/// agree with that difference — but only to the difference's *own* error, which
+/// is what this asserts rather than a tolerance somebody chose: a central
+/// difference is `O(h²)` in truncation and `O(ε/h)` in rounding, so refining `h`
+/// improves it and then makes it worse, and the closed form must sit inside that
+/// bowl at every step.
+///
+/// Written as convergence rather than as a number: at the coarse step the two
+/// differ by the truncation error, and halving `h` must shrink the gap toward
+/// the rounding floor. A closed form that is *wrong* does not do that — it
+/// converges on its own answer instead, and the gap stops falling.
+#[test]
+fn the_closed_form_fillet_curvature_is_what_a_difference_converges_on() {
+    use gear_core::strength::fillet_point_and_tangent as tangent;
+
+    for p in Grid::new()
+        .teeth(&[9, 17, 40, 120])
+        .shifts(&[-0.3, 0.0, 0.4])
+        .pressure_angle(&[14.5, 20.0, 25.0])
+        .root_radius(&[0.1, 0.25, 0.38])
+        .build()
+    {
+        let g = Gear::new(p);
+        if g.severed || !g.s_j.is_finite() {
+            continue;
+        }
+        // Three places along the fillet, avoiding both ends.
+        for t in [0.25, 0.5, 0.75] {
+            let s = g.s_j * (1.0 - t);
+            let exact = gear_core::strength::fillet_curvature_radius(&g, s);
+            if !exact.is_finite() {
+                continue;
+            }
+
+            let difference_at = |h: f64| {
+                let (_, t0) = tangent(&g, s - h);
+                let (_, t1) = tangent(&g, s + h);
+                let (_, tc) = tangent(&g, s);
+                let ddx = (t1[0] - t0[0]) / (2.0 * h);
+                let ddy = (t1[1] - t0[1]) / (2.0 * h);
+                let speed = f64::hypot(tc[0], tc[1]);
+                let cross = (tc[0] * ddy - tc[1] * ddx).abs();
+                speed.powi(3) / cross
+            };
+
+            let coarse = (difference_at(1e-3) - exact).abs() / exact;
+            let fine = (difference_at(1e-4) - exact).abs() / exact;
+            // Truncation falls as h²: a hundredfold at a tenth of the step,
+            // less whatever rounding has crept in. Ten is a generous floor and
+            // is still far outside what a *wrong* closed form could manage,
+            // since that one would not converge at all.
+            assert!(
+                fine * 10.0 < coarse.max(1e-14) || fine < 1e-9,
+                "z={} x={} rho={} s={s}: the difference is not converging on the \
+                 closed form — {coarse:e} at h=1e-3 against {fine:e} at h=1e-4",
+                p.teeth,
+                p.profile_shift,
+                p.root_radius
+            );
+        }
     }
 }

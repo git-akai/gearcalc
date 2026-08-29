@@ -13,29 +13,21 @@
 
 use gear_core::{inv, inv_from_roll, Gear, GearParams};
 
-/// A grid spanning the awkward regions: tiny tooth counts, both signs of shift,
-/// sharp and rounded racks, both helix hands.
+mod common;
+use common::{
+    Grid, AWKWARD_SHIFTS, AWKWARD_TEETH, HELIX_ANGLES, MODULES, PRESSURE_ANGLES, ROOT_RADII,
+};
+
+/// The awkward regions: tiny tooth counts, both signs of shift, sharp and
+/// rounded racks, both helix hands. One grid, shared — see `common`.
 fn grid() -> Vec<GearParams> {
-    let mut v = Vec::new();
-    for teeth in [3u32, 5, 7, 9, 12, 17, 23, 40, 80] {
-        for xi in [-5i32, -3, 0, 3, 6, 9] {
-            for pressure_angle in [14.5_f64, 20.0, 25.0] {
-                for helix_angle in [0.0_f64, 15.0, -30.0] {
-                    for root_radius in [0.0_f64, 0.2, 0.38] {
-                        v.push(GearParams {
-                            teeth,
-                            profile_shift: f64::from(xi) * 0.1,
-                            pressure_angle,
-                            helix_angle,
-                            root_radius,
-                            ..Default::default()
-                        });
-                    }
-                }
-            }
-        }
-    }
-    v
+    Grid::new()
+        .teeth(AWKWARD_TEETH)
+        .shifts(AWKWARD_SHIFTS)
+        .pressure_angle(PRESSURE_ANGLES)
+        .helix_angle(HELIX_ANGLES)
+        .root_radius(ROOT_RADII)
+        .build()
 }
 
 #[test]
@@ -325,7 +317,7 @@ fn an_internal_pair_has_zero_backlash_at_the_centre_distance_the_mesh_gives() {
         (25, 41, 0.0, 0.3, 1.0, 1.0),
     ] {
         let pinion = Gear::new(params(z1, x1, k1));
-        let ring = Ring::new(&params(z2, x2, k2), &Cutter::default());
+        let ring = Ring::cut_by(&params(z2, x2, k2), &Cutter::default());
         // The mesh reads the ring through the same `Gear` arithmetic, because a
         // ring's shift and thickness enter its space exactly as they enter an
         // external gear's tooth.
@@ -412,7 +404,7 @@ fn a_rings_drawn_profile_is_dense_and_lies_on_its_base_circles_involute() {
                 addendum: 1.25,
                 tip_round,
             };
-            let ring = Ring::new(
+            let ring = Ring::cut_by(
                 &GearParams {
                     teeth,
                     ..Default::default()
@@ -486,4 +478,111 @@ fn a_rings_drawn_profile_is_dense_and_lies_on_its_base_circles_involute() {
             );
         }
     }
+}
+
+/// **Every length scales with the module and every angle does not.**
+///
+/// A gear's geometry is homogeneous of degree one in `m`: the module is the only
+/// dimensional input, so doubling it must double every radius and leave every
+/// angle exactly where it was. That is an exact law, checkable without knowing a
+/// single answer — the strongest kind this project has — and until this test
+/// nothing asserted it. Nothing could: `module` was `1.0` in every profile-law
+/// case in the repository, so the axis that carries the law was never turned.
+///
+/// # What is deliberately not asserted, and why it is worth saying
+///
+/// The **roll parameters** `u_j` and `u_tip` are excluded, and not because they
+/// are wrong. `u` is recovered from a radius by `√((r/r_b)² − 1)`, which near
+/// `u → 0` amplifies a relative error by `1/u²` — the involute is tangent to its
+/// own base circle there, so the radius carries almost no information about the
+/// roll. On an undercut tooth `u_j ≈ 1e-3` and a 3e-14 residual in `r_j` becomes
+/// 3e-8 in `u_j`: conditioning, not a defect, and it goes the same way whichever
+/// route is taken to `u`.
+///
+/// So the law belongs on the lengths and the angles, which are what the geometry
+/// is stated in, and a roll parameter is the wrong instrument for it. Recorded
+/// here rather than discovered later as an unreproducible flake.
+#[test]
+fn every_length_scales_with_the_module_and_every_angle_is_invariant() {
+    let mut worst_length = 0.0_f64;
+    let mut worst_angle = 0.0_f64;
+    let mut where_length = String::new();
+
+    for base in Grid::new()
+        .teeth(&[5, 9, 17, 23, 40])
+        .shifts(&[-0.4, 0.0, 0.3])
+        .pressure_angle(PRESSURE_ANGLES)
+        .helix_angle(&[0.0, 20.0])
+        .root_radius(ROOT_RADII)
+        .thickness_mod(&[0.8, 1.0, 1.2])
+        .build()
+    {
+        let unit = Gear::new(GearParams {
+            module: 1.0,
+            ..base
+        });
+        for &m in MODULES {
+            let g = Gear::new(GearParams { module: m, ..base });
+
+            // Lengths: exactly `m` times the unit gear's.
+            for (name, got, want) in [
+                ("r", g.r, unit.r),
+                ("rb", g.rb, unit.rb),
+                ("rf", g.rf, unit.rf),
+                ("ra", g.ra, unit.ra),
+                ("rho", g.rho, unit.rho),
+                ("st", g.st, unit.st),
+                ("bd", g.bd, unit.bd),
+                ("bc", g.bc, unit.bc),
+                ("ac", g.ac, unit.ac),
+                ("r_j", g.r_j, unit.r_j),
+                ("s_j", g.s_j, unit.s_j),
+                ("l", g.l, unit.l),
+            ] {
+                if !got.is_finite() || !want.is_finite() {
+                    continue;
+                }
+                let target = want * m;
+                let rel = (got - target).abs() / target.abs().max(f64::MIN_POSITIVE);
+                if rel > worst_length {
+                    worst_length = rel;
+                    where_length = format!("{name} at m={m}, {base:?}");
+                }
+            }
+
+            // Angles: the same number, whatever the module.
+            for (_name, got, want) in [
+                ("psi_p", g.psi_p, unit.psi_p),
+                ("psi_b", g.psi_b, unit.psi_b),
+                ("theta_a", g.theta_a, unit.theta_a),
+                ("theta0", g.theta0, unit.theta0),
+                ("half_pitch", g.half_pitch, unit.half_pitch),
+                ("alpha_t", g.alpha_t, unit.alpha_t),
+            ] {
+                if got.is_finite() && want.is_finite() {
+                    worst_angle = worst_angle.max((got - want).abs());
+                }
+            }
+
+            // ...and the discrete verdicts are facts about the shape, so they
+            // cannot depend on how large it is drawn.
+            assert_eq!(
+                g.undercut, unit.undercut,
+                "undercut moved with m={m}: {base:?}"
+            );
+            assert_eq!(
+                g.severed, unit.severed,
+                "severed moved with m={m}: {base:?}"
+            );
+        }
+    }
+
+    assert!(
+        worst_length < 1e-12,
+        "a length is not homogeneous in the module: {worst_length:e} relative at {where_length}"
+    );
+    assert!(
+        worst_angle < 1e-14,
+        "an angle moved with the module by {worst_angle:e} rad"
+    );
 }

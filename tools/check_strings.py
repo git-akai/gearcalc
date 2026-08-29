@@ -18,8 +18,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CATALOGUE = ROOT / "crates/gear-io/data/strings_en.toml"
-SOURCES = sorted((ROOT / "web/src").glob("*.svelte")) + sorted(
-    (ROOT / "web/src").glob("*.ts")
+# The front end, and the Rust that hands it keys. `Maybe::Unavailable` carries a
+# reason across the boundary, and where that reason has a message it is written
+# as a `ui.…` key rather than a sentence — so gear-wasm is a place `ui.` keys are
+# used, and scanning only `web/src` reported a live one as an orphan.
+SOURCES = (
+    sorted((ROOT / "web/src").glob("*.svelte"))
+    + sorted((ROOT / "web/src").glob("*.ts"))
+    + sorted((ROOT / "crates").rglob("*.rs"))
 )
 
 

@@ -10,7 +10,7 @@ use super::{Backlash, ContactRatios, GearResult, SpurResult, TrainError};
 use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift};
 use crate::contact::{efficiency, ContactPath, Directional, Drive};
 use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
-use crate::mesh::{Member, Mesh, MeshKind};
+use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
 use crate::profile::Gear;
@@ -25,6 +25,11 @@ use crate::strength::{
 /// stage, because they are shared.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct StageGear {
     pub teeth: u32,
     /// Automatic uses [`minimum_profile_shift`] at `working_depth`.
@@ -36,7 +41,7 @@ pub struct StageGear {
     /// A fixed 1 module — the classical rule, and what this used to default to —
     /// asks a narrower one, *is it undercut within a module of depth?*, and the
     /// two have different answers: at α = 20° with a sharp rack they part at 18
-    /// teeth and 22 (§4.3). Following the dedendum rather than naming a number
+    /// teeth and 22 (docs/reference.md#automatic-values). Following the dedendum rather than naming a number
     /// also means a gear cut shallower is asked about the depth it actually has.
     pub working_depth: Auto<f64>,
     /// Automatic uses [`addendum_for_tip_width`] at `min_tip_width`.
@@ -90,7 +95,7 @@ impl Default for StageGear {
 /// β₁ = Σ/2 + β_add,     β₂ = Σ/2 − β_add
 /// ```
 ///
-/// so `β₁ + β₂ = Σ` — the relation crossed-axis screw gearing runs on (§4.5.1)
+/// so `β₁ + β₂ = Σ` — the relation crossed-axis screw gearing runs on (docs/reference.md#crossed-axes)
 /// — and at `Σ = 0` it collapses to `β₁ = −β₂ = β_add`, a parallel helical pair
 /// with its two hands opposed. The parallel case is the shaft angle's zero
 /// rather than a separate construction, which is the specification's own
@@ -99,11 +104,16 @@ impl Default for StageGear {
 /// What *does* branch is the mesh, and it must: parallel axes touch along a
 /// line and lose power to sliding along the profile, while crossed axes touch
 /// at a point and slide lengthwise. Those are different mechanisms with
-/// different formulas and different results (§4.5.1), so a crossed stage
+/// different formulas and different results (docs/reference.md#crossed-axes), so a crossed stage
 /// answers with the screw result — no contact ratio, no bending, two
 /// efficiencies — and says so.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct SpurStage {
     /// Normal module, mm. Shared by both gears.
     pub module: f64,
@@ -242,7 +252,7 @@ impl SpurStage {
 ///
 /// [`TrainError`] when the pair cannot mesh, never reaches contact, names a
 /// material the library does not have, or is too undercut to rate.
-pub fn solve_stage(
+pub fn solve_spur_stage(
     stage: &SpurStage,
     input_torque: f64,
     lib: &MaterialLibrary,
@@ -281,7 +291,7 @@ pub fn solve_stage(
     // `mesh` was rating a pair nobody builds: the clearance is not a tolerance
     // to be ignored, it is the reason there is any backlash to report.
     //
-    // A crossed stage reaches the same place by a different road (§4.4): its line
+    // A crossed stage reaches the same place by a different road (docs/reference.md#centre-distance-and-backlash): its line
     // of action slides instead of turning, so `Screw::path_of_contact_at` takes
     // the distance rather than the pair being re-described at it.
     let operating = mesh.at(centre).map_err(TrainError::Mesh)?;
@@ -289,7 +299,7 @@ pub fn solve_stage(
     let _ = clearance;
 
     // --- face width. `b_min` does not depend on the `b` it was measured at
-    // (DESIGN §4.7), so one evaluation at any width gives every minimum, and
+    // (docs/reference.md#contact-stress), so one evaluation at any width gives every minimum, and
     // nothing has to be iterated.
     const PROBE: f64 = 10.0;
     let e_star = contact_modulus(&materials[0], &materials[1]);
@@ -370,14 +380,14 @@ pub fn solve_stage(
 
     // --- backlash at the three centre distances.
     let angular =
-        |a: f64, at: Member| -> f64 { mesh.angular_backlash(a, at).unwrap_or(0.0).to_degrees() };
+        |a: f64, at: MeshSide| -> f64 { mesh.angular_backlash(a, at).unwrap_or(0.0).to_degrees() };
     // Reported by direction rather than by member: the output of a forward
     // drive is gear 2, of a backward drive gear 1, and the same gap subtends a
     // different angle at each.
     let backlash = Directional::of(|d| {
         let at = match d {
-            Drive::Forward => Member::Second,
-            Drive::Backward => Member::First,
+            Drive::Forward => MeshSide::Second,
+            Drive::Backward => MeshSide::First,
         };
         Backlash {
             nominal: angular(centre, at),

@@ -11,7 +11,7 @@
 //! and the values the sentence needs.
 //!
 //! The words live in `gear-io`'s string catalogue, one file per language, and
-//! reach the browser through the same door the defaults do — see DESIGN §12 for
+//! reach the browser through the same door the defaults do — see docs/corrections.md for
 //! what happened the one time a value was written down in two languages.
 //!
 //! # Rounding is engineering, so the core still does it
@@ -104,6 +104,56 @@ pub mod key {
         "stage.transverse_contact_ratio_below_one";
 
     /// Every key above, for the catalogue coverage tests.
+    // ---- errors --------------------------------------------------- //
+    //
+    // The reason a result does not exist, said the same way a clamp says what
+    // it altered. These were `Display` impls writing English inside
+    // `gear-core` — the last place the no-words rule was broken, and broken
+    // in the messages a user sees when something has gone wrong, which are
+    // the ones that most need translating (`docs/corrections.md`).
+    /// `error.mesh_incompatible`
+    pub const ERROR_MESH_INCOMPATIBLE: &str = "error.mesh_incompatible";
+    /// `error.mesh_ring_too_small`
+    pub const ERROR_MESH_RING_TOO_SMALL: &str = "error.mesh_ring_too_small";
+    /// `error.mesh_outside_involute_domain`
+    pub const ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN: &str = "error.mesh_outside_involute_domain";
+    /// `error.mesh_centre_distance_too_small`
+    pub const ERROR_MESH_CENTRE_DISTANCE_TOO_SMALL: &str = "error.mesh_centre_distance_too_small";
+    /// `error.measure_no_valid_span`
+    pub const ERROR_MEASURE_NO_VALID_SPAN: &str = "error.measure_no_valid_span";
+    /// `error.measure_pin_off_flank`
+    pub const ERROR_MEASURE_PIN_OFF_FLANK: &str = "error.measure_pin_off_flank";
+    /// `error.measure_pin_bottoms_out`
+    pub const ERROR_MEASURE_PIN_BOTTOMS_OUT: &str = "error.measure_pin_bottoms_out";
+    /// `error.measure_pin_too_small`
+    pub const ERROR_MEASURE_PIN_TOO_SMALL: &str = "error.measure_pin_too_small";
+    /// `error.measure_pin_too_large`
+    pub const ERROR_MEASURE_PIN_TOO_LARGE: &str = "error.measure_pin_too_large";
+    /// `error.screw_not_positive`
+    pub const ERROR_SCREW_NOT_POSITIVE: &str = "error.screw_not_positive";
+    /// `error.screw_worm_too_thin`
+    pub const ERROR_SCREW_WORM_TOO_THIN: &str = "error.screw_worm_too_thin";
+    /// `error.screw_shaft_angle_impossible`
+    pub const ERROR_SCREW_SHAFT_ANGLE_IMPOSSIBLE: &str = "error.screw_shaft_angle_impossible";
+    /// `error.screw_first_member_is_a_disc`
+    pub const ERROR_SCREW_FIRST_MEMBER_IS_A_DISC: &str = "error.screw_first_member_is_a_disc";
+    /// `error.screw_axes_are_parallel`
+    pub const ERROR_SCREW_AXES_ARE_PARALLEL: &str = "error.screw_axes_are_parallel";
+    /// `error.train_no_contact`
+    pub const ERROR_TRAIN_NO_CONTACT: &str = "error.train_no_contact";
+    /// `error.train_unknown_material`
+    pub const ERROR_TRAIN_UNKNOWN_MATERIAL: &str = "error.train_unknown_material";
+    /// `error.train_no_root_section`
+    pub const ERROR_TRAIN_NO_ROOT_SECTION: &str = "error.train_no_root_section";
+    /// `error.train_empty`
+    pub const ERROR_TRAIN_EMPTY: &str = "error.train_empty";
+    /// `error.gear_no_mate`
+    pub const ERROR_GEAR_NO_MATE: &str = "error.gear_no_mate";
+    /// `error.gear_concentric_has_no_profile`
+    pub const ERROR_GEAR_CONCENTRIC_HAS_NO_PROFILE: &str = "error.gear_concentric_has_no_profile";
+    /// `error.gear_no_pin_diameter`
+    pub const ERROR_GEAR_NO_PIN_DIAMETER: &str = "error.gear_no_pin_diameter";
+
     pub const ALL: &[&str] = &[
         CLAMP_CUTTER_NO_TIP_CORNER,
         CLAMP_CUTTER_TEETH_REDUCED,
@@ -118,7 +168,6 @@ pub mod key {
         CLAMP_RING_SPACE_RAISED,
         CLAMP_RING_TIP_RAISED,
         CLAMP_TIP_CAPPED_POINTED,
-        CLAMP_TOOTH_SEVERED,
         CLAMP_TOOTH_SEVERED,
         CLAMP_TOOTH_UNDERCUT,
         CLAMP_TOOTH_THICKNESS_CAPPED,
@@ -135,6 +184,27 @@ pub mod key {
         STAGE_RING_ADDENDUM_CLAMPED,
         STAGE_SELF_LOCKING,
         STAGE_TRANSVERSE_CONTACT_RATIO_BELOW_ONE,
+        ERROR_MESH_INCOMPATIBLE,
+        ERROR_MESH_RING_TOO_SMALL,
+        ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,
+        ERROR_MESH_CENTRE_DISTANCE_TOO_SMALL,
+        ERROR_MEASURE_NO_VALID_SPAN,
+        ERROR_MEASURE_PIN_OFF_FLANK,
+        ERROR_MEASURE_PIN_BOTTOMS_OUT,
+        ERROR_MEASURE_PIN_TOO_SMALL,
+        ERROR_MEASURE_PIN_TOO_LARGE,
+        ERROR_SCREW_NOT_POSITIVE,
+        ERROR_SCREW_WORM_TOO_THIN,
+        ERROR_SCREW_SHAFT_ANGLE_IMPOSSIBLE,
+        ERROR_SCREW_FIRST_MEMBER_IS_A_DISC,
+        ERROR_SCREW_AXES_ARE_PARALLEL,
+        ERROR_TRAIN_NO_CONTACT,
+        ERROR_TRAIN_UNKNOWN_MATERIAL,
+        ERROR_TRAIN_NO_ROOT_SECTION,
+        ERROR_TRAIN_EMPTY,
+        ERROR_GEAR_NO_MATE,
+        ERROR_GEAR_CONCENTRIC_HAS_NO_PROFILE,
+        ERROR_GEAR_NO_PIN_DIAMETER,
     ];
 }
 
@@ -144,6 +214,11 @@ pub mod key {
 /// `gear_wasm::strings` serves.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Note {
     /// Stable identifier for the message. Never shown to anyone.
     pub key: String,
@@ -195,6 +270,21 @@ impl Note {
     pub fn is(&self, key: &str) -> bool {
         self.key == key
     }
+}
+
+/// Something that can say why it happened, in the catalogue's currency.
+///
+/// Errors used to answer that question in English, through `Display`, from
+/// inside a crate whose standing rule is that it holds no words
+/// (`docs/corrections.md`). This is the same door [`Note`] already gave clamps
+/// and stage notes: one channel for every reason a person reads, so the
+/// catalogue check covers all of them and a translator has one file.
+///
+/// `Display` stays on each of these, for the CLI and for `Debug`. What changed
+/// is which of the two the browser sees.
+pub trait Explain {
+    /// Why, as a key and the values its sentence needs.
+    fn note(&self) -> Note;
 }
 
 #[cfg(test)]

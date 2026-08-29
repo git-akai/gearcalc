@@ -1,7 +1,7 @@
 //! Carlson symmetric elliptic integrals.
 //!
 //! These exist here for one reason: **general Hertzian contact**, and
-//! specifically the requirement that it not branch (DESIGN.md §4.7). The
+//! specifically the requirement that it not branch (docs/reference.md#contact-stress). The
 //! classical elliptical-contact solution is written with `K(e)` and `E(e)`,
 //! which forces the caller to know which semi-axis of the contact ellipse is
 //! the major one before it can evaluate anything. That is a branch, and it sits
@@ -21,7 +21,7 @@
 //!
 //! `R_D` is the one that carries the contact ellipse's shape; `R_F` sets its
 //! size. Both are homogeneous — degree −1/2 and −3/2 respectively — which is
-//! what lets the aspect-ratio solve of §4.7 be posed in a single dimensionless
+//! what lets the aspect-ratio solve of docs/reference.md#contact-stress be posed in a single dimensionless
 //! variable.
 //!
 //! # How they are computed

@@ -1,3 +1,20 @@
+> **Superseded, and kept for provenance only.**
+>
+> This design record has been replaced by four documents, each with one job:
+> [`reference.md`](../reference.md) states what the tool computes,
+> [`rationale.md`](../rationale.md) why each model is the one chosen,
+> [`corrections.md`](../corrections.md) what was once wrong and how it surfaced,
+> and [`state.md`](../state.md) what is built and what is not.
+>
+> **Nothing points here, and nothing should.** It is not maintained, its section
+> numbers no longer resolve, and where it disagrees with the four it is wrong. It
+> survives because it contains reasoning that was expensive to reach and that the
+> replacements condense rather than repeat — the JGMA two-scale argument, the
+> material survey, the crossed-path derivation, the λ minimax proof — and because
+> deleting an argument nobody remembers needing is how it gets rediscovered.
+
+---
+
 # Gear & geartrain design tool — architecture and mathematics
 
 **Status: milestones 0–10 complete and in CI; milestone 11 (polish) is the open
@@ -3517,6 +3534,16 @@ fails, which is the case where several notes vanish at once.
 Ranges read `1.000 to 4.050`, matching the `up to 0.448` used for one-sided
 bounds.
 
+**The gap is what pairs a note to its field.** With one spacing above and below,
+a note sits as near the next field as its own and reads as a heading for what
+follows — the column becomes a list of orphans. Two values, `--note-gap` and
+`--field-gap` in `app.css`, are the whole of the fix: a field and its note are
+`0.15rem` apart, and anything and the next field `0.75rem`. They live in the
+shared stylesheet rather than in either panel because the pairing has to mean the
+same thing wherever a note appears, and a note in its own element rather than
+inside a label — the geartrain's `.hint` — undoes the field gap explicitly with
+`calc(var(--note-gap) - var(--field-gap))` rather than carrying a magic number.
+
 ### 8.1 Additions to the specification's field list
 
 Three things the spec does not list are added. Two are read-only outputs and cheap
@@ -3533,6 +3560,19 @@ The first two are outputs, so §3.1 is untouched by them. The third *is* state, 
 deliberately: it is an input the specification omitted rather than a derived
 value, and inventing a default for it would be choosing a machine on the user's
 behalf.
+
+**One more input has two faces, like the worm stage.** An eccentric gear's
+eccentricity can be entered as the angular-shift amplitude `Δx` or as the
+**centre-distance throw** — the half-amplitude of the commanded centre distance's
+best-fit sinusoid, what a simple eccentric or crank delivers. The second is the
+first read backwards: [`amplitude_for_throw`](../crates/gear-core/src/eccentric.rs)
+solves the `Δx` whose `centre_profile` has that throw — the throw is zero at
+`Δx = 0` and rises monotonically until the mesh runs out of involute, so it is one
+bracketed inversion, not a new model. `Δx` stays the single field everything is
+built from; the wasm boundary resolves it once (`resolved_params`) and every
+entry point runs that, so nothing downstream knows which face was shown. Needs
+the mate the throw is commanded against; `λ = 1` makes the drive conjugate and
+its throw zero, so there is nothing to size by then, and the panel says so.
 
 ### 8.2 Editable material properties
 
@@ -3848,9 +3888,170 @@ finishes loading, took the fallback and never learned the real text had arrived.
 Every panel looked correct because every panel renders later. The catalogue lives
 in `$state` in a `.svelte.ts` module now.
 
----
+### The house style, and why it is written in the file
 
-## 12. Corrections made during implementation
+A hundred messages accumulated one at a time read as a hundred voices. Four rules
+are stated at the top of `strings_en.toml` itself — where someone adding a
+message will see them — rather than here, where they would not:
+
+1. **A label is a name**: sentence case, no closing punctuation.
+2. **A note is a fragment**: lowercase, unpunctuated, finishing a thought the
+   number started.
+3. **A statement in the application's own voice is a sentence**: capital, full
+   stop. Warning bullets and paragraphs of guidance are these.
+4. **`value: consequence`** — the figure first, then what it means, so clamp and
+   stage notes can be skimmed down the left.
+5. **Cut the leading article.** A note is read in the second it takes to glance
+   at it; "the cutter has no usable tip corner" says nothing "cutter has no
+   usable tip corner" does not. An indefinite article stays where it is doing
+   work — "a ring is shaped by a pinion" is a general statement, not this ring.
+6. **One sentence unless a second earns its place.** Most notes that ran to two
+   were restating the first in other words.
+
+And one rule about which messages exist: **a note earns its line by saying
+something the number cannot.** Restating a label in longer words is not free —
+it is what teaches a reader to skip the notes that matter. The `Type` selector's
+"External" option had a note reading "teeth point outward from the pitch circle";
+it is gone, while the internal and eccentric options kept theirs, which say
+something their names do not.
+
+### What the editorial pass found
+
+Four defects, none of which a typecheck or the both-ways key check could see,
+because every one of them was *consistent within its own file*:
+
+| | |
+|---|---|
+| The same bound, worded twice | `admissible_ranges` is shown on both tabs, and the sentence describing it lived in both panels. They drifted: the fillet bound read "the fillet must fit the tooth space" on the gear tab and "fillet must fit" on the geartrain tab, and the dedendum bound lost its reason entirely on the second. The sentences are `ui.bound_*` now, with `t()`'s placeholders carrying the numbers, and both panels read them |
+| A severed tooth said so twice | `Gear::new` pushes `clamp.tooth_severed` into `clamps` *and* sets `severed`, and the gear tab rendered both — the same sentence, one line apart. The panel drops that clamp from its list; the note stays in the catalogue because the eccentric gear's per-tooth list has no bool to use instead |
+| "Clamped:" on one list of three | The gear tab prefixed its clamp bullets; the ring section and the geartrain's gear card did not. All three do now — the clamp messages are fragments, and in a list that also holds undercut and severed statements the prefix is what separates a guard rail from a fact |
+| Three keys for one label | `train_c2c_tolerance_2`, `_4` and `_6`, all reading "C2C tolerance −", one per stage kind — an extraction artefact. Collapsed to `train_c2c_tolerance_minus`, with `_plus` renamed to match. Likewise `train_m` said "m" where `train_module` and the gear tab said "module", for the same unit on the same screen |
+
+### Closing the coverage gap
+
+The editorial pass above did not move any text into the catalogue; a second,
+mechanical pass did. Roughly **eighty strings** came out of `GearPanel.svelte`,
+`TrainPanel.svelte` and `web/src/core.ts` — `FIELDS`' labels, units and notes,
+the per-stage guidance paragraphs, the material property names, the validation
+messages, and the small tokens (`yes`, `sun–planet`, `Starts`) that a translator
+needs as much as the sentences.
+
+Two of them are worth naming, because they are what the gap costs rather than
+merely instances of it:
+
+- **`ui.gear_between` was one word of a twenty-word sentence.** The other
+  nineteen lived in `GearPanel.svelte`, wrapped around an `<em>`. No translator
+  could have done anything with either half. It is one message now.
+- **`FieldSpec` held display text.** `label`, `unit`, `note` and `ringNote` were
+  English in a TypeScript array; they are catalogue keys, resolved by `t()` at
+  the point of rendering.
+
+**The gate was the rendered DOM, as it was for the original extraction** — seven
+panel states (external, internal and eccentric gears; spur, worm, planetary and
+crossed stages), visible text dumped before and after, required byte-identical.
+It came back identical on five. The two that differed did so in exactly the two
+places the pass meant to change, which is the gate working rather than the gate
+being waived:
+
+| | |
+|---|---|
+| the internal gear's pins paragraph | six lines became one, because the sentence stopped being split around an element. Same words |
+| the eccentric gear's sinusoid phase | `-0.0°` became `0.0°`. The phase really is zero; `toFixed` prints a rounded −1e−17 with a sign, and a sign on a nothing reads as a measurement |
+
+`Bound::rejects` is gone with it. It returned "must be at least 0.5" and its
+three siblings from `gear-core`, on the stated reasoning that producing them
+there stopped two panels wording the same condition differently — and that never
+happened, because the front end wrote its own copies and displayed those. The
+English in the core was shown to nobody. It is `Bound::admits(v) -> bool` now;
+exclusivity is read from the fields by anything that needs to say *why*, and the
+surviving sentences are `ui.validation_*`. The test that asserted on its wording
+asserts on the flags instead.
+
+### Pruning, and what a note is for
+
+A later pass took eight messages out again. Each failed the same test — *a note
+earns its line by saying something the number cannot*:
+
+| removed | why |
+|---|---|
+| `train_equal_as_parallel_axis_mesh_must` | "equal, as a parallel-axis mesh must be", beside two figures a reader can see are equal |
+| `gear_span_over_teeth_not_shown_for`, `gear_between_pins_explained` | **absence needs noting only where the thing was expected.** Nothing on a ring's panel offers a span over teeth, so a paragraph explaining that it is missing introduced the idea in order to withdraw it |
+| `note_ring_cutter_teeth`, `train_root_fillet_are_cutter_s_below`, `bound_ring_shift` | all three said, at length, that a ring's form comes from its cutter. The field is labelled *Cutter teeth* and sits under *Ring cutter*; the word is already there |
+| `gear_pin_centre_radius`, `gear_between_2_pins_nominal` | see below |
+
+**The ring's measurement section was two vocabularies for one measurement.** It
+had its own heading (*Measurement*), its own row name (*Between 2 pins,
+nominal*), and two extra outputs the external gear never showed — pin centre
+radius and contact radius. It is `Measurement over pins` with a `2 pins` row now,
+the same words the external gear uses, because it is the same measurement read at
+the opposite sign (§4.6). The `, nominal` went with it on both panels: a single
+value per row has nothing to be nominal *against*, and the qualifier was doing
+the work of a column that does not exist.
+
+A later round took five more, on the same test: `train_note_static_friction_planetary`
+(the same sentence as the spur stage's, said differently — one note now serves
+both), `train_note_held_shaft` ("third shaft is the output", beside a control
+labelled *Held* with two of three shafts already named), `train_with_planet_count`
+(on a row labelled *Coprime* in a planetary stage), and the uncatalogued note on
+*Even spacing*, which reported `simultaneous_meshing` as a bare yes/no hung off
+another row's value — it has its own row now, beside the other layout checks,
+because it is a separate condition: even spacing is `N | z_s + z_r`, simultaneous
+meshing the stricter `N | z_s` *and* `N | z_r`, and `the_layout_checks_read_the_tooth_counts`
+holds a set where the first is true and the second false. A false answer there is
+not a fault — the planets engage staggered, which is usually preferable — which
+is why it reports rather than warns. A ring's measurement heading became *Measurement between
+pins*, since between is what it is.
+
+**A note that lives outside its label needs saying so in CSS.** `auto` fields are
+their own snippet, so their note is a sibling of the label rather than a child of
+it — which meant it missed both the pairing gap and the label's trailing column,
+sitting loose above, tight below, and running to the card's full width where
+every other note stopped short of the unit. `.gear > .note` now takes the same
+`calc(var(--note-gap) - var(--field-gap))` pull the geartrain's `.hint` does, and
+the same `3.9rem` trailing pad. Two notes were affected; only one was noticed.
+
+`PinsOut` went with them, down to `{ nominal }`. The pin centre and contact
+radii were on the wire and displayed by nothing once the ring's section was
+aligned; they are how the measurement is *derived*, and how `metrology` verifies
+its tangency against the generated flank, so they stay in the core and stop at
+the boundary. The one test that read `pin_centre_radius` off the wire — checking
+that a between-pins figure *subtracts* the pin where an over-pins figure adds it
+— asks `gear_core::metrology` for it instead, which is where the number comes
+from. A field nothing reads is a field that can go wrong unnoticed.
+
+### A door for the reasons, and for the errors
+
+`Maybe::Unavailable` carries a reason across the boundary — "no pin diameter
+given", "no mate given" — and every one of them was English written in
+`gear-wasm`, invisible to the catalogue for the same reason the panels' prose
+once was.
+
+The first of them has moved, and the mechanism generalises: **the reason is a
+catalogue key, and the front end runs every reason through `t()`.** `t()` returns
+its argument unchanged when there is no message for it (a deliberate property —
+a half-translated catalogue should show a reader something they can report), so a
+key resolves and the reasons not yet moved render exactly as they did. Migration
+one at a time, with no flag day, and it is the same door the error enums below
+should eventually use.
+
+`tools/check_strings.py` had to widen with it: it scanned `web/src` only, so a
+`ui.` key written in Rust came back as an orphan. It reads the crates too now —
+a key is a key wherever it is written, which was already the reason it looks for
+bare `"ui.…"` literals rather than only `t("…")` calls.
+
+### What is still English inside `gear-core`
+
+One class, and it is a design item rather than an oversight: **the error enums'
+`Display` impls**. `MeshError`, `MeasurementError` and `TrainError` each render
+a sentence — "the pin is too large: contact would fall below the base circle" is
+on screen today — and none of them goes through `Note`. The mechanism §11.5
+built for clamp and stage notes was never extended to errors.
+
+Fixing it means giving each variant a key and a `values` map, as `Note` has, and
+changing every consumer that formats one. That is worth doing and is not a
+tidy-up: it is the last place the "no English in `gear-core`" rule is broken,
+and it is broken in the messages a user sees when something has gone wrong,
+which are the ones that most need translating.
 
 Every one of these was a claim in an earlier revision of this document that
 turned out to be wrong. They are recorded rather than quietly edited, because
@@ -3896,6 +4097,12 @@ something independent.**
 | 8.0 | A gear tab's type-specific inputs left set when the type changed | Switching an eccentric gear back to external left its shift amplitude in place, so the gear stayed eccentric with no control on screen to say so — and the eccentricity outputs keyed on that *value* rather than on the type, so they stayed too. Changing type now returns every field the new type does not use to its default, read from `FIELDS` rather than from a second list |
 | 4.10 | Only the cutter *tip round* shared across the teeth | The **depth** is a tool setting too. `Gear::new` raises the cutter depth when it would go non-positive, which pinned four teeth to one root radius while their neighbours followed the envelope — a flat spot and a corner on the high side at positive shift, and the low side at negative. Both settings are the tool's and are settled once; what is a fact about *one tooth* is reported instead |
 | 4.10 | Each tooth drawn one **ideal** pitch wide | λ seats the teeth unevenly by construction — that is what it is for — so the space between two of them is a pitch plus the difference of their offsets. Every tooth drawn to the ideal width left a gap of 0.009 rad at λ = 1, and every continuity check written before it ran at λ = 0, the one value that hides it |
+| 4.10 | The shared cutter depth applied to the teeth but not to `Eccentric::mean` | When a high-shift tooth forces the cutter deeper than the dedendum asked for, the teeth are rebuilt to it — but `mean`, which every scalar is quoted from and which `root_at` builds the root envelope on, kept the raw dedendum. The drawn root then stood `m·(depth − dedendum)` proud of the teeth and protruded past the fillets: **0.25 mm** on `α=25° z=23 x=0.2 Δx=1 addendum=0.8 dedendum=1.0`, plainly visible on the shallow high side. Every step/kink trend test passed — a uniform radial offset of the whole root is smooth. `mean` is rebuilt with the same tool now, in lockstep with the teeth so a concentric gear is still `Gear::new` verbatim; the gate is `root_at(seat_k) == teeth[k].rf` at λ = 0, exact. *The object that summarises the pieces is a piece.* |
+| 4.10, 8 | The wasm gear summary built from `Gear::new(params)`, ignoring the eccentricity and the shared-tool rebuild | Same root cause on a second surface: `fillet_radius` reported the 0.38-module rack where the shared tool is 0.05, `cutter_tip_width` used the raw dedendum, and span/over-pins quoted the mean tooth as if it were *the* measurement. `solve_gear` now builds `Eccentric::new(params)` and quotes `mean()` — one construction for both kinds, a concentric gear's `mean` being `Gear::new` bit for bit. Span and over-pins are withheld for an eccentric gear (`Unavailable`, "varies around the revolution"); `undercut`/`severed` became "any tooth" (`troubled_teeth` names which); the panel hides the tip/root/thickness scalars for an eccentric gear and shows the `variation` ranges only |
+| 4.10, 8 | `admissible_ranges` bounded the nominal tooth, not the swept interval | An eccentric gear's teeth are cut across `x̄ + Δx cos θ`, so `x̄ = 0.2, Δx = 1` puts a tooth at 1.2 — past the buildable 0.95 — while the hint said the shift was fine and the root-radius hint offered the 0.38 rack the high teeth cannot hold. `admissible_ranges` now closes the shift-dependent bounds onto the interval: `profile_shift` pulls in by each extreme tooth's own offset (its cutter-depth ceiling drops — the shared tool follows the shift up), and `addendum`/`dedendum`/`root_radius` are the tighter of their two extremes against the shared cutter depth. Gated against the generator as the concentric bounds are — just inside the window every tooth builds, just outside one clamps. A concentric gear is `Δx = 0` and unchanged to the bit |
+| 4.10 | `centre_profile` reported `CentreDistanceTooSmall` where the cause is `inv α_w < 0` | Two different failures wore one name. `operating_geometry` returning `None` means no operating pressure angle exists — the tooth is too thick to sit in the mate's space at *any* centre distance — which is `OutsideInvoluteDomain`; `CentreDistanceTooSmall` is the base-circle limit and belongs to the sinusoid-fit step below it. On a close tooth-count **internal** mate the first fires readily, because the shift term carries `1/Σz` and `Σz` is the tooth-count *difference* there, so a modest amplitude is amplified into it. The message now names the eccentricity and says what relieves it |
+| 4.10 | ...and the "fix" for it invented a law, which broke the feature outright | Diagnosing the above, `x_eff = x̄ + (1 − λ)(x_k − x̄)` was introduced on the reasoning that a corrected drive flank sits where the mean tooth's would, so a λ ≈ 1 drive operates against a smaller shift interval. **λ moves a tooth rigidly** — both flanks by one angle — so it decides when a tooth arrives, not how thick it is, and zero backlash is set by the thickness. The consequence was not subtle: at λ = 1 every tooth collapsed onto the mean and the commanded centre distance reported **zero throw at every amplitude**, which is the whole output of the feature. Reverted; λ reaches nothing here and that is now gated *exactly*, over both mesh kinds and four λ. The gap that let it through: every test that turned λ did so on a lone gear, and every test with a mate attached left λ at its default — **a control needs a case that turns it in each context it reaches**, not just somewhere |
+| 4.10 | `centre_profile` answered an internal pair whose "ring" had fewer teeth than the pinion | `Mesh::new` refuses it as `RingTooSmall`; this arrived only as a signed sum of the wrong sign and the arithmetic answered it. Refused by name now |
 | 6 | Two-point Basquin S-N law per material | The data does not exist — no polyamide grade publishes any fatigue figure, and POM's is a printed graph. Replaced by peak and cyclic allowables, §6.2 |
 | 6 | `yield_strength` as the single strength field | Glass-filled grades have **no yield point**; their datasheets report stress at break. Renamed to an allowable, with `ultimate_measure` recording which quantity it is |
 | 6 | "1215 Hardened Steel" assumed a valid entry | 1215 is ~0.09 %C and cannot be through-harden; only carburised, giving a hard case over a soft core that one scalar cannot represent. Both 1215 entries dropped |

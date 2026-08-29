@@ -1,6 +1,6 @@
 // Application state: the open gear tabs.
 //
-// Per DESIGN.md §3.1, inputs are the only state. Nothing derived is stored, so
+// Per docs/rationale.md#inputs-are-the-only-state, inputs are the only state. Nothing derived is stored, so
 // nothing can go stale — every output on screen is recomputed from these by
 // Rust on each change.
 
@@ -38,6 +38,10 @@ export interface GearTab {
   /** What an eccentric gear runs against, for its commanded centre distance.
    *  Carried for every tab so switching kinds does not lose it. */
   mate: MateRef;
+  /** When set, the eccentricity is sized by this centre-distance throw (signed,
+   *  mm) and `params.angular_shift` becomes the value Rust solves for. `null`
+   *  leaves the amplitude as the direct input. */
+  eccentricThrow: number | null;
 }
 
 export interface TrainTab {
@@ -50,7 +54,7 @@ let nextId = 1;
 let nextTrainId = 1;
 
 // Every value here comes from the core — see `defaults()` in core.ts, and
-// DESIGN.md §12 for what happened when they were written down twice. That is
+// docs/corrections.md for what happened when they were written down twice. That is
 // why a tab cannot be built before the core is loaded, and why the two lists
 // below start empty and are filled by `initialise`.
 function freshTab(name = "Gear"): GearTab {
@@ -66,6 +70,7 @@ function freshTab(name = "Gear"): GearTab {
     kind: "external",
     cutter: d.cutter,
     mate: { teeth: 43, profile_shift: 0, internal: false },
+    eccentricThrow: null,
   };
 }
 
@@ -147,6 +152,9 @@ export function setKind(tab: GearTab, kind: GearKind) {
       tab.params = { ...tab.params, [f.key]: fallback[f.key] };
     }
   }
+  // The throw sizing is a mode on `angular_shift`, so it goes back with it —
+  // a gear that is no longer eccentric is sized by nothing.
+  if (kind !== "eccentric") tab.eccentricThrow = null;
   tab.kind = kind;
 }
 

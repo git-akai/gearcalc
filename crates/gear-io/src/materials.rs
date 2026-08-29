@@ -84,7 +84,7 @@ pub fn default_library() -> MaterialLibrary {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use gear_core::material::{Basis, Class, Measure};
+    use gear_core::material::{Basis, Family, Measure};
 
     #[test]
     fn the_default_library_parses_and_holds_the_expected_materials() {
@@ -241,7 +241,11 @@ mod tests {
         // that breaks it should fail loudly rather than quietly produce a
         // library whose estimates no longer mean the same thing.
         let lib = default_library();
-        for m in lib.materials.iter().filter(|m| m.class == Class::Polyamide) {
+        for m in lib
+            .materials
+            .iter()
+            .filter(|m| m.class == Family::Polyamide)
+        {
             {
                 let (ult, fat) = (m.ultimate_allowable.value, m.fatigue_allowable.value);
                 let ratio = fat / ult;

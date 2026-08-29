@@ -14,6 +14,14 @@
   --reference: #9aa4b2;
   --on-accent: #ffffff;
   color-scheme: light dark;
+
+  /* Vertical rhythm for an input and the note under it.
+     A note belongs to the box *above* it, and the gap is what says so. With one
+     spacing for both, a note sat as near the next field as its own and read as a
+     heading for what followed. Two values, shared by every panel so the pairing
+     means the same thing wherever it appears. */
+  --note-gap: 0.15rem;
+  --field-gap: 0.75rem;
 }
 
 @media (prefers-color-scheme: dark) {

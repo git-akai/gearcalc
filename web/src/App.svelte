@@ -14,7 +14,7 @@
       await loadCore();
       // The shipped materials and the defaults for a fresh tab both live in
       // the core, so neither can be read before it is up. That is deliberate:
-      // it is what stops a default from being written down twice (DESIGN §12).
+      // it is what stops a default from being written down twice (docs/corrections.md).
       library.loadDefaults();
       workspace.initialise();
       trains.initialise();

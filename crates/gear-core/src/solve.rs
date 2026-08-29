@@ -1,21 +1,31 @@
 //! Scalar root finding.
 //!
-//! Two solvers cover every transcendental step in this crate (DESIGN.md §5).
+//! Two solvers cover every transcendental step in this crate (docs/rationale.md#where-closed-form-is-impossible).
 //! Both are **bracketed**, so neither can diverge: a Newton step that leaves the
 //! bracket is replaced by a bisection step. That property is not a nicety here —
 //! the involute function's series seed diverges above roughly 60°, which is
 //! inside the pressure-angle range this tool allows.
 //!
 //! Neither returns a "best effort" answer on failure. A solve that did not
-//! bracket a root returns `None`, and the caller reports the geometry as
-//! impossible rather than propagating a NaN into a stress figure.
+//! bracket a root — or that ran out of iterations without converging — returns
+//! `None`, and the caller reports the geometry as impossible rather than
+//! propagating a NaN into a stress figure. Both halves of that were promised
+//! here long before the second was true: falling out of the loop used to return
+//! the last iterate.
 
 /// Convergence settings.
 ///
-/// `x_tol` is an absolute tolerance on the abscissa. The defaults target machine
-/// precision; `max_iter` is a safety stop, not an expected limit — bisection
-/// alone halves the bracket each step, so 200 iterations is far beyond what
-/// double precision can use.
+/// `x_tol` is a **floor** on the abscissa tolerance, not the whole of it: both
+/// solvers add a relative term, `2ε|x|`, so the same settings mean the same
+/// thing on a root of 1e-3 and one of 1e+3. That was not true of
+/// [`newton_bracketed`], which tested an absolute step alone — and since a root
+/// of order 100 mm has an ulp of 1.4e-14, the 1e-15 floor could never be met
+/// and the loop ran to its bound every time (`docs/corrections.md`).
+///
+/// `max_iter` is a safety stop, not an expected limit — bisection alone halves
+/// the bracket each step, so 200 iterations is far beyond what double precision
+/// can use. Reaching it means the iteration is not converging, and both solvers
+/// then return `None` rather than the last iterate.
 #[derive(Clone, Copy, Debug)]
 pub struct Tol {
     pub x_tol: f64,
@@ -119,7 +129,11 @@ where
             return None;
         }
     }
-    Some(b)
+    // The iteration bound is a safety stop, so reaching it is a failure to
+    // converge and not an answer. Returning the last iterate here contradicted
+    // this module's own promise that neither solver gives a best effort — and a
+    // promise nothing enforces is the one that gets relied on.
+    None
 }
 
 /// Newton's method with a maintained bracket.
@@ -172,7 +186,9 @@ where
             x -= step;
         }
 
-        if step.abs() < tol.x_tol {
+        // Relative, as Brent's is: an absolute floor alone is a different
+        // claim at every magnitude, and an unreachable one above about 10.
+        if step.abs() < 2.0 * f64::EPSILON * x.abs() + tol.x_tol {
             return Some(x);
         }
 
@@ -187,7 +203,7 @@ where
             high = x;
         }
     }
-    Some(x)
+    None
 }
 
 #[cfg(test)]
@@ -238,5 +254,55 @@ mod tests {
             newton_bracketed(|x| x * x + 1.0, |x| 2.0 * x, -1.0, 1.0, 0.0, Tol::default())
                 .is_none()
         );
+    }
+
+    /// **Running out of iterations is a failure, not an answer.**
+    ///
+    /// Both solvers used to fall out of their loop and return the last iterate,
+    /// which contradicts this module's own first paragraph. Nothing exercised
+    /// it, which is exactly why it survived: the one guarantee the docstring
+    /// makes was the one thing unenforced.
+    #[test]
+    fn a_solve_that_runs_out_of_iterations_says_so() {
+        let stingy = Tol {
+            x_tol: 0.0,
+            max_iter: 2,
+        };
+        // A perfectly ordinary root, denied the steps to reach it.
+        assert_eq!(brent(|x| x * x - 2.0, 0.0, 10.0, stingy), None);
+        assert_eq!(
+            newton_bracketed(|x| x * x - 2.0, |x| 2.0 * x, 0.0, 10.0, 9.0, stingy),
+            None
+        );
+        // ...and with room, both find it.
+        let d = Tol::default();
+        let r = brent(|x| x * x - 2.0, 0.0, 10.0, d).unwrap();
+        assert!((r - std::f64::consts::SQRT_2).abs() < 1e-12);
+    }
+
+    /// **The convergence test is relative, so it means the same thing at every
+    /// magnitude.**
+    ///
+    /// `newton_bracketed` tested an absolute step against `x_tol = 1e-15`. A
+    /// root of order 100 has an ulp of 1.4e-14, so that test could never be met
+    /// and the solve ran its full iteration bound — which, now that exhaustion
+    /// returns `None`, would be an outright failure rather than a slow success.
+    #[test]
+    fn a_large_root_converges_rather_than_exhausting_the_bound() {
+        for scale in [1e-3_f64, 1.0, 1e3, 1e6] {
+            let f = |x: f64| x * x - 2.0 * scale * scale;
+            let df = |x: f64| 2.0 * x;
+            let want = scale * std::f64::consts::SQRT_2;
+            for r in [
+                brent(f, 0.0, 10.0 * scale, Tol::default()),
+                newton_bracketed(f, df, 0.0, 10.0 * scale, 0.0, Tol::default()),
+            ] {
+                let r = r.unwrap_or_else(|| panic!("no root at scale {scale}"));
+                assert!(
+                    (r - want).abs() / want < 1e-14,
+                    "scale {scale}: {r} vs {want}"
+                );
+            }
+        }
     }
 }

@@ -131,6 +131,11 @@ pub fn automatic_profile_shift(p: &GearParams, working_depth: f64) -> f64 {
 /// Two tiers, deliberately, because they answer different questions.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct ShiftRange {
     /// What can be built: below it the tooth is thinner than the guards allow or
     /// the cutter runs past the centre; above it the cutter no longer reaches
@@ -147,6 +152,37 @@ pub struct ShiftRange {
     /// tip radius is capped and a clamp note is raised. `None` when the tooth
     /// never comes to a point anywhere in the buildable range.
     pub pointed: Option<f64>,
+    /// Above this the cutter has to reach **deeper than the dedendum asked
+    /// for**, because a shift moves the tool out and the depth `m(h_f − x)` runs
+    /// out before the shift does.
+    ///
+    /// A threshold rather than a limit, and it was a limit until it was measured
+    /// (`docs/corrections.md`). The dedendum is a request for where the root
+    /// should sit, and the tool is derived from it — the same reading a ring has
+    /// always had, where the root circle is wherever the cutter reaches and
+    /// there is no dedendum input at all. So a shift past here is buildable, by
+    /// a deeper tool, and what the designer is owed is to be told that the tool
+    /// is no longer the one specified rather than to be refused a gear that can
+    /// be cut.
+    ///
+    /// Treating it as a limit is also what made the buildable range **step by
+    /// 62 %** as the angular shift left zero: an eccentric gear's teeth share
+    /// one tool and cannot each own a dedendum, so that path had already derived
+    /// the depth, while a concentric gear refused. One reading now, and this
+    /// threshold is where the two used to part.
+    pub shallow_cut: f64,
+}
+
+/// How far the extreme teeth of an eccentric gear are shifted from the nominal:
+/// `+Δx` at θ = 0, and `Δx·cos(2π⌊z/2⌋/z) ≤ 0` at the far tooth — the same
+/// folding [`crate::eccentric::Eccentric::new`] applies so that mirror-pair
+/// teeth share a shift. `(0.0, 0.0)` for a concentric gear, so every `+ off`
+/// downstream is `+ 0.0` and the concentric answer is unchanged to the bit.
+fn shift_offsets(p: &GearParams) -> (f64, f64) {
+    let e = p.angular_shift.abs();
+    let z = f64::from(p.teeth.max(1));
+    let c_lo = (std::f64::consts::TAU * (z / 2.0).floor() / z).cos();
+    (e * c_lo, e)
 }
 
 /// The profile shifts this gear can actually be built at.
@@ -214,20 +250,48 @@ pub fn admissible_profile_shift(p: &GearParams, working_depth: f64) -> ShiftRang
     let lo_t = (guard::MIN_TOOTH_THICKNESS_MODULES * beta.cos() - PI / 2.0) / (2.0 * ta) - xs;
     let hi_t = (guard::MAX_TOOTH_THICKNESS_FRACTION_OF_PITCH * PI - PI / 2.0) / (2.0 * ta) - xs;
 
-    // Cutter depth, both ends.
-    let hi_d = p.dedendum - guard::MIN_CUTTER_DEPTH_MODULES;
-    let lo_d = p.dedendum - guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r / p.module;
+    // Where the dedendum asked for stops being deep enough to cut at all, so a
+    // deeper tool takes over. A threshold, not a bound — `root_off_axis` below
+    // is the only limit the depth still imposes, and it subsumes the old
+    // `dedendum − 0.9 r/m` floor because it is read off the tool actually used.
+    let shallow_cut = p.dedendum - guard::MIN_CUTTER_DEPTH_MODULES;
 
-    let min = lo_t.max(lo_d);
-    let max = hi_t.min(hi_d);
+    // A gear is cut across the interval `[x̄ + off_lo, x̄ + off_hi]` — a single
+    // point for a concentric gear, where both offsets are exactly zero — and
+    // every tooth in it must be buildable. So each bound binds at whichever end
+    // reaches it first, and there is **one expression** rather than a branch on
+    // whether the interval has width.
+    //
+    // It used to be a branch, and the two arms disagreed about the shallow cut:
+    // a concentric gear was refused where an eccentric one deepened its tool, so
+    // the ceiling stepped from 1.200 to 1.942 as `Δx` left zero. The shallow cut
+    // is a *threshold* now (see [`ShiftRange::shallow_cut`]) and the tool is
+    // derived from the dedendum at both ends, so nothing steps.
+    let (off_lo, off_hi) = shift_offsets(p);
+
+    // The tool the whole gear shares: deep enough for the tooth cut at the
+    // largest shift, and never shallower than the dedendum asked for.
+    let d_shared = p
+        .dedendum
+        .max(guard::MIN_CUTTER_DEPTH_MODULES + p.profile_shift + off_hi);
+    // ...and that tool has to leave the *deepest* cut's root off the axis, which
+    // is the tooth at the smallest shift. This is the only ceiling the depth
+    // still imposes, and it is a floor on the shift rather than a ceiling.
+    let root_off_axis = d_shared - guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r / p.module - off_lo;
+
+    let min = (lo_t - off_lo).max(root_off_axis);
+    let max = hi_t - off_hi;
 
     let shift = minimum_profile_shift(p, working_depth);
 
     // Where the tooth comes to a point at the requested addendum. Monotone in
     // practice but not guaranteed, so it is bracketed on the admissible range
-    // and simply absent if the tooth never points within it.
+    // and simply absent if the tooth never points within it. For an eccentric
+    // gear it is the *high* tooth, shift `x̄ + off_hi`, that points first — so the
+    // threshold is expressed on `x̄` with that offset folded in.
     let rb = r * alpha_t.cos();
     let half_tip_angle = |x: f64| {
+        let x = x + off_hi;
         let st = p.module * (PI / 2.0 + 2.0 * (x + xs) * ta) / beta.cos();
         let psi_b = st / (2.0 * r) + inv(alpha_t);
         let ra = r + p.module * (p.addendum + x);
@@ -244,8 +308,13 @@ pub fn admissible_profile_shift(p: &GearParams, working_depth: f64) -> ShiftRang
 
     ShiftRange {
         bound: Bound::between(Some(min), Some(max)),
-        undercut: shift.with_cutter_radius,
-        sharp_rack_undercut: shift.sharp_rack,
+        // The high tooth, shift `x̄ + off_hi`, exhausts the depth first — the
+        // same end that points first, and for the same reason: the tool has
+        // moved out furthest there.
+        shallow_cut: shallow_cut - off_hi,
+        // The low tooth, shift `x̄ + off_lo`, undercuts first.
+        undercut: shift.with_cutter_radius - off_lo,
+        sharp_rack_undercut: shift.sharp_rack - off_lo,
         pointed,
     }
 }
@@ -257,6 +326,11 @@ pub fn admissible_profile_shift(p: &GearParams, working_depth: f64) -> ShiftRang
 /// floor is a legal (if pointless) tooth.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Bound {
     pub min: Option<f64>,
     pub max: Option<f64>,
@@ -289,36 +363,35 @@ impl Bound {
         }
     }
 
-    /// Why `v` is outside, or `None` if it is inside.
+    /// Whether `v` is inside this bound.
     ///
-    /// The message is produced here rather than in the view so that the two
-    /// panels cannot word — or bound — the same condition differently.
+    /// A predicate rather than a message. It used to return the sentence too —
+    /// "must be at least 0.5" and its three siblings — on the reasoning that
+    /// producing them here stopped two panels wording the same condition
+    /// differently. That never happened: the front end wrote its own copies and
+    /// used those, so the English here was shown to nobody and drifted freely
+    /// (docs/rationale.md#no-english-in-gear-core-and-no-engineering-in-the-catalogue). `gear-core` holds no English, and the surviving copy is
+    /// the one with a catalogue behind it — `outside()` in `web/src/core.ts`,
+    /// reading `ui.validation_*`.
+    ///
+    /// Exclusivity lives in the fields, so a caller that needs to say *why*
+    /// reads those rather than parsing a sentence.
     #[must_use]
-    pub fn rejects(&self, v: f64) -> Option<String> {
+    pub fn admits(&self, v: f64) -> bool {
         if !v.is_finite() {
-            return Some("must be a number".into());
+            return false;
         }
         if let Some(lo) = self.min {
             if if self.exclusive_min { v <= lo } else { v < lo } {
-                let how = if self.exclusive_min {
-                    "greater than"
-                } else {
-                    "at least"
-                };
-                return Some(format!("must be {how} {lo}"));
+                return false;
             }
         }
         if let Some(hi) = self.max {
             if if self.exclusive_max { v >= hi } else { v > hi } {
-                let how = if self.exclusive_max {
-                    "less than"
-                } else {
-                    "at most"
-                };
-                return Some(format!("must be {how} {hi}"));
+                return false;
             }
         }
-        None
+        true
     }
 }
 
@@ -340,6 +413,11 @@ impl Bound {
 /// width is not a rack).
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Ranges {
     /// `m > 0`: at zero every radius collapses.
     pub module: Bound,
@@ -360,6 +438,24 @@ pub struct Ranges {
     pub dedendum: Bound,
     /// Upper bound only, from the fillet fit.
     pub root_radius: Bound,
+    /// How far the shift may vary around the revolution — see
+    /// [`admissible_angular_shift`]. Symmetric about zero, and the one bound
+    /// that is about the *tool* the teeth share rather than about any one tooth.
+    pub angular_shift: Bound,
+}
+
+/// Combine two bounds into the interval that satisfies both.
+fn tighter(a: Bound, b: Bound) -> Bound {
+    let both = |x: Option<f64>, y: Option<f64>, f: fn(f64, f64) -> f64| match (x, y) {
+        (Some(x), Some(y)) => Some(f(x, y)),
+        (x, y) => x.or(y),
+    };
+    Bound {
+        min: both(a.min, b.min, f64::max),
+        max: both(a.max, b.max, f64::min),
+        exclusive_min: a.exclusive_min || b.exclusive_min,
+        exclusive_max: a.exclusive_max || b.exclusive_max,
+    }
 }
 
 /// The ranges the geometry imposes on this gear's remaining parameters.
@@ -379,8 +475,126 @@ pub struct Ranges {
 ///   `ρ_max = w_tip cos α_t / (2(1 − sin α_t))` — the fit the prior work records
 ///   as easy to get wrong, since the plausible `w_tip/(2 cos α_t)` silently
 ///   shrinks every profile-shifted fillet.
+///
+/// # Eccentric gears
+///
+/// A gear whose shift varies (`angular_shift ≠ 0`) is cut across `x̄ ± Δx`, and
+/// every tooth of it must be buildable — so the shift-dependent bounds close in
+/// on the interval rather than a point. `profile_shift` pulls in by `Δx` on each
+/// side (its cutter-depth ceiling drops out — the shared tool follows the shift
+/// up), and `addendum` / `dedendum` / `root_radius` are each taken at the
+/// tighter of the two extremes against the shared cutter depth. A concentric
+/// gear is `Δx = 0` and this is the interval collapsed to a point, unchanged to
+/// the bit.
 #[must_use]
 pub fn admissible_ranges(p: &GearParams, working_depth: f64) -> Ranges {
+    let base = ranges_at_shift(p, working_depth);
+
+    let (off_lo, off_hi) = shift_offsets(p);
+
+    // `addendum`, `dedendum` and `root_radius` are read off the tooth being
+    // cut — its shift, and the cutter depth. A gear's teeth span
+    // `[x̄ + off_lo, x̄ + off_hi]` and share one cutter deep enough for the high
+    // tooth (docs/reference.md#angularly-varying-profile-shift), so each of these is the tighter of its values at the two
+    // shift extremes, taken against that shared depth. A concentric gear's
+    // interval is a **point** — both offsets are exactly zero and `d_shared` is
+    // exactly the dedendum — so the two evaluations are the same call and the
+    // answer is `base` to the bit. That is why there is no longer an early
+    // return for it: an `if` that has to be exactly equivalent to the general
+    // path is a second place the general path can be wrong.
+    // `profile_shift` is already the interval's own window — see
+    // `admissible_profile_shift`, which `ranges_at_shift` calls.
+    let x_lo = p.profile_shift + off_lo;
+    let x_hi = p.profile_shift + off_hi;
+    let d_shared = p
+        .dedendum
+        .max(crate::params::guard::MIN_CUTTER_DEPTH_MODULES + x_hi);
+    let at = |x: f64| {
+        ranges_at_shift(
+            &GearParams {
+                profile_shift: x,
+                dedendum: d_shared,
+                angular_shift: 0.0,
+                ..*p
+            },
+            working_depth,
+        )
+    };
+    let lo = at(x_lo);
+    let hi = at(x_hi);
+
+    Ranges {
+        addendum: tighter(lo.addendum, hi.addendum),
+        dedendum: tighter(lo.dedendum, hi.dedendum),
+        root_radius: tighter(lo.root_radius, hi.root_radius),
+        angular_shift: admissible_angular_shift(p),
+        ..base
+    }
+}
+
+/// How much the shift may vary around the revolution: `|Δx| ≤` this.
+///
+/// # Why the amplitude needs a bound of its own
+///
+/// Every other bound closes onto the swept interval `x̄ ± Δx`, which bounds the
+/// *shift* given an amplitude. None of them bounds the amplitude given a shift,
+/// and the amplitude has its own limit for a reason none of them can see:
+/// **the teeth have to share one tool.**
+///
+/// One hob cuts the whole gear, so its depth is set by the tooth that needs
+/// most — `MIN_CUTTER_DEPTH + x_hi` at least — and that same depth is then
+/// driven into the tooth cut at the *smallest* shift, whose root sinks to
+/// `r − m(depth − x_lo)`. Past some amplitude those two demands cross: no
+/// single depth both reaches the high tooth and keeps the low tooth's root off
+/// the axis, and there is no such gear. Both conditions are linear in `Δx`, so
+/// the bound is closed form and is the tighter of them.
+///
+/// Unbounded, this was reachable and observable: at `z = 5`, `Δx = 2.4` the
+/// drawn root stood **1.94 mm** clear of the teeth it belonged to, because the
+/// tool settled for the deep tooth was re-clamped when the shallow one was
+/// built against it (`docs/corrections.md`). The bound is what makes that
+/// region unreachable rather than merely unlikely.
+///
+/// Symmetric, because the geometry is: [`shift_offsets`] takes `|Δx|`, so the
+/// sign chooses which side of the gear is the thick one and nothing else.
+#[must_use]
+pub fn admissible_angular_shift(p: &GearParams) -> Bound {
+    use crate::params::guard;
+
+    let beta = p.helix_angle.to_radians();
+    let r = p.module / beta.cos() * f64::from(p.teeth) / 2.0;
+    let headroom = guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r / p.module;
+
+    // Per unit amplitude: how far the extremes spread, and how far the deep
+    // tooth sinks below the nominal. `c_lo ≤ 0` for every `z ≥ 2`; at `z = 1`
+    // there is one tooth, so it neither spreads nor sinks and only the gear's
+    // own dedendum can bind.
+    let z = f64::from(p.teeth.max(1));
+    let c_lo = (std::f64::consts::TAU * (z / 2.0).floor() / z).cos();
+    let (spread, sink) = (1.0 - c_lo, -c_lo);
+
+    // The tool must reach the high tooth without driving the low tooth's root
+    // into the axis...
+    let by_spread = if spread > 0.0 {
+        (headroom - guard::MIN_CUTTER_DEPTH_MODULES) / spread
+    } else {
+        f64::INFINITY
+    };
+    // ...and where the dedendum alone already sets the depth, the low tooth
+    // still has to survive it.
+    let by_sink = if sink > 0.0 {
+        (headroom - p.dedendum + p.profile_shift) / sink
+    } else {
+        f64::INFINITY
+    };
+
+    let amplitude = by_spread.min(by_sink).max(0.0);
+    Bound::between(Some(-amplitude), Some(amplitude))
+}
+
+/// The ranges for a gear cut at one shift — every tooth of a concentric gear,
+/// and each extreme of an eccentric one (called twice, [`admissible_ranges`]).
+fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
     use crate::params::guard;
     use std::f64::consts::PI;
 
@@ -431,6 +645,7 @@ pub fn admissible_ranges(p: &GearParams, working_depth: f64) -> Ranges {
         addendum: Bound::between(Some(above_root.max(above_base)), None),
         dedendum: Bound::between(Some(-p.addendum), Some(root_positive)),
         root_radius: Bound::between(Some(0.0), Some((rho_max / mt).max(0.0))),
+        angular_shift: admissible_angular_shift(p),
     }
 }
 
@@ -682,6 +897,16 @@ mod tests {
     /// The closed-form bounds against the generator itself: just inside each
     /// bound the geometry builds with no such clamp, just outside it clamps.
     /// That is what makes them the *real* limits rather than a tidier constant.
+    ///
+    /// **The dedendum note is not one of those clamps, and that is the two-tier
+    /// distinction.** `clamp.dedendum_raised` fires wherever the shift has moved
+    /// the tool out past the depth the dedendum asked for, which is a legal
+    /// gear cut by a deeper hob — [`ShiftRange::shallow_cut`] reports where that
+    /// begins, and the range deliberately runs past it. Only the thickness
+    /// clamps mark geometry that stops being constructible, so only they belong
+    /// here. Including the dedendum note is what made this test assert a limit
+    /// the eccentric path did not honour, and the bound then stepped by 62 % as
+    /// `Δx` left zero (`docs/corrections.md`).
     #[test]
     fn the_admissible_range_is_exactly_where_the_generator_starts_clamping() {
         for p in [
@@ -721,8 +946,7 @@ mod tests {
                 .notes
                 .iter()
                 .any(|n| {
-                    n.is(key::CLAMP_DEDENDUM_RAISED)
-                        || n.is(key::CLAMP_TOOTH_THICKNESS_RAISED)
+                    n.is(key::CLAMP_TOOTH_THICKNESS_RAISED)
                         || n.is(key::CLAMP_TOOTH_THICKNESS_CAPPED)
                 })
             };
@@ -740,15 +964,159 @@ mod tests {
         }
     }
 
+    /// **An eccentric gear's shift window is where *every* tooth still builds.**
+    ///
+    /// Its teeth are cut across `x̄ ± Δx`, so the buildable interval closes in —
+    /// and against the *generator*, as for a concentric gear: just inside the
+    /// window no distinct tooth carries a thickness clamp, just outside one
+    /// does. A concentric gear is `Δx = 0` and the window is unchanged to the
+    /// bit.
+    #[test]
+    fn an_eccentric_gears_shift_window_is_where_every_tooth_builds() {
+        use crate::eccentric::Eccentric;
+
+        // Concentric first: the window must be the single-gear one, exactly.
+        for p in [
+            GearParams::default(),
+            GearParams {
+                teeth: 9,
+                pressure_angle: 14.5,
+                ..Default::default()
+            },
+        ] {
+            let flat = GearParams {
+                angular_shift: 0.0,
+                ..p
+            };
+            let a = admissible_profile_shift(&flat, 1.0).bound;
+            let b = admissible_profile_shift(&p, 1.0).bound;
+            assert_eq!(a.min.unwrap().to_bits(), b.min.unwrap().to_bits());
+            assert_eq!(a.max.unwrap().to_bits(), b.max.unwrap().to_bits());
+        }
+
+        let a_tooth_is_thin = |p: &GearParams, x: f64| {
+            Eccentric::new(GearParams {
+                profile_shift: x,
+                ..*p
+            })
+            .distinct()
+            .any(|g| {
+                g.clamps.fired(key::CLAMP_TOOTH_THICKNESS_RAISED)
+                    || g.clamps.fired(key::CLAMP_TOOTH_THICKNESS_CAPPED)
+            })
+        };
+
+        for p in [
+            GearParams {
+                pressure_angle: 25.0,
+                teeth: 23,
+                addendum: 0.8,
+                dedendum: 1.0,
+                angular_shift: 1.0,
+                index_offset: 1.0,
+                ..Default::default()
+            },
+            GearParams {
+                teeth: 24, // even: the far tooth sits exactly at 180°
+                angular_shift: 0.6,
+                ..Default::default()
+            },
+            GearParams {
+                pressure_angle: 14.5,
+                teeth: 31,
+                angular_shift: 0.5,
+                ..Default::default()
+            },
+        ] {
+            let w = admissible_profile_shift(&p, p.dedendum).bound;
+            let (lo, hi) = (w.min.unwrap(), w.max.unwrap());
+            assert!(lo < hi, "empty window for {p:?}");
+            let eps = 0.01;
+
+            assert!(
+                !a_tooth_is_thin(&p, lo + eps),
+                "a tooth is thin inside the floor: {p:?}"
+            );
+            assert!(
+                a_tooth_is_thin(&p, lo - eps),
+                "no thin tooth below the floor: {p:?}"
+            );
+            assert!(
+                !a_tooth_is_thin(&p, hi - eps),
+                "a tooth is thin inside the ceiling: {p:?}"
+            );
+            assert!(
+                a_tooth_is_thin(&p, hi + eps),
+                "no thin tooth above the ceiling: {p:?}"
+            );
+        }
+    }
+
+    /// The reported eccentric case — a normal shift and a large amplitude —
+    /// stays inside its window, and the fillet-radius ceiling drops to the
+    /// **shared** cutter's tip round, which is what an eccentric gear is
+    /// actually cut with.
+    #[test]
+    fn the_reported_eccentric_case_is_buildable_and_its_hints_are_the_shared_tool() {
+        let p = GearParams {
+            pressure_angle: 25.0,
+            teeth: 23,
+            profile_shift: 0.2,
+            addendum: 0.8,
+            dedendum: 1.0,
+            angular_shift: 1.0,
+            index_offset: 1.0,
+            ..Default::default()
+        };
+        let r = admissible_ranges(&p, p.dedendum);
+        assert!(
+            r.profile_shift.bound.admits(p.profile_shift),
+            "x̄ = 0.2 rejected: {:?}",
+            r.profile_shift.bound
+        );
+        // The single-gear ceiling is ~0.48 module; the shared tool the high
+        // teeth force is ~0.05.
+        let ceiling = r.root_radius.max.unwrap();
+        assert!(
+            (0.03..0.07).contains(&ceiling),
+            "root-radius ceiling {ceiling} is not the shared tool's"
+        );
+        let flat = admissible_ranges(
+            &GearParams {
+                angular_shift: 0.0,
+                ..p
+            },
+            p.dedendum,
+        );
+        assert!(
+            flat.root_radius.max.unwrap() > 0.4,
+            "the concentric ceiling should be the roomy single-tooth one"
+        );
+    }
+
     /// The specification's fixed `|x| <= 2` is not a conservative version of the
     /// real bound — it is loose in some places and tight in others, which is
     /// exactly what a constant cannot fix.
     #[test]
     fn the_fixed_plus_minus_two_is_wrong_in_both_directions() {
-        // Too loose above: the real ceiling is the cutter depth.
+        // Too loose above: the real ceiling is the tooth thickness, and the
+        // depth arrives before it as a *threshold* — the cutter goes deeper than
+        // the dedendum asked for from 1.20 up, and the tooth runs out of
+        // thickness at 1.94. Both are below 2, so the constant is loose against
+        // either; which of them is the limit is the two-tier question, and the
+        // depth is not one because a deeper tool cuts the gear.
         let d = admissible_profile_shift(&GearParams::default(), 1.0);
         let dmax = d.bound.max.unwrap();
-        assert!(dmax < 2.0 && (dmax - 1.20).abs() < 1e-9, "max {dmax}");
+        assert!(dmax < 2.0, "max {dmax}");
+        assert!(
+            (d.shallow_cut - 1.20).abs() < 1e-9,
+            "shallow cut {}",
+            d.shallow_cut
+        );
+        assert!(
+            d.shallow_cut < dmax,
+            "the depth threshold must sit inside the range, not bound it"
+        );
 
         // Too tight below at a low pressure angle...
         let low = admissible_profile_shift(
@@ -821,26 +1189,25 @@ mod tests {
     /// Exclusivity is carried, not assumed. A module of exactly zero is not a
     /// gear; an addendum exactly at its floor is.
     #[test]
-    fn bounds_carry_their_own_exclusivity_and_wording() {
+    fn bounds_carry_their_own_exclusivity() {
         let strict = Bound::strictly(0.0, 90.0);
-        assert!(strict.rejects(0.0).is_some(), "0 is outside (0, 90)");
-        assert!(strict.rejects(90.0).is_some());
-        assert!(strict.rejects(0.001).is_none());
-        assert!(strict.rejects(20.0).is_none());
-        assert!(strict.rejects(f64::NAN).is_some());
+        assert!(!strict.admits(0.0), "0 is outside (0, 90)");
+        assert!(!strict.admits(90.0));
+        assert!(strict.admits(0.001));
+        assert!(strict.admits(20.0));
+        assert!(!strict.admits(f64::NAN));
 
         let inclusive = Bound::between(Some(-1.25), None);
-        assert!(
-            inclusive.rejects(-1.25).is_none(),
-            "the floor itself is legal"
-        );
-        assert!(inclusive.rejects(-1.26).is_some());
-        assert!(inclusive.rejects(1e9).is_none(), "no ceiling");
+        assert!(inclusive.admits(-1.25), "the floor itself is legal");
+        assert!(!inclusive.admits(-1.26));
+        assert!(inclusive.admits(1e9), "no ceiling");
 
-        // The wording distinguishes the two, since it is the only thing the user
-        // sees and both panels take it from here.
-        assert!(strict.rejects(0.0).unwrap().contains("greater than"));
-        assert!(inclusive.rejects(-2.0).unwrap().contains("at least"));
+        // Exclusivity is carried in the fields, which is what a caller reads to
+        // say *why* a value was refused. It used to be asserted by searching the
+        // rejection sentence for "greater than" — a test on wording, of a
+        // sentence nothing ever displayed.
+        assert!(strict.exclusive_min && strict.exclusive_max);
+        assert!(!inclusive.exclusive_min && !inclusive.exclusive_max);
     }
 
     /// Every input has a bound, and they come from one place.
@@ -849,22 +1216,22 @@ mod tests {
         let p = GearParams::default();
         let r = admissible_ranges(&p, 1.0);
 
-        assert!(r.module.rejects(p.module).is_none());
-        assert!(r.pressure_angle.rejects(p.pressure_angle).is_none());
-        assert!(r.teeth.rejects(f64::from(p.teeth)).is_none());
-        assert!(r.helix_angle.rejects(p.helix_angle).is_none());
-        assert!(r.thickness_mod.rejects(p.thickness_mod).is_none());
-        assert!(r.profile_shift.bound.rejects(p.profile_shift).is_none());
-        assert!(r.addendum.rejects(p.addendum).is_none());
-        assert!(r.dedendum.rejects(p.dedendum).is_none());
-        assert!(r.root_radius.rejects(p.root_radius).is_none());
+        assert!(r.module.admits(p.module));
+        assert!(r.pressure_angle.admits(p.pressure_angle));
+        assert!(r.teeth.admits(f64::from(p.teeth)));
+        assert!(r.helix_angle.admits(p.helix_angle));
+        assert!(r.thickness_mod.admits(p.thickness_mod));
+        assert!(r.profile_shift.bound.admits(p.profile_shift));
+        assert!(r.addendum.admits(p.addendum));
+        assert!(r.dedendum.admits(p.dedendum));
+        assert!(r.root_radius.admits(p.root_radius));
 
         // ...and the invariant ones reject what they must.
-        assert!(r.module.rejects(0.0).is_some());
-        assert!(r.teeth.rejects(0.0).is_some());
-        assert!(r.pressure_angle.rejects(90.0).is_some());
-        assert!(r.helix_angle.rejects(-90.0).is_some());
-        assert!(r.thickness_mod.rejects(2.0).is_some());
+        assert!(!r.module.admits(0.0));
+        assert!(!r.teeth.admits(0.0));
+        assert!(!r.pressure_angle.admits(90.0));
+        assert!(!r.helix_angle.admits(-90.0));
+        assert!(!r.thickness_mod.admits(2.0));
     }
 
     #[test]
@@ -875,5 +1242,75 @@ mod tests {
         });
         // Wider than the tooth is anywhere on its flank.
         assert!(addendum_for_tip_width(&g, 100.0).is_none());
+    }
+
+    /// **The buildable range is continuous in the eccentricity.**
+    ///
+    /// It was not. `admissible_profile_shift` branched on `off_hi == 0.0`, and
+    /// the two arms disagreed about what happens when the shift outruns the
+    /// dedendum: the concentric one refused, the eccentric one deepened the
+    /// tool. So the ceiling jumped 1.200 → 1.942 at `Δx = 1e-14`, where nothing
+    /// physical happens (`docs/corrections.md`).
+    ///
+    /// The gate is a **law rather than a tolerance**, which is what this project
+    /// asks of a limit check: an amplitude of `Δx` can move a bound by at most
+    /// the amount it moves the teeth, so the gap must fall *with* `Δx`. Halving
+    /// the amplitude must at least halve the gap. A step does not do that at any
+    /// amplitude, so no threshold has to be chosen and none is.
+    #[test]
+    fn the_shift_range_is_continuous_in_the_angular_shift() {
+        for p in [
+            GearParams::default(),
+            GearParams {
+                teeth: 9,
+                pressure_angle: 14.5,
+                ..Default::default()
+            },
+            GearParams {
+                teeth: 40,
+                dedendum: 1.0,
+                profile_shift: 0.3,
+                ..Default::default()
+            },
+            GearParams {
+                teeth: 23,
+                pressure_angle: 25.0,
+                addendum: 0.8,
+                dedendum: 1.0,
+                thickness_mod: 1.2,
+                ..Default::default()
+            },
+        ] {
+            let at = |amp: f64| {
+                let r = admissible_profile_shift(
+                    &GearParams {
+                        angular_shift: amp,
+                        ..p
+                    },
+                    1.0,
+                );
+                (r.bound.min.unwrap(), r.bound.max.unwrap())
+            };
+            let (lo0, hi0) = at(0.0);
+
+            // The bound moves *linearly* with the amplitude — the teeth spread
+            // by `Δx`, so the window closes by `Δx` — which means the honest
+            // instrument is the ratio, not the gap. A continuous bound holds
+            // `gap/Δx` bounded all the way down; a step sends it to infinity,
+            // because the gap it leaves does not shrink at all. Nothing has to
+            // be tolerated: the two behaviours differ by orders of magnitude at
+            // the smallest amplitude tried.
+            for step in 0..14 {
+                let amp = 0.1 * 0.5_f64.powi(step);
+                let (lo, hi) = at(amp);
+                let gap = (lo - lo0).abs().max((hi - hi0).abs());
+                assert!(
+                    gap <= 2.0 * amp,
+                    "{p:?}: the range steps rather than closing — it moves {gap:e} \
+                     for an amplitude of {amp:e}, a ratio of {}",
+                    gap / amp
+                );
+            }
+        }
     }
 }

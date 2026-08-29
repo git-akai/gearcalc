@@ -182,9 +182,9 @@ impl ContactPath {
 /// *result*, not a case to special-case.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Drive {
-    /// Member 1 drives member 2 — the direction a train propagates torque in.
+    /// MeshSide 1 drives member 2 — the direction a train propagates torque in.
     Forward,
-    /// Member 2 drives member 1.
+    /// MeshSide 2 drives member 1.
     Backward,
 }
 
@@ -205,6 +205,11 @@ impl Drive {
 /// are symmetric.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Directional<T> {
     pub forward: T,
     pub backward: T,
@@ -332,7 +337,7 @@ impl Directional<f64> {
 /// `ε₁² + ε₂²`, and physically it should be: swapping driver for driven swaps
 /// approach and recess but not the total sliding. Two identical numbers in the
 /// UI are a result, not a bug. (Crossed-axis screw gearing is the case where
-/// they genuinely differ — see DESIGN.md §4.5.1.)
+/// they genuinely differ — see docs/reference.md#crossed-axes.)
 ///
 /// **`μ` is a mesh input, not a material property.** It depends on lubrication,
 /// speed, finish and temperature at least as much as on the pair of materials,
@@ -374,7 +379,7 @@ impl Directional<f64> {
 /// [`sliding_velocity`] measures its component along the contact line as
 /// identically zero at any helix angle. `|ξ|(ω₁+ω₂)` is the **whole** sliding
 /// magnitude, not a component of it, so this formula is exact rather than
-/// conservative. See DESIGN.md §12.
+/// conservative. See docs/corrections.md.
 ///
 /// What does remain a limit is the single friction coefficient itself, and the
 /// fact that a crossed-axis mesh is a genuinely different question — there the
@@ -427,7 +432,7 @@ impl Sliding {
 
 /// The relative sliding velocity of two rotating bodies at a point they touch.
 ///
-/// This is the friction side of the unification in DESIGN.md §4.7: one
+/// This is the friction side of the unification in docs/reference.md#contact-stress: one
 /// expression covering parallel and crossed axes, with the shaft angle carried
 /// in `axis_2` rather than selecting between two formulas.
 ///
@@ -455,7 +460,7 @@ impl Sliding {
 /// That is worth stating plainly because an earlier draft of the design assumed
 /// the opposite — that a helical mesh has along-tooth sliding this crate was
 /// failing to charge for. It does not, so [`efficiency`] is exact rather than
-/// conservative (DESIGN.md §12).
+/// conservative (docs/corrections.md).
 ///
 /// # What changes when the axes cross
 ///
@@ -561,9 +566,9 @@ pub struct Contact {
     /// The common flank normal, unit. Its sign is fixed here, not by the
     /// caller: the one that makes driving member 1 take a positive torque.
     pub normal: [f64; 3],
-    /// Member 1's axis through the origin, unit.
+    /// MeshSide 1's axis through the origin, unit.
     pub axis_1: [f64; 3],
-    /// Member 2's axis, unit...
+    /// MeshSide 2's axis, unit...
     pub axis_2: [f64; 3],
     /// ...through this point.
     pub centre_2: [f64; 3],
@@ -587,13 +592,13 @@ impl Contact {
         (denominator.abs() > f64::EPSILON).then(|| numerator / denominator)
     }
 
-    /// Member 1's surface sliding over member 2's, per unit `ω₁`, mm.
+    /// MeshSide 1's surface sliding over member 2's, per unit `ω₁`, mm.
     ///
     /// The whole vector, not a component: Coulomb friction acts on its
     /// **magnitude**, so a model that keeps only the lengthwise part — as the
     /// pitch-point balance does — loses the profile sliding entirely, and that
     /// is the term whose absence makes a crossed pair look better than the same
-    /// teeth running parallel (§4.5.1).
+    /// teeth running parallel (docs/reference.md#crossed-axes).
     #[must_use]
     pub fn slip(&self) -> Option<[f64; 3]> {
         let k = self.speed_ratio()?;
@@ -717,7 +722,7 @@ pub(crate) fn norm(a: [f64; 3]) -> f64 {
 /// partner near the tip, so it takes less than half; 1/3 to 2/3 across the
 /// double-contact zone is the common first-order stand-in in the literature for
 /// spur gears. Replacing it with a real mesh-stiffness model is the work
-/// deferred in DESIGN.md.
+/// deferred in `docs/rationale.md#load-sharing-is-deferred-and-the-reason-is-structural`.
 const RAMP_MIN: f64 = 1.0 / 3.0;
 const RAMP_MAX: f64 = 2.0 / 3.0;
 
@@ -784,7 +789,7 @@ mod tests {
         };
         let pinion = Gear::new(params(zp));
         let wheel = Gear::new(params(zr));
-        let ring = crate::ring::Ring::new(&params(zr), &crate::ring::Cutter::default());
+        let ring = crate::ring::Ring::cut_by(&params(zr), &crate::ring::Cutter::default());
         let m = Mesh::new(&pinion, &wheel, MeshKind::Internal).unwrap();
         let path = ContactPath::new(&pinion, ring.ra, &m).unwrap();
         (pinion, wheel, m, path)
@@ -817,8 +822,8 @@ mod tests {
     ///
     /// Both bodies still turn about parallel axes, so both surface velocities are
     /// `ω ẑ × r` and their difference has no axial part — whatever side the
-    /// material is on. The internal case of the measurement that corrected §4.5
-    /// and §4.7.
+    /// material is on. The internal case of the measurement that corrected docs/reference.md#path-of-contact-and-contact-ratio
+    /// and docs/reference.md#contact-stress.
     #[test]
     fn an_internal_mesh_slides_across_its_teeth_and_never_along_them() {
         for (zp, zr) in [(17u32, 51u32), (20, 60)] {

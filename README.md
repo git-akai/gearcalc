@@ -15,23 +15,33 @@ layout and event handling only.
 > in the UI, Rust computed it. TypeScript may format it for display and nothing
 > else. That is what keeps the Rust test suite meaningful. Defaults count as
 > numbers: they cross the boundary from Rust, because the one that was written
-> down in both languages drifted — see DESIGN §12.
+> down in both languages drifted — see docs/corrections.md.
 
-The architecture, the mathematics behind every formula, and the verification log
-are in [`docs/DESIGN.md`](docs/DESIGN.md). Read that before changing anything in
-`gear-core`. [`docs/HANDOFF.md`](docs/HANDOFF.md) is the shorter route in: current
-state, the rules and why they are rules, the traps, and what is worth doing next.
+## The documents
+
+Four, split by what you came for. Nothing appears in two of them.
+
+| | |
+|---|---|
+| [`docs/reference.md`](docs/reference.md) | **How.** What the tool computes and by what relation — symbol, formula, units, domain, and what comes back when there is no answer. For integrating against it and for reading a number off it. |
+| [`docs/rationale.md`](docs/rationale.md) | **Why.** Which model was chosen, the measurement that settled it, and the condition that would reopen it. Read this before changing anything in `gear-core`. |
+| [`docs/corrections.md`](docs/corrections.md) | What this project believed, acted on, and got wrong — and what now makes each fault unrepresentable. The patterns are worth more than any entry. |
+| [`docs/state.md`](docs/state.md) | What is built, what is decided-rather-than-pending, and what to run. The only one that talks about the present, which is what lets the other three stop hedging. |
+
+[`docs/initial_spec.txt`](docs/initial_spec.txt) is the original brief, unedited.
+`docs/history/` holds the superseded design record; nothing points there.
 
 ## Layout
 
 | Path | Role |
 |---|---|
-| `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. Depends only on `serde`. |
+| `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. `serde` and `ts-rs`, both optional and both about the shape a type takes when it leaves. |
 | `crates/gear-io` | File formats: DXF export, and the TOML material library and geartrain documents. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
 | `web/` | Svelte 5 + TypeScript + Vite front end. |
-| `docs/` | Design document, handoff, the initial specification, and the JGMA 116-02 tables. |
+| `web/src/wire/` | **Generated** from the Rust types by `ts-rs`. Never edited by hand. |
+| `docs/` | The four documents, the initial specification, and the JGMA 116-02 tables. |
 | `crates/gear-io/data/strings_en.toml` | **Every word the application shows.** Notes and labels alike, one file per language. |
 | `handoff_inbound/` | Prior Python work. **Reference only** — do not build on it. |
 
@@ -43,7 +53,7 @@ and `wasm-bindgen-cli` together.
 ```bash
 nix develop              # or `direnv allow` once, for automatic entry
 
-cargo nextest run        # the full test suite, 398 tests, ~27 s
+cargo nextest run        # the full test suite, 415 tests, ~25 s
 cargo clippy --all-targets -- --deny warnings
 cargo fmt
 
@@ -86,7 +96,7 @@ The core never holds a sentence. It emits `{ key, values }` — see
 `gear_core::note` — with the numbers **already formatted**, because how many
 decimals a quantity deserves is a judgement about the quantity and belongs next
 to the model. The catalogue reaches the browser through `gear_wasm::strings`,
-the same door the defaults use and for the same reason (DESIGN §12).
+the same door the defaults use and for the same reason (docs/corrections.md).
 
 Three checks keep it honest, and between them they cover both directions:
 
@@ -135,7 +145,7 @@ be tidied and must not be:
 1. **The flank continues below the base circle** to its true intersection with the
    trochoid. Clamping it there and bridging the gap — the obvious-looking
    approach — leaves a visible 0.3 mm step on undercut gears.
-   `Gear::with_legacy_clamp` reproduces that fault on purpose, as a negative test
+   `Gear::with_flank_clamped_at_base` reproduces that fault on purpose, as a negative test
    fixture; if `legacy_clamp_still_shows_the_junction_step…` ever passes trivially,
    the *detection* has broken.
 2. **The fillet fit cap** is `w_tip·cos α / (2(1 − sin α))`. The plausible
@@ -169,7 +179,7 @@ python3 tools/check_strings.py                 # every UI message is used, and e
 ```
 
 The second also answers a design question — what choosing a ZI, ZN or ZA worm
-flank actually costs — and its answer is in `docs/DESIGN.md` §4.5.1.
+flank actually costs — and its answer is in `docs/reference.md#crossed-axes`.
 
 The third builds both crossed flanks as parametric surfaces and takes their
 normals by numerical differentiation, so the line of action, the contact ratio

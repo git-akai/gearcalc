@@ -20,6 +20,15 @@
 # placeholder wherever the grammar needs it, but do not invent one: a test
 # checks that every placeholder a message uses is one the code supplies.
 #
+# ## One line per message
+#
+# However long it runs. TOML has no line limit and nothing here reads the file by
+# line, so a wrapped value bought source width and cost a translator the ability
+# to see, search or replace a message as one string — and the continuation
+# backslash silently eats the following line's leading whitespace, which is a way
+# to join two words by accident. If a message is too long to read on one line,
+# shorten the message.
+#
 # ## Where these appear
 #
 # `[clamp]`   a guard rail fired, and the geometry is not quite what was asked
@@ -27,159 +36,244 @@
 # `[stage]`   something about a solved stage its designer should read.
 # `[ui]`      the application's own chrome: labels, headings, buttons, units,
 #             and the fixed explanatory notes beside inputs.
+#
+# ## House style
+#
+# Six rules, so a hundred messages read as one voice rather than a hundred.
+#
+# 1. **A label is a name**, in sentence case with no closing punctuation:
+#    "Pitch diameter", "Tooth count". Only the first word and proper nouns are
+#    capitalised.
+# 2. **A note is a fragment**, lowercase and unpunctuated at the end. It hangs
+#    off a value or a field and finishes a thought the number started.
+# 3. **A statement the application makes in its own voice** — a warning bullet,
+#    a paragraph of guidance — is a sentence: capital, full stop.
+# 4. **`value: consequence`.** Where a message reports a figure and then says
+#    what it means, the colon separates them, and the figure comes first. This
+#    is what lets clamp and stage notes be skimmed down the left.
+# 5. **Cut the leading article.** A note is read in the second it takes to glance
+#    at it, and "the cutter has no usable tip corner" says nothing that "cutter
+#    has no usable tip corner" does not. Definite articles at the start of a
+#    fragment go; an indefinite one stays where it is doing work ("a ring is
+#    shaped by a pinion" is a general statement, not this ring).
+# 6. **One sentence unless a second earns its place.** Most notes that ran to two
+#    were restating the first in other words.
+#
+# And one rule about which messages exist at all: **a note earns its line by
+# saying something the number cannot.** Restating a label in longer words, or
+# explaining a field whose name already explains it, is noise that makes the
+# notes worth reading get skipped. Where there is nothing non-obvious to say,
+# there is no note.
 
 # ---------------------------------------------------------------- clamps
 #
 # These fire when input cannot describe a real gear. They encode no physics;
 # they stop a NaN or a self-intersecting outline from being returned silently.
+#
+# Each reads `what changed: why`, so the change is the first thing seen. Lengths
+# carry their unit, because a bare number beside a radius is ambiguous.
 
 [clamp]
-pressure_angle_raised = "pressure angle raised to {degrees} deg"
-dedendum_raised = "dedendum raised: cutter depth was <= 0"
-dedendum_capped = "dedendum capped: root radius would be <= 0"
-tooth_thickness_raised = "tooth thickness raised: profile shift or thickness modification too negative"
-tooth_thickness_capped = "tooth thickness capped: profile shift or thickness modification too positive"
-fillet_capped = "fillet capped to {radius} (tooth space too tight)"
-tip_capped_pointed = "tip capped at pointed-tooth radius {radius}"
+pressure_angle_raised = "pressure angle raised to {degrees}°"
+dedendum_raised = "dedendum raised: cutter had no depth left"
+dedendum_capped = "dedendum capped: root circle would reach the axis"
+tooth_thickness_raised = "tooth thickness raised: shift or thickness modification too negative"
+tooth_thickness_capped = "tooth thickness capped: shift or thickness modification too positive"
+fillet_capped = "fillet capped to {radius} mm: tooth space holds no larger round"
+tip_capped_pointed = "tip capped at {radius} mm: tooth comes to a point there"
 tooth_severed = "tooth severed by undercut: profile truncated at the centreline"
-tooth_undercut = "undercut: the cutter has removed part of the flank near the root"
-cutter_no_tip_corner = "the cutter has no usable tip corner; no fillet generated"
+tooth_undercut = "undercut: cutter has removed part of the flank near the root"
+cutter_no_tip_corner = "no fillet: cutter has no usable tip corner"
 
-ring_space_capped = """\
-space width capped: profile shift or thickness modification too positive, and \
-a ring needs a tooth left over"""
-ring_space_raised = """\
-space width raised: profile shift or thickness modification too negative, and \
-the mating pinion's tooth has to fit"""
-ring_tip_raised = """\
-tip radius raised to {radius} mm: below that a ring's tooth has no thickness \
-left — either its addendum reaches inside its own base circle, or its flanks \
-meet before they get there"""
-cutter_teeth_reduced = """\
-cutter reduced to {teeth} teeth: a ring must have more teeth than the shaper \
-that cuts it, or there is no inside to cut from"""
-ring_flank_ungenerated = """\
-the flank below {limit} mm is not generated by this cutter — its own involute \
-runs out there, so the tip {tip} mm is inside the generated region. A cutter \
-with more teeth reaches further"""
-ring_fully_filleted = """\
-fully filleted root: the corner rounds meet before mid-space, so there is no \
-root arc"""
-ring_flank_fillet_gap = """\
-flank and fillet do not meet: the cutter does not reach this ring's flank, so \
-the profile is not generated"""
+ring_space_capped = "space width capped: shift or thickness modification too positive"
+ring_space_raised = "space width raised: shift or thickness modification too negative"
+ring_tip_raised = "tip radius raised to {radius} mm: below it a ring's tooth has no thickness"
+cutter_teeth_reduced = "cutter reduced to {teeth} teeth: ring needs more teeth than its shaper"
+ring_flank_ungenerated = "flank below {limit} mm not generated; increase cutter teeth"
+ring_fully_filleted = "fully filleted root: corner rounds meet, leaving no root arc"
+ring_flank_fillet_gap = "flank and fillet do not meet: cutter does not reach this ring's flank, so the profile is not generated"
 
 # ---------------------------------------------------------------- stage notes
+#
+# Shown as bullets under a solved stage. Each leads with the figure it is about,
+# so a reader scanning the list sees the numbers first.
 
 [stage]
-overlap_below_one = """\
-overlap ratio {ratio} is below 1: the stage is helical in form but still \
-transfers load like a spur gear"""
-transverse_contact_ratio_below_one = """\
-transverse contact ratio {ratio} is below 1: the mesh loses contact between \
-teeth"""
-crossed_face_width_as_entered = """\
-gear {member}'s face width used as entered: its teeth do not reach a full \
-contact ratio at any width, so there is no width that would keep contact \
-continuous"""
-crossed_contact_ratio_below_one = """\
-contact ratio {ratio}: below 1 the pair loses contact between one tooth and \
-the next, whatever the stresses say. A crossed pair's face width bounds this \
-where a parallel pair's does not — see the width for continuity beside it"""
-self_locking = """\
-self-locking at a static mu of {friction}: the wheel cannot break the worm away \
-at all, so it cannot back-drive it (the threshold is {threshold})"""
-near_self_locking = """\
-close to self-locking: a static mu of {friction} against a threshold of \
-{threshold}, so whether it back-drives depends on a friction coefficient nobody \
-measured"""
-low_mesh_efficiency = """\
-mesh efficiency {percent} % — most of the input becomes heat, and a worm drive \
-is usually limited by that rather than by stress"""
-proportions_not_applicable = """\
-face widths left as entered: the published proportions are for a worm carrying \
-an enveloping wheel, and a crossed gear pair has neither"""
-planets_share_load_equally = """\
-the {planets} planets are assumed to share the load equally; real sets do not \
-without a floating member, and the usual remedy is a mesh-load factor this \
-project declines to apply on the designer's behalf"""
-planets_not_evenly_spaced = """\
-{planets} planets cannot be spaced evenly: (z_sun + z_ring) is not divisible \
-by it"""
-planet_clearance_below_minimum = """\
-adjacent planets clear by {gap} mm, below the {minimum} mm asked for"""
-ring_addendum_clamped = """\
-the ring's addendum was clamped at its base circle: it needs more teeth or a \
-shorter addendum"""
+overlap_below_one = "overlap ratio {ratio}: below 1, helical in form but loaded like a spur gear"
+transverse_contact_ratio_below_one = "transverse contact ratio {ratio}: below 1, the mesh loses contact between teeth"
+crossed_face_width_as_entered = "gear {member}'s face width as entered: no width gives a full contact ratio"
+crossed_contact_ratio_below_one = "contact ratio {ratio}: below 1, the pair loses contact between teeth"
+self_locking = "self-locking: static μ {friction} against a threshold of {threshold}, so the wheel cannot back-drive the worm"
+near_self_locking = "close to self-locking: static μ {friction} near threshold of {threshold}, so back-driving changes on an estimated coefficient"
+low_mesh_efficiency = "mesh efficiency {percent} %: most of the input becomes heat, which usually limits a worm drive before stress does"
+proportions_not_applicable = "face widths as entered: published proportions assume a worm and an enveloping wheel, and a crossed pair is neither"
+planets_share_load_equally = "{planets} planets assumed to share load equally; real sets do not without a floating member, and the remedy is a mesh-load factor this tool declines to apply"
+planets_not_evenly_spaced = "{planets} planets cannot be evenly spaced: sun and ring tooth counts do not sum to a multiple of it"
+planet_clearance_below_minimum = "adjacent planets clear by {gap} mm, below the {minimum} mm asked for"
+ring_addendum_clamped = "ring addendum clamped at its base circle: it needs more teeth or a shorter addendum"
 
 # ---------------------------------------------------------------- the application
 #
 # The chrome: what the application calls things. Nothing here has a `Note`
 # behind it, so these keys are exempt from the "every message is one the core
-# emits" check — they are the only exemption.
+# emits" check — they are the only exemption. `tools/check_strings.py` covers
+# this section instead, in both directions.
+#
+# Kept in one alphabetical run. There is no grouping to get wrong, a new key has
+# exactly one right place, and a duplicate sorts next to what it duplicates.
+
+[error]
+# Why a result does not exist. These were `Display` impls inside `gear-core` —
+# the last English in a crate whose rule is that it holds none, and the messages
+# a user meets when something has gone wrong, which are the ones that most need
+# translating.
+mesh_incompatible = "the gears cannot mesh: module, pressure angle or helix differ"
+mesh_ring_too_small = "an internal mesh needs more teeth on the ring than the pinion"
+mesh_outside_involute_domain = "these profile shifts leave no operating pressure angle: the base circles would have to overlap"
+mesh_centre_distance_too_small = "centre distance is below the base-circle limit"
+measure_no_valid_span = "no span contacts the usable flank on this gear"
+measure_pin_off_flank = "the pin touches outside the usable flank"
+measure_pin_bottoms_out = "the pin sits on the root diameter, not the flanks"
+measure_pin_too_small = "the pin is too small: it falls between the flanks into the root"
+measure_pin_too_large = "the pin is too large: contact would fall below the base circle"
+screw_not_positive = "a module, diameter or tooth count is not positive"
+screw_worm_too_thin = "the first member has no lead angle: sized by diameter, the worm is too thin for that many starts at that module and its thread would have to wrap at ninety degrees or more; sized by helix angle, a zero helix makes it a spur gear, which has no lead at all — put the helical member first and the spur one second"
+screw_shaft_angle_impossible = "that shaft angle leaves the wheel with no lead angle"
+screw_first_member_is_a_disc = "the first member's helix angle reaches ninety degrees: its teeth would run circumferentially and its pitch diameter is unbounded, which is a disc rather than a gear"
+screw_axes_are_parallel = "parallel axes: a worm stage needs crossed shafts, and a parallel pair is a spur stage"
+train_no_contact = "the teeth never come into contact"
+train_unknown_material = "no material named {name} in the library"
+train_no_root_section = "the tooth is too undercut to have a root section"
+train_empty = "the geartrain has no stages"
+gear_no_mate = "no mate given"
+gear_concentric_has_no_profile = "a concentric gear commands one centre distance, not a profile"
+gear_no_pin_diameter = "no pin diameter given"
 
 [ui]
-gear_clamped = "Clamped:"
-gear_undercut = "Undercut."
-gear_severed = "Tooth severed by undercut — profile truncated at the centreline."
 app_loading_core = "Loading core…"
+# The admissible-range hints. One home each, because both the gear tab and the
+# geartrain tab show them and, written twice, they drifted: the same fillet
+# bound read "the fillet must fit the tooth space" on one and "fillet must fit"
+# on the other, and the dedendum lost its reason entirely on the second.
+bound_addendum = "above {min}: tooth must have height"
+bound_angular_shift = "up to {max}: one cutter must reach every tooth"
+bound_dedendum = "{min} to {max}: root circle must clear the axis"
+bound_every_tooth_cut_at = "{bound} · every tooth cut at x ± {amplitude}"
+bound_profile_shift = "buildable {min} to {max} · undercut below {undercut} (sharp rack {sharp})"
+bound_profile_shift_pointed = "pointed above {pointed}"
+bound_profile_shift_deep_cut = "cutter deeper than the dedendum above {deep}"
+bound_root_radius = "up to {max}: fillet must fit the tooth space"
+bound_root_radius_shared_cutter = "up to {max}: shared cutter must fit the tightest tooth"
+gear_backlash_a_crank_leaves = "Backlash a crank leaves"
 gear_base_diameter = "Base diameter"
-gear_below_this_tip_would_reach_inside = """\
-below this the tip would reach inside the base circle; it moves with the \
-addendum, pressure angle and helix"""
-gear_below_tip_cutter_s_own_involute = """\
-below the tip: the cutter's own involute runs out there, so the flank \
-near the tip is not generated. A cutter with more teeth reaches further"""
-gear_between = "between"
-gear_between_2_pins_nominal = "Between 2 pins, nominal"
+gear_below_this_tip_would_reach_inside = "below this the tip intersects the base circle; moves with addendum, pressure angle and helix"
+gear_below_tip_cutter_s_own_involute = "flank near the tip is not generated; increase cutter teeth"
+gear_best_fit_sinusoid = "Best-fit sinusoid"
+gear_cancel = "Cancel"
+gear_centre_distance = "Centre distance"
+gear_centre_distance_throw = "Centre-distance throw"
 gear_chord_tolerance = "Chord tolerance"
+gear_clamped = "Clamped:"
 gear_class = "Class"
+gear_commanded_centre_distance = "Commanded centre distance"
 gear_composite_error_jgma_116_02 = "Composite error, JGMA 116-02"
 gear_contact_radius = "Contact radius"
+gear_copy = "Copy"
 gear_cutter_addendum = "Cutter addendum"
 gear_cutter_teeth = "Cutter teeth"
 gear_cutter_tip_round = "Cutter tip round"
 gear_cutter_tip_width = "Cutter tip width"
+gear_deg = "°"
+gear_delete = "Delete"
+gear_delete_confirm = "Delete"
+gear_delete_question = "Delete “{name}”?"
+gear_departure_from_a_circle = "Departure from a circle"
+gear_departure_from_that_sinusoid = "Departure from that sinusoid"
+gear_eccentric_by_amplitude = "shift amplitude"
+gear_eccentric_by_throw = "centre-distance throw"
+gear_eccentric_sized_by = "Eccentricity from"
+gear_eccentricity = "Eccentricity"
+gear_envelope_eccentricity = "Envelope eccentricity"
+gear_envelope_limacon_not_circle_e_2ro = "a limaçon, not a displaced circle — departure is e²/2ρ"
 gear_export = "Export"
 gear_export_dxf = "Export DXF"
+gear_export_failed = "Export failed: {reason}"
+gear_field_addendum = "Addendum"
+gear_field_angular_shift = "Angular shift amplitude"
+gear_field_dedendum = "Dedendum"
+gear_field_helix_angle = "Helix angle"
+gear_field_index_offset = "Index compensation λ"
+gear_field_module = "Normal module"
+gear_field_pressure_angle = "Pressure angle"
+gear_field_profile_shift = "Profile shift"
+gear_field_root_radius = "Root radius coefficient"
+gear_field_teeth = "Tooth count"
+gear_field_thickness_mod = "Tooth thickness modification"
 gear_fillet_radius = "Fillet radius"
 gear_flank_fillet_junction = "Flank / fillet junction"
 gear_generated_down = "Generated down to"
 gear_geometry = "Geometry"
+gear_ideal_not_sinusoidal_inv_cosine = "not a sinusoid even though x(θ) is — it passes through inv⁻¹ and a cosine"
 gear_include_reference_circles = "Include reference circles"
 gear_inside_pitch_circle = "inside the pitch circle"
-gear_m = "m"
-gear_maximum_deviation_exported_outline_from_true = "maximum deviation of the exported outline from the true curve"
+gear_kind = "Type"
+gear_kind_eccentric = "External, eccentric"
+gear_kind_eccentric_note = "profile shift varies once per revolution, so the body runs eccentric at a constant ratio"
+gear_kind_external = "External"
+gear_kind_internal = "Internal (ring)"
+gear_m = "module"
+gear_mate_is_a_ring = "Mate is a ring"
+gear_mate_profile_shift = "Mate profile shift"
+gear_mate_ring_runs_inside = "this gear runs inside it, so centre distance is the difference of radii"
+gear_mate_shares_module_angle_helix = "shares module, pressure angle and helix"
+gear_mate_teeth = "Mate tooth count"
+gear_maximum_deviation_exported_outline_from_true = "how far the exported outline may depart from the true curve"
 gear_measurement = "Measurement"
+gear_measurement_between_pins = "Measurement between pins"
 gear_measurement_over_pins = "Measurement over pins"
 gear_measurement_over_teeth = "Measurement over teeth"
+gear_concentric_has_no_profile = "a concentric gear commands one centre distance, not a profile"
+gear_eccentricity_exceeds_mate = "some tooth's shift drives the operating pressure angle below zero — the eccentricity is larger than this mate can absorb. A smaller amplitude, a larger tooth-count difference, or a mean shift nearer zero each relieve it"
+gear_measurement_varies = "varies around the revolution on an eccentric gear; ranged measurement is not yet built"
+gear_no_mate = "no mate given"
+gear_no_pin_diameter = "no pin diameter given"
 gear_mm = "mm"
-gear_no_fillet_flank_runs_root_circle = """\
-no fillet: the flank runs to the root circle, so the root is a sharp \
-corner"""
+gear_name = "Gear name"
+gear_negative_is_interference_not_slack = "negative is interference; axes closer than teeth allow"
+gear_new = "New"
+gear_no_fillet_flank_runs_root_circle = "no fillet: flank intersects root circle; root is a sharp corner"
 gear_nominal = "Nominal"
 gear_none_available = "none available"
 gear_none_this_cutter_generated_no_fillet = "none — this cutter generated no fillet"
-gear_outside = "outside it"
+gear_note_angular_shift = "x(θ) = x + Δx cos θ — tip and root run eccentric by m·Δx while pitch and base circles stay on the axis, so the body runs eccentric at a constant ratio. Zero is an ordinary gear"
+gear_note_index_offset = "cannot be conjugate both ways, so the error is only distributed: drive scales |1 − λ|, coast |1 + λ|. 0 is the minimax and what a plain radial hob gives; 1 is exact forward, twice the error in reverse"
+gear_note_thickness_mod = "1 is the standard rack; a meshing pair must sum to 2"
+gear_note_thickness_mod_ring = "1 is the standard rack; meshing pair must match"
+gear_outside = "outside the pitch circle"
 gear_parameters = "Parameters"
 gear_past_tip_so_whole_flank_generated = "past the tip, so the whole flank is generated"
 gear_pin_ball_diameter = "Pin / ball diameter"
-gear_pin_centre_radius = "Pin centre radius"
 gear_pitch_diameter = "Pitch diameter"
-gear_ring_shaped_by_pinion_its_fillet = "a ring is shaped by a pinion, and its fillet depends on which one"
+gear_pitch_error_coast = "Pitch error, coast"
+gear_pitch_error_drive = "Pitch error, drive"
 gear_root_diameter = "Root diameter"
 gear_root_form = "Root form"
+gear_root_form_fully_filleted = "fully filleted — no root arc"
+gear_root_form_root_arc = "root arc between the fillets"
+gear_severed = "Tooth severed by undercut — profile truncated at the centreline."
+gear_shift_amplitude = "Shift amplitude"
+gear_sinusoid_phase = "phase {phase}° — what a simple crank delivers"
 gear_smallest_tooth_count = "Smallest tooth count"
 gear_span = "Span"
-gear_span_over_teeth_not_shown_for = """\
-Span over teeth is not shown for an internal gear: it is an \
-external-gear construction and this tool does not yet have its internal \
-equivalent. A strength rating is not shown here for any gear — bending \
-and contact need a mesh and a load, which belong to a stage; the \
-geartrain tab rates rings, spur and helical alike."""
-gear_teeth_point_inward_tip_circle_inside = "the teeth point inward: the tip circle is inside the pitch circle"
+gear_teeth_not_as_drawn = "{count} of {total} teeth are not as drawn — {which}, counting from θ = 0"
+gear_teeth_point_inward_tip_circle_inside = "teeth point inward, so the tip circle is inside the pitch circle"
 gear_teeth_spanned = "Teeth spanned"
+gear_three_pins = "3 pins"
+gear_throw_solves_the_amplitude = "shift amplitude solved so the commanded centre distance swings by this — the throw a simple crank delivers"
 gear_tip_diameter = "Tip diameter"
+gear_tip_root_envelopes_pitch_base_circles = "tip and root envelopes are displaced by this; pitch and base circles are not"
+gear_tolerance_no_entry = "JGMA 116-02 has no {class} entry for module {module} at {diameter} mm"
+gear_tolerance_not_covered = "JGMA 116-02 does not cover module {module} at {diameter} mm"
 gear_tolerance = "Tolerance"
 gear_tolerance_class = "Tolerance class"
 gear_tooth_thickness = "Tooth thickness"
@@ -187,9 +281,15 @@ gear_tooth_tooth_max = "Tooth-to-tooth, max"
 gear_total_max = "Total, max"
 gear_transverse_module = "Transverse module"
 gear_transverse_pressure_angle = "Transverse pressure angle"
+gear_two_pins = "2 pins"
+gear_undercut = "Undercut — cutter has removed part of the flank near the root."
+gear_unnamed = "Unnamed"
+gear_what_teeth_reach_short_2e_odd = "what the teeth reach, short of 2e when no tooth sits at 180°"
+gear_zero_backlash_at_each_tooth = "zero-backlash distance at each tooth position, which the mechanism must track"
 sidebar_export = "Export"
 sidebar_gears = "Gears"
 sidebar_geartrains = "Geartrains"
+sidebar_import_library = "Import"
 sidebar_materials = "Materials"
 train_actuation = "Actuation"
 train_actuation_count = "Actuation count"
@@ -197,24 +297,26 @@ train_actuation_range = "Actuation range"
 train_add_planetary_stage = "+ Add planetary stage"
 train_add_spur_stage = "+ Add spur stage"
 train_add_worm_stage = "+ Add worm stage"
+train_addendum = "Addendum"
 train_additional_helix_angle = "Additional helix angle"
 train_against_that_allowable = "against that allowable"
-train_along_each_member_s_own_axis = """\
-along each member's own axis — what a face has to cover, and what a \
-parallel pair does not have at all"""
+train_along_each_member_s_own_axis = "along each member's own axis"
 train_at_output = "° at output"
+train_auto = "auto"
+train_automatic = "Automatic"
 train_axis_angle = "Axis angle"
 train_backlash = "Backlash"
 train_backlash_at_input_shaft = "Backlash at the input shaft"
 train_backlash_at_output_shaft = "Backlash at the output shaft"
+train_below_the_minimum = "below the minimum asked for"
 train_bending = "Bending"
 train_bending_contact = "bending / contact"
 train_bending_stress = "Bending stress"
 train_c2c_clearance = "C2C clearance"
-train_c2c_tolerance = "C2C tolerance +"
-train_c2c_tolerance_2 = "C2C tolerance −"
-train_c2c_tolerance_4 = "C2C tolerance −"
-train_c2c_tolerance_6 = "C2C tolerance −"
+train_c2c_distance = "C2C distance"
+train_c2c_tolerance_minus = "C2C tolerance −"
+train_c2c_tolerance_plus = "C2C tolerance +"
+train_cancel = "Cancel"
 train_cannot_be_back_driven = "cannot be back-driven"
 train_carrier = "Carrier"
 train_centre_distance = "Centre distance"
@@ -222,143 +324,136 @@ train_contact_ratio = "Contact ratio"
 train_contact_stress = "Contact stress"
 train_contact_travel = "Contact travel"
 train_coprime = "Coprime"
+train_copy = "Copy"
 train_crossed = "crossed"
 train_cutter_addendum = "Cutter addendum"
 train_cutter_teeth = "Cutter teeth"
 train_cutter_tip_round = "Cutter tip round"
 train_dedendum = "Dedendum"
+train_delete = "Delete"
+train_delete_confirm = "Delete"
+train_delete_question = "Delete “{name}”?"
+train_density = "Density"
 train_driven_by = "Driven by"
 train_efficiency = "Efficiency"
-train_equal_as_parallel_axis_mesh_must = "equal, as a parallel-axis mesh must be"
+train_elastic_modulus = "Elastic modulus"
 train_even_spacing = "Even spacing"
 train_export = "Export"
 train_face_width = "Face width"
+train_fatigue_allowable = "Fatigue allowable"
+train_first_gear = "First gear"
 train_flank_type = "Flank type"
-train_forward = "η forward"
 train_from_bending = "from bending"
 train_from_contact = "from contact"
+train_fully_reversed = "fully reversed"
 train_held = "Held"
 train_helix_angle = "Helix angle"
 train_helix_angle_gear = "Helix angle — a gear"
 train_hours = "hours"
+train_import = "Import"
 train_input_speed_peak = "Input speed, peak"
 train_input_torque_peak = "Input torque, peak"
 train_k = "k₁"
+train_kg_m3 = "kg/m³"
 train_lead = "Lead"
 train_lead_angle = "Lead angle"
 train_length = "Length"
-train_m = "m"
-train_mate_takes_rest_shaft_angle = "the mate takes the rest of the shaft angle"
+train_m = "module"
+train_mate_takes_rest_shaft_angle = "mate takes the rest of the shaft angle"
 train_material = "Material"
-train_mesh = "mesh"
+train_meets_the_minimum = "meets the minimum"
 train_mesh_efficiency = "Mesh efficiency"
+train_mesh_planet_ring = "planet–ring"
+train_mesh_sun_planet = "sun–planet"
 train_min_face_width = "Min face width"
 train_minimum_planet_clearance = "Minimum planet clearance"
 train_minimum_tip_width = "Minimum tip width"
 train_mm = "mm"
 train_module = "module"
+train_mpa = "MPa"
+train_name = "Geartrain name"
+train_new = "New"
 train_nm = "Nm"
+train_no = "no"
 train_no_full_axial_overlap = "no full axial overlap"
 train_normal_module = "Normal module"
-train_not_reported_for_crossed_axes_no = """\
-not reported for crossed axes — no accepted analytical model exists, and \
-deriving one from a parallel-axis calculation would be a convention \
-rather than a derivation (DESIGN §4.5.1)"""
+train_not_reported_for_crossed_axes_no = "not reported for crossed axes; no accepted model exists"
+train_note_contact_ratio_below_one = "below 1: pair loses contact between teeth"
+train_note_face_width_continuity = "automatic is {width} mm, where contact stays continuous (ε = 1) — geometric, not a strength minimum"
+train_note_helix_split = "each gear carries {first}° and {second}°, summing to the axis angle"
+train_note_no_continuous_width = "contact never stays continuous here, at any width"
+train_note_planet_clearance = "tip to tip, between neighbouring planets"
+train_note_planet_shift_solved = "solved; makes the two centre distances agree"
+train_note_shafts_crossed = "shafts cross, so the teeth touch at a point — see the results below"
+train_note_shafts_parallel = "shafts are parallel at zero"
+train_note_static_friction = "break away at rest is decided against this; running is decided against the sliding value"
+train_note_thickness_mod_crossed = "above 1, gear {first}'s teeth thicken and gear {second}'s thin; teeth in mesh sum to 2"
+train_note_thickness_mod_planetary = "above 1, sun's and ring's teeth thicken and planet's thin; teeth in mesh sum to 2"
+train_note_thickness_mod_spur = "above 1, gear {first}'s teeth thicken and gear {second}'s thin; teeth in mesh sum to 2"
+train_note_thickness_mod_worm = "above 1, worm's thread thickens and wheel's teeth thin; teeth in mesh sum to 2"
+train_note_working_depth = "depth for undercut calculation; only used by automatic profile shift above"
+train_one_planet_no_neighbour = "one planet has no neighbour"
+train_one_way = "one-way"
 train_operating_speed = "Operating speed"
 train_output_speed = "Output speed"
 train_output_torque = "Output torque"
 train_peak = "% of peak"
 train_pitch_diameter = "Pitch diameter"
 train_pitch_diameter_worm = "Pitch diameter — a worm"
+train_planet = "Planet"
 train_planet_clearance = "Planet clearance"
 train_planetary = "planetary"
 train_planets = "Planets"
+train_poissons_ratio = "Poisson's ratio"
 train_pressure_angle = "Pressure angle"
 train_profile_shift = "Profile shift"
 train_ratio = "Ratio"
+train_remove_stage = "Remove stage"
+train_restore_library_value = "Restore the library value"
 train_ring = "Ring"
-train_root_fillet_are_cutter_s_below = """\
-Root and fillet are the cutter's, below — a ring has no dedendum of its \
-own."""
+train_ring_cutter = "Ring cutter"
 train_root_radius = "Root radius"
 train_rpm = "rpm"
 train_runtime = "Runtime"
 train_self_locking = "self-locking"
 train_self_locks_at = "Self-locks at μ"
+train_simultaneous_meshing = "Simultaneous meshing"
 train_sized_by = "Sized by"
+train_sliding_friction = "Sliding friction"
+train_sliding_friction_planet_ring = "Sliding friction, planet–ring"
+train_sliding_friction_sun_planet = "Sliding friction, sun–planet"
 train_sliding_speed = "Sliding speed"
 train_speed = "Speed"
+train_starts = "Starts"
+train_static_friction = "Static friction"
+train_static_friction_planet_ring = "Static friction, planet–ring"
+train_static_friction_sun_planet = "Static friction, sun–planet"
 train_sun = "Sun"
+train_the_wheel = "the wheel"
+train_the_worm = "the worm"
 train_tooth_count = "Tooth count"
 train_tooth_cycles = "Tooth cycles"
-train_tooth_form_below_shift_addendum_dedendum = """\
-The tooth form below — shift, addendum, dedendum, root radius — \
-describes the gears that will be cut. A crossed mesh is solved at its \
-pitch point, so it does not move the figures in this stage: a profile \
-shift reaches them only through the centre distance, which is an input \
-of its own."""
+train_tooth_form_below_shift_addendum_dedendum = "The tooth form below — shift, addendum, dedendum, root radius — describes the gears that will be cut. A crossed mesh is solved at its pitch point, so none of it moves the figures here. A profile shift reaches them only through the centre distance."
 train_tooth_thickness_mod = "Tooth thickness mod."
 train_torque = "Torque"
 train_total_efficiency = "Total efficiency"
 train_total_ratio = "Total ratio"
-train_with_planet_count = "with the planet count"
+train_ultimate_allowable = "Ultimate allowable"
+train_unnamed = "Unnamed"
 train_working_tooth_depth = "Working tooth depth"
 train_worm = "worm"
 train_worm_axial_clearance = "Worm axial clearance"
+train_worm_member = "Worm"
+train_wormwheel = "Wormwheel"
+train_worst_at_pitch_point = "worst at the pitch point"
+train_yes = "yes"
 train_zn_worm_s_contact_stress_1 = "a ZN worm's contact stress is 1–15 % lower, rising with lead angle"
+validation_at_least = "must be at least {bound}"
+validation_at_most = "must be at most {bound}"
+validation_greater_than = "must be greater than {bound}"
+validation_less_than = "must be less than {bound}"
+validation_not_a_number = "must be a number"
+validation_not_a_whole_number = "must be a whole number"
+validation_required = "required"
 viewport_drag_pan_scroll_zoom = "drag to pan · scroll to zoom"
 viewport_reset_view = "Reset view"
-gear_cancel = "Cancel"
-gear_copy = "Copy"
-gear_delete = "Delete"
-gear_delete_confirm = "Delete"
-gear_new = "New"
-train_cancel = "Cancel"
-train_copy = "Copy"
-train_delete = "Delete"
-train_delete_confirm = "Delete"
-train_import = "Import"
-train_new = "New"
-train_remove_stage = "Remove stage"
-train_ring_cutter = "Ring cutter"
-train_wormwheel = "Wormwheel"
-sidebar_import_library = "Import"
-train_the_worm = "the worm"
-train_the_wheel = "the wheel"
-train_c2c_distance = "C2C distance"
-train_automatic = "Automatic"
-train_auto = "auto"
-train_addendum = "Addendum"
-train_sliding_friction = "Sliding friction"
-train_static_friction = "Static friction"
-train_sliding_friction_sun_planet = "Sliding friction, sun–planet"
-train_static_friction_sun_planet = "Static friction, sun–planet"
-train_sliding_friction_planet_ring = "Sliding friction, planet–ring"
-train_static_friction_planet_ring = "Static friction, planet–ring"
-gear_eccentricity = "Eccentricity"
-gear_envelope_eccentricity = "Envelope eccentricity"
-gear_departure_from_a_circle = "Departure from a circle"
-gear_tip_root_envelopes_pitch_base_circles = "the tip and root envelopes are displaced by this; the pitch and base circles are not"
-gear_envelope_limacon_not_circle_e_2ro = "the envelope is a limaçon, not a displaced circle — e²/2ρ"
-gear_what_teeth_reach_short_2e_odd = "what the teeth actually reach, which falls short of 2e when no tooth sits at 180°"
-gear_pitch_error_drive = "Pitch error, drive"
-gear_pitch_error_coast = "Pitch error, coast"
-gear_kind = "Type"
-gear_kind_external = "External"
-gear_kind_internal = "Internal (ring)"
-gear_kind_eccentric = "External, eccentric"
-gear_kind_external_note = "teeth point outward from the pitch circle"
-gear_kind_eccentric_note = "the profile shift varies once per revolution, so the body runs eccentric at a constant ratio"
-gear_mate_teeth = "Mate tooth count"
-gear_mate_profile_shift = "Mate profile shift"
-gear_mate_is_a_ring = "Mate is a ring"
-gear_mate_shares_module_angle_helix = "a mate shares this gear's module, pressure angle and helix — a pair that did not could not mesh"
-gear_mate_ring_runs_inside = "this gear runs inside it, so the centre distance is the difference of the radii"
-gear_commanded_centre_distance = "Commanded centre distance"
-gear_centre_distance = "Centre distance"
-gear_best_fit_sinusoid = "Best-fit sinusoid"
-gear_departure_from_that_sinusoid = "Departure from that sinusoid"
-gear_backlash_a_crank_leaves = "Backlash a crank leaves"
-gear_zero_backlash_at_each_tooth = "the zero-backlash distance at each tooth position, which the mechanism has to track"
-gear_ideal_not_sinusoidal_inv_cosine = "the ideal is not sinusoidal even though x(θ) is — it passes through inv⁻¹ and a cosine"
-gear_negative_is_interference_not_slack = "negative is interference, not slack: the axes are closer than the teeth allow"

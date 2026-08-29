@@ -7,7 +7,7 @@
 //! # Inputs only
 //!
 //! The document holds exactly what [`Train`] holds, which is exactly the inputs
-//! — no ratio, no stresses, no efficiencies. That is DESIGN.md §3.1 showing up
+//! — no ratio, no stresses, no efficiencies. That is docs/rationale.md#inputs-are-the-only-state showing up
 //! in the file format: outputs are a pure function of the inputs, so writing
 //! them down would create a second copy that can disagree with the first. A file
 //! that says a stage's efficiency is 98.741 % is a file that will one day be

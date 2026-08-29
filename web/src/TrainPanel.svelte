@@ -2,14 +2,14 @@
   import type { Snippet } from "svelte";
   import {
     solveTrain,
-    defaultStage,
+    defaultSpurStage,
     defaultPlanetaryStage,
     defaultWormStage,
     outside,
     type Auto,
     type Overrides,
     type StageGear,
-    type MaterialValue,
+    type Value,
     type GearResult,
     type WormResult,
     note,
@@ -69,7 +69,7 @@
   }
 
   function addStage() {
-    tab.train.stages.push(defaultStage());
+    tab.train.stages.push(defaultSpurStage());
     open[tab.train.stages.length - 1] = true;
   }
 
@@ -109,7 +109,7 @@
 
 </script>
 
-<!-- A value + automatic toggle, locked while automatic (DESIGN.md 3.3).
+<!-- A value + automatic toggle, locked while automatic (docs/rationale.md#inputs-are-the-only-state).
      When automatic the field shows the SOLVED value, greyed, so a computed
      number is never mistaken for one that was chosen. Turning the toggle off
      leaves `manual` where it was, so the field does not jump. -->
@@ -124,7 +124,7 @@
   label: string,
   gear: StageGear,
   key: keyof Overrides,
-  used: MaterialValue | undefined,
+  used: Value | undefined,
   step: number,
   unit: string,
 )}
@@ -144,7 +144,7 @@
     {#if gear.material_overrides[key] !== null}
       <button
         class="clear"
-        title="Restore the library value"
+        title={t("ui.train_restore_library_value")}
         onclick={() => (gear.material_overrides[key] = null)}>×</button
       >
     {:else if used}
@@ -176,7 +176,7 @@
      chosen, and a member may have something of its own to report. -->
 <!-- What a crossed-axis mesh reports, whether it was entered as a worm drive or
      as a gear pair with its shafts turned: the same mathematics answers both
-     (DESIGN §4.5.1), so it is one readout rather than two that drift. -->
+     (docs/reference.md#crossed-axes), so it is one readout rather than two that drift. -->
 {#snippet screwReadout(r: WormResult, members: [string, string])}
 <!-- Ordered to match the spur stage's shared readout — centre distance,
      contact ratio, efficiency, backlash — with what only a screw pair has
@@ -197,7 +197,7 @@
       </span>
       <small>
         {r.crossed.contact_ratio < 1
-          ? "below 1: the pair loses contact between one tooth and the next"
+          ? t("ui.train_note_contact_ratio_below_one")
           : `pairs in contact · ended by the ${r.crossed.limited_by === "face" ? "face width" : "teeth"}`}
         {#if r.crossed.tooth_height_assumed}
           · a floor: the tooth height is assumed at one module, and an enveloping
@@ -236,7 +236,7 @@
     <small>
       patch {r.contact.patch_length.toFixed(4)} × {r.contact.patch_width.toFixed(4)} mm ·
       {Math.abs(r.contact.worst_position) < 1e-9
-        ? "worst at the pitch point"
+        ? t("ui.train_worst_at_pitch_point")
         : `worst ${r.contact.worst_position.toFixed(3)} mm along the path, where one tooth carries it alone`}
       · the pitch point alone gives {r.contact.at_pitch_point.toFixed(1)}
     </small>
@@ -294,9 +294,18 @@
     <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
       <span>{t("ui.train_dedendum")}</span>
       <input type="number" step="0.05" bind:value={gear.dedendum} />
+      <!-- The same sentences the gear tab shows. They used to be written out
+           here as well, and drifted: this one lost its reason altogether and
+           the fillet bound below was abbreviated past the point of saying
+           anything. -->
       {@render noteSlot(
         notes(
-          g ? `${n(g.ranges.dedendum.min ?? 0)} to ${n(g.ranges.dedendum.max ?? 0)}` : null,
+          g
+            ? t("ui.bound_dedendum", {
+                min: n(g.ranges.dedendum.min ?? 0),
+                max: n(g.ranges.dedendum.max ?? 0),
+              })
+            : null,
           g ? outside(gear.dedendum, g.ranges.dedendum) : null,
         ),
       )}
@@ -306,13 +315,11 @@
       <input type="number" step="0.01" bind:value={gear.root_radius} />
       {@render noteSlot(
         notes(
-          g ? `up to ${n(g.ranges.root_radius.max ?? 0)} · fillet must fit` : null,
+          g ? t("ui.bound_root_radius", { max: n(g.ranges.root_radius.max ?? 0) }) : null,
           g ? outside(gear.root_radius, g.ranges.root_radius) : null,
         ),
       )}
     </label>
-  {:else}
-    <p class="aside">{t("ui.train_root_fillet_are_cutter_s_below")}</p>
   {/if}
   {#if opts.solvedShift === undefined}
     {@render autoNumber("ui.train_profile_shift", gear.profile_shift, g?.profile_shift, 0.05)}
@@ -327,8 +334,7 @@
            like its neighbours, so the note says it instead. -->
       {@render noteSlot(
         notes(
-          "the depth the undercut question is asked at, and the only thing it reaches is " +
-            "the automatic profile shift above. Automatic is this gear's dedendum",
+          t("ui.train_note_working_depth"),
           null,
         ),
       )}
@@ -338,23 +344,28 @@
       <span>{t("ui.train_profile_shift")}</span>
       <input type="number" value={Number(opts.solvedShift.toFixed(4))} disabled class="computed" />
       <em>{t("ui.train_module")}</em>
-      {@render noteSlot(notes("solved: it is what makes the two centre distances agree", null))}
+      {@render noteSlot(notes(t("ui.train_note_planet_shift_solved"), null))}
     </label>
   {/if}
   {#if opts.solvedShift === undefined && !gear.profile_shift.auto}
     {@const r = opts.cut === "shaper" ? undefined : g?.ranges.profile_shift}
     <p class="hint">
-      <!-- The bounds shown here are the rack's — buildable range and undercut —
-           and a shaper-cut ring's are not those: what limits it is its own base
-           circle, its cutter's reach and the generation limit (DESIGN §4.11).
-           The core does not yet report those for a stage member, so the ring is
-           told what is missing rather than shown the wrong bound. -->
+      <!-- A shaper-cut ring's bounds are not the rack's shown here — its own
+           base circle, its cutter's reach and the generation limit are what
+           limit it (docs/reference.md#internal-gears) — and the core does not report those for a
+           stage member yet. It shows no bound rather than the wrong one. -->
       {@render noteSlot(
         notes(
           opts.cut === "shaper"
-            ? "a ring's bounds are its cutter's reach and its own base circle, not a rack's"
+            ? null
             : r
-              ? `buildable ${n(r.bound.min ?? 0)} to ${n(r.bound.max ?? 0)} · undercut below ${n(r.undercut)}`
+              ? t(r.pointed === null ? "ui.bound_profile_shift" : "ui.bound_profile_shift_pointed", {
+                  min: n(r.bound.min ?? 0),
+                  max: n(r.bound.max ?? 0),
+                  undercut: n(r.undercut),
+                  sharp: n(r.sharp_rack_undercut),
+                  pointed: n(r.pointed ?? 0),
+                })
               : null,
           r ? outside(gear.profile_shift.manual, r.bound) : null,
         ),
@@ -377,8 +388,8 @@
     {@render noteSlot(
       notes(
         opts.faceFromContinuity === undefined
-          ? "no width keeps contact continuous here — the teeth do not reach it at any width"
-          : `automatic is ${n(opts.faceFromContinuity)} mm, where contact stays continuous (ε = 1) — a geometric minimum, not a strength one`,
+          ? t("ui.train_note_no_continuous_width")
+          : t("ui.train_note_face_width_continuity", { width: n(opts.faceFromContinuity) }),
         null,
       ),
     )}
@@ -408,11 +419,11 @@
 
   {#if g}
     <div class="props">
-      {@render property("Density", gear, "density", g.material.density, 10, "kg/m³")}
-      {@render property("Elastic modulus", gear, "elastic_modulus", g.material.elastic_modulus, 100, "MPa")}
-      {@render property("Poisson's ratio", gear, "poissons_ratio", g.material.poissons_ratio, 0.01, "")}
-      {@render property("Ultimate allowable", gear, "ultimate_allowable", g.material.ultimate_allowable, 10, "MPa")}
-      {@render property("Fatigue allowable", gear, "fatigue_allowable", g.material.fatigue_allowable, 10, "MPa")}
+      {@render property(t("ui.train_density"), gear, "density", g.material.density, 10, t("ui.train_kg_m3"))}
+      {@render property(t("ui.train_elastic_modulus"), gear, "elastic_modulus", g.material.elastic_modulus, 100, t("ui.train_mpa"))}
+      {@render property(t("ui.train_poissons_ratio"), gear, "poissons_ratio", g.material.poissons_ratio, 0.01, "")}
+      {@render property(t("ui.train_ultimate_allowable"), gear, "ultimate_allowable", g.material.ultimate_allowable, 10, t("ui.train_mpa"))}
+      {@render property(t("ui.train_fatigue_allowable"), gear, "fatigue_allowable", g.material.fatigue_allowable, 10, t("ui.train_mpa"))}
     </div>
     <dl class="out small">
       <dt>{t("ui.train_torque")}</dt>
@@ -440,7 +451,7 @@
     </dl>
     {#if g.clamps.length}
       <ul class="notes">
-        {#each g.clamps as c (c.key)}<li>{note(c)}</li>{/each}
+        {#each g.clamps as c (c.key)}<li>{t("ui.gear_clamped")} {note(c)}</li>{/each}
       </ul>
     {/if}
   {/if}
@@ -480,7 +491,7 @@
 {/snippet}
 
 <header>
-  <input class="title" bind:value={tab.name} aria-label="Geartrain name" />
+  <input class="title" bind:value={tab.name} aria-label={t("ui.train_name")} />
   <div class="actions">
     <button onclick={saveTrain}>{t("ui.train_export")}</button>
     <button onclick={() => picker.click()}>{t("ui.train_import")}</button>
@@ -507,7 +518,7 @@
 
 {#if confirmingDelete}
   <div class="confirm" role="alertdialog">
-    <span>Delete “{tab.name || "Unnamed"}”?</span>
+    <span>{t("ui.train_delete_question", { name: tab.name || t("ui.train_unnamed") })}</span>
     <button
       class="danger"
       onclick={() => {
@@ -631,7 +642,7 @@
         <!-- One stage, two meshes. Crossing the shafts turns a line contact
              into a point one and changes what sliding costs, so the answer has
              a different shape: `sres` when the shafts are parallel, the screw
-             result when they are not (DESIGN §4.5.1). The *inputs* below are
+             result when they are not (docs/reference.md#crossed-axes). The *inputs* below are
              the same either way, which is what the specification asks for. -->
         {@const sres = res && res.kind === "spur" ? res : null}
         {@const xres = res && res.kind === "worm" ? res : null}
@@ -668,8 +679,8 @@
                 {@render noteSlot(
                   notes(
                     stage.shaft_angle === 0
-                      ? "zero: the shafts are parallel"
-                      : "the shafts cross, so the teeth touch at a point — see the results below",
+                      ? t("ui.train_note_shafts_parallel")
+                      : t("ui.train_note_shafts_crossed"),
                     null,
                   ),
                 )}
@@ -680,9 +691,10 @@
                 <em>°</em>
                 {@render noteSlot(
                   notes(
-                    `each gear carries ${n(stage.shaft_angle / 2 + stage.additional_helix)}° and ${n(
-                      stage.shaft_angle / 2 - stage.additional_helix,
-                    )}°, summing to the axis angle`,
+                    t("ui.train_note_helix_split", {
+                      first: n(stage.shaft_angle / 2 + stage.additional_helix),
+                      second: n(stage.shaft_angle / 2 - stage.additional_helix),
+                    }),
                     null,
                   ),
                 )}
@@ -698,9 +710,7 @@
                 <em></em>
                 {@render noteSlot(
                   notes(
-                    "breaking away is decided at rest and against this; how well it runs " +
-                      "once turning is decided against the sliding value. A drive that " +
-                      "cannot break away delivers nothing, whatever the sliding figure says",
+                    t("ui.train_note_static_friction"),
                     null,
                   ),
                 )}
@@ -711,18 +721,17 @@
                 <em>{t("ui.train_k")}</em>
                 <!-- One input where the specification had a pair, because the
                      two are not independent: `k₁ + k₂ = 2` is what keeps the
-                     mesh at zero backlash (DESIGN §3.2), so storing both would
+                     mesh at zero backlash (docs/rationale.md#inputs-are-the-only-state), so storing both would
                      be storing a constraint that can be broken. Which gear it
                      applies to therefore has to be said. -->
                 {@render noteSlot(
                   notes(
-                    `gear ${gearNumber(i, 0)}'s: above 1 its teeth thicken and gear ${gearNumber(
-                      i,
-                      1,
-                    )}'s thin by as much, since the pair must sum to 2` +
-                      (stage.shaft_angle === 0
-                        ? ""
-                        : " — it shapes the teeth here, but a crossed mesh is solved at its pitch point"),
+                    t(
+                      stage.shaft_angle === 0
+                        ? "ui.train_note_thickness_mod_spur"
+                        : "ui.train_note_thickness_mod_crossed",
+                      { first: String(gearNumber(i, 0)), second: String(gearNumber(i, 1)) },
+                    ),
                     null,
                   ),
                 )}
@@ -745,12 +754,12 @@
                 <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>{t("ui.train_c2c_tolerance")}</span>
+                <span>{t("ui.train_c2c_tolerance_plus")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>{t("ui.train_c2c_tolerance_2")}</span>
+                <span>{t("ui.train_c2c_tolerance_minus")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
@@ -784,7 +793,7 @@
                  and saying which is which is the honesty required: the mesh is
                  solved at its pitch point, so a shift reaches the answer only
                  through the centre distance, which is an input of its own.
-                 DESIGN §4.5.1. -->
+                 docs/reference.md#crossed-axes. -->
             {#if stage.shaft_angle !== 0}
               <p class="aside wide">{t("ui.train_tooth_form_below_shift_addendum_dedendum")}</p>
             {/if}
@@ -831,7 +840,6 @@
                 <dd>
                   {pct(sres.efficiency.forward)} % driven forward
                   · {pct(sres.efficiency.backward)} % driven backward
-                  <small>{t("ui.train_equal_as_parallel_axis_mesh_must")}</small>
                 </dd>
                 <dt>{t("ui.train_backlash")}</dt>
                 <dd>
@@ -844,7 +852,7 @@
                   · {sres.backlash.backward.nominal.toFixed(5)}° at gear {gearNumber(i, 0)}
                 </dd>
                 <dt>{t("ui.train_coprime")}</dt>
-                <dd>{sres.coprime ? "yes" : "no"}</dd>
+                <dd>{sres.coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
               </dl>
               {#if sres.notes.length}
                 <ul class="notes">
@@ -902,9 +910,7 @@
                 <em></em>
                 {@render noteSlot(
                   notes(
-                    "breaking away is decided at rest and against this; how well it runs " +
-                      "once turning is decided against the sliding value. A drive that " +
-                      "cannot break away delivers nothing, whatever the sliding figure says",
+                    t("ui.train_note_static_friction"),
                     null,
                   ),
                 )}
@@ -921,10 +927,7 @@
                      which is an answer rather than a gap. -->
                 {@render noteSlot(
                   notes(
-                    "the worm's: above 1 its thread thickens and the wheel's teeth thin by " +
-                      "as much, since the pair must sum to 2. It describes the parts cut and " +
-                      "moves nothing below — thickness shifted between two teeth cannot open " +
-                      "the pair",
+                    t("ui.train_note_thickness_mod_worm"),
                     null,
                   ),
                 )}
@@ -942,12 +945,12 @@
                 <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>{t("ui.train_c2c_tolerance")}</span>
+                <span>{t("ui.train_c2c_tolerance_plus")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>{t("ui.train_c2c_tolerance_4")}</span>
+                <span>{t("ui.train_c2c_tolerance_minus")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
@@ -960,9 +963,9 @@
 
             <div class="gears">
               <div class="gear">
-                <h4>{"pitch_diameter" in stage.sizing ? "Worm" : "First gear"}</h4>
+                <h4>{t("pitch_diameter" in stage.sizing ? "ui.train_worm_member" : "ui.train_first_gear")}</h4>
                 <label>
-                  <span>{"pitch_diameter" in stage.sizing ? "Starts" : "Tooth count"}</span>
+                  <span>{t("pitch_diameter" in stage.sizing ? "ui.train_starts" : "ui.train_tooth_count")}</span>
                   <input type="number" step="1" bind:value={stage.starts} />
                 </label>
                 <label>
@@ -1143,8 +1146,7 @@
                 <em></em>
                 {@render noteSlot(
                   notes(
-                    "breaking away is decided at rest and against these; a set is never " +
-                      "near its own threshold, so they confirm rather than decide",
+                    t("ui.train_note_static_friction"),
                     null,
                   ),
                 )}
@@ -1155,9 +1157,7 @@
                 <em>{t("ui.train_k")}</em>
                 {@render noteSlot(
                   notes(
-                    "the sun's: above 1 its teeth thicken and the planet's thin by as much " +
-                      "(2 − k), and the ring matches the planet — an internal mesh needs equal " +
-                      "k, not complementary",
+                    t("ui.train_note_thickness_mod_planetary"),
                     null,
                   ),
                 )}
@@ -1168,12 +1168,12 @@
                 <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>{t("ui.train_c2c_tolerance")}</span>
+                <span>{t("ui.train_c2c_tolerance_plus")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
               <label>
-                <span>{t("ui.train_c2c_tolerance_6")}</span>
+                <span>{t("ui.train_c2c_tolerance_minus")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
@@ -1181,7 +1181,7 @@
                 <span>{t("ui.train_minimum_planet_clearance")}</span>
                 <input type="number" step="0.05" bind:value={stage.min_planet_clearance} />
                 <em>{t("ui.train_mm")}</em>
-                {@render noteSlot(notes("tip to tip, between neighbouring planets", null))}
+                {@render noteSlot(notes(t("ui.train_note_planet_clearance"), null))}
               </label>
               <label>
                 <span>{t("ui.train_planets")}</span>
@@ -1205,9 +1205,7 @@
                   <option value="ring">{t("ui.train_ring")}</option>
                 </select>
                 <em></em>
-                {@render noteSlot(
-                  notes("the third shaft is the output; a set needs both named", null),
-                )}
+                {@render noteSlot(notes(null, null))}
               </label>
             </div>
 
@@ -1217,9 +1215,7 @@
                 <span>{t("ui.train_cutter_teeth")}</span>
                 <input type="number" step="1" min="1" bind:value={stage.cutter.teeth} />
                 <em></em>
-                {@render noteSlot(
-                  notes("a ring is shaped by a pinion; its root and fillet are the tool's", null),
-                )}
+                {@render noteSlot(notes(null, null))}
               </label>
               <label>
                 <span>{t("ui.train_cutter_addendum")}</span>
@@ -1236,13 +1232,13 @@
             <!-- The planet alone is loaded on both flanks, once per revolution relative to
                  its carrier, so it is rated against a **reversed** bending allowable
                  derived from the material rather than the one-way figure the sun and ring
-                 use (DESIGN §4.9). Shown where the number it changes is shown. -->
+                 use (docs/reference.md#trains). Shown where the number it changes is shown. -->
             {#snippet planetExtra(_j: number)}
               {#if pres}
                 <dl class="out small">
                   <dt>{t("ui.train_bending")}</dt>
                   <dd>
-                    {pres.planet.fully_reversed ? "fully reversed" : "one-way"}
+                    {t(pres.planet.fully_reversed ? "ui.train_fully_reversed" : "ui.train_one_way")}
                     <small>allowable {pres.planet.reversed_allowable.value.toFixed(0)} MPa</small>
                   </dd>
                   <dt>{t("ui.train_min_face_width")}</dt>
@@ -1262,16 +1258,16 @@
             {/snippet}
 
             <div class="gears">
-              {@render gearCard("Sun", stage.sun, pres?.sun, { cut: "rack" })}
-              {@render gearCard("Planet", stage.planet, pres?.planet.gear, {
+              {@render gearCard(t("ui.train_sun"), stage.sun, pres?.sun, { cut: "rack" })}
+              {@render gearCard(t("ui.train_planet"), stage.planet, pres?.planet.gear, {
                 cut: "rack",
                 solvedShift: pres?.planet.profile_shift,
                 extra: planetExtra,
               })}
               <!-- A ring's root and fillet are its cutter's, so it has neither a
-                   dedendum nor a root radius of its own (DESIGN §4.11); the tool
+                   dedendum nor a root radius of its own (docs/reference.md#internal-gears); the tool
                    is a stage input, above. -->
-              {@render gearCard("Ring", stage.ring, pres?.ring, { cut: "shaper" })}
+              {@render gearCard(t("ui.train_ring"), stage.ring, pres?.ring, { cut: "shaper" })}
             </div>
 
             {#if pres}
@@ -1307,49 +1303,56 @@
                 <dt>{t("ui.train_planet_clearance")}</dt>
                 <dd>
                   {pres.planet_clearance === null
-                    ? "one planet has no neighbour"
+                    ? t("ui.train_one_planet_no_neighbour")
                     : `${pres.planet_clearance.toFixed(3)} mm`}
                   {#if pres.planet_clearance !== null}
                     <small class:warn={!pres.planet_clearance_ok}>
-                      {pres.planet_clearance_ok ? "meets the minimum" : "below the minimum asked for"}
+                      {t(pres.planet_clearance_ok ? "ui.train_meets_the_minimum" : "ui.train_below_the_minimum")}
                     </small>
                   {/if}
                 </dd>
+                <!-- Two separate layout checks, so two rows. Even spacing is
+                     `N | z_sun + z_ring`; simultaneous meshing is the stricter
+                     `N | z_sun` *and* `N | z_ring`, and a false answer is not a
+                     fault — it means the planets engage staggered, which is
+                     usually preferable. -->
                 <dt>{t("ui.train_even_spacing")}</dt>
-                <dd>
-                  {pres.equal_spacing ? "yes" : "no"}
-                  <small>simultaneous meshing {pres.simultaneous_meshing ? "yes" : "no"}</small>
-                </dd>
-                <dt>{t("ui.train_coprime")}</dt>
-                <dd>
-                  sun {pres.sun_coprime_with_planets ? "yes" : "no"} · ring
-                  {pres.ring_coprime_with_planets ? "yes" : "no"}
-                  <small>{t("ui.train_with_planet_count")}</small>
-                </dd>
+                <dd>{pres.equal_spacing ? t("ui.train_yes") : t("ui.train_no")}</dd>
+                <dt>{t("ui.train_simultaneous_meshing")}</dt>
+                <dd>{pres.simultaneous_meshing ? t("ui.train_yes") : t("ui.train_no")}</dd>
               </dl>
 
-              <!-- Two meshes, so the per-mesh figures a spur stage lists once are
-                   a short table here rather than a second and third readout. -->
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t("ui.train_mesh")}</th><th>ε<sub>α</sub></th><th>ε<sub>β</sub></th><th>{t("ui.train_forward")}</th>
-                    <th>σ<sub>H</sub></th><th>ρ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each [["sun–planet", pres.sun_planet], ["planet–ring", pres.planet_ring]] as const as [label, m] (label)}
-                    <tr>
-                      <td>{label}</td>
-                      <td>{m.contact_ratios.transverse.toFixed(4)}</td>
-                      <td>{m.contact_ratios.overlap.toFixed(4)}</td>
-                      <td>{pct(m.efficiency.forward)} %</td>
-                      <td>{m.contact_stress.toFixed(1)} MPa</td>
-                      <td>{m.relative_radius.toFixed(3)} mm</td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
+              <!-- The two meshes, each stacked like a spur stage's readout
+                   rather than a table that lines up with nothing else on the
+                   panel. The coprime check belongs to a mesh — the sun against
+                   the planets, the ring against the planets — so it leads each
+                   list. -->
+              {#each [
+                [t("ui.train_mesh_sun_planet"), pres.sun_planet, pres.sun_coprime_with_planets],
+                [t("ui.train_mesh_planet_ring"), pres.planet_ring, pres.ring_coprime_with_planets],
+              ] as const as [label, m, coprime] (label)}
+                <h4 class="mesh">{label}</h4>
+                <dl class="out indent">
+                  <dt>{t("ui.train_coprime")}</dt>
+                  <dd>{coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
+                  <dt>{t("ui.train_contact_ratio")}</dt>
+                  <dd>
+                    ε<sub>α</sub> {m.contact_ratios.transverse.toFixed(4)} · ε<sub>β</sub>
+                    {m.contact_ratios.overlap.toFixed(4)} · ε<sub>γ</sub>
+                    {m.contact_ratios.total.toFixed(4)}
+                  </dd>
+                  <dt>{t("ui.train_mesh_efficiency")}</dt>
+                  <dd>
+                    {pct(m.efficiency.forward)} % driven forward · {pct(m.efficiency.backward)} %
+                    driven backward
+                  </dd>
+                  <dt>{t("ui.train_contact_stress")}</dt>
+                  <dd>
+                    {m.contact_stress.toFixed(1)} MPa
+                    <small>ρ {m.relative_radius.toFixed(3)} mm</small>
+                  </dd>
+                </dl>
+              {/each}
 
               {#if pres.notes.length}
                 <ul class="notes">
@@ -1461,7 +1464,7 @@
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-    gap: 0.4rem 1rem;
+    gap: var(--field-gap) 1rem;
   }
   /* A stage's shared inputs stack, not flow into columns. Wrapped into two or
      three columns a field's note sat beside the *next* field's box, and the
@@ -1493,7 +1496,10 @@
     display: grid;
     grid-template-columns: 1fr 6rem 3.5rem;
     align-items: center;
-    gap: 0.4rem;
+    /* See GearPanel: the column gap spaces a row, the row gap pairs a note to
+       the box above it. */
+    column-gap: 0.4rem;
+    row-gap: var(--note-gap);
     font-size: 0.85rem;
   }
   label span {
@@ -1580,6 +1586,18 @@
   .out.small {
     font-size: 0.8rem;
     margin-top: 0.5rem;
+  }
+  /* One mesh's readout, sitting under its heading. */
+  h4.mesh {
+    margin: 0.75rem 0 0;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .out.indent {
+    margin-top: 0.2rem;
+    padding-left: 0.9rem;
   }
   .out dt {
     color: var(--muted);
@@ -1705,7 +1723,9 @@
   /* Outside a label's grid, so it is padded by the trailing column's width plus
      its gap to finish on the same edge. */
   .hint {
-    margin: -0.1rem 0 0.3rem;
+    /* A note in its own element rather than inside the label, so it has to undo
+       the field gap above it to sit as close as an in-label note does. */
+    margin: calc(var(--note-gap) - var(--field-gap)) 0 var(--field-gap);
     padding-right: 3.9rem;
     font-size: 0.72rem;
     color: var(--muted);
@@ -1715,7 +1735,7 @@
      height, and nothing moves when the visible one changes. */
   .aside {
     grid-column: 1 / -1;
-    margin: 0 0 0.35rem;
+    margin: 0 0 var(--field-gap);
     font-size: 0.72rem;
     color: var(--muted);
   }
@@ -1730,6 +1750,15 @@
     grid-column: 1 / 3;
     display: grid;
     text-align: right;
+  }
+  /* A note rendered beside a field rather than inside its label — `auto` fields
+     are their own snippet, so their note is a sibling. It is the same note and
+     has to sit like one: pulled up against the box above, pushed off the field
+     below, and stopped at the same right edge (unit column 3.5rem + its 0.4rem
+     gap) instead of running to the card's full width. */
+  .gear > .note {
+    margin: calc(var(--note-gap) - var(--field-gap)) 0 var(--field-gap);
+    padding-right: 3.9rem;
   }
   .note small {
     grid-area: 1 / 1;
@@ -1747,7 +1776,7 @@
   }
   .gear label {
     grid-template-columns: 1fr 6.5rem 3.5rem;
-    margin-bottom: 0.25rem;
+    margin-bottom: var(--field-gap);
   }
   .notes {
     margin: 0.5rem 0 0;

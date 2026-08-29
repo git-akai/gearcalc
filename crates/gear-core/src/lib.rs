@@ -5,7 +5,8 @@
 //! same code serves the CLI, the test suite and the WebAssembly boundary.
 //!
 //! Design rationale, the mathematics behind each formula, and the verification
-//! log live in `docs/DESIGN.md`.
+//! log live in `docs/reference.md`, `docs/rationale.md` and
+//! `docs/corrections.md`.
 //!
 //! ```
 //! use gear_core::{Gear, GearParams};

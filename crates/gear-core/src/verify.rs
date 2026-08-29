@@ -418,7 +418,7 @@ pub fn ring_cut_envelope_spans(
     // `π m_t − ring_tooth` — the tool that would complement an unshifted ring at
     // reference centres — made this simulation share the model's assumption, so
     // it agreed to 2.7 µm on a shifted ring whose cutter was 0.44 mm out of
-    // place. A check built from the thing under test measures nothing. §12.
+    // place. A check built from the thing under test measures nothing. docs/corrections.md.
     let cutter_tooth = cut.cutter_tooth;
     let half_angle_at = |radius: f64| {
         let alpha = (r_bc / radius).acos();

@@ -407,7 +407,7 @@ fn print_worm_stage(k: usize, st: &gear_core::train::WormStage, s: &gear_core::t
             m.face_width, m.torque, m.speed, m.tooth_cycles, m.material.name
         );
     }
-    println!("  bending not reported, flank type ZI - see DESIGN.md 4.5.1");
+    println!("  bending not reported, flank type ZI - see docs/reference.md#crossed-axes");
     for n in &s.notes {
         println!("  note: {}", words().render(n));
     }
@@ -1036,7 +1036,7 @@ fn loadcase_report() {
 /// A worm pair, end to end: geometry, sliding, and both drive directions.
 fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_deg: f64) {
     use gear_core::contact::{Directional, Drive};
-    use gear_core::mesh::Member;
+    use gear_core::mesh::MeshSide;
     use gear_core::screw::{Screw, ScrewParams};
 
     let params = ScrewParams {
@@ -1106,7 +1106,7 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
     println!("  self-locks at mu >= {threshold:.4}   (cos alpha_n tan gamma)");
 
     // Contact is the strength figure a worm stage reports. There is deliberately
-    // no bending stress here; DESIGN.md §4.5.1 says why.
+    // no bending stress here; docs/reference.md#crossed-axes says why.
     let lib = gear_io::default_library();
     let (worm_material, wheel_material) = ("4340 Hardened Steel", "Brass C360");
     let (Some(m1), Some(m2)) = (lib.get(worm_material), lib.get(wheel_material)) else {
@@ -1128,7 +1128,7 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
         }
     };
     println!("  relative curvature   along {flat:.6} /mm   across {sharp:.6} /mm");
-    if let Some(c) = s.contact(torque_out, Member::Second, mu, e_star) {
+    if let Some(c) = s.contact(torque_out, MeshSide::Second, mu, e_star) {
         println!(
             "  patch  {:.4} x {:.4} mm   (rated on the wheel's torque)",
             c.semi_major() * 2.0,
@@ -1140,10 +1140,10 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
             s.sliding_ratio * 3000.0 / 60.0 * std::f64::consts::TAU * s.worm_pitch_diameter / 2.0
         );
     }
-    println!("  bending                     not reported - see DESIGN.md 4.5.1");
+    println!("  bending                     not reported - see docs/reference.md#crossed-axes");
     println!(
         "  flank type   ZI (involute helicoid). A ZN worm's contact stress is\n\
-         {:24}1-15 % lower, rising with lead angle - see DESIGN.md 4.5.1",
+         {:24}1-15 % lower, rising with lead angle - see docs/reference.md#crossed-axes",
         ""
     );
 }
@@ -1209,10 +1209,10 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
         r.backlash.forward.maximum,
         r.backlash.backward.nominal
     );
-    println!("  bending      not reported - see DESIGN.md 4.5.1");
+    println!("  bending      not reported - see docs/reference.md#crossed-axes");
     println!(
         "  flank type   ZI (involute helicoid); a ZN worm's contact stress is\n\
-         {:15}1-15 % lower, rising with lead angle - see DESIGN.md 4.5.1",
+         {:15}1-15 % lower, rising with lead angle - see docs/reference.md#crossed-axes",
         ""
     );
     for note in &r.notes {
@@ -1313,7 +1313,7 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
 
 /// A planetary stage, end to end, in all six arrangements.
 fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix: f64) {
-    use gear_core::planetary::{Arrangement, Member};
+    use gear_core::planetary::{Arrangement, PlanetaryShaft};
     use gear_core::train::{solve_planetary_stage, PlanetaryStage, StageGear};
 
     let lib = gear_io::default_library();
@@ -1341,11 +1341,15 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
          module {}  alpha {} deg",
         base.module, base.pressure_angle
     );
-    let all = [Member::Sun, Member::Carrier, Member::Ring];
-    let name = |m: Member| match m {
-        Member::Sun => "sun",
-        Member::Carrier => "carrier",
-        Member::Ring => "ring",
+    let all = [
+        PlanetaryShaft::Sun,
+        PlanetaryShaft::Carrier,
+        PlanetaryShaft::Ring,
+    ];
+    let name = |m: PlanetaryShaft| match m {
+        PlanetaryShaft::Sun => "sun",
+        PlanetaryShaft::Carrier => "carrier",
+        PlanetaryShaft::Ring => "ring",
     };
 
     let mut shown = false;

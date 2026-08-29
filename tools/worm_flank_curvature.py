@@ -18,7 +18,7 @@ It also answers a design question, which is why it is kept: ZA, ZN and ZI worms
 are the *same* surface family and differ only in where the generating line sits
 -- through the axis, in the normal plane, or tangent to the base cylinder -- so
 the script can measure what choosing one over another actually costs. The answer
-is in DESIGN.md 4.5.1: nothing at all except contact stress, and ZN comes out 1
+is in docs/reference.md#crossed-axes: nothing at all except contact stress, and ZN comes out 1
 to 15 % below ZI as the lead angle rises.
 
 Numerical differentiation is fine here and would not be fine in the crate: a

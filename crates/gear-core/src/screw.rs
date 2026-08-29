@@ -3,7 +3,7 @@
 //! A worm drive is not a separate kind of gearing. It is a screw pair with few
 //! starts, a small lead angle and (usually) a throated wheel, and the same
 //! mathematics covers a crossed-helical pair with none of those properties
-//! (DESIGN.md §4.5.1). So there is one module, and the worm stage and a
+//! (docs/reference.md#crossed-axes). So there is one module, and the worm stage and a
 //! crossed-axis spur stage will both use it.
 //!
 //! Everything here is evaluated **at the pitch point**, where the two pitch
@@ -63,11 +63,11 @@
 //! [`crate::contact::efficiency`]'s integral. The two are different physical
 //! regimes rather than two branches of one formula, and [`Screw::new`] refuses
 //! `Σ = 0` for that reason. What *is* unified across both — and is the point of
-//! DESIGN §4.7 — is the sliding vector, the Hertzian contact, and the geometry;
+//! docs/reference.md#contact-stress — is the sliding vector, the Hertzian contact, and the geometry;
 //! not this pitch-point shortcut.
 
 use crate::contact::{cross, dot, norm, scale, sub, Drive};
-use crate::mesh::Member;
+use crate::mesh::MeshSide;
 
 /// What a screw pair is made of.
 ///
@@ -159,6 +159,20 @@ pub enum ScrewError {
     /// enormous — 2.8e17 mm on a 17-tooth member — and every check downstream
     /// finds it perfectly finite.
     FirstMemberIsADisc,
+}
+
+impl crate::note::Explain for ScrewError {
+    /// Why the screw pair cannot exist, as a key and its values.
+    fn note(&self) -> crate::note::Note {
+        use crate::note::key;
+        crate::note::Note::new(match self {
+            Self::NotPositive => key::ERROR_SCREW_NOT_POSITIVE,
+            Self::WormTooThin => key::ERROR_SCREW_WORM_TOO_THIN,
+            Self::ShaftAngleImpossible => key::ERROR_SCREW_SHAFT_ANGLE_IMPOSSIBLE,
+            Self::AxesAreParallel => key::ERROR_SCREW_AXES_ARE_PARALLEL,
+            Self::FirstMemberIsADisc => key::ERROR_SCREW_FIRST_MEMBER_IS_A_DISC,
+        })
+    }
 }
 
 impl Screw {
@@ -270,7 +284,7 @@ impl Screw {
     /// which is fixed by the rotation senses. So friction that had been resisting
     /// the motion now sits on the other side of the balance. A parallel-axis
     /// mesh has no such asymmetry to flip: its sliding reverses across the pitch
-    /// point and averages out, which is why §4.5 gets two identical numbers.
+    /// point and averages out, which is why docs/reference.md#path-of-contact-and-contact-ratio gets two identical numbers.
     ///
     /// Self-locking is the same statement carried to its end: when friction alone
     /// exceeds what the flank can push back with, the numerator of the backward
@@ -330,8 +344,8 @@ impl Screw {
     /// member.
     ///
     /// `torque` is in Nm, as everywhere at this crate's boundary, and `on` says
-    /// which member it is the torque *of* — [`Member::First`] the worm,
-    /// [`Member::Second`] the wheel. This is the **loaded** normal force, from
+    /// which member it is the torque *of* — [`MeshSide::First`] the worm,
+    /// [`MeshSide::Second`] the wheel. This is the **loaded** normal force, from
     /// the same balance the efficiency comes from, so it already carries the
     /// friction that a frictionless projection would miss. In a worm mesh that
     /// is not a small correction.
@@ -350,11 +364,11 @@ impl Screw {
     /// **wheel** torque, which is the conservative direction and the one worm
     /// gearing is conventionally rated on.
     #[must_use]
-    pub fn normal_force(&self, torque: f64, on: Member, friction: f64) -> f64 {
+    pub fn normal_force(&self, torque: f64, on: MeshSide, friction: f64) -> f64 {
         let (per_normal_1, per_normal_2) = self.tangential_per_normal(friction, Flank::Driving);
         match on {
-            Member::First => 2000.0 * torque / self.worm_pitch_diameter / per_normal_1,
-            Member::Second => 2000.0 * torque / self.wheel_pitch_diameter / per_normal_2.abs(),
+            MeshSide::First => 2000.0 * torque / self.worm_pitch_diameter / per_normal_1,
+            MeshSide::Second => 2000.0 * torque / self.wheel_pitch_diameter / per_normal_2.abs(),
         }
     }
 
@@ -377,12 +391,12 @@ impl Screw {
     /// `e_star` is the effective contact modulus, from
     /// [`crate::material::contact_modulus`]. This is the strength figure a worm
     /// stage reports: **there is deliberately no bending stress**, and DESIGN
-    /// §4.5.1 says why at length.
+    /// docs/reference.md#crossed-axes says why at length.
     #[must_use]
     pub fn contact(
         &self,
         torque: f64,
-        on: Member,
+        on: MeshSide,
         friction: f64,
         e_star: f64,
     ) -> Option<crate::hertz::EllipticalContact> {
@@ -399,7 +413,7 @@ impl Screw {
 /// Where a crossed pair's contact point goes, and where it stops.
 ///
 /// This is the crossed-axis answer to [`crate::contact::ContactPath`], and the
-/// construction that the §4.5.1 audit identified as the one thing gating five
+/// construction that the docs/reference.md#crossed-axes audit identified as the one thing gating five
 /// otherwise separate gaps.
 ///
 /// # It is a straight line, and which one is forced
@@ -477,7 +491,7 @@ impl Screw {
     /// Direction of the common flank normal, unit — or `None` for parallel
     /// axes, which have a *plane* of normals rather than one.
     ///
-    /// Two properties of an involute helicoid fix it (§4.5.1): the normal makes
+    /// Two properties of an involute helicoid fix it (docs/reference.md#crossed-axes): the normal makes
     /// a fixed angle with its own member's axis, `n̂·â = sin β_b`. Applied to
     /// both members that is two linear conditions on one unit vector, so the
     /// direction is determined — and determined by `β_b1`, `β_b2` and `Σ`
@@ -556,7 +570,7 @@ impl Screw {
     /// the zone and with it the contact ratio, and the whole contact slides
     /// **along the axes**. A parallel pair has no equivalent of that last one —
     /// there the line of action turns instead, which is the same degeneracy seen
-    /// from the other side (§4.4).
+    /// from the other side (docs/reference.md#centre-distance-and-backlash).
     #[must_use]
     pub fn path_of_contact_at(
         &self,
@@ -683,6 +697,11 @@ impl Screw {
 /// What ended the zone of action.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum ZoneLimit {
     /// The teeth ran out: one member's tip left the path. Making a face wider
@@ -834,7 +853,7 @@ impl CrossedPath {
     /// bodily along both shafts. It is not a small effect near the parallel
     /// limit — roughly `Δa / sin Σ` in shape — so a pair that is fine at 90° can
     /// have its contact pushed clean off the face at 1°. A parallel pair has no
-    /// counterpart: there the line of action turns instead (§4.4).
+    /// counterpart: there the line of action turns instead (docs/reference.md#centre-distance-and-backlash).
     #[must_use]
     pub fn axial_centre(&self, screw: &Screw, i: usize) -> Option<f64> {
         let axis = if i == 0 {
@@ -883,7 +902,7 @@ impl CrossedPath {
     /// cylinder of radius `ρ_n = |s − s_tangency|` across the tooth and nothing
     /// along its ruling, and the skew between the rulings is a property of the
     /// pair rather than of the point. So one Hertz formula serves the whole
-    /// path, as it already serves both mesh kinds (§4.7).
+    /// path, as it already serves both mesh kinds (docs/reference.md#contact-stress).
     #[must_use]
     pub fn curvatures_at(&self, screw: &Screw, s: f64) -> Option<(f64, f64)> {
         let rho = [(s - self.tangency[0]).abs(), (s - self.tangency[1]).abs()];
@@ -922,13 +941,13 @@ impl CrossedPath {
     /// **This is the model the pitch-point formula is a single sample of.** It
     /// carries the sliding *up the profile* as well as *along the trace*, which
     /// is the term whose absence lets a crossed pair look better than the same
-    /// teeth running parallel (§4.5.1) — and it converges on the parallel-axis
+    /// teeth running parallel (docs/reference.md#crossed-axes) — and it converges on the parallel-axis
     /// figure as the shafts come parallel, where the pitch-point formula
     /// converges on 1.
     ///
     /// Uniform in `s` is uniform in time: the contact point advances along the
     /// path at a constant rate, `r_b/cos β_b` per radian. Load sharing is not
-    /// modelled, here as elsewhere (§4.7) — the average is over the path a
+    /// modelled, here as elsewhere (docs/reference.md#contact-stress) — the average is over the path a
     /// single pair traverses.
     ///
     /// `samples` is a quadrature count, not a tuning parameter: the integrand is
@@ -1121,7 +1140,7 @@ enum Flank {
 ///
 /// That both members are involute helicoids — the **ZI** worm, which is exactly
 /// a helical gear with few teeth and a large helix angle. That is the type
-/// §4.5.1's "worm and crossed-helical are the same mathematics" claim is true
+/// docs/reference.md#crossed-axes's "worm and crossed-helical are the same mathematics" claim is true
 /// of, and the only one consistent with a crate that builds everything from the
 /// involute. A ZA worm (straight-sided in the axial section) or a ZN has a
 /// different flank form and would need its own curvature, which is a separate
@@ -1358,7 +1377,7 @@ mod tests {
         // Frictionless, the balance is F_t/(cos α_n sin γ) exactly.
         let tangential = 2000.0 * torque / s.worm_pitch_diameter;
         let ideal = tangential / (s.normal_pressure_angle.cos() * s.lead_angle.sin());
-        assert!((s.normal_force(torque, Member::First, 0.0) - ideal).abs() < 1e-12 * ideal);
+        assert!((s.normal_force(torque, MeshSide::First, 0.0) - ideal).abs() < 1e-12 * ideal);
 
         // Which torque is held fixed decides which way friction moves the flank
         // load, and it is an easy one to get backwards. Holding the *input*
@@ -1366,17 +1385,19 @@ mod tests {
         // need pressing less hard; holding the *output* fixed, friction has
         // eaten into the useful part and they must be pressed harder.
         assert!(
-            s.normal_force(torque, Member::First, 0.06)
-                < s.normal_force(torque, Member::First, 0.0),
+            s.normal_force(torque, MeshSide::First, 0.06)
+                < s.normal_force(torque, MeshSide::First, 0.0),
             "at fixed input torque, friction lowers the flank load"
         );
         assert!(
-            s.normal_force(torque, Member::Second, 0.06)
-                > s.normal_force(torque, Member::Second, 0.0),
+            s.normal_force(torque, MeshSide::Second, 0.06)
+                > s.normal_force(torque, MeshSide::Second, 0.0),
             "at fixed output torque, friction raises it — the rating direction"
         );
 
-        let c = s.contact(torque, Member::Second, 0.06, 113_000.0).unwrap();
+        let c = s
+            .contact(torque, MeshSide::Second, 0.06, 113_000.0)
+            .unwrap();
         assert!(c.semi_major().is_finite() && c.semi_minor() > 0.0);
         assert!(
             c.semi_major() > c.semi_minor(),
@@ -1391,7 +1412,7 @@ mod tests {
         );
         // A point contact concentrates load far harder than a line would: the
         // same normal force spread along a 10 mm face at this curvature.
-        let line = (s.normal_force(torque, Member::Second, 0.06) / 10.0
+        let line = (s.normal_force(torque, MeshSide::Second, 0.06) / 10.0
             * s.contact_curvatures().unwrap().1
             * 113_000.0
             / PI)
@@ -1999,7 +2020,7 @@ mod tests {
                     let balance = pitch
                         .normal_force(torque, mu, Drive::Forward)
                         .expect("a force");
-                    let classical = s.normal_force(torque, crate::mesh::Member::Second, mu);
+                    let classical = s.normal_force(torque, crate::mesh::MeshSide::Second, mu);
                     assert!(
                         (balance - classical).abs() < 1e-9 * classical,
                         "Σ={sigma_deg}° μ={mu} T={torque}: {balance} N against {classical} N"

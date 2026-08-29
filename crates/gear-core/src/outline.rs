@@ -390,7 +390,7 @@ mod tests {
     fn a_rings_outline_tracks_its_profile_and_closes() {
         use crate::ring::{Cutter, Ring};
         for teeth in [43u32, 60, 90] {
-            let g = Ring::new(
+            let g = Ring::cut_by(
                 &GearParams {
                     teeth,
                     ..Default::default()
@@ -462,7 +462,7 @@ mod tests {
     #[test]
     fn a_rings_outline_refines_when_asked_to() {
         use crate::ring::{Cutter, Ring};
-        let g = Ring::new(
+        let g = Ring::cut_by(
             &GearParams {
                 teeth: 60,
                 ..Default::default()

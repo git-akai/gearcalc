@@ -32,21 +32,41 @@
   );
   let errors = $state<Record<string, string | null>>({});
 
-  /** The bound, phrased for the field it belongs to. */
+  /** The bound, phrased for the field it belongs to.
+   *
+   *  The sentences live in the catalogue rather than here, because the
+   *  geartrain tab shows the same bounds and the two wordings drifted while
+   *  each had its own copy. */
   function boundNote(key: string): string | null {
     if (!("ok" in result)) return null;
     const r = result.ok.ranges;
     switch (key) {
       case "addendum":
-        return r.addendum.min === null ? null : `above ${n(r.addendum.min)}: the tooth must have height`;
+        return r.addendum.min === null
+          ? null
+          : swept(t("ui.bound_addendum", { min: n(r.addendum.min) }));
       case "dedendum":
         return r.dedendum.max === null
           ? null
-          : `${n(r.dedendum.min ?? 0)} to ${n(r.dedendum.max)} · the root circle must clear the axis`;
+          : swept(
+              t("ui.bound_dedendum", {
+                min: n(r.dedendum.min ?? 0),
+                max: n(r.dedendum.max),
+              }),
+            );
       case "root_radius":
         return r.root_radius.max === null
           ? null
-          : `up to ${n(r.root_radius.max)} · the fillet must fit the tooth space`;
+          : t(eccentric ? "ui.bound_root_radius_shared_cutter" : "ui.bound_root_radius", {
+              max: n(r.root_radius.max),
+            });
+      // The amplitude's own bound, which is about the *tool* rather than about
+      // any one tooth: past it no single cutter reaches the high tooth without
+      // driving the low one's root into the axis.
+      case "angular_shift":
+        return r.angular_shift.max === null
+          ? null
+          : t("ui.bound_angular_shift", { max: n(r.angular_shift.max) });
       default:
         return null;
     }
@@ -71,20 +91,34 @@
     const normal =
       f.key === "profile_shift" && "ok" in result
         ? shiftNote(result.ok.ranges.profile_shift)
-        : (boundNote(f.key) ?? (internal && f.ringNote ? f.ringNote : (f.note ?? null)));
+        : (boundNote(f.key) ?? (internal && f.ringNote ? t(f.ringNote) : (f.note ? t(f.note) : null)));
     if (normal) all.push({ text: normal });
     const err = errors[f.key];
     if (err) all.push({ text: err, err: true });
     return { all, shown: err ? all.length - 1 : normal ? 1 : 0 };
   }
 
-  /** The profile shift's three bounds, as one line of text. */
+  /** The profile shift's three bounds, as one line of text. For an eccentric
+   *  gear these are the window the *nominal* shift x̄ can sit in so that every
+   *  swept tooth still builds. */
   function shiftNote(r: ShiftRange): string {
-    const pointed = r.pointed === null ? "" : ` · pointed above ${n(r.pointed)}`;
-    return (
-      `buildable ${n(r.bound.min ?? 0)} to ${n(r.bound.max ?? 0)} · ` +
-      `undercut below ${n(r.undercut)} (sharp rack ${n(r.sharp_rack_undercut)})${pointed}`
-    );
+    // The range, then one clause per threshold that has something to say. Built
+    // from parts rather than as one sentence per combination: there are three
+    // thresholds now and a sentence each would be eight strings to translate,
+    // seven of which restate the others.
+    const parts = [
+      t("ui.bound_profile_shift", {
+        min: n(r.bound.min ?? 0),
+        max: n(r.bound.max ?? 0),
+        undercut: n(r.undercut),
+        sharp: n(r.sharp_rack_undercut),
+      }),
+    ];
+    if (r.shallow_cut < (r.bound.max ?? Infinity))
+      parts.push(t("ui.bound_profile_shift_deep_cut", { deep: n(r.shallow_cut) }));
+    if (r.pointed !== null)
+      parts.push(t("ui.bound_profile_shift_pointed", { pointed: n(r.pointed) }));
+    return swept(parts.join(" · "));
   }
 
   function onInput(key: string, text: string) {
@@ -92,22 +126,26 @@
     const f = FIELDS.find((f) => f.key === key)!;
     const v = Number(text);
     const b = "ok" in result ? boundFor(f.key, result.ok.ranges) : null;
-    const err = text.trim() === "" ? "required" : validate(f, v, b);
+    const err = text.trim() === "" ? t("ui.validation_required") : validate(f, v, b);
     errors[key] = err;
     if (!err) tab.params[f.key] = v;
   }
 
   const n = (v: number) => v.toFixed(3);
-
   const request = $derived<GearRequest>({
     params: tab.params,
-    pin_diameter: tab.pinDiameter > 0 ? tab.pinDiameter : null,
-    tolerance_class: tab.toleranceClass,
+    pin_diameter: tab.pinDiameter > 0 ? tab.pinDiameter : undefined,
+    tolerance_class: tab.toleranceClass ?? undefined,
     chord_tolerance: tab.chordTolerance,
     reference_circles: tab.referenceCircles,
     // Sent only when it can mean something. A concentric gear commands one
     // centre distance and the core says so rather than profiling a constant.
+    // Absent rather than null: Rust takes these as `Option` with `serde(default)`,
+    // which the generated type states as an optional field.
     mate: tab.kind === "eccentric" ? tab.mate : undefined,
+    // When set, Rust solves `angular_shift` from it — see `resolved_params`.
+    eccentric_throw:
+      tab.kind === "eccentric" && tab.eccentricThrow !== null ? tab.eccentricThrow : undefined,
   });
 
   const result = $derived(solve(request));
@@ -129,14 +167,29 @@
   const eccentric = $derived(tab.kind === "eccentric");
   const ring = $derived(internal ? solveRing(ringRequest) : null);
 
+  /** For an eccentric gear the input bounds are for the whole swept interval,
+   *  not the nominal tooth — this says so, once, wherever a bound is shown.
+   *  It wraps the bound rather than being glued onto it, so the catalogue holds
+   *  a whole sentence and a translator can put the qualifier where it belongs. */
+  const swept = $derived((bound: string) =>
+    eccentric
+      ? t("ui.bound_every_tooth_cut_at", {
+          bound,
+          amplitude: n(
+            Math.abs("ok" in result ? result.ok.angular_shift : tab.params.angular_shift),
+          ),
+        })
+      : bound,
+  );
+
   // Kept as a typed array rather than an inline tuple list: destructuring a
   // mixed tuple inside {#each} widens both members to their union and loses the
   // field types.
   const pinRows = $derived<{ label: string; value: Maybe<PinsOut> }[]>(
     "ok" in result
       ? [
-          { label: "2 pins", value: result.ok.over_two_pins },
-          { label: "3 pins", value: result.ok.over_three_pins },
+          { label: t("ui.gear_two_pins"), value: result.ok.over_two_pins },
+          { label: t("ui.gear_three_pins"), value: result.ok.over_three_pins },
         ]
       : [],
   );
@@ -178,7 +231,7 @@
 </script>
 
 <header>
-  <input class="title" bind:value={tab.name} aria-label="Gear name" />
+  <input class="title" bind:value={tab.name} aria-label={t("ui.gear_name")} />
   <div class="actions">
     <button onclick={() => workspace.copy(tab.id)}>{t("ui.gear_copy")}</button>
     <button onclick={() => workspace.create()}>{t("ui.gear_new")}</button>
@@ -188,7 +241,7 @@
 
 {#if confirmingDelete}
   <div class="confirm" role="alertdialog">
-    <span>Delete “{tab.name || "Unnamed"}”?</span>
+    <span>{t("ui.gear_delete_question", { name: tab.name || t("ui.gear_unnamed") })}</span>
     <button
       class="danger"
       onclick={() => {
@@ -214,13 +267,13 @@
           <option value="internal">{t("ui.gear_kind_internal")}</option>
           <option value="eccentric">{t("ui.gear_kind_eccentric")}</option>
         </select>
+        <!-- An external gear needs no note: "External" says it. The other two
+             each have something the name does not carry. -->
         <small>
           {#if internal}
             {t("ui.gear_teeth_point_inward_tip_circle_inside")}
           {:else if eccentric}
             {t("ui.gear_kind_eccentric_note")}
-          {:else}
-            {t("ui.gear_kind_external_note")}
           {/if}
         </small>
       </label>
@@ -230,7 +283,6 @@
         <label>
           <span>{t("ui.gear_cutter_teeth")}</span>
           <input type="number" step="1" min="1" bind:value={tab.cutter.teeth} />
-          <small>{t("ui.gear_ring_shaped_by_pinion_its_fillet")}</small>
         </label>
         <label>
           <span>{t("ui.gear_cutter_addendum")}</span>
@@ -265,23 +317,62 @@
             <span>{t("ui.gear_mate_is_a_ring")}</span>
             <small>{t("ui.gear_mate_ring_runs_inside")}</small>
           </label>
+          <!-- The shift amplitude and the centre-distance throw are the same
+               eccentricity, one solved from the other — like a worm stage sized
+               by helix angle or pitch diameter. Switching seeds the new input
+               from the geometry so nothing jumps. -->
+          <label>
+            <span>{t("ui.gear_eccentric_sized_by")}</span>
+            <select
+              value={tab.eccentricThrow === null ? "amplitude" : "throw"}
+              onchange={(e) => {
+                if (e.currentTarget.value === "throw") {
+                  const cp = "ok" in result ? result.ok.centre_profile : null;
+                  tab.eccentricThrow = cp && !isUnavailable(cp) ? cp.sinusoid.amplitude : 0.1;
+                } else {
+                  if ("ok" in result) {
+                    tab.params = { ...tab.params, angular_shift: result.ok.angular_shift };
+                    raw.angular_shift = String(result.ok.angular_shift);
+                  }
+                  tab.eccentricThrow = null;
+                }
+              }}
+            >
+              <option value="amplitude">{t("ui.gear_eccentric_by_amplitude")}</option>
+              <option value="throw">{t("ui.gear_eccentric_by_throw")}</option>
+            </select>
+          </label>
+          {#if tab.eccentricThrow !== null}
+            <label class:invalid={"error" in result}>
+              <span>{t("ui.gear_centre_distance_throw")}</span>
+              <input type="number" step="0.05" bind:value={tab.eccentricThrow} />
+              <em>{t("ui.gear_mm")}</em>
+              <span class="note">
+                <small class:err={"error" in result}>
+                  {"error" in result ? result.error : t("ui.gear_throw_solves_the_amplitude")}
+                </small>
+              </span>
+            </label>
+          {/if}
         {/if}
-        {@const notes = notesFor(f)}
-        <label class:invalid={errors[f.key]}>
-          <span>{f.label}</span>
-          <input
-            type="number"
-            step={f.step}
-            value={raw[f.key]}
-            oninput={(e) => onInput(f.key, e.currentTarget.value)}
-          />
-          <em>{f.unit}</em>
-          <span class="note">
-            {#each notes.all as note, i (i)}
-              <small class:err={note.err} class:hidden={i !== notes.shown}>{note.text}</small>
-            {/each}
-          </span>
-        </label>
+        {#if f.key !== "angular_shift" || tab.eccentricThrow === null}
+          {@const notes = notesFor(f)}
+          <label class:invalid={errors[f.key]}>
+            <span>{t(f.label)}</span>
+            <input
+              type="number"
+              step={f.step}
+              value={raw[f.key]}
+              oninput={(e) => onInput(f.key, e.currentTarget.value)}
+            />
+            <em>{f.unit ? t(f.unit) : ""}</em>
+            <span class="note">
+              {#each notes.all as note, i (i)}
+                <small class:err={note.err} class:hidden={i !== notes.shown}>{note.text}</small>
+              {/each}
+            </span>
+          </label>
+        {/if}
       {/each}
     </div>
 
@@ -335,7 +426,7 @@
     </div>
     <button class="primary" onclick={saveDxf} disabled={!("ok" in result)}>{t("ui.gear_export_dxf")}</button>
     {#if exportError}
-      <p class="error">Export failed: {exportError}</p>
+      <p class="error">{t("ui.gear_export_failed", { reason: exportError })}</p>
     {/if}
   </section>
 
@@ -378,9 +469,9 @@
           <dt>{t("ui.gear_root_form")}</dt>
           <dd>
             {#if r.root_form === "fully_filleted"}
-              fully filleted — no root arc
+              {t("ui.gear_root_form_fully_filleted")}
             {:else if r.root_form === "root_arc"}
-              root arc between the fillets
+              {t("ui.gear_root_form_root_arc")}
             {:else}
               <span class="warn">{t("ui.gear_no_fillet_flank_runs_root_circle")}</span>
             {/if}
@@ -402,33 +493,24 @@
         </dl>
         {#if r.clamps.length}
           <ul class="notes">
-            {#each r.clamps as c (c.key)}<li>{note(c)}</li>{/each}
+            {#each r.clamps as c (c.key)}<li>{t("ui.gear_clamped")} {note(c)}</li>{/each}
           </ul>
         {/if}
-        <h2>{t("ui.gear_measurement")}</h2>
+        <!-- Same heading and same row as the external gear's, because it is the
+             same measurement read at the opposite sign. That a ring has no span
+             over teeth is not noted: absence needs saying only where the thing
+             was expected, and nothing here offers one. -->
+        <h2>{t("ui.gear_measurement_between_pins")}</h2>
         <dl>
-          <dt>{t("ui.gear_between_2_pins_nominal")}</dt>
+          <dt>{t("ui.gear_two_pins")}</dt>
           <dd>
             {#if isUnavailable(r.between_pins)}
-              <span class="muted">{r.between_pins.unavailable}</span>
+              <span class="na">{note(r.between_pins.unavailable)}</span>
             {:else}
-              {n(r.between_pins.nominal)} mm
+              {mm(r.between_pins.nominal)}
             {/if}
           </dd>
-          {#if !isUnavailable(r.between_pins)}
-            <dt>{t("ui.gear_pin_centre_radius")}</dt>
-            <dd>{n(r.between_pins.pin_centre_radius)} mm</dd>
-            <dt>{t("ui.gear_contact_radius")}</dt>
-            <dd>{n(r.between_pins.contact_radius)} mm</dd>
-          {/if}
         </dl>
-        <p class="muted">
-          Measured <em>{t("ui.gear_between")}</em> the pins' inner surfaces, so the pin diameter subtracts — the
-          opposite of an external gear, where it is measured across their outer surfaces. Two pins
-          only: three exist so a micrometer has a flat datum on an odd-tooth external gear, and a
-          bore gauge needs none.
-        </p>
-        <p class="muted">{t("ui.gear_span_over_teeth_not_shown_for")}</p>
       {/if}
     {:else if "error" in result}
       <p class="error">{result.error}</p>
@@ -442,21 +524,34 @@
         root={s.root_radius}
       />
 
-      {#if s.undercut || s.severed || s.clamps.length}
+      <!-- For an eccentric gear undercut/severed are per-tooth: the Eccentricity
+           section below names which teeth and where. Only the tool-level clamps
+           belong here. -->
+      <!-- `clamp.tooth_severed` is the same event as the line above it, and the
+           core pushes it into `clamps` as well as setting `severed` — so it is
+           dropped here rather than said twice. It still carries its own weight
+           in the eccentric gear's per-tooth list, where there is no bool. -->
+      {@const clamps = s.clamps.filter((c) => c.key !== "clamp.tooth_severed")}
+      {#if (!eccentric && (s.undercut || s.severed)) || clamps.length}
         <ul class="notes">
-          {#if s.undercut}<li>{t("ui.gear_undercut")}</li>{/if}
-          {#if s.severed}<li>{t("ui.gear_severed")}</li>{/if}
-          {#each s.clamps as c}<li>{t("ui.gear_clamped")} {note(c)}</li>{/each}
+          {#if !eccentric && s.undercut}<li>{t("ui.gear_undercut")}</li>{/if}
+          {#if !eccentric && s.severed}<li>{t("ui.gear_severed")}</li>{/if}
+          {#each clamps as c}<li>{t("ui.gear_clamped")} {note(c)}</li>{/each}
         </ul>
       {/if}
 
       <h2>{t("ui.gear_geometry")}</h2>
+      <!-- Tip/root diameter and tooth thickness vary around an eccentric gear;
+           they are shown as ranges in the Eccentricity section rather than as a
+           mean-tooth scalar here. -->
       <dl>
         <dt>{t("ui.gear_pitch_diameter")}</dt><dd>{mm(s.pitch_diameter)}</dd>
         <dt>{t("ui.gear_base_diameter")}</dt><dd>{mm(s.base_diameter)}</dd>
-        <dt>{t("ui.gear_tip_diameter")}</dt><dd>{mm(s.tip_diameter)}</dd>
-        <dt>{t("ui.gear_root_diameter")}</dt><dd>{mm(s.root_diameter)}</dd>
-        <dt>{t("ui.gear_tooth_thickness")}</dt><dd>{mm(s.tooth_thickness)}</dd>
+        {#if !eccentric}
+          <dt>{t("ui.gear_tip_diameter")}</dt><dd>{mm(s.tip_diameter)}</dd>
+          <dt>{t("ui.gear_root_diameter")}</dt><dd>{mm(s.root_diameter)}</dd>
+          <dt>{t("ui.gear_tooth_thickness")}</dt><dd>{mm(s.tooth_thickness)}</dd>
+        {/if}
         <dt>{t("ui.gear_fillet_radius")}</dt><dd>{mm(s.fillet_radius)}</dd>
         <dt>{t("ui.gear_transverse_pressure_angle")}</dt><dd>{s.transverse_pressure_angle.toFixed(4)}°</dd>
         <dt>{t("ui.gear_cutter_tip_width")}</dt><dd>{mm(s.cutter_tip_width)}</dd>
@@ -467,19 +562,29 @@
            than of what the core computed. -->
       {#if eccentric}
         <h2>{t("ui.gear_eccentricity")}</h2>
-        {#if s.troubled_teeth.teeth.length}
+        {#if s.per_tooth_clamps.teeth.length}
           <!-- A guard on a tool *setting* is shared, so it trips for the whole
                gear or not at all; these are the ones true of one tooth and not
                its neighbour, and they break the envelope where they land. -->
           <ul class="notes">
             <li>
-              {s.troubled_teeth.teeth.length} of {tab.params.teeth} teeth are not as drawn
-              — {s.troubled_teeth.teeth.join(", ")}, counting from θ = 0
+              {t("ui.gear_teeth_not_as_drawn", {
+                count: String(s.per_tooth_clamps.teeth.length),
+                total: String(tab.params.teeth),
+                which: s.per_tooth_clamps.teeth.join(", "),
+              })}
             </li>
-            {#each s.troubled_teeth.notes as n (n.key)}<li>{note(n)}</li>{/each}
+            {#each s.per_tooth_clamps.notes as n (n.key)}<li>{note(n)}</li>{/each}
           </ul>
         {/if}
         <dl>
+          {#if tab.eccentricThrow !== null}
+            <dt>{t("ui.gear_shift_amplitude")}</dt>
+            <dd>
+              {n(s.angular_shift)} module
+              <small>{t("ui.gear_throw_solves_the_amplitude")}</small>
+            </dd>
+          {/if}
           <dt>{t("ui.gear_envelope_eccentricity")}</dt>
           <dd>
             {mm(s.variation.eccentricity)}
@@ -527,7 +632,7 @@
 
         <h2>{t("ui.gear_commanded_centre_distance")}</h2>
         {#if isUnavailable(s.centre_profile)}
-          <p class="aside">{s.centre_profile.unavailable}</p>
+          <p class="aside">{note(s.centre_profile.unavailable)}</p>
         {:else}
           {@const p = s.centre_profile}
           <dl>
@@ -538,10 +643,9 @@
             </dd>
             <dt>{t("ui.gear_best_fit_sinusoid")}</dt>
             <dd>
-              {n(p.sinusoid[0])} ± {n(p.sinusoid[1])} mm
+              {n(p.sinusoid.mean)} ± {n(p.sinusoid.amplitude)} mm
               <small>
-                phase {((180 / Math.PI) * p.sinusoid[2]).toFixed(1)}° — what a simple crank can
-                deliver
+                {t("ui.gear_sinusoid_phase", { phase: p.sinusoid.phase_degrees.toFixed(1) })}
               </small>
             </dd>
             <dt>{t("ui.gear_departure_from_that_sinusoid")}</dt>
@@ -563,7 +667,7 @@
       <h2>{t("ui.gear_measurement_over_teeth")}</h2>
       <dl>
         {#if isUnavailable(s.span)}
-          <dt>{t("ui.gear_span")}</dt><dd class="na">{s.span.unavailable}</dd>
+          <dt>{t("ui.gear_span")}</dt><dd class="na">{note(s.span.unavailable)}</dd>
         {:else}
           <dt>{t("ui.gear_teeth_spanned")}</dt><dd>{s.span.teeth_spanned}</dd>
           <dt>{t("ui.gear_nominal")}</dt><dd>{mm(s.span.nominal)}</dd>
@@ -575,9 +679,9 @@
       <dl>
         {#each pinRows as row (row.label)}
           {#if isUnavailable(row.value)}
-            <dt>{row.label}</dt><dd class="na">{row.value.unavailable}</dd>
+            <dt>{row.label}</dt><dd class="na">{note(row.value.unavailable)}</dd>
           {:else}
-            <dt>{row.label}, nominal</dt><dd>{mm(row.value.nominal)}</dd>
+            <dt>{row.label}</dt><dd>{mm(row.value.nominal)}</dd>
           {/if}
         {/each}
       </dl>
@@ -585,7 +689,7 @@
       <h2>{t("ui.gear_composite_error_jgma_116_02")}</h2>
       <dl>
         {#if isUnavailable(s.tolerance)}
-          <dt>{t("ui.gear_tolerance")}</dt><dd class="na">{s.tolerance.unavailable}</dd>
+          <dt>{t("ui.gear_tolerance")}</dt><dd class="na">{note(s.tolerance.unavailable)}</dd>
         {:else}
           <dt>{t("ui.gear_class")}</dt>
           <dd>
@@ -692,13 +796,16 @@
   .grid {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: var(--field-gap);
   }
   label {
     display: grid;
     grid-template-columns: 1fr 7rem 3.5rem;
     align-items: center;
-    gap: 0.5rem;
+    /* Column gap spaces the label, box and unit; row gap is what holds a note
+       to the box it belongs to. They are not the same measurement. */
+    column-gap: 0.5rem;
+    row-gap: var(--note-gap);
     font-size: 0.85rem;
   }
   /* A select holding words, not a number, needs the room the number column does
@@ -714,7 +821,6 @@
     grid-column: 1 / -1;
     font-size: 0.72rem;
     color: var(--muted);
-    margin-top: -0.15rem;
   }
   label small.err {
     color: var(--warn);

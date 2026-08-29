@@ -21,7 +21,7 @@
 //! - The flank continues **below the base circle** to its true intersection with
 //!   the trochoid. Clamping it at the base circle and bridging the remainder —
 //!   the obvious-looking approach — leaves a visible 0.3 mm step on undercut
-//!   gears. [`Gear::with_legacy_clamp`] reproduces that fault deliberately, as a
+//!   gears. [`Gear::with_flank_clamped_at_base`] reproduces that fault deliberately, as a
 //!   negative test fixture.
 //! - The fillet fit cap is `ρ_max = w_tip·cos α_t / (2(1 − sin α_t))`. The
 //!   plausible-looking `w_tip / (2 cos α_t)` is wrong and silently shrinks the
@@ -43,8 +43,17 @@ mod search {
     pub const BASE_CROSS_GROWTH: f64 = 1.6;
     /// Growth factor when walking outward to find the flank/fillet crossing.
     pub const CROSSING_GROWTH: f64 = 1.4;
-    /// Additive nudge so the walk escapes `s = 0`.
-    pub const CROSSING_NUDGE: f64 = 1e-6;
+    /// Additive nudge so the walk escapes `s = 0`, **in modules**.
+    ///
+    /// `s` is a rack travel and so a length: a bare `1e-6` here was the only
+    /// dimensioned constant in a block whose neighbours are all dimensionless
+    /// growth factors, and it therefore meant something different at every
+    /// module. Harmless as it stood — it only widens a bracket, and the root a
+    /// bracketed solve converges on does not depend on where the bracket
+    /// started, which the module-homogeneity law in `tests/geometry_laws.rs`
+    /// confirms. Scaled anyway, because the next constant to be read out of
+    /// this block may not be so forgiving.
+    pub const CROSSING_NUDGE_MODULES: f64 = 1e-6;
     /// Maximum expansion steps before declaring no bracket exists.
     pub const MAX_STEPS: u32 = 200;
     /// Samples used to scan the fillet for a centreline crossing (severed tooth).
@@ -134,7 +143,7 @@ pub struct Gear {
     /// is why it is an `f64` while `params.teeth` stays a whole number — a real
     /// gear has an integer tooth count, a virtual one need not.
     pub z: f64,
-    /// True when undercut has removed the tooth entirely (DESIGN.md; the
+    /// True when undercut has removed the tooth entirely (docs/reference.md#the-generated-profile; the
     /// profile is truncated at the centreline so it stays a simple closed curve).
     pub severed: bool,
 }
@@ -177,7 +186,7 @@ pub(crate) fn allocate_by_arc_length(
     // `NaN`, and `(NaN) as usize` **zero** — so every section silently falls
     // back to `MIN_SECTION_POINTS` and a 600-point request returns seven. That
     // is how a ring with no fillet came to draw as a straight-sided polygon
-    // (§12). Dropping the section is the honest reading: it earns no points
+    // (docs/corrections.md). Dropping the section is the honest reading: it earns no points
     // because it has no length.
     let live: Vec<(Section, f64)> = sections
         .iter()
@@ -220,7 +229,7 @@ impl Gear {
     /// Retained **only** so the test suite can demonstrate it still detects that
     /// fault. Never use it to generate real geometry.
     #[must_use]
-    pub fn with_legacy_clamp(params: GearParams) -> Self {
+    pub fn with_flank_clamped_at_base(params: GearParams) -> Self {
         Self::build(params, true)
     }
 
@@ -263,13 +272,13 @@ impl Gear {
         Self::build_with_z(params, false, self.z / beta.cos().powi(3))
     }
 
-    fn build(params: GearParams, legacy_clamp: bool) -> Self {
+    fn build(params: GearParams, clamp_flank_at_base: bool) -> Self {
         let z = f64::from(params.teeth);
-        Self::build_with_z(params, legacy_clamp, z)
+        Self::build_with_z(params, clamp_flank_at_base, z)
     }
 
     #[allow(clippy::too_many_lines)]
-    fn build_with_z(params: GearParams, legacy_clamp: bool, z: f64) -> Self {
+    fn build_with_z(params: GearParams, clamp_flank_at_base: bool, z: f64) -> Self {
         let mut clamps = Clamps::default();
         let m = params.module;
         let x = params.profile_shift;
@@ -401,7 +410,7 @@ impl Gear {
         let (u_j, s_j) = g.solve_junction();
         g.u_j = u_j;
         g.s_j = s_j;
-        if legacy_clamp {
+        if clamp_flank_at_base {
             g.u_j = l.max(0.0) / rb;
             g.s_j = -bc / alpha_t.tan();
         }
@@ -478,7 +487,8 @@ impl Gear {
         let mut s_far = s_b;
         let mut crossed = false;
         for _ in 0..search::MAX_STEPS {
-            s_far = s_far * search::CROSSING_GROWTH - search::CROSSING_NUDGE;
+            s_far = s_far * search::CROSSING_GROWTH
+                - search::CROSSING_NUDGE_MODULES * self.params.module;
             if gap(s_far) > 0.0 {
                 crossed = true;
                 break;
@@ -582,6 +592,61 @@ impl Gear {
     #[must_use]
     pub fn profile(&self, per_tooth: usize) -> Vec<[f64; 2]> {
         crate::eccentric::Eccentric::new(self.params).outline(per_tooth)
+    }
+}
+
+/// Radius of curvature of a curve carried round by a rolling frame.
+///
+/// # One expression for both trochoids
+///
+/// A generated fillet is a curve `q(s)` drawn in a frame that is itself turning
+/// at a constant rate `φ′`: the rack's tip corner sliding along a line, the
+/// shaper's going round a circle. Only `q` differs between them. Writing the
+/// fixed-frame point as `P = R(φ) q` and differentiating twice,
+///
+/// ```text
+/// P′  = R ( q′ + φ′ J q )
+/// P″  = R ( q″ + 2φ′ J q′ − φ′² q )        J = rotate by a quarter turn
+/// ```
+///
+/// — the `φ″` term is absent because rolling is uniform. `R` is a rotation, so
+/// it changes neither a length nor a cross product: **the curvature can be read
+/// entirely in the moving frame**, and the rotation never has to be applied.
+/// That is what makes one function serve both cases instead of each carrying
+/// its own copy of `κ = |x′y″ − y′x″| / |P′|³`.
+///
+/// # Why this is closed form and used to be a difference
+///
+/// Both fillets were differentiated **numerically** — a central difference on
+/// the analytic tangent, with a step of `1e-6` modules, written out twice. That
+/// was defended on the grounds that `ρ_F` feeds the empirical notch factor
+/// rather than locating the critical section, which is a fair claim about the
+/// error and no claim at all about the other two costs: a chosen step is a
+/// magic number in a crate that has removed every other one, and a formula
+/// written twice is where two answers differ (`docs/corrections.md`). The
+/// second derivative is elementary in both cases, so neither cost has to be
+/// paid.
+///
+/// Returns `f64::INFINITY` where the curve is locally straight.
+#[must_use]
+pub(crate) fn rolling_curvature_radius(q: [f64; 2], dq: [f64; 2], ddq: [f64; 2], dphi: f64) -> f64 {
+    // J: a quarter turn, so `J(x, y) = (−y, x)`.
+    let j = |v: [f64; 2]| [-v[1], v[0]];
+    let jq = j(q);
+    let jdq = j(dq);
+
+    let vel = [dq[0] + dphi * jq[0], dq[1] + dphi * jq[1]];
+    let acc = [
+        ddq[0] + 2.0 * dphi * jdq[0] - dphi * dphi * q[0],
+        ddq[1] + 2.0 * dphi * jdq[1] - dphi * dphi * q[1],
+    ];
+
+    let speed = f64::hypot(vel[0], vel[1]);
+    let cross = (vel[0] * acc[1] - vel[1] * acc[0]).abs();
+    if cross < f64::MIN_POSITIVE {
+        f64::INFINITY
+    } else {
+        speed.powi(3) / cross
     }
 }
 

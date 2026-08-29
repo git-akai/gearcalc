@@ -9,11 +9,22 @@ repository.workspace = true
 [dependencies]
 # Intentionally none beyond serialisation. Root finding is hand-rolled in
 # `solve`, so the numerics stay auditable and the crate compiles in seconds.
+#
+# Both of these are off by default and both describe the *same* thing: the shape
+# a type takes when it leaves this crate. `serde` writes it at run time and
+# `ts-rs` writes it down for TypeScript at build time, so the front end stops
+# holding a hand-copied mirror of types it cannot check — which is the
+# duplicated-default fault (`docs/corrections.md`) one level up. Neither is
+# reachable from the mathematics.
 serde = { version = "1", features = ["derive"], optional = true }
+ts-rs = { version = "12.0.1", default-features = false, features = ["serde-compat"], optional = true }
 
 [features]
 default = []
 serde = ["dep:serde"]
+# Emitting the TypeScript needs the serde attributes it describes, so it implies
+# `serde` rather than standing alone.
+typescript = ["dep:ts-rs", "serde"]
 
 [lints]
 workspace = true

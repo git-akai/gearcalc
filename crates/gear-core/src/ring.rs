@@ -34,7 +34,7 @@
 //!
 //! **Radial assembly** — whether a pinion can be brought in sideways past the
 //! ring's teeth. It is a swept-motion question rather than a comparison of tip
-//! circles, and §4.11 records what happened to the attempt that treated it as
+//! circles, and docs/reference.md#internal-gears records what happened to the attempt that treated it as
 //! one. It belongs with the planetary set that actually asks.
 //!
 //! **A bending rating.** A ring's tooth widens outward and its fillet is
@@ -60,6 +60,11 @@ use crate::solve::{brent, Tol};
 /// module and depth are *different parts* if they were shaped differently.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Cutter {
     pub teeth: u32,
     /// Addendum, in modules — how far past its pitch circle the tool reaches.
@@ -89,6 +94,11 @@ impl Default for Cutter {
 /// the curve is defined.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Fillet {
     /// Cutter travel at the flank/fillet junction.
     pub s_j: f64,
@@ -109,7 +119,7 @@ pub struct Ring {
     /// so a ring can produce its virtual spur section without being handed back
     /// what it was made of.
     pub params: GearParams,
-    /// ...and the tool, because the tool is part of the part (§4.11).
+    /// ...and the tool, because the tool is part of the part (docs/reference.md#internal-gears).
     pub cutter: Cutter,
     /// Tooth count, **rounded**. A virtual spur ring has a fractional one; the
     /// geometry carries the exact value through `r` and `half_pitch`, and this
@@ -125,8 +135,8 @@ pub struct Ring {
     ///
     /// One number rather than the shift and the thickness modification
     /// separately, because only their sum ever reaches an answer — the same
-    /// reason `Mesh` sums them (§4.1). Positive widens the space and thins the
-    /// tooth; see [`Ring::new`].
+    /// reason `Mesh` sums them (docs/reference.md#tooth-thickness-and-its-equivalent-shift). Positive widens the space and thins the
+    /// tooth; see [`Ring::cut_by`].
     pub x_thick: f64,
     /// Pitch radius, mm.
     pub r: f64,
@@ -155,7 +165,7 @@ pub struct Ring {
     /// is not a fillet**. Sampled as though it were one, it made every section
     /// of the profile fall back to its minimum point count: a 600-point outline
     /// came out with seven, the involute became two straight chords, and a ring
-    /// drew as a sharp-rooted polygon that looked deliberate. See §12.
+    /// drew as a sharp-rooted polygon that looked deliberate. See docs/corrections.md.
     pub fillet: Option<Fillet>,
     /// The cut that made this ring.
     pub cut: ShaperCut,
@@ -170,8 +180,8 @@ impl Ring {
     /// makes it a ring; the numbers themselves mean the same as they do for an
     /// external gear.
     #[must_use]
-    pub fn new(params: &GearParams, cutter: &Cutter) -> Self {
-        Self::new_with_z(
+    pub fn cut_by(params: &GearParams, cutter: &Cutter) -> Self {
+        Self::cut_by_at_virtual_z(
             params,
             cutter,
             f64::from(params.teeth.max(1)),
@@ -187,7 +197,12 @@ impl Ring {
     /// and neither is a whole number. The same reason
     /// [`crate::Gear`] builds its virtual gear from a non-integer `z`.
     #[must_use]
-    pub fn new_with_z(params: &GearParams, cutter: &Cutter, z: f64, cutter_teeth: f64) -> Self {
+    pub fn cut_by_at_virtual_z(
+        params: &GearParams,
+        cutter: &Cutter,
+        z: f64,
+        cutter_teeth: f64,
+    ) -> Self {
         let mut clamps = Vec::new();
         let beta = params.helix_angle.to_radians();
         let alpha_n = params.pressure_angle.to_radians();
@@ -212,7 +227,7 @@ impl Ring {
         // relation flips gear 2's `x` and `x_s` together, and that is consistent
         // only with this reading: measured against tooth thicknesses at the
         // operating circles, the space reading gives exactly zero backlash at
-        // every k while the tooth reading is out by 0.63 mm at k = 1.2 (§12).
+        // every k while the tooth reading is out by 0.63 mm at k = 1.2 (docs/corrections.md).
         // The pair invariant is therefore `k₁ = k₂` for an internal mesh, where
         // an external one needs `k₁ + k₂ = 2`.
         let x = params.profile_shift;
@@ -283,7 +298,7 @@ impl Ring {
         // arrives as a *centre distance*, `r − r_c`, which simply goes negative:
         // a 43-tooth ring "cut" by a 50-tooth shaper reported a root radius of
         // 29.75 mm against a pitch radius of 21.5, and the only complaint was
-        // about the tip corner. Clamped rather than refused, because `Ring::new`
+        // about the tip corner. Clamped rather than refused, because `Ring::cut_by`
         // reports rather than fails and which of the two counts to give up is the
         // designer's call.
         let cutter_teeth = if cutter_teeth >= z {
@@ -530,7 +545,7 @@ impl Ring {
     /// Bending is rated on the normal section, so a helical ring has to be rated
     /// on this rather than on its transverse form — measuring `Y_F` transversely
     /// and dividing by `m_n` mixes planes and under-predicts by about `cos β`,
-    /// the error `docs/DESIGN.md` §12 records for external gears.
+    /// the error `docs/corrections.md` records for external gears.
     ///
     /// The construction is ISO's, the same one [`crate::Gear::virtual_spur`]
     /// uses: `z_n = z / cos³β` at the normal module and normal pressure angle.
@@ -548,7 +563,7 @@ impl Ring {
             helix_angle: 0.0,
             ..self.params
         };
-        Self::new_with_z(
+        Self::cut_by_at_virtual_z(
             &params,
             &self.cutter,
             f64::from(self.params.teeth.max(1)) / scale,
@@ -622,25 +637,12 @@ impl Ring {
 
     /// Radius of curvature of the fillet at travel `s`, mm.
     ///
-    /// A central difference on the **analytic** first derivative, exactly as the
-    /// rack-cut case does it and for the same reason: this feeds the empirical
-    /// notch factor rather than locating the section, so a difference is
-    /// proportionate here where it would not be for the tangent.
+    /// The cutter's, since the cutter is what leaves it —
+    /// [`ShaperCut::trochoid_curvature_radius`](crate::shaper::ShaperCut::trochoid_curvature_radius),
+    /// closed form and shared with the rack-cut case.
     #[must_use]
     pub fn fillet_curvature_radius(&self, s: f64) -> f64 {
-        let h = 1e-6 * self.mt.max(1e-9);
-        let (_, t0) = self.fillet_point_and_tangent(s - h);
-        let (_, t1) = self.fillet_point_and_tangent(s + h);
-        let (_, t) = self.fillet_point_and_tangent(s);
-        let ddx = (t1[0] - t0[0]) / (2.0 * h);
-        let ddy = (t1[1] - t0[1]) / (2.0 * h);
-        let speed = f64::hypot(t[0], t[1]);
-        let cross = (t[0] * ddy - t[1] * ddx).abs();
-        if cross < f64::MIN_POSITIVE {
-            f64::INFINITY
-        } else {
-            speed.powi(3) / cross
-        }
+        self.cut.trochoid_curvature_radius(s)
     }
 
     /// The involute flank at roll parameter `u`, as `(radius, angle from the
@@ -822,7 +824,7 @@ pub struct RingMesh {
 /// **The shifts enter through the space, not the tooth.** A ring's `x_thick`
 /// widens its space, so a ring shifted further than its pinion opens the mesh
 /// out and the pinion sits further from the ring's axis. That is why the sum is
-/// a difference and why it is this way round; see [`Ring::new`].
+/// a difference and why it is this way round; see [`Ring::cut_by`].
 ///
 /// # Errors
 ///
@@ -831,7 +833,11 @@ pub struct RingMesh {
 /// shifts that drive the operating pressure angle out of the involute domain.
 #[must_use]
 pub fn mesh_with(ring: &Ring, pinion: &Gear) -> Option<RingMesh> {
-    if (ring.mt - pinion.mt).abs() > 1e-9 || (ring.alpha_t - pinion.alpha_t).abs() > 1e-9 {
+    // The *transverse* rack, since a ring carries its own `mt` and `alpha_t`
+    // rather than a `GearParams`. Same tolerance as `GearParams::same_rack_as`,
+    // from the same place, so the two cannot drift apart again.
+    let tol = crate::params::compat::SAME_RACK;
+    if (ring.mt - pinion.mt).abs() > tol || (ring.alpha_t - pinion.alpha_t).abs() > tol {
         return None;
     }
     if pinion.params.teeth >= ring.teeth {
@@ -867,7 +873,7 @@ pub fn mesh_with(ring: &Ring, pinion: &Gear) -> Option<RingMesh> {
     let reachable = pinion_at(ring.ra);
     let pinion_contact_at_ring_tip = reachable.unwrap_or(pinion.rb);
 
-    // Contact ratio, from DESIGN §4.5's internal form. The path runs from where
+    // Contact ratio, from docs/reference.md#path-of-contact-and-contact-ratio's internal form. The path runs from where
     // the ring's tip engages to where the pinion's does.
     let base_pitch = std::f64::consts::PI * ring.mt * ring.alpha_t.cos();
     let path = ((pinion.ra * pinion.ra - pinion.rb * pinion.rb)
@@ -902,7 +908,7 @@ mod tests {
     use crate::profile::Gear;
 
     fn ring(teeth: u32) -> Ring {
-        Ring::new(
+        Ring::cut_by(
             &GearParams {
                 teeth,
                 ..Default::default()
@@ -962,7 +968,7 @@ mod tests {
             );
 
             let build = |teeth: u32| {
-                Ring::new(
+                Ring::cut_by(
                     &GearParams {
                         teeth,
                         addendum,
@@ -1080,7 +1086,7 @@ mod tests {
     /// it leaves reaches the flank higher up.
     #[test]
     fn a_larger_cutter_moves_the_junction() {
-        let small = Ring::new(
+        let small = Ring::cut_by(
             &GearParams {
                 teeth: 60,
                 ..Default::default()
@@ -1090,7 +1096,7 @@ mod tests {
                 ..Cutter::default()
             },
         );
-        let large = Ring::new(
+        let large = Ring::cut_by(
             &GearParams {
                 teeth: 60,
                 ..Default::default()
@@ -1241,7 +1247,7 @@ mod tests {
     #[test]
     fn the_generated_profile_is_the_shape_the_cutter_would_leave() {
         for (teeth, cutter_teeth) in [(43u32, 20u32), (60, 20), (60, 30), (90, 25)] {
-            let g = Ring::new(
+            let g = Ring::cut_by(
                 &GearParams {
                     teeth,
                     ..Default::default()
@@ -1280,7 +1286,7 @@ mod tests {
     fn a_shifted_ring_is_the_shape_its_cutter_leaves() {
         for teeth in [43u32, 60] {
             for x in [-0.4, -0.25, -0.1, 0.0, 0.1, 0.25, 0.5] {
-                let g = Ring::new(
+                let g = Ring::cut_by(
                     &GearParams {
                         teeth,
                         profile_shift: x,
@@ -1303,7 +1309,7 @@ mod tests {
     /// The point of this test is not the ring, it is the gate. The previous cut
     /// simulation derived the cutter's tooth from the ring's — the same inference
     /// the model made — so it agreed to 2.7 µm on a ring whose cutter was 0.44 mm
-    /// out of place, and reported nothing. That is the §12 trap exactly: a check
+    /// out of place, and reported nothing. That is the docs/corrections.md trap exactly: a check
     /// that cannot distinguish two cases is not evidence for either.
     ///
     /// So place the cutter where the old model put it, at reference centres, and
@@ -1311,7 +1317,7 @@ mod tests {
     #[test]
     fn a_cutter_at_the_wrong_centre_distance_is_visible_to_the_gate() {
         for x in [0.1, 0.25, 0.5, -0.25] {
-            let good = Ring::new(
+            let good = Ring::cut_by(
                 &GearParams {
                     teeth: 43,
                     profile_shift: x,
@@ -1348,7 +1354,7 @@ mod tests {
     #[test]
     fn a_bigger_cutter_generates_further_down_the_flank() {
         let build = |cutter_teeth: u32| {
-            Ring::new(
+            Ring::cut_by(
                 &GearParams {
                     teeth: 60,
                     ..Default::default()
@@ -1444,7 +1450,7 @@ mod tests {
                 profile_shift: x,
                 ..Default::default()
             };
-            let g = Ring::new(&p(zr, xr), &Cutter::default());
+            let g = Ring::cut_by(&p(zr, xr), &Cutter::default());
             let pin = Gear::new(p(zp, xp));
             let mesh =
                 crate::mesh::Mesh::new(&pin, &Gear::new(p(zr, xr)), MeshKind::Internal).unwrap();
@@ -1490,7 +1496,7 @@ mod tests {
             };
             let pin = Gear::new(p(zp));
             let wheel = Gear::new(p(zr));
-            let g = Ring::new(&p(zr), &Cutter::default());
+            let g = Ring::cut_by(&p(zr), &Cutter::default());
             let load = Load::new(2.0, 10.0);
             let e_star = 113_000.0;
 
@@ -1538,7 +1544,7 @@ mod tests {
             (43, 17, -0.2, 0.25),
             (90, 40, 0.15, -0.1),
         ] {
-            let g = Ring::new(
+            let g = Ring::cut_by(
                 &GearParams {
                     teeth: zr,
                     profile_shift: xr,
@@ -1596,13 +1602,13 @@ mod tests {
     /// space is wider, so the pinion sits further from the ring's axis.
     ///
     /// A direction rather than a number, because the number is not independently
-    /// known — the §12 rule about not predicting a threshold the computation can
+    /// known — the docs/corrections.md rule about not predicting a threshold the computation can
     /// find.
     #[test]
     fn shifting_the_ring_moves_the_pinion_outward() {
         let mut last = f64::NEG_INFINITY;
         for xr in [-0.3, -0.15, 0.0, 0.15, 0.3, 0.45] {
-            let g = Ring::new(
+            let g = Ring::cut_by(
                 &GearParams {
                     teeth: 60,
                     profile_shift: xr,
@@ -1619,7 +1625,7 @@ mod tests {
         }
         // ...and shifting the pinion by the same amount as the ring puts it
         // back: only the difference of the two shifts reaches the mesh.
-        let both = Ring::new(
+        let both = Ring::cut_by(
             &GearParams {
                 teeth: 60,
                 profile_shift: 0.3,
@@ -1682,7 +1688,7 @@ mod tests {
             "a standard full-depth 60/20 pair should interfere"
         );
 
-        let shortened = Ring::new(
+        let shortened = Ring::cut_by(
             &GearParams {
                 teeth: 60,
                 addendum: 0.8,
@@ -1877,7 +1883,7 @@ mod tests {
     #[test]
     fn thickness_modification_and_shift_act_on_the_space_not_the_tooth() {
         let of = |k: f64, x: f64| {
-            Ring::new(
+            Ring::cut_by(
                 &GearParams {
                     teeth: 43,
                     thickness_mod: k,
@@ -1917,7 +1923,7 @@ mod tests {
     #[test]
     fn a_positive_shift_moves_a_rings_radii_outward() {
         let of = |x: f64| {
-            Ring::new(
+            Ring::cut_by(
                 &GearParams {
                     teeth: 43,
                     profile_shift: x,
@@ -1975,7 +1981,7 @@ mod tests {
 
         // Above it, pushing the addendum used to give negative thickness.
         for addendum in [1.0, 2.0, 2.5, 3.0, 4.0, 8.0] {
-            let g = Ring::new(
+            let g = Ring::cut_by(
                 &GearParams {
                     teeth: 150,
                     addendum,
@@ -2006,7 +2012,7 @@ mod tests {
     #[test]
     fn a_cutter_no_smaller_than_the_ring_is_clamped_and_reported() {
         for cutter_teeth in [43u32, 50, 100] {
-            let g = Ring::new(
+            let g = Ring::cut_by(
                 &GearParams {
                     teeth: 43,
                     ..Default::default()
@@ -2037,7 +2043,7 @@ mod tests {
             );
         }
         // One fewer tooth than the ring is extreme but legal, and not clamped.
-        let ok = Ring::new(
+        let ok = Ring::cut_by(
             &GearParams {
                 teeth: 43,
                 ..Default::default()
@@ -2057,7 +2063,7 @@ mod tests {
     /// and says so, rather than producing an involute that does not exist.
     #[test]
     fn an_addendum_reaching_past_the_base_circle_is_clamped_and_reported() {
-        let g = Ring::new(
+        let g = Ring::cut_by(
             &GearParams {
                 teeth: 20,
                 addendum: 3.0,

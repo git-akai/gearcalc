@@ -166,7 +166,12 @@ pub struct RootSection {
 /// ```
 ///
 /// with `u = k s`, `v = r − k b_c`, `φ = (s − a_c)/r`.
-pub(crate) fn fillet_point_and_tangent(g: &Gear, s: f64) -> ([f64; 2], [f64; 2]) {
+///
+/// Public so `tests/bending.rs` can differentiate it numerically and check that
+/// the closed-form curvature below is what such a difference converges on. That
+/// gate is the whole reason the analytic second derivative is trustworthy, and
+/// an integration test cannot reach a crate-private function.
+pub fn fillet_point_and_tangent(g: &Gear, s: f64) -> ([f64; 2], [f64; 2]) {
     let d = f64::hypot(s, g.bc);
     let k = 1.0 + g.rho / d;
     let dk = -g.rho * s / (d * d * d);
@@ -187,25 +192,35 @@ pub(crate) fn fillet_point_and_tangent(g: &Gear, s: f64) -> ([f64; 2], [f64; 2])
     ([x, y], [dx, dy])
 }
 
-/// Second derivative by central difference on the analytic first derivative.
+/// Radius of curvature of the rack-cut fillet at rack travel `s`, mm.
 ///
-/// Only the fillet's radius of curvature needs it, and that feeds the empirical
-/// stress-concentration factor rather than the form factor, so a difference is
-/// proportionate here where it would not be for the tangent itself.
-fn fillet_curvature_radius(g: &Gear, s: f64) -> f64 {
-    let h = 1e-6 * g.params.module.max(1e-9);
-    let (_, t0) = fillet_point_and_tangent(g, s - h);
-    let (_, t1) = fillet_point_and_tangent(g, s + h);
-    let (_, t) = fillet_point_and_tangent(g, s);
-    let ddx = (t1[0] - t0[0]) / (2.0 * h);
-    let ddy = (t1[1] - t0[1]) / (2.0 * h);
-    let speed = f64::hypot(t[0], t[1]);
-    let cross = (t[0] * ddy - t[1] * ddx).abs();
-    if cross < f64::MIN_POSITIVE {
-        f64::INFINITY
-    } else {
-        speed.powi(3) / cross
-    }
+/// Closed form. The corner centre runs along a straight line at unit speed, so
+/// in the generating frame
+///
+/// ```text
+/// d = √(s² + b_c²)      k = 1 + ρ/d
+/// k′ = −ρ s / d³        k″ = −ρ (d² − 3s²) / d⁵
+/// q  = ( k s , r − k b_c )
+/// ```
+///
+/// and [`rolling_curvature_radius`] carries the rolling. It used to be a
+/// central difference with a chosen step; see that function for why that was
+/// worth removing.
+///
+/// Public for the same reason as [`fillet_point_and_tangent`]: the gate holding
+/// the two against each other lives in `tests/`.
+pub fn fillet_curvature_radius(g: &Gear, s: f64) -> f64 {
+    let d = f64::hypot(s, g.bc);
+    let (d3, d5) = (d.powi(3), d.powi(5));
+    let k = 1.0 + g.rho / d;
+    let dk = -g.rho * s / d3;
+    let ddk = -g.rho * (d * d - 3.0 * s * s) / d5;
+
+    let q = [k * s, g.r - k * g.bc];
+    let dq = [dk * s + k, -dk * g.bc];
+    let ddq = [ddk * s + 2.0 * dk, -ddk * g.bc];
+
+    crate::profile::rolling_curvature_radius(q, dq, ddq, 1.0 / g.r)
 }
 
 /// A point on the involute flank and its tangent, in tooth coordinates.
@@ -573,7 +588,7 @@ pub fn tip_load_section(g: &Gear) -> Option<RootSection> {
 ///
 /// # Why this survives the no-correction-factors policy
 ///
-/// DESIGN.md §4.7 excludes the ISO correction factors — `Y_β`, `K_A`, `K_v`,
+/// docs/reference.md#contact-stress excludes the ISO correction factors — `Y_β`, `K_A`, `K_v`,
 /// `K_Fβ`, `K_Fα`, `Z_ε`, `Z_β`. `Y_S` is kept, and the difference is not
 /// special pleading:
 ///
@@ -648,7 +663,7 @@ impl RootSection {
     /// discontinuity*, a number becoming no number, and nothing physical happens
     /// at 151 teeth to justify either. Reading the fillet's own curvature at the
     /// junction runs smoothly through the seam: 0.6095, 0.6081, 0.6067, with
-    /// `q_s` at 1.805, 1.808, 1.808. See `docs/DESIGN.md` §12.
+    /// `q_s` at 1.805, 1.808, 1.808. See `docs/corrections.md`.
     ///
     /// The notch parameter is **clamped** into the range the fit is stated for
     /// before being used, so an out-of-range gear gets the value at the boundary
@@ -719,7 +734,7 @@ impl RootSection {
 /// An earlier revision stored `F_bt` under the name `normal_force`. Nothing it
 /// computed was wrong, but the name asserted the normal plane while the value
 /// was transverse — exactly the failure this arrangement is meant to make
-/// impossible. See DESIGN.md §12.
+/// impossible. See docs/corrections.md.
 ///
 /// # Sign and reference
 ///
@@ -778,7 +793,7 @@ impl Load {
     ///
     /// `F_bt` is shared across the mesh, so `T₂ = T₁ · r_b2 / r_b1`. This is the
     /// **geometric** transfer only: efficiency losses belong to train
-    /// accumulation (DESIGN.md §4.9), not here.
+    /// accumulation (docs/reference.md#trains), not here.
     ///
     /// Face width is carried across unchanged, since a `Load` describes what is
     /// being carried rather than by what.
@@ -814,7 +829,7 @@ impl Load {
 ///
 /// **No ISO correction factors are applied** — not `Y_β`, and not the `K` and `Z`
 /// families either. This is a standing project policy, set out at the end of
-/// DESIGN.md §4.7: their validated bands are narrow against modern designs, they
+/// docs/reference.md#contact-stress: their validated bands are narrow against modern designs, they
 /// are only balanced as a complete set against `σ_Flim` values this project does
 /// not have, and they buy precision at the cost of accuracy. Since `Y_β ≤ 1`,
 /// leaving it out over-predicts stress — the safe direction — but it does mean a
@@ -1007,7 +1022,7 @@ pub struct ContactStress {
 /// contact line, in 1/mm. It is exactly zero for every mesh this crate builds
 /// today — parallel axes, uncrowned flanks — and positive only for crossed axes
 /// or crowning. It is the single parameter that unifies point and line contact
-/// (DESIGN.md §4.7), and the reason the crossed-axis work adds an argument here
+/// (docs/reference.md#contact-stress), and the reason the crossed-axis work adds an argument here
 /// rather than a second function chosen by stage type.
 ///
 /// The general elliptical solution ([`crate::hertz`]) is evaluated
@@ -1042,7 +1057,7 @@ pub struct ContactStress {
 /// by exactly `√(cos β_b)` — 3 % at β = 20°, 6 % at β = 30°. That benefit is
 /// pure geometry: longer contact line and flatter normal-plane curvature. It is
 /// **not** the extra benefit helical gears get from having several contact lines
-/// engaged at once, which is load sharing and is deferred (DESIGN.md §4.7).
+/// engaged at once, which is load sharing and is deferred (docs/reference.md#contact-stress).
 /// Assuming a single line is the conservative reading and is continuous with the
 /// spur case at β = 0.
 ///
@@ -1053,7 +1068,7 @@ pub struct ContactStress {
 /// worst single-pair point is therefore whichever boundary of the single-pair
 /// zone lies further from that balance point.
 ///
-/// **Both boundaries are evaluated, not just the inner one.** DESIGN.md §4.7
+/// **Both boundaries are evaluated, not just the inner one.** docs/reference.md#contact-stress
 /// says to take the inner point of single-pair contact, "usually the pinion's
 /// worst case" — but "usually" is doing real work there. The balance point sits
 /// at `(r_b2 − r_b1) tan α_w / 2`, so it is on the recess side when gear 1 is
@@ -1852,7 +1867,7 @@ mod tests {
         assert!(half_width > 0.0 && half_width < r, "implausible half width");
     }
 
-    /// **The acceptance gate for the contact unification** (DESIGN.md §4.7).
+    /// **The acceptance gate for the contact unification** (docs/reference.md#contact-stress).
     ///
     /// At `1/R_L = 0` the general elliptical solution must not perturb the line
     /// result — not "agree to 1e-12", but return the identical `f64`. It can,
@@ -2156,7 +2171,7 @@ mod tests {
 
     /// Contact stress belongs to the *pair*, so it cannot depend on which gear
     /// the caller labelled 1. Checking only the inner single-pair boundary — as
-    /// DESIGN.md §4.7 originally prescribed — breaks this, because the relative
+    /// docs/reference.md#contact-stress originally prescribed — breaks this, because the relative
     /// radius peaks on the recess side for a pinion and the approach side for a
     /// wheel.
     #[test]

@@ -13,11 +13,11 @@
 //! ring the other, so its bending is fully reversed where the sun's and ring's
 //! are one-directional. Its speed is also the odd one out: what fatigues it is
 //! its rotation *relative to the carrier*, not its rotation in the fixed frame.
-//! §4.9 warns that this is easy to get silently wrong, so both appear in the
+//! docs/reference.md#trains warns that this is easy to get silently wrong, so both appear in the
 //! result and the reversal is stated rather than folded into a number.
 //!
 //! **The tooth thickness invariants differ between the two meshes.** An external
-//! pair needs `k₁ + k₂ = 2`; an internal pair needs `k₁ = k₂` (§4.11). A
+//! pair needs `k₁ + k₂ = 2`; an internal pair needs `k₁ = k₂` (docs/reference.md#internal-gears). A
 //! planetary set has one of each, sharing the planet — so one stored `k` fixes
 //! all three, and the invariant is unwritable rather than merely tested.
 //!
@@ -25,7 +25,7 @@
 //!
 //! **The planets are assumed to share the load equally.** Real sets do not
 //! without a floating member or deliberate compliance; a mesh-load factor is the
-//! usual remedy and it is a rating factor of exactly the kind §4.7 declines. So
+//! usual remedy and it is a rating factor of exactly the kind docs/reference.md#contact-stress declines. So
 //! the assumption is stated in the result's notes rather than absorbed into a
 //! coefficient, and a designer who needs the derating can apply it knowingly.
 
@@ -33,10 +33,10 @@ use super::{Backlash, ContactRatios, GearResult, TrainError};
 use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift};
 use crate::contact::{efficiency, ContactPath, Directional};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
-use crate::mesh::{Member as MeshMember, Mesh, MeshKind};
+use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
-use crate::planetary::{self, Arrangement, Member, Rack, Teeth};
+use crate::planetary::{self, Arrangement, PlanetaryShaft, Rack, Teeth};
 use crate::profile::Gear;
 use crate::ring::{Cutter, Ring};
 use crate::strength::{
@@ -48,6 +48,11 @@ use crate::train::StageGear;
 /// A planetary stage as its inputs describe it.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct PlanetaryStage {
     /// Normal module, mm. Shared by all three members.
     pub module: f64,
@@ -92,10 +97,10 @@ pub struct PlanetaryStage {
     /// The sun. Its profile shift is an input, automatic or manual.
     pub sun: StageGear,
     /// The planet. **Its profile shift is ignored**: the shift is what makes the
-    /// two centre distances agree, so it is solved rather than chosen (§4.8).
+    /// two centre distances agree, so it is solved rather than chosen (docs/reference.md#planetary-sets).
     pub planet: StageGear,
     /// The ring. Its `dedendum` and `root_radius` are ignored — a ring's root
-    /// circle is where its cutter reaches (§4.11) — and its shift is a manual
+    /// circle is where its cutter reaches (docs/reference.md#internal-gears) — and its shift is a manual
     /// input, since the automatic rule is an undercut criterion for an external
     /// tooth.
     pub ring: StageGear,
@@ -114,8 +119,8 @@ impl Default for PlanetaryStage {
             thickness_mod: 1.0,
             planets: 3,
             arrangement: Arrangement {
-                input: Member::Sun,
-                fixed: Member::Ring,
+                input: PlanetaryShaft::Sun,
+                fixed: PlanetaryShaft::Ring,
             },
             clearance: 0.02,
             tolerance_plus: 0.02,
@@ -142,6 +147,11 @@ impl Default for PlanetaryStage {
 /// What one of the two meshes did.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct MeshReport {
     pub contact_ratios: ContactRatios,
     /// Mesh efficiency, both drive senses. Equal for a parallel-axis pair, and
@@ -159,6 +169,11 @@ pub struct MeshReport {
 /// The planet's own answers, which are not the shape of the other two.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct PlanetResult {
     /// Everything a gear in a stage reports.
     pub gear: GearResult,
@@ -185,10 +200,15 @@ pub struct PlanetResult {
 /// Everything a planetary stage produces.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct PlanetaryResult {
     pub arrangement: Arrangement,
     /// The shaft the other two leave over.
-    pub output: Member,
+    pub output: PlanetaryShaft,
     /// Speed reduction, input over output. Negative when the output reverses.
     pub ratio: f64,
     /// The common centre distance, zero-backlash, mm — sun-to-planet and
@@ -197,7 +217,7 @@ pub struct PlanetaryResult {
     /// ...and the one actually used, including clearance.
     pub centre_distance: f64,
     /// Fixed-carrier efficiency `η₀`, the product of the two mesh efficiencies.
-    /// The quantity §4.5.2 requires, because the meshes slide at their speeds
+    /// The quantity docs/reference.md#planetary-sets requires, because the meshes slide at their speeds
     /// relative to the carrier rather than to ground.
     pub fixed_carrier_efficiency: Directional<f64>,
     /// Whole-set efficiency, driving forward and backward. Driving backward means
@@ -241,13 +261,13 @@ impl PlanetaryStage {
     /// The sun's `k` is the input; the planet takes `2 − k` because they mesh
     /// externally, and the ring takes the planet's because they mesh internally.
     /// One number, three consistent values, no assertion needed.
-    fn params(&self, member: Member, teeth: u32, shift: f64, addendum: f64) -> GearParams {
+    fn params(&self, member: PlanetaryShaft, teeth: u32, shift: f64, addendum: f64) -> GearParams {
         let (k, helix) = match member {
-            Member::Sun => (self.thickness_mod, self.helix_angle),
+            PlanetaryShaft::Sun => (self.thickness_mod, self.helix_angle),
             // The planet opposes the sun's hand, as an external pair must.
-            Member::Carrier => (2.0 - self.thickness_mod, -self.helix_angle),
+            PlanetaryShaft::Carrier => (2.0 - self.thickness_mod, -self.helix_angle),
             // ...and the ring shares the planet's, as an internal pair must.
-            Member::Ring => (2.0 - self.thickness_mod, -self.helix_angle),
+            PlanetaryShaft::Ring => (2.0 - self.thickness_mod, -self.helix_angle),
         };
         GearParams {
             // A stage member is concentric: the eccentric feature is the gear
@@ -262,14 +282,14 @@ impl PlanetaryStage {
             profile_shift: shift,
             addendum,
             dedendum: match member {
-                Member::Sun => self.sun.dedendum,
-                Member::Carrier => self.planet.dedendum,
-                Member::Ring => self.ring.dedendum,
+                PlanetaryShaft::Sun => self.sun.dedendum,
+                PlanetaryShaft::Carrier => self.planet.dedendum,
+                PlanetaryShaft::Ring => self.ring.dedendum,
             },
             root_radius: match member {
-                Member::Sun => self.sun.root_radius,
-                Member::Carrier => self.planet.root_radius,
-                Member::Ring => self.ring.root_radius,
+                PlanetaryShaft::Sun => self.sun.root_radius,
+                PlanetaryShaft::Carrier => self.planet.root_radius,
+                PlanetaryShaft::Ring => self.ring.root_radius,
             },
             thickness_mod: k,
         }
@@ -307,34 +327,41 @@ pub fn solve_planetary_stage(
     let mut notes = Vec::new();
 
     // ---- shifts. The sun's and ring's are inputs; the planet's is solved.
-    let sun_base = stage.params(Member::Sun, teeth.sun, 0.0, stage.sun.addendum.manual);
+    let sun_base = stage.params(
+        PlanetaryShaft::Sun,
+        teeth.sun,
+        0.0,
+        stage.sun.addendum.manual,
+    );
     let sun_shift = stage.sun.profile_shift.resolve(automatic_profile_shift(
         &sun_base,
         stage.sun.working_depth.resolve(stage.sun.dedendum),
     ));
     let ring_shift = stage.ring.profile_shift.manual;
 
-    // Thickness shifts, since only `x + x_s` reaches the answer (§4.1).
-    let thickness = |shift: f64, member: Member| -> f64 {
+    // Thickness shifts, since only `x + x_s` reaches the answer (docs/reference.md#tooth-thickness-and-its-equivalent-shift).
+    let thickness = |shift: f64, member: PlanetaryShaft| -> f64 {
         shift + stage.params(member, 1, shift, 1.0).thickness_shift()
     };
     let set = planetary::Set {
         rack,
         teeth,
         planets: stage.planets,
-        sun_shift: thickness(sun_shift, Member::Sun),
-        ring_shift: thickness(ring_shift, Member::Ring),
+        sun_shift: thickness(sun_shift, PlanetaryShaft::Sun),
+        ring_shift: thickness(ring_shift, PlanetaryShaft::Ring),
         // Filled once the planet exists; clearance only reads it.
         planet_tip_diameter: 0.0,
     };
     let layout = planetary::solve(&set).ok_or(TrainError::NoContact)?;
     // The solve works in thickness shifts, so take the thickness modification
     // back out to get the planet's profile shift proper.
-    let planet_shift =
-        layout.planet_shift - stage.params(Member::Carrier, 1, 0.0, 1.0).thickness_shift();
+    let planet_shift = layout.planet_shift
+        - stage
+            .params(PlanetaryShaft::Carrier, 1, 0.0, 1.0)
+            .thickness_shift();
 
     // ---- the three members.
-    let addendum_of = |member: Member, g: &StageGear, teeth: u32, shift: f64| -> f64 {
+    let addendum_of = |member: PlanetaryShaft, g: &StageGear, teeth: u32, shift: f64| -> f64 {
         let with_shift = stage.params(member, teeth, shift, g.addendum.manual);
         if g.addendum.auto {
             addendum_for_tip_width(&Gear::new(with_shift), g.min_tip_width)
@@ -344,19 +371,24 @@ pub fn solve_planetary_stage(
         }
     };
     let sun_params = stage.params(
-        Member::Sun,
+        PlanetaryShaft::Sun,
         teeth.sun,
         sun_shift,
-        addendum_of(Member::Sun, &stage.sun, teeth.sun, sun_shift),
+        addendum_of(PlanetaryShaft::Sun, &stage.sun, teeth.sun, sun_shift),
     );
     let planet_params = stage.params(
-        Member::Carrier,
+        PlanetaryShaft::Carrier,
         teeth.planet,
         planet_shift,
-        addendum_of(Member::Carrier, &stage.planet, teeth.planet, planet_shift),
+        addendum_of(
+            PlanetaryShaft::Carrier,
+            &stage.planet,
+            teeth.planet,
+            planet_shift,
+        ),
     );
     let ring_params = stage.params(
-        Member::Ring,
+        PlanetaryShaft::Ring,
         teeth.ring,
         ring_shift,
         stage.ring.addendum.manual,
@@ -364,9 +396,9 @@ pub fn solve_planetary_stage(
 
     let sun = Gear::new(sun_params);
     let planet = Gear::new(planet_params);
-    let ring = Ring::new(&ring_params, &stage.cutter);
+    let ring = Ring::cut_by(&ring_params, &stage.cutter);
     // The mesh reads the ring through `Gear` arithmetic: a ring's shift enters
-    // its space exactly as an external gear's enters its tooth (§4.11).
+    // its space exactly as an external gear's enters its tooth (docs/reference.md#internal-gears).
     let ring_as_gear = Gear::new(ring_params);
 
     // ---- the two meshes.
@@ -470,7 +502,7 @@ pub fn solve_planetary_stage(
     let ring_torque_per_mesh = (forward.torques[2] / planets).abs();
 
     // ---- face widths and stresses. `b_min` does not depend on the width it was
-    // measured at (§4.7), so one probe evaluation gives every minimum.
+    // measured at (docs/reference.md#contact-stress), so one probe evaluation gives every minimum.
     const PROBE: f64 = 10.0;
     let sp_e = contact_modulus(&mats[0], &mats[1]);
     let pr_e = contact_modulus(&mats[1], &mats[2]);
@@ -568,10 +600,10 @@ pub fn solve_planetary_stage(
 
     // ---- centre distance and backlash.
     let centre = layout.centre_distance + stage.clearance;
-    let angular = |mesh: &Mesh, a: f64, at: MeshMember| -> f64 {
+    let angular = |mesh: &Mesh, a: f64, at: MeshSide| -> f64 {
         mesh.angular_backlash(a, at).unwrap_or(0.0).to_degrees()
     };
-    let backlash_of = |mesh: &Mesh, at: MeshMember| Backlash {
+    let backlash_of = |mesh: &Mesh, at: MeshSide| Backlash {
         nominal: angular(mesh, centre, at),
         minimum: angular(mesh, centre - stage.tolerance_minus, at),
         maximum: angular(mesh, centre + stage.tolerance_plus, at),
@@ -608,18 +640,18 @@ pub fn solve_planetary_stage(
     let zs = f64::from(teeth.sun);
     let zp = f64::from(teeth.planet);
     let zr = f64::from(teeth.ring);
-    let coefficient = |m: Member| match m {
-        Member::Sun => zs,
-        Member::Carrier => zs + zr,
-        Member::Ring => zr,
+    let coefficient = |m: PlanetaryShaft| match m {
+        PlanetaryShaft::Sun => zs,
+        PlanetaryShaft::Carrier => zs + zr,
+        PlanetaryShaft::Ring => zr,
     };
-    let referred = |at: Member, a: f64| -> f64 {
+    let referred = |at: PlanetaryShaft, a: f64| -> f64 {
         let j1 = sp_mesh.backlash(a).unwrap_or(0.0);
         let j2 = pr_mesh.backlash(a).unwrap_or(0.0);
         let delta = ((zs + zp) * j1.abs() + (zr - zp) * j2.abs()) / a;
         (delta / coefficient(at)).to_degrees()
     };
-    let backlash_at = |at: Member| Backlash {
+    let backlash_at = |at: PlanetaryShaft| Backlash {
         nominal: referred(at, centre),
         minimum: referred(at, centre - stage.tolerance_minus),
         maximum: referred(at, centre + stage.tolerance_plus),
@@ -652,7 +684,7 @@ pub fn solve_planetary_stage(
         notes.push(Note::new(key::STAGE_RING_ADDENDUM_CLAMPED));
     }
 
-    let gear_result = |member: Member,
+    let gear_result = |member: PlanetaryShaft,
                        input: &StageGear,
                        params: &GearParams,
                        width: f64,
@@ -705,8 +737,8 @@ pub fn solve_planetary_stage(
             contact_stress: sp_cs.worst,
             relative_radius: sp_cs.relative_radius,
             backlash: [
-                backlash_of(&sp_mesh, MeshMember::First),
-                backlash_of(&sp_mesh, MeshMember::Second),
+                backlash_of(&sp_mesh, MeshSide::First),
+                backlash_of(&sp_mesh, MeshSide::Second),
             ],
         },
         planet_ring: MeshReport {
@@ -715,8 +747,8 @@ pub fn solve_planetary_stage(
             contact_stress: pr_cs.worst,
             relative_radius: pr_cs.relative_radius,
             backlash: [
-                backlash_of(&pr_mesh, MeshMember::First),
-                backlash_of(&pr_mesh, MeshMember::Second),
+                backlash_of(&pr_mesh, MeshSide::First),
+                backlash_of(&pr_mesh, MeshSide::Second),
             ],
         },
         equal_spacing: layout.equal_spacing,
@@ -726,7 +758,7 @@ pub fn solve_planetary_stage(
         sun_coprime_with_planets: gcd(teeth.sun, stage.planets.max(1)) == 1,
         ring_coprime_with_planets: gcd(teeth.ring, stage.planets.max(1)) == 1,
         sun: gear_result(
-            Member::Sun,
+            PlanetaryShaft::Sun,
             &stage.sun,
             &sun_params,
             widths[0],
@@ -738,7 +770,7 @@ pub fn solve_planetary_stage(
         ),
         planet: PlanetResult {
             gear: gear_result(
-                Member::Carrier,
+                PlanetaryShaft::Carrier,
                 &stage.planet,
                 &planet_params,
                 widths[1],
@@ -759,7 +791,7 @@ pub fn solve_planetary_stage(
         },
         planets: stage.planets,
         ring: gear_result(
-            Member::Ring,
+            PlanetaryShaft::Ring,
             &stage.ring,
             &ring_params,
             widths[2],
@@ -859,9 +891,24 @@ mod tests {
     #[test]
     fn the_stage_reports_the_classical_ratios() {
         let want = [
-            (Member::Sun, Member::Ring, Member::Carrier, 3.5),
-            (Member::Sun, Member::Carrier, Member::Ring, -2.5),
-            (Member::Ring, Member::Sun, Member::Carrier, 1.4),
+            (
+                PlanetaryShaft::Sun,
+                PlanetaryShaft::Ring,
+                PlanetaryShaft::Carrier,
+                3.5,
+            ),
+            (
+                PlanetaryShaft::Sun,
+                PlanetaryShaft::Carrier,
+                PlanetaryShaft::Ring,
+                -2.5,
+            ),
+            (
+                PlanetaryShaft::Ring,
+                PlanetaryShaft::Sun,
+                PlanetaryShaft::Carrier,
+                1.4,
+            ),
         ];
         for (input, fixed, output, ratio) in want {
             let stage = PlanetaryStage {
@@ -885,8 +932,8 @@ mod tests {
     fn a_held_carrier_gives_exactly_the_product_of_the_mesh_efficiencies() {
         let stage = PlanetaryStage {
             arrangement: Arrangement {
-                input: Member::Sun,
-                fixed: Member::Carrier,
+                input: PlanetaryShaft::Sun,
+                fixed: PlanetaryShaft::Carrier,
             },
             ..stage_of(24, 18, 60, 0.0)
         };
@@ -952,15 +999,15 @@ mod tests {
             // Ring held: the sun and the carrier are the two possible outputs.
             let sun_in = PlanetaryStage {
                 arrangement: Arrangement {
-                    input: Member::Sun,
-                    fixed: Member::Ring,
+                    input: PlanetaryShaft::Sun,
+                    fixed: PlanetaryShaft::Ring,
                 },
                 ..stage_of(s, p, r, 0.0)
             };
             let carrier_in = PlanetaryStage {
                 arrangement: Arrangement {
-                    input: Member::Carrier,
-                    fixed: Member::Ring,
+                    input: PlanetaryShaft::Carrier,
+                    fixed: PlanetaryShaft::Ring,
                 },
                 ..stage_of(s, p, r, 0.0)
             };
@@ -1024,7 +1071,7 @@ mod tests {
         );
     }
 
-    /// The planet is the special case of §4.9: fully reversed, judged against a
+    /// The planet is the special case of docs/reference.md#trains: fully reversed, judged against a
     /// smaller allowable that says where it came from, and turning at a speed
     /// measured **relative to the carrier**.
     #[test]
@@ -1084,7 +1131,7 @@ mod tests {
     }
 
     /// Tooth counts that admit no planet shift are refused, not fudged into an
-    /// answer. Most combinations are impossible (§4.8) and that is the common
+    /// answer. Most combinations are impossible (docs/reference.md#planetary-sets) and that is the common
     /// case rather than an exceptional one.
     #[test]
     fn an_impossible_set_is_refused() {
@@ -1103,9 +1150,15 @@ mod tests {
                 thickness_mod: k,
                 ..stage_of(24, 18, 60, 0.0)
             };
-            let sun = stage.params(Member::Sun, 24, 0.0, 1.0).thickness_mod;
-            let planet = stage.params(Member::Carrier, 18, 0.0, 1.0).thickness_mod;
-            let ring = stage.params(Member::Ring, 60, 0.0, 1.0).thickness_mod;
+            let sun = stage
+                .params(PlanetaryShaft::Sun, 24, 0.0, 1.0)
+                .thickness_mod;
+            let planet = stage
+                .params(PlanetaryShaft::Carrier, 18, 0.0, 1.0)
+                .thickness_mod;
+            let ring = stage
+                .params(PlanetaryShaft::Ring, 60, 0.0, 1.0)
+                .thickness_mod;
             assert!(
                 (sun + planet - 2.0).abs() < 1e-15,
                 "external pair must sum to two"

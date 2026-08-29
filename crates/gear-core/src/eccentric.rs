@@ -7,7 +7,7 @@
 //! radially in and out once per revolution produces. The tip and root envelopes
 //! come out eccentric by `e = m Δx` while the **pitch and base circles stay on
 //! the axis**, so the body moves eccentrically at a genuinely constant ratio.
-//! That is the whole point, and §4.10 derives it; this module builds it.
+//! That is the whole point, and docs/reference.md#angularly-varying-profile-shift derives it; this module builds it.
 //!
 //! # Why it needs no new profile mathematics
 //!
@@ -41,10 +41,44 @@
 //! there either, since there is nothing for it to correct towards.
 
 use crate::involute::inv;
-use crate::mesh::{operating_geometry, Member, MeshError, MeshKind};
+use crate::mesh::{operating_geometry, MeshError, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::GearParams;
 use crate::profile::Gear;
+use crate::solve::{brent, Tol};
+
+/// Largest angular-shift amplitude [`amplitude_for_throw`] will search to, in
+/// modules. Not a design limit — a search bound: a throw that needs more than
+/// two modules of shift swing is past anything this tool is meant to size, and
+/// the geometry has almost always run out well before it (`centre_profile`
+/// stops returning a profile). Named so it is one number rather than a literal
+/// buried in a loop.
+const MAX_SEARCH_AMPLITUDE: f64 = 2.0;
+
+/// The mean, amplitude and phase of a pure sinusoid, in the units it is read in.
+///
+/// A named struct rather than `[f64; 3]`, because the three carry **different
+/// units** and an array says they do not. The phase is in **degrees**: angles
+/// are radians everywhere inside this crate and degrees at the boundary, and
+/// this type exists to be reported. Converting it in the front end instead put
+/// both the conversion and the choice of decimals on the side of the boundary
+/// that has no tests, which is the rule `docs/corrections.md` records a
+/// diameter breaking once already.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct Sinusoid {
+    /// The value it oscillates about, mm.
+    pub mean: f64,
+    /// Half its peak-to-peak swing, mm.
+    pub amplitude: f64,
+    /// Where its maximum sits, **degrees**.
+    pub phase_degrees: f64,
+}
 
 /// A gear assembled tooth by tooth.
 ///
@@ -74,7 +108,6 @@ impl Eccentric {
     #[must_use]
     pub fn new(params: GearParams) -> Self {
         let z = params.teeth.max(1);
-        let mean = Gear::new(params);
 
         // The shift each tooth is cut at. Written so that `Δx = 0` gives
         // `x + 0.0`, which is `x` exactly — the equality below then collapses
@@ -148,17 +181,52 @@ impl Eccentric {
         // The rebuild happens only when the teeth **disagree**, which a
         // concentric gear's never do — it has one tooth. So this costs an
         // ordinary gear nothing and cannot move it.
+        //
+        // **The mean gear is rebuilt with the same tool.** It is where every
+        // scalar output is quoted from, and `root_at` builds the root envelope
+        // on its `rf` — so if it kept the raw dedendum while the teeth were cut
+        // deeper, the drawn root would sit `m·(depth − dedendum)` proud of the
+        // teeth it belongs to, protruding past the fillets. Rebuilt in lockstep
+        // with the teeth, so a concentric gear still keeps `Gear::new` verbatim.
+        //
+        // **The depth cap is the tool's too, and settling it is what makes this
+        // one pass rather than a hope.** `Gear::new` caps the depth at
+        // `MAX_CUTTER_DEPTH_FRACTION_OF_R` to keep the root off the axis — a
+        // guard rail that, sorted by whose property it is, belongs to the tool
+        // exactly as the floor and the tip round do. Left per-tooth it fired
+        // *after* the rebuild: the depth settled for the high tooth was driven
+        // into the low one, which re-clamped against a guard the first pass had
+        // not yet seen, and nothing looked again. The drawn root then left the
+        // teeth by up to 1.94 mm at `z = 5` (`docs/corrections.md`).
+        //
+        // Capped here, the rebuilt teeth cannot clamp at either end — the floor
+        // because `depth ≥ MIN + x` for every tooth by construction, the ceiling
+        // because this is exactly the deepest tool the shallowest-shift tooth
+        // can take. So one pass settles it, and there is no second question to
+        // forget to ask. Where the cap actually binds, no single tool can cut
+        // every tooth and there is no such gear — `admissible_angular_shift`
+        // is the bound that says so, and inside it this `min` never chooses.
         let round = teeth.iter().fold(f64::MAX, |m, g| m.min(g.rho)) / params.module;
-        let depth = teeth.iter().zip(&shifts).fold(f64::MIN, |m: f64, (g, &x)| {
-            m.max((g.r - g.rf) / params.module + x)
-        });
-        let settled = |g: &Gear, x: f64| {
-            g.rho / params.module == round && (g.r - g.rf) / params.module + x == depth
-        };
+        let deepest = teeth
+            .iter()
+            .zip(&shifts)
+            .fold(f64::MIN, |m: f64, (g, &x)| m.max(g.bd / params.module + x));
+        let shallowest_shift = shifts.iter().copied().fold(f64::MAX, f64::min);
+        let r = params.module / params.helix_angle.to_radians().cos()
+            * f64::from(params.teeth.max(1))
+            / 2.0;
+        let depth = deepest.min(
+            crate::params::guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r / params.module
+                + shallowest_shift,
+        );
+        let settled =
+            |g: &Gear, x: f64| g.rho / params.module == round && g.bd / params.module + x == depth;
+        let mut mean = Gear::new(params);
         if !teeth.iter().zip(&shifts).all(|(g, &x)| settled(g, x)) {
             for (t, &x) in teeth.iter_mut().zip(&shifts) {
                 *t = build(x, round, depth);
             }
+            mean = build(params.profile_shift, round, depth);
         }
 
         // Seats. `ψ_b` is the angular half-thickness at the base circle — the
@@ -216,7 +284,7 @@ impl Eccentric {
     /// what lets a caller report a range unconditionally and have an ordinary
     /// gear read as a single number.
     #[must_use]
-    pub fn span(&self, of: impl Fn(&Gear) -> f64) -> [f64; 2] {
+    pub fn extremes(&self, of: impl Fn(&Gear) -> f64) -> [f64; 2] {
         let (lo, hi) = self.teeth.iter().fold((f64::MAX, f64::MIN), |(l, h), g| {
             let v = of(g);
             (l.min(v), h.max(v))
@@ -228,14 +296,21 @@ impl Eccentric {
     ///
     /// # Why the root is not the tooth's
     ///
-    /// A tooth's own root radius is `r − m(h_f − x_k)`, and neighbouring teeth
+    /// A tooth's own root radius is `r − m(h_cut − x_k)`, and neighbouring teeth
     /// have different `x` — so drawing each tooth's root at its own radius puts
     /// a **radial step at every mid-space**, up to 0.13 mm on a module-1 gear.
     /// No hob can leave that: it is one edge sweeping past, and what it leaves
-    /// is the envelope `r − m(h_f − x(θ))`, smooth all the way round.
+    /// is the envelope `r − m(h_cut − x(θ))`, smooth all the way round.
+    ///
+    /// `h_cut` is the **shared** cutter depth — the greatest any tooth needs —
+    /// not the raw dedendum. The mean gear carries it too (`Eccentric::new`
+    /// rebuilds `mean` with the same tool), so `mean.rf` is the envelope's DC
+    /// term and this stays consistent with the teeth the flanks belong to. When
+    /// no tooth forced the depth up, `h_cut` *is* the dedendum and `mean` is
+    /// `Gear::new` verbatim.
     ///
     /// The flanks are a different matter and stay with their teeth — constant
-    /// ratio *requires* each to be one involute at one shift (§4.10), and that
+    /// ratio *requires* each to be one involute at one shift (docs/reference.md#angularly-varying-profile-shift), and that
     /// is what makes the feature possible. Nothing constrains the root, which is
     /// why it is free to be continuous.
     ///
@@ -261,7 +336,7 @@ impl Eccentric {
     /// # Why the fillet moves and the flank does not
     ///
     /// The **flank** is untouchable: constant ratio requires it to be one
-    /// involute of one base circle at one shift (§4.10), and that is the whole
+    /// involute of one base circle at one shift (docs/reference.md#angularly-varying-profile-shift), and that is the whole
     /// feature. So the displacement is zero at the flank/fillet junction and
     /// stays zero over the flank and the tip.
     ///
@@ -278,7 +353,7 @@ impl Eccentric {
     /// and meets its neighbour's half at mid-space with the same slope.
     ///
     /// Still an **interpolation, not a derivation** — the true surface is the
-    /// envelope of a tool corner under rolling *and* radial motion, which §4.10
+    /// envelope of a tool corner under rolling *and* radial motion, which docs/reference.md#angularly-varying-profile-shift
     /// scoped out. What it has to be is zero at the flank, tangent there, and
     /// through the envelope at mid-space; it is all three.
     ///
@@ -305,7 +380,7 @@ impl Eccentric {
     /// Written as that difference rather than from the seats themselves, so a
     /// concentric gear — where every `ψ_k` is the same — gets exactly `0.0` and
     /// the root is left where it was, to the bit.
-    pub fn reach(&self, k: usize, side: f64) -> f64 {
+    pub fn root_reach(&self, k: usize, side: f64) -> f64 {
         let n = self.which.len();
         let psi = |j: usize| self.tooth(j % n).0.psi_b;
         let (a, b) = if side < 0.0 {
@@ -328,7 +403,7 @@ impl Eccentric {
         // point is on a generated curve — and it is the only part that stretches
         // to meet a neighbour. The tooth's own flanks and fillet do not move.
         let tt = if r == g.rf {
-            let reach = self.reach(k, tt);
+            let reach = self.root_reach(k, tt);
             let span = g.half_pitch - g.theta0;
             let along = if span > 0.0 {
                 (tt.abs() - g.theta0) / span
@@ -346,7 +421,7 @@ impl Eccentric {
         let (g, _) = self.tooth(k);
         // **Parametrised on radius, not on angle.** `θ` is not monotone along a
         // profile — the flank continues *below the base circle* to its true
-        // intersection with the trochoid (§4.2) and is re-entrant down there, so
+        // intersection with the trochoid (docs/reference.md#the-generated-profile) and is re-entrant down there, so
         // a flank point can sit at a larger angle than the junction does and
         // would take a displacement it must never have. Radius is the invariant
         // that does stay monotone, which is why it is the one that measures how
@@ -376,7 +451,7 @@ impl Eccentric {
     /// on a *setting* trips for the whole gear or not at all. What lands here is
     /// only what is true of one tooth and not its neighbour.
     #[must_use]
-    pub fn troubled_teeth(&self) -> Trouble {
+    pub fn per_tooth_clamps(&self) -> PerToothClamps {
         let mut teeth = Vec::new();
         let mut notes: Vec<Note> = Vec::new();
         for k in 0..self.which.len() {
@@ -398,7 +473,7 @@ impl Eccentric {
                 }
             }
         }
-        Trouble { teeth, notes }
+        PerToothClamps { teeth, notes }
     }
 
     /// The whole outline, closed, as `[x, y]` in the gear's own frame.
@@ -485,6 +560,11 @@ impl Eccentric {
 /// makes it safe to report unconditionally.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Variation {
     /// `e = m Δx`, mm — how far the tip and root envelopes are displaced.
     pub eccentricity: f64,
@@ -559,7 +639,7 @@ impl Eccentric {
             let d = departures(side);
             // Both as **ranges** — the full swing from the tightest pitch to
             // the widest — rather than as amplitudes about the mean. That is
-            // what a gear chart shows and what §4.10's tabulated figures are.
+            // what a gear chart shows and what docs/reference.md#angularly-varying-profile-shift's tabulated figures are.
             let range = |v: &[f64]| {
                 let (lo, hi) = v
                     .iter()
@@ -572,10 +652,10 @@ impl Eccentric {
         let (drive_pitch, drive_index) = errors(1.0);
         let (coast_pitch, coast_index) = errors(-1.0);
 
-        let tip_radius = self.span(|g| g.ra);
-        let root_radius = self.span(|g| g.rf);
-        let tooth_thickness = self.span(|g| 2.0 * g.r * g.psi_p);
-        let base_thickness = self.span(|g| 2.0 * g.rb * g.psi_b);
+        let tip_radius = self.extremes(|g| g.ra);
+        let root_radius = self.extremes(|g| g.rf);
+        let tooth_thickness = self.extremes(|g| 2.0 * g.r * g.psi_p);
+        let base_thickness = self.extremes(|g| 2.0 * g.rb * g.psi_b);
 
         let e = p.module * p.angular_shift.abs();
         Variation {
@@ -607,7 +687,12 @@ impl Eccentric {
 /// not what you drew" is only useful if it says which.
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Trouble {
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct PerToothClamps {
     /// Positions round the gear, counting from `θ = 0`.
     pub teeth: Vec<u32>,
     /// What happened, each reason once.
@@ -622,13 +707,18 @@ pub struct Trouble {
 /// to choose, and nothing interpolated.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct CentreProfile {
     /// The zero-backlash centre distance at each tooth position, mm, starting at
     /// `θ = 0` and going round.
     pub commanded: Vec<f64>,
     /// Smallest and largest of the above, mm.
     pub range: [f64; 2],
-    /// The best-fit pure sinusoid: mean, amplitude, phase in radians.
+    /// The best-fit pure sinusoid.
     ///
     /// What a **simple eccentric or crank** can actually deliver. `a_w(θ)` is
     /// not sinusoidal even though `x(θ)` is — it passes through `inv⁻¹` and a
@@ -638,7 +728,7 @@ pub struct CentreProfile {
     /// Exact rather than fitted: the samples are equally spaced, so the first
     /// Fourier coefficient *is* the least-squares sinusoid, with no optimiser
     /// and no starting guess.
-    pub sinusoid: [f64; 3],
+    pub sinusoid: Sinusoid,
     /// The largest departure of the ideal from that sinusoid, mm of centre
     /// distance.
     pub sinusoid_error: f64,
@@ -658,33 +748,42 @@ impl Eccentric {
     /// `at` says which member the eccentric gear is. That matters only for an
     /// **internal** mesh, where the ring is member 2 by the same convention
     /// [`Mesh::new`](crate::mesh::Mesh::new) uses — so an eccentric ring is
-    /// `Member::Second` and an eccentric pinion running in a fixed ring is
-    /// `Member::First`. For an external pair the two are the same answer.
+    /// `MeshSide::Second` and an eccentric pinion running in a fixed ring is
+    /// `MeshSide::First`. For an external pair the two are the same answer.
     ///
     /// # One relation, both kinds
     ///
     /// `mesh::operating_geometry` takes a **signed** tooth sum and shift sum,
     /// with member 2 carrying the kind's sign, and that one expression is the
-    /// whole of the difference between an external and an internal mesh (§4.11).
+    /// whole of the difference between an external and an internal mesh (docs/reference.md#internal-gears).
     /// Nothing here re-derives it: the arrangement decides which slot carries
     /// the sign, and the arithmetic below never asks which kind it is.
     ///
+    /// # What λ does not reach
+    ///
+    /// The indexing offset moves each tooth **rigidly** — both flanks by one
+    /// angle — so it decides when a tooth arrives, not how thick it is. Zero
+    /// backlash is the mate's tooth touching both flanks of this one, which the
+    /// tooth's *thickness* sets, so the shift each position operates against is
+    /// the shift it was **cut** at and λ does not enter. Gated exactly, in
+    /// `the_commanded_centre_distance_does_not_depend_on_the_indexing`.
+    ///
     /// # Errors
     ///
-    /// [`MeshError::Incompatible`] if the two cannot mesh at all, and
-    /// [`MeshError::CentreDistanceTooSmall`] if some position drives the base
-    /// circles into each other — which for this feature means the eccentricity
-    /// is larger than the pair can absorb.
+    /// [`MeshError::Incompatible`] if the two cannot mesh at all;
+    /// [`MeshError::OutsideInvoluteDomain`] if some position's shift drives the
+    /// operating pressure angle below zero — the eccentricity is larger than the
+    /// pair can absorb; [`MeshError::CentreDistanceTooSmall`] if the best-fit
+    /// sinusoid a real mechanism would track brings the axes inside the
+    /// base-circle limit.
     pub fn centre_profile(
         &self,
         mate: &Gear,
         kind: MeshKind,
-        at: Member,
+        at: MeshSide,
     ) -> Result<CentreProfile, MeshError> {
         let g = &self.mean;
-        if (g.params.module - mate.params.module).abs() > 1e-12
-            || (g.params.pressure_angle - mate.params.pressure_angle).abs() > 1e-12
-        {
+        if !g.params.same_rack_as(&mate.params) {
             return Err(MeshError::Incompatible);
         }
 
@@ -692,12 +791,31 @@ impl Eccentric {
         // enters; everything below is one expression for both kinds.
         let sigma = kind.sign();
         let (sign_e, sign_m) = match at {
-            Member::First => (1.0, sigma),
-            Member::Second => (sigma, 1.0),
+            MeshSide::First => (1.0, sigma),
+            MeshSide::Second => (sigma, 1.0),
         };
         let z_sum = sign_e * g.z + sign_m * mate.z;
+        // An internal pair needs the ring to enclose the pinion, the same
+        // condition `Mesh::new` refuses. Without it a "ring" with fewer teeth
+        // arrives as a signed sum that is merely the wrong sign, and the
+        // arithmetic below answers it — a plausible number for a pair that
+        // cannot exist. Which member is the ring is already decided by `at`, so
+        // this reads the sum rather than asking again.
+        if kind == MeshKind::Internal && z_sum >= 0.0 {
+            return Err(MeshError::RingTooSmall);
+        }
         let x_mate = mate.params.profile_shift + mate.params.thickness_shift();
 
+        // **λ does not enter.** The indexing offset moves a tooth *rigidly* —
+        // both flanks by the same angle — so it changes where the tooth arrives
+        // and not how thick it is. Zero backlash at a position is the mate's
+        // tooth touching both flanks of this one, which its **thickness** sets,
+        // and thickness is the shift the tooth was cut at. Scaling the shift by
+        // `(1 − λ)` here — on the reasoning that a corrected drive flank sits
+        // where the mean tooth's would — was wrong twice over: it made λ = 1
+        // report zero throw for every amplitude, and λ is not a property of the
+        // *pair* at all. It is gated now
+        // (`the_commanded_centre_distance_does_not_depend_on_the_indexing`).
         let commanded = (0..self.which.len())
             .map(|k| {
                 let (tooth, _) = self.tooth(k);
@@ -705,7 +823,7 @@ impl Eccentric {
                 let x_sum = sign_e * x_e + sign_m * x_mate;
                 operating_geometry(g.mt, g.alpha_t, g.alpha_n, z_sum, x_sum)
                     .map(|(_, _, a_w)| a_w)
-                    .ok_or(MeshError::CentreDistanceTooSmall)
+                    .ok_or(MeshError::OutsideInvoluteDomain)
             })
             .collect::<Result<Vec<f64>, MeshError>>()?;
 
@@ -748,7 +866,7 @@ impl Eccentric {
         for (k, &ideal) in commanded.iter().enumerate() {
             let fit = mean + amplitude * (angle(k) - phase).cos();
             error = error.max((ideal - fit).abs());
-            // What the mechanism's departure costs, by the §4.4 law: the ideal
+            // What the mechanism's departure costs, by the docs/reference.md#centre-distance-and-backlash law: the ideal
             // is the zero-backlash distance at this position, the fit is where
             // the machine actually puts the axes.
             let a_ref = g.mt * z_sum.abs() / 2.0;
@@ -775,11 +893,103 @@ impl Eccentric {
         Ok(CentreProfile {
             commanded,
             range: [lo, hi],
-            sinusoid: [mean, amplitude, phase],
+            sinusoid: Sinusoid {
+                mean,
+                amplitude,
+                // Degrees at the boundary: this is a reported quantity, and the
+                // conversion belongs on the side that computed it.
+                phase_degrees: phase.to_degrees(),
+            },
             sinusoid_error: error,
             sinusoid_backlash: play,
         })
     }
+}
+
+/// The angular-shift amplitude whose commanded centre-distance sinusoid has the
+/// given half-amplitude — the throw a simple crank delivers ([`CentreProfile`]).
+///
+/// This is the [`Eccentric::centre_profile`] output read backwards: rather than
+/// entering `Δx` and reading the throw, you enter the throw and this finds the
+/// `Δx`. Nothing about the geometry changes — it is one downstream inversion of
+/// a value the forward path already computes, so `Δx` stays the single input
+/// everything else is built from.
+///
+/// `params.angular_shift` is ignored — it is the unknown. `params.profile_shift`
+/// (the mean shift), the mate, the kind and the arrangement all enter exactly as
+/// they do in `centre_profile`. `params.index_offset` reaches nothing, there as
+/// here: λ moves a tooth rigidly and the commanded distance is set by its
+/// thickness.
+///
+/// The throw is zero at `Δx = 0` and rises monotonically with it until the mesh
+/// runs out of involute (`centre_profile` stops returning a profile) — so the
+/// feasible amplitudes are one interval and a bracketed solve suffices.
+///
+/// # Errors
+///
+/// [`MeshError::Incompatible`] or the mate's own error if the pair cannot mesh
+/// at the mean shift; [`MeshError::OutsideInvoluteDomain`] if the largest
+/// amplitude the pair can absorb still falls short of the requested throw, and
+/// if `target` is not positive and finite.
+pub fn amplitude_for_throw(
+    params: GearParams,
+    mate: &Gear,
+    kind: MeshKind,
+    at: MeshSide,
+    target: f64,
+) -> Result<f64, MeshError> {
+    if !target.is_finite() || target < 0.0 {
+        return Err(MeshError::OutsideInvoluteDomain);
+    }
+    if target == 0.0 {
+        return Ok(0.0);
+    }
+
+    let throw = |dx: f64| {
+        Eccentric::new(GearParams {
+            angular_shift: dx,
+            ..params
+        })
+        .centre_profile(mate, kind, at)
+        .map(|p| p.sinusoid.amplitude)
+    };
+    // Surface a pair that does not mesh at all with its own error, rather than
+    // as "throw unreachable".
+    throw(0.0)?;
+
+    // The feasible amplitudes are `[0, dx_max]`. If the whole search range is
+    // feasible, `dx_max` is the range end; otherwise bisect for where the mesh
+    // gives out. Bisection needs no tolerance — it converges to the last
+    // representable feasible amplitude on its own.
+    let dx_max = if throw(MAX_SEARCH_AMPLITUDE).is_ok() {
+        MAX_SEARCH_AMPLITUDE
+    } else {
+        let (mut lo, mut hi) = (0.0, MAX_SEARCH_AMPLITUDE);
+        for _ in 0..64 {
+            let mid = 0.5 * (lo + hi);
+            if throw(mid).is_ok() {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        lo
+    };
+
+    let reach = throw(dx_max).unwrap_or(0.0);
+    if target > reach {
+        return Err(MeshError::OutsideInvoluteDomain);
+    }
+
+    // `throw(0) − target = −target < 0` and `throw(dx_max) − target ≥ 0`: a
+    // bracket, so Brent cannot miss it.
+    brent(
+        |dx| throw(dx).map_or(f64::NAN, |t| t - target),
+        0.0,
+        dx_max,
+        Tol::default(),
+    )
+    .ok_or(MeshError::OutsideInvoluteDomain)
 }
 
 #[cfg(test)]
@@ -854,7 +1064,7 @@ mod tests {
         }
     }
 
-    /// **The figures §4.10 tabulates, reproduced to every quoted digit.**
+    /// **The figures docs/reference.md#angularly-varying-profile-shift tabulates, reproduced to every quoted digit.**
     ///
     /// That section's numbers were derived independently of this code and
     /// marked `[verified]` before any of it existed, which makes them the
@@ -964,7 +1174,7 @@ mod tests {
         }
     }
 
-    /// **The pitch and base circles do not move.** §4.10 rests on this: it is
+    /// **The pitch and base circles do not move.** docs/reference.md#angularly-varying-profile-shift rests on this: it is
     /// what makes the body eccentric while the *action* stays uniform, and it is
     /// why the feature is possible at all. Profile shift moves the tool, not the
     /// rolling.
@@ -1107,21 +1317,21 @@ mod tests {
                 ecc(24),
                 plain(43),
                 MeshKind::External,
-                Member::First,
+                MeshSide::First,
             ),
             (
                 "eccentric pinion in a ring",
                 ecc(24),
                 plain(60),
                 MeshKind::Internal,
-                Member::First,
+                MeshSide::First,
             ),
             (
                 "eccentric ring round a pinion",
                 ecc(60),
                 plain(24),
                 MeshKind::Internal,
-                Member::Second,
+                MeshSide::Second,
             ),
         ] {
             let profile = e.centre_profile(&mate, kind, at).expect("a meshable pair");
@@ -1130,8 +1340,8 @@ mod tests {
                 // The ring is member 2, whichever gear that is — the same
                 // convention `Mesh::new` is written to.
                 let mesh = match at {
-                    Member::First => Mesh::new(tooth, &mate, kind),
-                    Member::Second => Mesh::new(&mate, tooth, kind),
+                    MeshSide::First => Mesh::new(tooth, &mate, kind),
+                    MeshSide::Second => Mesh::new(&mate, tooth, kind),
                 }
                 .expect("a meshable pair");
                 assert_eq!(
@@ -1143,6 +1353,215 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// **λ does not reach the commanded centre distance — exactly.**
+    ///
+    /// The indexing offset moves a tooth rigidly, so it changes where the tooth
+    /// arrives and not how thick it is; zero backlash is set by the thickness.
+    /// So the whole profile is the *same numbers* at every λ, and this asserts
+    /// that bit for bit rather than to a tolerance.
+    ///
+    /// It is a regression gate. Scaling the shift by `(1 − λ)` here — on the
+    /// reasoning that a corrected drive flank sits where the mean tooth's would
+    /// — made λ = 1 report **zero throw at every amplitude**, which is the whole
+    /// output of the feature collapsing to nothing, and no test then existed
+    /// that turned λ with a mate attached.
+    #[test]
+    fn the_commanded_centre_distance_does_not_depend_on_the_indexing() {
+        use crate::mesh::MeshSide;
+
+        for (mate_z, kind) in [(43_u32, MeshKind::External), (60, MeshKind::Internal)] {
+            let mate = Gear::new(GearParams {
+                teeth: mate_z,
+                ..Default::default()
+            });
+            let at = |lambda: f64| {
+                Eccentric::new(GearParams {
+                    teeth: 24,
+                    profile_shift: 0.2,
+                    angular_shift: 0.5,
+                    index_offset: lambda,
+                    ..Default::default()
+                })
+                .centre_profile(&mate, kind, MeshSide::First)
+                .expect("a meshable pair")
+            };
+
+            let reference = at(0.0);
+            assert!(
+                reference.sinusoid.amplitude > 0.0,
+                "z_mate={mate_z}: the fixture must actually have a throw to protect"
+            );
+            for lambda in [0.5_f64, 1.0, -1.0, 2.0] {
+                let p = at(lambda);
+                assert_eq!(
+                    p.sinusoid.amplitude.to_bits(),
+                    reference.sinusoid.amplitude.to_bits(),
+                    "z_mate={mate_z} λ={lambda}: the throw moved with the indexing"
+                );
+                for (k, (a, b)) in p.commanded.iter().zip(&reference.commanded).enumerate() {
+                    assert_eq!(
+                        a.to_bits(),
+                        b.to_bits(),
+                        "z_mate={mate_z} λ={lambda}, tooth {k}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// **The throw solve is `centre_profile` read backwards, to the bit.**
+    ///
+    /// Enter a throw, get the amplitude; build the gear at that amplitude and
+    /// `centre_profile`'s sinusoid half-amplitude comes back to the target. One
+    /// downstream inversion — nothing about the geometry moved.
+    #[test]
+    fn the_throw_solve_inverts_the_commanded_centre_distance() {
+        use crate::mesh::MeshSide;
+
+        for (mate_z, internal) in [(43u32, false), (60, true), (26, true)] {
+            let mate = Gear::new(GearParams {
+                teeth: mate_z,
+                ..Default::default()
+            });
+            let kind = if internal {
+                MeshKind::Internal
+            } else {
+                MeshKind::External
+            };
+            for lambda in [0.0_f64, 0.5] {
+                let base = GearParams {
+                    teeth: 24,
+                    profile_shift: 0.15,
+                    index_offset: lambda,
+                    ..Default::default()
+                };
+                for target in [0.05_f64, 0.15, 0.3] {
+                    let dx = match amplitude_for_throw(base, &mate, kind, MeshSide::First, target) {
+                        Ok(dx) => dx,
+                        Err(_) => continue, // an out-of-reach target is its own test below
+                    };
+                    let got = Eccentric::new(GearParams {
+                        angular_shift: dx,
+                        ..base
+                    })
+                    .centre_profile(&mate, kind, MeshSide::First)
+                    .unwrap()
+                    .sinusoid
+                    .amplitude;
+                    assert!(
+                        (got - target).abs() < 1e-9,
+                        "z_mate={mate_z} λ={lambda} target={target}: Δx={dx} gives a throw of {got}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// A throw larger than the pair can ever deliver comes back as
+    /// `OutsideInvoluteDomain` rather than as a silent clamp, and a zero throw
+    /// is a concentric gear rather than an error.
+    #[test]
+    fn a_throw_the_pair_cannot_reach_is_refused() {
+        use crate::mesh::MeshSide;
+        let close = Gear::new(GearParams {
+            teeth: 26,
+            ..Default::default()
+        });
+        let roomy = Gear::new(GearParams {
+            teeth: 43,
+            ..Default::default()
+        });
+        let base = GearParams {
+            teeth: 24,
+            ..Default::default()
+        };
+        // z 24 in z 26 gives out at a tiny amplitude — 3 mm of throw is far past it.
+        assert_eq!(
+            amplitude_for_throw(base, &close, MeshKind::Internal, MeshSide::First, 3.0),
+            Err(MeshError::OutsideInvoluteDomain)
+        );
+        // A zero target is a concentric gear, not an error.
+        assert_eq!(
+            amplitude_for_throw(base, &roomy, MeshKind::External, MeshSide::First, 0.0),
+            Ok(0.0)
+        );
+        // And λ reaches none of it: the same throw needs the same amplitude
+        // however the teeth are indexed.
+        let at = |lambda: f64| {
+            amplitude_for_throw(
+                GearParams {
+                    index_offset: lambda,
+                    ..base
+                },
+                &roomy,
+                MeshKind::External,
+                MeshSide::First,
+                0.2,
+            )
+        };
+        assert_eq!(at(1.0), at(0.0));
+    }
+
+    /// A "ring" that does not enclose its pinion is not a pair, and is refused
+    /// by name rather than answered — the same condition `Mesh::new` checks.
+    #[test]
+    fn an_internal_pair_needs_the_ring_to_enclose_the_pinion() {
+        use crate::mesh::MeshSide;
+        let small = Gear::new(GearParams {
+            teeth: 20,
+            ..Default::default()
+        });
+        let e = Eccentric::new(GearParams {
+            teeth: 24,
+            angular_shift: 0.2,
+            ..Default::default()
+        });
+        assert_eq!(
+            e.centre_profile(&small, MeshKind::Internal, MeshSide::First)
+                .unwrap_err(),
+            MeshError::RingTooSmall
+        );
+        // ...and read the other way round: an eccentric *ring* must be the
+        // larger of the two.
+        assert_eq!(
+            Eccentric::new(GearParams {
+                teeth: 20,
+                angular_shift: 0.2,
+                ..Default::default()
+            })
+            .centre_profile(
+                &Gear::new(GearParams {
+                    teeth: 24,
+                    ..Default::default()
+                }),
+                MeshKind::Internal,
+                MeshSide::Second,
+            )
+            .unwrap_err(),
+            MeshError::RingTooSmall
+        );
+    }
+
+    /// A mate that cannot mesh even at the mean shift says the shifts are the
+    /// problem, not the centre distance — `CentreDistanceTooSmall` was the
+    /// wrong signal for `inv α_w < 0`.
+    #[test]
+    fn an_infeasible_eccentric_mesh_blames_the_shifts() {
+        let mate = Gear::new(GearParams {
+            teeth: 30,
+            ..Default::default()
+        });
+        let err = Eccentric::new(GearParams {
+            teeth: 24,
+            profile_shift: 0.2,
+            angular_shift: 0.5,
+            ..Default::default()
+        })
+        .centre_profile(&mate, MeshKind::Internal, crate::mesh::MeshSide::First)
+        .unwrap_err();
+        assert_eq!(err, MeshError::OutsideInvoluteDomain);
     }
 
     /// **The range framework holds an ordinary gear to one number.**
@@ -1167,7 +1586,7 @@ mod tests {
             |g: &Gear| g.psi_b,
             |g: &Gear| 2.0 * g.r * g.psi_p,
         ] {
-            let [lo, hi] = flat.span(of);
+            let [lo, hi] = flat.extremes(of);
             assert_eq!(lo.to_bits(), hi.to_bits());
         }
 
@@ -1179,7 +1598,7 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(ecc.distinct().count(), 16);
-        let [lo, hi] = ecc.span(|g| g.params.profile_shift);
+        let [lo, hi] = ecc.extremes(|g| g.params.profile_shift);
         let seen = ecc
             .distinct()
             .map(|g| g.params.profile_shift)
@@ -1205,14 +1624,14 @@ mod tests {
             ..Default::default()
         });
         let p = flat
-            .centre_profile(&mate, MeshKind::External, Member::First)
+            .centre_profile(&mate, MeshKind::External, MeshSide::First)
             .unwrap();
         let mesh = Mesh::new(flat.mean(), &mate, MeshKind::External).unwrap();
         for a in &p.commanded {
             assert_eq!(a.to_bits(), mesh.a_w.to_bits());
         }
         assert_eq!(p.range[0].to_bits(), p.range[1].to_bits());
-        assert_eq!(p.sinusoid[1], 0.0, "a flat profile has no amplitude");
+        assert_eq!(p.sinusoid.amplitude, 0.0, "a flat profile has no amplitude");
         assert_eq!(p.sinusoid_error, 0.0);
         assert_eq!(p.sinusoid_backlash, [0.0, 0.0]);
     }
@@ -1236,7 +1655,7 @@ mod tests {
                 angular_shift: shift,
                 ..Default::default()
             })
-            .centre_profile(&mate, MeshKind::External, Member::First)
+            .centre_profile(&mate, MeshKind::External, MeshSide::First)
             .expect("a meshable pair")
         };
 
@@ -1321,6 +1740,127 @@ mod tests {
         }
     }
 
+    /// **The drawn root envelope is the one the teeth were actually cut to.**
+    ///
+    /// `root_at` builds the envelope on `mean.rf`, and the teeth are cut to
+    /// `r − m(h_cut − x_k)` with `h_cut` the *shared* cutter depth. If the mean
+    /// gear kept the raw dedendum while the teeth went deeper — which happens
+    /// whenever a high-shift tooth forces `h_cut` above it — the envelope would
+    /// stand `m·(h_cut − dedendum)` proud of the teeth, and the drawn root would
+    /// protrude past the fillets it is meant to join. On the reported case
+    /// (α = 25°, z = 23, x = 0.2, Δx = 1, addendum 0.8, dedendum 1.0) that gap
+    /// is 0.25 mm, clearly visible on the high side where the teeth are
+    /// shallowest.
+    ///
+    /// Checked at `λ = 0`, where each tooth's seat is its fold angle so
+    /// `root_at(seat_k)` and the tooth's own `rf` are the same point exactly.
+    /// The step/kink trend tests nearby cannot see this: a uniform radial
+    /// offset of the whole root is perfectly smooth.
+    #[test]
+    fn the_drawn_root_sits_on_the_teeth_it_belongs_to() {
+        for (teeth, pa, shift, add, ded, amp) in [
+            (23_u32, 25.0_f64, 0.2_f64, 0.8_f64, 1.0_f64, 1.0_f64), // the reported case
+            (24, 20.0, 0.0, 1.0, 1.25, 0.6),
+            (24, 20.0, 0.5, 1.0, 1.0, 0.5),
+            (40, 20.0, -0.3, 1.0, 0.9, 0.5),
+            (31, 20.0, 0.3, 1.0, 1.25, 0.0), // concentric: envelope is flat
+        ] {
+            let e = Eccentric::new(GearParams {
+                teeth,
+                pressure_angle: pa,
+                profile_shift: shift,
+                addendum: add,
+                dedendum: ded,
+                angular_shift: amp,
+                index_offset: 0.0,
+                ..Default::default()
+            });
+            for k in 0..teeth as usize {
+                let (g, seat) = e.tooth(k);
+                assert!(
+                    (e.root_at(seat) - g.rf).abs() < 1e-9,
+                    "z={teeth} x={shift} Δx={amp}: the drawn root at tooth {k} is \
+                     {} where the tooth's own root is {} — {} mm of protrusion",
+                    e.root_at(seat),
+                    g.rf,
+                    e.root_at(seat) - g.rf
+                );
+            }
+        }
+
+        // The reported case exactly, λ = 1. With `λ ≠ 0` the seats spread, so
+        // the envelope is sampled off the fold angle the shift was chosen at and
+        // `root_at(seat_k)` differs from `rf_k` by `m·Δx·(cos θ_k − cos seat_k)`
+        // — a few µm here, and the root correctly following where the tooth
+        // actually sits rather than its nominal index slot. What must *not*
+        // happen is the 0.25 mm protrusion above: the drawn root stays well
+        // within a tooth depth of the tooth's own root, and below its fillet
+        // junction.
+        let e = Eccentric::new(GearParams {
+            teeth: 23,
+            pressure_angle: 25.0,
+            profile_shift: 0.2,
+            addendum: 0.8,
+            dedendum: 1.0,
+            angular_shift: 1.0,
+            index_offset: 1.0,
+            ..Default::default()
+        });
+        for k in 0..23usize {
+            let (g, seat) = e.tooth(k);
+            let drawn = e.root_at(seat);
+            assert!(
+                (drawn - g.rf).abs() < 0.05 && drawn < g.r_j,
+                "λ=1: the drawn root at tooth {k} is {drawn}; the tooth's root is \
+                 {} and its fillet junction {}",
+                g.rf,
+                g.r_j
+            );
+        }
+    }
+
+    /// **The mean gear is cut by the shared tool.**
+    ///
+    /// The invariant the bug above slipped through: the teeth were rebuilt with
+    /// the shared tip round and depth, but `mean` — which every scalar output is
+    /// quoted from, and which `root_at` builds the root envelope on — was left
+    /// as `Gear::new` of the raw inputs. So it could sit on a different tool and
+    /// a different root envelope from every tooth of the gear it summarises.
+    #[test]
+    fn the_mean_gear_is_cut_by_the_shared_tool() {
+        for (shift, amp, ded) in [
+            (0.2_f64, 1.0_f64, 1.0_f64),
+            (0.5, 0.5, 1.0),
+            (0.0, 0.25, 1.25),
+        ] {
+            let e = Eccentric::new(GearParams {
+                teeth: 24,
+                pressure_angle: 25.0,
+                profile_shift: shift,
+                dedendum: ded,
+                angular_shift: amp,
+                ..Default::default()
+            });
+            let m = e.mean();
+            let depth = |g: &Gear| g.bd / g.params.module + g.params.profile_shift;
+            for g in e.distinct() {
+                assert_eq!(
+                    g.rho.to_bits(),
+                    m.rho.to_bits(),
+                    "a distinct tooth has tip round {} where the mean has {}",
+                    g.rho,
+                    m.rho
+                );
+                assert!(
+                    (depth(g) - depth(m)).abs() < 1e-12,
+                    "a distinct tooth sits on root envelope depth {} where the mean has {}",
+                    depth(g),
+                    depth(m)
+                );
+            }
+        }
+    }
+
     /// **A tooth that is not the gear that was asked for says which tooth it
     /// is.**
     ///
@@ -1338,7 +1878,7 @@ mod tests {
                 angular_shift: 0.3,
                 ..Default::default()
             })
-            .troubled_teeth()
+            .per_tooth_clamps()
         };
 
         // A buildable gear has nothing to report, eccentric or not. Not the
@@ -1349,11 +1889,11 @@ mod tests {
             teeth: 30,
             ..Default::default()
         })
-        .troubled_teeth()
+        .per_tooth_clamps()
         .teeth
         .is_empty());
         assert!(!Eccentric::new(GearParams::default())
-            .troubled_teeth()
+            .per_tooth_clamps()
             .teeth
             .is_empty());
 
@@ -1542,8 +2082,8 @@ mod tests {
                 let (_, next) = e.tooth((k + 1) % 23);
                 // Both reaches are measured from their own tooth, so they meet
                 // only if each is half the *actual* space between the two.
-                let from_here = seat + e.reach(k, 1.0);
-                let from_there = next - e.reach((k + 1) % 23, -1.0);
+                let from_here = seat + e.root_reach(k, 1.0);
+                let from_there = next - e.root_reach((k + 1) % 23, -1.0);
                 // The wrap at k = z − 1 crosses zero, so compare modulo a turn.
                 let gap = (from_here - from_there + std::f64::consts::PI)
                     .rem_euclid(std::f64::consts::TAU)
@@ -1757,6 +2297,72 @@ mod tests {
                 eccentric.distinct_teeth(),
                 teeth as usize / 2 + 1,
                 "z={teeth}: should be ⌈z/2⌉+1 distinct teeth"
+            );
+        }
+    }
+    /// **The amplitude is bounded, and the bound is where one tool stops being
+    /// able to cut every tooth.**
+    ///
+    /// Inside it, `Eccentric` settles a single tool that no tooth re-clamps
+    /// against — which is what makes the drawn root envelope the one the teeth
+    /// were cut to. Outside it there is no such gear, and the old absence of any
+    /// bound is what let a `z = 5` gear draw a root 1.94 mm clear of its own
+    /// teeth (`docs/corrections.md`).
+    ///
+    /// Asserted as the comparison rather than as a number: just inside the
+    /// bound every tooth's root sits on the envelope exactly, just outside it
+    /// does not.
+    #[test]
+    fn the_amplitude_bound_is_where_one_tool_stops_cutting_every_tooth() {
+        for p in [
+            GearParams {
+                teeth: 5,
+                pressure_angle: 14.5,
+                dedendum: 0.9,
+                ..Default::default()
+            },
+            GearParams {
+                teeth: 7,
+                ..Default::default()
+            },
+            GearParams {
+                teeth: 9,
+                dedendum: 1.0,
+                ..Default::default()
+            },
+            GearParams {
+                teeth: 17,
+                ..Default::default()
+            },
+            GearParams {
+                teeth: 23,
+                pressure_angle: 25.0,
+                addendum: 0.8,
+                dedendum: 1.0,
+                profile_shift: 0.2,
+                ..Default::default()
+            },
+        ] {
+            let amp = crate::auto::admissible_angular_shift(&p).max.unwrap();
+            assert!(amp > 0.0, "{p:?}: no amplitude admitted at all");
+
+            let on_envelope = |a: f64| {
+                let e = Eccentric::new(GearParams {
+                    angular_shift: a,
+                    ..p
+                });
+                (0..p.teeth as usize).all(|k| {
+                    let (g, seat) = e.tooth(k);
+                    (e.root_at(seat) - g.rf).abs() < 1e-9
+                })
+            };
+            assert!(
+                on_envelope(amp * 0.99),
+                "{p:?}: off the envelope inside the bound"
+            );
+            assert!(
+                !on_envelope(amp * 1.5),
+                "{p:?}: still on the envelope well past the bound — the bound is not the limit"
             );
         }
     }

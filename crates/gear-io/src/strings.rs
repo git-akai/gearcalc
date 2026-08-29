@@ -10,7 +10,7 @@
 //! Because the notes are, and a message split across two repositories of text is
 //! a message that will disagree with itself. The application gets this same
 //! catalogue through `gear_wasm::strings`, exactly as it gets its defaults
-//! through `gear_wasm::defaults` — and for the same reason, which DESIGN §12
+//! through `gear_wasm::defaults` — and for the same reason, which docs/corrections.md
 //! records: the one value that was written down in two languages drifted, and
 //! only the side without tests was wrong.
 //!
@@ -299,7 +299,7 @@ mod tests {
     ///
     /// Deliberately a *sweep of real solves* rather than a table: a table would
     /// be a second declaration of the same thing, and the copy nobody exercises
-    /// is the one that goes wrong (DESIGN §12). Anything this sweep does not
+    /// is the one that goes wrong (docs/corrections.md). Anything this sweep does not
     /// reach is simply not checked, which is honest — it is not claimed to be
     /// exhaustive, only true.
     fn observed_values() -> BTreeMap<String, Vec<String>> {
@@ -371,7 +371,7 @@ mod tests {
                 angular_shift: amplitude,
                 ..Default::default()
             });
-            record(&e.troubled_teeth().notes);
+            record(&e.per_tooth_clamps().notes);
         }
 
         // Rings, which have guard rails of their own and none in common with an
@@ -381,7 +381,7 @@ mod tests {
             for cutter_teeth in [8_u32, 20, 40, 90] {
                 for shift in [-0.6_f64, 0.0, 0.8] {
                     for tip_round in [0.02_f64, 0.38] {
-                        let ring = gear_core::ring::Ring::new(
+                        let ring = gear_core::ring::Ring::cut_by(
                             &GearParams {
                                 teeth,
                                 profile_shift: shift,
@@ -395,7 +395,7 @@ mod tests {
                         );
                         record(&ring.clamps);
                         for thickness in [0.05_f64, 2.5] {
-                            let extreme = gear_core::ring::Ring::new(
+                            let extreme = gear_core::ring::Ring::cut_by(
                                 &GearParams {
                                     teeth,
                                     profile_shift: shift,
@@ -434,7 +434,7 @@ mod tests {
                     ],
                     ..Default::default()
                 };
-                if let Ok(r) = gear_core::train::solve_stage(&stage, 2.0, &lib) {
+                if let Ok(r) = gear_core::train::solve_spur_stage(&stage, 2.0, &lib) {
                     record(&r.notes);
                 }
                 for sigma in [0.5_f64, 90.0] {
@@ -492,7 +492,7 @@ mod tests {
         for tip_round in [0.5_f64, 0.7] {
             for cutter_teeth in [10_u32, 14] {
                 record(
-                    &gear_core::ring::Ring::new(
+                    &gear_core::ring::Ring::cut_by(
                         &GearParams {
                             teeth: 24,
                             dedendum: 1.6,
@@ -526,7 +526,7 @@ mod tests {
                 ],
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_stage(&stage, 2.0, &lib) {
+            if let Ok(r) = gear_core::train::solve_spur_stage(&stage, 2.0, &lib) {
                 record(&r.notes);
             }
             // ...and a crossed pair of the same, whose teeth then reach a full
@@ -617,6 +617,144 @@ mod tests {
             }
         }
 
+        // ---- the errors -------------------------------------------- //
+        //
+        // Every reason a result does not exist, fired from the geometry that
+        // produces it rather than by constructing the variant. Building the
+        // enum by hand would check that a key has a message and nothing else;
+        // reaching it through the model also checks that the case is *live* —
+        // the same standard the clamps above are held to, and the reason a note
+        // nothing can fire has to be named in `UNFIRED` with its evidence.
+        {
+            use gear_core::note::Explain;
+            let g = |p| gear_core::Gear::new(p);
+            let d = gear_core::GearParams::default();
+            let mut err = |n: gear_core::note::Note| record(std::slice::from_ref(&n));
+
+            // A mesh: different racks, a ring no bigger than its pinion, shifts
+            // that leave the involute domain, and centres inside the base
+            // circles.
+            let big = gear_core::GearParams { module: 2.0, ..d };
+            let pair = |a, b, k| gear_core::Mesh::new(&g(a), &g(b), k).map(|_| ());
+            if let Err(e) = pair(d, big, gear_core::MeshKind::External) {
+                err(e.note());
+            }
+            let small_ring = gear_core::GearParams { teeth: 9, ..d };
+            if let Err(e) = pair(d, small_ring, gear_core::MeshKind::Internal) {
+                err(e.note());
+            }
+            let very_thin = gear_core::GearParams {
+                profile_shift: -2.0,
+                ..d
+            };
+            if let Err(e) = pair(very_thin, very_thin, gear_core::MeshKind::External) {
+                err(e.note());
+            }
+            if let Ok(m) = gear_core::Mesh::new(&g(d), &g(d), gear_core::MeshKind::External) {
+                if let Err(e) = m.backlash(1.0) {
+                    err(e.note());
+                }
+            }
+
+            // Metrology: no measurable span, and pins that miss the flank, sit
+            // on the root, fall through, or ride out past the base circle.
+            // A one-tooth gear at a steep helix has no `k` whose contact lands
+            // on the usable flank, which is the honest answer rather than a
+            // number nobody could measure.
+            for p in [
+                gear_core::GearParams {
+                    teeth: 1,
+                    pressure_angle: 10.0,
+                    profile_shift: -0.5,
+                    helix_angle: 70.0,
+                    ..d
+                },
+                gear_core::GearParams { teeth: 3, ..d },
+            ] {
+                if let Err(e) = gear_core::metrology::best_span(&g(p)) {
+                    err(e.note());
+                }
+            }
+            for (p, dia) in [
+                (d, 0.2_f64),
+                (d, 1.75),
+                (d, 4.0),
+                (gear_core::GearParams { teeth: 5, ..d }, 3.0),
+                (gear_core::GearParams { teeth: 200, ..d }, 0.05),
+                (
+                    gear_core::GearParams {
+                        teeth: 1,
+                        pressure_angle: 10.0,
+                        profile_shift: -0.5,
+                        ..d
+                    },
+                    1.75,
+                ),
+            ] {
+                if let Err(e) =
+                    gear_core::metrology::over_pins(&g(p), dia, gear_core::metrology::PinCount::Two)
+                {
+                    err(e.note());
+                }
+            }
+
+            // A screw pair: nothing positive, a worm too thin for its starts, a
+            // shaft angle the wheel cannot take, a first member that is a disc,
+            // and parallel axes.
+            use gear_core::screw::{Screw, ScrewParams};
+            for (starts, dia, sigma, module) in [
+                (1_u32, 7.0_f64, 90.0_f64, 0.0_f64),
+                (9, 3.0, 90.0, 1.0),
+                (1, 7.0, 179.999, 1.0),
+                (1, 7.0, 0.0, 1.0),
+            ] {
+                let sp = ScrewParams {
+                    normal_module: module,
+                    normal_pressure_angle: 20.0_f64.to_radians(),
+                    shaft_angle: sigma.to_radians(),
+                    starts,
+                    wheel_teeth: 40,
+                    worm_pitch_diameter: dia,
+                };
+                if let Err(e) = Screw::new(&sp) {
+                    err(e.note());
+                }
+            }
+            err(gear_core::screw::ScrewError::FirstMemberIsADisc.note());
+
+            // A train: no contact, an unknown material, a tooth with no root
+            // section left to rate, and no stages at all.
+            use gear_core::train::{Train, TrainError};
+            err(TrainError::NoContact.note());
+            err(TrainError::UnknownMaterial("nothing by that name".into()).note());
+            err(TrainError::NoRootSection.note());
+            if let Err(e) = gear_core::train::solve_train(
+                &Train {
+                    input_speed: 3000.0,
+                    input_torque: 2.0,
+                    actuation: gear_core::train::Actuation::Continuous {
+                        operating_percent: 80.0,
+                        runtime_hours: 1000.0,
+                    },
+                    stages: Vec::new(),
+                },
+                &lib,
+            ) {
+                err(e.note());
+            }
+
+            // ...and the three the boundary raises rather than the core: they
+            // are `ui.` keys, checked by `tools/check_strings.py`, so they are
+            // recorded here only so this sweep sees the `error.` twins.
+            for k in [
+                key::ERROR_GEAR_NO_MATE,
+                key::ERROR_GEAR_CONCENTRIC_HAS_NO_PROFILE,
+                key::ERROR_GEAR_NO_PIN_DIAMETER,
+            ] {
+                err(gear_core::note::Note::new(k));
+            }
+        }
+
         seen
     }
 
@@ -668,7 +806,7 @@ mod tests {
     ///   normally hand it one that cannot work.
     ///
     /// Both are live code with live messages, so neither is deleted on
-    /// suspicion. See HANDOFF §5.
+    /// suspicion. See HANDOFF docs/rationale.md#where-closed-form-is-impossible.
     const UNFIRED: &[&str] = &["clamp.ring_fully_filleted", "stage.ring_addendum_clamped"];
 
     #[test]

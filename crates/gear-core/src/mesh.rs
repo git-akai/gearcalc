@@ -22,7 +22,7 @@
 //!
 //! # Thickness modification enters through the shift, not separately
 //!
-//! The sum that sets `α_w` is over `x + x_s`, the *thickness* shift of §4.1, not
+//! The sum that sets `α_w` is over `x + x_s`, the *thickness* shift of docs/reference.md#tooth-thickness-and-its-equivalent-shift, not
 //! over `x` alone. When both gears use `k = 1` this is the textbook formula; when
 //! a mating pair satisfies `k₁ + k₂ = 2` the `x_s` terms cancel and the centre
 //! distance is provably unmoved. Both fall out of one expression rather than
@@ -61,7 +61,7 @@ impl MeshKind {
     /// an ordinary internal mesh. Neither was reachable at the time, because
     /// [`ContactPath::new`](crate::contact::ContactPath::new) then admitted no
     /// internal mesh; both would have gone live the moment it did, which it now
-    /// has. See `docs/DESIGN.md` §12.
+    /// has. See `docs/corrections.md`.
     #[must_use]
     pub const fn sign(self) -> f64 {
         match self {
@@ -172,15 +172,14 @@ impl Mesh {
     /// shifts put the operating pressure angle outside the involute domain.
     pub fn new(g1: &Gear, g2: &Gear, kind: MeshKind) -> Result<Self, MeshError> {
         let (p1, p2) = (&g1.params, &g2.params);
-        let compatible = (p1.module - p2.module).abs() < 1e-12
-            && (p1.pressure_angle - p2.pressure_angle).abs() < 1e-12
-            && match kind {
-                // External helical gears mesh with opposite hands, so the helix
-                // angles are equal and opposite; spur gears have both at zero.
-                MeshKind::External => (p1.helix_angle + p2.helix_angle).abs() < 1e-9,
-                // Internal pairs share the same hand.
-                MeshKind::Internal => (p1.helix_angle - p2.helix_angle).abs() < 1e-9,
-            };
+        // The rack is a property of each gear; the hand is a property of the
+        // pair, so only the second knows what `kind` means. Gear 2's helix
+        // enters with the kind's own sign — external gears mesh with opposite
+        // hands and an internal pair with the same — which is `MeshKind::sign`
+        // again rather than a second branch.
+        let compatible = p1.same_rack_as(p2)
+            && (p1.helix_angle + kind.sign() * p2.helix_angle).abs()
+                < crate::params::compat::SAME_RACK;
         if !compatible {
             return Err(MeshError::Incompatible);
         }
@@ -284,7 +283,7 @@ impl Mesh {
     /// Backlash is how far a member can turn *between* its two flanks. This is
     /// where it sits when one of them is loaded — which is what a driven gear
     /// does, and what an eccentric pair's commanded centre distance moves
-    /// (§4.10). The two are related by a symmetry rather than by a convention:
+    /// (docs/reference.md#angularly-varying-profile-shift). The two are related by a symmetry rather than by a convention:
     ///
     /// > The drive and coast lines of action are the two common tangents to the
     /// > base circles, and they are **mirror images about the line of centres**.
@@ -295,8 +294,8 @@ impl Mesh {
     ///
     /// Half of an exact law, so exact: no small-angle step enters, and it
     /// carries the involute law's second-order term with it. In the rack limit
-    /// it reduces to `δ tan α` per flank, which is the §4.1 thickness relation
-    /// and the one §4.10 leans on.
+    /// it reduces to `δ tan α` per flank, which is the docs/reference.md#tooth-thickness-and-its-equivalent-shift thickness relation
+    /// and the one docs/reference.md#angularly-varying-profile-shift leans on.
     ///
     /// Positive for `a_actual` above the zero-backlash distance, in the sense
     /// that the loaded member has *retreated* — the flank it is riding on has
@@ -307,14 +306,14 @@ impl Mesh {
     ///
     /// Because a factor of two between two nearly-identical quantities is the
     /// thing that goes wrong. It went wrong once already — the crossed-axis
-    /// backlash counted one flank where a separation opens both (§12) — and the
+    /// backlash counted one flank where a separation opens both (docs/corrections.md) — and the
     /// only defence that worked was making the two quantities separate, named,
     /// and separately gated.
     ///
     /// # Errors
     ///
     /// [`MeshError::CentreDistanceTooSmall`] if the base circles cannot reach.
-    pub fn loaded_flank_phase(&self, a_actual: f64, at_gear: Member) -> Result<f64, MeshError> {
+    pub fn loaded_flank_phase(&self, a_actual: f64, at_gear: MeshSide) -> Result<f64, MeshError> {
         Ok(self.angular_backlash(a_actual, at_gear)? / 2.0)
     }
 
@@ -323,14 +322,14 @@ impl Mesh {
     /// # Errors
     ///
     /// [`MeshError::CentreDistanceTooSmall`] if the base circles cannot reach.
-    pub fn angular_backlash(&self, a_actual: f64, at_gear: Member) -> Result<f64, MeshError> {
+    pub fn angular_backlash(&self, a_actual: f64, at_gear: MeshSide) -> Result<f64, MeshError> {
         let j = self.backlash(a_actual)?;
         // Play is a magnitude at whichever member is asked, so both the tooth
         // sum and the member's own count enter by magnitude. Which member turns
         // which way is a kinematic question and not this one.
         let z = match at_gear {
-            Member::First => f64::from(self.z1),
-            Member::Second => f64::from(self.z2),
+            MeshSide::First => f64::from(self.z1),
+            MeshSide::Second => f64::from(self.z2),
         };
         Ok(j * self.tooth_sum().abs() / (a_actual * z))
     }
@@ -451,7 +450,7 @@ impl Mesh {
 
 /// Which member of a pair a quantity refers to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Member {
+pub enum MeshSide {
     First,
     Second,
 }
@@ -464,6 +463,23 @@ fn x_thick(g: &Gear) -> f64 {
     g.params.profile_shift + g.params.thickness_shift()
 }
 
+impl crate::note::Explain for MeshError {
+    /// What went wrong, as a key and its values — the same currency a clamp
+    /// uses, so one channel carries every reason a user reads and the catalogue
+    /// check covers all of it.
+    fn note(&self) -> crate::note::Note {
+        use crate::note::key;
+        crate::note::Note::new(match self {
+            Self::Incompatible => key::ERROR_MESH_INCOMPATIBLE,
+            Self::RingTooSmall => key::ERROR_MESH_RING_TOO_SMALL,
+            Self::OutsideInvoluteDomain => key::ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,
+            Self::CentreDistanceTooSmall => key::ERROR_MESH_CENTRE_DISTANCE_TOO_SMALL,
+        })
+    }
+}
+
+/// English, for the CLI and for `Debug`. **Not** what the browser renders — see
+/// [`MeshError::note`], which is where the words come from there.
 impl std::fmt::Display for MeshError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -537,7 +553,7 @@ mod tests {
     /// **The loaded flank sits exactly halfway, and the outlines say so
     /// too.**
     ///
-    /// The acceptance gate §4.10 asks for, met twice. The first half is
+    /// The acceptance gate docs/reference.md#angularly-varying-profile-shift asks for, met twice. The first half is
     /// arithmetic — the phase is half the backlash by construction, so it
     /// reproduces `j_t = 2a′(inv α′ − inv α_w)` because it *is* that law — and
     /// arithmetic that cannot fail is not evidence. The second half is the
@@ -589,7 +605,7 @@ mod tests {
 
                 // 1. The play the drawn teeth leave is the law's, approached
                 //    from below as the drawing gets finer.
-                let law = mesh.angular_backlash(at, Member::Second).unwrap();
+                let law = mesh.angular_backlash(at, MeshSide::Second).unwrap();
                 let measured = drive - coast;
                 assert!(
                     measured <= law && law - measured < FLOOR,
@@ -615,7 +631,7 @@ mod tests {
                 }
 
                 // 3. ...so each flank sits one derived phase away from it.
-                let phase = mesh.loaded_flank_phase(at, Member::Second).unwrap();
+                let phase = mesh.loaded_flank_phase(at, MeshSide::Second).unwrap();
                 for (name, side) in [("drive", drive - midpoint), ("coast", midpoint - coast)] {
                     assert!(
                         (phase - side).abs() < FLOOR,
@@ -654,16 +670,16 @@ mod tests {
         let mesh = Mesh::new(&a, &b, MeshKind::External).unwrap();
         for delta in [1e-6_f64, 0.05, 0.5] {
             let at = mesh.a_w + delta;
-            for member in [Member::First, Member::Second] {
+            for member in [MeshSide::First, MeshSide::Second] {
                 let phase = mesh.loaded_flank_phase(at, member).unwrap();
                 let play = mesh.angular_backlash(at, member).unwrap();
                 assert!((2.0 * phase - play).abs() < 1e-15 * play);
             }
         }
-        // And the rack limit §4.10 leans on: per flank, `δ tan α`.
+        // And the rack limit docs/reference.md#angularly-varying-profile-shift leans on: per flank, `δ tan α`.
         let small = 1e-7;
         let phase = mesh
-            .loaded_flank_phase(mesh.a_w + small, Member::Second)
+            .loaded_flank_phase(mesh.a_w + small, MeshSide::Second)
             .unwrap();
         let r2 = mesh.a_w * f64::from(mesh.z2) / f64::from(mesh.z1 + mesh.z2);
         let rack = small * mesh.alpha_w.tan() / r2;
@@ -711,7 +727,7 @@ mod tests {
                     let alpha_op = mesh.pressure_angle_at(a_actual).unwrap();
                     // The same gap, read along the common normal instead.
                     let j_n = mesh.backlash(a_actual).unwrap() * alpha_op.cos() * beta_b.cos();
-                    for (member, z) in [(Member::First, z1), (Member::Second, z2)] {
+                    for (member, z) in [(MeshSide::First, z1), (MeshSide::Second, z2)] {
                         let transverse = mesh.angular_backlash(a_actual, member).unwrap();
                         let normal = angular_play(j_n, z, p_bn);
                         assert!(
@@ -744,7 +760,7 @@ mod tests {
                 let a_actual = mesh.a_w + delta;
                 let alpha_op = mesh.pressure_angle_at(a_actual).unwrap();
                 let j_n = mesh.backlash(a_actual).unwrap() * alpha_op.cos();
-                for (member, z) in [(Member::First, z1), (Member::Second, z2)] {
+                for (member, z) in [(MeshSide::First, z1), (MeshSide::Second, z2)] {
                     let transverse = mesh.angular_backlash(a_actual, member).unwrap();
                     let normal = angular_play(j_n, z, p_bn);
                     assert!(
@@ -837,7 +853,7 @@ mod tests {
     /// **The internal relative curvature, against the relation derived the other
     /// way — and against the error that was there before.**
     ///
-    /// DESIGN.md §4.11 gives the internal pair's conjugate relation with both
+    /// docs/reference.md#internal-gears gives the internal pair's conjugate relation with both
     /// distances positive:
     ///
     /// ```text
