@@ -9,6 +9,21 @@
   let loaded = $state(false);
   let failed = $state<string | null>(null);
 
+  // The tab's title is the application's **name**, read from the same catalogue
+  // entry the sidebar heading uses — so the name is written down once.
+  //
+  // Reactive, and it has to be: the catalogue arrives with the core, and `t`
+  // renders a missing message as its own key, so a plain assignment at mount
+  // would put the literal `ui.app_name` in the tab and never correct it. That is
+  // the "a module-level variable is not reactive" fault the sidebar hit once
+  // already (`docs/corrections.md`), and the guard below is what keeps the key
+  // itself off the screen while the core is still loading — `index.html` holds
+  // what the tab says until then.
+  $effect(() => {
+    const name = t("ui.app_name");
+    if (name !== "ui.app_name") document.title = name;
+  });
+
   onMount(async () => {
     try {
       await loadCore();
