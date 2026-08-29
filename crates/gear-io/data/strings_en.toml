@@ -91,7 +91,7 @@ ring_tip_raised = "tip radius raised to {radius} mm: below it a ring's tooth has
 cutter_teeth_reduced = "cutter reduced to {teeth} teeth: ring needs more teeth than its shaper"
 ring_flank_ungenerated = "flank below {limit} mm not generated; increase cutter teeth"
 ring_fully_filleted = "fully filleted root: corner rounds meet, leaving no root arc"
-ring_flank_fillet_gap = "flank and fillet do not meet: cutter does not reach this ring's flank, so the profile is not generated"
+ring_flank_fillet_gap = "flank and fillet do not meet: cutter does not reach this ring's flank; profile not generated"
 
 # ---------------------------------------------------------------- stage notes
 #
@@ -137,9 +137,9 @@ measure_pin_bottoms_out = "the pin sits on the root diameter, not the flanks"
 measure_pin_too_small = "the pin is too small: it falls between the flanks into the root"
 measure_pin_too_large = "the pin is too large: contact would fall below the base circle"
 screw_not_positive = "a module, diameter or tooth count is not positive"
-screw_worm_too_thin = "the first member has no lead angle: sized by diameter, the worm is too thin for that many starts at that module and its thread would have to wrap at ninety degrees or more; sized by helix angle, a zero helix makes it a spur gear, which has no lead at all — put the helical member first and the spur one second"
+screw_worm_too_thin = "the first member has no lead angle; put the helical member first and the spur one second"
 screw_shaft_angle_impossible = "that shaft angle leaves the wheel with no lead angle"
-screw_first_member_is_a_disc = "the first member's helix angle reaches ninety degrees: its teeth would run circumferentially and its pitch diameter is unbounded, which is a disc rather than a gear"
+screw_first_member_is_a_disc = "the first member's helix angle reaches ninety degrees, which is a disc rather than a gear"
 screw_axes_are_parallel = "parallel axes: a worm stage needs crossed shafts, and a parallel pair is a spur stage"
 train_no_contact = "the teeth never come into contact"
 train_unknown_material = "no material named {name} in the library"
@@ -150,6 +150,13 @@ gear_concentric_has_no_profile = "a concentric gear commands one centre distance
 gear_no_pin_diameter = "no pin diameter given"
 
 [ui]
+# **The one value in this file that is not translated.** It is the application's
+# name, not a word describing it, so a translator should leave it exactly as it
+# stands — and it is in the catalogue rather than hard-coded so that the checks
+# covering every other string cover it too. Prose outside the catalogue is
+# invisible to every gate this project has, and a proper noun is no exception to
+# that even though it is an exception to translation.
+app_name = "GEARCALC"
 app_loading_core = "Loading core…"
 # The admissible-range hints. One home each, because both the gear tab and the
 # geartrain tab show them and, written twice, they drifted: the same fillet
@@ -391,7 +398,7 @@ train_note_thickness_mod_crossed = "above 1, gear {first}'s teeth thicken and ge
 train_note_thickness_mod_planetary = "above 1, sun's and ring's teeth thicken and planet's thin; teeth in mesh sum to 2"
 train_note_thickness_mod_spur = "above 1, gear {first}'s teeth thicken and gear {second}'s thin; teeth in mesh sum to 2"
 train_note_thickness_mod_worm = "above 1, worm's thread thickens and wheel's teeth thin; teeth in mesh sum to 2"
-train_note_working_depth = "depth for undercut calculation; only used by automatic profile shift above"
+train_note_working_depth = "depth for undercut calculation; only used by automatic profile shift"
 train_one_planet_no_neighbour = "one planet has no neighbour"
 train_one_way = "one-way"
 train_operating_speed = "Operating speed"

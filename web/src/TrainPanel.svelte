@@ -1134,6 +1134,12 @@
                 <span>{t("ui.train_static_friction_sun_planet")}</span>
                 <input type="number" step="0.01" bind:value={stage.static_friction_sun_planet} />
                 <em></em>
+                {@render noteSlot(
+                  notes(
+                    t("ui.train_note_static_friction"),
+                    null,
+                  ),
+                )}
               </label>
               <label>
                 <span>{t("ui.train_sliding_friction_planet_ring")}</span>

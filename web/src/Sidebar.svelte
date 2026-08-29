@@ -31,7 +31,10 @@
 </script>
 
 <aside>
-  <h1>{t("ui.sidebar_gears")}</h1>
+  <!-- The application's name, which is not the same string as the heading over
+       the gear tabs below even though both once read "Gears". One key for two
+       jobs meant renaming either renamed both. -->
+  <h1>{t("ui.app_name")}</h1>
 
   <section class="library">
     <h2>{t("ui.sidebar_materials")}</h2>
