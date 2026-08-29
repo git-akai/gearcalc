@@ -114,6 +114,36 @@ depth the dedendum asked for, because a deeper hob cuts that gear perfectly well
 owed there is to be *told* the tool is no longer the one specified, which is what
 `ShiftRange::shallow_cut` is.
 
+### Clamp rather than refuse, and say so
+
+Where an input describes something the geometry cannot honour exactly, the
+answer is the nearest thing that *can* be cut, reported — not a refusal.
+
+**The distinction that makes this coherent** is which question the input is
+answering. A **clearance** is secondary: it says how much room to leave, and
+leaving slightly less is a part rather than a contradiction. So a dedendum, a
+tip round, a cutter depth are all clamped and noted. What is refused is input
+that describes *no shape at all*: a pinion cutter larger than the ring it is to
+cut, a module of zero, a shaft with `T ω ≤ 0`, two gears with different racks.
+
+This is the reading that settles the shift ceiling above — the dedendum is
+clearance, so treating it as secondary to unify the model is a fair conceit —
+and it is what makes the tool's own round a clamp rather than a refusal.
+
+**Measured, and it was a live inconsistency.** The identical guard — the tip
+round does not fit the tool's tip — was clamped on an external gear
+(`clamp.fillet_capped`, backed off to 95 % of what fits) and **refused** on a
+shaper, so `Ring` fell back to `fillet: None` and the part had no fillet at all.
+One input, two answers, and the jump was in kind rather than in degree at a point
+where nothing physical happens. The shaper caps now, by the same rule and with
+the same note.
+
+**And a clamp has to be continuous too.** Backing off by the 5 % margin only once
+the ask crosses the boundary drops the realised round *at* that instant, which is
+a step in the quantity the clamp exists to keep smooth. `min(asked, 0.95 × max)`
+is monotone in what was asked for; `if asked > max { 0.95 × max }` is not. Gated
+as that law rather than against a threshold.
+
 ### Say what is not modelled, next to the number
 
 A worm stage shows no bending stress and says why on screen. A ring shows the

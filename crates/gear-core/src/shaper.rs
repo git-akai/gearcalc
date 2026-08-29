@@ -44,7 +44,9 @@
 
 use crate::involute::inv;
 use crate::mesh::MeshKind;
+use crate::params::guard;
 use crate::profile::Gear;
+use crate::solve::{brent, Tol};
 
 /// A workpiece being cut by a pinion-shaped cutter.
 ///
@@ -148,7 +150,21 @@ impl ShaperCut {
             return None;
         }
         let cutter_radius = p.cutter_radius;
-        let corner_radius = p.cutter_tip_radius - p.tip_round;
+
+        // **The round is capped, not refused.** A tip round too large for the
+        // tool's own tip is the same guard `Gear::new` meets on an external gear
+        // — and there it caps the round to what fits and says so. Refusing here
+        // instead made one input give a fillet on an external gear and *no
+        // fillet at all* on a ring: a discontinuity in kind, at a point where
+        // nothing physical happens, from one guard answered two ways.
+        //
+        // The argument for refusing was that which of the round, the addendum
+        // and the tooth count to give up is the designer's call. True, and it
+        // applies just as much to the external gear that clamps anyway — so what
+        // the designer is owed is the largest round that *does* fit, reported,
+        // rather than a part with no fillet.
+        let tip_round = Self::largest_tip_round(p);
+        let corner_radius = p.cutter_tip_radius - tip_round;
         if corner_radius.is_nan() || corner_radius <= 0.0 {
             return None;
         }
@@ -157,7 +173,7 @@ impl ShaperCut {
             corner_radius,
             p.cutter_tooth,
             p.alpha_t,
-            p.tip_round,
+            tip_round,
         )?;
         // Rolling is on the operating circles, and both are the reference radii
         // scaled by the same `a / a_ref` — so a shift enters the kinematics as
@@ -186,7 +202,7 @@ impl ShaperCut {
             workpiece_operating_radius: p.workpiece_radius * scale,
             cutter_operating_radius: cutter_radius * scale,
             corner_radius,
-            tip_round: p.tip_round,
+            tip_round,
             phase: scale * Self::phase_from(p.module_t, cutter_radius, angle),
             kind: p.kind,
         })
@@ -395,6 +411,52 @@ impl ShaperCut {
             return None;
         }
         Some(angle)
+    }
+
+    /// The largest tip round this cutter's own tip will hold, capped the way an
+    /// external gear's is.
+    ///
+    /// The corner rounds sit either side of the tool's tooth centreline, so
+    /// [`Self::corner_angle`] going negative means they have crossed: the tip is
+    /// narrower than the rounds asked for. That angle falls as the round grows —
+    /// a larger round takes more of the tip and inset further — so the boundary
+    /// is a single crossing and is bracketed rather than searched for.
+    ///
+    /// Returns the requested round untouched where it fits, which is the
+    /// ordinary case and is bit-identical to what came before. Where it does
+    /// not, the answer is `FILLET_FRACTION_OF_MAX` of the boundary, exactly as
+    /// `Gear::new` backs off from its own geometric maximum — sitting on the
+    /// limit leaves a zero-width tip flat, which is legal and numerically
+    /// awkward.
+    fn largest_tip_round(p: &CutParams) -> f64 {
+        let angle_at = |rho: f64| {
+            let corner = p.cutter_tip_radius - rho;
+            if corner <= 0.0 {
+                return -1.0;
+            }
+            Self::corner_angle(p.cutter_radius, corner, p.cutter_tooth, p.alpha_t, rho)
+                .unwrap_or(-1.0)
+        };
+        // A round this small fits any tool that is a tool at all; where it does
+        // not, the tip corner is degenerate and `new` refuses on the corner
+        // radius rather than here.
+        let floor = guard::MIN_FILLET_MODULES * p.module_t;
+        if angle_at(floor) < 0.0 {
+            return floor;
+        }
+        // The boundary is bracketed rather than searched for: the angle falls as
+        // the round grows, and it is certainly negative by the time the round
+        // reaches the tip radius, where the corner has no radius left at all.
+        let boundary = brent(angle_at, floor, p.cutter_tip_radius, Tol::default()).unwrap_or(floor);
+
+        // `min(asked, 0.95 × boundary)`, which is `Gear::new`'s rule written the
+        // same way — and written the same way *deliberately*. Backing off only
+        // once the ask crosses the boundary would drop the realised round by the
+        // 5 % margin at that instant, which is a step in the very quantity this
+        // is here to keep continuous.
+        p.tip_round
+            .min(guard::FILLET_FRACTION_OF_MAX * boundary)
+            .max(floor)
     }
 
     /// The travel at which the corner is at the workpiece's tooth centreline —

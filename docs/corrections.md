@@ -34,7 +34,9 @@ numerically in two files; `MeshKind::sign` was written out again three times.
 *Now:* the mesh kind is a signed number rather than a branch; defaults, bounds
 and strings cross from Rust; the TypeScript wire types are generated and CI
 regenerates them and requires no diff; the trochoid curvature is one closed-form
-function shared by both cutters.
+function shared by both cutters; and the tool an external gear is cut by is a
+`Rack` of two **lengths**, because a coefficient converted on the way in and out
+picked up a stray `1/cos β` every time it made the round trip.
 
 ### A check built from the thing under test measures nothing
 
@@ -237,6 +239,9 @@ whose units are wrong is wrong however plausible.
 | [4.5.1](reference.md#crossed-axes) | "A narrow face pushes the rating 10–27 % past the pitch point" | Measured at 1.2 %, not 27 %. Losing load sharing does push the rating outward, but a face narrow enough to lose it has also cut the zone's ends off — and those ends were what made the path severe — so the two effects nearly cancel. The 10–27 % figure describes the zone's extremes, which are never rated because the load is shared there |
 | [4.5.1](reference.md#crossed-axes) | "Frictionless is lossless **to the last bit**" | To a few ulps. The answer is a ratio of two moments reached by different cancellations, so bit-exactness was never on offer; the assertion said more than the arithmetic could and failed on the first geometry that exercised it |
 | [4.5.2](reference.md#planetary-sets) | Reversing a planetary by handing its output shaft's torque back as the input | That torque is a **reaction**, opposite in sign to the shaft's speed, and a shaft that is now driving must have them agree. The wrong sign flips the rolling power, `η₀^w` takes the wrong branch, and the set reports an efficiency **above one** — 101.571 % in the running application. Every test drove forward with a positive torque and a positive speed, so none could see it; found by looking at the UI. Related: a shaft with `T ω ≤ 0` is absorbing power and is not an input at all, so naming it one is now refused rather than answered with `1/η₀` |
+| [reference.md#angularly-varying-profile-shift](reference.md#angularly-varying-profile-shift) | The shared tip round settled as a **coefficient** | Divided by the normal module and handed back as a `root_radius`, which is re-multiplied by `m/cos β` — so every rebuild inflated a helical gear's round by `1/cos β`, 1.22× at 35°, and the teeth came out cut by different tools. Invisible because every eccentric test used a spur gear. The tool is two lengths now, so there is no coefficient to round-trip |
+| [reference.md#internal-gears](reference.md#internal-gears) | A tip round too large for a shaper's tip **refused** the tool | The same guard caps it on an external gear. So one input gave a fillet outside and *no fillet at all* inside — a jump in kind at a point where nothing physical happens. Capped now, by the same rule and with the same note |
+| [reference.md#internal-gears](reference.md#internal-gears) | ...and the first cap was not monotone | Backing off by the 5 % margin only once the ask crossed the boundary dropped the realised round *at* that instant. `min(asked, 0.95 × max)` rather than `if asked > max { 0.95 × max }` — a clamp has to be continuous in what it clamps |
 
 ---
 

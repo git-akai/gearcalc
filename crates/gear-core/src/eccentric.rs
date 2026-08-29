@@ -44,7 +44,7 @@ use crate::involute::inv;
 use crate::mesh::{operating_geometry, MeshError, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::GearParams;
-use crate::profile::Gear;
+use crate::profile::{Gear, Rack};
 use crate::solve::{brent, Tol};
 
 /// Largest angular-shift amplitude [`amplitude_for_throw`] will search to, in
@@ -137,96 +137,67 @@ impl Eccentric {
             });
             which.push(at);
         }
-        let build = |x: f64, root_radius: f64, dedendum: f64| {
-            Gear::new(GearParams {
-                profile_shift: x,
-                root_radius,
-                dedendum,
-                ..params
-            })
-        };
-        let mut teeth: Vec<Gear> = shifts
-            .iter()
-            .map(|&x| build(x, params.root_radius, params.dedendum))
-            .collect();
-
         // **One hob, one setting.** This is the whole of what makes an eccentric
-        // gear an eccentric gear rather than a ring of unrelated ones, and it is
-        // where every guard rail in `Gear::new` becomes a trap: those guards are
-        // *gear-level* decisions, and applying them tooth by tooth lets
-        // neighbours be built to different rules. Every such difference is a
-        // step around the gear.
+        // gear an eccentric gear rather than a ring of unrelated ones.
         //
-        // Two of the settings are the tool's and must be shared:
-        //
-        // - **The tip round.** `Gear::new` caps it to what the tooth space will
-        //   hold, and a space narrows as the shift rises — so per-tooth building
-        //   gave 0.2375 modules on the high side against 0.3800 on the low.
-        // - **The depth.** `Gear::new` raises the cutter depth when it would go
-        //   non-positive, which happens as the shift approaches the dedendum. On
-        //   the high side that pinned four teeth to the same root radius while
-        //   their neighbours followed the envelope — a flat spot and then a
-        //   corner, exactly where the shift is most extreme.
-        //
-        // The tool that can cut every tooth is the one the *most demanding*
-        // tooth needs: the smallest round and the greatest depth. Set once and
-        // used by all, which is what a hob does. Teeth that set a limit keep
-        // their clamps, so the reason stays on the record.
+        // Every tooth is asked what tool it would want, and the one that can cut
+        // them all is the most demanding answer: the **smallest** round and the
+        // **deepest** reach. Asked before anything is built, so there is no
+        // settle-and-rebuild step and therefore no second question to forget —
+        // which is what twice went wrong (`docs/corrections.md`). A tooth is
+        // then handed that tool and, by the shape of [`Gear::cut_by`], cannot
+        // clamp it.
         //
         // What is **not** shared is what is genuinely a fact about a tooth
         // rather than about the tool: a tooth with too much shift comes to a
         // point, and one with too little is undercut. Those are reported per
-        // tooth (see `clamped_teeth`) rather than smoothed away.
-        //
-        // The rebuild happens only when the teeth **disagree**, which a
-        // concentric gear's never do — it has one tooth. So this costs an
-        // ordinary gear nothing and cannot move it.
-        //
-        // **The mean gear is rebuilt with the same tool.** It is where every
-        // scalar output is quoted from, and `root_at` builds the root envelope
-        // on its `rf` — so if it kept the raw dedendum while the teeth were cut
-        // deeper, the drawn root would sit `m·(depth − dedendum)` proud of the
-        // teeth it belongs to, protruding past the fillets. Rebuilt in lockstep
-        // with the teeth, so a concentric gear still keeps `Gear::new` verbatim.
-        //
-        // **The depth cap is the tool's too, and settling it is what makes this
-        // one pass rather than a hope.** `Gear::new` caps the depth at
-        // `MAX_CUTTER_DEPTH_FRACTION_OF_R` to keep the root off the axis — a
-        // guard rail that, sorted by whose property it is, belongs to the tool
-        // exactly as the floor and the tip round do. Left per-tooth it fired
-        // *after* the rebuild: the depth settled for the high tooth was driven
-        // into the low one, which re-clamped against a guard the first pass had
-        // not yet seen, and nothing looked again. The drawn root then left the
-        // teeth by up to 1.94 mm at `z = 5` (`docs/corrections.md`).
-        //
-        // Capped here, the rebuilt teeth cannot clamp at either end — the floor
-        // because `depth ≥ MIN + x` for every tooth by construction, the ceiling
-        // because this is exactly the deepest tool the shallowest-shift tooth
-        // can take. So one pass settles it, and there is no second question to
-        // forget to ask. Where the cap actually binds, no single tool can cut
-        // every tooth and there is no such gear — `admissible_angular_shift`
-        // is the bound that says so, and inside it this `min` never chooses.
-        let round = teeth.iter().fold(f64::MAX, |m, g| m.min(g.rho)) / params.module;
-        let deepest = teeth
+        // tooth (see [`Self::per_tooth_clamps`]) rather than smoothed away.
+        let at = |x: f64| GearParams {
+            profile_shift: x,
+            ..params
+        };
+        let wanted: Vec<(Rack, Vec<Note>)> = shifts
             .iter()
-            .zip(&shifts)
-            .fold(f64::MIN, |m: f64, (g, &x)| m.max(g.bd / params.module + x));
-        let shallowest_shift = shifts.iter().copied().fold(f64::MAX, f64::min);
+            .map(|&x| Gear::tool_wanted_by(&at(x)))
+            .collect();
+
+        let mut tool = Rack {
+            depth: wanted.iter().fold(f64::MIN, |d, (r, _)| d.max(r.depth)),
+            tip_round: wanted.iter().fold(f64::MAX, |t, (r, _)| t.min(r.tip_round)),
+        };
+
+        // The one thing the most-demanding rule cannot settle by itself: a tool
+        // deep enough for the high tooth is driven into the low one, whose root
+        // must still clear the axis. `b_d = depth − m x`, so the binding tooth
+        // is the one at the smallest shift. Where this actually binds, no single
+        // tool cuts every tooth and there is no such gear — `admissible_angular_shift`
+        // is the bound that says so, and inside it this `min` never chooses.
+        let x_lo = shifts.iter().copied().fold(f64::MAX, f64::min);
         let r = params.module / params.helix_angle.to_radians().cos()
             * f64::from(params.teeth.max(1))
             / 2.0;
-        let depth = deepest.min(
-            crate::params::guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r / params.module
-                + shallowest_shift,
-        );
-        let settled =
-            |g: &Gear, x: f64| g.rho / params.module == round && g.bd / params.module + x == depth;
-        let mut mean = Gear::new(params);
-        if !teeth.iter().zip(&shifts).all(|(g, &x)| settled(g, x)) {
-            for (t, &x) in teeth.iter_mut().zip(&shifts) {
-                *t = build(x, round, depth);
+        tool.depth = tool
+            .depth
+            .min(crate::params::guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r + params.module * x_lo);
+
+        let teeth: Vec<Gear> = shifts.iter().map(|&x| Gear::cut_by(at(x), tool)).collect();
+
+        // **The mean gear is cut by the same tool.** It is where every scalar
+        // output is quoted from, and `root_at` builds the root envelope on its
+        // `rf` — so if it kept the raw dedendum while the teeth were cut deeper,
+        // the drawn root would sit `m·(depth − dedendum)` proud of the teeth it
+        // belongs to, protruding past the fillets.
+        //
+        // The tool's own clamps land here rather than on whichever tooth
+        // happened to ask for them: sorted by whose property it is, a clamped
+        // tool setting is the *gear's*, and `mean` is the gear.
+        let mut mean = Gear::cut_by(params, tool);
+        for (_, notes) in &wanted {
+            for n in notes {
+                if !mean.clamps.fired(&n.key) {
+                    mean.clamps.push(n.clone());
+                }
             }
-            mean = build(params.profile_shift, round, depth);
         }
 
         // Seats. `ψ_b` is the angular half-thickness at the base circle — the
@@ -2346,24 +2317,96 @@ mod tests {
             let amp = crate::auto::admissible_angular_shift(&p).max.unwrap();
             assert!(amp > 0.0, "{p:?}: no amplitude admitted at all");
 
-            let on_envelope = |a: f64| {
+            // Inside the bound one tool cuts every tooth, and the teeth sit on
+            // the envelope it leaves. **Both halves are needed and they now fail
+            // differently**: since `Gear::cut_by` cannot clamp a tool it was
+            // handed, the envelope holds by construction at *any* amplitude —
+            // the shape guarantees it. What the bound actually marks is where no
+            // single depth serves both extremes, and past it the tool settled
+            // for the low tooth no longer reaches the high one at all.
+            // "The tool reaches" is `b_d > 0` — it dips below the rolling line
+            // at all. Physical, and so no tolerance has to be chosen: inside the
+            // bound the tightest tooth sits at the depth floor, and outside it
+            // the settled tool is *above* the high tooth's rolling line by a
+            // whole module or more.
+            let cuts_every_tooth = |a: f64| {
                 let e = Eccentric::new(GearParams {
                     angular_shift: a,
                     ..p
                 });
                 (0..p.teeth as usize).all(|k| {
                     let (g, seat) = e.tooth(k);
-                    (e.root_at(seat) - g.rf).abs() < 1e-9
+                    g.bd > 0.0 && (e.root_at(seat) - g.rf).abs() < 1e-9
                 })
             };
             assert!(
-                on_envelope(amp * 0.99),
-                "{p:?}: off the envelope inside the bound"
+                cuts_every_tooth(amp * 0.99),
+                "{p:?}: one tool does not cut every tooth inside the bound"
             );
             assert!(
-                !on_envelope(amp * 1.5),
-                "{p:?}: still on the envelope well past the bound — the bound is not the limit"
+                !cuts_every_tooth(amp * 1.5),
+                "{p:?}: one tool still cuts every tooth well past the bound — \
+                 the bound is not the limit"
             );
+        }
+    }
+
+    /// **One hob, one tip radius — at every helix angle.**
+    ///
+    /// The shared tool was settled as a *coefficient*: the smallest `rho` over
+    /// the teeth divided by the normal module, handed back as a `root_radius`
+    /// and multiplied by `m/cos β` on the way in again. So every rebuild
+    /// inflated a helical gear's round by `1/cos β` — 1.06× at 20°, 1.22× at
+    /// 35° — and the teeth came out cut by different tools, which is the exact
+    /// defect the shared tool exists to prevent.
+    ///
+    /// Nothing saw it because every eccentric test used a spur gear, where
+    /// `cos β` is 1: *a test that never leaves a control at its default never
+    /// tests the control*, met for the third time in this module
+    /// (`docs/corrections.md`).
+    ///
+    /// The tool is a [`Rack`] of two lengths now, so there is no coefficient to
+    /// round-trip. Asserted **exactly** — one tool means one number, not two
+    /// close ones — and swept over the helix because that is the axis that was
+    /// missing.
+    #[test]
+    fn one_tool_cuts_every_tooth_at_every_helix_angle() {
+        for beta in [0.0_f64, -15.0, 20.0, 35.0] {
+            for (teeth, dedendum, round, amp) in [
+                (23_u32, 1.0_f64, 0.38_f64, 0.9_f64), // the round caps on the high teeth
+                (23, 1.25, 0.38, 0.6),
+                (17, 1.0, 0.2, 0.5),
+                (40, 1.25, 0.38, 1.0),
+                (31, 1.25, 0.38, 0.0), // concentric: one tooth, trivially
+            ] {
+                let p = GearParams {
+                    teeth,
+                    helix_angle: beta,
+                    dedendum,
+                    root_radius: round,
+                    angular_shift: amp,
+                    ..Default::default()
+                };
+                let e = Eccentric::new(p);
+                let first = e.distinct().next().expect("a gear has teeth");
+                for g in e.distinct() {
+                    assert_eq!(
+                        g.rho.to_bits(),
+                        first.rho.to_bits(),
+                        "β={beta} z={teeth} Δx={amp}: two teeth cut by different tools — \
+                         tip round {} against {}",
+                        g.rho,
+                        first.rho
+                    );
+                }
+                // ...and the mean is one of them, since every scalar is quoted
+                // from it and the root envelope is built on it.
+                assert_eq!(
+                    e.mean().rho.to_bits(),
+                    first.rho.to_bits(),
+                    "β={beta} z={teeth}"
+                );
+            }
         }
     }
 }

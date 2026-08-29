@@ -645,7 +645,9 @@ involute of the same base circle:
 ```
 
 A negative `θ_g` means the corner rounds would overlap: the tip is narrower than
-the rounds asked for, and it is not a tool. Refused, not clamped.
+the rounds asked for. The round is **capped** at 95 % of the largest that fits,
+and the part reports it — the same rule and the same note an external gear's tip
+round gets, since it is the same guard.
 
 **The junction is a tangency, not a crossing**, so it is closed form from the
 line of action — for an internal pair the ring's tangency point lies beyond the
@@ -702,12 +704,15 @@ is exactly conjugate forward at twice the error in reverse.
 
 **One hob, one setting.** Whatever is a property of the *tool* is settled once
 for the whole gear, by the tooth that demands most of it; whatever is a property
-of *one tooth* is reported instead.
+of *one tooth* is reported instead. The tool is a value — `Rack { depth,
+tip_round }`, both in millimetres — passed to each tooth, so a tooth handed one
+has nothing to clamp. `b_d = depth − m x` is what makes a single tool leave a
+moving root envelope.
 
 | guard | whose property | treatment |
 |---|---|---|
 | cutter tip round | the tool's | shared: the smallest any tooth allows |
-| cutter depth | the tool's | shared: the greatest any tooth needs, capped once |
+| cutter depth | the tool's | shared: the greatest any tooth needs, capped once so the shallowest-shift tooth's root clears the axis |
 | tooth comes to a point | that tooth's | reported, with its position |
 | tooth is undercut or severed | that tooth's | reported, with its position |
 

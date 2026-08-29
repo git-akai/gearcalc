@@ -342,6 +342,18 @@ impl Ring {
             kind: MeshKind::Internal,
         });
 
+        // The tool caps its own round where the tip cannot hold what was asked
+        // for, exactly as `Gear::new` does on an external gear. Say so: a
+        // substituted tool that goes unmentioned is the same fault as a
+        // clamped input that goes unmentioned, and this one changes the fillet
+        // the part is rated on.
+        let asked = m * cutter.tip_round;
+        if let Some(c) = &cut {
+            if c.tip_round < asked {
+                clamps.push(Note::new(key::CLAMP_FILLET_CAPPED).number("radius", c.tip_round, 4));
+            }
+        }
+
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let teeth = z.round().max(1.0) as u32;
         let mut ring = Self {
@@ -2077,5 +2089,65 @@ mod tests {
             "clamps: {:?}",
             g.clamps
         );
+    }
+
+    /// **A ring's fillet does not vanish as the tool's round grows past its
+    /// tip — it stops growing.**
+    ///
+    /// The same guard on an external gear caps the round and says so
+    /// (`clamp.fillet_capped`). On a ring it used to *refuse* the tool, so
+    /// `Ring` fell back to `fillet: None` and the part had no fillet at all.
+    /// One input, two answers, and the jump was in kind rather than in degree —
+    /// at a point where nothing physical happens.
+    ///
+    /// Gated as a **law rather than a threshold**: the realised round is
+    /// non-decreasing in the round asked for, and every ring in the sweep has a
+    /// fillet. A refusal breaks both at once, and neither needs a tolerance.
+    #[test]
+    fn a_tool_round_too_large_is_capped_rather_than_refused() {
+        for (teeth, cutter_teeth, addendum) in
+            [(43_u32, 20_u32, 1.25_f64), (60, 24, 1.0), (120, 30, 1.25)]
+        {
+            let mut realised = f64::MIN;
+            let mut capped_somewhere = false;
+            for step in 0..=40 {
+                let asked = f64::from(step) * 0.02; // 0 … 0.80 modules
+                let p = GearParams {
+                    teeth,
+                    ..Default::default()
+                };
+                let ring = Ring::cut_by(
+                    &p,
+                    &Cutter {
+                        teeth: cutter_teeth,
+                        addendum,
+                        tip_round: asked,
+                    },
+                );
+                let f = ring.fillet.as_ref().unwrap_or_else(|| {
+                    panic!("z={teeth} cutter={cutter_teeth}: no fillet at all at ρ={asked}")
+                });
+                let _ = f;
+                let got = ring.cut.tip_round;
+                assert!(
+                    got >= realised - 1e-12,
+                    "z={teeth}: the realised round fell from {realised} to {got} as the \
+                     round asked for rose to {asked}"
+                );
+                realised = got;
+                if got < asked * p.module - 1e-12 {
+                    capped_somewhere = true;
+                    assert!(
+                        ring.clamps.iter().any(|n| n.is(key::CLAMP_FILLET_CAPPED)),
+                        "z={teeth}: the tool was capped to {got} from {asked} and said nothing"
+                    );
+                }
+            }
+            assert!(
+                capped_somewhere,
+                "z={teeth} cutter={cutter_teeth}: the sweep never reached the cap, so it \
+                 checks nothing"
+            );
+        }
     }
 }

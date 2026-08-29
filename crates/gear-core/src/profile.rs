@@ -75,6 +75,45 @@ pub enum Section {
     RootArc,
 }
 
+/// The tool an external gear is cut by: how deep it reaches and how its tip is
+/// rounded.
+///
+/// # Why the tool is a value rather than something a tooth works out
+///
+/// It used to be the second. [`Gear::new`] derived its own depth and tip round
+/// from the parameters and **clamped both** when they did not fit — which is a
+/// gear-level decision, taken inside something that is also used as *one tooth*
+/// of an eccentric gear. [`crate::eccentric::Eccentric`] then had to undo it:
+/// settle a tool across the teeth and rebuild them to it. Twice, the undoing was
+/// incomplete, and both times it reached the drawn geometry
+/// (`docs/corrections.md`).
+///
+/// Passing the tool in instead makes the invariant **unwritable**: a tooth
+/// handed a `Rack` has nothing to clamp, because it does not own the setting.
+/// [`Ring`](crate::ring::Ring) has always had this shape — it takes a
+/// [`Cutter`](crate::ring::Cutter) and keeps it — and this is the external
+/// gear's version of the same statement.
+///
+/// # Units, spelled out because getting them wrong is exactly what went wrong
+///
+/// **Both fields are millimetres**, deliberately, where the inputs they come
+/// from are coefficients. A depth in modules and a round in *transverse*
+/// modules were once shared through one number apiece and converted back on the
+/// way in, which multiplied a helical gear's tip round by `1/cos β` every time
+/// the shared tool was rebuilt — 1.22× at a 35° helix. A length that stays a
+/// length cannot pick up a stray conversion.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Rack {
+    /// How far the tip reaches below the **reference pitch circle** at zero
+    /// profile shift, mm. A tooth cut at shift `x` therefore has
+    /// `b_d = depth − m x`, which is what makes one tool leave an eccentric
+    /// gear's moving root envelope.
+    pub depth: f64,
+    /// Tip corner round, mm, in the **transverse** plane — where the trochoid
+    /// is swept, so no conversion happens after this point.
+    pub tip_round: f64,
+}
+
 /// A generated gear cross-section.
 ///
 /// Every field is in millimetres or radians. Construction never fails: degenerate
@@ -269,16 +308,58 @@ impl Gear {
             helix_angle: 0.0,
             ..self.params
         };
-        Self::build_with_z(params, false, self.z / beta.cos().powi(3))
+        Self::build_with_z(params, false, self.z / beta.cos().powi(3), None)
     }
 
     fn build(params: GearParams, clamp_flank_at_base: bool) -> Self {
         let z = f64::from(params.teeth);
-        Self::build_with_z(params, clamp_flank_at_base, z)
+        Self::build_with_z(params, clamp_flank_at_base, z, None)
     }
 
-    #[allow(clippy::too_many_lines)]
-    fn build_with_z(params: GearParams, clamp_flank_at_base: bool, z: f64) -> Self {
+    /// This tooth's form, cut by a tool that has **already been settled**.
+    ///
+    /// The difference from [`Gear::new`] is what is *absent*: no depth clamp and
+    /// no tip-round cap, because neither is this tooth's to make. Whoever owns
+    /// the whole gear settles the tool once — [`crate::eccentric::Eccentric`]
+    /// does, by taking what the most demanding tooth needs — and every tooth is
+    /// then cut by the same one, which is what a hob does and what the type now
+    /// says.
+    ///
+    /// The tooth's own clamps still fire: a tooth can be pointed, undercut,
+    /// severed or too thin whatever tool cut it.
+    /// What tool one tooth of these parameters asks for, and the clamps that
+    /// asking raises.
+    ///
+    /// The entry point an assembly uses to settle a shared tool before building
+    /// anything — see [`crate::eccentric::Eccentric::new`].
+    #[must_use]
+    pub fn tool_wanted_by(params: &GearParams) -> (Rack, Vec<Note>) {
+        let z = f64::from(params.teeth.max(1));
+        let m = params.module;
+        let an = params
+            .pressure_angle
+            .to_radians()
+            .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
+        let beta = params.helix_angle.to_radians();
+        let alpha_t = (an.tan() / beta.cos()).atan();
+        let r = m / beta.cos() * z / 2.0;
+        let (st, _) = transverse_thickness(params, z, m, an, beta, r);
+        Rack::wanted_by(params, z, st, m, an, alpha_t, beta, r)
+    }
+
+    #[must_use]
+    pub fn cut_by(params: GearParams, tool: Rack) -> Self {
+        let z = f64::from(params.teeth);
+        Self::build_with_z(params, false, z, Some(tool))
+    }
+
+    #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+    fn build_with_z(
+        params: GearParams,
+        clamp_flank_at_base: bool,
+        z: f64,
+        tool: Option<Rack>,
+    ) -> Self {
         let mut clamps = Clamps::default();
         let m = params.module;
         let x = params.profile_shift;
@@ -303,51 +384,36 @@ impl Gear {
         let (ca, sa) = (alpha_t.cos(), alpha_t.sin());
 
         // ---- depth: RADIAL, so plain x ---------------------------------
-        let mut bd = m * (params.dedendum - x);
-        if bd < guard::MIN_CUTTER_DEPTH_MODULES * m {
-            bd = guard::MIN_CUTTER_DEPTH_MODULES * m;
-            clamps.push(Note::new(key::CLAMP_DEDENDUM_RAISED));
-        }
-        if bd > guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r {
-            bd = guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r;
-            clamps.push(Note::new(key::CLAMP_DEDENDUM_CAPPED));
-        }
-        let rf = r - bd;
-
         // ---- thickness: uses x + x_s (the thickness modification) -------
-        let x_thick = x + params.thickness_shift();
-        let mut st = m * (std::f64::consts::PI / 2.0 + 2.0 * x_thick * an.tan()) / beta.cos();
-        let st_max =
-            guard::MAX_TOOTH_THICKNESS_FRACTION_OF_PITCH * 2.0 * r * std::f64::consts::PI / z;
-        if st <= guard::MIN_TOOTH_THICKNESS_MODULES * m {
-            st = guard::MIN_TOOTH_THICKNESS_MODULES * m;
-            clamps.push(Note::new(key::CLAMP_TOOTH_THICKNESS_RAISED));
-        }
-        if st > st_max {
-            st = st_max;
-            clamps.push(Note::new(key::CLAMP_TOOTH_THICKNESS_CAPPED));
+        //
+        // Before the tool, because the round's fit depends on how much space the
+        // tooth leaves. Thickness is the *tooth's* property, so its clamps stay
+        // here whether the tool was handed in or worked out.
+        let (st, thickness_clamps) = transverse_thickness(&params, z, m, an, beta, r);
+        for n in thickness_clamps {
+            clamps.push(n);
         }
         let psi_p = st / (2.0 * r);
         let psi_b = psi_p + inv(alpha_t);
 
-        // ---- cutter tip radius, capped so the rounds fit the tooth space
-        let w_roll = std::f64::consts::PI * mt - st; // rack tooth width at the rolling line
-        let w_tip = w_roll - 2.0 * bd * alpha_t.tan(); // ... and at the tip line
-                                                       // NOT w_tip / (2 cos a): that form is wrong and silently shrinks the
-                                                       // fillet on every profile-shifted gear.
-        let rho_fit = if w_tip > 0.0 {
-            w_tip * ca / (2.0 * (1.0 - sa))
-        } else {
-            0.0
+        // ---- the tool ---------------------------------------------------
+        //
+        // Handed in, or settled for this one tooth. **A tooth given a tool does
+        // not clamp it** — there is no `if` in that branch, which is the whole
+        // point of `Rack` existing (see its documentation).
+        let tool = match tool {
+            Some(rack) => rack,
+            None => {
+                let (rack, tool_clamps) = Rack::wanted_by(&params, z, st, m, an, alpha_t, beta, r);
+                for n in tool_clamps {
+                    clamps.push(n);
+                }
+                rack
+            }
         };
-        let mut rho = params.root_radius * m / beta.cos();
-        let rho_cap =
-            (guard::FILLET_FRACTION_OF_MAX * bd).min(guard::FILLET_FRACTION_OF_MAX * rho_fit);
-        if rho > rho_cap {
-            rho = rho_cap.max(guard::MIN_FILLET_MODULES * m);
-            clamps.push(Note::new(key::CLAMP_FILLET_CAPPED).number("radius", rho, 4));
-        }
-        let rho = rho.max(guard::MIN_FILLET_MODULES * m);
+        let bd = tool.depth - m * x;
+        let rho = tool.tip_round;
+        let rf = r - bd;
         let bc = bd - rho;
         let ac = st / 2.0 + bc * alpha_t.tan() + rho / ca;
 
@@ -647,6 +713,104 @@ pub(crate) fn rolling_curvature_radius(q: [f64; 2], dq: [f64; 2], ddq: [f64; 2],
         f64::INFINITY
     } else {
         speed.powi(3) / cross
+    }
+}
+
+/// Transverse tooth thickness at the pitch circle, and any clamp that setting it
+/// raised.
+///
+/// Extracted because both routes to a tooth need it and the tool's fit depends
+/// on it: `Rack::wanted_by` has to know how much space is left before it can say
+/// how large a round fits.
+fn transverse_thickness(
+    params: &GearParams,
+    z: f64,
+    m: f64,
+    an: f64,
+    beta: f64,
+    r: f64,
+) -> (f64, Vec<Note>) {
+    use std::f64::consts::PI;
+    let mut notes = Vec::new();
+    let x_thick = params.profile_shift + params.thickness_shift();
+    let mut st = m * (PI / 2.0 + 2.0 * x_thick * an.tan()) / beta.cos();
+    let st_max = guard::MAX_TOOTH_THICKNESS_FRACTION_OF_PITCH * 2.0 * r * PI / z;
+    if st <= guard::MIN_TOOTH_THICKNESS_MODULES * m {
+        st = guard::MIN_TOOTH_THICKNESS_MODULES * m;
+        notes.push(Note::new(key::CLAMP_TOOTH_THICKNESS_RAISED));
+    }
+    if st > st_max {
+        st = st_max;
+        notes.push(Note::new(key::CLAMP_TOOTH_THICKNESS_CAPPED));
+    }
+    (st, notes)
+}
+
+impl Rack {
+    /// The tool a single tooth asks for, and the clamps that asking raised.
+    ///
+    /// This is the settling [`Gear::new`] used to do inline. It is a free
+    /// function on the *tool* now so that an assembly can ask every tooth what
+    /// it wants **before** building any of them, and hand one answer to all —
+    /// which is what removes the build-settle-rebuild dance that twice failed to
+    /// converge (`docs/corrections.md`).
+    #[must_use]
+    #[allow(clippy::too_many_arguments)]
+    fn wanted_by(
+        params: &GearParams,
+        _z: f64,
+        st: f64,
+        m: f64,
+        _an: f64,
+        alpha_t: f64,
+        beta: f64,
+        r: f64,
+    ) -> (Self, Vec<Note>) {
+        use std::f64::consts::PI;
+        let mut notes = Vec::new();
+        let x = params.profile_shift;
+        let (ca, sa) = (alpha_t.cos(), alpha_t.sin());
+        let mt = m / beta.cos();
+
+        // Depth below the tip of the tooth being cut, then the clamps that keep
+        // a tool from vanishing or reaching the axis.
+        let mut bd = m * (params.dedendum - x);
+        if bd < guard::MIN_CUTTER_DEPTH_MODULES * m {
+            bd = guard::MIN_CUTTER_DEPTH_MODULES * m;
+            notes.push(Note::new(key::CLAMP_DEDENDUM_RAISED));
+        }
+        if bd > guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r {
+            bd = guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r;
+            notes.push(Note::new(key::CLAMP_DEDENDUM_CAPPED));
+        }
+
+        // The round has to fit both the depth and the space the tooth leaves.
+        // NOT `w_tip / (2 cos α)`: that form is wrong and silently shrinks the
+        // fillet on every profile-shifted gear.
+        let w_tip = (PI * mt - st) - 2.0 * bd * alpha_t.tan();
+        let rho_fit = if w_tip > 0.0 {
+            w_tip * ca / (2.0 * (1.0 - sa))
+        } else {
+            0.0
+        };
+        let mut rho = params.root_radius * mt;
+        let rho_cap =
+            (guard::FILLET_FRACTION_OF_MAX * bd).min(guard::FILLET_FRACTION_OF_MAX * rho_fit);
+        if rho > rho_cap {
+            rho = rho_cap.max(guard::MIN_FILLET_MODULES * m);
+            notes.push(Note::new(key::CLAMP_FILLET_CAPPED).number("radius", rho, 4));
+        }
+        let rho = rho.max(guard::MIN_FILLET_MODULES * m);
+
+        // Stored against the *reference* pitch circle rather than this tooth's
+        // rolling line, so one value serves every shift: `b_d = depth − m x`.
+        (
+            Self {
+                depth: bd + m * x,
+                tip_round: rho,
+            },
+            notes,
+        )
     }
 }
 

@@ -217,9 +217,13 @@ Not a queue with a head; this is what a next session would pick from.
 - **Inspection data for an eccentric gear**, which is the largest named gap and
   has its framework already built.
 - **A planetary set's drawing.**
-- **The `ToothForm` split.** `Gear` is both a whole gear and one tooth of an
-  `Eccentric`, so every guard in `Gear::new` is a gear-level decision taken per
-  tooth. Two measured defects were that shape asking for it, and the evidence is
-  in [corrections](corrections.md). Deferred deliberately: the defects are fixed
-  and the amplitude is now bounded, so a third would be caught by the grid.
+- **Renaming `Gear` to `ToothForm`.** The structural half of that split is done —
+  `Gear::cut_by` takes a settled `Rack`, so a tooth cannot clamp a tool it does
+  not own — and what is left is cosmetic: `Gear` still names both a whole gear
+  and one tooth of an eccentric one. 223 call sites, mechanical, and worth doing
+  only if the name starts costing someone.
+- **Moving the whole-gear methods off `Gear`.** `Gear::profile` and
+  `Gear::outline` build an `Eccentric` from `self.params`, so `profile.rs` and
+  `outline.rs` depend on the module that depends on them. ~43 call sites, and it
+  would break that circularity.
 - **Further UI work**, as it is asked for.
