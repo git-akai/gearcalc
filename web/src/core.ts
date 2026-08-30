@@ -3,7 +3,14 @@
 // Project rule: no engineering calculation lives on this side of the boundary.
 // Everything here either forwards inputs to Rust or formats what Rust returned.
 
-import { setCatalogue, t, type Note } from "./strings.svelte";
+import {
+  setCatalogue,
+  setLanguages,
+  setCurrentLanguage,
+  t,
+  type LanguageOption,
+  type Note,
+} from "./strings.svelte";
 import type {
   Actuation,
   Arrangement,
@@ -290,20 +297,6 @@ export function validate(f: FieldSpec, v: number, b: Bound | null): string | nul
 let ready: Promise<void> | null = null;
 let cachedDefaults: Defaults | null = null;
 
-/** A language this build can be read in. The list comes from Rust — see
- *  `gear_wasm::languages` for why it is not written down here as well. */
-export interface LanguageOption {
-  code: string;
-  name: string;
-}
-
-let cachedLanguages: LanguageOption[] = [];
-
-/** The languages available. Empty until the core has loaded. */
-export function languages(): LanguageOption[] {
-  return cachedLanguages;
-}
-
 /** Where the chosen language is remembered.
  *
  *  A preference about *reading*, not an input to a calculation — so unlike
@@ -321,13 +314,6 @@ function stored(): string | null {
   }
 }
 
-/** The language in force. */
-export function language(): string {
-  return current;
-}
-
-let current = "en";
-
 /** Switch language, reloading the catalogue from the core.
  *
  *  Nothing else has to happen: `t()` is a reactive read, so every label on
@@ -338,7 +324,7 @@ export function setLanguage(tag: string): void {
   // `gear_io::strings::Language::resolve` — so a browser's `zh-TW` and a stored
   // `de-CH` both land somewhere real, and the picker shows what is in force.
   const code = wasm_resolve_language(tag);
-  current = code;
+  setCurrentLanguage(code);
   try {
     localStorage.setItem(STORED, code);
   } catch {
@@ -352,7 +338,7 @@ export function loadCore(): Promise<void> {
   if (!ready) {
     ready = init().then(() => {
       cachedDefaults = JSON.parse(wasm_defaults()) as Defaults;
-      cachedLanguages = JSON.parse(wasm_languages()) as LanguageOption[];
+      setLanguages(JSON.parse(wasm_languages()) as LanguageOption[]);
       // A stored preference, else what the browser asks for. Neither needs
       // validating: an unrecognised tag resolves to English.
       setLanguage(stored() ?? navigator.language ?? "en");
@@ -540,5 +526,5 @@ export function solveTrain(
 // The words live in `strings.svelte.ts` — it has to be a rune module, because
 // the catalogue arrives after the first render. Re-exported here so a component
 // still reaches everything through one door.
-export { t, note } from "./strings.svelte";
-export type { Note } from "./strings.svelte";
+export { t, note, languages, language } from "./strings.svelte";
+export type { Note, LanguageOption } from "./strings.svelte";

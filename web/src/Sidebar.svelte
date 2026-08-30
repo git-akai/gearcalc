@@ -6,12 +6,6 @@
 
   let picker: HTMLInputElement;
 
-  // The language in force, held locally so the select is a controlled input.
-  // `setLanguage` refills the catalogue and `t()` is a reactive read, so every
-  // label on screen re-renders itself — the same property that lets the
-  // catalogue arrive late at start-up, used a second time.
-  let chosen = $state(language());
-
   async function onPicked(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
@@ -41,6 +35,28 @@
        the gear tabs below even though both once read "Gears". One key for two
        jobs meant renaming either renamed both. -->
   <h1>{t("ui.app_name")}</h1>
+
+  <!-- Under the title rather than at the foot of the pane. It sat below the tab
+       lists, which grow: past a dozen tabs it was pushed off the bottom and the
+       one control a reader needs *before* they can read anything was the one
+       they had to scroll to find.
+
+       Each language is named in itself, because a reader looking for theirs is
+       looking for the word they call it by — a list that says "German" is a
+       list for people who already read English.
+
+       Only once the core has answered: the list comes from Rust, and an empty
+       select is a blank box rather than a language. -->
+  {#if languages().length}
+    <label class="language">
+      <span class="visually-hidden">{t("ui.sidebar_language")}</span>
+      <select value={language()} onchange={(e) => setLanguage(e.currentTarget.value)}>
+        {#each languages() as l (l.code)}
+          <option value={l.code}>{l.name}</option>
+        {/each}
+      </select>
+    </label>
+  {/if}
 
   <section class="library">
     <h2>{t("ui.sidebar_materials")}</h2>
@@ -101,29 +117,9 @@
     <button class="add" onclick={() => trains.create()}>+ New geartrain</button>
   </section>
 
-  <!-- Bottom of the pane, below the work: a preference, not a control that
-       changes an answer. Each language is named in itself, because a reader
-       looking for theirs is looking for the word they call it by — a list that
-       says "German" is a list for people who already read English. -->
-  <div class="foot">
-    <label class="language">
-      <span class="visually-hidden">{t("ui.sidebar_language")}</span>
-      <select
-        value={chosen}
-        onchange={(e) => {
-          chosen = (e.currentTarget as HTMLSelectElement).value;
-          setLanguage(chosen);
-        }}
-      >
-        {#each languages() as l (l.code)}
-          <option value={l.code}>{l.name}</option>
-        {/each}
-      </select>
-    </label>
-    {#if version}
-      <p class="version">core v{version}</p>
-    {/if}
-  </div>
+  {#if version}
+    <p class="version">core v{version}</p>
+  {/if}
 </aside>
 
 <style>
@@ -239,14 +235,14 @@
     color: var(--warn);
     margin: 0.35rem 0 0 0.25rem;
   }
-  .foot {
-    margin-top: auto;
-    padding-top: 0.6rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
+  /* A `select` sizes itself to its longest option unless told not to, and a
+     flex item will not shrink below that intrinsic width — so without the
+     `min-width` the picker pushed itself past the edge of the pane. */
+  .language {
+    min-width: 0;
   }
   .language select {
+    max-width: 100%;
     font: inherit;
     font-size: 0.75rem;
     width: 100%;
@@ -272,9 +268,9 @@
     white-space: nowrap;
   }
   .version {
+    margin-top: auto;
     font-size: 0.7rem;
     color: var(--muted);
     padding-left: 0.25rem;
-    margin: 0;
   }
 </style>

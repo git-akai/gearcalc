@@ -13,9 +13,44 @@
 /** The catalogue, keyed `section.key`. Empty until the core has loaded. */
 let catalogue = $state<Record<string, string>>({});
 
-/** Called once by `loadCore`. */
+/** Called by `loadCore`, and again whenever the language changes. */
 export function setCatalogue(messages: Record<string, string>) {
   catalogue = messages;
+}
+
+/** A language this build can be read in. The list comes from Rust — see
+ *  `gear_wasm::languages` for why it is not written down here as well. */
+export interface LanguageOption {
+  code: string;
+  name: string;
+}
+
+// **Which words is the same kind of fact as the words**, and arrives at the same
+// moment — from the core, after the first render. So the language lives here
+// beside the catalogue and in `$state` for the same reason it does: held in a
+// plain module variable the picker drew itself once, empty, and never again
+// (`docs/corrections.md`).
+let available = $state<LanguageOption[]>([]);
+let current = $state("en");
+
+/** The languages available. Empty until the core has loaded. */
+export function languages(): LanguageOption[] {
+  return available;
+}
+
+/** The language in force. */
+export function language(): string {
+  return current;
+}
+
+/** Called by `loadCore` with what the core ships. */
+export function setLanguages(list: LanguageOption[]) {
+  available = list;
+}
+
+/** Called by `setLanguage` with the **resolved** code, never a raw tag. */
+export function setCurrentLanguage(code: string) {
+  current = code;
 }
 
 /** Look up a message, with `{name}` filled in from `values`.

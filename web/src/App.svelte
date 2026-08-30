@@ -62,10 +62,25 @@
 </div>
 
 <style>
+  /* **The shell is a frame, and the two panes are the only things that scroll.**
+     Whenever a pane's content grew past the window, a third scrollbar appeared
+     on the document itself — at the far right, beside the one `main` already
+     had, and scrolling nothing but blank space. `overflow: hidden` here is what
+     makes that impossible rather than merely unlikely: a grid row that outgrows
+     a fixed-height container overflows it, and an overflow the container does
+     not handle is passed up to the viewport. Nothing is lost by clipping it,
+     because both children scroll inside themselves.
+
+     `dvh` before `vh` for the same reason, one level down: `100vh` is the
+     viewport *ignoring* any horizontal scrollbar, so a page that grows one is
+     suddenly a scrollbar's-height too tall — which is exactly a strip of blank
+     at the bottom and a bar to scroll to it. */
   .shell {
     display: grid;
     grid-template-columns: 16rem 1fr;
     height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
   }
   main {
     padding: 1rem 1.25rem 2rem;
