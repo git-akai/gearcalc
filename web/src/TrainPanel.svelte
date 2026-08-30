@@ -474,6 +474,17 @@
         {cases(g.bending_stress, 1)} MPa
         <small>{t("ui.train_peak_cyclic")}</small>
       </dd>
+      <!-- Per gear, and genuinely so. The two flanks share one pressure at any
+           instant — the individual curvatures reach Hertz only through their
+           sum — but the two gears are not rated at the same instant: each one's
+           dedendum carries the load alone at its own end of the path, and that
+           is where its pitting is assessed. -->
+      <dt>{t("ui.train_contact_stress")}</dt>
+      <dd>
+        {cases(g.contact_stress, 1)} MPa
+        <small>{t("ui.train_peak_cyclic")}</small>
+        <small>{t("ui.train_note_at_its_own_single_pair_point")}</small>
+      </dd>
       <dt>{t("ui.train_min_face_width")}</dt>
       <dd>
         <span class="line">
@@ -940,15 +951,12 @@
                     <small class="warn">{t("ui.train_no_full_axial_overlap")}</small>
                   {/if}
                 </dd>
-                <!-- Here, not on either gear card. The pair shares one patch,
-                     one normal force and one E*, so there is one pressure and
-                     both flanks feel it — printed per gear it read as a
-                     calculation somebody had forgotten to do twice. What a gear
-                     has of its own is the allowable it is judged against, and
-                     that shows up in the face width it asks for. -->
-                <dt>{t("ui.train_contact_stress")}</dt>
+                <!-- The one figure both members share: same patch, same normal
+                     force, same E*, one instant. Each gear's own rating is on
+                     its card and is this or worse. -->
+                <dt>{t("ui.train_contact_stress_at_pitch_point")}</dt>
                 <dd>
-                  {cases(sres.contact_stress, 1)} MPa
+                  {cases(sres.contact_stress_at_pitch_point, 1)} MPa
                   <small>{t("ui.train_peak_cyclic")}</small>
                   <small>ρ {sres.relative_radius.toFixed(3)} mm</small>
                 </dd>
@@ -1470,9 +1478,9 @@
                     {pct(m.efficiency.forward)} % driven forward · {pct(m.efficiency.backward)} %
                     driven backward
                   </dd>
-                  <dt>{t("ui.train_contact_stress")}</dt>
+                  <dt>{t("ui.train_contact_stress_at_pitch_point")}</dt>
                   <dd>
-                    {cases(m.contact_stress, 1)} MPa
+                    {cases(m.contact_stress_at_pitch_point, 1)} MPa
                     <small>{t("ui.train_peak_cyclic")}</small>
                     <small>ρ {m.relative_radius.toFixed(3)} mm</small>
                   </dd>

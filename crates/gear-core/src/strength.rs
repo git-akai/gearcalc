@@ -988,9 +988,15 @@ pub const PARALLEL_AXES: f64 = 0.0;
 pub struct ContactStress {
     /// At the pitch point, where the relative radius is largest.
     pub at_pitch_point: f64,
-    /// At the worse of the two single-pair contact boundaries.
-    pub at_single_pair: f64,
-    /// The higher of the two, which is what a design is rated on.
+    /// At each gear's own **inner point of single-pair contact**, indexed as the
+    /// gears are.
+    ///
+    /// The two are different points on the same line of action, and that is the
+    /// one way a mesh's two members legitimately carry different contact
+    /// stresses — see [`ContactStress::governing`].
+    pub at_single_pair: [f64; 2],
+    /// The worst anywhere on the path: the envelope over both members, and what
+    /// the *mesh* is rated on when no member is named.
     pub worst: f64,
     /// Position of the worst point on the line of action, mm from the pitch
     /// point.
@@ -1000,6 +1006,50 @@ pub struct ContactStress {
     /// the number is really driven by. Equal to the transverse radius for a spur
     /// gear.
     pub relative_radius: f64,
+}
+
+impl ContactStress {
+    /// What gear `i` is rated on: the worse of the pitch point and **its own**
+    /// inner point of single-pair contact.
+    ///
+    /// # Why a mesh has two contact stresses, and why it is not the curvature
+    ///
+    /// At any one instant there is one pressure. The two flanks share a patch, a
+    /// normal force and an `E*`, and Hertz reaches that patch through the *gap*
+    /// between the surfaces, which depends on the individual radii only as
+    /// `1/ρ = 1/ρ₁ + 1/ρ₂`. Each body is then treated as an elastic half-space
+    /// loaded by that shared pressure, and a half-space does not know its own
+    /// curvature — so `ρ₁ = ρ₂ = 10` and `ρ₁ = 5.5, ρ₂ = 55` are the same
+    /// contact, at the same pressure, in both bodies. Two teeth of very
+    /// different size do **not** see different stresses for being different
+    /// sizes.
+    ///
+    /// What differs is **where each gear's own worst moment is**. Along the
+    /// path, `ρ₁ + ρ₂` is constant, so `ρ` peaks where they are equal and falls
+    /// toward both ends; the two ends are not symmetric about that peak, so the
+    /// two single-pair boundaries carry different pressures. And the two gears
+    /// are not rated at the same one: pitting initiates in the **dedendum**,
+    /// where sliding opposes rolling, and each gear's flank is at its root at
+    /// one end of the path and at its tip at the other. Gear 1's root end is the
+    /// low end of `ξ` and gear 2's is the high end — one relation, both mesh
+    /// kinds, since `ρ₁` rises and `ρ₂` falls monotonically with `ξ`.
+    ///
+    /// So each gear takes the worse of the pitch point and the boundary where
+    /// its own root is loaded alone. This is ISO 6336-2's `Z_B` and `Z_D` — a
+    /// factor of `max(1, M_i)` on the pitch-point stress, applied to the pinion
+    /// and the wheel respectively — reached here by evaluating the two points
+    /// rather than by quoting the factor.
+    ///
+    /// [`Self::worst`] remains the envelope over both, and is what the *mesh*
+    /// is rated on where no member is named.
+    ///
+    /// # Panics
+    ///
+    /// Never for `i` in `0..2`; indexes out of bounds otherwise.
+    #[must_use]
+    pub fn governing(&self, gear: usize) -> f64 {
+        self.at_pitch_point.max(self.at_single_pair[gear])
+    }
 }
 
 /// Exact Hertzian contact for a meshing pair.
@@ -1064,19 +1114,10 @@ pub struct ContactStress {
 /// # Which points are checked
 ///
 /// `ρ₁ + ρ₂` is constant along the path, so the relative radius `ρ₁ρ₂/(ρ₁+ρ₂)`
-/// is largest where the two are equal and falls away toward **both** ends. The
-/// worst single-pair point is therefore whichever boundary of the single-pair
-/// zone lies further from that balance point.
-///
-/// **Both boundaries are evaluated, not just the inner one.** docs/reference.md#contact-stress
-/// says to take the inner point of single-pair contact, "usually the pinion's
-/// worst case" — but "usually" is doing real work there. The balance point sits
-/// at `(r_b2 − r_b1) tan α_w / 2`, so it is on the recess side when gear 1 is
-/// the pinion and on the approach side when gear 1 is the wheel. Checking only
-/// the inner boundary would therefore make the answer depend on which gear the
-/// caller happened to label 1 — for the same physical mesh. Contact stress is a
-/// property of the *pair*; a test asserts that swapping the labels leaves it
-/// unchanged.
+/// is largest where the two are equal and falls away toward **both** ends. Both
+/// single-pair boundaries are evaluated as well as the pitch point, and they are
+/// kept **apart** rather than reduced to one figure: each belongs to one of the
+/// two gears. [`ContactStress::governing`] says which.
 ///
 /// Returns `None` if the geometry puts a contact point outside both flanks,
 /// which cannot happen for a mesh [`ContactPath`] accepted.
@@ -1136,7 +1177,10 @@ pub fn contact_stress(
 
     Some(ContactStress {
         at_pitch_point: pitch,
-        at_single_pair: single,
+        // Gear 1's flank is at its root at the **low** end of the path and gear
+        // 2's at the high end — one relation, both mesh kinds, and the reason
+        // the two members are rated at different points. See `governing`.
+        at_single_pair: [s_lo, s_hi],
         worst,
         worst_position,
         relative_radius,
@@ -2212,6 +2256,87 @@ mod tests {
         }
     }
 
+    /// **Gear 1's root is loaded at the low end of the path and gear 2's at the
+    /// high end** — the geometric fact [`ContactStress::governing`] rests on.
+    ///
+    /// One relation covers both mesh kinds. A contact radius is `√(r_b² + ρ²)`,
+    /// `ρ₁` rises with `ξ` and `ρ₂` falls, so gear 1's contact point climbs its
+    /// flank as `ξ` grows while gear 2's radius moves the other way — outward
+    /// for a ring, inward for an external gear, and **toward its root either
+    /// way**, because a ring's root is its larger radius. That last step is the
+    /// one a case analysis would get wrong, so the sign is taken from
+    /// [`MeshKind::sign`] rather than assumed.
+    #[test]
+    fn each_gears_root_is_loaded_at_its_own_end_of_the_path() {
+        for (kind, z1, z2) in [
+            (MeshKind::External, 17u32, 43u32),
+            (MeshKind::External, 43, 17),
+            (MeshKind::External, 20, 20),
+            (MeshKind::Internal, 17, 51),
+            (MeshKind::Internal, 24, 60),
+        ] {
+            let g = |z| {
+                Tooth::new(GearParams {
+                    teeth: z,
+                    ..Default::default()
+                })
+            };
+            let mesh = Mesh::new(&g(z1), &g(z2), kind).expect("this pair should mesh");
+            let (rb1, rb2) = mesh.base_radii();
+            let span = mesh.a_w * mesh.alpha_w.sin();
+            let radii = |xi: f64| {
+                let (rho1, rho2) = mesh.curvature_radii(xi);
+                (rb1.hypot(rho1), rb2.hypot(rho2))
+            };
+            let (lo, hi) = (radii(-0.3 * span), radii(0.3 * span));
+
+            assert!(
+                hi.0 > lo.0,
+                "{kind:?} {z1}/{z2}: gear 1 must climb from its root as xi grows \
+                 ({} to {})",
+                lo.0,
+                hi.0
+            );
+            // Toward gear 2's root: down in radius for an external gear, up for
+            // a ring, which is exactly what the kind's sign says.
+            assert!(
+                kind.sign() * (hi.1 - lo.1) < 0.0,
+                "{kind:?} {z1}/{z2}: gear 2 must approach its root as xi grows \
+                 ({} to {})",
+                lo.1,
+                hi.1
+            );
+        }
+    }
+
+    /// **The individual curvatures do not reach the answer; only their sum
+    /// does.**
+    ///
+    /// This is the claim that makes "the two teeth are different sizes, so they
+    /// must see different stresses" false, and it is a property of Hertz rather
+    /// than of this code — so it is checked against the code: two pairs built to
+    /// the *same* relative radius out of wildly different individual radii must
+    /// give the same pressure.
+    #[test]
+    fn only_the_relative_curvature_reaches_the_pressure() {
+        // 1/ρ = 1/ρ₁ + 1/ρ₂ = 1/5 for every one of these.
+        let same_relative = [(10.0_f64, 10.0_f64), (5.5, 55.0), (6.0, 30.0), (7.5, 15.0)];
+        let (f_per_length, e_star) = (250.0_f64, 113_000.0_f64);
+        let pressure = |rho1: f64, rho2: f64| {
+            let inv_rho = 1.0 / rho1 + 1.0 / rho2;
+            (f_per_length * inv_rho * e_star / std::f64::consts::PI).sqrt()
+        };
+        let first = pressure(same_relative[0].0, same_relative[0].1);
+        for (rho1, rho2) in same_relative {
+            let p = pressure(rho1, rho2);
+            assert!(
+                (p - first).abs() < 1e-9 * first,
+                "rho1={rho1} rho2={rho2}: {p} against {first} — only 1/rho1 + 1/rho2 \
+                 may reach the pressure"
+            );
+        }
+    }
+
     #[test]
     fn contact_stress_is_worst_off_the_pitch_point_and_softens_with_a_softer_pair() {
         let (g1, g2, mesh) = pair(17, 43);
@@ -2219,9 +2344,19 @@ mod tests {
         let load = Load::new(2.0, 8.0);
 
         let steel = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 113_000.0).unwrap();
-        // The single-pair point has the smaller relative radius, so it governs.
-        assert!(steel.at_single_pair > steel.at_pitch_point);
-        assert!((steel.worst - steel.at_single_pair).abs() < 1e-12);
+        // A single-pair point has the smaller relative radius, so one of the
+        // two governs, and it is the worse of the two that sets the envelope.
+        let single = steel.at_single_pair[0].max(steel.at_single_pair[1]);
+        assert!(single > steel.at_pitch_point);
+        assert!((steel.worst - single).abs() < 1e-12);
+        // ...and each gear is rated at its own, which is this or the pitch point.
+        for i in 0..2 {
+            assert_eq!(
+                steel.governing(i),
+                steel.at_pitch_point.max(steel.at_single_pair[i])
+            );
+            assert!(steel.governing(i) <= steel.worst);
+        }
 
         // A compliant pair spreads the contact and drops the pressure, as √E*.
         let poly = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 1_700.0).unwrap();

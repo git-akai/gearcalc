@@ -53,15 +53,18 @@ tooth_cycles: Cycles,
  */
 bending_stress: LoadCase<number | null>, 
 /**
- * The face width each rating would need: two per case, four in all.
+ * Hertzian contact stress, MPa, for each load case — at **this gear's**
+ * governing point.
  *
- * This is where a pair's two gears differ on contact. The **stress** is one
- * number for the mesh — the pair shares a patch, a normal force and an
- * `E*`, so there is only one pressure and both flanks feel it — and it is
- * reported once, at the mesh (`SpurResult::contact_stress`,
- * [`crate::train::MeshReport`], `WormResult::contact`). What belongs to a
- * gear is the allowable it is judged against, and therefore the width it
- * asks for.
+ * The two gears of a mesh share one patch and one pressure at any instant,
+ * so this is not a per-tooth curvature effect. They differ because they are
+ * rated at different *moments*: each gear's dedendum is loaded alone at one
+ * end of the path, and that is where its own pitting is assessed. See
+ * [`crate::strength::ContactStress::governing`].
+ */
+contact_stress: LoadCase<number>, 
+/**
+ * The face width each rating would need: two per case, four in all.
  */
 min_face_width: LoadCase<Widths>, 
 /**

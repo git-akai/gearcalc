@@ -23,17 +23,15 @@ centre_distance_nominal: number,
  */
 centre_distance: number, contact_ratios: ContactRatios, 
 /**
- * Hertzian contact stress, MPa, in both load cases.
+ * Hertzian contact stress at the pitch point, MPa, in both load cases.
  *
- * **A property of the mesh, not of either gear.** The two flanks share one
- * patch, one normal force and one `E*`, so there is one pressure and it is
- * reported once. What differs between the gears is the allowable it is
- * judged against, which is why [`GearResult::min_face_width`] is per gear
- * and this is not.
+ * The one figure the two members genuinely share: same patch, same normal
+ * force, same `E*`. Each gear's own rating sits on [`GearResult`] and is
+ * this or worse, depending on where its dedendum is loaded alone.
  */
-contact_stress: LoadCase<number>, 
+contact_stress_at_pitch_point: LoadCase<number>, 
 /**
- * Relative radius of curvature at the governing point, mm.
+ * Relative radius of curvature at the worst point on the path, mm.
  */
 relative_radius: number, 
 /**

@@ -14,9 +14,12 @@ export type MeshReport = { contact_ratios: ContactRatios,
  */
 efficiency: Directional<number>, 
 /**
- * Hertzian contact stress, MPa — shared by the pair, in both load cases.
+ * Hertzian contact stress at the pitch point, MPa, in both load cases.
+ *
+ * The one figure both members of the mesh share. Each member's own rating —
+ * taken where its dedendum is loaded alone — sits on its `GearResult`.
  */
-contact_stress: LoadCase<number>, 
+contact_stress_at_pitch_point: LoadCase<number>, 
 /**
  * Relative radius of curvature at the governing point, mm.
  */

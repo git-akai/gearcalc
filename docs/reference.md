@@ -892,12 +892,32 @@ largest any *enabled* rating asks for. Peak contact is off by default — see
 enabled there is nothing to invert and the width is zero, which the stage reports
 as a note.
 
-**Where each figure lives.** Contact stress is a property of the **mesh**: the
-pair shares one patch, one normal force and one `E*`, so there is one pressure
-and both flanks feel it. It is reported once per mesh — `SpurResult`,
-`MeshReport`, `WormResult::contact`. What belongs to a *gear* is the allowable it
-is judged against, and therefore the face width it asks for. Bending is genuinely
-per gear: each tooth has its own root section and form factor.
+**Where each figure lives.** At any one instant a mesh has **one** contact
+pressure: the two flanks share a patch, a normal force and an `E*`, and the
+individual radii reach Hertz only as `1/ρ = 1/ρ₁ + 1/ρ₂`. That shared figure is
+reported per mesh, at the pitch point.
+
+The two gears are nonetheless rated at **different points**, and so carry
+different contact stresses:
+
+```text
+σ_H,i = max( σ_H(pitch point), σ_H(gear i's inner point of single-pair contact) )
+```
+
+`ρ₁` rises and `ρ₂` falls monotonically along the path, so gear 1's flank is at
+its root at the low end and gear 2's at the high end — one relation, both mesh
+kinds, since a ring's root is its *larger* radius. Pitting initiates in the
+dedendum, so each gear is assessed where its own root carries the load alone.
+This is ISO 6336-2's `Z_B` and `Z_D` (`max(1, M_i)` on the pitch-point stress,
+pinion and wheel respectively), reached by evaluating the two points rather than
+by quoting the factor.
+
+Bending is per gear for the ordinary reason: each tooth has its own root section
+and form factor.
+
+**An automatic face width is sized to the mesh, not to one gear.** The narrower
+face carries the pair, so each automatic width resolves to the largest ask any
+member of that mesh has. A member in two meshes — a planet — answers to both.
 
 A gear's reported `torque` is the one it carries **driving forward**; a
 back-driving load is reported beside it, not folded into it. The peak *rating*

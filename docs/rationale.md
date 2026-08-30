@@ -648,22 +648,56 @@ It is offered rather than removed, because a designer who *has* a
 contact-pressure limit can put it in the override and switch the rating on. What
 the tool declines to do is assume one.
 
-### Contact stress belongs to the mesh, not to either gear
+### One pressure, two ratings — and the curvature is not what separates them
 
-Two gears of a pair share one contact patch, one normal force and one `E*`. There
-is one pressure, and both flanks feel it. Reported per gear it came out as the
-same number twice, which reads exactly like a calculation somebody forgot to do
-for the second gear — and the honest answer to "why are these identical" is that
-there was never a second number to compute.
+Two teeth in mesh have very different flank curvatures, so it is natural to
+expect them to carry different contact stresses for that reason. They do not, and
+the reason is worth being exact about because the wrong mechanism leads to the
+wrong fix.
 
-So it is reported where it belongs: once, at the mesh. What a gear has of its own
-is the **allowable**, and that shows up in the face width it asks for — halve one
-gear's allowable and its `b_min` quadruples while the stress does not move. Both
-halves are gated, because "this looks like a bug" is not something a comment can
-settle.
+Hertz reaches the contact through the **gap** between the surfaces, and the gap
+depends on the individual radii only as `1/ρ = 1/ρ₁ + 1/ρ₂`. Each body is then
+treated as an elastic half-space carrying that shared pressure, and a half-space
+does not know its own curvature. So `ρ₁ = ρ₂ = 10` and `ρ₁ = 5.5, ρ₂ = 55` are
+the same contact at the same pressure in both bodies — gated, because it is the
+claim the whole reporting decision turns on. A small pinion tooth and a large
+wheel tooth touching each other do not see different pressures for being
+different sizes.
 
-Bending is not like this. Each tooth has its own root section and its own form
-factor, so two gears in a mesh genuinely report two bending stresses.
+What genuinely separates them is **when each is rated**. Along the path `ρ₁ + ρ₂`
+is constant, so `ρ` peaks where the two are equal and falls toward both ends —
+and the two ends are not symmetric about that peak, so the two single-pair
+boundaries carry different pressures. Pitting initiates in the dedendum, where
+sliding opposes rolling; each gear's flank is at its root at one end of the path
+and its tip at the other. So each gear is rated at the worse of the pitch point
+and *its own* end. That is ISO 6336-2's `Z_B`/`Z_D`, arrived at by evaluating the
+two points instead of quoting the factor — [no correction
+factors](#no-isoagma-correction-factors) applies here as everywhere.
+
+On the reference 17/43 pair the difference is not decorative: the pinion is rated
+at 692.7 MPa and the wheel at 629.9 — the wheel's own boundary is *milder* than
+the pitch point, so the pitch point governs it.
+
+**This was reported wrong twice.** First as one figure duplicated onto both gears
+— true of the pressure at an instant, but not what a gear is rated on. Then, on
+being told the curvatures differ, briefly as a mesh-only figure with the gears
+carrying none. The number that belongs to a gear was there the whole time; it was
+the evaluation point, not the curvature.
+
+### The narrower face carries the pair, so the automatic width answers to the mesh
+
+Sizing each gear's automatic width from its own requirement is wrong in a way
+that only shows once the two gears' requirements differ — which is exactly what
+rating them at their own points, or giving them different materials, produces.
+The mesh is carried at `min(b₁, b₂)`. A gear sized to its own smaller figure
+therefore pulls the effective width, and the *other* gear with it, under what
+that other gear required.
+
+So an automatic width resolves to the largest ask any member of its mesh has, and
+a member in two meshes answers to both. Each gear's four toggles still choose
+which of *its own* ratings count; what they do not get to do is decide the width
+on behalf of a gear that needs more. Gated as the invariant the control claims:
+at an automatic width, every enabled rating is met.
 
 ### A load exists only where it is reacted
 

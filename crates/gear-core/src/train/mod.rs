@@ -137,15 +137,16 @@ pub struct GearResult {
     /// stress correction is undefined for this section — see
     /// [`crate::strength::bending_stress`] — or where the case carries no load.
     pub bending_stress: LoadCase<Option<f64>>,
-    /// The face width each rating would need: two per case, four in all.
+    /// Hertzian contact stress, MPa, for each load case — at **this gear's**
+    /// governing point.
     ///
-    /// This is where a pair's two gears differ on contact. The **stress** is one
-    /// number for the mesh — the pair shares a patch, a normal force and an
-    /// `E*`, so there is only one pressure and both flanks feel it — and it is
-    /// reported once, at the mesh (`SpurResult::contact_stress`,
-    /// [`crate::train::MeshReport`], `WormResult::contact`). What belongs to a
-    /// gear is the allowable it is judged against, and therefore the width it
-    /// asks for.
+    /// The two gears of a mesh share one patch and one pressure at any instant,
+    /// so this is not a per-tooth curvature effect. They differ because they are
+    /// rated at different *moments*: each gear's dedendum is loaded alone at one
+    /// end of the path, and that is where its own pitting is assessed. See
+    /// [`crate::strength::ContactStress::governing`].
+    pub contact_stress: LoadCase<f64>,
+    /// The face width each rating would need: two per case, four in all.
     pub min_face_width: LoadCase<Widths>,
     /// Guards that altered this gear's geometry.
     pub clamps: Vec<crate::note::Note>,
@@ -176,15 +177,13 @@ pub struct SpurResult {
     /// The centre distance actually used, including clearance.
     pub centre_distance: f64,
     pub contact_ratios: ContactRatios,
-    /// Hertzian contact stress, MPa, in both load cases.
+    /// Hertzian contact stress at the pitch point, MPa, in both load cases.
     ///
-    /// **A property of the mesh, not of either gear.** The two flanks share one
-    /// patch, one normal force and one `E*`, so there is one pressure and it is
-    /// reported once. What differs between the gears is the allowable it is
-    /// judged against, which is why [`GearResult::min_face_width`] is per gear
-    /// and this is not.
-    pub contact_stress: LoadCase<f64>,
-    /// Relative radius of curvature at the governing point, mm.
+    /// The one figure the two members genuinely share: same patch, same normal
+    /// force, same `E*`. Each gear's own rating sits on [`GearResult`] and is
+    /// this or worse, depending on where its dedendum is loaded alone.
+    pub contact_stress_at_pitch_point: LoadCase<f64>,
+    /// Relative radius of curvature at the worst point on the path, mm.
     pub relative_radius: f64,
     /// Mesh efficiency, 0..1, in both drive directions.
     ///
@@ -1262,7 +1261,7 @@ mod tests {
                 s.efficiency.forward, s.efficiency.backward,
                 "a parallel-axis stage is as efficient driven either way"
             );
-            assert!(s.contact_stress.peak > 0.0);
+            assert!(s.contact_stress_at_pitch_point.peak > 0.0);
             for g in &s.gears {
                 assert!(g.face_width > 0.0);
                 assert!(g.bending_stress.peak.unwrap() > 0.0);
@@ -1807,7 +1806,7 @@ mod tests {
             }
             solve_spur_stage(&s, StageTorques::just(2.0), &lib)
                 .unwrap()
-                .contact_stress
+                .contact_stress_at_pitch_point
                 .peak
         };
         let base = at(None);
@@ -1957,23 +1956,83 @@ mod tests {
         }
     }
 
-    /// **Contact stress belongs to the mesh; the allowable belongs to the gear.**
+    /// **An automatic face width has to satisfy the mesh, not one gear.**
     ///
-    /// The two gears of a pair share one patch, one normal force and one `E*`,
-    /// so there is one pressure and both flanks feel it. Reported per gear that
-    /// read as a calculation somebody had forgotten to do twice — so it is
-    /// reported once, and this pins both halves of why:
+    /// The narrower face carries the pair, so a width sized to its own gear's
+    /// requirement satisfies nothing: give one gear a weaker material and it
+    /// asks for more face, while the other — sized to its own smaller figure —
+    /// pulls the effective width, and the weak gear with it, under what the weak
+    /// gear needed.
     ///
-    /// - **both** materials reach the stress, through `E*`, so softening either
-    ///   gear moves the one figure; and
-    /// - what makes the gears differ is the **allowable**, which shows up in the
-    ///   width each asks for and nowhere else.
+    /// Stated as the invariant rather than as the arithmetic: **at an automatic
+    /// width, every enabled rating is met**. That is what the control claims to
+    /// do, and it is false in both directions if either gear is sized alone.
     #[test]
-    fn contact_stress_is_one_number_for_the_pair_and_the_allowable_is_not() {
+    fn an_automatic_face_width_satisfies_every_enabled_rating_of_both_gears() {
         let lib = library();
-        // At a **fixed** width for the first half: an automatic width is
-        // inverted from the stress, so it lands the stress on the allowable by
-        // construction and nothing about the material could show through.
+        let weak = |x: f64| Overrides {
+            ultimate_allowable: Some(x),
+            fatigue_allowable: Some(x),
+            ..Default::default()
+        };
+        // A matched pair, then each gear in turn made much weaker than the
+        // other, so whichever gear governs the mesh is the one that changes.
+        for over in [
+            [Overrides::default(), Overrides::default()],
+            [weak(250.0), Overrides::default()],
+            [Overrides::default(), weak(250.0)],
+        ] {
+            let mut stage = SpurStage::default();
+            for (g, o) in stage.gears.iter_mut().zip(over) {
+                g.face_width = Auto::automatic(0.0);
+                g.material_overrides = o;
+            }
+            let r = solve_spur_stage(&stage, StageTorques::just(2.0), &lib).unwrap();
+            let effective = r.gears[0].face_width.min(r.gears[1].face_width);
+            assert!(effective > 0.0);
+
+            for (i, g) in r.gears.iter().enumerate() {
+                let sources = &stage.gears[i].face_sources;
+                for case in [Case::Peak, Case::Cyclic] {
+                    let asks = g.min_face_width.get(case);
+                    if *sources.contact.get(case) {
+                        assert!(
+                            effective >= asks.contact * (1.0 - 1e-9),
+                            "gear {i} {case:?} contact needs {} mm, mesh carries {effective}",
+                            asks.contact
+                        );
+                    }
+                    if let (true, Some(b)) = (*sources.bending.get(case), asks.bending) {
+                        assert!(
+                            effective >= b * (1.0 - 1e-9),
+                            "gear {i} {case:?} bending needs {b} mm, mesh carries {effective}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// **The two gears of a mesh are rated at different *points*, not at
+    /// different curvatures.**
+    ///
+    /// The mechanism matters, because the wrong one is very plausible: two teeth
+    /// in mesh do have different flank curvatures, so it looks as though they
+    /// should carry different stresses. They do not — Hertz reaches the contact
+    /// through the *gap*, which depends on the individual radii only as their
+    /// sum, and each body is then a half-space under a shared pressure. At one
+    /// instant there is one pressure.
+    ///
+    /// What separates them is *when* each is rated: each gear's dedendum carries
+    /// the load alone at one end of the path, and that is where its own pitting
+    /// is assessed. So this pins three things — the shared figure is shared and
+    /// reaches both materials, the two governing figures differ and each is its
+    /// own end of the path, and an allowable moves a width and never a stress.
+    #[test]
+    fn the_two_gears_of_a_mesh_are_rated_at_different_points() {
+        let lib = library();
+        // At a **fixed** width: an automatic one is inverted from the stress, so
+        // it lands the stress on the allowable and hides the material.
         let solved = |auto: bool, over: [Overrides; 2]| {
             let mut s = SpurStage::default();
             for (g, o) in s.gears.iter_mut().zip(over) {
@@ -1991,38 +2050,58 @@ mod tests {
             ..Default::default()
         };
 
-        // Softening **either** gear softens the pair, so neither material is
-        // being ignored — which is the failure this test exists to rule out.
+        // --- the shared figure. Softening **either** gear softens the pair, so
+        // neither material is being ignored, and `1/E*` is symmetric in the two
+        // so it does not matter which was softened.
         let base = solved(false, [Overrides::default(), Overrides::default()]);
         let soft_first = solved(false, [modulus(70_000.0), Overrides::default()]);
         let soft_second = solved(false, [Overrides::default(), modulus(70_000.0)]);
+        let pitch = |r: &SpurResult| r.contact_stress_at_pitch_point.peak;
         for (r, which) in [(&soft_first, "gear 1"), (&soft_second, "gear 2")] {
             assert!(
-                r.contact_stress.peak < base.contact_stress.peak,
+                pitch(r) < pitch(&base),
                 "softening {which} must soften the pair: {} against {}",
-                r.contact_stress.peak,
-                base.contact_stress.peak
+                pitch(r),
+                pitch(&base)
             );
         }
-        // ...and `E*` is symmetric, so it does not matter which one was softened.
         assert!(
-            (soft_first.contact_stress.peak - soft_second.contact_stress.peak).abs() < 1e-9,
+            (pitch(&soft_first) - pitch(&soft_second)).abs() < 1e-9,
             "1/E* is symmetric in the two gears"
         );
 
-        // The gears differ where the allowable is, and only there. Halving one
-        // gear's allowable quadruples the width it asks for — `b_min ∝
-        // (σ_H/σ_allow)²` — while the stress that produced it does not move.
-        let allowable = |a: f64| Overrides {
-            ultimate_allowable: Some(a),
-            fatigue_allowable: Some(a),
+        // --- the two ratings. On this pair they differ, and each is at least
+        // the shared figure — a gear is rated at the worse of the pitch point
+        // and its own end of the path, never below it.
+        let (a, b) = (
+            base.gears[0].contact_stress.peak,
+            base.gears[1].contact_stress.peak,
+        );
+        assert!(
+            a != b,
+            "17/43 is not symmetric, so its two gears are not rated alike: {a} and {b}"
+        );
+        for g in &base.gears {
+            assert!(g.contact_stress.peak >= pitch(&base));
+        }
+        // ...and the envelope is the worse of them, which is what the *mesh*
+        // would be rated on with no member named.
+        assert!((a.max(b) - base.gears[0].contact_stress.peak.max(b)).abs() < 1e-12);
+
+        // --- the allowable. At a fixed width again, and for a reason worth
+        // stating: with an *automatic* width the allowable does reach the stress,
+        // because it moves the width the pair is rated at. Held still, it moves
+        // only what it should.
+        let allowable = |x: f64| Overrides {
+            ultimate_allowable: Some(x),
+            fatigue_allowable: Some(x),
             ..Default::default()
         };
-        let wide = solved(true, [Overrides::default(), Overrides::default()]);
-        let half = allowable(0.5 * allowable_of(&wide.gears[1]));
-        let derated = solved(true, [Overrides::default(), half]);
+        let wide = base;
+        let half = allowable(0.5 * super::allowable(&wide.gears[1].material, Case::Cyclic));
+        let derated = solved(false, [Overrides::default(), half]);
         assert_eq!(
-            derated.contact_stress, wide.contact_stress,
+            derated.contact_stress_at_pitch_point, wide.contact_stress_at_pitch_point,
             "an allowable is not a stress and must not move one"
         );
         let (was, now) = (
@@ -2038,11 +2117,6 @@ mod tests {
             wide.gears[0].min_face_width.cyclic.contact,
             "and it must not reach the other gear"
         );
-    }
-
-    /// The allowable one gear's cyclic contact is judged against.
-    fn allowable_of(g: &GearResult) -> f64 {
-        super::allowable(&g.material, Case::Cyclic)
     }
 
     /// **A load exists only where it is reacted.**

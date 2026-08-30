@@ -1641,7 +1641,12 @@ mod tests {
                     > 1.0
             );
             for case in ["peak", "cyclic"] {
-                assert!(stage[mesh]["contact_stress"][case].as_f64().unwrap() > 0.0);
+                assert!(
+                    stage[mesh]["contact_stress_at_pitch_point"][case]
+                        .as_f64()
+                        .unwrap()
+                        > 0.0
+                );
             }
         }
         for who in ["sun", "ring"] {

@@ -160,8 +160,11 @@ pub struct MeshReport {
     /// Mesh efficiency, both drive senses. Equal for a parallel-axis pair, and
     /// arrived at rather than copied.
     pub efficiency: Directional<f64>,
-    /// Hertzian contact stress, MPa — shared by the pair, in both load cases.
-    pub contact_stress: LoadCase<f64>,
+    /// Hertzian contact stress at the pitch point, MPa, in both load cases.
+    ///
+    /// The one figure both members of the mesh share. Each member's own rating —
+    /// taken where its dedendum is loaded alone — sits on its `GearResult`.
+    pub contact_stress_at_pitch_point: LoadCase<f64>,
     /// Relative radius of curvature at the governing point, mm.
     pub relative_radius: f64,
     /// Angular backlash at each member, degrees: the first is the pinion-side
@@ -555,12 +558,12 @@ pub fn solve_planetary_stage(
     // An automatic width with every source switched off has nothing to invert
     // and comes out zero. Said rather than divided by, as in the spur stage.
     let mut no_source = Vec::new();
-    let mut width_for = |name: &str, g: &StageGear, asks: &LoadCase<Widths>| -> f64 {
+    let mut ask_of = |name: &str, g: &StageGear, asks: &LoadCase<Widths>| -> f64 {
         if g.face_width.auto && !g.face_sources.any() {
             no_source
                 .push(Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", name.to_string()));
         }
-        g.face_width.resolve(g.face_sources.largest_of(asks))
+        g.face_sources.largest_of(asks)
     };
 
     /// The four widths one member's ratings ask for.
@@ -610,35 +613,35 @@ pub fn solve_planetary_stage(
         Case::Cyclic => crate::material::reversed_bending_allowable(&mats[1]).value,
         Case::Peak => mats[1].ultimate_allowable.value,
     };
-    let widths = [
-        width_for(
+    let asks = [
+        ask_of(
             "sun",
             &stage.sun,
             &asks_of(
                 sun_sf,
-                sp_probe.worst,
+                sp_probe.governing(0),
                 PROBE,
                 &|c| allowable(&mats[0], c),
                 &scale_case,
             ),
         ),
-        width_for(
+        ask_of(
             "planet",
             &stage.planet,
             &asks_of(
                 planet_sf,
-                sp_probe.worst.max(pr_probe.worst),
+                sp_probe.governing(1).max(pr_probe.governing(0)),
                 PROBE,
                 &planet_allow,
                 &scale_case,
             ),
         ),
-        width_for(
+        ask_of(
             "ring",
             &stage.ring,
             &asks_of(
                 ring_sf,
-                pr_probe.worst,
+                pr_probe.governing(1),
                 PROBE,
                 &|c| allowable(&mats[2], c),
                 &scale_case,
@@ -646,6 +649,17 @@ pub fn solve_planetary_stage(
         ),
     ];
     notes.extend(no_source);
+    // **A member's automatic width is the largest requirement of any mesh it is
+    // in**, because the narrower face carries the pair — see the spur stage for
+    // the fault this avoids. The planet is in both meshes, so it answers to
+    // both; the sun and the ring answer to their own.
+    let mesh_ask = [asks[0].max(asks[1]), asks[1].max(asks[2])];
+    let wanted = [mesh_ask[0], mesh_ask[0].max(mesh_ask[1]), mesh_ask[1]];
+    let widths = [
+        stage.sun.face_width.resolve(wanted[0]),
+        stage.planet.face_width.resolve(wanted[1]),
+        stage.ring.face_width.resolve(wanted[2]),
+    ];
     // The narrower member carries the mesh, per the specification.
     let sp_width = widths[0].min(widths[1]);
     let pr_width = widths[1].min(widths[2]);
@@ -759,7 +773,7 @@ pub fn solve_planetary_stage(
         // expression evaluated at the two scales rather than a second solve.
         //
         // **The allowable comes in rather than being read off the material**, so
-        // that the width `width_for` chose and the minimum reported here are
+        // that the width the member was given and the minimum reported here are
         // sized against the same figure. The planet is the member this matters
         // for: its bending is fully reversed whatever the drive does, so it is
         // rated against a derated allowable, and reading the plain one here
@@ -779,6 +793,7 @@ pub fn solve_planetary_stage(
                 contact: 0.0,
             },
             bending_stress: LoadCase::of(|c| sigma_f.map(|s| s * by_case(c).0)),
+            contact_stress: LoadCase::of(|c| sigma_h * by_case(c).0.sqrt()),
             min_face_width: LoadCase::of(|c| {
                 let (k, a) = by_case(c);
                 Widths {
@@ -814,7 +829,9 @@ pub fn solve_planetary_stage(
         sun_planet: MeshReport {
             contact_ratios: ratios(sp_path.contact_ratio, sp_width, stage),
             efficiency: sp_eff,
-            contact_stress: LoadCase::of(|c| sp_cs.worst * scale_case(c).sqrt()),
+            contact_stress_at_pitch_point: LoadCase::of(|c| {
+                sp_cs.at_pitch_point * scale_case(c).sqrt()
+            }),
             relative_radius: sp_cs.relative_radius,
             backlash: [
                 backlash_of(&sp_mesh, MeshSide::First),
@@ -824,7 +841,9 @@ pub fn solve_planetary_stage(
         planet_ring: MeshReport {
             contact_ratios: ratios(pr_path.contact_ratio, pr_width, stage),
             efficiency: pr_eff,
-            contact_stress: LoadCase::of(|c| pr_cs.worst * scale_case(c).sqrt()),
+            contact_stress_at_pitch_point: LoadCase::of(|c| {
+                pr_cs.at_pitch_point * scale_case(c).sqrt()
+            }),
             relative_radius: pr_cs.relative_radius,
             backlash: [
                 backlash_of(&pr_mesh, MeshSide::First),
@@ -844,7 +863,7 @@ pub fn solve_planetary_stage(
             widths[0],
             forward.torques[0] / planets,
             sun_stress,
-            sp_cs.worst,
+            sp_cs.governing(0),
             &mats[0],
             &|c| allowable(&mats[0], c),
             sun.clamps.notes.clone(),
@@ -857,7 +876,10 @@ pub fn solve_planetary_stage(
                 widths[1],
                 sp_load.across_mesh(&sun, &planet).torque,
                 planet_stress,
-                sp_cs.worst.max(pr_cs.worst),
+                // The planet is member 2 of the sun mesh and member 1 of the
+                // ring mesh, so its own root is loaded alone at a different end
+                // of each path. It takes the worse of its two.
+                sp_cs.governing(1).max(pr_cs.governing(0)),
                 &mats[1],
                 &planet_allow,
                 planet.clamps.notes.clone(),
@@ -877,7 +899,7 @@ pub fn solve_planetary_stage(
             widths[2],
             forward.torques[2] / planets,
             ring_stress,
-            pr_cs.worst,
+            pr_cs.governing(1),
             &mats[2],
             &|c| allowable(&mats[2], c),
             ring.clamps.clone(),

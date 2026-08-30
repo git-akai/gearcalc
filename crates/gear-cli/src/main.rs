@@ -369,8 +369,10 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
     // `E*`, so there is no second number to print per gear — what a gear has of
     // its own is the allowable, and therefore `b_min`.
     println!(
-        "  contact  sigma_H {:.1} / {:.1} MPa peak/cyclic   rho {:.3} mm",
-        s.contact_stress.peak, s.contact_stress.cyclic, s.relative_radius
+        "  contact at the pitch point  sigma_H {:.1} / {:.1} MPa peak/cyclic   rho {:.3} mm",
+        s.contact_stress_at_pitch_point.peak,
+        s.contact_stress_at_pitch_point.cyclic,
+        s.relative_radius
     );
     println!(
         "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>21} {:>21} {:>9} {:>21}",
@@ -380,13 +382,13 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
         "T fwd Nm",
         "T bwd Nm",
         "sigma_F peak/cyclic",
-        "b_min contact pk/cyc",
+        "sigma_H peak/cyclic",
         "rpm",
         "cycles bend/contact"
     );
     for (i, g) in s.gears.iter().enumerate() {
         println!(
-            "  {:<6} {:>8.4} {:>8.3} {:>10.4} {:>10} {:>9.1} /{:>9.1} {:>9.3} /{:>9.3} {:>9.1} {:>9.3e} /{:>9.3e}",
+            "  {:<6} {:>8.4} {:>8.3} {:>10.4} {:>10} {:>9.1} /{:>9.1} {:>9.1} /{:>9.1} {:>9.1} {:>9.3e} /{:>9.3e}",
             i + 1,
             g.profile_shift,
             g.face_width,
@@ -394,8 +396,8 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
             g.back_driving_torque.map_or("-".into(), |t| format!("{t:.4}")),
             g.bending_stress.peak.unwrap_or(f64::NAN),
             g.bending_stress.cyclic.unwrap_or(f64::NAN),
-            g.min_face_width.peak.contact,
-            g.min_face_width.cyclic.contact,
+            g.contact_stress.peak,
+            g.contact_stress.cyclic,
             g.speed,
             g.tooth_cycles.bending,
             g.tooth_cycles.contact
@@ -596,15 +598,20 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
         }
     }
 
-    // --- contact, shared by the pair
+    // --- contact. One pressure at any instant, two ratings: each gear is judged
+    // where its own dedendum carries the load alone.
     let e_star = contact_modulus(mat, mat);
     if let Some(cs) = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, e_star) {
         println!("\ncontact   E* {e_star:.0} MPa (like on like)");
         println!("  at the pitch point        {:>7.1} MPa", cs.at_pitch_point);
-        println!(
-            "  at single-pair contact    {:>7.1} MPa   <- governs",
-            cs.at_single_pair
-        );
+        for i in 0..2 {
+            println!(
+                "  gear {} single-pair        {:>7.1} MPa   -> rated at {:>7.1} MPa",
+                i + 1,
+                cs.at_single_pair[i],
+                cs.governing(i)
+            );
+        }
         println!("  relative radius           {:>7.3} mm", cs.relative_radius);
         println!(
             "  b_min against fatigue     {:>7.3} mm",
@@ -1433,8 +1440,9 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                                 .map_or_else(|| "n/a".into(), |g| format!("{g:.3} mm"))
                         );
                         println!(
-                            "sigma_H  sun-planet {:.1} MPa   planet-ring {:.1} MPa",
-                            r.sun_planet.contact_stress.peak, r.planet_ring.contact_stress.peak
+                            "sigma_H at pitch  sun-planet {:.1} MPa   planet-ring {:.1} MPa",
+                            r.sun_planet.contact_stress_at_pitch_point.peak,
+                            r.planet_ring.contact_stress_at_pitch_point.peak
                         );
                         println!(
                             "sigma_F  sun {}   planet {} (reversed, allowable {:.1} MPa)   ring {}",
