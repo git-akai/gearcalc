@@ -412,6 +412,10 @@ impl StageResult {
 
     /// Write in the speeds and cycles, which only the whole shaft line knows.
     ///
+    /// The cycles arriving here are **revolutions**, fractional; each stage kind
+    /// scales them into the count its members actually see and rounds at the end
+    /// with [`loaded_cycles`].
+    ///
     /// A worm's "tooth cycles" are revolutions: its thread is engaged
     /// continuously rather than meeting a mate once per turn, so the count is
     /// the same arithmetic but means something looser. It is reported because a
@@ -422,13 +426,13 @@ impl StageResult {
             Self::Spur(r) => {
                 for (i, g) in r.gears.iter_mut().enumerate() {
                     g.speed = speeds[i];
-                    g.tooth_cycles = cycles[i];
+                    g.tooth_cycles = loaded_cycles(cycles[i]);
                 }
             }
             Self::Worm(r) => {
                 for (i, m) in r.members.iter_mut().enumerate() {
                     m.speed = speeds[i];
-                    m.tooth_cycles = cycles[i];
+                    m.tooth_cycles = loaded_cycles(cycles[i]);
                 }
                 // Sliding needs a shaft speed, so it could only be filled here.
                 r.sliding_velocity = r.sliding_ratio
@@ -442,14 +446,36 @@ impl StageResult {
             // fatigues it is its rotation **relative to the carrier**.
             Self::Planetary(r) => {
                 let n = f64::from(r.planets.max(1));
-                r.sun.tooth_cycles = cycles[0] * n;
-                r.ring.tooth_cycles = cycles[0] * n;
+                r.sun.tooth_cycles = loaded_cycles(cycles[0] * n);
+                r.ring.tooth_cycles = loaded_cycles(cycles[0] * n);
                 let carrier_relative =
                     (r.planet.speed_relative / r.speeds[0].abs().max(f64::MIN_POSITIVE)).abs();
-                r.planet.gear.tooth_cycles = cycles[0] * carrier_relative;
+                r.planet.gear.tooth_cycles = loaded_cycles(cycles[0] * carrier_relative);
             }
         }
     }
+}
+
+/// How many times a tooth is loaded, from how many times it comes round.
+///
+/// # Why this rounds, and why the rounding is here
+///
+/// A tooth is either loaded or it is not: two thirds of an engagement is one
+/// engagement as far as the tooth is concerned, so a fractional count is
+/// rounded **up**. That is a statement about how a gear is loaded, and it
+/// belongs in the model.
+///
+/// It lived in `TrainPanel.svelte` as `Math.ceil` on the way to the screen —
+/// harmless while it was only display, because rounding an integer up gives the
+/// same integer wherever you do it, and against this project's standing rule the
+/// whole time. Two things made it worth moving: the CLI printed the *unrounded*
+/// figure while the browser printed the rounded one, so one model already had
+/// two answers; and a reversing drive rounds at a different point in the
+/// arithmetic, which makes *where* this happens a modelling decision rather than
+/// a formatting one.
+#[must_use]
+pub fn loaded_cycles(revolutions: f64) -> f64 {
+    revolutions.ceil()
 }
 
 /// Solve one stage of whichever kind, given the torque on its input member.
@@ -1030,9 +1056,12 @@ mod tests {
         };
         let r = solve_train(&t, &library()).unwrap();
 
-        // The output gear turns exactly once per actuation.
+        // The output gear turns exactly once per actuation. A whole number of
+        // revolutions, so the rounding has nothing to do and the count is the
+        // revolutions exactly — which is the case worth putting first, because
+        // it is where a count and a revolution coincide.
         let last = &spur(&r.stages[1]).gears[1];
-        assert!((last.tooth_cycles - 100.0).abs() < 1e-9);
+        assert_eq!(last.tooth_cycles, 100.0);
 
         // Every gear upstream turns more than the one after it.
         let seq = [
@@ -1043,13 +1072,28 @@ mod tests {
         for w in seq.windows(2) {
             assert!(w[0] > w[1], "cycles must fall towards the output: {seq:?}");
         }
-        // The input gear sees the whole train ratio's worth.
-        assert!((seq[0] - 100.0 * r.total_ratio).abs() < 1e-9);
+        // The input gear sees the whole train ratio's worth — **rounded up**,
+        // because these are engagements rather than revolutions and a tooth
+        // three quarters of the way through one has still been loaded by it.
+        assert_eq!(seq[0], (100.0 * r.total_ratio).ceil());
 
         // The two gears meshing with each other turn at different speeds but
-        // share a mesh, so their cycle counts differ by exactly that stage ratio.
+        // share a mesh, so their cycle counts differ by that stage ratio — and
+        // only **up to the rounding**, now that each count is a whole number of
+        // engagements rather than a revolution count.
+        //
+        // The bound is derived rather than chosen: rounding adds less than one
+        // to each, so `a/b` moves from `A/B` by less than `(1 + ratio)/b`. On
+        // this train that is 6e-8, which is why the old exact-to-1e-9 assertion
+        // was the thing that had to change and not the arithmetic.
         let s0 = spur(&r.stages[0]);
-        assert!((s0.gears[0].tooth_cycles / s0.gears[1].tooth_cycles - s0.ratio).abs() < 1e-9);
+        let (a, b) = (s0.gears[0].tooth_cycles, s0.gears[1].tooth_cycles);
+        assert!(
+            (a / b - s0.ratio).abs() < (1.0 + s0.ratio) / b,
+            "{a}/{b} = {} against a stage ratio of {}",
+            a / b,
+            s0.ratio
+        );
     }
 
     #[test]
@@ -1203,5 +1247,86 @@ mod tests {
             stages: vec![],
         };
         assert_eq!(solve_train(&t, &library()).unwrap_err(), TrainError::Empty);
+    }
+
+    /// **A tooth cycle count is what the browser used to round, and now what the
+    /// model returns.**
+    ///
+    /// The `Math.ceil` in `TrainPanel.svelte` was a modelling decision on the
+    /// side of the boundary with no tests, and the CLI printed the *unrounded*
+    /// figure beside it — one model with two answers, which is the fault this
+    /// crate spends most of its gates on.
+    ///
+    /// The old arithmetic is written out here rather than referenced, so the
+    /// check is against what the browser actually displayed rather than against
+    /// the code that replaced it. Every count must be exactly the ceiling of it,
+    /// and must itself be a whole number.
+    #[test]
+    fn every_cycle_count_is_the_ceiling_of_the_revolutions_it_replaced() {
+        let lib = test_library();
+        for (train, what) in [
+            (two_stage(), "two spur stages"),
+            (
+                Train {
+                    actuation: Actuation::Continuous {
+                        operating_percent: 80.0,
+                        runtime_hours: 1000.0,
+                    },
+                    ..two_stage()
+                },
+                "continuous",
+            ),
+            (
+                Train {
+                    actuation: Actuation::Intermittent {
+                        range_degrees: 25.0,
+                        actuations: 1000,
+                    },
+                    ..two_stage()
+                },
+                "intermittent",
+            ),
+        ] {
+            let r = solve_train(&train, &lib).expect(what);
+
+            // The old formula, written out: revolutions to the output, before
+            // anything rounded them.
+            let ratios: Vec<f64> = r.stages.iter().map(StageResult::ratio).collect();
+            for (k, s) in r.stages.iter().enumerate() {
+                let upstream: f64 = ratios[..k].iter().product();
+                let speed_in = train.input_speed / upstream;
+                let speeds = [speed_in, speed_in / ratios[k]];
+                let revolutions = [0usize, 1].map(|i| {
+                    let to_output: f64 = if i == 0 {
+                        ratios[k..].iter().product()
+                    } else {
+                        ratios[k + 1..].iter().product()
+                    };
+                    match train.actuation {
+                        Actuation::Intermittent {
+                            range_degrees,
+                            actuations,
+                        } => (range_degrees / 360.0) * to_output * f64::from(actuations),
+                        Actuation::Continuous {
+                            operating_percent,
+                            runtime_hours,
+                        } => speeds[i] * 60.0 * runtime_hours * operating_percent / 100.0,
+                    }
+                });
+
+                let Some(sp) = s.as_spur() else { continue };
+                for (i, (g, turns)) in sp.gears.iter().zip(revolutions).enumerate() {
+                    let got = g.tooth_cycles;
+                    assert_eq!(
+                        got.to_bits(),
+                        turns.ceil().to_bits(),
+                        "{what}, stage {k} gear {i}: {got} against the browser's \
+                         ceil({turns}) = {}",
+                        turns.ceil()
+                    );
+                    assert_eq!(got, got.trunc(), "{what}: {got} is not a whole count");
+                }
+            }
+        }
     }
 }

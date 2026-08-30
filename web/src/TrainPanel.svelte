@@ -431,7 +431,7 @@
       <dt>{t("ui.train_speed")}</dt>
       <dd>{g.speed.toFixed(1)} rpm</dd>
       <dt>{t("ui.train_tooth_cycles")}</dt>
-      <dd>{Math.ceil(g.tooth_cycles).toLocaleString()}</dd>
+      <dd>{g.tooth_cycles.toLocaleString()}</dd>
       <dt>{t("ui.train_bending_stress")}</dt>
       <dd>
         {g.bending_stress === null
@@ -782,7 +782,7 @@
                   <dt>{t("ui.train_speed")}</dt>
                   <dd>{xres.members[j].speed.toFixed(1)} rpm</dd>
                   <dt>{t("ui.train_tooth_cycles")}</dt>
-                  <dd>{Math.ceil(xres.members[j].tooth_cycles).toLocaleString()}</dd>
+                  <dd>{xres.members[j].tooth_cycles.toLocaleString()}</dd>
                 </dl>
               {/if}
             {/snippet}
