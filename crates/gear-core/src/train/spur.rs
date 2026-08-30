@@ -375,7 +375,12 @@ pub fn solve_spur_stage(
         peak: rate(Case::Peak)?,
         cyclic: rate(Case::Cyclic)?,
     };
-    let load = rated.peak.2;
+    // **The rating and the reported torque are different questions.** The peak
+    // *case* is rated at whichever direction loads the teeth harder, which is
+    // what `rated.peak` used; the torque a gear is labelled with is the one it
+    // carries driving **forward**, with the back-driving figure reported beside
+    // it rather than folded into it.
+    let load = Load::new(torques.peak_forward, effective);
 
     let mut gears = Vec::with_capacity(2);
     for i in 0..2 {
@@ -398,10 +403,6 @@ pub fn solve_spur_stage(
             bending_stress: LoadCase {
                 peak: rated.peak.1[i],
                 cyclic: rated.cyclic.1[i],
-            },
-            contact_stress: LoadCase {
-                peak: rated.peak.0.worst,
-                cyclic: rated.cyclic.0.worst,
             },
             min_face_width: LoadCase::of(|case| {
                 let (cs, sf, _) = rated.get(case);
@@ -468,6 +469,11 @@ pub fn solve_spur_stage(
         centre_distance_nominal: mesh.a_w,
         centre_distance: centre,
         contact_ratios,
+        contact_stress: LoadCase {
+            peak: rated.peak.0.worst,
+            cyclic: rated.cyclic.0.worst,
+        },
+        relative_radius: rated.peak.0.relative_radius,
         // Breaking away is decided at rest, running is decided sliding — one
         // rule, applied to every stage kind (`Directional::once_moving`). A
         // parallel-axis mesh is never near the threshold, so this passes the

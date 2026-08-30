@@ -365,6 +365,13 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
         100.0 * s.efficiency.forward,
         100.0 * s.efficiency.backward
     );
+    // One pressure, printed once. The pair shares a patch, a normal force and an
+    // `E*`, so there is no second number to print per gear — what a gear has of
+    // its own is the allowable, and therefore `b_min`.
+    println!(
+        "  contact  sigma_H {:.1} / {:.1} MPa peak/cyclic   rho {:.3} mm",
+        s.contact_stress.peak, s.contact_stress.cyclic, s.relative_radius
+    );
     println!(
         "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>21} {:>21} {:>9} {:>21}",
         "gear",
@@ -373,13 +380,13 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
         "T fwd Nm",
         "T bwd Nm",
         "sigma_F peak/cyclic",
-        "sigma_H peak/cyclic",
+        "b_min contact pk/cyc",
         "rpm",
         "cycles bend/contact"
     );
     for (i, g) in s.gears.iter().enumerate() {
         println!(
-            "  {:<6} {:>8.4} {:>8.3} {:>10.4} {:>10} {:>9.1} /{:>9.1} {:>9.1} /{:>9.1} {:>9.1} {:>9.3e} /{:>9.3e}",
+            "  {:<6} {:>8.4} {:>8.3} {:>10.4} {:>10} {:>9.1} /{:>9.1} {:>9.3} /{:>9.3} {:>9.1} {:>9.3e} /{:>9.3e}",
             i + 1,
             g.profile_shift,
             g.face_width,
@@ -387,8 +394,8 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
             g.back_driving_torque.map_or("-".into(), |t| format!("{t:.4}")),
             g.bending_stress.peak.unwrap_or(f64::NAN),
             g.bending_stress.cyclic.unwrap_or(f64::NAN),
-            g.contact_stress.peak,
-            g.contact_stress.cyclic,
+            g.min_face_width.peak.contact,
+            g.min_face_width.cyclic.contact,
             g.speed,
             g.tooth_cycles.bending,
             g.tooth_cycles.contact

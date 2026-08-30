@@ -779,7 +779,6 @@ pub fn solve_planetary_stage(
                 contact: 0.0,
             },
             bending_stress: LoadCase::of(|c| sigma_f.map(|s| s * by_case(c).0)),
-            contact_stress: LoadCase::of(|c| sigma_h * by_case(c).0.sqrt()),
             min_face_width: LoadCase::of(|c| {
                 let (k, a) = by_case(c);
                 Widths {

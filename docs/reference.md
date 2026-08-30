@@ -887,8 +887,21 @@ nonzero, **nothing reacted it** — the train is back-drivable, the load simply
 turns it, and the case is zero at every gear.
 
 **Automatic face width.** Four ratings, four toggles per gear; the width is the
-largest any *enabled* rating asks for. With none enabled there is nothing to
-invert and the width is zero, which the stage reports as a note.
+largest any *enabled* rating asks for. Peak contact is off by default — see
+[rationale](rationale.md#a-contact-pressure-is-not-a-tensile-stress). With none
+enabled there is nothing to invert and the width is zero, which the stage reports
+as a note.
+
+**Where each figure lives.** Contact stress is a property of the **mesh**: the
+pair shares one patch, one normal force and one `E*`, so there is one pressure
+and both flanks feel it. It is reported once per mesh — `SpurResult`,
+`MeshReport`, `WormResult::contact`. What belongs to a *gear* is the allowable it
+is judged against, and therefore the face width it asks for. Bending is genuinely
+per gear: each tooth has its own root section and form factor.
+
+A gear's reported `torque` is the one it carries **driving forward**; a
+back-driving load is reported beside it, not folded into it. The peak *rating*
+still uses whichever direction loads the teeth harder.
 
 ### Tooth cycles
 

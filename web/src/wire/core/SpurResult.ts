@@ -3,6 +3,7 @@ import type { Backlash } from "./Backlash";
 import type { ContactRatios } from "./ContactRatios";
 import type { Directional } from "./Directional";
 import type { GearResult } from "./GearResult";
+import type { LoadCase } from "./LoadCase";
 import type { Note } from "./Note";
 
 /**
@@ -21,6 +22,20 @@ centre_distance_nominal: number,
  * The centre distance actually used, including clearance.
  */
 centre_distance: number, contact_ratios: ContactRatios, 
+/**
+ * Hertzian contact stress, MPa, in both load cases.
+ *
+ * **A property of the mesh, not of either gear.** The two flanks share one
+ * patch, one normal force and one `E*`, so there is one pressure and it is
+ * reported once. What differs between the gears is the allowable it is
+ * judged against, which is why [`GearResult::min_face_width`] is per gear
+ * and this is not.
+ */
+contact_stress: LoadCase<number>, 
+/**
+ * Relative radius of curvature at the governing point, mm.
+ */
+relative_radius: number, 
 /**
  * Mesh efficiency, 0..1, in both drive directions.
  *

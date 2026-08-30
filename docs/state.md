@@ -165,7 +165,9 @@ revolution, verified against a caliper reading off the drawn teeth.
 backlash and cycle accumulation; efficiency and backlash in **both** drive
 directions. Two load cases throughout — a peak against the ultimate allowable
 and a cyclic one against fatigue — with the automatic face width sized from any
-of the four ratings a gear chooses. A back-driving load applied at the output
+of the four ratings a gear chooses — peak contact excepted, which is offered but
+off. Contact stress is reported at the mesh; the allowable, and therefore the
+width asked for, is per gear. A back-driving load applied at the output
 finds the stage that reacts it, or reports that nothing does. A reversing
 intermittent drive rounds its cycles within one actuation and splits contact
 between the flanks.

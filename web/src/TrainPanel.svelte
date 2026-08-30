@@ -474,11 +474,6 @@
         {cases(g.bending_stress, 1)} MPa
         <small>{t("ui.train_peak_cyclic")}</small>
       </dd>
-      <dt>{t("ui.train_contact_stress")}</dt>
-      <dd>
-        {cases(g.contact_stress, 1)} MPa
-        <small>{t("ui.train_peak_cyclic")}</small>
-      </dd>
       <dt>{t("ui.train_min_face_width")}</dt>
       <dd>
         <span class="line">
@@ -945,6 +940,18 @@
                     <small class="warn">{t("ui.train_no_full_axial_overlap")}</small>
                   {/if}
                 </dd>
+                <!-- Here, not on either gear card. The pair shares one patch,
+                     one normal force and one E*, so there is one pressure and
+                     both flanks feel it — printed per gear it read as a
+                     calculation somebody had forgotten to do twice. What a gear
+                     has of its own is the allowable it is judged against, and
+                     that shows up in the face width it asks for. -->
+                <dt>{t("ui.train_contact_stress")}</dt>
+                <dd>
+                  {cases(sres.contact_stress, 1)} MPa
+                  <small>{t("ui.train_peak_cyclic")}</small>
+                  <small>ρ {sres.relative_radius.toFixed(3)} mm</small>
+                </dd>
                 <dt>{t("ui.train_mesh_efficiency")}</dt>
                 <dd>
                   {pct(sres.efficiency.forward)} % driven forward
@@ -1175,6 +1182,14 @@
                     1,
                   )}
                 {/if}
+                <label>
+                  <span>{t("ui.train_material")}</span>
+                  <select bind:value={stage.wheel.material}>
+                    {#each library.materials.material as m (m.name)}
+                      <option value={m.name}>{m.name}</option>
+                    {/each}
+                  </select>
+                </label>
                 {#if wres}
                   <dl class="out">
                     <dt>{t("ui.train_pitch_diameter")}</dt>

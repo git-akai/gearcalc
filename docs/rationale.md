@@ -632,6 +632,39 @@ relation, so it declines to assert it: the user states each absolutely, each is
 clamped to its own peak, and the *ratio between them* is reported as an output.
 Zero is admissible — a train that only ever sees its peak has no cyclic case.
 
+### A contact pressure is not a tensile stress
+
+Peak contact is the one of the four ratings that is **off** by default. The other
+three compare like with like: a root bending stress against a tensile allowable,
+and a flank pressure against a fatigue figure that was derived for flanks.
+Comparing a Hertzian pressure with the library's `ultimate_allowable` — a tensile
+number — is arithmetic with no mechanism behind it. A flank under a single
+overload fails by *subsurface shear*, which arrives at a contact pressure well
+above the tensile ultimate, so the comparison is not merely unfounded, it is
+unfounded in the conservative direction and would dominate a face width for no
+reason a designer could defend.
+
+It is offered rather than removed, because a designer who *has* a
+contact-pressure limit can put it in the override and switch the rating on. What
+the tool declines to do is assume one.
+
+### Contact stress belongs to the mesh, not to either gear
+
+Two gears of a pair share one contact patch, one normal force and one `E*`. There
+is one pressure, and both flanks feel it. Reported per gear it came out as the
+same number twice, which reads exactly like a calculation somebody forgot to do
+for the second gear — and the honest answer to "why are these identical" is that
+there was never a second number to compute.
+
+So it is reported where it belongs: once, at the mesh. What a gear has of its own
+is the **allowable**, and that shows up in the face width it asks for — halve one
+gear's allowable and its `b_min` quadruples while the stress does not move. Both
+halves are gated, because "this looks like a bug" is not something a comment can
+settle.
+
+Bending is not like this. Each tooth has its own root section and its own form
+factor, so two gears in a mesh genuinely report two bending stresses.
+
 ### A load exists only where it is reacted
 
 A back-driving torque is not a sign on the input. It enters at the far end, and
