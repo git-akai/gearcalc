@@ -104,6 +104,10 @@ worth keeping because each was a model change rather than a fix:
 4. *Backward efficiency to zero*, when static friction arrived. **Forward is
    unchanged**, which is the check that the two coefficients stayed in theirs.
 
+Load cases moved neither canary. Both are single-load reports, and a stage asked
+for one torque answers with the figure it always did — which is the check that
+the second case was added rather than substituted for the first.
+
 ---
 
 ## Layout
@@ -159,7 +163,12 @@ revolution, verified against a caliper reading off the drawn teeth.
 
 **Trains.** Spur/helical, worm and planetary stages in one train; torque,
 backlash and cycle accumulation; efficiency and backlash in **both** drive
-directions.
+directions. Two load cases throughout — a peak against the ultimate allowable
+and a cyclic one against fatigue — with the automatic face width sized from any
+of the four ratings a gear chooses. A back-driving load applied at the output
+finds the stage that reacts it, or reports that nothing does. A reversing
+intermittent drive rounds its cycles within one actuation and splits contact
+between the flanks.
 
 **Materials, export, UI.** An eight-material library with per-value provenance ·
 DXF with exact arcs for external *and* internal gears · geartrains exported and

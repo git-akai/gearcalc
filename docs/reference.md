@@ -857,12 +857,62 @@ dominates:
 θ_out,total = Σ_k  j_θ,k / Π_{j>k} i_j
 ```
 
-**Tooth cycles.** Intermittent: revolutions of gear *i* are
-`(range/360) × Π(ratios between i and output) × actuations`. Continuous:
-`rpm × 60 × hours × operating%/100`. One cycle per revolution for a simple gear,
-`N_planets` for a sun or a ring — and a planet is loaded on one flank by the sun
-and the other by the ring, so its bending is fully reversed and its rotation
-counts relative to the carrier.
+### Load cases
+
+A train carries two loads and they are judged against different figures. Every
+stress, cycle count and minimum face width is a `LoadCase<T>`:
+
+```text
+peak     max(|T_forward|, |T_backward|)   vs  ultimate_allowable
+cyclic   |T_operating|                    vs  fatigue_allowable
+```
+
+`T_forward` propagates from the input as above. `T_operating` is an input in its
+own right, clamped to the peak, and may be zero. Both scale every rating in
+closed form — bending is linear in torque and contact goes as its square root —
+so a second case is a scale, not a second solve.
+
+**Back-driving.** `T_backward` is applied at the *output* shaft and works
+upstream, referred to each stage's own input shaft and attenuated by that
+stage's backward efficiency:
+
+```text
+T_k = T_out,k / i_k          the load stage k carries, at its input shaft
+T_out,k−1 = T_k η_b,k        what reaches the stage above it
+```
+
+The walk stops at the first stage with `η_b ≤ 0`: that stage reacts the load and
+everything upstream carries none of it. If the walk reaches the input still
+nonzero, **nothing reacted it** — the train is back-drivable, the load simply
+turns it, and the case is zero at every gear.
+
+**Automatic face width.** Four ratings, four toggles per gear; the width is the
+largest any *enabled* rating asks for. With none enabled there is nothing to
+invert and the width is zero, which the stage reports as a note.
+
+### Tooth cycles
+
+Revolutions first. Intermittent: `(range/360) × Π(ratios between i and output)`
+per actuation. Continuous: `rpm_i × 60 × hours`, where `rpm_i` is that shaft's
+speed scaled from the peak the train was laid out at to the operating speed.
+One engagement per revolution for a simple gear, `N_planets` for a sun or a
+ring; a planet's rotation counts relative to its carrier.
+
+Counts are then **whole numbers**, and where the rounding happens depends on
+whether the drive reverses:
+
+```text
+not reversing   bending = contact = ceil(revolutions over the whole duty)
+reversing       bending = ceil(revolutions per actuation) × actuations
+                contact = bending / 2
+```
+
+A partial sweep still loads the teeth it reaches, so a reversing drive rounds
+*within* one actuation rather than once over all of them; and its two flanks
+share the engagements while the root takes every one of them. A planet's bending
+is fully reversed whatever the drive does — the sun loads one flank and the ring
+the other — so it is rated against a reversed allowable, and that derate does
+**not** stack with a reversing drive.
 
 ---
 

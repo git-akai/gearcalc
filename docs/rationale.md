@@ -608,6 +608,71 @@ clearance, `ε` falls from 1.664 to **0.860** and the zone is `Face`-limited. A
 designer now gets *"these teeth will not touch as built"* where the model used to
 report a healthy contact ratio for a mesh that was not happening.
 
+### Two load cases, because there are two allowables
+
+A rating is a stress against an allowable, and the crate held two allowables from
+the start — `ultimate_allowable` and `fatigue_allowable` — while rating
+everything against the second. That is the wrong question asked confidently: a
+peak load has to be survived *once*, and judging it against what the part must
+survive forever fails gears that are fine and passes none that are not.
+
+So a rating is `LoadCase<T>`. What separates the two cases is exactly two things
+— which torque, and which allowable — and nothing else about a stage knows which
+one it is looking at. Both scale in closed form (bending linear in torque,
+contact as its square root), so the second case costs a multiply rather than a
+second solve, and `LoadCase::of` is the only constructor for the same reason
+`Directional::of` is: there is no path by which a stage reports one case and not
+the other.
+
+**Why the operating load is a torque and a speed, not a percentage.** The
+obvious control is one "duty" slider at 80 %. It asserts that torque and speed
+fall together, which an electric motor roughly obeys, efficiencies bend, and
+another power source need not obey at all. This crate has no basis for that
+relation, so it declines to assert it: the user states each absolutely, each is
+clamped to its own peak, and the *ratio between them* is reported as an output.
+Zero is admissible — a train that only ever sees its peak has no cyclic case.
+
+### A load exists only where it is reacted
+
+A back-driving torque is not a sign on the input. It enters at the far end, and
+the question it raises is not "how big is it" but "what holds it".
+
+Walking upstream, each stage passes the load on attenuated by its **backward**
+efficiency until one cannot be driven backward at all. That stage reacts it, and
+everything above it carries none of it — which is the whole reason a designer
+puts a worm in a lifting drive. If the walk reaches the input with the load still
+turning something, then nothing reacted it: the train is back-drivable, the load
+drives it, and the case is zero at every gear.
+
+That last outcome is an input reaching no number, which the interface rule below
+says must be **said** rather than silently ignored — so the train reports which
+stage held the load, or that none did.
+
+**Why a two-pass solve.** A stage's backward torque depends on every efficiency
+downstream of it, which is not known until those stages are solved. Ratio and
+efficiency do not depend on torque, so the train is solved once for the shaft
+line and again for the ratings. The second pass is not a refinement of the
+first — it is the same arithmetic with the load it was missing.
+
+### Reversing changes the count, and only the count
+
+A reversing drive changes no stress. What it changes is how many times each
+thing is loaded, in two ways that pull opposite directions:
+
+- **Bending rounds within one actuation, not once over all of them.** A tooth
+  three quarters of the way through a sweep has still been loaded by that sweep,
+  and every tooth must meet the worst actuation, not the average one.
+- **Contact halves.** The two flanks share the engagements; the root takes all
+  of them.
+
+It is offered only for an intermittent drive, because only there is there an
+actuation to reverse between — an input that would mean nothing in the other
+mode is not offered in it.
+
+**It does not stack with the planet's derate.** A planet's bending is fully
+reversed whatever the drive does: the sun loads one flank and the ring the other.
+Applying a reversing-drive derate on top would be counting one fact twice.
+
 ### The tolerance table has two grade scales, not one
 
 The natural rule — "the band with the smaller value wins, regardless of page" —
