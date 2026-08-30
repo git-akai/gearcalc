@@ -1711,6 +1711,14 @@
     color: var(--fg);
     font-variant-numeric: tabular-nums;
   }
+  /* **A `select` is painted by the browser, not by the page, unless the page
+     says otherwise.** With a transparent background the text is the token's and
+     the box behind it is the platform's native control — which in a dark theme
+     came out light, and put near-white text on it. The gear tab's selects were
+     right all along because they name a background; these now do too. */
+  select {
+    background: var(--bg);
+  }
   /* A computed value is shown greyed, so a default is never mistaken for a
      considered choice. */
   input.computed {

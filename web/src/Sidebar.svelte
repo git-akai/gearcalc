@@ -258,7 +258,10 @@
     padding: 0.25rem 0.4rem;
     border: 1px solid var(--rule);
     border-radius: 3px;
-    background: none;
+    /* Named rather than left transparent: an unpainted `select` shows the
+       browser's own control behind the page's text, and the two do not agree
+       in a dark theme. */
+    background: var(--bg);
     /* Read, not skimmed: this is a control someone uses when they cannot read
        the rest of the page, so it is the last thing that should be set in the
        muted grey the *notes* use. The affordance moves to the border. */

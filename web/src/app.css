@@ -13,6 +13,12 @@
   --selected: #e2e8f0;
   --reference: #9aa4b2;
   --on-accent: #ffffff;
+  /* Declared here as "either", and **narrowed by each stamp below**. This is
+     what a browser paints a native control from — a `<select>`'s own widget,
+     a scrollbar, a focus ring — and none of it reads the tokens above. Left at
+     `light dark` under an explicit `data-theme`, the page's colours and its
+     controls would answer to different things: the tokens to the attribute, the
+     widgets to the operating system. */
   color-scheme: light dark;
 
   /* Vertical rhythm for an input and the note under it.
@@ -26,6 +32,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #14171b;
     --panel: #1b1f24;
     --fg: #e6e8ea;
@@ -42,6 +49,7 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #14171b;
   --panel: #1b1f24;
   --fg: #e6e8ea;
@@ -54,6 +62,10 @@
   --selected: #262d36;
   --reference: #5b6672;
   --on-accent: #0d1117;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }

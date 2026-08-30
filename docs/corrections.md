@@ -263,6 +263,8 @@ whose units are wrong is wrong however plausible.
 
 | [reference.md#the-boundary](reference.md#the-boundary) | The gap *inside* a group of fields taken for the gap *between* groups | The gear tab's Type field sits in its own group — it decides which fields follow it — and a ring's cutter in a third, so both sat flush against the group below while every other pair of fields was one field-gap apart. A flex `gap` says nothing about siblings of the container, and the fault is invisible until a group has exactly one member: measured at 0 px against 12 px everywhere else |
 
+| [rationale.md#notes-must-not-move-the-controls](rationale.md#notes-must-not-move-the-controls) | A `select` left **transparent**, so the browser painted it and the page painted the text on top | The two do not agree in a dark theme: the text came from a token and the box from the platform's native control, which stayed light. Only the gear tab's selects were right, and only because they happened to name a background — the geartrain's and the language picker's said `background: none`, which is not "no background" but "whatever is underneath", and underneath a form control is the widget. Measured at 16.56:1 light and 14.63:1 dark once every select named its own. The same pass narrowed `color-scheme` per theme: it was declared once as `light dark` and never stamped, so under an explicit `data-theme` the tokens would answer to the attribute while every native control answered to the operating system |
+
 ---
 
 ## Process notes
