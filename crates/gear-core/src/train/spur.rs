@@ -347,11 +347,11 @@ pub fn solve_spur_stage(
         // invert, and comes out zero. Said rather than divided by: the input
         // that produced it is on screen, and this is what it did.
         if g.face_width.auto && !g.face_sources.any() {
-            notes.push(
-                Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", (i + 1).to_string()),
-            );
+            notes
+                .push(Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", (i + 1).to_string()));
         }
-        g.face_width.resolve(g.face_sources.largest_of(&probe_widths(i)))
+        g.face_width
+            .resolve(g.face_sources.largest_of(&probe_widths(i)))
     });
 
     // The spec is explicit: the *narrower* gear carries the mesh, so both gears
@@ -385,9 +385,9 @@ pub fn solve_spur_stage(
             addendum: p[i].addendum,
             face_width: widths[i],
             torque: load_i.torque,
-            back_driving_torque: torques.peak_backward.map(|t| {
-                Load::new(t, effective).across_mesh(&g[0], &g[i]).torque
-            }),
+            back_driving_torque: torques
+                .peak_backward
+                .map(|t| Load::new(t, effective).across_mesh(&g[0], &g[i]).torque),
             // Filled in by `solve_train`, which is the only level that knows the
             // duty cycle and where this gear sits in the shaft line.
             speed: 0.0,

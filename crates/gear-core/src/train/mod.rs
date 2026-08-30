@@ -764,12 +764,8 @@ pub fn solve_any(
         Stage::Spur(s) if s.is_crossed() => {
             solve_crossed_stage(s, torques, lib).map(|r| StageResult::Worm(Box::new(r)))
         }
-        Stage::Spur(s) => {
-            solve_spur_stage(s, torques, lib).map(|r| StageResult::Spur(Box::new(r)))
-        }
-        Stage::Worm(s) => {
-            solve_worm_stage(s, torques, lib).map(|r| StageResult::Worm(Box::new(r)))
-        }
+        Stage::Spur(s) => solve_spur_stage(s, torques, lib).map(|r| StageResult::Spur(Box::new(r))),
+        Stage::Worm(s) => solve_worm_stage(s, torques, lib).map(|r| StageResult::Worm(Box::new(r))),
         // A planetary needs a speed as well as a torque: its efficiency depends
         // on which shaft is held, and that is a kinematic question. The train
         // supplies the speed it has reached by this point.
@@ -973,10 +969,7 @@ pub struct TrainResult {
 /// every stage solver takes its torque on. That referral is a division by the
 /// ratio and nothing else: the mesh force is set by the torque at the wheel, and
 /// the losses sit between the mesh and the shaft beyond it, not before it.
-fn back_driving_torques(
-    stages: &[StageResult],
-    applied: f64,
-) -> (Vec<Option<f64>>, Option<usize>) {
+fn back_driving_torques(stages: &[StageResult], applied: f64) -> (Vec<Option<f64>>, Option<usize>) {
     let none = || vec![None; stages.len()];
     if applied == 0.0 {
         return (none(), None);
@@ -1015,16 +1008,17 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     // train is solved once to learn the shaft line and again to rate it. The
     // second pass is not a refinement of the first — it is the same arithmetic
     // with the load it was missing.
-    let forward = |torques: &dyn Fn(usize) -> StageTorques| -> Result<Vec<StageResult>, TrainError> {
-        let mut speed = train.input_speed;
-        let mut out = Vec::with_capacity(train.stages.len());
-        for (k, stage) in train.stages.iter().enumerate() {
-            let r = solve_any(stage, speed, torques(k), lib)?;
-            speed /= r.ratio();
-            out.push(r);
-        }
-        Ok(out)
-    };
+    let forward =
+        |torques: &dyn Fn(usize) -> StageTorques| -> Result<Vec<StageResult>, TrainError> {
+            let mut speed = train.input_speed;
+            let mut out = Vec::with_capacity(train.stages.len());
+            for (k, stage) in train.stages.iter().enumerate() {
+                let r = solve_any(stage, speed, torques(k), lib)?;
+                speed /= r.ratio();
+                out.push(r);
+            }
+            Ok(out)
+        };
 
     // Forward torques are the same in both passes, so they are worked out once
     // from the ratios and efficiencies the first pass reports.
@@ -1048,12 +1042,18 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     // --- what the train wants read, as opposed to what a stage does.
     let mut notes = Vec::new();
     if train.operating_torque != cyclic_torque {
-        notes.push(
-            Note::new(key::TRAIN_OPERATING_TORQUE_CLAMPED).number("torque", cyclic_torque, 4),
-        );
+        notes.push(Note::new(key::TRAIN_OPERATING_TORQUE_CLAMPED).number(
+            "torque",
+            cyclic_torque,
+            4,
+        ));
     }
-    if let (Actuation::Continuous { operating_speed, .. }, Some(used)) =
-        (&train.actuation, train.cyclic_speed())
+    if let (
+        Actuation::Continuous {
+            operating_speed, ..
+        },
+        Some(used),
+    ) = (&train.actuation, train.cyclic_speed())
     {
         if *operating_speed != used {
             notes.push(Note::new(key::TRAIN_OPERATING_SPEED_CLAMPED).number("speed", used, 1));
@@ -1061,7 +1061,9 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     }
     if train.back_driving_torque != 0.0 {
         notes.push(match reacted_at {
-            Some(k) => Note::new(key::TRAIN_BACK_DRIVING_REACTED_AT).text("stage", (k + 1).to_string()),
+            Some(k) => {
+                Note::new(key::TRAIN_BACK_DRIVING_REACTED_AT).text("stage", (k + 1).to_string())
+            }
             None => Note::new(key::TRAIN_BACK_DRIVING_NOT_REACTED),
         });
     }
@@ -1494,26 +1496,41 @@ mod tests {
                 g.face_width = Auto::automatic(0.0);
                 g.face_sources = sources;
             }
-            solve_spur_stage(&s, StageTorques::just(2.0), &lib).unwrap().gears[0].face_width
+            solve_spur_stage(&s, StageTorques::just(2.0), &lib)
+                .unwrap()
+                .gears[0]
+                .face_width
         };
         // One source at a time, then every combination of them: the width is the
         // largest of whatever is enabled, and that is the whole rule.
         let each: Vec<f64> = [
             FaceSources {
-                bending: LoadCase { peak: true, cyclic: false },
+                bending: LoadCase {
+                    peak: true,
+                    cyclic: false,
+                },
                 contact: off,
             },
             FaceSources {
-                bending: LoadCase { peak: false, cyclic: true },
+                bending: LoadCase {
+                    peak: false,
+                    cyclic: true,
+                },
                 contact: off,
             },
             FaceSources {
                 bending: off,
-                contact: LoadCase { peak: true, cyclic: false },
+                contact: LoadCase {
+                    peak: true,
+                    cyclic: false,
+                },
             },
             FaceSources {
                 bending: off,
-                contact: LoadCase { peak: false, cyclic: true },
+                contact: LoadCase {
+                    peak: false,
+                    cyclic: true,
+                },
             },
         ]
         .into_iter()
@@ -1764,7 +1781,9 @@ mod tests {
                     ..Default::default()
                 };
             }
-            solve_spur_stage(&s, StageTorques::just(2.0), &lib).unwrap().gears[0]
+            solve_spur_stage(&s, StageTorques::just(2.0), &lib)
+                .unwrap()
+                .gears[0]
                 .contact_stress
                 .peak
         };

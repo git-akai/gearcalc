@@ -436,7 +436,8 @@ fn print_worm_stage(k: usize, st: &gear_core::train::WormStage, s: &gear_core::t
             "  {name:<6} {:>8.3} {:>10.4} {:>10} {:>9.1} {:>9.3e} /{:>9.3e}   {}",
             m.face_width,
             m.torque,
-            m.back_driving_torque.map_or("-".into(), |t| format!("{t:.4}")),
+            m.back_driving_torque
+                .map_or("-".into(), |t| format!("{t:.4}")),
             m.speed,
             m.tooth_cycles.bending,
             m.tooth_cycles.contact,
@@ -1398,7 +1399,12 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                 arrangement: Arrangement { input, fixed },
                 ..base.clone()
             };
-            match solve_planetary_stage(&stage, 3000.0, gear_core::train::StageTorques::just(2.0), &lib) {
+            match solve_planetary_stage(
+                &stage,
+                3000.0,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
                 Err(e) => println!("  {:>7} in, {:>7} held: {e}", name(input), name(fixed)),
                 Ok(r) => {
                     if !shown {
@@ -1462,7 +1468,12 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
         return;
     }
     let stage = base;
-    if let Ok(r) = solve_planetary_stage(&stage, 3000.0, gear_core::train::StageTorques::just(2.0), &lib) {
+    if let Ok(r) = solve_planetary_stage(
+        &stage,
+        3000.0,
+        gear_core::train::StageTorques::just(2.0),
+        &lib,
+    ) {
         println!();
         for note in &r.notes {
             println!("note: {}", words().render(note));

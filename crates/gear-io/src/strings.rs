@@ -434,7 +434,11 @@ mod tests {
                     ],
                     ..Default::default()
                 };
-                if let Ok(r) = gear_core::train::solve_spur_stage(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+                if let Ok(r) = gear_core::train::solve_spur_stage(
+                    &stage,
+                    gear_core::train::StageTorques::just(2.0),
+                    &lib,
+                ) {
                     record(&r.notes);
                 }
                 for sigma in [0.5_f64, 90.0] {
@@ -449,7 +453,11 @@ mod tests {
                         for g in &mut crossed.gears {
                             g.face_width = face;
                         }
-                        if let Ok(r) = gear_core::train::solve_crossed_stage(&crossed, gear_core::train::StageTorques::just(2.0), &lib) {
+                        if let Ok(r) = gear_core::train::solve_crossed_stage(
+                            &crossed,
+                            gear_core::train::StageTorques::just(2.0),
+                            &lib,
+                        ) {
                             record(&r.notes);
                         }
                     }
@@ -469,7 +477,11 @@ mod tests {
                 sliding_friction: friction,
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_worm_stage(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = gear_core::train::solve_worm_stage(
+                &stage,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
                 record(&r.notes);
             }
         }
@@ -479,7 +491,12 @@ mod tests {
                 min_planet_clearance: clearance,
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_planetary_stage(&stage, 3000.0, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = gear_core::train::solve_planetary_stage(
+                &stage,
+                3000.0,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
                 record(&r.notes);
             }
         }
@@ -526,7 +543,11 @@ mod tests {
                 ],
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_spur_stage(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = gear_core::train::solve_spur_stage(
+                &stage,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
                 record(&r.notes);
             }
             // ...and a crossed pair of the same, whose teeth then reach a full
@@ -546,7 +567,11 @@ mod tests {
                     ],
                     ..stage.clone()
                 };
-                if let Ok(r) = gear_core::train::solve_crossed_stage(&crossed, gear_core::train::StageTorques::just(2.0), &lib) {
+                if let Ok(r) = gear_core::train::solve_crossed_stage(
+                    &crossed,
+                    gear_core::train::StageTorques::just(2.0),
+                    &lib,
+                ) {
                     record(&r.notes);
                 }
             }
@@ -572,7 +597,11 @@ mod tests {
                 },
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_worm_stage(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = gear_core::train::solve_worm_stage(
+                &stage,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
                 record(&r.notes);
             }
             // ...and a worm sitting just under its self-locking threshold.
@@ -612,7 +641,12 @@ mod tests {
                 },
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_planetary_stage(&stage, 3000.0, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = gear_core::train::solve_planetary_stage(
+                &stage,
+                3000.0,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
                 record(&r.notes);
             }
         }

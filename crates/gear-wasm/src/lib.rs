@@ -1650,7 +1650,12 @@ mod tests {
                 "{who} must be rated"
             );
         }
-        assert!(stage["planet"]["gear"]["bending_stress"]["peak"].as_f64().unwrap() > 0.0);
+        assert!(
+            stage["planet"]["gear"]["bending_stress"]["peak"]
+                .as_f64()
+                .unwrap()
+                > 0.0
+        );
         assert_eq!(stage["equal_spacing"], true);
         // What the stage *assumes* has to come across too — here, equal load
         // sharing between planets, which no calculation can establish. Crossing

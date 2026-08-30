@@ -557,7 +557,8 @@ pub fn solve_planetary_stage(
     let mut no_source = Vec::new();
     let mut width_for = |name: &str, g: &StageGear, asks: &LoadCase<Widths>| -> f64 {
         if g.face_width.auto && !g.face_sources.any() {
-            no_source.push(Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", name.to_string()));
+            no_source
+                .push(Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", name.to_string()));
         }
         g.face_width.resolve(g.face_sources.largest_of(asks))
     };
@@ -996,7 +997,8 @@ mod tests {
                 arrangement: Arrangement { input, fixed },
                 ..stage_of(24, 18, 60, 0.0)
             };
-            let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library()).unwrap();
+            let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library())
+                .unwrap();
             assert_eq!(r.output, output);
             assert!(
                 (r.ratio - ratio).abs() < 1e-12,
@@ -1018,7 +1020,8 @@ mod tests {
             },
             ..stage_of(24, 18, 60, 0.0)
         };
-        let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library()).unwrap();
+        let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library())
+            .unwrap();
         let product = r.sun_planet.efficiency.forward * r.planet_ring.efficiency.forward;
         assert!((r.fixed_carrier_efficiency.forward - product).abs() < 1e-15);
         assert!(
@@ -1053,7 +1056,10 @@ mod tests {
             // withhold the figure entirely — see
             // `the_rating_is_continuous_across_the_flank_fillet_transition`.
             let (sun_s, ring_s) = (
-                res.sun.bending_stress.peak.expect("the sun is always rated"),
+                res.sun
+                    .bending_stress
+                    .peak
+                    .expect("the sun is always rated"),
                 res.ring.bending_stress.peak.expect("and so is the ring"),
             );
             assert!(
@@ -1093,7 +1099,8 @@ mod tests {
                 ..stage_of(s, p, r, 0.0)
             };
             let a = solve_planetary_stage(&sun_in, 3000.0, StageTorques::just(2.0), &lib).unwrap();
-            let b = solve_planetary_stage(&carrier_in, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+            let b =
+                solve_planetary_stage(&carrier_in, 3000.0, StageTorques::just(2.0), &lib).unwrap();
 
             // `a` outputs at the carrier, `b` at the sun.
             let at_carrier = a.backlash.forward.nominal;
@@ -1186,7 +1193,8 @@ mod tests {
             planets: 1,
             ..stage_of(24, 18, 60, 0.0)
         };
-        let r = solve_planetary_stage(&one, 3000.0, StageTorques::just(2.0), &test_library()).unwrap();
+        let r =
+            solve_planetary_stage(&one, 3000.0, StageTorques::just(2.0), &test_library()).unwrap();
         assert!(r.planet_clearance.is_none());
         assert!(r.planet_clearance_ok);
     }
@@ -1216,10 +1224,13 @@ mod tests {
     /// case rather than an exceptional one.
     #[test]
     fn an_impossible_set_is_refused() {
-        assert!(
-            solve_planetary_stage(&stage_of(24, 18, 200, 0.0), 3000.0, StageTorques::just(2.0), &test_library())
-                .is_err()
-        );
+        assert!(solve_planetary_stage(
+            &stage_of(24, 18, 200, 0.0),
+            3000.0,
+            StageTorques::just(2.0),
+            &test_library()
+        )
+        .is_err());
     }
 
     /// The thickness invariants differ between the two meshes and both hold from
@@ -1246,7 +1257,13 @@ mod tests {
             );
             assert!((planet - ring).abs() < 1e-15, "internal pair must match");
             // ...and it still solves.
-            assert!(solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library()).is_ok());
+            assert!(solve_planetary_stage(
+                &stage,
+                3000.0,
+                StageTorques::just(2.0),
+                &test_library()
+            )
+            .is_ok());
         }
     }
 }

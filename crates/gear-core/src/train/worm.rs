@@ -779,47 +779,48 @@ pub fn solve_worm_stage(
     // case is a torque and nothing else, so this closure takes the torque on the
     // wheel and knows nothing about which case asked.
     let rate = |output_torque: f64| -> Result<WormContact, TrainError> {
-    let at_pitch = s
-        .contact(
-            output_torque,
-            MeshSide::Second,
-            stage.sliding_friction,
-            e_star,
-        )
-        .ok_or(TrainError::NoContact)?;
-    // **Rated along the path, not at the pitch point.** The relative radius
-    // peaks where the two roll lengths are equal and falls toward both ends of
-    // the zone; the pitch point sits near that peak, so rating there alone took
-    // the mesh at close to its gentlest and flattered it.
-    // The points that matter are the two boundaries of single-pair contact,
-    // where one tooth carries everything; beyond them the next pair has taken
-    // up. Where `ε ≤ 1` those boundaries are the ends of the zone, so a face
-    // too narrow raises this figure as well as costing continuity.
-    let mut patch = at_pitch;
-    let mut worst_position = 0.0;
-    if let Some(path) = path {
-        for position in path.single_pair_bounds(&s) {
-            let contact = path.contact_at(&s, position);
-            let Some((along, across)) = path.curvatures_at(&s, position) else {
-                continue;
-            };
-            // The force at *this* contact, not at the pitch point: a stress
-            // evaluated in one place with a load computed in another is two
-            // answers wearing one number.
-            let Some(force) =
-                contact.normal_force(output_torque, stage.sliding_friction, Drive::Forward)
-            else {
-                continue;
-            };
-            let Some(here) = crate::hertz::elliptical_contact(along, across, force, e_star) else {
-                continue;
-            };
-            if here.max_pressure > patch.max_pressure {
-                patch = here;
-                worst_position = position;
+        let at_pitch = s
+            .contact(
+                output_torque,
+                MeshSide::Second,
+                stage.sliding_friction,
+                e_star,
+            )
+            .ok_or(TrainError::NoContact)?;
+        // **Rated along the path, not at the pitch point.** The relative radius
+        // peaks where the two roll lengths are equal and falls toward both ends of
+        // the zone; the pitch point sits near that peak, so rating there alone took
+        // the mesh at close to its gentlest and flattered it.
+        // The points that matter are the two boundaries of single-pair contact,
+        // where one tooth carries everything; beyond them the next pair has taken
+        // up. Where `ε ≤ 1` those boundaries are the ends of the zone, so a face
+        // too narrow raises this figure as well as costing continuity.
+        let mut patch = at_pitch;
+        let mut worst_position = 0.0;
+        if let Some(path) = path {
+            for position in path.single_pair_bounds(&s) {
+                let contact = path.contact_at(&s, position);
+                let Some((along, across)) = path.curvatures_at(&s, position) else {
+                    continue;
+                };
+                // The force at *this* contact, not at the pitch point: a stress
+                // evaluated in one place with a load computed in another is two
+                // answers wearing one number.
+                let Some(force) =
+                    contact.normal_force(output_torque, stage.sliding_friction, Drive::Forward)
+                else {
+                    continue;
+                };
+                let Some(here) = crate::hertz::elliptical_contact(along, across, force, e_star)
+                else {
+                    continue;
+                };
+                if here.max_pressure > patch.max_pressure {
+                    patch = here;
+                    worst_position = position;
+                }
             }
         }
-    }
 
         Ok(WormContact {
             max_pressure: patch.max_pressure,
@@ -1374,7 +1375,8 @@ mod tests {
         };
 
         // Automatic: the width for ε = 1, and the ratio comes back as 1.
-        let auto = solve_crossed_stage(&stage(Auto::automatic(0.0)), StageTorques::just(2.0), &lib).unwrap();
+        let auto = solve_crossed_stage(&stage(Auto::automatic(0.0)), StageTorques::just(2.0), &lib)
+            .unwrap();
         let m = auto.crossed.expect("a crossed pair has a path of contact");
         assert!(
             (m.contact_ratio - 1.0).abs() < 1e-9,
@@ -1396,7 +1398,12 @@ mod tests {
         // nominal centre distance *plus the clearance* and that slides the
         // contact along the shafts (docs/reference.md#centre-distance-and-backlash). Trimming a face symmetrically about
         // an asymmetric contact loses a little more than half.
-        let narrow = solve_crossed_stage(&stage(Auto::fixed(sized[0] / 2.0)), StageTorques::just(2.0), &lib).unwrap();
+        let narrow = solve_crossed_stage(
+            &stage(Auto::fixed(sized[0] / 2.0)),
+            StageTorques::just(2.0),
+            &lib,
+        )
+        .unwrap();
         let n = narrow.crossed.unwrap();
         assert!(
             n.contact_ratio < 0.5 && n.contact_ratio > 0.45,
@@ -1410,13 +1417,20 @@ mod tests {
             clearance: 0.0,
             ..stage(face)
         };
-        let centred = solve_crossed_stage(&tight(Auto::automatic(0.0)), StageTorques::just(2.0), &lib).unwrap();
+        let centred =
+            solve_crossed_stage(&tight(Auto::automatic(0.0)), StageTorques::just(2.0), &lib)
+                .unwrap();
         let width = centred
             .crossed
             .expect("a path")
             .face_width_for_continuity
             .expect("a width for continuity");
-        let halved = solve_crossed_stage(&tight(Auto::fixed(width[0] / 2.0)), StageTorques::just(2.0), &lib).unwrap();
+        let halved = solve_crossed_stage(
+            &tight(Auto::fixed(width[0] / 2.0)),
+            StageTorques::just(2.0),
+            &lib,
+        )
+        .unwrap();
         assert!(
             (halved.crossed.unwrap().contact_ratio - 0.5).abs() < 1e-9,
             "with the contact centred, half the face is exactly half the contact"
@@ -1431,11 +1445,13 @@ mod tests {
         );
 
         // Generous, and the teeth are what end it — a wider face buys nothing.
-        let wide = solve_crossed_stage(&stage(Auto::fixed(60.0)), StageTorques::just(2.0), &lib).unwrap();
+        let wide =
+            solve_crossed_stage(&stage(Auto::fixed(60.0)), StageTorques::just(2.0), &lib).unwrap();
         let w = wide.crossed.unwrap();
         assert_eq!(w.limited_by, ZoneLimit::Tips);
         assert!(w.contact_ratio > m.contact_ratio);
-        let wider = solve_crossed_stage(&stage(Auto::fixed(120.0)), StageTorques::just(2.0), &lib).unwrap();
+        let wider =
+            solve_crossed_stage(&stage(Auto::fixed(120.0)), StageTorques::just(2.0), &lib).unwrap();
         assert!((wider.crossed.unwrap().contact_ratio - w.contact_ratio).abs() < 1e-12);
     }
 
@@ -1960,7 +1976,11 @@ mod tests {
             ("centre distance", a.centre_distance, b.centre_distance),
             ("lead angle", a.lead_angle, b.lead_angle),
             ("efficiency", a.efficiency.forward, b.efficiency.forward),
-            ("contact", a.contact.peak.max_pressure, b.contact.peak.max_pressure),
+            (
+                "contact",
+                a.contact.peak.max_pressure,
+                b.contact.peak.max_pressure,
+            ),
             (
                 "backlash",
                 a.backlash.forward.nominal,
@@ -2051,11 +2071,12 @@ mod tests {
                 .nominal;
             // As close to parallel as the screw model will go. The pair is still
             // crossed, so it is still the crossed law answering.
-            let crossed = solve_crossed_stage(&stage(0.001, clearance), StageTorques::just(2.0), &lib)
-                .expect("a crossed pair")
-                .backlash
-                .forward
-                .nominal;
+            let crossed =
+                solve_crossed_stage(&stage(0.001, clearance), StageTorques::just(2.0), &lib)
+                    .expect("a crossed pair")
+                    .backlash
+                    .forward
+                    .nominal;
 
             assert!(
                 parallel > 0.0 && crossed > 0.0,
@@ -2120,11 +2141,12 @@ mod tests {
                 .backlash
                 .forward
                 .nominal;
-            let crossed = solve_crossed_stage(&stage(0.001, clearance), StageTorques::just(2.0), &lib)
-                .expect("a crossed pair")
-                .backlash
-                .forward
-                .nominal;
+            let crossed =
+                solve_crossed_stage(&stage(0.001, clearance), StageTorques::just(2.0), &lib)
+                    .expect("a crossed pair")
+                    .backlash
+                    .forward
+                    .nominal;
             (parallel - crossed) / parallel
         };
         let (coarse, fine) = (shortfall(0.04), shortfall(0.02));
@@ -2218,7 +2240,8 @@ mod tests {
         use crate::train::SpurStage;
 
         let lib = super::super::test_library();
-        let reference = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib).expect("a stage");
+        let reference = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib)
+            .expect("a stage");
         for statik in [0.0_f64, 0.06, 0.16, 0.5, 0.9] {
             let r = solve_spur_stage(
                 &SpurStage {
@@ -2386,7 +2409,12 @@ mod tests {
             sizing: FirstMemberSizing::HelixAngle(45.0),
             ..WormStage::default()
         };
-        let r = solve_worm_stage(&stage, StageTorques::just(2.0), &super::super::test_library()).unwrap();
+        let r = solve_worm_stage(
+            &stage,
+            StageTorques::just(2.0),
+            &super::super::test_library(),
+        )
+        .unwrap();
         assert!((r.ratio - 23.0 / 17.0).abs() < 1e-12);
         assert!(r.efficiency.forward > 0.0 && r.efficiency.forward < 1.0);
         assert!(r.contact.peak.max_pressure > 0.0);
