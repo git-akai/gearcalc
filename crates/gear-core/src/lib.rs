@@ -9,11 +9,12 @@
 //! `docs/corrections.md`.
 //!
 //! ```
-//! use gear_core::{Tooth, GearParams};
+//! use gear_core::{Gear, GearParams, Tooth};
 //!
-//! let g = Tooth::new(GearParams { teeth: 17, profile_shift: 0.2, ..Default::default() });
-//! assert!(!g.undercut);
-//! let outline = g.profile(400);        // closed cross-section, CCW
+//! // A tooth is one tooth's form; a gear is the assembly that repeats it.
+//! let t = Tooth::new(GearParams { teeth: 17, profile_shift: 0.2, ..Default::default() });
+//! assert!(!t.undercut);
+//! let outline = Gear::new(t.params).profile(400);   // closed cross-section, CCW
 //! ```
 
 pub mod auto;
@@ -39,6 +40,7 @@ pub mod tooth;
 pub mod train;
 pub mod verify;
 
+pub use gear::Gear;
 pub use involute::{inv, inv_from_roll, inv_inverse};
 pub use material::{Material, MaterialLibrary};
 pub use mesh::{Mesh, MeshError, MeshKind};

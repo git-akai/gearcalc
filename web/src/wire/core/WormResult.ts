@@ -2,6 +2,7 @@
 import type { Backlash } from "./Backlash";
 import type { CrossedMesh } from "./CrossedMesh";
 import type { Directional } from "./Directional";
+import type { LoadCase } from "./LoadCase";
 import type { Note } from "./Note";
 import type { WormContact } from "./WormContact";
 import type { WormMemberResult } from "./WormMemberResult";
@@ -67,7 +68,11 @@ sliding_ratio: number,
 /**
  * Sliding speed at the pitch point, mm/s. Filled in by the train.
  */
-sliding_velocity: number, contact: WormContact, 
+sliding_velocity: number, 
+/**
+ * The contact patch, in both load cases.
+ */
+contact: LoadCase<WormContact>, 
 /**
  * Angular backlash at whichever member is the output in each direction,
  * degrees: the wheel driving forward, the worm driving backward. A worm

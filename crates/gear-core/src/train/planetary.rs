@@ -29,7 +29,10 @@
 //! the assumption is stated in the result's notes rather than absorbed into a
 //! coefficient, and a designer who needs the derating can apply it knowingly.
 
-use super::{Backlash, ContactRatios, GearResult, TrainError};
+use super::{
+    allowable, Backlash, Case, ContactRatios, Cycles, GearResult, LoadCase, StageTorques,
+    TrainError, Widths,
+};
 use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift};
 use crate::contact::{efficiency, ContactPath, Directional};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
@@ -157,8 +160,8 @@ pub struct MeshReport {
     /// Mesh efficiency, both drive senses. Equal for a parallel-axis pair, and
     /// arrived at rather than copied.
     pub efficiency: Directional<f64>,
-    /// Hertzian contact stress, MPa — shared by the pair.
-    pub contact_stress: f64,
+    /// Hertzian contact stress, MPa — shared by the pair, in both load cases.
+    pub contact_stress: LoadCase<f64>,
     /// Relative radius of curvature at the governing point, mm.
     pub relative_radius: f64,
     /// Angular backlash at each member, degrees: the first is the pinion-side
@@ -192,9 +195,11 @@ pub struct PlanetResult {
     pub fully_reversed: bool,
     /// The bending allowable a fully reversed load leaves, MPa, and where the
     /// figure comes from.
+    ///
+    /// This is the allowable [`Self::gear`]'s **cyclic** bending is rated
+    /// against — there is no second minimum face width to report beside it, and
+    /// there used to be, which was one derate written down in two places.
     pub reversed_allowable: crate::material::Value,
-    /// Face width the reversed bending would need against that allowable.
-    pub min_face_width_reversed: Option<f64>,
 }
 
 /// Everything a planetary stage produces.
@@ -319,9 +324,10 @@ impl PlanetaryStage {
 pub fn solve_planetary_stage(
     stage: &PlanetaryStage,
     input_speed: f64,
-    input_torque: f64,
+    torques: StageTorques,
     lib: &MaterialLibrary,
 ) -> Result<PlanetaryResult, TrainError> {
+    let input_torque = torques.peak_forward;
     let teeth = stage.teeth();
     let rack = stage.rack();
     let mut notes = Vec::new();
@@ -533,18 +539,46 @@ pub fn solve_planetary_stage(
     let ring_section =
         ring_bending_section(&ring, pr_path.contact_ratio).ok_or(TrainError::NoRootSection)?;
 
-    let width_for = |g: &StageGear, sigma_f: Option<f64>, sigma_h: f64, allow: f64| -> f64 {
-        let mut want = 0.0_f64;
-        if g.auto_face_from_bending {
-            if let Some(sf) = sigma_f {
-                want = want.max(min_face_width_bending(sf, PROBE, allow));
-            }
+    // Every rating is linear or square-root in the torque, and the planetary's
+    // power split is **not** a function of its magnitude: `w = sgn(T_s(ω_s − ω_c))`
+    // and back-driving reverses both factors, so the branch is the same one. A
+    // load case is therefore a scale on the forward torques rather than a second
+    // kinematic solve.
+    let scale_case = |case: Case| {
+        if torques.peak_forward == 0.0 {
+            0.0
+        } else {
+            torques.at(case) / torques.peak_forward.abs()
         }
-        if g.auto_face_from_contact {
-            want = want.max(min_face_width_contact(sigma_h, PROBE, allow));
-        }
-        g.face_width.resolve(want)
     };
+
+    // An automatic width with every source switched off has nothing to invert
+    // and comes out zero. Said rather than divided by, as in the spur stage.
+    let mut no_source = Vec::new();
+    let mut width_for = |name: &str, g: &StageGear, asks: &LoadCase<Widths>| -> f64 {
+        if g.face_width.auto && !g.face_sources.any() {
+            no_source.push(Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", name.to_string()));
+        }
+        g.face_width.resolve(g.face_sources.largest_of(asks))
+    };
+
+    /// The four widths one member's ratings ask for.
+    fn asks_of(
+        sigma_f: Option<f64>,
+        sigma_h: f64,
+        probe: f64,
+        allow: &dyn Fn(Case) -> f64,
+        scale: &dyn Fn(Case) -> f64,
+    ) -> LoadCase<Widths> {
+        LoadCase::of(|case| {
+            let k = scale(case);
+            let a = allow(case);
+            Widths {
+                bending: sigma_f.map(|s| min_face_width_bending(s * k, probe, a)),
+                contact: min_face_width_contact(sigma_h * k.sqrt(), probe, a),
+            }
+        })
+    }
 
     let probe_load_sp = Load::new(sun_torque_per_mesh, PROBE);
     let sun_sf = bending_stress(
@@ -567,26 +601,50 @@ pub fn solve_planetary_stage(
         StressConcentration::Iso6336,
     );
 
+    // The planet's bending allowable is already the fully reversed one: sun and
+    // ring load opposite flanks of the same tooth, whatever the drive does. A
+    // reversing *drive* does not make it more reversed, so the two do not stack
+    // — the derate stands and the contact halving is applied to the cycles.
+    let planet_allow = |case: Case| match case {
+        Case::Cyclic => crate::material::reversed_bending_allowable(&mats[1]).value,
+        Case::Peak => mats[1].ultimate_allowable.value,
+    };
     let widths = [
         width_for(
+            "sun",
             &stage.sun,
-            sun_sf,
-            sp_probe.worst,
-            mats[0].fatigue_allowable.value,
+            &asks_of(
+                sun_sf,
+                sp_probe.worst,
+                PROBE,
+                &|c| allowable(&mats[0], c),
+                &scale_case,
+            ),
         ),
         width_for(
+            "planet",
             &stage.planet,
-            planet_sf,
-            sp_probe.worst.max(pr_probe.worst),
-            crate::material::reversed_bending_allowable(&mats[1]).value,
+            &asks_of(
+                planet_sf,
+                sp_probe.worst.max(pr_probe.worst),
+                PROBE,
+                &planet_allow,
+                &scale_case,
+            ),
         ),
         width_for(
+            "ring",
             &stage.ring,
-            ring_sf,
-            pr_probe.worst,
-            mats[2].fatigue_allowable.value,
+            &asks_of(
+                ring_sf,
+                pr_probe.worst,
+                PROBE,
+                &|c| allowable(&mats[2], c),
+                &scale_case,
+            ),
         ),
     ];
+    notes.extend(no_source);
     // The narrower member carries the mesh, per the specification.
     let sp_width = widths[0].min(widths[1]);
     let pr_width = widths[1].min(widths[2]);
@@ -692,20 +750,42 @@ pub fn solve_planetary_stage(
                        sigma_f: Option<f64>,
                        sigma_h: f64,
                        material: &Material,
+                       allow: &dyn Fn(Case) -> f64,
                        clamps: Vec<Note>|
      -> GearResult {
-        let allow = material.fatigue_allowable.value;
+        // A load case is a scale on the torque, and every rating is linear or
+        // square-root in it — so the peak and cyclic figures are the same
+        // expression evaluated at the two scales rather than a second solve.
+        //
+        // **The allowable comes in rather than being read off the material**, so
+        // that the width `width_for` chose and the minimum reported here are
+        // sized against the same figure. The planet is the member this matters
+        // for: its bending is fully reversed whatever the drive does, so it is
+        // rated against a derated allowable, and reading the plain one here
+        // would have reported a minimum the stage had not used.
+        let by_case = |case: Case| (scale_case(case), allow(case));
         GearResult {
             profile_shift: params.profile_shift,
             addendum: params.addendum,
             face_width: width,
             torque,
+            back_driving_torque: torques
+                .peak_backward
+                .map(|t| torque * (t.abs() / torques.peak_forward.abs().max(f64::MIN_POSITIVE))),
             speed: forward.speeds[member.index_pub()],
-            tooth_cycles: 0.0,
-            bending_stress: sigma_f,
-            contact_stress: sigma_h,
-            min_face_width_bending: sigma_f.map(|s| min_face_width_bending(s, width, allow)),
-            min_face_width_contact: min_face_width_contact(sigma_h, width, allow),
+            tooth_cycles: Cycles {
+                bending: 0.0,
+                contact: 0.0,
+            },
+            bending_stress: LoadCase::of(|c| sigma_f.map(|s| s * by_case(c).0)),
+            contact_stress: LoadCase::of(|c| sigma_h * by_case(c).0.sqrt()),
+            min_face_width: LoadCase::of(|c| {
+                let (k, a) = by_case(c);
+                Widths {
+                    bending: sigma_f.map(|s| min_face_width_bending(s * k, width, a)),
+                    contact: min_face_width_contact(sigma_h * k.sqrt(), width, a),
+                }
+            }),
             clamps,
             material: material.clone(),
             ranges: admissible_ranges(params, input.working_depth.resolve(input.dedendum)),
@@ -734,7 +814,7 @@ pub fn solve_planetary_stage(
         sun_planet: MeshReport {
             contact_ratios: ratios(sp_path.contact_ratio, sp_width, stage),
             efficiency: sp_eff,
-            contact_stress: sp_cs.worst,
+            contact_stress: LoadCase::of(|c| sp_cs.worst * scale_case(c).sqrt()),
             relative_radius: sp_cs.relative_radius,
             backlash: [
                 backlash_of(&sp_mesh, MeshSide::First),
@@ -744,7 +824,7 @@ pub fn solve_planetary_stage(
         planet_ring: MeshReport {
             contact_ratios: ratios(pr_path.contact_ratio, pr_width, stage),
             efficiency: pr_eff,
-            contact_stress: pr_cs.worst,
+            contact_stress: LoadCase::of(|c| pr_cs.worst * scale_case(c).sqrt()),
             relative_radius: pr_cs.relative_radius,
             backlash: [
                 backlash_of(&pr_mesh, MeshSide::First),
@@ -766,6 +846,7 @@ pub fn solve_planetary_stage(
             sun_stress,
             sp_cs.worst,
             &mats[0],
+            &|c| allowable(&mats[0], c),
             sun.clamps.notes.clone(),
         ),
         planet: PlanetResult {
@@ -778,6 +859,7 @@ pub fn solve_planetary_stage(
                 planet_stress,
                 sp_cs.worst.max(pr_cs.worst),
                 &mats[1],
+                &planet_allow,
                 planet.clamps.notes.clone(),
             ),
             profile_shift: planet_shift,
@@ -785,8 +867,6 @@ pub fn solve_planetary_stage(
             speed_absolute: forward.speeds[1],
             speed_relative: planet_relative,
             fully_reversed: true,
-            min_face_width_reversed: planet_stress
-                .map(|s| min_face_width_bending(s, widths[1], reversed_allowable.value)),
             reversed_allowable,
         },
         planets: stage.planets,
@@ -799,6 +879,7 @@ pub fn solve_planetary_stage(
             ring_stress,
             pr_cs.worst,
             &mats[2],
+            &|c| allowable(&mats[2], c),
             ring.clamps.clone(),
         ),
         notes,
@@ -855,7 +936,7 @@ mod tests {
         solve_planetary_stage(
             &stage_of(sun, planet, ring, 0.0),
             3000.0,
-            2.0,
+            StageTorques::just(2.0),
             &test_library(),
         )
         .unwrap()
@@ -915,7 +996,7 @@ mod tests {
                 arrangement: Arrangement { input, fixed },
                 ..stage_of(24, 18, 60, 0.0)
             };
-            let r = solve_planetary_stage(&stage, 3000.0, 2.0, &test_library()).unwrap();
+            let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library()).unwrap();
             assert_eq!(r.output, output);
             assert!(
                 (r.ratio - ratio).abs() < 1e-12,
@@ -937,7 +1018,7 @@ mod tests {
             },
             ..stage_of(24, 18, 60, 0.0)
         };
-        let r = solve_planetary_stage(&stage, 3000.0, 2.0, &test_library()).unwrap();
+        let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library()).unwrap();
         let product = r.sun_planet.efficiency.forward * r.planet_ring.efficiency.forward;
         assert!((r.fixed_carrier_efficiency.forward - product).abs() < 1e-15);
         assert!(
@@ -972,8 +1053,8 @@ mod tests {
             // withhold the figure entirely — see
             // `the_rating_is_continuous_across_the_flank_fillet_transition`.
             let (sun_s, ring_s) = (
-                res.sun.bending_stress.expect("the sun is always rated"),
-                res.ring.bending_stress.expect("and so is the ring"),
+                res.sun.bending_stress.peak.expect("the sun is always rated"),
+                res.ring.bending_stress.peak.expect("and so is the ring"),
             );
             assert!(
                 ring_s < sun_s,
@@ -1011,8 +1092,8 @@ mod tests {
                 },
                 ..stage_of(s, p, r, 0.0)
             };
-            let a = solve_planetary_stage(&sun_in, 3000.0, 2.0, &lib).unwrap();
-            let b = solve_planetary_stage(&carrier_in, 3000.0, 2.0, &lib).unwrap();
+            let a = solve_planetary_stage(&sun_in, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+            let b = solve_planetary_stage(&carrier_in, 3000.0, StageTorques::just(2.0), &lib).unwrap();
 
             // `a` outputs at the carrier, `b` at the sun.
             let at_carrier = a.backlash.forward.nominal;
@@ -1037,14 +1118,14 @@ mod tests {
     fn both_meshes_contribute_to_the_output_backlash() {
         let lib = test_library();
         let base = stage_of(24, 18, 60, 0.0);
-        let tight = solve_planetary_stage(&base, 3000.0, 2.0, &lib).unwrap();
+        let tight = solve_planetary_stage(&base, 3000.0, StageTorques::just(2.0), &lib).unwrap();
 
         // More clearance opens both meshes, so the output must loosen.
         let loose = PlanetaryStage {
             clearance: base.clearance + 0.05,
             ..base.clone()
         };
-        let loose = solve_planetary_stage(&loose, 3000.0, 2.0, &lib).unwrap();
+        let loose = solve_planetary_stage(&loose, 3000.0, StageTorques::just(2.0), &lib).unwrap();
         assert!(
             loose.backlash.forward.nominal > tight.backlash.forward.nominal,
             "{} should exceed {}",
@@ -1063,7 +1144,7 @@ mod tests {
             tolerance_minus: 0.0,
             ..base
         };
-        let exact = solve_planetary_stage(&exact, 3000.0, 2.0, &lib).unwrap();
+        let exact = solve_planetary_stage(&exact, 3000.0, StageTorques::just(2.0), &lib).unwrap();
         assert!(
             exact.backlash.forward.nominal < 1e-12,
             "zero clearance must give zero play, got {}",
@@ -1105,7 +1186,7 @@ mod tests {
             planets: 1,
             ..stage_of(24, 18, 60, 0.0)
         };
-        let r = solve_planetary_stage(&one, 3000.0, 2.0, &test_library()).unwrap();
+        let r = solve_planetary_stage(&one, 3000.0, StageTorques::just(2.0), &test_library()).unwrap();
         assert!(r.planet_clearance.is_none());
         assert!(r.planet_clearance_ok);
     }
@@ -1117,14 +1198,14 @@ mod tests {
     fn a_helical_set_reports_everything_a_spur_one_does() {
         for helix in [10.0, 20.0, 30.0] {
             let stage = stage_of(24, 18, 60, helix);
-            let r = solve_planetary_stage(&stage, 3000.0, 2.0, &test_library())
+            let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library())
                 .unwrap_or_else(|e| panic!("helix={helix}: {e}"));
-            assert!(r.sun.bending_stress.is_some(), "helix={helix}: sun");
+            assert!(r.sun.bending_stress.peak.is_some(), "helix={helix}: sun");
             assert!(
-                r.planet.gear.bending_stress.is_some(),
+                r.planet.gear.bending_stress.peak.is_some(),
                 "helix={helix}: planet"
             );
-            assert!(r.ring.bending_stress.is_some(), "helix={helix}: ring");
+            assert!(r.ring.bending_stress.peak.is_some(), "helix={helix}: ring");
             assert!(r.sun_planet.contact_ratios.overlap > 0.0, "helix={helix}");
             assert!(r.planet.shift_residual < 1e-12);
         }
@@ -1136,7 +1217,7 @@ mod tests {
     #[test]
     fn an_impossible_set_is_refused() {
         assert!(
-            solve_planetary_stage(&stage_of(24, 18, 200, 0.0), 3000.0, 2.0, &test_library())
+            solve_planetary_stage(&stage_of(24, 18, 200, 0.0), 3000.0, StageTorques::just(2.0), &test_library())
                 .is_err()
         );
     }
@@ -1165,7 +1246,7 @@ mod tests {
             );
             assert!((planet - ring).abs() < 1e-15, "internal pair must match");
             // ...and it still solves.
-            assert!(solve_planetary_stage(&stage, 3000.0, 2.0, &test_library()).is_ok());
+            assert!(solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library()).is_ok());
         }
     }
 }

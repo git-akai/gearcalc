@@ -2,6 +2,7 @@
 import type { Backlash } from "./Backlash";
 import type { ContactRatios } from "./ContactRatios";
 import type { Directional } from "./Directional";
+import type { LoadCase } from "./LoadCase";
 
 /**
  * What one of the two meshes did.
@@ -13,9 +14,9 @@ export type MeshReport = { contact_ratios: ContactRatios,
  */
 efficiency: Directional<number>, 
 /**
- * Hertzian contact stress, MPa — shared by the pair.
+ * Hertzian contact stress, MPa — shared by the pair, in both load cases.
  */
-contact_stress: number, 
+contact_stress: LoadCase<number>, 
 /**
  * Relative radius of curvature at the governing point, mm.
  */

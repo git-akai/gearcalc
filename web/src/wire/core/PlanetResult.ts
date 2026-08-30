@@ -36,9 +36,9 @@ fully_reversed: boolean,
 /**
  * The bending allowable a fully reversed load leaves, MPa, and where the
  * figure comes from.
+ *
+ * This is the allowable [`Self::gear`]'s **cyclic** bending is rated
+ * against — there is no second minimum face width to report beside it, and
+ * there used to be, which was one derate written down in two places.
  */
-reversed_allowable: Value, 
-/**
- * Face width the reversed bending would need against that allowable.
- */
-min_face_width_reversed: number | null, };
+reversed_allowable: Value, };

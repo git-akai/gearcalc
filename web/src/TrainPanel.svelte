@@ -64,8 +64,10 @@
     if (m === mode) return;
     tab.train.actuation =
       m === "intermittent"
-        ? { intermittent: { range_degrees: 25, actuations: 1000 } }
-        : { continuous: { operating_percent: 80, runtime_hours: 1000 } };
+        ? { intermittent: { range_degrees: 25, actuations: 1000, reversing: false } }
+        : // The operating speed starts at the peak, which is the one value that
+          // is certainly admissible and asserts nothing about the drive.
+          { continuous: { operating_speed: tab.train.input_speed, runtime_hours: 1000 } };
   }
 
   function addStage() {
@@ -106,6 +108,17 @@
 
   const pct = (v: number) => (100 * v).toFixed(3);
   const n = (v: number) => v.toFixed(3);
+
+  /** A rating in both load cases, written in the order they are read: what the
+   *  part must survive once, then what it must survive for the duty.
+   *
+   *  Formatting, not arithmetic — every number here came from Rust. A rating
+   *  that does not exist for a member renders as a dash rather than as a zero,
+   *  because those are different facts. */
+  const cases = (v: { peak: number | null; cyclic: number | null }, digits: number) =>
+    `${v.peak === null ? "—" : v.peak.toFixed(digits)} / ${
+      v.cyclic === null ? "—" : v.cyclic.toFixed(digits)
+    }`;
 
 </script>
 
@@ -232,13 +245,14 @@
   <dd>{r.self_locking_friction.toFixed(4)}</dd>
   <dt>{t("ui.train_contact_stress")}</dt>
   <dd>
-    {r.contact.max_pressure.toFixed(1)} MPa
+    {cases({ peak: r.contact.peak.max_pressure, cyclic: r.contact.cyclic.max_pressure }, 1)} MPa
+    <small>{t("ui.train_peak_cyclic")}</small>
     <small>
-      patch {r.contact.patch_length.toFixed(4)} × {r.contact.patch_width.toFixed(4)} mm ·
-      {Math.abs(r.contact.worst_position) < 1e-9
+      patch {r.contact.peak.patch_length.toFixed(4)} × {r.contact.peak.patch_width.toFixed(4)} mm ·
+      {Math.abs(r.contact.peak.worst_position) < 1e-9
         ? t("ui.train_worst_at_pitch_point")
-        : `worst ${r.contact.worst_position.toFixed(3)} mm along the path, where one tooth carries it alone`}
-      · the pitch point alone gives {r.contact.at_pitch_point.toFixed(1)}
+        : `worst ${r.contact.peak.worst_position.toFixed(3)} mm along the path, where one tooth carries it alone`}
+      · the pitch point alone gives {r.contact.peak.at_pitch_point.toFixed(1)}
     </small>
   </dd>
   <dt>{t("ui.train_sliding_speed")}</dt>
@@ -397,14 +411,28 @@
     {@render autoNumber("ui.train_face_width", gear.face_width, g?.face_width, 0.5)}
   {/if}
   {#if gear.face_width.auto && opts.faceAuto !== false}
+    <!-- Four ratings, so four toggles: a rating exists for every combination
+         of what fails (bending or contact) and what it is rated against (the
+         peak load, against the ultimate, or the cyclic one, against fatigue).
+         The width is the largest any enabled rating asks for. With none of them
+         enabled there is nothing to invert and the width comes out zero, which
+         the stage says in a note rather than hiding. -->
     <div class="subtoggles">
       <label class="check">
-        <input type="checkbox" bind:checked={gear.auto_face_from_bending} />
-        <span>{t("ui.train_from_bending")}</span>
+        <input type="checkbox" bind:checked={gear.face_sources.bending.peak} />
+        <span>{t("ui.train_from_bending_peak")}</span>
       </label>
       <label class="check">
-        <input type="checkbox" bind:checked={gear.auto_face_from_contact} />
-        <span>{t("ui.train_from_contact")}</span>
+        <input type="checkbox" bind:checked={gear.face_sources.bending.cyclic} />
+        <span>{t("ui.train_from_bending_cyclic")}</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" bind:checked={gear.face_sources.contact.peak} />
+        <span>{t("ui.train_from_contact_peak")}</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" bind:checked={gear.face_sources.contact.cyclic} />
+        <span>{t("ui.train_from_contact_cyclic")}</span>
       </label>
     </div>
   {/if}
@@ -428,25 +456,39 @@
     <dl class="out small">
       <dt>{t("ui.train_torque")}</dt>
       <dd>{g.torque.toFixed(4)} Nm</dd>
+      <!-- Only where there is one. A back-driving load that nothing reacts
+           reaches no gear, and an empty row is the honest report of that. -->
+      {#if g.back_driving_torque !== null}
+        <dt>{t("ui.train_back_driving_torque")}</dt>
+        <dd>{g.back_driving_torque.toFixed(4)} Nm</dd>
+      {/if}
       <dt>{t("ui.train_speed")}</dt>
       <dd>{g.speed.toFixed(1)} rpm</dd>
       <dt>{t("ui.train_tooth_cycles")}</dt>
-      <dd>{g.tooth_cycles.toLocaleString()}</dd>
+      <dd>
+        {g.tooth_cycles.bending.toLocaleString()} / {g.tooth_cycles.contact.toLocaleString()}
+        <small>{t("ui.train_bending_contact")}</small>
+      </dd>
       <dt>{t("ui.train_bending_stress")}</dt>
       <dd>
-        {g.bending_stress === null
-          ? "—"
-          : `${g.bending_stress.toFixed(1)} MPa`}
+        {cases(g.bending_stress, 1)} MPa
+        <small>{t("ui.train_peak_cyclic")}</small>
       </dd>
       <dt>{t("ui.train_contact_stress")}</dt>
-      <dd>{g.contact_stress.toFixed(1)} MPa</dd>
+      <dd>
+        {cases(g.contact_stress, 1)} MPa
+        <small>{t("ui.train_peak_cyclic")}</small>
+      </dd>
       <dt>{t("ui.train_min_face_width")}</dt>
       <dd>
-        {g.min_face_width_bending === null
-          ? "—"
-          : `${g.min_face_width_bending.toFixed(3)}`} /
-        {g.min_face_width_contact.toFixed(3)} mm
-        <small>{t("ui.train_bending_contact")}</small>
+        <span class="line">
+          {cases({ peak: g.min_face_width.peak.bending, cyclic: g.min_face_width.cyclic.bending }, 3)} mm
+          <small>{t("ui.train_bending_peak_cyclic")}</small>
+        </span>
+        <span class="line">
+          {cases({ peak: g.min_face_width.peak.contact, cyclic: g.min_face_width.cyclic.contact }, 3)} mm
+          <small>{t("ui.train_contact_peak_cyclic")}</small>
+        </span>
       </dd>
     </dl>
     {#if g.clamps.length}
@@ -542,6 +584,16 @@
       <input type="number" step="0.01" bind:value={tab.train.input_torque} />
       <em>{t("ui.train_nm")}</em>
     </label>
+    <!-- A load applied at the *output*, trying to turn the train the other way.
+         It is not a sign on the input torque: it enters at the far end and is
+         attenuated by each stage's backward efficiency on the way up, and on a
+         train that can be back-driven it is reacted by nothing and reaches no
+         gear at all. The train says which of those happened. -->
+    <label>
+      <span>{t("ui.train_back_driving_torque_peak")}</span>
+      <input type="number" step="0.01" bind:value={tab.train.back_driving_torque} />
+      <em>{t("ui.train_nm")}</em>
+    </label>
 
     <div class="mode">
       <span>{t("ui.train_actuation")}</span>
@@ -554,6 +606,34 @@
         </button>
       </div>
     </div>
+
+    <!-- First under the actuation, and in both modes: the load the train's
+         fatigue life is spent against, as opposed to the peak it must merely
+         survive. Absolute rather than a percentage of peak — this tool declines
+         to assert a relation between torque and speed on the user's behalf — so
+         the percentage is reported beside it instead of driving it. Zero is a
+         legitimate entry: a train that only ever sees its peak has no cyclic
+         case. -->
+    <label>
+      <span>{t("ui.train_operating_torque")}</span>
+      <input
+        type="number"
+        step="0.01"
+        max={tab.train.input_torque}
+        bind:value={tab.train.operating_torque}
+      />
+      <em>{t("ui.train_nm")}</em>
+    </label>
+    {@render noteSlot(
+      notes(
+        "ok" in result && result.ok.operating_torque_percent !== null
+          ? t("ui.train_note_operating_torque_percent", {
+              percent: result.ok.operating_torque_percent.toFixed(1),
+            })
+          : null,
+        null,
+      ),
+    )}
 
     {#if "intermittent" in tab.train.actuation}
       <label>
@@ -570,15 +650,27 @@
         <input type="number" step="100" bind:value={tab.train.actuation.intermittent.actuations} />
         <em></em>
       </label>
+      <!-- Offered only here, because it only means something here: a continuous
+           drive has no actuation to reverse between. It changes nothing but the
+           cycle count, and the note says how. -->
+      <label class="toggle">
+        <span>{t("ui.train_reversing")}</span>
+        <input type="checkbox" bind:checked={tab.train.actuation.intermittent.reversing} />
+        <em></em>
+      </label>
+      {@render noteSlot(
+        notes(tab.train.actuation.intermittent.reversing ? t("ui.train_note_reversing") : null, null),
+      )}
     {:else if "continuous" in tab.train.actuation}
       <label>
         <span>{t("ui.train_operating_speed")}</span>
         <input
           type="number"
-          step="5"
-          bind:value={tab.train.actuation.continuous.operating_percent}
+          step="100"
+          max={tab.train.input_speed}
+          bind:value={tab.train.actuation.continuous.operating_speed}
         />
-        <em>{t("ui.train_peak")}</em>
+        <em>{t("ui.train_rpm")}</em>
       </label>
       <label>
         <span>{t("ui.train_runtime")}</span>
@@ -599,9 +691,9 @@
           ? `${result.ok.total_ratio.toFixed(4)} : 1`
           : `1 : ${(1 / result.ok.total_ratio).toFixed(4)}`}
         </dd>
-        <dt>{t("ui.train_output_speed")}</dt>
+        <dt>{t("ui.train_output_speed_peak")}</dt>
         <dd>{result.ok.output_speed.toFixed(1)} rpm</dd>
-        <dt>{t("ui.train_output_torque")}</dt>
+        <dt>{t("ui.train_output_torque_peak")}</dt>
         <dd>{result.ok.output_torque.toFixed(4)} Nm</dd>
         <dt>{t("ui.train_total_efficiency")}</dt>
         <dd>
@@ -630,6 +722,14 @@
           >
         </dd>
       </dl>
+      <!-- What the shaft line wants read, which no single stage is in a
+           position to say: an input clamped against its peak, and where — or
+           whether — the back-driving load is reacted. -->
+      {#if result.ok.notes.length}
+        <ul class="notes">
+          {#each result.ok.notes as n (n.key)}<li>{note(n)}</li>{/each}
+        </ul>
+      {/if}
       {/if}
   </div>
 </section>
@@ -779,10 +879,19 @@
                   <dd>{n(j === 0 ? xres.helix_angle : xres.wheel_helix_angle)}°</dd>
                   <dt>{t("ui.train_torque")}</dt>
                   <dd>{xres.members[j].torque.toFixed(4)} N·m</dd>
+                  {#if xres.members[j].back_driving_torque !== null}
+                    <dt>{t("ui.train_back_driving_torque")}</dt>
+                    <dd>{xres.members[j].back_driving_torque.toFixed(4)} N·m</dd>
+                  {/if}
                   <dt>{t("ui.train_speed")}</dt>
                   <dd>{xres.members[j].speed.toFixed(1)} rpm</dd>
                   <dt>{t("ui.train_tooth_cycles")}</dt>
-                  <dd>{xres.members[j].tooth_cycles.toLocaleString()}</dd>
+                  <dd>
+                    {xres.members[j].tooth_cycles.bending.toLocaleString()} / {xres.members[
+                      j
+                    ].tooth_cycles.contact.toLocaleString()}
+                    <small>{t("ui.train_bending_contact")}</small>
+                  </dd>
                 </dl>
               {/if}
             {/snippet}
@@ -1246,13 +1355,7 @@
                   <dd>
                     {t(pres.planet.fully_reversed ? "ui.train_fully_reversed" : "ui.train_one_way")}
                     <small>allowable {pres.planet.reversed_allowable.value.toFixed(0)} MPa</small>
-                  </dd>
-                  <dt>{t("ui.train_min_face_width")}</dt>
-                  <dd>
-                    {pres.planet.min_face_width_reversed === null
-                      ? "—"
-                      : `${pres.planet.min_face_width_reversed.toFixed(3)} mm`}
-                    <small>{t("ui.train_against_that_allowable")}</small>
+                    <small>{t("ui.train_note_reversed_allowable_is_the_cyclic_one")}</small>
                   </dd>
                   <dt>{t("ui.train_speed")}</dt>
                   <dd>
@@ -1354,7 +1457,8 @@
                   </dd>
                   <dt>{t("ui.train_contact_stress")}</dt>
                   <dd>
-                    {m.contact_stress.toFixed(1)} MPa
+                    {cases(m.contact_stress, 1)} MPa
+                    <small>{t("ui.train_peak_cyclic")}</small>
                     <small>ρ {m.relative_radius.toFixed(3)} mm</small>
                   </dd>
                 </dl>
@@ -1491,6 +1595,13 @@
   .grid.shared > label {
     grid-template-columns: 1fr 9rem 3.5rem;
   }
+  /* A checkbox keeps its field's label column, so it lines up under the boxes
+     above it, but takes only the width it needs rather than stretching across
+     one meant for a number. */
+  .grid.shared > label.toggle input {
+    width: auto;
+    justify-self: start;
+  }
   /* The **input box** is the anchor, not the text after it. With an `auto`
      trailing column the boxes shifted left or right by however wide a unit
      happened to be — "module" against "°" — so nothing lined up down a column.
@@ -1616,6 +1727,11 @@
     color: var(--muted);
     margin-left: 0.35rem;
   }
+  /* A readout with more than one figure to give — the four face widths a gear
+     asks for — puts each on its own line rather than running them together. */
+  .out dd .line {
+    display: block;
+  }
   .warn {
     color: var(--warn) !important;
   }
@@ -1683,9 +1799,11 @@
   .sub span {
     padding-left: 0.8rem;
   }
+  /* Four sources now, not two, so the row wraps rather than squeezing them. */
   .subtoggles {
     display: flex;
-    gap: 0.9rem;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.9rem;
     padding: 0 0 0.3rem 0.8rem;
   }
   .check {

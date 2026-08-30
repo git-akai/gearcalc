@@ -7,8 +7,22 @@ export type Actuation = { "intermittent": {
 /**
  * Output sweep per actuation, degrees.
  */
-range_degrees: number, actuations: number, } } | { "continuous": { 
+range_degrees: number, actuations: number, 
 /**
- * Percentage of the peak input speed.
+ * Whether the drive reverses between actuations.
+ *
+ * It changes nothing but the **cycle count**, and it changes that in
+ * two ways ([`loaded_cycles`]): each actuation's revolutions round up
+ * on their own rather than the total rounding once, because a partial
+ * sweep still loads the teeth it reaches and every tooth must meet the
+ * worst of them; and the contact count halves, because the two flanks
+ * share the engagements while both take the full bending.
  */
-operating_percent: number, runtime_hours: number, } };
+reversing: boolean, } } | { "continuous": { 
+/**
+ * The input speed the train runs at, rpm. Bounded by the peak, and
+ * **absolute** rather than a percentage of it for the reason
+ * [`Train::operating_torque_percent`] gives: the crate will not assert
+ * a relation between torque and speed on the user's behalf.
+ */
+operating_speed: number, runtime_hours: number, } };

@@ -6,7 +6,10 @@
 //! of *any* kind produces — [`StageResult`], [`GearResult`], [`Backlash`] — and
 //! the train that strings them together.
 
-use super::{Backlash, ContactRatios, GearResult, SpurResult, TrainError};
+use super::{
+    allowable, Backlash, Case, ContactRatios, Cycles, GearResult, LoadCase, SpurResult,
+    StageTorques, TrainError, Widths,
+};
 use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift};
 use crate::contact::{efficiency, ContactPath, Directional, Drive};
 use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
@@ -52,8 +55,8 @@ pub struct StageGear {
     pub root_radius: f64,
     /// Automatic takes the larger of the enabled minimums below.
     pub face_width: Auto<f64>,
-    pub auto_face_from_bending: bool,
-    pub auto_face_from_contact: bool,
+    /// Which of the four ratings an automatic face width is sized from.
+    pub face_sources: super::FaceSources,
     /// Name of a material in the library.
     pub material: String,
     /// Properties replaced for this gear only. Empty means "as the library
@@ -73,8 +76,7 @@ impl Default for StageGear {
             dedendum: 1.25,
             root_radius: 0.38,
             face_width: Auto::fixed(10.0),
-            auto_face_from_bending: true,
-            auto_face_from_contact: true,
+            face_sources: super::FaceSources::default(),
             material: "4340 Hardened Steel".to_string(),
             material_overrides: Overrides::default(),
         }
@@ -254,7 +256,7 @@ impl SpurStage {
 /// material the library does not have, or is too undercut to rate.
 pub fn solve_spur_stage(
     stage: &SpurStage,
-    input_torque: f64,
+    torques: StageTorques,
     lib: &MaterialLibrary,
 ) -> Result<SpurResult, TrainError> {
     let p = [stage.params(0), stage.params(1)];
@@ -303,60 +305,112 @@ pub fn solve_spur_stage(
     // nothing has to be iterated.
     const PROBE: f64 = 10.0;
     let e_star = contact_modulus(&materials[0], &materials[1]);
-    let probe_load = Load::new(input_torque, PROBE);
 
     let sections = [
         bending_section(&g[0], path.contact_ratio).ok_or(TrainError::NoRootSection)?,
         bending_section(&g[1], path.contact_ratio).ok_or(TrainError::NoRootSection)?,
     ];
-    let probe_contact =
-        contact_stress(&path, &operating, &g[0], PARALLEL_AXES, &probe_load, e_star)
+
+    // Every rating at a probe width, one set per load case. `b_min` does not
+    // depend on the `b` it was measured at, so this is still one evaluation per
+    // case and nothing iterates.
+    let probe = |case| -> Result<(f64, [Option<f64>; 2]), TrainError> {
+        let load = Load::new(torques.at(case), PROBE);
+        let cs = contact_stress(&path, &operating, &g[0], PARALLEL_AXES, &load, e_star)
             .ok_or(TrainError::NoContact)?;
+        let sf = [0usize, 1].map(|i| {
+            let li = load.across_mesh(&g[0], &g[i]);
+            bending_stress(&sections[i], &g[i], &li, StressConcentration::Iso6336)
+        });
+        Ok((cs.worst, sf))
+    };
+    let probed = LoadCase {
+        peak: probe(Case::Peak)?,
+        cyclic: probe(Case::Cyclic)?,
+    };
 
-    let mut widths = [0.0_f64; 2];
-    for i in 0..2 {
-        let load_i = probe_load.across_mesh(&g[0], &g[i]);
-        let sf = bending_stress(&sections[i], &g[i], &load_i, StressConcentration::Iso6336);
-        let allow = materials[i].fatigue_allowable.value;
-
-        let mut want: f64 = 0.0;
-        if stage.gears[i].auto_face_from_bending {
-            if let Some(sf) = sf {
-                want = want.max(min_face_width_bending(sf, PROBE, allow));
+    let probe_widths = |i: usize| -> LoadCase<Widths> {
+        LoadCase::of(|case| {
+            let (cs, sf) = probed.get(case);
+            let allow = allowable(&materials[i], case);
+            Widths {
+                bending: sf[i].map(|s| min_face_width_bending(s, PROBE, allow)),
+                contact: min_face_width_contact(*cs, PROBE, allow),
             }
+        })
+    };
+
+    let mut notes = Vec::new();
+    let widths = [0usize, 1].map(|i| {
+        let g = &stage.gears[i];
+        // An automatic width with every source switched off has nothing to
+        // invert, and comes out zero. Said rather than divided by: the input
+        // that produced it is on screen, and this is what it did.
+        if g.face_width.auto && !g.face_sources.any() {
+            notes.push(
+                Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", (i + 1).to_string()),
+            );
         }
-        if stage.gears[i].auto_face_from_contact {
-            want = want.max(min_face_width_contact(probe_contact.worst, PROBE, allow));
-        }
-        widths[i] = stage.gears[i].face_width.resolve(want);
-    }
+        g.face_width.resolve(g.face_sources.largest_of(&probe_widths(i)))
+    });
 
     // The spec is explicit: the *narrower* gear carries the mesh, so both gears
     // are rated at the smaller width regardless of which one owns it.
     let effective = widths[0].min(widths[1]);
 
-    let load = Load::new(input_torque, effective);
-    let cs = contact_stress(&path, &operating, &g[0], PARALLEL_AXES, &load, e_star)
-        .ok_or(TrainError::NoContact)?;
+    // Every rating again, at the width actually in force. Two evaluations
+    // rather than one, and the same expression: a load case is a torque, and
+    // nothing else about the stage knows which one it is looking at.
+    let rate = |case: Case| -> Result<(crate::strength::ContactStress, [Option<f64>; 2], Load), TrainError> {
+        let load = Load::new(torques.at(case), effective);
+        let cs = contact_stress(&path, &operating, &g[0], PARALLEL_AXES, &load, e_star)
+            .ok_or(TrainError::NoContact)?;
+        let sf = [0usize, 1].map(|i| {
+            let li = load.across_mesh(&g[0], &g[i]);
+            bending_stress(&sections[i], &g[i], &li, StressConcentration::Iso6336)
+        });
+        Ok((cs, sf, load))
+    };
+    let rated = LoadCase {
+        peak: rate(Case::Peak)?,
+        cyclic: rate(Case::Cyclic)?,
+    };
+    let load = rated.peak.2;
 
     let mut gears = Vec::with_capacity(2);
     for i in 0..2 {
         let load_i = load.across_mesh(&g[0], &g[i]);
-        let sf = bending_stress(&sections[i], &g[i], &load_i, StressConcentration::Iso6336);
-        let allow = materials[i].fatigue_allowable.value;
         gears.push(GearResult {
             profile_shift: p[i].profile_shift,
             addendum: p[i].addendum,
             face_width: widths[i],
             torque: load_i.torque,
+            back_driving_torque: torques.peak_backward.map(|t| {
+                Load::new(t, effective).across_mesh(&g[0], &g[i]).torque
+            }),
             // Filled in by `solve_train`, which is the only level that knows the
             // duty cycle and where this gear sits in the shaft line.
             speed: 0.0,
-            tooth_cycles: 0.0,
-            bending_stress: sf,
-            contact_stress: cs.worst,
-            min_face_width_bending: sf.map(|s| min_face_width_bending(s, effective, allow)),
-            min_face_width_contact: min_face_width_contact(cs.worst, effective, allow),
+            tooth_cycles: Cycles {
+                bending: 0.0,
+                contact: 0.0,
+            },
+            bending_stress: LoadCase {
+                peak: rated.peak.1[i],
+                cyclic: rated.cyclic.1[i],
+            },
+            contact_stress: LoadCase {
+                peak: rated.peak.0.worst,
+                cyclic: rated.cyclic.0.worst,
+            },
+            min_face_width: LoadCase::of(|case| {
+                let (cs, sf, _) = rated.get(case);
+                let allow = allowable(&materials[i], case);
+                Widths {
+                    bending: sf[i].map(|s| min_face_width_bending(s, effective, allow)),
+                    contact: min_face_width_contact(cs.worst, effective, allow),
+                }
+            }),
             clamps: g[i].clamps.notes.clone(),
             material: materials[i].clone(),
             ranges: admissible_ranges(
@@ -396,7 +450,6 @@ pub fn solve_spur_stage(
         }
     });
 
-    let mut notes = Vec::new();
     if stage.additional_helix != 0.0 && !contact_ratios.has_full_axial_overlap() {
         notes.push(Note::new(key::STAGE_OVERLAP_BELOW_ONE).number("ratio", overlap, 3));
     }

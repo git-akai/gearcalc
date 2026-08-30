@@ -102,6 +102,22 @@ pub mod key {
     /// `stage.transverse_contact_ratio_below_one`
     pub const STAGE_TRANSVERSE_CONTACT_RATIO_BELOW_ONE: &str =
         "stage.transverse_contact_ratio_below_one";
+    /// `stage.face_width_no_source`
+    pub const STAGE_FACE_WIDTH_NO_SOURCE: &str = "stage.face_width_no_source";
+
+    // ---- the train, as a whole ------------------------------------ //
+    //
+    // What a stage cannot say, because it is a fact about the shaft line: an
+    // input clamped against the peak it is measured from, and where — or
+    // whether — a back-driving load is reacted at all.
+    /// `train.operating_torque_clamped`
+    pub const TRAIN_OPERATING_TORQUE_CLAMPED: &str = "train.operating_torque_clamped";
+    /// `train.operating_speed_clamped`
+    pub const TRAIN_OPERATING_SPEED_CLAMPED: &str = "train.operating_speed_clamped";
+    /// `train.back_driving_reacted_at`
+    pub const TRAIN_BACK_DRIVING_REACTED_AT: &str = "train.back_driving_reacted_at";
+    /// `train.back_driving_not_reacted`
+    pub const TRAIN_BACK_DRIVING_NOT_REACTED: &str = "train.back_driving_not_reacted";
 
     /// Every key above, for the catalogue coverage tests.
     // ---- errors --------------------------------------------------- //
@@ -173,6 +189,11 @@ pub mod key {
         CLAMP_TOOTH_THICKNESS_CAPPED,
         CLAMP_TOOTH_THICKNESS_RAISED,
         STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE,
+        STAGE_FACE_WIDTH_NO_SOURCE,
+        TRAIN_OPERATING_TORQUE_CLAMPED,
+        TRAIN_OPERATING_SPEED_CLAMPED,
+        TRAIN_BACK_DRIVING_REACTED_AT,
+        TRAIN_BACK_DRIVING_NOT_REACTED,
         STAGE_CROSSED_FACE_WIDTH_AS_ENTERED,
         STAGE_LOW_MESH_EFFICIENCY,
         STAGE_NEAR_SELF_LOCKING,

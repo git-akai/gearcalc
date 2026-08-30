@@ -28,6 +28,7 @@ use crate::auto::Ranges;
 use crate::contact::{Directional, Drive};
 use crate::material::{Material, MaterialLibrary};
 use crate::mesh::MeshError;
+use crate::note::{key, Note};
 
 mod planetary;
 mod spur;
@@ -86,6 +87,21 @@ pub struct Backlash {
     pub maximum: f64,
 }
 
+/// The face width a pair of ratings asks for, at one load case.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct Widths {
+    /// From bending. `None` where the section has no rating.
+    pub bending: Option<f64>,
+    /// From contact.
+    pub contact: f64,
+}
+
 /// What a stage does to one of its gears.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -101,8 +117,14 @@ pub struct GearResult {
     pub addendum: f64,
     /// Likewise the face width.
     pub face_width: f64,
-    /// Torque on this gear, N·m.
+    /// Torque on this gear, N·m, driving forward at peak.
     pub torque: f64,
+    /// Torque on this gear from a back-driving load, N·m.
+    ///
+    /// `None` where none is reacted here — which is every gear of a train that
+    /// can be back-driven at all, and every gear upstream of whatever stage
+    /// stops one that cannot.
+    pub back_driving_torque: Option<f64>,
     /// Rotational speed, rpm.
     pub speed: f64,
     /// Tooth load cycles over the duty the train describes.
@@ -110,17 +132,17 @@ pub struct GearResult {
     /// One cycle per revolution for a simple gear: a given tooth meets the mate
     /// once per turn. Sun and ring gears in a planetary stage see `N_planets`
     /// per revolution, and a planet is a special case again — docs/reference.md#trains.
-    pub tooth_cycles: f64,
-    /// Tooth root bending stress, MPa. `None` where the stress correction is
-    /// undefined for this section — see [`crate::strength::bending_stress`].
-    pub bending_stress: Option<f64>,
-    /// Hertzian contact stress, MPa. Shared by the pair, so both gears report
-    /// the same number; the *allowables* they are judged against differ.
-    pub contact_stress: f64,
-    /// Face width the bending stress would need against the fatigue allowable.
-    pub min_face_width_bending: Option<f64>,
-    /// ...and against contact.
-    pub min_face_width_contact: f64,
+    pub tooth_cycles: Cycles,
+    /// Tooth root bending stress, MPa, for each load case. `None` where the
+    /// stress correction is undefined for this section — see
+    /// [`crate::strength::bending_stress`] — or where the case carries no load.
+    pub bending_stress: LoadCase<Option<f64>>,
+    /// Hertzian contact stress, MPa, for each load case. Shared by the pair, so
+    /// both gears report the same number; the *allowables* they are judged
+    /// against differ.
+    pub contact_stress: LoadCase<f64>,
+    /// The face width each rating would need: two per case, four in all.
+    pub min_face_width: LoadCase<Widths>,
     /// Guards that altered this gear's geometry.
     pub clamps: Vec<crate::note::Note>,
     /// The material as used, after any overrides — what the numbers were
@@ -421,18 +443,18 @@ impl StageResult {
     /// the same arithmetic but means something looser. It is reported because a
     /// duty cycle has to be reported somewhere, not because a worm thread has a
     /// fatigue life this crate can rate.
-    fn set_kinematics(&mut self, speeds: [f64; 2], cycles: [f64; 2]) {
+    fn set_kinematics(&mut self, speeds: [f64; 2], cycles: [(f64, Option<(f64, f64)>); 2]) {
         match self {
             Self::Spur(r) => {
                 for (i, g) in r.gears.iter_mut().enumerate() {
                     g.speed = speeds[i];
-                    g.tooth_cycles = loaded_cycles(cycles[i]);
+                    g.tooth_cycles = loaded_cycles(cycles[i].0, cycles[i].1);
                 }
             }
             Self::Worm(r) => {
                 for (i, m) in r.members.iter_mut().enumerate() {
                     m.speed = speeds[i];
-                    m.tooth_cycles = loaded_cycles(cycles[i]);
+                    m.tooth_cycles = loaded_cycles(cycles[i].0, cycles[i].1);
                 }
                 // Sliding needs a shaft speed, so it could only be filled here.
                 r.sliding_velocity = r.sliding_ratio
@@ -446,14 +468,226 @@ impl StageResult {
             // fatigues it is its rotation **relative to the carrier**.
             Self::Planetary(r) => {
                 let n = f64::from(r.planets.max(1));
-                r.sun.tooth_cycles = loaded_cycles(cycles[0] * n);
-                r.ring.tooth_cycles = loaded_cycles(cycles[0] * n);
+                // Sun and ring meet a planet `N` times per revolution and the
+                // planet turns relative to the carrier, so each member's
+                // revolutions scale before they are counted — including, for a
+                // reversing drive, the per-actuation figure the rounding is
+                // applied to.
+                let scaled = |f: f64| (cycles[0].0 * f, cycles[0].1.map(|(e, a)| (e * f, a)));
+                let (sun_turns, sun_each) = scaled(n);
+                r.sun.tooth_cycles = loaded_cycles(sun_turns, sun_each);
+                r.ring.tooth_cycles = loaded_cycles(sun_turns, sun_each);
                 let carrier_relative =
                     (r.planet.speed_relative / r.speeds[0].abs().max(f64::MIN_POSITIVE)).abs();
-                r.planet.gear.tooth_cycles = loaded_cycles(cycles[0] * carrier_relative);
+                let (p_turns, p_each) = scaled(carrier_relative);
+                r.planet.gear.tooth_cycles = loaded_cycles(p_turns, p_each);
             }
         }
     }
+}
+
+/// Which ratings an automatic face width is sized from.
+///
+/// Four toggles rather than two, and shaped like the answer they select from so
+/// the UI can walk them rather than naming each: a rating exists for every
+/// combination of what fails (bending or contact) and what it is rated against
+/// (the peak or the cyclic load).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct FaceSources {
+    pub bending: LoadCase<bool>,
+    pub contact: LoadCase<bool>,
+}
+
+impl Default for FaceSources {
+    fn default() -> Self {
+        let both = LoadCase {
+            peak: true,
+            cyclic: true,
+        };
+        Self {
+            bending: both,
+            contact: both,
+        }
+    }
+}
+
+impl FaceSources {
+    /// The largest width any **enabled** rating asks for.
+    ///
+    /// Zero when none is enabled, which resolves to a zero face width — a
+    /// degenerate gear rather than a wrong one, and said in the stage's notes
+    /// rather than divided by.
+    #[must_use]
+    pub fn largest_of(&self, asks: &LoadCase<Widths>) -> f64 {
+        let mut want = 0.0_f64;
+        for case in [Case::Peak, Case::Cyclic] {
+            let w = asks.get(case);
+            if *self.bending.get(case) {
+                if let Some(b) = w.bending {
+                    want = want.max(b);
+                }
+            }
+            if *self.contact.get(case) {
+                want = want.max(w.contact);
+            }
+        }
+        want
+    }
+
+    /// Whether anything at all is selected.
+    #[must_use]
+    pub fn any(&self) -> bool {
+        self.bending.peak || self.bending.cyclic || self.contact.peak || self.contact.cyclic
+    }
+}
+
+/// The torques one stage sees, at its **first** member, one per load case.
+///
+/// Assembled by [`solve_train`], which is the only level that knows where a
+/// stage sits in the shaft line and what reaches it from each end.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct StageTorques {
+    /// Peak, delivered forward from the input, N·m.
+    pub peak_forward: f64,
+    /// Peak, delivered backward from the output, N·m — `None` where no
+    /// back-driving load is reacted here. See [`back_driving_torques`].
+    pub peak_backward: Option<f64>,
+    /// The torque the train runs at, forward, N·m. May be zero.
+    pub cyclic: f64,
+}
+
+impl StageTorques {
+    /// The torque to rate a load case at.
+    ///
+    /// The peak case takes whichever direction loads the teeth harder. Both have
+    /// already been attenuated by the efficiencies on their own way here, so
+    /// either can be the larger and either can be absent.
+    #[must_use]
+    pub fn at(&self, case: Case) -> f64 {
+        match case {
+            Case::Peak => self
+                .peak_forward
+                .abs()
+                .max(self.peak_backward.unwrap_or(0.0).abs()),
+            Case::Cyclic => self.cyclic.abs(),
+        }
+    }
+
+    /// Everything at one torque, and nothing back-driving — the shape a caller
+    /// wants when it is asking about a single load.
+    #[must_use]
+    pub fn just(torque: f64) -> Self {
+        Self {
+            peak_forward: torque,
+            peak_backward: None,
+            cyclic: torque,
+        }
+    }
+}
+
+/// Which allowable a load case is judged against.
+///
+/// **This is the whole reason the two cases are separate.** A peak load has to be
+/// survived once, so the ultimate is the right bar; a cyclic one has to be
+/// survived for the duty, so the fatigue figure is. Rating a peak against a
+/// fatigue allowable asks the wrong question, and it is what this crate did
+/// before the cases existed.
+#[must_use]
+pub fn allowable(material: &Material, case: Case) -> f64 {
+    match case {
+        Case::Peak => material.ultimate_allowable.value,
+        Case::Cyclic => material.fatigue_allowable.value,
+    }
+}
+
+/// A quantity evaluated for each **load case** the train describes.
+///
+/// Named for the engineering term — a defined set of loads applied for analysis
+/// — and deliberately *not* for a duty cycle, which is a fraction of time spent
+/// running and a different idea with different implications. One of this train's
+/// inputs genuinely is that; these are not it.
+///
+/// The two differ in one thing beyond their torque, and it is the thing that
+/// matters: **which allowable they are rated against.** A peak load has to be
+/// survived once, so it is judged against the ultimate; a cyclic one has to be
+/// survived indefinitely, so it is judged against the fatigue figure. Rating a
+/// peak against a fatigue allowable — which is what this crate did before the
+/// two cases existed — asks the wrong question and answers it confidently.
+///
+/// Built through [`LoadCase::of`] for the same reason [`Directional`] is: there
+/// is no path by which a stage reports one case and not the other.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct LoadCase<T> {
+    /// The worst single application: survive it once.
+    pub peak: T,
+    /// The load it runs at: survive it for the duty.
+    pub cyclic: T,
+}
+
+/// Which load case a quantity belongs to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Case {
+    Peak,
+    Cyclic,
+}
+
+impl<T> LoadCase<T> {
+    /// Ask the same question of both cases.
+    pub fn of(mut f: impl FnMut(Case) -> T) -> Self {
+        Self {
+            peak: f(Case::Peak),
+            cyclic: f(Case::Cyclic),
+        }
+    }
+
+    /// The value for one case.
+    pub const fn get(&self, case: Case) -> &T {
+        match case {
+            Case::Peak => &self.peak,
+            Case::Cyclic => &self.cyclic,
+        }
+    }
+
+    /// The same pair with each value mapped.
+    pub fn map<U>(self, mut f: impl FnMut(T) -> U) -> LoadCase<U> {
+        LoadCase {
+            peak: f(self.peak),
+            cyclic: f(self.cyclic),
+        }
+    }
+}
+
+/// How often a tooth is loaded, which is not one number once the drive reverses.
+///
+/// Both counts are always reported and are the **same number** when the drive
+/// does not reverse — the ordinary case as a value rather than behind a flag, so
+/// a reader can quote a range unconditionally.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct Cycles {
+    /// Engagements the tooth root sees. A reversing drive loads **both** flanks
+    /// in bending, so every engagement counts.
+    pub bending: f64,
+    /// Engagements one flank sees. A reversing drive shares them between the two
+    /// flanks, so each takes half; otherwise it is the same number as `bending`.
+    pub contact: f64,
 }
 
 /// How many times a tooth is loaded, from how many times it comes round.
@@ -473,9 +707,42 @@ impl StageResult {
 /// two answers; and a reversing drive rounds at a different point in the
 /// arithmetic, which makes *where* this happens a modelling decision rather than
 /// a formatting one.
+///
+/// # What reversing changes, and why it is two changes
+///
+/// **Where the rounding happens.** Not reversing, the whole duty rounds once:
+/// `ceil(revolutions_per_actuation × actuations)`. Reversing, each actuation
+/// rounds on its own: `ceil(revolutions_per_actuation) × actuations`. A sweep of
+/// less than a full turn loads only some of the teeth — but which ones is not
+/// knowable, the teeth are radially symmetric, and every one of them has to meet
+/// the worst case. So each actuation costs a whole engagement to whichever teeth
+/// it reaches, and rounding the total instead would spread a fraction that is
+/// not divisible.
+///
+/// **And the contact count halves.** Reversing puts the load on the other flank
+/// on the way back, so a given flank sees half the engagements while the root
+/// sees all of them.
+///
+/// `None` for a continuous drive: there is no actuation to round within, so the
+/// total rounds once and the two counts are equal.
 #[must_use]
-pub fn loaded_cycles(revolutions: f64) -> f64 {
-    revolutions.ceil()
+pub fn loaded_cycles(revolutions: f64, per_actuation: Option<(f64, f64)>) -> Cycles {
+    match per_actuation {
+        Some((each, actuations)) => {
+            let bending = each.ceil() * actuations;
+            Cycles {
+                bending,
+                contact: bending / 2.0,
+            }
+        }
+        None => {
+            let n = revolutions.ceil();
+            Cycles {
+                bending: n,
+                contact: n,
+            }
+        }
+    }
 }
 
 /// Solve one stage of whichever kind, given the torque on its input member.
@@ -486,7 +753,7 @@ pub fn loaded_cycles(revolutions: f64) -> f64 {
 pub fn solve_any(
     stage: &Stage,
     input_speed: f64,
-    input_torque: f64,
+    torques: StageTorques,
     lib: &MaterialLibrary,
 ) -> Result<StageResult, TrainError> {
     match stage {
@@ -495,18 +762,18 @@ pub fn solve_any(
         // sliding changes direction — so a crossed pair answers with the screw
         // result. The *inputs* stay one set, as the specification has them.
         Stage::Spur(s) if s.is_crossed() => {
-            solve_crossed_stage(s, input_torque, lib).map(|r| StageResult::Worm(Box::new(r)))
+            solve_crossed_stage(s, torques, lib).map(|r| StageResult::Worm(Box::new(r)))
         }
         Stage::Spur(s) => {
-            solve_spur_stage(s, input_torque, lib).map(|r| StageResult::Spur(Box::new(r)))
+            solve_spur_stage(s, torques, lib).map(|r| StageResult::Spur(Box::new(r)))
         }
         Stage::Worm(s) => {
-            solve_worm_stage(s, input_torque, lib).map(|r| StageResult::Worm(Box::new(r)))
+            solve_worm_stage(s, torques, lib).map(|r| StageResult::Worm(Box::new(r)))
         }
         // A planetary needs a speed as well as a torque: its efficiency depends
         // on which shaft is held, and that is a kinematic question. The train
         // supplies the speed it has reached by this point.
-        Stage::Planetary(s) => solve_planetary_stage(s, input_speed, input_torque, lib)
+        Stage::Planetary(s) => solve_planetary_stage(s, input_speed, torques, lib)
             .map(|r| StageResult::Planetary(Box::new(r))),
     }
 }
@@ -528,11 +795,23 @@ pub enum Actuation {
         /// Output sweep per actuation, degrees.
         range_degrees: f64,
         actuations: u32,
+        /// Whether the drive reverses between actuations.
+        ///
+        /// It changes nothing but the **cycle count**, and it changes that in
+        /// two ways ([`loaded_cycles`]): each actuation's revolutions round up
+        /// on their own rather than the total rounding once, because a partial
+        /// sweep still loads the teeth it reaches and every tooth must meet the
+        /// worst of them; and the contact count halves, because the two flanks
+        /// share the engagements while both take the full bending.
+        reversing: bool,
     },
-    /// Continuous running at a fraction of peak speed.
+    /// Continuous running at the speed it actually runs at.
     Continuous {
-        /// Percentage of the peak input speed.
-        operating_percent: f64,
+        /// The input speed the train runs at, rpm. Bounded by the peak, and
+        /// **absolute** rather than a percentage of it for the reason
+        /// [`Train::operating_torque_percent`] gives: the crate will not assert
+        /// a relation between torque and speed on the user's behalf.
+        operating_speed: f64,
         runtime_hours: f64,
     },
 }
@@ -542,6 +821,7 @@ impl Default for Actuation {
         Self::Intermittent {
             range_degrees: 25.0,
             actuations: 1000,
+            reversing: false,
         }
     }
 }
@@ -559,8 +839,64 @@ pub struct Train {
     pub input_speed: f64,
     /// Peak input torque, N·m.
     pub input_torque: f64,
+    /// Peak torque applied at the **output** shaft, N·m, trying to drive the
+    /// train backwards.
+    ///
+    /// A load case of its own rather than a sign on the input: it enters at the
+    /// far end and is attenuated by each stage's *backward* efficiency on the
+    /// way up. See [`back_driving_torques`] for where it is reacted, and where
+    /// it therefore reaches no number at all.
+    pub back_driving_torque: f64,
+    /// The torque the train runs at, N·m — the load its fatigue life is spent
+    /// against, as opposed to the peak it must merely survive.
+    ///
+    /// Bounded by [`Self::input_torque`] and meaningful down to and including
+    /// **zero**: a train that only ever sees its peak has no cyclic case.
+    pub operating_torque: f64,
     pub actuation: Actuation,
     pub stages: Vec<Stage>,
+}
+
+impl Train {
+    /// What fraction of peak the operating torque is, as a percentage.
+    ///
+    /// Reported rather than entered. The two are given **separately and
+    /// absolutely** because this crate has no basis for a relation between
+    /// torque and speed: an electric motor makes them inversely proportional,
+    /// efficiencies bend that, and another power source need not obey it at all.
+    /// One percentage driving both would assert a relationship nothing here can
+    /// stand behind — so the user states each, and the ratio between them is an
+    /// *output*, computed where every other number is.
+    ///
+    /// `None` at zero peak, where there is no fraction to take.
+    #[must_use]
+    pub fn operating_torque_percent(&self) -> Option<f64> {
+        (self.input_torque != 0.0).then(|| 100.0 * self.cyclic_torque() / self.input_torque)
+    }
+
+    /// The operating torque as the solve uses it: never above the peak.
+    ///
+    /// Clamped rather than refused (docs/rationale.md), and clamped **here** so
+    /// that the figure the train is solved at, the percentage reported beside
+    /// the input, and the note that says it happened cannot disagree.
+    #[must_use]
+    pub fn cyclic_torque(&self) -> f64 {
+        self.operating_torque
+            .clamp(-self.input_torque.abs(), self.input_torque.abs())
+    }
+
+    /// The operating speed as the solve uses it, rpm — likewise never above the
+    /// peak. `None` for an intermittent drive, which has no operating speed:
+    /// it turns through its range and stops.
+    #[must_use]
+    pub fn cyclic_speed(&self) -> Option<f64> {
+        match self.actuation {
+            Actuation::Continuous {
+                operating_speed, ..
+            } => Some(operating_speed.clamp(-self.input_speed.abs(), self.input_speed.abs())),
+            Actuation::Intermittent { .. } => None,
+        }
+    }
 }
 
 /// What a train produces.
@@ -586,6 +922,14 @@ pub struct TrainResult {
     /// Angular backlash referred to whichever shaft is the output, degrees: the
     /// last shaft driving forward, the first driving backward.
     pub backlash: Directional<Backlash>,
+    /// The operating torque as a percentage of the peak — see
+    /// [`Train::operating_torque_percent`] for why this is an output and not an
+    /// input. `None` at zero peak.
+    pub operating_torque_percent: Option<f64>,
+    /// What the train as a whole wants read: an input clamped against its peak,
+    /// and where a back-driving load is reacted. Facts about the shaft line, so
+    /// no stage is in a position to say them.
+    pub notes: Vec<Note>,
     pub stages: Vec<StageResult>,
 }
 
@@ -610,6 +954,49 @@ pub struct TrainResult {
 /// the first stage is nearly free. A train designed for low output backlash
 /// should spend its tolerance budget at the output end.
 ///
+/// Where a back-driving load is reacted, and what each stage feels of it.
+///
+/// # The model
+///
+/// A load exists only where something reacts it. A torque applied at the output
+/// shaft works its way *upstream*, attenuated at each stage by that stage's
+/// backward ratio and backward efficiency — until it reaches a stage that cannot
+/// be back-driven at all. That stage holds it: everything upstream sees nothing,
+/// and the reaction is the load this stage carries.
+///
+/// If the chain reaches the input still turning something, then **nothing
+/// reacted it**: the train is back-drivable, the load simply drives it, and the
+/// case is zero everywhere. A back-driving torque on a back-drivable train is an
+/// input that moves no number, and this is why.
+///
+/// Each stage's figure is referred to its own **input** shaft, which is the shaft
+/// every stage solver takes its torque on. That referral is a division by the
+/// ratio and nothing else: the mesh force is set by the torque at the wheel, and
+/// the losses sit between the mesh and the shaft beyond it, not before it.
+fn back_driving_torques(
+    stages: &[StageResult],
+    applied: f64,
+) -> (Vec<Option<f64>>, Option<usize>) {
+    let none = || vec![None; stages.len()];
+    if applied == 0.0 {
+        return (none(), None);
+    }
+    let mut torques = none();
+    let mut at_output = applied;
+    for (k, s) in stages.iter().enumerate().rev() {
+        let referred = at_output / s.ratio();
+        torques[k] = Some(referred);
+        let backward = s.efficiency().backward;
+        if backward <= 0.0 {
+            // Self-locking: this stage is where the load stops.
+            return (torques, Some(k));
+        }
+        at_output = referred * backward;
+    }
+    // The load reached the input with something still to turn.
+    (none(), None)
+}
+
 /// # Errors
 ///
 /// [`TrainError::Empty`] for a train with no stages, or whatever the first
@@ -619,16 +1006,64 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
         return Err(TrainError::Empty);
     }
 
-    let mut torque = train.input_torque;
-    let mut speed = train.input_speed;
-    let mut stages = Vec::with_capacity(train.stages.len());
-    for stage in &train.stages {
-        let r = solve_any(stage, speed, torque, lib)?;
-        // Forward is the direction a train propagates torque in; the backward
-        // figure is reported, not applied.
-        torque = torque * r.ratio() * r.efficiency().forward;
-        speed /= r.ratio();
-        stages.push(r);
+    // --- what each stage is loaded by.
+    //
+    // Two propagations, in opposite directions, and only the forward one can
+    // start: a stage's ratio and efficiency do not depend on the torque through
+    // it, but the *backward* torque at a stage depends on every efficiency
+    // downstream, which is not known until those stages have been solved. So the
+    // train is solved once to learn the shaft line and again to rate it. The
+    // second pass is not a refinement of the first — it is the same arithmetic
+    // with the load it was missing.
+    let forward = |torques: &dyn Fn(usize) -> StageTorques| -> Result<Vec<StageResult>, TrainError> {
+        let mut speed = train.input_speed;
+        let mut out = Vec::with_capacity(train.stages.len());
+        for (k, stage) in train.stages.iter().enumerate() {
+            let r = solve_any(stage, speed, torques(k), lib)?;
+            speed /= r.ratio();
+            out.push(r);
+        }
+        Ok(out)
+    };
+
+    // Forward torques are the same in both passes, so they are worked out once
+    // from the ratios and efficiencies the first pass reports.
+    let first = forward(&|_| StageTorques::just(train.input_torque))?;
+    let mut fwd = Vec::with_capacity(first.len());
+    let cyclic_torque = train.cyclic_torque();
+    let (mut peak, mut cyclic) = (train.input_torque, cyclic_torque);
+    for r in &first {
+        fwd.push((peak, cyclic));
+        peak = peak * r.ratio() * r.efficiency().forward;
+        cyclic = cyclic * r.ratio() * r.efficiency().forward;
+    }
+    let (backward, reacted_at) = back_driving_torques(&first, train.back_driving_torque);
+    let mut stages = forward(&|k| StageTorques {
+        peak_forward: fwd[k].0,
+        peak_backward: backward[k],
+        cyclic: fwd[k].1,
+    })?;
+    let torque = peak;
+
+    // --- what the train wants read, as opposed to what a stage does.
+    let mut notes = Vec::new();
+    if train.operating_torque != cyclic_torque {
+        notes.push(
+            Note::new(key::TRAIN_OPERATING_TORQUE_CLAMPED).number("torque", cyclic_torque, 4),
+        );
+    }
+    if let (Actuation::Continuous { operating_speed, .. }, Some(used)) =
+        (&train.actuation, train.cyclic_speed())
+    {
+        if *operating_speed != used {
+            notes.push(Note::new(key::TRAIN_OPERATING_SPEED_CLAMPED).number("speed", used, 1));
+        }
+    }
+    if train.back_driving_torque != 0.0 {
+        notes.push(match reacted_at {
+            Some(k) => Note::new(key::TRAIN_BACK_DRIVING_REACTED_AT).text("stage", (k + 1).to_string()),
+            None => Note::new(key::TRAIN_BACK_DRIVING_NOT_REACTED),
+        });
     }
 
     let total_ratio: f64 = stages.iter().map(StageResult::ratio).product();
@@ -649,6 +1084,9 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
 
         // The reduction between each member and the output. MeshSide 0 of a stage
         // sits before that stage's own mesh, member 1 after it.
+        // Revolutions, and — for an intermittent drive — how they divide into
+        // actuations, which is what a reversing drive needs in order to round
+        // within one rather than over all of them.
         let cycles = [0usize, 1].map(|i| {
             let to_output: f64 = if i == 0 {
                 ratios[k..].iter().product()
@@ -659,11 +1097,26 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
                 Actuation::Intermittent {
                     range_degrees,
                     actuations,
-                } => (range_degrees / 360.0) * to_output * f64::from(actuations),
-                Actuation::Continuous {
-                    operating_percent,
-                    runtime_hours,
-                } => speeds[i] * 60.0 * runtime_hours * operating_percent / 100.0,
+                    reversing,
+                } => {
+                    let each = (range_degrees / 360.0) * to_output;
+                    let n = f64::from(actuations);
+                    (each * n, reversing.then_some((each, n)))
+                }
+                // A continuous drive turns at the speed it runs at, for as long
+                // as it runs. There is no actuation to round within, so reversing
+                // has nothing to mean here — the toggle is offered only where it
+                // does.
+                Actuation::Continuous { runtime_hours, .. } => {
+                    // Each shaft's own speed, scaled from the peak the train was
+                    // laid out at to the speed it actually runs at.
+                    let scale = if train.input_speed == 0.0 {
+                        0.0
+                    } else {
+                        train.cyclic_speed().unwrap_or(0.0) / train.input_speed
+                    };
+                    (speeds[i] * scale * 60.0 * runtime_hours, None)
+                }
             }
         });
         s.set_kinematics(speeds, cycles);
@@ -707,6 +1160,8 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
             minimum: refer(d, |b| b.minimum),
             maximum: refer(d, |b| b.maximum),
         }),
+        operating_torque_percent: train.operating_torque_percent(),
+        notes,
         stages,
     })
 }
@@ -740,6 +1195,8 @@ mod tests {
         Train {
             input_speed: 3000.0,
             input_torque: 2.0,
+            back_driving_torque: 0.0,
+            operating_torque: 2.0,
             actuation: Actuation::default(),
             stages: vec![
                 Stage::Spur(SpurStage::default()),
@@ -781,8 +1238,8 @@ mod tests {
             );
             for g in &s.gears {
                 assert!(g.face_width > 0.0);
-                assert!(g.contact_stress > 0.0);
-                assert!(g.bending_stress.unwrap() > 0.0);
+                assert!(g.contact_stress.peak > 0.0);
+                assert!(g.bending_stress.peak.unwrap() > 0.0);
             }
         }
     }
@@ -883,7 +1340,7 @@ mod tests {
                 ],
                 ..Default::default()
             };
-            solve_spur_stage(&stage, 2.0, &lib)
+            solve_spur_stage(&stage, StageTorques::just(2.0), &lib)
                 .expect("a solvable stage")
                 .gears[0]
                 .profile_shift
@@ -951,9 +1408,9 @@ mod tests {
         };
         let mut previous: Option<(f64, f64)> = None;
         for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
-            let r = solve_spur_stage(&stage(clearance), 2.0, &lib).unwrap();
+            let r = solve_spur_stage(&stage(clearance), StageTorques::just(2.0), &lib).unwrap();
             let eps = r.contact_ratios.transverse;
-            let bending = r.gears[0].bending_stress.expect("a rateable tooth");
+            let bending = r.gears[0].bending_stress.peak.expect("a rateable tooth");
             if let Some((was_eps, was_bending)) = previous {
                 assert!(
                     eps < was_eps,
@@ -973,7 +1430,7 @@ mod tests {
     #[test]
     fn a_spur_stage_has_exactly_zero_overlap_and_a_helical_one_does_not() {
         let lib = library();
-        let spur = solve_spur_stage(&SpurStage::default(), 2.0, &lib).unwrap();
+        let spur = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib).unwrap();
         assert_eq!(spur.contact_ratios.overlap, 0.0, "must be exactly zero");
         assert_eq!(spur.contact_ratios.total, spur.contact_ratios.transverse);
         assert!(!spur.contact_ratios.has_full_axial_overlap());
@@ -983,7 +1440,7 @@ mod tests {
                 additional_helix: 20.0,
                 ..SpurStage::default()
             },
-            2.0,
+            StageTorques::just(2.0),
             &lib,
         )
         .unwrap();
@@ -1027,21 +1484,61 @@ mod tests {
     #[test]
     fn the_automatic_face_width_is_the_larger_of_the_enabled_checks() {
         let lib = library();
-        let auto_both = |bending: bool, contact: bool| {
+        let off = LoadCase {
+            peak: false,
+            cyclic: false,
+        };
+        let width = |sources: FaceSources| {
             let mut s = SpurStage::default();
             for g in &mut s.gears {
                 g.face_width = Auto::automatic(0.0);
-                g.auto_face_from_bending = bending;
-                g.auto_face_from_contact = contact;
+                g.face_sources = sources;
             }
-            solve_spur_stage(&s, 2.0, &lib).unwrap().gears[0].face_width
+            solve_spur_stage(&s, StageTorques::just(2.0), &lib).unwrap().gears[0].face_width
         };
-        let b = auto_both(true, false);
-        let c = auto_both(false, true);
-        let both = auto_both(true, true);
-        assert!((both - b.max(c)).abs() < 1e-9, "{both} vs max({b}, {c})");
+        // One source at a time, then every combination of them: the width is the
+        // largest of whatever is enabled, and that is the whole rule.
+        let each: Vec<f64> = [
+            FaceSources {
+                bending: LoadCase { peak: true, cyclic: false },
+                contact: off,
+            },
+            FaceSources {
+                bending: LoadCase { peak: false, cyclic: true },
+                contact: off,
+            },
+            FaceSources {
+                bending: off,
+                contact: LoadCase { peak: true, cyclic: false },
+            },
+            FaceSources {
+                bending: off,
+                contact: LoadCase { peak: false, cyclic: true },
+            },
+        ]
+        .into_iter()
+        .map(width)
+        .collect();
+        let all = width(FaceSources::default());
+        let largest = each.iter().copied().fold(0.0_f64, f64::max);
+        assert!((all - largest).abs() < 1e-9, "{all} vs max{each:?}");
+
+        // Peak and cyclic are the same torque on this train, so what separates
+        // them is only the allowable — and the ultimate is above the fatigue
+        // figure, so the cyclic case is the one that asks for more face.
+        assert!(each[1] > each[0] && each[3] > each[2]);
         // Contact governs a lightly loaded steel pair, as it usually does.
-        assert!(c > b);
+        assert!(each[3] > each[1]);
+
+        // Nothing enabled asks for nothing, which is a degenerate gear rather
+        // than a divide by zero.
+        assert_eq!(
+            width(FaceSources {
+                bending: off,
+                contact: off
+            }),
+            0.0
+        );
     }
 
     /// Intermittent duty is measured at the OUTPUT, so upstream gears turn
@@ -1053,6 +1550,7 @@ mod tests {
         t.actuation = Actuation::Intermittent {
             range_degrees: 360.0,
             actuations: 100,
+            reversing: false,
         };
         let r = solve_train(&t, &library()).unwrap();
 
@@ -1061,13 +1559,15 @@ mod tests {
         // revolutions exactly — which is the case worth putting first, because
         // it is where a count and a revolution coincide.
         let last = &spur(&r.stages[1]).gears[1];
-        assert_eq!(last.tooth_cycles, 100.0);
+        assert_eq!(last.tooth_cycles.bending, 100.0);
+        // Not reversing, so one flank takes every engagement.
+        assert_eq!(last.tooth_cycles.contact, last.tooth_cycles.bending);
 
         // Every gear upstream turns more than the one after it.
         let seq = [
-            spur(&r.stages[0]).gears[0].tooth_cycles,
-            spur(&r.stages[0]).gears[1].tooth_cycles,
-            spur(&r.stages[1]).gears[1].tooth_cycles,
+            spur(&r.stages[0]).gears[0].tooth_cycles.bending,
+            spur(&r.stages[0]).gears[1].tooth_cycles.bending,
+            spur(&r.stages[1]).gears[1].tooth_cycles.bending,
         ];
         for w in seq.windows(2) {
             assert!(w[0] > w[1], "cycles must fall towards the output: {seq:?}");
@@ -1087,7 +1587,10 @@ mod tests {
         // this train that is 6e-8, which is why the old exact-to-1e-9 assertion
         // was the thing that had to change and not the arithmetic.
         let s0 = spur(&r.stages[0]);
-        let (a, b) = (s0.gears[0].tooth_cycles, s0.gears[1].tooth_cycles);
+        let (a, b) = (
+            s0.gears[0].tooth_cycles.bending,
+            s0.gears[1].tooth_cycles.bending,
+        );
         assert!(
             (a / b - s0.ratio).abs() < (1.0 + s0.ratio) / b,
             "{a}/{b} = {} against a stage ratio of {}",
@@ -1100,20 +1603,23 @@ mod tests {
     fn continuous_cycles_follow_each_gears_own_speed() {
         let mut t = two_stage();
         t.actuation = Actuation::Continuous {
-            operating_percent: 50.0,
+            operating_speed: 1500.0,
             runtime_hours: 2.0,
         };
         let r = solve_train(&t, &library()).unwrap();
 
-        // Input gear: 3000 rpm * 60 min * 2 h * 50%.
-        let want = 3000.0 * 60.0 * 2.0 * 0.5;
-        assert!((spur(&r.stages[0]).gears[0].tooth_cycles - want).abs() < 1e-6);
+        // Input gear: 1500 rpm * 60 min * 2 h — its own speed, for as long as
+        // the train runs. Rounded up, as every count is.
+        let want = (1500.0_f64 * 60.0 * 2.0).ceil();
+        let first = spur(&r.stages[0]).gears[0].tooth_cycles;
+        assert!((first.bending - want).abs() < 1e-6);
+        // A continuous drive has no actuation to reverse within, so the two
+        // counts agree.
+        assert_eq!(first.bending, first.contact);
         // Speeds fall through the train, and cycles follow them.
         assert!((spur(&r.stages[0]).gears[0].speed - 3000.0).abs() < 1e-9);
         assert!((spur(&r.stages[1]).gears[1].speed - r.output_speed).abs() < 1e-9);
-        assert!(
-            spur(&r.stages[1]).gears[1].tooth_cycles < spur(&r.stages[0]).gears[0].tooth_cycles
-        );
+        assert!(spur(&r.stages[1]).gears[1].tooth_cycles.bending < first.bending);
     }
 
     /// The automatic addendum, exercised through a whole stage rather than in
@@ -1127,7 +1633,7 @@ mod tests {
                 g.addendum = Auto::automatic(1.0);
                 g.min_tip_width = want;
             }
-            let r = solve_spur_stage(&stage, 2.0, &library()).unwrap();
+            let r = solve_spur_stage(&stage, StageTorques::just(2.0), &library()).unwrap();
 
             for i in 0..2 {
                 let built = Tooth::new(stage.params(i));
@@ -1147,7 +1653,7 @@ mod tests {
     #[test]
     fn a_manual_centre_distance_ignores_the_clearance() {
         let lib = library();
-        let auto = solve_spur_stage(&SpurStage::default(), 2.0, &lib).unwrap();
+        let auto = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib).unwrap();
 
         // The same distance, set by hand, with a clearance that must be ignored.
         let manual = solve_spur_stage(
@@ -1156,7 +1662,7 @@ mod tests {
                 clearance: 0.5,
                 ..SpurStage::default()
             },
-            2.0,
+            StageTorques::just(2.0),
             &lib,
         )
         .unwrap();
@@ -1168,41 +1674,80 @@ mod tests {
         assert!(auto.backlash.forward.nominal > 0.0);
     }
 
-    /// An override has to reach the arithmetic, not just the display. Doubling
-    /// the fatigue allowable must halve the face width contact asks for, since
-    /// `b_min ∝ (σ_H/σ_allow)²` and the automatic width is sized by it.
+    /// An override has to reach the arithmetic, not just the display — and each
+    /// load case has to read **its own** allowable.
+    ///
+    /// Doubling an allowable must quarter the face width contact asks for, since
+    /// `b_min ∝ (σ_H/σ_allow)²`. Which allowable does it is the whole point of
+    /// separating the cases: the peak case is judged against the ultimate and
+    /// the cyclic one against the fatigue figure, so each override moves exactly
+    /// one of the two widths and leaves the other alone.
     #[test]
     fn a_material_override_changes_the_answer() {
         let lib = library();
-        let auto_width = |o: Overrides| {
+        let off = LoadCase {
+            peak: false,
+            cyclic: false,
+        };
+        let auto_width = |sources: FaceSources, o: Overrides| {
             let mut s = SpurStage::default();
             for g in &mut s.gears {
                 g.face_width = Auto::automatic(0.0);
-                g.auto_face_from_bending = false;
+                g.face_sources = sources;
                 g.material_overrides = o;
             }
-            solve_spur_stage(&s, 2.0, &lib).unwrap()
+            solve_spur_stage(&s, StageTorques::just(2.0), &lib).unwrap()
+        };
+        let contact_only = |case: Case| FaceSources {
+            bending: off,
+            contact: LoadCase::of(|c| c == case),
         };
 
-        let base = auto_width(Overrides::default());
-        let doubled = auto_width(Overrides {
-            fatigue_allowable: Some(2.0 * 750.0),
-            ..Default::default()
-        });
+        for (case, other) in [(Case::Cyclic, Case::Peak), (Case::Peak, Case::Cyclic)] {
+            let base = auto_width(contact_only(case), Overrides::default());
+            // Twice **this material's** figure, read from the answer rather than
+            // written down again: a test that repeats the library's numbers
+            // stops testing the arithmetic the moment the library moves.
+            let doubled = 2.0 * allowable(&base.gears[0].material, case);
+            let over = match case {
+                Case::Peak => Overrides {
+                    ultimate_allowable: Some(doubled),
+                    ..Default::default()
+                },
+                Case::Cyclic => Overrides {
+                    fatigue_allowable: Some(doubled),
+                    ..Default::default()
+                },
+            };
 
-        let ratio = base.gears[0].face_width / doubled.gears[0].face_width;
-        assert!(
-            (ratio - 4.0).abs() < 1e-9,
-            "doubling the allowable should quarter the width: ratio {ratio}"
-        );
+            let width = |sources, o| auto_width(sources, o).gears[0].face_width;
+            let ratio = base.gears[0].face_width / width(contact_only(case), over);
+            assert!(
+                (ratio - 4.0).abs() < 1e-9,
+                "{case:?}: doubling the allowable should quarter the width: ratio {ratio}"
+            );
+            // ...and it moved only the case it belongs to.
+            let untouched = width(contact_only(other), Overrides::default());
+            assert_eq!(untouched, width(contact_only(other), over));
+        }
 
         // ...and the reported material says the number came from the user.
+        let doubled = auto_width(
+            FaceSources::default(),
+            Overrides {
+                fatigue_allowable: Some(2.0 * 750.0),
+                ..Default::default()
+            },
+        );
         assert_eq!(
             doubled.gears[0].material.fatigue_allowable.basis,
             crate::material::Basis::Overridden
         );
         assert_eq!(
-            base.gears[0].material.fatigue_allowable.basis,
+            auto_width(FaceSources::default(), Overrides::default()).gears[0]
+                .material
+                .fatigue_allowable
+                .basis,
             crate::material::Basis::Estimated
         );
     }
@@ -1219,7 +1764,9 @@ mod tests {
                     ..Default::default()
                 };
             }
-            solve_spur_stage(&s, 2.0, &lib).unwrap().gears[0].contact_stress
+            solve_spur_stage(&s, StageTorques::just(2.0), &lib).unwrap().gears[0]
+                .contact_stress
+                .peak
         };
         let base = at(None);
         let quarter = at(Some(190_000.0 / 4.0));
@@ -1233,7 +1780,7 @@ mod tests {
     fn an_unknown_material_is_named_rather_than_swallowed() {
         let mut s = SpurStage::default();
         s.gears[0].material = "unobtainium".into();
-        let e = solve_spur_stage(&s, 2.0, &library()).unwrap_err();
+        let e = solve_spur_stage(&s, StageTorques::just(2.0), &library()).unwrap_err();
         assert!(matches!(e, TrainError::UnknownMaterial(ref n) if n == "unobtainium"));
         assert!(e.to_string().contains("unobtainium"));
     }
@@ -1243,6 +1790,8 @@ mod tests {
         let t = Train {
             input_speed: 1.0,
             input_torque: 1.0,
+            back_driving_torque: 0.0,
+            operating_torque: 1.0,
             actuation: Actuation::default(),
             stages: vec![],
         };
@@ -1257,10 +1806,12 @@ mod tests {
     /// figure beside it — one model with two answers, which is the fault this
     /// crate spends most of its gates on.
     ///
-    /// The old arithmetic is written out here rather than referenced, so the
-    /// check is against what the browser actually displayed rather than against
-    /// the code that replaced it. Every count must be exactly the ceiling of it,
-    /// and must itself be a whole number.
+    /// The revolutions are written out here rather than referenced, so the check
+    /// is against the shaft line rather than against the code that counts it.
+    /// Every count must be whole, and must be the ceiling taken in the right
+    /// place: over the whole duty for a one-way drive, and **within one
+    /// actuation** for a reversing one, where a tooth part way through an
+    /// actuation has still been loaded by that actuation and by every one after.
     #[test]
     fn every_cycle_count_is_the_ceiling_of_the_revolutions_it_replaced() {
         let lib = test_library();
@@ -1269,7 +1820,7 @@ mod tests {
             (
                 Train {
                     actuation: Actuation::Continuous {
-                        operating_percent: 80.0,
+                        operating_speed: 2400.0,
                         runtime_hours: 1000.0,
                     },
                     ..two_stage()
@@ -1281,22 +1832,33 @@ mod tests {
                     actuation: Actuation::Intermittent {
                         range_degrees: 25.0,
                         actuations: 1000,
+                        reversing: false,
                     },
                     ..two_stage()
                 },
                 "intermittent",
             ),
+            (
+                Train {
+                    actuation: Actuation::Intermittent {
+                        range_degrees: 25.0,
+                        actuations: 1000,
+                        reversing: true,
+                    },
+                    ..two_stage()
+                },
+                "reversing",
+            ),
         ] {
             let r = solve_train(&train, &lib).expect(what);
 
-            // The old formula, written out: revolutions to the output, before
-            // anything rounded them.
+            // The revolutions each member turns, before anything rounds them.
             let ratios: Vec<f64> = r.stages.iter().map(StageResult::ratio).collect();
             for (k, s) in r.stages.iter().enumerate() {
                 let upstream: f64 = ratios[..k].iter().product();
                 let speed_in = train.input_speed / upstream;
                 let speeds = [speed_in, speed_in / ratios[k]];
-                let revolutions = [0usize, 1].map(|i| {
+                let expected = [0usize, 1].map(|i| {
                     let to_output: f64 = if i == 0 {
                         ratios[k..].iter().product()
                     } else {
@@ -1306,27 +1868,110 @@ mod tests {
                         Actuation::Intermittent {
                             range_degrees,
                             actuations,
-                        } => (range_degrees / 360.0) * to_output * f64::from(actuations),
+                            reversing,
+                        } => {
+                            let each = (range_degrees / 360.0) * to_output;
+                            let n = f64::from(actuations);
+                            if reversing {
+                                let bending = each.ceil() * n;
+                                Cycles {
+                                    bending,
+                                    contact: bending / 2.0,
+                                }
+                            } else {
+                                let n = (each * n).ceil();
+                                Cycles {
+                                    bending: n,
+                                    contact: n,
+                                }
+                            }
+                        }
                         Actuation::Continuous {
-                            operating_percent,
+                            operating_speed,
                             runtime_hours,
-                        } => speeds[i] * 60.0 * runtime_hours * operating_percent / 100.0,
+                        } => {
+                            let scale = operating_speed / train.input_speed;
+                            let n = (speeds[i] * scale * 60.0 * runtime_hours).ceil();
+                            Cycles {
+                                bending: n,
+                                contact: n,
+                            }
+                        }
                     }
                 });
 
                 let Some(sp) = s.as_spur() else { continue };
-                for (i, (g, turns)) in sp.gears.iter().zip(revolutions).enumerate() {
+                for (i, (g, want)) in sp.gears.iter().zip(expected).enumerate() {
                     let got = g.tooth_cycles;
+                    assert_eq!(got, want, "{what}, stage {k} gear {i}");
                     assert_eq!(
-                        got.to_bits(),
-                        turns.ceil().to_bits(),
-                        "{what}, stage {k} gear {i}: {got} against the browser's \
-                         ceil({turns}) = {}",
-                        turns.ceil()
+                        got.bending,
+                        got.bending.trunc(),
+                        "{what}: {} is not a whole count",
+                        got.bending
                     );
-                    assert_eq!(got, got.trunc(), "{what}: {got} is not a whole count");
                 }
             }
         }
+    }
+
+    /// **A load exists only where it is reacted.**
+    ///
+    /// A back-driving torque on a train of ordinary spur stages reaches no
+    /// number: every stage can be driven backward, so the load simply turns the
+    /// train and nothing holds it. Put one self-locking stage in the way and the
+    /// load stops there — that stage and everything downstream of it carry it,
+    /// and everything upstream still sees nothing.
+    #[test]
+    fn a_back_driving_load_is_carried_only_where_something_reacts_it() {
+        let lib = test_library();
+        let mut t = two_stage();
+        t.back_driving_torque = 5.0;
+        let r = solve_train(&t, &lib).unwrap();
+        for s in &r.stages {
+            for g in &spur(s).gears {
+                assert_eq!(
+                    g.back_driving_torque, None,
+                    "a back-drivable train reacts nothing"
+                );
+            }
+        }
+
+        // The same load against a stage that cannot be driven backward. A worm
+        // with enough friction locks, and then the load stops there: the worm
+        // stage carries it, and the spur stage ahead of it carries none.
+        t.stages.push(Stage::Worm(WormStage {
+            sliding_friction: 0.3,
+            static_friction: 0.3,
+            ..WormStage::default()
+        }));
+        let r = solve_train(&t, &lib).unwrap();
+        let worm = r.stages[2].as_worm().expect("the third stage is a worm");
+        assert!(
+            worm.efficiency.self_locking(),
+            "this worm was meant to lock: backward efficiency {}",
+            worm.efficiency.backward
+        );
+        for m in &worm.members {
+            assert!(
+                m.back_driving_torque.is_some_and(|t| t > 0.0),
+                "the stage that reacts the load carries it"
+            );
+        }
+        for s in &r.stages[..2] {
+            for g in &spur(s).gears {
+                assert_eq!(
+                    g.back_driving_torque, None,
+                    "nothing upstream of a self-locking stage sees the load"
+                );
+            }
+        }
+
+        // ...and the train says which stage held it, rather than leaving the
+        // reader to infer it from a column of dashes.
+        assert!(r
+            .notes
+            .iter()
+            .any(|n| n.is(key::TRAIN_BACK_DRIVING_REACTED_AT)));
     }
 }

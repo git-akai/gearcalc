@@ -150,8 +150,10 @@ mod tests {
             train: Train {
                 input_speed: 12_000.0,
                 input_torque: 0.25,
+                back_driving_torque: 0.1,
+                operating_torque: 0.2,
                 actuation: Actuation::Continuous {
-                    operating_percent: 80.0,
+                    operating_speed: 9600.0,
                     runtime_hours: 1000.0,
                 },
                 stages: vec![

@@ -976,6 +976,11 @@ fn defaults_impl() -> Result<String, String> {
         train: Train {
             input_speed: 30_000.0,
             input_torque: 0.1,
+            // No back-driving load until one is entered, and a cyclic torque
+            // equal to the peak until one is: a fresh tab assumes no derating
+            // rather than a derating nobody asked for.
+            back_driving_torque: 0.0,
+            operating_torque: 0.1,
             actuation: Actuation::default(),
             stages: vec![Stage::Spur(spur.clone())],
         },
@@ -1098,8 +1103,8 @@ mod tests {
             "name": "Elevation drive",
             "train": {
                 "input_speed": 12_000.0,
-                "input_torque": 0.25,
-                "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
+                "input_torque": 0.25, "back_driving_torque": 0.1, "operating_torque": 0.2,
+                "actuation": { "continuous": { "operating_speed": 9600.0, "runtime_hours": 1000.0 } },
                 // Every stage kind, and a crossed pair too — which is a spur
                 // stage with its shafts at an angle, not a kind of its own.
                 "stages": [d["spur_stage"], crossed, d["worm_stage"], d["planetary_stage"]],
@@ -1136,8 +1141,8 @@ mod tests {
 
         let empty = serde_json::json!({
             "name": "no stages",
-            "train": { "input_speed": 1.0, "input_torque": 1.0,
-                       "actuation": { "intermittent": { "range_degrees": 25.0, "actuations": 10 } },
+            "train": { "input_speed": 1.0, "input_torque": 1.0, "back_driving_torque": 0.0, "operating_torque": 1.0,
+                       "actuation": { "intermittent": { "range_degrees": 25.0, "actuations": 10, "reversing": false } },
                        "stages": [] }
         });
         let text = export_train_impl(&empty.to_string()).unwrap();
@@ -1576,8 +1581,8 @@ mod tests {
     fn a_planetary_stage_crosses_the_boundary_with_its_own_shape() {
         let req = r#"{"train":{
             "input_speed": 3000.0,
-            "input_torque": 2.0,
-            "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
+            "input_torque": 2.0, "back_driving_torque": 0.0, "operating_torque": 1.6,
+            "actuation": { "continuous": { "operating_speed": 2400.0, "runtime_hours": 1000.0 } },
             "stages": [
               {"kind":"planetary",
                "module":1.0,"pressure_angle":20.0,"helix_angle":0.0,
@@ -1588,9 +1593,9 @@ mod tests {
                "clearance":0.02,"tolerance_plus":0.02,"tolerance_minus":0.02,
                "min_planet_clearance":0.3,
                "cutter":{"teeth":20,"addendum":1.25,"tip_round":0.2},
-               "sun":{"teeth":24,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"auto_face_from_bending":true,"auto_face_from_contact":true,"material":"4340 Hardened Steel"},
-               "planet":{"teeth":18,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"auto_face_from_bending":true,"auto_face_from_contact":true,"material":"4340 Hardened Steel"},
-               "ring":{"teeth":60,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"auto_face_from_bending":true,"auto_face_from_contact":true,"material":"4340 Hardened Steel"}
+               "sun":{"teeth":24,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},"material":"4340 Hardened Steel"},
+               "planet":{"teeth":18,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},"material":"4340 Hardened Steel"},
+               "ring":{"teeth":60,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},"material":"4340 Hardened Steel"}
               }
             ]}}"#;
 
@@ -1635,15 +1640,17 @@ mod tests {
                     .unwrap()
                     > 1.0
             );
-            assert!(stage[mesh]["contact_stress"].as_f64().unwrap() > 0.0);
+            for case in ["peak", "cyclic"] {
+                assert!(stage[mesh]["contact_stress"][case].as_f64().unwrap() > 0.0);
+            }
         }
         for who in ["sun", "ring"] {
             assert!(
-                stage[who]["bending_stress"].as_f64().unwrap() > 0.0,
+                stage[who]["bending_stress"]["peak"].as_f64().unwrap() > 0.0,
                 "{who} must be rated"
             );
         }
-        assert!(stage["planet"]["gear"]["bending_stress"].as_f64().unwrap() > 0.0);
+        assert!(stage["planet"]["gear"]["bending_stress"]["peak"].as_f64().unwrap() > 0.0);
         assert_eq!(stage["equal_spacing"], true);
         // What the stage *assumes* has to come across too — here, equal load
         // sharing between planets, which no calculation can establish. Crossing
@@ -1664,8 +1671,8 @@ mod tests {
     fn a_mixed_train_crosses_the_boundary_with_both_shapes_intact() {
         let req = r#"{"train":{
             "input_speed": 3000.0,
-            "input_torque": 2.0,
-            "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
+            "input_torque": 2.0, "back_driving_torque": 0.0, "operating_torque": 1.6,
+            "actuation": { "continuous": { "operating_speed": 2400.0, "runtime_hours": 1000.0 } },
             "stages": [
               {"kind":"spur",
                "module":1.0,"pressure_angle":20.0,"additional_helix":0.0,"sliding_friction":0.06,"static_friction":0.16,
@@ -1677,13 +1684,13 @@ mod tests {
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":0.0},
-                  "auto_face_from_bending":true,"auto_face_from_contact":true,
+                  "face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},
                   "material":"4340 Hardened Steel"},
                  {"teeth":43,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":0.0},
-                  "auto_face_from_bending":true,"auto_face_from_contact":true,
+                  "face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},
                   "material":"4340 Hardened Steel"}
                ]},
               {"kind":"worm",
@@ -1705,7 +1712,7 @@ mod tests {
         assert_eq!(v["stages"][0]["kind"], "spur");
         assert_eq!(v["stages"][1]["kind"], "worm");
         assert!(
-            v["stages"][0]["gears"][0]["bending_stress"]
+            v["stages"][0]["gears"][0]["bending_stress"]["peak"]
                 .as_f64()
                 .unwrap()
                 > 0.0
@@ -1716,7 +1723,7 @@ mod tests {
             worm["gears"].is_null(),
             "a worm stage has members, not gears"
         );
-        assert!(worm["contact"]["max_pressure"].as_f64().unwrap() > 0.0);
+        assert!(worm["contact"]["peak"]["max_pressure"].as_f64().unwrap() > 0.0);
         let eff = &worm["efficiency"];
         assert!(eff["backward"].as_f64().unwrap() < eff["forward"].as_f64().unwrap());
         // ...while the spur stage puts the same number in both, which is the
@@ -1747,8 +1754,8 @@ mod tests {
         // one you ship with".
         let req = r#"{"train":{
             "input_speed": 3000.0,
-            "input_torque": 2.0,
-            "actuation": { "continuous": { "operating_percent": 80.0, "runtime_hours": 1000.0 } },
+            "input_torque": 2.0, "back_driving_torque": 0.0, "operating_torque": 1.6,
+            "actuation": { "continuous": { "operating_speed": 2400.0, "runtime_hours": 1000.0 } },
             "stages": [
               {"kind":"spur",
                "module":1.0,"pressure_angle":20.0,"additional_helix":0.0,"sliding_friction":0.06,"static_friction":0.16,
@@ -1760,13 +1767,13 @@ mod tests {
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":0.0},
-                  "auto_face_from_bending":true,"auto_face_from_contact":true,
+                  "face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},
                   "material":"4340 Hardened Steel"},
                  {"teeth":43,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":0.0},
-                  "auto_face_from_bending":true,"auto_face_from_contact":true,
+                  "face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},
                   "material":"4340 Hardened Steel"}
                ]}
             ]}}"#;
@@ -1778,7 +1785,8 @@ mod tests {
         let g0 = &v["stages"][0]["gears"][0];
         // The automatic face width came back, and so did the cycle count.
         assert!(g0["face_width"].as_f64().unwrap() > 0.0);
-        assert!(g0["tooth_cycles"].as_f64().unwrap() > 0.0);
+        assert!(g0["tooth_cycles"]["bending"].as_f64().unwrap() > 0.0);
+        assert!(g0["tooth_cycles"]["contact"].as_f64().unwrap() > 0.0);
         assert!((g0["speed"].as_f64().unwrap() - 3000.0).abs() < 1e-9);
         // Spur stage: the overlap ratio is exactly zero, not merely small.
         assert_eq!(
@@ -1791,8 +1799,8 @@ mod tests {
 
     #[test]
     fn a_train_that_cannot_be_solved_says_why() {
-        let bad = r#"{"train":{"input_speed":1.0,"input_torque":1.0,
-            "actuation":{"intermittent":{"range_degrees":25.0,"actuations":1000}},
+        let bad = r#"{"train":{"input_speed":1.0,"input_torque":1.0,"back_driving_torque":0.0,"operating_torque":1.0,
+            "actuation":{"intermittent":{"range_degrees":25.0,"actuations":1000,"reversing":false}},
             "stages":[]}}"#;
         assert!(solve_train_impl(bad).unwrap_err().contains("no stages"));
         assert!(solve_train_impl("{ not json").is_err());

@@ -434,7 +434,7 @@ mod tests {
                     ],
                     ..Default::default()
                 };
-                if let Ok(r) = gear_core::train::solve_spur_stage(&stage, 2.0, &lib) {
+                if let Ok(r) = gear_core::train::solve_spur_stage(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
                     record(&r.notes);
                 }
                 for sigma in [0.5_f64, 90.0] {
@@ -449,7 +449,7 @@ mod tests {
                         for g in &mut crossed.gears {
                             g.face_width = face;
                         }
-                        if let Ok(r) = gear_core::train::solve_crossed_stage(&crossed, 2.0, &lib) {
+                        if let Ok(r) = gear_core::train::solve_crossed_stage(&crossed, gear_core::train::StageTorques::just(2.0), &lib) {
                             record(&r.notes);
                         }
                     }
@@ -469,7 +469,7 @@ mod tests {
                 sliding_friction: friction,
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_worm_stage(&stage, 2.0, &lib) {
+            if let Ok(r) = gear_core::train::solve_worm_stage(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
                 record(&r.notes);
             }
         }
@@ -479,7 +479,7 @@ mod tests {
                 min_planet_clearance: clearance,
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_planetary_stage(&stage, 3000.0, 2.0, &lib) {
+            if let Ok(r) = gear_core::train::solve_planetary_stage(&stage, 3000.0, gear_core::train::StageTorques::just(2.0), &lib) {
                 record(&r.notes);
             }
         }
@@ -526,7 +526,7 @@ mod tests {
                 ],
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_spur_stage(&stage, 2.0, &lib) {
+            if let Ok(r) = gear_core::train::solve_spur_stage(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
                 record(&r.notes);
             }
             // ...and a crossed pair of the same, whose teeth then reach a full
@@ -546,7 +546,7 @@ mod tests {
                     ],
                     ..stage.clone()
                 };
-                if let Ok(r) = gear_core::train::solve_crossed_stage(&crossed, 2.0, &lib) {
+                if let Ok(r) = gear_core::train::solve_crossed_stage(&crossed, gear_core::train::StageTorques::just(2.0), &lib) {
                     record(&r.notes);
                 }
             }
@@ -572,7 +572,7 @@ mod tests {
                 },
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_worm_stage(&stage, 2.0, &lib) {
+            if let Ok(r) = gear_core::train::solve_worm_stage(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
                 record(&r.notes);
             }
             // ...and a worm sitting just under its self-locking threshold.
@@ -582,7 +582,7 @@ mod tests {
                     static_friction: friction,
                     ..Default::default()
                 },
-                2.0,
+                gear_core::train::StageTorques::just(2.0),
                 &lib,
             ) {
                 record(&r.notes);
@@ -612,7 +612,89 @@ mod tests {
                 },
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_planetary_stage(&stage, 3000.0, 2.0, &lib) {
+            if let Ok(r) = gear_core::train::solve_planetary_stage(&stage, 3000.0, gear_core::train::StageTorques::just(2.0), &lib) {
+                record(&r.notes);
+            }
+        }
+
+        // ---- the whole train ---------------------------------------- //
+        //
+        // The notes no stage can fire, because they are facts about the shaft
+        // line: an operating input above the peak it is measured from, and a
+        // back-driving load that is either reacted somewhere or reacted
+        // nowhere. Fired through `solve_train` for the same reason the clamps
+        // are fired through the geometry — the case has to be live, not merely
+        // constructible.
+        {
+            use gear_core::train::{Actuation, SpurStage, Stage, Train, WormStage};
+            let train = |back_driving_torque, operating_torque, actuation, stages| Train {
+                input_speed: 3000.0,
+                input_torque: 2.0,
+                back_driving_torque,
+                operating_torque,
+                actuation,
+                stages,
+            };
+            let spur = || vec![Stage::Spur(SpurStage::default())];
+            let intermittent = Actuation::Intermittent {
+                range_degrees: 25.0,
+                actuations: 1000,
+                reversing: true,
+            };
+            // Both inputs above their peaks, and a load nothing reacts.
+            if let Ok(r) = gear_core::train::solve_train(
+                &train(
+                    5.0,
+                    10.0,
+                    Actuation::Continuous {
+                        operating_speed: 9000.0,
+                        runtime_hours: 1000.0,
+                    },
+                    spur(),
+                ),
+                &lib,
+            ) {
+                record(&r.notes);
+            }
+            // ...and the same load against a worm that cannot be back-driven.
+            if let Ok(r) = gear_core::train::solve_train(
+                &train(
+                    5.0,
+                    2.0,
+                    intermittent,
+                    vec![Stage::Worm(WormStage {
+                        sliding_friction: 0.3,
+                        static_friction: 0.3,
+                        ..WormStage::default()
+                    })],
+                ),
+                &lib,
+            ) {
+                record(&r.notes);
+            }
+            // An automatic face width with every rating switched off.
+            let no_source = gear_core::train::StageGear {
+                face_width: gear_core::params::Auto::automatic(0.0),
+                face_sources: gear_core::train::FaceSources {
+                    bending: gear_core::train::LoadCase {
+                        peak: false,
+                        cyclic: false,
+                    },
+                    contact: gear_core::train::LoadCase {
+                        peak: false,
+                        cyclic: false,
+                    },
+                },
+                ..Default::default()
+            };
+            if let Ok(r) = gear_core::train::solve_spur_stage(
+                &SpurStage {
+                    gears: [no_source.clone(), no_source],
+                    ..SpurStage::default()
+                },
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
                 record(&r.notes);
             }
         }
@@ -732,8 +814,10 @@ mod tests {
                 &Train {
                     input_speed: 3000.0,
                     input_torque: 2.0,
+                    back_driving_torque: 0.0,
+                    operating_torque: 2.0,
                     actuation: gear_core::train::Actuation::Continuous {
-                        operating_percent: 80.0,
+                        operating_speed: 2400.0,
                         runtime_hours: 1000.0,
                     },
                     stages: Vec::new(),

@@ -61,7 +61,7 @@
 //! tests below — and part company by 0.21 % at the default clearance. That step
 //! at `Σ = 0` is the degeneracy, not a seam in the code.
 
-use super::{solve_spur_stage, Backlash, TrainError};
+use super::{solve_spur_stage, Backlash, Case, Cycles, LoadCase, StageTorques, TrainError};
 
 /// Quadrature points for the path-averaged friction balance.
 ///
@@ -278,12 +278,19 @@ impl Default for WormStage {
     ts(export, export_to = "core/")
 )]
 pub struct WormMemberResult {
-    /// Torque on this member, N·m.
+    /// Torque on this member, N·m — the peak, driven forward.
     pub torque: f64,
+    /// Torque on this member when the load drives the train backward, N·m.
+    ///
+    /// `None` when there is no such load to react: either none was entered, or
+    /// the train is back-drivable and so nothing upstream holds it — see
+    /// [`super::back_driving_torques`].
+    pub back_driving_torque: Option<f64>,
     /// Rotational speed, rpm. Filled in by the train.
     pub speed: f64,
-    /// Tooth load cycles over the duty. Filled in by the train.
-    pub tooth_cycles: f64,
+    /// Tooth load cycles over the duty, bending and contact. Filled in by the
+    /// train.
+    pub tooth_cycles: Cycles,
     /// The width in use, mm — the recommendation when automatic, the input
     /// otherwise. For the worm this is a *length* along its axis.
     pub face_width: f64,
@@ -441,7 +448,8 @@ pub struct WormResult {
     pub sliding_ratio: f64,
     /// Sliding speed at the pitch point, mm/s. Filled in by the train.
     pub sliding_velocity: f64,
-    pub contact: WormContact,
+    /// The contact patch, in both load cases.
+    pub contact: LoadCase<WormContact>,
     /// Angular backlash at whichever member is the output in each direction,
     /// degrees: the wheel driving forward, the worm driving backward. A worm
     /// stage shows the gap the two ways round more starkly than any other,
@@ -555,7 +563,7 @@ impl WormStage {
 /// not have.
 pub fn solve_crossed_stage(
     stage: &super::SpurStage,
-    input_torque: f64,
+    torques: StageTorques,
     lib: &MaterialLibrary,
 ) -> Result<WormResult, TrainError> {
     let member = |g: &super::StageGear| WormMember {
@@ -635,7 +643,7 @@ pub fn solve_crossed_stage(
         }
     }
 
-    let mut result = solve_worm_stage(&equivalent, input_torque, lib)?;
+    let mut result = solve_worm_stage(&equivalent, torques, lib)?;
     result.notes.extend(notes);
 
     // ...and the zone as the widths in use actually leave it.
@@ -648,7 +656,7 @@ pub fn solve_crossed_stage(
             shaft_angle: 0.0,
             ..stage.clone()
         },
-        input_torque,
+        torques,
         lib,
     )
     .ok()
@@ -686,9 +694,10 @@ pub fn solve_crossed_stage(
 /// not have.
 pub fn solve_worm_stage(
     stage: &WormStage,
-    input_torque: f64,
+    torques: StageTorques,
     lib: &MaterialLibrary,
 ) -> Result<WormResult, TrainError> {
+    let input_torque = torques.peak_forward;
     let s = stage.geometry()?;
 
     let materials: Vec<Material> = [&stage.worm, &stage.wheel]
@@ -765,6 +774,11 @@ pub fn solve_worm_stage(
     let e_star = contact_modulus(&materials[0], &materials[1]);
     let (curvature_along, curvature_across) =
         s.contact_curvatures().ok_or(TrainError::NoContact)?;
+
+    // One rating, and the load case is the only thing that changes about it: a
+    // case is a torque and nothing else, so this closure takes the torque on the
+    // wheel and knows nothing about which case asked.
+    let rate = |output_torque: f64| -> Result<WormContact, TrainError> {
     let at_pitch = s
         .contact(
             output_torque,
@@ -806,6 +820,25 @@ pub fn solve_worm_stage(
             }
         }
     }
+
+        Ok(WormContact {
+            max_pressure: patch.max_pressure,
+            at_pitch_point: at_pitch.max_pressure,
+            worst_position,
+            patch_length: 2.0 * patch.semi_major(),
+            patch_width: 2.0 * patch.semi_minor(),
+            curvature_along,
+            curvature_across,
+        })
+    };
+
+    // Both cases at the shaft the rating is taken on. `Case::Peak` is the worse
+    // of driving and being driven; `Case::Cyclic` is the operating load, which
+    // may legitimately be zero.
+    let contact = LoadCase {
+        peak: rate(torques.at(Case::Peak) * s.ratio * efficiency.forward)?,
+        cyclic: rate(torques.at(Case::Cyclic) * s.ratio * efficiency.forward)?,
+    };
 
     let backlash = Directional::of(|d| {
         let at = match d {
@@ -876,8 +909,9 @@ pub fn solve_worm_stage(
     let members = [
         WormMemberResult {
             torque: input_torque,
+            back_driving_torque: torques.peak_backward,
             speed: 0.0,
-            tooth_cycles: 0.0,
+            tooth_cycles: Cycles::default(),
             face_width: widths[0],
             recommended_face_width: recommended[0],
             pitch_diameter: s.worm_pitch_diameter,
@@ -885,8 +919,14 @@ pub fn solve_worm_stage(
         },
         WormMemberResult {
             torque: output_torque,
+            // Referred across the mesh the same way the forward torque is: the
+            // load is on the wheel, so the worm sees it divided by the ratio and
+            // by whatever the mesh loses carrying it there.
+            back_driving_torque: torques
+                .peak_backward
+                .map(|t| t * s.ratio / efficiency.backward.max(f64::MIN_POSITIVE)),
             speed: 0.0,
-            tooth_cycles: 0.0,
+            tooth_cycles: Cycles::default(),
             face_width: widths[1],
             recommended_face_width: recommended[1],
             pitch_diameter: s.wheel_pitch_diameter,
@@ -909,15 +949,7 @@ pub fn solve_worm_stage(
         self_locking_friction: threshold,
         sliding_ratio: s.sliding_ratio,
         sliding_velocity: 0.0,
-        contact: WormContact {
-            max_pressure: patch.max_pressure,
-            at_pitch_point: at_pitch.max_pressure,
-            worst_position,
-            patch_length: 2.0 * patch.semi_major(),
-            patch_width: 2.0 * patch.semi_minor(),
-            curvature_along,
-            curvature_across,
-        },
+        contact,
         backlash,
         members,
         notes,
@@ -1067,7 +1099,7 @@ mod tests {
     }
 
     fn solved(stage: &WormStage) -> WormResult {
-        solve_worm_stage(stage, 2.0, &library()).unwrap()
+        solve_worm_stage(stage, StageTorques::just(2.0), &library()).unwrap()
     }
 
     /// **Backlash, derived once and checked against the two rules the handbooks
@@ -1146,16 +1178,16 @@ mod tests {
             r.efficiency.backward < r.efficiency.forward,
             "back-driving is the worse direction"
         );
-        assert!(r.contact.max_pressure > 0.0 && r.contact.max_pressure.is_finite());
+        assert!(r.contact.peak.max_pressure > 0.0 && r.contact.peak.max_pressure.is_finite());
         assert!(
-            r.contact.curvature_along > 0.0,
+            r.contact.peak.curvature_along > 0.0,
             "crossed shafts make a point contact, not a line"
         );
         assert!(
-            r.contact.patch_length > r.contact.patch_width,
+            r.contact.peak.patch_length > r.contact.peak.patch_width,
             "an ellipse: {} by {}",
-            r.contact.patch_length,
-            r.contact.patch_width
+            r.contact.peak.patch_length,
+            r.contact.peak.patch_width
         );
         // Torque follows the ratio and the operative efficiency.
         let expected = 2.0 * r.ratio * r.efficiency.forward;
@@ -1193,7 +1225,7 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(
-            narrow.contact.max_pressure, wide.contact.max_pressure,
+            narrow.contact.peak.max_pressure, wide.contact.peak.max_pressure,
             "a ten-fold face width must change nothing about a point contact"
         );
     }
@@ -1342,7 +1374,7 @@ mod tests {
         };
 
         // Automatic: the width for ε = 1, and the ratio comes back as 1.
-        let auto = solve_crossed_stage(&stage(Auto::automatic(0.0)), 2.0, &lib).unwrap();
+        let auto = solve_crossed_stage(&stage(Auto::automatic(0.0)), StageTorques::just(2.0), &lib).unwrap();
         let m = auto.crossed.expect("a crossed pair has a path of contact");
         assert!(
             (m.contact_ratio - 1.0).abs() < 1e-9,
@@ -1364,7 +1396,7 @@ mod tests {
         // nominal centre distance *plus the clearance* and that slides the
         // contact along the shafts (docs/reference.md#centre-distance-and-backlash). Trimming a face symmetrically about
         // an asymmetric contact loses a little more than half.
-        let narrow = solve_crossed_stage(&stage(Auto::fixed(sized[0] / 2.0)), 2.0, &lib).unwrap();
+        let narrow = solve_crossed_stage(&stage(Auto::fixed(sized[0] / 2.0)), StageTorques::just(2.0), &lib).unwrap();
         let n = narrow.crossed.unwrap();
         assert!(
             n.contact_ratio < 0.5 && n.contact_ratio > 0.45,
@@ -1378,13 +1410,13 @@ mod tests {
             clearance: 0.0,
             ..stage(face)
         };
-        let centred = solve_crossed_stage(&tight(Auto::automatic(0.0)), 2.0, &lib).unwrap();
+        let centred = solve_crossed_stage(&tight(Auto::automatic(0.0)), StageTorques::just(2.0), &lib).unwrap();
         let width = centred
             .crossed
             .expect("a path")
             .face_width_for_continuity
             .expect("a width for continuity");
-        let halved = solve_crossed_stage(&tight(Auto::fixed(width[0] / 2.0)), 2.0, &lib).unwrap();
+        let halved = solve_crossed_stage(&tight(Auto::fixed(width[0] / 2.0)), StageTorques::just(2.0), &lib).unwrap();
         assert!(
             (halved.crossed.unwrap().contact_ratio - 0.5).abs() < 1e-9,
             "with the contact centred, half the face is exactly half the contact"
@@ -1399,11 +1431,11 @@ mod tests {
         );
 
         // Generous, and the teeth are what end it — a wider face buys nothing.
-        let wide = solve_crossed_stage(&stage(Auto::fixed(60.0)), 2.0, &lib).unwrap();
+        let wide = solve_crossed_stage(&stage(Auto::fixed(60.0)), StageTorques::just(2.0), &lib).unwrap();
         let w = wide.crossed.unwrap();
         assert_eq!(w.limited_by, ZoneLimit::Tips);
         assert!(w.contact_ratio > m.contact_ratio);
-        let wider = solve_crossed_stage(&stage(Auto::fixed(120.0)), 2.0, &lib).unwrap();
+        let wider = solve_crossed_stage(&stage(Auto::fixed(120.0)), StageTorques::just(2.0), &lib).unwrap();
         assert!((wider.crossed.unwrap().contact_ratio - w.contact_ratio).abs() < 1e-12);
     }
 
@@ -1453,7 +1485,7 @@ mod tests {
                 ],
                 ..SpurStage::default()
             },
-            2.0,
+            StageTorques::just(2.0),
             &library(),
         )
         .unwrap();
@@ -1496,29 +1528,29 @@ mod tests {
 
         // Generous face: the teeth end the zone, the pair shares load, and the
         // rating sits just above the pitch-point figure.
-        let wide = solve_crossed_stage(&crossed(20.0), 2.0, &lib).unwrap();
+        let wide = solve_crossed_stage(&crossed(20.0), StageTorques::just(2.0), &lib).unwrap();
         assert!(
-            wide.contact.max_pressure >= wide.contact.at_pitch_point,
+            wide.contact.peak.max_pressure >= wide.contact.peak.at_pitch_point,
             "the path cannot be kinder than its gentlest point"
         );
         assert!(wide.crossed.unwrap().contact_ratio > 1.0);
 
         // Squeeze it: ε falls below 1, load sharing goes, and the same mesh at
         // the same torque rates higher.
-        let narrow = solve_crossed_stage(&crossed(0.8), 2.0, &lib).unwrap();
+        let narrow = solve_crossed_stage(&crossed(0.8), StageTorques::just(2.0), &lib).unwrap();
         assert!(narrow.crossed.unwrap().contact_ratio < 1.0);
         assert!(
-            narrow.contact.max_pressure > wide.contact.max_pressure,
+            narrow.contact.peak.max_pressure > wide.contact.peak.max_pressure,
             "losing contact continuity should cost stress, not save it: {} against {}",
-            narrow.contact.max_pressure,
-            wide.contact.max_pressure
+            narrow.contact.peak.max_pressure,
+            wide.contact.peak.max_pressure
         );
         // ...and it is the *place* being rated that did it, not the load. The
         // load moved too — a narrower face engages only the middle of the zone,
         // which slides less, which delivers more torque — so the two figures
         // are compared as a ratio, which divides the load out: the same mesh
         // rated at its worst against rated at its pitch point.
-        let severity = |r: &WormResult| r.contact.max_pressure / r.contact.at_pitch_point;
+        let severity = |r: &WormResult| r.contact.peak.max_pressure / r.contact.peak.at_pitch_point;
         // The margin is small, and the reason is worth knowing: a narrow face
         // cuts the zone's *ends* off, and those ends are what made the path
         // severe. So losing the sharing pushes the rating outward while the
@@ -1564,7 +1596,7 @@ mod tests {
                 ..WormStage::default()
             },
         ] {
-            let r = solve_worm_stage(&stage, 2.0, &lib).unwrap();
+            let r = solve_worm_stage(&stage, StageTorques::just(2.0), &lib).unwrap();
             let classical = r.crossed.map(|_| ()).map(|()| {
                 let s = stage.geometry().unwrap();
                 Directional::of(|d| s.efficiency(stage.sliding_friction, d))
@@ -1606,7 +1638,7 @@ mod tests {
             ],
             ..SpurStage::default()
         };
-        let r = solve_crossed_stage(&crossed, 2.0, &lib).unwrap();
+        let r = solve_crossed_stage(&crossed, StageTorques::just(2.0), &lib).unwrap();
         let m = r.crossed.expect("a path");
         assert!(
             r.efficiency.forward < m.parallel_axis_efficiency.unwrap(),
@@ -1657,7 +1689,7 @@ mod tests {
 
         let mut previous = 1.0;
         for sigma in [0.5f64, 2.0, 10.0, 45.0, 90.0] {
-            let r = solve_crossed_stage(&stage(sigma), 2.0, &lib).unwrap();
+            let r = solve_crossed_stage(&stage(sigma), StageTorques::just(2.0), &lib).unwrap();
             let mesh = r.crossed.expect("a path");
             assert_eq!(
                 mesh.limited_by,
@@ -1721,7 +1753,7 @@ mod tests {
                 sizing: FirstMemberSizing::PitchDiameter(8.0),
                 ..Default::default()
             },
-            2.0,
+            StageTorques::just(2.0),
             &library(),
         )
         .unwrap_err();
@@ -1735,7 +1767,7 @@ mod tests {
                 },
                 ..Default::default()
             },
-            2.0,
+            StageTorques::just(2.0),
             &library(),
         )
         .unwrap_err();
@@ -1921,14 +1953,14 @@ mod tests {
             ..WormStage::default()
         };
 
-        let a = solve_crossed_stage(&spur, 2.0, &lib).unwrap();
-        let b = solve_worm_stage(&as_screw, 2.0, &lib).unwrap();
+        let a = solve_crossed_stage(&spur, StageTorques::just(2.0), &lib).unwrap();
+        let b = solve_worm_stage(&as_screw, StageTorques::just(2.0), &lib).unwrap();
         for (name, x, y) in [
             ("ratio", a.ratio, b.ratio),
             ("centre distance", a.centre_distance, b.centre_distance),
             ("lead angle", a.lead_angle, b.lead_angle),
             ("efficiency", a.efficiency.forward, b.efficiency.forward),
-            ("contact", a.contact.max_pressure, b.contact.max_pressure),
+            ("contact", a.contact.peak.max_pressure, b.contact.peak.max_pressure),
             (
                 "backlash",
                 a.backlash.forward.nominal,
@@ -2012,14 +2044,14 @@ mod tests {
 
         let mut last = f64::INFINITY;
         for clearance in [0.08_f64, 0.04, 0.02, 0.01, 0.005] {
-            let parallel = solve_spur_stage(&stage(0.0, clearance), 2.0, &lib)
+            let parallel = solve_spur_stage(&stage(0.0, clearance), StageTorques::just(2.0), &lib)
                 .expect("a parallel pair")
                 .backlash
                 .forward
                 .nominal;
             // As close to parallel as the screw model will go. The pair is still
             // crossed, so it is still the crossed law answering.
-            let crossed = solve_crossed_stage(&stage(0.001, clearance), 2.0, &lib)
+            let crossed = solve_crossed_stage(&stage(0.001, clearance), StageTorques::just(2.0), &lib)
                 .expect("a crossed pair")
                 .backlash
                 .forward
@@ -2083,12 +2115,12 @@ mod tests {
             ..SpurStage::default()
         };
         let shortfall = |clearance: f64| {
-            let parallel = solve_spur_stage(&stage(0.0, clearance), 2.0, &lib)
+            let parallel = solve_spur_stage(&stage(0.0, clearance), StageTorques::just(2.0), &lib)
                 .expect("a parallel pair")
                 .backlash
                 .forward
                 .nominal;
-            let crossed = solve_crossed_stage(&stage(0.001, clearance), 2.0, &lib)
+            let crossed = solve_crossed_stage(&stage(0.001, clearance), StageTorques::just(2.0), &lib)
                 .expect("a crossed pair")
                 .backlash
                 .forward
@@ -2186,14 +2218,14 @@ mod tests {
         use crate::train::SpurStage;
 
         let lib = super::super::test_library();
-        let reference = solve_spur_stage(&SpurStage::default(), 2.0, &lib).expect("a stage");
+        let reference = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib).expect("a stage");
         for statik in [0.0_f64, 0.06, 0.16, 0.5, 0.9] {
             let r = solve_spur_stage(
                 &SpurStage {
                     static_friction: statik,
                     ..SpurStage::default()
                 },
-                2.0,
+                StageTorques::just(2.0),
                 &lib,
             )
             .expect("a stage");
@@ -2294,7 +2326,7 @@ mod tests {
             ..SpurStage::default()
         };
         let mesh = |sigma: f64, clearance: f64| {
-            solve_crossed_stage(&stage(sigma, clearance), 2.0, &lib)
+            solve_crossed_stage(&stage(sigma, clearance), StageTorques::just(2.0), &lib)
                 .expect("a crossed pair")
                 .crossed
                 .expect("a path of contact")
@@ -2354,10 +2386,10 @@ mod tests {
             sizing: FirstMemberSizing::HelixAngle(45.0),
             ..WormStage::default()
         };
-        let r = solve_worm_stage(&stage, 2.0, &super::super::test_library()).unwrap();
+        let r = solve_worm_stage(&stage, StageTorques::just(2.0), &super::super::test_library()).unwrap();
         assert!((r.ratio - 23.0 / 17.0).abs() < 1e-12);
         assert!(r.efficiency.forward > 0.0 && r.efficiency.forward < 1.0);
-        assert!(r.contact.max_pressure > 0.0);
+        assert!(r.contact.peak.max_pressure > 0.0);
         assert!(!r.efficiency.self_locking());
 
         // **Where a crossed pair sits, stated as comparisons rather than a
@@ -2373,7 +2405,7 @@ mod tests {
                 sizing: FirstMemberSizing::PitchDiameter(7.0),
                 ..WormStage::default()
             },
-            2.0,
+            StageTorques::just(2.0),
             &super::super::test_library(),
         )
         .unwrap();
@@ -2400,7 +2432,7 @@ mod tests {
                     sizing: FirstMemberSizing::HelixAngle(sigma / 2.0),
                     ..WormStage::default()
                 },
-                2.0,
+                StageTorques::just(2.0),
                 &super::super::test_library(),
             )
             .unwrap()

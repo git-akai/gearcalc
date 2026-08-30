@@ -129,8 +129,10 @@ fn train_file_report(path: Option<&str>) {
         train: Train {
             input_speed: 3000.0,
             input_torque: 2.0,
+            back_driving_torque: 0.0,
+            operating_torque: 2.0,
             actuation: Actuation::Continuous {
-                operating_percent: 80.0,
+                operating_speed: 2400.0,
                 runtime_hours: 1000.0,
             },
             stages: vec![
@@ -250,8 +252,10 @@ fn train_report(mixed: bool) {
     let train = Train {
         input_speed: 3000.0,
         input_torque: 2.0,
+        back_driving_torque: 0.0,
+        operating_torque: 2.0,
         actuation: Actuation::Continuous {
-            operating_percent: 80.0,
+            operating_speed: 2400.0,
             runtime_hours: 1000.0,
         },
         stages: if mixed {
@@ -292,8 +296,15 @@ fn train_report(mixed: bool) {
     };
 
     println!(
-        "train  in {:.0} rpm / {:.3} Nm   ->   out {:.1} rpm / {:.3} Nm",
+        "train  in {:.0} rpm / {:.3} Nm peak   ->   out {:.1} rpm / {:.3} Nm peak",
         train.input_speed, train.input_torque, r.output_speed, r.output_torque
+    );
+    println!(
+        "       operating {:.3} Nm{}   back-driving {:.3} Nm at the output",
+        train.cyclic_torque(),
+        r.operating_torque_percent
+            .map_or(String::new(), |p| format!(" ({p:.1} % of peak)")),
+        train.back_driving_torque
     );
     println!(
         "       total ratio {:.4}:1   total efficiency {:.3} % forward / {:.3} % backward{}",
@@ -306,6 +317,9 @@ fn train_report(mixed: bool) {
             ""
         }
     );
+    for n in &r.notes {
+        println!("       note: {}", words().render(n));
+    }
     println!(
         "       backlash at the output shaft  {:.5} deg  (min {:.5}, max {:.5})",
         r.backlash.forward.nominal, r.backlash.forward.minimum, r.backlash.forward.maximum
@@ -352,20 +366,32 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
         100.0 * s.efficiency.backward
     );
     println!(
-        "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>10} {:>9} {:>12}",
-        "gear", "x", "b mm", "torque Nm", "sigma_F", "sigma_H", "rpm", "cycles"
+        "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>21} {:>21} {:>9} {:>21}",
+        "gear",
+        "x",
+        "b mm",
+        "T fwd Nm",
+        "T bwd Nm",
+        "sigma_F peak/cyclic",
+        "sigma_H peak/cyclic",
+        "rpm",
+        "cycles bend/contact"
     );
     for (i, g) in s.gears.iter().enumerate() {
         println!(
-            "  {:<6} {:>8.4} {:>8.3} {:>10.4} {:>6.1} MPa {:>5.1} MPa {:>9.1} {:>12.3e}",
+            "  {:<6} {:>8.4} {:>8.3} {:>10.4} {:>10} {:>9.1} /{:>9.1} {:>9.1} /{:>9.1} {:>9.1} {:>9.3e} /{:>9.3e}",
             i + 1,
             g.profile_shift,
             g.face_width,
             g.torque,
-            g.bending_stress.unwrap_or(f64::NAN),
-            g.contact_stress,
+            g.back_driving_torque.map_or("-".into(), |t| format!("{t:.4}")),
+            g.bending_stress.peak.unwrap_or(f64::NAN),
+            g.bending_stress.cyclic.unwrap_or(f64::NAN),
+            g.contact_stress.peak,
+            g.contact_stress.cyclic,
             g.speed,
-            g.tooth_cycles
+            g.tooth_cycles.bending,
+            g.tooth_cycles.contact
         );
     }
     for n in &s.notes {
@@ -394,17 +420,27 @@ fn print_worm_stage(k: usize, st: &gear_core::train::WormStage, s: &gear_core::t
         }
     );
     println!(
-        "  contact {:.1} MPa   patch {:.4} x {:.4} mm   sliding {:.1} mm/s",
-        s.contact.max_pressure, s.contact.patch_length, s.contact.patch_width, s.sliding_velocity
+        "  contact  peak {:.1} MPa  cyclic {:.1} MPa   patch {:.4} x {:.4} mm   sliding {:.1} mm/s",
+        s.contact.peak.max_pressure,
+        s.contact.cyclic.max_pressure,
+        s.contact.peak.patch_length,
+        s.contact.peak.patch_width,
+        s.sliding_velocity
     );
     println!(
-        "  {:<6} {:>8} {:>10} {:>9} {:>12}   material",
-        "member", "b mm", "torque Nm", "rpm", "cycles"
+        "  {:<6} {:>8} {:>10} {:>10} {:>9} {:>21}   material",
+        "member", "b mm", "T fwd Nm", "T bwd Nm", "rpm", "cycles bend/contact"
     );
     for (name, m) in ["worm", "wheel"].iter().zip(&s.members) {
         println!(
-            "  {name:<6} {:>8.3} {:>10.4} {:>9.1} {:>12.3e}   {}",
-            m.face_width, m.torque, m.speed, m.tooth_cycles, m.material.name
+            "  {name:<6} {:>8.3} {:>10.4} {:>10} {:>9.1} {:>9.3e} /{:>9.3e}   {}",
+            m.face_width,
+            m.torque,
+            m.back_driving_torque.map_or("-".into(), |t| format!("{t:.4}")),
+            m.speed,
+            m.tooth_cycles.bending,
+            m.tooth_cycles.contact,
+            m.material.name
         );
     }
     println!("  bending not reported, flank type ZI - see docs/reference.md#crossed-axes");
@@ -1150,7 +1186,7 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
 
 /// A worm stage end to end: geometry, both directions, contact and backlash.
 fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: f64) {
-    use gear_core::train::{solve_worm_stage, WormMember, WormStage};
+    use gear_core::train::{solve_worm_stage, StageTorques, WormMember, WormStage};
 
     let stage = WormStage {
         starts,
@@ -1163,7 +1199,7 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
         ..WormStage::default()
     };
     let lib = gear_io::default_library();
-    let r = match solve_worm_stage(&stage, torque, &lib) {
+    let r = match solve_worm_stage(&stage, StageTorques::just(torque), &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("cannot solve that stage: {e}");
@@ -1200,7 +1236,7 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
     );
     println!(
         "  contact      {:.1} MPa   patch {:.4} x {:.4} mm",
-        r.contact.max_pressure, r.contact.patch_length, r.contact.patch_width
+        r.contact.peak.max_pressure, r.contact.peak.patch_length, r.contact.peak.patch_width
     );
     println!(
         "  backlash     at the wheel {:.5} deg (min {:.5}, max {:.5})   at the worm {:.5} deg",
@@ -1362,7 +1398,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                 arrangement: Arrangement { input, fixed },
                 ..base.clone()
             };
-            match solve_planetary_stage(&stage, 3000.0, 2.0, &lib) {
+            match solve_planetary_stage(&stage, 3000.0, gear_core::train::StageTorques::just(2.0), &lib) {
                 Err(e) => println!("  {:>7} in, {:>7} held: {e}", name(input), name(fixed)),
                 Ok(r) => {
                     if !shown {
@@ -1385,20 +1421,23 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                         );
                         println!(
                             "sigma_H  sun-planet {:.1} MPa   planet-ring {:.1} MPa",
-                            r.sun_planet.contact_stress, r.planet_ring.contact_stress
+                            r.sun_planet.contact_stress.peak, r.planet_ring.contact_stress.peak
                         );
                         println!(
                             "sigma_F  sun {}   planet {} (reversed, allowable {:.1} MPa)   ring {}",
                             r.sun
                                 .bending_stress
+                                .peak
                                 .map_or_else(|| "-".into(), |v| format!("{v:.1} MPa")),
                             r.planet
                                 .gear
                                 .bending_stress
+                                .peak
                                 .map_or_else(|| "-".into(), |v| format!("{v:.1} MPa")),
                             r.planet.reversed_allowable.value,
                             r.ring
                                 .bending_stress
+                                .peak
                                 .map_or_else(|| "-".into(), |v| format!("{v:.1} MPa")),
                         );
                         println!(
@@ -1423,7 +1462,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
         return;
     }
     let stage = base;
-    if let Ok(r) = solve_planetary_stage(&stage, 3000.0, 2.0, &lib) {
+    if let Ok(r) = solve_planetary_stage(&stage, 3000.0, gear_core::train::StageTorques::just(2.0), &lib) {
         println!();
         for note in &r.notes {
             println!("note: {}", words().render(note));
@@ -1439,7 +1478,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
 /// by tooth count and helix, so `β₁` is what there is to choose. Nothing else
 /// about the pair changes — it is the same screw geometry either way.
 fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
-    use gear_core::train::{solve_worm_stage, FirstMemberSizing, WormStage};
+    use gear_core::train::{solve_worm_stage, FirstMemberSizing, StageTorques, WormStage};
 
     let lib = gear_io::default_library();
     println!(
@@ -1465,7 +1504,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
             println!("{beta1:>7.1} {:>7} — no such pair", shaft_angle - beta1);
             continue;
         };
-        match solve_worm_stage(&stage, 2.0, &lib) {
+        match solve_worm_stage(&stage, StageTorques::just(2.0), &lib) {
             Err(e) => println!(
                 "{beta1:>7.1} {:>7.1}  {e}",
                 g.wheel_helix_angle.to_degrees()
@@ -1480,7 +1519,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
                     g.centre_distance,
                     g.sliding_ratio,
                     r.efficiency.forward * 100.0,
-                    r.contact.max_pressure,
+                    r.contact.peak.max_pressure,
                     r.crossed.as_ref().map_or_else(
                         || "—".to_string(),
                         |c| format!("{:.9}", c.contact_ratio)

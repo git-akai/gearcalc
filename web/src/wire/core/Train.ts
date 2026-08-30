@@ -13,4 +13,22 @@ input_speed: number,
 /**
  * Peak input torque, N·m.
  */
-input_torque: number, actuation: Actuation, stages: Array<Stage>, };
+input_torque: number, 
+/**
+ * Peak torque applied at the **output** shaft, N·m, trying to drive the
+ * train backwards.
+ *
+ * A load case of its own rather than a sign on the input: it enters at the
+ * far end and is attenuated by each stage's *backward* efficiency on the
+ * way up. See [`back_driving_torques`] for where it is reacted, and where
+ * it therefore reaches no number at all.
+ */
+back_driving_torque: number, 
+/**
+ * The torque the train runs at, N·m — the load its fatigue life is spent
+ * against, as opposed to the peak it must merely survive.
+ *
+ * Bounded by [`Self::input_torque`] and meaningful down to and including
+ * **zero**: a train that only ever sees its peak has no cyclic case.
+ */
+operating_torque: number, actuation: Actuation, stages: Array<Stage>, };
