@@ -249,7 +249,7 @@ impl Default for WormStage {
             module: 1.0,
             pressure_angle: 20.0,
             shaft_angle: 90.0,
-            sliding_friction: 0.06,
+            sliding_friction: 0.08,
             static_friction: 0.16,
             thickness_mod: 1.0,
             starts: 1,

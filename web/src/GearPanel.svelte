@@ -808,6 +808,13 @@
     flex-direction: column;
     gap: var(--field-gap);
   }
+  /* The gap inside a group is not the gap *between* groups until it is said so.
+     Type sits in its own group — it decides which fields follow it — and the
+     ring's cutter in a third, so both landed flush against the group below
+     while every other pair of fields was a field-gap apart. */
+  .grid + .grid {
+    margin-top: var(--field-gap);
+  }
   label {
     display: grid;
     grid-template-columns: 1fr 7rem 3.5rem;

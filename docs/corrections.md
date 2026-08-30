@@ -261,6 +261,8 @@ whose units are wrong is wrong however plausible.
 
 | [reference.md#languages](reference.md#languages) | **Forty-odd sentences never became keys at all**, so four languages shipped with English scattered through them | `tools/check_strings.py` holds the catalogue and the sources to each other in both directions — and cannot see a sentence that was never a key, which is the one thing it was there to catch. What was left behind was mostly the *words around* numbers: a stage heading, "driven forward", the "at" before a gear's name, "to" between the ends of a range, a fresh tab's name, the units `rpm` and `MPa` in the places they were typed rather than read from their own keys. Found by sweeping the front end for English rather than by trusting the tool, and the sweep is now what the reference tells the next person to run |
 
+| [reference.md#the-boundary](reference.md#the-boundary) | The gap *inside* a group of fields taken for the gap *between* groups | The gear tab's Type field sits in its own group — it decides which fields follow it — and a ring's cutter in a third, so both sat flush against the group below while every other pair of fields was one field-gap apart. A flex `gap` says nothing about siblings of the container, and the fault is invisible until a group has exactly one member: measured at 0 px against 12 px everywhere else |
+
 ---
 
 ## Process notes

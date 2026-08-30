@@ -86,7 +86,7 @@ caught more in their areas than the suite has.
 | | |
 |---|---|
 | `gear-cli strength 17 43 2.0` | `σ_F` 69.2 / 63.4 MPa · `σ_H` 692.7 MPa · ρ 1.723 mm · η 98.741 % |
-| `gear-cli wormstage 1 40 7 2` | η 68.369 % forward, 0.000 % backward (self-locking) · backlash 0.15512° at the wheel (min 0.11342, max 0.19683), 6.20497° at the worm |
+| `gear-cli wormstage 1 40 7 2` | η 61.805 % forward, 0.000 % backward (self-locking) · backlash 0.15512° at the wheel (min 0.11342, max 0.19683), 6.20497° at the worm |
 
 **The worm canary has moved four times, all deliberately**, and the reasons are
 worth keeping because each was a model change rather than a fix:
@@ -103,6 +103,11 @@ worth keeping because each was a model change rather than a fix:
    two centre distances stayed in their own lanes.
 4. *Backward efficiency to zero*, when static friction arrived. **Forward is
    unchanged**, which is the check that the two coefficients stayed in theirs.
+5. *Efficiency again*, when the default sliding coefficient moved from 0.06 to
+   0.08: 68.369 → 61.805 % forward. Not a model change — the same arithmetic at
+   a different input — and recorded here only because the canary is quoted as a
+   figure. **Backlash did not move**, which is again the two staying in their
+   lanes: a coefficient of friction is not a geometry.
 
 Load cases moved neither canary. Both are single-load reports, and a stage asked
 for one torque answers with the figure it always did — which is the check that
@@ -165,8 +170,11 @@ revolution, verified against a caliper reading off the drawn teeth.
 backlash and cycle accumulation; efficiency and backlash in **both** drive
 directions. Two load cases throughout — a peak against the ultimate allowable
 and a cyclic one against fatigue — with the automatic face width sized from any
-of the four ratings a gear chooses — peak contact excepted, which is offered but
-off. The two gears of a mesh are rated at different points on the path
+of the four ratings a gear chooses. **Neither contact rating is enabled by
+default**: both are computed and shown, but a fresh stage is sized from bending
+alone, so its face width will not satisfy contact until a designer says which
+rating should decide it — the figures are on screen, and the minimum face width
+each rating asks for is beside them. The two gears of a mesh are rated at different points on the path
 — each where its own dedendum is loaded alone — so they carry different contact
 stresses; the shared pitch-point figure is reported at the mesh. An automatic
 width answers to the mesh, not to one gear. A back-driving load applied at the output

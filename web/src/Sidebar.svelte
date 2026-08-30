@@ -259,12 +259,15 @@
     border: 1px solid var(--rule);
     border-radius: 3px;
     background: none;
-    color: var(--muted);
+    /* Read, not skimmed: this is a control someone uses when they cannot read
+       the rest of the page, so it is the last thing that should be set in the
+       muted grey the *notes* use. The affordance moves to the border. */
+    color: var(--fg);
     cursor: pointer;
   }
   .language select:hover,
   .language select:focus {
-    color: var(--fg);
+    border-color: var(--muted);
   }
   /* The picker needs no visible label — a list of language names in their own
      scripts says what it is — but it still needs one to be announced. */

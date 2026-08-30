@@ -524,17 +524,24 @@ impl Default for FaceSources {
                 peak: true,
                 cyclic: true,
             },
-            // **Peak contact is off by default, and is the one of the four that
-            // is.** A Hertzian pressure is not a tensile stress, and the
-            // material library's `ultimate_allowable` is a tensile figure — a
-            // flank under a single overload fails by subsurface shear, which
-            // arrives at a contact pressure well above it. Comparing the two is
-            // arithmetic without a mechanism behind it, so the rating is offered
-            // rather than assumed: a designer who has a contact-pressure limit
-            // in mind can put it in the override and switch this on.
+            // **Neither contact rating sizes a width by default.** Both are
+            // offered and both are computed; what they are not is *assumed*.
+            //
+            // The peak case is the weaker of the two: a Hertzian pressure is not
+            // a tensile stress, and the library's `ultimate_allowable` is a
+            // tensile figure — a flank under a single overload fails by
+            // subsurface shear, at a contact pressure well above it. Comparing
+            // them is arithmetic with no mechanism behind it.
+            //
+            // The cyclic case is sounder — the fatigue allowable is a flank
+            // figure — but it is the one that *dominates*, by an order of
+            // magnitude: on the reference train it asks 8.5 mm where bending
+            // asks 0.9. A default that decides the answer is a default making
+            // the design decision, so both are left to the designer and bending
+            // is what a fresh stage is sized from.
             contact: LoadCase {
                 peak: false,
-                cyclic: true,
+                cyclic: false,
             },
         }
     }
@@ -1559,7 +1566,17 @@ mod tests {
         .into_iter()
         .map(width)
         .collect();
-        let all = width(FaceSources::default());
+        // The law is about what is *enabled*, so it is checked against every
+        // source switched on rather than against the default — which is a
+        // separate decision, and is asserted as one below.
+        let on = LoadCase {
+            peak: true,
+            cyclic: true,
+        };
+        let all = width(FaceSources {
+            bending: on,
+            contact: on,
+        });
         let largest = each.iter().copied().fold(0.0_f64, f64::max);
         assert!((all - largest).abs() < 1e-9, "{all} vs max{each:?}");
 
@@ -1569,6 +1586,19 @@ mod tests {
         assert!(each[1] > each[0] && each[3] > each[2]);
         // Contact governs a lightly loaded steel pair, as it usually does.
         assert!(each[3] > each[1]);
+
+        // **A fresh stage is sized from bending alone.** Both contact ratings
+        // are computed and both are offered; neither decides a width until a
+        // designer says so, because the cyclic one dominates by an order of
+        // magnitude and a default that picks the answer is a default making the
+        // design decision.
+        let d = FaceSources::default();
+        assert_eq!(d.bending, on, "bending is what sizes a fresh stage");
+        assert_eq!(d.contact, off, "neither contact rating is assumed");
+        assert!(
+            (width(d) - each[0].max(each[1])).abs() < 1e-9,
+            "the default width is the bending pair and nothing else"
+        );
 
         // Nothing enabled asks for nothing, which is a degenerate gear rather
         // than a divide by zero.

@@ -157,7 +157,7 @@ impl Default for SpurStage {
             pressure_angle: 20.0,
             shaft_angle: 0.0,
             additional_helix: 0.0,
-            sliding_friction: 0.06,
+            sliding_friction: 0.08,
             static_friction: 0.16,
             thickness_mod: 1.0,
             centre_distance: Auto::automatic(0.0),
