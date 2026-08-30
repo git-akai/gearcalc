@@ -779,7 +779,7 @@ fn strings_impl(language: &str) -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
-/// The languages this build ships, as JSON: `[{ code, name }, …]`.
+/// The languages this build ships, as JSON: `[{ code, name, english }, …]`.
 ///
 /// The **list** crosses the boundary rather than being written in the front end,
 /// for the reason `defaults` and the catalogue itself cross it: a language added
@@ -793,7 +793,7 @@ fn resolve_language_impl(tag: &str) -> String {
 fn languages_impl() -> Result<String, String> {
     let list: Vec<_> = gear_io::strings::LANGUAGES
         .iter()
-        .map(|l| serde_json::json!({ "code": l.code, "name": l.name }))
+        .map(|l| serde_json::json!({ "code": l.code, "name": l.name, "english": l.english_name }))
         .collect();
     serde_json::to_string(&list).map_err(|e| e.to_string())
 }

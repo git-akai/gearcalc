@@ -8,6 +8,7 @@ import {
   defaults,
   defaultLibrary,
   defaultTrain,
+  t,
   type CutterRef,
   FIELDS,
   type GearKind,
@@ -57,7 +58,12 @@ let nextTrainId = 1;
 // docs/corrections.md for what happened when they were written down twice. That is
 // why a tab cannot be built before the core is loaded, and why the two lists
 // below start empty and are filled by `initialise`.
-function freshTab(name = "Gear"): GearTab {
+// The name a tab starts with is the application's word for the thing, so it
+// comes from the catalogue like every other word — a tab made while reading
+// German is called "Zahnrad". It becomes the user's own the moment they type
+// over it, and travels in the exported document as whatever it then says, which
+// is why it is read once here rather than re-read on every render.
+function freshTab(name = t("ui.gear_default_name")): GearTab {
   const d = defaults().gear;
   return {
     id: nextId++,
@@ -160,7 +166,7 @@ export function setKind(tab: GearTab, kind: GearKind) {
 
 export const workspace = new Workspace();
 
-function freshTrain(name = "Geartrain"): TrainTab {
+function freshTrain(name = t("ui.train_default_name")): TrainTab {
   return { id: nextTrainId++, name, train: defaultTrain() };
 }
 

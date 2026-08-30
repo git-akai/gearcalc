@@ -872,9 +872,13 @@ file was added, and the half nobody tests is the half that forgets.
 So `languages()` and `resolve_language()` cross too, and the front end asks
 rather than knows.
 
-**Names are in their own language.** A picker that says "German" and "Chinese
-(Traditional)" is a picker for people who already read English, which is the one
-audience that does not need it.
+**Names are in their own language, with English beside them.** A picker that
+says only "German" and "Chinese (Traditional)" is a picker for people who
+already read English, which is the one audience that does not need it. But a
+reader who has landed in a script they cannot read needs a way *back*, and four
+names none of which they recognise is not one — so the native name leads and the
+English name follows in brackets, as the common index. English itself shows once,
+not twice.
 
 **A missing translation shows English, not a key.** `t()` renders an unknown key
 as the key itself — deliberately, so a half-translated catalogue shows a reader
@@ -885,6 +889,12 @@ where the English sentence carries the whole meaning. So a translated catalogue
 is layered over English rather than replacing it. The safety net is not the
 plan: a test holds every shipped file to English's exact key set, so a
 translation that falls behind fails CI rather than quietly reverting.
+
+**A fresh tab's name is a word the application chose, so it comes from the
+catalogue too.** It stops being one the moment a reader types over it — after
+that it is their document's name, travels in the exported TOML as whatever it
+says, and does not follow a later change of language. Read once at creation for
+exactly that reason.
 
 **The preference outlives the session, and nothing else does.** "Inputs are the
 only state" is about the model: everything that changes an answer is an input,

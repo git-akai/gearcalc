@@ -36,6 +36,13 @@ pub struct Language {
     pub code: &'static str,
     /// The language's name in itself.
     pub name: &'static str,
+    /// ...and in English, shown beside it.
+    ///
+    /// A reader looking for their own language wants the word they call it by,
+    /// which is why [`Self::name`] leads. But a reader who has landed in a
+    /// script they cannot read needs a way *back*, and four names none of which
+    /// they recognise is not one — so English rides along as the common index.
+    pub english_name: &'static str,
     source: &'static str,
 }
 
@@ -95,21 +102,31 @@ pub const LANGUAGES: &[Language] = &[
     Language {
         code: "en",
         name: "English",
+        english_name: "English",
         source: include_str!("../data/strings_en.toml"),
     },
     Language {
         code: "de",
         name: "Deutsch",
+        english_name: "German",
         source: include_str!("../data/strings_de.toml"),
+    },
+    Language {
+        code: "pt",
+        name: "Português",
+        english_name: "Portuguese",
+        source: include_str!("../data/strings_pt.toml"),
     },
     Language {
         code: "zh-Hans",
         name: "简体中文",
+        english_name: "Chinese (Simplified)",
         source: include_str!("../data/strings_zh-Hans.toml"),
     },
     Language {
         code: "zh-Hant",
         name: "繁體中文",
+        english_name: "Chinese (Traditional)",
         source: include_str!("../data/strings_zh-Hant.toml"),
     },
 ];
@@ -362,6 +379,9 @@ mod tests {
             ("de", "de"),
             ("de-CH", "de"),
             ("de-AT", "de"),
+            ("pt", "pt"),
+            ("pt-BR", "pt"),
+            ("pt-PT", "pt"),
             // Chinese is decided by script, and the region usually implies it.
             ("zh", "zh-Hans"),
             ("zh-CN", "zh-Hans"),
@@ -393,12 +413,23 @@ mod tests {
             );
         }
         assert_eq!(Catalogue::for_language("xx").messages(), en.messages());
+        // A file that is still a copy of English would fall back invisibly, so
+        // the gate is on **coverage** rather than on one chosen word: some
+        // messages legitimately survive translation unchanged — "Material" in
+        // Portuguese, "mm" everywhere — and picking a key that happened to be
+        // one of them failed a translation that was fine.
         for lang in LANGUAGES.iter().filter(|l| l.code != "en") {
             let c = Catalogue::for_language(lang.code);
-            assert_ne!(
-                c.get("ui.train_material"),
-                en.get("ui.train_material"),
-                "{} looks untranslated",
+            let differ = en
+                .messages()
+                .iter()
+                .filter(|(k, v)| c.get(k) != Some(v.as_str()))
+                .count();
+            let total = en.messages().len();
+            assert!(
+                differ * 4 >= total * 3,
+                "{}: only {differ} of {total} messages differ from English — \
+                 that is a copy, not a translation",
                 lang.code
             );
         }

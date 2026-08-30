@@ -52,7 +52,9 @@
       <span class="visually-hidden">{t("ui.sidebar_language")}</span>
       <select value={language()} onchange={(e) => setLanguage(e.currentTarget.value)}>
         {#each languages() as l (l.code)}
-          <option value={l.code}>{l.name}</option>
+          <option value={l.code}>
+            {l.name}{l.name === l.english ? "" : ` (${l.english})`}
+          </option>
         {/each}
       </select>
     </label>
@@ -72,7 +74,9 @@
       hidden
     />
     <p class="detail">
-      {library.materials.material.length} materials{library.origin ? ` · ${library.origin}` : ""}
+      {t("ui.sidebar_material_count", { count: String(library.materials.material.length) })}{library.origin
+          ? ` · ${library.origin}`
+          : ""}
     </p>
     {#if library.error}
       <p class="err">{library.error}</p>
@@ -95,7 +99,7 @@
         </li>
       {/each}
     </ul>
-    <button class="add" onclick={() => workspace.create()}>+ New gear</button>
+    <button class="add" onclick={() => workspace.create()}>{t("ui.sidebar_new_gear")}</button>
   </section>
 
   <section>
@@ -109,16 +113,21 @@
             onclick={() => trains.select(tab.id)}
           >
             <span class="name">{tab.name || "Unnamed"}</span>
-            <span class="teeth">{tab.train.stages.length} stage{tab.train.stages.length === 1 ? "" : "s"}</span>
+            <span class="teeth">
+              {t(
+                tab.train.stages.length === 1 ? "ui.sidebar_stage_count_one" : "ui.sidebar_stage_count",
+                { count: String(tab.train.stages.length) },
+              )}
+            </span>
           </button>
         </li>
       {/each}
     </ul>
-    <button class="add" onclick={() => trains.create()}>+ New geartrain</button>
+    <button class="add" onclick={() => trains.create()}>{t("ui.sidebar_new_geartrain")}</button>
   </section>
 
   {#if version}
-    <p class="version">core v{version}</p>
+    <p class="version">{t("ui.sidebar_core_version", { version })}</p>
   {/if}
 </aside>
 

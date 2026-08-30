@@ -1001,11 +1001,11 @@ a stable key and the values its sentence needs — exactly as a clamp does.
 ### Languages
 
 Every word the application shows lives in `crates/gear-io/data/strings_<code>.toml`,
-one file per language, all compiled in. Four ship: `en`, `de`, `zh-Hans`,
+one file per language, all compiled in. Five ship: `en`, `de`, `pt`, `zh-Hans`,
 `zh-Hant`.
 
 ```text
-languages()             what this build ships: [{ code, name }, …], name in itself
+languages()             [{ code, name, english }, …] — the name in itself, and in English
 resolve_language(tag)   which of them a BCP 47 tag names
 strings(tag)            that language's catalogue, filled in from English
 ```
@@ -1017,7 +1017,14 @@ key it lacks shows the English sentence rather than a bare key — a safety net,
 not the plan: a test holds every shipped file to English's exact key set and to
 the same placeholders in each message.
 
-The picker sits at the foot of the sidebar and stores its choice in
+**Nothing the application says is written in the front end**, including the
+words around a number: a stage heading, a gear's name, the two halves of a
+directional efficiency, the word between the ends of a range, and the name a
+fresh tab starts with. `tools/check_strings.py` holds the catalogue and the
+sources to each other in both directions; what it cannot see is a sentence that
+never became a key, so the front end is swept for bare English as well.
+
+The picker sits under the title in the sidebar and stores its choice in
 `localStorage`; it is a preference about reading, not an input to a calculation,
 which is why it may outlive a session when nothing else in the application does.
 Switching needs no reload — `t()` is a reactive read, so refilling the catalogue

@@ -22,7 +22,11 @@ export function setCatalogue(messages: Record<string, string>) {
  *  `gear_wasm::languages` for why it is not written down here as well. */
 export interface LanguageOption {
   code: string;
+  /** The language's name in itself — what a reader looks for. */
   name: string;
+  /** ...and in English, so a reader stranded in a script they cannot read has
+   *  something they can recognise. */
+  english: string;
 }
 
 // **Which words is the same kind of fact as the words**, and arrives at the same

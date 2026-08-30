@@ -163,7 +163,8 @@
     onpointercancel={onUp}
   ></canvas>
   <div class="bar">
-    <label><input type="checkbox" bind:checked={showCircles} /> Reference circles</label>
+    <label><input type="checkbox" bind:checked={showCircles} />
+      {t("ui.viewport_reference_circles")}</label>
     <span class="hint">{t("ui.viewport_drag_pan_scroll_zoom")}</span>
     <button onclick={reset}>{t("ui.viewport_reset_view")}</button>
   </div>

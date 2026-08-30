@@ -108,6 +108,26 @@
 
   const pct = (v: number) => (100 * v).toFixed(3);
   const n = (v: number) => v.toFixed(3);
+  /** "lo to hi" — one shape, so the word between two numbers is written once. */
+  const range = (lo: string, hi: string) => t("ui.range", { lo, hi });
+  /** A planetary shaft's name, from the same key its own option in the
+   *  arrangement selects uses — the readout used to print the wire value, which
+   *  is an identifier and was never English to begin with. */
+  const shaft = (s: string) => t(`ui.train_${s}`);
+  /** A stage or a gear by number. The *word* is a label and belongs in the
+   *  catalogue; the number is a name and does not. Both are written here rather
+   *  than at each of the five places they are read, so a heading and a reference
+   *  to it cannot drift apart. */
+  const stageName = (i: number) => t("ui.train_stage_heading", { number: String(i + 1) });
+  const gearName = (stage: number, which: number) =>
+    t("ui.train_gear_name", { number: String(gearNumber(stage, which)) });
+  /** A mesh efficiency, both ways round. Two keys rather than one sentence: the
+   *  two halves are separated by a bullet the grammar of no language owns. */
+  const bothWays = (e: { forward: number; backward: number }) =>
+    `${t("ui.train_driven_forward", { percent: pct(e.forward) })} · ${t(
+      "ui.train_driven_backward",
+      { percent: pct(e.backward) },
+    )}`;
 
   /** A rating in both load cases, written in the order they are read: what the
    *  part must survive once, then what it must survive for the duty.
@@ -200,7 +220,7 @@
   <dt>{t("ui.train_centre_distance")}</dt>
   <dd>
     {r.centre_distance.toFixed(4)} mm
-    <small>nominal {r.centre_distance_nominal.toFixed(4)}</small>
+    <small>{t("ui.train_nominal_value", { value: r.centre_distance_nominal.toFixed(4) })}</small>
   </dd>
   {#if r.crossed}
     <dt>{t("ui.train_contact_ratio")}</dt>
@@ -211,48 +231,66 @@
       <small>
         {r.crossed.contact_ratio < 1
           ? t("ui.train_note_contact_ratio_below_one")
-          : `pairs in contact · ended by the ${r.crossed.limited_by === "face" ? "face width" : "teeth"}`}
+          : t("ui.train_crossed_pairs_in_contact", {
+              limit: t(
+                r.crossed.limited_by === "face"
+                  ? "ui.train_limited_by_face_width"
+                  : "ui.train_limited_by_teeth",
+              ),
+            })}
         {#if r.crossed.tooth_height_assumed}
-          · a floor: the tooth height is assumed at one module, and an enveloping
-          wheel wraps further than the cylinder this is figured on
+          {t("ui.train_crossed_height_assumed")}
         {/if}
       </small>
     </dd>
   {/if}
   <dt>{t("ui.train_mesh_efficiency")}</dt>
   <dd>
-    {pct(r.efficiency.forward)} % driven forward
-    · {pct(r.efficiency.backward)} % driven backward
+    {bothWays(r.efficiency)}
     {#if r.efficiency.backward <= 0}
       <small class="warn">{t("ui.train_self_locking")}</small>
     {/if}
     {#if r.crossed?.parallel_axis_efficiency != null}
       <small>
-        the same teeth with parallel shafts would give {pct(r.crossed.parallel_axis_efficiency)} %
-        — crossing them is what the difference costs
+        {t("ui.train_parallel_shafts_would_give", {
+          percent: pct(r.crossed.parallel_axis_efficiency),
+        })}
       </small>
     {/if}
   </dd>
   <dt>{t("ui.train_backlash")}</dt>
   <dd>
-    {r.backlash.forward.nominal.toFixed(5)}° at {members[1]}
+    {t("ui.train_backlash_at", {
+      angle: r.backlash.forward.nominal.toFixed(5),
+      member: members[1],
+    })}
     <small
-      >({r.backlash.forward.minimum.toFixed(5)} to {r.backlash.forward.maximum.toFixed(5)})</small
+      >({range(r.backlash.forward.minimum.toFixed(5), r.backlash.forward.maximum.toFixed(5))})</small
     >
-    · {r.backlash.backward.nominal.toFixed(5)}° at {members[0]}
+    · {t("ui.train_backlash_at", {
+      angle: r.backlash.backward.nominal.toFixed(5),
+      member: members[0],
+    })}
   </dd>
   <dt>{t("ui.train_self_locks_at")}</dt>
   <dd>{r.self_locking_friction.toFixed(4)}</dd>
   <dt>{t("ui.train_contact_stress")}</dt>
   <dd>
-    {cases({ peak: r.contact.peak.max_pressure, cyclic: r.contact.cyclic.max_pressure }, 1)} MPa
+    {cases({ peak: r.contact.peak.max_pressure, cyclic: r.contact.cyclic.max_pressure }, 1)} {t("ui.train_mpa")}
     <small>{t("ui.train_peak_cyclic")}</small>
     <small>
-      patch {r.contact.peak.patch_length.toFixed(4)} × {r.contact.peak.patch_width.toFixed(4)} mm ·
+      {t("ui.train_patch", {
+        length: r.contact.peak.patch_length.toFixed(4),
+        width: r.contact.peak.patch_width.toFixed(4),
+      })} ·
       {Math.abs(r.contact.peak.worst_position) < 1e-9
         ? t("ui.train_worst_at_pitch_point")
-        : `worst ${r.contact.peak.worst_position.toFixed(3)} mm along the path, where one tooth carries it alone`}
-      · the pitch point alone gives {r.contact.peak.at_pitch_point.toFixed(1)}
+        : t("ui.train_worst_along_the_path", {
+            position: r.contact.peak.worst_position.toFixed(3),
+          })}
+      · {t("ui.train_pitch_point_alone_gives", {
+        stress: r.contact.peak.at_pitch_point.toFixed(1),
+      })}
     </small>
   </dd>
   <dt>{t("ui.train_sliding_speed")}</dt>
@@ -263,7 +301,7 @@
   </dd>
   <dt>{t("ui.train_flank_type")}</dt>
   <dd>
-    ZI (involute helicoid)
+    {t("ui.train_flank_type_zi")}
     <small>{t("ui.train_zn_worm_s_contact_stress_1")}</small>
   </dd>
   {#if r.crossed}
@@ -463,7 +501,7 @@
         <dd>{g.back_driving_torque.toFixed(4)} Nm</dd>
       {/if}
       <dt>{t("ui.train_speed")}</dt>
-      <dd>{g.speed.toFixed(1)} rpm</dd>
+      <dd>{g.speed.toFixed(1)} {t("ui.train_rpm")}</dd>
       <dt>{t("ui.train_tooth_cycles")}</dt>
       <dd>
         {g.tooth_cycles.bending.toLocaleString()} / {g.tooth_cycles.contact.toLocaleString()}
@@ -471,7 +509,7 @@
       </dd>
       <dt>{t("ui.train_bending_stress")}</dt>
       <dd>
-        {cases(g.bending_stress, 1)} MPa
+        {cases(g.bending_stress, 1)} {t("ui.train_mpa")}
         <small>{t("ui.train_peak_cyclic")}</small>
       </dd>
       <!-- Per gear, and genuinely so. The two flanks share one pressure at any
@@ -481,7 +519,7 @@
            is where its pitting is assessed. -->
       <dt>{t("ui.train_contact_stress")}</dt>
       <dd>
-        {cases(g.contact_stress, 1)} MPa
+        {cases(g.contact_stress, 1)} {t("ui.train_mpa")}
         <small>{t("ui.train_peak_cyclic")}</small>
       </dd>
       <dt>{t("ui.train_min_face_width")}</dt>
@@ -557,10 +595,10 @@
 />
 
 {#if trains.importError}
-  <p class="error">Import failed: {trains.importError}</p>
+  <p class="error">{t("ui.train_import_failed", { reason: trains.importError })}</p>
 {/if}
 {#if exportError}
-  <p class="error">Export failed: {exportError}</p>
+  <p class="error">{t("ui.train_export_failed", { reason: exportError })}</p>
 {/if}
 
 {#if confirmingDelete}
@@ -604,10 +642,10 @@
       <span>{t("ui.train_actuation")}</span>
       <div class="segmented">
         <button class:on={mode === "intermittent"} onclick={() => setMode("intermittent")}>
-          Intermittent
+          {t("ui.train_intermittent")}
         </button>
         <button class:on={mode === "continuous"} onclick={() => setMode("continuous")}>
-          Continuous
+          {t("ui.train_continuous")}
         </button>
       </div>
     </div>
@@ -697,13 +735,12 @@
           : `1 : ${(1 / result.ok.total_ratio).toFixed(4)}`}
         </dd>
         <dt>{t("ui.train_output_speed_peak")}</dt>
-        <dd>{result.ok.output_speed.toFixed(1)} rpm</dd>
+        <dd>{result.ok.output_speed.toFixed(1)} {t("ui.train_rpm")}</dd>
         <dt>{t("ui.train_output_torque_peak")}</dt>
         <dd>{result.ok.output_torque.toFixed(4)} Nm</dd>
         <dt>{t("ui.train_total_efficiency")}</dt>
         <dd>
-        {pct(result.ok.total_efficiency.forward)} % driven forward
-        · {pct(result.ok.total_efficiency.backward)} % driven backward
+        {bothWays(result.ok.total_efficiency)}
         {#if result.ok.total_efficiency.backward <= 0}
           <small class="warn">{t("ui.train_cannot_be_back_driven")}</small>
         {/if}
@@ -712,18 +749,14 @@
         <dd>
         {result.ok.backlash.forward.nominal.toFixed(5)}°
         <small
-          >({result.ok.backlash.forward.minimum.toFixed(5)} to {result.ok.backlash.forward.maximum.toFixed(
-            5,
-          )})</small
+          >({range(result.ok.backlash.forward.minimum.toFixed(5), result.ok.backlash.forward.maximum.toFixed(5))})</small
         >
         </dd>
         <dt>{t("ui.train_backlash_at_input_shaft")}</dt>
         <dd>
           {result.ok.backlash.backward.nominal.toFixed(5)}°
           <small
-            >({result.ok.backlash.backward.minimum.toFixed(5)} to {result.ok.backlash.backward.maximum.toFixed(
-              5,
-            )})</small
+            >({range(result.ok.backlash.backward.minimum.toFixed(5), result.ok.backlash.backward.maximum.toFixed(5))})</small
           >
         </dd>
       </dl>
@@ -753,7 +786,7 @@
         {@const xres = res && res.kind === "worm" ? res : null}
         <button class="head" onclick={() => (open[i] = !open[i])}>
           <span class="caret">{open[i] ? "▾" : "▸"}</span>
-          <strong>Stage {i + 1}</strong>
+          <strong>{stageName(i)}</strong>
           {#if stage.shaft_angle !== 0}
             <span class="kind">{t("ui.train_crossed")}</span>
           {/if}
@@ -889,7 +922,7 @@
                     <dd>{xres.members[j].back_driving_torque.toFixed(4)} N·m</dd>
                   {/if}
                   <dt>{t("ui.train_speed")}</dt>
-                  <dd>{xres.members[j].speed.toFixed(1)} rpm</dd>
+                  <dd>{xres.members[j].speed.toFixed(1)} {t("ui.train_rpm")}</dd>
                   <dt>{t("ui.train_tooth_cycles")}</dt>
                   <dd>
                     {xres.members[j].tooth_cycles.bending.toLocaleString()} / {xres.members[
@@ -915,7 +948,7 @@
             <div class="gears">
               {#each stage.gears as gear, j (j)}
                 {@const g = sres?.gears[j]}
-                {@render gearCard(`Gear ${gearNumber(i, j)}`, gear, g, {
+                {@render gearCard(gearName(i, j), gear, g, {
                   cut: "rack",
                   faceAuto: stage.shaft_angle === 0,
                   faceFromContinuity: xres?.crossed?.face_width_for_continuity?.[j],
@@ -926,7 +959,7 @@
             </div>
 
             {#if xres}
-              {@render screwReadout(xres, [`gear ${gearNumber(i, 0)}`, `gear ${gearNumber(i, 1)}`])}
+              {@render screwReadout(xres, [gearName(i, 0), gearName(i, 1)])}
               {#if xres.notes.length}
                 <ul class="notes">
                   {#each xres.notes as n (n.key)}<li>{note(n)}</li>{/each}
@@ -939,7 +972,7 @@
                 <dt>{t("ui.train_centre_distance")}</dt>
                 <dd>
                   {sres.centre_distance.toFixed(4)} mm
-                  <small>nominal {sres.centre_distance_nominal.toFixed(4)}</small>
+                  <small>{t("ui.train_nominal_value", { value: sres.centre_distance_nominal.toFixed(4) })}</small>
                 </dd>
                 <dt>{t("ui.train_contact_ratio")}</dt>
                 <dd>
@@ -955,24 +988,27 @@
                      its card and is this or worse. -->
                 <dt>{t("ui.train_contact_stress_at_pitch_point")}</dt>
                 <dd>
-                  {cases(sres.contact_stress_at_pitch_point, 1)} MPa
+                  {cases(sres.contact_stress_at_pitch_point, 1)} {t("ui.train_mpa")}
                   <small>{t("ui.train_peak_cyclic")}</small>
                   <small>ρ {sres.relative_radius.toFixed(3)} mm</small>
                 </dd>
                 <dt>{t("ui.train_mesh_efficiency")}</dt>
                 <dd>
-                  {pct(sres.efficiency.forward)} % driven forward
-                  · {pct(sres.efficiency.backward)} % driven backward
+                  {bothWays(sres.efficiency)}
                 </dd>
                 <dt>{t("ui.train_backlash")}</dt>
                 <dd>
-                  {sres.backlash.forward.nominal.toFixed(5)}° at gear {gearNumber(i, 1)}
+                  {t("ui.train_backlash_at", {
+                    angle: sres.backlash.forward.nominal.toFixed(5),
+                    member: gearName(i, 1),
+                  })}
                   <small
-                    >({sres.backlash.forward.minimum.toFixed(5)} to {sres.backlash.forward.maximum.toFixed(
-                      5,
-                    )})</small
+                    >({range(sres.backlash.forward.minimum.toFixed(5), sres.backlash.forward.maximum.toFixed(5))})</small
                   >
-                  · {sres.backlash.backward.nominal.toFixed(5)}° at gear {gearNumber(i, 0)}
+                  · {t("ui.train_backlash_at", {
+                    angle: sres.backlash.backward.nominal.toFixed(5),
+                    member: gearName(i, 0),
+                  })}
                 </dd>
                 <dt>{t("ui.train_coprime")}</dt>
                 <dd>{sres.coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
@@ -995,7 +1031,7 @@
         {@const wres = res && res.kind === "worm" ? res : null}
         <button class="head" onclick={() => (open[i] = !open[i])}>
           <span class="caret">{open[i] ? "▾" : "▸"}</span>
-          <strong>Stage {i + 1}</strong>
+          <strong>{stageName(i)}</strong>
           <span class="kind">{t("ui.train_worm")}</span>
           <span class="teeth">z {stage.starts} / {stage.wheel_teeth}</span>
           {#if wres}
@@ -1142,9 +1178,10 @@
                 {/if}
                 {#if wres?.members[0].recommended_face_width != null}
                   <p class="convention">
-                    automatic uses {wres.members[0].recommended_face_width?.toFixed(2)} mm —
-                    <code>(11 + 0.06 z₂) m_x</code> for one to three starts, DIN/ČSN practice. A
-                    proportion, not a derivation: it sizes the part and enters no stress here.
+                    {t("ui.train_note_proportions", {
+                      width: wres.members[0].recommended_face_width?.toFixed(2) ?? "",
+                      formula: "(11 + 0.06 z₂) m_x",
+                    })}
                   </p>
                 {/if}
                 <label>
@@ -1164,7 +1201,7 @@
                     <dt>{t("ui.train_torque")}</dt>
                     <dd>{wres.members[0].torque.toFixed(4)} N·m</dd>
                     <dt>{t("ui.train_speed")}</dt>
-                    <dd>{wres.members[0].speed.toFixed(1)} rpm</dd>
+                    <dd>{wres.members[0].speed.toFixed(1)} {t("ui.train_rpm")}</dd>
                   </dl>
                 {/if}
               </div>
@@ -1204,7 +1241,7 @@
                     <dt>{t("ui.train_torque")}</dt>
                     <dd>{wres.members[1].torque.toFixed(4)} N·m</dd>
                     <dt>{t("ui.train_speed")}</dt>
-                    <dd>{wres.members[1].speed.toFixed(1)} rpm</dd>
+                    <dd>{wres.members[1].speed.toFixed(1)} {t("ui.train_rpm")}</dd>
                   </dl>
                 {/if}
               </div>
@@ -1230,7 +1267,7 @@
         {@const pres = res && res.kind === "planetary" ? res : null}
         <button class="head" onclick={() => (open[i] = !open[i])}>
           <span class="caret">{open[i] ? "▾" : "▸"}</span>
-          <strong>Stage {i + 1}</strong>
+          <strong>{stageName(i)}</strong>
           <span class="kind">{t("ui.train_planetary")}</span>
           <span class="teeth">z {stage.sun.teeth} / {stage.planet.teeth} / {stage.ring.teeth}</span>
           {#if pres}
@@ -1376,13 +1413,21 @@
                   <dt>{t("ui.train_bending")}</dt>
                   <dd>
                     {t(pres.planet.fully_reversed ? "ui.train_fully_reversed" : "ui.train_one_way")}
-                    <small>allowable {pres.planet.reversed_allowable.value.toFixed(0)} MPa</small>
+                    <small>
+                      {t("ui.train_allowable", {
+                        stress: pres.planet.reversed_allowable.value.toFixed(0),
+                      })}
+                    </small>
                     <small>{t("ui.train_note_reversed_allowable_is_the_cyclic_one")}</small>
                   </dd>
                   <dt>{t("ui.train_speed")}</dt>
                   <dd>
-                    {pres.planet.speed_absolute.toFixed(1)} rpm
-                    <small>{pres.planet.speed_relative.toFixed(1)} relative to the carrier</small>
+                    {pres.planet.speed_absolute.toFixed(1)} {t("ui.train_rpm")}
+                    <small>
+                      {t("ui.train_relative_to_the_carrier", {
+                        speed: pres.planet.speed_relative.toFixed(1),
+                      })}
+                    </small>
                   </dd>
                 </dl>
               {/if}
@@ -1406,29 +1451,40 @@
                 <dt>{t("ui.train_ratio")}</dt>
                 <dd>
                   {pres.ratio.toFixed(4)} : 1
-                  <small>{pres.arrangement.input} in · {pres.arrangement.fixed} held · {pres.output} out</small>
+                  <small>
+                    {t("ui.train_in_held_out", {
+                      input: shaft(pres.arrangement.input),
+                      held: shaft(pres.arrangement.fixed),
+                      output: shaft(pres.output),
+                    })}
+                  </small>
                 </dd>
                 <dt>{t("ui.train_centre_distance")}</dt>
                 <dd>
                   {pres.centre_distance.toFixed(4)} mm
                   <small>
-                    common to both meshes — the planet's shift is what makes them agree, to
-                    {pres.planet.shift_residual.toExponential(1)} mm
+                    {t("ui.train_common_to_both_meshes", {
+                      residual: pres.planet.shift_residual.toExponential(1),
+                    })}
                   </small>
                 </dd>
                 <dt>{t("ui.train_efficiency")}</dt>
                 <dd>
-                  {pct(pres.efficiency.forward)} % driven forward · {pct(pres.efficiency.backward)} %
-                  driven backward
-                  <small>fixed-carrier η₀ {pct(pres.fixed_carrier_efficiency.forward)} %</small>
+                  {bothWays(pres.efficiency)}
+                  <small>
+                    {t("ui.train_fixed_carrier_efficiency", {
+                      percent: pct(pres.fixed_carrier_efficiency.forward),
+                    })}
+                  </small>
                 </dd>
                 <dt>{t("ui.train_backlash")}</dt>
                 <dd>
-                  {pres.backlash.forward.nominal.toFixed(5)}° at the {pres.output} shaft
+                  {t("ui.train_at_the_shaft", {
+                    angle: pres.backlash.forward.nominal.toFixed(5),
+                    shaft: shaft(pres.output),
+                  })}
                   <small
-                    >({pres.backlash.forward.minimum.toFixed(5)} to {pres.backlash.forward.maximum.toFixed(
-                      5,
-                    )})</small
+                    >({range(pres.backlash.forward.minimum.toFixed(5), pres.backlash.forward.maximum.toFixed(5))})</small
                   >
                 </dd>
                 <dt>{t("ui.train_planet_clearance")}</dt>
@@ -1474,12 +1530,11 @@
                   </dd>
                   <dt>{t("ui.train_mesh_efficiency")}</dt>
                   <dd>
-                    {pct(m.efficiency.forward)} % driven forward · {pct(m.efficiency.backward)} %
-                    driven backward
+                    {bothWays(m.efficiency)}
                   </dd>
                   <dt>{t("ui.train_contact_stress_at_pitch_point")}</dt>
                   <dd>
-                    {cases(m.contact_stress_at_pitch_point, 1)} MPa
+                    {cases(m.contact_stress_at_pitch_point, 1)} {t("ui.train_mpa")}
                     <small>{t("ui.train_peak_cyclic")}</small>
                     <small>ρ {m.relative_radius.toFixed(3)} mm</small>
                   </dd>
@@ -1711,9 +1766,6 @@
     font-size: 0.72rem;
     line-height: 1.4;
     color: var(--muted);
-  }
-  .convention code {
-    font-size: 0.72rem;
   }
   .out {
     display: grid;

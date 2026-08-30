@@ -44,7 +44,7 @@
   <Sidebar version={loaded ? coreVersion() : null} />
   <main>
     {#if failed}
-      <p class="error">The calculation core failed to load: {failed}</p>
+      <p class="error">{t("ui.app_core_failed", { reason: failed })}</p>
     {:else if !loaded}
       <p class="muted">{t("ui.app_loading_core")}</p>
     {:else}

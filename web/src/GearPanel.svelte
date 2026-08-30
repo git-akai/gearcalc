@@ -132,6 +132,8 @@
   }
 
   const n = (v: number) => v.toFixed(3);
+  /** "lo to hi" — one shape, so the word between two numbers is written once. */
+  const range = (lo: string, hi: string) => t("ui.range", { lo, hi });
   /** What a measurement takes around the revolution, where that is more than one
    *  value.
    *
@@ -605,35 +607,35 @@
           </dd>
           <dt>{t("ui.gear_tip_diameter")}</dt>
           <dd>
-            {n(2 * s.variation.tip_radius[0])} to {n(2 * s.variation.tip_radius[1])} mm
+            {range(n(2 * s.variation.tip_radius[0]), n(2 * s.variation.tip_radius[1]))} mm
             <small>{t("ui.gear_what_teeth_reach_short_2e_odd")}</small>
           </dd>
           <dt>{t("ui.gear_root_diameter")}</dt>
           <dd>
-            {n(2 * s.variation.root_radius[0])} to {n(2 * s.variation.root_radius[1])} mm
+            {range(n(2 * s.variation.root_radius[0]), n(2 * s.variation.root_radius[1]))} mm
           </dd>
           <dt>{t("ui.gear_tooth_thickness")}</dt>
           <dd>
-            {n(s.variation.tooth_thickness[0])} to {n(s.variation.tooth_thickness[1])} mm
+            {range(n(s.variation.tooth_thickness[0]), n(s.variation.tooth_thickness[1]))} mm
             <small>
-              at the base circle {n(s.variation.base_thickness[0])} to {n(
-                s.variation.base_thickness[1],
-              )} mm
+              {t("ui.gear_at_the_base_circle", {
+                lo: n(s.variation.base_thickness[0]),
+                hi: n(s.variation.base_thickness[1]),
+              })}
             </small>
           </dd>
           <dt>{t("ui.gear_pitch_error_drive")}</dt>
           <dd>
             {um(1e3 * s.variation.drive_pitch_error)}
             <small>
-              accumulated {um(1e3 * s.variation.drive_index_error)} · scales |1 − λ|
+              {t("ui.gear_accumulated_drive", { value: um(1e3 * s.variation.drive_index_error) })}
             </small>
           </dd>
           <dt>{t("ui.gear_pitch_error_coast")}</dt>
           <dd>
             {um(1e3 * s.variation.coast_pitch_error)}
             <small>
-              accumulated {um(1e3 * s.variation.coast_index_error)} · scales |1 + λ| — reversing the
-              drive makes these the driving flanks
+              {t("ui.gear_accumulated_coast", { value: um(1e3 * s.variation.coast_index_error) })}
             </small>
           </dd>
         </dl>
@@ -646,7 +648,7 @@
           <dl>
             <dt>{t("ui.gear_centre_distance")}</dt>
             <dd>
-              {n(p.range[0])} to {n(p.range[1])} mm
+              {range(n(p.range[0]), n(p.range[1]))} mm
               <small>{t("ui.gear_zero_backlash_at_each_tooth")}</small>
             </dd>
             <dt>{t("ui.gear_best_fit_sinusoid")}</dt>
@@ -664,7 +666,7 @@
             <dt>{t("ui.gear_backlash_a_crank_leaves")}</dt>
             <dd>
               <span class:warn={p.sinusoid_backlash[0] < 0}>
-                {um(1e3 * p.sinusoid_backlash[0])} to {um(1e3 * p.sinusoid_backlash[1])}
+                {range(um(1e3 * p.sinusoid_backlash[0]), um(1e3 * p.sinusoid_backlash[1]))}
               </span>
               <small>{t("ui.gear_negative_is_interference_not_slack")}</small>
             </dd>
