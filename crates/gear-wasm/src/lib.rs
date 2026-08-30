@@ -774,9 +774,28 @@ fn default_materials_impl() -> Result<String, String> {
 /// value that was written down in both languages drifted, and only the side
 /// without tests was wrong. A string catalogue is that trap with thirty more
 /// entries.
-fn strings_impl() -> Result<String, String> {
-    serde_json::to_string(gear_io::strings::Catalogue::english().messages())
+fn strings_impl(language: &str) -> Result<String, String> {
+    serde_json::to_string(gear_io::strings::Catalogue::for_language(language).messages())
         .map_err(|e| e.to_string())
+}
+
+/// The languages this build ships, as JSON: `[{ code, name }, …]`.
+///
+/// The **list** crosses the boundary rather than being written in the front end,
+/// for the reason `defaults` and the catalogue itself cross it: a language added
+/// here would otherwise need remembering there too, and the half nobody tests is
+/// the half that forgets. Each name is in its own language, because a reader
+/// looking for theirs is looking for the word they call it by.
+fn resolve_language_impl(tag: &str) -> String {
+    gear_io::strings::Language::resolve(tag).code.to_string()
+}
+
+fn languages_impl() -> Result<String, String> {
+    let list: Vec<_> = gear_io::strings::LANGUAGES
+        .iter()
+        .map(|l| serde_json::json!({ "code": l.code, "name": l.name }))
+        .collect();
+    serde_json::to_string(&list).map_err(|e| e.to_string())
 }
 
 /// The commanded centre distance, when there is a mate to command it against.
@@ -1001,14 +1020,40 @@ pub fn defaults() -> Result<String, JsError> {
     defaults_impl().map_err(|e| JsError::new(&e))
 }
 
-/// The string catalogue, as JSON. See [`strings_impl`].
+/// The string catalogue for a language tag, as JSON. See [`strings_impl`].
+///
+/// An unknown tag answers with English rather than an error: a language
+/// preference is not an engineering input, and a stale one stored in a browser
+/// should leave a working application rather than a blank one.
 ///
 /// # Errors
 ///
 /// Only if the catalogue cannot be encoded, which would be a build-time defect.
 #[wasm_bindgen]
-pub fn strings() -> Result<String, JsError> {
-    strings_impl().map_err(|e| JsError::new(&e))
+pub fn strings(language: &str) -> Result<String, JsError> {
+    strings_impl(language).map_err(|e| JsError::new(&e))
+}
+
+/// The languages this build ships. See [`languages_impl`].
+///
+/// # Errors
+///
+/// Only if the list cannot be encoded, which would be a build-time defect.
+#[wasm_bindgen]
+pub fn languages() -> Result<String, JsError> {
+    languages_impl().map_err(|e| JsError::new(&e))
+}
+
+/// Which shipped language a BCP 47 tag should be read in — `zh-TW` answers
+/// `zh-Hant`, `de-CH` answers `de`, anything unknown answers `en`.
+///
+/// Exposed so the picker can show the option actually in force, and so the
+/// mapping from a browser's `navigator.language` lives beside the language list
+/// rather than being written down a second time in TypeScript.
+#[wasm_bindgen]
+#[must_use]
+pub fn resolve_language(tag: &str) -> String {
+    resolve_language_impl(tag)
 }
 
 #[wasm_bindgen]

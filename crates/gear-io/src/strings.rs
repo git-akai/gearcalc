@@ -2,8 +2,9 @@
 //!
 //! `gear-core` emits [`Note`]s — a key and the values a message needs — and this
 //! turns them into a sentence. The sentences are in `data/strings_<code>.toml`,
-//! one file per language, and English is compiled in so a build with no files on
-//! disk still speaks.
+//! one file per language, all of them compiled in: a language nobody can select
+//! is not shipped, and a file loaded from disk at run time would be a fourth
+//! place a message could go missing.
 //!
 //! # Why the catalogue is here and not in the front end
 //!
@@ -24,8 +25,97 @@
 use gear_core::note::Note;
 use std::collections::BTreeMap;
 
+/// A language the application can be read in.
+///
+/// The **native** name is what appears in the picker, because a reader looking
+/// for their own language is looking for the word they call it by — a list that
+/// says "German" is a list for people who already read English.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Language {
+    /// BCP 47 tag: what a caller asks for, and what a preference is stored as.
+    pub code: &'static str,
+    /// The language's name in itself.
+    pub name: &'static str,
+    source: &'static str,
+}
+
+impl Language {
+    /// The language a BCP 47 tag should be read in.
+    ///
+    /// **Matching lives here rather than in the browser** for the reason the
+    /// list does: a tag like `zh-TW` names a script this file knows about and a
+    /// front end would have to be told about separately. Three steps, widest
+    /// last:
+    ///
+    /// 1. the tag names a shipped language outright — `de`, `zh-Hant`;
+    /// 2. it is Chinese, where the *script* is what decides and the region
+    ///    usually implies it: Taiwan, Hong Kong and Macau read traditional,
+    ///    everywhere else simplified;
+    /// 3. its primary subtag matches one — `de-CH` and `de-AT` are both German
+    ///    here, which is a claim about this catalogue's vocabulary rather than
+    ///    about the languages.
+    ///
+    /// Anything else is English, because a preference nobody can honour should
+    /// leave a working application. Tags are compared case-insensitively: they
+    /// are conventionally cased but not required to be.
+    #[must_use]
+    pub fn resolve(tag: &str) -> &'static Self {
+        let tag = tag.to_ascii_lowercase();
+        let mut parts = tag.split('-');
+        let primary = parts.next().unwrap_or_default();
+        let rest: Vec<&str> = parts.collect();
+
+        let by_code = |want: &str| {
+            LANGUAGES
+                .iter()
+                .find(|l| l.code.eq_ignore_ascii_case(want))
+                .unwrap_or(&LANGUAGES[0])
+        };
+        if let Some(exact) = LANGUAGES
+            .iter()
+            .find(|l| l.code.to_ascii_lowercase() == tag)
+        {
+            return exact;
+        }
+        if primary == "zh" {
+            let traditional = rest
+                .iter()
+                .any(|p| matches!(*p, "hant" | "tw" | "hk" | "mo"));
+            return by_code(if traditional { "zh-Hant" } else { "zh-Hans" });
+        }
+        LANGUAGES
+            .iter()
+            .find(|l| l.code.split('-').next() == Some(primary))
+            .unwrap_or(&LANGUAGES[0])
+    }
+}
+
+/// Every language shipped. English is first and is the fallback.
+pub const LANGUAGES: &[Language] = &[
+    Language {
+        code: "en",
+        name: "English",
+        source: include_str!("../data/strings_en.toml"),
+    },
+    Language {
+        code: "de",
+        name: "Deutsch",
+        source: include_str!("../data/strings_de.toml"),
+    },
+    Language {
+        code: "zh-Hans",
+        name: "简体中文",
+        source: include_str!("../data/strings_zh-Hans.toml"),
+    },
+    Language {
+        code: "zh-Hant",
+        name: "繁體中文",
+        source: include_str!("../data/strings_zh-Hant.toml"),
+    },
+];
+
 /// English, compiled in. A build always has one language.
-const EN: &str = include_str!("../data/strings_en.toml");
+const EN: &str = LANGUAGES[0].source;
 
 /// A language's messages, flattened to `section.key`.
 #[derive(Clone, Debug, Default)]
@@ -91,6 +181,33 @@ impl Catalogue {
     #[must_use]
     pub fn english() -> Self {
         Self::parse(EN).expect("the compiled-in English catalogue must parse")
+    }
+
+    /// The catalogue for a language tag, **filled in from English**.
+    ///
+    /// An unknown tag gives English rather than an error: a language preference
+    /// is not an engineering input, and a reader who arrives with one this build
+    /// does not ship should get a working application rather than a refusal.
+    ///
+    /// Every key English has, this has — a translation that falls behind shows
+    /// the English sentence rather than a bare key, which is the failure a
+    /// reader can actually act on. A test holds every shipped file to the full
+    /// key set, so the fallback is a safety net rather than the plan.
+    ///
+    /// # Panics
+    ///
+    /// Never in a shipped build, for the reason [`Self::english`] gives: every
+    /// file is parsed by the test suite.
+    #[must_use]
+    pub fn for_language(tag: &str) -> Self {
+        let mut base = Self::english();
+        let lang = Language::resolve(tag);
+        if lang.code == LANGUAGES[0].code {
+            return base;
+        }
+        let translated = Self::parse(lang.source).expect("every compiled-in catalogue must parse");
+        base.messages.extend(translated.messages);
+        base
     }
 
     /// The raw messages, for handing to a front end whole.
@@ -177,6 +294,114 @@ mod tests {
             c.messages().len()
         );
         assert!(c.get("stage.self_locking").is_some());
+    }
+
+    /// **Every shipped language says everything English says, and nothing more.**
+    ///
+    /// A translation is allowed to fall behind at run time — `for_language`
+    /// fills the gap from English, because a reader would rather meet an English
+    /// sentence than a bare key. But falling behind is not allowed to *ship*: a
+    /// missing key here is a message nobody will ever see in that language and
+    /// nobody will ever notice, and an invented one is a message the code cannot
+    /// reach. Both are caught here rather than discovered by a reader.
+    ///
+    /// Placeholders are held to the same standard. A translator may move
+    /// `{name}` wherever the grammar wants it; inventing one silently produces
+    /// a sentence with a brace in it, and dropping one silently loses the number
+    /// the sentence existed to carry.
+    #[test]
+    fn every_language_carries_the_whole_catalogue() {
+        let en = Catalogue::english();
+        let placeholders = |text: &str| -> std::collections::BTreeSet<String> {
+            let mut out = std::collections::BTreeSet::new();
+            let mut rest = text;
+            while let Some(open) = rest.find('{') {
+                let after = &rest[open + 1..];
+                let Some(close) = after.find('}') else { break };
+                out.insert(after[..close].to_string());
+                rest = &after[close + 1..];
+            }
+            out
+        };
+
+        for lang in LANGUAGES {
+            let c = Catalogue::parse(lang.source)
+                .unwrap_or_else(|e| panic!("{} does not parse: {e}", lang.code));
+            let (mine, theirs): (Vec<_>, Vec<_>) = (
+                en.messages().keys().collect(),
+                c.messages().keys().collect(),
+            );
+            assert_eq!(
+                mine, theirs,
+                "{} does not have exactly English's keys",
+                lang.code
+            );
+            for (key, english) in en.messages() {
+                let translated = &c.messages()[key];
+                assert_eq!(
+                    placeholders(english),
+                    placeholders(translated),
+                    "{}: {key} does not use the same placeholders as English",
+                    lang.code
+                );
+                assert!(
+                    !translated.trim().is_empty(),
+                    "{}: {key} is empty",
+                    lang.code
+                );
+            }
+        }
+    }
+
+    /// A browser's tag reaches the language it names, or English.
+    #[test]
+    fn a_language_tag_resolves_to_the_catalogue_it_names() {
+        for (tag, want) in [
+            ("en", "en"),
+            ("EN-gb", "en"),
+            ("de", "de"),
+            ("de-CH", "de"),
+            ("de-AT", "de"),
+            // Chinese is decided by script, and the region usually implies it.
+            ("zh", "zh-Hans"),
+            ("zh-CN", "zh-Hans"),
+            ("zh-Hans", "zh-Hans"),
+            ("zh-SG", "zh-Hans"),
+            ("zh-TW", "zh-Hant"),
+            ("zh-HK", "zh-Hant"),
+            ("zh-Hant", "zh-Hant"),
+            ("zh-Hant-TW", "zh-Hant"),
+            // ...and anything this build does not ship reads in English.
+            ("fr", "en"),
+            ("xx-Nowhere", "en"),
+            ("", "en"),
+        ] {
+            assert_eq!(Language::resolve(tag).code, want, "tag {tag}");
+        }
+    }
+
+    /// An unknown tag is answered, not refused, and a known one is translated.
+    #[test]
+    fn an_unknown_language_falls_back_rather_than_failing() {
+        let en = Catalogue::english();
+        for tag in ["", "en", "xx-Nowhere", "de-CH"] {
+            let c = Catalogue::for_language(tag);
+            assert_eq!(
+                c.messages().keys().collect::<Vec<_>>(),
+                en.messages().keys().collect::<Vec<_>>(),
+                "{tag} should still answer with every key"
+            );
+        }
+        assert_eq!(Catalogue::for_language("xx").messages(), en.messages());
+        for lang in LANGUAGES.iter().filter(|l| l.code != "en") {
+            let c = Catalogue::for_language(lang.code);
+            assert_ne!(
+                c.get("ui.train_material"),
+                en.get("ui.train_material"),
+                "{} looks untranslated",
+                lang.code
+            );
+        }
     }
 
     /// Values go in where the braces are, and the core's formatting survives

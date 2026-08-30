@@ -483,7 +483,6 @@
       <dd>
         {cases(g.contact_stress, 1)} MPa
         <small>{t("ui.train_peak_cyclic")}</small>
-        <small>{t("ui.train_note_at_its_own_single_pair_point")}</small>
       </dd>
       <dt>{t("ui.train_min_face_width")}</dt>
       <dd>

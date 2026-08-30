@@ -860,6 +860,40 @@ auditable.
 
 ## The interface
 
+### The language list is Rust's, and so is the tag matching
+
+The catalogue crosses the boundary whole because a message split across two
+repositories of text will disagree with itself. The same argument reaches one
+step further than it first appears: the *list* of languages, and the rule
+deciding which one a browser's `zh-TW` means, are facts about the catalogue —
+so a front end that held either would have to be told separately every time a
+file was added, and the half nobody tests is the half that forgets.
+
+So `languages()` and `resolve_language()` cross too, and the front end asks
+rather than knows.
+
+**Names are in their own language.** A picker that says "German" and "Chinese
+(Traditional)" is a picker for people who already read English, which is the one
+audience that does not need it.
+
+**A missing translation shows English, not a key.** `t()` renders an unknown key
+as the key itself — deliberately, so a half-translated catalogue shows a reader
+something they can report rather than swallowing the sentence that was warning
+them. That is the right failure for a message nobody has written; it is the
+wrong one for a message that exists in English and has not been translated yet,
+where the English sentence carries the whole meaning. So a translated catalogue
+is layered over English rather than replacing it. The safety net is not the
+plan: a test holds every shipped file to English's exact key set, so a
+translation that falls behind fails CI rather than quietly reverting.
+
+**The preference outlives the session, and nothing else does.** "Inputs are the
+only state" is about the model: everything that changes an answer is an input,
+and every output is recomputed. A language is not an input — it changes no
+number — so it is not bound by that rule, and a reader should not have to pick
+their language again on every reload. It is stored in `localStorage`, with both
+the read and the write guarded: a browser with site data blocked throws on the
+accessor itself, and a language picker is not worth a blank page.
+
 ### Notes must not move the controls
 
 Every field's note is rendered into a slot holding **all** the notes that field

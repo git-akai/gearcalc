@@ -987,15 +987,38 @@ a train with no stages is refused.
 
 ## The boundary
 
-Fifteen `#[wasm_bindgen]` entry points, JSON in and JSON out, all pure
-functions. Three are not calculations: `defaults`, `strings`, and the geartrain
-document's two directions.
+Seventeen `#[wasm_bindgen]` entry points, JSON in and JSON out, all pure
+functions. Five are not calculations: `defaults`, `strings`, `languages`,
+`resolve_language`, and the geartrain document's two directions.
 
 Every type that crosses is declared to TypeScript by `ts-rs` into
 `web/src/wire`, generated rather than hand-copied.
 `tools/check_bindings.sh` regenerates and requires no diff.
 
 A value that does not exist crosses as `Maybe::Unavailable`, carrying a `Note` —
-a stable key and the values its sentence needs — exactly as a clamp does. Every
-word the application shows lives in `crates/gear-io/data/strings_en.toml`, one
-file per language.
+a stable key and the values its sentence needs — exactly as a clamp does.
+
+### Languages
+
+Every word the application shows lives in `crates/gear-io/data/strings_<code>.toml`,
+one file per language, all compiled in. Four ship: `en`, `de`, `zh-Hans`,
+`zh-Hant`.
+
+```text
+languages()             what this build ships: [{ code, name }, …], name in itself
+resolve_language(tag)   which of them a BCP 47 tag names
+strings(tag)            that language's catalogue, filled in from English
+```
+
+`Language::resolve` matches widest-last: the exact tag, then Chinese by script
+(`Hant`/`TW`/`HK`/`MO` traditional, otherwise simplified), then the primary
+subtag, then English. A translated catalogue is layered **over** English, so a
+key it lacks shows the English sentence rather than a bare key — a safety net,
+not the plan: a test holds every shipped file to English's exact key set and to
+the same placeholders in each message.
+
+The picker sits at the foot of the sidebar and stores its choice in
+`localStorage`; it is a preference about reading, not an input to a calculation,
+which is why it may outlive a session when nothing else in the application does.
+Switching needs no reload — `t()` is a reactive read, so refilling the catalogue
+re-renders every label.

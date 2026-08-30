@@ -1,10 +1,16 @@
 <script lang="ts">
   import { workspace, trains, library } from "./state.svelte";
-  import { exportLibrary, t } from "./core";
+  import { exportLibrary, t, languages, language, setLanguage } from "./core";
 
   let { version }: { version: string | null } = $props();
 
   let picker: HTMLInputElement;
+
+  // The language in force, held locally so the select is a controlled input.
+  // `setLanguage` refills the catalogue and `t()` is a reactive read, so every
+  // label on screen re-renders itself — the same property that lets the
+  // catalogue arrive late at start-up, used a second time.
+  let chosen = $state(language());
 
   async function onPicked(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
@@ -95,9 +101,29 @@
     <button class="add" onclick={() => trains.create()}>+ New geartrain</button>
   </section>
 
-  {#if version}
-    <p class="version">core v{version}</p>
-  {/if}
+  <!-- Bottom of the pane, below the work: a preference, not a control that
+       changes an answer. Each language is named in itself, because a reader
+       looking for theirs is looking for the word they call it by — a list that
+       says "German" is a list for people who already read English. -->
+  <div class="foot">
+    <label class="language">
+      <span class="visually-hidden">{t("ui.sidebar_language")}</span>
+      <select
+        value={chosen}
+        onchange={(e) => {
+          chosen = (e.currentTarget as HTMLSelectElement).value;
+          setLanguage(chosen);
+        }}
+      >
+        {#each languages() as l (l.code)}
+          <option value={l.code}>{l.name}</option>
+        {/each}
+      </select>
+    </label>
+    {#if version}
+      <p class="version">core v{version}</p>
+    {/if}
+  </div>
 </aside>
 
 <style>
@@ -213,10 +239,42 @@
     color: var(--warn);
     margin: 0.35rem 0 0 0.25rem;
   }
-  .version {
+  .foot {
     margin-top: auto;
+    padding-top: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .language select {
+    font: inherit;
+    font-size: 0.75rem;
+    width: 100%;
+    padding: 0.25rem 0.4rem;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .language select:hover,
+  .language select:focus {
+    color: var(--fg);
+  }
+  /* The picker needs no visible label — a list of language names in their own
+     scripts says what it is — but it still needs one to be announced. */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .version {
     font-size: 0.7rem;
     color: var(--muted);
     padding-left: 0.25rem;
+    margin: 0;
   }
 </style>

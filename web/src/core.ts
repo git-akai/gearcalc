@@ -122,6 +122,8 @@ import init, {
   version,
   defaults as wasm_defaults,
   strings as wasm_strings,
+  languages as wasm_languages,
+  resolve_language as wasm_resolve_language,
   default_materials,
   import_materials,
   export_materials,
@@ -288,12 +290,72 @@ export function validate(f: FieldSpec, v: number, b: Bound | null): string | nul
 let ready: Promise<void> | null = null;
 let cachedDefaults: Defaults | null = null;
 
+/** A language this build can be read in. The list comes from Rust — see
+ *  `gear_wasm::languages` for why it is not written down here as well. */
+export interface LanguageOption {
+  code: string;
+  name: string;
+}
+
+let cachedLanguages: LanguageOption[] = [];
+
+/** The languages available. Empty until the core has loaded. */
+export function languages(): LanguageOption[] {
+  return cachedLanguages;
+}
+
+/** Where the chosen language is remembered.
+ *
+ *  A preference about *reading*, not an input to a calculation — so unlike
+ *  everything in a tab it is allowed to outlive the session, and unlike
+ *  everything in a tab losing it costs nothing. Both reads and writes are
+ *  guarded: a browser with site data blocked throws on the accessor itself, and
+ *  a language picker is not worth a blank page. */
+const STORED = "gearcalc.language";
+
+function stored(): string | null {
+  try {
+    return localStorage.getItem(STORED);
+  } catch {
+    return null;
+  }
+}
+
+/** The language in force. */
+export function language(): string {
+  return current;
+}
+
+let current = "en";
+
+/** Switch language, reloading the catalogue from the core.
+ *
+ *  Nothing else has to happen: `t()` is a reactive read, so every label on
+ *  screen re-renders itself. That is the same property that lets the catalogue
+ *  arrive late at start-up (`strings.svelte.ts`), used a second time. */
+export function setLanguage(tag: string): void {
+  // Rust decides which shipped language a tag names — see
+  // `gear_io::strings::Language::resolve` — so a browser's `zh-TW` and a stored
+  // `de-CH` both land somewhere real, and the picker shows what is in force.
+  const code = wasm_resolve_language(tag);
+  current = code;
+  try {
+    localStorage.setItem(STORED, code);
+  } catch {
+    // A viewer who cannot store a preference can still change it for now.
+  }
+  setCatalogue(JSON.parse(wasm_strings(code)) as Record<string, string>);
+}
+
 /** Load the core once. Safe to await repeatedly. */
 export function loadCore(): Promise<void> {
   if (!ready) {
     ready = init().then(() => {
       cachedDefaults = JSON.parse(wasm_defaults()) as Defaults;
-      setCatalogue(JSON.parse(wasm_strings()) as Record<string, string>);
+      cachedLanguages = JSON.parse(wasm_languages()) as LanguageOption[];
+      // A stored preference, else what the browser asks for. Neither needs
+      // validating: an unrecognised tag resolves to English.
+      setLanguage(stored() ?? navigator.language ?? "en");
     });
   }
   return ready;

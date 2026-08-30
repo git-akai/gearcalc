@@ -174,6 +174,14 @@ finds the stage that reacts it, or reports that nothing does. A reversing
 intermittent drive rounds its cycles within one actuation and splits contact
 between the flanks.
 
+**Languages.** English, German, Simplified Chinese and Traditional Chinese, all
+compiled in, picked from the foot of the sidebar. **The three translations are
+machine-produced and have not been reviewed by a native speaker** — the
+terminology follows the standard gear vocabulary of each language (DIN 3960,
+GB/T 3374, CNS) and the placeholders are gated, but the prose deserves a
+proof-read before anyone leans on it. Correcting one changes no calculation:
+`crates/gear-io/data/strings_<code>.toml`, one message per line, keys untouched.
+
 **Materials, export, UI.** An eight-material library with per-value provenance ·
 DXF with exact arcs for external *and* internal gears · geartrains exported and
 imported as TOML, inputs only · gear tabs with external, internal and eccentric
