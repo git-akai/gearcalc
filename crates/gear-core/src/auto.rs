@@ -84,7 +84,7 @@ pub struct MinimumShift {
 #[must_use]
 pub fn minimum_profile_shift(p: &GearParams, working_depth: f64) -> MinimumShift {
     let beta = p.helix_angle.to_radians();
-    let alpha_t = (p.pressure_angle.to_radians().tan() / beta.cos()).atan();
+    let alpha_t = crate::plane::transverse_pressure_angle(p.pressure_angle.to_radians(), beta);
     let mt = p.module / beta.cos();
     let r = mt * f64::from(p.teeth) / 2.0;
     let sa = alpha_t.sin();
@@ -240,7 +240,7 @@ pub fn admissible_profile_shift(p: &GearParams, working_depth: f64) -> ShiftRang
         .pressure_angle
         .to_radians()
         .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
-    let alpha_t = (an.tan() / beta.cos()).atan();
+    let alpha_t = crate::plane::transverse_pressure_angle(an, beta);
     let mt = p.module / beta.cos();
     let r = mt * f64::from(p.teeth) / 2.0;
     let xs = p.thickness_shift();
@@ -603,7 +603,7 @@ fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
         .pressure_angle
         .to_radians()
         .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
-    let alpha_t = (an.tan() / beta.cos()).atan();
+    let alpha_t = crate::plane::transverse_pressure_angle(an, beta);
     let mt = p.module / beta.cos();
     let r = mt * f64::from(p.teeth) / 2.0;
     let rb = r * alpha_t.cos();

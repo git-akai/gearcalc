@@ -948,6 +948,14 @@ pub struct GearTabDefaults {
     /// Export accuracy, mm.
     pub chord_tolerance: f64,
     pub reference_circles: bool,
+    /// The centre-distance throw a gear starts at when the eccentricity is
+    /// entered that way round and the geometry cannot seed it.
+    ///
+    /// It crosses from here for the same reason every other default does: a
+    /// number the application shows is a number Rust decided. The gear tab
+    /// carried this one in TypeScript, which is the class of drift that put a
+    /// rack's tip round on a shaper (`docs/corrections.md`).
+    pub eccentric_throw: f64,
 }
 
 fn defaults_impl() -> Result<String, String> {
@@ -991,6 +999,7 @@ fn defaults_impl() -> Result<String, String> {
             pin_diameter: 1.75,
             chord_tolerance: gear_core::outline::DEFAULT_CHORD_TOLERANCE,
             reference_circles: true,
+            eccentric_throw: 0.1,
         },
         train: Train {
             input_speed: 30_000.0,

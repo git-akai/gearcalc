@@ -14,4 +14,14 @@ pin_diameter: number,
 /**
  * Export accuracy, mm.
  */
-chord_tolerance: number, reference_circles: boolean, };
+chord_tolerance: number, reference_circles: boolean, 
+/**
+ * The centre-distance throw a gear starts at when the eccentricity is
+ * entered that way round and the geometry cannot seed it.
+ *
+ * It crosses from here for the same reason every other default does: a
+ * number the application shows is a number Rust decided. The gear tab
+ * carried this one in TypeScript, which is the class of drift that put a
+ * rack's tip round on a shaper (`docs/corrections.md`).
+ */
+eccentric_throw: number, };

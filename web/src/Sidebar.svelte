@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { workspace, trains, library } from "./state.svelte";
-  import { exportLibrary, t, languages, language, setLanguage } from "./core";
+  import { workspace, trains, library, applyLanguage } from "./state.svelte";
+  import { exportLibrary, t, languages, language } from "./core";
 
   let { version }: { version: string | null } = $props();
 
@@ -50,7 +50,13 @@
   {#if languages().length}
     <label class="language">
       <span class="visually-hidden">{t("ui.sidebar_language")}</span>
-      <select value={language()} onchange={(e) => setLanguage(e.currentTarget.value)}>
+      <!-- Switching carries the untouched tab names across with it. A fresh
+           tab is called the application's word for the thing, so a tab made
+           while reading Chinese is called 齿轮 — and that word is *not* the
+           reader's until they type over it, so it has to follow the language
+           like every other label. One a reader has named cannot match the old
+           default and is left alone. -->
+      <select value={language()} onchange={(e) => applyLanguage(e.currentTarget.value)}>
         {#each languages() as l (l.code)}
           <option value={l.code}>
             {l.name}{l.name === l.english ? "" : ` (${l.english})`}

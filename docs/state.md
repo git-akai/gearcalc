@@ -30,6 +30,16 @@ tools/check_strings.py            # every ui message is used, and every use has 
 cd web && npm run check           # typecheck the front end
 ```
 
+## Two copies in one browser
+
+Nothing crosses between them but the **language**. Every input lives in its tab
+and every output is recomputed from it, so there is no cookie, no service
+worker, no IndexedDB, no shared worker and no cache — one `localStorage` key,
+`gearcalc.language`, and a `storage` listener so the copy that did not make the
+change follows the one that did rather than disagreeing until it is reloaded.
+A value it does not recognise resolves to English, so an older copy cannot be
+broken by a newer one writing something it has never heard of.
+
 ## Where it is published
 
 <https://git-akai.github.io/gearcalc/>, from `main`, by `.github/workflows/ci.yml`.
@@ -65,10 +75,17 @@ cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
 cargo run --bin gear-cli -- crossed 17 23 90       # a crossed pair, swept over the split
 cargo run --bin gear-cli -- planetary 17 17 3      # every ring count that can work
 cargo run --bin gear-cli -- planetstage 24 18 60 3 # a planetary stage, six modes
+cargo run --bin gear-cli -- bending                 # the bending construction, drawn
 cargo run --release --bin gear-cli -- verify 100   # the two-sided cutter check
 python3 tools/worm_flank_curvature.py              # ZI vs ZN vs ZA, from the surface
 python3 tools/crossed_path.py                      # the crossed path, from the surfaces
 ```
+
+[`bending-check.html`](bending-check.html) is that last command's figures with
+the prose that reads them, kept because the bending construction is far easier
+to judge by looking than by reading an assertion. It is a **document with
+generated figures in it**, not a stored answer: re-run the command and paste the
+body back in if the construction ever moves.
 
 The last two share no code with the crate — that is their whole purpose.
 `crossed_path.py` builds both flanks as parametric surfaces and reaches the line
@@ -122,6 +139,7 @@ the second case was added rather than substituted for the first.
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. `serde` and `ts-rs`, both optional and both about the shape a type takes when it leaves. |
 | `gear-core/src/tooth.rs` | `Tooth` — one tooth's form, at one shift, cut by one `Rack`. Not a gear. |
 | `gear-core/src/gear.rs` | `Gear` — the assembly, and the only place a gear is drawn. An ordinary gear is `Δx = 0`. |
+| `gear-core/src/plane.rs` | The normal and transverse planes, and the two identities that carry an angle between them. One home, because there were nineteen. |
 | `crates/gear-io` | File formats: DXF export, the TOML material library and geartrain documents, and the string catalogue. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
@@ -160,15 +178,26 @@ Verified by simulating the cut — 2.5–2.7 µm across shifts −0.4 … +0.5.
 the ring search, layout checks, Willis kinematics, Pennestrì–Freudenstein
 efficiency in all six arrangements, and backlash referred to the output shaft.
 
-**Eccentric gears.** A gear whose profile shift varies with angular position, at
-a genuinely constant transmission ratio. One hob, one setting; the root belongs
+**Eccentric gears — labelled experimental on screen.** A gear whose profile
+shift varies with angular position, at a genuinely constant transmission ratio.
+The mathematics is derived and gated like everything else here; what earns the
+label is that no part cut from it has been measured, and the residual it reports
+is against an ideal rather than against a mechanism anyone has built
+([rationale](rationale.md), "An eccentric gear is an ordinary gear with Δx = 0").
+The word is in the type's own name, so it cannot be read without it.
+
+One hob, one setting; the root belongs
 to the gear; the commanded centre distance and what a simple crank leaves; and
 inspection data — span and over-pins — as the range it takes around the
 revolution, verified against a caliper reading off the drawn teeth.
 
 **Trains.** Spur/helical, worm and planetary stages in one train; torque,
 backlash and cycle accumulation; efficiency and backlash in **both** drive
-directions. Two load cases throughout — a peak against the ultimate allowable
+directions. Contact is `max(elliptical, line)` on **both** mesh kinds now — a
+crossed pair's ellipse lengthens as its shafts come parallel, so the line its
+teeth actually provide is what carries the load there, and rating on the ellipse
+alone under-stated a near-parallel pair eightfold. Load sharing is a stage input,
+off by default, reaching bending alone. Two load cases throughout — a peak against the ultimate allowable
 and a cyclic one against fatigue — with the automatic face width sized from any
 of the four ratings a gear chooses. **Neither contact rating is enabled by
 default**: both are computed and shown, but a fresh stage is sized from bending
@@ -207,7 +236,6 @@ been. They are not a backlog.
 |---|---|
 | **Crossed-axis bending** | The beam formula has no honest reading of a point load on a wide tooth, and choosing an effective width is a convention that multiplies a stress. [rationale](rationale.md#a-worm-stage-reports-no-bending-stress) |
 | **ISO/AGMA correction factors** | Narrow validated bands, balanced only as a complete set, against `σ_Flim` values this project does not have. [rationale](rationale.md#no-isoagma-correction-factors) |
-| **Load sharing** | Measured at 0.0–0.2 % for a worst-case number; the conditions that would reopen it are named. [rationale](rationale.md#load-sharing-is-deferred-and-the-reason-is-structural) |
 | **Equal planet load sharing** | The remedy is a mesh-load factor of the kind above. Said in every planetary result's notes. |
 | **An S-N curve per material** | The two points it needs do not exist for six of the eight materials. [rationale](rationale.md#material-data-ships-estimates-deliberately) |
 | **Radial assembly** | Attempted, diagnosed and shelved with its findings; it blocks nothing, and planets are commonly installed axially. |
@@ -244,6 +272,12 @@ been. They are not a backlog.
 - **The cut simulation cannot see below the generation limit**: its simulated
   cutter has no fillet of its own, so what it reports there is not evidence
   either way.
+- **The `Y_S` notch band (`1 ≤ q_s < 8`) is a secondary source**, not a reading
+  of ISO 6336-3. It is the only second-hand constant in the geometry path, it is
+  confined to the empirical correction, and whether it was applied is reported.
+- **Load sharing above a virtual contact ratio of 2** is the ramp extrapolating:
+  no single-pair zone exists, and it relieves the tooth by about a third. The
+  stage says so where the figure is shown.
 - **Hardened 4340's fatigue allowable is the weakest number in the library.**
 - **A note slot is as tall as the tallest note that field can show.** Every real
   message fits; a validation message longer than its field's bound note would
@@ -269,3 +303,7 @@ are named in `strings.rs`'s `UNFIRED` with their evidence.
 Not a queue with a head; this is what a next session would pick from.
 
 - **Further UI work**, as it is asked for.
+- **Read ISO 6336-3** and settle the `Y_S` notch band from the standard rather
+  than from a citation of it.
+- **A calibrated mesh-stiffness model**, which would replace the load-sharing
+  ramp rather than the control now exposing it.

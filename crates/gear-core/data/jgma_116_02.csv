@@ -1,5 +1,10 @@
-# JGMA 116-02 (1983) gear meshing error tables, transcribed from
-# docs/JGMA 116-02 1983.pdf and verified against the rendered pages.
+# JGMA 116-02 (1983) gear meshing error tables, transcribed from the standard
+# and verified against its rendered pages at the time of transcription.
+#
+# The standard itself is not in this repository: it is copyrighted, and a table
+# of numbers read out of it is a different act from redistributing it. What can
+# still be audited without it is everything below — the three transcription
+# checks in the test suite do not need the source document, only this file.
 #
 # Two INDEPENDENT grade scales. A grade number on one is not the same
 # tolerance as the same number on the other -- see DESIGN.md 4.6.1.

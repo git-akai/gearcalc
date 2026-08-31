@@ -775,6 +775,31 @@ pub fn solve_worm_stage(
     let (curvature_along, curvature_across) =
         s.contact_curvatures().ok_or(TrainError::NoContact)?;
 
+    // **How much contact line the teeth actually have.** The patch lengthens
+    // along the rulings, and each member's flank runs along its own ruling for
+    // `b / cos β_b` — its face seen in the plane the contact is a point in. The
+    // shorter of the two is what bounds the patch, exactly as the narrower face
+    // carries a parallel pair.
+    //
+    // Without this the crossed rating was the elliptical solution alone, which
+    // assumes half-spaces of unlimited extent. At a worm's 90° the patch is a
+    // small fraction of the face and the assumption costs nothing; as the shafts
+    // come parallel the ellipse lengthens without bound and the pressure it
+    // reports falls toward zero, while the real pair is carrying its load on a
+    // line that has not grown at all (`docs/corrections.md`).
+    let line_length = [
+        widths[0]
+            / crate::plane::base_helix_angle(s.worm_helix_angle, s.normal_pressure_angle).cos(),
+        widths[1]
+            / crate::plane::base_helix_angle(
+                s.shaft_angle - s.worm_helix_angle,
+                s.normal_pressure_angle,
+            )
+            .cos(),
+    ]
+    .into_iter()
+    .fold(f64::MAX, f64::min);
+
     // One rating, and the load case is the only thing that changes about it: a
     // case is a torque and nothing else, so this closure takes the torque on the
     // wheel and knows nothing about which case asked.
@@ -787,6 +812,16 @@ pub fn solve_worm_stage(
                 e_star,
             )
             .ok_or(TrainError::NoContact)?;
+        // The same force the patch above was pressed with, bounded by the line
+        // the teeth have — `Screw::contact` is the ellipse alone.
+        let pitch_pressure = crate::hertz::peak_pressure(
+            curvature_along,
+            curvature_across,
+            s.normal_force(output_torque, MeshSide::Second, stage.sliding_friction),
+            line_length,
+            e_star,
+        )
+        .ok_or(TrainError::NoContact)?;
         // **Rated along the path, not at the pitch point.** The relative radius
         // peaks where the two roll lengths are equal and falls toward both ends of
         // the zone; the pitch point sits near that peak, so rating there alone took
@@ -796,6 +831,7 @@ pub fn solve_worm_stage(
         // up. Where `ε ≤ 1` those boundaries are the ends of the zone, so a face
         // too narrow raises this figure as well as costing continuity.
         let mut patch = at_pitch;
+        let mut max_pressure = pitch_pressure;
         let mut worst_position = 0.0;
         if let Some(path) = path {
             for position in path.single_pair_bounds(&s) {
@@ -815,18 +851,28 @@ pub fn solve_worm_stage(
                 else {
                     continue;
                 };
-                if here.max_pressure > patch.max_pressure {
+                let Some(pressure) =
+                    crate::hertz::peak_pressure(along, across, force, line_length, e_star)
+                else {
+                    continue;
+                };
+                if pressure > max_pressure {
                     patch = here;
+                    max_pressure = pressure;
                     worst_position = position;
                 }
             }
         }
 
         Ok(WormContact {
-            max_pressure: patch.max_pressure,
-            at_pitch_point: at_pitch.max_pressure,
+            max_pressure,
+            at_pitch_point: pitch_pressure,
             worst_position,
-            patch_length: 2.0 * patch.semi_major(),
+            // **The patch cannot be longer than the teeth it sits on.** The
+            // elastic solution is free to lengthen past the face, and reporting
+            // that length beside a face width it exceeds is a number no part
+            // has. Where the line governs, the length is the line's.
+            patch_length: (2.0 * patch.semi_major()).min(line_length),
             patch_width: 2.0 * patch.semi_minor(),
             curvature_along,
             curvature_across,
@@ -1101,6 +1147,101 @@ mod tests {
 
     fn solved(stage: &WormStage) -> WormResult {
         solve_worm_stage(stage, StageTorques::just(2.0), &library()).unwrap()
+    }
+
+    /// **A crossed pair is rated on the contact line its teeth actually have.**
+    ///
+    /// The elliptical solution assumes half-spaces of unlimited extent, so as
+    /// the shafts come parallel its patch lengthens without bound and the
+    /// pressure it reports falls toward **zero** — while the real pair carries
+    /// the same load on a contact line the face has not lengthened at all. The
+    /// two models cross once, and the physical answer is the larger on each
+    /// side of the crossing.
+    ///
+    /// This gates both sides of that, which is what makes it a gate rather than
+    /// a demonstration:
+    ///
+    /// - near parallel the **line** term governs, and the elliptical figure the
+    ///   rating used to report is far below it — 30–40 % at half a degree;
+    /// - at a worm's right angle the **elliptical** term governs and the line
+    ///   term is nowhere near, so nothing about a worm moves. Both canaries are
+    ///   evidence of the same thing.
+    ///
+    /// Run against the elliptical-only code this fails at `Σ = 0.5°` with the
+    /// rating 40 % under the line its own teeth provide.
+    #[test]
+    fn a_near_parallel_crossed_pair_is_rated_on_the_line_its_teeth_have() {
+        use crate::hertz::elliptical_contact;
+
+        let lib = library();
+        // A near-parallel crossed pair, and the worm the canary is taken on.
+        // Which term governs is the assertion; the two cases are here because
+        // the answer has to be different at the two ends.
+        let crossed = |sigma_deg: f64| WormStage {
+            shaft_angle: sigma_deg.to_radians(),
+            starts: 17,
+            wheel_teeth: 23,
+            sizing: FirstMemberSizing::HelixAngle(sigma_deg.to_radians() / 2.0),
+            ..Default::default()
+        };
+        let worm = WormStage {
+            starts: 1,
+            wheel_teeth: 40,
+            sizing: FirstMemberSizing::PitchDiameter(7.0),
+            ..Default::default()
+        };
+        for (name, stage, line_should_govern) in [
+            ("crossed 0.5°", crossed(0.5), true),
+            ("crossed 1°", crossed(1.0), true),
+            ("the worm canary", worm, false),
+        ] {
+            let s = stage.geometry().unwrap();
+            let r = solve_worm_stage(&stage, StageTorques::just(2.0), &lib).unwrap();
+
+            // The same questions the stage asked, from the widths it actually
+            // resolved: the load on the wheel, the line the teeth provide, and
+            // the two models evaluated separately at the pitch point.
+            let materials: Vec<Material> = [&stage.worm, &stage.wheel]
+                .iter()
+                .map(|m| lib.get(&m.material).unwrap().clone())
+                .collect();
+            let e_star = contact_modulus(&materials[0], &materials[1]);
+            let out_torque = 2.0 * s.ratio * r.efficiency.forward;
+            let force = s.normal_force(out_torque, MeshSide::Second, stage.sliding_friction);
+            let (along, across) = s.contact_curvatures().unwrap();
+            let betas = [s.worm_helix_angle, s.shaft_angle - s.worm_helix_angle];
+            let line_length = (0..2)
+                .map(|i| {
+                    r.members[i].face_width
+                        / crate::plane::base_helix_angle(betas[i], s.normal_pressure_angle).cos()
+                })
+                .fold(f64::MAX, f64::min);
+
+            let ellipse = elliptical_contact(along, across, force, e_star)
+                .unwrap()
+                .max_pressure;
+            let line = (force / line_length * across * e_star / std::f64::consts::PI).sqrt();
+
+            assert_eq!(
+                line > ellipse,
+                line_should_govern,
+                "{name}: line {line:.1} against ellipse {ellipse:.1} — the sweep is \
+                 not exercising the regime it claims to"
+            );
+            // ...and the rating is the larger of the two, whichever that is.
+            let want = line.max(ellipse);
+            assert!(
+                (r.contact.peak.at_pitch_point - want).abs() < 1e-9 * want,
+                "{name}: rated at {} where the governing model gives {want}",
+                r.contact.peak.at_pitch_point
+            );
+            // A patch cannot be longer than the teeth it sits on.
+            assert!(
+                r.contact.peak.patch_length <= line_length * (1.0 + 1e-12),
+                "{name}: a {} mm patch on a {line_length} mm line",
+                r.contact.peak.patch_length
+            );
+        }
     }
 
     /// **Backlash, derived once and checked against the two rules the handbooks

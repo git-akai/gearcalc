@@ -208,7 +208,7 @@ impl Ring {
         let alpha_n = params.pressure_angle.to_radians();
         let m = params.module;
         let mt = m / beta.cos();
-        let alpha_t = (alpha_n.tan() / beta.cos()).atan();
+        let alpha_t = crate::plane::transverse_pressure_angle(alpha_n, beta);
 
         let r = z * mt / 2.0;
         let rb = r * alpha_t.cos();
@@ -591,7 +591,7 @@ impl Ring {
     #[must_use]
     pub fn base_helix_angle(&self) -> f64 {
         let beta = self.params.helix_angle.to_radians();
-        (beta.sin() * self.alpha_n.cos()).asin()
+        crate::plane::base_helix_angle(beta, self.alpha_n)
     }
 
     /// The fillet point and its tangent, Cartesian, tooth centred on `+y`.
@@ -968,7 +968,7 @@ mod tests {
         ];
         for (addendum, alpha_deg, beta_deg, expected) in cases {
             let beta = f64::to_radians(beta_deg);
-            let alpha_t = (f64::to_radians(alpha_deg).tan() / beta.cos()).atan();
+            let alpha_t = crate::plane::transverse_pressure_angle(f64::to_radians(alpha_deg), beta);
             let threshold = 2.0 * addendum * beta.cos() / (1.0 - alpha_t.cos());
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let smallest = threshold.ceil() as u32;

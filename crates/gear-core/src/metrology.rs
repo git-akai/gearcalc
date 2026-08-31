@@ -15,13 +15,15 @@
 use crate::involute::{inv, inv_inverse};
 use crate::tooth::Tooth;
 
-/// Base helix angle: `sin β_b = sin β · cos α_n`.
+/// This gear's base helix angle, radians — [`crate::plane::base_helix_angle`]
+/// read off a [`Tooth`].
 ///
-/// The angle of the helix measured on the base cylinder, which is what projects
-/// a transverse base-circle arc into the normal plane.
+/// The identity lives in [`crate::plane`]; what this adds is which two of a
+/// gear's angles go into it, which is the part a call site would otherwise have
+/// to remember.
 #[must_use]
 pub fn base_helix_angle(g: &Tooth) -> f64 {
-    (g.beta.sin() * g.alpha_n.cos()).asin()
+    crate::plane::base_helix_angle(g.beta, g.alpha_n)
 }
 
 /// Why a measurement cannot be taken.

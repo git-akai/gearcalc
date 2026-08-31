@@ -348,7 +348,7 @@ impl Tooth {
             .to_radians()
             .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
         let beta = params.helix_angle.to_radians();
-        let alpha_t = (an.tan() / beta.cos()).atan();
+        let alpha_t = crate::plane::transverse_pressure_angle(an, beta);
         let r = m / beta.cos() * z / 2.0;
         let (st, _) = transverse_thickness(params, z, m, an, beta, r);
         Rack::wanted_by(params, z, st, m, an, alpha_t, beta, r)
@@ -385,7 +385,7 @@ impl Tooth {
 
         // ---- normal -> transverse --------------------------------------
         let mt = m / beta.cos();
-        let alpha_t = (an.tan() / beta.cos()).atan();
+        let alpha_t = crate::plane::transverse_pressure_angle(an, beta);
         let r = mt * z / 2.0;
         let rb = r * alpha_t.cos();
         let (ca, sa) = (alpha_t.cos(), alpha_t.sin());

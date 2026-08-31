@@ -718,7 +718,7 @@ mod tests {
                 let (a, b) = (g(z1, 1.0), g(z2, -1.0));
                 let mesh = Mesh::new(&a, &b, MeshKind::External).unwrap();
                 let alpha_n = mesh.alpha_n;
-                let beta_b = (beta.sin() * alpha_n.cos()).asin();
+                let beta_b = crate::plane::base_helix_angle(beta, alpha_n);
                 let m_n = mesh.mt * beta.cos();
                 let p_bn = std::f64::consts::PI * m_n * alpha_n.cos();
 

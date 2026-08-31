@@ -720,6 +720,33 @@ mod tests {
                 }
             }
         }
+        // Load sharing switched on, which is off by default and so unreachable
+        // from the grid above. The tall tooth is the point: a **high contact
+        // ratio** design — the addendum a real one is given — puts the virtual
+        // ratio past 2, where the ramp has no single-pair zone left to work
+        // with and the stage says so. A standard tooth cannot reach it at any
+        // helix, which is why this case carries an addendum rather than an
+        // angle.
+        for (teeth, addendum) in [(17_u32, 1.0_f64), (60, 1.35)] {
+            let gear = gear_core::train::StageGear {
+                teeth,
+                addendum: gear_core::params::Auto::fixed(addendum),
+                profile_shift: gear_core::params::Auto::fixed(0.0),
+                ..Default::default()
+            };
+            let stage = gear_core::train::SpurStage {
+                load_sharing: gear_core::contact::LoadSharing::LinearRamp,
+                gears: [gear.clone(), gear],
+                ..Default::default()
+            };
+            if let Ok(r) = gear_core::train::solve_spur_stage(
+                &stage,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
+                record(&r.notes);
+            }
+        }
         for (starts, friction) in [
             (1_u32, 0.06_f64),
             (1, 0.3),

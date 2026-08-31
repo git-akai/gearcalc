@@ -419,7 +419,7 @@ impl Gear {
         w * (self.root_at(angle) - g.rf)
     }
 
-    /// The tooth at position `k`, and where it is seated.    /// The tooth at position `k`, and where it is seated.
+    /// The tooth at position `k`, and where it is seated.
     #[must_use]
     pub fn tooth(&self, k: usize) -> (&Tooth, f64) {
         let i = k % self.which.len();

@@ -24,8 +24,8 @@
 //! Everything is done in **tooth coordinates**: `y` along the tooth centreline
 //! pointing outward, `x` across it, origin at the gear axis.
 
-use crate::contact::ContactPath;
-use crate::hertz::elliptical_contact;
+use crate::contact::{ContactPath, LoadSharing};
+use crate::hertz::peak_pressure;
 use crate::mesh::Mesh;
 use crate::metrology::base_helix_angle;
 use crate::solve::{brent, Tol};
@@ -636,13 +636,32 @@ pub enum StressConcentration {
     None,
 }
 
-/// Upper bound on the notch parameter for which the ISO fit is stated.
+/// Range of the notch parameter over which the ISO `Y_S` fit is stated.
 ///
 /// Outside it the formula still evaluates, and [`RootSection::stress_correction`]
 /// still returns a value — but [`RootSection::notch_parameter_in_range`] reports
-/// false so a caller can say so. **Confirm against ISO 6336-3 before relying on
-/// this bound**; it is the figure quoted in secondary sources, not one I have
-/// read from the standard.
+/// false so a caller can say so.
+///
+/// # Provenance, which is the whole of what there is to say about it
+///
+/// `1 ≤ q_s < 8` is the band **quoted in secondary sources** for ISO 6336-3's
+/// `Y_S` fit. The standard itself is paywalled and has not been read for this
+/// project, so this is a citation of a citation and is recorded as one rather
+/// than presented as a reading. It is the only constant in the geometry path
+/// whose basis is second-hand, and it is confined to the empirical correction
+/// where it belongs — no geometry, no solver and no other rating takes it.
+///
+/// **What it can and cannot do to an answer.** It cannot move a number silently:
+/// the clamp's effect is bounded by the fit's own behaviour, the unclamped
+/// figure stays on [`RootSection::notch_parameter`], and whether it was applied
+/// is reported by [`RootSection::notch_parameter_in_range`]. What it does do is
+/// under-predict a sharper-than-stated notch, since `Y_S` rises with `q_s` —
+/// the unconservative direction, which is exactly why the range is surfaced
+/// rather than swallowed.
+///
+/// **What would settle it:** reading ISO 6336-3. Until then the honest statement
+/// is the one above, and `docs/rationale.md` carries it beside the other
+/// material this project takes on trust.
 pub const NOTCH_PARAMETER_RANGE: std::ops::Range<f64> = 1.0..8.0;
 
 impl RootSection {
@@ -899,6 +918,105 @@ pub fn bending_section(g: &Tooth, transverse_contact_ratio: f64) -> Option<RootS
     root_section(&v, load_roll)
 }
 
+/// How finely the mesh cycle is sampled when load sharing is enabled.
+///
+/// A count rather than a tolerance because what is wanted is the **maximum** of
+/// a smooth product over an interval, not an integral of it — and a sampled
+/// maximum near a smooth interior peak converges as `h²`. The two places the
+/// peak can sit are added to the sweep explicitly rather than hoped for: the
+/// single-pair boundary, which is where it provably is once sharing is allowed
+/// ([rationale](../../../docs/rationale.md)), and the tip. So the sampling
+/// refines an answer it is already guaranteed not to miss, which is why no
+/// tolerance is attached to it.
+const SHARING_SAMPLES: usize = 200;
+
+/// The critical section to rate bending on, and the share of the load acting
+/// there, once load sharing is allowed to move the governing point.
+///
+/// # With sharing off this *is* [`bending_section`]
+///
+/// Not "agrees with to a tolerance" — it returns that call, and a share of
+/// exactly 1. Sharing is off by default everywhere, so the ordinary rating path
+/// is untouched and costs what it always did.
+///
+/// # What sharing changes, and what it does not
+///
+/// **Bending only.** A contact rating is already taken at the pitch point and
+/// the two single-pair boundaries, and those are precisely the places one tooth
+/// carries everything — so a sharing model cannot move a contact stress, and
+/// this is not consulted for one.
+///
+/// Bending is different because its worst point is a *product*: the form factor
+/// grows toward the tip while the share falls away there, so the maximum of the
+/// two together is somewhere in between and has to be looked for. Without
+/// sharing the tooth is assumed to carry everything at the highest point of
+/// single-pair contact, which is the standard conservative reading; with it, the
+/// whole cycle is swept.
+///
+/// **Measured at 0.0–0.2 %** on ordinary meshes, because the governing point
+/// *becomes* the single-pair boundary — where the share is exactly 1, so the
+/// answer is the one already reported. It is worth having anyway for the case
+/// the measurement does not cover: at a high contact ratio (`ε ≥ 2`) two pairs
+/// are always engaged and the single-pair zone this argument rests on does not
+/// exist.
+///
+/// The model itself is an **uncalibrated placeholder** — see [`LoadSharing`] —
+/// which is why it is an option a designer switches on rather than something
+/// applied on their behalf.
+///
+/// # Errors
+///
+/// `None` where [`bending_section`] has none: a tooth with no usable form, or a
+/// load point past the end of the generated flank.
+#[must_use]
+pub fn bending_section_shared(
+    g: &Tooth,
+    transverse_contact_ratio: f64,
+    model: LoadSharing,
+) -> Option<(RootSection, f64)> {
+    if matches!(model, LoadSharing::None) {
+        return Some((bending_section(g, transverse_contact_ratio)?, 1.0));
+    }
+
+    let v = g.virtual_spur();
+    let base_pitch = std::f64::consts::PI * v.mt * v.alpha_t.cos();
+    let cos_bb = base_helix_angle(g).cos();
+    // The whole cycle in the plane the tooth actually bends in. `d` counts
+    // virtual base pitches back from the far end of the path, the same
+    // coordinate `contact::load_share` takes.
+    let eps_n = transverse_contact_ratio / (cos_bb * cos_bb);
+
+    // The candidates the sweep must not miss, then the sweep itself.
+    let mut at = vec![0.0, eps_n, (eps_n - 1.0).max(0.0), eps_n.min(1.0)];
+    for i in 0..=SHARING_SAMPLES {
+        #[allow(clippy::cast_precision_loss)]
+        let t = i as f64 / SHARING_SAMPLES as f64;
+        at.push(t * eps_n);
+    }
+
+    let mut best: Option<(RootSection, f64, f64)> = None;
+    for d in at {
+        let share = crate::contact::load_share(d, eps_n, model);
+        let load_roll = v.u_tip - d * base_pitch / v.rb;
+        let Some(section) = root_section(&v, load_roll) else {
+            continue;
+        };
+        // The form factor is what the stress is proportional to at a fixed
+        // torque, so the worst point is the largest `Y_F · Y_S · share`. Taking
+        // the factor rather than a stress keeps this independent of the load
+        // case, which is why it is evaluated once per gear and not once per
+        // case.
+        let Some(factor) = section.bending_factor(StressConcentration::Iso6336) else {
+            continue;
+        };
+        let weighted = factor * share;
+        if best.is_none_or(|(_, _, w)| weighted > w) {
+            best = Some((section, share, weighted));
+        }
+    }
+    best.map(|(section, share, _)| (section, share))
+}
+
 /// The critical section of a **ring's** tooth, loaded at its highest point of
 /// single-pair contact.
 ///
@@ -1134,28 +1252,27 @@ pub fn contact_stress(
     // the one signed relation both kinds obey — see `Mesh::curvature_radii`.
     // Re-deriving `r_b2` here is what previously got an internal pair wrong.
 
-    // F_bt is shared by both gears of the pair, so which gear the load was
-    // quoted against does not survive into the answer.
-    let f_bt = load.transverse_line_of_action(g1);
-    // The elliptical patch carries the whole flank force at a point, where the
-    // line carries it per unit length; F_bn is the same force either way.
+    // F_bn is shared by both gears of the pair — it is `F_bt/cos β_b` and
+    // `F_bt` is action and reaction along the line of action — so which gear the
+    // load was quoted against does not survive into the answer. The patch
+    // carries the whole of it at a point; the line carries the same force spread
+    // along its length.
     let f_bn = load.normal_to_flank(g1);
     let cos_bb = base_helix_angle(g1).cos();
 
     let at = |xi: f64| -> Option<(f64, f64)> {
         let inv_rho_t = mesh.relative_curvature(xi)?;
-        // F_bn / L = (F_bt/cos β_b) / (b/cos β_b) = F_bt / b, and
-        // 1/ρ_n = cos β_b / ρ_t. Written out rather than pre-cancelled so the
-        // two plane changes stay visible.
-        let f_per_length = f_bt / load.face_width;
+        // The contact line is one line inclined across the face at the base
+        // helix angle, so it is longer than the face by `1/cos β_b` — and the
+        // force normal to the flank is larger than its transverse projection by
+        // the same factor. Written out rather than pre-cancelled so the two
+        // plane changes stay visible; they cancel in `F_bn/L = F_bt/b`.
+        let line_length = load.face_width / cos_bb;
         let inv_rho_n = cos_bb * inv_rho_t;
-        let line = (f_per_length * inv_rho_n * e_star / std::f64::consts::PI).sqrt();
-        // Zero at zero lengthwise curvature, so this `max` is the line term
-        // unchanged for every mesh built today. A patch that cannot exist —
-        // no load, say — carries no pressure, which the line term still can.
-        let elliptical = elliptical_contact(lengthwise_curvature, inv_rho_n, f_bn, e_star)
-            .map_or(0.0, |c| c.max_pressure);
-        Some((line.max(elliptical), 1.0 / inv_rho_n))
+        // At `lengthwise_curvature = 0` — every uncrowned parallel mesh — the
+        // elliptical term is exactly zero and this is the line term unchanged.
+        let sigma = peak_pressure(lengthwise_curvature, inv_rho_n, f_bn, line_length, e_star)?;
+        Some((sigma, 1.0 / inv_rho_n))
     };
 
     let (pitch, r_pitch) = at(0.0)?;
@@ -1216,6 +1333,82 @@ mod tests {
     use super::*;
     use crate::mesh::MeshKind;
     use crate::GearParams;
+
+    /// **Load sharing is off by default, and off means untouched.**
+    ///
+    /// Not "agrees to a tolerance": with [`LoadSharing::None`] the sweep is not
+    /// entered at all and the answer is [`bending_section`]'s own, which is
+    /// what lets an uncalibrated model be offered without it reaching anyone
+    /// who did not ask for it. Switched on, it may only ever *reduce* what a
+    /// tooth carries — sharing cannot invent load — and the reduction is the
+    /// small one the rationale measured, because the governing point moves to
+    /// the single-pair boundary where the share is exactly 1.
+    #[test]
+    fn sharing_is_off_by_default_and_can_only_ever_relieve_the_tooth() {
+        for teeth in [12_u32, 17, 43, 97] {
+            for beta in [0.0_f64, 20.0] {
+                let g = Tooth::new(GearParams {
+                    teeth,
+                    helix_angle: beta,
+                    ..Default::default()
+                });
+                for eps in [1.2_f64, 1.55, 1.9] {
+                    let (plain, share) =
+                        bending_section_shared(&g, eps, LoadSharing::None).unwrap();
+                    let want = bending_section(&g, eps).unwrap();
+                    assert_eq!(share, 1.0, "z={teeth}: no sharing means the whole load");
+                    assert_eq!(
+                        plain.s.to_bits(),
+                        want.s.to_bits(),
+                        "z={teeth} β={beta} ε={eps}: the default path moved"
+                    );
+
+                    let (shared, fraction) =
+                        bending_section_shared(&g, eps, LoadSharing::LinearRamp).unwrap();
+                    assert!(
+                        (0.0..=1.0).contains(&fraction),
+                        "z={teeth}: a share of {fraction}"
+                    );
+                    // The rating is proportional to `Y_F · Y_S · share`, so that
+                    // product is what may not rise.
+                    let of = |s: &RootSection, f: f64| {
+                        s.bending_factor(StressConcentration::Iso6336).unwrap() * f
+                    };
+                    let (was, now) = (of(&plain, 1.0), of(&shared, fraction));
+                    assert!(
+                        now <= was * (1.0 + 1e-9),
+                        "z={teeth} β={beta} ε={eps}: sharing raised the rating from \
+                         {was} to {now}"
+                    );
+                    // **And which regime it is in decides how much it may do.**
+                    //
+                    // Below `ε_n = 2` there is a single-pair zone, the governing
+                    // point moves into it, the share there is exactly 1, and the
+                    // effect is the fraction of a per cent the rationale
+                    // measured. At or above it there is no such zone — two pairs
+                    // are always engaged — the ramp never reaches 1, and it
+                    // relieves the tooth by a third. That second regime is the
+                    // one the ramp was never calibrated for, and the stage says
+                    // so rather than letting the number pass as a rating.
+                    let eps_n = eps / crate::metrology::base_helix_angle(&g).cos().powi(2);
+                    if eps_n < 2.0 {
+                        assert!(
+                            now >= 0.97 * was,
+                            "z={teeth} β={beta} ε={eps} (ε_n={eps_n}): a single-pair zone \
+                             exists, so the governing point should sit in it and the effect \
+                             should be slight — {was} to {now}"
+                        );
+                    } else {
+                        assert!(
+                            now < was,
+                            "z={teeth} β={beta} ε_n={eps_n}: with no single-pair zone the \
+                             ramp must relieve the tooth somewhere"
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn analytic_tangent_matches_a_finite_difference() {

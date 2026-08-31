@@ -33,6 +33,12 @@
 //!   behaviour.
 //! - A worm stage gained `thickness_mod`, which a pre-existing file will not
 //!   have. `thickness_mod = 1.0` is the standard tooth.
+//! - A spur stage gained `load_sharing`, which a pre-existing file will not
+//!   have. It is the one shape change so far that **defaults rather than
+//!   refusing**, and deliberately: `load_sharing = "none"` is both the default
+//!   and what every file written before it meant, so there is no reading of an
+//!   older document that this gets wrong. A field whose absence is unambiguous
+//!   is not a document describing a different gearbox.
 //! - `friction` became `sliding_friction`, and every stage gained a
 //!   `static_friction` beside it (`static_friction_sun_planet` and
 //!   `static_friction_planet_ring` on a planetary set). Rename the field and add

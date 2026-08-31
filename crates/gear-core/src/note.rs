@@ -104,6 +104,8 @@ pub mod key {
         "stage.transverse_contact_ratio_below_one";
     /// `stage.face_width_no_source`
     pub const STAGE_FACE_WIDTH_NO_SOURCE: &str = "stage.face_width_no_source";
+    /// `stage.load_sharing_out_of_band`
+    pub const STAGE_LOAD_SHARING_OUT_OF_BAND: &str = "stage.load_sharing_out_of_band";
 
     // ---- the train, as a whole ------------------------------------ //
     //
@@ -205,6 +207,7 @@ pub mod key {
         STAGE_RING_ADDENDUM_CLAMPED,
         STAGE_SELF_LOCKING,
         STAGE_TRANSVERSE_CONTACT_RATIO_BELOW_ONE,
+        STAGE_LOAD_SHARING_OUT_OF_BAND,
         ERROR_MESH_INCOMPATIBLE,
         ERROR_MESH_RING_TOO_SMALL,
         ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,

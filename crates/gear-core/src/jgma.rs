@@ -29,13 +29,19 @@
 //!
 //! # The data lives in a file
 //!
-//! `data/jgma_116_02.csv`, one row per cell, so it can be diffed against the PDF
-//! rather than read out of Rust syntax. Three transcription checks run in the
-//! test suite: row counts per grade, every value a preferred number, and
+//! `data/jgma_116_02.csv`, one row per cell, so it can be diffed against the
+//! standard rather than read out of Rust syntax. Three transcription checks run
+//! in the test suite: row counts per grade, every value a preferred number, and
 //! monotonicity in grade within a band. Those catch column misalignment, which
 //! is the realistic failure mode when transcribing a scanned table — and which
 //! the raw text extraction did in fact exhibit before the pages were checked as
 //! images.
+//!
+//! **The standard is not in this repository.** It is copyrighted, and shipping
+//! it is a different act from transcribing a table of numbers out of it — the
+//! same distinction `docs/rationale.md` draws about ISO's values. The three
+//! checks above are what keeps this file auditable without it, and they need
+//! nothing but the file itself.
 
 use std::sync::OnceLock;
 

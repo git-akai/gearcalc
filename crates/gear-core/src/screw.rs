@@ -429,8 +429,16 @@ impl Screw {
 /// linear conditions on one unit vector — the contact normal has a **fixed
 /// direction**, whatever the rotation. With the direction fixed, (2) says the
 /// contact points lie on a line with that direction tangent to both base
-/// cylinders. There are four such lines and only one passes through the pitch
-/// point; that one is the mesh.
+/// cylinders. **Eight such lines exist and exactly two pass through the pitch
+/// point** — the tooth's two flanks, drive and coast, which are mirror images —
+/// and either serves, since every length the path yields is the same on both.
+///
+/// An earlier draft of this paragraph said four lines and one. The count came
+/// from enumerating one normal direction and forgetting the other, and it was
+/// hidden precisely because the two are mirror images; it surfaced when
+/// `tools/crossed_path.py` gained a tangency check (`docs/corrections.md`).
+/// [`Screw::mesh_branch`] has had the right rule throughout — this text was the
+/// stale copy, which is the hazard of describing a construction twice.
 ///
 /// It is the same statement as the parallel case's "the line of action is the
 /// common tangent to the two base circles", lifted into three dimensions — which
@@ -518,7 +526,7 @@ impl Screw {
     #[must_use]
     pub fn contact_normal(&self) -> Option<[f64; 3]> {
         let alpha_n = self.normal_pressure_angle;
-        let bb = |beta: f64| (beta.sin() * alpha_n.cos()).asin();
+        let bb = |beta: f64| crate::plane::base_helix_angle(beta, alpha_n);
         let bb1 = bb(self.worm_helix_angle);
         let bb2 = bb(self.shaft_angle - self.worm_helix_angle);
 
@@ -585,12 +593,10 @@ impl Screw {
         let beta_1 = self.worm_helix_angle;
         let beta_2 = self.shaft_angle - beta_1;
         let alpha_n = self.normal_pressure_angle;
-        let base = |r: f64, beta: f64| {
-            let alpha_t = (alpha_n.tan() / beta.cos()).atan();
-            r * alpha_t.cos()
-        };
+        let base =
+            |r: f64, beta: f64| r * crate::plane::transverse_pressure_angle(alpha_n, beta).cos();
         let (rb1, rb2) = (base(r1, beta_1), base(r2, beta_2));
-        let bb = |beta: f64| (beta.sin() * alpha_n.cos()).asin();
+        let bb = |beta: f64| crate::plane::base_helix_angle(beta, alpha_n);
         let (bb1, bb2) = (bb(beta_1), bb(beta_2));
 
         // 1. The direction — `Screw::contact_normal`, which the backlash
@@ -829,9 +835,7 @@ impl CrossedPath {
         } else {
             screw.shaft_angle - screw.worm_helix_angle
         };
-        (beta.sin() * screw.normal_pressure_angle.cos())
-            .asin()
-            .sin()
+        crate::plane::base_helix_angle(beta, screw.normal_pressure_angle).sin()
     }
 
     /// Half the path a face of width `b` can hold, in path units.
@@ -886,9 +890,8 @@ impl CrossedPath {
         ];
         let mut out = [0.0; 2];
         for i in 0..2 {
-            let alpha_t = (alpha_n.tan() / beta[i].cos()).atan();
-            let rb = r[i] * alpha_t.cos();
-            let bb = (beta[i].sin() * alpha_n.cos()).asin();
+            let rb = r[i] * crate::plane::transverse_pressure_angle(alpha_n, beta[i]).cos();
+            let bb = crate::plane::base_helix_angle(beta[i], alpha_n);
             let rho_t = (s - self.tangency[i]).abs() * bb.cos();
             out[i] = f64::hypot(rb, rho_t);
         }
@@ -1223,7 +1226,7 @@ fn flank_curvature(radius: f64, helix: f64, alpha_n: f64) -> Option<(f64, f64)> 
         return None;
     }
     let alpha_t = (alpha_n.tan() / cos_beta).atan();
-    let beta_b = (helix.sin() * alpha_n.cos()).asin();
+    let beta_b = crate::plane::base_helix_angle(helix, alpha_n);
     let rho_t = radius * alpha_t.sin();
     let rho_n = rho_t / beta_b.cos();
     if !(rho_n.is_finite() && rho_n > 0.0) {
@@ -1329,8 +1332,8 @@ mod tests {
                 let beta_1 = f64::to_radians(beta_1_deg);
                 let (g1, g2) = rulings(sigma, alpha_n, beta_1).unwrap();
 
-                let beta_b1 = (beta_1.sin() * alpha_n.cos()).asin();
-                let beta_b2 = ((sigma - beta_1).sin() * alpha_n.cos()).asin();
+                let beta_b1 = crate::plane::base_helix_angle(beta_1, alpha_n);
+                let beta_b2 = crate::plane::base_helix_angle(sigma - beta_1, alpha_n);
                 assert!(
                     (dot(g1, [0.0, 0.0, 1.0]).abs() - beta_b1.cos()).abs() < 1e-14,
                     "Σ={sigma_deg} β₁={beta_1_deg}: worm ruling"
@@ -1736,8 +1739,8 @@ mod tests {
 
             for i in 0..2 {
                 let alpha_n = s.normal_pressure_angle;
-                let alpha_t = (alpha_n.tan() / betas[i].cos()).atan();
-                let bb = (betas[i].sin() * alpha_n.cos()).asin();
+                let alpha_t = crate::plane::transverse_pressure_angle(alpha_n, betas[i]);
+                let bb = crate::plane::base_helix_angle(betas[i], alpha_n);
                 let classical = r[i] * alpha_t.sin() / bb.cos();
                 let measured = path.tangency[i].abs();
                 assert!(
@@ -1775,14 +1778,14 @@ mod tests {
 
         // The classical parallel figures, at Σ = 0 where β₁ = −β₂ = β_add.
         let mt = mn / beta_add.cos();
-        let alpha_t = (alpha_n.tan() / beta_add.cos()).atan();
+        let alpha_t = crate::plane::transverse_pressure_angle(alpha_n, beta_add);
         let (r1, r2) = (f64::from(z1) * mt / 2.0, f64::from(z2) * mt / 2.0);
         let (rb1, rb2) = (r1 * alpha_t.cos(), r2 * alpha_t.cos());
         let (ra1, ra2) = (r1 + mn, r2 + mn);
         let path_t = (ra1 * ra1 - rb1 * rb1).sqrt() + (ra2 * ra2 - rb2 * rb2).sqrt()
             - (r1 + r2) * alpha_t.sin();
         let eps_alpha = path_t / (std::f64::consts::PI * mt * alpha_t.cos());
-        let bb = (beta_add.sin() * alpha_n.cos()).asin();
+        let bb = crate::plane::base_helix_angle(beta_add, alpha_n);
         let expected = eps_alpha / (bb.cos() * bb.cos());
 
         let mut last = f64::INFINITY;
@@ -1881,7 +1884,7 @@ mod tests {
                 .into_iter()
                 .enumerate()
             {
-                let bb = (member_beta.sin() * alpha_n.cos()).asin();
+                let bb = crate::plane::base_helix_angle(member_beta, alpha_n);
                 let expected = path.length * bb.sin().abs();
                 assert!(
                     (travel[i] - expected).abs() < 1e-9 * expected.max(1e-9),
@@ -2346,7 +2349,7 @@ mod tests {
                         );
                         // ...and the worm-axis component is `sin β_b1`, which is
                         // what the axial-float half of backlash projects onto.
-                        let bb1 = (beta_1.sin() * alpha_n.cos()).asin();
+                        let bb1 = crate::plane::base_helix_angle(beta_1, alpha_n);
                         assert!((n[2].abs() - bb1.sin()).abs() < 1e-12);
                         checked += 1;
                     }

@@ -300,32 +300,52 @@ would have something consistent to be measured against. They are paywalled, and
 transcribing them into an open repository is a licensing question the JGMA
 precedent does not settle.
 
-### Load sharing is deferred, and the reason is structural
+### Load sharing is offered rather than assumed
 
-`ContactPath::load_fraction` takes a `LoadSharing` model and
-`LoadSharing::LinearRamp` exists as an explicitly uncalibrated 1/3→2/3 ramp. It
-is labelled a placeholder, not a substitute for a stiffness model; its purpose
-was to size the effect, and it has.
+`ContactPath::load_fraction` takes a `LoadSharing` model, and
+`LoadSharing::LinearRamp` is an explicitly uncalibrated 1/3→2/3 ramp. It is a
+**stage input, off by default**, and it reaches bending alone.
 
-**Measured:** once sharing is allowed the governing point *becomes* the HPSTC. At
-the tip a tooth carries roughly a third of the load, so tip loading stops
-governing — and the worst surviving point of the cycle is exactly where the
-model already places it. Sharing therefore lands within **0.0–0.2 %** across
-every mesh tried.
+**Off by default, because it is an estimate.** A calibrated mesh-stiffness model
+would drag in tooth and rim stiffness, deflection under load and manufacturing
+deviation — none of them available to a high-level design tool — and an
+uncalibrated one produces confident numbers that are *worse* than a conservative
+bound, because they look authoritative. So nothing is applied on a designer's
+behalf.
 
-So the expensive part — a calibrated mesh-stiffness model — buys almost nothing
-for a worst-case number, while dragging in tooth and rim stiffness, deflection
-under load and manufacturing deviation. Those inputs are not available to a
-high-level design tool, and an uncalibrated stiffness model produces confident
-numbers that are *worse* than the conservative bound, because they look
-authoritative.
+**Offered rather than hidden, because that is what this project does with an
+estimate.** Rules of thumb are kept as features a user switches on, not as
+machinery buried where a number quietly depends on them. It had been reachable
+only from a CLI diagnostic, which is neither.
 
-**Two conditions would change this, and both are worth naming:**
-- **A duty-cycle or transmission-error calculation**, where the whole mesh cycle
-  matters rather than its worst instant. Sharing is essential there and the
-  0.2 % figure does not apply.
-- **High contact ratio (`ε ≥ 2`)**, where two pairs are always engaged and the
-  single-pair zone this argument rests on does not exist.
+**Bending only, and that is a property of the model rather than a scoping
+decision.** A contact rating is already taken at the pitch point and the two
+single-pair boundaries — precisely the places where one tooth carries
+everything — so a sharing model cannot move a contact stress. Bending's worst
+point is a *product*: the form factor grows toward the tip while the share falls
+away there, so allowing sharing means sweeping the cycle for the maximum of the
+two together instead of evaluating one point.
+
+**Measured: 0.0–0.2 %** across every ordinary mesh tried. Once sharing is
+allowed the governing point *becomes* the highest point of single-pair contact —
+where the share is exactly 1 — so the answer is the one already reported, and the
+expensive model buys almost nothing for a worst-case number.
+
+**Where it is not 0.2 %, and the disclosure that costs.** At a **virtual contact
+ratio of 2 or more** there is no single-pair zone at all: two pairs are always
+engaged, the ramp never reaches a full share, and it relieves the tooth by about
+a third. That is a large number from an uncalibrated model in the
+unconservative direction, so the stage reports `stage.load_sharing_out_of_band`
+beside the figure. It is not a hypothetical regime — a standard tooth cannot
+reach it at any helix angle, but an ordinary **high-contact-ratio** design
+(addendum 1.35) reaches it immediately, and that is exactly the design a user
+would switch sharing on for.
+
+**What would change this:** a calibrated stiffness model, which would replace the
+ramp rather than the control. The two conditions that would make one worth having
+are unchanged — a duty-cycle or transmission-error calculation, where the whole
+mesh cycle matters rather than its worst instant, and the high-contact-ratio case
+above, where the single-pair argument this rests on does not exist.
 
 ### Contact is one formula
 
@@ -759,6 +779,17 @@ So: two named scales, never compared, and the default is decided on scale and
 grade ordering alone rather than on which entry yields the smaller value — which
 keeps it predictable and independent of the table contents, so it survives the
 addition of other standards.
+
+**The standard itself is not in the repository, and the transcription is.** They
+are different acts: a table of numbers read out of a document is not that
+document, and this project needs the numbers to compute a tolerance while it
+needs nothing from the pages but the reading. So `data/jgma_116_02.csv` ships
+with its three transcription checks — row counts per grade, every value a
+preferred number, monotone in grade within a band — and the copyrighted PDF that
+was once beside it does not. This is the same line drawn in
+[no ISO/AGMA correction factors](#no-isoagma-correction-factors): what stops
+those being adopted is that the *values* are unavailable, not that the documents
+are.
 
 ### Material data ships estimates, deliberately
 

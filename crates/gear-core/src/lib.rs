@@ -30,12 +30,15 @@ pub mod metrology;
 pub mod note;
 pub mod outline;
 pub mod params;
+pub mod plane;
 pub mod planetary;
 pub mod ring;
 pub mod screw;
 pub mod shaper;
 pub mod solve;
 pub mod strength;
+#[cfg(test)]
+pub(crate) mod testing;
 pub mod tooth;
 pub mod train;
 pub mod verify;

@@ -11,13 +11,13 @@ use super::{
     StageTorques, TrainError, Widths,
 };
 use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift};
-use crate::contact::{efficiency, ContactPath, Directional, Drive};
+use crate::contact::{efficiency, ContactPath, Directional, Drive, LoadSharing};
 use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
 use crate::strength::{
-    bending_section, bending_stress, contact_stress, min_face_width_bending,
+    bending_section_shared, bending_stress, contact_stress, min_face_width_bending,
     min_face_width_contact, Load, StressConcentration, PARALLEL_AXES,
 };
 use crate::tooth::Tooth;
@@ -147,6 +147,20 @@ pub struct SpurStage {
     pub clearance: f64,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
+    /// How the load is divided while two tooth pairs are engaged.
+    ///
+    /// **Off by default, and it reaches bending only.** A contact rating is
+    /// already taken where one tooth carries everything, so sharing cannot move
+    /// it; a bending rating's worst point is a product of the form factor and
+    /// the share, so it can. See
+    /// [`bending_section_shared`](crate::strength::bending_section_shared).
+    ///
+    /// The model behind it is an explicitly uncalibrated placeholder rather
+    /// than a stiffness calculation, which is why it is offered as a choice a
+    /// designer makes rather than applied on their behalf — the same treatment
+    /// every other estimate in this crate gets.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub load_sharing: LoadSharing,
     pub gears: [StageGear; 2],
 }
 
@@ -164,6 +178,7 @@ impl Default for SpurStage {
             clearance: 0.02,
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
+            load_sharing: LoadSharing::None,
             gears: [
                 StageGear::default(),
                 StageGear {
@@ -306,9 +321,18 @@ pub fn solve_spur_stage(
     const PROBE: f64 = 10.0;
     let e_star = contact_modulus(&materials[0], &materials[1]);
 
+    // The critical section, and the share of the load acting on it. With
+    // sharing off — the default — this *is* `bending_section` and a share of
+    // exactly 1, so the ordinary rating is untouched to the bit.
+    let shared =
+        [0usize, 1].map(|i| bending_section_shared(&g[i], path.contact_ratio, stage.load_sharing));
     let sections = [
-        bending_section(&g[0], path.contact_ratio).ok_or(TrainError::NoRootSection)?,
-        bending_section(&g[1], path.contact_ratio).ok_or(TrainError::NoRootSection)?,
+        shared[0].ok_or(TrainError::NoRootSection)?.0,
+        shared[1].ok_or(TrainError::NoRootSection)?.0,
+    ];
+    let load_share = [
+        shared[0].ok_or(TrainError::NoRootSection)?.1,
+        shared[1].ok_or(TrainError::NoRootSection)?.1,
     ];
 
     // Every rating at a probe width, one set per load case. `b_min` does not
@@ -320,7 +344,10 @@ pub fn solve_spur_stage(
             .ok_or(TrainError::NoContact)?;
         let sf = [0usize, 1].map(|i| {
             let li = load.across_mesh(&g[0], &g[i]);
+            // The share this tooth carries where it is rated — exactly 1 unless
+            // a sharing model was asked for, so nothing scales by default.
             bending_stress(&sections[i], &g[i], &li, StressConcentration::Iso6336)
+                .map(|s| s * load_share[i])
         });
         Ok((cs, sf))
     };
@@ -377,7 +404,10 @@ pub fn solve_spur_stage(
             .ok_or(TrainError::NoContact)?;
         let sf = [0usize, 1].map(|i| {
             let li = load.across_mesh(&g[0], &g[i]);
+            // The share this tooth carries where it is rated — exactly 1 unless
+            // a sharing model was asked for, so nothing scales by default.
             bending_stress(&sections[i], &g[i], &li, StressConcentration::Iso6336)
+                .map(|s| s * load_share[i])
         });
         Ok((cs, sf, load))
     };
@@ -473,6 +503,21 @@ pub fn solve_spur_stage(
                 3,
             ),
         );
+    }
+    // **The sharing ramp outside the band it was described in.** It is a
+    // first-order stand-in for a spur mesh with a single-pair zone; at
+    // `ε_n ≥ 2` there is no such zone, the ramp never reaches a full share, and
+    // it relieves the tooth by about a third. That is a large number from an
+    // uncalibrated model, in the unconservative direction — exactly what
+    // `docs/rationale.md` refuses to let pass silently — so the stage says so
+    // where the figure is shown. The model is still the one the designer asked
+    // for; what they are owed is knowing it is extrapolating.
+    if !matches!(stage.load_sharing, LoadSharing::None) {
+        let cos_bb = crate::metrology::base_helix_angle(&g[0]).cos();
+        let eps_n = path.contact_ratio / (cos_bb * cos_bb);
+        if eps_n >= 2.0 {
+            notes.push(Note::new(key::STAGE_LOAD_SHARING_OUT_OF_BAND).number("ratio", eps_n, 3));
+        }
     }
 
     Ok(SpurResult {

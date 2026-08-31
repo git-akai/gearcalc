@@ -1,7 +1,7 @@
 //! The involute function and its inverse.
 //!
 //! `inv α = tan α − α` is the backbone of involute gear geometry. It has no
-//! algebraic inverse, and that single fact is the reason three of the five
+//! algebraic inverse, and that single fact is the reason three of the nine
 //! transcendental solves in this crate exist (docs/rationale.md#where-closed-form-is-impossible).
 
 use crate::solve::{newton_bracketed, Tol};

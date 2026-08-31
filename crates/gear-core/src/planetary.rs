@@ -68,7 +68,7 @@ impl Rack {
         let alpha_n = pressure_angle_deg.to_radians();
         Self {
             mt: module / beta.cos(),
-            alpha_t: (alpha_n.tan() / beta.cos()).atan(),
+            alpha_t: crate::plane::transverse_pressure_angle(alpha_n, beta),
             alpha_n,
         }
     }

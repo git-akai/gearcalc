@@ -342,6 +342,14 @@
     <span>{t("ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={gear.teeth} />
   </label>
+  {@render autoNumber("ui.train_addendum", gear.addendum, g?.addendum, 0.05)}
+  {#if gear.addendum.auto}
+    <label class="sub">
+      <span>{t("ui.train_minimum_tip_width")}</span>
+      <input type="number" step="0.02" bind:value={gear.min_tip_width} />
+      <em>{t("ui.train_mm")}</em>
+    </label>
+  {/if}
   {#if opts.cut !== "shaper"}
     <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
       <span>{t("ui.train_dedendum")}</span>
@@ -423,14 +431,6 @@
         ),
       )}
     </p>
-  {/if}
-  {@render autoNumber("ui.train_addendum", gear.addendum, g?.addendum, 0.05)}
-  {#if gear.addendum.auto}
-    <label class="sub">
-      <span>{t("ui.train_minimum_tip_width")}</span>
-      <input type="number" step="0.02" bind:value={gear.min_tip_width} />
-      <em>{t("ui.train_mm")}</em>
-    </label>
   {/if}
   {#if opts.faceAuto === false}
     <!-- A crossed pair's automatic width is a **geometric** minimum: the width
@@ -901,6 +901,25 @@
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
+              {#if stage.shaft_angle === 0}
+                <label>
+                  <span>{t("ui.train_load_sharing")}</span>
+                  <!-- Off by default and deliberately so: the ramp behind it is
+                       an uncalibrated placeholder rather than a stiffness model.
+                       Offered rather than hidden, because an estimate a designer
+                       chooses is a feature and one applied on their behalf is
+                       not — and offered only here, since it reaches bending
+                       alone and a crossed stage reports none. -->
+                  <select bind:value={stage.load_sharing}>
+                    <option value="none">{t("ui.train_load_sharing_none")}</option>
+                    <option value="linear_ramp">
+                      {t("ui.train_load_sharing_linear_ramp")}
+                    </option>
+                  </select>
+                  <em></em>
+                  {@render noteSlot(notes(t("ui.train_note_load_sharing"), null))}
+                </label>
+              {/if}
             </div>
             <!-- Clearance is meaningless once the centre distance is set by hand:
                  the specification locks it to zero, and so does the solver. -->

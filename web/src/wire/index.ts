@@ -30,6 +30,7 @@ export type { GearParams } from "./core/GearParams";
 export type { GearResult } from "./core/GearResult";
 export type { Layout } from "./core/Layout";
 export type { LoadCase } from "./core/LoadCase";
+export type { LoadSharing } from "./core/LoadSharing";
 export type { Material } from "./core/Material";
 export type { MaterialLibrary } from "./core/MaterialLibrary";
 export type { Measure } from "./core/Measure";

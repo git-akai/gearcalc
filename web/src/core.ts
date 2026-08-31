@@ -304,7 +304,8 @@ let cachedDefaults: Defaults | null = null;
  *  everything in a tab losing it costs nothing. Both reads and writes are
  *  guarded: a browser with site data blocked throws on the accessor itself, and
  *  a language picker is not worth a blank page. */
-const STORED = "gearcalc.language";
+export const LANGUAGE_KEY = "gearcalc.language";
+const STORED = LANGUAGE_KEY;
 
 function stored(): string | null {
   try {

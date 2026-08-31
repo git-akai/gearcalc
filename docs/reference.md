@@ -52,9 +52,15 @@ list of them is in [rationale.md](rationale.md#where-closed-form-is-impossible).
 ### Rack and reference geometry
 
 ```text
-m_t = m / cos β              tan α_t = tan α_n / cos β
+m_t = m / cos β              tan α_t = tan α_n / cos β      plane.rs
 r   = m_t z / 2              r_b     = r cos α_t
+sin β_b = sin β · cos α_n                                   plane.rs
 ```
+
+The two that carry an angle between the normal and transverse planes are
+`crate::plane`'s, in one place: each was written out nine or ten times across
+the crate, which is the shape of a defect this project has recorded more than
+once. A spur gear is `β = 0`, where both reduce exactly.
 
 ### Tooth thickness and its equivalent shift
 
@@ -450,12 +456,30 @@ solved in `ln κ`, so the tolerance is relative and the line-contact limit at
 infinitely long and a finite load over it gives exactly zero peak pressure, so
 
 ```text
-σ_H = max( σ_elliptical , σ_line )
-σ_line = √( (F_n/b) (1/ρ₁ ± 1/ρ₂) E* / π )
+σ_H = max( σ_elliptical , σ_line )              hertz::peak_pressure
+σ_line = √( (F_n/L) (1/ρ₁ ± 1/ρ₂) E* / π )      L the contact line the teeth have
 ```
 
 collapses to the line term for every parallel-axis mesh, without a branch.
 `PARALLEL_AXES` is the named zero.
+
+**The `max` is where the bodies take over from the elasticity, and it belongs to
+both mesh kinds.** The elliptical solution assumes half-spaces of unlimited
+extent; a real tooth's contact line runs out at the face, `L = b / cos β_b`. So
+once the ellipse is longer than `L` the load is carried on the length that
+exists. The two cross exactly once and the larger is physical on each side of the
+crossing — near it the truth sits slightly above both, since a truncated ellipse
+concentrates load more than a uniform line does.
+
+A crossed pair needs it as much as a parallel one and for the opposite reason:
+its ellipse *lengthens* as the shafts come parallel, so at small shaft angles the
+line term governs and at a worm's right angle the elliptical one does. One
+function answers both, and a patch is reported no longer than the teeth carrying
+it.
+
+**Both degenerate ends are values.** A zero lengthwise curvature presses with
+exactly zero; a zero contact line presses with an unbounded pressure, which is
+what a face width of zero means. Only a zero load on a zero line has no answer.
 
 **Which points are checked.** Since `ρ₁ + ρ₂` is constant along the path, the
 relative radius peaks where the two are equal and falls away toward **both**
@@ -885,6 +909,16 @@ The walk stops at the first stage with `η_b ≤ 0`: that stage reacts the load 
 everything upstream carries none of it. If the walk reaches the input still
 nonzero, **nothing reacted it** — the train is back-drivable, the load simply
 turns it, and the case is zero at every gear.
+
+**Load sharing.** A stage input, `LoadSharing`, **off by default**. It reaches
+bending alone — a contact rating is already taken where one tooth carries
+everything, so sharing cannot move it — and where it is off the rating is
+`bending_section`'s own answer rather than one that agrees with it. Switched on,
+the mesh cycle is swept for the largest `Y_F · Y_S · share`; the share is
+`contact::load_share`, in base pitches from the far end of the path, so the
+transverse path and the virtual spur gear ask one function rather than two.
+Above a virtual contact ratio of 2 there is no single-pair zone and the ramp is
+extrapolating, which the stage reports.
 
 **Automatic face width.** Four ratings, four toggles per gear; the width is the
 largest any *enabled* rating asks for. Peak contact is off by default — see

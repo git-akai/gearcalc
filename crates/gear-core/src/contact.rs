@@ -140,6 +140,10 @@ impl ContactPath {
     /// the split depends on their relative stiffness. This is the
     /// [`LoadSharing`] model's job; see its documentation for what it is and is
     /// not.
+    ///
+    /// The share itself is [`load_share`], in the dimensionless coordinate both
+    /// callers of it have: a bending sweep asks the same question on the
+    /// **virtual** spur gear, whose base pitch is not this one's.
     #[must_use]
     pub fn load_fraction(&self, xi: f64, model: LoadSharing) -> f64 {
         let start = -self.approach;
@@ -152,25 +156,7 @@ impl ContactPath {
             return 0.0;
         }
         let xi = xi.clamp(start, end);
-        match model {
-            LoadSharing::None => 1.0,
-            LoadSharing::LinearRamp => {
-                // Single-pair zone: this tooth carries everything.
-                let single_lo = end - self.base_pitch;
-                let single_hi = start + self.base_pitch;
-                if xi >= single_lo && xi <= single_hi {
-                    return 1.0;
-                }
-                // Double-pair zones: ramp between the endpoints below.
-                if xi < single_lo {
-                    let t = (xi - start) / (single_lo - start).max(f64::MIN_POSITIVE);
-                    RAMP_MIN + (RAMP_MAX - RAMP_MIN) * t
-                } else {
-                    let t = (end - xi) / (end - single_hi).max(f64::MIN_POSITIVE);
-                    RAMP_MIN + (RAMP_MAX - RAMP_MIN) * t
-                }
-            }
-        }
+        load_share((end - xi) / self.base_pitch, self.contact_ratio, model)
     }
 }
 
@@ -678,7 +664,6 @@ impl Contact {
     pub fn efficiency(&self, friction: f64, drive: Drive) -> Option<f64> {
         let [torque_1, torque_2] = self.moment_per_force(friction, drive)?;
         // Power, which is where the speed ratio belongs and nowhere else.
-        // Power, which is where the speed ratio belongs and nowhere else.
         let k = self.speed_ratio()?;
         let (input, output) = match drive {
             Drive::Forward => (torque_1, torque_2 * k),
@@ -722,12 +707,62 @@ pub(crate) fn norm(a: [f64; 3]) -> f64 {
 /// partner near the tip, so it takes less than half; 1/3 to 2/3 across the
 /// double-contact zone is the common first-order stand-in in the literature for
 /// spur gears. Replacing it with a real mesh-stiffness model is the work
-/// deferred in `docs/rationale.md#load-sharing-is-deferred-and-the-reason-is-structural`.
+/// `docs/rationale.md#load-sharing-is-offered-rather-than-assumed` sets out —
+/// and note the band: the ramp is described for a mesh that *has* a single-pair
+/// zone, so above a virtual contact ratio of 2 it is extrapolating.
 const RAMP_MIN: f64 = 1.0 / 3.0;
 const RAMP_MAX: f64 = 2.0 / 3.0;
 
+/// What share of the load one tooth carries, `d` base pitches back from the far
+/// end of a path `contact_ratio` base pitches long.
+///
+/// # Why the coordinate is dimensionless
+///
+/// Because the same question is asked in two planes. A contact quantity asks it
+/// along the transverse path of contact; a **bending** rating asks it on the
+/// ISO virtual spur gear, whose base pitch and contact ratio are the transverse
+/// ones divided by `cos²β_b` — so a position in millimetres means different
+/// things to the two, while "how far through the mesh cycle, in tooth pairs"
+/// means the same thing to both.
+///
+/// Writing the ramp out once per plane is how one idea becomes two answers
+/// (`docs/corrections.md`), so it is written here and both ask it.
+///
+/// ```text
+/// single pair   d ∈ [ε−1, 1]           this tooth carries everything
+/// two pairs     d < ε−1  or  d > 1     the ramp below
+/// ```
+#[must_use]
+pub fn load_share(d: f64, contact_ratio: f64, model: LoadSharing) -> f64 {
+    match model {
+        LoadSharing::None => 1.0,
+        LoadSharing::LinearRamp => {
+            let double = (contact_ratio - 1.0).max(f64::MIN_POSITIVE);
+            if d >= contact_ratio - 1.0 && d <= 1.0 {
+                return 1.0;
+            }
+            // Near the far end the tooth is entering; near the origin end it is
+            // leaving. Both ramps run from `RAMP_MIN` at the extreme to
+            // `RAMP_MAX` where the single-pair zone begins.
+            let t = if d < contact_ratio - 1.0 {
+                d / double
+            } else {
+                (contact_ratio - d) / double
+            };
+            RAMP_MIN + (RAMP_MAX - RAMP_MIN) * t.clamp(0.0, 1.0)
+        }
+    }
+}
+
 /// How the load is divided when two tooth pairs are in contact.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum LoadSharing {
     /// No sharing: this tooth carries the whole load wherever it is in mesh.
     #[default]
@@ -747,6 +782,28 @@ mod tests {
     use super::*;
     use crate::mesh::MeshKind;
     use crate::GearParams;
+
+    /// The midpoint average of `f` over the whole path of contact.
+    ///
+    /// Contact traverses the line of action at constant speed, so a uniform
+    /// average in `ξ` *is* the time average — which is the step every closed
+    /// form below is checked against. Written once because it was written three
+    /// times, each with its own `N` and its own off-by-a-half risk, to average
+    /// three different integrands over the same interval.
+    fn mean_over_path(path: &ContactPath, f: impl Fn(f64) -> f64) -> f64 {
+        const N: usize = 200_000;
+        let span = path.approach + path.recess;
+        let mut sum = 0.0;
+        for i in 0..N {
+            #[allow(clippy::cast_precision_loss)]
+            let t = (i as f64 + 0.5) / N as f64;
+            sum += f(-path.approach + span * t);
+        }
+        #[allow(clippy::cast_precision_loss)]
+        {
+            sum / N as f64
+        }
+    }
 
     fn pair(z1: u32, z2: u32) -> (Tooth, Tooth, Mesh) {
         let a = Tooth::new(GearParams {
@@ -860,16 +917,7 @@ mod tests {
                 let mu = 0.06;
                 let (rb1, rb2) = m.base_radii();
 
-                const N: usize = 200_000;
-                let span = path.approach + path.recess;
-                let mut sum = 0.0;
-                for i in 0..N {
-                    #[allow(clippy::cast_precision_loss)]
-                    let t = (i as f64 + 0.5) / N as f64;
-                    sum += (-path.approach + span * t).abs();
-                }
-                #[allow(clippy::cast_precision_loss)]
-                let mean_abs_xi = sum / N as f64;
+                let mean_abs_xi = mean_over_path(&path, f64::abs);
                 let cos_bb = crate::metrology::base_helix_angle(&a).cos();
                 let numeric = 1.0 - mu * mean_abs_xi * (1.0 / rb1 + 1.0 / rb2) / cos_bb;
 
@@ -1030,17 +1078,9 @@ mod tests {
                 let v_b = omega_1 * a.rb;
                 let cos_bb = crate::metrology::base_helix_angle(&a).cos();
 
-                const N: usize = 200_000;
-                let span = path.approach + path.recess;
-                let mut sum = 0.0;
-                for i in 0..N {
-                    #[allow(clippy::cast_precision_loss)]
-                    let t = (i as f64 + 0.5) / N as f64;
-                    let xi = -path.approach + span * t;
-                    sum += sliding_at(&path, &m, &a, xi, omega_1).magnitude();
-                }
-                #[allow(clippy::cast_precision_loss)]
-                let mean_slide = sum / N as f64;
+                let mean_slide = mean_over_path(&path, |xi| {
+                    sliding_at(&path, &m, &a, xi, omega_1).magnitude()
+                });
                 let numeric = 1.0 - mu * mean_slide / (v_b * cos_bb);
 
                 let closed = efficiency(&path, &m, &a, mu, Drive::Forward);
@@ -1146,16 +1186,7 @@ mod tests {
                 // Instantaneous fractional loss is mu|xi|(1/rb1 + 1/rb2)/cos(beta_b);
                 // contact sweeps the path at constant speed, so average it
                 // uniformly in xi.
-                const N: usize = 200_000;
-                let span = path.approach + path.recess;
-                let mut sum = 0.0;
-                for i in 0..N {
-                    #[allow(clippy::cast_precision_loss)]
-                    let t = (i as f64 + 0.5) / N as f64;
-                    sum += (-path.approach + span * t).abs();
-                }
-                #[allow(clippy::cast_precision_loss)]
-                let mean_abs_xi = sum / N as f64;
+                let mean_abs_xi = mean_over_path(&path, f64::abs);
                 let cos_bb = crate::metrology::base_helix_angle(&a).cos();
                 let numeric = 1.0 - mu * mean_abs_xi * (1.0 / a.rb + 1.0 / b.rb) / cos_bb;
 

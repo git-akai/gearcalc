@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     FIELDS,
+    defaults,
     dxf,
     isUnavailable,
     profile,
@@ -338,7 +339,10 @@
               onchange={(e) => {
                 if (e.currentTarget.value === "throw") {
                   const cp = "ok" in result ? result.ok.centre_profile : null;
-                  tab.eccentricThrow = cp && !isUnavailable(cp) ? cp.sinusoid.amplitude : 0.1;
+                  tab.eccentricThrow =
+                    cp && !isUnavailable(cp)
+                      ? cp.sinusoid.amplitude
+                      : defaults().gear.eccentric_throw;
                 } else {
                   if ("ok" in result) {
                     tab.params = { ...tab.params, angular_shift: result.ok.angular_shift };

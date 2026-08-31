@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { loadCore, coreVersion, t } from "./core";
-  import { workspace, trains, library } from "./state.svelte";
+  import { loadCore, coreVersion, t, language, LANGUAGE_KEY } from "./core";
+  import { workspace, trains, library, applyLanguage } from "./state.svelte";
   import Sidebar from "./Sidebar.svelte";
   import GearPanel from "./GearPanel.svelte";
   import TrainPanel from "./TrainPanel.svelte";
@@ -37,6 +37,27 @@
     } catch (e) {
       failed = e instanceof Error ? e.message : String(e);
     }
+  });
+
+  // **Two copies of this application in one browser share exactly one thing**,
+  // and this is it: the stored language. Everything else a tab holds is an
+  // input, and inputs live in the tab (`docs/rationale.md`) — there is no
+  // cookie, no service worker, no IndexedDB and no shared worker, so nothing
+  // else can cross.
+  //
+  // `storage` fires only in the *other* documents on the origin, so this is the
+  // copy that did not make the change following the one that did. Without it
+  // the two disagree silently until one is reloaded, which reads as the picker
+  // being broken. An unknown or future value is safe: Rust resolves anything it
+  // does not ship to English.
+  onMount(() => {
+    const follow = (e: StorageEvent) => {
+      if (e.key === LANGUAGE_KEY && e.newValue && e.newValue !== language()) {
+        applyLanguage(e.newValue);
+      }
+    };
+    window.addEventListener("storage", follow);
+    return () => window.removeEventListener("storage", follow);
   });
 </script>
 

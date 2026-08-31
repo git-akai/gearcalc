@@ -15,6 +15,7 @@ import {
   type MateRef,
   importLibrary,
   importTrain,
+  setLanguage,
   type ClassRef,
   type GearParams,
   type MaterialLibrary,
@@ -94,6 +95,18 @@ class Workspace {
     const t = freshTab();
     this.tabs.push(t);
     this.selectedId = t.id;
+  }
+
+  /** Rename tabs still carrying the application's own word for a fresh tab.
+   *
+   *  A tab's name starts as the catalogue's and becomes the reader's the moment
+   *  they type over it — so a name that still *is* the old language's default
+   *  was never theirs, and leaving it behind is how an English session ends up
+   *  with a Chinese tab in it. A name they typed cannot match, so it is not
+   *  touched, which is the whole of the distinction the two cases need. */
+  relabelDefaults(from: string, to: string) {
+    if (from === to) return;
+    for (const tab of this.tabs) if (tab.name === from) tab.name = to;
   }
 
   get selected(): GearTab {
@@ -185,6 +198,18 @@ class Trains {
     const t = freshTrain();
     this.tabs.push(t);
     this.selectedId = t.id;
+  }
+
+  /** Rename tabs still carrying the application's own word for a fresh tab.
+   *
+   *  A tab's name starts as the catalogue's and becomes the reader's the moment
+   *  they type over it — so a name that still *is* the old language's default
+   *  was never theirs, and leaving it behind is how an English session ends up
+   *  with a Chinese tab in it. A name they typed cannot match, so it is not
+   *  touched, which is the whole of the distinction the two cases need. */
+  relabelDefaults(from: string, to: string) {
+    if (from === to) return;
+    for (const tab of this.tabs) if (tab.name === from) tab.name = to;
   }
 
   /** Which list the main panel is showing. */
@@ -288,3 +313,24 @@ class Library {
 }
 
 export const library = new Library();
+
+/** Switch language, carrying the names the *application* chose across with it.
+ *
+ *  One home for the whole of what a language change means, because there are two
+ *  ways to ask for one and they must not answer differently: the picker, and
+ *  another copy of the application in the same browser changing the stored
+ *  preference underneath this one.
+ *
+ *  A tab's name starts as the catalogue's word and becomes the reader's the
+ *  moment they type over it, so a name that still *is* the outgoing default was
+ *  never theirs and follows the language like every other label. One they typed
+ *  cannot match it and is left alone. */
+export function applyLanguage(tag: string) {
+  const before = {
+    gear: t("ui.gear_default_name"),
+    train: t("ui.train_default_name"),
+  };
+  setLanguage(tag);
+  workspace.relabelDefaults(before.gear, t("ui.gear_default_name"));
+  trains.relabelDefaults(before.train, t("ui.train_default_name"));
+}

@@ -193,6 +193,95 @@ pub fn elliptical_contact(
     })
 }
 
+/// The peak pressure a contact presses with, once the **bodies' own extent** is
+/// allowed to truncate the elastic patch.
+///
+/// ```text
+/// σ_H = max( σ_elliptical , σ_line )        σ_line = √( (P/L) · (1/R_y) · E*/π )
+/// ```
+///
+/// `curvature_along` and `curvature_across` are the two relative principal
+/// curvatures from [`relative_curvatures`], flatter first — `along` is the
+/// direction the patch lengthens in, `across` the one it is pinched in. `load`
+/// is the total normal force in N, `line_length` how much contact line the two
+/// bodies actually have in the `along` direction (mm), and `e_star` the
+/// effective contact modulus.
+///
+/// # Why the two models are a `max` and not a choice
+///
+/// They are the same contact seen under two different limits, and which one is
+/// the truth is decided by the *bodies*, not by the elasticity. The elliptical
+/// solution assumes half-spaces of unlimited extent: as `curvature_along → 0`
+/// its patch lengthens without bound and its peak pressure falls to zero. A real
+/// tooth is not unlimited — its contact line runs out at the face — so once the
+/// ellipse is longer than `line_length` the load is carried on the length that
+/// exists, which is the line-contact term. The two cross exactly once, and the
+/// larger is the physical one on each side of the crossing.
+///
+/// Near the crossing the truth sits slightly **above** both, since a truncated
+/// ellipse concentrates load more than a uniform line does. That is the honest
+/// limit of this expression rather than something papered over.
+///
+/// # One home, because it had two answers
+///
+/// The parallel path has had this `max` since general contact arrived, where it
+/// collapses to the line term for every uncrowned mesh (`curvature_along` is
+/// [`PARALLEL_AXES`](crate::strength::PARALLEL_AXES), a named zero, so the
+/// elliptical term is *exactly* zero and the line term is returned bit for bit).
+/// The crossed path evaluated the ellipse **alone** — correct at a worm's 90°,
+/// where the patch is a fraction of the face, and badly optimistic as the shafts
+/// come parallel: at `Σ = 0.5°` on a 10 mm face the ellipse wants to be 42 mm
+/// long and reports 369 MPa where the line it actually has carries 618. Both
+/// paths ask this one function now (`docs/corrections.md`).
+///
+/// # Both degenerate ends are values, and only `0/0` is not
+///
+/// This module's convention is that a degenerate case is a *value* rather than
+/// an error: at `curvature_along = 0` the ellipse is infinitely long and presses
+/// with **exactly zero**. A zero `line_length` is the same statement from the
+/// other end — a face of no width carries its load on no line — and its value is
+/// an infinite pressure. Both are honest, and a stage that resolves to a zero
+/// face width because no rating was enabled to size it therefore still reports,
+/// with the infinity saying plainly what a zero-width gear does.
+///
+/// The one case with no answer is a zero load on a zero line, which is `0/0` and
+/// means nothing at all.
+///
+/// # Errors
+///
+/// `None` if `e_star` or `curvature_across` is not positive, if `load` or
+/// `line_length` is negative or not finite, or for the `0/0` above.
+#[must_use]
+pub fn peak_pressure(
+    curvature_along: f64,
+    curvature_across: f64,
+    load: f64,
+    line_length: f64,
+    e_star: f64,
+) -> Option<f64> {
+    let positive = |v: f64| v.is_finite() && v > 0.0;
+    let non_negative = |v: f64| v.is_finite() && v >= 0.0;
+    if !positive(e_star) || !positive(curvature_across) {
+        return None;
+    }
+    // `curvature_along` reaches only the elliptical term, which would answer a
+    // NaN with `None` and let the line term carry the result — so it is checked
+    // here rather than left to fall through as a silently ignored argument.
+    if !non_negative(load) || !non_negative(line_length) || !non_negative(curvature_along) {
+        return None;
+    }
+    if line_length == 0.0 && load == 0.0 {
+        return None;
+    }
+    let line = (load / line_length * curvature_across * e_star / PI).sqrt();
+    // A patch that cannot exist — no load, say — carries no pressure, which the
+    // line term still can. So a failed ellipse contributes zero rather than
+    // refusing the whole answer.
+    let elliptical = elliptical_contact(curvature_along, curvature_across, load, e_star)
+        .map_or(0.0, |c| c.max_pressure);
+    Some(line.max(elliptical))
+}
+
 /// The two **relative** principal curvatures of a contacting pair, from each
 /// body's own principal curvatures and the angle between their principal
 /// planes.
@@ -500,8 +589,10 @@ mod tests {
             let (a, b, p0) = (c.semi_x, c.semi_y, c.max_pressure);
 
             // 1/(2R_x) = (p0 a b / 2E*) ∫₀^∞ dw (a²+w)^(−3/2)(b²+w)^(−1/2) w^(−1/2)
-            let m = improper_sqrt(|w| (a * a + w).powf(-1.5) * (b * b + w).powf(-0.5));
-            let n = improper_sqrt(|w| (a * a + w).powf(-0.5) * (b * b + w).powf(-1.5));
+            let m =
+                crate::testing::improper_sqrt(|w| (a * a + w).powf(-1.5) * (b * b + w).powf(-0.5));
+            let n =
+                crate::testing::improper_sqrt(|w| (a * a + w).powf(-0.5) * (b * b + w).powf(-1.5));
             let coefficient = p0 * a * b / (2.0 * e_star);
 
             assert!(
@@ -609,35 +700,65 @@ mod tests {
         assert!(elliptical_contact(f64::NAN, 0.5, 100.0, 113_000.0).is_none());
     }
 
-    /// `∫₀^∞ g(w) w^(−1/2) dw` for smooth `g` — the shape all three Hertz
-    /// integrals have.
-    ///
-    /// Split at `w = 1` and substituted onto `[0,1]` twice: `w = u²` near the
-    /// origin, which cancels the `w^(−1/2)` outright rather than integrating
-    /// through it, and `w = 1/v²` on the tail, which turns the algebraic decay
-    /// into a smooth vanishing. Test-only, and deliberately naive: its job is
-    /// to be obviously right, not fast.
-    fn improper_sqrt<F: Fn(f64) -> f64>(g: F) -> f64 {
-        const N: usize = 200_000;
-        #[allow(clippy::cast_precision_loss)]
-        let h = 1.0 / N as f64;
-        let integrate = |f: &dyn Fn(f64) -> f64| {
-            let mut sum = f(0.0) + f(1.0);
-            for i in 1..N {
-                #[allow(clippy::cast_precision_loss)]
-                let x = i as f64 * h;
-                sum += if i % 2 == 0 { 2.0 } else { 4.0 } * f(x);
+    /// **The two models cross exactly once, and the larger is the answer on
+    /// each side.** Sweeping the flat direction from a point contact down to a
+    /// line one, the elliptical term falls to zero while the line term does not
+    /// move at all — so there is one crossing, and `peak_pressure` must track
+    /// the upper envelope through it without a step.
+    #[test]
+    fn the_governing_model_changes_once_and_the_answer_does_not_step() {
+        let (across, load, line, e_star) = (0.5, 250.0, 10.0, 113_000.0);
+        let line_only = (load / line * across * e_star / PI).sqrt();
+
+        let mut crossings = 0;
+        let mut previous: Option<(f64, bool)> = None;
+        let mut along = 1.0;
+        while along > 1e-14 {
+            let got = peak_pressure(along, across, load, line, e_star).unwrap();
+            let ellipse = elliptical_contact(along, across, load, e_star)
+                .unwrap()
+                .max_pressure;
+            assert!(
+                (got - line_only.max(ellipse)).abs() < 1e-12 * got,
+                "along={along}: {got} is not the larger of {ellipse} and {line_only}"
+            );
+            let line_governs = line_only > ellipse;
+            if let Some((was, then)) = previous {
+                if then != line_governs {
+                    crossings += 1;
+                }
+                // Continuity through the seam: the envelope of two continuous
+                // curves is continuous, so no step may appear at the crossing.
+                assert!(
+                    (got - was).abs() < 0.25 * was,
+                    "along={along}: {got} stepped from {was}"
+                );
             }
-            sum * h / 3.0
-        };
-        let near = integrate(&|u: f64| 2.0 * g(u * u));
-        let tail = integrate(&|v: f64| {
-            if v == 0.0 {
-                0.0
-            } else {
-                2.0 * g(1.0 / (v * v)) / (v * v)
-            }
-        });
-        near + tail
+            previous = Some((got, line_governs));
+            along /= 1.3;
+        }
+        assert_eq!(crossings, 1, "the two models must cross exactly once");
+        // ...and at the line-contact limit the line term is all that is left.
+        let at_limit = peak_pressure(0.0, across, load, line, e_star).unwrap();
+        assert!((at_limit - line_only).abs() < 1e-15 * line_only);
+    }
+
+    /// Both degenerate ends are values; only `0/0` has no answer.
+    #[test]
+    fn the_degenerate_ends_are_values_and_only_nothing_over_nothing_is_not() {
+        // No line to press on, but a load to press with: unbounded pressure.
+        assert_eq!(
+            peak_pressure(0.0, 0.5, 250.0, 0.0, 113_000.0),
+            Some(f64::INFINITY)
+        );
+        // No load at all: no pressure, which is a number.
+        assert_eq!(peak_pressure(0.0, 0.5, 0.0, 10.0, 113_000.0), Some(0.0));
+        // No load and no line: nothing at all.
+        assert_eq!(peak_pressure(0.0, 0.5, 0.0, 0.0, 113_000.0), None);
+        // ...and the ordinary refusals.
+        assert!(peak_pressure(0.0, 0.0, 250.0, 10.0, 113_000.0).is_none());
+        assert!(peak_pressure(0.0, 0.5, -1.0, 10.0, 113_000.0).is_none());
+        assert!(peak_pressure(0.0, 0.5, 250.0, 10.0, 0.0).is_none());
+        assert!(peak_pressure(f64::NAN, 0.5, 250.0, 10.0, 113_000.0).is_none());
     }
 }

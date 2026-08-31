@@ -327,8 +327,10 @@ mod tests {
             (1e-4, 1.0, 1.0),
         ] {
             let f = r_f(x, y, z).unwrap();
-            let near = simpson(|u| 2.0 * u / ((u * u + x) * (u * u + y) * (u * u + z)).sqrt());
-            let far = simpson(|w| {
+            let near = crate::testing::simpson_unit_interval(|u| {
+                2.0 * u / ((u * u + x) * (u * u + y) * (u * u + z)).sqrt()
+            });
+            let far = crate::testing::simpson_unit_interval(|w| {
                 let (a, b, c) = (1.0 + x * w * w, 1.0 + y * w * w, 1.0 + z * w * w);
                 2.0 / (a * b * c).sqrt()
             });
@@ -339,9 +341,10 @@ mod tests {
             );
 
             let d = r_d(x, y, z).unwrap();
-            let near =
-                simpson(|u| 2.0 * u / (((u * u + x) * (u * u + y)).sqrt() * (u * u + z).powf(1.5)));
-            let far = simpson(|w| {
+            let near = crate::testing::simpson_unit_interval(|u| {
+                2.0 * u / (((u * u + x) * (u * u + y)).sqrt() * (u * u + z).powf(1.5))
+            });
+            let far = crate::testing::simpson_unit_interval(|w| {
                 let (a, b, c) = (1.0 + x * w * w, 1.0 + y * w * w, 1.0 + z * w * w);
                 2.0 * w * w / ((a * b).sqrt() * c.powf(1.5))
             });
@@ -421,21 +424,6 @@ mod tests {
         // and the legal degenerate cases are not caught by those guards
         assert!(r_f(0.0, 1.0, 1.0).is_some());
         assert!(r_d(0.0, 1.0, 1.0).is_some());
-    }
-
-    /// Composite Simpson over `[0,1]`. Test-only, and deliberately naive: its
-    /// job is to be obviously right, not fast.
-    fn simpson<F: Fn(f64) -> f64>(f: F) -> f64 {
-        const N: usize = 200_000;
-        #[allow(clippy::cast_precision_loss)]
-        let h = 1.0 / N as f64;
-        let mut sum = f(0.0) + f(1.0);
-        for i in 1..N {
-            #[allow(clippy::cast_precision_loss)]
-            let x = i as f64 * h;
-            sum += if i % 2 == 0 { 2.0 } else { 4.0 } * f(x);
-        }
-        sum * h / 3.0
     }
 
     /// `K(m)` and `E(m)` by the arithmetic–geometric mean, which shares nothing

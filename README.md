@@ -31,8 +31,17 @@ Four, split by what you came for. Nothing appears in two of them.
 | [`docs/corrections.md`](docs/corrections.md) | What this project believed, acted on, and got wrong — and what now makes each fault unrepresentable. The patterns are worth more than any entry. |
 | [`docs/state.md`](docs/state.md) | What is built, what is decided-rather-than-pending, and what to run. The only one that talks about the present, which is what lets the other three stop hedging. |
 
-[`docs/initial_spec.txt`](docs/initial_spec.txt) is the original brief, unedited.
-`docs/history/` holds the superseded design record; nothing points there.
+[`docs/bending-check.html`](docs/bending-check.html) is the bending construction
+drawn tooth by tooth, with the prose that reads it — a document with generated
+figures in it, because that construction is far easier to judge by looking than
+by reading an assertion. `docs/history/` holds the superseded design record;
+nothing points there.
+
+The original brief and the inbound handoff note were removed once every line of
+them was built and the four documents above had outgrown them: a description
+kept past the point where the code answers it more precisely is one more thing
+that can go stale, and this project has been bitten by a stale description more
+than once.
 
 ## Layout
 
