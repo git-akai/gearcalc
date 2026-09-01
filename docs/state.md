@@ -209,7 +209,12 @@ stresses; the shared pitch-point figure is reported at the mesh. An automatic
 width answers to the mesh, not to one gear. A back-driving load applied at the output
 finds the stage that reacts it, or reports that nothing does. A reversing
 intermittent drive rounds its cycles within one actuation and splits contact
-between the flanks.
+between the flanks. **Reversed bending is a train-wide switch, off by default**:
+a planet's root is loaded both ways whatever the drive does, a reversing drive
+loads every root both ways, and each gear that one reaches says so beside its own
+numbers — corrected against the reduced allowable only where the switch asks for
+it. A notch parameter outside the band the `Y_S` fit is stated for says so on
+the gear too.
 
 **Languages.** English, German, Portuguese, Simplified Chinese and Traditional
 Chinese, all compiled in, picked from under the title in the sidebar. **The four

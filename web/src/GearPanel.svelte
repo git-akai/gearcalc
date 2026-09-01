@@ -486,16 +486,6 @@
               {mm(r.junction_radius)}
             {/if}
           </dd>
-          <dt>{t("ui.gear_root_form")}</dt>
-          <dd>
-            {#if r.root_form === "fully_filleted"}
-              {t("ui.gear_root_form_fully_filleted")}
-            {:else if r.root_form === "root_arc"}
-              {t("ui.gear_root_form_root_arc")}
-            {:else}
-              <span class="warn">{t("ui.gear_no_fillet_flank_runs_root_circle")}</span>
-            {/if}
-          </dd>
           <dt>{t("ui.gear_generated_down")}</dt>
           <dd>
             {mm(r.generation_limit)}

@@ -35,9 +35,10 @@ mod spur;
 mod worm;
 
 pub use planetary::{
-    solve_planetary_stage, MeshReport, PlanetResult, PlanetaryResult, PlanetaryStage,
+    solve_planetary_stage, solve_planetary_stage_with, MeshReport, PlanetResult, PlanetaryResult,
+    PlanetaryStage,
 };
-pub use spur::{solve_spur_stage, SpurStage, StageGear};
+pub use spur::{solve_spur_stage, solve_spur_stage_with, SpurStage, StageGear};
 pub use worm::{
     solve_crossed_stage, solve_worm_stage, FirstMemberSizing, WormContact, WormMember,
     WormMemberResult, WormResult, WormStage,
@@ -85,6 +86,32 @@ pub struct Backlash {
     pub nominal: f64,
     pub minimum: f64,
     pub maximum: f64,
+}
+
+/// The note a **rating** raises about one member: its notch parameter sits
+/// outside the band the `Y_S` fit is stated for.
+///
+/// `Y_S` is an empirical fit over `q_s = s_Fn / 2ρ_F`, stated for `1 ≤ q_s < 8`.
+/// Outside it the formula still evaluates and
+/// [`stress_correction`](crate::strength::RootSection::stress_correction)
+/// clamps to the boundary — which for a notch *sharper* than the fit covers
+/// **under-predicts** the stress, since `Y_S` rises with `q_s`. That is the
+/// unconservative direction, and it is why
+/// [`notch_parameter_in_range`](crate::strength::RootSection::notch_parameter_in_range)
+/// exists.
+///
+/// It existed and nothing asked it. `docs/rationale.md` has said all along that
+/// the range is "reported, not assumed", and that a result leaving the band
+/// says so "instead of quietly returning a boundary value" — a promise with
+/// nothing enforcing it, which is the shape of half of `docs/corrections.md`.
+/// This is what asks.
+///
+/// Not a *clamp* on the part, so not in the member's clamp list: no geometry was
+/// moved. It is the stage saying which member it is reporting a fitted number
+/// outside the fit for.
+pub(crate) fn notch_outside_fit(section: &crate::strength::RootSection) -> Option<Note> {
+    (!section.notch_parameter_in_range())
+        .then(|| Note::new(key::STAGE_NOTCH_OUTSIDE_FIT).number("q", section.notch_parameter, 2))
 }
 
 /// The face width a pair of ratings asks for, at one load case.
@@ -150,6 +177,20 @@ pub struct GearResult {
     pub min_face_width: LoadCase<Widths>,
     /// Guards that altered this gear's geometry.
     pub clamps: Vec<crate::note::Note>,
+    /// What the **rating** has to say about this gear, as against what was done
+    /// to its geometry.
+    ///
+    /// Kept apart from [`Self::clamps`] because nothing here moved a dimension:
+    /// a root loaded on both flanks and a notch outside the `Y_S` fit's band are
+    /// statements about how the number was arrived at, not about the part.
+    ///
+    /// **Per gear rather than per stage**, and that is not filing. A stage note
+    /// naming a member has to carry the member's name in its own text, and two
+    /// members raising the same note give one list two entries with one key —
+    /// which a keyed list in the front end cannot render (`docs/corrections.md`).
+    /// A note that belongs to a gear belongs *on* the gear.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub notes: Vec<crate::note::Note>,
     /// The material as used, after any overrides — what the numbers were
     /// actually computed from, rather than what the library holds.
     pub material: Material,
@@ -577,6 +618,82 @@ impl FaceSources {
     }
 }
 
+/// How a stage's gears are treated for **reversed bending**.
+///
+/// Assembled by [`solve_train`] and handed down, because both halves of it are
+/// facts about the train rather than about any one stage: whether the drive
+/// reverses, and whether the designer asked for the correction at all.
+///
+/// # Why the correction is asked for rather than applied
+///
+/// A root loaded on both flanks endures less than one loaded on a single flank,
+/// and the usual allowance is a fraction on the *allowable*
+/// ([`REVERSED_BENDING_FRACTION`](crate::material::REVERSED_BENDING_FRACTION)).
+/// That fraction is a convention: it multiplies a stress a part is sized
+/// against, which is exactly what `docs/rationale.md` refuses to apply on a
+/// designer's behalf. So it is a switch, off by default, and where it is off the
+/// stage **says** that reversal is present and uncorrected rather than leaving
+/// the reader to notice.
+///
+/// # Which members reverse
+///
+/// A planet always does — the sun drives one flank and the ring the other,
+/// whatever the drive does. Every other gear does when the *drive* reverses,
+/// which is the same flag that already splits the contact cycles between the two
+/// flanks. One rule, so a note cannot appear where a cycle count does not.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Reversal {
+    /// The drive reverses between actuations, so every gear's root is loaded
+    /// both ways.
+    pub drive_reverses: bool,
+    /// Judge a reversed root against the reduced allowable.
+    pub correct: bool,
+}
+
+impl Reversal {
+    /// Whether a member's root is loaded both ways. `always` is the member's own
+    /// structural answer — true for a planet, false for everything else.
+    #[must_use]
+    pub fn reverses(self, always: bool) -> bool {
+        always || self.drive_reverses
+    }
+
+    /// What a member's reversal is worth saying about it, if anything.
+    ///
+    /// One home, so a stage cannot report the correction on one member and stay
+    /// silent about it on another — and so the sentence is the same whichever
+    /// kind of stage raises it.
+    #[must_use]
+    pub fn note_for(self, reverses: bool) -> Option<Note> {
+        if !reverses {
+            return None;
+        }
+        Some(if self.correct {
+            Note::new(key::STAGE_REVERSED_BENDING_APPLIED).number(
+                "fraction",
+                crate::material::REVERSED_BENDING_FRACTION,
+                2,
+            )
+        } else {
+            Note::new(key::STAGE_REVERSED_BENDING_UNCORRECTED)
+        })
+    }
+
+    /// The **bending** allowable a member is judged against, MPa.
+    ///
+    /// Only the cyclic case can be reduced: a peak load is survived once and has
+    /// no reversal to endure. And only bending — pitting is compressive whichever
+    /// flank carries it, so a contact rating keeps the material's own figure.
+    #[must_use]
+    pub fn bending_allowable(self, m: &Material, case: Case, reverses: bool) -> f64 {
+        if self.correct && reverses && case == Case::Cyclic {
+            crate::material::reversed_bending_allowable(m).value
+        } else {
+            allowable(m, case)
+        }
+    }
+}
+
 /// The torques one stage sees, at its **first** member, one per load case.
 ///
 /// Assembled by [`solve_train`], which is the only level that knows where a
@@ -786,6 +903,26 @@ pub fn solve_any(
     torques: StageTorques,
     lib: &MaterialLibrary,
 ) -> Result<StageResult, TrainError> {
+    solve_any_with(stage, input_speed, torques, lib, Reversal::default())
+}
+
+/// The same, told how the train treats reversed bending.
+///
+/// A second entry point rather than a fourth argument on the first, because a
+/// stage asked about in isolation — by a test, by the CLI, by the sweep — has no
+/// train to inherit that from and should not have to invent one. The plain call
+/// is this one at [`Reversal::default`]: no reversing drive, no correction.
+///
+/// # Errors
+///
+/// Whatever the stage kind reports.
+pub fn solve_any_with(
+    stage: &Stage,
+    input_speed: f64,
+    torques: StageTorques,
+    lib: &MaterialLibrary,
+    reversal: Reversal,
+) -> Result<StageResult, TrainError> {
     match stage {
         // One stage kind, two meshes. Crossing the shafts changes what the
         // teeth do to each other — a line contact becomes a point, and the
@@ -794,12 +931,14 @@ pub fn solve_any(
         Stage::Spur(s) if s.is_crossed() => {
             solve_crossed_stage(s, torques, lib).map(|r| StageResult::Worm(Box::new(r)))
         }
-        Stage::Spur(s) => solve_spur_stage(s, torques, lib).map(|r| StageResult::Spur(Box::new(r))),
+        Stage::Spur(s) => {
+            solve_spur_stage_with(s, torques, lib, reversal).map(|r| StageResult::Spur(Box::new(r)))
+        }
         Stage::Worm(s) => solve_worm_stage(s, torques, lib).map(|r| StageResult::Worm(Box::new(r))),
         // A planetary needs a speed as well as a torque: its efficiency depends
         // on which shaft is held, and that is a kinematic question. The train
         // supplies the speed it has reached by this point.
-        Stage::Planetary(s) => solve_planetary_stage(s, input_speed, torques, lib)
+        Stage::Planetary(s) => solve_planetary_stage_with(s, input_speed, torques, lib, reversal)
             .map(|r| StageResult::Planetary(Box::new(r))),
     }
 }
@@ -880,6 +1019,16 @@ pub struct Train {
     /// **zero**: a train that only ever sees its peak has no cyclic case.
     pub operating_torque: f64,
     pub actuation: Actuation,
+    /// Judge a root that is loaded on **both** flanks against the reduced
+    /// bending allowable.
+    ///
+    /// Off by default. A planet's root is always loaded both ways and a
+    /// reversing drive loads every root both ways, but what to do about it is a
+    /// convention that multiplies a stress — so the train asks rather than
+    /// assumes, and says where reversal is present and uncorrected. See
+    /// [`Reversal`].
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub reversed_bending: bool,
     pub stages: Vec<Stage>,
 }
 
@@ -1029,6 +1178,21 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
         return Err(TrainError::Empty);
     }
 
+    // How every stage treats a root loaded on both flanks. Both halves are the
+    // train's to know: the drive's own reversal is the same flag that splits the
+    // contact cycles, and whether to correct for it at all is one switch for the
+    // whole train rather than a decision taken per stage.
+    let reversal = Reversal {
+        drive_reverses: matches!(
+            train.actuation,
+            Actuation::Intermittent {
+                reversing: true,
+                ..
+            }
+        ),
+        correct: train.reversed_bending,
+    };
+
     // --- what each stage is loaded by.
     //
     // Two propagations, in opposite directions, and only the forward one can
@@ -1043,7 +1207,7 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
             let mut speed = train.input_speed;
             let mut out = Vec::with_capacity(train.stages.len());
             for (k, stage) in train.stages.iter().enumerate() {
-                let r = solve_any(stage, speed, torques(k), lib)?;
+                let r = solve_any_with(stage, speed, torques(k), lib, reversal)?;
                 speed /= r.ratio();
                 out.push(r);
             }
@@ -1229,6 +1393,7 @@ mod tests {
             input_torque: 2.0,
             back_driving_torque: 0.0,
             operating_torque: 2.0,
+            reversed_bending: false,
             actuation: Actuation::default(),
             stages: vec![
                 Stage::Spur(SpurStage::default()),
@@ -1863,6 +2028,7 @@ mod tests {
             input_torque: 1.0,
             back_driving_torque: 0.0,
             operating_torque: 1.0,
+            reversed_bending: false,
             actuation: Actuation::default(),
             stages: vec![],
         };
@@ -1900,6 +2066,7 @@ mod tests {
             ),
             (
                 Train {
+                    reversed_bending: false,
                     actuation: Actuation::Intermittent {
                         range_degrees: 25.0,
                         actuations: 1000,
@@ -1911,6 +2078,7 @@ mod tests {
             ),
             (
                 Train {
+                    reversed_bending: false,
                     actuation: Actuation::Intermittent {
                         range_degrees: 25.0,
                         actuations: 1000,

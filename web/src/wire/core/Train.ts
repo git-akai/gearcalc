@@ -31,4 +31,15 @@ back_driving_torque: number,
  * Bounded by [`Self::input_torque`] and meaningful down to and including
  * **zero**: a train that only ever sees its peak has no cyclic case.
  */
-operating_torque: number, actuation: Actuation, stages: Array<Stage>, };
+operating_torque: number, actuation: Actuation, 
+/**
+ * Judge a root that is loaded on **both** flanks against the reduced
+ * bending allowable.
+ *
+ * Off by default. A planet's root is always loaded both ways and a
+ * reversing drive loads every root both ways, but what to do about it is a
+ * convention that multiplies a stress — so the train asks rather than
+ * assumes, and says where reversal is present and uncorrected. See
+ * [`Reversal`].
+ */
+reversed_bending: boolean, stages: Array<Stage>, };

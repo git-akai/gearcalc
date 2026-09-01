@@ -516,6 +516,10 @@ standards-comparable number.
 q_s = s_Fn / (2 ρ_F)
 ```
 
+The `Y_S` fit is stated over `1 ≤ q_s < 8`. Outside it the correction is taken
+at the boundary and the stage **says so**, naming the member and the value —
+above the band that under-predicts, which is the unconservative direction.
+
 `ρ_F` is a **fillet** property at any tooth size: when the critical section
 climbs onto the involute flank the notch is still the fillet, read at the
 junction. Its curvature is closed form —
@@ -685,6 +689,18 @@ e_ring = m_t (π/2 + 2(x + x_s) tan α_n)        s_ring = π m_t − e_ring
 so a larger `k` or `x` makes a ring's tooth **thinner**, and an internal pair
 wants `k₁ = k₂` where an external one needs `k₁ + k₂ = 2`.
 
+**The two reach the cut by different roads, and that is the rule rather than a
+detail.** `x` is radial and is delivered by *where the tool sits*; `k` is
+thickness-only and is delivered by *the tool's own tooth*, which comes out as the
+standard one scaled by `k` — the basic rack's definition read round a circle. So
+the plunge, and with it the root circle, answers to `x` alone:
+
+```text
+s_cutter = π m_t k / 2                         the tool's tooth
+e_ring − s_cutter = 2 m_t x tan α_n            what the plunge is left to deliver
+a_cut = operating_geometry(…, −x)              so no k reaches a radius
+```
+
 A shaper cannot be displaced the way a rack can — two pinions have their ratio
 fixed by their tooth counts, so the pitch point moves with the centre distance
 and the rolling circles with it. Everything follows from one factor:
@@ -736,7 +752,17 @@ gives `fillet: None` and every consumer answers it.
 ```text
 smallest ring       z > 2 h_a cos β / (1 − cos α_t)
 generation limit    deepest generated radius = √(r_b² + (a sin α_t)²)
+space closes        inv α = π/z − ψ_b          root truncated at r_b/cos α
+tooth runs out      inv α = −ψ_b               tip raised to r_b/cos α
 ```
+
+The last two are one guard at the two ends of a ring's tooth, and both are the
+external gear's pointed-tooth cap read on a ring. Its **tooth** narrows inward,
+so it can run out of thickness at the tip; its **space** narrows outward, so the
+two flanks bounding it can meet before the cutter's tip circle — and where they
+do, the root is where they meet rather than where the tool reached. Past that
+point the flank would cross the space's own centreline and its mirror image
+would come back through it, which is an outline no tool can leave.
 
 Below the generation limit the ring's flank is not cut by an involute at all —
 the internal analogue of undercut, and a property of the *pair*. It bites on
@@ -978,8 +1004,18 @@ A partial sweep still loads the teeth it reaches, so a reversing drive rounds
 *within* one actuation rather than once over all of them; and its two flanks
 share the engagements while the root takes every one of them. A planet's bending
 is fully reversed whatever the drive does — the sun loads one flank and the ring
-the other — so it is rated against a reversed allowable, and that derate does
-**not** stack with a reversing drive.
+the other — and a reversing drive loads every root both ways. The two do not
+stack: a member reverses if either says so.
+
+**Whether that is corrected for is a train-wide input, off by default.**
+
+```text
+reversed_bending = false   the reversal is reported, member by member
+reversed_bending = true    cyclic bending allowable × 0.7 for those members
+```
+
+Bending only: pitting is compressive on whichever flank carries it, so a contact
+rating keeps the material's own allowable either way.
 
 ---
 

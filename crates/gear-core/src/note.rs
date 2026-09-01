@@ -64,6 +64,8 @@ pub mod key {
     pub const CLAMP_RING_SPACE_CAPPED: &str = "clamp.ring_space_capped";
     /// `clamp.ring_space_raised`
     pub const CLAMP_RING_SPACE_RAISED: &str = "clamp.ring_space_raised";
+    /// `clamp.ring_space_closed`
+    pub const CLAMP_RING_SPACE_CLOSED: &str = "clamp.ring_space_closed";
     /// `clamp.ring_tip_raised`
     pub const CLAMP_RING_TIP_RAISED: &str = "clamp.ring_tip_raised";
     /// `clamp.tip_capped_pointed`
@@ -104,6 +106,12 @@ pub mod key {
         "stage.transverse_contact_ratio_below_one";
     /// `stage.face_width_no_source`
     pub const STAGE_FACE_WIDTH_NO_SOURCE: &str = "stage.face_width_no_source";
+    /// `stage.notch_outside_fit`
+    pub const STAGE_NOTCH_OUTSIDE_FIT: &str = "stage.notch_outside_fit";
+    /// `stage.reversed_bending_uncorrected`
+    pub const STAGE_REVERSED_BENDING_UNCORRECTED: &str = "stage.reversed_bending_uncorrected";
+    /// `stage.reversed_bending_applied`
+    pub const STAGE_REVERSED_BENDING_APPLIED: &str = "stage.reversed_bending_applied";
     /// `stage.load_sharing_out_of_band`
     pub const STAGE_LOAD_SHARING_OUT_OF_BAND: &str = "stage.load_sharing_out_of_band";
 
@@ -184,6 +192,7 @@ pub mod key {
         CLAMP_RING_FULLY_FILLETED,
         CLAMP_RING_SPACE_CAPPED,
         CLAMP_RING_SPACE_RAISED,
+        CLAMP_RING_SPACE_CLOSED,
         CLAMP_RING_TIP_RAISED,
         CLAMP_TIP_CAPPED_POINTED,
         CLAMP_TOOTH_SEVERED,
@@ -192,6 +201,9 @@ pub mod key {
         CLAMP_TOOTH_THICKNESS_RAISED,
         STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE,
         STAGE_FACE_WIDTH_NO_SOURCE,
+        STAGE_NOTCH_OUTSIDE_FIT,
+        STAGE_REVERSED_BENDING_UNCORRECTED,
+        STAGE_REVERSED_BENDING_APPLIED,
         TRAIN_OPERATING_TORQUE_CLAMPED,
         TRAIN_OPERATING_SPEED_CLAMPED,
         TRAIN_BACK_DRIVING_REACTED_AT,

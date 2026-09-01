@@ -28,4 +28,13 @@ train: Train,
  * specification lists them: a crossed gear pair is **not** a fourth — it is
  * a spur stage with its shafts at an angle (docs/reference.md#crossed-axes).
  */
-spur_stage: Stage, worm_stage: Stage, planetary_stage: Stage, };
+spur_stage: Stage, worm_stage: Stage, planetary_stage: Stage, 
+/**
+ * The fraction a reversed root's cyclic bending allowable is taken at.
+ *
+ * Crosses so the control's own note can name it. It is
+ * [`REVERSED_BENDING_FRACTION`](gear_core::material::REVERSED_BENDING_FRACTION)
+ * and nothing else — a number the interface shows is a number Rust decided,
+ * this one included.
+ */
+reverse_loading_coefficient: number, };

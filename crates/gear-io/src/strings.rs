@@ -745,6 +745,34 @@ mod tests {
                 &lib,
             ) {
                 record(&r.notes);
+                for g in &r.gears {
+                    record(&g.notes);
+                }
+            }
+        }
+        // A **sharp** rack on many teeth, which is where the `Y_S` fit's notch
+        // band is left: `q_s` reaches 10.3 at z = 300 with no tip round at all
+        // (docs/corrections.md), and the correction is then taken at the
+        // boundary rather than extrapolated.
+        for (teeth, root_radius) in [(300_u32, 0.0_f64), (17, 0.38)] {
+            let gear = gear_core::train::StageGear {
+                teeth,
+                root_radius,
+                ..Default::default()
+            };
+            let stage = gear_core::train::SpurStage {
+                gears: [gear.clone(), gear],
+                ..Default::default()
+            };
+            if let Ok(r) = gear_core::train::solve_spur_stage(
+                &stage,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
+                record(&r.notes);
+                for g in &r.gears {
+                    record(&g.notes);
+                }
             }
         }
         for (starts, friction) in [
@@ -768,6 +796,26 @@ mod tests {
                 record(&r.notes);
             }
         }
+        // A planet's root is loaded both ways whatever the drive does, so the
+        // correction switched on is what fires the "applied" half of the pair;
+        // switched off — every other case here — fires the disclosure.
+        if let Ok(r) = gear_core::train::solve_planetary_stage_with(
+            &gear_core::train::PlanetaryStage::default(),
+            3000.0,
+            gear_core::train::StageTorques::just(2.0),
+            &lib,
+            gear_core::train::Reversal {
+                drive_reverses: false,
+                correct: true,
+            },
+        ) {
+            record(&r.notes);
+            // ...and what the members themselves say, which is where a note
+            // about one gear belongs.
+            for g in [&r.sun, &r.planet.gear, &r.ring] {
+                record(&g.notes);
+            }
+        }
         for (planets, clearance) in [(3_u32, 0.5_f64), (4, 9.0), (5, 0.5), (6, 40.0), (7, 0.5)] {
             let stage = gear_core::train::PlanetaryStage {
                 planets,
@@ -781,6 +829,9 @@ mod tests {
                 &lib,
             ) {
                 record(&r.notes);
+                for g in [&r.sun, &r.planet.gear, &r.ring] {
+                    record(&g.notes);
+                }
             }
         }
         // Six that the grids above do not reach, each needing its own corner.
@@ -832,6 +883,9 @@ mod tests {
                 &lib,
             ) {
                 record(&r.notes);
+                for g in &r.gears {
+                    record(&g.notes);
+                }
             }
             // ...and a crossed pair of the same, whose teeth then reach a full
             // contact ratio at no width at all.
@@ -931,6 +985,9 @@ mod tests {
                 &lib,
             ) {
                 record(&r.notes);
+                for g in [&r.sun, &r.planet.gear, &r.ring] {
+                    record(&g.notes);
+                }
             }
         }
 
@@ -949,6 +1006,7 @@ mod tests {
                 input_torque: 2.0,
                 back_driving_torque,
                 operating_torque,
+                reversed_bending: false,
                 actuation,
                 stages,
             };
@@ -1013,6 +1071,9 @@ mod tests {
                 &lib,
             ) {
                 record(&r.notes);
+                for g in &r.gears {
+                    record(&g.notes);
+                }
             }
         }
 
@@ -1133,6 +1194,7 @@ mod tests {
                     input_torque: 2.0,
                     back_driving_torque: 0.0,
                     operating_torque: 2.0,
+                    reversed_bending: false,
                     actuation: gear_core::train::Actuation::Continuous {
                         operating_speed: 2400.0,
                         runtime_hours: 1000.0,

@@ -274,6 +274,23 @@ pub fn solve_spur_stage(
     torques: StageTorques,
     lib: &MaterialLibrary,
 ) -> Result<SpurResult, TrainError> {
+    solve_spur_stage_with(stage, torques, lib, super::Reversal::default())
+}
+
+/// The same, told how the train treats a root loaded on both flanks.
+///
+/// A parallel-axis gear reverses only when the **drive** does, so with an
+/// ordinary one-way drive this is the call above and nothing moves.
+///
+/// # Errors
+///
+/// As [`solve_spur_stage`].
+pub fn solve_spur_stage_with(
+    stage: &SpurStage,
+    torques: StageTorques,
+    lib: &MaterialLibrary,
+    reversal: super::Reversal,
+) -> Result<SpurResult, TrainError> {
     let p = [stage.params(0), stage.params(1)];
     let g = [Tooth::new(p[0]), Tooth::new(p[1])];
     let mesh = Mesh::new(&g[0], &g[1], MeshKind::External).map_err(TrainError::Mesh)?;
@@ -356,20 +373,44 @@ pub fn solve_spur_stage(
         cyclic: probe(Case::Cyclic)?,
     };
 
+    // A parallel-axis gear's root is loaded both ways only when the drive
+    // reverses; nothing about the pair itself reverses it.
+    let reverses = reversal.reverses(false);
     let probe_widths = |i: usize| -> LoadCase<Widths> {
         LoadCase::of(|case| {
             let (cs, sf) = probed.get(case);
-            let allow = allowable(&materials[i], case);
             Widths {
-                bending: sf[i].map(|s| min_face_width_bending(s, PROBE, allow)),
+                bending: sf[i].map(|s| {
+                    let allow = reversal.bending_allowable(&materials[i], case, reverses);
+                    min_face_width_bending(s, PROBE, allow)
+                }),
                 // **This gear's** governing point, not the pair's envelope: the
-                // width a gear needs follows from the stress it is rated at.
-                contact: min_face_width_contact(cs.governing(i), PROBE, allow),
+                // width a gear needs follows from the stress it is rated at. And
+                // the material's own allowable whatever the drive does: pitting
+                // is compressive on whichever flank carries it.
+                contact: min_face_width_contact(
+                    cs.governing(i),
+                    PROBE,
+                    allowable(&materials[i], case),
+                ),
             }
         })
     };
 
     let mut notes = Vec::new();
+    // The `Y_S` fit is stated over a band, and a section outside it is reported
+    // rather than silently taking the boundary value — see `notch_outside_fit`.
+    // What the rating has to say about each gear. Per gear, because that is
+    // whose it is — and because two gears raising the same note would give one
+    // stage-level list two entries with one key.
+    let gear_notes = |i: usize| {
+        let mut out = Vec::new();
+        out.extend(super::notch_outside_fit(&sections[i]));
+        // ...and whether this root is loaded both ways, which for a parallel
+        // pair is the drive's doing alone.
+        out.extend(reversal.note_for(reverses));
+        out
+    };
     // **What the mesh needs, not what one gear needs.** The narrower face
     // carries the pair, so a width that satisfies only its own gear satisfies
     // nothing: give gear 2 a weaker material and it asks for more, and sizing
@@ -447,13 +488,20 @@ pub fn solve_spur_stage(
             contact_stress: LoadCase::of(|case| rated.get(case).0.governing(i)),
             min_face_width: LoadCase::of(|case| {
                 let (cs, sf, _) = rated.get(case);
-                let allow = allowable(&materials[i], case);
                 Widths {
-                    bending: sf[i].map(|s| min_face_width_bending(s, effective, allow)),
-                    contact: min_face_width_contact(cs.governing(i), effective, allow),
+                    bending: sf[i].map(|s| {
+                        let allow = reversal.bending_allowable(&materials[i], case, reverses);
+                        min_face_width_bending(s, effective, allow)
+                    }),
+                    contact: min_face_width_contact(
+                        cs.governing(i),
+                        effective,
+                        allowable(&materials[i], case),
+                    ),
                 }
             }),
             clamps: g[i].clamps.notes.clone(),
+            notes: gear_notes(i),
             material: materials[i].clone(),
             ranges: admissible_ranges(
                 &p[i],

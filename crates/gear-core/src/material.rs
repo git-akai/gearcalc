@@ -150,9 +150,12 @@ pub enum Family {
 /// Fraction of the one-directional bending allowable that survives a **fully
 /// reversed** load.
 ///
-/// A planet gear is driven on one flank by the sun and on the other by the ring,
-/// so every tooth sees a complete stress reversal each turn rather than a
-/// released load (docs/reference.md#trains). ISO's convention for an alternating load is about 0.7,
+/// A root is loaded both ways when the drive reverses, and a planet's always is —
+/// driven on one flank by the sun and on the other by the ring, so every tooth
+/// sees a complete stress reversal each turn rather than a released load
+/// (docs/reference.md#trains). Which members that reaches is
+/// [`Reversal`](crate::train::Reversal)'s to say; this is only the fraction.
+/// ISO's convention for an alternating load is about 0.7,
 /// and unlike the `K` and `Z` families this is not a population-calibrated
 /// rating factor balanced against `σ_Flim` values this project does not have —
 /// it is the Goodman/Haigh statement that reversal doubles the stress range, and
@@ -175,8 +178,8 @@ pub fn reversed_bending_allowable(m: &Material) -> Value {
         basis: Basis::Derived,
         note: Some(format!(
             "{REVERSED_BENDING_FRACTION} x the one-directional allowable of \
-             {:.1} MPa: a planet's bending is fully reversed, driven on one flank \
-             by the sun and the other by the ring",
+             {:.1} MPa: a root loaded on both flanks endures less than one \
+             loaded on a single flank",
             m.fatigue_allowable.value
         )),
     }

@@ -192,17 +192,6 @@ pub struct PlanetResult {
     pub speed_absolute: f64,
     /// Speed **relative to the carrier**, rpm — what its teeth actually see.
     pub speed_relative: f64,
-    /// Bending is fully reversed: the sun drives one flank and the ring the
-    /// other. Always true, and carried so a reader meets it beside the stress
-    /// rather than in the documentation.
-    pub fully_reversed: bool,
-    /// The bending allowable a fully reversed load leaves, MPa, and where the
-    /// figure comes from.
-    ///
-    /// This is the allowable [`Self::gear`]'s **cyclic** bending is rated
-    /// against — there is no second minimum face width to report beside it, and
-    /// there used to be, which was one derate written down in two places.
-    pub reversed_allowable: crate::material::Value,
 }
 
 /// Everything a planetary stage produces.
@@ -329,6 +318,27 @@ pub fn solve_planetary_stage(
     input_speed: f64,
     torques: StageTorques,
     lib: &MaterialLibrary,
+) -> Result<PlanetaryResult, TrainError> {
+    solve_planetary_stage_with(stage, input_speed, torques, lib, super::Reversal::default())
+}
+
+/// The same, told how the train treats a root loaded on both flanks.
+///
+/// **A planet's root always is**, whatever the drive does: the sun drives one
+/// flank and the ring the other. So a planetary set is the stage kind where this
+/// is never idle — with the correction off, the planet is rated against the
+/// material's plain fatigue figure and the stage says the reversal is there and
+/// uncorrected.
+///
+/// # Errors
+///
+/// As [`solve_planetary_stage`].
+pub fn solve_planetary_stage_with(
+    stage: &PlanetaryStage,
+    input_speed: f64,
+    torques: StageTorques,
+    lib: &MaterialLibrary,
+    reversal: super::Reversal,
 ) -> Result<PlanetaryResult, TrainError> {
     let input_torque = torques.peak_forward;
     let teeth = stage.teeth();
@@ -539,8 +549,21 @@ pub fn solve_planetary_stage(
         bending_section(&sun, sp_path.contact_ratio).ok_or(TrainError::NoRootSection)?;
     let planet_section =
         bending_section(&planet, sp_path.contact_ratio).ok_or(TrainError::NoRootSection)?;
-    let ring_section =
-        ring_bending_section(&ring, pr_path.contact_ratio).ok_or(TrainError::NoRootSection)?;
+    // **A ring that cannot be rated for bending refuses the rating, not the
+    // stage.**
+    //
+    // The commonest way to get here is a ring with no fillet, and its geometry
+    // exists perfectly well: it draws, it exports, it meshes, and every figure
+    // that does not need a notch is still answerable — the ratios, both contact
+    // stresses, the efficiencies, the cycles, and the sun and planet's own
+    // bending. What cannot be had is `Y_S`, whose input is a fillet radius, and
+    // a stage that threw all of the rest away over one missing input would be
+    // deciding for the designer instead of informing them.
+    //
+    // Nothing downstream needs telling: a bending stress is already an `Option`
+    // for the worm stage's sake, so the width it would have asked for is simply
+    // not asked for, and the member's own clamps say why the fillet is missing.
+    let ring_section = ring_bending_section(&ring, pr_path.contact_ratio);
 
     // Every rating is linear or square-root in the torque, and the planetary's
     // power split is **not** a function of its magnitude: `w = sgn(T_s(ω_s − ω_c))`
@@ -557,6 +580,31 @@ pub fn solve_planetary_stage(
 
     // An automatic width with every source switched off has nothing to invert
     // and comes out zero. Said rather than divided by, as in the spur stage.
+    // **Which members are loaded on both flanks.** The planet structurally —
+    // sun on one flank, ring on the other, whatever the drive does — and all
+    // three when the drive itself reverses. A reversing drive does not make a
+    // planet *more* reversed, so the two do not stack: `Reversal::reverses`
+    // takes the member's own answer or the drive's, never both.
+    let reverses = [
+        reversal.reverses(false),
+        reversal.reverses(true),
+        reversal.reverses(false),
+    ];
+    // What the rating has to say about each member, kept **on** the member: two
+    // of them raising the same note would give one list two entries under one
+    // key, which is not something a keyed list can draw.
+    let sections = [
+        Some(&sun_section),
+        Some(&planet_section),
+        ring_section.as_ref(),
+    ];
+    let gear_notes = |i: usize| {
+        let mut out = Vec::new();
+        out.extend(sections[i].and_then(super::notch_outside_fit));
+        out.extend(reversal.note_for(reverses[i]));
+        out
+    };
+
     let mut no_source = Vec::new();
     let mut ask_of = |name: &str, g: &StageGear, asks: &LoadCase<Widths>| -> f64 {
         if g.face_width.auto && !g.face_sources.any() {
@@ -571,15 +619,17 @@ pub fn solve_planetary_stage(
         sigma_f: Option<f64>,
         sigma_h: f64,
         probe: f64,
-        allow: &dyn Fn(Case) -> f64,
+        bending_allow: &dyn Fn(Case) -> f64,
+        contact_allow: &dyn Fn(Case) -> f64,
         scale: &dyn Fn(Case) -> f64,
     ) -> LoadCase<Widths> {
         LoadCase::of(|case| {
             let k = scale(case);
-            let a = allow(case);
             Widths {
-                bending: sigma_f.map(|s| min_face_width_bending(s * k, probe, a)),
-                contact: min_face_width_contact(sigma_h * k.sqrt(), probe, a),
+                // Two allowables, because a reversed root endures less bending
+                // while its flank pits exactly as it did.
+                bending: sigma_f.map(|s| min_face_width_bending(s * k, probe, bending_allow(case))),
+                contact: min_face_width_contact(sigma_h * k.sqrt(), probe, contact_allow(case)),
             }
         })
     }
@@ -598,21 +648,22 @@ pub fn solve_planetary_stage(
         StressConcentration::Iso6336,
     );
     let probe_load_pr = Load::new(ring_torque_per_mesh / pr_mesh.ratio(), PROBE);
-    let ring_sf = bending_stress(
-        &ring_section,
-        &planet,
-        &probe_load_pr,
-        StressConcentration::Iso6336,
-    );
+    let ring_sf = ring_section.and_then(|section| {
+        bending_stress(
+            &section,
+            &planet,
+            &probe_load_pr,
+            StressConcentration::Iso6336,
+        )
+    });
 
-    // The planet's bending allowable is already the fully reversed one: sun and
-    // ring load opposite flanks of the same tooth, whatever the drive does. A
-    // reversing *drive* does not make it more reversed, so the two do not stack
-    // — the derate stands and the contact halving is applied to the cycles.
-    let planet_allow = |case: Case| match case {
-        Case::Cyclic => crate::material::reversed_bending_allowable(&mats[1]).value,
-        Case::Peak => mats[1].ultimate_allowable.value,
-    };
+    // Bending takes whatever the reversal leaves; contact takes the material's
+    // own figure, since pitting is compressive on whichever flank carries it.
+    // Borrowed explicitly so the inner closure captures a reference rather than
+    // the materials themselves, and the outer one can be called three times.
+    let materials = &mats;
+    let bending_allow =
+        move |i: usize| move |c: Case| reversal.bending_allowable(&materials[i], c, reverses[i]);
     let asks = [
         ask_of(
             "sun",
@@ -621,6 +672,7 @@ pub fn solve_planetary_stage(
                 sun_sf,
                 sp_probe.governing(0),
                 PROBE,
+                &bending_allow(0),
                 &|c| allowable(&mats[0], c),
                 &scale_case,
             ),
@@ -632,7 +684,8 @@ pub fn solve_planetary_stage(
                 planet_sf,
                 sp_probe.governing(1).max(pr_probe.governing(0)),
                 PROBE,
-                &planet_allow,
+                &bending_allow(1),
+                &|c| allowable(&mats[1], c),
                 &scale_case,
             ),
         ),
@@ -643,6 +696,7 @@ pub fn solve_planetary_stage(
                 ring_sf,
                 pr_probe.governing(1),
                 PROBE,
+                &bending_allow(2),
                 &|c| allowable(&mats[2], c),
                 &scale_case,
             ),
@@ -765,20 +819,21 @@ pub fn solve_planetary_stage(
                        sigma_f: Option<f64>,
                        sigma_h: f64,
                        material: &Material,
-                       allow: &dyn Fn(Case) -> f64,
-                       clamps: Vec<Note>|
+                       bending_allow: &dyn Fn(Case) -> f64,
+                       clamps: Vec<Note>,
+                       notes: Vec<Note>|
      -> GearResult {
         // A load case is a scale on the torque, and every rating is linear or
         // square-root in it — so the peak and cyclic figures are the same
         // expression evaluated at the two scales rather than a second solve.
         //
-        // **The allowable comes in rather than being read off the material**, so
-        // that the width the member was given and the minimum reported here are
-        // sized against the same figure. The planet is the member this matters
-        // for: its bending is fully reversed whatever the drive does, so it is
-        // rated against a derated allowable, and reading the plain one here
-        // would have reported a minimum the stage had not used.
-        let by_case = |case: Case| (scale_case(case), allow(case));
+        // **The bending allowable comes in rather than being read off the
+        // material**, so the width the member was given and the minimum reported
+        // here are sized against the same figure. It is the member's own: a root
+        // loaded on both flanks is judged against less, where the train asked for
+        // that correction. Contact reads the material directly, because reversal
+        // does not reach it.
+        let by_case = |case: Case| (scale_case(case), bending_allow(case));
         GearResult {
             profile_shift: params.profile_shift,
             addendum: params.addendum,
@@ -798,10 +853,15 @@ pub fn solve_planetary_stage(
                 let (k, a) = by_case(c);
                 Widths {
                     bending: sigma_f.map(|s| min_face_width_bending(s * k, width, a)),
-                    contact: min_face_width_contact(sigma_h * k.sqrt(), width, a),
+                    contact: min_face_width_contact(
+                        sigma_h * k.sqrt(),
+                        width,
+                        allowable(material, c),
+                    ),
                 }
             }),
             clamps,
+            notes,
             material: material.clone(),
             ranges: admissible_ranges(params, input.working_depth.resolve(input.dedendum)),
         }
@@ -813,7 +873,6 @@ pub fn solve_planetary_stage(
     let ring_stress = scale(ring_sf, pr_width);
 
     let planet_relative = forward.speeds[0] - forward.speeds[1];
-    let reversed_allowable = crate::material::reversed_bending_allowable(&mats[1]);
 
     Ok(PlanetaryResult {
         arrangement: stage.arrangement,
@@ -865,8 +924,9 @@ pub fn solve_planetary_stage(
             sun_stress,
             sp_cs.governing(0),
             &mats[0],
-            &|c| allowable(&mats[0], c),
+            &bending_allow(0),
             sun.clamps.notes.clone(),
+            gear_notes(0),
         ),
         planet: PlanetResult {
             gear: gear_result(
@@ -881,15 +941,14 @@ pub fn solve_planetary_stage(
                 // of each path. It takes the worse of its two.
                 sp_cs.governing(1).max(pr_cs.governing(0)),
                 &mats[1],
-                &planet_allow,
+                &bending_allow(1),
                 planet.clamps.notes.clone(),
+                gear_notes(1),
             ),
             profile_shift: planet_shift,
             shift_residual: layout.residual,
             speed_absolute: forward.speeds[1],
             speed_relative: planet_relative,
-            fully_reversed: true,
-            reversed_allowable,
         },
         planets: stage.planets,
         ring: gear_result(
@@ -901,8 +960,9 @@ pub fn solve_planetary_stage(
             ring_stress,
             pr_cs.governing(1),
             &mats[2],
-            &|c| allowable(&mats[2], c),
+            &bending_allow(2),
             ring.clamps.clone(),
+            gear_notes(2),
         ),
         notes,
     })
@@ -933,6 +993,59 @@ const fn gcd(mut a: u32, mut b: u32) -> u32 {
 mod tests {
     use super::*;
     use crate::train::test_library;
+
+    /// **A ring that cannot be rated for bending costs the rating, not the set.**
+    ///
+    /// A planetary set gives its ring `k = 2 − k_stage`, so an ordinary stage
+    /// thickness modification of 1.4 puts the ring at 0.6 — thick enough that
+    /// the cutter which would leave its space comes to a point before its own
+    /// tip, and no fillet is generated. There is then no notch, so no `Y_S`, so
+    /// no bending number for that member.
+    ///
+    /// None of which stops the set existing. The geometry draws, exports and
+    /// meshes, and the ratio, both contact stresses, the efficiencies, the
+    /// cycles and the other two members' bending are all still answerable. A
+    /// stage that threw those away over one missing input would be deciding for
+    /// the designer rather than informing them, which is the opposite of what
+    /// this tool is for.
+    ///
+    /// Run against the code this replaced, every case below is
+    /// `Err(NoRootSection)` — and the message blamed undercut, which nothing
+    /// here is.
+    #[test]
+    fn a_ring_with_no_notch_costs_its_bending_rather_than_the_stage() {
+        let lib = test_library();
+        for k in [1.3_f64, 1.4, 1.5, 1.7] {
+            let stage = PlanetaryStage {
+                thickness_mod: k,
+                ..Default::default()
+            };
+            let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &lib)
+                .unwrap_or_else(|e| panic!("k={k}: the set should still solve, got {e}"));
+
+            assert!(
+                r.ring.bending_stress.peak.is_none(),
+                "k={k}: a ring with no notch cannot have a bending stress"
+            );
+            // ...and everything that never needed the notch is still there.
+            assert!(r.ratio.is_finite() && r.ratio != 0.0, "k={k}: no ratio");
+            assert!(
+                r.sun.bending_stress.peak.is_some(),
+                "k={k}: the sun's own bending went with it"
+            );
+            for (name, gear) in [("sun", &r.sun), ("ring", &r.ring)] {
+                assert!(
+                    gear.contact_stress.peak > 0.0,
+                    "k={k}: {name} lost its contact stress"
+                );
+            }
+            // The member says why, so the blank is read rather than guessed at.
+            assert!(
+                !r.ring.clamps.is_empty(),
+                "k={k}: the ring reports no reason for having no fillet"
+            );
+        }
+    }
 
     fn stage_of(sun: u32, planet: u32, ring: u32, helix: f64) -> PlanetaryStage {
         PlanetaryStage {
@@ -1180,24 +1293,98 @@ mod tests {
         );
     }
 
-    /// The planet is the special case of docs/reference.md#trains: fully reversed, judged against a
-    /// smaller allowable that says where it came from, and turning at a speed
-    /// measured **relative to the carrier**.
+    /// The planet turns at a speed measured **relative to the carrier**, which
+    /// is what its teeth actually see.
     #[test]
     fn the_planet_is_reported_as_the_special_case_it_is() {
         let r = solved(24, 18, 60);
-        assert!(r.planet.fully_reversed);
-        let allow = &r.planet.reversed_allowable;
-        assert_eq!(allow.basis, crate::material::Basis::Derived);
-        assert!(allow.note.is_some(), "a derived value must say what from");
-        assert!(
-            allow.value < r.planet.gear.material.fatigue_allowable.value,
-            "a reversed allowable must be the smaller"
-        );
-        // Its speed relative to the carrier is not its speed in the fixed frame,
-        // and with the ring held neither is zero.
         assert!(r.planet.speed_relative.abs() > 0.0);
         assert!((r.planet.speed_relative - r.planet.speed_absolute).abs() > 1e-9);
+    }
+
+    /// **A planet's root is loaded both ways, and what to do about it is asked
+    /// rather than assumed.**
+    ///
+    /// The derate is a convention — a fraction on an allowable a part is sized
+    /// against — so it is a switch, off by default, and the stage says which of
+    /// its members the reversal reaches either way. It used to be applied to the
+    /// planet silently, and to the planet alone, so a reversing *drive* derated
+    /// nothing while a set nobody had told anything about derated one member.
+    #[test]
+    fn a_reversed_root_is_corrected_only_when_the_train_asks() {
+        let lib = test_library();
+        let stage = PlanetaryStage::default();
+        let solve = |reversal: crate::train::Reversal| {
+            solve_planetary_stage_with(&stage, 3000.0, StageTorques::just(2.0), &lib, reversal)
+                .unwrap()
+        };
+        // **On the member, not the stage.** Three members raising one note is
+        // exactly what a stage-level list could not carry: one key, three
+        // entries, and a keyed list in the front end that cannot draw it.
+        let fired = |r: &PlanetaryResult, k: &str| {
+            [&r.sun, &r.planet.gear, &r.ring]
+                .iter()
+                .filter(|g| g.notes.iter().any(|n| n.is(k)))
+                .count()
+        };
+
+        // Off: nothing is derated, and the planet's reversal is disclosed.
+        let plain = solve(crate::train::Reversal::default());
+        assert_eq!(fired(&plain, key::STAGE_REVERSED_BENDING_UNCORRECTED), 1);
+        assert_eq!(fired(&plain, key::STAGE_REVERSED_BENDING_APPLIED), 0);
+
+        // On: the same member is derated, and the note says so instead.
+        let corrected = solve(crate::train::Reversal {
+            drive_reverses: false,
+            correct: true,
+        });
+        assert_eq!(fired(&corrected, key::STAGE_REVERSED_BENDING_APPLIED), 1);
+        assert_eq!(
+            fired(&corrected, key::STAGE_REVERSED_BENDING_UNCORRECTED),
+            0
+        );
+
+        // A smaller allowable asks for more face, and only for the planet.
+        let width = |r: &PlanetaryResult, g: &GearResult| {
+            let _ = r;
+            g.min_face_width.cyclic.bending.unwrap()
+        };
+        assert!(
+            width(&corrected, &corrected.planet.gear) > width(&plain, &plain.planet.gear) * 1.2,
+            "the correction must reach the planet's minimum width"
+        );
+        for (name, a, b) in [
+            ("sun", &corrected.sun, &plain.sun),
+            ("ring", &corrected.ring, &plain.ring),
+        ] {
+            assert_eq!(
+                width(&corrected, a).to_bits(),
+                width(&plain, b).to_bits(),
+                "{name}: a one-way root must not be derated"
+            );
+        }
+
+        // A reversing **drive** reverses all three, and does not stack with the
+        // planet's own — which is the whole point of asking `reverses` once.
+        let driven = solve(crate::train::Reversal {
+            drive_reverses: true,
+            correct: true,
+        });
+        assert_eq!(fired(&driven, key::STAGE_REVERSED_BENDING_APPLIED), 3);
+        // ...and no member's own list carries one note twice, which is the shape
+        // that broke the panel: a keyed list cannot draw two of one key.
+        for g in [&driven.sun, &driven.planet.gear, &driven.ring] {
+            let mut keys: Vec<&str> = g.notes.iter().map(|n| n.key.as_str()).collect();
+            let before = keys.len();
+            keys.sort_unstable();
+            keys.dedup();
+            assert_eq!(before, keys.len(), "a member repeated a note key");
+        }
+        assert_eq!(
+            width(&driven, &driven.planet.gear).to_bits(),
+            width(&corrected, &corrected.planet.gear).to_bits(),
+            "a reversing drive cannot make a planet more reversed than it is"
+        );
     }
 
     /// Layout is arithmetic on the tooth counts, and it reaches the result.

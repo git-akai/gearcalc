@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import {
+    defaults,
     solveTrain,
     defaultSpurStage,
     defaultPlanetaryStage,
@@ -50,7 +51,10 @@
     input.value = "";
   }
 
-  let open = $state<Record<number, boolean>>({ 0: true });
+  // Which stages are expanded lives on the **tab**, so looking at another
+  // train — or at a gear — and coming back finds the panel as it was left.
+  // Read through `tab` at each use rather than aliased, so there is one object
+  // and no question about which of the two a write lands on.
 
   // Every number on screen comes back from Rust. Nothing here computes a
   // result — the project rule — so this is the only place a value is produced.
@@ -72,7 +76,7 @@
 
   function addStage() {
     tab.train.stages.push(defaultSpurStage());
-    open[tab.train.stages.length - 1] = true;
+    tab.open[tab.train.stages.length - 1] = true;
   }
 
   function addPlanetaryStage() {
@@ -81,11 +85,21 @@
 
   function addWormStage() {
     tab.train.stages.push(defaultWormStage());
-    open[tab.train.stages.length - 1] = true;
+    tab.open[tab.train.stages.length - 1] = true;
   }
 
   function removeStage(i: number) {
     tab.train.stages.splice(i, 1);
+    // The expansions are keyed by index, so the ones after the hole move down
+    // with the stages they belong to. Left alone, deleting a stage reopens
+    // whichever stage inherited its number.
+    const was = { ...tab.open };
+    tab.open = {};
+    for (const [k, v] of Object.entries(was)) {
+      const at = Number(k);
+      if (at < i) tab.open[at] = v;
+      else if (at > i) tab.open[at - 1] = v;
+    }
   }
 
   /** Gear numbering runs across the whole train: stage 1 is gears 1 and 2,
@@ -534,9 +548,14 @@
         </span>
       </dd>
     </dl>
-    {#if g.clamps.length}
+    {#if g.clamps.length || g.notes.length}
       <ul class="notes">
-        {#each g.clamps as c (c.key)}<li>{t("ui.gear_clamped")} {note(c)}</li>{/each}
+        {#each g.clamps as c, i (i)}<li>{t("ui.gear_clamped")} {note(c)}</li>{/each}
+        <!-- The rating's own remarks, unprefixed: nothing here was clamped.
+             Keyed by position rather than by note key, because two notes of one
+             kind on one list is a thing that happens and a keyed list must not
+             be what discovers it. -->
+        {#each g.notes as n, i (i)}<li>{note(n)}</li>{/each}
       </ul>
     {/if}
   {/if}
@@ -721,6 +740,29 @@
         <em>{t("ui.train_hours")}</em>
       </label>
     {/if}
+
+    <!-- Last, and train-wide, because it is one decision about how every gear
+         is judged rather than a property of any stage. A planet's root is
+         loaded on both flanks whatever the drive does, and a reversing drive
+         loads every root both ways — but the allowance for it is a fraction on
+         an allowable a part is sized against, which this tool asks for rather
+         than applies. Off, the stages say where reversal is present and
+         uncorrected. -->
+    <label class="toggle">
+      <span>{t("ui.train_reversed_bending")}</span>
+      <input type="checkbox" bind:checked={tab.train.reversed_bending} />
+      <em></em>
+    </label>
+    {@render noteSlot(
+      notes(
+        tab.train.reversed_bending
+          ? t("ui.train_note_reversed_bending_on", {
+              coefficient: defaults().reverse_loading_coefficient.toFixed(2),
+            })
+          : null,
+        null,
+      ),
+    )}
   </div>
 
   <div class="summary">
@@ -765,7 +807,7 @@
            whether — the back-driving load is reacted. -->
       {#if result.ok.notes.length}
         <ul class="notes">
-          {#each result.ok.notes as n (n.key)}<li>{note(n)}</li>{/each}
+          {#each result.ok.notes as n, i (i)}<li>{note(n)}</li>{/each}
         </ul>
       {/if}
       {/if}
@@ -784,8 +826,8 @@
              the same either way, which is what the specification asks for. -->
         {@const sres = res && res.kind === "spur" ? res : null}
         {@const xres = res && res.kind === "worm" ? res : null}
-        <button class="head" onclick={() => (open[i] = !open[i])}>
-          <span class="caret">{open[i] ? "▾" : "▸"}</span>
+        <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
+          <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
           {#if stage.shaft_angle !== 0}
             <span class="kind">{t("ui.train_crossed")}</span>
@@ -797,7 +839,7 @@
           {/if}
         </button>
 
-        {#if open[i]}
+        {#if tab.open[i]}
           <div class="body">
             <div class="grid shared">
               <label>
@@ -981,7 +1023,7 @@
               {@render screwReadout(xres, [gearName(i, 0), gearName(i, 1)])}
               {#if xres.notes.length}
                 <ul class="notes">
-                  {#each xres.notes as n (n.key)}<li>{note(n)}</li>{/each}
+                  {#each xres.notes as n, i (i)}<li>{note(n)}</li>{/each}
                 </ul>
               {/if}
             {/if}
@@ -1034,7 +1076,7 @@
               </dl>
               {#if sres.notes.length}
                 <ul class="notes">
-                  {#each sres.notes as n (n.key)}<li>{note(n)}</li>{/each}
+                  {#each sres.notes as n, i (i)}<li>{note(n)}</li>{/each}
                 </ul>
               {/if}
             {/if}
@@ -1048,8 +1090,8 @@
         {/if}
       {:else if stage.kind === "worm"}
         {@const wres = res && res.kind === "worm" ? res : null}
-        <button class="head" onclick={() => (open[i] = !open[i])}>
-          <span class="caret">{open[i] ? "▾" : "▸"}</span>
+        <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
+          <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
           <span class="kind">{t("ui.train_worm")}</span>
           <span class="teeth">z {stage.starts} / {stage.wheel_teeth}</span>
@@ -1059,7 +1101,7 @@
           {/if}
         </button>
 
-        {#if open[i]}
+        {#if tab.open[i]}
           <div class="body">
             <div class="grid shared">
               <label>
@@ -1270,7 +1312,7 @@
               {@render screwReadout(wres, [t("ui.train_the_worm"), t("ui.train_the_wheel")])}
               {#if wres.notes.length}
                 <ul class="notes">
-                  {#each wres.notes as n (n.key)}<li>{note(n)}</li>{/each}
+                  {#each wres.notes as n, i (i)}<li>{note(n)}</li>{/each}
                 </ul>
               {/if}
             {/if}
@@ -1284,8 +1326,8 @@
         {/if}
       {:else}
         {@const pres = res && res.kind === "planetary" ? res : null}
-        <button class="head" onclick={() => (open[i] = !open[i])}>
-          <span class="caret">{open[i] ? "▾" : "▸"}</span>
+        <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
+          <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
           <span class="kind">{t("ui.train_planetary")}</span>
           <span class="teeth">z {stage.sun.teeth} / {stage.planet.teeth} / {stage.ring.teeth}</span>
@@ -1294,7 +1336,7 @@
             <span class="eff">{pct(pres.efficiency.forward)} %</span>
           {/if}
         </button>
-        {#if open[i]}
+        {#if tab.open[i]}
           <div class="body">
             <div class="grid shared">
               <label>
@@ -1422,23 +1464,14 @@
               </label>
             </div>
 
-            <!-- The planet alone is loaded on both flanks, once per revolution relative to
-                 its carrier, so it is rated against a **reversed** bending allowable
-                 derived from the material rather than the one-way figure the sun and ring
-                 use (docs/reference.md#trains). Shown where the number it changes is shown. -->
+            <!-- The planet's reversal is a *stage* note now, not a readout here:
+                 it is the same sentence a reversing drive earns for every gear,
+                 and one home for it means the two cannot say different things.
+                 What stays is what is only true of a planet — the speed its
+                 teeth actually see, relative to the carrier. -->
             {#snippet planetExtra(_j: number)}
               {#if pres}
                 <dl class="out small">
-                  <dt>{t("ui.train_bending")}</dt>
-                  <dd>
-                    {t(pres.planet.fully_reversed ? "ui.train_fully_reversed" : "ui.train_one_way")}
-                    <small>
-                      {t("ui.train_allowable", {
-                        stress: pres.planet.reversed_allowable.value.toFixed(0),
-                      })}
-                    </small>
-                    <small>{t("ui.train_note_reversed_allowable_is_the_cyclic_one")}</small>
-                  </dd>
                   <dt>{t("ui.train_speed")}</dt>
                   <dd>
                     {pres.planet.speed_absolute.toFixed(1)} {t("ui.train_rpm")}
@@ -1562,7 +1595,7 @@
 
               {#if pres.notes.length}
                 <ul class="notes">
-                  {#each pres.notes as n (n.key)}<li>{note(n)}</li>{/each}
+                  {#each pres.notes as n, i (i)}<li>{note(n)}</li>{/each}
                 </ul>
               {/if}
             {/if}

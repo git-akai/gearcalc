@@ -131,6 +131,7 @@ fn train_file_report(path: Option<&str>) {
             input_torque: 2.0,
             back_driving_torque: 0.0,
             operating_torque: 2.0,
+            reversed_bending: false,
             actuation: Actuation::Continuous {
                 operating_speed: 2400.0,
                 runtime_hours: 1000.0,
@@ -254,6 +255,7 @@ fn train_report(mixed: bool) {
         input_torque: 2.0,
         back_driving_torque: 0.0,
         operating_torque: 2.0,
+        reversed_bending: false,
         actuation: Actuation::Continuous {
             operating_speed: 2400.0,
             runtime_hours: 1000.0,
@@ -1445,7 +1447,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                             r.planet_ring.contact_stress_at_pitch_point.peak
                         );
                         println!(
-                            "sigma_F  sun {}   planet {} (reversed, allowable {:.1} MPa)   ring {}",
+                            "sigma_F  sun {}   planet {}   ring {}",
                             r.sun
                                 .bending_stress
                                 .peak
@@ -1455,7 +1457,6 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                                 .bending_stress
                                 .peak
                                 .map_or_else(|| "-".into(), |v| format!("{v:.1} MPa")),
-                            r.planet.reversed_allowable.value,
                             r.ring
                                 .bending_stress
                                 .peak

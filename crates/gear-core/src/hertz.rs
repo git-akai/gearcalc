@@ -232,7 +232,7 @@ pub fn elliptical_contact(
 /// where the patch is a fraction of the face, and badly optimistic as the shafts
 /// come parallel: at `Σ = 0.5°` on a 10 mm face the ellipse wants to be 42 mm
 /// long and reports 369 MPa where the line it actually has carries 618. Both
-/// paths ask this one function now (`docs/corrections.md`).
+/// paths ask this one function (`docs/corrections.md`).
 ///
 /// # Both degenerate ends are values, and only `0/0` is not
 ///

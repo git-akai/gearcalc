@@ -73,7 +73,6 @@ export type { Maybe } from "./wasm/Maybe";
 export type { PinsOut } from "./wasm/PinsOut";
 export type { RingRequest } from "./wasm/RingRequest";
 export type { RingSummary } from "./wasm/RingSummary";
-export type { RootForm } from "./wasm/RootForm";
 export type { SpanOut } from "./wasm/SpanOut";
 export type { ToleranceOut } from "./wasm/ToleranceOut";
 export type { TrainRequest } from "./wasm/TrainRequest";

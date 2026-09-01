@@ -50,6 +50,17 @@ export interface TrainTab {
   id: number;
   name: string;
   train: Train;
+  /** Which stages are expanded, by index.
+   *
+   *  **Not an input**, and deliberately beside `train` rather than in it: it
+   *  changes no number, and what is exported is `train` alone, so a view
+   *  preference cannot leak into a document that describes a gearbox
+   *  (`docs/rationale.md`). It lives on the tab rather than in the panel
+   *  because the panel is rebuilt whenever a reader looks at something else,
+   *  and coming back to a train with every stage slammed shut is the kind of
+   *  small forgetting that makes two tabs tiring to compare. It dies with the
+   *  session, like every other thing here that is not the language. */
+  open: Record<number, boolean>;
 }
 
 let nextId = 1;
@@ -180,7 +191,8 @@ export function setKind(tab: GearTab, kind: GearKind) {
 export const workspace = new Workspace();
 
 function freshTrain(name = t("ui.train_default_name")): TrainTab {
-  return { id: nextTrainId++, name, train: defaultTrain() };
+  // The first stage open, as a fresh panel has always shown it.
+  return { id: nextTrainId++, name, train: defaultTrain(), open: { 0: true } };
 }
 
 /** The geartrain tabs.
@@ -254,7 +266,12 @@ class Trains {
       this.importError = r.error;
       return;
     }
-    const t: TrainTab = { id: nextTrainId++, name: r.ok.name, train: r.ok.train };
+    const t: TrainTab = {
+      id: nextTrainId++,
+      name: r.ok.name,
+      train: r.ok.train,
+      open: { 0: true },
+    };
     this.tabs.push(t);
     this.importError = null;
     this.select(t.id);

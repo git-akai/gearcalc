@@ -466,28 +466,6 @@ impl CutterRef {
     }
 }
 
-/// How the space between two ring teeth closes.
-///
-/// Three cases rather than the two a boolean allowed: a cut that generates no
-/// fillet at all is not "a root arc between the fillets", and saying so put a
-/// description of a fillet next to a drawing that had none.
-#[derive(Serialize)]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "wasm/")
-)]
-#[serde(rename_all = "snake_case")]
-pub enum RootForm {
-    /// The fillets from the two flanks meet before mid-space: no flat at all.
-    FullyFilleted,
-    /// A flat at the root circle between the two fillets.
-    RootArc,
-    /// No fillet was cut — the flank runs to the root circle. The reason is in
-    /// [`RingSummary::clamps`].
-    NoFillet,
-}
-
 /// What the UI shows for a ring.
 #[derive(Serialize)]
 #[cfg_attr(
@@ -516,7 +494,6 @@ pub struct RingSummary {
     /// reporting the root radius here said there was one.
     pub junction_radius: Option<f64>,
     /// How the tooth space closes.
-    pub root_form: RootForm,
     /// Where a drawing shades the rim out to, mm. A convention with no
     /// engineering meaning — see [`gear_core::ring::Ring::rim_radius`].
     pub rim_radius: f64,
@@ -573,11 +550,6 @@ fn solve_ring_impl(input: &str) -> Result<String, String> {
         root_diameter: 2.0 * g.rf,
         junction_radius: g.fillet.map(|_| g.involute_at(g.u_j).0),
         rim_radius: g.rim_radius(),
-        root_form: match g.fillet {
-            None => RootForm::NoFillet,
-            Some(f) if f.s_root != 0.0 => RootForm::FullyFilleted,
-            Some(_) => RootForm::RootArc,
-        },
         generation_limit: g.generation_limit(),
         fully_generated: g.fully_generated(),
         smallest_tooth_count: smallest_tooth_count(&req.params),
@@ -930,6 +902,13 @@ pub struct Defaults {
     pub spur_stage: gear_core::train::Stage,
     pub worm_stage: gear_core::train::Stage,
     pub planetary_stage: gear_core::train::Stage,
+    /// The fraction a reversed root's cyclic bending allowable is taken at.
+    ///
+    /// Crosses so the control's own note can name it. It is
+    /// [`REVERSED_BENDING_FRACTION`](gear_core::material::REVERSED_BENDING_FRACTION)
+    /// and nothing else — a number the interface shows is a number Rust decided,
+    /// this one included.
+    pub reverse_loading_coefficient: f64,
 }
 
 /// What a new gear tab holds. The values are the specification's, and the
@@ -1009,12 +988,16 @@ fn defaults_impl() -> Result<String, String> {
             // rather than a derating nobody asked for.
             back_driving_torque: 0.0,
             operating_torque: 0.1,
+            // Off, like every other correction this crate could apply and does
+            // not: a reversed root is disclosed rather than silently derated.
+            reversed_bending: false,
             actuation: Actuation::default(),
             stages: vec![Stage::Spur(spur.clone())],
         },
         spur_stage: Stage::Spur(spur),
         worm_stage: Stage::Worm(WormStage::default()),
         planetary_stage: Stage::Planetary(Box::new(planetary)),
+        reverse_loading_coefficient: gear_core::material::REVERSED_BENDING_FRACTION,
     };
     serde_json::to_string(&defaults).map_err(|e| format!("could not encode defaults: {e}"))
 }
@@ -1227,15 +1210,11 @@ mod tests {
         );
         let v: serde_json::Value = serde_json::from_str(&solve_ring_impl(&req).unwrap()).unwrap();
 
-        assert_ne!(
-            v["root_form"].as_str(),
-            Some("no_fillet"),
-            "the shipped cutter generates no fillet: {:?}",
-            v["clamps"]
-        );
+        // A fillet was cut, said by the one field that carries it: a junction
+        // exists exactly when there is a fillet to meet the flank.
         let junction = v["junction_radius"]
             .as_f64()
-            .expect("a generated fillet has a junction with the flank");
+            .unwrap_or_else(|| panic!("the shipped cutter generates no fillet: {:?}", v["clamps"]));
         assert!(
             junction > v["tip_radius"].as_f64().unwrap()
                 && junction < v["root_radius"].as_f64().unwrap(),
@@ -1680,11 +1659,17 @@ mod tests {
         // ring, so it comes back as exactly zero with a closed residual.
         assert!(stage["planet"]["profile_shift"].as_f64().unwrap().abs() < 1e-12);
         assert!(stage["planet"]["shift_residual"].as_f64().unwrap() < 1e-12);
-        assert_eq!(stage["planet"]["fully_reversed"], true);
-        // Its reduced allowable carries provenance across, like every other
-        // material figure (docs/reference.md#materials).
-        assert_eq!(stage["planet"]["reversed_allowable"]["basis"], "derived");
-        assert!(stage["planet"]["reversed_allowable"]["note"].is_string());
+        // A planet's root is loaded on both flanks, and with no correction asked
+        // for the stage says so rather than derating it out of sight.
+        let notes = stage["planet"]["gear"]["notes"]
+            .as_array()
+            .expect("a gear carries its own notes");
+        assert!(
+            notes
+                .iter()
+                .any(|n| n["key"] == "stage.reversed_bending_uncorrected"),
+            "the planet's reversal should be disclosed on the planet: {notes:?}"
+        );
 
         // Two meshes with their own answers, and every member rated.
         for mesh in ["sun_planet", "planet_ring"] {

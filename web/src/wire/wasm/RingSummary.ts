@@ -2,7 +2,6 @@
 import type { Note } from "../core/Note";
 import type { Maybe } from "./Maybe";
 import type { PinsOut } from "./PinsOut";
-import type { RootForm } from "./RootForm";
 
 /**
  * What the UI shows for a ring.
@@ -26,9 +25,6 @@ pitch_diameter: number, base_diameter: number, tip_diameter: number, root_diamet
 junction_radius: number | null, 
 /**
  * How the tooth space closes.
- */
-root_form: RootForm, 
-/**
  * Where a drawing shades the rim out to, mm. A convention with no
  * engineering meaning — see [`gear_core::ring::Ring::rim_radius`].
  */

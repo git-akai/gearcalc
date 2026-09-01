@@ -741,7 +741,40 @@ efficiency do not depend on torque, so the train is solved once for the shaft
 line and again for the ratings. The second pass is not a refinement of the
 first — it is the same arithmetic with the load it was missing.
 
-### Reversing changes the count, and only the count
+### A reversed root is disclosed, and corrected only on request
+
+A root loaded on **both** flanks endures less than one loaded on a single flank.
+The usual allowance is a fraction on the allowable —
+`REVERSED_BENDING_FRACTION`, 0.7 — and that is a convention which multiplies a
+number a part is sized against, which is exactly what
+[no ISO/AGMA correction factors](#no-isoagma-correction-factors) refuses to
+apply on a designer's behalf. So it is a train-wide switch, **off by default**,
+and where it is off the stage says which members the reversal reaches.
+
+**Two things reverse a root, and they do not stack.** A planet always is loaded
+both ways — the sun drives one flank and the ring the other, whatever the drive
+does — and every gear is when the *drive* reverses, which is the same flag that
+already splits the contact cycles between the two flanks. `Reversal::reverses`
+takes the member's own answer or the drive's, never both, so one rule decides
+where a note can appear and where a derate can land.
+
+**It was applied to the planet alone, silently.** A planetary set derated its
+planet whether or not anyone had asked, while a reversing drive — an explicit
+input, on a control that says it reverses the load — derated nothing anywhere.
+One convention, applied in the place nobody chose it and absent from the place
+they did.
+
+**Bending only.** Pitting is compressive on whichever flank carries it, so a
+contact rating keeps the material's own figure. The planet's contact width was
+being sized against the derated allowable too, which is a bending allowance
+reaching a rating it has nothing to say about.
+
+**What would change this:** an allowable measured under fully reversed loading,
+which would replace the fraction rather than the switch. The library has no such
+column, and inventing one is the thing
+[material data](#material-data-ships-estimates-deliberately) declines to do.
+
+### Reversing changes the count, and which roots are reversed
 
 A reversing drive changes no stress. What it changes is how many times each
 thing is loaded, in two ways that pull opposite directions:
@@ -756,9 +789,12 @@ It is offered only for an intermittent drive, because only there is there an
 actuation to reverse between — an input that would mean nothing in the other
 mode is not offered in it.
 
-**It does not stack with the planet's derate.** A planet's bending is fully
-reversed whatever the drive does: the sun loads one flank and the ring the other.
-Applying a reversing-drive derate on top would be counting one fact twice.
+**And it marks every root as reversed**, which is the one thing beyond the count
+it decides — see
+[a reversed root is disclosed](#a-reversed-root-is-disclosed-and-corrected-only-on-request).
+It does not stack with a planet's own reversal: a planet's bending is fully
+reversed whatever the drive does, since the sun loads one flank and the ring the
+other, and counting that twice would be counting one fact twice.
 
 ### The tolerance table has two grade scales, not one
 
@@ -843,6 +879,33 @@ latter covering only unfilled grades in any case.
 Real sets need a floating member, and the remedy is a mesh-load factor of exactly
 the kind refused above. It is stated in every planetary result's notes rather
 than left in a document.
+
+### A rating that cannot be taken costs the rating, not the stage
+
+A ring whose cut leaves no fillet has no notch, so no `Y_S`, so no bending
+number. Its geometry is not in doubt — it draws, it exports and it meshes — and
+neither is anything else the stage reports: the ratio, both contact stresses,
+the efficiencies, the cycles, and the other members' bending are all still
+answerable. So the missing input costs the one figure that needed it.
+
+**The reachable case is ordinary, which is what settles it.** A planetary set
+gives its ring `k = 2 − k_stage`, so a stage thickness modification of 1.4 puts
+the ring at 0.6 — thick enough that the cutter which would leave its space comes
+to a point before its own tip. Refusing the whole set there would throw away
+nine sound figures over one absent one.
+
+**The blank is readable**, which is the condition on doing this at all: the
+member carries its own clamps, so `clamp.cutter_no_tip_corner` sits beside the
+dash and says what is missing and that a cutter with more teeth relieves it. A
+number becoming no number is a jump the interface has to explain, not one it may
+leave to be guessed at.
+
+**What this is not** is a licence to answer where the answer would be wrong.
+Input that describes no shape at all is still refused — a cutter larger than the
+ring it cuts, a module of zero, a shaft absorbing power. The distinction is the
+one [clamp rather than refuse](#clamp-rather-than-refuse-and-say-so) already
+draws: a rating is a question *about* a part, and a part can be perfectly real
+while one question about it has no answer.
 
 ### A planetary needs the held shaft named
 

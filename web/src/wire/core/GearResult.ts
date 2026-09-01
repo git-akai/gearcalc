@@ -72,6 +72,21 @@ min_face_width: LoadCase<Widths>,
  */
 clamps: Array<Note>, 
 /**
+ * What the **rating** has to say about this gear, as against what was done
+ * to its geometry.
+ *
+ * Kept apart from [`Self::clamps`] because nothing here moved a dimension:
+ * a root loaded on both flanks and a notch outside the `Y_S` fit's band are
+ * statements about how the number was arrived at, not about the part.
+ *
+ * **Per gear rather than per stage**, and that is not filing. A stage note
+ * naming a member has to carry the member's name in its own text, and two
+ * members raising the same note give one list two entries with one key —
+ * which a keyed list in the front end cannot render (`docs/corrections.md`).
+ * A note that belongs to a gear belongs *on* the gear.
+ */
+notes: Array<Note>, 
+/**
  * The material as used, after any overrides — what the numbers were
  * actually computed from, rather than what the library holds.
  */

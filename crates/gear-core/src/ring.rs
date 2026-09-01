@@ -240,11 +240,20 @@ impl Ring {
         // because on a ring the space is the thing generated like a tooth.
         let space_max = guard::MAX_TOOTH_THICKNESS_FRACTION_OF_PITCH * pitch;
         let space_min = guard::MIN_TOOTH_THICKNESS_MODULES * m;
+        // The space expression read backwards: which thickness shift leaves a
+        // space of this width. Needed only where a clamp has moved the space,
+        // because the **tool** has to be the one that leaves the space the ring
+        // actually has — a capped space cut by the tool the raw figure asked
+        // for is a cut and a profile describing two different rings.
+        let shift_for = |s: f64| (s / mt - std::f64::consts::PI / 2.0) / (2.0 * alpha_n.tan());
+        let mut x_space = x_thick;
         if space > space_max {
             space = space_max;
+            x_space = shift_for(space);
             clamps.push(Note::new(key::CLAMP_RING_SPACE_CAPPED));
         } else if space < space_min {
             space = space_min;
+            x_space = shift_for(space);
             clamps.push(Note::new(key::CLAMP_RING_SPACE_RAISED));
         }
         let tooth = pitch - space;
@@ -309,14 +318,39 @@ impl Ring {
             cutter_teeth
         };
         let cutter_radius = cutter_teeth * mt / 2.0;
-        // A standard cutter: `k = 1`, no shift of its own. A resharpened tool
-        // carries one, and it would enter the sums below exactly as the ring's
-        // does; nothing here assumes it is zero beyond this line.
-        let cutter_tooth = std::f64::consts::PI * mt / 2.0;
+        // **The thickness modification is the tool's tooth, not its plunge.**
+        //
+        // `k` is thickness-only by definition (docs/reference.md#tooth-thickness-and-its-equivalent-shift):
+        // radial quantities take plain `x` and thickness ones take `x + x_s`,
+        // and a ring's root radius is radial — it is where the cutter's tip
+        // reaches. An external gear gets this from its rack, whose tooth is
+        // narrowed or widened while its depth stays where it was. A shaper is
+        // the same statement on a pinion: the **cutter's tooth** carries the
+        // modification, and it comes out as the standard tooth scaled by `k`,
+        // which is the basic rack's own definition read round a circle.
+        //
+        // Taken into the centre distance instead — as this did — `k` plunges the
+        // tool, so the root diameter grows and shrinks with it and the ring
+        // *scales* where its teeth should have thinned. That is a module change
+        // wearing a thickness control's name, and it had a second face: on a
+        // 43-tooth ring `k = 0.7` drove the pair clean out of the involute
+        // domain, where the fallback below quietly cut at reference centres and
+        // the thickness modification reached the cut not at all.
+        //
+        // The cutter's own thickness shift is what is left once the ring's is
+        // accounted for, so the signed sum `x_c − x_ring` collapses to `−x` and
+        // the plunge answers to the radial shift alone. Written as `−x` rather
+        // than as the difference because it *is* `−x`, exactly, and a cancelled
+        // pair of large terms is not the same floating point as the small one
+        // they cancel to.
+        let cutter_thickness_shift = x_space - x;
+        let cutter_tooth =
+            mt * (std::f64::consts::PI / 2.0 + 2.0 * cutter_thickness_shift * alpha_n.tan());
         let sum_z = cutter_teeth - z;
-        // Falls back to reference centres only when the shift takes the pair out
-        // of the involute domain, which `ShaperCut::new` then refuses anyway.
-        let a_cut = operating_geometry(mt, alpha_t, alpha_n, sum_z, -x_thick)
+        // Falls back to reference centres when the **radial** shift alone takes
+        // the pair out of the involute domain — a far smaller region than the
+        // thickness sum reached, and one only `x` can enter.
+        let a_cut = operating_geometry(mt, alpha_t, alpha_n, sum_z, -x)
             .map_or(r - cutter_radius, |(_, _, a)| a);
         // ---- the root circle is where the cutter's tip reaches, not an input.
         //
@@ -327,7 +361,39 @@ impl Ring {
         // cutter's addendum seen from the other side, and having both invites
         // them to disagree.
         let cutter_tip_radius = cutter_radius + m * cutter.addendum;
-        let rf = a_cut + cutter_tip_radius;
+        let mut rf = a_cut + cutter_tip_radius;
+
+        // ---- ...and it cannot reach past where the space closes.
+        //
+        // **A ring's space narrows outward**, because the space is where the
+        // mating pinion's tooth goes and a pinion's tooth narrows toward its own
+        // tip. So the two flanks bounding one space converge as they go out, and
+        // where they meet the space *ends*: the tooth half-angle
+        // `ψ_b + inv α` has reached half the angular pitch and there is no
+        // material left between them to cut.
+        //
+        // This is the same guard as the one on `ra` above, at the other end of
+        // the same tooth, and the same one `Tooth` puts on an external gear's
+        // pointed tip — `inv α = π/z − ψ_b` where that one solves `inv α = −ψ_b`,
+        // through the same `inv⁻¹`. The space clamp above keeps `ψ_b < π/z`, so
+        // the argument is positive and a radius always exists.
+        //
+        // Left unclamped this is not a shallow space but a **crossed** one: the
+        // flank runs past the space's own centreline and its mirror image comes
+        // back through it, which draws as the inverted spur of geometry at the
+        // bottom of every tooth space. It bit whenever no fillet was cut to
+        // truncate the flank first — a thickness modification of 0.6 on a
+        // 43-tooth ring put the root 0.14 mm beyond the crossing, and 0.4 put it
+        // 0.48 mm beyond. An external gear has never been able to do this,
+        // because its pointed-tooth cap is unconditional; a ring's was missing.
+        if let Some(alpha_close) = crate::involute::inv_inverse(half_pitch - psi_b) {
+            let rf_max = rb / alpha_close.cos();
+            if rf > rf_max {
+                rf = rf_max;
+                clamps.push(Note::new(key::CLAMP_RING_SPACE_CLOSED).number("radius", rf_max, 4));
+            }
+        }
+        let rf = rf;
 
         let cut = ShaperCut::new(&CutParams {
             module_t: mt,
@@ -1292,24 +1358,213 @@ mod tests {
     /// their ratio fixed by their tooth counts, so the pitch point is wherever
     /// the centre distance puts it and the rolling circles move with it. One
     /// factor `a / a_ref` carries all of that, and at zero shift it is exactly 1.
+    ///
+    /// **The thickness modification is swept here too, and that is the point.**
+    /// It was not, and a ring whose `k` left 1 was cut by a tool placed for a
+    /// ring it was not making: `k` had been taken into the *centre distance*
+    /// rather than into the cutter's tooth, so the root diameter grew and shrank
+    /// with a control that is thickness-only by definition. Every gate on the
+    /// cut swept the shift and left `k` at its default — *an axis nobody turns
+    /// is an axis nobody tests* (docs/corrections.md), met in the module that
+    /// records the sentence.
     #[test]
     fn a_shifted_ring_is_the_shape_its_cutter_leaves() {
         for teeth in [43u32, 60] {
             for x in [-0.4, -0.25, -0.1, 0.0, 0.1, 0.25, 0.5] {
-                let g = Ring::cut_by(
-                    &GearParams {
-                        teeth,
-                        profile_shift: x,
-                        ..Default::default()
-                    },
-                    &Cutter::default(),
-                );
-                let report = crate::verify::check_ring_cut(&g, 400, 4_000);
-                assert!(
-                    report.worst_distance < 5e-3,
-                    "z={teeth} x={x}: cut and profile differ by {} mm",
-                    report.worst_distance
-                );
+                for k in [0.8, 1.0, 1.2] {
+                    let g = Ring::cut_by(
+                        &GearParams {
+                            teeth,
+                            profile_shift: x,
+                            thickness_mod: k,
+                            ..Default::default()
+                        },
+                        &Cutter::default(),
+                    );
+                    let report = crate::verify::check_ring_cut(&g, 400, 4_000);
+                    assert!(
+                        report.worst_distance < 5e-3,
+                        "z={teeth} x={x} k={k}: cut and profile differ by {} mm",
+                        report.worst_distance
+                    );
+                }
+            }
+        }
+    }
+
+    /// **A ring's drawn profile never crosses its own space centreline.**
+    ///
+    /// The half-profile is mirrored to make a tooth, so a point past the
+    /// centreline comes back through its own reflection: the outline stops being
+    /// a simple closed curve and draws as an inverted spur at the bottom of
+    /// every space — geometry that would go into a DXF and that no tool can
+    /// leave. An external gear has never been able to do this, because its
+    /// pointed-tooth cap is unconditional; a ring's root had no such cap, so the
+    /// flank ran to the root circle whether or not the space had already closed.
+    ///
+    /// The case that reaches it is a **thick** ring tooth — a low thickness
+    /// modification — where the cutter's own tooth comes to a point, no fillet
+    /// is generated, and nothing truncates the flank. Swept here across `k`, `x`
+    /// and the tooth count together, because the three move the same crossing.
+    ///
+    /// Run against the code this replaced it fails at `k = 0.6` with 14 of 398
+    /// points past the centreline, and at `k = 0.4` with 45.
+    #[test]
+    fn a_rings_profile_stays_inside_its_own_space() {
+        for teeth in [20u32, 43, 90, 150] {
+            for x in [-0.3, 0.0, 0.4] {
+                for k in [0.3, 0.5, 0.7, 1.0, 1.3, 1.6] {
+                    let g = Ring::cut_by(
+                        &GearParams {
+                            teeth,
+                            profile_shift: x,
+                            thickness_mod: k,
+                            ..Default::default()
+                        },
+                        &Cutter::default(),
+                    );
+                    let points = g.half_profile(400);
+                    assert!(!points.is_empty(), "z={teeth} x={x} k={k}: no profile");
+                    for &(radius, theta) in &points {
+                        assert!(
+                            theta <= g.half_pitch + 1e-12,
+                            "z={teeth} x={x} k={k}: a point at r={radius} sits at {theta}, \
+                             past the space centreline at {}",
+                            g.half_pitch
+                        );
+                        assert!(
+                            theta >= -1e-12 && radius.is_finite(),
+                            "z={teeth} x={x} k={k}: r={radius} theta={theta}"
+                        );
+                    }
+                    // ...and the truncation is reported wherever it happened,
+                    // rather than the part quietly coming back shorter.
+                    let closed = g.clamps.iter().any(|n| n.is(key::CLAMP_RING_SPACE_CLOSED));
+                    let reaches = g.involute_at(g.u_j).1;
+                    assert_eq!(
+                        closed,
+                        (reaches - g.half_pitch).abs() < 1e-9 && g.fillet.is_none(),
+                        "z={teeth} x={x} k={k}: the space closed at {reaches} against a \
+                         half pitch of {}, and the note {}",
+                        g.half_pitch,
+                        if closed { "fired" } else { "did not" }
+                    );
+                }
+            }
+        }
+    }
+
+    /// **A thickness modification changes a thickness, and nothing radial.**
+    ///
+    /// The rule the whole crate is built on: *radial* quantities take plain `x`
+    /// and *thickness* quantities take `x + x_s`
+    /// (docs/reference.md#tooth-thickness-and-its-equivalent-shift). A ring's
+    /// root radius is radial — it is where the cutter's tip reaches — so `k` may
+    /// not move it, any more than it moves an external gear's.
+    ///
+    /// Asserted **exactly**, because it is an invariant rather than a trend: the
+    /// plunge does not depend on `k`, so neither does anything the plunge sets.
+    /// Run against the code this replaced it fails at once — `rf` swept
+    /// 22.373 → 23.309 mm across `k = 0.85 … 1.3` on a 43-tooth ring, and at
+    /// `k = 0.7` the pair left the involute domain and was quietly cut at
+    /// reference centres instead.
+    #[test]
+    fn a_thickness_modification_moves_no_radius_on_a_ring() {
+        for teeth in [43u32, 60, 90] {
+            for x in [-0.25, 0.0, 0.3] {
+                let at = |k: f64| {
+                    Ring::cut_by(
+                        &GearParams {
+                            teeth,
+                            profile_shift: x,
+                            thickness_mod: k,
+                            ..Default::default()
+                        },
+                        &Cutter::default(),
+                    )
+                };
+                let plain = at(1.0);
+                let closed = |g: &Ring| g.clamps.iter().any(|n| n.is(key::CLAMP_RING_SPACE_CLOSED));
+                for k in [0.7, 0.85, 1.15, 1.3] {
+                    let g = at(k);
+                    // **Where the space itself closes, the root is truncated by
+                    // the profile rather than placed by the tool**, and that
+                    // limit *is* a function of `k` — a thicker tooth closes its
+                    // space sooner. It is a different guard, with its own note
+                    // and its own test; what it may never do is let the root out
+                    // *past* where the tool put it.
+                    if closed(&g) || closed(&plain) {
+                        assert!(
+                            g.rf < plain.rf.max(g.rf) + 1e-12 && g.rf > 0.0,
+                            "z={teeth} x={x} k={k}: a closed space grew the root to {}",
+                            g.rf
+                        );
+                        continue;
+                    }
+                    for (name, got, want) in [
+                        ("root radius", g.rf, plain.rf),
+                        ("tip radius", g.ra, plain.ra),
+                    ] {
+                        assert_eq!(
+                            got.to_bits(),
+                            want.to_bits(),
+                            "z={teeth} x={x} k={k}: {name} moved from {want} to {got}"
+                        );
+                    }
+                    // **A `k` far enough from 1 asks for a tool that does not
+                    // exist**, and that is a real answer rather than a hole in
+                    // this one: thickening a ring's tooth thins the cutter's,
+                    // and a cutter thin enough comes to a point before it
+                    // reaches its own tip. The part then has no fillet and says
+                    // so, which is where `cut` holds a placeholder rather than a
+                    // placement — so the plunge is compared only where there is
+                    // a tool to place. The radii above are compared regardless,
+                    // because they are settled before the tool is built and are
+                    // what the rule is actually about.
+                    let no_tool = g
+                        .clamps
+                        .iter()
+                        .any(|n| n.is(key::CLAMP_CUTTER_NO_TIP_CORNER));
+                    if !no_tool {
+                        assert_eq!(
+                            g.cut.centre_distance.to_bits(),
+                            plain.cut.centre_distance.to_bits(),
+                            "z={teeth} x={x} k={k}: the cutter was plunged to {} rather \
+                             than {}",
+                            g.cut.centre_distance,
+                            plain.cut.centre_distance
+                        );
+                    }
+                    // ...while the thing it *is* about did change, or the test
+                    // above would be satisfied by a control that does nothing.
+                    assert!(
+                        (g.psi_b - plain.psi_b).abs() > 1e-6,
+                        "z={teeth} x={x} k={k}: the tooth did not change thickness"
+                    );
+                    // **The tool carries the thickness, the plunge carries the
+                    // shift, and this is that sentence as arithmetic.** The
+                    // cutter's tooth fills the ring's space but for the radial
+                    // shift, which is delivered by moving the tool rather than
+                    // by shaping it:
+                    //
+                    // ```text
+                    // e_ring − s_cutter = 2 m_t x tan α_n
+                    // ```
+                    //
+                    // — a difference in `x` alone, with no `k` in it at any `k`.
+                    // At `x = 0` the two are simply equal, which is what
+                    // generation means when the tool is not displaced.
+                    let tooth = 2.0 * g.r * (g.psi_b + crate::involute::inv(g.alpha_t));
+                    let space = std::f64::consts::PI * g.mt - tooth;
+                    let from_shift = 2.0 * g.mt * x * g.alpha_n.tan();
+                    assert!(
+                        (space - g.cut.cutter_tooth - from_shift).abs() < 1e-12 * g.mt,
+                        "z={teeth} x={x} k={k}: the space {space} less the cutter's tooth \
+                         {} is {}, where only the shift's {from_shift} should separate them",
+                        g.cut.cutter_tooth,
+                        space - g.cut.cutter_tooth
+                    );
+                }
             }
         }
     }

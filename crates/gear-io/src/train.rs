@@ -158,6 +158,7 @@ mod tests {
                 input_torque: 0.25,
                 back_driving_torque: 0.1,
                 operating_torque: 0.2,
+                reversed_bending: false,
                 actuation: Actuation::Continuous {
                     operating_speed: 9600.0,
                     runtime_hours: 1000.0,
