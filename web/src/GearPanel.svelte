@@ -278,35 +278,16 @@
           <option value="internal">{t("ui.gear_kind_internal")}</option>
           <option value="eccentric">{t("ui.gear_kind_eccentric")}</option>
         </select>
-        <!-- An external gear needs no note: "External" says it. The other two
-             each have something the name does not carry. -->
+        <!-- Only the eccentric kind carries something its name does not.
+             "External" says it, and so does "Internal": a note repeating the
+             word above it is one more thing to keep true for no reading gained. -->
         <small>
-          {#if internal}
-            {t("ui.gear_teeth_point_inward_tip_circle_inside")}
-          {:else if eccentric}
+          {#if eccentric}
             {t("ui.gear_kind_eccentric_note")}
           {/if}
         </small>
       </label>
     </div>
-    {#if internal}
-      <div class="grid">
-        <label>
-          <span>{t("ui.gear_cutter_teeth")}</span>
-          <input type="number" step="1" min="1" bind:value={tab.cutter.teeth} />
-        </label>
-        <label>
-          <span>{t("ui.gear_cutter_addendum")}</span>
-          <input type="number" step="0.05" bind:value={tab.cutter.addendum} />
-          <em>{t("ui.gear_m")}</em>
-        </label>
-        <label>
-          <span>{t("ui.gear_cutter_tip_round")}</span>
-          <input type="number" step="0.02" bind:value={tab.cutter.tip_round} />
-          <em>{t("ui.gear_m")}</em>
-        </label>
-      </div>
-    {/if}
     <div class="grid">
       {#each FIELDS.filter((f) => !f.kinds || f.kinds.includes(tab.kind)) as f (f.key)}
         <!-- The mate is what the commanded centre distance is commanded
@@ -389,6 +370,31 @@
         {/if}
       {/each}
     </div>
+    <!-- The cutter comes last, under the thickness modification, because it is
+         the one group here that is not a dimension of the gear: a ring has no
+         dedendum and no root-radius coefficient, it has a *tool*, and where the
+         tool reaches is what those become (docs/reference.md#internal-gears).
+         Reading it after the gear's own parameters also lines the ring's panel
+         up with the external one, whose last field is the same thickness
+         modification. -->
+    {#if internal}
+      <div class="grid">
+        <label>
+          <span>{t("ui.gear_cutter_teeth")}</span>
+          <input type="number" step="1" min="1" bind:value={tab.cutter.teeth} />
+        </label>
+        <label>
+          <span>{t("ui.gear_cutter_addendum")}</span>
+          <input type="number" step="0.05" bind:value={tab.cutter.addendum} />
+          <em>{t("ui.gear_m")}</em>
+        </label>
+        <label>
+          <span>{t("ui.gear_cutter_tip_round")}</span>
+          <input type="number" step="0.02" bind:value={tab.cutter.tip_round} />
+          <em>{t("ui.gear_m")}</em>
+        </label>
+      </div>
+    {/if}
 
     <h2>{t("ui.gear_measurement")}</h2>
     <div class="grid">
