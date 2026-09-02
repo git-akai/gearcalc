@@ -22,6 +22,30 @@ import {
   type Train,
 } from "./core";
 
+/** How a gear's drawing is being looked at.
+ *
+ *  **Not an input**, and beside `params` rather than in it, for the same reason
+ *  `TrainTab.open` is beside `train`: it changes no number, and what leaves the
+ *  application — the DXF, and a train's TOML — must not carry a view
+ *  preference. It lives on the tab rather than in the canvas because the panel
+ *  is rebuilt whenever a reader looks at something else, so a zoom held in the
+ *  component is a zoom lost by glancing at the next gear and coming back —
+ *  which is the small forgetting that makes two gears tiring to compare. It
+ *  dies with the session, like everything here that is not the language. */
+export interface GearView {
+  /** Whether the reference circles are drawn under the outline.
+   *
+   *  Not the same question as `GearTab.referenceCircles`, which puts them in
+   *  the exported file: one is what a reader is looking at and the other is
+   *  what a drawing contains, and answering both with one box would mean
+   *  clearing the screen quietly changed an export. */
+  circles: boolean;
+  /** Scale on the automatic framing, and the pan in pixels from centre. */
+  zoom: number;
+  panX: number;
+  panY: number;
+}
+
 export interface GearTab {
   id: number;
   name: string;
@@ -33,6 +57,8 @@ export interface GearTab {
   /** Export accuracy, mm. */
   chordTolerance: number;
   referenceCircles: boolean;
+  /** How the drawing is being looked at — see `GearView`. */
+  view: GearView;
   /** Which of the three kinds this tab holds. */
   kind: GearKind;
   /** The pinion cutter that shapes it, used only when internal. */
@@ -85,6 +111,9 @@ function freshTab(name = t("ui.gear_default_name")): GearTab {
     toleranceClass: null,
     chordTolerance: d.chord_tolerance,
     referenceCircles: d.reference_circles,
+    // Framed by the canvas, circles on: a view has no engineering default to
+    // ask the core for, which is the whole of what makes it a view.
+    view: { circles: true, zoom: 1, panX: 0, panY: 0 },
     kind: "external",
     cutter: d.cutter,
     mate: { teeth: 43, profile_shift: 0, internal: false },

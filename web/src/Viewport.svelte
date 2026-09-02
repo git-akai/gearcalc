@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t } from "./core";
+  import type { GearView } from "./state.svelte";
   // Draws what the core produced. It computes no geometry: the profile arrives
   // as a flat [x0, y0, x1, y1, ...] array and the reference radii as numbers.
   // Only view transform lives here.
@@ -11,6 +12,7 @@
     tip,
     root,
     rim = null,
+    view = $bindable(),
   }: {
     points: Float64Array | null;
     pitch: number;
@@ -21,21 +23,24 @@
      *  outline is then the *bore*, and what is shaded is the material around
      *  it. Omitted for an external gear, where the outline is the part. */
     rim?: number | null;
+    /** Where the reader is looking, held by the tab rather than here.
+     *
+     *  This component is destroyed and rebuilt every time the reader looks at
+     *  another gear, so state it owned would be state a glance away from the
+     *  panel erased. Bound rather than passed: the pointer and the wheel are
+     *  here, so this is the component that *writes* it. */
+    view: GearView;
   } = $props();
 
   let canvas: HTMLCanvasElement | undefined = $state();
-  let showCircles = $state(true);
-  let zoom = $state(1);
-  let panX = $state(0);
-  let panY = $state(0);
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
 
   function reset() {
-    zoom = 1;
-    panX = 0;
-    panY = 0;
+    view.zoom = 1;
+    view.panX = 0;
+    view.panY = 0;
   }
 
   /** Zoom by `factor` about a point given in pixels from the canvas centre, so
@@ -47,16 +52,16 @@
    *  here — this is the view transform, and it composes: zooming in and back
    *  out about the same point returns to exactly where it started. */
   function zoomAbout(cx: number, cy: number, factor: number) {
-    const before = zoom;
-    zoom = Math.min(50, Math.max(0.2, zoom * factor));
-    if (zoom === before) return;
+    const before = view.zoom;
+    view.zoom = Math.min(50, Math.max(0.2, view.zoom * factor));
+    if (view.zoom === before) return;
     // The pan that keeps the drawing point under the cursor where it is: with
     // `cx = panX + s·x`, the same `x` at the new scale needs
     // `panX' = cx − (cx − panX)·s'/s`. The y axis is flipped in the transform,
     // but the flip cancels in that ratio, so both axes take the same form.
-    const growth = zoom / before;
-    panX = cx - (cx - panX) * growth;
-    panY = cy - (cy - panY) * growth;
+    const growth = view.zoom / before;
+    view.panX = cx - (cx - view.panX) * growth;
+    view.panY = cy - (cy - view.panY) * growth;
   }
 
   function onWheel(e: WheelEvent) {
@@ -78,8 +83,8 @@
   }
   function onMove(e: PointerEvent) {
     if (!dragging) return;
-    panX += e.clientX - lastX;
-    panY += e.clientY - lastY;
+    view.panX += e.clientX - lastX;
+    view.panY += e.clientY - lastY;
     lastX = e.clientX;
     lastY = e.clientY;
   }
@@ -91,7 +96,7 @@
     const c = canvas;
     if (!c || !points || points.length < 4) return;
     // referenced so the effect re-runs on view changes
-    void [zoom, panX, panY, showCircles, pitch, base, tip, root, rim];
+    void [view.zoom, view.panX, view.panY, view.circles, pitch, base, tip, root, rim];
 
     const dpr = window.devicePixelRatio || 1;
     const w = c.clientWidth;
@@ -111,12 +116,12 @@
     // Frame whatever the part actually reaches: a ring's tip radius is its
     // *smallest*, so scaling by it drew the rim off the edge of the canvas.
     const extent = Math.max(tip, root, rim ?? 0, 1e-9);
-    const scale = ((Math.min(w, h) * 0.45) / extent) * zoom;
-    ctx.translate(w / 2 + panX, h / 2 + panY);
+    const scale = ((Math.min(w, h) * 0.45) / extent) * view.zoom;
+    ctx.translate(w / 2 + view.panX, h / 2 + view.panY);
     ctx.scale(scale, -scale); // +y up, the way a drawing is read
     ctx.lineWidth = 1 / scale;
 
-    if (showCircles) {
+    if (view.circles) {
       ctx.setLineDash([4 / scale, 4 / scale]);
       ctx.strokeStyle = token("--reference", "#888");
       for (const r of [root, base, pitch, tip]) {
@@ -163,7 +168,7 @@
     onpointercancel={onUp}
   ></canvas>
   <div class="bar">
-    <label><input type="checkbox" bind:checked={showCircles} />
+    <label><input type="checkbox" bind:checked={view.circles} />
       {t("ui.viewport_reference_circles")}</label>
     <span class="hint">{t("ui.viewport_drag_pan_scroll_zoom")}</span>
     <button onclick={reset}>{t("ui.viewport_reset_view")}</button>

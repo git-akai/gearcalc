@@ -466,6 +466,7 @@
           tip={r.tip_radius}
           root={r.root_radius}
           rim={r.rim_radius}
+          bind:view={tab.view}
         />
         <h2>{t("ui.gear_geometry")}</h2>
         <dl>
@@ -535,6 +536,7 @@
         base={s.base_radius}
         tip={s.tip_radius}
         root={s.root_radius}
+        bind:view={tab.view}
       />
 
       <!-- For an eccentric gear undercut/severed are per-tooth: the Eccentricity

@@ -1050,6 +1050,27 @@ a readout that asks "is this non-zero?" where it meant "is this that kind of
 thing?". Changing type returns every field the incoming type does not use to
 its default.
 
+### A view preference belongs to the tab, not to the panel
+
+The panel, and with it the canvas, is rebuilt whenever a reader looks at another
+gear — so anything the drawing remembers about *being looked at* has to live
+where the tab does, or a glance erases it. The zoom, the pan and the reference
+circles on screen did not, and coming back to a gear found it framed from
+scratch with the circles switched back on. Which stage of a train is expanded
+had already been moved for exactly this reason; this is the same fact a second
+time, now in one shape: a `GearView` beside `params`.
+
+**Beside, not in.** A view is not an input. Nothing derived is stored and
+nothing that leaves may carry one — a DXF is a drawing of a part and a train's
+TOML is a description of a gearbox, and neither has an opinion about zoom. It
+dies with the session, like every setting here that is not the language.
+
+**Two boxes can carry one phrase and ask different questions.** "Reference
+circles" under the canvas and "Include reference circles" in the export panel
+are deliberately not wired together: one is what a reader is looking at, the
+other is what a file contains. Answering both with one box would mean clearing
+the screen quietly changed what an export contained.
+
 ### Unfinished work is knocked for, not switched on
 
 The eccentric gear is derived, gated and drawn like everything else here, and
