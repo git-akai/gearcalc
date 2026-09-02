@@ -184,7 +184,7 @@ Three scripts exist to check the Rust against something that shares no code with
 it, and all are run by hand rather than in CI:
 
 ```bash
-python3 tools/validate_dxf.py <file.dxf> ...   # read an export back with ezdxf
+python3 tools/validate_dxf.py <file.dxf> ...   # an export's structure, then its geometry
 python3 tools/worm_flank_curvature.py          # worm flank curvature from the surface itself
 python3 tools/crossed_path.py                  # a crossed pair's path of contact, from the surfaces
 python3 tools/check_strings.py                 # every UI message is used, and every used one exists

@@ -9,6 +9,17 @@ gear that went in.
 It is the same standard used elsewhere in this project: verify against something
 that does not share the code under test.
 
+**With one correction, learnt the hard way.** An independent reader that
+*repairs* what it reads is not a check. ezdxf builds a document: every structure
+a file leaves out, it supplies from its own template and then reports the result
+as valid. This export shipped with no BLOCKS section, no BLOCK_RECORD table and
+no OBJECTS section -- and ezdxf invented all three, so this tool passed it while
+SOLIDWORKS, which repairs nothing, refused the file outright.
+
+So the structure is read from the raw tags, before ezdxf is allowed near them.
+The full requirement is gated in `gear_io::dxf`'s own tests -- one list, in one
+place; what is checked here is the shape that reading cannot recover.
+
 Usage:
     validate_dxf.py <file.dxf> --root R --tip T --base B --pitch P --teeth Z
 """
@@ -26,6 +37,58 @@ except ImportError:
 TOL = 1e-6  # mm; the exporter writes 12 decimal places
 
 
+def raw_tags(path):
+    """The file as (group code, value) pairs, which is all a DXF is."""
+    with open(path, encoding="utf-8") as f:
+        lines = f.read().splitlines()
+    return [(lines[i].strip(), lines[i + 1]) for i in range(0, len(lines) - 1, 2)]
+
+
+def structure(path, check):
+    """What the file itself declares -- read before any parser can repair it.
+
+    Two properties, both of which a rebuilding reader hides: the sections a
+    reader walks in order, and the ownership graph. In R2000 every record names
+    its owner by handle (group code 330) and every entity is owned by the block
+    record of the space it is drawn in; a pointer into nothing is exactly what
+    separates a file a lenient reader fixes from one a strict reader rejects.
+    """
+    tags = raw_tags(path)
+    sections = [tags[i + 1][1] for i, (c, v) in enumerate(tags) if c == "0" and v == "SECTION"]
+    check(
+        sections == ["HEADER", "CLASSES", "TABLES", "BLOCKS", "ENTITIES", "OBJECTS"],
+        f"the six sections R2000 requires, in order (got {sections})",
+    )
+
+    handles = {v for c, v in tags if c in ("5", "105")}
+    dangling = sorted(
+        {v for c, v in tags if c in ("330", "340", "350") and v != "0" and v not in handles}
+    )
+    check(not dangling, f"every owner and pointer resolves to a handle in the file {dangling or ''}")
+
+    # The entities must be owned by model space, or they are in the file and in
+    # no layout -- present to a reader that rebuilds, absent to one that does not.
+    model_space = None
+    for i, (c, v) in enumerate(tags):
+        if c == "0" and v == "BLOCK_RECORD":
+            body = []
+            for j in range(i + 1, len(tags)):
+                if tags[j][0] == "0":
+                    break
+                body.append(tags[j])
+            if any(c2 == "2" and v2 == "*Model_Space" for c2, v2 in body):
+                model_space = next(v2 for c2, v2 in body if c2 == "5")
+    check(model_space is not None, "a *Model_Space block record exists")
+
+    owners = [
+        tags[i + 2] for i, (c, v) in enumerate(tags) if c == "0" and v in ("LWPOLYLINE", "CIRCLE")
+    ]
+    check(
+        bool(owners) and all(o == ("330", model_space) for o in owners),
+        f"every entity is owned by model space (handle {model_space})",
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("path")
@@ -36,14 +99,17 @@ def main() -> int:
     ap.add_argument("--teeth", type=int, required=True)
     a = ap.parse_args()
 
-    doc = ezdxf.readfile(a.path)
-    ents = list(doc.modelspace())
     fail = []
 
     def check(ok, msg):
         print(("  ok   " if ok else "  FAIL ") + msg)
         if not ok:
             fail.append(msg)
+
+    structure(a.path, check)
+
+    doc = ezdxf.readfile(a.path)
+    ents = list(doc.modelspace())
 
     print(f"{a.path}: parsed as {doc.dxfversion}")
 

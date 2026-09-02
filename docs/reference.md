@@ -1043,10 +1043,26 @@ becomes `overridden`, ordered *ahead* of `datasheet`.
 ## Export and import
 
 **DXF**, ASCII, hand-written: the profile as a dense `LWPOLYLINE` with spacing
-from the chord tolerance, tip and root arcs as true `ARC` entities where the
-geometry is genuinely circular, and reference circles on a construction layer.
+from the chord tolerance, its tip and root arcs carried as vertex **bulges** —
+exact circular arcs rather than chords, in the one entity a designer can extrude
+without joining anything first — and reference circles on a construction layer.
 A ring also carries a rim circle at `r + 2 m_t` — a drawing convention with no
 engineering meaning, and `Ring::rim_radius` is its one home.
+
+**The file is written to the published R2000 minimum**, which is more than the
+geometry. AC1015 is a graph rather than a list: six sections in order (`HEADER`,
+`CLASSES`, `TABLES`, `BLOCKS`, `ENTITIES`, `OBJECTS`), nine symbol tables —
+`VPORT`, `VIEW` and `UCS` may be empty, and are — with `ByBlock`/`ByLayer`/
+`Continuous` line types, layer `0`, a `Standard` text style, an `ACAD` appid, a
+`Standard` dimension style, and a `BLOCK_RECORD` for each of `*Model_Space` and
+`*Paper_Space`; both spaces defined again as blocks; a root dictionary naming
+`ACAD_GROUP`; and an owner handle on every record, entities included, since a
+layout owns what is drawn in it. `DIMSTYLE` is the one record whose handle is
+group code **105** rather than 5.
+
+None of that draws anything, and leaving it out costs nothing until a reader
+that does not rebuild what it is missing is asked to open the file. See
+[corrections.md](corrections.md#a-reader-that-repairs-is-not-a-check).
 
 **Geartrains and the material library**, TOML, the same shape as the input
 structs. **Inputs only**, so files stay small and cannot go stale. A geartrain

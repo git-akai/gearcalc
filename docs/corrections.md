@@ -49,6 +49,20 @@ the answer turned out to *be* the backlash law halved.
 fail, it is not a check.* Before trusting a new gate, run it against the broken
 code.
 
+### A reader that repairs is not a check
+
+The sibling of the one above, and harder to see. `ezdxf` was chosen to read the
+exported DXF back precisely because it shares no code with the writer — and it
+*builds a document*: every structure the file left out, it supplied from its own
+template and then pronounced the result sound. The export shipped with no
+`BLOCKS` section, no `BLOCK_RECORD` table and no `OBJECTS` section, entities
+owned by nothing, and passed every check for months. SOLIDWORKS repairs nothing
+and refused the file outright.
+
+*A tool forgiving enough to be worth checking against may be forgiving enough to
+hide the fault. Ask what it does with a defect, not whether it opens the file.*
+The structure is now read from the raw tags before any parser sees them.
+
 ### An axis nobody turns is an axis nobody tests
 
 Every continuity check on the eccentric gear ran at λ = 0, which is the one value
@@ -290,6 +304,8 @@ whose units are wrong is wrong however plausible.
 | [reference.md#bending](reference.md#bending) | `notch_parameter_in_range` **existed and nothing asked it** | `docs/rationale.md` has said all along that the `Y_S` fit's notch band is "clamped into the fit's stated range and **reported raw**", and `strength.rs` that a result outside it "says so instead of quietly returning a boundary value". Nothing said so: no stage and no boundary type ever called the function. Outside the band the correction is taken at the boundary, and above it that **under-predicts** root stress — the unconservative direction. Both stages report it now, naming the member and the value. It fires on ordinary inputs: a planet at `k = 1.3` sits at `q_s = 0.97`, just under the band |
 
 | [reference.md#the-boundary](reference.md#the-boundary) | **A note naming a member, in a list keyed by note key** — so a stage that raised it for two members could not be drawn at all | The front end draws every note list as a Svelte keyed `{#each … (n.key)}`, and duplicate keys in one are an error rather than a warning: the block throws and the stage stops rendering. Switching a drive to reversing raised `stage.reversed_bending_uncorrected` for the sun, the planet **and** the ring — one key, three entries — so the planetary stage would not expand. Reported as a hang, and it was a thrown render. Two fixes, and both were wanted anyway: a note about a gear lives **on the gear** now, one per list; and every note list is keyed by position, so a repeat can never again be the thing that stops a panel drawing. The same shape had been latent in `stage.face_width_no_source`, which names a member and can fire for both |
+
+| [reference.md#export-and-import](reference.md#export-and-import) | **Every DXF this project ever exported was structurally incomplete** | AC1015 is a graph: six sections, nine symbol tables, both spaces defined as blocks, a root dictionary, and an owner handle on every record. The writer emitted three sections and two tables, and no entity said which layout owned it. Nothing caught it — the Rust tests checked the writer against our own reading of the format, and `ezdxf`, the independent reader, invented the missing structures on load and reported no fault. It surfaced the only way left: **SOLIDWORKS would not open the file.** Gated now against the published minimum, tag by tag, and against a handle graph that must close — both verified by breaking the writer and watching them fail, and the corrected file confirmed importing |
 
 ---
 

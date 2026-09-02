@@ -1140,6 +1140,13 @@ On top of that, in rough order of what has actually caught things:
    average of instantaneous loss, the crossed path differentiated off the flanks
    rather than constructed, the ring cut simulated from the cutter alone. Every
    one of those caught something self-consistent tests had passed.
+
+   **...and that does not repair what you got wrong.** A reader forgiving
+   enough to be worth checking against is often forgiving enough to hide the
+   fault: `ezdxf` builds a document, supplying from its own template every
+   structure the file omitted, and then agreed the file was sound. What it
+   agreed to, SOLIDWORKS refused. Ask what the independent tool *does* with a
+   defect before trusting that it would show you one.
 2. **Ask what property the answer must have.** The ring's flank disagreement was
    located by noticing the simulated envelope was *not an involute of the ring's
    base circle* — a property conjugate action guarantees, checkable without

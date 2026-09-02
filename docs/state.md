@@ -231,7 +231,9 @@ proof-read before anyone leans on it. Correcting one changes no calculation:
 `crates/gear-io/data/strings_<code>.toml`, one message per line, keys untouched.
 
 **Materials, export, UI.** An eight-material library with per-value provenance ·
-DXF with exact arcs for external *and* internal gears · geartrains exported and
+DXF with exact arcs for external *and* internal gears, written to the published
+R2000 minimum so a reader that repairs nothing still opens it — confirmed
+importing into SOLIDWORKS · geartrains exported and
 imported as TOML, inputs only · gear tabs with external and internal kinds — and
 eccentric, in the developer mode — geartrain tabs with spur, worm and planetary
 stages.
