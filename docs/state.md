@@ -178,13 +178,18 @@ Verified by simulating the cut — 2.5–2.7 µm across shifts −0.4 … +0.5.
 the ring search, layout checks, Willis kinematics, Pennestrì–Freudenstein
 efficiency in all six arrangements, and backlash referred to the output shaft.
 
-**Eccentric gears — labelled experimental on screen.** A gear whose profile
+**Eccentric gears — not offered until they are asked for.** A gear whose profile
 shift varies with angular position, at a genuinely constant transmission ratio.
-The mathematics is derived and gated like everything else here; what earns the
-label is that no part cut from it has been measured, and the residual it reports
-is against an ideal rather than against a mechanism anyone has built
+The mathematics is derived and gated like everything else here; what keeps it
+out of the picker is that no part cut from it has been measured, and the residual
+it reports is against an ideal rather than against a mechanism anyone has built
 ([rationale](rationale.md), "An eccentric gear is an ordinary gear with Δx = 0").
-The word is in the type's own name, so it cannot be read without it.
+The type appears in a gear tab's list only in the developer mode, which is
+knocked for on the application's title in the sidebar — ten clicks inside four
+seconds, no visible answer — and left by reloading, like every setting here that
+is not the language. It is still labelled experimental in its own name once it is
+there, so it cannot be read without the word
+([rationale](rationale.md#unfinished-work-is-knocked-for-not-switched-on)).
 
 One hob, one setting; the root belongs
 to the gear; the commanded centre distance and what a simple crank leaves; and
@@ -227,8 +232,9 @@ proof-read before anyone leans on it. Correcting one changes no calculation:
 
 **Materials, export, UI.** An eight-material library with per-value provenance ·
 DXF with exact arcs for external *and* internal gears · geartrains exported and
-imported as TOML, inputs only · gear tabs with external, internal and eccentric
-kinds, geartrain tabs with spur, worm and planetary stages.
+imported as TOML, inputs only · gear tabs with external and internal kinds — and
+eccentric, in the developer mode — geartrain tabs with spur, worm and planetary
+stages.
 
 ---
 

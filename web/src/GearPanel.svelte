@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     FIELDS,
+    KINDS,
     defaults,
     dxf,
     isUnavailable,
@@ -21,7 +22,7 @@
     note,
     t,
   } from "./core";
-  import { setKind, workspace, type GearTab as Tab } from "./state.svelte";
+  import { developer, setKind, workspace, type GearTab as Tab } from "./state.svelte";
   import Viewport from "./Viewport.svelte";
 
   let { tab }: { tab: Tab } = $props();
@@ -178,6 +179,15 @@
   const eccentric = $derived(tab.kind === "eccentric");
   const ring = $derived(internal ? solveRing(ringRequest) : null);
 
+  /** The kinds this tab may be switched to, and the note under the one it holds.
+   *
+   *  A kind marked `developer` is not in the list until the mode is knocked for
+   *  in the sidebar. The tab's own kind cannot fall out of the list underneath
+   *  it: the picker is the only way a tab becomes eccentric, and the mode does
+   *  not close (`Developer` in `state.svelte.ts`). */
+  const kinds = $derived(KINDS.filter((k) => !k.developer || developer.enabled));
+  const kindNote = $derived(KINDS.find((k) => k.key === tab.kind)?.note);
+
   /** For an eccentric gear the input bounds are for the whole swept interval,
    *  not the nominal tooth — this says so, once, wherever a bound is shown.
    *  It wraps the bound rather than being glued onto it, so the catalogue holds
@@ -274,18 +284,11 @@
           value={tab.kind}
           onchange={(e) => setKind(tab, e.currentTarget.value as GearKind)}
         >
-          <option value="external">{t("ui.gear_kind_external")}</option>
-          <option value="internal">{t("ui.gear_kind_internal")}</option>
-          <option value="eccentric">{t("ui.gear_kind_eccentric")}</option>
+          {#each kinds as k (k.key)}
+            <option value={k.key}>{t(k.label)}</option>
+          {/each}
         </select>
-        <!-- Only the eccentric kind carries something its name does not.
-             "External" says it, and so does "Internal": a note repeating the
-             word above it is one more thing to keep true for no reading gained. -->
-        <small>
-          {#if eccentric}
-            {t("ui.gear_kind_eccentric_note")}
-          {/if}
-        </small>
+        <small>{kindNote ? t(kindNote) : ""}</small>
       </label>
     </div>
     <div class="grid">

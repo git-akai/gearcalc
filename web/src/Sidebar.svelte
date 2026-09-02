@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { workspace, trains, library, applyLanguage } from "./state.svelte";
+  import { workspace, trains, library, applyLanguage, developer } from "./state.svelte";
   import { exportLibrary, t, languages, language } from "./core";
 
   let { version }: { version: string | null } = $props();
@@ -33,8 +33,21 @@
 <aside>
   <!-- The application's name, which is not the same string as the heading over
        the gear tabs below even though both once read "Gears". One key for two
-       jobs meant renaming either renamed both. -->
-  <h1>{t("ui.app_name")}</h1>
+       jobs meant renaming either renamed both.
+
+       It is also where the developer mode is knocked for — ten times inside
+       four seconds. A heading rather than a button, and that is the point: a
+       control that is announced, lights up under the pointer or turns the
+       cursor into a hand is a control being *offered*, and this one is not on
+       offer. So the two a11y rules below are waived rather than satisfied —
+       satisfying them would mean putting it in the tab order and naming it to a
+       screen reader, which is the same as printing it on the page. Nothing
+       answers a knock; what changes is what the gear tab's type picker lists. -->
+  <!-- One rule per comment: a `svelte-ignore` reads the first code and drops
+       the rest, so two on one line silently waives one and warns on the other. -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <h1 onclick={() => developer.knock()}>{t("ui.app_name")}</h1>
 
   <!-- Under the title rather than at the foot of the pane. It sat below the tab
        lists, which grow: past a dozen tabs it was pushed off the bottom and the
@@ -153,6 +166,14 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--muted);
+    /* The knock leaves no trace. There is no hover or active rule to add here —
+       the absence is the design — but two defaults would have given it away on
+       their own: the caret the pointer becomes over text, and the selection a
+       word takes when it is clicked ten times in a row. A highlighted title is
+       exactly the visible answer a knock must not give. */
+    cursor: default;
+    -webkit-user-select: none;
+    user-select: none;
   }
   h2 {
     font-size: 0.7rem;

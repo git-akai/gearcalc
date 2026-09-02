@@ -208,6 +208,35 @@ export function boundFor(key: keyof GearParams, r: Ranges): Bound | null {
  *  below the boundary. The core has no such enum and does not want one. */
 export type GearKind = "external" | "internal" | "eccentric";
 
+export interface KindSpec {
+  key: GearKind;
+  /** Catalogue key for the kind's name. Not the name, for the reason a field's
+   *  label is not either: it is a word the application shows. */
+  label: string;
+  /** Catalogue key for the note under the picker, where the kind carries
+   *  something its name does not. "External" says it and so does "Internal": a
+   *  note repeating the word above it is one more thing to keep true for no
+   *  reading gained. */
+  note?: string;
+  /** Offered only while the developer mode is on — see `developer` in
+   *  `state.svelte.ts`, and docs/rationale.md#unfinished-work-is-knocked-for-not-switched-on. */
+  developer?: boolean;
+}
+
+/** The kinds, as data, for the same reason `FIELDS` below is: the picker renders
+ *  from this and `setKind` reads the fields against it, so a fourth kind is a
+ *  row here rather than an option, a note and a filter kept in step by hand. */
+export const KINDS: KindSpec[] = [
+  { key: "external", label: "ui.gear_kind_external" },
+  { key: "internal", label: "ui.gear_kind_internal" },
+  {
+    key: "eccentric",
+    label: "ui.gear_kind_eccentric",
+    note: "ui.gear_kind_eccentric_note",
+    developer: true,
+  },
+];
+
 export interface FieldSpec {
   key: keyof GearParams;
   /** Catalogue key for the field's name. Not the name: an input label is a word

@@ -331,6 +331,47 @@ class Library {
 
 export const library = new Library();
 
+/** How the developer mode is asked for: ten knocks inside four seconds.
+ *
+ *  Long enough that the tenth click is never an accident on a heading, short
+ *  enough that it can be done without counting. */
+const KNOCKS = 10;
+const KNOCK_WINDOW_MS = 4000;
+
+/** The developer mode: work that is in the tool but not offered to a reader.
+ *
+ *  Asked for by knocking on the application's title in the sidebar, and left by
+ *  reloading the page — like every setting here that is not the language
+ *  (`docs/rationale.md#unfinished-work-is-knocked-for-not-switched-on`). It is
+ *  deliberately *not* stored: nothing about it can arrive with a link, and the
+ *  other copy of the application in the same browser stays as it was, because
+ *  the language remains the only thing that crosses between two copies.
+ *
+ *  **It only opens.** A mode that could be knocked shut again would leave a tab
+ *  holding a kind the picker no longer lists — a control disappearing from
+ *  under a value that is still doing something, which is the fault
+ *  `docs/rationale.md#a-hidden-input-is-still-an-input` is about. A reload is
+ *  the way out, and a reload is also what returns every tab to a default one. */
+class Developer {
+  /** Whether work behind the mode is offered. */
+  enabled = $state(false);
+
+  /** The knocks still inside the window. Not `$state`: nothing renders from it,
+   *  and the one thing that does is `enabled`. */
+  #knocks: number[] = [];
+
+  /** One knock. Silent by contract — the caller shows nothing, and what changes
+   *  when the tenth lands is what the gear tab's type picker lists. */
+  knock() {
+    const now = Date.now();
+    this.#knocks = this.#knocks.filter((at) => now - at < KNOCK_WINDOW_MS);
+    this.#knocks.push(now);
+    if (this.#knocks.length >= KNOCKS) this.enabled = true;
+  }
+}
+
+export const developer = new Developer();
+
 /** Switch language, carrying the names the *application* chose across with it.
  *
  *  One home for the whole of what a language change means, because there are two

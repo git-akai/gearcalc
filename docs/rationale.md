@@ -1050,6 +1050,41 @@ a readout that asks "is this non-zero?" where it meant "is this that kind of
 thing?". Changing type returns every field the incoming type does not use to
 its default.
 
+### Unfinished work is knocked for, not switched on
+
+The eccentric gear is derived, gated and drawn like everything else here, and
+still no part cut from it has been measured — that is what "experimental" in its
+own name has been carrying. But a type picker is read as a list of what the tool
+does, and a reader opening it has no way to know that the third entry asks for
+more trust than the other two. Naming the doubt in the option is asking the
+reader to weigh it before they know what any of the words mean.
+
+So it is not in the list until it is asked for: ten knocks on the application's
+title in the sidebar, inside four seconds. Three properties, each deliberate.
+
+**The knock has no answer.** No hover, no cursor change, no message, nothing in
+the tab order, nothing announced. A control that says "you found something" is a
+control being offered, and this is not on offer — what changes is that the
+picker has a third entry. The two defaults that would have leaked it on their
+own, the text caret and the selection ten clicks put on a word, are turned off in
+the one stylesheet rule this costs.
+
+**It only opens.** Knocking it shut again would leave a tab holding a kind the
+picker no longer lists, which is the same fault as "A hidden input is still an
+input" one level up: a value still doing something with no control on screen to
+say so. A reload is the way out, and a reload already returns everything else
+here to its default.
+
+**It is not stored.** The mode is a session's, like every setting that is not
+the language, so it cannot arrive with a link and cannot cross to the other copy
+of the application in the same browser — the language is still the only thing
+that does.
+
+The kinds became a table to hold this, in the same shape and for the same reason
+as the field list beside it: a kind's name, its note and whether it is offered
+are one row rather than three places to keep in step, and the picker renders
+whatever the row says.
+
 ### Additions to the specification's field list
 
 Three things the specification does not list. Two are read-only outputs; the
