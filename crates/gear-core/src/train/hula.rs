@@ -30,6 +30,7 @@
 //! put through, given a basic ratio rather than a set of planetary counts to
 //! derive one from.
 
+use crate::contact::Directional;
 use crate::hula::{self, Offset, Split, Teeth};
 use crate::mesh::{Mesh, MeshError, MeshKind, MeshSide};
 use crate::note::Note;
@@ -224,6 +225,10 @@ pub struct HulaResult {
     pub binding_mesh: Option<usize>,
     /// Speed of the crank, rpm — the input, and the carrier of both meshes.
     pub crank_speed: f64,
+    /// Angular backlash at whichever shaft is the **output**, degrees: gear 4
+    /// driving forward, the crank driving backward. The same two plays subtend
+    /// very different angles at the two, by exactly the reduction.
+    pub backlash: Directional<super::Backlash>,
     pub meshes: [HulaMesh; 2],
     pub gears: [HulaGear; 4],
 }
@@ -258,6 +263,9 @@ pub fn solve_hula_stage(stage: &HulaStage, input_speed: f64) -> Result<HulaResul
     let output_speed = input_speed / layout.ratio.value();
 
     let mut meshes = Vec::with_capacity(2);
+    // Kept past the loop: the pair's rolling geometry is what refers a play to
+    // a shaft, and that cannot be done one mesh at a time.
+    let mut rolling = Vec::with_capacity(2);
     // Filled as each pair is built, since a gear belongs to exactly one mesh
     // and is finished the moment its own pair is.
     let mut gears: [Option<HulaGear>; 4] = [None, None, None, None];
@@ -313,6 +321,7 @@ pub fn solve_hula_stage(stage: &HulaStage, input_speed: f64) -> Result<HulaResul
             clamps: pinion.clamps.notes.clone(),
         });
 
+        rolling.push(mesh);
         let report = mesh_with(&ring, &pinion);
         let angular =
             |a: f64, at: MeshSide| mesh.angular_backlash(a, at).unwrap_or(0.0).to_degrees();
@@ -335,6 +344,57 @@ pub fn solve_hula_stage(stage: &HulaStage, input_speed: f64) -> Result<HulaResul
 
     let gears = gears.map(|g| g.expect("every gear belongs to a mesh"));
 
+    // ---- backlash, referred to whichever shaft is the output.
+    //
+    // Both meshes sit at the same centre distance — the crank's — so in the
+    // crank's frame each mesh's play lets its members slip. Writing each pair
+    // with its ring first, and `θ_w` for the body carrying gears 2 and 3:
+    //
+    //     r′₁(θ₁ − θ_c) − r′₂(θ_w − θ_c) = ±δ_A        gears 1 and 2
+    //     r′₃(θ_w − θ_c) − r′₄(θ₄ − θ_c) = ±δ_B        gears 3 and 4
+    //
+    // `r′₂ ≠ r′₃` in general — the two are different gears on one body, with
+    // different tooth counts, modules and operating pressure angles, and
+    // assuming one radius for the body is the mistake waiting to be made here.
+    // Eliminating `θ_w` leaves one constraint on the three shafts:
+    //
+    //     r′₁r′₃(θ₁ − θ_c) − r′₂r′₄(θ₄ − θ_c) = Δ,     Δ = r′₃δ_A + r′₂δ_B
+    //
+    // which is Willis at Δ = 0. Hold the two shafts that are not the output and
+    // the third moves by `|Δ|/Z`, with `Z` its own coefficient: `r′₂r′₄` at the
+    // output, `r′₂r′₄ − r′₁r′₃` at the crank. The two plays are independent, so
+    // their extremes add.
+    //
+    // The check that this is right: the same play measured at the two shafts
+    // must differ by exactly the reduction between them — and the coefficients
+    // here are built from operating radii while the reduction is counted in
+    // teeth, so the two routes share nothing.
+    let operating_radius = |gear: usize, a: f64| {
+        let mesh = gear / 2;
+        a * z[gear] / (z[mesh * 2] - z[mesh * 2 + 1]).abs()
+    };
+    let referred = |a: f64| -> Directional<f64> {
+        let play: Vec<f64> = rolling
+            .iter()
+            .map(|m| m.backlash(a).unwrap_or(0.0).abs())
+            .collect();
+        let r: Vec<f64> = (0..4).map(|g| operating_radius(g, a)).collect();
+        let delta = r[2] * play[0] + r[1] * play[1];
+        Directional {
+            forward: (delta / (r[1] * r[3])).to_degrees(),
+            backward: (delta / (r[1] * r[3] - r[0] * r[2]).abs()).to_degrees(),
+        }
+    };
+    let band = |pick: fn(&Directional<f64>) -> f64| super::Backlash {
+        nominal: pick(&referred(offset)),
+        minimum: pick(&referred(offset - stage.tolerance_minus)),
+        maximum: pick(&referred(offset + stage.tolerance_plus)),
+    };
+    let backlash = Directional {
+        forward: band(|d| d.forward),
+        backward: band(|d| d.backward),
+    };
+
     Ok(HulaResult {
         ratio: layout.ratio.value(),
         ratio_products: [layout.ratio.numerator, layout.ratio.denominator],
@@ -342,6 +402,7 @@ pub fn solve_hula_stage(stage: &HulaStage, input_speed: f64) -> Result<HulaResul
         offset,
         binding_mesh: layout.binding,
         crank_speed: input_speed,
+        backlash,
         meshes: [meshes[0].clone(), meshes[1].clone()],
         gears,
     })
@@ -453,6 +514,94 @@ mod tests {
                 !ring.clamps.is_empty(),
                 "a ring cut by a tool bigger than itself should have said so"
             );
+        }
+    }
+
+    /// **The same play, measured at the two shafts, differs by the reduction.**
+    ///
+    /// The two figures come from coefficients built out of operating radii;
+    /// the reduction is counted in teeth. That they agree says the operating
+    /// radii scale as the tooth counts within each mesh — which is the step
+    /// that would go wrong if a reference radius were used for one member and
+    /// an operating one for another.
+    #[test]
+    fn the_play_at_the_two_shafts_differs_by_the_reduction() {
+        for teeth in [[19_u32, 18, 17, 18], [17, 18, 19, 18], [20, 18, 17, 18]] {
+            let mut s = stage();
+            for (gear, count) in s.gears.iter_mut().zip(teeth) {
+                gear.teeth = count;
+            }
+            let r = solve_hula_stage(&s, 100.0).unwrap();
+            let want = r.ratio.abs();
+            let got = r.backlash.backward.nominal / r.backlash.forward.nominal;
+            assert!(
+                (got - want).abs() < 1e-9 * want,
+                "{teeth:?}: play differs by {got} where the reduction is {want}"
+            );
+        }
+    }
+
+    /// **The output's play, reached the other way round.**
+    ///
+    /// The stage refers the two plays with coefficients built from operating
+    /// radii and linear backlash. This rebuilds the same figure from the
+    /// per-member angular backlash each mesh already reports — mesh A's play at
+    /// the wobble body, carried through mesh B by `z₃/z₄`, plus mesh B's own at
+    /// the output. Different function, different quantities, same answer, which
+    /// is what says the two plays are combined the right way round rather than
+    /// merely added.
+    #[test]
+    fn the_outputs_play_is_the_two_meshes_referred_through_the_body() {
+        for teeth in [[19_u32, 18, 17, 18], [17, 18, 19, 18], [20, 18, 17, 18]] {
+            let mut s = stage();
+            for (gear, count) in s.gears.iter_mut().zip(teeth) {
+                gear.teeth = count;
+            }
+            let r = solve_hula_stage(&s, 100.0).unwrap();
+            // `backlash[0]` is the pinion's, `[1]` the ring's — the mesh was
+            // built with the pinion first.
+            let at = |mesh: usize, gear: usize| {
+                r.meshes[mesh].backlash[usize::from(r.gears[gear].ring)].nominal
+            };
+            let want = at(0, 1) * f64::from(teeth[2]) / f64::from(teeth[3]) + at(1, 3);
+            let got = r.backlash.forward.nominal;
+            assert!(
+                (got - want).abs() < 1e-9 * want,
+                "{teeth:?}: {got} referred, {want} from the members"
+            );
+        }
+    }
+
+    /// The output's play is the two meshes' plays referred through the drive,
+    /// so it rises with either of them and vanishes with both.
+    #[test]
+    fn the_outputs_play_is_the_two_meshes_referred() {
+        let tight = HulaStage {
+            running_clearance: 0.0,
+            tolerance_plus: 0.0,
+            tolerance_minus: 0.0,
+            ..stage()
+        };
+        let r = solve_hula_stage(&tight, 100.0).unwrap();
+        assert!(
+            r.backlash.forward.nominal.abs() < 1e-12,
+            "a drive with no clearance should have no play, not {}",
+            r.backlash.forward.nominal
+        );
+
+        let mut last = 0.0;
+        for step in 1..8 {
+            let s = HulaStage {
+                running_clearance: f64::from(step) * 0.01,
+                ..stage()
+            };
+            let j = solve_hula_stage(&s, 100.0)
+                .unwrap()
+                .backlash
+                .forward
+                .nominal;
+            assert!(j > last, "the output's play fell from {last} to {j}");
+            last = j;
         }
     }
 

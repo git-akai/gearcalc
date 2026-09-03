@@ -171,6 +171,13 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         "  speeds  crank {:.1}  wobble {:+.3}  output {:+.4} rpm",
         result.crank_speed, result.gears[1].speed, result.gears[3].speed
     );
+    println!(
+        "  backlash at the output {:.6} deg (min {:.6}, max {:.6})   at the crank {:.4} deg",
+        result.backlash.forward.nominal,
+        result.backlash.forward.minimum,
+        result.backlash.forward.maximum,
+        result.backlash.backward.nominal
+    );
 
     for (index, mesh) in result.meshes.iter().enumerate() {
         let members: Vec<&gear_core::train::HulaGear> =
