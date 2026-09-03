@@ -512,6 +512,26 @@ fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, tit
 /// shaper, and the division of each mesh's shift. What it reports is the best
 /// design that is *admissible* — contact continuous, no interference of any of
 /// the three kinds, nothing clamped — which is the only kind worth comparing.
+///
+/// # Which shifts these are
+///
+/// Not the basic ones, and not
+/// [`contact::efficient_split`](gear_core::contact::efficient_split)'s either.
+///
+/// The **sum** of a mesh's two shifts is never free here: the crank offset is
+/// what it is, and that is the arrangement's defining constraint. Only the
+/// division is left, and it is searched rather than solved — because the
+/// unconstrained optimum is not a design. On these drives the mesh loses least
+/// at a division of `+2.85`, `+2.05`, `−2.55` for one, two and four teeth of
+/// difference, and **none of the three is admissible**: contact has gone
+/// discontinuous or the tips have fouled long before. Every row below sits
+/// instead on the constraints, at `ε ≈ 1.00` with the tip margin at zero, which
+/// is where a bound answers rather than an optimum.
+///
+/// So the closed form is not the tool for this arrangement. It finds where the
+/// loss is stationary, and here the loss is still falling when the geometry runs
+/// out — the useful statement is which bound stops it, and that is what these
+/// rows are.
 fn hula_band(z0: u32, clearance_in_modules: f64) {
     use gear_core::hula::Split;
     use gear_core::train::{solve_hula_stage, HulaStage};

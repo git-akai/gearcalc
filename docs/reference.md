@@ -1126,6 +1126,17 @@ addendum, the shaper and each mesh's shift division free (`gear-cli hulaband`):
 | 6 | 108 | 0.167 | 99.98 % | **95.1 %** | 16.1° | 0.025° |
 | 9 | 162 | 0.111 | 99.92 % | **79.9 %** | 12.8° | 0.014° |
 
+**These are optimised divisions, and they sit on a bound rather than at an
+optimum.** The *sum* of a mesh's two shifts is never free — the crank offset is
+what it is — so only the division is, and searching it (with the addendum and the
+shaper) is what the rows above report. The stationary point of the loss is not
+where they land: on these drives the mesh loses least at divisions of `+2.85`,
+`+2.05` and `−2.55` for one, two and four teeth of difference, and none of the
+three is admissible, because contact has gone discontinuous or the tips have
+fouled well before. Every row sits at `ε ≈ 1.00` with the tip margin at zero
+instead. The loss is still falling when the geometry runs out, so what a designer
+wants to know is which bound stops it — and that is what these are.
+
 Three times better at four teeth of difference than at one, on the same
 reduction in the same envelope — and a sixteenth of the backlash. The mesh
 figures explain it: a one-tooth pair has to be opened to 48° of operating
