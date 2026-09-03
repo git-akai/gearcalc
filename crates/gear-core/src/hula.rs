@@ -114,6 +114,13 @@ impl Ratio {
 /// The offset is the stage's own quantity rather than either mesh's, which is
 /// why it is named once here and not twice in the pairs.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum Offset {
     /// Given, in mm.
     Given(f64),
@@ -130,11 +137,18 @@ pub enum Offset {
 /// names it by what fixes it rather than by which member "gets" the shift — so
 /// neither member is privileged and a design can be entered from either end.
 ///
-/// The variant this is shaped for and does not yet have is `Efficiency`: with
-/// the difference already spent, the split is exactly the freedom a
-/// distribution rule needs, and adding it is adding an arm here rather than
+/// What the shape is for beyond the two arms below: with the difference already
+/// spent, the split is exactly the freedom a distribution rule needs, so a rule
+/// that chooses it — for efficiency, say — is one more arm here rather than
 /// another way to describe a gear.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum Split {
     /// The ring's shift is given; the pinion's follows from the offset.
     Ring(f64),

@@ -141,7 +141,9 @@ the second case was added rather than substituted for the first.
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. `serde` and `ts-rs`, both optional and both about the shape a type takes when it leaves. |
 | `gear-core/src/tooth.rs` | `Tooth` — one tooth's form, at one shift, cut by one `Rack`. Not a gear. |
 | `gear-core/src/gear.rs` | `Gear` — the assembly, and the only place a gear is drawn. An ordinary gear is `Δx = 0`. |
-| `gear-core/src/plane.rs` | The normal and transverse planes, and the two identities that carry an angle between them. One home, because there were nineteen. |
+| `gear-core/src/plane.rs` | The normal and transverse planes, the two identities that carry an angle between them, and the basic rack they act on. One home, because there were nineteen. |
+| `gear-core/src/hula.rs` | The hula arrangement: the integer ratio, the one crank offset, and the shifts that let both meshes run at it. |
+| `gear-core/src/train/hula.rs` | ...and the stage that builds the parts it describes. |
 | `crates/gear-io` | File formats: DXF export, the TOML material library and geartrain documents, and the string catalogue. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |

@@ -30,10 +30,12 @@ use crate::material::{Material, MaterialLibrary};
 use crate::mesh::MeshError;
 use crate::note::{key, Note};
 
+mod hula;
 mod planetary;
 mod spur;
 mod worm;
 
+pub use hula::{solve_hula_stage, HulaGear, HulaMesh, HulaResult, HulaStage};
 pub use planetary::{
     solve_planetary_stage, solve_planetary_stage_with, MeshReport, PlanetResult, PlanetaryResult,
     PlanetaryStage,

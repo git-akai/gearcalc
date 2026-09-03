@@ -120,27 +120,31 @@ fn main() {
 
 /// A hula drive, from the arrangement down to what the teeth do.
 ///
-/// The mechanism solves an offset and four shifts; this builds the parts those
-/// describe and asks the pair what it thinks, because a drive that closes
-/// algebraically can still be one whose teeth foul — and at one tooth of
-/// difference that is the likely outcome rather than the unlucky one.
+/// Drives `train::solve_hula_stage` rather than assembling the parts itself:
+/// the stage is where a drive becomes gears, and a harness that built its own
+/// would be a second answer to the same question — which is how the two start
+/// disagreeing.
 fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth: Option<u32>) {
-    use gear_core::hula::{self, Offset, Set, Split, Teeth};
-    use gear_core::ring::{mesh_with, Cutter, Ring};
+    use gear_core::train::{solve_hula_stage, HulaStage};
 
     let teeth = [n + 1, n, n - 1, n];
-    let set = Set {
-        teeth: Teeth(teeth),
+    let mut stage = HulaStage {
         module: [m_outer, m_inner],
-        pressure_angle: 20.0,
-        helix_angle: 0.0,
-        addendum: [0.8; 4],
         clearance,
-        offset: Offset::Clearance,
-        split: [Split::Pinion(0.0); 2],
+        ..HulaStage::default()
     };
-    let layout = match hula::solve(&set) {
-        Ok(l) => l,
+    for (gear, count) in stage.gears.iter_mut().zip(teeth) {
+        gear.teeth = count;
+    }
+    // A shaper has to be smaller than the ring it cuts; five teeth down clears
+    // the rings this arrangement produces at any size worth building.
+    for (mesh, cutter) in stage.cutter.iter_mut().enumerate() {
+        let ring = teeth[mesh * 2].max(teeth[mesh * 2 + 1]);
+        cutter.teeth = cutter_teeth.unwrap_or_else(|| ring.saturating_sub(5).max(6));
+    }
+
+    let result = match solve_hula_stage(&stage, 1000.0) {
+        Ok(r) => r,
         Err(e) => {
             eprintln!("that drive has no geometry: {e:?}");
             return;
@@ -148,77 +152,60 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
     };
 
     println!(
-        "hula  z {}/{}/{}/{}  module {m_outer}/{m_inner}  alpha 20 deg  clearance {clearance} mm",
-        teeth[0], teeth[1], teeth[2], teeth[3]
+        "hula  z {}/{}/{}/{}  module {m_outer}/{m_inner}  alpha {} deg  clearance {clearance} mm",
+        teeth[0], teeth[1], teeth[2], teeth[3], stage.pressure_angle
     );
     println!(
-        "  ratio {} / {} = {:+.4}   crank offset {:.6} mm{}",
-        layout.ratio.numerator,
-        layout.ratio.denominator,
-        layout.ratio.value(),
-        layout.offset,
-        match layout.binding {
-            Some(m) => format!("  (held open by mesh {})", m + 1),
+        "  ratio {} / {} = {:+.4}   crank offset {:.6} mm (running {:.6}){}",
+        result.ratio_products[0],
+        result.ratio_products[1],
+        result.ratio,
+        result.offset_nominal,
+        result.offset,
+        match result.binding_mesh {
+            Some(m) => format!("   held open by mesh {}", m + 1),
             None => String::new(),
         }
     );
+    println!(
+        "  speeds  crank {:.1}  wobble {:+.3}  output {:+.4} rpm",
+        result.crank_speed, result.gears[1].speed, result.gears[3].speed
+    );
 
-    for mesh in 0..2 {
-        let pair = set.teeth.pair(mesh).expect("a pair");
-        let module = set.module[mesh];
-        let params = |i: usize| GearParams {
-            module,
-            teeth: teeth[i],
-            profile_shift: layout.shift[i],
-            addendum: set.addendum[i],
-            dedendum: 1.0,
-            ..Default::default()
-        };
-        // A ring of this size needs a shaper smaller than itself, and the
-        // default tool is not: left alone it clamps down to the ring's own
-        // count and then reaches nothing.
-        let cutter = Cutter {
-            teeth: cutter_teeth.unwrap_or_else(|| teeth[pair.ring].saturating_sub(5).max(6)),
-            ..Cutter::default()
-        };
-        let ring = Ring::cut_by(&params(pair.ring), &cutter);
-        let pinion = Tooth::new(params(pair.pinion));
-
+    for (index, mesh) in result.meshes.iter().enumerate() {
+        let members: Vec<&gear_core::train::HulaGear> =
+            result.gears[index * 2..index * 2 + 2].iter().collect();
         println!(
-            "\n  mesh {}  ring z{} x{:+.4}  pinion z{} x{:+.4}   alpha_w {:.3} deg   shaper z{}",
-            mesh + 1,
-            teeth[pair.ring],
-            layout.shift[pair.ring],
-            teeth[pair.pinion],
-            layout.shift[pair.pinion],
-            layout.alpha_w[mesh].to_degrees(),
-            cutter.teeth
+            "\n  mesh {}  {}   alpha_w {:.3} deg   shaper z{}",
+            index + 1,
+            members
+                .iter()
+                .map(|g| format!(
+                    "{} z{} x{:+.4}",
+                    if g.ring { "ring" } else { "pinion" },
+                    g.teeth,
+                    g.profile_shift
+                ))
+                .collect::<Vec<_>>()
+                .join("  "),
+            mesh.operating_pressure_angle,
+            stage.cutter[index].teeth
         );
-        // The gap the mechanism solved for, against the one the parts have: a
-        // clamped tip is a real tip, and the difference is what a clamp cost.
-        let cut = ring.ra - pinion.ra + layout.offset;
         println!(
-            "    far-side gap {:.4} mm (as cut {:.4} mm)   ring tip {:.4}  pinion tip {:.4}",
-            layout.clearance[mesh], cut, ring.ra, pinion.ra
+            "    far-side gap {:.4} mm (as cut {:.4})   contact ratio {:.4}",
+            mesh.clearance, mesh.clearance_as_cut, mesh.contact_ratio
         );
-        match mesh_with(&ring, &pinion) {
-            None => println!("    the pair does not mesh"),
-            Some(m) => {
-                println!(
-                    "    centre distance {:.6} mm   contact ratio {:.4}",
-                    m.centre_distance, m.contact_ratio
-                );
-                println!(
-                    "    trochoid interference {}   involute interference {}",
-                    m.trochoid_interference, m.involute_interference
-                );
+        println!(
+            "    backlash {:.5} / {:.5} deg   trochoid interference {}   involute {}",
+            mesh.backlash[0].nominal,
+            mesh.backlash[1].nominal,
+            mesh.trochoid_interference,
+            mesh.involute_interference
+        );
+        for gear in &members {
+            for note in &gear.clamps {
+                println!("    ! z{}: {}", gear.teeth, words().render(note));
             }
-        }
-        for note in &ring.clamps {
-            println!("    ! ring: {}", words().render(note));
-        }
-        for note in &pinion.clamps.notes {
-            println!("    ! pinion: {}", words().render(note));
         }
     }
 }

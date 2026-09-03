@@ -938,6 +938,20 @@ angles no ordinary pair would: 57° at `z = 18`, one tooth of difference and hal
 a millimetre of gap. Two teeth of difference is far kinder — 26° for the same gap
 — at a quarter of the ratio, since `D = 4`.
 
+**The stage builds what the arrangement describes.** A drive that closes
+algebraically can still be one whose teeth foul, so each ring is cut by its
+shaper and each pair is asked what it thinks: the contact ratio, the two
+interference conditions, and the gap measured on the tips as cut beside the one
+the arrangement solved for — they part company exactly where a tip was clamped.
+Backlash is the pair's own, through the same `Mesh` relation every stage here
+uses rather than a second one written for this arrangement.
+
+**A shaper has to be smaller than the ring it cuts**, and these rings are small.
+A tool larger than its workpiece is clamped down to the ring's own tooth count
+and then reaches none of its flank, leaving no fillet at all — an ordinary
+mistake here rather than an exotic one, which is why the shipped cutters sit
+well below the shipped rings.
+
 Both terms of `dC/dα_w` are positive (`Σz < 0`), so the gap rises strictly with
 the operating pressure angle and hence with the offset. The root is unique, and
 taking the larger of the two meshes' requirements is safe: opening the drive out
