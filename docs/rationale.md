@@ -1106,6 +1106,13 @@ as the field list beside it: a kind's name, its note and whether it is offered
 are one row rather than three places to keep in step, and the picker renders
 whatever the row says.
 
+**And the same table shape gates the geartrain's kinds**, so one knock reaches
+both. A stage kind was three hand-written buttons and four hand-written
+accessors for a default; it is one row each now, carrying the catalogue key, the
+default the core supplies and whether the mode has to be open for it. A crossed
+pair is deliberately not a row: it is a spur stage with its shafts at an angle,
+and the core says so.
+
 ### Additions to the specification's field list
 
 Three things the specification does not list. Two are read-only outputs; the

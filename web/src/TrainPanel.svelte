@@ -3,9 +3,8 @@
   import {
     defaults,
     solveTrain,
-    defaultSpurStage,
-    defaultPlanetaryStage,
-    defaultWormStage,
+    STAGE_KINDS,
+    type StageKindSpec,
     outside,
     type Auto,
     type Overrides,
@@ -16,7 +15,7 @@
     note,
     t,
   } from "./core";
-  import { trains, library, type TrainTab } from "./state.svelte";
+  import { developer, trains, library, type TrainTab } from "./state.svelte";
   import { exportTrain } from "./core";
 
   let { tab }: { tab: TrainTab } = $props();
@@ -74,19 +73,18 @@
           { continuous: { operating_speed: tab.train.input_speed, runtime_hours: 1000 } };
   }
 
-  function addStage() {
-    tab.train.stages.push(defaultSpurStage());
+  /** The kinds on offer. A kind the developer mode hides cannot already be in
+   *  a train the reader is looking at — the picker is the only way one arrives
+   *  — so nothing is stranded by the mode being off. */
+  const stageKinds = $derived(STAGE_KINDS.filter((k) => !k.developer || developer.enabled));
+
+  function addStageOfKind(kind: StageKindSpec) {
+    tab.train.stages.push(kind.fresh());
     tab.open[tab.train.stages.length - 1] = true;
   }
 
-  function addPlanetaryStage() {
-    tab.train.stages.push(defaultPlanetaryStage());
-  }
 
-  function addWormStage() {
-    tab.train.stages.push(defaultWormStage());
-    tab.open[tab.train.stages.length - 1] = true;
-  }
+
 
   function removeStage(i: number) {
     tab.train.stages.splice(i, 1);
@@ -1324,7 +1322,7 @@
             >
           </div>
         {/if}
-      {:else}
+      {:else if stage.kind === "planetary"}
         {@const pres = res && res.kind === "planetary" ? res : null}
         <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
           <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
@@ -1608,13 +1606,270 @@
           </div>
         {/if}
 
+      {:else if stage.kind === "hula"}
+        {@const hres = res && res.kind === "hula" ? res : null}
+        {@const roles = [
+          "ui.train_hula_role_grounded",
+          "ui.train_hula_role_wobble",
+          "ui.train_hula_role_wobble",
+          "ui.train_hula_role_output",
+        ]}
+        <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
+          <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
+          <strong>{stageName(i)}</strong>
+          <span class="kind">{t("ui.train_hula")}</span>
+          <span class="teeth">z {stage.gears.map((g) => g.teeth).join(" / ")}</span>
+          {#if hres}
+            <span class="ratio">{hres.ratio.toFixed(2)} : 1</span>
+            <span class="eff">{pct(hres.efficiency.forward)} %</span>
+          {/if}
+        </button>
+        {#if tab.open[i]}
+          <div class="body">
+            <div class="grid shared">
+              {#each stage.gears as gear, j (j)}
+                <label>
+                  <span>{t("ui.train_hula_teeth_of", { role: t(roles[j]) })}</span>
+                  <input type="number" step="1" min="1" bind:value={gear.teeth} />
+                  <em></em>
+                </label>
+              {/each}
+              <label>
+                <span>{t("ui.train_pressure_angle")}</span>
+                <input type="number" step="0.5" bind:value={stage.pressure_angle} />
+                <em>°</em>
+              </label>
+              <label>
+                <span>{t("ui.train_helix_angle")}</span>
+                <input type="number" step="1" bind:value={stage.helix_angle} />
+                <em>°</em>
+              </label>
+              {#each [0, 1] as m (m)}
+                <label>
+                  <span>{t("ui.train_hula_module_of", { mesh: String(m + 1) })}</span>
+                  <input type="number" step="0.1" bind:value={stage.module[m]} />
+                  <em>{t("ui.train_mm")}</em>
+                </label>
+                <label>
+                  <span>{t("ui.train_hula_thickness_mod_of", { mesh: String(m + 1) })}</span>
+                  <input type="number" step="0.05" bind:value={stage.thickness_mod[m]} />
+                  <em></em>
+                  <small>{t("ui.train_hula_note_thickness_mod")}</small>
+                </label>
+                <label>
+                  <span>{t("ui.train_hula_shaper_teeth_of", { mesh: String(m + 1) })}</span>
+                  <input type="number" step="1" min="4" bind:value={stage.cutter[m].teeth} />
+                  <em></em>
+                  <small>{t("ui.train_hula_note_shaper")}</small>
+                </label>
+                <label>
+                  <span>{t("ui.train_hula_friction_of", { mesh: String(m + 1) })}</span>
+                  <input type="number" step="0.01" bind:value={stage.sliding_friction[m]} />
+                  <em></em>
+                </label>
+              {/each}
+              <label>
+                <span>{t("ui.train_hula_offset_from")}</span>
+                <select
+                  value={typeof stage.offset === "string" ? "clearance" : "given"}
+                  onchange={(e) => {
+                    stage.offset =
+                      e.currentTarget.value === "clearance"
+                        ? "clearance"
+                        : { given: stage.clearance };
+                  }}
+                >
+                  <option value="clearance">{t("ui.train_hula_offset_from_bounds")}</option>
+                  <option value="given">{t("ui.train_hula_offset_given")}</option>
+                </select>
+                <small>{t("ui.train_hula_note_offset")}</small>
+              </label>
+              {#if typeof stage.offset !== "string"}
+                <label>
+                  <span>{t("ui.train_hula_crank_offset")}</span>
+                  <input type="number" step="0.01" bind:value={stage.offset.given} />
+                  <em>{t("ui.train_mm")}</em>
+                </label>
+              {/if}
+              <label>
+                <span>{t("ui.train_hula_gap")}</span>
+                <input type="number" step="0.05" bind:value={stage.clearance} />
+                <em>{t("ui.train_mm")}</em>
+                <small>{t("ui.train_hula_note_gap")}</small>
+              </label>
+              <label>
+                <span>{t("ui.train_c2c_clearance")}</span>
+                <input type="number" step="0.01" bind:value={stage.running_clearance} />
+                <em>{t("ui.train_mm")}</em>
+                <small>{t("ui.train_hula_note_offset")}</small>
+              </label>
+              <label>
+                <span>{t("ui.train_c2c_tolerance_plus")}</span>
+                <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
+                <em>{t("ui.train_mm")}</em>
+              </label>
+              <label>
+                <span>{t("ui.train_c2c_tolerance_minus")}</span>
+                <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
+                <em>{t("ui.train_mm")}</em>
+              </label>
+              {#each [0, 1] as m (m)}
+                <label>
+                  <span>{t("ui.train_hula_split_of", { mesh: String(m + 1) })}</span>
+                  <select
+                    value={"ring" in stage.split[m] ? "ring" : "pinion"}
+                    onchange={(e) => {
+                      const held =
+                        "ring" in stage.split[m] ? stage.split[m].ring : stage.split[m].pinion;
+                      stage.split[m] =
+                        e.currentTarget.value === "ring" ? { ring: held } : { pinion: held };
+                    }}
+                  >
+                    <option value="pinion">{t("ui.train_hula_split_pinion")}</option>
+                    <option value="ring">{t("ui.train_hula_split_ring")}</option>
+                  </select>
+                  <small>{t("ui.train_hula_note_split")}</small>
+                </label>
+              {/each}
+            </div>
+
+            {#if hres}
+              <dl class="out">
+                <dt>{t("ui.train_ratio")}</dt>
+                <dd>
+                  {hres.ratio.toFixed(4)} : 1
+                  <small>
+                    {t("ui.train_hula_ratio_products", {
+                      numerator: String(hres.ratio_products[0]),
+                      denominator: String(hres.ratio_products[1]),
+                    })} · {t("ui.train_hula_note_ratio", {
+                      denominator: String(hres.ratio_products[1]),
+                    })}
+                  </small>
+                </dd>
+                <dt>{t("ui.train_hula_crank_offset")}</dt>
+                <dd>
+                  {hres.offset_nominal.toFixed(4)} {t("ui.train_mm")}
+                  <small>
+                    {t("ui.train_hula_running", { value: hres.offset.toFixed(4) })}{hres.binding_mesh !==
+                    null
+                      ? ` · ${t("ui.train_hula_held_open_by", { mesh: String(hres.binding_mesh + 1) })}`
+                      : ""}
+                  </small>
+                </dd>
+                <dt>{t("ui.train_hula_speeds")}</dt>
+                <dd>
+                  {t("ui.train_hula_speeds_at", {
+                    crank: hres.crank_speed.toFixed(1),
+                    wobble: hres.gears[1].speed.toFixed(3),
+                    output: hres.gears[3].speed.toFixed(4),
+                  })}
+                </dd>
+                <dt>{t("ui.train_efficiency")}</dt>
+                <dd>
+                  {pct(hres.efficiency.forward)} %
+                  {#if hres.efficiency.backward === 0}
+                    <span class="warn">· {t("ui.train_hula_self_locking")}</span>
+                  {/if}
+                  <small>
+                    {t("ui.train_hula_meshes_alone", {
+                      percent: pct(hres.fixed_carrier_efficiency.forward),
+                    })} · {t("ui.train_hula_note_circulating")}
+                  </small>
+                </dd>
+                <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
+                <dd>
+                  {t("ui.train_backlash_at", {
+                    angle: hres.backlash.forward.nominal.toFixed(4),
+                    member: t("ui.train_hula_role_output"),
+                  })}
+                </dd>
+              </dl>
+
+              {#each hres.meshes as mesh, m (m)}
+                {@const pair = [hres.gears[m * 2], hres.gears[m * 2 + 1]]}
+                <h4>{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
+                <dl class="out">
+                  <dt>{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</dt>
+                  <dd>
+                    {pair
+                      .map((g) =>
+                        t("ui.train_hula_member", {
+                          role: t(g.ring ? "ui.train_hula_ring" : "ui.train_hula_pinion"),
+                          teeth: String(g.teeth),
+                          shift: g.profile_shift.toFixed(4),
+                        }),
+                      )
+                      .join(" · ")}
+                  </dd>
+                  <dt>{t("ui.train_hula_operating_pressure_angle")}</dt>
+                  <dd>
+                    {mesh.operating_pressure_angle.toFixed(3)}°
+                    <small>{t("ui.train_hula_note_operating_pressure_angle")}</small>
+                  </dd>
+                  <dt>{t("ui.train_hula_gap_result")}</dt>
+                  <dd>
+                    {mesh.clearance.toFixed(4)} {t("ui.train_mm")}
+                    <small>
+                      {t("ui.train_hula_gap_as_cut", { value: mesh.clearance_as_cut.toFixed(4) })}
+                    </small>
+                  </dd>
+                  <dt>{t("ui.train_contact_ratio")}</dt>
+                  <dd>
+                    {mesh.contact_ratio.toFixed(4)}
+                    {#if mesh.contact_ratio < 1}
+                      <small class="warn">{t("ui.train_note_contact_ratio_below_one")}</small>
+                    {/if}
+                  </dd>
+                  <dt>{t("ui.train_hula_tip_margin")}</dt>
+                  <dd>
+                    {mesh.tip_margin.toFixed(4)}°
+                    <small>{t("ui.train_hula_note_tip_margin")}</small>
+                  </dd>
+                  <dt>{t("ui.train_hula_interference")}</dt>
+                  <dd>
+                    {[
+                      mesh.trochoid_interference ? t("ui.train_hula_interference_trochoid") : null,
+                      mesh.involute_interference ? t("ui.train_hula_interference_involute") : null,
+                      mesh.tip_interference ? t("ui.train_hula_interference_tip") : null,
+                    ]
+                      .filter((x) => x !== null)
+                      .join(" · ") || t("ui.train_hula_interference_none")}
+                  </dd>
+                  <dt>{t("ui.train_backlash")}</dt>
+                  <dd>
+                    {mesh.backlash
+                      .map((b) => `${b.nominal.toFixed(5)}°`)
+                      .join(" / ")}
+                  </dd>
+                </dl>
+                {#each pair as gear (gear.teeth)}
+                  {#each gear.clamps as clamp, c (c)}
+                    <p class="clamp">z{gear.teeth}: {note(clamp)}</p>
+                  {/each}
+                {/each}
+              {/each}
+            {/if}
+
+            <button
+              class="danger small"
+              onclick={() => removeStage(i)}
+              disabled={tab.train.stages.length === 1}>{t("ui.train_remove_stage")}</button
+            >
+          </div>
+        {/if}
+
       {/if}
     </section>
   {/each}
 
-  <button class="add" onclick={addStage}>{t("ui.train_add_spur_stage")}</button>
-  <button class="add" onclick={addWormStage}>{t("ui.train_add_worm_stage")}</button>
-  <button class="add" onclick={addPlanetaryStage}>{t("ui.train_add_planetary_stage")}</button>
+  <!-- One button a kind, from the table rather than by hand: a kind marked for
+       the developer mode is not offered until the sidebar's title has been
+       knocked on, which is the same gate the gear tab's eccentric kind is
+       behind and the same table shape. -->
+  {#each stageKinds as k (k.key)}
+    <button class="add" onclick={() => addStageOfKind(k)}>{t(k.label)}</button>
+  {/each}
 </div>
 
 <style>

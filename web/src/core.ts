@@ -237,6 +237,47 @@ export const KINDS: KindSpec[] = [
   },
 ];
 
+/// What kind of stage a geartrain holds.
+export type StageKind = "spur" | "worm" | "planetary" | "hula";
+
+export interface StageKindSpec {
+  key: StageKind;
+  /** Catalogue key for the button that adds one. */
+  label: string;
+  /** A fresh stage of this kind, from the core. */
+  fresh: () => Stage;
+  /** Offered only while the developer mode is on — the same knock the gear
+   *  tab's eccentric kind is behind, through the same table shape, so one
+   *  mechanism gates both. */
+  developer?: boolean;
+}
+
+/** The stage kinds, as data, for the same reason `KINDS` and `FIELDS` are: the
+ *  "add stage" buttons render from this, so a fifth kind is a row rather than a
+ *  hand-written button that has to be remembered.
+ *
+ *  A **crossed** pair is deliberately not here. It is a spur stage with its
+ *  shafts at an angle, not a kind of its own, and the core says so. */
+// A default stage arrives **tagged** — Rust's `Stage` is an internally tagged
+// enum, so the object carries its own `kind`. They used to be four hand-written
+// accessors and three hand-written buttons; a kind is one row here now, and the
+// tag is what the panel branches on.
+export const STAGE_KINDS: StageKindSpec[] = [
+  { key: "spur", label: "ui.train_add_spur_stage", fresh: () => defaults().spur_stage },
+  { key: "worm", label: "ui.train_add_worm_stage", fresh: () => defaults().worm_stage },
+  {
+    key: "planetary",
+    label: "ui.train_add_planetary_stage",
+    fresh: () => defaults().planetary_stage,
+  },
+  {
+    key: "hula",
+    label: "ui.train_add_hula_stage",
+    fresh: () => defaults().hula_stage,
+    developer: true,
+  },
+];
+
 export interface FieldSpec {
   key: keyof GearParams;
   /** Catalogue key for the field's name. Not the name: an input label is a word
@@ -516,22 +557,6 @@ export interface ProvenancedValue {
   value: number;
   basis: string;
   note: string | null;
-}
-
-// A default stage arrives **tagged** — Rust's `Stage` is an internally tagged
-// enum, so the object carries its own `kind`. These used to be declared as the
-// bare stage bodies, which typechecked only because TypeScript lets a wider
-// value through; the tag was really there and the type said it was not.
-export function defaultWormStage(): Stage {
-  return defaults().worm_stage;
-}
-
-export function defaultPlanetaryStage(): Stage {
-  return defaults().planetary_stage;
-}
-
-export function defaultSpurStage(): Stage {
-  return defaults().spur_stage;
 }
 
 /** A fresh geartrain, one spur stage in it. */

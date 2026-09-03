@@ -246,7 +246,7 @@ importing into SOLIDWORKS · geartrain stages: spur/helical, crossed, worm,
 planetary and **hula** · geartrains exported and
 imported as TOML, inputs only · gear tabs with external and internal kinds — and
 eccentric, in the developer mode — geartrain tabs with spur, worm and planetary
-stages.
+stages, and hula in the same mode behind the same knock.
 
 ---
 
