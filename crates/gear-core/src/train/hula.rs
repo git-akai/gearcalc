@@ -123,14 +123,25 @@ impl Default for HulaStage {
             pressure_angle: 20.0,
             helix_angle: 0.0,
             thickness_mod: [1.0, 1.0],
-            clearance: 0.2,
+            // **The tips set this, not the far-side gap.** A fifth of a module
+            // leaves the two tip circles overlapping where they cross, 134° from
+            // the line of centres; three tenths clears at every tooth count
+            // tried, and the margin is reported so a design can be taken closer.
+            clearance: 0.3,
             running_clearance: 0.02,
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
             offset: Offset::Clearance,
             split: [Split::Pinion(0.0); 2],
+            // **A shaper is coupled to the shift it has to cut**, not only to
+            // the ring's size: the clearance drives the ring's shift up, and a
+            // tool that reached its flank at one shift stops reaching it at a
+            // larger one. Twelve teeth cuts the shipped rings clean over the
+            // gaps worth running; a ring far from these counts will want its
+            // own, and says so through its clamps rather than quietly coming out
+            // without a fillet.
             cutter: [Cutter {
-                teeth: 14,
+                teeth: 12,
                 ..Cutter::default()
             }; 2],
             gears: [gear(19), gear(18), gear(17), gear(18)],
@@ -194,6 +205,13 @@ pub struct HulaMesh {
     pub trochoid_interference: bool,
     /// The ring's tip reaches below where the pinion's flank ends.
     pub involute_interference: bool,
+    /// **The tips foul away from the line of action** — the condition that
+    /// decides a small tooth difference, where the tip circles cross far from
+    /// the line of centres and the mesh itself is perfectly conjugate.
+    pub tip_interference: bool,
+    /// How much room the tips have where their circles cross, as an angle of
+    /// pinion rotation, degrees. Negative is the overlap.
+    pub tip_margin: f64,
     /// Angular backlash at each member, degrees — the pinion's first, then the
     /// ring's: nominal at the running offset, then at each end of the tolerance
     /// band. The same gap subtends a different angle at each, so the two differ
@@ -338,6 +356,8 @@ pub fn solve_hula_stage(stage: &HulaStage, input_speed: f64) -> Result<HulaResul
             contact_ratio: report.as_ref().map_or(0.0, |m| m.contact_ratio),
             trochoid_interference: report.as_ref().is_some_and(|m| m.trochoid_interference),
             involute_interference: report.as_ref().is_some_and(|m| m.involute_interference),
+            tip_interference: report.as_ref().is_some_and(|m| m.tip_interference),
+            tip_margin: report.as_ref().map_or(0.0, |m| m.tip_margin.to_degrees()),
             backlash: [backlash_of(MeshSide::First), backlash_of(MeshSide::Second)],
         });
     }
@@ -603,6 +623,43 @@ mod tests {
             assert!(j > last, "the output's play fell from {last} to {j}");
             last = j;
         }
+    }
+
+    /// **The shipped drive clears its tips, and a fifth of a module does not.**
+    ///
+    /// The far-side gap and the tip fouling are different bounds and the second
+    /// is the one that binds here. The figures either side of it are tight — a
+    /// tenth of a degree of pinion rotation — which is what makes this a gate on
+    /// the arithmetic rather than on the sign: the two windows are on different
+    /// wheels and one has to be carried onto the other before they can be
+    /// compared, and a comparison that skips that step lands the wrong side of
+    /// this boundary.
+    ///
+    /// Both figures are what rolling the outlines through a tooth measures
+    /// (`gear-cli hulasweep`): 0.22 fouls by 3 µm and 0.3 does not foul.
+    #[test]
+    fn the_tips_are_what_the_clearance_has_to_clear() {
+        let clear = solve_hula_stage(&stage(), 100.0).unwrap();
+        for mesh in &clear.meshes {
+            assert!(
+                !mesh.tip_interference,
+                "the shipped gap should clear the tips, margin {}",
+                mesh.tip_margin
+            );
+        }
+        let tight = solve_hula_stage(
+            &HulaStage {
+                clearance: 0.22,
+                ..stage()
+            },
+            100.0,
+        )
+        .unwrap();
+        assert!(
+            tight.meshes.iter().any(|m| m.tip_interference),
+            "a fifth of a module leaves the tips overlapping: margins {:?}",
+            tight.meshes.each_ref().map(|m| m.tip_margin)
+        );
     }
 
     /// An arrangement whose meshes cancel is refused by the stage, as by the

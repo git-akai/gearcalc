@@ -177,7 +177,10 @@ different questions.
 
 **Internal gears.** The ring's flank, its profile shift, a shaper-cut fillet at
 the centre distance the shift puts the tool at, the flank/fillet tangency, the
-generation limit, two mesh interference conditions, and a bending rating.
+generation limit, **three** mesh interference conditions — two about a tip
+reaching past a flank where the teeth mesh, and one about the tips fouling where
+their circles cross, which is what decides a small tooth difference — and a
+bending rating.
 Verified by simulating the cut — 2.5–2.7 µm across shifts −0.4 … +0.5.
 
 **Planetary sets.** The planet shift that makes the two centre distances agree,

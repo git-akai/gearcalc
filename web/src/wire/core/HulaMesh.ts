@@ -34,6 +34,17 @@ trochoid_interference: boolean,
  */
 involute_interference: boolean, 
 /**
+ * **The tips foul away from the line of action** — the condition that
+ * decides a small tooth difference, where the tip circles cross far from
+ * the line of centres and the mesh itself is perfectly conjugate.
+ */
+tip_interference: boolean, 
+/**
+ * How much room the tips have where their circles cross, as an angle of
+ * pinion rotation, degrees. Negative is the overlap.
+ */
+tip_margin: number, 
+/**
  * Angular backlash at each member, degrees — the pinion's first, then the
  * ring's: nominal at the running offset, then at each end of the tolerance
  * band. The same gap subtends a different angle at each, so the two differ

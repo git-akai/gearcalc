@@ -157,7 +157,10 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
     // the rings this arrangement produces at any size worth building.
     for (mesh, cutter) in stage.cutter.iter_mut().enumerate() {
         let ring = teeth[mesh * 2].max(teeth[mesh * 2 + 1]);
-        cutter.teeth = cutter_teeth.unwrap_or_else(|| ring.saturating_sub(5).max(6));
+        let _ = ring;
+        if let Some(t) = cutter_teeth {
+            cutter.teeth = t;
+        }
     }
 
     let result = match solve_hula_stage(&stage, 1000.0) {
@@ -220,11 +223,13 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
             mesh.clearance, mesh.clearance_as_cut, mesh.contact_ratio
         );
         println!(
-            "    backlash {:.5} / {:.5} deg   trochoid interference {}   involute {}",
+            "    backlash {:.5} / {:.5} deg   interference: trochoid {}  involute {}  tip {} ({:+.4} deg)",
             mesh.backlash[0].nominal,
             mesh.backlash[1].nominal,
             mesh.trochoid_interference,
-            mesh.involute_interference
+            mesh.involute_interference,
+            mesh.tip_interference,
+            mesh.tip_margin
         );
         for gear in &members {
             for note in &gear.clamps {
@@ -504,11 +509,13 @@ fn mesh_sweep(z_ring: u32, z_pinion: u32, ring_addendum: f64, pinion_addendum: f
         &pinion,
         m.centre_distance,
         &format!(
-            "control  ring z{z_ring}  pinion z{z_pinion}   contact ratio {:.4}   alpha_w {:.2} deg   interference troch {} inv {}",
+            "control  ring z{z_ring}  pinion z{z_pinion}   contact ratio {:.4}   alpha_w {:.2} deg   troch {} inv {} tip {} ({:+.4} deg)",
             m.contact_ratio,
             m.alpha_w.to_degrees(),
             m.trochoid_interference,
-            m.involute_interference
+            m.involute_interference,
+            m.tip_interference,
+            m.tip_margin.to_degrees()
         ),
     );
 }
@@ -554,12 +561,24 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     };
     let ring = Ring::cut_by(&params(pair.ring), &cutter);
     let pinion = gear_core::Gear::new(params(pair.pinion));
+    let flags = gear_core::ring::mesh_with(&ring, pinion.mean()).map_or_else(
+        || "  (no mesh)".to_string(),
+        |m| {
+            format!(
+                "  troch {} inv {} tip {} ({:+.4} deg)",
+                m.trochoid_interference,
+                m.involute_interference,
+                m.tip_interference,
+                m.tip_margin.to_degrees()
+            )
+        },
+    );
     roll_pair(
         &ring,
         &pinion,
         layout.offset,
         &format!(
-            "hula mesh {}  ring z{} x{:+.4}  pinion z{} x{:+.4}   gap {clearance} mm   alpha_w {:.2} deg",
+            "hula mesh {}  ring z{} x{:+.4}  pinion z{} x{:+.4}   gap {clearance} mm   alpha_w {:.2} deg{flags}",
             mesh_index + 1,
             teeth[pair.ring],
             layout.shift[pair.ring],
