@@ -67,7 +67,7 @@
 //! arrangement, so they are asked there rather than restated here.
 
 use crate::plane::BasicRack;
-use crate::solve::{newton_bracketed, Tol};
+use crate::solve::{brent, newton_bracketed, Tol};
 
 /// The four tooth counts, in the order the drive is read: the grounded gear,
 /// the two that ride the wobble body, then the output.
@@ -156,6 +156,20 @@ pub enum Split {
     Pinion(f64),
 }
 
+/// A further bound on the crank offset, asked at a trial one.
+///
+/// Given a mesh and the four shifts that offset implies, return a margin that is
+/// **negative where the bound is broken** and rises with the offset. The offset
+/// then opens out until every bound is met, and the one that asked for most is
+/// the one that sets it.
+///
+/// It is a bound supplied rather than a bound written here because the ones that
+/// matter belong to the *pair* rather than to the arrangement — the room the
+/// tips have where their circles cross is
+/// [`crate::ring::RingMesh::tip_margin`], and a copy of it here would be a
+/// second answer to a question that already has one.
+pub type Bound<'a> = &'a dyn Fn(usize, f64, [f64; 4]) -> f64;
+
 /// A drive as its inputs describe it.
 #[derive(Clone, Copy, Debug)]
 pub struct Set {
@@ -213,6 +227,8 @@ pub enum Error {
     /// No offset in the involute domain gives this mesh the clearance asked
     /// for.
     ClearanceUnreachable(usize),
+    /// No offset in the involute domain satisfies a bound the caller supplied.
+    BoundUnreachable(usize),
 }
 
 impl Teeth {
@@ -246,6 +262,35 @@ impl Teeth {
             })
             .ok_or(Error::Locked)
     }
+}
+
+/// The four shifts an offset implies, laid out in [`Teeth`]'s order.
+///
+/// One home, because the solve needs them at every trial offset and the answer
+/// needs them at the one it settles on — and a second copy would be the place
+/// the two could disagree about what a shift is.
+fn shifts_at_offset(
+    set: &Set,
+    geometry: &[Geometry; 2],
+    pairs: &[Pair; 2],
+    offset: f64,
+) -> Option<[f64; 4]> {
+    let mut shift = [0.0; 4];
+    for (mesh, geo) in geometry.iter().enumerate() {
+        let sum_x = geo.sum_x_at(geo.alpha_w_at(offset)?);
+        let (ring, pinion) = (pairs[mesh].ring, pairs[mesh].pinion);
+        match set.split[mesh] {
+            Split::Ring(x) => {
+                shift[ring] = x;
+                shift[pinion] = x + sum_x;
+            }
+            Split::Pinion(x) => {
+                shift[pinion] = x;
+                shift[ring] = x - sum_x;
+            }
+        }
+    }
+    Some(shift)
 }
 
 /// One mesh reduced to the quantities the offset and the gap are written in.
@@ -345,6 +390,16 @@ impl Geometry {
 /// Every arm of [`Error`]. Each is a drive that cannot exist rather than a
 /// solver that gave up, and each names which mesh could not be made to work.
 pub fn solve(set: &Set) -> Result<Layout, Error> {
+    solve_with(set, &|_, _, _| f64::INFINITY)
+}
+
+/// The same, with further bounds on the offset — see [`Bound`].
+///
+/// # Errors
+///
+/// Every arm of [`Error`], and [`Error::BoundUnreachable`] where no offset in
+/// the involute domain satisfies a supplied bound.
+pub fn solve_with(set: &Set, bound: Bound) -> Result<Layout, Error> {
     let ratio = set.teeth.ratio()?;
     let pairs = [set.teeth.pair(0)?, set.teeth.pair(1)?];
     let geometry = [
@@ -361,14 +416,63 @@ pub fn solve(set: &Set) -> Result<Layout, Error> {
     let (offset, binding) = match set.offset {
         Offset::Given(e) => (e, None),
         Offset::Clearance => {
-            let wants = [
-                geometry[0]
+            // Each mesh names the smallest offset that will do, and the larger
+            // of the two is what both must run at. **Every bound is one more
+            // such requirement**, not one more solve: they all rise with the
+            // offset, so opening out for whichever asked most gives the rest
+            // more as well, and the maximum is the whole of that argument.
+            // No offset below either mesh's own base-circle limit describes a
+            // pair at all, so every requirement is asked at or above the higher
+            // of the two floors — otherwise a bound would be asked about a mesh
+            // that does not exist yet, and answer with a NaN.
+            let floor = geometry
+                .iter()
+                .map(|g| g.a_ref * g.rack.alpha_t.cos())
+                .fold(0.0_f64, f64::max)
+                * (1.0 + 1e-9);
+            let mut wants = [0.0_f64; 2];
+            for (mesh, geo) in geometry.iter().enumerate() {
+                let gap = geo
                     .offset_for_clearance(set.clearance)
-                    .ok_or(Error::ClearanceUnreachable(0))?,
-                geometry[1]
-                    .offset_for_clearance(set.clearance)
-                    .ok_or(Error::ClearanceUnreachable(1))?,
-            ];
+                    .ok_or(Error::ClearanceUnreachable(mesh))?
+                    .max(floor);
+                let shifts_at = |e: f64| shifts_at_offset(set, &geometry, &pairs, e);
+                let supplied = |e: f64| shifts_at(e).map_or(f64::NAN, |x| bound(mesh, e, x));
+                wants[mesh] = if supplied(gap) >= 0.0 {
+                    gap
+                } else {
+                    // The bound is broken where the gap alone would put it, so
+                    // open out until it is met. The margin rises with the
+                    // offset, so the root is unique and the bracket is found by
+                    // walking out rather than guessed at.
+                    let mut hi = gap;
+                    let mut steps = 0;
+                    while supplied(hi) < 0.0 {
+                        hi *= 1.1;
+                        steps += 1;
+                        if steps > 200 || !hi.is_finite() {
+                            return Err(Error::BoundUnreachable(mesh));
+                        }
+                    }
+                    // **A bound is met, not approached.** A root finder lands
+                    // on either side of zero, and the side it lands on is the
+                    // difference between a drive that clears its tips and one
+                    // reported as fouling by a picometre. Stepping to the
+                    // satisfied side costs a part in a hundred million of the
+                    // offset, which is nothing a gear can tell.
+                    let mut e = brent(supplied, gap, hi, Tol::default())
+                        .ok_or(Error::BoundUnreachable(mesh))?;
+                    let mut steps = 0;
+                    while supplied(e) < 0.0 {
+                        e *= 1.0 + f64::EPSILON.sqrt();
+                        steps += 1;
+                        if steps > 64 {
+                            return Err(Error::BoundUnreachable(mesh));
+                        }
+                    }
+                    e
+                };
+            }
             let held_by = usize::from(wants[1] > wants[0]);
             (wants[held_by], Some(held_by))
         }
@@ -376,25 +480,13 @@ pub fn solve(set: &Set) -> Result<Layout, Error> {
 
     let mut alpha_w = [0.0; 2];
     let mut clearance = [0.0; 2];
-    let mut shift = [0.0; 4];
     for (mesh, geo) in geometry.iter().enumerate() {
         let a_w = geo.alpha_w_at(offset).ok_or(Error::OffsetTooSmall(mesh))?;
         alpha_w[mesh] = a_w;
         clearance[mesh] = geo.clearance_at(a_w);
-        // The difference is the offset's; the sum is whatever the split says.
-        let sum_x = geo.sum_x_at(a_w);
-        let (ring, pinion) = (pairs[mesh].ring, pairs[mesh].pinion);
-        match set.split[mesh] {
-            Split::Ring(x) => {
-                shift[ring] = x;
-                shift[pinion] = x + sum_x;
-            }
-            Split::Pinion(x) => {
-                shift[pinion] = x;
-                shift[ring] = x - sum_x;
-            }
-        }
     }
+    // The difference is the offset's; the sum is whatever the split says.
+    let shift = shifts_at_offset(set, &geometry, &pairs, offset).ok_or(Error::OffsetTooSmall(0))?;
 
     Ok(Layout {
         offset,

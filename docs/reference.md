@@ -949,6 +949,17 @@ products rather than as a float, because it *is* integers.
 apart can only be an internal pair, so the ring is whichever member has more
 teeth, and every arrangement describes itself — the sixteen are one code path.
 
+**The offset answers to every bound, not just the gap.** The far-side gap is one
+requirement and the room the tips have where their circles cross
+([Limits](#limits)) is another; both rise with the offset, so the drive opens out
+until the one that asked for most is met and the rest have more than they asked
+for. The tips bind below about a quarter of a module of gap, and the gap above
+it — so a design asking for less than the tips allow is answered with what can be
+built rather than with what was requested, and the figure it actually got is
+reported beside the one it asked for. The tip bound is **supplied to the solve**
+rather than written inside it, because it belongs to the pair; a copy of it in
+the arrangement would be a second answer to a question that already has one.
+
 **One offset, and what is left over.** Only the *difference* of a pair's two
 shifts reaches either quantity above: the operating pressure angle takes it
 through [`operating_geometry`](#signed-relations-both-mesh-kinds), and in the gap

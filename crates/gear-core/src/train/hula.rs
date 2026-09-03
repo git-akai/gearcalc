@@ -269,8 +269,30 @@ pub fn solve_hula_stage(stage: &HulaStage, input_speed: f64) -> Result<HulaResul
         offset: stage.offset,
         split: stage.split,
     };
-    let layout = hula::solve(&set)?;
+    // **The offset has to clear the tips as well as the far side**, and that
+    // bound belongs to the pair rather than to the arrangement — so it is
+    // supplied to the solve from the parts a trial offset would produce, not
+    // rewritten inside it.
     let pairs = [teeth.pair(0)?, teeth.pair(1)?];
+    let built = |mesh: usize, shift: [f64; 4], i: usize| GearParams {
+        module: stage.module[mesh],
+        pressure_angle: stage.pressure_angle,
+        helix_angle: stage.helix_angle,
+        teeth: teeth.0[i],
+        profile_shift: shift[i],
+        addendum: stage.gears[i].addendum.manual,
+        dedendum: stage.gears[i].dedendum,
+        root_radius: stage.gears[i].root_radius,
+        thickness_mod: stage.thickness_mod[mesh],
+        ..GearParams::default()
+    };
+    let tip_room = |mesh: usize, _offset: f64, shift: [f64; 4]| {
+        let pair = pairs[mesh];
+        let ring = Ring::cut_by(&built(mesh, shift, pair.ring), &stage.cutter[mesh]);
+        let pinion = Tooth::new(built(mesh, shift, pair.pinion));
+        mesh_with(&ring, &pinion).map_or(f64::NAN, |m| m.tip_margin)
+    };
+    let layout = hula::solve_with(&set, &tip_room)?;
     let offset = layout.offset + stage.running_clearance;
 
     // Kinematics. The crank is the carrier of both meshes; the wobble body
@@ -294,18 +316,7 @@ pub fn solve_hula_stage(stage: &HulaStage, input_speed: f64) -> Result<HulaResul
     };
 
     for (index, pair) in pairs.iter().enumerate() {
-        let params = |i: usize| GearParams {
-            module: stage.module[index],
-            pressure_angle: stage.pressure_angle,
-            helix_angle: stage.helix_angle,
-            teeth: teeth.0[i],
-            profile_shift: layout.shift[i],
-            addendum: stage.gears[i].addendum.manual,
-            dedendum: stage.gears[i].dedendum,
-            root_radius: stage.gears[i].root_radius,
-            thickness_mod: stage.thickness_mod[index],
-            ..GearParams::default()
-        };
+        let params = |i: usize| built(index, layout.shift, i);
         // The ring twice over, and neither reading is redundant. `Ring` is the
         // part as its shaper leaves it — the tip it really has, the fillet, the
         // clamps — while `Mesh` is the pair's rolling geometry, which is where
@@ -625,40 +636,66 @@ mod tests {
         }
     }
 
-    /// **The shipped drive clears its tips, and a fifth of a module does not.**
+    /// **The offset clears the tips as well as the far side.**
     ///
-    /// The far-side gap and the tip fouling are different bounds and the second
-    /// is the one that binds here. The figures either side of it are tight — a
-    /// tenth of a degree of pinion rotation — which is what makes this a gate on
-    /// the arithmetic rather than on the sign: the two windows are on different
-    /// wheels and one has to be carried onto the other before they can be
-    /// compared, and a comparison that skips that step lands the wrong side of
-    /// this boundary.
+    /// The two are different bounds and either can be the one that binds. At
+    /// the shipped gap the far side asks for more, so the gap is what a reader
+    /// gets and the tips have room to spare. Ask for a gap the tips cannot
+    /// live with and the offset opens past it: the tips come to rest exactly at
+    /// their limit, and the far-side gap that results is *larger* than the one
+    /// asked for, which is the tool answering with what can be built rather
+    /// than with what was requested.
     ///
     /// Both figures are what rolling the outlines through a tooth measures
-    /// (`gear-cli hulasweep`): 0.22 fouls by 3 µm and 0.3 does not foul.
+    /// (`gear-cli hulasweep`): a fifth of a module fouled by 3 µm before the
+    /// offset was allowed to answer to it.
     #[test]
-    fn the_tips_are_what_the_clearance_has_to_clear() {
-        let clear = solve_hula_stage(&stage(), 100.0).unwrap();
-        for mesh in &clear.meshes {
+    fn the_offset_clears_the_tips_as_well_as_the_far_side() {
+        let s = stage();
+        let shipped = solve_hula_stage(&s, 100.0).unwrap();
+        for mesh in &shipped.meshes {
+            assert!(!mesh.tip_interference, "margin {}", mesh.tip_margin);
             assert!(
-                !mesh.tip_interference,
-                "the shipped gap should clear the tips, margin {}",
+                mesh.tip_margin > 0.1,
+                "the far side should be what binds here, not the tips: {}",
                 mesh.tip_margin
             );
         }
-        let tight = solve_hula_stage(
-            &HulaStage {
-                clearance: 0.22,
-                ..stage()
-            },
-            100.0,
-        )
-        .unwrap();
+        let held = shipped.binding_mesh.expect("the gap held it open");
         assert!(
-            tight.meshes.iter().any(|m| m.tip_interference),
-            "a fifth of a module leaves the tips overlapping: margins {:?}",
-            tight.meshes.each_ref().map(|m| m.tip_margin)
+            (shipped.meshes[held].clearance - s.clearance).abs() < 1e-9,
+            "the binding mesh should sit at the gap asked for"
+        );
+
+        // Now a gap the tips cannot live with.
+        let tight = HulaStage {
+            clearance: 0.22,
+            ..stage()
+        };
+        let opened = solve_hula_stage(&tight, 100.0).unwrap();
+        assert!(
+            opened.offset_nominal > shipped.offset_nominal - 1e-9
+                || opened.meshes.iter().all(|m| !m.tip_interference),
+            "the tips must be clear whatever was asked for"
+        );
+        for mesh in &opened.meshes {
+            assert!(
+                !mesh.tip_interference,
+                "the offset should have opened until the tips cleared: {}",
+                mesh.tip_margin
+            );
+            assert!(
+                mesh.clearance >= tight.clearance - 1e-9,
+                "opening for the tips gives the far side more, never less: {} against {}",
+                mesh.clearance,
+                tight.clearance
+            );
+        }
+        let binding = opened.binding_mesh.expect("something held it open");
+        assert!(
+            opened.meshes[binding].tip_margin.abs() < 1e-6,
+            "the tips are what held it, so they sit at their limit: {}",
+            opened.meshes[binding].tip_margin
         );
     }
 

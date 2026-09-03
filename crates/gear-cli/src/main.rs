@@ -520,71 +520,60 @@ fn mesh_sweep(z_ring: u32, z_pinion: u32, ring_addendum: f64, pinion_addendum: f
     );
 }
 
-/// The same roll, on a hula pair.
+/// The same roll, on the hula pair the **stage** produces.
+///
+/// Through `solve_hula_stage` rather than the arrangement alone, because the
+/// offset answers to the tips as well as to the far-side gap and a harness
+/// rolling the drive before that bound was applied would be measuring one
+/// nobody builds.
 fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
-    use gear_core::hula::{self, Offset, Set, Split, Teeth};
-    use gear_core::ring::{Cutter, Ring};
+    use gear_core::ring::Ring;
+    use gear_core::train::{solve_hula_stage, HulaStage};
 
     let teeth = [n + 1, n, n - 1, n];
-    let set = Set {
-        teeth: Teeth(teeth),
-        module: [1.0, 1.0],
-        pressure_angle: 20.0,
-        helix_angle: 0.0,
-        addendum: [0.8; 4],
+    let mut stage = HulaStage {
         clearance,
-        offset: Offset::Clearance,
-        split: [Split::Pinion(0.0); 2],
+        ..HulaStage::default()
     };
-    let layout = match hula::solve(&set) {
-        Ok(l) => l,
+    for (gear, count) in stage.gears.iter_mut().zip(teeth) {
+        gear.teeth = count;
+    }
+    let result = match solve_hula_stage(&stage, 1000.0) {
+        Ok(r) => r,
         Err(e) => {
             eprintln!("that drive has no geometry: {e:?}");
             return;
         }
     };
-    let Ok(pair) = set.teeth.pair(mesh_index) else {
-        eprintln!("mesh {mesh_index} is not a pair");
-        return;
-    };
+    let (a, b) = (mesh_index * 2, mesh_index * 2 + 1);
+    let (ring_i, pinion_i) = if result.gears[a].ring { (a, b) } else { (b, a) };
     let params = |i: usize| GearParams {
-        module: set.module[mesh_index],
-        teeth: teeth[i],
-        profile_shift: layout.shift[i],
-        addendum: set.addendum[i],
-        dedendum: 1.0,
+        module: stage.module[mesh_index],
+        teeth: result.gears[i].teeth,
+        profile_shift: result.gears[i].profile_shift,
+        addendum: stage.gears[i].addendum.manual,
+        dedendum: stage.gears[i].dedendum,
+        thickness_mod: stage.thickness_mod[mesh_index],
         ..GearParams::default()
     };
-    let cutter = Cutter {
-        teeth: teeth[pair.ring].saturating_sub(5).max(6),
-        ..Cutter::default()
-    };
-    let ring = Ring::cut_by(&params(pair.ring), &cutter);
-    let pinion = gear_core::Gear::new(params(pair.pinion));
-    let flags = gear_core::ring::mesh_with(&ring, pinion.mean()).map_or_else(
-        || "  (no mesh)".to_string(),
-        |m| {
-            format!(
-                "  troch {} inv {} tip {} ({:+.4} deg)",
-                m.trochoid_interference,
-                m.involute_interference,
-                m.tip_interference,
-                m.tip_margin.to_degrees()
-            )
-        },
-    );
+    let ring = Ring::cut_by(&params(ring_i), &stage.cutter[mesh_index]);
+    let pinion = gear_core::Gear::new(params(pinion_i));
+    let m = &result.meshes[mesh_index];
     roll_pair(
         &ring,
         &pinion,
-        layout.offset,
+        result.offset_nominal,
         &format!(
-            "hula mesh {}  ring z{} x{:+.4}  pinion z{} x{:+.4}   gap {clearance} mm   alpha_w {:.2} deg{flags}",
+            "hula mesh {}  ring z{} x{:+.4}  pinion z{} x{:+.4}   gap asked {clearance} got {:.4} mm   alpha_w {:.2} deg   tip {} ({:+.4} deg)",
             mesh_index + 1,
-            teeth[pair.ring],
-            layout.shift[pair.ring],
-            teeth[pair.pinion],
-            layout.shift[pair.pinion],
-            layout.alpha_w[mesh_index].to_degrees()
+            result.gears[ring_i].teeth,
+            result.gears[ring_i].profile_shift,
+            result.gears[pinion_i].teeth,
+            result.gears[pinion_i].profile_shift,
+            m.clearance,
+            m.operating_pressure_angle,
+            m.tip_interference,
+            m.tip_margin
         ),
     );
 }
