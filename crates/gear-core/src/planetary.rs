@@ -42,37 +42,8 @@
 //! one. Efficiency is docs/reference.md#planetary-sets and belongs with the stage.
 
 use crate::mesh::operating_geometry;
+use crate::plane::BasicRack;
 use crate::solve::{newton_bracketed, Tol};
-
-/// The reference rack a planetary set shares.
-///
-/// All three members are cut by it, so the module, both pressure angles and the
-/// helix live here once rather than three times — the same reason a stage owns
-/// them rather than its gears (docs/rationale.md#inputs-are-the-only-state).
-#[derive(Clone, Copy, Debug)]
-pub struct Rack {
-    /// Transverse module, mm.
-    pub mt: f64,
-    /// Transverse pressure angle, radians.
-    pub alpha_t: f64,
-    /// Normal pressure angle, radians.
-    pub alpha_n: f64,
-}
-
-impl Rack {
-    /// From the inputs as the UI holds them: normal module, and both angles in
-    /// degrees.
-    #[must_use]
-    pub fn new(module: f64, pressure_angle_deg: f64, helix_angle_deg: f64) -> Self {
-        let beta = helix_angle_deg.to_radians();
-        let alpha_n = pressure_angle_deg.to_radians();
-        Self {
-            mt: module / beta.cos(),
-            alpha_t: crate::plane::transverse_pressure_angle(alpha_n, beta),
-            alpha_n,
-        }
-    }
-}
 
 /// The three tooth counts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -152,7 +123,7 @@ pub struct Layout {
 /// silently. The same reason [`crate::shaper::CutParams`] exists.
 #[derive(Clone, Copy, Debug)]
 pub struct Set {
-    pub rack: Rack,
+    pub rack: BasicRack,
     pub teeth: Teeth,
     /// How many planets. One is legal — it has no neighbour to clear.
     pub planets: u32,
@@ -919,8 +890,8 @@ mod tests {
         }
     }
 
-    fn rack() -> Rack {
-        Rack::new(1.0, 20.0, 0.0)
+    fn rack() -> BasicRack {
+        BasicRack::new(1.0, 20.0, 0.0)
     }
 
     /// A set with three planets, nothing shifted but the planet, and a planet

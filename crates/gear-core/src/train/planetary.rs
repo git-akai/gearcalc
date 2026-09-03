@@ -39,7 +39,8 @@ use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
-use crate::planetary::{self, Arrangement, PlanetaryShaft, Rack, Teeth};
+use crate::plane::BasicRack;
+use crate::planetary::{self, Arrangement, PlanetaryShaft, Teeth};
 use crate::ring::{Cutter, Ring};
 use crate::strength::{
     bending_section, bending_stress, contact_stress, min_face_width_bending,
@@ -292,8 +293,8 @@ impl PlanetaryStage {
         }
     }
 
-    fn rack(&self) -> Rack {
-        Rack::new(self.module, self.pressure_angle, self.helix_angle)
+    fn rack(&self) -> BasicRack {
+        BasicRack::new(self.module, self.pressure_angle, self.helix_angle)
     }
 
     fn teeth(&self) -> Teeth {

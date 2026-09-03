@@ -1280,11 +1280,12 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
 /// designer's: the geometric ideal needs no shift but rarely spaces the planets
 /// evenly, and the one that does costs a shift. Both facts are on the same row.
 fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_shift: f64) {
-    use gear_core::planetary::{ring_candidates, shift_bracket, solve, Rack, Set, Teeth};
+    use gear_core::plane::BasicRack;
+    use gear_core::planetary::{ring_candidates, shift_bracket, solve, Set, Teeth};
 
     let module = 1.0;
     let set = Set {
-        rack: Rack::new(module, 20.0, 0.0),
+        rack: BasicRack::new(module, 20.0, 0.0),
         teeth: Teeth {
             sun,
             planet,

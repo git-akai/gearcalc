@@ -56,6 +56,43 @@ pub fn base_helix_angle(helix_angle: f64, normal_pressure_angle: f64) -> f64 {
     (helix_angle.sin() * normal_pressure_angle.cos()).asin()
 }
 
+/// The **basic rack** two meshing gears share: one module, and its pressure
+/// angle in both planes.
+///
+/// Three numbers that always travel together and are always derived the same
+/// way, named once for the same reason the two identities above are — a third
+/// copy of `m/cos β` and `transverse_pressure_angle` was about to be written
+/// when this moved here from `planetary`, which is how that pattern starts.
+///
+/// It lives in this module rather than beside a mesh because its whole content
+/// is one rack expressed in two planes, which is this module's subject. It is
+/// **not** [`crate::tooth::Rack`]: that is the *tool*, two lengths and a round,
+/// and this is the reference the tooth counts are measured against.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BasicRack {
+    /// Transverse module, mm.
+    pub mt: f64,
+    /// Transverse pressure angle, radians.
+    pub alpha_t: f64,
+    /// Normal pressure angle, radians.
+    pub alpha_n: f64,
+}
+
+impl BasicRack {
+    /// From the inputs as the UI holds them: normal module, and both angles in
+    /// degrees.
+    #[must_use]
+    pub fn new(module: f64, pressure_angle_deg: f64, helix_angle_deg: f64) -> Self {
+        let beta = helix_angle_deg.to_radians();
+        let alpha_n = pressure_angle_deg.to_radians();
+        Self {
+            mt: module / beta.cos(),
+            alpha_t: transverse_pressure_angle(alpha_n, beta),
+            alpha_n,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
