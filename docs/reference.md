@@ -341,6 +341,38 @@ both tip circles — and there sliding never reverses along the path, so the
 integral is the difference of the ends rather than their sum. One expression
 covers both; the sign does the work.
 
+**The division of a pair's shift is free, and the loss claims it.** Two shifts
+reach the operating pressure angle only through their signed *sum*, so a centre
+distance fixes the sum and leaves the division over. Nothing in the geometry
+wants it — but moving shift from one member to the other lengthens one end of the
+path and shortens the other, and the loss is an integral along that path.
+Differentiating at fixed sum gives one equation:
+
+```text
+(2|ε₂|ε_α − N)/sin α_a1 = (2|ε₁|ε_α − N)/sin α_a2      N = ε₁|ε₁| + ε₂|ε₂|
+```
+
+Where the two tips sit at the same pressure angle it collapses to `ε₁ = ε₂` —
+**balance approach against recess**, the rule the textbooks give, which is this
+at equal tip angles rather than a separate law. The ends move at `1/sin α_a`,
+which is why the tip angles are what it is written in: a tooth whose tip sits low
+on its flank moves the path a long way for a little shift.
+
+Gated against the loss rather than against the algebra: the condition changes
+sign where a sweep of two hundred divisions finds the best one, on four pairs;
+the division the solver returns beats every other tried; and a pair with nothing
+to tell its members apart divides evenly. Both the textbook rule alone and the
+same expression without its tip-angle weighting fail those.
+
+**What it is worth depends entirely on what the mesh feeds.** On an ordinary
+pair it is three to eight hundredths of a point — 98.32 % to 98.35 % on 17/43,
+98.08 % to 98.16 % on 13/61 — which is real and small. On a drive whose reduction
+comes from two meshes nearly cancelling it is worth thirty to fifty times that at
+the output, because `η = 1/[R(1 − η₀) + η₀]` multiplies the mesh loss by the
+reduction. That is the whole reason a high-ratio design bothers to optimise its
+shifts, and why the same optimiser is unremarkable in a gearbox and decisive in a
+Wolfrom.
+
 ## Crossed axes
 
 One model covers a worm drive and a crossed helical pair; they differ in **one

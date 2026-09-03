@@ -31,6 +31,13 @@ pub struct ContactPath {
     pub base_radius_1: f64,
     /// Operating pressure angle.
     pub alpha_w: f64,
+    /// Pressure angle at each gear's **tip**, radians, gear 1 first.
+    ///
+    /// Where each end of the path sits on its own flank, which is what says how
+    /// fast that end travels when the tooth is made taller or shorter — so it is
+    /// a property of the path's ends rather than of the gears, and it is what
+    /// [`efficient_split`] is written in.
+    pub tip_pressure_angle: [f64; 2],
 }
 
 impl ContactPath {
@@ -105,6 +112,10 @@ impl ContactPath {
             contact_ratio: (approach + recess) / base_pitch,
             operating_radius_1: r1,
             base_radius_1: g1.rb,
+            tip_pressure_angle: [
+                (g1.rb / g1.ra).clamp(-1.0, 1.0).acos(),
+                (rb2 / tip_radius_2).clamp(-1.0, 1.0).acos(),
+            ],
             alpha_w: mesh.alpha_w,
         })
     }
@@ -405,6 +416,76 @@ pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Tooth, friction: f64, dr
     // sign does here, and it is one expression rather than a case.
     1.0 - friction * std::f64::consts::PI * z * (e1 * e1.abs() + e2 * e2.abs())
         / (path.contact_ratio * cos_bb)
+}
+
+/// **How much a mesh's loss changes as its shift is divided differently**, as a
+/// residual that is zero at the best division.
+///
+/// A pair's two profile shifts reach its operating pressure angle only through
+/// their signed *sum*, so the sum is what a centre distance fixes and the
+/// division is left over. Nothing in the geometry claims it — but the loss does,
+/// because moving shift from one member to the other lengthens one end of the
+/// path of contact and shortens the other, and the loss is
+/// `∫|s| ds` along that path.
+///
+/// Differentiating [`efficiency`]'s integrand at fixed sum gives one equation:
+///
+/// ```text
+/// (2|ε₂|ε_α − N)/sin α_a1 = (2|ε₁|ε_α − N)/sin α_a2      N = ε₁|ε₁| + ε₂|ε₂|
+/// ```
+///
+/// # What it contains
+///
+/// Where the two tips sit at the same pressure angle the condition collapses to
+/// `ε₁ = ε₂` — **balance approach against recess**, which is the rule the
+/// textbooks give. It is the equal-tip-angle case of this rather than a
+/// separate law, and the general form is what a pair with tips at different
+/// angles actually wants.
+///
+/// The two ends move at `1/sin α_a`, which is why the tip pressure angles are
+/// what the condition is written in: a tooth whose tip sits low on its flank
+/// moves the path a long way for a little shift.
+///
+/// Returns the residual, not the answer. It is monotone across the useful range
+/// and a caller brackets it — see [`crate::hula::Split`], where the division is
+/// exactly the freedom a shared crank offset leaves over.
+#[must_use]
+pub fn split_residual(path: &ContactPath) -> f64 {
+    let p_b = path.base_pitch;
+    let (e1, e2) = (path.approach / p_b, path.recess / p_b);
+    let total = e1 + e2;
+    let n = e1 * e1.abs() + e2 * e2.abs();
+    let [a1, a2] = path.tip_pressure_angle;
+    let (s1, s2) = (a1.sin(), a2.sin());
+    if s1.abs() < f64::EPSILON || s2.abs() < f64::EPSILON {
+        return f64::NAN;
+    }
+    (2.0 * e2.abs() * total - n) / s1 - (2.0 * e1.abs() * total - n) / s2
+}
+
+/// The division of a pair's profile shift that makes it lose least.
+///
+/// `path_at(δ)` is the path of contact when `δ` is added to gear 1's shift and
+/// taken from gear 2's **in the sense that holds their signed sum** — which for
+/// an external pair means the other way and for an internal pair means the same
+/// way, since a ring enters the sum negative. The caller builds the gears
+/// because the caller knows what they are; this only knows what to look for.
+///
+/// Returns the `δ` in `bracket` where [`split_residual`] vanishes. `None` when
+/// the bracket does not straddle it, which is a design whose best division lies
+/// outside the range it was allowed — and a caller that wants the best
+/// *admissible* one should then take the end it ran into, not this.
+///
+/// # Errors
+///
+/// `None` also where the pair does not mesh at an end of the bracket.
+#[must_use]
+pub fn efficient_split(
+    path_at: &dyn Fn(f64) -> Option<ContactPath>,
+    bracket: (f64, f64),
+) -> Option<f64> {
+    let residual = |d: f64| path_at(d).map_or(f64::NAN, |p| split_residual(&p));
+    crate::solve::brent(residual, bracket.0, bracket.1, crate::solve::Tol::default())
 }
 
 /// A relative sliding velocity, resolved in the plane where the flanks touch.
@@ -833,6 +914,145 @@ mod tests {
         });
         let m = Mesh::new(&a, &b, MeshKind::External).unwrap();
         (a, b, m)
+    }
+
+    /// **The residual is zero where the loss is least**, checked against the
+    /// loss itself rather than against the algebra it came from.
+    ///
+    /// A pair's two shifts are moved in opposite directions so their sum — and
+    /// with it the operating pressure angle and the centre distance — does not
+    /// change. The efficiency is then swept and its best point found by looking
+    /// at every one; the condition has to change sign there. Sharing nothing but
+    /// the path, this is the derivative checked against the function.
+    #[test]
+    fn the_split_residual_is_zero_where_the_loss_is_least() {
+        for (z1, z2, sum) in [
+            (17_u32, 43_u32, 0.0),
+            (20, 20, 0.4),
+            (13, 61, -0.2),
+            (25, 31, 0.6),
+        ] {
+            let at = |d: f64| {
+                let g = |teeth: u32, x: f64| {
+                    Tooth::new(GearParams {
+                        teeth,
+                        profile_shift: x,
+                        ..Default::default()
+                    })
+                };
+                let (a, b) = (g(z1, sum / 2.0 + d), g(z2, sum / 2.0 - d));
+                let m = Mesh::new(&a, &b, MeshKind::External).ok()?;
+                let p = ContactPath::new(&a, b.ra, &m)?;
+                Some((p, efficiency(&p, &m, &a, 0.08, Drive::Forward), m.a_w))
+            };
+
+            // The sum is what a centre distance is, so it must not move.
+            let a_w = at(0.0).expect("a pair at the middle").2;
+            let mut best = (f64::NEG_INFINITY, 0.0);
+            let mut samples = Vec::new();
+            for i in -60..=60 {
+                let d = f64::from(i) * 0.01;
+                let Some((path, eta, moved)) = at(d) else {
+                    continue;
+                };
+                assert!(
+                    (moved - a_w).abs() < 1e-12,
+                    "z{z1}/z{z2}: dividing the shift moved the centre distance"
+                );
+                if eta > best.0 {
+                    best = (eta, d);
+                }
+                samples.push((d, split_residual(&path)));
+            }
+            assert!(best.0 > 0.0, "z{z1}/z{z2}: nothing solved");
+
+            // The condition changes sign across the best point, within the step
+            // the sweep took.
+            let near: Vec<f64> = samples
+                .iter()
+                .filter(|(d, _)| (d - best.1).abs() < 0.0151)
+                .map(|(_, r)| *r)
+                .collect();
+            assert!(
+                near.iter().any(|r| *r <= 0.0) && near.iter().any(|r| *r >= 0.0),
+                "z{z1}/z{z2}: the loss is least at {} but the condition does not vanish there: {near:?}",
+                best.1
+            );
+        }
+    }
+
+    /// **The split it returns is the best one**, against every other split
+    /// tried.
+    ///
+    /// The condition is solved once; the loss is then evaluated at two hundred
+    /// divisions and none of them may beat it. That is the optimiser checked
+    /// against the thing it optimises, which is the only check worth having
+    /// here.
+    #[test]
+    fn the_split_it_finds_is_the_one_that_loses_least() {
+        for (z1, z2, sum) in [
+            (17_u32, 43_u32, 0.0),
+            (20, 20, 0.4),
+            (13, 61, -0.2),
+            (25, 31, 0.6),
+        ] {
+            let built = |d: f64| {
+                let g = |teeth: u32, x: f64| {
+                    Tooth::new(GearParams {
+                        teeth,
+                        profile_shift: x,
+                        ..Default::default()
+                    })
+                };
+                let (a, b) = (g(z1, sum / 2.0 + d), g(z2, sum / 2.0 - d));
+                let m = Mesh::new(&a, &b, MeshKind::External).ok()?;
+                let p = ContactPath::new(&a, b.ra, &m)?;
+                Some((p, efficiency(&p, &m, &a, 0.08, Drive::Forward)))
+            };
+            let best = efficient_split(&|d| built(d).map(|(p, _)| p), (-0.6, 0.6))
+                .unwrap_or_else(|| panic!("z{z1}/z{z2}: no division satisfies the condition"));
+            let here = built(best).expect("a pair at the best division").1;
+            for i in -100..=100 {
+                let d = f64::from(i) * 0.006;
+                if let Some((_, eta)) = built(d) {
+                    assert!(
+                        eta <= here + 1e-12,
+                        "z{z1}/z{z2}: {d} loses less ({eta}) than the division found, {best} ({here})"
+                    );
+                }
+            }
+        }
+    }
+
+    /// **A pair with nothing to tell its members apart divides its shift
+    /// evenly**, which is a property the answer must have and can be checked
+    /// without knowing it.
+    ///
+    /// Equal tooth counts at an equal sum put the two tips at the same pressure
+    /// angle, where the condition collapses to `ε₁ = ε₂` — the textbook rule —
+    /// and symmetry puts that at the middle. A solver that returned anything
+    /// else here would be answering a question the geometry does not ask.
+    #[test]
+    fn a_symmetric_pair_divides_its_shift_evenly() {
+        for z in [17_u32, 20, 31] {
+            let built = |d: f64| {
+                let g = |x: f64| {
+                    Tooth::new(GearParams {
+                        teeth: z,
+                        profile_shift: x,
+                        ..Default::default()
+                    })
+                };
+                let (a, b) = (g(d), g(-d));
+                let m = Mesh::new(&a, &b, MeshKind::External).ok()?;
+                ContactPath::new(&a, b.ra, &m)
+            };
+            let d = efficient_split(&built, (-0.4, 0.4)).expect("a symmetric pair has an answer");
+            assert!(
+                d.abs() < 1e-9,
+                "z{z}/z{z} divided its shift {d}, not evenly"
+            );
+        }
     }
 
     fn helical_pair(z1: u32, z2: u32, beta: f64) -> (Tooth, Tooth, Mesh) {
