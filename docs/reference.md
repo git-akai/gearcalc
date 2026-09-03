@@ -1035,6 +1035,33 @@ the more power goes round between them before any reaches the output, so a
 is self-locking: below half efficiency forward, the reversed flow has no state
 where the output absorbs.
 
+**The figure is the mechanism, not the model**, and the same code says so. Of
+the sixteen arrangements, those whose wobble body carries two faces of the *same*
+kind cancel, reduce by `z²`, and keep about a quarter; those carrying one of each
+cancel nothing, reduce by about `z/2`, and keep ninety-odd percent — on the same
+two meshes, losing the same 0.85 % between them.
+
+| arrangement | `D` | ratio | meshes | the drive |
+|---|---|---|---|---|
+| `N+1/N/N−1/N` | 1 | 324 | 99.15 % | 26.6 % |
+| `N/N+1/N/N−1` | −1 | −323 | 99.15 % | 26.4 % |
+| `N+1/N/N/N−1` | −36 | −8.5 | 99.15 % | 92.4 % |
+| `N/N+1/N/N+1` | 37 | 9.8 | 99.17 % | 93.2 % |
+
+This is the published behaviour of a Wolfrom set — efficiency falls as the
+reduction rises, because the reduction *is* the cancellation — and it is why such
+drives are used where their efficiency does not matter. A **three-ring reducer**
+reaches a high ratio at high efficiency by not doing this at all: its rings are
+carried on a parallelogram of cranks and *translate without rotating*, so its
+reduction comes from one mesh's tooth difference with nothing to cancel against,
+and two of them in series multiply ratios rather than cancelling. It is a
+different mechanism, not a better-built one, and it is not what these four counts
+describe.
+
+The sensitivity is the published one too: half a point of mesh efficiency at
+324:1 takes the drive from 26.6 % to 46.8 %, cutting the loss by better than a
+quarter of itself.
+
 **The stage builds what the arrangement describes.** A drive that closes
 algebraically can still be one whose teeth foul, so each ring is cut by its
 shaper and each pair is asked what it thinks: the contact ratio, the two

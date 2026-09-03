@@ -916,6 +916,62 @@ mod tests {
         }
     }
 
+    /// **A reduction that does not come from cancellation is efficient**, and
+    /// the same code says so.
+    ///
+    /// This is the check that the low figure above is the mechanism rather than
+    /// the model. Both families here have the *same* two meshes losing the same
+    /// 0.85 % between them; they differ only in whether the wobble body carries
+    /// two faces of the same kind. Where it does, the two meshes nearly cancel,
+    /// `D = ±1`, the ratio is `z²` and the drive keeps a quarter of what it is
+    /// given. Where it does not, `D ≈ 2z`, the ratio is about `z/2` and the
+    /// drive keeps ninety-odd percent — an ordinary gearbox.
+    ///
+    /// It is the published behaviour of a Wolfrom set: efficiency falls as the
+    /// reduction rises, because the reduction *is* the cancellation and
+    /// cancellation is what circulates the power. A three-ring reducer reaches
+    /// a high ratio at high efficiency by not doing this — its rings translate
+    /// on a parallelogram of cranks instead of rotating, so its reduction comes
+    /// from one mesh's tooth difference with nothing to cancel against.
+    #[test]
+    fn a_reduction_that_does_not_come_from_cancellation_is_efficient() {
+        let solve = |z: [u32; 4]| {
+            let mut s = stage();
+            for (gear, count) in s.gears.iter_mut().zip(z) {
+                gear.teeth = count;
+            }
+            solve_hula_stage(&s, 1000.0, 2.0).unwrap()
+        };
+        // Both faces of the wobble body the same kind: the meshes cancel.
+        for z in [[19, 18, 17, 18], [17, 18, 19, 18]] {
+            let r = solve(z);
+            assert!(r.ratio.abs() > 300.0, "{z:?} reduces by {}", r.ratio);
+            assert!(
+                r.efficiency.forward < 0.35,
+                "{z:?}: cancellation costs, {} is too good",
+                r.efficiency.forward
+            );
+        }
+        // One of each: nothing cancels, and the same meshes keep their loss.
+        for z in [[19, 18, 18, 17], [17, 18, 18, 19], [18, 17, 19, 18]] {
+            let r = solve(z);
+            assert!(r.ratio.abs() < 12.0, "{z:?} reduces by {}", r.ratio);
+            assert!(
+                r.efficiency.forward > 0.9,
+                "{z:?}: nothing circulates here, {} is too poor",
+                r.efficiency.forward
+            );
+        }
+        // ...and it is the same meshes throughout, so the difference is the
+        // arrangement and not the teeth.
+        let cancelling = solve([19, 18, 17, 18]).fixed_carrier_efficiency.forward;
+        let plain = solve([19, 18, 18, 17]).fixed_carrier_efficiency.forward;
+        assert!(
+            (cancelling - plain).abs() < 0.005,
+            "the meshes should lose alike: {cancelling} against {plain}"
+        );
+    }
+
     /// An arrangement whose meshes cancel is refused by the stage, as by the
     /// drive: the error travels rather than being re-diagnosed.
     #[test]
