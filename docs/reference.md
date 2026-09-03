@@ -890,6 +890,62 @@ at the ring.
 
 ---
 
+## The hula drive
+
+Four gears in two pairs, all on one crank. Gears 1 and 4 sit on the fixed axis —
+1 grounded, 4 the output — while gears 2 and 3 ride a body carried on an
+eccentric, so **both pairs are separated by the same distance**, the crank's
+offset, and that shared number is what makes the arrangement a drive rather than
+two independent meshes.
+
+```text
+ratio        R = z₂z₄ / D,      D = z₂z₄ − z₁z₃          (Willis, both meshes)
+shift        Σx = Σz (inv α_w − inv α_t) / (2 tan α_n)   Σx = x_pinion − x_ring
+offset       e  = a_ref cos α_t / cos α_w
+far-side gap C  = a_ref − m(h_ring + h_pinion) − m·Σx + e
+dC/dα_w      = −m Σz tan²α_w / (2 tan α_n) + e tan α_w
+```
+
+`D` is an **integer** and it is the whole design rule. `|D| = 1` reduces by order
+`z²`; `D = 0` means the two meshes step by the same amount and cancel, so the
+output cannot turn — a refusal rather than a large number, and four of the
+sixteen arrangements of `z, z ± 1` are exactly that. A wobble body carrying one
+external face and one internal one lands at `|D| ≈ 2z`, so it cannot exceed about
+`z/2` however the counts are chosen; the high-ratio arrangements are the four
+whose wobble carries two faces of the same kind. The ratio is reported as the two
+products rather than as a float, because it *is* integers.
+
+**Which member of a pair is its ring is not an input.** Two axes one crank offset
+apart can only be an internal pair, so the ring is whichever member has more
+teeth, and every arrangement describes itself — the sixteen are one code path.
+
+**One offset, and what is left over.** Only the *difference* of a pair's two
+shifts reaches either quantity above: the operating pressure angle takes it
+through [`operating_geometry`](#signed-relations-both-mesh-kinds), and in the gap
+both tips move together with the sum, so it cancels. The offset therefore decides
+the difference and **the sum is free** — one spare number per mesh that no
+geometry claims. So the drive has exactly three unknowns, the offset and one
+split per mesh, and each names what decides it; a system where every unknown
+carries its own source cannot be over- or under-determined, which is why there is
+no constraint count to check and no solve order to choose.
+
+**Why the far-side gap is the constraint.** At one tooth of difference a ring and
+its pinion very nearly fill each other, and with ordinary proportions their tip
+circles *overlap* on the side away from the mesh — at `h = 0.8` and no shift the
+gap is `−0.6 m`. A wobble body cannot orbit through that, so the gap is what the
+shift is spent on, and it is why a drive of this kind runs at operating pressure
+angles no ordinary pair would: 57° at `z = 18`, one tooth of difference and half
+a millimetre of gap. Two teeth of difference is far kinder — 26° for the same gap
+— at a quarter of the ratio, since `D = 4`.
+
+Both terms of `dC/dα_w` are positive (`Σz < 0`), so the gap rises strictly with
+the operating pressure angle and hence with the offset. The root is unique, and
+taking the larger of the two meshes' requirements is safe: opening the drive out
+for the mesh that needs it gives the other one more as well. The two conditions
+that bite *inside* a mesh — a tip reaching past a flank — belong to the pair and
+are asked at [`ring::mesh_with`](#limits) rather than restated here.
+
+
 ## Trains
 
 Per stage `i = z_out/z_in`; a worm's is `z_wheel/z_starts` and a planetary's

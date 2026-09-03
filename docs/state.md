@@ -79,6 +79,7 @@ cargo run --bin gear-cli -- bending                 # the bending construction, 
 cargo run --release --bin gear-cli -- verify 100   # the two-sided cutter check
 python3 tools/worm_flank_curvature.py              # ZI vs ZN vs ZA, from the surface
 python3 tools/crossed_path.py                      # the crossed path, from the surfaces
+python3 tools/hula_kinematics.py                   # the hula ratio, from the rolling circles
 ```
 
 [`bending-check.html`](bending-check.html) is that last command's figures with

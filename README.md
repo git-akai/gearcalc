@@ -187,6 +187,7 @@ it, and all are run by hand rather than in CI:
 python3 tools/validate_dxf.py <file.dxf> ...   # an export's structure, then its geometry
 python3 tools/worm_flank_curvature.py          # worm flank curvature from the surface itself
 python3 tools/crossed_path.py                  # a crossed pair's path of contact, from the surfaces
+python3 tools/hula_kinematics.py               # a hula drive's ratio, from the rolling circles
 python3 tools/check_strings.py                 # every UI message is used, and every used one exists
 ```
 
