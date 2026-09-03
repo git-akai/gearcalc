@@ -921,6 +921,28 @@ T_ring/T_sun = −i₀ η₀^w      T_carrier = −(T_sun + T_ring)
 η  = |T_out ω_out| / |T_in ω_in|
 ```
 
+**`w` is not known in advance**, since it depends on a torque that is itself
+being solved for, so both values are tried and the physical one kept. Two
+conditions decide it, and the first alone is not enough:
+
+1. the sign the branch assumed has to be the sign it produces;
+2. **the output has to absorb what the input delivers** — `T_out ω_out ≤ 0`.
+
+`k = i₀ η₀^w` sits either side of 1 as `w` flips, so where `i₀` is itself close
+to 1 the two candidates straddle it, `1 − k` changes sign between them, the sun's
+torque does, the rolling power does, and *both* branches confirm their own
+assumption. One of the two then has the output's torque along its own rotation —
+a shaft delivering power while the input delivers too, with friction making up
+the difference — which is energy from nowhere and reads as an efficiency above
+1. That is not a corner case: a set reducing by the square of a tooth count lives
+there, and nothing about the arrangement warns of it, which is why the second
+condition is on the energy rather than on the ratio.
+
+Where **neither** branch has the output absorbing, there is no back-driven state
+at all: the set is self-locking, and the refusal is the answer. It agrees with
+the classical criterion — back-driving efficiency `2 − 1/η` is negative exactly
+when `η < ½`.
+
 **Backlash, referred to an output shaft.** The two meshes sit at the same centre
 distance and `r′_p1 ≠ r′_p2` in general. Eliminating the planet leaves Willis at
 zero play:
@@ -994,17 +1016,24 @@ angles no ordinary pair would: 57° at `z = 18`, one tooth of difference and hal
 a millimetre of gap. Two teeth of difference is far kinder — 26° for the same gap
 — at a quarter of the ratio, since `D = 4`.
 
-**The meshes' loss is reported; the drive's is not.** Each pair's own efficiency
-comes from [`contact::efficiency`](#efficiency-parallel-axes) with the crank
-held, and the two multiply — 99.15 % together on the shipped counts. That is
-*not* the drive's figure and is nowhere near it, because power circulates: the
-drive is a three-shaft epicyclic whose basic ratio is `i₀ = z₂z₄/(z₁z₃)`, and
-turning a mesh loss into a drive loss is [`planetary::power`](#planetary-sets),
-which is written for a basic ratio that stays away from one. This arrangement's
-sits at 324/323. There the two candidate signs of the rolling power straddle
-unity, the solve returns efficiencies above 1 at some tooth counts, and an
-efficiency above one is not an efficiency — so the drive's own figure is withheld
-until that is settled rather than reported and disbelieved.
+**Two efficiencies, because one is not the other.** Each pair's own comes from
+[`contact::efficiency`](#efficiency-parallel-axes) with the crank held, and the
+two multiply — 99.15 % together on the shipped counts. The *drive's* comes from
+the three-shaft power flow ([Planetary sets](#planetary-sets)) at
+`i₀ = z₂z₄/(z₁z₃)`, and it is nowhere near the first, because power circulates:
+
+| reduction | meshes, crank held | the drive |
+|---|---|---|
+| 144 | 98.74 % | 35.8 % |
+| 324 | 99.15 % | 26.6 % |
+| 900 | 99.48 % | 17.5 % |
+| 2500 | 99.68 % | 11.1 % |
+
+The nearer the two meshes come to cancelling — which is what buys the reduction —
+the more power goes round between them before any reaches the output, so a
+*better* pair of meshes at a *higher* ratio is a worse drive. Every one of these
+is self-locking: below half efficiency forward, the reversed flow has no state
+where the output absorbs.
 
 **The stage builds what the arrangement describes.** A drive that closes
 algebraically can still be one whose teeth foul, so each ring is cut by its

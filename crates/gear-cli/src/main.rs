@@ -192,8 +192,15 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         result.crank_speed, result.gears[1].speed, result.gears[3].speed
     );
     println!(
-        "  the two meshes lose {:.3} % between them, crank held   (the drive's own figure is not reported)",
-        (1.0 - result.fixed_carrier_efficiency.forward) * 100.0
+        "  efficiency {:.3} % forward, {:.3} % back-driven{}   (the two meshes alone, crank held: {:.4})",
+        result.efficiency.forward * 100.0,
+        result.efficiency.backward * 100.0,
+        if result.efficiency.backward == 0.0 {
+            "  (self-locking)"
+        } else {
+            ""
+        },
+        result.fixed_carrier_efficiency.forward
     );
     println!(
         "  backlash at the output {:.6} deg (min {:.6}, max {:.6})   at the crank {:.4} deg",

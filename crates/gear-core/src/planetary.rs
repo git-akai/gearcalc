@@ -532,6 +532,26 @@ pub fn power(
         if rolling != 0.0 && rolling.signum() != w {
             continue;
         }
+        // **...and the output has to absorb what the input delivers.**
+        //
+        // Self-consistency in the rolling sign is necessary and not sufficient.
+        // `k = i₀ η₀^w` sits either side of 1 as `w` flips, and where `i₀` is
+        // itself close to 1 — which is exactly what a set reducing by the square
+        // of a tooth count is — the two candidates straddle it. Then `1 − k`
+        // changes sign between the branches, so the sun's torque does, so the
+        // rolling power does, and **both branches confirm their own assumption**.
+        //
+        // What separates them is where the power goes. One puts the output's
+        // torque along its own rotation, which is a shaft *delivering* power
+        // while the input delivers too and friction makes up the difference —
+        // energy from nowhere, and it shows up as an efficiency above 1. The
+        // other has the output absorbing, the loss positive, and an efficiency
+        // below it. On a well conditioned set only one branch was ever
+        // self-consistent and this changes nothing; near `i₀ = 1` it is the
+        // whole answer.
+        if torques[o] * speeds[o] > 0.0 {
+            continue;
+        }
         let efficiency = (torques[o] * speeds[o]).abs() / input_power;
         return Some(Power {
             speeds,
@@ -637,6 +657,91 @@ mod tests {
     /// A set built from lossless meshes is lossless, in **all six** arrangements
     /// and exactly — so the loss term enters only through `η₀` and nothing else
     /// leaks.
+    /// **Self-consistency in the rolling sign does not pick the branch on its
+    /// own**, and where it cannot, energy is what decides.
+    ///
+    /// `k = i₀ η₀^w` sits either side of 1 as `w` flips, so where `i₀` is itself
+    /// close to 1 the two candidates straddle it, `1 − k` changes sign between
+    /// them, and both confirm their own assumption. One of the two has the
+    /// output's torque along its own rotation — a shaft delivering power while
+    /// the input delivers too — which is energy from nowhere and shows up as an
+    /// efficiency above 1. Taking the first self-consistent branch returned
+    /// exactly that: 1.22 at `i₀ = 144/143`.
+    ///
+    /// This is the regime of a set that reduces by the square of a tooth count,
+    /// so it is ordinary rather than pathological — and nothing about the
+    /// arrangement warns of it, which is why the guard is on the physics.
+    #[test]
+    fn a_basic_ratio_near_one_still_loses_power() {
+        for (num, den) in [(144_i64, 143_i64), (324, 323), (900, 899), (2500, 2499)] {
+            let i0 = num as f64 / den as f64;
+            for eta0 in [0.98, 0.99, 0.995] {
+                let p = power(
+                    i0,
+                    Arrangement {
+                        input: PlanetaryShaft::Carrier,
+                        fixed: PlanetaryShaft::Sun,
+                    },
+                    1000.0,
+                    2.0,
+                    eta0,
+                )
+                .unwrap_or_else(|| panic!("i0 {i0} eta0 {eta0} should solve"));
+                assert!(
+                    p.efficiency > 0.0 && p.efficiency < 1.0,
+                    "i0 {i0} eta0 {eta0}: efficiency {} is not one",
+                    p.efficiency
+                );
+                let out = PlanetaryShaft::Ring.index_pub();
+                assert!(
+                    p.torques[out] * p.speeds[out] <= 0.0,
+                    "i0 {i0}: the output delivers power as well as the input"
+                );
+            }
+        }
+    }
+
+    /// A set that loses more than half of what it is given cannot be driven
+    /// backwards: the reversed flow has no branch where the output absorbs, and
+    /// the classical `2 − 1/η` for such a set is negative.
+    #[test]
+    fn a_set_below_half_efficiency_does_not_back_drive() {
+        let i0 = 324.0 / 323.0;
+        let fixed = PlanetaryShaft::Sun;
+        let forward = power(
+            i0,
+            Arrangement {
+                input: PlanetaryShaft::Carrier,
+                fixed,
+            },
+            1000.0,
+            2.0,
+            0.99,
+        )
+        .unwrap();
+        assert!(forward.efficiency < 0.5, "{}", forward.efficiency);
+        let out = PlanetaryShaft::Ring.index_pub();
+        let back = power(
+            i0,
+            Arrangement {
+                input: PlanetaryShaft::Ring,
+                fixed,
+            },
+            forward.speeds[out],
+            forward.torques[out].abs(),
+            0.99,
+        );
+        assert!(
+            back.is_none(),
+            "back-driving should have no state at all, not {:?}",
+            back.map(|p| p.efficiency)
+        );
+        assert!(
+            2.0 - 1.0 / forward.efficiency < 0.0,
+            "and the relation agrees"
+        );
+    }
+
     #[test]
     fn a_lossless_set_is_lossless_in_every_arrangement() {
         for a in arrangements() {

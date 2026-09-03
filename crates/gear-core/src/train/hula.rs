@@ -258,16 +258,20 @@ pub struct HulaResult {
     /// pairs' own, multiplied.
     ///
     /// **It is not the drive's efficiency**, and on a high-ratio arrangement it
-    /// is nowhere near it — the meshes lose under a percent while the drive
-    /// loses tens of them, because power circulates. The drive's own figure is
-    /// not reported: the power flow it would come from is written for a basic
-    /// ratio that stays away from one, and this arrangement's sits at
-    /// `z₂z₄/(z₁z₃)` — 324/323 on the shipped counts — where the two candidate
-    /// signs of the rolling power straddle unity and the solve returns figures
-    /// above 1 at some tooth counts. An efficiency above one is not an
-    /// efficiency, and until that is settled the honest report is the meshes'
-    /// own loss and the arithmetic that turns it into the drive's.
+    /// is nowhere near it: the meshes lose under a percent while the drive loses
+    /// tens of them, because power circulates. Both figures are reported for
+    /// exactly that reason — one is not a stand-in for the other, and reading
+    /// the mesh figure as the drive's is the mistake this pair of fields exists
+    /// to prevent.
     pub fixed_carrier_efficiency: Directional<f64>,
+    /// The drive's own efficiency, 0..1, in both directions.
+    ///
+    /// **Backward is zero where the drive cannot be back-driven**, which on this
+    /// arrangement is the ordinary case rather than the exception: an
+    /// efficiency below a half forward means a reversed power flow with no
+    /// self-consistent solution, and the classical `2 − 1/η` for such a set is
+    /// negative there. Reported the way a self-locking worm reports it.
+    pub efficiency: Directional<f64>,
     /// Torque on each shaft — the grounded gear, the crank, the output — in
     /// whatever unit the input torque was given. They sum to zero.
     pub shaft_torques: [f64; 3],
@@ -488,6 +492,7 @@ pub fn solve_hula_stage(
     // members, not two tooth forms. Here both may be rings, or both external,
     // and the solve is indifferent — which is the point of handing it a ratio.
     const GROUNDED: PlanetaryShaft = PlanetaryShaft::Sun;
+    const OUTPUT: PlanetaryShaft = PlanetaryShaft::Ring;
     const CRANK: PlanetaryShaft = PlanetaryShaft::Carrier;
     let products = (layout.ratio.numerator, layout.ratio.denominator);
     let basic_ratio = products.0 as f64 / (products.0 - products.1) as f64;
@@ -498,7 +503,7 @@ pub fn solve_hula_stage(
     // The same product on the static coefficients. It decides a sign rather
     // than a figure — whether the drive breaks away at all — and is kept beside
     // the sliding one so no stage kind is the exception.
-    let _at_rest_meshes = product(|e| e.1);
+    let at_rest_meshes = product(|e| e.1);
     let flow = |input: PlanetaryShaft, speed: f64, torque: f64, eta0: f64| {
         planetary::power(
             basic_ratio,
@@ -511,15 +516,48 @@ pub fn solve_hula_stage(
             eta0,
         )
     };
+    // Driving backward the output shaft becomes the input, at **the speed and
+    // torque the forward solve gave it**; the same shaft stays held. Where no
+    // branch has the output absorbing there is no back-driven state at all —
+    // the drive is self-locking, and that is a refusal rather than a low number.
+    let reversed = |eta0: f64, forward: &planetary::Power| {
+        let out = OUTPUT.index_pub();
+        let speed = forward.speeds[out];
+        flow(
+            OUTPUT,
+            speed,
+            forward.torques[out].abs() * if speed < 0.0 { -1.0 } else { 1.0 },
+            eta0,
+        )
+    };
     let forward = flow(
         CRANK,
         input_speed,
         input_torque,
         fixed_carrier_efficiency.forward,
     );
+    let drive_efficiency = Directional {
+        forward: forward.as_ref().map_or(0.0, |p| p.efficiency),
+        backward: forward
+            .as_ref()
+            .and_then(|f| reversed(fixed_carrier_efficiency.backward, f))
+            .map_or(0.0, |p| p.efficiency),
+    }
+    // **Whether it turns at all is decided at rest**, against the static
+    // coefficients: the same two solves on the higher friction, for the sign
+    // only.
+    .once_moving(&Directional {
+        forward: flow(CRANK, input_speed, input_torque, at_rest_meshes.forward)
+            .map_or(0.0, |p| p.efficiency),
+        backward: forward
+            .as_ref()
+            .and_then(|f| reversed(at_rest_meshes.backward, f))
+            .map_or(0.0, |p| p.efficiency),
+    });
 
     Ok(HulaResult {
         fixed_carrier_efficiency,
+        efficiency: drive_efficiency,
         shaft_torques: forward.as_ref().map_or([0.0; 3], |p| p.torques),
         ratio: layout.ratio.value(),
         ratio_products: [layout.ratio.numerator, layout.ratio.denominator],
@@ -793,27 +831,65 @@ mod tests {
         );
     }
 
-    /// **The meshes' own loss is reported; the drive's is not.**
+    /// **The meshes lose a little and the drive loses a lot**, and the second
+    /// does not follow from the first by reading it twice.
     ///
-    /// The two pairs lose under a percent between them and the drive loses tens
-    /// of them, because power circulates — so the first is not a stand-in for
-    /// the second and this gates the distinction rather than the figure. What
-    /// is asserted here is only what the two `contact::efficiency` calls give:
-    /// a loss, small, present, and the same in both directions for a pair of
-    /// parallel-axis meshes.
+    /// Power circulates: at 324:1 the two pairs lose 0.85 % between them while
+    /// the drive loses nearly three quarters of what it is given. That gap is
+    /// the whole reason both figures are reported, and reading the mesh figure
+    /// as the drive's is the mistake the pair of them exists to prevent.
     #[test]
-    fn the_meshes_lose_a_little_and_the_drive_is_not_told_from_it() {
+    fn the_meshes_lose_a_little_and_the_drive_loses_a_lot() {
         let r = solve_hula_stage(&stage(), 100.0, 2.0).unwrap();
-        let eta = r.fixed_carrier_efficiency;
+        let meshes = r.fixed_carrier_efficiency;
         assert!(
-            eta.forward > 0.95 && eta.forward < 1.0,
+            meshes.forward > 0.95 && meshes.forward < 1.0,
             "two parallel-axis meshes lose a little, not nothing and not much: {}",
-            eta.forward
+            meshes.forward
         );
         assert!(
-            (eta.forward - eta.backward).abs() < 1e-12,
+            (meshes.forward - meshes.backward).abs() < 1e-12,
             "a parallel-axis mesh loses the same either way"
         );
+        assert!(
+            r.efficiency.forward > 0.0 && r.efficiency.forward < 0.5,
+            "the drive loses far more than its meshes: {}",
+            r.efficiency.forward
+        );
+        assert!(
+            1.0 - r.efficiency.forward > 20.0 * (1.0 - meshes.forward),
+            "the circulating power is the point: drive {} against meshes {}",
+            r.efficiency.forward,
+            meshes.forward
+        );
+    }
+
+    /// **A higher reduction costs efficiency**, monotonically, because the
+    /// nearer the two meshes come to cancelling the more power goes round
+    /// between them before any of it reaches the output.
+    #[test]
+    fn a_higher_reduction_costs_efficiency() {
+        let mut last = 1.0;
+        for n in [12_u32, 18, 30, 50] {
+            let mut s = stage();
+            for (gear, count) in s.gears.iter_mut().zip([n + 1, n, n - 1, n]) {
+                gear.teeth = count;
+            }
+            let r = solve_hula_stage(&s, 100.0, 2.0).unwrap();
+            assert!(
+                r.efficiency.forward < last,
+                "z {n}: {} did not fall below {last}",
+                r.efficiency.forward
+            );
+            // ...and none of them turns backwards.
+            assert_eq!(
+                r.efficiency.backward, 0.0,
+                "z {n} should be self-locking at {}",
+                r.efficiency.forward
+            );
+            last = r.efficiency.forward;
+        }
+        assert!(last < 0.2, "2500:1 should be dear: {last}");
     }
 
     /// **A path that never reaches the pitch point is still a path.**

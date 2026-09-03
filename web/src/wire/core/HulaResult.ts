@@ -40,17 +40,23 @@ crank_speed: number,
  * pairs' own, multiplied.
  *
  * **It is not the drive's efficiency**, and on a high-ratio arrangement it
- * is nowhere near it — the meshes lose under a percent while the drive
- * loses tens of them, because power circulates. The drive's own figure is
- * not reported: the power flow it would come from is written for a basic
- * ratio that stays away from one, and this arrangement's sits at
- * `z₂z₄/(z₁z₃)` — 324/323 on the shipped counts — where the two candidate
- * signs of the rolling power straddle unity and the solve returns figures
- * above 1 at some tooth counts. An efficiency above one is not an
- * efficiency, and until that is settled the honest report is the meshes'
- * own loss and the arithmetic that turns it into the drive's.
+ * is nowhere near it: the meshes lose under a percent while the drive loses
+ * tens of them, because power circulates. Both figures are reported for
+ * exactly that reason — one is not a stand-in for the other, and reading
+ * the mesh figure as the drive's is the mistake this pair of fields exists
+ * to prevent.
  */
 fixed_carrier_efficiency: Directional<number>, 
+/**
+ * The drive's own efficiency, 0..1, in both directions.
+ *
+ * **Backward is zero where the drive cannot be back-driven**, which on this
+ * arrangement is the ordinary case rather than the exception: an
+ * efficiency below a half forward means a reversed power flow with no
+ * self-consistent solution, and the classical `2 − 1/η` for such a set is
+ * negative there. Reported the way a self-locking worm reports it.
+ */
+efficiency: Directional<number>, 
 /**
  * Torque on each shaft — the grounded gear, the crank, the output — in
  * whatever unit the input torque was given. They sum to zero.
