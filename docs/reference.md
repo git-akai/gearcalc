@@ -1058,9 +1058,35 @@ and two of them in series multiply ratios rather than cancelling. It is a
 different mechanism, not a better-built one, and it is not what these four counts
 describe.
 
-The sensitivity is the published one too: half a point of mesh efficiency at
-324:1 takes the drive from 26.6 % to 46.8 %, cutting the loss by better than a
-quarter of itself.
+**The whole power flow collapses to one relation** for this arrangement — carrier
+driving, one central member held, the other the output:
+
+```text
+η = 1 / [ R(1 − η₀) + η₀ ]
+```
+
+which is the most useful thing here, because it answers the design question
+before anything is drawn: *what would the teeth have to be worth?* The loss term
+carries `R`, so a reduction multiplies the mesh loss before it reaches the
+output. At 324:1 a mesh pair losing 0.85 % keeps 27 %, and it would have to lose
+under 0.04 % to keep 90 %. The solve agrees with it across three reductions and
+four coefficients of friction, which is what makes it safe to design against.
+
+**Checked against a gearbox somebody built.** The bilateral drive gear is a 3K of
+this family, optimised for efficiency by choice of profile shift and tooth count,
+reporting 89.0 % forward — against 68.5 % for *the same gearbox with uncorrected
+teeth*. Read through the relation at a reduction near fifty those are meshes at
+99.73 % and 99.04 %: an excellent pair and an ordinary one. This stage at that
+reduction and that mesh figure comes out at 88.5 %.
+
+Two things follow, and they are the practical content of the whole section.
+**A reduction near fifty is where this family works**; the same optimised meshes
+at 324:1 would keep 53 %, and no mesh a designer can cut reaches 90 % there.
+And **profile shift is the lever**, worth more here than anywhere else in this
+tool: a third of a percent of mesh loss is 20 points of drive efficiency at these
+ratios, which is the published 68.5 % → 89.0 % and matches the sensitivity this
+model shows — half a point of mesh efficiency at 324:1 takes the drive from
+26.6 % to 46.8 %.
 
 **The stage builds what the arrangement describes.** A drive that closes
 algebraically can still be one whose teeth foul, so each ring is cut by its

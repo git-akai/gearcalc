@@ -266,6 +266,17 @@ pub struct HulaResult {
     pub fixed_carrier_efficiency: Directional<f64>,
     /// The drive's own efficiency, 0..1, in both directions.
     ///
+    /// It follows from the reduction and the meshes alone:
+    ///
+    /// ```text
+    /// η = 1 / [ R(1 − η₀) + η₀ ]
+    /// ```
+    ///
+    /// — which is [`drive_efficiency`] and is worth reading before choosing
+    /// tooth counts, because it says what a design *can* reach before any of it
+    /// is drawn. At `R = 49` a mesh pair losing 0.27 % gives 88 %; the same pair
+    /// at `R = 324` gives 53 %, and losing 0.85 % instead gives 27 %.
+    ///
     /// **Backward is zero where the drive cannot be back-driven**, which on this
     /// arrangement is the ordinary case rather than the exception: an
     /// efficiency below a half forward means a reversed power flow with no
@@ -281,6 +292,29 @@ pub struct HulaResult {
     pub backlash: Directional<super::Backlash>,
     pub meshes: [HulaMesh; 2],
     pub gears: [HulaGear; 4],
+}
+
+/// What a reduction of `ratio` can reach, given meshes that keep `mesh` of what
+/// passes through them.
+///
+/// ```text
+/// η = 1 / [ R(1 − η₀) + η₀ ]
+/// ```
+///
+/// The whole power flow collapses to this for the arrangement here — carrier
+/// driving, one central member held, the other the output — and it is the most
+/// useful thing this module knows, because it answers the design question
+/// before anything is drawn: *what would the teeth have to be worth?*
+///
+/// Read it and the trade is plain. The loss term carries `R`, so a reduction
+/// multiplies the mesh loss before it reaches the output: at `R = 324` a mesh
+/// pair losing 0.85 % keeps 27 % of the input, and it would have to lose under
+/// 0.04 % to keep 90 %. Halve the reduction and the same teeth do far better.
+/// This is why a gearbox of this family is built at a few tens to one and not a
+/// few hundreds, and why the ones that reach both are a different mechanism.
+#[must_use]
+pub fn drive_efficiency(ratio: f64, mesh: f64) -> f64 {
+    1.0 / (ratio.abs() * (1.0 - mesh) + mesh)
 }
 
 /// Solve a hula stage: the arrangement, then the parts, then the meshes.
@@ -969,6 +1003,88 @@ mod tests {
         assert!(
             (cancelling - plain).abs() < 0.005,
             "the meshes should lose alike: {cancelling} against {plain}"
+        );
+    }
+
+    /// **The power flow collapses to one relation**, and the solve agrees with
+    /// it everywhere.
+    ///
+    /// `η = 1/[R(1 − η₀) + η₀]` is written from the torque shares by hand; the
+    /// solve reaches the same number through Willis, the two candidate signs of
+    /// the rolling power and an energy condition. Agreeing across three
+    /// reductions and four friction coefficients says the closed form is the
+    /// same statement, which is what makes it safe to design against.
+    #[test]
+    fn the_drive_efficiency_is_the_reduction_and_the_meshes() {
+        for n in [7_u32, 12, 18] {
+            for mu in [0.08, 0.04, 0.02, 0.01] {
+                let mut s = HulaStage {
+                    sliding_friction: [mu; 2],
+                    static_friction: [mu * 2.0; 2],
+                    ..stage()
+                };
+                for (gear, count) in s.gears.iter_mut().zip([n + 1, n, n - 1, n]) {
+                    gear.teeth = count;
+                }
+                let r = solve_hula_stage(&s, 1000.0, 2.0).unwrap();
+                let want = drive_efficiency(r.ratio, r.fixed_carrier_efficiency.forward);
+                assert!(
+                    (r.efficiency.forward - want).abs() < 1e-9,
+                    "z {n} mu {mu}: solve {} against the relation {want}",
+                    r.efficiency.forward
+                );
+            }
+        }
+    }
+
+    /// **Checked against a gearbox somebody built.**
+    ///
+    /// The bilateral drive gear is a 3K of this family, optimised for
+    /// efficiency by choice of profile shift and tooth count, and it reports
+    /// 89.0 % forward — against 68.5 % for the same gearbox with uncorrected
+    /// teeth. Reading those through the relation gives mesh efficiencies of
+    /// 99.73 % and 99.04 % at a reduction near fifty, which is an ordinary pair
+    /// and a good one; and this stage at that reduction and that mesh figure
+    /// comes out at 88.5 %.
+    ///
+    /// It is not a reproduction of their gearbox — theirs has a carrier and
+    /// planets and its shifts are freer than a shared crank offset allows — but
+    /// it is the same arithmetic reaching the same place from tooth counts this
+    /// module chose independently, which is the most that can be asked of a
+    /// model against a published number.
+    #[test]
+    fn the_relation_agrees_with_a_gearbox_somebody_built() {
+        // What the published pair of figures implies about the meshes.
+        let implied = |eta: f64, ratio: f64| (1.0 / eta - 1.0) / (ratio - 1.0);
+        let optimised = 1.0 - implied(0.890, 49.0);
+        let uncorrected = 1.0 - implied(0.685, 49.0);
+        assert!(
+            (optimised - 0.9973).abs() < 5e-4,
+            "89.0 % at 49:1 wants meshes at {optimised}"
+        );
+        assert!(
+            (uncorrected - 0.9904).abs() < 5e-4,
+            "68.5 % at 49:1 wants meshes at {uncorrected}"
+        );
+        // ...and this stage, at that reduction and that mesh efficiency.
+        assert!(
+            (drive_efficiency(49.0, optimised) - 0.890).abs() < 1e-3,
+            "the relation should return the figure it was read from"
+        );
+        let mut s = HulaStage {
+            sliding_friction: [0.010; 2],
+            static_friction: [0.020; 2],
+            ..stage()
+        };
+        for (gear, count) in s.gears.iter_mut().zip([8_u32, 7, 6, 7]) {
+            gear.teeth = count;
+        }
+        let r = solve_hula_stage(&s, 1000.0, 2.0).unwrap();
+        assert!((r.ratio - 49.0).abs() < 1e-9, "ratio {}", r.ratio);
+        assert!(
+            r.efficiency.forward > 0.87 && r.efficiency.forward < 0.90,
+            "a drive of this reduction with meshes this good keeps {}",
+            r.efficiency.forward
         );
     }
 

@@ -50,6 +50,17 @@ fixed_carrier_efficiency: Directional<number>,
 /**
  * The drive's own efficiency, 0..1, in both directions.
  *
+ * It follows from the reduction and the meshes alone:
+ *
+ * ```text
+ * η = 1 / [ R(1 − η₀) + η₀ ]
+ * ```
+ *
+ * — which is [`drive_efficiency`] and is worth reading before choosing
+ * tooth counts, because it says what a design *can* reach before any of it
+ * is drawn. At `R = 49` a mesh pair losing 0.27 % gives 88 %; the same pair
+ * at `R = 324` gives 53 %, and losing 0.85 % instead gives 27 %.
+ *
  * **Backward is zero where the drive cannot be back-driven**, which on this
  * arrangement is the ordinary case rather than the exception: an
  * efficiency below a half forward means a reversed power flow with no
