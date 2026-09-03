@@ -78,6 +78,7 @@ cargo run --bin gear-cli -- planetstage 24 18 60 3 # a planetary stage, six mode
 cargo run --bin gear-cli -- hula 18 0.2            # a hula drive, offset to teeth
 cargo run --release --bin gear-cli -- meshsweep 60 20 0.8   # roll an internal pair, the control
 cargo run --release --bin gear-cli -- hulasweep 18 0.25     # ...and a hula pair, where the tips cross
+cargo run --release --bin gear-cli -- hulaband 18           # one reduction at every tooth difference
 cargo run --bin gear-cli -- bending                 # the bending construction, drawn
 cargo run --release --bin gear-cli -- verify 100   # the two-sided cutter check
 python3 tools/worm_flank_curvature.py              # ZI vs ZN vs ZA, from the surface

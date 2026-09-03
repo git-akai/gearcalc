@@ -1111,6 +1111,34 @@ teeth*. Read through the relation at a reduction near fifty those are meshes at
 99.73 % and 99.04 %: an excellent pair and an ordinary one. This stage at that
 reduction and that mesh figure comes out at 88.5 %.
 
+**A reduction does not say how to get it, and the difference of one tooth is the
+dearest way.** `R = z²/d²`, so `z = d·z₀` gives the same `z₀²` at any tooth
+difference `d` — the same ratio, the same pitch diameters, the same crank offset,
+reached with `d` times the teeth at a `d`th of the module. At 324:1, with the
+addendum, the shaper and each mesh's shift division free (`gear-cli hulaband`):
+
+| d | z | module | meshes | the drive | α_w | backlash out |
+|---|---|---|---|---|---|---|
+| 1 | 18 | 1.000 | 99.32 % | **31.3 %** | 48.0° | 0.396° |
+| 2 | 36 | 0.500 | 99.77 % | **57.7 %** | 33.7° | 0.149° |
+| 3 | 54 | 0.333 | 99.94 % | **83.7 %** | 26.2° | 0.080° |
+| 4 | 72 | 0.250 | 99.98 % | **93.9 %** | 20.0° | 0.047° |
+| 6 | 108 | 0.167 | 99.98 % | **95.1 %** | 16.1° | 0.025° |
+| 9 | 162 | 0.111 | 99.92 % | **79.9 %** | 12.8° | 0.014° |
+
+Three times better at four teeth of difference than at one, on the same
+reduction in the same envelope — and a sixteenth of the backlash. The mesh
+figures explain it: a one-tooth pair has to be opened to 48° of operating
+pressure angle to clear itself, and the loss carries `1/z₁ + 1/z₂`, which halves
+as the counts double. It turns over past six, where the contact ratio has grown
+and the path sits further from the pitch point again.
+
+So the interesting design is **not** the one-tooth difference. It is the largest
+difference whose teeth still clear each other, which on this reduction is four to
+six — and the constraint that stops it going further is involute interference,
+answered by shortening the teeth, which is why the addendum is part of the
+search rather than a fixed 0.8.
+
 Two things follow, and they are the practical content of the whole section.
 **A reduction near fifty is where this family works**; the same optimised meshes
 at 324:1 would keep 53 %, and no mesh a designer can cut reaches 90 % there.

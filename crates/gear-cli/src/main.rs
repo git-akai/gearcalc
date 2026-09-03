@@ -15,6 +15,9 @@
 //!                             a crossed gear pair, swept over the helix split
 //! gear-cli planetstage [z_sun] [z_planet] [z_ring] [N] [helix]
 //!                             a planetary stage, end to end
+//! gear-cli hulaband [z] [clearance in modules]
+//!                             the same reduction at every tooth difference, to
+//!                             see what the difference of one costs
 //! gear-cli meshsweep [z_ring] [z_pinion] [ring addendum] [pinion addendum]
 //!                             roll an ordinary internal pair through a tooth —
 //!                             the control the hula sweep is read against
@@ -110,6 +113,10 @@ fn main() {
             args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1.0),
             args.get(4).and_then(|s| s.parse().ok()).unwrap_or(1.0),
             args.get(5).and_then(|s| s.parse().ok()),
+        ),
+        Some("hulaband") => hula_band(
+            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(18),
+            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.30),
         ),
         Some("meshsweep") => mesh_sweep(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(40),
@@ -491,6 +498,93 @@ fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, tit
             "   (touching, as a mesh does)"
         }
     );
+}
+
+/// The same reduction at every tooth difference, and what each one can reach.
+///
+/// **A reduction does not say how to get it.** `R = z²/d²`, so `z = d·z₀` gives
+/// `z₀²` at any difference `d` — the same ratio, the same pitch diameters and
+/// the same crank offset, reached with `d` times the teeth at a `d`th of the
+/// module. Whether that matters is the question this answers, and the answer is
+/// not small.
+///
+/// For each difference it searches what a designer would: the addendum, the
+/// shaper, and the division of each mesh's shift. What it reports is the best
+/// design that is *admissible* — contact continuous, no interference of any of
+/// the three kinds, nothing clamped — which is the only kind worth comparing.
+fn hula_band(z0: u32, clearance_in_modules: f64) {
+    use gear_core::hula::Split;
+    use gear_core::train::{solve_hula_stage, HulaStage};
+
+    println!(
+        "hula, reduction {} : 1 — the same ratio at every tooth difference\n",
+        z0 * z0
+    );
+    println!(
+        "{:>3} {:>6} {:>7} {:>5} {:>6} {:>7} {:>10} {:>8} {:>8} {:>7} {:>9}",
+        "d", "z", "module", "h_a", "shaper", "x", "meshes", "drive", "alpha_w", "eps", "backlash"
+    );
+    for d in 1..=9u32 {
+        let n = z0 * d;
+        let module = 1.0 / f64::from(d);
+        let teeth = [n + d, n, n - d, n];
+        let mut best: Option<(f64, u32, f64, gear_core::train::HulaResult)> = None;
+        for addendum in [0.8, 0.7, 0.6, 0.5, 0.4] {
+            for cutter in [10u32, 14, 20, 28] {
+                if cutter + 2 >= n {
+                    continue;
+                }
+                for i in -30..=40 {
+                    let x = f64::from(i) * 0.05;
+                    let mut stage = HulaStage {
+                        module: [module; 2],
+                        clearance: clearance_in_modules * module,
+                        running_clearance: 0.02 * module,
+                        tolerance_plus: 0.02 * module,
+                        tolerance_minus: 0.02 * module,
+                        split: [Split::Pinion(x); 2],
+                        ..HulaStage::default()
+                    };
+                    for (gear, count) in stage.gears.iter_mut().zip(teeth) {
+                        gear.teeth = count;
+                        gear.addendum = gear_core::params::Auto::fixed(addendum);
+                    }
+                    for c in &mut stage.cutter {
+                        c.teeth = cutter;
+                    }
+                    let Ok(r) = solve_hula_stage(&stage, 1000.0, 2.0) else {
+                        continue;
+                    };
+                    let admissible = r.meshes.iter().all(|m| {
+                        m.contact_ratio >= 1.0
+                            && !m.tip_interference
+                            && !m.trochoid_interference
+                            && !m.involute_interference
+                    }) && r.gears.iter().all(|g| g.clamps.is_empty());
+                    if !admissible {
+                        continue;
+                    }
+                    if best
+                        .as_ref()
+                        .is_none_or(|(_, _, _, b)| r.efficiency.forward > b.efficiency.forward)
+                    {
+                        best = Some((x, cutter, addendum, r));
+                    }
+                }
+            }
+        }
+        match best {
+            None => println!("{d:>3} {n:>6} {module:>7.3}   nothing admissible"),
+            Some((x, cutter, h, r)) => println!(
+                "{d:>3} {n:>6} {module:>7.3} {h:>5.1} {cutter:>6} {x:>+7.2} {:>9.4}% {:>7.2}% {:>8.2} {:>7.4} {:>9.5}",
+                r.fixed_carrier_efficiency.forward * 100.0,
+                r.efficiency.forward * 100.0,
+                r.meshes[0].operating_pressure_angle,
+                r.meshes[0].contact_ratio,
+                r.backlash.forward.nominal
+            ),
+        }
+    }
 }
 
 /// The control: an ordinary internal pair, whose answer is known.
