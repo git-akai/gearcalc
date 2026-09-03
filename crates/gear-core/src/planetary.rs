@@ -432,6 +432,17 @@ pub fn basic_ratio(teeth: Teeth) -> f64 {
 
 /// Solve the whole set: speeds, torques, ratio and efficiency, in one go.
 ///
+/// # What it is about
+///
+/// **Three shafts, a basic ratio and a fixed-carrier efficiency** — and nothing
+/// else. Sun, carrier and ring name the three *roles*: the two central members
+/// on the common axis, and the arm that carries whatever runs between them.
+/// Which tooth form each central member has, and what the planet is, reach this
+/// solve only through the basic ratio it is handed. So any three-shaft
+/// epicyclic can be put through it by naming its own members in those roles —
+/// which is why the ratio arrives as a number rather than as a set of planetary
+/// tooth counts to derive one from.
+///
 /// # The method
 ///
 /// Pennestrì–Freudenstein, as docs/reference.md#planetary-sets sets it out. Two linear relations carry
@@ -468,7 +479,7 @@ pub fn basic_ratio(teeth: Teeth) -> f64 {
 /// self-consistent.
 #[must_use]
 pub fn power(
-    teeth: Teeth,
+    basic_ratio: f64,
     arrangement: Arrangement,
     input_speed: f64,
     input_torque: f64,
@@ -480,7 +491,7 @@ pub fn power(
         arrangement.fixed.index(),
         output.index(),
     );
-    let i0 = basic_ratio(teeth);
+    let i0 = basic_ratio;
     if !i0.is_finite() || !fixed_carrier_efficiency.is_finite() {
         return None;
     }
@@ -578,7 +589,7 @@ mod tests {
 
         // Ring held, sun driving: the reduction is 1 + z_r/z_s.
         let p = power(
-            t,
+            basic_ratio(t),
             Arrangement {
                 input: PlanetaryShaft::Sun,
                 fixed: PlanetaryShaft::Ring,
@@ -593,7 +604,7 @@ mod tests {
 
         // Sun held, ring driving: 1 + z_s/z_r.
         let p = power(
-            t,
+            basic_ratio(t),
             Arrangement {
                 input: PlanetaryShaft::Ring,
                 fixed: PlanetaryShaft::Sun,
@@ -608,7 +619,7 @@ mod tests {
 
         // Carrier held: the sun and ring turn opposite ways, ratio −z_r/z_s.
         let p = power(
-            t,
+            basic_ratio(t),
             Arrangement {
                 input: PlanetaryShaft::Sun,
                 fixed: PlanetaryShaft::Carrier,
@@ -629,7 +640,7 @@ mod tests {
     #[test]
     fn a_lossless_set_is_lossless_in_every_arrangement() {
         for a in arrangements() {
-            let p = power(teeth(), a, 1500.0, 3.0, 1.0).unwrap();
+            let p = power(basic_ratio(teeth()), a, 1500.0, 3.0, 1.0).unwrap();
             assert!(
                 (p.efficiency - 1.0).abs() < 1e-12,
                 "{a:?}: efficiency {}",
@@ -648,7 +659,7 @@ mod tests {
     fn the_torques_are_in_equilibrium() {
         for a in arrangements() {
             for eta in [1.0, 0.98, 0.9] {
-                let p = power(teeth(), a, 1500.0, 3.0, eta).unwrap();
+                let p = power(basic_ratio(teeth()), a, 1500.0, 3.0, eta).unwrap();
                 let sum: f64 = p.torques.iter().sum();
                 assert!(
                     sum.abs() < 1e-9 * p.torques[0].abs().max(1.0),
@@ -664,10 +675,10 @@ mod tests {
     #[test]
     fn friction_never_pays() {
         for a in arrangements() {
-            let ideal = power(teeth(), a, 1500.0, 3.0, 1.0).unwrap();
+            let ideal = power(basic_ratio(teeth()), a, 1500.0, 3.0, 1.0).unwrap();
             let mut last = ideal.efficiency;
             for eta in [0.99, 0.97, 0.94, 0.9] {
-                let p = power(teeth(), a, 1500.0, 3.0, eta).unwrap();
+                let p = power(basic_ratio(teeth()), a, 1500.0, 3.0, eta).unwrap();
                 assert!(
                     p.efficiency <= 1.0,
                     "{a:?} eta={eta}: efficiency {} exceeds one",
@@ -696,7 +707,7 @@ mod tests {
         for eta0 in [1.0, 0.99, 0.98, 0.9, 0.75] {
             for input in [PlanetaryShaft::Sun, PlanetaryShaft::Ring] {
                 let p = power(
-                    teeth(),
+                    basic_ratio(teeth()),
                     Arrangement {
                         input,
                         fixed: PlanetaryShaft::Carrier,
@@ -729,7 +740,7 @@ mod tests {
         let i0 = basic_ratio(t);
         for eta0 in [1.0, 0.99, 0.98, 0.95] {
             let p = power(
-                t,
+                basic_ratio(t),
                 Arrangement {
                     input: PlanetaryShaft::Sun,
                     fixed: PlanetaryShaft::Ring,
@@ -767,7 +778,7 @@ mod tests {
             for eta0 in [1.0, 0.99, 0.97, 0.9] {
                 // Both senses of a genuinely driving input.
                 for (speed, torque) in [(1500.0, 3.0), (-1500.0, -3.0)] {
-                    let p = power(teeth(), a, speed, torque, eta0).unwrap();
+                    let p = power(basic_ratio(teeth()), a, speed, torque, eta0).unwrap();
                     assert!(
                         p.efficiency <= 1.0 + 1e-12,
                         "{a:?} eta0={eta0} n={speed} T={torque}: efficiency {}",
@@ -781,7 +792,7 @@ mod tests {
                 // anyway used to return `1/η₀`, above one, which is the
                 // arithmetic saying the question was put the wrong way round.
                 assert!(
-                    power(teeth(), a, 1500.0, -3.0, eta0).is_none(),
+                    power(basic_ratio(teeth()), a, 1500.0, -3.0, eta0).is_none(),
                     "{a:?}: a non-driving input must be refused"
                 );
             }
@@ -806,7 +817,7 @@ mod tests {
                 ring: 60,
             };
             let p = power(
-                t,
+                basic_ratio(t),
                 Arrangement {
                     input: PlanetaryShaft::Carrier,
                     fixed: PlanetaryShaft::Ring,
@@ -829,7 +840,7 @@ mod tests {
         // because the direction is the whole point.
         let t = teeth();
         let carrier_out = power(
-            t,
+            basic_ratio(t),
             Arrangement {
                 input: PlanetaryShaft::Sun,
                 fixed: PlanetaryShaft::Ring,
@@ -840,7 +851,7 @@ mod tests {
         )
         .unwrap();
         let ring_out = power(
-            t,
+            basic_ratio(t),
             Arrangement {
                 input: PlanetaryShaft::Sun,
                 fixed: PlanetaryShaft::Carrier,
@@ -863,7 +874,7 @@ mod tests {
     #[test]
     fn the_held_shaft_is_still_and_the_third_is_the_output() {
         for a in arrangements() {
-            let p = power(teeth(), a, 1234.0, 7.0, 0.98).unwrap();
+            let p = power(basic_ratio(teeth()), a, 1234.0, 7.0, 0.98).unwrap();
             assert_eq!(p.speeds[a.fixed.index()], 0.0);
             assert_eq!(p.speeds[a.input.index()], 1234.0);
             assert_ne!(p.output, a.input);
@@ -880,7 +891,7 @@ mod tests {
             PlanetaryShaft::Ring,
         ] {
             assert!(power(
-                teeth(),
+                basic_ratio(teeth()),
                 Arrangement { input: m, fixed: m },
                 1000.0,
                 1.0,

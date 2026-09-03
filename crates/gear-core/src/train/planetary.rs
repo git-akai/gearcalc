@@ -460,7 +460,7 @@ pub fn solve_planetary_stage_with(
     );
 
     let forward = planetary::power(
-        teeth,
+        planetary::basic_ratio(teeth),
         stage.arrangement,
         input_speed,
         input_torque,
@@ -481,7 +481,7 @@ pub fn solve_planetary_stage_with(
         fixed: stage.arrangement.fixed,
     };
     let backward = planetary::power(
-        teeth,
+        planetary::basic_ratio(teeth),
         reversed,
         forward.speeds[out],
         forward.torques[out].abs() * if forward.speeds[out] < 0.0 { -1.0 } else { 1.0 },
@@ -494,7 +494,7 @@ pub fn solve_planetary_stage_with(
     // remember why.
     let at_rest = Directional {
         forward: planetary::power(
-            teeth,
+            planetary::basic_ratio(teeth),
             stage.arrangement,
             input_speed,
             input_torque,
@@ -502,7 +502,7 @@ pub fn solve_planetary_stage_with(
         )
         .map_or(0.0, |p| p.efficiency),
         backward: planetary::power(
-            teeth,
+            planetary::basic_ratio(teeth),
             reversed,
             forward.speeds[out],
             forward.torques[out].abs() * if forward.speeds[out] < 0.0 { -1.0 } else { 1.0 },
