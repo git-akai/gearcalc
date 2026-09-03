@@ -1144,6 +1144,28 @@ pressure angle to clear itself, and the loss carries `1/z₁ + 1/z₂`, which ha
 as the counts double. It turns over past six, where the contact ratio has grown
 and the path sits further from the pitch point again.
 
+**The two modules are separate inputs and want to be equal.** Nothing in the
+arithmetic ties them — a pair's module is its own — so it is worth knowing that
+moving them apart only costs. Both meshes run at one offset and each needs
+`e ≥ a_ref cos α_t`, so below equality the larger mesh still binds, the offset
+does not move, and the smaller mesh's reference distance falls away from it;
+above equality the enlarged mesh binds instead and drags the offset up, pushing
+the *other* mesh's angle out by what the first one gained. At `z = 18`, one tooth
+of difference, the worse of the two operating pressure angles reads:
+
+| m₁/m₂ | 0.80 | 0.90 | **1.00** | 1.10 | 1.30 |
+|---|---|---|---|---|---|
+| offset, mm | 0.704 | 0.704 | **0.704** | 0.774 | 0.915 |
+| α_w, mesh 1 | 57.7° | 53.1° | **48.1°** | 48.1° | 48.1° |
+| α_w, mesh 2 | 48.1° | 48.1° | **48.1°** | 52.6° | 59.1° |
+
+Equal modules is a corner where both bounds are active at once, and the drive
+efficiency falls away either side of it — 30.5 % at equality against 26.6 % at
+0.8 and 27.5 % at 1.1 on the same search. So the design space is
+`(z, d, addendum, shaper, two divisions)` and nothing more: the tooth
+differences are equal because the ratio demands it, the two base counts are equal
+for the same reason, and the modules are equal because the offset is shared.
+
 So the interesting design is **not** the one-tooth difference. It is the largest
 difference whose teeth still clear each other, which on this reduction is four to
 six — and the constraint that stops it going further is involute interference,

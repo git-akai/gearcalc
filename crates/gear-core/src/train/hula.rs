@@ -1126,6 +1126,70 @@ mod tests {
         );
     }
 
+    /// **The two meshes want the same module**, and the shared offset is why.
+    ///
+    /// Their modules are separate inputs and nothing in the arithmetic ties
+    /// them, so it is worth knowing that moving them apart only costs. Both
+    /// meshes run at one offset, and `e ≥ a_ref cos α_t` for each, so:
+    ///
+    /// - **below equality** the larger mesh still binds, the offset does not
+    ///   move, and the smaller mesh's reference centre distance falls away from
+    ///   it — its operating pressure angle climbs and the other's stands still;
+    /// - **above it** the enlarged mesh binds instead and drags the offset up,
+    ///   which pushes the *other* mesh's angle out by exactly what the first one
+    ///   gained.
+    ///
+    /// Either way one mesh sits at its limit and the other is pushed off the
+    /// pitch point, so the worse of the two is least where they are equal. That
+    /// is a corner where both bounds are active at once, and it is what makes
+    /// the design space `(z, d, addendum, shaper, two divisions)` and nothing
+    /// more.
+    #[test]
+    fn the_two_meshes_want_the_same_module() {
+        let worst_angle = |ratio: f64| {
+            let mut s = HulaStage {
+                module: [ratio, 1.0],
+                clearance: 0.30,
+                split: [hula::Split::Pinion(-0.2); 2],
+                ..HulaStage::default()
+            };
+            for (gear, count) in s.gears.iter_mut().zip([19_u32, 18, 17, 18]) {
+                gear.teeth = count;
+                gear.addendum = crate::params::Auto::fixed(0.6);
+            }
+            for c in &mut s.cutter {
+                c.teeth = 14;
+            }
+            let r = solve_hula_stage(&s, 1000.0, 2.0).expect("a drive at every module ratio");
+            (
+                r.meshes[0]
+                    .operating_pressure_angle
+                    .max(r.meshes[1].operating_pressure_angle),
+                r.offset_nominal,
+            )
+        };
+        let (equal, equal_offset) = worst_angle(1.0);
+        for ratio in [0.8, 0.9, 1.1, 1.3] {
+            let (angle, offset) = worst_angle(ratio);
+            assert!(
+                angle > equal + 1e-9,
+                "m₁/m₂ = {ratio} should cost: {angle}° against {equal}°"
+            );
+            // ...and which way it costs, since the two sides fail differently.
+            if ratio < 1.0 {
+                assert!(
+                    (offset - equal_offset).abs() < 1e-9,
+                    "below equality the other mesh still binds, so the offset holds"
+                );
+            } else {
+                assert!(
+                    offset > equal_offset + 1e-9,
+                    "above it the enlarged mesh binds and drags the offset up"
+                );
+            }
+        }
+    }
+
     /// An arrangement whose meshes cancel is refused by the stage, as by the
     /// drive: the error travels rather than being re-diagnosed.
     #[test]
