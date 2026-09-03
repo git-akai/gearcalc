@@ -15,6 +15,12 @@
 //!                             a crossed gear pair, swept over the helix split
 //! gear-cli planetstage [z_sun] [z_planet] [z_ring] [N] [helix]
 //!                             a planetary stage, end to end
+//! gear-cli meshsweep [z_ring] [z_pinion] [ring addendum] [pinion addendum]
+//!                             roll an ordinary internal pair through a tooth —
+//!                             the control the hula sweep is read against
+//! gear-cli hulasweep [N] [clearance] [mesh]
+//!                             the same roll, on a hula pair, where the tip
+//!                             circles cross and the pitch point is outside both
 //! gear-cli planetary [z_sun] [z_planet] [N] [x_sun] [x_ring]
 //!                             the ring counts that can be made to work, and
 //!                             the planet shift each of them needs
@@ -104,6 +110,17 @@ fn main() {
             args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1.0),
             args.get(4).and_then(|s| s.parse().ok()).unwrap_or(1.0),
             args.get(5).and_then(|s| s.parse().ok()),
+        ),
+        Some("meshsweep") => mesh_sweep(
+            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(40),
+            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(20),
+            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1.0),
+            args.get(4).and_then(|s| s.parse().ok()).unwrap_or(1.0),
+        ),
+        Some("hulasweep") => hula_sweep(
+            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(18),
+            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.2),
+            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(0),
         ),
         Some("show") | None => {
             let teeth = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17);
@@ -215,6 +232,342 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
             }
         }
     }
+}
+
+/// An outline as plain points, with its **arcs expanded rather than chorded**.
+///
+/// A tip and a root are exact arcs carried as vertex bulges, so reading only the
+/// vertices replaces each with its chord — which on a 19 mm tip sits six microns
+/// inside the true surface. That is small, and it is four times the interference
+/// this harness was built to measure.
+fn flatten(v: &[gear_core::Vertex]) -> Vec<(f64, f64)> {
+    const PER_ARC: usize = 64;
+    let mut out = Vec::with_capacity(v.len() * 2);
+    for i in 0..v.len() {
+        let (a, b) = (v[i], v[(i + 1) % v.len()]);
+        out.push((a.x, a.y));
+        if a.bulge.abs() < 1e-15 {
+            continue;
+        }
+        // `bulge = tan(θ/4)`, so the included angle, the radius and the centre
+        // all follow; the sign of the bulge carries the sense through `R`.
+        let theta = 4.0 * a.bulge.atan();
+        let (dx, dy) = (b.x - a.x, b.y - a.y);
+        let chord = dx.hypot(dy);
+        if chord < 1e-15 {
+            continue;
+        }
+        let radius = chord / (2.0 * (theta / 2.0).sin());
+        let h = radius * (theta / 2.0).cos();
+        let centre = (
+            (a.x + b.x) / 2.0 - dy / chord * h,
+            (a.y + b.y) / 2.0 + dx / chord * h,
+        );
+        let start = (a.y - centre.1).atan2(a.x - centre.0);
+        let r = radius.abs();
+        for k in 1..PER_ARC {
+            let t = start + theta * (k as f64) / (PER_ARC as f64);
+            out.push((centre.0 + r * t.cos(), centre.1 + r * t.sin()));
+        }
+    }
+    out
+}
+
+/// A closed outline, as segments bucketed by the angle they span about the
+/// origin.
+///
+/// **Containment, not a radius table.** An earlier version of this compared a
+/// point's radius against the bore's radius interpolated at the same angle,
+/// which is not a distance between two curves and is not even defined where a
+/// fillet doubles back in angle. It reported a seventieth of a millimetre of
+/// interference on a pair that has none, which is how it was caught: the control
+/// is not decoration.
+///
+/// A radial ray from a point stays in one angular bucket, so the crossing test
+/// that decides inside from outside is exact and costs one bucket. The distance
+/// wants a few buckets either side, since the nearest segment need not span the
+/// point's own angle.
+struct Boundary {
+    segments: Vec<[f64; 4]>,
+    buckets: Vec<Vec<usize>>,
+}
+
+impl Boundary {
+    const BUCKETS: usize = 3600;
+
+    fn new(points: &[(f64, f64)]) -> Self {
+        let mut segments = Vec::with_capacity(points.len());
+        for i in 0..points.len() {
+            let (a, b) = (points[i], points[(i + 1) % points.len()]);
+            segments.push([a.0, a.1, b.0, b.1]);
+        }
+        let mut buckets = vec![Vec::new(); Self::BUCKETS];
+        let index = Self::bucket_of;
+        for (i, s) in segments.iter().enumerate() {
+            // The angular span of a segment, the short way round: a segment of a
+            // gear outline never spans half a turn.
+            let (t0, t1) = (s[1].atan2(s[0]), s[3].atan2(s[2]));
+            let mut d = (t1 - t0).rem_euclid(std::f64::consts::TAU);
+            if d > std::f64::consts::PI {
+                d -= std::f64::consts::TAU;
+            }
+            // Clamped into range first, so the conversion below is exact and
+            // the lint is waived for a value that cannot be out of it.
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let steps = ((d.abs() / std::f64::consts::TAU) * Self::BUCKETS as f64)
+                .ceil()
+                .clamp(1.0, Self::BUCKETS as f64) as usize;
+            for k in 0..=steps.max(1) {
+                let t = t0 + d * (k as f64) / (steps.max(1) as f64);
+                buckets[index(t)].push(i);
+            }
+        }
+        // **Once per bucket.** A short segment samples into the same bucket at
+        // both ends, and a segment counted twice by the crossing test turns an
+        // odd number of crossings into an even one — which is to say, turns
+        // inside into outside for every point on that ray.
+        for b in &mut buckets {
+            b.sort_unstable();
+            b.dedup();
+        }
+        Self { segments, buckets }
+    }
+
+    /// The bucket an angle falls in.
+    ///
+    /// `rem_euclid` puts it in `[0, τ)` and the scale puts it in
+    /// `[0, BUCKETS)`, so the conversion is in range by construction; the
+    /// remainder catches the one value that rounds up to the end.
+    fn bucket_of(theta: f64) -> usize {
+        let scaled = (theta.rem_euclid(std::f64::consts::TAU) / std::f64::consts::TAU)
+            * Self::BUCKETS as f64;
+        // Clamped into range first, as above.
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let bucket = scaled.trunc().clamp(0.0, Self::BUCKETS as f64 - 1.0) as usize;
+        bucket
+    }
+
+    /// Positive inside the outline, negative outside, in millimetres.
+    fn clearance(&self, p: (f64, f64)) -> f64 {
+        let theta = p.1.atan2(p.0);
+        let r = p.0.hypot(p.1);
+        // Inside or out: a ray straight out from the centre through `p` crosses
+        // the outline an odd number of times beyond `p` exactly when `p` is
+        // within it.
+        let (c, s) = (theta.cos(), theta.sin());
+        let mut crossings = 0;
+        for &i in &self.buckets[Self::bucket_of(theta)] {
+            let g = self.segments[i];
+            // Cross the ray x = r' (c, s), r' > r, with the segment.
+            let (a, b) = ((g[0], g[1]), (g[2], g[3]));
+            let (na, nb) = (a.0 * -s + a.1 * c, b.0 * -s + b.1 * c);
+            if (na > 0.0) == (nb > 0.0) {
+                continue;
+            }
+            let t = na / (na - nb);
+            let hit = (a.0 + t * (b.0 - a.0)) * c + (a.1 + t * (b.1 - a.1)) * s;
+            if hit > r {
+                crossings += 1;
+            }
+        }
+        let inside = crossings % 2 == 1;
+
+        let mut least = f64::INFINITY;
+        let here = Self::bucket_of(theta);
+        for k in 0..=60usize {
+            let b = (here + Self::BUCKETS + k - 30) % Self::BUCKETS;
+            for &i in &self.buckets[b] {
+                let g = self.segments[i];
+                let (dx, dy) = (g[2] - g[0], g[3] - g[1]);
+                let len2 = dx * dx + dy * dy;
+                let t = if len2 > 0.0 {
+                    (((p.0 - g[0]) * dx + (p.1 - g[1]) * dy) / len2).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                let d = (p.0 - (g[0] + t * dx)).hypot(p.1 - (g[1] + t * dy));
+                least = least.min(d);
+            }
+        }
+        if inside {
+            least
+        } else {
+            -least
+        }
+    }
+}
+
+/// Roll an internal pair through one tooth and report where the flanks touch.
+///
+/// **A contact ratio counts tooth pairs on the line of action; it does not say
+/// whether the rest of the teeth are clear of each other.** The two questions
+/// are separate, and at one tooth of difference the second is the one in doubt.
+///
+/// The assembly phase is swept rather than assumed, because an assembly that has
+/// a phase is one that can be built, and the outlines' own conventions are not
+/// this harness's business.
+fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, title: &str) {
+    const TOLERANCE: f64 = 1e-5;
+    let pin_pts = flatten(&pinion.outline(TOLERANCE));
+    let bore = Boundary::new(&flatten(&ring.outline(TOLERANCE)));
+
+    let (z1, z2) = (f64::from(pinion.mean().params.teeth), f64::from(ring.teeth));
+    // Only the points that could reach the bore are worth testing: everything
+    // well inside the ring's tip circle is clear whatever the phase.
+    let near: Vec<(f64, f64)> = pin_pts
+        .iter()
+        .copied()
+        .filter(|(x, y)| (x + a).hypot(*y) > ring.ra - 1.0 || x.hypot(*y) > pinion.mean().ra - 1.0)
+        .collect();
+
+    let worst = |psi: f64, phi: f64| -> (f64, f64) {
+        let (c1, s1) = (phi.cos(), phi.sin());
+        let ring_angle = phi * z1 / z2 + psi;
+        let (cr, sr) = ((-ring_angle).cos(), (-ring_angle).sin());
+        let mut least = f64::INFINITY;
+        let mut at = 0.0;
+        for (x, y) in &near {
+            let (fx, fy) = (x * c1 - y * s1 + a, x * s1 + y * c1);
+            let p = (fx * cr - fy * sr, fx * sr + fy * cr);
+            let gap = bore.clearance(p);
+            if gap < least {
+                least = gap;
+                at = fy.atan2(fx);
+            }
+        }
+        (least, at)
+    };
+
+    let pitch = std::f64::consts::TAU / z2;
+    let mut best = (f64::NEG_INFINITY, 0.0);
+    for i in 0..600 {
+        let psi = pitch * f64::from(i) / 600.0;
+        let g = worst(psi, 0.0).0;
+        if g > best.0 {
+            best = (g, psi);
+        }
+    }
+    let psi = best.1;
+
+    println!("{title}   centre distance {a:.4} mm");
+    println!(
+        "  best assembly phase {:.4} deg of a {:.3} deg ring pitch, clear by {:+.5} mm there",
+        psi.to_degrees(),
+        pitch.to_degrees(),
+        best.0
+    );
+
+    let mut overall = (f64::INFINITY, 0.0);
+    for step in 0..180 {
+        let phi = (std::f64::consts::TAU / z1) * f64::from(step) / 180.0;
+        let (gap, at) = worst(psi, phi);
+        if gap < overall.0 {
+            overall = (gap, at);
+        }
+    }
+    println!(
+        "  rolled through one tooth: least clearance {:+.5} mm at {:.1} deg from the line of centres{}",
+        overall.0,
+        overall.1.to_degrees(),
+        if overall.0 < -10.0 * TOLERANCE {
+            "   THE TEETH FOUL"
+        } else {
+            "   (touching, as a mesh does)"
+        }
+    );
+}
+
+/// The control: an ordinary internal pair, whose answer is known.
+///
+/// Standard proportions, no shift, at its own zero-backlash centre distance. Its
+/// flanks touch and nothing penetrates, so whatever this reports is the
+/// harness's own error and the figure everything else is read against.
+fn mesh_sweep(z_ring: u32, z_pinion: u32, ring_addendum: f64, pinion_addendum: f64) {
+    use gear_core::ring::{mesh_with, Cutter, Ring};
+    let params = |teeth: u32, addendum: f64| GearParams {
+        teeth,
+        addendum,
+        ..GearParams::default()
+    };
+    let cutter = Cutter {
+        teeth: z_ring.saturating_sub(5).max(6),
+        ..Cutter::default()
+    };
+    let ring = Ring::cut_by(&params(z_ring, ring_addendum), &cutter);
+    let pinion = gear_core::Gear::new(params(z_pinion, pinion_addendum));
+    let Some(m) = mesh_with(&ring, pinion.mean()) else {
+        eprintln!("z{z_ring} and z{z_pinion} do not mesh");
+        return;
+    };
+    roll_pair(
+        &ring,
+        &pinion,
+        m.centre_distance,
+        &format!(
+            "control  ring z{z_ring}  pinion z{z_pinion}   contact ratio {:.4}   alpha_w {:.2} deg   interference troch {} inv {}",
+            m.contact_ratio,
+            m.alpha_w.to_degrees(),
+            m.trochoid_interference,
+            m.involute_interference
+        ),
+    );
+}
+
+/// The same roll, on a hula pair.
+fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
+    use gear_core::hula::{self, Offset, Set, Split, Teeth};
+    use gear_core::ring::{Cutter, Ring};
+
+    let teeth = [n + 1, n, n - 1, n];
+    let set = Set {
+        teeth: Teeth(teeth),
+        module: [1.0, 1.0],
+        pressure_angle: 20.0,
+        helix_angle: 0.0,
+        addendum: [0.8; 4],
+        clearance,
+        offset: Offset::Clearance,
+        split: [Split::Pinion(0.0); 2],
+    };
+    let layout = match hula::solve(&set) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("that drive has no geometry: {e:?}");
+            return;
+        }
+    };
+    let Ok(pair) = set.teeth.pair(mesh_index) else {
+        eprintln!("mesh {mesh_index} is not a pair");
+        return;
+    };
+    let params = |i: usize| GearParams {
+        module: set.module[mesh_index],
+        teeth: teeth[i],
+        profile_shift: layout.shift[i],
+        addendum: set.addendum[i],
+        dedendum: 1.0,
+        ..GearParams::default()
+    };
+    let cutter = Cutter {
+        teeth: teeth[pair.ring].saturating_sub(5).max(6),
+        ..Cutter::default()
+    };
+    let ring = Ring::cut_by(&params(pair.ring), &cutter);
+    let pinion = gear_core::Gear::new(params(pair.pinion));
+    roll_pair(
+        &ring,
+        &pinion,
+        layout.offset,
+        &format!(
+            "hula mesh {}  ring z{} x{:+.4}  pinion z{} x{:+.4}   gap {clearance} mm   alpha_w {:.2} deg",
+            mesh_index + 1,
+            teeth[pair.ring],
+            layout.shift[pair.ring],
+            teeth[pair.pinion],
+            layout.shift[pair.pinion],
+            layout.alpha_w[mesh_index].to_degrees()
+        ),
+    );
 }
 
 /// A two-stage geartrain, end to end — milestone 6's gate.
