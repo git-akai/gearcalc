@@ -75,6 +75,7 @@ cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
 cargo run --bin gear-cli -- crossed 17 23 90       # a crossed pair, swept over the split
 cargo run --bin gear-cli -- planetary 17 17 3      # every ring count that can work
 cargo run --bin gear-cli -- planetstage 24 18 60 3 # a planetary stage, six modes
+cargo run --bin gear-cli -- hula 18 0.2            # a hula drive, offset to teeth
 cargo run --bin gear-cli -- bending                 # the bending construction, drawn
 cargo run --release --bin gear-cli -- verify 100   # the two-sided cutter check
 python3 tools/worm_flank_curvature.py              # ZI vs ZN vs ZA, from the surface

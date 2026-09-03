@@ -18,6 +18,9 @@
 //! gear-cli planetary [z_sun] [z_planet] [N] [x_sun] [x_ring]
 //!                             the ring counts that can be made to work, and
 //!                             the planet shift each of them needs
+//! gear-cli hula [N] [clearance] [m_outer] [m_inner] [cutter teeth]
+//!                             a hula drive: the offset both meshes run at, the
+//!                             shifts it takes, and what the teeth then do
 //! ```
 
 mod diagram;
@@ -95,6 +98,13 @@ fn main() {
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(usize::MAX),
         ),
+        Some("hula") => hula_report(
+            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(18),
+            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.5),
+            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1.0),
+            args.get(4).and_then(|s| s.parse().ok()).unwrap_or(1.0),
+            args.get(5).and_then(|s| s.parse().ok()),
+        ),
         Some("show") | None => {
             let teeth = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17);
             let x = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.0);
@@ -105,6 +115,111 @@ fn main() {
             });
         }
         Some(other) => eprintln!("unknown command {other:?}; try `show` or `sweep`"),
+    }
+}
+
+/// A hula drive, from the arrangement down to what the teeth do.
+///
+/// The mechanism solves an offset and four shifts; this builds the parts those
+/// describe and asks the pair what it thinks, because a drive that closes
+/// algebraically can still be one whose teeth foul — and at one tooth of
+/// difference that is the likely outcome rather than the unlucky one.
+fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth: Option<u32>) {
+    use gear_core::hula::{self, Offset, Set, Split, Teeth};
+    use gear_core::ring::{mesh_with, Cutter, Ring};
+
+    let teeth = [n + 1, n, n - 1, n];
+    let set = Set {
+        teeth: Teeth(teeth),
+        module: [m_outer, m_inner],
+        pressure_angle: 20.0,
+        helix_angle: 0.0,
+        addendum: [0.8; 4],
+        clearance,
+        offset: Offset::Clearance,
+        split: [Split::Pinion(0.0); 2],
+    };
+    let layout = match hula::solve(&set) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("that drive has no geometry: {e:?}");
+            return;
+        }
+    };
+
+    println!(
+        "hula  z {}/{}/{}/{}  module {m_outer}/{m_inner}  alpha 20 deg  clearance {clearance} mm",
+        teeth[0], teeth[1], teeth[2], teeth[3]
+    );
+    println!(
+        "  ratio {} / {} = {:+.4}   crank offset {:.6} mm{}",
+        layout.ratio.numerator,
+        layout.ratio.denominator,
+        layout.ratio.value(),
+        layout.offset,
+        match layout.binding {
+            Some(m) => format!("  (held open by mesh {})", m + 1),
+            None => String::new(),
+        }
+    );
+
+    for mesh in 0..2 {
+        let pair = set.teeth.pair(mesh).expect("a pair");
+        let module = set.module[mesh];
+        let params = |i: usize| GearParams {
+            module,
+            teeth: teeth[i],
+            profile_shift: layout.shift[i],
+            addendum: set.addendum[i],
+            dedendum: 1.0,
+            ..Default::default()
+        };
+        // A ring of this size needs a shaper smaller than itself, and the
+        // default tool is not: left alone it clamps down to the ring's own
+        // count and then reaches nothing.
+        let cutter = Cutter {
+            teeth: cutter_teeth.unwrap_or_else(|| teeth[pair.ring].saturating_sub(5).max(6)),
+            ..Cutter::default()
+        };
+        let ring = Ring::cut_by(&params(pair.ring), &cutter);
+        let pinion = Tooth::new(params(pair.pinion));
+
+        println!(
+            "\n  mesh {}  ring z{} x{:+.4}  pinion z{} x{:+.4}   alpha_w {:.3} deg   shaper z{}",
+            mesh + 1,
+            teeth[pair.ring],
+            layout.shift[pair.ring],
+            teeth[pair.pinion],
+            layout.shift[pair.pinion],
+            layout.alpha_w[mesh].to_degrees(),
+            cutter.teeth
+        );
+        // The gap the mechanism solved for, against the one the parts have: a
+        // clamped tip is a real tip, and the difference is what a clamp cost.
+        let cut = ring.ra - pinion.ra + layout.offset;
+        println!(
+            "    far-side gap {:.4} mm (as cut {:.4} mm)   ring tip {:.4}  pinion tip {:.4}",
+            layout.clearance[mesh], cut, ring.ra, pinion.ra
+        );
+        match mesh_with(&ring, &pinion) {
+            None => println!("    the pair does not mesh"),
+            Some(m) => {
+                println!(
+                    "    centre distance {:.6} mm   contact ratio {:.4}",
+                    m.centre_distance, m.contact_ratio
+                );
+                println!(
+                    "    trochoid interference {}   involute interference {}",
+                    m.trochoid_interference, m.involute_interference
+                );
+            }
+        }
+        for note in &ring.clamps {
+            println!("    ! ring: {}", words().render(note));
+        }
+        for note in &pinion.clamps.notes {
+            println!("    ! pinion: {}", words().render(note));
+        }
     }
 }
 
