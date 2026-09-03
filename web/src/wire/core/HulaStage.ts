@@ -28,6 +28,18 @@ helix_angle: number,
  */
 thickness_mod: [number, number], 
 /**
+ * Coefficient of friction in each mesh.
+ */
+sliding_friction: [number, number], 
+/**
+ * Coefficient of **static** friction in each mesh, for breaking away.
+ *
+ * Whether a drive turns at all is decided at rest and against this; how
+ * well it does once turning is decided against the sliding coefficient,
+ * which is lower. See [`Directional::once_moving`].
+ */
+static_friction: [number, number], 
+/**
  * The smallest far-side tip gap any mesh may run at, mm.
  *
  * A minimum, and checked whether or not the offset is taken from it: an

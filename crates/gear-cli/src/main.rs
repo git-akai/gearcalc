@@ -163,7 +163,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         }
     }
 
-    let result = match solve_hula_stage(&stage, 1000.0) {
+    let result = match solve_hula_stage(&stage, 1000.0, 2.0) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("that drive has no geometry: {e:?}");
@@ -190,6 +190,10 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
     println!(
         "  speeds  crank {:.1}  wobble {:+.3}  output {:+.4} rpm",
         result.crank_speed, result.gears[1].speed, result.gears[3].speed
+    );
+    println!(
+        "  the two meshes lose {:.3} % between them, crank held   (the drive's own figure is not reported)",
+        (1.0 - result.fixed_carrier_efficiency.forward) * 100.0
     );
     println!(
         "  backlash at the output {:.6} deg (min {:.6}, max {:.6})   at the crank {:.4} deg",
@@ -538,7 +542,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     for (gear, count) in stage.gears.iter_mut().zip(teeth) {
         gear.teeth = count;
     }
-    let result = match solve_hula_stage(&stage, 1000.0) {
+    let result = match solve_hula_stage(&stage, 1000.0, 2.0) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("that drive has no geometry: {e:?}");

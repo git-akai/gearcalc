@@ -326,6 +326,21 @@ is load-sharing bookkeeping and holds the total transmitted force at `F_n`.
 
 ---
 
+The loss integral is `∫|s| ds` along the path, `s` measured from the pitch point,
+and it is written with the sign carried rather than squared away:
+
+```text
+loss ∝ (ε₁|ε₁| + ε₂|ε₂|) / ε_α          ε₁, ε₂ the two ends, in base pitches
+```
+
+For the familiar mesh the path straddles the pitch point, both ends are positive,
+`ε|ε|` **is** `ε²`, and this is the classical expression to the last bit. A pair
+can also touch entirely on one side — an internal pair at one tooth of difference
+runs at an operating pressure angle high enough to put the pitch point outside
+both tip circles — and there sliding never reverses along the path, so the
+integral is the difference of the ends rather than their sum. One expression
+covers both; the sign does the work.
+
 ## Crossed axes
 
 One model covers a worm drive and a crossed helical pair; they differ in **one
@@ -978,6 +993,18 @@ shift is spent on, and it is why a drive of this kind runs at operating pressure
 angles no ordinary pair would: 57° at `z = 18`, one tooth of difference and half
 a millimetre of gap. Two teeth of difference is far kinder — 26° for the same gap
 — at a quarter of the ratio, since `D = 4`.
+
+**The meshes' loss is reported; the drive's is not.** Each pair's own efficiency
+comes from [`contact::efficiency`](#efficiency-parallel-axes) with the crank
+held, and the two multiply — 99.15 % together on the shipped counts. That is
+*not* the drive's figure and is nowhere near it, because power circulates: the
+drive is a three-shaft epicyclic whose basic ratio is `i₀ = z₂z₄/(z₁z₃)`, and
+turning a mesh loss into a drive loss is [`planetary::power`](#planetary-sets),
+which is written for a basic ratio that stays away from one. This arrangement's
+sits at 324/323. There the two candidate signs of the rolling power straddle
+unity, the solve returns efficiencies above 1 at some tooth counts, and an
+efficiency above one is not an efficiency — so the drive's own figure is withheld
+until that is settled rather than reported and disbelieved.
 
 **The stage builds what the arrangement describes.** A drive that closes
 algebraically can still be one whose teeth foul, so each ring is cut by its

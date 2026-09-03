@@ -82,9 +82,18 @@ impl ContactPath {
         let sin_aw = mesh.alpha_w.sin();
         let recess = tangent(g1.ra, rb1) - r1 * sin_aw;
         let approach = tangent(tip_radius_2, rb2) - r2 * sin_aw;
-        // Both ends must be reached, and NaN is not a reach: `<= 0.0` is false
-        // for it, so finiteness is asked for rather than assumed.
-        if !recess.is_finite() || !approach.is_finite() || recess <= 0.0 || approach <= 0.0 {
+        // **A path needs a length, not two positive halves.** `approach` and
+        // `recess` are signed coordinates along the line of action, measured
+        // from the pitch point, and the familiar mesh has one either side of it.
+        // A pair can also touch entirely on one side — an internal pair at one
+        // tooth of difference runs at an operating pressure angle high enough to
+        // put its pitch point outside both tip circles, so contact never reaches
+        // it and both coordinates come out the same sign. That is a mesh, with a
+        // contact ratio, and the sum below is its length either way.
+        //
+        // NaN is not a length: `<= 0.0` is false for it, so finiteness is asked
+        // for rather than assumed.
+        if !recess.is_finite() || !approach.is_finite() || approach + recess <= 0.0 {
             return None;
         }
         let base_pitch = std::f64::consts::PI * g1.mt * g1.alpha_t.cos();
@@ -387,7 +396,15 @@ pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Tooth, friction: f64, dr
     // a case of its own — see `MeshKind::sign`.
     let z = 1.0 / f64::from(mesh.z1) + 1.0 / mesh.signed_z2();
     let cos_bb = crate::metrology::base_helix_angle(g1).cos();
-    1.0 - friction * std::f64::consts::PI * z * (e1 * e1 + e2 * e2) / (path.contact_ratio * cos_bb)
+    // `∫|s| ds` over the path, in base pitches. Written with the sign carried
+    // rather than squared away: for the familiar mesh, where the path straddles
+    // the pitch point and both coordinates are positive, `ε|ε|` **is** `ε²` and
+    // this is the classical expression to the last bit. Where the path lies
+    // entirely on one side, sliding never reverses along it, and the integral is
+    // the difference of the two ends rather than their sum — which is what the
+    // sign does here, and it is one expression rather than a case.
+    1.0 - friction * std::f64::consts::PI * z * (e1 * e1.abs() + e2 * e2.abs())
+        / (path.contact_ratio * cos_bb)
 }
 
 /// A relative sliding velocity, resolved in the plane where the flanks touch.

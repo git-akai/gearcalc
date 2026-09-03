@@ -36,6 +36,27 @@ binding_mesh: number | null,
  */
 crank_speed: number, 
 /**
+ * Mesh efficiency with the **crank held**, 0..1, both directions: the two
+ * pairs' own, multiplied.
+ *
+ * **It is not the drive's efficiency**, and on a high-ratio arrangement it
+ * is nowhere near it — the meshes lose under a percent while the drive
+ * loses tens of them, because power circulates. The drive's own figure is
+ * not reported: the power flow it would come from is written for a basic
+ * ratio that stays away from one, and this arrangement's sits at
+ * `z₂z₄/(z₁z₃)` — 324/323 on the shipped counts — where the two candidate
+ * signs of the rolling power straddle unity and the solve returns figures
+ * above 1 at some tooth counts. An efficiency above one is not an
+ * efficiency, and until that is settled the honest report is the meshes'
+ * own loss and the arithmetic that turns it into the drive's.
+ */
+fixed_carrier_efficiency: Directional<number>, 
+/**
+ * Torque on each shaft — the grounded gear, the crank, the output — in
+ * whatever unit the input torque was given. They sum to zero.
+ */
+shaft_torques: [number, number, number], 
+/**
  * Angular backlash at whichever shaft is the **output**, degrees: gear 4
  * driving forward, the crank driving backward. The same two plays subtend
  * very different angles at the two, by exactly the reduction.
