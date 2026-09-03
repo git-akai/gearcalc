@@ -24,11 +24,18 @@ export type Defaults = { gear: GearTabDefaults,
  */
 train: Train, 
 /**
- * One of each stage kind, for the "add stage" menu. Three, as the
- * specification lists them: a crossed gear pair is **not** a fourth — it is
- * a spur stage with its shafts at an angle (docs/reference.md#crossed-axes).
+ * One of each stage kind, for the "add stage" menu. A crossed gear pair is
+ * **not** one of them — it is a spur stage with its shafts at an angle
+ * (docs/reference.md#crossed-axes).
  */
 spur_stage: Stage, worm_stage: Stage, planetary_stage: Stage, 
+/**
+ * The hula drive (docs/reference.md#the-hula-drive). Offered only behind
+ * the interface's developer mode, which is a decision about what to put in
+ * front of a reader rather than about the mathematics — so it crosses the
+ * boundary like the other three and the front end decides who sees it.
+ */
+hula_stage: Stage, 
 /**
  * The fraction a reversed root's cyclic bending allowable is taken at.
  *

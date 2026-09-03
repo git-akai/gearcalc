@@ -174,6 +174,7 @@ mod tests {
                         ..WormStage::default()
                     }),
                     Stage::Planetary(Box::<PlanetaryStage>::default()),
+                    Stage::Hula(Box::default()),
                 ],
             },
         }
@@ -211,10 +212,10 @@ mod tests {
         assert!(text.contains("name = \"Test train\""));
         assert_eq!(
             text.matches("kind = ").count(),
-            4,
+            5,
             "one tag a stage:\n{text}"
         );
-        for kind in ["spur", "worm", "planetary"] {
+        for kind in ["spur", "worm", "planetary", "hula"] {
             assert!(text.contains(&format!("kind = \"{kind}\"")), "no {kind}");
         }
     }

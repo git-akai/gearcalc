@@ -242,7 +242,8 @@ proof-read before anyone leans on it. Correcting one changes no calculation:
 **Materials, export, UI.** An eight-material library with per-value provenance ·
 DXF with exact arcs for external *and* internal gears, written to the published
 R2000 minimum so a reader that repairs nothing still opens it — confirmed
-importing into SOLIDWORKS · geartrains exported and
+importing into SOLIDWORKS · geartrain stages: spur/helical, crossed, worm,
+planetary and **hula** · geartrains exported and
 imported as TOML, inputs only · gear tabs with external and internal kinds — and
 eccentric, in the developer mode — geartrain tabs with spur, worm and planetary
 stages.

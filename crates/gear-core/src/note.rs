@@ -173,6 +173,16 @@ pub mod key {
     pub const ERROR_TRAIN_NO_ROOT_SECTION: &str = "error.train_no_root_section";
     /// `error.train_empty`
     pub const ERROR_TRAIN_EMPTY: &str = "error.train_empty";
+    /// `error.hula_locked`
+    pub const ERROR_HULA_LOCKED: &str = "error.hula_locked";
+    /// `error.hula_coaxial`
+    pub const ERROR_HULA_COAXIAL: &str = "error.hula_coaxial";
+    /// `error.hula_offset_too_small`
+    pub const ERROR_HULA_OFFSET_TOO_SMALL: &str = "error.hula_offset_too_small";
+    /// `error.hula_clearance_unreachable`
+    pub const ERROR_HULA_CLEARANCE_UNREACHABLE: &str = "error.hula_clearance_unreachable";
+    /// `error.hula_bound_unreachable`
+    pub const ERROR_HULA_BOUND_UNREACHABLE: &str = "error.hula_bound_unreachable";
     /// `error.gear_no_mate`
     pub const ERROR_GEAR_NO_MATE: &str = "error.gear_no_mate";
     /// `error.gear_concentric_has_no_profile`
@@ -238,6 +248,11 @@ pub mod key {
         ERROR_TRAIN_UNKNOWN_MATERIAL,
         ERROR_TRAIN_NO_ROOT_SECTION,
         ERROR_TRAIN_EMPTY,
+        ERROR_HULA_LOCKED,
+        ERROR_HULA_COAXIAL,
+        ERROR_HULA_OFFSET_TOO_SMALL,
+        ERROR_HULA_CLEARANCE_UNREACHABLE,
+        ERROR_HULA_BOUND_UNREACHABLE,
         ERROR_GEAR_NO_MATE,
         ERROR_GEAR_CONCENTRIC_HAS_NO_PROFILE,
         ERROR_GEAR_NO_PIN_DIAMETER,

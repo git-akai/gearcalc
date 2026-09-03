@@ -262,6 +262,17 @@ pub enum TrainError {
     NoRootSection,
     /// The train has no stages, so there is nothing to accumulate.
     Empty,
+    /// A hula drive that has no geometry — see [`crate::hula::Error`].
+    Hula(crate::hula::Error),
+}
+
+impl From<hula::Error> for TrainError {
+    fn from(e: hula::Error) -> Self {
+        match e {
+            hula::Error::Mesh(m) => Self::Mesh(m),
+            hula::Error::Drive(d) => Self::Hula(d),
+        }
+    }
 }
 
 impl crate::note::Explain for TrainError {
@@ -273,6 +284,9 @@ impl crate::note::Explain for TrainError {
         use crate::note::{key, Note};
         match self {
             Self::Mesh(e) => e.note(),
+            // The drive diagnoses itself; the train carries the note rather
+            // than restating it.
+            Self::Hula(e) => e.note(),
             Self::Screw(e) => e.note(),
             Self::NoContact => Note::new(key::ERROR_TRAIN_NO_CONTACT),
             Self::UnknownMaterial(n) => {
@@ -290,6 +304,7 @@ impl std::fmt::Display for TrainError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Mesh(e) => write!(f, "{e}"),
+            Self::Hula(e) => write!(f, "the drive has no geometry: {e:?}"),
             Self::Screw(e) => match e {
                 crate::screw::ScrewError::NotPositive => {
                     write!(f, "a module, diameter or tooth count is not positive")
@@ -387,6 +402,7 @@ pub enum Stage {
     // two gears, so a `Vec<Stage>` would otherwise pay the largest of them for
     // every stage whatever its kind. Invisible to readers and to serde.
     Planetary(Box<PlanetaryStage>),
+    Hula(Box<HulaStage>),
 }
 
 impl Default for Stage {
@@ -420,6 +436,7 @@ pub enum StageResult {
     Spur(Box<SpurResult>),
     Worm(Box<WormResult>),
     Planetary(Box<PlanetaryResult>),
+    Hula(Box<HulaResult>),
 }
 
 impl StageResult {
@@ -430,6 +447,7 @@ impl StageResult {
             Self::Spur(r) => r.ratio,
             Self::Worm(r) => r.ratio,
             Self::Planetary(r) => r.ratio,
+            Self::Hula(r) => r.ratio,
         }
     }
 
@@ -444,6 +462,7 @@ impl StageResult {
             Self::Spur(r) => r.efficiency,
             Self::Worm(r) => r.efficiency,
             Self::Planetary(r) => r.efficiency,
+            Self::Hula(r) => r.efficiency,
         }
     }
 
@@ -458,6 +477,16 @@ impl StageResult {
             Self::Spur(r) => r.backlash,
             Self::Worm(r) => r.backlash,
             Self::Planetary(r) => r.backlash,
+            Self::Hula(r) => r.backlash,
+        }
+    }
+
+    /// The hula result, if that is what this is.
+    #[must_use]
+    pub fn as_hula(&self) -> Option<&HulaResult> {
+        match self {
+            Self::Hula(r) => Some(r),
+            _ => None,
         }
     }
 
@@ -522,6 +551,12 @@ impl StageResult {
             // the cycles are filled here. Sun and ring meet a planet `N` times
             // per revolution; the planet is the special case of docs/reference.md#trains, and what
             // fatigues it is its rotation **relative to the carrier**.
+            // A hula sets its own speeds — four gears on three shafts, and its
+            // own kinematics filled them. Nothing else is filled here: a cycle
+            // count is what a fatigue rating consumes, and this stage has none
+            // to consume it, so the arm is empty rather than filling a field
+            // nothing reads.
+            Self::Hula(_) => {}
             Self::Planetary(r) => {
                 let n = f64::from(r.planets.max(1));
                 // Sun and ring meet a planet `N` times per revolution and the
@@ -942,6 +977,12 @@ pub fn solve_any_with(
         // supplies the speed it has reached by this point.
         Stage::Planetary(s) => solve_planetary_stage_with(s, input_speed, torques, lib, reversal)
             .map(|r| StageResult::Planetary(Box::new(r))),
+        // A hula needs a speed and a torque for the same reason a planetary
+        // does: its efficiency is a power flow, and a power flow is not a
+        // property of the teeth alone.
+        Stage::Hula(s) => solve_hula_stage(s, input_speed, torques.peak_forward)
+            .map(|r| StageResult::Hula(Box::new(r)))
+            .map_err(TrainError::from),
     }
 }
 

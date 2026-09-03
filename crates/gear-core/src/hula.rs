@@ -231,6 +231,25 @@ pub enum Error {
     BoundUnreachable(usize),
 }
 
+impl crate::note::Explain for Error {
+    /// Why the drive has no geometry, as a key and the mesh it happened in —
+    /// the same currency a clamp uses, so one channel carries every reason a
+    /// reader sees.
+    fn note(&self) -> crate::note::Note {
+        use crate::note::{key, Note};
+        let of = |k: &'static str, mesh: usize| {
+            Note::new(k).count("mesh", u32::try_from(mesh + 1).unwrap_or(1))
+        };
+        match *self {
+            Self::Locked => Note::new(key::ERROR_HULA_LOCKED),
+            Self::Coaxial(m) => of(key::ERROR_HULA_COAXIAL, m),
+            Self::OffsetTooSmall(m) => of(key::ERROR_HULA_OFFSET_TOO_SMALL, m),
+            Self::ClearanceUnreachable(m) => of(key::ERROR_HULA_CLEARANCE_UNREACHABLE, m),
+            Self::BoundUnreachable(m) => of(key::ERROR_HULA_BOUND_UNREACHABLE, m),
+        }
+    }
+}
+
 impl Teeth {
     /// The pair a mesh is, ring first.
     ///

@@ -1088,6 +1088,44 @@ mod tests {
         );
     }
 
+    /// **A hula is a stage of a train**, and the train does not have to know
+    /// which kind it is.
+    ///
+    /// Ratio, efficiency and backlash reach the accumulation through the same
+    /// three accessors every other kind answers, and a drive that cannot be
+    /// built refuses through the same channel — the error travelling rather
+    /// than being re-diagnosed at the boundary.
+    #[test]
+    fn a_hula_is_a_stage_a_train_can_carry() {
+        use crate::train::{solve_any, Stage, StageTorques};
+        let lib = crate::train::test_library();
+        let torques = StageTorques {
+            peak_forward: 2.0,
+            peak_backward: None,
+            cyclic: 1.0,
+        };
+        let stage = Stage::Hula(Box::default());
+        let r = solve_any(&stage, 1000.0, torques, &lib).expect("a stage a train can solve");
+        assert!((r.ratio() - 324.0).abs() < 1e-9);
+        assert!(r.efficiency().forward > 0.0 && r.efficiency().forward < 0.5);
+        assert!(r.backlash().forward.nominal > 0.0);
+        assert!(r.as_hula().is_some(), "and it says which kind it is");
+
+        // ...and a drive with no geometry refuses through the train's channel.
+        let mut locked = HulaStage::default();
+        locked.gears[2].teeth = 18;
+        locked.gears[3].teeth = 19;
+        let e = solve_any(&Stage::Hula(Box::new(locked)), 1000.0, torques, &lib)
+            .expect_err("meshes that cancel are not a stage");
+        assert!(
+            matches!(
+                e,
+                crate::train::TrainError::Hula(crate::hula::Error::Locked)
+            ),
+            "{e:?}"
+        );
+    }
+
     /// An arrangement whose meshes cancel is refused by the stage, as by the
     /// drive: the error travels rather than being re-diagnosed.
     #[test]

@@ -1206,6 +1206,46 @@ mod tests {
                 err(e.note());
             }
 
+            // A hula drive, refused five ways. Each is reachable from ordinary
+            // inputs rather than contrived: two meshes that cancel, a pair whose
+            // gears have the same tooth count, a crank offset under the base
+            // circles, a clearance no offset can give, and a bound no offset can
+            // clear.
+            {
+                use gear_core::hula::{self, Offset, Set, Split, Teeth};
+                let drive = |teeth: [u32; 4], clearance: f64, offset: Offset| Set {
+                    teeth: Teeth(teeth),
+                    module: [1.0, 1.0],
+                    pressure_angle: 20.0,
+                    helix_angle: 0.0,
+                    addendum: [0.8; 4],
+                    clearance,
+                    offset,
+                    split: [Split::Pinion(0.0); 2],
+                };
+                let cases = [
+                    drive([19, 18, 18, 19], 0.3, Offset::Clearance),
+                    drive([18, 18, 17, 18], 0.3, Offset::Clearance),
+                    drive([19, 18, 17, 18], 0.3, Offset::Given(0.01)),
+                    // The gap rises without bound with the offset, so every
+                    // finite clearance is reachable; what is refused is one
+                    // that is not a number at all.
+                    drive([19, 18, 17, 18], f64::INFINITY, Offset::Clearance),
+                ];
+                for set in cases {
+                    if let Err(e) = hula::solve(&set) {
+                        err(e.note());
+                    }
+                }
+                // A bound no offset can clear: one that is never satisfied.
+                if let Err(e) = hula::solve_with(
+                    &drive([19, 18, 17, 18], 0.3, Offset::Clearance),
+                    &|_, _, _| -1.0,
+                ) {
+                    err(e.note());
+                }
+            }
+
             // ...and the three the boundary raises rather than the core: they
             // are `ui.` keys, checked by `tools/check_strings.py`, so they are
             // recorded here only so this sweep sees the `error.` twins.
