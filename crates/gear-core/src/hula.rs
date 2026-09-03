@@ -238,9 +238,6 @@ impl Teeth {
 #[derive(Clone, Copy, Debug)]
 struct Geometry {
     rack: BasicRack,
-    /// Normal module, mm — what an addendum and a shift are measured in, where
-    /// `a_ref` is measured in the transverse one.
-    module: f64,
     /// `z_pinion − z_ring`, and so always negative.
     sum_z: f64,
     /// Reference centre distance, mm.
@@ -255,7 +252,6 @@ impl Geometry {
         let sum_z = f64::from(set.teeth.0[pair.pinion]) - f64::from(set.teeth.0[pair.ring]);
         Self {
             rack,
-            module: set.module[mesh],
             sum_z,
             a_ref: rack.mt * sum_z.abs() / 2.0,
             addendum_sum: set.addendum[pair.ring] + set.addendum[pair.pinion],
@@ -286,7 +282,7 @@ impl Geometry {
     /// `a_ref` is transverse and the two tooth terms are normal, which is not a
     /// slip: an addendum and a shift are what the *tool* cuts, across the tooth.
     fn clearance_at(&self, alpha_w: f64) -> f64 {
-        self.a_ref - self.module * (self.addendum_sum + self.sum_x_at(alpha_w))
+        self.a_ref - self.rack.mn * (self.addendum_sum + self.sum_x_at(alpha_w))
             + self.offset_at(alpha_w)
     }
 
@@ -298,7 +294,7 @@ impl Geometry {
     /// pressure angle, the root is unique, and Newton cannot be led astray.
     fn d_clearance(&self, alpha_w: f64) -> f64 {
         let t = alpha_w.tan();
-        -self.module * self.sum_z * t * t / (2.0 * self.rack.alpha_n.tan())
+        -self.rack.mn * self.sum_z * t * t / (2.0 * self.rack.alpha_n.tan())
             + self.offset_at(alpha_w) * t
     }
 

@@ -70,7 +70,16 @@ pub fn base_helix_angle(helix_angle: f64, normal_pressure_angle: f64) -> f64 {
 /// and this is the reference the tooth counts are measured against.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BasicRack {
-    /// Transverse module, mm.
+    /// Normal module, mm — the plane the **tool** works in, and so the one an
+    /// addendum, a dedendum and a profile shift are counted in.
+    ///
+    /// Carried rather than dropped because it is the input this was built from,
+    /// and a caller that needs it otherwise carries a second copy beside the
+    /// rack — which is the duplication this type exists to end, one field
+    /// further down.
+    pub mn: f64,
+    /// Transverse module, mm — the plane the **gear** turns in, and so the one
+    /// a radius and a centre distance are measured in.
     pub mt: f64,
     /// Transverse pressure angle, radians.
     pub alpha_t: f64,
@@ -86,6 +95,7 @@ impl BasicRack {
         let beta = helix_angle_deg.to_radians();
         let alpha_n = pressure_angle_deg.to_radians();
         Self {
+            mn: module,
             mt: module / beta.cos(),
             alpha_t: transverse_pressure_angle(alpha_n, beta),
             alpha_n,
