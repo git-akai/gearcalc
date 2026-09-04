@@ -78,6 +78,35 @@ centre_distance: Auto<number>,
  */
 clearance: number, tolerance_plus: number, tolerance_minus: number, 
 /**
+ * **Choose the automatic shifts for efficiency rather than for undercut.**
+ *
+ * Off, so a stage answers as it always has. On, the shifts a designer has
+ * left automatic are chosen to make the pair lose least, with the undercut
+ * shift as a *floor* rather than as the answer — which is worth over a
+ * point of mesh efficiency on an ordinary pair, and buys it with contact
+ * ratio (docs/reference.md#efficiency-parallel-axes).
+ *
+ * What is already given constrains it: a manual shift is that gear's, and
+ * a manual centre distance fixes the two shifts' sum. Two of the three
+ * leave nothing to choose, which is a design fully specified rather than
+ * an error.
+ */
+optimise_efficiency: boolean, 
+/**
+ * **The transverse contact ratio the optimiser may not go below.**
+ *
+ * Sliding loss falls monotonically with the length of the path: every
+ * millimetre of profile that touches is a millimetre that slides. So the
+ * least-loss pair is always the one whose teeth barely reach, and this is
+ * the constraint that answers rather than the optimum — which is why it is
+ * an input and not a constant. 1.2 is the usual design minimum, leaving
+ * margin for the tolerance and tip relief a real pair carries.
+ *
+ * It bounds the *optimiser* only. A pair specified by hand is reported as
+ * it is, with the existing note below 1, exactly as before.
+ */
+min_contact_ratio: number, 
+/**
  * How the load is divided while two tooth pairs are engaged.
  *
  * **Off by default, and it reaches bending only.** A contact rating is

@@ -188,6 +188,19 @@ Verified by simulating the cut — 2.5–2.7 µm across shifts −0.4 … +0.5.
 the ring search, layout checks, Willis kinematics, Pennestrì–Freudenstein
 efficiency in all six arrangements, and backlash referred to the output shaft.
 
+**Profile shifts chosen for efficiency.** A stage-level toggle, off by default,
+that chooses the automatic shifts to lose least instead of taking the least that
+clears undercut — which becomes a floor rather than the answer, and is worth up
+to 1.6 points of mesh efficiency on an ordinary pair. Whatever is given
+constrains the search instead of being overruled by it: a shift is that gear's, a
+centre distance fixes the two shifts' sum, and pinning all three is relieved
+visibly rather than silently ignored. The spur pair, the planetary set and the
+eccentric drive each have their own free variables and their own objective over
+one shared search; the worm stage has no profile shift to choose. Two bounds that
+never bit near zero shift do here — a contact-ratio floor, which is a stage input
+because the answer sits against it, and bottom clearance, which reads the
+dedendum the designer already specified ([reference](reference.md#efficiency-parallel-axes)).
+
 **Eccentric gears — not offered until they are asked for.** A gear whose profile
 shift varies with angular position, at a genuinely constant transmission ratio.
 The mathematics is derived and gated like everything else here; what keeps it

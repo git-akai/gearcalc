@@ -395,6 +395,54 @@ reduction. That is the whole reason a high-ratio design bothers to optimise its
 shifts, and why the same optimiser is unremarkable in a gearbox and decisive in a
 Wolfrom.
 
+---
+
+**What a stage asks for, and what it may not do.** Every stage that has shifts to
+choose carries one toggle. Off, the automatic shifts are the undercut minimum and
+every answer is what it always was. On, they are chosen to lose least, and the
+undercut shift becomes the floor.
+
+What is already given constrains the search rather than being overruled by it:
+
+| given | what it fixes |
+|---|---|
+| a profile shift | that gear's, exactly |
+| a centre distance | the two shifts' signed *sum*, through `mesh::shift_sum_for` |
+| a crank offset | the same, on each of the eccentric drive's two meshes |
+
+A pair has two shifts to choose, so any two of `{a, x₁, x₂}` fix the third and
+pinning all three is a contradiction rather than a tighter specification. The
+front end relieves it visibly — the input furthest from what was just touched
+returns to automatic — rather than accepting a number and disregarding it.
+
+Two bounds have never had to bite before, because near zero shift they do not:
+
+- **A contact ratio floor.** Loss falls monotonically with the length of the
+  path, so the least-loss pair is always the one whose teeth barely reach and the
+  floor is the answer rather than a guard. It is therefore a stage input. 1.2 is
+  the usual design minimum for a pair; the eccentric drive defaults to continuous
+  contact instead, because a mesh of one tooth of difference has so short a path
+  that 1.2 would forbid the mechanism rather than constrain it.
+- **Bottom clearance.** A tip that passes the mating root circle bottoms out. The
+  dedendum already carries that gap — a standard 1.25 module against a 1 module
+  addendum *is* the 0.25 of clearance — so the bound reads the clearance the
+  designer specified rather than inventing an input for it.
+
+Each stage differs only in what is free and what it is worth:
+
+| stage | free | objective |
+|---|---|---|
+| spur | both shifts | the mesh's own efficiency |
+| planetary | the sun's and the ring's, the planet's following | `η₀`, since `power` rises with it either way |
+| eccentric | each mesh's division of its shift | the two meshes' product |
+| worm | — | no profile shift exists to choose |
+
+The searches share `auto::maximise`, a bounded coordinate descent: what differs
+between stages is how many numbers are free and what they are worth, not how to
+look for them. Each rates the geometry the stage would *build* — the automatic
+addendum resolved, at the distance the pair runs at rather than its zero-backlash
+one — so what is optimised is what is reported.
+
 ## Crossed axes
 
 One model covers a worm drive and a crossed helical pair; they differ in **one

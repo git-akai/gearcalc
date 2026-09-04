@@ -387,13 +387,19 @@ pub fn solve_hula_stage(
         GivenShift::Ring => Split::Ring(value),
         GivenShift::Pinion => Split::Pinion(value),
     };
-    let given = std::array::from_fn(|mesh| {
+    let named = |mesh: usize| {
         let (ring, pinion) = pair_of(mesh);
-        let named = match stage.given_shift[mesh] {
+        match stage.given_shift[mesh] {
             GivenShift::Ring => ring,
             GivenShift::Pinion => pinion,
-        };
-        stage.gears[named].profile_shift.manual
+        }
+    };
+    let given: [f64; 2] = std::array::from_fn(|mesh| stage.gears[named(mesh)].profile_shift.manual);
+    // A split entered by hand is a constraint, exactly as a shift is on a pair:
+    // the search may not overrule it, and a mesh with one has nothing left to
+    // search.
+    let pinned: [Option<f64>; 2] = std::array::from_fn(|mesh| {
+        (!stage.gears[named(mesh)].profile_shift.auto).then_some(given[mesh])
     });
     let set_at = |value: [f64; 2]| hula::Set {
         teeth,
@@ -464,8 +470,22 @@ pub fn solve_hula_stage(
             }
             Some(product)
         };
-        crate::auto::maximise(2, &|free| eta([free[0], free[1]]))
-            .map_or(given, |free| [free[0], free[1]])
+        let place = |free: &[f64]| {
+            let mut i = 0;
+            std::array::from_fn(|mesh| {
+                pinned[mesh].unwrap_or_else(|| {
+                    let v = free[i];
+                    i += 1;
+                    v
+                })
+            })
+        };
+        let dof = pinned.iter().filter(|p| p.is_none()).count();
+        if dof == 0 {
+            given
+        } else {
+            crate::auto::maximise(dof, &|free| eta(place(free))).map_or(given, |free| place(&free))
+        }
     } else {
         given
     };

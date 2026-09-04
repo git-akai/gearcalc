@@ -353,7 +353,7 @@ pub fn solve_planetary_stage(
 ///
 /// The sun's and the ring's shifts are the free ones; the planet's follows from
 /// them, because the two centre distances are one number
-/// (docs/reference.md#planetary-geometry). Everything downstream — the
+/// (docs/reference.md#planetary-sets). Everything downstream — the
 /// stresses, the kinematics, the efficiency — reads the geometry from here, and
 /// so does the search that chooses those two shifts, so what is optimised is
 /// what is built.

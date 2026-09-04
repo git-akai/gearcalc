@@ -60,6 +60,22 @@ planets: number,
  */
 arrangement: Arrangement, 
 /**
+ * **Choose the automatic shifts for efficiency rather than for undercut**,
+ * as [`super::SpurStage::optimise_efficiency`].
+ *
+ * The sun's and the ring's shifts are searched together for the greatest
+ * fixed-carrier efficiency; the planet's follows from them as it always
+ * has. A shift given by hand is a constraint on the search, not something
+ * it may overrule.
+ */
+optimise_efficiency: boolean, 
+/**
+ * **The transverse contact ratio the optimiser may not take either mesh
+ * below**, as [`super::SpurStage::min_contact_ratio`]. Both meshes are held
+ * to it, since a set is only as continuous as its worse half.
+ */
+min_contact_ratio: number, 
+/**
  * Added to the common centre distance, mm — the running clearance.
  */
 clearance: number, tolerance_plus: number, tolerance_minus: number, 

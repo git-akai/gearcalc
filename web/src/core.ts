@@ -157,11 +157,15 @@ export function isUnavailable<T>(v: Maybe<T>): v is { unavailable: Note } {
 export function outside(v: number, b: Bound): string | null {
   if (!Number.isFinite(v)) return t("ui.validation_not_a_number");
   if (b.min !== null && (b.exclusive_min ? v <= b.min : v < b.min)) {
-    const key = b.exclusive_min ? "ui.validation_greater_than" : "ui.validation_at_least";
+    const key = b.exclusive_min
+      ? "ui.validation_greater_than"
+      : "ui.validation_at_least";
     return t(key, { bound: String(b.min) });
   }
   if (b.max !== null && (b.exclusive_max ? v >= b.max : v > b.max)) {
-    const key = b.exclusive_max ? "ui.validation_less_than" : "ui.validation_at_most";
+    const key = b.exclusive_max
+      ? "ui.validation_less_than"
+      : "ui.validation_at_most";
     return t(key, { bound: String(b.max) });
   }
   return null;
@@ -263,8 +267,16 @@ export interface StageKindSpec {
 // accessors and three hand-written buttons; a kind is one row here now, and the
 // tag is what the panel branches on.
 export const STAGE_KINDS: StageKindSpec[] = [
-  { key: "spur", label: "ui.train_add_spur_stage", fresh: () => defaults().spur_stage },
-  { key: "worm", label: "ui.train_add_worm_stage", fresh: () => defaults().worm_stage },
+  {
+    key: "spur",
+    label: "ui.train_add_spur_stage",
+    fresh: () => defaults().spur_stage,
+  },
+  {
+    key: "worm",
+    label: "ui.train_add_worm_stage",
+    fresh: () => defaults().worm_stage,
+  },
   {
     key: "planetary",
     label: "ui.train_add_planetary_stage",
@@ -304,12 +316,43 @@ export interface FieldSpec {
 }
 
 export const FIELDS: FieldSpec[] = [
-  { key: "module", label: "ui.gear_field_module", unit: "ui.gear_mm", step: 0.1 },
-  { key: "pressure_angle", label: "ui.gear_field_pressure_angle", unit: "ui.gear_deg", step: 0.5 },
-  { key: "teeth", label: "ui.gear_field_teeth", unit: "", step: 1, integer: true },
-  { key: "helix_angle", label: "ui.gear_field_helix_angle", unit: "ui.gear_deg", step: 1 },
-  { key: "profile_shift", label: "ui.gear_field_profile_shift", unit: "ui.gear_m", step: 0.05 },
-  { key: "addendum", label: "ui.gear_field_addendum", unit: "ui.gear_m", step: 0.05 },
+  {
+    key: "module",
+    label: "ui.gear_field_module",
+    unit: "ui.gear_mm",
+    step: 0.1,
+  },
+  {
+    key: "pressure_angle",
+    label: "ui.gear_field_pressure_angle",
+    unit: "ui.gear_deg",
+    step: 0.5,
+  },
+  {
+    key: "teeth",
+    label: "ui.gear_field_teeth",
+    unit: "",
+    step: 1,
+    integer: true,
+  },
+  {
+    key: "helix_angle",
+    label: "ui.gear_field_helix_angle",
+    unit: "ui.gear_deg",
+    step: 1,
+  },
+  {
+    key: "profile_shift",
+    label: "ui.gear_field_profile_shift",
+    unit: "ui.gear_m",
+    step: 0.05,
+  },
+  {
+    key: "addendum",
+    label: "ui.gear_field_addendum",
+    unit: "ui.gear_m",
+    step: 0.05,
+  },
   {
     key: "dedendum",
     label: "ui.gear_field_dedendum",
@@ -353,8 +396,13 @@ export const FIELDS: FieldSpec[] = [
 ];
 
 /** Why a value is not acceptable, given the bound Rust returned. */
-export function validate(f: FieldSpec, v: number, b: Bound | null): string | null {
-  if (f.integer && !Number.isInteger(v)) return t("ui.validation_not_a_whole_number");
+export function validate(
+  f: FieldSpec,
+  v: number,
+  b: Bound | null,
+): string | null {
+  if (f.integer && !Number.isInteger(v))
+    return t("ui.validation_not_a_whole_number");
   return b === null
     ? Number.isFinite(v)
       ? null
@@ -418,12 +466,13 @@ export function loadCore(): Promise<void> {
   return ready;
 }
 
-
 /** The defaults, as a fresh copy: everything handed out here is about to
  *  become a tab's mutable state, so callers must not share one object. */
 export function defaults(): Defaults {
   if (!cachedDefaults) {
-    throw new Error("the defaults were asked for before the core finished loading");
+    throw new Error(
+      "the defaults were asked for before the core finished loading",
+    );
   }
   return structuredClone(cachedDefaults);
 }
@@ -432,7 +481,9 @@ export function coreVersion(): string {
   return version();
 }
 
-export function solve(req: GearRequest): { ok: GearSummary } | { error: string } {
+export function solve(
+  req: GearRequest,
+): { ok: GearSummary } | { error: string } {
   try {
     return { ok: JSON.parse(solve_gear(JSON.stringify(req))) as GearSummary };
   } catch (e) {
@@ -440,7 +491,10 @@ export function solve(req: GearRequest): { ok: GearSummary } | { error: string }
   }
 }
 
-export function profile(req: GearRequest, pointsPerTooth: number): Float64Array | null {
+export function profile(
+  req: GearRequest,
+  pointsPerTooth: number,
+): Float64Array | null {
   try {
     return gear_profile(JSON.stringify(req), pointsPerTooth);
   } catch {
@@ -472,7 +526,9 @@ export function defaultCutter(): CutterRef {
   return defaults().gear.cutter;
 }
 
-export function solveRing(req: RingRequest): { ok: RingSummary } | { error: string } {
+export function solveRing(
+  req: RingRequest,
+): { ok: RingSummary } | { error: string } {
   try {
     return { ok: JSON.parse(solve_ring(JSON.stringify(req))) as RingSummary };
   } catch (e) {
@@ -480,7 +536,10 @@ export function solveRing(req: RingRequest): { ok: RingSummary } | { error: stri
   }
 }
 
-export function ringProfile(req: RingRequest, pointsPerTooth: number): Float64Array | null {
+export function ringProfile(
+  req: RingRequest,
+  pointsPerTooth: number,
+): Float64Array | null {
   try {
     return ring_profile(JSON.stringify(req), pointsPerTooth);
   } catch {
@@ -507,7 +566,9 @@ export interface TrainDocument {
 
 /** Parse an exported geartrain. The TOML never touches TypeScript: the file is
  *  handed to Rust as text, so exactly one parser exists. */
-export function importTrain(tomlText: string): { ok: TrainDocument } | { error: string } {
+export function importTrain(
+  tomlText: string,
+): { ok: TrainDocument } | { error: string } {
   try {
     return { ok: JSON.parse(import_train(tomlText)) as TrainDocument };
   } catch (e) {
@@ -515,7 +576,9 @@ export function importTrain(tomlText: string): { ok: TrainDocument } | { error: 
   }
 }
 
-export function exportTrain(doc: TrainDocument): { ok: string } | { error: string } {
+export function exportTrain(
+  doc: TrainDocument,
+): { ok: string } | { error: string } {
   try {
     return { ok: export_train(JSON.stringify(doc)) };
   } catch (e) {
@@ -529,7 +592,9 @@ export function defaultLibrary(): MaterialLibrary {
 
 /** Parse a hand-edited library. The TOML never touches TypeScript: the file is
  *  read as text and handed straight to the one tested parser. */
-export function importLibrary(tomlText: string): { ok: MaterialLibrary } | { error: string } {
+export function importLibrary(
+  tomlText: string,
+): { ok: MaterialLibrary } | { error: string } {
   try {
     return { ok: JSON.parse(import_materials(tomlText)) as MaterialLibrary };
   } catch (e) {
@@ -537,7 +602,9 @@ export function importLibrary(tomlText: string): { ok: MaterialLibrary } | { err
   }
 }
 
-export function exportLibrary(lib: MaterialLibrary): { ok: string } | { error: string } {
+export function exportLibrary(
+  lib: MaterialLibrary,
+): { ok: string } | { error: string } {
   try {
     return { ok: export_materials(JSON.stringify(lib)) };
   } catch (e) {
@@ -550,6 +617,35 @@ export function exportLibrary(lib: MaterialLibrary): { ok: string } | { error: s
 // --------------------------------------------------------------------- //
 
 /** Which shaft of a planetary set. Mirrors Rust's `planetary::PlanetaryShaft`. */
+/**
+ * Turn constraints automatic until no more than `limit` of them are given.
+ *
+ * A pair of gears has two profile shifts to choose and three things a designer
+ * can pin down: each shift, and the distance the pair runs at. Any two of those
+ * fix the third, so pinning all three is not a tighter specification — it is a
+ * contradiction, and the third would simply be ignored. Rather than accept an
+ * input and quietly disregard it, the one furthest from what the designer just
+ * touched goes back to automatic, visibly.
+ *
+ * `constraints` is in relief order, least precious first, and `just` is the one
+ * the designer has this moment turned on, which is never the one relieved.
+ * Nothing here decides a value: it only says which inputs are still being read.
+ */
+export function relieve(
+  constraints: Auto<number>[],
+  limit: number,
+  just: Auto<number>,
+): void {
+  let given = constraints.filter((c) => !c.auto).length;
+  for (const c of constraints) {
+    if (given <= limit) return;
+    if (!c.auto && c !== just) {
+      c.auto = true;
+      given -= 1;
+    }
+  }
+}
+
 export type PlanetaryMember = "sun" | "carrier" | "ring";
 
 /** A material figure with its provenance, as Rust's `Value` serialises. */

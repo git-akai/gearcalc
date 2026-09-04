@@ -9,6 +9,7 @@
     type Auto,
     type Overrides,
     type StageGear,
+    type SpurStage,
     type Value,
     type GearResult,
     type WormResult,
@@ -16,7 +17,20 @@
     t,
   } from "./core";
   import { developer, trains, library, type TrainTab } from "./state.svelte";
-  import { exportTrain } from "./core";
+  import { exportTrain, relieve } from "./core";
+
+  /** A pair chooses two shifts, so at most two of {distance, shift, shift} can
+   *  be given — and only while the stage is choosing them at all. With the
+   *  optimiser off the shifts are not being solved for anything, so pinning all
+   *  three is the design it always was and nothing is relieved. */
+  function relieveSpur(stage: SpurStage, just: Auto<number>) {
+    if (!stage.optimise_efficiency) return;
+    relieve(
+      [stage.centre_distance, stage.gears[0].profile_shift, stage.gears[1].profile_shift],
+      2,
+      just,
+    );
+  }
 
   let { tab }: { tab: TrainTab } = $props();
 
@@ -341,6 +355,10 @@
     /** False where nothing rates the face width — a crossed pair's contact is a
      *  point, so no stress depends on it and none can size it. */
     faceAuto?: boolean;
+    /** Called when this gear's shift is switched between given and automatic,
+     *  so a stage whose inputs constrain one another can relieve whichever of
+     *  them that has over-specified. */
+    onShiftAuto?: () => void;
     /** The width at which ε = 1, for a crossed pair. */
     faceFromContinuity?: number;
     /** A readout only this member has; given the member's position. */
@@ -394,7 +412,13 @@
     </label>
   {/if}
   {#if opts.solvedShift === undefined}
-    {@render autoNumber("ui.train_profile_shift", gear.profile_shift, g?.profile_shift, 0.05)}
+    {@render autoNumber(
+      "ui.train_profile_shift",
+      gear.profile_shift,
+      g?.profile_shift,
+      0.05,
+      opts.onShiftAuto,
+    )}
     {#if gear.profile_shift.auto}
       <!-- Automatic is the gear's own dedendum, which asks the same question the
            profile generator answers: is the flank undercut *at all*? A fixed 1
@@ -567,7 +591,17 @@
      other piece of chrome. Passing the English through as an argument is how
      five labels stayed hard-coded through the extraction that caught the other
      185: they are not markup, so nothing scanning markup could see them. -->
-{#snippet autoNumber(key: string, a: Auto<number>, computed: number | undefined, step: number)}
+<!-- `after` is how a stage says that its inputs constrain one another: the
+     toggle flips, then the stage relieves whatever that has over-specified
+     (`relieve`). Stages that have no such rule pass nothing and behave as they
+     always have. -->
+{#snippet autoNumber(
+  key: string,
+  a: Auto<number>,
+  computed: number | undefined,
+  step: number,
+  after?: () => void,
+)}
   <label class="auto">
     <span>{t(key)}</span>
     {#if a.auto}
@@ -584,12 +618,48 @@
     <button
       class="toggle"
       class:on={a.auto}
-      onclick={() => (a.auto = !a.auto)}
+      onclick={() => {
+        a.auto = !a.auto;
+        after?.();
+      }}
       title={t("ui.train_automatic")}
     >
       {t("ui.train_auto")}
     </button>
   </label>
+{/snippet}
+
+<!-- **What the automatic shifts are chosen for.** Off, they are the least that
+     clears undercut, which is the smallest admissible pair rather than the best
+     one; on, they are chosen to lose least with that undercut shift as a floor.
+     The contact ratio comes with it because it is the constraint the answer sits
+     against: sliding loss falls with the length of the path, so without a floor
+     the least-loss pair is always the one whose teeth barely reach. -->
+{#snippet efficiencyToggle(
+  on: boolean,
+  setOn: (v: boolean) => void,
+  ratio: number,
+  setRatio: (v: number) => void,
+)}
+  <label class="auto">
+    <span>{t("ui.train_optimise_efficiency")}</span>
+    <input type="checkbox" checked={on} onchange={(e) => setOn(e.currentTarget.checked)} />
+    <em></em>
+    {@render noteSlot(notes(t("ui.train_note_optimise_efficiency"), null))}
+  </label>
+  {#if on}
+    <label>
+      <span>{t("ui.train_min_contact_ratio")}</span>
+      <input
+        type="number"
+        step="0.05"
+        value={ratio}
+        onchange={(e) => setRatio(Number(e.currentTarget.value))}
+      />
+      <em>{t("ui.train_epsilon")}</em>
+      {@render noteSlot(notes(t("ui.train_note_min_contact_ratio"), null))}
+    </label>
+  {/if}
 {/snippet}
 
 <header>
@@ -919,6 +989,7 @@
                 stage.centre_distance,
                 (sres ?? xres)?.centre_distance,
                 0.1,
+                () => relieveSpur(stage, stage.centre_distance),
               )}
               <label>
                 <span>{t("ui.train_c2c_clearance")}</span>
@@ -960,6 +1031,12 @@
                   {@render noteSlot(notes(t("ui.train_note_load_sharing"), null))}
                 </label>
               {/if}
+              {@render efficiencyToggle(
+                stage.optimise_efficiency,
+                (on) => (stage.optimise_efficiency = on),
+                stage.min_contact_ratio,
+                (v) => (stage.min_contact_ratio = v),
+              )}
             </div>
             <!-- Clearance is meaningless once the centre distance is set by hand:
                  the specification locks it to zero, and so does the solver. -->
@@ -1009,6 +1086,7 @@
                 {@const g = sres?.gears[j]}
                 {@render gearCard(gearName(i, j), gear, g, {
                   cut: "rack",
+                  onShiftAuto: () => relieveSpur(stage, gear.profile_shift),
                   faceAuto: stage.shaft_angle === 0,
                   faceFromContinuity: xres?.crossed?.face_width_for_continuity?.[j],
                   extra: xres ? crossedMember : undefined,
@@ -1440,6 +1518,12 @@
                 <em></em>
                 {@render noteSlot(notes(null, null))}
               </label>
+              {@render efficiencyToggle(
+                stage.optimise_efficiency,
+                (on) => (stage.optimise_efficiency = on),
+                stage.min_contact_ratio,
+                (v) => (stage.min_contact_ratio = v),
+              )}
             </div>
 
             <h4>{t("ui.train_ring_cutter")}</h4>
@@ -1675,6 +1759,12 @@
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
+              {@render efficiencyToggle(
+                stage.optimise_efficiency,
+                (on) => (stage.optimise_efficiency = on),
+                stage.min_contact_ratio,
+                (v) => (stage.min_contact_ratio = v),
+              )}
             </div>
 
             {#if hres}
@@ -1715,7 +1805,7 @@
                 <dd>
                   {pct(hres.efficiency.forward)} %
                   {#if hres.efficiency.backward === 0}
-                    <small class="warn">{t("ui.train_hula_self_locking")}</small>
+                    <small class="warn">{t("ui.train_self_locking")}</small>
                   {/if}
                   {@render noteSlot(
                     notes(
@@ -1840,11 +1930,7 @@
               <div class="gears">
                 {#each [ring, pinion] as j (j)}
                   {@render gearCard(
-                    t(
-                      hres && hres.gears[j].ring
-                        ? "ui.train_hula_ring"
-                        : "ui.train_hula_pinion",
-                    ) +
+                    t(hres && hres.gears[j].ring ? "ui.train_ring" : "ui.train_pinion") +
                       " — " +
                       t(
                         ["ui.train_hula_role_grounded", "ui.train_hula_role_wobble", "ui.train_hula_role_wobble", "ui.train_hula_role_output"][j],
@@ -1853,9 +1939,16 @@
                     undefined,
                     {
                       cut: hres && hres.gears[j].ring ? "shaper" : "rack",
+                      // A shift is an *input* only where it is the member this
+                      // mesh names and is still being read: the other member's
+                      // follows from the crank, and once the split is being
+                      // chosen for efficiency the named one follows too — unless
+                      // it was given, which pins it and leaves the mesh nothing
+                      // to search.
                       solvedShift:
                         hres &&
-                        (stage.given_shift[m] === "ring") !== (hres.gears[j].ring === true)
+                        ((stage.given_shift[m] === "ring") !== (hres.gears[j].ring === true) ||
+                          (stage.optimise_efficiency && stage.gears[j].profile_shift.auto))
                           ? hres.gears[j].profile_shift
                           : undefined,
                       faceAuto: false,
