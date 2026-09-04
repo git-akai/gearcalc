@@ -1144,6 +1144,51 @@ pressure angle to clear itself, and the loss carries `1/z₁ + 1/z₂`, which ha
 as the counts double. It turns over past six, where the contact ratio has grown
 and the path sits further from the pitch point again.
 
+**A pair's loss is dimensionless, so the two meshes do not constrain each
+other.** Every term is a ratio — the ends of the path in base pitches, the
+reciprocal tooth counts — so a pair keeps the same fraction of what it is given
+at any size. Two meshes sharing one offset can therefore be *chosen
+independently* and reconciled afterwards by their modules,
+`m = 2 a_w cos α_w / (|Σz| cos α_t)`; the offset itself is a scale that cancels.
+What the far-side gap, the tips and the contact ratio do is **remove ranges of
+each pair's own shifts**, not tie the two pairs together.
+
+Optimised that way, each pair on its own at `z = 36`, `h_a = 0.6`, `μ = 0.08`:
+
+| d | reduction | α_w | the pair keeps | the drive keeps | m₁/m₂ |
+|---|---|---|---|---|---|
+| 2 | 324 | 34.8° | 99.875 % | 54.7 % | 1.0000 |
+| 3 | 144 | 27.2° | 99.949 % | 86.5 % | 1.0000 |
+| 4 | 81 | 23.3° | 99.965 % | 94.0 % | 1.0000 |
+| 5 | 51.8 | 22.7° | 99.956 % | 95.0 % | 1.0000 |
+
+**The module ratio comes out exactly one** — not because the meshes are tied but
+because a drive's two pairs are near twins, `(z+d, z)` against `(z, z−d)`, whose
+independent optima land at the same operating pressure angle. Equal modules is a
+coincidence of that near-symmetry, and the table below is what it costs to depart
+from it.
+
+**Against the lowest shifts that clear.** The default rule — take the least shift
+that produces non-interfering geometry — gets the *sum* right and the *division*
+wrong:
+
+| d | least loss (Σx, x_ring, x_pinion) | least shift | drive, best | drive, least |
+|---|---|---|---|---|
+| 2 | −0.20, +0.40, +0.20 | −0.20, +0.05, −0.15 | 54.65 % | 49.83 % |
+| 3 | −0.10, +0.55, +0.45 | −0.10, +0.15, +0.05 | 86.48 % | 78.50 % |
+| 4 | −0.05, +0.55, +0.50 | −0.05, −0.10, −0.15 | 94.00 % | 87.49 % |
+| 5 | −0.05, +0.50, +0.45 | 0.00, −0.10, −0.10 | 95.04 % | 93.63 % |
+
+The **sum is identical** at `d = 2, 3, 4` — a constraint sets it, and the default
+finds it. The whole difference is that the optimum raises *both* shifts together
+by 0.4 to 0.65 while holding their difference, and the default has no reason to.
+That is worth 1.4 to 8 points of drive efficiency, and it is the freedom
+[`efficient_split`](#efficiency-parallel-axes) exists for: at `d = 4` and `d = 5`
+it lands on the sweep's answer (0.510 against 0.500, 0.436 against 0.425, the
+efficiencies agreeing to 1e−7). At `d = 2` and `d = 3` it reports no root,
+correctly — the loss there is still falling when the contact ratio runs out, so
+the answer is a bound and not a stationary point.
+
 **The two modules are separate inputs and want to be equal.** Nothing in the
 arithmetic ties them — a pair's module is its own — so it is worth knowing that
 moving them apart only costs. Both meshes run at one offset and each needs

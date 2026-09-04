@@ -1055,6 +1055,52 @@ mod tests {
         }
     }
 
+    /// **A pair's loss is dimensionless, so the module is a scale and not a
+    /// variable.**
+    ///
+    /// Every term in the loss is a ratio — the two ends of the path in base
+    /// pitches, the reciprocal tooth counts — so scaling a pair changes nothing
+    /// about what it keeps. That is what lets two meshes sharing one centre
+    /// distance be chosen independently and reconciled afterwards by their
+    /// modules, through `m = 2 a_w cos α_w / (|Σz| cos α_t)`, rather than
+    /// constraining each other.
+    ///
+    /// Checked at the last bit rather than approximately, because "the module
+    /// does not enter" is the kind of claim that is true until someone divides
+    /// by a length.
+    #[test]
+    fn a_pairs_loss_does_not_know_its_size() {
+        for module in [0.25_f64, 0.5, 2.0, 7.5] {
+            let g = |teeth: u32, m: f64| {
+                Tooth::new(GearParams {
+                    teeth,
+                    module: m,
+                    profile_shift: 0.3,
+                    ..Default::default()
+                })
+            };
+            let of = |m: f64| {
+                let (a, b) = (g(17, m), g(43, m));
+                let mesh = Mesh::new(&a, &b, MeshKind::External).unwrap();
+                let path = ContactPath::new(&a, b.ra, &mesh).unwrap();
+                (
+                    efficiency(&path, &mesh, &a, 0.08, Drive::Forward),
+                    split_residual(&path),
+                )
+            };
+            let (one, one_r) = of(1.0);
+            let (other, other_r) = of(module);
+            assert!(
+                (one - other).abs() < 1e-14,
+                "module {module}: {other} against {one}"
+            );
+            assert!(
+                (one_r - other_r).abs() < 1e-12,
+                "and the condition too: {other_r} against {one_r}"
+            );
+        }
+    }
+
     fn helical_pair(z1: u32, z2: u32, beta: f64) -> (Tooth, Tooth, Mesh) {
         let a = Tooth::new(GearParams {
             teeth: z1,
