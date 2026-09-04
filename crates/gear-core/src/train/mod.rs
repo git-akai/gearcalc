@@ -35,7 +35,9 @@ mod planetary;
 mod spur;
 mod worm;
 
-pub use hula::{drive_efficiency, solve_hula_stage, HulaGear, HulaMesh, HulaResult, HulaStage};
+pub use hula::{
+    drive_efficiency, solve_hula_stage, GivenShift, HulaGear, HulaMesh, HulaResult, HulaStage,
+};
 pub use planetary::{
     solve_planetary_stage, solve_planetary_stage_with, MeshReport, PlanetResult, PlanetaryResult,
     PlanetaryStage,

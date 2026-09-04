@@ -1608,12 +1608,6 @@
 
       {:else if stage.kind === "hula"}
         {@const hres = res && res.kind === "hula" ? res : null}
-        {@const roles = [
-          "ui.train_hula_role_grounded",
-          "ui.train_hula_role_wobble",
-          "ui.train_hula_role_wobble",
-          "ui.train_hula_role_output",
-        ]}
         <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
           <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
@@ -1627,13 +1621,6 @@
         {#if tab.open[i]}
           <div class="body">
             <div class="grid shared">
-              {#each stage.gears as gear, j (j)}
-                <label>
-                  <span>{t("ui.train_hula_teeth_of", { role: t(roles[j]) })}</span>
-                  <input type="number" step="1" min="1" bind:value={gear.teeth} />
-                  <em></em>
-                </label>
-              {/each}
               <label>
                 <span>{t("ui.train_pressure_angle")}</span>
                 <input type="number" step="0.5" bind:value={stage.pressure_angle} />
@@ -1644,30 +1631,12 @@
                 <input type="number" step="1" bind:value={stage.helix_angle} />
                 <em>°</em>
               </label>
-              {#each [0, 1] as m (m)}
-                <label>
-                  <span>{t("ui.train_hula_module_of", { mesh: String(m + 1) })}</span>
-                  <input type="number" step="0.1" bind:value={stage.module[m]} />
-                  <em>{t("ui.train_mm")}</em>
-                </label>
-                <label>
-                  <span>{t("ui.train_hula_thickness_mod_of", { mesh: String(m + 1) })}</span>
-                  <input type="number" step="0.05" bind:value={stage.thickness_mod[m]} />
-                  <em></em>
-                  <small>{t("ui.train_hula_note_thickness_mod")}</small>
-                </label>
-                <label>
-                  <span>{t("ui.train_hula_shaper_teeth_of", { mesh: String(m + 1) })}</span>
-                  <input type="number" step="1" min="4" bind:value={stage.cutter[m].teeth} />
-                  <em></em>
-                  <small>{t("ui.train_hula_note_shaper")}</small>
-                </label>
-                <label>
-                  <span>{t("ui.train_hula_friction_of", { mesh: String(m + 1) })}</span>
-                  <input type="number" step="0.01" bind:value={stage.sliding_friction[m]} />
-                  <em></em>
-                </label>
-              {/each}
+              <label>
+                <span>{t("ui.train_hula_gap")}</span>
+                <input type="number" step="0.05" bind:value={stage.clearance} />
+                <em>{t("ui.train_mm")}</em>
+                {@render noteSlot(notes(t("ui.train_hula_note_gap"), null))}
+              </label>
               <label>
                 <span>{t("ui.train_hula_offset_from")}</span>
                 <select
@@ -1676,13 +1645,13 @@
                     stage.offset =
                       e.currentTarget.value === "clearance"
                         ? "clearance"
-                        : { given: stage.clearance };
+                        : { given: hres ? hres.offset_nominal : stage.clearance };
                   }}
                 >
                   <option value="clearance">{t("ui.train_hula_offset_from_bounds")}</option>
                   <option value="given">{t("ui.train_hula_offset_given")}</option>
                 </select>
-                <small>{t("ui.train_hula_note_offset")}</small>
+                {@render noteSlot(notes(t("ui.train_hula_note_offset"), null))}
               </label>
               {#if typeof stage.offset !== "string"}
                 <label>
@@ -1692,16 +1661,9 @@
                 </label>
               {/if}
               <label>
-                <span>{t("ui.train_hula_gap")}</span>
-                <input type="number" step="0.05" bind:value={stage.clearance} />
-                <em>{t("ui.train_mm")}</em>
-                <small>{t("ui.train_hula_note_gap")}</small>
-              </label>
-              <label>
                 <span>{t("ui.train_c2c_clearance")}</span>
                 <input type="number" step="0.01" bind:value={stage.running_clearance} />
                 <em>{t("ui.train_mm")}</em>
-                <small>{t("ui.train_hula_note_offset")}</small>
               </label>
               <label>
                 <span>{t("ui.train_c2c_tolerance_plus")}</span>
@@ -1713,49 +1675,63 @@
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
-              {#each [0, 1] as m (m)}
-                <label>
-                  <span>{t("ui.train_hula_split_of", { mesh: String(m + 1) })}</span>
-                  <select
-                    value={"ring" in stage.split[m] ? "ring" : "pinion"}
-                    onchange={(e) => {
-                      const held =
-                        "ring" in stage.split[m] ? stage.split[m].ring : stage.split[m].pinion;
-                      stage.split[m] =
-                        e.currentTarget.value === "ring" ? { ring: held } : { pinion: held };
-                    }}
-                  >
-                    <option value="pinion">{t("ui.train_hula_split_pinion")}</option>
-                    <option value="ring">{t("ui.train_hula_split_ring")}</option>
-                  </select>
-                  <small>{t("ui.train_hula_note_split")}</small>
-                </label>
-              {/each}
             </div>
 
             {#if hres}
+              <!-- Ordered as the spur and screw readouts are — the distance the
+                   pair runs at, contact, efficiency, backlash — with what only
+                   this arrangement has following on. -->
               <dl class="out">
                 <dt>{t("ui.train_ratio")}</dt>
                 <dd>
                   {hres.ratio.toFixed(4)} : 1
-                  <small>
-                    {t("ui.train_hula_ratio_products", {
-                      numerator: String(hres.ratio_products[0]),
-                      denominator: String(hres.ratio_products[1]),
-                    })} · {t("ui.train_hula_note_ratio", {
-                      denominator: String(hres.ratio_products[1]),
-                    })}
-                  </small>
+                  {@render noteSlot(
+                    notes(
+                      `${t("ui.train_hula_ratio_products", {
+                        numerator: String(hres.ratio_products[0]),
+                        denominator: String(hres.ratio_products[1]),
+                      })} · ${t("ui.train_hula_note_ratio", {
+                        denominator: String(hres.ratio_products[1]),
+                      })}`,
+                      null,
+                    ),
+                  )}
                 </dd>
                 <dt>{t("ui.train_hula_crank_offset")}</dt>
                 <dd>
                   {hres.offset_nominal.toFixed(4)} {t("ui.train_mm")}
-                  <small>
-                    {t("ui.train_hula_running", { value: hres.offset.toFixed(4) })}{hres.binding_mesh !==
-                    null
-                      ? ` · ${t("ui.train_hula_held_open_by", { mesh: String(hres.binding_mesh + 1) })}`
-                      : ""}
-                  </small>
+                  {@render noteSlot(
+                    notes(
+                      `${t("ui.train_hula_running", { value: hres.offset.toFixed(4) })}${
+                        hres.binding_mesh !== null
+                          ? ` · ${t("ui.train_hula_held_open_by", { mesh: String(hres.binding_mesh + 1) })}`
+                          : ""
+                      }`,
+                      null,
+                    ),
+                  )}
+                </dd>
+                <dt>{t("ui.train_efficiency")}</dt>
+                <dd>
+                  {pct(hres.efficiency.forward)} %
+                  {#if hres.efficiency.backward === 0}
+                    <small class="warn">{t("ui.train_hula_self_locking")}</small>
+                  {/if}
+                  {@render noteSlot(
+                    notes(
+                      `${t("ui.train_hula_meshes_alone", {
+                        percent: pct(hres.fixed_carrier_efficiency.forward),
+                      })} · ${t("ui.train_hula_note_circulating")}`,
+                      null,
+                    ),
+                  )}
+                </dd>
+                <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
+                <dd>
+                  {t("ui.train_backlash_at", {
+                    angle: hres.backlash.forward.nominal.toFixed(4),
+                    member: t("ui.train_hula_role_output"),
+                  })}
                 </dd>
                 <dt>{t("ui.train_hula_speeds")}</dt>
                 <dd>
@@ -1765,91 +1741,136 @@
                     output: hres.gears[3].speed.toFixed(4),
                   })}
                 </dd>
-                <dt>{t("ui.train_efficiency")}</dt>
-                <dd>
-                  {pct(hres.efficiency.forward)} %
-                  {#if hres.efficiency.backward === 0}
-                    <span class="warn">· {t("ui.train_hula_self_locking")}</span>
-                  {/if}
-                  <small>
-                    {t("ui.train_hula_meshes_alone", {
-                      percent: pct(hres.fixed_carrier_efficiency.forward),
-                    })} · {t("ui.train_hula_note_circulating")}
-                  </small>
-                </dd>
-                <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
-                <dd>
-                  {t("ui.train_backlash_at", {
-                    angle: hres.backlash.forward.nominal.toFixed(4),
-                    member: t("ui.train_hula_role_output"),
-                  })}
-                </dd>
               </dl>
+            {/if}
 
-              {#each hres.meshes as mesh, m (m)}
-                {@const pair = [hres.gears[m * 2], hres.gears[m * 2 + 1]]}
-                <h4>{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
+            {#each [0, 1] as m (m)}
+              {@const ring = hres && hres.gears[m * 2].ring ? m * 2 : m * 2 + 1}
+              {@const pinion = ring === m * 2 ? m * 2 + 1 : m * 2}
+              <h4>{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
+              <div class="grid shared">
+                <label>
+                  <span>{t("ui.train_normal_module")}</span>
+                  <input type="number" step="0.05" bind:value={stage.module[m]} />
+                  <em>{t("ui.train_mm")}</em>
+                </label>
+                <label>
+                  <span>{t("ui.train_tooth_thickness_mod")}</span>
+                  <input type="number" step="0.05" bind:value={stage.thickness_mod[m]} />
+                  {@render noteSlot(notes(t("ui.train_hula_note_thickness_mod"), null))}
+                </label>
+                <label>
+                  <span>{t("ui.train_cutter_teeth")}</span>
+                  <input type="number" step="1" min="4" bind:value={stage.cutter[m].teeth} />
+                  {@render noteSlot(notes(t("ui.train_hula_note_shaper"), null))}
+                </label>
+                <label>
+                  <span>{t("ui.train_sliding_friction")}</span>
+                  <input type="number" step="0.01" bind:value={stage.sliding_friction[m]} />
+                </label>
+                <label>
+                  <span>{t("ui.train_hula_given_shift")}</span>
+                  <select bind:value={stage.given_shift[m]}>
+                    <option value="pinion">{t("ui.train_hula_split_pinion")}</option>
+                    <option value="ring">{t("ui.train_hula_split_ring")}</option>
+                  </select>
+                  {@render noteSlot(notes(t("ui.train_hula_note_split"), null))}
+                </label>
+              </div>
+              {#if hres}
                 <dl class="out">
-                  <dt>{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</dt>
-                  <dd>
-                    {pair
-                      .map((g) =>
-                        t("ui.train_hula_member", {
-                          role: t(g.ring ? "ui.train_hula_ring" : "ui.train_hula_pinion"),
-                          teeth: String(g.teeth),
-                          shift: g.profile_shift.toFixed(4),
-                        }),
-                      )
-                      .join(" · ")}
-                  </dd>
                   <dt>{t("ui.train_hula_operating_pressure_angle")}</dt>
                   <dd>
-                    {mesh.operating_pressure_angle.toFixed(3)}°
-                    <small>{t("ui.train_hula_note_operating_pressure_angle")}</small>
-                  </dd>
-                  <dt>{t("ui.train_hula_gap_result")}</dt>
-                  <dd>
-                    {mesh.clearance.toFixed(4)} {t("ui.train_mm")}
-                    <small>
-                      {t("ui.train_hula_gap_as_cut", { value: mesh.clearance_as_cut.toFixed(4) })}
-                    </small>
+                    {hres.meshes[m].operating_pressure_angle.toFixed(3)}°
+                    {@render noteSlot(
+                      notes(t("ui.train_hula_note_operating_pressure_angle"), null),
+                    )}
                   </dd>
                   <dt>{t("ui.train_contact_ratio")}</dt>
                   <dd>
-                    {mesh.contact_ratio.toFixed(4)}
-                    {#if mesh.contact_ratio < 1}
-                      <small class="warn">{t("ui.train_note_contact_ratio_below_one")}</small>
-                    {/if}
+                    {hres.meshes[m].contact_ratio.toFixed(4)}
+                    {@render noteSlot(
+                      notes(
+                        null,
+                        hres.meshes[m].contact_ratio < 1
+                          ? t("ui.train_note_contact_ratio_below_one")
+                          : null,
+                      ),
+                    )}
+                  </dd>
+                  <dt>{t("ui.train_hula_gap_result")}</dt>
+                  <dd>
+                    {hres.meshes[m].clearance.toFixed(4)} {t("ui.train_mm")}
+                    {@render noteSlot(
+                      notes(
+                        t("ui.train_hula_gap_as_cut", {
+                          value: hres.meshes[m].clearance_as_cut.toFixed(4),
+                        }),
+                        null,
+                      ),
+                    )}
                   </dd>
                   <dt>{t("ui.train_hula_tip_margin")}</dt>
                   <dd>
-                    {mesh.tip_margin.toFixed(4)}°
-                    <small>{t("ui.train_hula_note_tip_margin")}</small>
+                    {hres.meshes[m].tip_margin.toFixed(4)}°
+                    {@render noteSlot(notes(t("ui.train_hula_note_tip_margin"), null))}
                   </dd>
                   <dt>{t("ui.train_hula_interference")}</dt>
                   <dd>
                     {[
-                      mesh.trochoid_interference ? t("ui.train_hula_interference_trochoid") : null,
-                      mesh.involute_interference ? t("ui.train_hula_interference_involute") : null,
-                      mesh.tip_interference ? t("ui.train_hula_interference_tip") : null,
+                      hres.meshes[m].trochoid_interference
+                        ? t("ui.train_hula_interference_trochoid")
+                        : null,
+                      hres.meshes[m].involute_interference
+                        ? t("ui.train_hula_interference_involute")
+                        : null,
+                      hres.meshes[m].tip_interference
+                        ? t("ui.train_hula_interference_tip")
+                        : null,
                     ]
                       .filter((x) => x !== null)
                       .join(" · ") || t("ui.train_hula_interference_none")}
                   </dd>
                   <dt>{t("ui.train_backlash")}</dt>
                   <dd>
-                    {mesh.backlash
-                      .map((b) => `${b.nominal.toFixed(5)}°`)
-                      .join(" / ")}
+                    {hres.meshes[m].backlash.map((b) => `${b.nominal.toFixed(5)}°`).join(" / ")}
                   </dd>
                 </dl>
-                {#each pair as gear (gear.teeth)}
-                  {#each gear.clamps as clamp, c (c)}
-                    <p class="clamp">z{gear.teeth}: {note(clamp)}</p>
+              {/if}
+              <div class="gears">
+                {#each [ring, pinion] as j (j)}
+                  {@render gearCard(
+                    t(
+                      hres && hres.gears[j].ring
+                        ? "ui.train_hula_ring"
+                        : "ui.train_hula_pinion",
+                    ) +
+                      " — " +
+                      t(
+                        ["ui.train_hula_role_grounded", "ui.train_hula_role_wobble", "ui.train_hula_role_wobble", "ui.train_hula_role_output"][j],
+                      ),
+                    stage.gears[j],
+                    undefined,
+                    {
+                      cut: hres && hres.gears[j].ring ? "shaper" : "rack",
+                      solvedShift:
+                        hres &&
+                        (stage.given_shift[m] === "ring") !== (hres.gears[j].ring === true)
+                          ? hres.gears[j].profile_shift
+                          : undefined,
+                      faceAuto: false,
+                    },
+                  )}
+                {/each}
+              </div>
+              {#if hres}
+                {#each [ring, pinion] as j (j)}
+                  {#each hres.gears[j].clamps as clamp, c (c)}
+                    <p class="hint">z{hres.gears[j].teeth}: {note(clamp)}</p>
                   {/each}
                 {/each}
-              {/each}
-            {/if}
+              {/if}
+            {/each}
 
             <button
               class="danger small"

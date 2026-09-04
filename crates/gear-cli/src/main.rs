@@ -533,8 +533,7 @@ fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, tit
 /// out — the useful statement is which bound stops it, and that is what these
 /// rows are.
 fn hula_band(z0: u32, clearance_in_modules: f64) {
-    use gear_core::hula::Split;
-    use gear_core::train::{solve_hula_stage, HulaStage};
+    use gear_core::train::{solve_hula_stage, GivenShift, HulaStage};
 
     println!(
         "hula, reduction {} : 1 — the same ratio at every tooth difference\n",
@@ -562,12 +561,13 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                         running_clearance: 0.02 * module,
                         tolerance_plus: 0.02 * module,
                         tolerance_minus: 0.02 * module,
-                        split: [Split::Pinion(x); 2],
+                        given_shift: [GivenShift::Pinion; 2],
                         ..HulaStage::default()
                     };
                     for (gear, count) in stage.gears.iter_mut().zip(teeth) {
                         gear.teeth = count;
                         gear.addendum = gear_core::params::Auto::fixed(addendum);
+                        gear.profile_shift = gear_core::params::Auto::fixed(x);
                     }
                     for c in &mut stage.cutter {
                         c.teeth = cutter;

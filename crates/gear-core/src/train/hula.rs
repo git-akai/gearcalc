@@ -41,6 +41,20 @@ use crate::tooth::Tooth;
 use crate::train::StageGear;
 use crate::GearParams;
 
+/// Which member of a mesh carries the shift a designer gives.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum GivenShift {
+    Ring,
+    Pinion,
+}
+
 /// Why a hula stage could not be solved.
 ///
 /// Its own type rather than a widening of [`super::TrainError`]: a drive that
@@ -105,8 +119,13 @@ pub struct HulaStage {
     pub tolerance_minus: f64,
     /// What decides the crank offset.
     pub offset: Offset,
-    /// What decides each mesh's shift distribution.
-    pub split: [Split; 2],
+    /// Which member of each mesh carries the shift that is **given**.
+    ///
+    /// The other's follows from the crank offset, which fixes the difference of
+    /// the two. The value itself is not here: it is the named member's own
+    /// `profile_shift`, so a shift has one home and the panel can render it in
+    /// the gear's card like every other stage's.
+    pub given_shift: [GivenShift; 2],
     /// The shaper each mesh's ring is cut with.
     ///
     /// **A shaper has to be smaller than the ring it cuts**, and the rings here
@@ -143,7 +162,7 @@ impl Default for HulaStage {
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
             offset: Offset::Clearance,
-            split: [Split::Pinion(0.0); 2],
+            given_shift: [GivenShift::Pinion; 2],
             // **A shaper is coupled to the shift it has to cut**, not only to
             // the ring's size: the clearance drives the ring's shift up, and a
             // tool that reached its flank at one shift stops reaching it at a
@@ -329,6 +348,23 @@ pub fn solve_hula_stage(
     input_torque: f64,
 ) -> Result<HulaResult, Error> {
     let teeth = Teeth(stage.gears.each_ref().map(|g| g.teeth));
+    // The given shift is the named member's own, so the arrangement is handed
+    // the value from where a reader entered it rather than from a second copy.
+    let pair_of = |mesh: usize| {
+        let (a, b) = (mesh * 2, mesh * 2 + 1);
+        if teeth.0[a] > teeth.0[b] {
+            (a, b)
+        } else {
+            (b, a)
+        }
+    };
+    let split = std::array::from_fn(|mesh| {
+        let (ring, pinion) = pair_of(mesh);
+        match stage.given_shift[mesh] {
+            GivenShift::Ring => Split::Ring(stage.gears[ring].profile_shift.manual),
+            GivenShift::Pinion => Split::Pinion(stage.gears[pinion].profile_shift.manual),
+        }
+    });
     let set = hula::Set {
         teeth,
         module: stage.module,
@@ -337,7 +373,7 @@ pub fn solve_hula_stage(
         addendum: stage.gears.each_ref().map(|g| g.addendum.manual),
         clearance: stage.clearance,
         offset: stage.offset,
-        split: stage.split,
+        split,
     };
     // **The offset has to clear the tips as well as the far side**, and that
     // bound belongs to the pair rather than to the arrangement — so it is
@@ -1150,12 +1186,13 @@ mod tests {
             let mut s = HulaStage {
                 module: [ratio, 1.0],
                 clearance: 0.30,
-                split: [hula::Split::Pinion(-0.2); 2],
+                given_shift: [GivenShift::Pinion; 2],
                 ..HulaStage::default()
             };
             for (gear, count) in s.gears.iter_mut().zip([19_u32, 18, 17, 18]) {
                 gear.teeth = count;
                 gear.addendum = crate::params::Auto::fixed(0.6);
+                gear.profile_shift = crate::params::Auto::fixed(-0.2);
             }
             for c in &mut s.cutter {
                 c.teeth = 14;

@@ -28,6 +28,7 @@ export type { Fillet } from "./core/Fillet";
 export type { FirstMemberSizing } from "./core/FirstMemberSizing";
 export type { GearParams } from "./core/GearParams";
 export type { GearResult } from "./core/GearResult";
+export type { GivenShift } from "./core/GivenShift";
 export type { HulaGear } from "./core/HulaGear";
 export type { HulaMesh } from "./core/HulaMesh";
 export type { HulaResult } from "./core/HulaResult";
