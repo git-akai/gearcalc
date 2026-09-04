@@ -147,6 +147,33 @@ pub struct SpurStage {
     pub clearance: f64,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
+    /// **Choose the automatic shifts for efficiency rather than for undercut.**
+    ///
+    /// Off, so a stage answers as it always has. On, the shifts a designer has
+    /// left automatic are chosen to make the pair lose least, with the undercut
+    /// shift as a *floor* rather than as the answer — which is worth over a
+    /// point of mesh efficiency on an ordinary pair, and buys it with contact
+    /// ratio (docs/reference.md#efficiency-parallel-axes).
+    ///
+    /// What is already given constrains it: a manual shift is that gear's, and
+    /// a manual centre distance fixes the two shifts' sum. Two of the three
+    /// leave nothing to choose, which is a design fully specified rather than
+    /// an error.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub optimise_efficiency: bool,
+    /// **The transverse contact ratio the optimiser may not go below.**
+    ///
+    /// Sliding loss falls monotonically with the length of the path: every
+    /// millimetre of profile that touches is a millimetre that slides. So the
+    /// least-loss pair is always the one whose teeth barely reach, and this is
+    /// the constraint that answers rather than the optimum — which is why it is
+    /// an input and not a constant. 1.2 is the usual design minimum, leaving
+    /// margin for the tolerance and tip relief a real pair carries.
+    ///
+    /// It bounds the *optimiser* only. A pair specified by hand is reported as
+    /// it is, with the existing note below 1, exactly as before.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub min_contact_ratio: f64,
     /// How the load is divided while two tooth pairs are engaged.
     ///
     /// **Off by default, and it reaches bending only.** A contact rating is
@@ -174,6 +201,8 @@ impl Default for SpurStage {
             sliding_friction: 0.08,
             static_friction: 0.16,
             thickness_mod: 1.0,
+            optimise_efficiency: false,
+            min_contact_ratio: 1.2,
             centre_distance: Auto::automatic(0.0),
             clearance: 0.02,
             tolerance_plus: 0.02,
@@ -208,16 +237,90 @@ impl SpurStage {
         self.shaft_angle != 0.0
     }
 
-    /// `GearParams` for one gear, with the automatic values resolved.
+    /// The two profile shifts, chosen together where that is what the stage
+    /// asked for.
     ///
-    /// The two automatic calculations are ordered, and the order matters: the
-    /// shift is chosen first because the addendum solve needs `ψ_b`, which
-    /// depends on it. The reverse dependency does not exist — `minimum_profile_shift`
-    /// touches only `r`, `α_t` and the cutter, none of which the addendum moves —
-    /// so there is no loop to iterate.
-    pub(super) fn params(&self, i: usize) -> GearParams {
+    /// With the toggle off each gear answers on its own, as it always has: the
+    /// manual value, or the least shift that clears undercut. With it on the
+    /// pair is chosen at once, because a shift is only good or bad relative to
+    /// the one it meshes with — and what a designer has already given is handed
+    /// over as pinned rather than overridden.
+    pub(super) fn shifts(&self) -> [f64; 2] {
+        let floor = [0, 1].map(|i| {
+            let g = &self.gears[i];
+            automatic_profile_shift(&self.base_params(i), g.working_depth.resolve(g.dedendum))
+        });
+        let given = [0, 1].map(|i| {
+            (!self.gears[i].profile_shift.auto).then_some(self.gears[i].profile_shift.manual)
+        });
+        if !self.optimise_efficiency {
+            return [0, 1].map(|i| given[i].unwrap_or(floor[i]));
+        }
+        let sum = (!self.centre_distance.auto)
+            .then(|| {
+                let rack = crate::plane::BasicRack::new(
+                    self.module,
+                    self.pressure_angle,
+                    self.helix_angles()[0].abs(),
+                );
+                let sum_z = f64::from(self.gears[0].teeth) + f64::from(self.gears[1].teeth);
+                crate::mesh::shift_sum_for(
+                    rack.mt,
+                    rack.alpha_t,
+                    rack.alpha_n,
+                    sum_z,
+                    self.centre_distance.manual,
+                )
+            })
+            .flatten();
+        crate::auto::shifts_for_efficiency(
+            &|x| [0, 1].map(|i| self.params_at(i, x[i])),
+            crate::mesh::MeshKind::External,
+            &crate::auto::Bounds {
+                floor,
+                min_contact_ratio: self.min_contact_ratio,
+                // Clearance applies only where the stage derives the distance,
+                // matching `solve_spur_stage` exactly.
+                clearance: if self.centre_distance.auto {
+                    self.clearance
+                } else {
+                    0.0
+                },
+            },
+            &crate::auto::Pinned { shift: given, sum },
+            self.sliding_friction,
+        )
+        .unwrap_or_else(|| [0, 1].map(|i| given[i].unwrap_or(floor[i])))
+    }
+
+    /// The gear the stage would build at a given shift — the automatic
+    /// addendum resolved, because a shift changes the tip width and so the
+    /// tooth that shift produces.
+    ///
+    /// [`Self::params`] is this at the shift the stage settled on, and the
+    /// optimiser searches over it, so the geometry that is rated is the
+    /// geometry that is built.
+    pub(super) fn params_at(&self, i: usize, x: f64) -> GearParams {
         let g = &self.gears[i];
-        let base = GearParams {
+        let with_shift = GearParams {
+            profile_shift: x,
+            ..self.base_params(i)
+        };
+        GearParams {
+            addendum: if g.addendum.auto {
+                addendum_for_tip_width(&Tooth::new(with_shift), g.min_tip_width)
+                    .unwrap_or(with_shift.addendum)
+            } else {
+                g.addendum.manual
+            },
+            ..with_shift
+        }
+    }
+
+    /// `GearParams` for one gear, before any automatic value is resolved.
+    pub(super) fn base_params(&self, i: usize) -> GearParams {
+        let g = &self.gears[i];
+        GearParams {
             // A stage member is concentric: the eccentric feature is the gear
             // tab's, and `..Default::default()` here would silently invent one
             // the day a stage grew the input.
@@ -238,28 +341,18 @@ impl SpurStage {
             } else {
                 2.0 - self.thickness_mod
             },
-        };
-
-        let x = g.profile_shift.resolve(automatic_profile_shift(
-            &base,
-            g.working_depth.resolve(g.dedendum),
-        ));
-        let with_shift = GearParams {
-            profile_shift: x,
-            ..base
-        };
-
-        let addendum = if g.addendum.auto {
-            addendum_for_tip_width(&Tooth::new(with_shift), g.min_tip_width)
-                .unwrap_or(with_shift.addendum)
-        } else {
-            g.addendum.manual
-        };
-
-        GearParams {
-            addendum,
-            ..with_shift
         }
+    }
+
+    /// `GearParams` for one gear, with the automatic values resolved.
+    ///
+    /// The two automatic calculations are ordered, and the order matters: the
+    /// shift is chosen first because the addendum solve needs `ψ_b`, which
+    /// depends on it. The reverse dependency does not exist — `minimum_profile_shift`
+    /// touches only `r`, `α_t` and the cutter, none of which the addendum moves —
+    /// so there is no loop to iterate.
+    pub(super) fn params(&self, i: usize) -> GearParams {
+        self.params_at(i, self.shifts()[i])
     }
 }
 

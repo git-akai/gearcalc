@@ -704,6 +704,185 @@ pub fn addendum_for_tip_width(g: &Tooth, min_tip_width: f64) -> Option<f64> {
     Some((ra - g.r) / g.params.module - g.params.profile_shift)
 }
 
+/// What is already decided about a pair's two profile shifts.
+///
+/// Two shifts is two unknowns, and each of the three things a designer can pin
+/// — either shift, or the centre distance, which fixes their signed sum —
+/// removes one. So **at most two may be given**; a third is a contradiction
+/// rather than a tighter design, and the caller is expected to have dropped one
+/// before asking.
+/// **What the search may not do**, as opposed to what it is trying to achieve.
+///
+/// Each field eliminates a range of shifts rather than reshaping the surface
+/// being searched, which is the whole of how constraints enter here: the
+/// optimum is wherever it is, and these say which parts of the plane the answer
+/// is not allowed to come from.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Bounds {
+    /// The least shift each gear may take — the undercut minimum, which is a
+    /// floor and not an answer.
+    pub floor: [f64; 2],
+    /// The transverse contact ratio the pair must keep. Loss falls
+    /// monotonically with path length, so without this the least-loss pair is
+    /// always the one whose teeth barely reach and the constraint *is* the
+    /// answer; it belongs to the stage, not to this function, because how much
+    /// margin a design wants over continuous contact is a design decision.
+    pub min_contact_ratio: f64,
+    /// How far the stage opens the zero-backlash distance to assemble, so the
+    /// pair is rated where it actually touches.
+    pub clearance: f64,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Pinned {
+    /// A shift a designer gave, per gear.
+    pub shift: [Option<f64>; 2],
+    /// The signed shift sum a given centre distance implies, if one was given.
+    pub sum: Option<f64>,
+}
+
+impl Pinned {
+    /// How many of the two unknowns are still free.
+    #[must_use]
+    pub fn freedoms(&self) -> usize {
+        2 - usize::from(self.shift[0].is_some())
+            - usize::from(self.shift[1].is_some())
+            - usize::from(self.sum.is_some())
+    }
+}
+
+/// The profile shifts a pair loses least at, given what is already pinned and a
+/// floor neither may go below.
+///
+/// # What the floor is
+///
+/// [`automatic_profile_shift`] — the least shift that clears undercut. It is a
+/// **floor and not an answer**: an external pair loses least well above it,
+/// because the loss is an integral along the whole path of contact and positive
+/// shift shortens the path (docs/reference.md#efficiency-parallel-axes). On
+/// 17/43 the difference is 1.6 points of mesh efficiency and a contact ratio of
+/// 1.48 against 3.04 — which is the trade a designer is being handed, not one
+/// this decides for them.
+///
+/// # Why the sum is searched and the division solved
+///
+/// Moving the two shifts *apart* at a fixed sum leaves the operating pressure
+/// angle where it was, so only the path's two ends move and the stationary
+/// condition is one line — [`crate::contact::split_residual`]. Moving them
+/// *together* changes the operating pressure angle, and with it the base pitch,
+/// the operating radii and both ends at once; there is no such line, so that
+/// direction is searched. Both are cheap: a trial pair is two `Tooth`s and a
+/// path.
+///
+/// # Errors
+///
+/// `None` when no admissible pair exists — every candidate undercut, pointed, or
+/// with contact that does not stay continuous.
+#[must_use]
+pub fn shifts_for_efficiency(
+    pair: &dyn Fn([f64; 2]) -> [GearParams; 2],
+    kind: crate::mesh::MeshKind,
+    bounds: &Bounds,
+    pinned: &Pinned,
+    friction: f64,
+) -> Option<[f64; 2]> {
+    let Bounds {
+        floor,
+        min_contact_ratio,
+        clearance,
+    } = *bounds;
+    let sign = kind.sign();
+    let loss_at = |x: [f64; 2]| -> Option<f64> {
+        if x[0] < floor[0] - 1e-12 || x[1] < floor[1] - 1e-12 {
+            return None;
+        }
+        let [pa, pb] = pair(x);
+        let (a, b) = (Tooth::new(pa), Tooth::new(pb));
+        if a.undercut || b.undercut || a.severed || b.severed {
+            return None;
+        }
+        // **The pair as it runs, not as its shifts leave it.** The stage opens
+        // the zero-backlash distance by its assembly clearance and rates
+        // contact there (docs/reference.md#centre-distance-and-backlash); so
+        // does this, or the search would optimise a contact ratio nobody
+        // measures and settle just under the floor it was given.
+        let zero_backlash = crate::mesh::Mesh::new(&a, &b, kind).ok()?;
+        let mesh = zero_backlash.at(zero_backlash.a_w + clearance).ok()?;
+        // **The teeth have to reach the bottom of the space and stop.** A tip
+        // that passes the mating root circle is a tooth that bottoms out, and
+        // no amount of efficiency redeems it. The dedendum already carries the
+        // gap — a standard 1.25 module against a 1 module addendum *is* the
+        // 0.25 of bottom clearance — so this reads the clearance the designer
+        // specified rather than inventing a second input for it.
+        //
+        // It never bites near zero shift, which is why the stages have not
+        // needed it: it is the constraint that appears the moment a pair is
+        // pushed out, and it is what stops the search pushing further.
+        if mesh.a_w - a.ra - b.rf < 0.0 || mesh.a_w - b.ra - a.rf < 0.0 {
+            return None;
+        }
+        let path = crate::contact::ContactPath::new(&a, b.ra, &mesh)?;
+        // The floor is what stops the search walking off the end of a
+        // shortening path. Loss falls monotonically with path length — every
+        // millimetre of profile that touches is a millimetre that slides — so
+        // without a floor the least-loss pair is always the one whose teeth
+        // barely reach, and the constraint is the answer.
+        (path.contact_ratio >= min_contact_ratio).then(|| {
+            crate::contact::efficiency(&path, &mesh, &a, friction, crate::contact::Drive::Forward)
+        })
+    };
+
+    // The pair that a set of free coordinates describes, given what is pinned.
+    let place = |free: &[f64]| -> [f64; 2] {
+        match (pinned.shift[0], pinned.shift[1], pinned.sum) {
+            (Some(a), Some(b), _) => [a, b],
+            (Some(a), None, Some(s)) => [a, (s - a) / sign],
+            (None, Some(b), Some(s)) => [s - sign * b, b],
+            (Some(a), None, None) => [a, free[0]],
+            (None, Some(b), None) => [free[0], b],
+            // Only the sum is pinned: the free coordinate is the division, taken
+            // as gear 1's shift with gear 2's following.
+            (None, None, Some(s)) => [free[0], (s - free[0]) / sign],
+            (None, None, None) => [free[0], free[1]],
+        }
+    };
+
+    // A bounded search on each free coordinate in turn, refined about the best
+    // — coordinate descent on a smooth two-variable surface, which converges in
+    // a handful of passes and needs no derivative in a direction that has none.
+    let dof = pinned.freedoms();
+    if dof == 0 {
+        let x = place(&[]);
+        return loss_at(x).map(|_| x);
+    }
+    let span = 3.0_f64;
+    let mut centre = vec![0.0; dof];
+    let mut best: Option<([f64; 2], f64)> = None;
+    let mut step = span / 12.0;
+    for _ in 0..6 {
+        for axis in 0..dof {
+            let mut local: Option<(f64, [f64; 2], f64)> = None;
+            for k in -12..=12 {
+                let mut trial = centre.clone();
+                trial[axis] = centre[axis] + f64::from(k) * step;
+                let x = place(&trial);
+                let Some(eta) = loss_at(x) else { continue };
+                if local.as_ref().is_none_or(|l| eta > l.2) {
+                    local = Some((trial[axis], x, eta));
+                }
+            }
+            if let Some((at, x, eta)) = local {
+                centre[axis] = at;
+                if best.as_ref().is_none_or(|b| eta > b.1) {
+                    best = Some((x, eta));
+                }
+            }
+        }
+        step /= 3.0;
+    }
+    best.map(|(x, _)| x)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -1312,5 +1491,155 @@ mod tests {
                 );
             }
         }
+    }
+    /// The contact ratio the chooser is not allowed to go below, shared with
+    /// the grid it is checked against so the two agree on what is admissible.
+    const MIN_RATIO: f64 = 1.2;
+
+    /// **The chooser finds what a sweep finds**, on the pairs the reference
+    /// documents — including one whose pinion needs shift to exist at all.
+    ///
+    /// Checked against the efficiency itself over a grid, not against the
+    /// search's own arithmetic: nothing on that grid may beat what it returns.
+    #[test]
+    fn the_shifts_it_chooses_are_the_ones_that_lose_least() {
+        for (z1, z2) in [(9_u32, 37_u32), (17, 43), (13, 37)] {
+            let base = |teeth: u32| GearParams {
+                teeth,
+                ..GearParams::default()
+            };
+            let (b1, b2) = (base(z1), base(z2));
+            let floor = [
+                automatic_profile_shift(&b1, b1.dedendum),
+                automatic_profile_shift(&b2, b2.dedendum),
+            ];
+            let pair = |x: [f64; 2]| {
+                [0, 1].map(|i| GearParams {
+                    profile_shift: x[i],
+                    ..if i == 0 { b1 } else { b2 }
+                })
+            };
+            let chosen = shifts_for_efficiency(
+                &pair,
+                crate::mesh::MeshKind::External,
+                &Bounds {
+                    floor,
+                    min_contact_ratio: MIN_RATIO,
+                    clearance: 0.0,
+                },
+                &Pinned::default(),
+                0.08,
+            )
+            .expect("a pair that can be built");
+
+            let eta_at = |x: [f64; 2]| {
+                let g = |i: usize, teeth: u32| {
+                    Tooth::new(GearParams {
+                        teeth,
+                        profile_shift: x[i],
+                        ..GearParams::default()
+                    })
+                };
+                let (a, b) = (g(0, z1), g(1, z2));
+                if a.undercut || b.undercut || a.severed || b.severed {
+                    return None;
+                }
+                let mesh = crate::mesh::Mesh::new(&a, &b, crate::mesh::MeshKind::External).ok()?;
+                let path = crate::contact::ContactPath::new(&a, b.ra, &mesh)?;
+                (path.contact_ratio >= MIN_RATIO).then(|| {
+                    crate::contact::efficiency(
+                        &path,
+                        &mesh,
+                        &a,
+                        0.08,
+                        crate::contact::Drive::Forward,
+                    )
+                })
+            };
+            let here = eta_at(chosen).expect("the chosen pair builds");
+            assert!(
+                chosen[0] >= floor[0] - 1e-9 && chosen[1] >= floor[1] - 1e-9,
+                "z{z1}/z{z2}: {chosen:?} is under the undercut floor {floor:?}"
+            );
+            for i in -10..=40 {
+                for j in -25..=40 {
+                    let x = [f64::from(i) * 0.05, f64::from(j) * 0.05];
+                    if let Some(eta) = eta_at(x) {
+                        assert!(
+                            eta <= here + 1e-9,
+                            "z{z1}/z{z2}: {x:?} keeps {eta}, better than the chosen {chosen:?} at {here}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// **What is pinned stays pinned**, and the freedom count says how much is
+    /// left to choose.
+    #[test]
+    fn a_pinned_shift_is_the_shift_it_was_given() {
+        let (b1, b2) = (
+            GearParams {
+                teeth: 17,
+                ..GearParams::default()
+            },
+            GearParams {
+                teeth: 43,
+                ..GearParams::default()
+            },
+        );
+        let floor = [0.0, 0.0];
+        let pinned = Pinned {
+            shift: [Some(0.3), None],
+            sum: None,
+        };
+        assert_eq!(pinned.freedoms(), 1);
+        let x = shifts_for_efficiency(
+            &|x: [f64; 2]| {
+                [0, 1].map(|i| GearParams {
+                    profile_shift: x[i],
+                    ..if i == 0 { b1 } else { b2 }
+                })
+            },
+            crate::mesh::MeshKind::External,
+            &Bounds {
+                floor,
+                min_contact_ratio: MIN_RATIO,
+                clearance: 0.0,
+            },
+            &pinned,
+            0.08,
+        )
+        .unwrap();
+        assert!((x[0] - 0.3).abs() < 1e-12, "the given shift moved: {x:?}");
+
+        // ...and a given sum leaves only the division.
+        let both = Pinned {
+            shift: [Some(0.3), None],
+            sum: Some(0.9),
+        };
+        assert_eq!(both.freedoms(), 0);
+        let x = shifts_for_efficiency(
+            &|x: [f64; 2]| {
+                [0, 1].map(|i| GearParams {
+                    profile_shift: x[i],
+                    ..if i == 0 { b1 } else { b2 }
+                })
+            },
+            crate::mesh::MeshKind::External,
+            &Bounds {
+                floor,
+                min_contact_ratio: MIN_RATIO,
+                clearance: 0.0,
+            },
+            &both,
+            0.08,
+        )
+        .unwrap();
+        assert!(
+            (x[0] - 0.3).abs() < 1e-12 && (x[1] - 0.6).abs() < 1e-12,
+            "two pins determine the pair: {x:?}"
+        );
     }
 }

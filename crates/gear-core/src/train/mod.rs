@@ -1928,6 +1928,84 @@ mod tests {
         }
     }
 
+    /// The efficiency toggle is **additive**: a stage that never asked for it
+    /// answers exactly as it did before the toggle existed, and a stage that
+    /// does is moved somewhere else.
+    #[test]
+    fn a_stage_that_did_not_ask_keeps_the_shifts_it_had() {
+        let stage = |on: bool| SpurStage {
+            gears: [
+                StageGear {
+                    teeth: 17,
+                    ..SpurStage::default().gears[0].clone()
+                },
+                StageGear {
+                    teeth: 43,
+                    ..SpurStage::default().gears[1].clone()
+                },
+            ],
+            optimise_efficiency: on,
+            ..SpurStage::default()
+        };
+        let plain = stage(false).shifts();
+        let tuned = stage(true).shifts();
+        assert!(
+            (tuned[0] + tuned[1]) - (plain[0] + plain[1]) > 0.05,
+            "the toggle should move the pair off its undercut floor, {tuned:?} from {plain:?}"
+        );
+        // ...and where it moves it, the pair loses less than it did.
+        let lib = library();
+        let loss = |on: bool| {
+            1.0 - solve_spur_stage(&stage(on), StageTorques::just(2.0), &lib)
+                .unwrap()
+                .efficiency
+                .forward
+        };
+        assert!(
+            loss(true) < loss(false),
+            "optimised loss {:.5} should beat the undercut minimum {:.5}",
+            loss(true),
+            loss(false)
+        );
+    }
+
+    /// A centre distance the designer typed is a **constraint on the pair**, not
+    /// a suggestion the optimiser may overrule: the shifts it chooses still add
+    /// up to the housing it was given, and only their split is free.
+    #[test]
+    fn a_given_centre_distance_still_sets_the_distance() {
+        let lib = library();
+        let free = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib).unwrap();
+        let asked = free.centre_distance_nominal + 0.4;
+        let stage = SpurStage {
+            optimise_efficiency: true,
+            centre_distance: Auto::fixed(asked),
+            ..SpurStage::default()
+        };
+        let r = solve_spur_stage(&stage, StageTorques::just(2.0), &lib).unwrap();
+        assert!(
+            (r.centre_distance - asked).abs() < 1e-9,
+            "asked for {asked}, ran at {}",
+            r.centre_distance
+        );
+    }
+
+    /// Both shifts given leaves the optimiser nothing to choose, and it says so
+    /// by handing back what it was given rather than by failing.
+    #[test]
+    fn a_fully_specified_pair_is_left_alone() {
+        let given = |x: f64| StageGear {
+            profile_shift: Auto::fixed(x),
+            ..SpurStage::default().gears[0].clone()
+        };
+        let stage = SpurStage {
+            optimise_efficiency: true,
+            gears: [given(0.3), given(-0.1)],
+            ..SpurStage::default()
+        };
+        assert_eq!(stage.shifts(), [0.3, -0.1]);
+    }
+
     /// Setting the centre distance by hand takes clearance out of the picture,
     /// which is what the specification requires and what changes the backlash.
     #[test]

@@ -348,8 +348,11 @@ impl Geometry {
         (offset > 0.0 && cos_w <= 1.0).then(|| cos_w.acos())
     }
 
-    /// `Σx = x_pinion − x_ring`, from [`crate::mesh::operating_geometry`]'s
-    /// relation solved for the shift rather than for the angle.
+    /// `Σx = x_pinion − x_ring` at an operating pressure angle.
+    ///
+    /// [`crate::mesh::shift_sum_for`] is the same step from a *distance*, and
+    /// the two agree by construction: this is that relation with the angle
+    /// already in hand, which is what the clearance solve sweeps.
     fn sum_x_at(&self, alpha_w: f64) -> f64 {
         self.sum_z * (crate::inv(alpha_w) - crate::inv(self.rack.alpha_t))
             / (2.0 * self.rack.alpha_n.tan())

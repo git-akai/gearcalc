@@ -102,6 +102,29 @@ pub fn operating_geometry(
     Some((alpha_w, a_ref, a_ref * alpha_t.cos() / alpha_w.cos()))
 }
 
+/// The same relation read backwards: **the signed shift sum a centre distance
+/// asks for.**
+///
+/// [`operating_geometry`] takes a shift sum to a distance; a designer with a
+/// housing has the distance and wants the sum. The inversion is closed —
+/// `cos α_w = a_ref cos α_t / a_w`, then the involute relation solved for the
+/// sum — and it is here rather than at either call site because both an
+/// external pair fitted to a given centre distance and an eccentric drive
+/// fitting two meshes to one crank offset need the same step.
+///
+/// `None` when the distance is below the base-circle limit, where no operating
+/// pressure angle exists and no pair runs at it.
+#[must_use]
+pub fn shift_sum_for(mt: f64, alpha_t: f64, alpha_n: f64, sum_z: f64, a_w: f64) -> Option<f64> {
+    let a_ref = mt * sum_z.abs() / 2.0;
+    let cos_w = a_ref * alpha_t.cos() / a_w;
+    if !(a_w > 0.0 && cos_w <= 1.0 && cos_w > -1.0) {
+        return None;
+    }
+    let alpha_w = cos_w.acos();
+    Some(sum_z * (inv(alpha_w) - inv(alpha_t)) / (2.0 * alpha_n.tan()))
+}
+
 /// Why a requested mesh has no real geometry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MeshError {
