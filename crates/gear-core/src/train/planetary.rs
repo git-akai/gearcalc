@@ -90,6 +90,20 @@ pub struct PlanetaryStage {
     pub planets: u32,
     /// Which shaft drives and which is held.
     pub arrangement: Arrangement,
+    /// **Choose the automatic shifts for efficiency rather than for undercut**,
+    /// as [`super::SpurStage::optimise_efficiency`].
+    ///
+    /// The sun's and the ring's shifts are searched together for the greatest
+    /// fixed-carrier efficiency; the planet's follows from them as it always
+    /// has. A shift given by hand is a constraint on the search, not something
+    /// it may overrule.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub optimise_efficiency: bool,
+    /// **The transverse contact ratio the optimiser may not take either mesh
+    /// below**, as [`super::SpurStage::min_contact_ratio`]. Both meshes are held
+    /// to it, since a set is only as continuous as its worse half.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub min_contact_ratio: f64,
     /// Added to the common centre distance, mm — the running clearance.
     pub clearance: f64,
     pub tolerance_plus: f64,
@@ -127,6 +141,8 @@ impl Default for PlanetaryStage {
                 fixed: PlanetaryShaft::Ring,
             },
             clearance: 0.02,
+            optimise_efficiency: false,
+            min_contact_ratio: 1.2,
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
             min_planet_clearance: 0.3,
@@ -333,6 +349,195 @@ pub fn solve_planetary_stage(
 ///
 /// # Errors
 ///
+/// **The set as it would be built at a given pair of shifts.**
+///
+/// The sun's and the ring's shifts are the free ones; the planet's follows from
+/// them, because the two centre distances are one number
+/// (docs/reference.md#planetary-geometry). Everything downstream — the
+/// stresses, the kinematics, the efficiency — reads the geometry from here, and
+/// so does the search that chooses those two shifts, so what is optimised is
+/// what is built.
+struct Built {
+    sun: Tooth,
+    planet: Tooth,
+    ring: Ring,
+    ring_as_gear: Tooth,
+    layout: crate::planetary::Layout,
+    planet_shift: f64,
+    sp_mesh: Mesh,
+    sp_path: ContactPath,
+    pr_mesh: Mesh,
+    pr_path: ContactPath,
+}
+
+impl PlanetaryStage {
+    /// [`Built`] at the two given shifts, or why the set has no geometry there.
+    fn built(&self, shifts: [f64; 2]) -> Result<Built, TrainError> {
+        let stage = self;
+        let teeth = stage.teeth();
+        let rack = stage.rack();
+        let [sun_shift, ring_shift] = shifts;
+
+        // Thickness shifts, since only `x + x_s` reaches the answer (docs/reference.md#tooth-thickness-and-its-equivalent-shift).
+        let thickness = |shift: f64, member: PlanetaryShaft| -> f64 {
+            shift + stage.params(member, 1, shift, 1.0).thickness_shift()
+        };
+        let set = crate::planetary::Set {
+            rack,
+            teeth,
+            planets: stage.planets,
+            sun_shift: thickness(sun_shift, PlanetaryShaft::Sun),
+            ring_shift: thickness(ring_shift, PlanetaryShaft::Ring),
+            // Filled once the planet exists; clearance only reads it.
+            planet_tip_diameter: 0.0,
+        };
+        let layout = crate::planetary::solve(&set).ok_or(TrainError::NoContact)?;
+        // The solve works in thickness shifts, so take the thickness modification
+        // back out to get the planet's profile shift proper.
+        let planet_shift = layout.planet_shift
+            - stage
+                .params(PlanetaryShaft::Carrier, 1, 0.0, 1.0)
+                .thickness_shift();
+
+        let addendum_of = |member: PlanetaryShaft, g: &StageGear, teeth: u32, shift: f64| -> f64 {
+            let with_shift = stage.params(member, teeth, shift, g.addendum.manual);
+            if g.addendum.auto {
+                addendum_for_tip_width(&Tooth::new(with_shift), g.min_tip_width)
+                    .unwrap_or(with_shift.addendum)
+            } else {
+                g.addendum.manual
+            }
+        };
+        let sun_params = stage.params(
+            PlanetaryShaft::Sun,
+            teeth.sun,
+            sun_shift,
+            addendum_of(PlanetaryShaft::Sun, &stage.sun, teeth.sun, sun_shift),
+        );
+        let planet_params = stage.params(
+            PlanetaryShaft::Carrier,
+            teeth.planet,
+            planet_shift,
+            addendum_of(
+                PlanetaryShaft::Carrier,
+                &stage.planet,
+                teeth.planet,
+                planet_shift,
+            ),
+        );
+        let ring_params = stage.params(
+            PlanetaryShaft::Ring,
+            teeth.ring,
+            ring_shift,
+            stage.ring.addendum.manual,
+        );
+
+        let sun = Tooth::new(sun_params);
+        let planet = Tooth::new(planet_params);
+        let ring = Ring::cut_by(&ring_params, &stage.cutter);
+        // The mesh reads the ring through `Tooth` arithmetic: a ring's shift enters
+        // its space exactly as an external gear's enters its tooth (docs/reference.md#internal-gears).
+        let ring_as_gear = Tooth::new(ring_params);
+
+        let sp_mesh = Mesh::new(&sun, &planet, MeshKind::External).map_err(TrainError::Mesh)?;
+        let sp_path = ContactPath::new(&sun, planet.ra, &sp_mesh).ok_or(TrainError::NoContact)?;
+        let pr_mesh =
+            Mesh::new(&planet, &ring_as_gear, MeshKind::Internal).map_err(TrainError::Mesh)?;
+        let pr_path = ContactPath::new(&planet, ring.ra, &pr_mesh).ok_or(TrainError::NoContact)?;
+
+        Ok(Built {
+            sun,
+            planet,
+            ring,
+            ring_as_gear,
+            layout,
+            planet_shift,
+            sp_mesh,
+            sp_path,
+            pr_mesh,
+            pr_path,
+        })
+    }
+
+    /// **The sun's and the ring's shifts**, chosen together where the stage
+    /// asked for that.
+    ///
+    /// Off, each is what it always was: the ring's as given, the sun's the
+    /// least that clears undercut. On, the pair is searched for the fixed-carrier
+    /// efficiency `η₀` — the product of the two mesh efficiencies — because
+    /// [`crate::planetary::power`] rises with `η₀` in either direction, so the
+    /// most efficient basic train is the most efficient set and the power flow
+    /// need not be run inside the search.
+    ///
+    /// Unlike a pair, these two are not free of each other: the planet's shift
+    /// absorbs whatever they ask for, and where it cannot the set has no
+    /// geometry and the point is simply not admissible.
+    fn shifts(&self) -> [f64; 2] {
+        let sun_base = self.params(
+            PlanetaryShaft::Sun,
+            self.teeth().sun,
+            0.0,
+            self.sun.addendum.manual,
+        );
+        let floor =
+            automatic_profile_shift(&sun_base, self.sun.working_depth.resolve(self.sun.dedendum));
+        let plain = [
+            self.sun.profile_shift.resolve(floor),
+            self.ring.profile_shift.manual,
+        ];
+        if !self.optimise_efficiency {
+            return plain;
+        }
+        let given = [
+            (!self.sun.profile_shift.auto).then_some(self.sun.profile_shift.manual),
+            (!self.ring.profile_shift.auto).then_some(self.ring.profile_shift.manual),
+        ];
+        let place = |free: &[f64]| {
+            let mut i = 0;
+            [0, 1].map(|k| {
+                given[k].unwrap_or_else(|| {
+                    let v = free[i];
+                    i += 1;
+                    v
+                })
+            })
+        };
+        let eta0 = |x: [f64; 2]| -> Option<f64> {
+            if x[0] < floor - 1e-12 {
+                return None;
+            }
+            let b = self.built(x).ok()?;
+            if b.sp_path.contact_ratio < self.min_contact_ratio
+                || b.pr_path.contact_ratio < self.min_contact_ratio
+            {
+                return None;
+            }
+            Some(
+                efficiency(
+                    &b.sp_path,
+                    &b.sp_mesh,
+                    &b.sun,
+                    self.sliding_friction_sun_planet,
+                    crate::contact::Drive::Forward,
+                ) * efficiency(
+                    &b.pr_path,
+                    &b.pr_mesh,
+                    &b.planet,
+                    self.sliding_friction_planet_ring,
+                    crate::contact::Drive::Forward,
+                ),
+            )
+        };
+        let dof = 2 - given.iter().filter(|g| g.is_some()).count();
+        if dof == 0 {
+            return plain;
+        }
+        crate::auto::maximise(dof, &|free| eta0(place(free)))
+            .map(|free| place(&free))
+            .unwrap_or(plain)
+    }
+}
+
 /// As [`solve_planetary_stage`].
 pub fn solve_planetary_stage_with(
     stage: &PlanetaryStage,
@@ -343,90 +548,25 @@ pub fn solve_planetary_stage_with(
 ) -> Result<PlanetaryResult, TrainError> {
     let input_torque = torques.peak_forward;
     let teeth = stage.teeth();
-    let rack = stage.rack();
     let mut notes = Vec::new();
 
-    // ---- shifts. The sun's and ring's are inputs; the planet's is solved.
-    let sun_base = stage.params(
-        PlanetaryShaft::Sun,
-        teeth.sun,
-        0.0,
-        stage.sun.addendum.manual,
-    );
-    let sun_shift = stage.sun.profile_shift.resolve(automatic_profile_shift(
-        &sun_base,
-        stage.sun.working_depth.resolve(stage.sun.dedendum),
-    ));
-    let ring_shift = stage.ring.profile_shift.manual;
-
-    // Thickness shifts, since only `x + x_s` reaches the answer (docs/reference.md#tooth-thickness-and-its-equivalent-shift).
-    let thickness = |shift: f64, member: PlanetaryShaft| -> f64 {
-        shift + stage.params(member, 1, shift, 1.0).thickness_shift()
-    };
-    let set = planetary::Set {
-        rack,
-        teeth,
-        planets: stage.planets,
-        sun_shift: thickness(sun_shift, PlanetaryShaft::Sun),
-        ring_shift: thickness(ring_shift, PlanetaryShaft::Ring),
-        // Filled once the planet exists; clearance only reads it.
-        planet_tip_diameter: 0.0,
-    };
-    let layout = planetary::solve(&set).ok_or(TrainError::NoContact)?;
-    // The solve works in thickness shifts, so take the thickness modification
-    // back out to get the planet's profile shift proper.
-    let planet_shift = layout.planet_shift
-        - stage
-            .params(PlanetaryShaft::Carrier, 1, 0.0, 1.0)
-            .thickness_shift();
-
-    // ---- the three members.
-    let addendum_of = |member: PlanetaryShaft, g: &StageGear, teeth: u32, shift: f64| -> f64 {
-        let with_shift = stage.params(member, teeth, shift, g.addendum.manual);
-        if g.addendum.auto {
-            addendum_for_tip_width(&Tooth::new(with_shift), g.min_tip_width)
-                .unwrap_or(with_shift.addendum)
-        } else {
-            g.addendum.manual
-        }
-    };
-    let sun_params = stage.params(
-        PlanetaryShaft::Sun,
-        teeth.sun,
-        sun_shift,
-        addendum_of(PlanetaryShaft::Sun, &stage.sun, teeth.sun, sun_shift),
-    );
-    let planet_params = stage.params(
-        PlanetaryShaft::Carrier,
-        teeth.planet,
+    // ---- the set as built, at the shifts the stage settled on.
+    let shifts = stage.shifts();
+    let Built {
+        sun,
+        planet,
+        ring,
+        ring_as_gear,
+        layout,
         planet_shift,
-        addendum_of(
-            PlanetaryShaft::Carrier,
-            &stage.planet,
-            teeth.planet,
-            planet_shift,
-        ),
-    );
-    let ring_params = stage.params(
-        PlanetaryShaft::Ring,
-        teeth.ring,
-        ring_shift,
-        stage.ring.addendum.manual,
-    );
-
-    let sun = Tooth::new(sun_params);
-    let planet = Tooth::new(planet_params);
-    let ring = Ring::cut_by(&ring_params, &stage.cutter);
-    // The mesh reads the ring through `Tooth` arithmetic: a ring's shift enters
-    // its space exactly as an external gear's enters its tooth (docs/reference.md#internal-gears).
-    let ring_as_gear = Tooth::new(ring_params);
-
-    // ---- the two meshes.
-    let sp_mesh = Mesh::new(&sun, &planet, MeshKind::External).map_err(TrainError::Mesh)?;
-    let sp_path = ContactPath::new(&sun, planet.ra, &sp_mesh).ok_or(TrainError::NoContact)?;
-    let pr_mesh =
-        Mesh::new(&planet, &ring_as_gear, MeshKind::Internal).map_err(TrainError::Mesh)?;
-    let pr_path = ContactPath::new(&planet, ring.ra, &pr_mesh).ok_or(TrainError::NoContact)?;
+        sp_mesh,
+        sp_path,
+        pr_mesh,
+        pr_path,
+    } = stage.built(shifts)?;
+    let sun_params = sun.params;
+    let planet_params = planet.params;
+    let ring_params = ring_as_gear.params;
 
     // ---- materials.
     let material_of = |g: &StageGear| -> Result<Material, TrainError> {
@@ -1474,5 +1614,80 @@ mod tests {
             )
             .is_ok());
         }
+    }
+    /// **The set's shifts follow the same rule as a pair's**: off, the sun sits
+    /// at its undercut minimum and the ring where it was put; on, the two are
+    /// searched together and the set keeps more of its power.
+    ///
+    /// `η₀` is the thing maximised and the set efficiency is what has to rise,
+    /// which is the claim that [`crate::planetary::power`] is monotone in `η₀`
+    /// being checked rather than assumed.
+    #[test]
+    fn choosing_the_shifts_for_efficiency_leaves_the_set_more_of_its_power() {
+        let lib = test_library();
+        // Both free: a shift given by hand is a constraint, and a set with two
+        // of them has nothing left to search.
+        let free = || {
+            let mut s = stage_of(24, 18, 60, 0.0);
+            s.sun.profile_shift = Auto::automatic(0.0);
+            s.ring.profile_shift = Auto::automatic(0.0);
+            s
+        };
+        let solve = |on: bool| {
+            solve_planetary_stage(
+                &PlanetaryStage {
+                    optimise_efficiency: on,
+                    ..free()
+                },
+                3000.0,
+                StageTorques::just(2.0),
+                &lib,
+            )
+            .expect("the set solves")
+        };
+        let plain = solve(false);
+        let tuned = solve(true);
+
+        assert!(
+            (tuned.sun.profile_shift - plain.sun.profile_shift).abs() > 1e-6
+                || (tuned.ring.profile_shift - plain.ring.profile_shift).abs() > 1e-6,
+            "the search moved nothing: sun {} ring {}",
+            tuned.sun.profile_shift,
+            tuned.ring.profile_shift
+        );
+        assert!(
+            tuned.fixed_carrier_efficiency.forward > plain.fixed_carrier_efficiency.forward,
+            "eta0 {:.6} should beat {:.6}",
+            tuned.fixed_carrier_efficiency.forward,
+            plain.fixed_carrier_efficiency.forward
+        );
+        assert!(
+            tuned.efficiency.forward > plain.efficiency.forward,
+            "the set efficiency {:.6} should beat {:.6}, or power is not monotone in eta0",
+            tuned.efficiency.forward,
+            plain.efficiency.forward
+        );
+        // Both meshes stay continuous by at least the margin asked for.
+        for eps in [
+            tuned.sun_planet.contact_ratios.transverse,
+            tuned.planet_ring.contact_ratios.transverse,
+        ] {
+            let asked = free().min_contact_ratio;
+            assert!(eps >= asked - 1e-3, "contact ratio {eps} under {asked}");
+        }
+    }
+
+    /// A shift given by hand is a constraint the search may not overrule.
+    #[test]
+    fn a_given_shift_survives_the_search() {
+        let mut stage = PlanetaryStage {
+            optimise_efficiency: true,
+            ..stage_of(24, 18, 60, 0.0)
+        };
+        stage.sun.profile_shift = Auto::automatic(0.0);
+        stage.ring.profile_shift = Auto::fixed(0.25);
+        let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library())
+            .expect("solves");
+        assert!((r.ring.profile_shift - 0.25).abs() < 1e-9);
     }
 }

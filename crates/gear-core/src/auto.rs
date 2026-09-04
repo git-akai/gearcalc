@@ -847,40 +847,61 @@ pub fn shifts_for_efficiency(
         }
     };
 
-    // A bounded search on each free coordinate in turn, refined about the best
-    // — coordinate descent on a smooth two-variable surface, which converges in
-    // a handful of passes and needs no derivative in a direction that has none.
-    let dof = pinned.freedoms();
-    if dof == 0 {
+    if pinned.freedoms() == 0 {
         let x = place(&[]);
         return loss_at(x).map(|_| x);
     }
-    let span = 3.0_f64;
+    maximise(pinned.freedoms(), &|free| loss_at(place(free))).map(|free| place(&free))
+}
+
+/// **Coordinate descent over a few free numbers**, refined about the best.
+///
+/// The shift surfaces this searches are smooth and shallow, with the optimum
+/// pushed against a constraint rather than sitting in a bowl, so a bounded
+/// sweep on each axis in turn converges in a handful of passes and needs no
+/// derivative in a direction that has none. `objective` returns `None` where
+/// the point is not admissible at all, which is how a constraint eliminates a
+/// range rather than penalising one.
+///
+/// It is here, rather than inside the one function that first needed it,
+/// because every stage that chooses shifts for efficiency chooses a different
+/// number of them against a different objective: a pair has its mesh, and an
+/// epicyclic has two meshes whose shifts a shared centre distance ties
+/// together, so only the search is common.
+#[must_use]
+pub fn maximise(dof: usize, objective: &dyn Fn(&[f64]) -> Option<f64>) -> Option<Vec<f64>> {
+    /// Shifts of interest span a couple of modules either way; the refinement
+    /// below reaches everything between.
+    const SPAN: f64 = 3.0;
+    const SAMPLES: i32 = 12;
+    const PASSES: usize = 6;
+
     let mut centre = vec![0.0; dof];
-    let mut best: Option<([f64; 2], f64)> = None;
-    let mut step = span / 12.0;
-    for _ in 0..6 {
+    let mut best: Option<(Vec<f64>, f64)> = None;
+    let mut step = SPAN / f64::from(SAMPLES);
+    for _ in 0..PASSES {
         for axis in 0..dof {
-            let mut local: Option<(f64, [f64; 2], f64)> = None;
-            for k in -12..=12 {
+            let mut local: Option<(Vec<f64>, f64)> = None;
+            for k in -SAMPLES..=SAMPLES {
                 let mut trial = centre.clone();
                 trial[axis] = centre[axis] + f64::from(k) * step;
-                let x = place(&trial);
-                let Some(eta) = loss_at(x) else { continue };
-                if local.as_ref().is_none_or(|l| eta > l.2) {
-                    local = Some((trial[axis], x, eta));
+                let Some(value) = objective(&trial) else {
+                    continue;
+                };
+                if local.as_ref().is_none_or(|l| value > l.1) {
+                    local = Some((trial, value));
                 }
             }
-            if let Some((at, x, eta)) = local {
-                centre[axis] = at;
-                if best.as_ref().is_none_or(|b| eta > b.1) {
-                    best = Some((x, eta));
+            if let Some((at, value)) = local {
+                centre.clone_from(&at);
+                if best.as_ref().is_none_or(|b| value > b.1) {
+                    best = Some((at, value));
                 }
             }
         }
         step /= 3.0;
     }
-    best.map(|(x, _)| x)
+    best.map(|(at, _)| at)
 }
 
 #[cfg(test)]

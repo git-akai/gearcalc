@@ -30,7 +30,7 @@
 //! put through, given a basic ratio rather than a set of planetary counts to
 //! derive one from.
 
-use crate::contact::{efficiency, ContactPath, Directional};
+use crate::contact::{efficiency, ContactPath, Directional, Drive};
 use crate::hula::{self, Offset, Split, Teeth};
 use crate::mesh::{Mesh, MeshError, MeshKind, MeshSide};
 use crate::note::Note;
@@ -126,6 +126,27 @@ pub struct HulaStage {
     /// `profile_shift`, so a shift has one home and the panel can render it in
     /// the gear's card like every other stage's.
     pub given_shift: [GivenShift; 2],
+    /// **Choose the shift split for efficiency rather than taking it as given**,
+    /// as [`super::SpurStage::optimise_efficiency`].
+    ///
+    /// A pair's shift *sum* is fixed by the offset the crank has to reach, so
+    /// within a mesh only the division between ring and pinion is free — and
+    /// that division is worth real efficiency. Off, the split is the number
+    /// entered against the named member, exactly as before.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub optimise_efficiency: bool,
+    /// **The transverse contact ratio the optimiser may not take either mesh
+    /// below**, as [`super::SpurStage::min_contact_ratio`].
+    ///
+    /// It defaults lower here than on a pair, and for a reason that is the
+    /// drive's rather than a relaxation of the rule: a mesh of one tooth of
+    /// difference has a very short path of contact, and sits just above
+    /// continuous contact at every split it can be built at. A pair's usual 1.2
+    /// of design margin would forbid the mechanism rather than constrain it, so
+    /// the default is continuous contact itself and any margin beyond that is
+    /// the designer's to ask for.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub min_contact_ratio: f64,
     /// The shaper each mesh's ring is cut with.
     ///
     /// **A shaper has to be smaller than the ring it cuts**, and the rings here
@@ -163,6 +184,8 @@ impl Default for HulaStage {
             tolerance_minus: 0.02,
             offset: Offset::Clearance,
             given_shift: [GivenShift::Pinion; 2],
+            optimise_efficiency: false,
+            min_contact_ratio: 1.0,
             // **A shaper is coupled to the shift it has to cut**, not only to
             // the ring's size: the clearance drives the ring's shift up, and a
             // tool that reached its flank at one shift stops reaching it at a
@@ -358,14 +381,21 @@ pub fn solve_hula_stage(
             (b, a)
         }
     };
-    let split = std::array::from_fn(|mesh| {
+    // The split is one number per mesh, read into whichever member the stage
+    // named. Which member that is never changes; only the value is searched.
+    let split_of = |mesh: usize, value: f64| match stage.given_shift[mesh] {
+        GivenShift::Ring => Split::Ring(value),
+        GivenShift::Pinion => Split::Pinion(value),
+    };
+    let given = std::array::from_fn(|mesh| {
         let (ring, pinion) = pair_of(mesh);
-        match stage.given_shift[mesh] {
-            GivenShift::Ring => Split::Ring(stage.gears[ring].profile_shift.manual),
-            GivenShift::Pinion => Split::Pinion(stage.gears[pinion].profile_shift.manual),
-        }
+        let named = match stage.given_shift[mesh] {
+            GivenShift::Ring => ring,
+            GivenShift::Pinion => pinion,
+        };
+        stage.gears[named].profile_shift.manual
     });
-    let set = hula::Set {
+    let set_at = |value: [f64; 2]| hula::Set {
         teeth,
         module: stage.module,
         pressure_angle: stage.pressure_angle,
@@ -373,7 +403,7 @@ pub fn solve_hula_stage(
         addendum: stage.gears.each_ref().map(|g| g.addendum.manual),
         clearance: stage.clearance,
         offset: stage.offset,
-        split,
+        split: std::array::from_fn(|mesh| split_of(mesh, value[mesh])),
     };
     // **The offset has to clear the tips as well as the far side**, and that
     // bound belongs to the pair rather than to the arrangement — so it is
@@ -398,6 +428,48 @@ pub fn solve_hula_stage(
         let pinion = Tooth::new(built(mesh, shift, pair.pinion));
         mesh_with(&ring, &pinion).map_or(f64::NAN, |m| m.tip_margin)
     };
+    // **The split is the free variable, and the crank is what ties the two
+    // meshes together.** A pair's shift sum is fixed by the offset it has to
+    // reach, so within a mesh only the division is left — but the two meshes
+    // share one crank, so the two divisions are searched as a pair rather than
+    // one at a time.
+    //
+    // The objective is the product of the two mesh efficiencies, which is what
+    // the drive's own efficiency rises with, so the power flow does not have to
+    // be run inside the search.
+    let split_at = if stage.optimise_efficiency {
+        let eta = |value: [f64; 2]| -> Option<f64> {
+            let layout = hula::solve_with(&set_at(value), &tip_room).ok()?;
+            let mut product = 1.0;
+            for (index, pair) in pairs.iter().enumerate() {
+                let params = |i: usize| built(index, layout.shift, i);
+                let ring = Ring::cut_by(&params(pair.ring), &stage.cutter[index]);
+                let pinion = Tooth::new(params(pair.pinion));
+                if pinion.undercut || pinion.severed {
+                    return None;
+                }
+                let mesh =
+                    Mesh::new(&pinion, &Tooth::new(params(pair.ring)), MeshKind::Internal).ok()?;
+                let path = ContactPath::new(&pinion, ring.ra, &mesh)?;
+                if path.contact_ratio < stage.min_contact_ratio {
+                    return None;
+                }
+                product *= efficiency(
+                    &path,
+                    &mesh,
+                    &pinion,
+                    stage.sliding_friction[index],
+                    Drive::Forward,
+                );
+            }
+            Some(product)
+        };
+        crate::auto::maximise(2, &|free| eta([free[0], free[1]]))
+            .map_or(given, |free| [free[0], free[1]])
+    } else {
+        given
+    };
+    let set = set_at(split_at);
     let layout = hula::solve_with(&set, &tip_room)?;
     let offset = layout.offset + stage.running_clearance;
 
@@ -1240,5 +1312,76 @@ mod tests {
             solve_hula_stage(&s, 100.0, 2.0).unwrap_err(),
             Error::Drive(hula::Error::Locked)
         );
+    }
+    /// **The split is worth something**, and choosing it is additive: a drive
+    /// that did not ask keeps the split it was given.
+    ///
+    /// Where the crank offset is given, the shift *sum* each mesh must reach is
+    /// given with it, so the search can move only the division — and the drive
+    /// keeps more of its power for it. Where the offset is instead solved for a
+    /// clearance the sum is free too, which is why that case is checked
+    /// separately rather than folded into one assertion.
+    #[test]
+    fn choosing_the_split_leaves_the_drive_more_of_its_power() {
+        let run = |offset: Offset, on: bool| {
+            solve_hula_stage(
+                &HulaStage {
+                    offset,
+                    optimise_efficiency: on,
+                    ..HulaStage::default()
+                },
+                3000.0,
+                2.0,
+            )
+        };
+        // The offset the default drive settles at, then held there.
+        let free = run(HulaStage::default().offset, false).expect("the ordinary drive solves");
+        let held = Offset::Given(free.offset_nominal);
+
+        let plain = run(held, false).expect("the held drive solves");
+        let tuned = run(held, true).expect("the tuned drive solves");
+
+        // The signed sum, since a ring's shift enters a mesh negatively — that
+        // signed quantity is what an offset fixes, and the plain sum is not.
+        let sum = |r: &HulaResult, mesh: usize| {
+            [mesh * 2, mesh * 2 + 1]
+                .map(|i| {
+                    if r.gears[i].ring {
+                        -r.gears[i].profile_shift
+                    } else {
+                        r.gears[i].profile_shift
+                    }
+                })
+                .iter()
+                .sum::<f64>()
+        };
+        for mesh in 0..2 {
+            assert!(
+                (sum(&tuned, mesh) - sum(&plain, mesh)).abs() < 1e-6,
+                "mesh {mesh}: a given offset fixes the sum, {} moved from {}",
+                sum(&tuned, mesh),
+                sum(&plain, mesh)
+            );
+        }
+        assert!(
+            tuned
+                .gears
+                .iter()
+                .zip(&plain.gears)
+                .any(|(t, p)| (t.profile_shift - p.profile_shift).abs() > 1e-6),
+            "the search moved no shift at all"
+        );
+        assert!(
+            tuned.efficiency.forward > plain.efficiency.forward,
+            "{:.6} should beat {:.6}",
+            tuned.efficiency.forward,
+            plain.efficiency.forward
+        );
+
+        // And with the offset solved for clearance instead, the sum is free as
+        // well — the search may take a different crank, and still has to pay
+        // for itself.
+        let loose = run(HulaStage::default().offset, true).expect("the tuned drive solves");
+        assert!(loose.efficiency.forward > free.efficiency.forward);
     }
 }
