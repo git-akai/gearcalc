@@ -341,6 +341,28 @@ both tip circles — and there sliding never reverses along the path, so the
 integral is the difference of the ends rather than their sum. One expression
 covers both; the sign does the work.
 
+**And the sum is not free for nothing either — an external pair loses least well
+above its undercut floor.** The loss is an integral along the *whole* path, so a
+longer path is a dearer one; positive shift shortens it, the contact ratio falls
+toward unity, and the loss falls with it.
+
+| pair | least loss | least shift that clears undercut |
+|---|---|---|
+| 9/37 | 97.62 % at `Σx = +1.20`, ε 1.36 | 96.83 % at `Σx = −0.65`, ε 1.65 |
+| 17/43 | 98.47 % at `Σx = +1.25`, ε 1.48 | 96.87 % at `Σx = −1.20`, ε 3.04 |
+
+The optimum is **interior** — stepping either shift further makes it worse — so
+nothing holds it there but the loss turning over. This matters because the
+automatic shift this crate has always offered is the *undercut* one, the least
+that clears, and that is a **floor rather than an answer**: on 17/43 it gives up
+1.6 points of mesh efficiency. A pinion small enough to need shift to exist does
+not change the direction, only where the shift goes — at 9 teeth the floor pins
+`x₁` at +0.50 and the optimum puts the rest on its wheel.
+
+What it buys the efficiency with is contact ratio, 3.04 down to 1.48, and that is
+a trade a designer may not want: fewer teeth sharing the load, and a noisier pair.
+The tool reports both and decides neither.
+
 **The division of a pair's shift is free, and the loss claims it.** Two shifts
 reach the operating pressure angle only through their signed *sum*, so a centre
 distance fixes the sum and leaves the division over. Nothing in the geometry

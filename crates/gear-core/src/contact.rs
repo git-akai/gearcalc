@@ -1101,6 +1101,81 @@ mod tests {
         }
     }
 
+    /// **An external pair loses least at a large positive shift sum**, not at
+    /// the smallest one that clears undercut.
+    ///
+    /// The loss is an integral along the whole path, so a *longer* path is a
+    /// dearer one: positive shift shortens it, the contact ratio falls toward
+    /// unity, and the loss falls with it. On 17/43 the best admissible pair
+    /// keeps 98.47 % at `Σx = +1.25` where the least-shift design keeps 96.87 %
+    /// at `Σx = −1.20`, and the contact ratio is 1.48 against 3.04.
+    ///
+    /// It matters because the automatic shift this crate has always offered is
+    /// the *undercut* one — the least that clears — and that is a floor rather
+    /// than an answer. The optimum is interior: stepping either shift further
+    /// makes it worse, so nothing is holding it there but the loss itself.
+    ///
+    /// A pinion small enough to need shift to exist does not change the
+    /// direction, only where the shift goes: at 9 teeth the floor pins `x₁` at
+    /// +0.50 and the optimum puts the rest on its wheel.
+    #[test]
+    fn an_external_pair_loses_least_well_above_its_undercut_floor() {
+        for (z1, z2) in [(9_u32, 37_u32), (17, 43)] {
+            let at = |x1: f64, x2: f64| {
+                let g = |teeth: u32, x: f64| {
+                    Tooth::new(GearParams {
+                        teeth,
+                        profile_shift: x,
+                        ..Default::default()
+                    })
+                };
+                let (a, b) = (g(z1, x1), g(z2, x2));
+                let spoiled = a.undercut || b.undercut || a.severed || b.severed;
+                let mesh = Mesh::new(&a, &b, MeshKind::External).ok()?;
+                let path = ContactPath::new(&a, b.ra, &mesh)?;
+                (!spoiled && path.contact_ratio >= 1.0).then(|| {
+                    (
+                        efficiency(&path, &mesh, &a, 0.08, Drive::Forward),
+                        x1 + x2,
+                        path.contact_ratio,
+                    )
+                })
+            };
+            let (mut best, mut least) = (None::<(f64, f64, f64)>, None::<(f64, f64, f64)>);
+            for i1 in -10..=40 {
+                for i2 in -25..=40 {
+                    let Some(v) = at(f64::from(i1) * 0.05, f64::from(i2) * 0.05) else {
+                        continue;
+                    };
+                    if best.as_ref().is_none_or(|b| v.0 > b.0) {
+                        best = Some(v);
+                    }
+                    if least.as_ref().is_none_or(|l| v.1 < l.1 - 1e-12) {
+                        least = Some(v);
+                    }
+                }
+            }
+            let (best, least) = (best.expect("a pair"), least.expect("a pair"));
+            assert!(
+                best.1 > 1.0,
+                "z{z1}/z{z2}: the best sum is {}, not the large positive one",
+                best.1
+            );
+            assert!(
+                best.0 > least.0 + 0.005,
+                "z{z1}/z{z2}: {} against the least shift's {}",
+                best.0,
+                least.0
+            );
+            assert!(
+                best.2 < least.2,
+                "z{z1}/z{z2}: and it gets there by shortening the path, {} against {}",
+                best.2,
+                least.2
+            );
+        }
+    }
+
     fn helical_pair(z1: u32, z2: u32, beta: f64) -> (Tooth, Tooth, Mesh) {
         let a = Tooth::new(GearParams {
             teeth: z1,
