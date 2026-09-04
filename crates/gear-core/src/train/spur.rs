@@ -343,17 +343,6 @@ impl SpurStage {
             },
         }
     }
-
-    /// `GearParams` for one gear, with the automatic values resolved.
-    ///
-    /// The two automatic calculations are ordered, and the order matters: the
-    /// shift is chosen first because the addendum solve needs `ψ_b`, which
-    /// depends on it. The reverse dependency does not exist — `minimum_profile_shift`
-    /// touches only `r`, `α_t` and the cutter, none of which the addendum moves —
-    /// so there is no loop to iterate.
-    pub(super) fn params(&self, i: usize) -> GearParams {
-        self.params_at(i, self.shifts()[i])
-    }
 }
 
 /// Solve one stage, given the torque on its first gear.
@@ -384,7 +373,11 @@ pub fn solve_spur_stage_with(
     lib: &MaterialLibrary,
     reversal: super::Reversal,
 ) -> Result<SpurResult, TrainError> {
-    let p = [stage.params(0), stage.params(1)];
+    // The shifts once, not once per gear: with the optimiser on, `shifts` is a
+    // search, and asking each gear for its own would run it twice for one
+    // answer.
+    let x = stage.shifts();
+    let p = [stage.params_at(0, x[0]), stage.params_at(1, x[1])];
     let g = [Tooth::new(p[0]), Tooth::new(p[1])];
     let mesh = Mesh::new(&g[0], &g[1], MeshKind::External).map_err(TrainError::Mesh)?;
 

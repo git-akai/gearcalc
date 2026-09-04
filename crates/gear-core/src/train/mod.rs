@@ -1719,7 +1719,9 @@ mod tests {
             thickness_mod: 1.3,
             ..SpurStage::default()
         };
-        let k: Vec<f64> = (0..2).map(|i| stage.params(i).thickness_mod).collect();
+        let k: Vec<f64> = (0..2)
+            .map(|i| stage.params_at(i, stage.shifts()[i]).thickness_mod)
+            .collect();
         assert!((k[0] + k[1] - 2.0).abs() < 1e-15);
     }
 
@@ -1916,7 +1918,7 @@ mod tests {
             let r = solve_spur_stage(&stage, StageTorques::just(2.0), &library()).unwrap();
 
             for i in 0..2 {
-                let built = Tooth::new(stage.params(i));
+                let built = Tooth::new(stage.params_at(i, stage.shifts()[i]));
                 let got = 2.0 * built.ra * built.theta_a;
                 assert!(
                     (got - want).abs() < 1e-9,
@@ -1926,6 +1928,27 @@ mod tests {
                 assert!((r.gears[i].addendum - built.params.addendum).abs() < 1e-12);
             }
         }
+    }
+
+    /// The search runs on every keystroke in the front end, so it has to cost
+    /// like an input and not like a build.
+    #[test]
+    fn choosing_the_shifts_is_quick_enough_to_type_over() {
+        let lib = library();
+        let stage = SpurStage {
+            optimise_efficiency: true,
+            ..SpurStage::default()
+        };
+        let start = std::time::Instant::now();
+        for _ in 0..20 {
+            solve_spur_stage(&stage, StageTorques::just(2.0), &lib).unwrap();
+        }
+        let each = start.elapsed() / 20;
+        assert!(
+            each < std::time::Duration::from_millis(50),
+            "a solve with the optimiser on took {each:?}"
+        );
+        eprintln!("optimised solve: {each:?}");
     }
 
     /// The efficiency toggle is **additive**: a stage that never asked for it

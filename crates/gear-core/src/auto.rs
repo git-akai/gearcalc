@@ -872,9 +872,17 @@ pub fn shifts_for_efficiency(
 pub fn maximise(dof: usize, objective: &dyn Fn(&[f64]) -> Option<f64>) -> Option<Vec<f64>> {
     /// Shifts of interest span a couple of modules either way; the refinement
     /// below reaches everything between.
+    ///
+    /// A pass samples `±SAMPLES` steps about the best point and then divides the
+    /// step, so the next window is `SAMPLES/4` steps wide in the old units. That
+    /// ratio is above one, which is what makes the refinement sound: the new
+    /// window covers the whole interval the old sampling could not resolve, so
+    /// nothing can hide between two samples. The numbers themselves are as small
+    /// as the grid gate in this module tolerates — the search still has to beat
+    /// every point of a sweep — because it runs on every keystroke.
     const SPAN: f64 = 3.0;
-    const SAMPLES: i32 = 12;
-    const PASSES: usize = 6;
+    const SAMPLES: i32 = 6;
+    const PASSES: usize = 5;
 
     let mut centre = vec![0.0; dof];
     let mut best: Option<(Vec<f64>, f64)> = None;
@@ -899,7 +907,7 @@ pub fn maximise(dof: usize, objective: &dyn Fn(&[f64]) -> Option<f64>) -> Option
                 }
             }
         }
-        step /= 3.0;
+        step /= 4.0;
     }
     best.map(|(at, _)| at)
 }
