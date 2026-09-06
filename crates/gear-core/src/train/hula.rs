@@ -38,7 +38,7 @@ use crate::planetary::{self, Arrangement, PlanetaryShaft};
 
 use crate::ring::{mesh_with, Cutter, Ring};
 use crate::tooth::Tooth;
-use crate::train::StageGear;
+use crate::train::{Optimisation, StageGear};
 use crate::{Auto, GearParams};
 
 /// Which member of a mesh carries the shift a designer gives.
@@ -133,27 +133,19 @@ pub struct HulaStage {
     /// `profile_shift`, so a shift has one home and the panel can render it in
     /// the gear's card like every other stage's.
     pub given_shift: [GivenShift; 2],
-    /// **Choose the shift split for efficiency rather than taking it as given**,
-    /// as [`super::SpurStage::optimise_efficiency`].
+    /// What the drive is asked to optimise, and what it may not do to get
+    /// there. See [`Optimisation`].
     ///
     /// A pair's shift *sum* is fixed by the offset the crank has to reach, so
     /// within a mesh only the division between ring and pinion is free — and
-    /// that division is worth real efficiency. Off, the split is the number
-    /// entered against the named member, exactly as before.
+    /// that division is worth real efficiency. The contact ratio defaults lower
+    /// here than the shared default, for a reason that is the drive's rather
+    /// than a relaxation of the rule: a mesh of one tooth of difference has a
+    /// very short path and sits just above continuous contact at every split it
+    /// can be built at, so a pair's usual 1.2 of design margin would forbid the
+    /// mechanism rather than constrain it.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub optimise_efficiency: bool,
-    /// **The transverse contact ratio the optimiser may not take either mesh
-    /// below**, as [`super::SpurStage::min_contact_ratio`].
-    ///
-    /// It defaults lower here than on a pair, and for a reason that is the
-    /// drive's rather than a relaxation of the rule: a mesh of one tooth of
-    /// difference has a very short path of contact, and sits just above
-    /// continuous contact at every split it can be built at. A pair's usual 1.2
-    /// of design margin would forbid the mechanism rather than constrain it, so
-    /// the default is continuous contact itself and any margin beyond that is
-    /// the designer's to ask for.
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub min_contact_ratio: f64,
+    pub optimisation: Optimisation,
     /// The shaper each mesh's ring is cut with.
     ///
     /// **A shaper has to be smaller than the ring it cuts**, and the rings here
@@ -164,6 +156,23 @@ pub struct HulaStage {
     /// The four gears, in [`Teeth`]'s order: the grounded one, the two that
     /// ride the wobble body, then the output.
     pub gears: [StageGear; 4],
+}
+
+impl HulaStage {
+    /// **The minimum clearance this drive is actually held to.**
+    ///
+    /// It is what *sets* the crank offset, so it is read only while the offset
+    /// is being derived. Given the offset by hand, the far-side gap is whatever
+    /// that offset leaves — reported, but not asked for — and the input goes
+    /// unread.
+    #[must_use]
+    pub fn clearance_taken(&self) -> f64 {
+        if self.offset.auto {
+            self.clearance
+        } else {
+            0.0
+        }
+    }
 }
 
 impl Default for HulaStage {
@@ -198,8 +207,10 @@ impl Default for HulaStage {
             tolerance_minus: 0.02,
             offset: Auto::automatic(0.0),
             given_shift: [GivenShift::Pinion; 2],
-            optimise_efficiency: false,
-            min_contact_ratio: 1.0,
+            optimisation: Optimisation {
+                min_contact_ratio: 1.0,
+                ..Optimisation::default()
+            },
             // **A shaper is coupled to the shift it has to cut**, not only to
             // the ring's size: the clearance drives the ring's shift up, and a
             // tool that reached its flank at one shift stops reaching it at a
@@ -307,6 +318,11 @@ pub struct HulaResult {
     pub ratio_products: [i64; 2],
     /// The zero-backlash crank offset, mm.
     pub offset_nominal: f64,
+    /// **The minimum far-side clearance the drive was held to**, zero where the
+    /// crank offset was given instead and the input went unread — the same
+    /// question every stage answers about its own clearance (see
+    /// [`super::SpurStage::clearance_taken`]).
+    pub clearance: f64,
     /// The offset actually run at, including the running clearance.
     pub offset: f64,
     /// Which mesh sits at the clearance minimum, when the offset came from it.
@@ -466,7 +482,7 @@ pub fn solve_hula_stage(
     // The objective is the product of the two mesh efficiencies, which is what
     // the drive's own efficiency rises with, so the power flow does not have to
     // be run inside the search.
-    let split_at = if stage.optimise_efficiency {
+    let split_at = if stage.optimisation.enabled {
         // **The crank is solved once a round, and each mesh is chosen alone.**
         //
         // Two facts make this cheap, and both are the mechanism's rather than
@@ -521,7 +537,7 @@ pub fn solve_hula_stage(
             let mesh =
                 Mesh::new(&pinion, &Tooth::new(params(pair.ring)), MeshKind::Internal).ok()?;
             let path = ContactPath::new(&pinion, ring.ra, &mesh)?;
-            if path.contact_ratio < stage.min_contact_ratio {
+            if path.contact_ratio < stage.optimisation.min_contact_ratio {
                 return None;
             }
             Some(efficiency(
@@ -799,6 +815,7 @@ pub fn solve_hula_stage(
         ratio: layout.ratio.value(),
         ratio_products: [layout.ratio.numerator, layout.ratio.denominator],
         offset_nominal: layout.offset,
+        clearance: stage.clearance_taken(),
         offset,
         binding_mesh: layout.binding,
         crank_speed: input_speed,
@@ -1501,7 +1518,10 @@ mod tests {
             solve_hula_stage(
                 &HulaStage {
                     offset,
-                    optimise_efficiency: on,
+                    optimisation: Optimisation {
+                        enabled: on,
+                        ..Optimisation::default()
+                    },
                     ..HulaStage::default()
                 },
                 3000.0,

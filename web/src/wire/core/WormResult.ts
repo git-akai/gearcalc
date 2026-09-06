@@ -16,6 +16,11 @@ export type WormResult = {
  */
 ratio: number, centre_distance_nominal: number, centre_distance: number, 
 /**
+ * **The clearance the stage opened by**, zero where nothing was free to
+ * absorb it — see [`WormStage::clearance_taken`].
+ */
+clearance: number, 
+/**
  * Lead angle of the worm, degrees.
  */
 lead_angle: number, 

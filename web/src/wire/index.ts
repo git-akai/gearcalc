@@ -42,6 +42,7 @@ export type { Measure } from "./core/Measure";
 export type { MeshReport } from "./core/MeshReport";
 export type { Note } from "./core/Note";
 export type { Offset } from "./core/Offset";
+export type { Optimisation } from "./core/Optimisation";
 export type { Overrides } from "./core/Overrides";
 export type { PerToothClamps } from "./core/PerToothClamps";
 export type { PlanetResult } from "./core/PlanetResult";

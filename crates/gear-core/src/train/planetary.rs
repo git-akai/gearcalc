@@ -47,7 +47,7 @@ use crate::strength::{
     min_face_width_contact, ring_bending_section, Load, StressConcentration, PARALLEL_AXES,
 };
 use crate::tooth::Tooth;
-use crate::train::StageGear;
+use crate::train::{Optimisation, StageGear};
 
 /// A planetary stage as its inputs describe it.
 #[derive(Clone, Debug)]
@@ -90,20 +90,12 @@ pub struct PlanetaryStage {
     pub planets: u32,
     /// Which shaft drives and which is held.
     pub arrangement: Arrangement,
-    /// **Choose the automatic shifts for efficiency rather than for undercut**,
-    /// as [`super::SpurStage::optimise_efficiency`].
-    ///
-    /// The sun's and the ring's shifts are searched together for the greatest
-    /// fixed-carrier efficiency; the planet's follows from them as it always
-    /// has. A shift given by hand is a constraint on the search, not something
-    /// it may overrule.
+    /// What the set is asked to optimise, and what it may not do to get there.
+    /// See [`Optimisation`]: the sun's and the ring's shifts are searched
+    /// together and the planet's follows, and both meshes are held to the
+    /// contact ratio since a set is only as continuous as its worse half.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub optimise_efficiency: bool,
-    /// **The transverse contact ratio the optimiser may not take either mesh
-    /// below**, as [`super::SpurStage::min_contact_ratio`]. Both meshes are held
-    /// to it, since a set is only as continuous as its worse half.
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub min_contact_ratio: f64,
+    pub optimisation: Optimisation,
     /// Added to the common centre distance, mm — the running clearance.
     pub clearance: f64,
     pub tolerance_plus: f64,
@@ -141,8 +133,7 @@ impl Default for PlanetaryStage {
                 fixed: PlanetaryShaft::Ring,
             },
             clearance: 0.02,
-            optimise_efficiency: false,
-            min_contact_ratio: 1.2,
+            optimisation: Optimisation::default(),
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
             min_planet_clearance: 0.3,
@@ -485,23 +476,14 @@ impl PlanetaryStage {
             self.sun.profile_shift.resolve(floor),
             self.ring.profile_shift.manual,
         ];
-        if !self.optimise_efficiency {
+        if !self.optimisation.enabled {
             return plain;
         }
         let given = [
             (!self.sun.profile_shift.auto).then_some(self.sun.profile_shift.manual),
             (!self.ring.profile_shift.auto).then_some(self.ring.profile_shift.manual),
         ];
-        let place = |free: &[f64]| {
-            let mut i = 0;
-            [0, 1].map(|k| {
-                given[k].unwrap_or_else(|| {
-                    let v = free[i];
-                    i += 1;
-                    v
-                })
-            })
-        };
+        let freedoms = crate::auto::Freedoms::new(given);
         let eta0 = |x: [f64; 2]| -> Option<f64> {
             let b = self.built(x).ok()?;
             // **The sun and the planet both have to be cuttable**, and the
@@ -519,8 +501,8 @@ impl PlanetaryStage {
             {
                 return None;
             }
-            if b.sp_path.contact_ratio < self.min_contact_ratio
-                || b.pr_path.contact_ratio < self.min_contact_ratio
+            if b.sp_path.contact_ratio < self.optimisation.min_contact_ratio
+                || b.pr_path.contact_ratio < self.optimisation.min_contact_ratio
             {
                 return None;
             }
@@ -540,12 +522,11 @@ impl PlanetaryStage {
                 ),
             )
         };
-        let dof = 2 - given.iter().filter(|g| g.is_some()).count();
-        if dof == 0 {
+        if freedoms.count() == 0 {
             return plain;
         }
-        crate::auto::maximise(dof, &|free| eta0(place(free)))
-            .map(|free| place(&free))
+        crate::auto::maximise(freedoms.count(), &|free| eta0(freedoms.place(free)))
+            .map(|free| freedoms.place(&free))
             .unwrap_or(plain)
     }
 }
@@ -1648,7 +1629,10 @@ mod tests {
         let solve = |on: bool| {
             solve_planetary_stage(
                 &PlanetaryStage {
-                    optimise_efficiency: on,
+                    optimisation: Optimisation {
+                        enabled: on,
+                        ..Optimisation::default()
+                    },
                     ..free()
                 },
                 3000.0,
@@ -1684,7 +1668,7 @@ mod tests {
             tuned.sun_planet.contact_ratios.transverse,
             tuned.planet_ring.contact_ratios.transverse,
         ] {
-            let asked = free().min_contact_ratio;
+            let asked = free().optimisation.min_contact_ratio;
             assert!(eps >= asked - 1e-3, "contact ratio {eps} under {asked}");
         }
     }
@@ -1693,7 +1677,10 @@ mod tests {
     #[test]
     fn a_given_shift_survives_the_search() {
         let mut stage = PlanetaryStage {
-            optimise_efficiency: true,
+            optimisation: Optimisation {
+                enabled: true,
+                ..Optimisation::default()
+            },
             ..stage_of(24, 18, 60, 0.0)
         };
         stage.sun.profile_shift = Auto::automatic(0.0);

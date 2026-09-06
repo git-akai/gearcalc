@@ -732,6 +732,53 @@ pub fn root_radius_fits(p: &GearParams, working_depth: f64) -> bool {
         .admits(p.root_radius)
 }
 
+/// **Which of a fixed set of numbers a search still has to choose.**
+///
+/// A stage hands its searcher some numbers already decided and some not, and
+/// then has to map whatever the search hands back onto the full set. That
+/// mapping was written out twice, identically, in two stages — and it is the
+/// kind of thing that stays identical right up until one of them is edited.
+///
+/// `None` is a number left free; `Some` is one a designer gave, which a search
+/// may not overrule.
+#[derive(Debug, Clone, Copy)]
+pub struct Freedoms<const N: usize> {
+    given: [Option<f64>; N],
+}
+
+impl<const N: usize> Freedoms<N> {
+    /// From what is already decided.
+    #[must_use]
+    pub const fn new(given: [Option<f64>; N]) -> Self {
+        Self { given }
+    }
+
+    /// How many numbers are left to choose — the dimension to search in, and
+    /// zero where the design is already fully specified.
+    #[must_use]
+    pub fn count(&self) -> usize {
+        self.given.iter().filter(|g| g.is_none()).count()
+    }
+
+    /// The full set, with `free` read into the places left open in order.
+    ///
+    /// # Panics
+    ///
+    /// If `free` is shorter than [`Self::count`], which is a caller that
+    /// searched in the wrong number of dimensions.
+    #[must_use]
+    pub fn place(&self, free: &[f64]) -> [f64; N] {
+        let mut next = 0;
+        self.given.map(|g| {
+            g.unwrap_or_else(|| {
+                let v = free[next];
+                next += 1;
+                v
+            })
+        })
+    }
+}
+
 /// **Whether a rack-generated member can be built at the shift it is given.**
 ///
 /// Four things stop a tooth existing, and they are the same four whatever chose

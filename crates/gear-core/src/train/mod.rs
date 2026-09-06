@@ -390,6 +390,57 @@ pub(super) fn test_library() -> MaterialLibrary {
     }
 }
 
+/// **What a stage is asked to optimise, and what it may not do to get there.**
+///
+/// Every stage with shifts to choose carries the same two decisions, and they
+/// were the same two fields written out three times — which is three places to
+/// edit, three serde defaults to keep in step, and a fourth stage away from
+/// being four. The searches differ in what is free and what it is worth; this
+/// does not differ at all.
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct Optimisation {
+    /// **Choose the automatic shifts for efficiency rather than for undercut.**
+    ///
+    /// Off, so a stage answers as it always has. On, the shifts a designer has
+    /// left automatic are chosen to make the stage lose least, with the undercut
+    /// shift as a *floor* rather than as the answer
+    /// (docs/reference.md#efficiency-parallel-axes).
+    ///
+    /// What is already given constrains it rather than being overruled by it: a
+    /// manual shift is that gear's, and a manual centre distance or crank offset
+    /// fixes a shift sum. Enough of them leave nothing to choose, which is a
+    /// design fully specified rather than an error.
+    pub enabled: bool,
+    /// **The transverse contact ratio the optimiser may not go below.**
+    ///
+    /// Sliding loss falls monotonically with the length of the path, so the
+    /// least-loss pair is always the one whose teeth barely reach: this is the
+    /// constraint that answers rather than the optimum, which is why it is an
+    /// input and not a constant. 1.2 is the usual design minimum; a mesh of one
+    /// tooth of difference sits just above continuous contact at every shift it
+    /// can be built at, and asks for less.
+    ///
+    /// It bounds the *optimiser* only. A design specified by hand is reported as
+    /// it is, with the existing note below 1.
+    pub min_contact_ratio: f64,
+}
+
+impl Default for Optimisation {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            min_contact_ratio: 1.2,
+        }
+    }
+}
+
 /// A stage of a geartrain, of whichever kind.
 ///
 /// Serialised with a `kind` tag alongside the stage's own fields, so a train
@@ -1948,7 +1999,10 @@ mod tests {
     fn choosing_the_shifts_is_quick_enough_to_type_over() {
         let lib = library();
         let stage = SpurStage {
-            optimise_efficiency: true,
+            optimisation: Optimisation {
+                enabled: true,
+                ..Optimisation::default()
+            },
             ..SpurStage::default()
         };
         let start = std::time::Instant::now();
@@ -1985,7 +2039,10 @@ mod tests {
                 ..SpurStage::default().gears[0].clone()
             };
             SpurStage {
-                optimise_efficiency: true,
+                optimisation: Optimisation {
+                    enabled: true,
+                    ..Optimisation::default()
+                },
                 gears: [gear(9), gear(37)],
                 ..SpurStage::default()
             }
@@ -2007,7 +2064,7 @@ mod tests {
                 assert_eq!(
                     x,
                     SpurStage {
-                        optimise_efficiency: false,
+                        optimisation: Optimisation::default(),
                         ..s
                     }
                     .shifts()
@@ -2040,7 +2097,10 @@ mod tests {
                     ..SpurStage::default().gears[1].clone()
                 },
             ],
-            optimise_efficiency: on,
+            optimisation: Optimisation {
+                enabled: on,
+                ..Optimisation::default()
+            },
             ..SpurStage::default()
         };
         let plain = stage(false).shifts();
@@ -2094,7 +2154,10 @@ mod tests {
         };
 
         let spur = SpurStage {
-            optimise_efficiency: true,
+            optimisation: Optimisation {
+                enabled: true,
+                ..Optimisation::default()
+            },
             ..SpurStage::default()
         };
         for (i, x) in spur.shifts().iter().enumerate() {
@@ -2102,7 +2165,10 @@ mod tests {
         }
 
         let mut set = PlanetaryStage {
-            optimise_efficiency: true,
+            optimisation: Optimisation {
+                enabled: true,
+                ..Optimisation::default()
+            },
             ..PlanetaryStage::default()
         };
         set.sun.profile_shift = Auto::automatic(0.0);
@@ -2114,7 +2180,10 @@ mod tests {
         // The eccentric drive's rack-generated members are its pinions; its
         // rings are the shaper's and are not asked.
         let drive = HulaStage {
-            optimise_efficiency: true,
+            optimisation: Optimisation {
+                enabled: true,
+                ..Optimisation::default()
+            },
             ..HulaStage::default()
         };
         let r = solve_hula_stage(&drive, 1000.0, 2.0).expect("the drive solves");
@@ -2158,7 +2227,10 @@ mod tests {
         // distance the automatic solve already closes to.
         let asked = free.centre_distance_nominal + 0.05;
         let at = |on: bool| SpurStage {
-            optimise_efficiency: on,
+            optimisation: Optimisation {
+                enabled: on,
+                ..Optimisation::default()
+            },
             centre_distance: Auto::fixed(asked),
             clearance: 0.05,
             ..SpurStage::default()
@@ -2186,7 +2258,10 @@ mod tests {
         for on in [false, true] {
             let r = solve_spur_stage(
                 &SpurStage {
-                    optimise_efficiency: on,
+                    optimisation: Optimisation {
+                        enabled: on,
+                        ..Optimisation::default()
+                    },
                     clearance: 0.05,
                     ..SpurStage::default()
                 },
@@ -2207,7 +2282,10 @@ mod tests {
         let free = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib).unwrap();
         let asked = free.centre_distance_nominal + 0.4;
         let stage = SpurStage {
-            optimise_efficiency: true,
+            optimisation: Optimisation {
+                enabled: true,
+                ..Optimisation::default()
+            },
             centre_distance: Auto::fixed(asked),
             ..SpurStage::default()
         };
@@ -2228,7 +2306,10 @@ mod tests {
             ..SpurStage::default().gears[0].clone()
         };
         let stage = SpurStage {
-            optimise_efficiency: true,
+            optimisation: Optimisation {
+                enabled: true,
+                ..Optimisation::default()
+            },
             gears: [given(0.3), given(-0.1)],
             ..SpurStage::default()
         };

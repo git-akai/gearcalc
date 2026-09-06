@@ -10,6 +10,7 @@
     type Overrides,
     type StageGear,
     type SpurStage,
+    type Optimisation,
     type Value,
     type GearResult,
     type WormResult,
@@ -20,15 +21,18 @@
   import { exportTrain, relieve } from "./core";
   import Switch from "./Switch.svelte";
 
-  /** A pair chooses two shifts, so at most two of {distance, shift, shift} can
-   *  be given — and only while the stage is choosing them at all. With the
-   *  optimiser off the shifts are not being solved for anything, so pinning all
-   *  three is the design it always was and nothing is relieved. */
+  /** A mesh chooses one shift per gear, and its centre distance is one relation
+   *  among them — so at most `gears.length` of {distance, shift…} can be given,
+   *  and the count comes from the stage rather than from a number written here.
+   *
+   *  Only while the stage is choosing them at all: with the optimiser off the
+   *  shifts are not being solved for anything, so pinning every one of them is
+   *  the fully specified design it always was and nothing is relieved. */
   function relieveSpur(stage: SpurStage, just: Auto<number>) {
-    if (!stage.optimise_efficiency) return;
+    if (!stage.optimisation.enabled) return;
     relieve(
-      [stage.centre_distance, stage.gears[0].profile_shift, stage.gears[1].profile_shift],
-      2,
+      [stage.centre_distance, ...stage.gears.map((g) => g.profile_shift)],
+      stage.gears.length,
       just,
     );
   }
@@ -665,27 +669,20 @@
      The contact ratio comes with it because it is the constraint the answer sits
      against: sliding loss falls with the length of the path, so without a floor
      the least-loss pair is always the one whose teeth barely reach. -->
-{#snippet efficiencyToggle(
-  on: boolean,
-  setOn: (v: boolean) => void,
-  ratio: number,
-  setRatio: (v: number) => void,
-)}
+{#snippet efficiencyToggle(o: Optimisation, after?: () => void)}
   {@render switchField(
     "ui.train_optimise_efficiency",
-    on,
-    setOn,
+    o.enabled,
+    (v) => {
+      o.enabled = v;
+      after?.();
+    },
     t("ui.train_note_optimise_efficiency"),
   )}
-  {#if on}
+  {#if o.enabled}
     <label class="sub">
       <span>{t("ui.train_min_contact_ratio")}</span>
-      <input
-        type="number"
-        step="0.05"
-        value={ratio}
-        onchange={(e) => setRatio(Number(e.currentTarget.value))}
-      />
+      <input type="number" step="0.05" bind:value={o.min_contact_ratio} />
       <em>{t("ui.train_epsilon")}</em>
       {@render noteSlot(notes(t("ui.train_note_min_contact_ratio"), null))}
     </label>
@@ -1024,7 +1021,7 @@
                    rule a second time and drift from it. -->
               <label>
                 <span>{t("ui.train_c2c_clearance")}</span>
-                {#if sres && sres.clearance === 0}
+                {#if (sres ?? xres) && (sres ?? xres)?.clearance === 0}
                   <input type="number" value={0} disabled class="computed" />
                 {:else}
                   <input type="number" step="0.01" bind:value={stage.clearance} />
@@ -1060,12 +1057,7 @@
                   {@render noteSlot(notes(t("ui.train_note_load_sharing"), null))}
                 </label>
               {/if}
-              {@render efficiencyToggle(
-                stage.optimise_efficiency,
-                (on) => (stage.optimise_efficiency = on),
-                stage.min_contact_ratio,
-                (v) => (stage.min_contact_ratio = v),
-              )}
+              {@render efficiencyToggle(stage.optimisation)}
             </div>
             <!-- Clearance is meaningless once the centre distance is set by hand:
                  the specification locks it to zero, and so does the solver. -->
@@ -1260,13 +1252,11 @@
               {@render autoNumber("ui.train_c2c_distance", stage.centre_distance, wres?.centre_distance, 0.1)}
               <label>
                 <span>{t("ui.train_c2c_clearance")}</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  bind:value={stage.clearance}
-                  disabled={!stage.centre_distance.auto}
-                  class:computed={!stage.centre_distance.auto}
-                />
+                {#if wres && wres.clearance === 0}
+                  <input type="number" value={0} disabled class="computed" />
+                {:else}
+                  <input type="number" step="0.01" bind:value={stage.clearance} />
+                {/if}
                 <em>{t("ui.train_mm")}</em>
               </label>
               <label>
@@ -1547,12 +1537,7 @@
                 <em></em>
                 {@render noteSlot(notes(null, null))}
               </label>
-              {@render efficiencyToggle(
-                stage.optimise_efficiency,
-                (on) => (stage.optimise_efficiency = on),
-                stage.min_contact_ratio,
-                (v) => (stage.min_contact_ratio = v),
-              )}
+              {@render efficiencyToggle(stage.optimisation)}
             </div>
 
             <h4>{t("ui.train_ring_cutter")}</h4>
@@ -1746,7 +1731,11 @@
               </label>
               <label>
                 <span>{t("ui.train_hula_gap")}</span>
-                <input type="number" step="0.05" bind:value={stage.clearance} />
+                {#if hres && hres.clearance === 0}
+                  <input type="number" value={0} disabled class="computed" />
+                {:else}
+                  <input type="number" step="0.05" bind:value={stage.clearance} />
+                {/if}
                 <em>{t("ui.train_mm")}</em>
                 {@render noteSlot(notes(t("ui.train_hula_note_gap"), null))}
               </label>
@@ -1787,12 +1776,7 @@
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
-              {@render efficiencyToggle(
-                stage.optimise_efficiency,
-                (on) => (stage.optimise_efficiency = on),
-                stage.min_contact_ratio,
-                (v) => (stage.min_contact_ratio = v),
-              )}
+              {@render efficiencyToggle(stage.optimisation)}
             </div>
 
             {#if hres}
@@ -1966,7 +1950,7 @@
                       solvedShift:
                         hres &&
                         ((stage.given_shift[m] === "ring") !== (hres.gears[j].ring === true) ||
-                          (stage.optimise_efficiency && stage.gears[j].profile_shift.auto))
+                          (stage.optimisation.enabled && stage.gears[j].profile_shift.auto))
                           ? hres.gears[j].profile_shift
                           : undefined,
                       faceAuto: false,

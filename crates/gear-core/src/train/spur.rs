@@ -150,33 +150,10 @@ pub struct SpurStage {
     pub clearance: f64,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
-    /// **Choose the automatic shifts for efficiency rather than for undercut.**
-    ///
-    /// Off, so a stage answers as it always has. On, the shifts a designer has
-    /// left automatic are chosen to make the pair lose least, with the undercut
-    /// shift as a *floor* rather than as the answer — which is worth over a
-    /// point of mesh efficiency on an ordinary pair, and buys it with contact
-    /// ratio (docs/reference.md#efficiency-parallel-axes).
-    ///
-    /// What is already given constrains it: a manual shift is that gear's, and
-    /// a manual centre distance fixes the two shifts' sum. Two of the three
-    /// leave nothing to choose, which is a design fully specified rather than
-    /// an error.
+    /// What the stage is asked to optimise, and what it may not do to get
+    /// there. See [`super::Optimisation`].
     #[cfg_attr(feature = "serde", serde(default))]
-    pub optimise_efficiency: bool,
-    /// **The transverse contact ratio the optimiser may not go below.**
-    ///
-    /// Sliding loss falls monotonically with the length of the path: every
-    /// millimetre of profile that touches is a millimetre that slides. So the
-    /// least-loss pair is always the one whose teeth barely reach, and this is
-    /// the constraint that answers rather than the optimum — which is why it is
-    /// an input and not a constant. 1.2 is the usual design minimum, leaving
-    /// margin for the tolerance and tip relief a real pair carries.
-    ///
-    /// It bounds the *optimiser* only. A pair specified by hand is reported as
-    /// it is, with the existing note below 1, exactly as before.
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub min_contact_ratio: f64,
+    pub optimisation: super::Optimisation,
     /// How the load is divided while two tooth pairs are engaged.
     ///
     /// **Off by default, and it reaches bending only.** A contact rating is
@@ -204,8 +181,7 @@ impl Default for SpurStage {
             sliding_friction: 0.08,
             static_friction: 0.16,
             thickness_mod: 1.0,
-            optimise_efficiency: false,
-            min_contact_ratio: 1.2,
+            optimisation: super::Optimisation::default(),
             centre_distance: Auto::automatic(0.0),
             clearance: 0.02,
             tolerance_plus: 0.02,
@@ -260,7 +236,7 @@ impl SpurStage {
     /// than by knowing the rule a second time.
     #[must_use]
     pub fn clearance_taken(&self) -> f64 {
-        if self.centre_distance.auto || self.optimise_efficiency {
+        if self.centre_distance.auto || self.optimisation.enabled {
             self.clearance
         } else {
             0.0
@@ -283,7 +259,7 @@ impl SpurStage {
         let given = [0, 1].map(|i| {
             (!self.gears[i].profile_shift.auto).then_some(self.gears[i].profile_shift.manual)
         });
-        if !self.optimise_efficiency {
+        if !self.optimisation.enabled {
             return [0, 1].map(|i| given[i].unwrap_or(floor[i]));
         }
         let sum = (!self.centre_distance.auto)
@@ -308,7 +284,7 @@ impl SpurStage {
             crate::mesh::MeshKind::External,
             &crate::auto::Bounds {
                 floor,
-                min_contact_ratio: self.min_contact_ratio,
+                min_contact_ratio: self.optimisation.min_contact_ratio,
                 clearance: self.clearance_taken(),
             },
             &crate::auto::Pinned { shift: given, sum },

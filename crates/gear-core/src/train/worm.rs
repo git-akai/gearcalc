@@ -413,6 +413,9 @@ pub struct WormResult {
     pub ratio: f64,
     pub centre_distance_nominal: f64,
     pub centre_distance: f64,
+    /// **The clearance the stage opened by**, zero where nothing was free to
+    /// absorb it — see [`WormStage::clearance_taken`].
+    pub clearance: f64,
     /// Lead angle of the worm, degrees.
     pub lead_angle: f64,
     /// Lead angle of the wheel, degrees.
@@ -985,6 +988,7 @@ pub fn solve_worm_stage(
         ratio: s.ratio,
         centre_distance_nominal: s.centre_distance,
         centre_distance: centre,
+        clearance: stage.clearance_taken(),
         lead_angle: s.lead_angle.to_degrees(),
         wheel_lead_angle: s.wheel_lead_angle.to_degrees(),
         helix_angle: s.worm_helix_angle.to_degrees(),
@@ -1044,9 +1048,25 @@ pub fn solve_worm_stage(
 /// zero-backlash one nobody assembles.
 fn operating_centre(s: &Screw, stage: &WormStage) -> f64 {
     if stage.centre_distance.auto {
-        s.centre_distance + stage.clearance
+        s.centre_distance + stage.clearance_taken()
     } else {
         stage.centre_distance.manual
+    }
+}
+
+impl WormStage {
+    /// **The clearance this stage actually opens by** — the same question every
+    /// stage answers, in the same words (see [`super::SpurStage::clearance_taken`]).
+    ///
+    /// A crossed pair has no shifts to choose, so the distance is the only thing
+    /// that can absorb a clearance and a given distance leaves nothing at all.
+    #[must_use]
+    pub fn clearance_taken(&self) -> f64 {
+        if self.centre_distance.auto {
+            self.clearance
+        } else {
+            0.0
+        }
     }
 }
 

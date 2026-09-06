@@ -2,6 +2,7 @@
 import type { Auto } from "./Auto";
 import type { Cutter } from "./Cutter";
 import type { GivenShift } from "./GivenShift";
+import type { Optimisation } from "./Optimisation";
 import type { StageGear } from "./StageGear";
 
 /**
@@ -77,28 +78,19 @@ offset: Auto<number>,
  */
 given_shift: [GivenShift, GivenShift], 
 /**
- * **Choose the shift split for efficiency rather than taking it as given**,
- * as [`super::SpurStage::optimise_efficiency`].
+ * What the drive is asked to optimise, and what it may not do to get
+ * there. See [`Optimisation`].
  *
  * A pair's shift *sum* is fixed by the offset the crank has to reach, so
  * within a mesh only the division between ring and pinion is free — and
- * that division is worth real efficiency. Off, the split is the number
- * entered against the named member, exactly as before.
+ * that division is worth real efficiency. The contact ratio defaults lower
+ * here than the shared default, for a reason that is the drive's rather
+ * than a relaxation of the rule: a mesh of one tooth of difference has a
+ * very short path and sits just above continuous contact at every split it
+ * can be built at, so a pair's usual 1.2 of design margin would forbid the
+ * mechanism rather than constrain it.
  */
-optimise_efficiency: boolean, 
-/**
- * **The transverse contact ratio the optimiser may not take either mesh
- * below**, as [`super::SpurStage::min_contact_ratio`].
- *
- * It defaults lower here than on a pair, and for a reason that is the
- * drive's rather than a relaxation of the rule: a mesh of one tooth of
- * difference has a very short path of contact, and sits just above
- * continuous contact at every split it can be built at. A pair's usual 1.2
- * of design margin would forbid the mechanism rather than constrain it, so
- * the default is continuous contact itself and any margin beyond that is
- * the designer's to ask for.
- */
-min_contact_ratio: number, 
+optimisation: Optimisation, 
 /**
  * The shaper each mesh's ring is cut with.
  *

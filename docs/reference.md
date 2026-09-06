@@ -437,11 +437,35 @@ Each stage differs only in what is free and what it is worth:
 | eccentric | each mesh's division of its shift | the two meshes' product |
 | worm | — | no profile shift exists to choose |
 
-The searches share `auto::maximise`, a bounded coordinate descent: what differs
-between stages is how many numbers are free and what they are worth, not how to
-look for them. Each rates the geometry the stage would *build* — the automatic
-addendum resolved, at the distance the pair runs at rather than its zero-backlash
-one — so what is optimised is what is reported.
+The searches share `auto::maximise`: what differs between stages is how many
+numbers are free and what they are worth, not how to look for them, and
+`auto::Freedoms` is the one mapping from what a search hands back onto the full
+set. Each rates the geometry the stage would *build* — the automatic addendum
+resolved, at the distance the pair runs at rather than its zero-backlash one —
+so what is optimised is what is reported.
+
+**The same four questions of every chosen shift** (`auto::member_is_buildable`):
+the shift is at or above the least that clears undercut, the flank is not
+undercut anyway, the tooth does not come to a point before its tip, and the root
+round asked for still fits the space — which shrinks as the shift rises, since
+the cutter bites less deep and the space narrows. A ring is not asked: its root
+and fillet are its shaper's rather than inputs of its own, and an internal
+mesh's bounds are the tip margin and the interference it reports, which belong
+to the pair rather than to one member.
+
+They were once asked stage by stage, which meant a bound reached the search it
+was written in and no other: the root round bounded a pair and not an epicyclic
+set, and the eccentric drive was choosing a pinion nobody could cut and taking
+1.9 points of efficiency less for it.
+
+**Where a clearance is read.** A clearance is taken by whatever is free to
+absorb it, and each stage reports what it took rather than leaving a reader to
+work it out. The centre distance absorbs it when the distance is automatic; the
+shifts absorb it when they are being chosen, closing the pair to zero backlash a
+clearance *inside* a given housing; and with neither free the input goes unread
+and the answer says zero. The eccentric drive's minimum clearance is the same
+question asked of its crank: it is what *sets* the offset, so a given offset
+leaves it unread.
 
 ## Crossed axes
 
