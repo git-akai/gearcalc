@@ -384,6 +384,7 @@
     <label class:invalid={g && outside(gear.dedendum, g.ranges.dedendum)}>
       <span>{t("ui.train_dedendum")}</span>
       <input type="number" step="0.05" bind:value={gear.dedendum} />
+      <em>{t("ui.train_m")}</em>
       <!-- The same sentences the gear tab shows. They used to be written out
            here as well, and drifted: this one lost its reason altogether and
            the fillet bound below was abbreviated past the point of saying
@@ -403,6 +404,7 @@
     <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
       <span>{t("ui.train_root_radius")}</span>
       <input type="number" step="0.01" bind:value={gear.root_radius} />
+      <em>{t("ui.train_m")}</em>
       {@render noteSlot(
         notes(
           g ? t("ui.bound_root_radius", { max: n(g.ranges.root_radius.max ?? 0) }) : null,
@@ -601,6 +603,7 @@
   computed: number | undefined,
   step: number,
   after?: () => void,
+  note?: string | null,
 )}
   <label class="auto">
     <span>{t(key)}</span>
@@ -626,6 +629,13 @@
     >
       {t("ui.train_auto")}
     </button>
+    <!-- Inside the label, because that is where a note is laid out: `.note`
+         spans this row's own columns and is right-aligned against them. Placed
+         beside the field instead it spans whatever grid it lands in, which is
+         the outer one, and lines up with nothing. -->
+    {#if note !== undefined}
+      {@render noteSlot(notes(note, null))}
+    {/if}
   </label>
 {/snippet}
 
@@ -641,14 +651,14 @@
   ratio: number,
   setRatio: (v: number) => void,
 )}
-  <label class="auto">
+  <label class="check">
     <span>{t("ui.train_optimise_efficiency")}</span>
     <input type="checkbox" checked={on} onchange={(e) => setOn(e.currentTarget.checked)} />
     <em></em>
     {@render noteSlot(notes(t("ui.train_note_optimise_efficiency"), null))}
   </label>
   {#if on}
-    <label>
+    <label class="sub">
       <span>{t("ui.train_min_contact_ratio")}</span>
       <input
         type="number"
@@ -816,7 +826,7 @@
          an allowable a part is sized against, which this tool asks for rather
          than applies. Off, the stages say where reversal is present and
          uncorrected. -->
-    <label class="toggle">
+    <label class="check">
       <span>{t("ui.train_reversed_bending")}</span>
       <input type="checkbox" bind:checked={tab.train.reversed_bending} />
       <em></em>
@@ -991,7 +1001,7 @@
                 0.1,
                 () => relieveSpur(stage, stage.centre_distance),
               )}
-              <label>
+              <label class="sub">
                 <span>{t("ui.train_c2c_clearance")}</span>
                 <input
                   type="number"
@@ -1229,7 +1239,7 @@
                 )}
               </label>
               {@render autoNumber("ui.train_c2c_distance", stage.centre_distance, wres?.centre_distance, 0.1)}
-              <label>
+              <label class="sub">
                 <span>{t("ui.train_c2c_clearance")}</span>
                 <input
                   type="number"
@@ -1473,7 +1483,7 @@
                   ),
                 )}
               </label>
-              <label>
+              <label class="sub">
                 <span>{t("ui.train_c2c_clearance")}</span>
                 <input type="number" step="0.01" bind:value={stage.clearance} />
                 <em>{t("ui.train_mm")}</em>
@@ -1721,30 +1731,29 @@
                 <em>{t("ui.train_mm")}</em>
                 {@render noteSlot(notes(t("ui.train_hula_note_gap"), null))}
               </label>
-              <label>
-                <span>{t("ui.train_hula_offset_from")}</span>
-                <select
-                  value={typeof stage.offset === "string" ? "clearance" : "given"}
-                  onchange={(e) => {
-                    stage.offset =
-                      e.currentTarget.value === "clearance"
-                        ? "clearance"
-                        : { given: hres ? hres.offset_nominal : stage.clearance };
-                  }}
-                >
-                  <option value="clearance">{t("ui.train_hula_offset_from_bounds")}</option>
-                  <option value="given">{t("ui.train_hula_offset_given")}</option>
-                </select>
-                {@render noteSlot(notes(t("ui.train_hula_note_offset"), null))}
-              </label>
-              {#if typeof stage.offset !== "string"}
-                <label>
-                  <span>{t("ui.train_hula_crank_offset")}</span>
-                  <input type="number" step="0.01" bind:value={stage.offset.given} />
-                  <em>{t("ui.train_mm")}</em>
-                </label>
-              {/if}
-              <label>
+              <!-- The crank offset is this arrangement's centre distance and is
+                   entered as one: automatic derives it from the clearances the
+                   parts must keep, a number given by hand is what it runs at.
+                   It carried a mode select and a second box before, which said
+                   the same thing in two controls neither of which looked like
+                   the field it replaced. What it settled at was also reported
+                   again below; the note it earned there belongs here, beside
+                   the number a designer is reading. -->
+              {@render autoNumber(
+                "ui.train_hula_crank_offset",
+                stage.offset,
+                hres?.offset_nominal,
+                0.01,
+                undefined,
+                hres
+                  ? `${t("ui.train_hula_running", { value: hres.offset.toFixed(4) })}${
+                      hres.binding_mesh !== null
+                        ? ` · ${t("ui.train_hula_held_open_by", { mesh: String(hres.binding_mesh + 1) })}`
+                        : ""
+                    }`
+                  : null,
+              )}
+              <label class="sub">
                 <span>{t("ui.train_c2c_clearance")}</span>
                 <input type="number" step="0.01" bind:value={stage.running_clearance} />
                 <em>{t("ui.train_mm")}</em>
@@ -1783,20 +1792,6 @@
                       })} · ${t("ui.train_hula_note_ratio", {
                         denominator: String(hres.ratio_products[1]),
                       })}`,
-                      null,
-                    ),
-                  )}
-                </dd>
-                <dt>{t("ui.train_hula_crank_offset")}</dt>
-                <dd>
-                  {hres.offset_nominal.toFixed(4)} {t("ui.train_mm")}
-                  {@render noteSlot(
-                    notes(
-                      `${t("ui.train_hula_running", { value: hres.offset.toFixed(4) })}${
-                        hres.binding_mesh !== null
-                          ? ` · ${t("ui.train_hula_held_open_by", { mesh: String(hres.binding_mesh + 1) })}`
-                          : ""
-                      }`,
                       null,
                     ),
                   )}
@@ -1847,16 +1842,19 @@
                 <label>
                   <span>{t("ui.train_tooth_thickness_mod")}</span>
                   <input type="number" step="0.05" bind:value={stage.thickness_mod[m]} />
+                  <em>{t("ui.train_k")}</em>
                   {@render noteSlot(notes(t("ui.train_hula_note_thickness_mod"), null))}
                 </label>
                 <label>
                   <span>{t("ui.train_cutter_teeth")}</span>
                   <input type="number" step="1" min="4" bind:value={stage.cutter[m].teeth} />
+                  <em></em>
                   {@render noteSlot(notes(t("ui.train_hula_note_shaper"), null))}
                 </label>
                 <label>
                   <span>{t("ui.train_sliding_friction")}</span>
                   <input type="number" step="0.01" bind:value={stage.sliding_friction[m]} />
+                  <em></em>
                 </label>
                 <label>
                   <span>{t("ui.train_hula_given_shift")}</span>
@@ -1864,6 +1862,7 @@
                     <option value="pinion">{t("ui.train_hula_split_pinion")}</option>
                     <option value="ring">{t("ui.train_hula_split_ring")}</option>
                   </select>
+                  <em></em>
                   {@render noteSlot(notes(t("ui.train_hula_note_split"), null))}
                 </label>
               </div>
@@ -2095,7 +2094,13 @@
   }
   /* A checkbox keeps its field's label column, so it lines up under the boxes
      above it, but takes only the width it needs rather than stretching across
-     one meant for a number. */
+     one meant for a number.
+     `.check` is a field whose control happens to be a checkbox and `.toggle` is
+     the small `auto` button; both want this column, and only the second wants
+     the muted, shrunken styling below. The two shared a class for a while, and
+     what it looked like was a field indented under one it had nothing to do
+     with. */
+  .grid.shared > label.check input,
   .grid.shared > label.toggle input {
     width: auto;
     justify-self: start;
