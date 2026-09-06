@@ -219,6 +219,12 @@ pub struct SpurResult {
     pub ratio: f64,
     /// Zero-backlash centre distance, mm.
     pub centre_distance_nominal: f64,
+    /// **The clearance the stage opened by**, which is zero where nothing was
+    /// free to absorb it — see [`SpurStage::clearance_taken`], the one place
+    /// that is decided. Reported so a reader is told the input went unread
+    /// rather than left to work it out, and so the panel can grey the field by
+    /// reading the answer instead of knowing the rule a second time.
+    pub clearance: f64,
     /// The centre distance actually used, including clearance.
     pub centre_distance: f64,
     pub contact_ratios: ContactRatios,
@@ -2051,6 +2057,64 @@ mod tests {
             loss(true),
             loss(false)
         );
+    }
+
+    /// **The clearance is taken by whatever is free to absorb it.**
+    ///
+    /// With the distance automatic, the distance absorbs it — it is the
+    /// zero-backlash distance opened out, and that opening is the backlash.
+    /// With the distance given and the shifts pinned at their undercut minimum
+    /// nothing is left to move, so the input goes unread and the answer says so
+    /// by reporting zero. With the distance given *and* the shifts being chosen,
+    /// the shifts absorb it: the pair closes to zero backlash a clearance inside
+    /// the housing, so the designer gets both the distance they specified and
+    /// the play they asked for.
+    #[test]
+    fn the_clearance_is_taken_by_whatever_is_free_to_absorb_it() {
+        let lib = library();
+        let free = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib).unwrap();
+        // A housing the pair can actually meet: a clearance inside it is the
+        // distance the automatic solve already closes to.
+        let asked = free.centre_distance_nominal + 0.05;
+        let at = |on: bool| SpurStage {
+            optimise_efficiency: on,
+            centre_distance: Auto::fixed(asked),
+            clearance: 0.05,
+            ..SpurStage::default()
+        };
+
+        // Nothing free: the input is not read, and the answer reports that.
+        let pinned = solve_spur_stage(&at(false), StageTorques::just(2.0), &lib).unwrap();
+        assert!(pinned.clearance == 0.0, "read {}", pinned.clearance);
+
+        // The shifts free: they take it, and the backlash is the one asked for.
+        let chosen = solve_spur_stage(&at(true), StageTorques::just(2.0), &lib).unwrap();
+        assert!((chosen.clearance - 0.05).abs() < 1e-12);
+        assert!(
+            (chosen.centre_distance - asked).abs() < 1e-9,
+            "the housing still holds: {}",
+            chosen.centre_distance
+        );
+        assert!(
+            (chosen.centre_distance - chosen.centre_distance_nominal - 0.05).abs() < 1e-6,
+            "the pair should close to zero backlash 0.05 inside the housing, not {}",
+            chosen.centre_distance - chosen.centre_distance_nominal
+        );
+
+        // And with the distance automatic it is read either way, as it always was.
+        for on in [false, true] {
+            let r = solve_spur_stage(
+                &SpurStage {
+                    optimise_efficiency: on,
+                    clearance: 0.05,
+                    ..SpurStage::default()
+                },
+                StageTorques::just(2.0),
+                &lib,
+            )
+            .unwrap();
+            assert!((r.clearance - 0.05).abs() < 1e-12);
+        }
     }
 
     /// A centre distance the designer typed is a **constraint on the pair**, not

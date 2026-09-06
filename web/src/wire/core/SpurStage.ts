@@ -73,8 +73,11 @@ thickness_mod: number,
  */
 centre_distance: Auto<number>, 
 /**
- * Added to the centre distance, mm. Forced to zero when the centre distance
- * is set manually, per the specification.
+ * Added to the centre distance, mm — the assembly clearance, and so the
+ * backlash.
+ *
+ * Read only where something is free to absorb it; see
+ * [`Self::clearance_taken`], which is the whole of that rule.
  */
 clearance: number, tolerance_plus: number, tolerance_minus: number, 
 /**

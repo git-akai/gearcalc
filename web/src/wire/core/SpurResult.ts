@@ -19,6 +19,14 @@ ratio: number,
  */
 centre_distance_nominal: number, 
 /**
+ * **The clearance the stage opened by**, which is zero where nothing was
+ * free to absorb it — see [`SpurStage::clearance_taken`], the one place
+ * that is decided. Reported so a reader is told the input went unread
+ * rather than left to work it out, and so the panel can grey the field by
+ * reading the answer instead of knowing the rule a second time.
+ */
+clearance: number, 
+/**
  * The centre distance actually used, including clearance.
  */
 centre_distance: number, contact_ratios: ContactRatios, 

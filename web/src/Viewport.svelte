@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from "./core";
   import type { GearView } from "./state.svelte";
+  import Switch from "./Switch.svelte";
   // Draws what the core produced. It computes no geometry: the profile arrives
   // as a flat [x0, y0, x1, y1, ...] array and the reference radii as numbers.
   // Only view transform lives here.
@@ -168,8 +169,11 @@
     onpointercancel={onUp}
   ></canvas>
   <div class="bar">
-    <label><input type="checkbox" bind:checked={view.circles} />
-      {t("ui.viewport_reference_circles")}</label>
+    <Switch
+      label={t("ui.viewport_reference_circles")}
+      on={view.circles}
+      set={(v) => (view.circles = v)}
+    />
     <span class="hint">{t("ui.viewport_drag_pan_scroll_zoom")}</span>
     <button onclick={reset}>{t("ui.viewport_reset_view")}</button>
   </div>
@@ -200,11 +204,6 @@
     gap: 1rem;
     font-size: 0.75rem;
     color: var(--muted);
-  }
-  .bar label {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
   }
   .hint {
     margin-left: auto;

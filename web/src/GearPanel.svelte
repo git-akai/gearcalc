@@ -23,6 +23,7 @@
     t,
   } from "./core";
   import { developer, setKind, workspace, type GearTab as Tab } from "./state.svelte";
+  import Switch from "./Switch.svelte";
   import Viewport from "./Viewport.svelte";
 
   let { tab }: { tab: Tab } = $props();
@@ -308,8 +309,11 @@
             <em>{t("ui.gear_m")}</em>
           </label>
           <label class="check">
-            <input type="checkbox" bind:checked={tab.mate.internal} />
-            <span>{t("ui.gear_mate_is_a_ring")}</span>
+            <Switch
+              label={t("ui.gear_mate_is_a_ring")}
+              on={tab.mate.internal}
+              set={(v) => (tab.mate.internal = v)}
+            />
             <small>{t("ui.gear_mate_ring_runs_inside")}</small>
           </label>
           <!-- The shift amplitude and the centre-distance throw are the same
@@ -442,10 +446,11 @@
         <em>{t("ui.gear_mm")}</em>
         <small>{t("ui.gear_maximum_deviation_exported_outline_from_true")}</small>
       </label>
-      <label class="check">
-        <input type="checkbox" bind:checked={tab.referenceCircles} />
-        <span>{t("ui.gear_include_reference_circles")}</span>
-      </label>
+      <Switch
+        label={t("ui.gear_include_reference_circles")}
+        on={tab.referenceCircles}
+        set={(v) => (tab.referenceCircles = v)}
+      />
     </div>
     <button class="primary" onclick={saveDxf} disabled={!("ok" in result)}>{t("ui.gear_export_dxf")}</button>
     {#if exportError}

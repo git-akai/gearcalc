@@ -142,8 +142,11 @@ pub struct SpurStage {
     pub thickness_mod: f64,
     /// Automatic uses the zero-backlash centre distance plus `clearance`.
     pub centre_distance: Auto<f64>,
-    /// Added to the centre distance, mm. Forced to zero when the centre distance
-    /// is set manually, per the specification.
+    /// Added to the centre distance, mm — the assembly clearance, and so the
+    /// backlash.
+    ///
+    /// Read only where something is free to absorb it; see
+    /// [`Self::clearance_taken`], which is the whole of that rule.
     pub clearance: f64,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
@@ -237,6 +240,33 @@ impl SpurStage {
         self.shaft_angle != 0.0
     }
 
+    /// **The clearance this stage actually opens by**, which is the one it was
+    /// given wherever anything is free to absorb it.
+    ///
+    /// With the centre distance automatic, the distance itself absorbs it: it is
+    /// the zero-backlash distance opened out, and that opening *is* the
+    /// backlash. With the distance given by hand there is nothing left to move
+    /// — the shifts sit at their undercut minimum, the distance is whatever was
+    /// typed, and the backlash is a consequence rather than a choice — so the
+    /// clearance is not read at all.
+    ///
+    /// Unless the shifts are being chosen, in which case they are what absorbs
+    /// it: the sum is pinned so the pair closes to zero backlash a clearance
+    /// *inside* the given distance, and the designer gets both the housing they
+    /// specified and the play they asked for.
+    ///
+    /// One rule, in one place, and [`SpurResult::clearance`] reports what came
+    /// of it — so the panel greys the input out by reading the answer rather
+    /// than by knowing the rule a second time.
+    #[must_use]
+    pub fn clearance_taken(&self) -> f64 {
+        if self.centre_distance.auto || self.optimise_efficiency {
+            self.clearance
+        } else {
+            0.0
+        }
+    }
+
     /// The two profile shifts, chosen together where that is what the stage
     /// asked for.
     ///
@@ -269,7 +299,7 @@ impl SpurStage {
                     rack.alpha_t,
                     rack.alpha_n,
                     sum_z,
-                    self.centre_distance.manual,
+                    self.centre_distance.manual - self.clearance_taken(),
                 )
             })
             .flatten();
@@ -279,13 +309,7 @@ impl SpurStage {
             &crate::auto::Bounds {
                 floor,
                 min_contact_ratio: self.min_contact_ratio,
-                // Clearance applies only where the stage derives the distance,
-                // matching `solve_spur_stage` exactly.
-                clearance: if self.centre_distance.auto {
-                    self.clearance
-                } else {
-                    0.0
-                },
+                clearance: self.clearance_taken(),
             },
             &crate::auto::Pinned { shift: given, sum },
             self.sliding_friction,
@@ -393,11 +417,12 @@ pub fn solve_spur_stage_with(
         })
         .collect::<Result<_, _>>()?;
 
-    // --- centre distance. Clearance applies only in automatic mode, per spec.
-    let (centre, clearance) = if stage.centre_distance.auto {
-        (mesh.a_w + stage.clearance, stage.clearance)
+    // --- centre distance and the clearance it is opened by.
+    let clearance = stage.clearance_taken();
+    let centre = if stage.centre_distance.auto {
+        mesh.a_w + clearance
     } else {
-        (stage.centre_distance.manual, 0.0)
+        stage.centre_distance.manual
     };
 
     // --- the pair as it actually runs.
@@ -416,7 +441,6 @@ pub fn solve_spur_stage_with(
     // the distance rather than the pair being re-described at it.
     let operating = mesh.at(centre).map_err(TrainError::Mesh)?;
     let path = ContactPath::new(&g[0], g[1].ra, &operating).ok_or(TrainError::NoContact)?;
-    let _ = clearance;
 
     // --- face width. `b_min` does not depend on the `b` it was measured at
     // (docs/reference.md#contact-stress), so one evaluation at any width gives every minimum, and
@@ -658,6 +682,7 @@ pub fn solve_spur_stage_with(
         ratio: f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth),
         centre_distance_nominal: mesh.a_w,
         centre_distance: centre,
+        clearance,
         contact_ratios,
         contact_stress_at_pitch_point: LoadCase {
             peak: rated.peak.0.at_pitch_point,

@@ -18,6 +18,7 @@
   } from "./core";
   import { developer, trains, library, type TrainTab } from "./state.svelte";
   import { exportTrain, relieve } from "./core";
+  import Switch from "./Switch.svelte";
 
   /** A pair chooses two shifts, so at most two of {distance, shift, shift} can
    *  be given — and only while the stage is choosing them at all. With the
@@ -219,6 +220,21 @@
      this width, so a note arriving or leaving — a value going out of range, a
      stage failing to solve — moves nothing below it. The blank candidate is
      what reserves the space when there is no note at all. -->
+<!-- A boolean that belongs in a column of fields: the row's label says what it
+     is, exactly as it does for a number, and the switch says whether it is on.
+     Standing alone — the four width sources below — a switch carries its own
+     name instead and needs no row. -->
+{#snippet switchField(key: string, on: boolean, set: (v: boolean) => void, note?: string | null)}
+  <label>
+    <span>{t(key)}</span>
+    <Switch label={t("ui.train_on")} {on} {set} />
+    <em></em>
+    {#if note !== undefined}
+      {@render noteSlot(notes(note, null))}
+    {/if}
+  </label>
+{/snippet}
+
 {#snippet noteSlot(notes: Notes)}
   <span class="note">
     {#each notes.all as note, i (i)}
@@ -494,22 +510,26 @@
          enabled there is nothing to invert and the width comes out zero, which
          the stage says in a note rather than hiding. -->
     <div class="subtoggles">
-      <label class="check">
-        <input type="checkbox" bind:checked={gear.face_sources.bending.peak} />
-        <span>{t("ui.train_from_bending_peak")}</span>
-      </label>
-      <label class="check">
-        <input type="checkbox" bind:checked={gear.face_sources.bending.cyclic} />
-        <span>{t("ui.train_from_bending_cyclic")}</span>
-      </label>
-      <label class="check">
-        <input type="checkbox" bind:checked={gear.face_sources.contact.peak} />
-        <span>{t("ui.train_from_contact_peak")}</span>
-      </label>
-      <label class="check">
-        <input type="checkbox" bind:checked={gear.face_sources.contact.cyclic} />
-        <span>{t("ui.train_from_contact_cyclic")}</span>
-      </label>
+      <Switch
+        label={t("ui.train_from_bending_peak")}
+        on={gear.face_sources.bending.peak}
+        set={(v) => (gear.face_sources.bending.peak = v)}
+      />
+      <Switch
+        label={t("ui.train_from_bending_cyclic")}
+        on={gear.face_sources.bending.cyclic}
+        set={(v) => (gear.face_sources.bending.cyclic = v)}
+      />
+      <Switch
+        label={t("ui.train_from_contact_peak")}
+        on={gear.face_sources.contact.peak}
+        set={(v) => (gear.face_sources.contact.peak = v)}
+      />
+      <Switch
+        label={t("ui.train_from_contact_cyclic")}
+        on={gear.face_sources.contact.cyclic}
+        set={(v) => (gear.face_sources.contact.cyclic = v)}
+      />
     </div>
   {/if}
   <label>
@@ -651,12 +671,12 @@
   ratio: number,
   setRatio: (v: number) => void,
 )}
-  <label class="check">
-    <span>{t("ui.train_optimise_efficiency")}</span>
-    <input type="checkbox" checked={on} onchange={(e) => setOn(e.currentTarget.checked)} />
-    <em></em>
-    {@render noteSlot(notes(t("ui.train_note_optimise_efficiency"), null))}
-  </label>
+  {@render switchField(
+    "ui.train_optimise_efficiency",
+    on,
+    setOn,
+    t("ui.train_note_optimise_efficiency"),
+  )}
   {#if on}
     <label class="sub">
       <span>{t("ui.train_min_contact_ratio")}</span>
@@ -793,13 +813,12 @@
       <!-- Offered only here, because it only means something here: a continuous
            drive has no actuation to reverse between. It changes nothing but the
            cycle count, and the note says how. -->
-      <label class="toggle">
-        <span>{t("ui.train_reversing")}</span>
-        <input type="checkbox" bind:checked={tab.train.actuation.intermittent.reversing} />
-        <em></em>
-      </label>
-      {@render noteSlot(
-        notes(tab.train.actuation.intermittent.reversing ? t("ui.train_note_reversing") : null, null),
+      {@const act = tab.train.actuation.intermittent}
+      {@render switchField(
+        "ui.train_reversing",
+        act.reversing,
+        (v) => (act.reversing = v),
+        act.reversing ? t("ui.train_note_reversing") : null,
       )}
     {:else if "continuous" in tab.train.actuation}
       <label>
@@ -826,20 +845,15 @@
          an allowable a part is sized against, which this tool asks for rather
          than applies. Off, the stages say where reversal is present and
          uncorrected. -->
-    <label class="check">
-      <span>{t("ui.train_reversed_bending")}</span>
-      <input type="checkbox" bind:checked={tab.train.reversed_bending} />
-      <em></em>
-    </label>
-    {@render noteSlot(
-      notes(
-        tab.train.reversed_bending
-          ? t("ui.train_note_reversed_bending_on", {
-              coefficient: defaults().reverse_loading_coefficient.toFixed(2),
-            })
-          : null,
-        null,
-      ),
+    {@render switchField(
+      "ui.train_reversed_bending",
+      tab.train.reversed_bending,
+      (v) => (tab.train.reversed_bending = v),
+      tab.train.reversed_bending
+        ? t("ui.train_note_reversed_bending_on", {
+            coefficient: defaults().reverse_loading_coefficient.toFixed(2),
+          })
+        : null,
     )}
   </div>
 
@@ -1001,15 +1015,20 @@
                 0.1,
                 () => relieveSpur(stage, stage.centre_distance),
               )}
-              <label class="sub">
+              <!-- **Greyed by the answer, not by a rule kept here.** Whether
+                   this is read depends on whether anything is free to absorb it
+                   — the distance when it is automatic, the shifts when they are
+                   being chosen — and that is decided once, in the solve, which
+                   reports what it took (`SpurStage::clearance_taken`). Reading
+                   it back is what keeps the panel from having to know the same
+                   rule a second time and drift from it. -->
+              <label>
                 <span>{t("ui.train_c2c_clearance")}</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  bind:value={stage.clearance}
-                  disabled={!stage.centre_distance.auto}
-                  class:computed={!stage.centre_distance.auto}
-                />
+                {#if sres && sres.clearance === 0}
+                  <input type="number" value={0} disabled class="computed" />
+                {:else}
+                  <input type="number" step="0.01" bind:value={stage.clearance} />
+                {/if}
                 <em>{t("ui.train_mm")}</em>
               </label>
               <label>
@@ -1239,7 +1258,7 @@
                 )}
               </label>
               {@render autoNumber("ui.train_c2c_distance", stage.centre_distance, wres?.centre_distance, 0.1)}
-              <label class="sub">
+              <label>
                 <span>{t("ui.train_c2c_clearance")}</span>
                 <input
                   type="number"
@@ -1483,7 +1502,7 @@
                   ),
                 )}
               </label>
-              <label class="sub">
+              <label>
                 <span>{t("ui.train_c2c_clearance")}</span>
                 <input type="number" step="0.01" bind:value={stage.clearance} />
                 <em>{t("ui.train_mm")}</em>
@@ -1753,7 +1772,7 @@
                     }`
                   : null,
               )}
-              <label class="sub">
+              <label>
                 <span>{t("ui.train_c2c_clearance")}</span>
                 <input type="number" step="0.01" bind:value={stage.running_clearance} />
                 <em>{t("ui.train_mm")}</em>
@@ -2092,19 +2111,6 @@
   .grid.shared > label {
     grid-template-columns: 1fr 9rem 3.5rem;
   }
-  /* A checkbox keeps its field's label column, so it lines up under the boxes
-     above it, but takes only the width it needs rather than stretching across
-     one meant for a number.
-     `.check` is a field whose control happens to be a checkbox and `.toggle` is
-     the small `auto` button; both want this column, and only the second wants
-     the muted, shrunken styling below. The two shared a class for a while, and
-     what it looked like was a field indented under one it had nothing to do
-     with. */
-  .grid.shared > label.check input,
-  .grid.shared > label.toggle input {
-    width: auto;
-    justify-self: start;
-  }
   /* The **input box** is the anchor, not the text after it. With an `auto`
      trailing column the boxes shifted left or right by however wide a unit
      happened to be — "module" against "°" — so nothing lined up down a column.
@@ -2313,17 +2319,6 @@
     flex-wrap: wrap;
     gap: 0.25rem 0.9rem;
     padding: 0 0 0.3rem 0.8rem;
-  }
-  .check {
-    display: flex;
-    grid-template-columns: none;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.75rem;
-    margin: 0;
-  }
-  .check input {
-    width: auto;
   }
   .props {
     margin: 0.2rem 0 0.4rem;
