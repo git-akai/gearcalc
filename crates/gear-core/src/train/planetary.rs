@@ -357,22 +357,22 @@ pub fn solve_planetary_stage(
 /// stresses, the kinematics, the efficiency — reads the geometry from here, and
 /// so does the search that chooses those two shifts, so what is optimised is
 /// what is built.
-struct Built {
-    sun: Tooth,
-    planet: Tooth,
-    ring: Ring,
-    ring_as_gear: Tooth,
-    layout: crate::planetary::Layout,
-    planet_shift: f64,
-    sp_mesh: Mesh,
-    sp_path: ContactPath,
-    pr_mesh: Mesh,
-    pr_path: ContactPath,
+pub(super) struct Built {
+    pub(super) sun: Tooth,
+    pub(super) planet: Tooth,
+    pub(super) ring: Ring,
+    pub(super) ring_as_gear: Tooth,
+    pub(super) layout: crate::planetary::Layout,
+    pub(super) planet_shift: f64,
+    pub(super) sp_mesh: Mesh,
+    pub(super) sp_path: ContactPath,
+    pub(super) pr_mesh: Mesh,
+    pub(super) pr_path: ContactPath,
 }
 
 impl PlanetaryStage {
     /// [`Built`] at the two given shifts, or why the set has no geometry there.
-    fn built(&self, shifts: [f64; 2]) -> Result<Built, TrainError> {
+    pub(super) fn built(&self, shifts: [f64; 2]) -> Result<Built, TrainError> {
         let stage = self;
         let teeth = stage.teeth();
         let rack = stage.rack();
@@ -472,7 +472,7 @@ impl PlanetaryStage {
     /// Unlike a pair, these two are not free of each other: the planet's shift
     /// absorbs whatever they ask for, and where it cannot the set has no
     /// geometry and the point is simply not admissible.
-    fn shifts(&self) -> [f64; 2] {
+    pub(super) fn shifts(&self) -> [f64; 2] {
         let sun_base = self.params(
             PlanetaryShaft::Sun,
             self.teeth().sun,
@@ -503,10 +503,22 @@ impl PlanetaryStage {
             })
         };
         let eta0 = |x: [f64; 2]| -> Option<f64> {
-            if x[0] < floor - 1e-12 {
+            let b = self.built(x).ok()?;
+            // **The sun and the planet both have to be cuttable**, and the
+            // planet especially: its shift is not chosen but absorbed, so a sun
+            // and a ring that ask for more than a planet can carry is exactly
+            // the combination this has to refuse. The ring is not asked — its
+            // root is its shaper's — and the set's own internal bounds are the
+            // interference flags the mesh reports.
+            let floors = [
+                floor,
+                automatic_profile_shift(&b.planet.params, self.planet.dedendum),
+            ];
+            if !crate::auto::member_is_buildable(&b.sun, floors[0])
+                || !crate::auto::member_is_buildable(&b.planet, floors[1])
+            {
                 return None;
             }
-            let b = self.built(x).ok()?;
             if b.sp_path.contact_ratio < self.min_contact_ratio
                 || b.pr_path.contact_ratio < self.min_contact_ratio
             {

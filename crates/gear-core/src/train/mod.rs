@@ -1938,6 +1938,12 @@ mod tests {
 
     /// The search runs on every keystroke in the front end, so it has to cost
     /// like an input and not like a build.
+    ///
+    /// The bound is loose on purpose. Wall-clock in a suite that runs its tests
+    /// in parallel measures the machine as much as the code, and a tight bound
+    /// here would fail on a loaded one and teach a reader to ignore it. What it
+    /// is for is the order of magnitude: the eccentric drive's search once cost
+    /// eight tenths of a second, and this is what would have caught it.
     #[test]
     fn choosing_the_shifts_is_quick_enough_to_type_over() {
         let lib = library();
@@ -1951,7 +1957,7 @@ mod tests {
         }
         let each = start.elapsed() / 20;
         assert!(
-            each < std::time::Duration::from_millis(50),
+            each < std::time::Duration::from_millis(200),
             "a solve with the optimiser on took {each:?}"
         );
         eprintln!("optimised solve: {each:?}");
@@ -2057,6 +2063,81 @@ mod tests {
             loss(true),
             loss(false)
         );
+    }
+
+    /// **Whatever a stage chooses, it can be cut.**
+    ///
+    /// The bound that matters is not any single one but that every stage asks
+    /// the same questions. They did not: the root round bounded a pair and not
+    /// an epicyclic set, and the eccentric drive checked its pinion for a
+    /// pointed tip but never for the round it was given — so it was returning a
+    /// pinion nobody could cut, and a worse answer for it.
+    ///
+    /// This asks the invariant rather than the wiring, so a stage added later
+    /// that forgets `member_is_buildable` fails here rather than shipping.
+    #[test]
+    fn every_stage_chooses_a_member_that_can_be_cut() {
+        use crate::GearParams;
+        let cuttable = |p: &GearParams, what: &str| {
+            let t = Tooth::new(*p);
+            assert!(
+                crate::auto::member_is_buildable(
+                    &t,
+                    crate::auto::automatic_profile_shift(p, p.dedendum)
+                ),
+                "{what} at x {} cannot be cut: undercut {} severed {} round {}",
+                p.profile_shift,
+                t.undercut,
+                t.severed,
+                crate::auto::root_radius_fits(p, p.dedendum)
+            );
+        };
+
+        let spur = SpurStage {
+            optimise_efficiency: true,
+            ..SpurStage::default()
+        };
+        for (i, x) in spur.shifts().iter().enumerate() {
+            cuttable(&spur.params_at(i, *x), "the pair's gear");
+        }
+
+        let mut set = PlanetaryStage {
+            optimise_efficiency: true,
+            ..PlanetaryStage::default()
+        };
+        set.sun.profile_shift = Auto::automatic(0.0);
+        set.ring.profile_shift = Auto::automatic(0.0);
+        let built = set.built(set.shifts()).expect("the set has geometry");
+        cuttable(&built.sun.params, "the sun");
+        cuttable(&built.planet.params, "the planet");
+
+        // The eccentric drive's rack-generated members are its pinions; its
+        // rings are the shaper's and are not asked.
+        let drive = HulaStage {
+            optimise_efficiency: true,
+            ..HulaStage::default()
+        };
+        let r = solve_hula_stage(&drive, 1000.0, 2.0).expect("the drive solves");
+        for (i, g) in r.gears.iter().enumerate() {
+            if g.ring {
+                continue;
+            }
+            cuttable(
+                &GearParams {
+                    module: drive.module[i / 2],
+                    pressure_angle: drive.pressure_angle,
+                    helix_angle: drive.helix_angle,
+                    teeth: g.teeth,
+                    profile_shift: g.profile_shift,
+                    addendum: drive.gears[i].addendum.manual,
+                    dedendum: drive.gears[i].dedendum,
+                    root_radius: drive.gears[i].root_radius,
+                    thickness_mod: drive.thickness_mod[i / 2],
+                    ..GearParams::default()
+                },
+                "the drive's pinion",
+            );
+        }
     }
 
     /// **The clearance is taken by whatever is free to absorb it.**

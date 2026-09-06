@@ -732,6 +732,34 @@ pub fn root_radius_fits(p: &GearParams, working_depth: f64) -> bool {
         .admits(p.root_radius)
 }
 
+/// **Whether a rack-generated member can be built at the shift it is given.**
+///
+/// Four things stop a tooth existing, and they are the same four whatever chose
+/// the shift: it is below the least that clears undercut, the flank is undercut
+/// anyway, the tooth comes to a point before its tip, or the root round asked
+/// for no longer fits the space. One place for them, so that a bound added here
+/// reaches every stage that chooses shifts rather than only the search it was
+/// written in — which is how the root round came to bound a pair and not an
+/// epicyclic set.
+///
+/// A **ring is not asked**: its root and its fillet are its shaper's rather than
+/// inputs of its own (docs/reference.md#internal-gears), so three of the four
+/// mean nothing there and the fourth is asked of the tool instead. A stage's
+/// internal meshes carry their own bounds — the tip margin, and the
+/// interference flags a `RingMesh` reports — which are about the pair rather
+/// than about one member.
+///
+/// Takes the tooth rather than its parameters because every caller has already
+/// built one — undercut and a severed tip are read off the form — and building
+/// it twice per candidate is a cost a search pays a thousand times over.
+#[must_use]
+pub fn member_is_buildable(tooth: &Tooth, floor: f64) -> bool {
+    tooth.params.profile_shift >= floor - 1e-12
+        && !tooth.undercut
+        && !tooth.severed
+        && root_radius_fits(&tooth.params, tooth.params.dedendum)
+}
+
 /// **What the search may not do**, as opposed to what it is trying to achieve.
 ///
 /// Each field eliminates a range of shifts rather than reshaping the surface
@@ -814,15 +842,18 @@ pub fn shifts_for_efficiency(
     } = *bounds;
     let sign = kind.sign();
     let loss_at = |x: [f64; 2]| -> Option<f64> {
+        // The floor is this caller's own bound and costs a comparison, so a
+        // candidate below it is dropped before anything is built for it. That
+        // is not a second opinion about what is admissible — `member_is_buildable`
+        // asks the same question below and is the one that answers it — it is
+        // declining to build a tooth already known to be out of bounds, which
+        // over a search of some hundreds of candidates is most of the work.
         if x[0] < floor[0] - 1e-12 || x[1] < floor[1] - 1e-12 {
             return None;
         }
         let [pa, pb] = pair(x);
-        if !root_radius_fits(&pa, pa.dedendum) || !root_radius_fits(&pb, pb.dedendum) {
-            return None;
-        }
         let (a, b) = (Tooth::new(pa), Tooth::new(pb));
-        if a.undercut || b.undercut || a.severed || b.severed {
+        if !member_is_buildable(&a, floor[0]) || !member_is_buildable(&b, floor[1]) {
             return None;
         }
         // **The pair as it runs, not as its shifts leave it.** The stage opens

@@ -498,8 +498,15 @@ pub fn solve_hula_stage(
             let pair = pairs[index];
             let params = |i: usize| built(index, layout.shift, i);
             let ring = Ring::cut_by(&params(pair.ring), &stage.cutter[index]);
-            let pinion = Tooth::new(params(pair.pinion));
-            if pinion.undercut || pinion.severed {
+            let pinion_params = params(pair.pinion);
+            let pinion = Tooth::new(pinion_params);
+            // The pinion is rack-generated and so is asked the four questions
+            // every chosen shift is asked; the ring is shaper-cut and is not,
+            // and the pair's own bound is the tip margin below.
+            if !crate::auto::member_is_buildable(
+                &pinion,
+                crate::auto::automatic_profile_shift(&pinion_params, pinion_params.dedendum),
+            ) {
                 return None;
             }
             // A split that fouls the tips at this offset is not admissible at
