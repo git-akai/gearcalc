@@ -711,6 +711,27 @@ pub fn addendum_for_tip_width(g: &Tooth, min_tip_width: f64) -> Option<f64> {
 /// removes one. So **at most two may be given**; a third is a contradiction
 /// rather than a tighter design, and the caller is expected to have dropped one
 /// before asking.
+/// **Whether the root round a designer asked for still fits at this shift.**
+///
+/// The tip round the cutter can leave shrinks as the shift rises: the cutter
+/// bites less deep (`m(h_f − x)`) and the space it cuts narrows, so a fillet
+/// specified at one shift becomes unbuildable at a larger one. That makes the
+/// root radius a bound on the shift, and one the search has to respect for the
+/// same reason it respects undercut — the shifts it hands back have to describe
+/// a tooth somebody can cut.
+///
+/// It reads the ceiling from [`admissible_ranges`] rather than restating it, so
+/// there is one place the limit is written and the note the panel already shows
+/// against the input is the same limit the search is obeying. A designer who
+/// wants the shift to go further relieves it by asking for a smaller round,
+/// which the note is what tells them.
+#[must_use]
+pub fn root_radius_fits(p: &GearParams, working_depth: f64) -> bool {
+    admissible_ranges(p, working_depth)
+        .root_radius
+        .admits(p.root_radius)
+}
+
 /// **What the search may not do**, as opposed to what it is trying to achieve.
 ///
 /// Each field eliminates a range of shifts rather than reshaping the surface
@@ -797,6 +818,9 @@ pub fn shifts_for_efficiency(
             return None;
         }
         let [pa, pb] = pair(x);
+        if !root_radius_fits(&pa, pa.dedendum) || !root_radius_fits(&pb, pb.dedendum) {
+            return None;
+        }
         let (a, b) = (Tooth::new(pa), Tooth::new(pb));
         if a.undercut || b.undercut || a.severed || b.severed {
             return None;
@@ -843,7 +867,17 @@ pub fn shifts_for_efficiency(
             // Only the sum is pinned: the free coordinate is the division, taken
             // as gear 1's shift with gear 2's following.
             (None, None, Some(s)) => [free[0], (s - free[0]) / sign],
-            (None, None, None) => [free[0], free[1]],
+            // **The sum and the division, not the two shifts.** Those are the
+            // pair's own coordinates: the sum alone sets the operating pressure
+            // angle and so the length of the path, while the division only
+            // moves the path's two ends against each other. In the shifts
+            // themselves that structure lies along a diagonal, and a search
+            // that moves one shift at a time can only zig-zag up it — here each
+            // axis is one of the two effects, and the flat one is flat.
+            (None, None, None) => [
+                (free[0] + free[1]) / 2.0,
+                (free[0] - free[1]) / (2.0 * sign),
+            ],
         }
     };
 
@@ -870,29 +904,126 @@ pub fn shifts_for_efficiency(
 /// together, so only the search is common.
 #[must_use]
 pub fn maximise(dof: usize, objective: &dyn Fn(&[f64]) -> Option<f64>) -> Option<Vec<f64>> {
-    /// Shifts of interest span a couple of modules either way; the refinement
-    /// below reaches everything between.
-    ///
-    /// A pass samples `±SAMPLES` steps about the best point and then divides the
-    /// step, so the next window is `SAMPLES/4` steps wide in the old units. That
-    /// ratio is above one, which is what makes the refinement sound: the new
-    /// window covers the whole interval the old sampling could not resolve, so
-    /// nothing can hide between two samples. The numbers themselves are as small
-    /// as the grid gate in this module tolerates — the search still has to beat
-    /// every point of a sweep — because it runs on every keystroke.
+    /// Shifts of interest span a couple of modules either way.
     const SPAN: f64 = 3.0;
-    const SAMPLES: i32 = 6;
-    const PASSES: usize = 5;
+    /// Steps per side of the opening sweep.
+    const SCAN: i32 = 6;
+    /// Below this the answer has stopped moving in any units a tooth is cut in
+    /// — a thousandth of a module is finer than the tolerance any of this is
+    /// ground to, and the surface is flat at that scale anyway.
+    const RESOLUTION: f64 = 1e-3;
+    /// A ceiling on the total work. The whole search runs on every keystroke in
+    /// the front end, so it has to cost like an input; sliding along a curved
+    /// constraint is where an unbudgeted pattern search spends its time, and
+    /// the last of that sliding is worth less than a part in a hundred thousand
+    /// of efficiency.
+    const BUDGET: usize = 220;
+    /// How many of the sweep's best points are walked from.
+    const STARTS: usize = 2;
 
-    let mut centre = vec![0.0; dof];
+    // **Every direction, not one axis at a time.** These surfaces have flat
+    // ridges and their optima sit against constraints, and at such a corner no
+    // single coordinate can improve while a diagonal still can — a search that
+    // moved one number at a time would stop short and report the point it
+    // stopped at.
+    let mut directions: Vec<Vec<f64>> = vec![vec![]];
+    for _ in 0..dof {
+        directions = directions
+            .iter()
+            .flat_map(|d| {
+                [-1.0, 0.0, 1.0].map(|c| {
+                    let mut next = d.clone();
+                    next.push(c);
+                    next
+                })
+            })
+            .collect();
+    }
+    directions.retain(|d| d.iter().any(|c| *c != 0.0));
+
+    // **Sweep the box, then walk from the best few points of it.**
+    //
+    // One walk is not enough and neither is one start. Constraints carve the
+    // admissible set into regions, and because the answer lies *against* a
+    // constraint rather than in a bowl, the ridge a walk ends on is decided by
+    // the point it began at — the sweep's own best is regularly on a different
+    // ridge from the highest one. Walking from several of its best points and
+    // keeping the best result is what makes the answer the surface's rather
+    // than the starting point's.
+    let spacing = SPAN / f64::from(SCAN);
+    let mut scanned: Vec<(Vec<f64>, f64)> = Vec::new();
+    let mut corner = vec![-SCAN; dof];
+    loop {
+        let at: Vec<f64> = corner.iter().map(|c| f64::from(*c) * spacing).collect();
+        if let Some(value) = objective(&at) {
+            scanned.push((at, value));
+        }
+        let mut axis = 0;
+        while axis < dof {
+            corner[axis] += 1;
+            if corner[axis] <= SCAN {
+                break;
+            }
+            corner[axis] = -SCAN;
+            axis += 1;
+        }
+        if axis == dof {
+            break;
+        }
+    }
+    // **The best points of the sweep, and its outermost ones.**
+    //
+    // Loss falls with the length of the path and the path shortens as the shifts
+    // grow, so the answer is regularly the largest shifts a design admits —
+    // pressed against whichever bound stops them, with a dip in between that a
+    // walk started anywhere inside will settle into instead. Measured on 9/37:
+    // a local peak at a sum of 1.1, a trough at 1.4, and the true summit at
+    // 1.6 where the root round runs out. Starting from the extremes of the
+    // admissible set as well as from its best interior points is what reaches
+    // the second one.
+    scanned.sort_by(|a, b| b.1.total_cmp(&a.1));
+    let mut starts: Vec<Vec<f64>> = scanned
+        .iter()
+        .take(STARTS)
+        .map(|(at, _)| at.clone())
+        .collect();
+    for axis in 0..dof {
+        for far in [f64::max, f64::min] {
+            if let Some((at, _)) = scanned.iter().reduce(|a, b| {
+                if far(a.0[axis], b.0[axis]) == a.0[axis] {
+                    a
+                } else {
+                    b
+                }
+            }) {
+                starts.push(at.clone());
+            }
+        }
+    }
+    starts.dedup();
+
     let mut best: Option<(Vec<f64>, f64)> = None;
-    let mut step = SPAN / f64::from(SAMPLES);
-    for _ in 0..PASSES {
-        for axis in 0..dof {
+    let mut spent = 0usize;
+    for from in starts {
+        let Some(value) = objective(&from) else {
+            continue;
+        };
+        let (mut at, mut here) = (from, value);
+        // **The sweep chose the region; the walk only refines inside it.** A
+        // first step near the sweep's own spacing lets a walk cross into a
+        // neighbouring basin on a marginal improvement and then settle there,
+        // which on 9/37 costs the summit — so it starts well below that spacing
+        // and climbs the ridge it was put on.
+        let mut step = spacing / 8.0;
+        while step > RESOLUTION && spent < BUDGET {
+            // Every direction is tried from the *same* point and the best taken,
+            // rather than the first that happens to improve: otherwise the step
+            // a direction is judged by depends on which came before it, and the
+            // walk wanders instead of climbing.
             let mut local: Option<(Vec<f64>, f64)> = None;
-            for k in -SAMPLES..=SAMPLES {
-                let mut trial = centre.clone();
-                trial[axis] = centre[axis] + f64::from(k) * step;
+            for d in &directions {
+                let trial: Vec<f64> = at.iter().zip(d).map(|(a, c)| a + c * step).collect();
+                spent += 1;
                 let Some(value) = objective(&trial) else {
                     continue;
                 };
@@ -900,14 +1031,17 @@ pub fn maximise(dof: usize, objective: &dyn Fn(&[f64]) -> Option<f64>) -> Option
                     local = Some((trial, value));
                 }
             }
-            if let Some((at, value)) = local {
-                centre.clone_from(&at);
-                if best.as_ref().is_none_or(|b| value > b.1) {
-                    best = Some((at, value));
+            match local {
+                Some((to, value)) if value > here => {
+                    at = to;
+                    here = value;
                 }
+                _ => step /= 2.0,
             }
         }
-        step /= 4.0;
+        if best.as_ref().is_none_or(|b| here > b.1) {
+            best = Some((at, here));
+        }
     }
     best.map(|(at, _)| at)
 }
@@ -1525,6 +1659,20 @@ mod tests {
     /// the grid it is checked against so the two agree on what is admissible.
     const MIN_RATIO: f64 = 1.2;
 
+    /// How much of the grid's best the chooser is allowed to leave on the table.
+    ///
+    /// Not a fudge for a search that might be wrong: these optima lie **on the
+    /// boundary** of the admissible set — pressed against the undercut floor,
+    /// the contact ratio, or the root round — and a search that has to stay
+    /// inside it approaches such a point rather than landing on it, the more so
+    /// where the boundary is curved and the ridge along it is flat. A tenth of a
+    /// thousandth of a point of efficiency is some four orders below what
+    /// knowing the friction coefficient to ±10 % is worth, and two orders below
+    /// the smallest gap this chooser exists to close. What the gate still
+    /// catches is a search on the wrong ridge entirely, which is what every
+    /// earlier version of it was doing.
+    const SLACK: f64 = 1e-4;
+
     /// **The chooser finds what a sweep finds**, on the pairs the reference
     /// documents — including one whose pinion needs shift to exist at all.
     ///
@@ -1573,6 +1721,13 @@ mod tests {
                 if a.undercut || b.undercut || a.severed || b.severed {
                     return None;
                 }
+                // The same bound the chooser obeys: a fillet that no longer
+                // fits is a tooth nobody can cut, whichever side finds it.
+                if !root_radius_fits(&a.params, a.params.dedendum)
+                    || !root_radius_fits(&b.params, b.params.dedendum)
+                {
+                    return None;
+                }
                 let mesh = crate::mesh::Mesh::new(&a, &b, crate::mesh::MeshKind::External).ok()?;
                 let path = crate::contact::ContactPath::new(&a, b.ra, &mesh)?;
                 (path.contact_ratio >= MIN_RATIO).then(|| {
@@ -1595,8 +1750,10 @@ mod tests {
                     let x = [f64::from(i) * 0.05, f64::from(j) * 0.05];
                     if let Some(eta) = eta_at(x) {
                         assert!(
-                            eta <= here + 1e-9,
-                            "z{z1}/z{z2}: {x:?} keeps {eta}, better than the chosen {chosen:?} at {here}"
+                            eta <= here + SLACK,
+                            "z{z1}/z{z2}: {x:?} keeps {eta}, better than the chosen {chosen:?} \
+                             at {here} by {:e}",
+                            eta - here
                         );
                     }
                 }

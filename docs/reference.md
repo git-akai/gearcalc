@@ -1150,6 +1150,17 @@ two meshes, losing the same 0.85 % between them.
 | `N+1/N/N/N−1` | −36 | −8.5 | 99.15 % | 92.4 % |
 | `N/N+1/N/N+1` | 37 | 9.8 | 99.17 % | 93.2 % |
 
+**What the tool ships with is `N ± 4` about 61**, reducing 232.6:1 and keeping
+73 % forward and 63 % back. Four teeth of difference cancels less than one does,
+and that is the whole of the difference: the same code, the same two meshes, and
+a drive that keeps two and a half times what the `N ± 1` arrangement does at a
+comparable size. It carries a shorter tooth with it — 0.7 module rather than 0.8
+— because the addendum belongs to the *difference* rather than to the drive: the
+operating pressure angle at four teeth is far lower, so a tooth that cleared the
+involute interference limit at one tooth of difference reaches past it here. That
+coupling is reported rather than assumed, and a drive taken to another difference
+will want its own proportion.
+
 This is the published behaviour of a Wolfrom set — efficiency falls as the
 reduction rises, because the reduction *is* the cancellation — and it is why such
 drives are used where their efficiency does not matter. A **three-ring reducer**

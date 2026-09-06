@@ -39,7 +39,7 @@ use crate::planetary::{self, Arrangement, PlanetaryShaft};
 use crate::ring::{mesh_with, Cutter, Ring};
 use crate::tooth::Tooth;
 use crate::train::StageGear;
-use crate::GearParams;
+use crate::{Auto, GearParams};
 
 /// Which member of a mesh carries the shift a designer gives.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -117,8 +117,15 @@ pub struct HulaStage {
     pub running_clearance: f64,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
-    /// What decides the crank offset.
-    pub offset: Offset,
+    /// **The crank offset, or automatic.**
+    ///
+    /// The same shape every stage's centre distance has, because it is the same
+    /// decision: automatic derives the distance from the clearances the parts
+    /// have to keep, and a number given by hand is the distance to run at. The
+    /// arrangement below keeps its own vocabulary for that — [`Offset`] says
+    /// *what decides* the offset rather than how it was entered — and this is
+    /// the one place the two are translated.
+    pub offset: Auto<f64>,
     /// Which member of each mesh carries the shift that is **given**.
     ///
     /// The other's follows from the crank offset, which fixes the difference of
@@ -161,9 +168,16 @@ pub struct HulaStage {
 
 impl Default for HulaStage {
     fn default() -> Self {
+        // **The addendum belongs to the difference, not to the drive.** Four
+        // teeth of difference runs at a far lower operating pressure angle than
+        // one does, so the tooth that cleared at 0.8 module reaches past the
+        // interference limit here; 0.7 clears both meshes, leaves a transverse
+        // contact ratio of 1.37, and is worth six points of efficiency over 0.8
+        // into the bargain. A drive taken to another difference will want its
+        // own, and the interference readout is what says so.
         let gear = |teeth: u32| StageGear {
             teeth,
-            addendum: crate::params::Auto::fixed(0.8),
+            addendum: crate::params::Auto::fixed(0.7),
             dedendum: 1.0,
             ..StageGear::default()
         };
@@ -182,7 +196,7 @@ impl Default for HulaStage {
             running_clearance: 0.02,
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
-            offset: Offset::Clearance,
+            offset: Auto::automatic(0.0),
             given_shift: [GivenShift::Pinion; 2],
             optimise_efficiency: false,
             min_contact_ratio: 1.0,
@@ -197,7 +211,10 @@ impl Default for HulaStage {
                 teeth: 12,
                 ..Cutter::default()
             }; 2],
-            gears: [gear(19), gear(18), gear(17), gear(18)],
+            // `N ± d` about 61, at four teeth of difference on each mesh —
+            // the same `[N+d, N, N−d, N]` arrangement the counts have always
+            // taken, at a size and a difference a real reducer is built at.
+            gears: [gear(65), gear(61), gear(57), gear(61)],
         }
     }
 }
@@ -408,7 +425,11 @@ pub fn solve_hula_stage(
         helix_angle: stage.helix_angle,
         addendum: stage.gears.each_ref().map(|g| g.addendum.manual),
         clearance: stage.clearance,
-        offset: stage.offset,
+        offset: if stage.offset.auto {
+            Offset::Clearance
+        } else {
+            Offset::Given(stage.offset.manual)
+        },
         split: std::array::from_fn(|mesh| split_of(mesh, value[mesh])),
     };
     // **The offset has to clear the tips as well as the far side**, and that
@@ -738,8 +759,24 @@ pub fn solve_hula_stage(
 mod tests {
     use super::*;
 
+    /// The arrangement these tests were written against: `N ± 1` about 18,
+    /// whose ratio, speeds and losses the assertions below name outright.
+    ///
+    /// Pinned here rather than taken from [`HulaStage::default`], so that what
+    /// the tool ships with is free to change without changing what a test
+    /// claims — a test that asserts 324:1 has to be the one saying which counts
+    /// give 324:1.
     fn stage() -> HulaStage {
-        HulaStage::default()
+        let mut s = HulaStage::default();
+        for (gear, count) in s.gears.iter_mut().zip([19, 18, 17, 18]) {
+            gear.teeth = count;
+            // The taller tooth this difference needs: at one tooth of
+            // difference the operating pressure angle is far higher and the
+            // path far shorter, so the 0.7 that suits the shipped arrangement
+            // leaves this one below continuous contact.
+            gear.addendum = crate::params::Auto::fixed(0.8);
+        }
+        s
     }
 
     /// The stage reports the arrangement's ratio, products and all — it does not
@@ -1234,15 +1271,18 @@ mod tests {
         };
         let stage = Stage::Hula(Box::default());
         let r = solve_any(&stage, 1000.0, torques, &lib).expect("a stage a train can solve");
-        assert!((r.ratio() - 324.0).abs() < 1e-9);
-        assert!(r.efficiency().forward > 0.0 && r.efficiency().forward < 0.5);
+        // The shipped arrangement's own ratio, `z₂z₄/(z₂z₄ − z₁z₃)` at 61 ± 4.
+        assert!((r.ratio() - 3721.0 / 16.0).abs() < 1e-9);
+        assert!(r.efficiency().forward > 0.5 && r.efficiency().forward < 1.0);
         assert!(r.backlash().forward.nominal > 0.0);
         assert!(r.as_hula().is_some(), "and it says which kind it is");
 
         // ...and a drive with no geometry refuses through the train's channel.
+        // `z₁z₃ = z₂z₄`, so the two meshes cancel and there is no ratio.
         let mut locked = HulaStage::default();
-        locked.gears[2].teeth = 18;
-        locked.gears[3].teeth = 19;
+        for (gear, count) in locked.gears.iter_mut().zip([19, 18, 18, 19]) {
+            gear.teeth = count;
+        }
         let e = solve_any(&Stage::Hula(Box::new(locked)), 1000.0, torques, &lib)
             .expect_err("meshes that cancel are not a stage");
         assert!(
@@ -1343,7 +1383,7 @@ mod tests {
     /// separately rather than folded into one assertion.
     #[test]
     fn choosing_the_split_leaves_the_drive_more_of_its_power() {
-        let run = |offset: Offset, on: bool| {
+        let run = |offset: Auto<f64>, on: bool| {
             solve_hula_stage(
                 &HulaStage {
                     offset,
@@ -1356,7 +1396,7 @@ mod tests {
         };
         // The offset the default drive settles at, then held there.
         let free = run(HulaStage::default().offset, false).expect("the ordinary drive solves");
-        let held = Offset::Given(free.offset_nominal);
+        let held = Auto::fixed(free.offset_nominal);
 
         let plain = run(held, false).expect("the held drive solves");
         let tuned = run(held, true).expect("the tuned drive solves");

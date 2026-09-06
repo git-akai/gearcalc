@@ -1951,6 +1951,67 @@ mod tests {
         eprintln!("optimised solve: {each:?}");
     }
 
+    /// **The root round a designer asked for bounds the shift.**
+    ///
+    /// The tip round a cutter can leave shrinks as the shift rises — it bites
+    /// less deep and the space it cuts narrows — so a fillet specified at one
+    /// shift becomes unbuildable at a larger one. Without that bound the search
+    /// pushes the shift up until some other limit stops it and hands back a
+    /// tooth nobody can cut.
+    ///
+    /// Two things are asked of it: the pair it returns carries the round it was
+    /// given, and asking for more round never buys more shift. Where the round
+    /// cannot be cut at *any* admissible shift the search finds nothing and the
+    /// stage falls back to the shifts it would have had, which the panel's
+    /// existing note against the input is what explains.
+    #[test]
+    fn a_larger_root_round_holds_the_shift_down() {
+        let stage = |rho: f64| {
+            let gear = |teeth: u32| StageGear {
+                teeth,
+                root_radius: rho,
+                ..SpurStage::default().gears[0].clone()
+            };
+            SpurStage {
+                optimise_efficiency: true,
+                gears: [gear(9), gear(37)],
+                ..SpurStage::default()
+            }
+        };
+        let mut last = f64::INFINITY;
+        let mut fell = false;
+        for k in 0..=8 {
+            let rho = f64::from(k) * 0.05;
+            let s = stage(rho);
+            let x = s.shifts();
+            let sum = x[0] + x[1];
+            // Where it optimised at all, the teeth it chose can be cut.
+            let cuttable = (0..2).all(|i| {
+                let p = s.params_at(i, x[i]);
+                crate::auto::root_radius_fits(&p, p.dedendum)
+            });
+            if !cuttable {
+                // The round is unreachable at every shift; nothing was chosen.
+                assert_eq!(
+                    x,
+                    SpurStage {
+                        optimise_efficiency: false,
+                        ..s
+                    }
+                    .shifts()
+                );
+                continue;
+            }
+            assert!(
+                sum <= last + 1e-9,
+                "round {rho} bought shift: sum {sum} against {last}"
+            );
+            fell = fell || sum < last - 1e-6;
+            last = sum;
+        }
+        assert!(fell, "the round never bound the shift at all");
+    }
+
     /// The efficiency toggle is **additive**: a stage that never asked for it
     /// answers exactly as it did before the toggle existed, and a stage that
     /// does is moved somewhere else.
