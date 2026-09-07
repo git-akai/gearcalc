@@ -322,11 +322,13 @@
             <em>{t("ui.gear_m")}</em>
           </label>
           <label class="switchrow">
-            <Switch
-              label={t("ui.gear_mate_is_a_ring")}
-              on={tab.mate.internal}
-              set={(v) => (tab.mate.internal = v)}
-            />
+            <span class="control">
+              <Switch
+                label={t("ui.gear_mate_is_a_ring")}
+                on={tab.mate.internal}
+                set={(v) => (tab.mate.internal = v)}
+              />
+            </span>
             <FieldNote notes={notes(t("ui.gear_mate_ring_runs_inside"), null)} />
           </label>
         {/if}
@@ -485,11 +487,13 @@
            action rather than to the column of fields above, and lining it up
            with the button is what says so. -->
       <label class="switchrow start">
-        <Switch
-          label={t("ui.gear_include_reference_circles")}
-          on={tab.referenceCircles}
-          set={(v) => (tab.referenceCircles = v)}
-        />
+        <span class="control">
+          <Switch
+            label={t("ui.gear_include_reference_circles")}
+            on={tab.referenceCircles}
+            set={(v) => (tab.referenceCircles = v)}
+          />
+        </span>
       </label>
     </div>
     <button class="primary" onclick={saveDxf} disabled={!("ok" in result)}>{t("ui.gear_export_dxf")}</button>
@@ -892,14 +896,18 @@
   label.switchrow {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    /* The unit cell every row keeps, and the gap before it. */
+  }
+  /* The control stops where the input boxes stop; its note runs the full row,
+     as every other note does. */
+  label.switchrow .control {
+    display: flex;
+    justify-content: flex-end;
     padding-right: var(--unit-inset);
   }
   /* Except where the switch belongs to the action below it rather than to the
      column of fields: then it lines up with that button instead. */
-  label.switchrow.start {
-    align-items: flex-start;
+  label.switchrow.start .control {
+    justify-content: flex-start;
     padding-right: 0;
   }
   /* An `auto` toggle takes a column of its own, out of the label's share, so

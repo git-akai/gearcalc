@@ -226,7 +226,7 @@
      has the heading. -->
 {#snippet switchField(key: string, on: boolean, set: (v: boolean) => void, note?: string | null)}
   <label class="switchrow">
-    <Switch label={t(key)} {on} {set} />
+    <span class="control"><Switch label={t(key)} {on} {set} /></span>
     {#if note !== undefined}
       <FieldNote notes={notes(note, null)} />
     {/if}
@@ -1568,7 +1568,7 @@
               {@render efficiencyToggle(stage.optimisation)}
             </div>
 
-            <h4>{t("ui.train_ring_cutter")}</h4>
+            <h4 class="mesh">{t("ui.train_ring_cutter")}</h4>
             <div class="grid shared">
               <label>
                 <span>{t("ui.train_cutter_teeth")}</span>
@@ -1816,17 +1816,12 @@
                 <dt>{t("ui.train_ratio")}</dt>
                 <dd>
                   {hres.ratio.toFixed(4)} : 1
-                  <FieldNote notes={
-                    notes(
-                      `${t("ui.train_hula_ratio_products", {
+                  <small>{`${t("ui.train_hula_ratio_products", {
                         numerator: String(hres.ratio_products[0]),
                         denominator: String(hres.ratio_products[1]),
                       })} · ${t("ui.train_hula_note_ratio", {
                         denominator: String(hres.ratio_products[1]),
-                      })}`,
-                      null,
-                    )
-                  } />
+                      })}`}</small>
                 </dd>
                 <dt>{t("ui.train_efficiency")}</dt>
                 <dd>
@@ -1834,14 +1829,9 @@
                   {#if hres.efficiency.backward === 0}
                     <small class="warn">{t("ui.train_self_locking")}</small>
                   {/if}
-                  <FieldNote notes={
-                    notes(
-                      `${t("ui.train_hula_meshes_alone", {
+                  <small>{`${t("ui.train_hula_meshes_alone", {
                         percent: pct(hres.fixed_carrier_efficiency.forward),
-                      })} · ${t("ui.train_hula_note_circulating")}`,
-                      null,
-                    )
-                  } />
+                      })} · ${t("ui.train_hula_note_circulating")}`}</small>
                 </dd>
                 <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
                 <dd>
@@ -1864,7 +1854,7 @@
             {#each [0, 1] as m (m)}
               {@const ring = hres && hres.gears[m * 2].ring ? m * 2 : m * 2 + 1}
               {@const pinion = ring === m * 2 ? m * 2 + 1 : m * 2}
-              <h4>{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
+              <h4 class="mesh">{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
               <div class="grid shared">
                 <label>
                   <span>{t("ui.train_normal_module")}</span>
@@ -1899,42 +1889,32 @@
                 </label>
               </div>
               {#if hres}
-                <dl class="out">
+                <dl class="out indent">
                   <dt>{t("ui.train_hula_operating_pressure_angle")}</dt>
                   <dd>
                     {hres.meshes[m].operating_pressure_angle.toFixed(3)}°
-                    <FieldNote notes={
-                      notes(t("ui.train_hula_note_operating_pressure_angle"), null)
-                    } />
+                    <small>{t("ui.train_hula_note_operating_pressure_angle")}</small>
                   </dd>
                   <dt>{t("ui.train_contact_ratio")}</dt>
                   <dd>
                     {hres.meshes[m].contact_ratio.toFixed(4)}
-                    <FieldNote notes={
-                      notes(
-                        null,
-                        hres.meshes[m].contact_ratio < 1
-                          ? t("ui.train_note_contact_ratio_below_one")
-                          : null,
-                      )
-                    } />
+                    {#if hres.meshes[m].contact_ratio < 1}
+                      <small class="warn">{t("ui.train_note_contact_ratio_below_one")}</small>
+                    {/if}
                   </dd>
                   <dt>{t("ui.train_hula_gap_result")}</dt>
                   <dd>
                     {hres.meshes[m].clearance.toFixed(4)} {t("ui.train_mm")}
-                    <FieldNote notes={
-                      notes(
-                        t("ui.train_hula_gap_as_cut", {
-                          value: hres.meshes[m].clearance_as_cut.toFixed(4),
-                        }),
-                        null,
-                      )
-                    } />
+                    <small>
+                      {t("ui.train_hula_gap_as_cut", {
+                        value: hres.meshes[m].clearance_as_cut.toFixed(4),
+                      })}
+                    </small>
                   </dd>
                   <dt>{t("ui.train_hula_tip_margin")}</dt>
                   <dd>
                     {hres.meshes[m].tip_margin.toFixed(4)}°
-                    <FieldNote notes={notes(t("ui.train_hula_note_tip_margin"), null)} />
+                    <small>{t("ui.train_hula_note_tip_margin")}</small>
                   </dd>
                   <dt>{t("ui.train_hula_interference")}</dt>
                   <dd>
@@ -1988,11 +1968,20 @@
                 {/each}
               </div>
               {#if hres}
-                {#each [ring, pinion] as j (j)}
-                  {#each hres.gears[j].clamps as clamp, c (c)}
-                    <p class="hint">z{hres.gears[j].teeth}: {note(clamp)}</p>
-                  {/each}
-                {/each}
+                {@const clamped = [ring, pinion].flatMap((j) =>
+                  hres.gears[j].clamps.map((c) => ({ teeth: hres.gears[j].teeth, note: c })),
+                )}
+                {#if clamped.length}
+                  <!-- One list for the pair, as every other clamped gear in the
+                       application reports: `.hint` is a note pulled *up* against
+                       the field above it, so a run of them closed on each other
+                       instead of reading as a list. -->
+                  <ul class="notes">
+                    {#each clamped as c, i (i)}
+                      <li>z{c.teeth}: {note(c.note)}</li>
+                    {/each}
+                  </ul>
+                {/if}
               {/if}
             {/each}
 
@@ -2352,8 +2341,13 @@
   .switchrow {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    /* The unit cell every row keeps, and the gap before it. */
+  }
+  /* The control stops where the input boxes stop; its note runs the full row,
+     as every other note does. Taking the inset off the control rather than off
+     the row is what lets the two differ. */
+  .switchrow .control {
+    display: flex;
+    justify-content: flex-end;
     padding-right: var(--unit-inset);
   }
   .subtoggles {
@@ -2393,9 +2387,9 @@
      its gap to finish on the same edge. */
   .hint {
     /* A note in its own element rather than inside the label, so it has to undo
-       the field gap above it to sit as close as an in-label note does. */
+       the field gap above it to sit as close as an in-label note does. It ends
+       where an in-label note does, which is the row's own edge. */
     margin: calc(var(--note-gap) - var(--field-gap)) 0 var(--field-gap);
-    padding-right: var(--unit-inset);
     font-size: 0.72rem;
     color: var(--muted);
     text-align: right;
