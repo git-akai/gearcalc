@@ -10,6 +10,7 @@
     type Overrides,
     type StageGear,
     type SpurStage,
+    type Stage,
     type Optimisation,
     type Value,
     type GearResult,
@@ -37,6 +38,16 @@
       stage.gears.length,
       just,
     );
+  }
+
+  /** **A hula mesh has one shift to give, not two.** The crank offset fixes the
+   *  difference of a pair's two shifts, so pinning both over-specifies the mesh
+   *  — the same triangle the spur stage's distance and two shifts make, one
+   *  freedom smaller. Pinning one returns the other to automatic, which is what
+   *  the select this replaced used to say in words. */
+  function relieveHula(stage: Extract<Stage, { kind: "hula" }>, mesh: number, just: Auto<number>) {
+    const pair = [stage.gears[mesh * 2], stage.gears[mesh * 2 + 1]].map((g) => g.profile_shift);
+    relieve(pair, 1, just);
   }
 
   let { tab }: { tab: TrainTab } = $props();
@@ -224,13 +235,18 @@
      control's buttons sit, which is the other switch of this size in the panel.
      The four width sources need no row at all: they are a group, and the group
      has the heading. -->
+<!-- **Not a `<label>`.** A label activates its first labelable descendant when
+     any part of it is clicked, and `<button>` is labelable — so a switch row
+     written as a label had a hit area running the width of the row, well
+     outside the button a reader can see. There is nothing else in this row to
+     focus, so there is nothing for a label to be for. -->
 {#snippet switchField(key: string, on: boolean, set: (v: boolean) => void, note?: string | null)}
-  <label class="switchrow">
+  <div class="switchrow">
     <span class="control"><Switch label={t(key)} {on} {set} /></span>
     {#if note !== undefined}
       <FieldNote notes={notes(note, null)} />
     {/if}
-  </label>
+  </div>
 {/snippet}
 
 
@@ -357,8 +373,20 @@
     /** "shaper" for a ring, whose root and fillet are the tool's rather than
      *  inputs of its own; anything else is rack-generated. */
     cut?: "rack" | "shaper";
-    /** Present when the shift is solved rather than offered — the planet's. */
+    /** **The shift the stage came back with**, where the gear's own
+     *  `GearResult` is not what carries it — the eccentric drive reports its
+     *  gears in its own shape. Shown in the box while `auto` is on, exactly as
+     *  a solved centre distance or addendum is. */
     solvedShift?: number;
+    /** **The one gear whose shift is not offered at all** — the planet's, which
+     *  is absorbed to make the set's two centre distances agree rather than
+     *  chosen by anybody.
+     *
+     *  Every other gear says the same thing with its `auto` toggle: on, the
+     *  stage decided the number and the box shows what came back. A readout
+     *  with a note explaining itself is what a gear needs when it has no toggle
+     *  to say it with, and nothing else here is in that position. */
+    shiftAbsorbed?: boolean;
     /** **What decides this gear's face width**, which is one question with
      *  three answers rather than a flag with two.
      *
@@ -435,17 +463,31 @@
       } />
     </label>
   {/if}
-  {#if opts.solvedShift === undefined}
+  {#if !opts.shiftAbsorbed}
+    <!-- **A ring is not asked about undercut.** Its flank is its shaper's
+         rather than a rack's, so the constraint has nothing to bound and the
+         searches never ask it (`auto::member_is_buildable`). -->
     {@render autoNumber(
       "ui.train_profile_shift",
       gear.profile_shift,
-      g?.profile_shift,
+      opts.solvedShift ?? g?.profile_shift,
       0.05,
       opts.onShiftAuto,
       undefined,
       "ui.train_m",
+      opts.cut === "shaper"
+        ? undefined
+        : {
+            label: "ui.train_no_undercut",
+            title: "ui.train_note_no_undercut",
+            on: gear.no_undercut,
+            set: (v) => (gear.no_undercut = v),
+          },
     )}
-    {#if gear.profile_shift.auto}
+    <!-- The depth the undercut question is asked at, so it is offered exactly
+         while that question is being asked — which is now the constraint's
+         business rather than the `auto` toggle's. -->
+    {#if gear.no_undercut && opts.cut !== "shaper"}
       <!-- Automatic is the gear's own dedendum, which asks the same question the
            profile generator answers: is the flank undercut *at all*? A fixed 1
            module — what this used to be — asks whether it is undercut within a
@@ -466,12 +508,17 @@
   {:else}
     <label>
       <span>{t("ui.train_profile_shift")}</span>
-      <input type="number" value={Number(opts.solvedShift.toFixed(4))} disabled class="computed" />
+      <input
+        type="number"
+        value={Number((opts.solvedShift ?? gear.profile_shift.manual).toFixed(4))}
+        disabled
+        class="computed"
+      />
       <em>{t("ui.train_module")}</em>
       <FieldNote notes={notes(t("ui.train_note_planet_shift_solved"), null)} />
     </label>
   {/if}
-  {#if opts.solvedShift === undefined && !gear.profile_shift.auto}
+  {#if !opts.shiftAbsorbed && !gear.profile_shift.auto}
     {@const r = opts.cut === "shaper" ? undefined : g?.ranges.profile_shift}
     <p class="hint">
       <!-- A shaper-cut ring's bounds are not the rack's shown here — its own
@@ -648,23 +695,23 @@
   after?: () => void,
   note?: string | null,
   unit?: string,
+  /** A second switch, between `auto` and the box. **A constraint, where `auto`
+   *  is a source**: `auto` says who decides the number, this says what the
+   *  answer has to satisfy however it is decided — so the two combine rather
+   *  than competing, and the nearer one to the box is the one that is about
+   *  the value rather than about who supplies it. */
+  constraint?: { label: string; title: string; on: boolean; set: (v: boolean) => void },
 )}
-  <label class="auto">
-    <span>{t(key)}</span>
-    <!-- **Left of the number it qualifies**, because that is what it qualifies.
-         On the right it took the cell every other row prints its unit in, so an
-         automatic field was the one field that could not say what it was
-         measured in. -->
-    <Switch
-      small
-      label={t("ui.train_auto")}
-      on={a.auto}
-      title={t("ui.train_automatic")}
-      set={(v) => {
-        a.auto = v;
-        after?.();
-      }}
-    />
+  <label class="auto" class:constrained={constraint !== undefined}>
+    <span class="name">{t(key)}</span>
+    <!-- **The box comes first so the label is the box's.** A label activates
+         its first labelable descendant, and a `<button>` is one — with the
+         switches written above the input, clicking the field's *name* pressed
+         the `auto` toggle, and every switch in the panel had a hit area
+         stretching left to the previous thing in its row. Reading order is
+         restored by placing each child in its own column below, which is where
+         the columns were going to have to be named anyway once a row could
+         carry two switches. -->
     {#if a.auto}
       <input
         type="number"
@@ -675,6 +722,33 @@
       />
     {:else}
       <input type="number" {step} bind:value={a.manual} />
+    {/if}
+    <!-- **Left of the number it qualifies**, because that is what it qualifies.
+         On the right it took the cell every other row prints its unit in, so an
+         automatic field was the one field that could not say what it was
+         measured in. -->
+    <span class="sw auto">
+      <Switch
+        small
+        label={t("ui.train_auto")}
+        on={a.auto}
+        title={t("ui.train_automatic")}
+        set={(v) => {
+          a.auto = v;
+          after?.();
+        }}
+      />
+    </span>
+    {#if constraint}
+      <span class="sw bound">
+        <Switch
+          small
+          label={t(constraint.label)}
+          on={constraint.on}
+          title={t(constraint.title)}
+          set={constraint.set}
+        />
+      </span>
     {/if}
     <em>{unit ? t(unit) : ""}</em>
     <!-- Inside the label, because that is where a note is laid out: `.note`
@@ -1158,6 +1232,8 @@
                   {sres.centre_distance.toFixed(4)} mm
                   <small>{t("ui.train_nominal_value", { value: sres.centre_distance_nominal.toFixed(4) })}</small>
                 </dd>
+                <dt>{t("ui.train_operating_pressure_angle")}</dt>
+                <dd>{sres.operating_pressure_angle.toFixed(3)}°</dd>
                 <dt>{t("ui.train_contact_ratio")}</dt>
                 <dd>
                   ε<sub>α</sub> {sres.contact_ratios.transverse.toFixed(4)} · ε<sub>β</sub>
@@ -1619,6 +1695,7 @@
               {@render gearCard(t("ui.train_planet"), stage.planet, pres?.planet.gear, {
                 cut: "rack",
                 solvedShift: pres?.planet.profile_shift,
+                shiftAbsorbed: true,
                 extra: planetExtra,
               })}
               <!-- A ring's root and fillet are its cutter's, so it has neither a
@@ -1706,6 +1783,8 @@
                 <dl class="out indent">
                   <dt>{t("ui.train_coprime")}</dt>
                   <dd>{coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
+                  <dt>{t("ui.train_operating_pressure_angle")}</dt>
+                  <dd>{m.operating_pressure_angle.toFixed(3)}°</dd>
                   <dt>{t("ui.train_contact_ratio")}</dt>
                   <dd>
                     ε<sub>α</sub> {m.contact_ratios.transverse.toFixed(4)} · ε<sub>β</sub>
@@ -1868,14 +1947,6 @@
                   <em></em>
                   <FieldNote notes={notes(t("ui.train_note_static_friction"), null)} />
                 </label>
-                <label>
-                  <span>{t("ui.train_hula_given_shift")}</span>
-                  <select bind:value={stage.given_shift[m]}>
-                    <option value="pinion">{t("ui.train_hula_split_pinion")}</option>
-                    <option value="ring">{t("ui.train_hula_split_ring")}</option>
-                  </select>
-                  <em></em>
-                </label>
               </div>
               <div class="gears">
                 {#each [ring, pinion] as j (j)}
@@ -1889,18 +1960,8 @@
                     undefined,
                     {
                       cut: hres && hres.gears[j].ring ? "shaper" : "rack",
-                      // A shift is an *input* only where it is the member this
-                      // mesh names and is still being read: the other member's
-                      // follows from the crank, and once the split is being
-                      // chosen for efficiency the named one follows too — unless
-                      // it was given, which pins it and leaves the mesh nothing
-                      // to search.
-                      solvedShift:
-                        hres &&
-                        ((stage.given_shift[m] === "ring") !== (hres.gears[j].ring === true) ||
-                          (stage.optimisation.enabled && stage.gears[j].profile_shift.auto))
-                          ? hres.gears[j].profile_shift
-                          : undefined,
+                      solvedShift: hres?.gears[j].profile_shift,
+                      onShiftAuto: () => relieveHula(stage, m, stage.gears[j].profile_shift),
                       faceWidth: "none",
                     },
                   )}
@@ -1908,14 +1969,14 @@
               </div>
               {#if hres}
                 <dl class="out indent">
-                  <dt>{t("ui.train_hula_operating_pressure_angle")}</dt>
-                  <dd>
-                    {hres.meshes[m].operating_pressure_angle.toFixed(3)}°
-                  </dd>
+                  <dt>{t("ui.train_operating_pressure_angle")}</dt>
+                  <dd>{hres.meshes[m].operating_pressure_angle.toFixed(3)}°</dd>
                   <dt>{t("ui.train_contact_ratio")}</dt>
                   <dd>
-                    {hres.meshes[m].contact_ratio.toFixed(4)}
-                    {#if hres.meshes[m].contact_ratio < 1}
+                    ε<sub>α</sub> {hres.meshes[m].contact_ratios.transverse.toFixed(4)} · ε<sub>β</sub>
+                    {hres.meshes[m].contact_ratios.overlap.toFixed(4)} · ε<sub>γ</sub>
+                    {hres.meshes[m].contact_ratios.total.toFixed(4)}
+                    {#if hres.meshes[m].contact_ratios.transverse < 1}
                       <small class="warn">{t("ui.train_note_contact_ratio_below_one")}</small>
                     {/if}
                   </dd>
@@ -2187,6 +2248,49 @@
   .gear label.auto {
     grid-template-columns: 1fr auto 6.5rem 3.5rem;
   }
+  /* A second switch takes a second column of its own, out of the label's share
+     again, so the box keeps the edge every other box in the card shares. */
+  label.auto.constrained {
+    grid-template-columns: 1fr auto auto 6rem 3.5rem;
+  }
+  .grid.shared > label.auto.constrained {
+    grid-template-columns: 1fr auto auto 9rem 3.5rem;
+  }
+  .gear label.auto.constrained {
+    grid-template-columns: 1fr auto auto 6.5rem 3.5rem;
+  }
+  /* **Read in columns, not in source order.** The box is written first so the
+     row's label is for the box; these put everything back where it reads. Each
+     switch sits in a wrapper for the same reason — a child component's own
+     element is out of this stylesheet's reach, and the wrapper is the grid item
+     it needs to place. */
+  label.auto > .name {
+    grid-column: 1;
+  }
+  label.auto > .sw.auto {
+    grid-column: 2;
+  }
+  label.auto > input {
+    grid-column: 3;
+  }
+  label.auto > em {
+    grid-column: 4;
+  }
+  label.auto.constrained > .sw.bound {
+    grid-column: 3;
+  }
+  label.auto.constrained > input {
+    grid-column: 4;
+  }
+  label.auto.constrained > em {
+    grid-column: 5;
+  }
+  /* The wrapper is only a handle for placement; it must not add a hit area of
+     its own beyond the button it holds. */
+  label.auto > .sw {
+    display: flex;
+    justify-self: start;
+  }
   /* The **input box** is the anchor, not the text after it. With an `auto`
      trailing column the boxes shifted left or right by however wide a unit
      happened to be — "module" against "°" — so nothing lined up down a column.
@@ -2410,6 +2514,10 @@
   .switchrow {
     display: flex;
     flex-direction: column;
+    /* Carried explicitly now that this is not a `<label>`: the row gap is what
+       pairs a note to the control above it, and the size is every field row's. */
+    row-gap: var(--note-gap);
+    font-size: 0.85rem;
     /* **Stretch, explicitly.** `label` sets `align-items: center` for its grid
        rows, where it means "centre the box against its label vertically". On a
        flex column it means "centre every child horizontally", which is not a

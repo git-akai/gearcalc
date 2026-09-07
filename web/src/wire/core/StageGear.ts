@@ -11,9 +11,36 @@ import type { Overrides } from "./Overrides";
  */
 export type StageGear = { teeth: number, 
 /**
- * Automatic uses [`minimum_profile_shift`] at `working_depth`.
+ * The shift, and who decides it: **automatic means the stage does**, not
+ * that undercut does. What it resolves to when nothing else constrains it
+ * is [`StageGear::no_undercut`]'s business.
  */
 profile_shift: Auto<number>, 
+/**
+ * **The shift may not go below the least that clears undercut.**
+ *
+ * A constraint rather than a source, which is what lets it combine with
+ * everything else: it bounds a shift a designer typed, a shift the stage
+ * solved from a centre distance or a crank offset, and a shift the
+ * efficiency search chose, all in the same words.
+ *
+ * The bound is the **true** minimum from [`minimum_profile_shift`], which
+ * on a comfortable tooth count is negative — so a deliberate negative
+ * shift is left alone and only a genuinely undercut one is raised. That is
+ * deliberate: negative shift is a decision about centre distance or
+ * balance, and this is a question about undercut. Where the *stage* is
+ * choosing and nothing else decides, the answer is instead
+ * [`automatic_profile_shift`] — the same bound taken no lower than zero,
+ * because a shift chosen for no reason should not thin a tooth that needed
+ * no help.
+ *
+ * Off, the gear may undercut, and the searches stop asking
+ * ([`crate::auto::member_is_buildable`]).
+ *
+ * **Meaningless on a ring**, whose flank is its shaper's rather than a
+ * rack's, and which is never asked — see `member_is_buildable`.
+ */
+no_undercut: boolean, 
 /**
  * Depth, in modules, at which the undercut question is asked.
  *

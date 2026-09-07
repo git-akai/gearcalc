@@ -89,6 +89,8 @@ pub mod key {
     pub const STAGE_NEAR_SELF_LOCKING: &str = "stage.near_self_locking";
     /// `stage.overlap_below_one`
     pub const STAGE_OVERLAP_BELOW_ONE: &str = "stage.overlap_below_one";
+    /// `stage.shift_raised_for_undercut`
+    pub const STAGE_SHIFT_RAISED_FOR_UNDERCUT: &str = "stage.shift_raised_for_undercut";
     /// `stage.planet_clearance_below_minimum`
     pub const STAGE_PLANET_CLEARANCE_BELOW_MINIMUM: &str = "stage.planet_clearance_below_minimum";
     /// `stage.planets_not_evenly_spaced`
@@ -222,6 +224,7 @@ pub mod key {
         STAGE_LOW_MESH_EFFICIENCY,
         STAGE_NEAR_SELF_LOCKING,
         STAGE_OVERLAP_BELOW_ONE,
+        STAGE_SHIFT_RAISED_FOR_UNDERCUT,
         STAGE_PLANET_CLEARANCE_BELOW_MINIMUM,
         STAGE_PLANETS_NOT_EVENLY_SPACED,
         STAGE_PLANETS_SHARE_LOAD_EQUALLY,

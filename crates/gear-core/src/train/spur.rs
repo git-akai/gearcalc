@@ -35,8 +35,34 @@ use crate::tooth::Tooth;
 )]
 pub struct StageGear {
     pub teeth: u32,
-    /// Automatic uses [`minimum_profile_shift`] at `working_depth`.
+    /// The shift, and who decides it: **automatic means the stage does**, not
+    /// that undercut does. What it resolves to when nothing else constrains it
+    /// is [`StageGear::no_undercut`]'s business.
     pub profile_shift: Auto<f64>,
+    /// **The shift may not go below the least that clears undercut.**
+    ///
+    /// A constraint rather than a source, which is what lets it combine with
+    /// everything else: it bounds a shift a designer typed, a shift the stage
+    /// solved from a centre distance or a crank offset, and a shift the
+    /// efficiency search chose, all in the same words.
+    ///
+    /// The bound is the **true** minimum from [`minimum_profile_shift`], which
+    /// on a comfortable tooth count is negative — so a deliberate negative
+    /// shift is left alone and only a genuinely undercut one is raised. That is
+    /// deliberate: negative shift is a decision about centre distance or
+    /// balance, and this is a question about undercut. Where the *stage* is
+    /// choosing and nothing else decides, the answer is instead
+    /// [`automatic_profile_shift`] — the same bound taken no lower than zero,
+    /// because a shift chosen for no reason should not thin a tooth that needed
+    /// no help.
+    ///
+    /// Off, the gear may undercut, and the searches stop asking
+    /// ([`crate::auto::member_is_buildable`]).
+    ///
+    /// **Meaningless on a ring**, whose flank is its shaper's rather than a
+    /// rack's, and which is never asked — see `member_is_buildable`.
+    #[cfg_attr(feature = "serde", serde(default = "yes"))]
+    pub no_undercut: bool,
     /// Depth, in modules, at which the undercut question is asked.
     ///
     /// **Automatic is the gear's own dedendum**, which makes this ask the same
@@ -65,11 +91,129 @@ pub struct StageGear {
     pub material_overrides: Overrides,
 }
 
+/// A shift clears undercut unless it is told not to — and a document written
+/// before the question was asked separately meant exactly that.
+#[cfg(feature = "serde")]
+const fn yes() -> bool {
+    true
+}
+
+/// **What a gear's two shift controls come to**, read once so every stage reads
+/// them the same way.
+///
+/// The two are different kinds of thing and this is where that is written down:
+/// `profile_shift.auto` says *who decides*, `no_undercut` says *what the answer
+/// must satisfy however it is decided*. Every stage here needs all three of the
+/// values below — the bound for its search, what it may not overrule, and what
+/// to report when there is nothing to search — and each had been working them
+/// out for itself.
+///
+/// # The bound is not one number, and that is not an inconsistency
+///
+/// Undercut asks one question, but *choosing* a shift and *checking* a given
+/// one want different answers to it, and [`automatic_profile_shift`] says why:
+/// the true minimum is negative on any comfortable tooth count, so applying it
+/// literally would thin a tooth that needed no help, for nothing.
+///
+/// So a search is floored at `max(x_min, 0)` — shift when the geometry demands
+/// it, otherwise leave the tooth alone — while a number a designer typed is
+/// held only to `x_min` itself. A deliberate −0.3 on a 43-tooth gear is a
+/// decision about centre distance or balance, not a mistake about undercut, and
+/// survives; a −2.0 there genuinely undercuts and is raised.
+///
+/// Getting this wrong is measurable rather than a matter of taste: flooring the
+/// *search* at the true minimum let the eccentric drive's split walk out to
+/// −1.79 and come back with **less** drive efficiency than it started with.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ShiftAsked {
+    /// What a search choosing this shift may not go below — `max(x_min, 0)`,
+    /// see above — or `None` where there is no such bound to apply.
+    ///
+    /// `None` covers **two** cases and they are the same statement: the gear
+    /// may undercut, or the gear is not being chosen at all. A shift a designer
+    /// gave was already held to its own bound when it was read, and a search
+    /// that re-judges it against the *chooser's* bound rejects designs that are
+    /// perfectly legal — a 43-tooth wheel pinned at −0.5 is nowhere near
+    /// undercut and sits a whole module below `max(x_min, 0)`, so every
+    /// candidate built on it was thrown away and the optimiser fell back to
+    /// doing nothing, silently. A pinned gear is a constraint on the search,
+    /// not a candidate of it.
+    pub search_floor: Option<f64>,
+    /// The shift a designer gave, which no search may overrule. `None` where it
+    /// was left automatic — and a given shift arrives already raised to its
+    /// floor, so a pinned value and a reported one cannot disagree.
+    pub given: Option<f64>,
+    /// What the gear settles at when nothing else decides: the given value, or
+    /// [`automatic_profile_shift`] where the bound is on, or zero where it is
+    /// off and nothing is asked of the shift at all.
+    pub settled: f64,
+    /// Whether a given shift had to be raised to reach its floor, and so
+    /// whether the number in hand is the number that was typed.
+    pub raised: bool,
+}
+
+impl ShiftAsked {
+    /// **The note a raised shift owes its reader.**
+    ///
+    /// `no undercut` bounds a shift a designer typed as well as one the stage
+    /// chose, which is what lets it mean one thing everywhere — but a number
+    /// that was not taken as given has to say so, or the field and the gear
+    /// disagree in silence. The gear is named by its tooth count, which every
+    /// stage kind has and none has to invent a scheme for.
+    pub(crate) fn note(&self, teeth: u32) -> Option<crate::note::Note> {
+        self.raised.then(|| {
+            crate::note::Note::new(crate::note::key::STAGE_SHIFT_RAISED_FOR_UNDERCUT)
+                .count("teeth", teeth)
+                .number("shift", self.settled, 4)
+        })
+    }
+}
+
+impl StageGear {
+    /// [`ShiftAsked`], for this gear at its own working depth.
+    pub(crate) fn shift_asked(&self, base: &crate::params::GearParams) -> ShiftAsked {
+        let depth = self.working_depth.resolve(self.dedendum);
+        if !self.no_undercut {
+            // Nothing asked of the shift. Given, it is taken as typed; left to
+            // the stage with no objective either, there is no reason to move
+            // the tooth at all.
+            let given = (!self.profile_shift.auto).then_some(self.profile_shift.manual);
+            return ShiftAsked {
+                search_floor: None,
+                given,
+                settled: given.unwrap_or(0.0),
+                raised: false,
+            };
+        }
+        if self.profile_shift.auto {
+            let floor = automatic_profile_shift(base, depth);
+            return ShiftAsked {
+                search_floor: Some(floor),
+                given: None,
+                settled: floor,
+                raised: false,
+            };
+        }
+        // Given, and held to the true minimum rather than to the search's — a
+        // negative shift somebody meant is not an undercut one. Nothing is
+        // choosing it, so it carries no search bound.
+        let typed = self.profile_shift.manual;
+        let used = typed.max(crate::auto::minimum_profile_shift(base, depth).with_cutter_radius);
+        ShiftAsked {
+            search_floor: None,
+            given: Some(used),
+            settled: used,
+            raised: used > typed,
+        }
+    }
+}
+
 impl Default for StageGear {
     fn default() -> Self {
         Self {
             teeth: 17,
             profile_shift: Auto::automatic(0.0),
+            no_undercut: true,
             working_depth: Auto::automatic(1.0),
             addendum: Auto::fixed(1.0),
             min_tip_width: 0.1,
@@ -251,16 +395,24 @@ impl SpurStage {
     /// pair is chosen at once, because a shift is only good or bad relative to
     /// the one it meshes with — and what a designer has already given is handed
     /// over as pinned rather than overridden.
+    /// What the shift controls have to say for themselves — empty unless one
+    /// of them raised a given value.
+    pub(super) fn shift_notes(&self) -> Vec<Note> {
+        (0..2)
+            .filter_map(|i| {
+                self.gears[i]
+                    .shift_asked(&self.base_params(i))
+                    .note(self.gears[i].teeth)
+            })
+            .collect()
+    }
+
     pub(super) fn shifts(&self) -> [f64; 2] {
-        let floor = [0, 1].map(|i| {
-            let g = &self.gears[i];
-            automatic_profile_shift(&self.base_params(i), g.working_depth.resolve(g.dedendum))
-        });
-        let given = [0, 1].map(|i| {
-            (!self.gears[i].profile_shift.auto).then_some(self.gears[i].profile_shift.manual)
-        });
+        let asked = [0, 1].map(|i| self.gears[i].shift_asked(&self.base_params(i)));
+        let floor = asked.map(|a| a.search_floor);
+        let given = asked.map(|a| a.given);
         if !self.optimisation.enabled {
-            return [0, 1].map(|i| given[i].unwrap_or(floor[i]));
+            return asked.map(|a| a.settled);
         }
         let sum = (!self.centre_distance.auto)
             .then(|| {
@@ -290,7 +442,7 @@ impl SpurStage {
             &crate::auto::Pinned { shift: given, sum },
             self.sliding_friction,
         )
-        .unwrap_or_else(|| [0, 1].map(|i| given[i].unwrap_or(floor[i])))
+        .unwrap_or_else(|| asked.map(|a| a.settled))
     }
 
     /// The gear the stage would build at a given shift — the automatic
@@ -483,7 +635,7 @@ pub fn solve_spur_stage_with(
         })
     };
 
-    let mut notes = Vec::new();
+    let mut notes = stage.shift_notes();
     // The `Y_S` fit is stated over a band, and a section outside it is reported
     // rather than silently taking the boundary value — see `notch_outside_fit`.
     // What the rating has to say about each gear. Per gear, because that is
@@ -600,13 +752,12 @@ pub fn solve_spur_stage_with(
 
     // --- contact ratios. eps_beta needs the face width, which is why it could
     // not exist before this milestone.
-    let beta = stage.additional_helix.to_radians();
-    let overlap = effective * beta.sin().abs() / (std::f64::consts::PI * stage.module);
-    let contact_ratios = ContactRatios {
-        transverse: path.contact_ratio,
-        overlap,
-        total: path.contact_ratio + overlap,
-    };
+    let contact_ratios = ContactRatios::of(
+        path.contact_ratio,
+        effective,
+        stage.additional_helix,
+        stage.module,
+    );
 
     // --- backlash at the three centre distances.
     let angular =
@@ -627,7 +778,11 @@ pub fn solve_spur_stage_with(
     });
 
     if stage.additional_helix != 0.0 && !contact_ratios.has_full_axial_overlap() {
-        notes.push(Note::new(key::STAGE_OVERLAP_BELOW_ONE).number("ratio", overlap, 3));
+        notes.push(Note::new(key::STAGE_OVERLAP_BELOW_ONE).number(
+            "ratio",
+            contact_ratios.overlap,
+            3,
+        ));
     }
     if path.contact_ratio < 1.0 {
         notes.push(
@@ -658,6 +813,7 @@ pub fn solve_spur_stage_with(
         ratio: f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth),
         centre_distance_nominal: mesh.a_w,
         centre_distance: centre,
+        operating_pressure_angle: mesh.alpha_w.to_degrees(),
         clearance,
         contact_ratios,
         contact_stress_at_pitch_point: LoadCase {

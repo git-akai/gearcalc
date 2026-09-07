@@ -7,7 +7,13 @@ import type { LoadCase } from "./LoadCase";
 /**
  * What one of the two meshes did.
  */
-export type MeshReport = { contact_ratios: ContactRatios, 
+export type MeshReport = { 
+/**
+ * Operating pressure angle `α_w`, degrees — see
+ * [`crate::train::SpurResult::operating_pressure_angle`], which defines it
+ * for every parallel-axis mesh here.
+ */
+operating_pressure_angle: number, contact_ratios: ContactRatios, 
 /**
  * Mesh efficiency, both drive senses. Equal for a parallel-axis pair, and
  * arrived at rather than copied.

@@ -33,7 +33,7 @@ use super::{
     allowable, Backlash, Case, ContactRatios, Cycles, GearResult, LoadCase, StageTorques,
     TrainError, Widths,
 };
-use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift};
+use crate::auto::{addendum_for_tip_width, admissible_ranges};
 use crate::contact::{efficiency, ContactPath, Directional};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
@@ -164,6 +164,10 @@ impl Default for PlanetaryStage {
     ts(export, export_to = "core/")
 )]
 pub struct MeshReport {
+    /// Operating pressure angle `α_w`, degrees — see
+    /// [`crate::train::SpurResult::operating_pressure_angle`], which defines it
+    /// for every parallel-axis mesh here.
+    pub operating_pressure_angle: f64,
     pub contact_ratios: ContactRatios,
     /// Mesh efficiency, both drive senses. Equal for a parallel-axis pair, and
     /// arrived at rather than copied.
@@ -470,19 +474,25 @@ impl PlanetaryStage {
             0.0,
             self.sun.addendum.manual,
         );
-        let floor =
-            automatic_profile_shift(&sun_base, self.sun.working_depth.resolve(self.sun.dedendum));
-        let plain = [
-            self.sun.profile_shift.resolve(floor),
-            self.ring.profile_shift.manual,
-        ];
+        let sun_asked = self.sun.shift_asked(&sun_base);
+        // **A ring is never asked about undercut** — its flank is its shaper's
+        // rather than a rack's — so its shift is given or it is the set's to
+        // choose, and nothing floors it either way.
+        let ring_asked = super::ShiftAsked {
+            search_floor: None,
+            given: (!self.ring.profile_shift.auto).then_some(self.ring.profile_shift.manual),
+            settled: if self.ring.profile_shift.auto {
+                0.0
+            } else {
+                self.ring.profile_shift.manual
+            },
+            raised: false,
+        };
+        let plain = [sun_asked.settled, ring_asked.settled];
         if !self.optimisation.enabled {
             return plain;
         }
-        let given = [
-            (!self.sun.profile_shift.auto).then_some(self.sun.profile_shift.manual),
-            (!self.ring.profile_shift.auto).then_some(self.ring.profile_shift.manual),
-        ];
+        let given = [sun_asked.given, ring_asked.given];
         let freedoms = crate::auto::Freedoms::new(given);
         let eta0 = |x: [f64; 2]| -> Option<f64> {
             let b = self.built(x).ok()?;
@@ -492,9 +502,13 @@ impl PlanetaryStage {
             // the combination this has to refuse. The ring is not asked — its
             // root is its shaper's — and the set's own internal bounds are the
             // interference flags the mesh reports.
+            // The planet's shift is absorbed rather than chosen, so its own
+            // bound is the one its own control asks for.
             let floors = [
-                floor,
-                automatic_profile_shift(&b.planet.params, self.planet.dedendum),
+                sun_asked.search_floor,
+                self.planet.no_undercut.then(|| {
+                    crate::auto::automatic_profile_shift(&b.planet.params, self.planet.dedendum)
+                }),
             ];
             if !crate::auto::member_is_buildable(&b.sun, floors[0])
                 || !crate::auto::member_is_buildable(&b.planet, floors[1])
@@ -541,7 +555,31 @@ pub fn solve_planetary_stage_with(
 ) -> Result<PlanetaryResult, TrainError> {
     let input_torque = torques.peak_forward;
     let teeth = stage.teeth();
-    let mut notes = Vec::new();
+    // The sun and the planet are rack-cut and can be raised to clear undercut;
+    // a ring is not asked. Same note, same channel, as the pair's.
+    let mut notes: Vec<Note> = [
+        (
+            &stage.sun,
+            stage.params(
+                PlanetaryShaft::Sun,
+                stage.sun.teeth,
+                0.0,
+                stage.sun.addendum.manual,
+            ),
+        ),
+        (
+            &stage.planet,
+            stage.params(
+                PlanetaryShaft::Carrier,
+                stage.planet.teeth,
+                0.0,
+                stage.planet.addendum.manual,
+            ),
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(g, p)| g.shift_asked(&p).note(g.teeth))
+    .collect();
 
     // ---- the set as built, at the shifts the stage settled on.
     let shifts = stage.shifts();
@@ -1020,7 +1058,13 @@ pub fn solve_planetary_stage_with(
         speeds: forward.speeds,
         torques: forward.torques,
         sun_planet: MeshReport {
-            contact_ratios: ratios(sp_path.contact_ratio, sp_width, stage),
+            operating_pressure_angle: sp_mesh.alpha_w.to_degrees(),
+            contact_ratios: ContactRatios::of(
+                sp_path.contact_ratio,
+                sp_width,
+                stage.helix_angle,
+                stage.module,
+            ),
             efficiency: sp_eff,
             contact_stress_at_pitch_point: LoadCase::of(|c| {
                 sp_cs.at_pitch_point * scale_case(c).sqrt()
@@ -1032,7 +1076,13 @@ pub fn solve_planetary_stage_with(
             ],
         },
         planet_ring: MeshReport {
-            contact_ratios: ratios(pr_path.contact_ratio, pr_width, stage),
+            operating_pressure_angle: pr_mesh.alpha_w.to_degrees(),
+            contact_ratios: ContactRatios::of(
+                pr_path.contact_ratio,
+                pr_width,
+                stage.helix_angle,
+                stage.module,
+            ),
             efficiency: pr_eff,
             contact_stress_at_pitch_point: LoadCase::of(|c| {
                 pr_cs.at_pitch_point * scale_case(c).sqrt()
@@ -1100,17 +1150,6 @@ pub fn solve_planetary_stage_with(
         ),
         notes,
     })
-}
-
-/// The three contact ratios for one mesh of the set.
-fn ratios(transverse: f64, width: f64, stage: &PlanetaryStage) -> ContactRatios {
-    let beta = stage.helix_angle.to_radians();
-    let overlap = width * beta.sin().abs() / (std::f64::consts::PI * stage.module);
-    ContactRatios {
-        transverse,
-        overlap,
-        total: transverse + overlap,
-    }
 }
 
 const fn gcd(mut a: u32, mut b: u32) -> u32 {

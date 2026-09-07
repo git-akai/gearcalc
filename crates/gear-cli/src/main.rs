@@ -240,7 +240,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         );
         println!(
             "    far-side gap {:.4} mm (as cut {:.4})   contact ratio {:.4}",
-            mesh.clearance, mesh.clearance_as_cut, mesh.contact_ratio
+            mesh.clearance, mesh.clearance_as_cut, mesh.contact_ratios.transverse
         );
         println!(
             "    backlash {:.5} / {:.5} deg   interference: trochoid {}  involute {}  tip {} ({:+.4} deg)",
@@ -535,7 +535,7 @@ fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, tit
 /// out — the useful statement is which bound stops it, and that is what these
 /// rows are.
 fn hula_band(z0: u32, clearance_in_modules: f64) {
-    use gear_core::train::{solve_hula_stage, GivenShift, HulaStage};
+    use gear_core::train::{solve_hula_stage, HulaStage};
 
     println!(
         "hula, reduction {} : 1 — the same ratio at every tooth difference\n",
@@ -563,7 +563,6 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                         running_clearance: 0.02 * module,
                         tolerance_plus: 0.02 * module,
                         tolerance_minus: 0.02 * module,
-                        given_shift: [GivenShift::Pinion; 2],
                         ..HulaStage::default()
                     };
                     for (gear, count) in stage.gears.iter_mut().zip(teeth) {
@@ -578,7 +577,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                         continue;
                     };
                     let admissible = r.meshes.iter().all(|m| {
-                        m.contact_ratio >= 1.0
+                        m.contact_ratios.transverse >= 1.0
                             && !m.tip_interference
                             && !m.trochoid_interference
                             && !m.involute_interference
@@ -602,7 +601,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                 r.fixed_carrier_efficiency.forward * 100.0,
                 r.efficiency.forward * 100.0,
                 r.meshes[0].operating_pressure_angle,
-                r.meshes[0].contact_ratio,
+                r.meshes[0].contact_ratios.transverse,
                 r.backlash.forward.nominal
             ),
         }

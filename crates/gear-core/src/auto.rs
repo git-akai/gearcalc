@@ -799,12 +799,20 @@ impl<const N: usize> Freedoms<N> {
 /// Takes the tooth rather than its parameters because every caller has already
 /// built one — undercut and a severed tip are read off the form — and building
 /// it twice per candidate is a cost a search pays a thousand times over.
+///
+/// # The floor is optional, and that is the `no undercut` constraint
+///
+/// `Some(x_min)` asks all four; `None` asks the last two only. Undercut is a
+/// **design choice** rather than a fault — a designer who wants an undercut
+/// tooth is entitled to one, and the first two questions are that one question
+/// asked twice, numerically and off the form, so they are relieved together or
+/// not at all. The other two are not a choice: a severed tooth and a root round
+/// that will not fit are shapes no cutter leaves, and nothing relieves them.
 #[must_use]
-pub fn member_is_buildable(tooth: &Tooth, floor: f64) -> bool {
-    tooth.params.profile_shift >= floor - 1e-12
-        && !tooth.undercut
-        && !tooth.severed
-        && root_radius_fits(&tooth.params, tooth.params.dedendum)
+pub fn member_is_buildable(tooth: &Tooth, floor: Option<f64>) -> bool {
+    let undercut_ok =
+        floor.is_none_or(|f| tooth.params.profile_shift >= f - 1e-12 && !tooth.undercut);
+    undercut_ok && !tooth.severed && root_radius_fits(&tooth.params, tooth.params.dedendum)
 }
 
 /// **What the search may not do**, as opposed to what it is trying to achieve.
@@ -816,8 +824,9 @@ pub fn member_is_buildable(tooth: &Tooth, floor: f64) -> bool {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Bounds {
     /// The least shift each gear may take — the undercut minimum, which is a
-    /// floor and not an answer.
-    pub floor: [f64; 2],
+    /// floor and not an answer, and `None` where the designer has said this
+    /// gear may undercut ([`member_is_buildable`]).
+    pub floor: [Option<f64>; 2],
     /// The transverse contact ratio the pair must keep. Loss falls
     /// monotonically with path length, so without this the least-loss pair is
     /// always the one whose teeth barely reach and the constraint *is* the
@@ -895,7 +904,10 @@ pub fn shifts_for_efficiency(
         // asks the same question below and is the one that answers it — it is
         // declining to build a tooth already known to be out of bounds, which
         // over a search of some hundreds of candidates is most of the work.
-        if x[0] < floor[0] - 1e-12 || x[1] < floor[1] - 1e-12 {
+        if [0, 1]
+            .iter()
+            .any(|&i| floor[i].is_some_and(|f| x[i] < f - 1e-12))
+        {
             return None;
         }
         let [pa, pb] = pair(x);
@@ -1784,7 +1796,7 @@ mod tests {
                 &pair,
                 crate::mesh::MeshKind::External,
                 &Bounds {
-                    floor,
+                    floor: floor.map(Some),
                     min_contact_ratio: MIN_RATIO,
                     clearance: 0.0,
                 },
@@ -1874,7 +1886,7 @@ mod tests {
             },
             crate::mesh::MeshKind::External,
             &Bounds {
-                floor,
+                floor: floor.map(Some),
                 min_contact_ratio: MIN_RATIO,
                 clearance: 0.0,
             },
@@ -1899,7 +1911,7 @@ mod tests {
             },
             crate::mesh::MeshKind::External,
             &Bounds {
-                floor,
+                floor: floor.map(Some),
                 min_contact_ratio: MIN_RATIO,
                 clearance: 0.0,
             },

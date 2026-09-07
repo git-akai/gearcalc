@@ -29,7 +29,21 @@ clearance: number,
 /**
  * The centre distance actually used, including clearance.
  */
-centre_distance: number, contact_ratios: ContactRatios, 
+centre_distance: number, 
+/**
+ * **Operating pressure angle `α_w`, degrees** — the angle the profile
+ * shifts put the pair at, measured at the zero-backlash distance beside
+ * it rather than at the running one.
+ *
+ * The nominal one because it is the design quantity: it is what the shifts
+ * decide and what interference and tip thickness are judged against, and
+ * an assembly clearance of a few hundredths moves it without changing any
+ * of that. Reported by every stage that has a parallel-axis mesh, in the
+ * same units and from the same place ([`crate::mesh::Mesh::alpha_w`]); a
+ * crossed pair has no such angle, its line of action sliding rather than
+ * turning (docs/reference.md#crossed-axes).
+ */
+operating_pressure_angle: number, contact_ratios: ContactRatios, 
 /**
  * Hertzian contact stress at the pitch point, MPa, in both load cases.
  *

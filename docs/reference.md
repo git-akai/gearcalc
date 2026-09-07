@@ -458,6 +458,50 @@ was written in and no other: the root round bounded a pair and not an epicyclic
 set, and the eccentric drive was choosing a pinion nobody could cut and taking
 1.9 points of efficiency less for it.
 
+**The first two of the four are a choice, and the other two are not.** Undercut
+is a design decision — a designer entitled to an undercut tooth is entitled to
+one — and being below the floor and being undercut are that single question
+asked numerically and off the form, so they are relieved together. A severed
+tooth and a root round that will not fit are shapes no cutter leaves, and
+nothing relieves them. Which is why the bound is `Option`: `no undercut` off
+passes `None` and the first two go unasked.
+
+### Who decides a shift, and what it must satisfy
+
+Every gear that is cut by a rack carries two controls, and they are different
+kinds of thing. **`auto` is a source** — this shift is not given, the stage
+decides it. **`no undercut` is a constraint** — whatever decides it, it may not
+undercut. They combine rather than compete:
+
+| `auto` | `no undercut` | the shift is |
+|---|---|---|
+| off | off | the number typed, exactly |
+| off | on | that number, raised only if it genuinely undercuts |
+| on | off | free: nothing asked of it, so zero unless a distance, an offset or the optimiser decides it |
+| on | on | free and floored: the least that clears undercut where nothing else decides, which is what an automatic shift has always been |
+
+Only shifts left automatic are the optimiser's to move; a given one constrains
+it, as a given centre distance does.
+
+**The bound is not one number, and that is not an inconsistency.** Choosing a
+shift and checking a given one want different answers to the same question. The
+true minimum is negative on any comfortable tooth count — −1.76 at `z = 43` —
+so applying it to a *chooser* would thin a tooth that needed no help, for
+nothing; a search is therefore floored at `max(x_min, 0)`, which is the
+automatic value this crate has always used. A number a designer typed is held
+to `x_min` itself, because a deliberate −0.3 on a 43-tooth wheel is a decision
+about centre distance or balance and not a mistake about undercut. A shift that
+*was* raised says so in a note, so the field and the gear never disagree in
+silence.
+
+That asymmetry is measured rather than argued: flooring the **search** at the
+true minimum let the eccentric drive's split walk out to −1.79 and come back
+with less drive efficiency than it started with.
+
+A ring has neither control's second half: its flank is its shaper's rather than
+a rack's, so it is given or it is the stage's to choose, and undercut is not a
+question that can be asked of it.
+
 **Where a clearance is read.** A clearance is taken by whatever is free to
 absorb it, and each stage reports what it took rather than leaving a reader to
 work it out. The centre distance absorbs it when the distance is automatic; the
@@ -1213,8 +1257,11 @@ four coefficients of friction, which is what makes it safe to design against.
 this family, optimised for efficiency by choice of profile shift and tooth count,
 reporting 89.0 % forward — against 68.5 % for *the same gearbox with uncorrected
 teeth*. Read through the relation at a reduction near fifty those are meshes at
-99.73 % and 99.04 %: an excellent pair and an ordinary one. This stage at that
-reduction and that mesh figure comes out at 88.5 %.
+99.73 % and 99.04 %: an excellent pair and an ordinary one. What the comparison
+establishes is the relation; the stage's own answer at that reduction is above
+the published figure rather than at it, because the six- and seven-tooth pinions
+the check is built on take the shift such counts need to exist at all, and so
+mesh better than the gearbox being compared to.
 
 **A reduction does not say how to get it, and the difference of one tooth is the
 dearest way.** `R = z²/d²`, so `z = d·z₀` gives the same `z₀²` at any tooth

@@ -198,6 +198,19 @@ and with it every search that builds hundreds of teeth to read a radius and a
 flag off each: the pair's from 34 ms to 0.7, the eccentric drive's from 35 to
 1.7, the epicyclic set's from 68 to 10.
 
+**Two controls on a profile shift, and they are not the same kind of thing.**
+`auto` says who decides the number; `no undercut` says what the answer has to
+satisfy however it is decided — so they combine, and the automatic shift this
+tool has always offered is the pair of them on at once. A shift given by hand is
+held to the true undercut minimum, which is negative on a comfortable tooth
+count, so a deliberate negative shift survives and only a genuinely undercut one
+is raised — and it says so when it is. A search is floored at the automatic
+value instead, for a reason that is measured rather than tidy
+([reference](reference.md#efficiency-parallel-axes)). A ring has only the first
+control: its flank is its shaper's, and undercut is not a question that can be
+asked of it. The eccentric drive's "shift given on" select is gone with it — a
+mesh has one shift to give, and which member gives it is what the toggles say.
+
 **Profile shifts chosen for efficiency.** A stage-level toggle, off by default,
 that chooses the automatic shifts to lose least instead of taking the least that
 clears undercut — which becomes a floor rather than the answer, and is worth up

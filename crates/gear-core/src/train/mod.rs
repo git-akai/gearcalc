@@ -35,13 +35,12 @@ mod planetary;
 mod spur;
 mod worm;
 
-pub use hula::{
-    drive_efficiency, solve_hula_stage, GivenShift, HulaGear, HulaMesh, HulaResult, HulaStage,
-};
+pub use hula::{drive_efficiency, solve_hula_stage, HulaGear, HulaMesh, HulaResult, HulaStage};
 pub use planetary::{
     solve_planetary_stage, solve_planetary_stage_with, MeshReport, PlanetResult, PlanetaryResult,
     PlanetaryStage,
 };
+pub(crate) use spur::ShiftAsked;
 pub use spur::{solve_spur_stage, solve_spur_stage_with, SpurStage, StageGear};
 pub use worm::{
     solve_crossed_stage, solve_worm_stage, FirstMemberSizing, WormContact, WormMember,
@@ -67,6 +66,24 @@ pub struct ContactRatios {
 }
 
 impl ContactRatios {
+    /// The three, from the transverse one and the mesh they belong to.
+    ///
+    /// `ε_β = b sin β / (π m_n)` and `ε_γ = ε_α + ε_β` — one line each, but
+    /// written out once per stage kind they were three copies of the same two
+    /// lines, and a fourth stage away from being four. The width is the mesh's
+    /// **effective** one, the narrower of the two members, because that is the
+    /// width that carries the pair.
+    #[must_use]
+    pub fn of(transverse: f64, width: f64, helix_angle: f64, normal_module: f64) -> Self {
+        let overlap =
+            width * helix_angle.to_radians().sin().abs() / (std::f64::consts::PI * normal_module);
+        Self {
+            transverse,
+            overlap,
+            total: transverse + overlap,
+        }
+    }
+
     /// Whether at least one contact line is engaged at all times.
     ///
     /// Below this a gear is helical in form but still transfers load like a spur
@@ -227,6 +244,18 @@ pub struct SpurResult {
     pub clearance: f64,
     /// The centre distance actually used, including clearance.
     pub centre_distance: f64,
+    /// **Operating pressure angle `α_w`, degrees** — the angle the profile
+    /// shifts put the pair at, measured at the zero-backlash distance beside
+    /// it rather than at the running one.
+    ///
+    /// The nominal one because it is the design quantity: it is what the shifts
+    /// decide and what interference and tip thickness are judged against, and
+    /// an assembly clearance of a few hundredths moves it without changing any
+    /// of that. Reported by every stage that has a parallel-axis mesh, in the
+    /// same units and from the same place ([`crate::mesh::Mesh::alpha_w`]); a
+    /// crossed pair has no such angle, its line of action sliding rather than
+    /// turning (docs/reference.md#crossed-axes).
+    pub operating_pressure_angle: f64,
     pub contact_ratios: ContactRatios,
     /// Hertzian contact stress at the pitch point, MPa, in both load cases.
     ///
@@ -2177,7 +2206,7 @@ mod tests {
             assert!(
                 crate::auto::member_is_buildable(
                     &t,
-                    crate::auto::automatic_profile_shift(p, p.dedendum)
+                    Some(crate::auto::automatic_profile_shift(p, p.dedendum))
                 ),
                 "{what} at x {} cannot be cut: undercut {} severed {} round {}",
                 p.profile_shift,
@@ -2333,21 +2362,53 @@ mod tests {
 
     /// Both shifts given leaves the optimiser nothing to choose, and it says so
     /// by handing back what it was given rather than by failing.
+    ///
+    /// **A negative shift somebody meant is not an undercut one.** The bound a
+    /// given value is held to is the true minimum, so −0.1 on a 43-tooth wheel
+    /// — whose flank is clear down to −1.76 — is a decision about centre
+    /// distance and is left exactly where it was put. Only a value that
+    /// genuinely undercuts is raised, which the second half asks of a 17-tooth
+    /// pinion, clear only above +0.006.
     #[test]
     fn a_fully_specified_pair_is_left_alone() {
-        let given = |x: f64| StageGear {
+        let given = |teeth: u32, x: f64| StageGear {
+            teeth,
             profile_shift: Auto::fixed(x),
             ..SpurStage::default().gears[0].clone()
         };
-        let stage = SpurStage {
+        let tuned = |gears: [StageGear; 2]| SpurStage {
             optimisation: Optimisation {
                 enabled: true,
                 ..Optimisation::default()
             },
-            gears: [given(0.3), given(-0.1)],
+            gears,
             ..SpurStage::default()
         };
-        assert_eq!(stage.shifts(), [0.3, -0.1]);
+        assert_eq!(
+            tuned([given(17, 0.3), given(43, -0.1)]).shifts(),
+            [0.3, -0.1]
+        );
+
+        // ...and the same pinion asked for a shift its own flank will not carry.
+        let raised = tuned([given(17, -0.1), given(43, -0.1)]).shifts();
+        assert!(
+            raised[0] > -0.1 && raised[0] < 0.01,
+            "a pinion below its undercut minimum should be raised to it, not past it: {raised:?}"
+        );
+        assert!(
+            (raised[1] + 0.1).abs() < 1e-12,
+            "and the wheel, which undercuts nowhere near here, left alone: {raised:?}"
+        );
+
+        // With the constraint off, the number stands however it undercuts.
+        let loose = |teeth: u32, x: f64| StageGear {
+            no_undercut: false,
+            ..given(teeth, x)
+        };
+        assert_eq!(
+            tuned([loose(17, -0.1), loose(43, -0.1)]).shifts(),
+            [-0.1, -0.1]
+        );
     }
 
     /// Setting the centre distance by hand takes clearance out of the picture,
