@@ -2341,6 +2341,12 @@
   .switchrow {
     display: flex;
     flex-direction: column;
+    /* **Stretch, explicitly.** `label` sets `align-items: center` for its grid
+       rows, where it means "centre the box against its label vertically". On a
+       flex column it means "centre every child horizontally", which is not a
+       thing any row here wants and is what this quietly became when the rule
+       that used to override it moved onto `.control`. */
+    align-items: stretch;
   }
   /* The control stops where the input boxes stop; its note runs the full row,
      as every other note does. Taking the inset off the control rather than off

@@ -1010,6 +1010,20 @@ Two properties make this worth the indirection over a written-down line count:
 the browser does the measuring, so it stays right at any window width and cannot
 be made stale by editing a note's text; and nothing is ever clipped.
 
+**One builder and one component**, because two copies of a convention are a
+convention that will eventually disagree with itself — and these had. A panel
+decides *which* sentences a field has to offer; `notes.ts` and `FieldNote` decide
+how they are shown. Where a note ends comes with the component for the same
+reason: it is a property of the note rather than of whichever row it lands in,
+and `grid-column: 1 / -1` is "the row's full width" in every template at once
+rather than a column count each panel counts out for itself and has to recount
+when a row grows a column.
+
+**A readout's annotation is not a field's note.** The slot exists so that typing
+does not move the page; a figure that cannot change while you look at it needs
+none of that, and asking for it right-aligns the annotation away from the value
+it belongs to and reserves a line for nothing.
+
 **Checked by measurement**, because screenshots are not pixel-deterministic here:
 every control reports the same `getBoundingClientRect().top` with and without an
 error note.
@@ -1126,9 +1140,15 @@ determine an answer.
 | Planetary stage | **Held** — which shaft is grounded | the spec names only the driven shaft, which picks one of three and leaves the arrangement undetermined |
 
 **One more input has two faces:** an eccentric gear's eccentricity can be entered
-as the angular-shift amplitude or as the centre-distance throw. The second is the
+as the angular-shift amplitude or as the centre-distance offset. The second is the
 first read backwards, and `Δx` stays the single field everything is built from —
 the boundary resolves it once, so nothing downstream knows which face was shown.
+
+Offered as the two fields they are, each with the `auto` toggle every derived
+number in the application carries, and turning one on turns the other off. They
+were a mode select and a field that appeared beneath it, which said the same
+thing in two controls neither of which looked like the field it replaced, and
+reported the solved amplitude a third time among the results.
 
 ---
 

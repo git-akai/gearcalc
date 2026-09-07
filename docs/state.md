@@ -170,8 +170,8 @@ helical throughout) · efficiency · automatic profile shift and altered addendu
 **Crossed axes.** One model rather than a family: the lead angle exact, the path
 of contact from two properties of an involute helicoid, elliptical contact,
 sliding as a vector, and one friction balance containing both older efficiency
-formulas. A crossed gear pair is a spur stage with an axis angle — three stage
-kinds, not four. A crossed pair's face width is automatic from `ε ≥ 1`, a
+formulas. A crossed gear pair is a spur stage with an axis angle — one stage
+kind fewer than a family of them would need. A crossed pair's face width is automatic from `ε ≥ 1`, a
 *geometric* minimum; a worm keeps its published proportions. Both are labelled
 with which kind of minimum they are, because they differ by 2.4× and answer
 different questions.
@@ -232,7 +232,8 @@ building a gear per trial; and
 inspection data — span and over-pins — as the range it takes around the
 revolution, verified against a caliper reading off the drawn teeth.
 
-**Trains.** Spur/helical, worm and planetary stages in one train; torque,
+**Trains.** Spur/helical, worm, planetary and eccentric-drive stages in one
+train — the last behind the developer knock, as the eccentric gear is; torque,
 backlash and cycle accumulation; efficiency and backlash in **both** drive
 directions. Contact is `max(elliptical, line)` on **both** mesh kinds now — a
 crossed pair's ellipse lengthens as its shafts come parallel, so the line its

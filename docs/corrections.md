@@ -38,6 +38,24 @@ function shared by both cutters; and the tool an external gear is cut by is a
 `Rack` of two **lengths**, because a coefficient converted on the way in and out
 picked up a stray `1/cos β` every time it made the round trip.
 
+### Work nobody reads is still work
+
+**A search evaluates a candidate hundreds of times, so anything built per
+candidate and then not read is the whole of what it costs.** Solving an
+amplitude from a centre-distance offset built a *gear* per trial — every
+distinct tooth generated — to read one shift off each: 102 ms, of which the
+profile it was built for was 7.8 µs. Building any tooth ran a two-thousand-point
+scan of its trochoid looking for a flank that undercut had removed, on teeth
+that were not undercut and had nothing for it to find: 62 µs a tooth, and every
+stage's shift search is hundreds of teeth. An eccentric drive's objective cut
+each ring twice, once to check the tips and once to mesh them.
+
+None of it was wrong, and no answer changed when it went — which is why nothing
+caught it. What finds it is asking what a result actually reads, and the honest
+way to ask is to measure the parts rather than the whole: each time, one line of
+the breakdown was ninety-nine per cent of the total and the thing it produced
+was never touched.
+
 ### A check built from the thing under test measures nothing
 
 The ring cut simulation derived the cutter's tooth the same way the model did, so
@@ -76,6 +94,23 @@ reaches?"*
 
 *Now:* one shared grid with every axis nameable, and module homogeneity asserted
 as a standing law.
+
+### A bound records where the sweep stopped
+
+**A threshold taken from a measurement is a record of the parameters that were
+swept, not a statement about the thing.** A guard was justified by sweeping
+thirty thousand teeth and asserting the margin stayed above a thousandth of a
+radian. Widening the sweep by one parameter — the root round, which had been
+left at its default — walked the margin to 6e-4 on geometry that is perfectly
+sound, and would have failed the gate.
+
+The margin was fine; the bound was fiction. The reason the guard holds is that
+the tool's tip round is capped at 95 % of the round that would fill the space
+between the flanks, so the fillets are held apart by the five per cent and the
+margin is a *fraction of the space* — it narrows with the tooth and never
+closes. That says what to assert: that it stays positive. A bound has to be the
+one the reasoning gives, or the next parameter someone adds to the sweep breaks
+it.
 
 ### A gate on a ratio cannot see a scale error
 
@@ -306,6 +341,11 @@ whose units are wrong is wrong however plausible.
 | [reference.md#the-boundary](reference.md#the-boundary) | **A note naming a member, in a list keyed by note key** — so a stage that raised it for two members could not be drawn at all | The front end draws every note list as a Svelte keyed `{#each … (n.key)}`, and duplicate keys in one are an error rather than a warning: the block throws and the stage stops rendering. Switching a drive to reversing raised `stage.reversed_bending_uncorrected` for the sun, the planet **and** the ring — one key, three entries — so the planetary stage would not expand. Reported as a hang, and it was a thrown render. Two fixes, and both were wanted anyway: a note about a gear lives **on the gear** now, one per list; and every note list is keyed by position, so a repeat can never again be the thing that stops a panel drawing. The same shape had been latent in `stage.face_width_no_source`, which names a member and can fire for both |
 
 | [reference.md#export-and-import](reference.md#export-and-import) | **Every DXF this project ever exported was structurally incomplete** | AC1015 is a graph: six sections, nine symbol tables, both spaces defined as blocks, a root dictionary, and an owner handle on every record. The writer emitted three sections and two tables, and no entity said which layout owned it. Nothing caught it — the Rust tests checked the writer against our own reading of the format, and `ezdxf`, the independent reader, invented the missing structures on load and reported no fault. It surfaced the only way left: **SOLIDWORKS would not open the file.** Gated now against the published minimum, tag by tag, and against a handle graph that must close — both verified by breaking the writer and watching them fail, and the corrected file confirmed importing |
+
+| [reference.md#efficiency-parallel-axes](reference.md#efficiency-parallel-axes) | **The shift optimiser rated a pair the stage would not build** | Turned on, it drove the shift sum to 3.8 — because it built its candidates with the *manual* addendum and rated them at the *zero-backlash* distance, when the stage resolves an automatic addendum for tip width and runs the pair a clearance further out. It was optimising a pair nobody assembles, and the answer it liked best was the one furthest from the one that gets built. The search takes the stage's own `params_at` now, so what is optimised is what is reported. The same fix, in the same words, as rating contact at `mesh` rather than at `operating` — the second time this exact confusion has cost an answer |
+| [reference.md#efficiency-parallel-axes](reference.md#efficiency-parallel-axes) | **Each search asked its own questions of a shift**, so a bound reached the one it was written in and no other | Four things stop a tooth existing: below the undercut floor, undercut anyway, pointed before its tip, or a root round that no longer fits. The pair asked all four. The epicyclic set asked one, of one member. The eccentric drive asked two, of one member — and was choosing a pinion whose root round could not be cut, taking 1.9 points of efficiency less for it than when told not to. Written once as `auto::member_is_buildable`, and the test asks the invariant rather than the wiring: whatever a stage chooses must be cuttable |
+| [rationale.md#notes-must-not-move-the-controls](rationale.md#notes-must-not-move-the-controls) | **A field's note used to draw a readout**, where it right-aligned the annotation away from its value and reserved a line that could never fill | The slot exists so typing does not move the page. A figure that cannot change while you look at it needs none of it. The eccentric drive's readouts had been built that way throughout, and its clamps were a run of the note that is pulled *up* against the field above it — stacked, each closed on the one before instead of reading as a list |
+| — | **A row's alignment lost to a selector two classes stronger, silently** | `.switchrow` set one column and `justify-items: end`; `.grid.shared > label` sets three and carries two classes and an element to that one class, so the three-column template stayed underneath and the switch was placed at the end of the *label* column, mid-row. The gear panel's container has no such rule, which is the only reason identical markup landed correctly there and the fault read as "the gear panel broke the train panel". Racing specificity needs a selector naming every container the row might sit in and goes stale at the fourth; the row is a flex column now, which a column template cannot reach at all. Then `align-items: center`, harmless on the grid it was written for, meant "centre every child horizontally" on that flex column — the override that had been hiding it was the very rule that moved |
 
 ---
 
