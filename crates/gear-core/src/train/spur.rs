@@ -73,8 +73,24 @@ pub struct StageGear {
     /// teeth and 22 (docs/reference.md#automatic-values). Following the dedendum rather than naming a number
     /// also means a gear cut shallower is asked about the depth it actually has.
     pub working_depth: Auto<f64>,
-    /// Automatic uses [`addendum_for_tip_width`] at `min_tip_width`.
-    pub addendum: Auto<f64>,
+    /// Addendum coefficient, in modules, as asked for.
+    ///
+    /// Plain, because the only thing an automatic addendum ever computed was
+    /// the tallest tooth that keeps a tip [`Self::min_tip_width`] wide — which
+    /// is a **bound on the number**, not a source for it, and now says so.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "coefficient"))]
+    pub addendum: f64,
+    /// **The tooth may not be taller than its tip is wide.**
+    ///
+    /// The same shape as [`Self::no_undercut`], on the other end of the tooth:
+    /// a constraint the number answers to however it arrived, rather than a
+    /// mode the number is only read in. It was the latter, and so
+    /// `min_tip_width` went unread on every addendum a designer typed — a
+    /// tooth could come to a point and nothing said so.
+    ///
+    /// Off, the addendum stands as asked and the tip is whatever it is.
+    #[cfg_attr(feature = "serde", serde(default = "yes"))]
+    pub no_sharp_tip: bool,
     /// Minimum transverse tooth tip width, mm.
     pub min_tip_width: f64,
     pub dedendum: f64,
@@ -96,6 +112,25 @@ pub struct StageGear {
 #[cfg(feature = "serde")]
 const fn yes() -> bool {
     true
+}
+
+/// A coefficient that used to be an `Auto` and is now a number.
+///
+/// Read either shape: a document written before the addendum's bound was split
+/// from its value holds `{ auto, manual }`, and the number it meant is the
+/// `manual` one — with `auto` on, it meant "and hold it to the tip width",
+/// which [`StageGear::no_sharp_tip`] says now and defaults to.
+#[cfg(feature = "serde")]
+fn coefficient<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
+    #[derive(serde::Deserialize)]
+    #[serde(untagged)]
+    enum Either {
+        Number(f64),
+        WasAuto { manual: f64 },
+    }
+    Ok(match <Either as serde::Deserialize>::deserialize(d)? {
+        Either::Number(v) | Either::WasAuto { manual: v } => v,
+    })
 }
 
 /// **What a gear's two shift controls come to**, read once so every stage reads
@@ -218,7 +253,83 @@ impl ShiftAsked {
     }
 }
 
+/// **What a gear's addendum comes to**, once its bound has had its say.
+///
+/// The same shape as [`ShiftAsked`] and for the same reason: two stages were
+/// working it out for themselves, in the same four lines, and the answer has
+/// two halves — the number to build with, and whether it is the number that was
+/// asked for.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct AddendumAsked {
+    /// The coefficient to build with, in modules.
+    pub used: f64,
+    /// Whether the bound cut it down, and so whether the tooth is the one that
+    /// was asked for.
+    pub clamped: bool,
+}
+
+impl AddendumAsked {
+    /// The note a clamped addendum owes its reader, if it was clamped.
+    pub(crate) fn note(&self, teeth: u32) -> Option<crate::note::Note> {
+        self.clamped.then(|| {
+            crate::note::Note::new(crate::note::key::STAGE_ADDENDUM_HELD_TO_TIP_WIDTH)
+                .count("teeth", teeth)
+                .number("addendum", self.used, 4)
+        })
+    }
+
+    /// **The same finding where the stage cannot act on it**, which is a report
+    /// rather than a clamp.
+    ///
+    /// An eccentric drive solves its crank offset from a gap written in the
+    /// tips, in closed form with an analytic derivative. An addendum that moved
+    /// with the shift — which moves with the offset — would put a tip-width
+    /// solve inside that root-find and take the derivative away with it. Not
+    /// every bound an input creates needs a solver behind it: this one says
+    /// what the tooth would have to be and leaves the number alone.
+    pub(crate) fn warning(&self, teeth: u32) -> Option<crate::note::Note> {
+        self.clamped.then(|| {
+            crate::note::Note::new(crate::note::key::STAGE_ADDENDUM_ABOVE_TIP_WIDTH)
+                .count("teeth", teeth)
+                .number("addendum", self.used, 4)
+        })
+    }
+}
+
 impl StageGear {
+    /// **The addendum this gear builds at**, at a given shift.
+    ///
+    /// The bound is an upper one — a taller tooth is a sharper tooth — so the
+    /// answer is the smaller of what was asked and what the tip width allows.
+    /// It depends on the shift, which is why it is asked per built tooth rather
+    /// than once per gear.
+    ///
+    /// A tooth already thinner than `min_tip_width` at its base circle has no
+    /// admissible addendum at all ([`addendum_for_tip_width`] returns `None`);
+    /// there is nothing to clamp to, so the number stands and the tooth's own
+    /// `pointed` reporting is what says it is wrong.
+    pub(crate) fn addendum_asked(&self, at_shift: &crate::params::GearParams) -> AddendumAsked {
+        let asked = self.addendum;
+        if !self.no_sharp_tip {
+            return AddendumAsked {
+                used: asked,
+                clamped: false,
+            };
+        }
+        let ceiling = addendum_for_tip_width(
+            &Tooth::new(GearParams {
+                addendum: asked,
+                ..*at_shift
+            }),
+            self.min_tip_width,
+        );
+        let used = ceiling.map_or(asked, |c| asked.min(c));
+        AddendumAsked {
+            used,
+            clamped: used < asked - 1e-12,
+        }
+    }
+
     /// [`ShiftAsked`], for this gear at its own working depth.
     pub(crate) fn shift_asked(&self, base: &crate::params::GearParams) -> ShiftAsked {
         let depth = self.working_depth.resolve(self.dedendum);
@@ -264,7 +375,8 @@ impl Default for StageGear {
             profile_shift: Auto::automatic(0.0),
             no_undercut: true,
             working_depth: Auto::automatic(1.0),
-            addendum: Auto::fixed(1.0),
+            addendum: 1.0,
+            no_sharp_tip: true,
             min_tip_width: 0.1,
             dedendum: 1.25,
             root_radius: 0.38,
@@ -444,18 +556,6 @@ impl SpurStage {
     /// pair is chosen at once, because a shift is only good or bad relative to
     /// the one it meshes with — and what a designer has already given is handed
     /// over as pinned rather than overridden.
-    /// What the shift controls have to say for themselves — empty unless one
-    /// of them raised a given value.
-    pub(super) fn shift_notes(&self) -> Vec<Note> {
-        (0..2)
-            .filter_map(|i| {
-                self.gears[i]
-                    .shift_asked(&self.base_params(i))
-                    .note(self.gears[i].teeth)
-            })
-            .collect()
-    }
-
     pub(super) fn shifts(&self) -> [f64; 2] {
         let asked = [0, 1].map(|i| self.gears[i].shift_asked(&self.base_params(i)));
         let floor = asked.map(|a| a.search_floor);
@@ -508,12 +608,7 @@ impl SpurStage {
             ..self.base_params(i)
         };
         GearParams {
-            addendum: if g.addendum.auto {
-                addendum_for_tip_width(&Tooth::new(with_shift), g.min_tip_width)
-                    .unwrap_or(with_shift.addendum)
-            } else {
-                g.addendum.manual
-            },
+            addendum: g.addendum_asked(&with_shift).used,
             ..with_shift
         }
     }
@@ -533,7 +628,7 @@ impl SpurStage {
             // Opposite hands mesh; the stage stores the magnitude once.
             helix_angle: self.helix_angles()[i],
             profile_shift: g.profile_shift.manual,
-            addendum: g.addendum.manual,
+            addendum: g.addendum,
             dedendum: g.dedendum,
             root_radius: g.root_radius,
             // k1 + k2 = 2 by construction, not by assertion.
@@ -684,7 +779,7 @@ pub fn solve_spur_stage_with(
         })
     };
 
-    let mut notes = stage.shift_notes();
+    let mut notes = Vec::new();
     // The `Y_S` fit is stated over a band, and a section outside it is reported
     // rather than silently taking the boundary value — see `notch_outside_fit`.
     // What the rating has to say about each gear. Per gear, because that is
@@ -696,6 +791,19 @@ pub fn solve_spur_stage_with(
         // ...and whether this root is loaded both ways, which for a parallel
         // pair is the drive's doing alone.
         out.extend(reversal.note_for(reverses));
+        // **A bound that moved this gear's own number belongs to this gear.**
+        // A note naming an input is one the reader wants under that input, not
+        // in a list at the foot of the stage where they have to match it back
+        // up by tooth count.
+        let g = &stage.gears[i];
+        out.extend(g.shift_asked(&stage.base_params(i)).note(g.teeth));
+        out.extend(
+            g.addendum_asked(&GearParams {
+                profile_shift: x[i],
+                ..stage.base_params(i)
+            })
+            .note(g.teeth),
+        );
         out
     };
     // **What the mesh needs, not what one gear needs.** The narrower face

@@ -214,6 +214,13 @@ control: its flank is its shaper's, and undercut is not a question that can be
 asked of it. The eccentric drive's "shift given on" select is gone with it — a
 mesh has one shift to give, and which member gives it is what the toggles say.
 
+The addendum carries the same pair, on the other end of the tooth: `no sharp
+tip` holds it to the tallest that keeps a tip `min_tip_width` wide, where an
+`auto` toggle used to *be* that tooth and left a typed addendum unbounded. The
+eccentric drive reports that bound rather than acting on it — its crank offset
+is a closed-form solve on the tips, and an addendum moving with the shift would
+put an iteration inside it.
+
 **Profile shifts chosen for efficiency.** A stage-level toggle, off by default,
 that chooses the automatic shifts to lose least instead of taking the least that
 clears undercut — which becomes a floor rather than the answer, and is worth up

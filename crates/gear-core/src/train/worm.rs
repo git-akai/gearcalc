@@ -607,8 +607,8 @@ pub fn solve_crossed_stage(
             screw.wheel_pitch_diameter / 2.0,
         ];
         [
-            r[0] + stage.gears[0].addendum.manual * stage.module,
-            r[1] + stage.gears[1].addendum.manual * stage.module,
+            r[0] + stage.gears[0].addendum * stage.module,
+            r[1] + stage.gears[1].addendum * stage.module,
         ]
     };
     // At the centre distance the pair will run at, not the zero-backlash one:

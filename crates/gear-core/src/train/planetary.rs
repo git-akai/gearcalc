@@ -33,7 +33,7 @@ use super::{
     allowable, Backlash, Case, ContactRatios, Cycles, GearResult, LoadCase, StageTorques,
     TrainError, Widths,
 };
-use crate::auto::{addendum_for_tip_width, admissible_ranges};
+use crate::auto::admissible_ranges;
 use crate::contact::{efficiency, ContactPath, Directional};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
@@ -404,13 +404,8 @@ impl PlanetaryStage {
         let [sun_shift, planet_shift, ring_shift] = solved;
 
         let addendum_of = |member: PlanetaryShaft, g: &StageGear, teeth: u32, shift: f64| -> f64 {
-            let with_shift = stage.params(member, teeth, shift, g.addendum.manual);
-            if g.addendum.auto {
-                addendum_for_tip_width(&Tooth::new(with_shift), g.min_tip_width)
-                    .unwrap_or(with_shift.addendum)
-            } else {
-                g.addendum.manual
-            }
+            g.addendum_asked(&stage.params(member, teeth, shift, g.addendum))
+                .used
         };
         let sun_params = stage.params(
             PlanetaryShaft::Sun,
@@ -433,7 +428,7 @@ impl PlanetaryStage {
             PlanetaryShaft::Ring,
             teeth.ring,
             ring_shift,
-            stage.ring.addendum.manual,
+            stage.ring.addendum,
         );
 
         let sun = Tooth::new(sun_params);
@@ -508,17 +503,12 @@ impl PlanetaryStage {
 
     /// What each member asks of its shift, in the solve's order.
     fn asked(&self) -> [super::ShiftAsked; 3] {
-        let sun_base = self.params(
-            PlanetaryShaft::Sun,
-            self.sun.teeth,
-            0.0,
-            self.sun.addendum.manual,
-        );
+        let sun_base = self.params(PlanetaryShaft::Sun, self.sun.teeth, 0.0, self.sun.addendum);
         let planet_base = self.params(
             PlanetaryShaft::Carrier,
             self.planet.teeth,
             0.0,
-            self.planet.addendum.manual,
+            self.planet.addendum,
         );
         [
             self.sun.shift_asked(&sun_base),
@@ -634,15 +624,16 @@ pub fn solve_planetary_stage_with(
     let input_torque = torques.peak_forward;
     let teeth = stage.teeth();
     // The sun and the planet are rack-cut and can be raised to clear undercut;
-    // a ring is not asked. Same note, same channel, as the pair's.
-    let mut notes: Vec<Note> = [
+    // a ring is not asked. Collected here and handed to the member each one is
+    // about, so a note naming an input reaches the reader under that input.
+    let member_notes: Vec<(usize, Note)> = [
         (
             &stage.sun,
             stage.params(
                 PlanetaryShaft::Sun,
                 stage.sun.teeth,
                 0.0,
-                stage.sun.addendum.manual,
+                stage.sun.addendum,
             ),
         ),
         (
@@ -651,16 +642,45 @@ pub fn solve_planetary_stage_with(
                 PlanetaryShaft::Carrier,
                 stage.planet.teeth,
                 0.0,
-                stage.planet.addendum.manual,
+                stage.planet.addendum,
             ),
         ),
     ]
     .into_iter()
-    .filter_map(|(g, p)| g.shift_asked(&p).note(g.teeth))
+    .enumerate()
+    .filter_map(|(i, (g, p))| g.shift_asked(&p).note(g.teeth).map(|n| (i, n)))
     .collect();
+    let mut notes: Vec<Note> = Vec::new();
 
     // ---- the set as built, at the shifts the stage settled on.
     let shifts = stage.shifts();
+    // ...and the other end of the tooth, which needs those shifts to be known.
+    let mut member_notes = member_notes;
+    member_notes.extend(
+        [
+            (&stage.sun, PlanetaryShaft::Sun, stage.sun.teeth, shifts[0]),
+            (
+                &stage.planet,
+                PlanetaryShaft::Carrier,
+                stage.planet.teeth,
+                shifts[1],
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        .filter_map(|(i, (g, member, teeth, x))| {
+            g.addendum_asked(&stage.params(member, teeth, x, g.addendum))
+                .note(teeth)
+                .map(|n| (i, n))
+        }),
+    );
+    let notes_for = |which: usize| -> Vec<Note> {
+        member_notes
+            .iter()
+            .filter(|(i, _)| *i == which)
+            .map(|(_, n)| n.clone())
+            .collect()
+    };
     let Built {
         sun,
         planet,
@@ -852,6 +872,10 @@ pub fn solve_planetary_stage_with(
         let mut out = Vec::new();
         out.extend(sections[i].and_then(super::notch_outside_fit));
         out.extend(reversal.note_for(reverses[i]));
+        // **A bound that moved this member's own number belongs to it**, not to
+        // a list at the foot of the stage that a reader has to match back up by
+        // tooth count. The ring has none: it is asked neither question.
+        out.extend(notes_for(i));
         out
     };
 

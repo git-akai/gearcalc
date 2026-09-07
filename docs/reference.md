@@ -512,6 +512,29 @@ A ring has neither control's second half: its flank is its shaper's rather than
 a rack's, so it is given or it is the stage's to choose, and undercut is not a
 question that can be asked of it.
 
+**The other end of the tooth is the same shape.** An addendum's only automatic
+value was ever the tallest tooth that keeps a tip `min_tip_width` wide — a
+*bound on the number* wearing a source's clothes, and one that was read only
+while the toggle was on, so an addendum a designer typed went unbounded and a
+tooth could come to a point with nothing said. It is `no sharp tip` now: the
+number is always the designer's, and the bound holds it down to the tallest
+tooth that keeps the tip. It bites exactly — the tallest that clears, not an
+arbitrary shorter one — and says so when it does.
+
+**Not every bound an input creates needs a solver behind it.** The eccentric
+drive solves its crank offset from a gap written in the tips, in closed form
+with an analytic derivative; an addendum that moved with the shift — which moves
+with the offset — would put a tip-width solve inside that root-find and take the
+derivative away with it. So there the bound *reports*: it says what the tooth
+would have to be and leaves the number alone. One control, one meaning, honoured
+by whatever the stage is able to move.
+
+**A note that names an input is drawn under that input.** A shift raised to
+clear undercut and an addendum held down to keep a tip both name a field and
+carry a number, so they reach the reader beside that field rather than in a list
+at the foot of the stage to be matched back up by tooth count. The stage's list
+keeps what is about the stage.
+
 **Where a clearance is read.** A clearance is taken by whatever is free to
 absorb it, and each stage reports what it took rather than leaving a reader to
 work it out. The centre distance absorbs it when the distance is automatic; the

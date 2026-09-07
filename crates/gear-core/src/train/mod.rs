@@ -1990,28 +1990,50 @@ mod tests {
         assert!(spur(&r.stages[1]).gears[1].tooth_cycles.bending < first.bending);
     }
 
-    /// The automatic addendum, exercised through a whole stage rather than in
-    /// isolation: set a minimum tip width, solve the stage, and measure the tip
-    /// width off the gear the stage actually built.
+    /// **The tip width is a bound on the addendum, not a target for it.**
+    ///
+    /// Exercised through a whole stage rather than in isolation: ask for a
+    /// minimum tip width, solve, and measure the tip off the gear the stage
+    /// actually built. Two things have to hold and they are different
+    /// statements — the tip is never narrower than was asked for, and where the
+    /// bound bit it bit *exactly*, leaving the tallest tooth that keeps the tip
+    /// rather than an arbitrary shorter one.
+    ///
+    /// It used to be a target, because the addendum's only automatic value was
+    /// the tooth this bound allows — so an addendum a designer typed went
+    /// unbounded and one they left automatic was overwritten. Neither is what
+    /// either control was for.
     #[test]
-    fn the_stages_automatic_addendum_produces_the_requested_tip_width() {
+    fn the_tip_width_bounds_the_addendum_and_bites_exactly() {
         for want in [0.05, 0.15, 0.3] {
-            let mut stage = SpurStage::default();
-            for g in &mut stage.gears {
-                g.addendum = Auto::automatic(1.0);
-                g.min_tip_width = want;
-            }
-            let r = solve_spur_stage(&stage, StageTorques::just(2.0), &library()).unwrap();
+            for asked in [0.8, 1.0, 1.6] {
+                let mut stage = SpurStage::default();
+                for g in &mut stage.gears {
+                    g.addendum = asked;
+                    g.min_tip_width = want;
+                }
+                let r = solve_spur_stage(&stage, StageTorques::just(2.0), &library()).unwrap();
 
-            for i in 0..2 {
-                let built = Tooth::new(stage.params_at(i, stage.shifts()[i]));
-                let got = 2.0 * built.ra * built.theta_a;
-                assert!(
-                    (got - want).abs() < 1e-9,
-                    "gear {i}: wanted tip width {want}, built {got}"
-                );
-                // ...and the addendum reported is the one that produced it.
-                assert!((r.gears[i].addendum - built.params.addendum).abs() < 1e-12);
+                for i in 0..2 {
+                    let built = Tooth::new(stage.params_at(i, stage.shifts()[i]));
+                    let got = 2.0 * built.ra * built.theta_a;
+                    assert!(
+                        got > want - 1e-9,
+                        "gear {i} at h={asked}: tip {got} is under the {want} asked for"
+                    );
+                    let clamped = built.params.addendum < asked - 1e-12;
+                    assert!(
+                        !clamped || (got - want).abs() < 1e-9,
+                        "gear {i} at h={asked}: held down to {} but the tip is {got}, not {want}",
+                        built.params.addendum
+                    );
+                    assert!(
+                        clamped || (built.params.addendum - asked).abs() < 1e-12,
+                        "gear {i} at h={asked}: unclamped, so the addendum should be as asked"
+                    );
+                    // ...and the addendum reported is the one that produced it.
+                    assert!((r.gears[i].addendum - built.params.addendum).abs() < 1e-12);
+                }
             }
         }
     }
@@ -2261,7 +2283,7 @@ mod tests {
                     helix_angle: drive.helix_angle,
                     teeth: g.teeth,
                     profile_shift: g.profile_shift,
-                    addendum: drive.gears[i].addendum.manual,
+                    addendum: drive.gears[i].addendum,
                     dedendum: drive.gears[i].dedendum,
                     root_radius: drive.gears[i].root_radius,
                     thickness_mod: drive.thickness_mod[i / 2],

@@ -165,7 +165,7 @@ impl Default for HulaStage {
         // own, and the interference readout is what says so.
         let gear = |teeth: u32| StageGear {
             teeth,
-            addendum: crate::params::Auto::fixed(0.7),
+            addendum: 0.7,
             dedendum: 1.0,
             ..StageGear::default()
         };
@@ -416,7 +416,7 @@ pub fn solve_hula_stage(
         helix_angle: stage.helix_angle,
         teeth: teeth.0[i],
         profile_shift: shift[i],
-        addendum: stage.gears[i].addendum.manual,
+        addendum: stage.gears[i].addendum,
         dedendum: stage.gears[i].dedendum,
         root_radius: stage.gears[i].root_radius,
         thickness_mod: stage.thickness_mod[mesh],
@@ -474,7 +474,7 @@ pub fn solve_hula_stage(
         module: stage.module,
         pressure_angle: stage.pressure_angle,
         helix_angle: stage.helix_angle,
-        addendum: stage.gears.each_ref().map(|g| g.addendum.manual),
+        addendum: stage.gears.each_ref().map(|g| g.addendum),
         clearance: stage.clearance,
         offset,
         split: std::array::from_fn(|mesh| split_of(mesh, value[mesh])),
@@ -646,6 +646,17 @@ pub fn solve_hula_stage(
                 if let Some(n) = raised[index].clone() {
                     notes.push(n);
                 }
+            }
+            // **The tip width reports here rather than clamping.** A drive that
+            // solved its offset would have to put a tip-width solve inside a
+            // closed-form root-find to hold a tooth down, so this says what the
+            // tooth would have to be and leaves it as asked
+            // (`AddendumAsked::warning`).
+            if let Some(n) = stage.gears[gear]
+                .addendum_asked(&built(index, layout.shift, gear))
+                .warning(teeth.0[gear])
+            {
+                notes.push(n);
             }
             notes
         };
@@ -893,7 +904,7 @@ mod tests {
             // difference the operating pressure angle is far higher and the
             // path far shorter, so the 0.7 that suits the shipped arrangement
             // leaves this one below continuous contact.
-            gear.addendum = crate::params::Auto::fixed(0.8);
+            gear.addendum = 0.8;
         }
         // **The tool follows the rings this fixture builds**, which are a third
         // the size of the shipped ones. The stocked default would be larger
@@ -1482,7 +1493,7 @@ mod tests {
             };
             for (gear, count) in s.gears.iter_mut().zip([19_u32, 18, 17, 18]) {
                 gear.teeth = count;
-                gear.addendum = crate::params::Auto::fixed(0.6);
+                gear.addendum = 0.6;
                 gear.profile_shift = crate::params::Auto::fixed(-0.2);
             }
             for c in &mut s.cutter {

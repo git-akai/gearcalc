@@ -730,7 +730,7 @@ mod tests {
         for (teeth, addendum) in [(17_u32, 1.0_f64), (60, 1.35)] {
             let gear = gear_core::train::StageGear {
                 teeth,
-                addendum: gear_core::params::Auto::fixed(addendum),
+                addendum,
                 profile_shift: gear_core::params::Auto::fixed(0.0),
                 ..Default::default()
             };
@@ -772,6 +772,44 @@ mod tests {
                 record(&r.notes);
                 for g in &r.gears {
                     record(&g.notes);
+                }
+            }
+        }
+        // **Both ends of a tooth pushed past what it can carry.** A tall
+        // addendum on a small pinion comes to a point, so the tip-width bound
+        // cuts it down — and the eccentric drive reports the same finding
+        // rather than acting on it, since holding the tooth would put a solve
+        // inside its closed-form crank solve.
+        {
+            let gear = |teeth: u32| gear_core::train::StageGear {
+                teeth,
+                addendum: 1.6,
+                min_tip_width: 0.4,
+                ..Default::default()
+            };
+            let stage = gear_core::train::SpurStage {
+                gears: [gear(17), gear(43)],
+                ..Default::default()
+            };
+            if let Ok(r) = gear_core::train::solve_spur_stage(
+                &stage,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
+                record(&r.notes);
+                // A bound that moved a gear's own number rides that gear.
+                for g in &r.gears {
+                    record(&g.notes);
+                }
+            }
+            let mut drive = gear_core::train::HulaStage::default();
+            for g in &mut drive.gears {
+                g.addendum = 1.6;
+                g.min_tip_width = 0.4;
+            }
+            if let Ok(r) = gear_core::train::solve_hula_stage(&drive, 1000.0, 2.0) {
+                for g in &r.gears {
+                    record(&g.clamps);
                 }
             }
         }
@@ -866,12 +904,12 @@ mod tests {
                 gears: [
                     gear_core::train::StageGear {
                         teeth: 17,
-                        addendum: gear_core::params::Auto::fixed(addendum),
+                        addendum,
                         ..Default::default()
                     },
                     gear_core::train::StageGear {
                         teeth: 43,
-                        addendum: gear_core::params::Auto::fixed(addendum),
+                        addendum,
                         ..Default::default()
                     },
                 ],
@@ -973,7 +1011,7 @@ mod tests {
                     ..Default::default()
                 },
                 ring: gear_core::train::StageGear {
-                    addendum: gear_core::params::Auto::fixed(addendum),
+                    addendum,
                     ..Default::default()
                 },
                 ..Default::default()

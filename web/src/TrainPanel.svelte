@@ -15,6 +15,7 @@
     type Optimisation,
     type Value,
     type GearResult,
+    type Note,
     type WormResult,
     note,
     t,
@@ -167,6 +168,25 @@
   const stageName = (i: number) => t("ui.train_stage_heading", { number: String(i + 1) });
   const gearName = (stage: number, which: number) =>
     t("ui.train_gear_name", { number: String(gearNumber(stage, which)) });
+  /** **A gear's own note, rendered under the input it is about.**
+   *
+   *  A hint that names a field and carries a number — a shift raised to clear
+   *  undercut, an addendum held down to keep a tip — is one the reader wants
+   *  beside that field, not in a list at the foot of the stage where it has to
+   *  be matched back up by tooth count. The stage's list keeps what is about
+   *  the stage. */
+  const clampNote = (from: Note[], keys: readonly string[]) =>
+    from.filter((n) => keys.includes(n.key)).map(note).join(" · ") || undefined;
+
+  /** Which of a gear's notes belong to which of its fields. One table, so a
+   *  stage that lists what is left over can subtract exactly what was drawn
+   *  rather than repeating the keys. */
+  const FIELD_NOTES = {
+    profile_shift: ["stage.shift_raised_for_undercut"],
+    addendum: ["stage.addendum_held_to_tip_width", "stage.addendum_above_tip_width"],
+  } as const;
+  const UNDER_A_FIELD: readonly string[] = Object.values(FIELD_NOTES).flat();
+
   /** A mesh efficiency, both ways round. Two keys rather than one sentence: the
    *  two halves are separated by a bullet the grammar of no language owns. */
   const bothWays = (e: { forward: number; backward: number }) =>
@@ -388,14 +408,14 @@
      *  gears in its own shape. Shown in the box while `auto` is on, exactly as
      *  a solved centre distance or addendum is. */
     solvedShift?: number;
-    /** **The one gear whose shift is not offered at all** — the planet's, which
-     *  is absorbed to make the set's two centre distances agree rather than
-     *  chosen by anybody.
+    /** **This gear's shift is the one closing its stage's own relation** — an
+     *  epicyclic set's two centre distances agreeing, say.
      *
-     *  Every other gear says the same thing with its `auto` toggle: on, the
-     *  stage decided the number and the box shows what came back. A readout
-     *  with a note explaining itself is what a gear needs when it has no toggle
-     *  to say it with, and nothing else here is in that position. */
+     *  Not a different kind of control, only a different reason for the number:
+     *  the member that absorbs is the one left automatic, so hiding its toggle
+     *  would hide the only way to hand the job to another member. It says so in
+     *  a note instead, which is worth a line because all three can be automatic
+     *  at once and only one of them is closing anything. */
     shiftAbsorbed?: boolean;
     /** **What decides this gear's face width**, which is one question with
      *  three answers rather than a flag with two.
@@ -413,27 +433,45 @@
     onShiftAuto?: () => void;
     /** The width at which ε = 1, for a crossed pair. */
     faceFromContinuity?: number;
+    /** **This gear's own notes**, where its `GearResult` is not what carries
+     *  them — the eccentric drive reports its gears in its own shape. The ones
+     *  naming a field are drawn under that field; see `clampNote`. */
+    gearNotes?: Note[];
     /** A readout only this member has; given the member's position. */
     extra?: Snippet<[number]>;
     extraIndex?: number;
   },
 )}
+{@const own = opts.gearNotes ?? g?.notes ?? []}
 <div class="gear">
   <h4>{title}</h4>
   <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
     <span>{t("ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={gear.teeth} />
   </label>
-  {@render autoNumber(
+  <!-- **The other end of the tooth, and the same shape as the shift's.** The
+       addendum had an `auto` toggle whose only answer was the tallest tooth the
+       tip width allows — a bound wearing a source's clothes, and one that went
+       unread on every addendum a designer typed. It is the bound now, and the
+       number is always the designer's. -->
+  {@render boundedNumber(
     "ui.train_addendum",
-    gear.addendum,
-    g?.addendum,
+    () => gear.addendum,
+    (v) => (gear.addendum = v),
     0.05,
-    undefined,
-    undefined,
     "ui.train_m",
+    // What the bound came to, where it had something to say. A hint that names
+    // an input belongs under that input rather than in a list at the foot of
+    // the stage.
+    clampNote(own, FIELD_NOTES.addendum),
+    {
+      label: "ui.train_no_sharp_tip",
+      title: "ui.train_note_no_sharp_tip",
+      on: gear.no_sharp_tip,
+      set: (v) => (gear.no_sharp_tip = v),
+    },
   )}
-  {#if gear.addendum.auto}
+  {#if gear.no_sharp_tip}
     <label class="sub">
       <span>{t("ui.train_minimum_tip_width")}</span>
       <input type="number" step="0.02" bind:value={gear.min_tip_width} />
@@ -473,62 +511,53 @@
       } />
     </label>
   {/if}
-  {#if !opts.shiftAbsorbed}
-    <!-- **A ring is not asked about undercut.** Its flank is its shaper's
-         rather than a rack's, so the constraint has nothing to bound and the
-         searches never ask it (`auto::member_is_buildable`). -->
-    {@render autoNumber(
-      "ui.train_profile_shift",
-      gear.profile_shift,
-      opts.solvedShift ?? g?.profile_shift,
-      0.05,
-      opts.onShiftAuto,
-      undefined,
-      "ui.train_m",
-      opts.cut === "shaper"
-        ? undefined
-        : {
-            label: "ui.train_no_undercut",
-            title: "ui.train_note_no_undercut",
-            on: gear.no_undercut,
-            set: (v) => (gear.no_undercut = v),
-          },
-    )}
-    <!-- The depth the undercut question is asked at, so it is offered exactly
-         while that question is being asked — which is now the constraint's
-         business rather than the `auto` toggle's. -->
-    {#if gear.no_undercut && opts.cut !== "shaper"}
+  <!-- **A ring is not asked about undercut.** Its flank is its shaper's
+       rather than a rack's, so the constraint has nothing to bound and the
+       searches never ask it (`auto::member_is_buildable`). -->
+  {@render autoNumber(
+    "ui.train_profile_shift",
+    gear.profile_shift,
+    opts.solvedShift ?? g?.profile_shift,
+    0.05,
+    opts.onShiftAuto,
+    // The one thing an absorbing member has to say that its toggle cannot: all
+    // three can be automatic at once and only one of them closes the set. Where
+    // it has nothing to add, the bound that moved this gear's own shift does.
+    opts.shiftAbsorbed
+      ? t("ui.train_note_shift_closes_the_set")
+      : clampNote(own, FIELD_NOTES.profile_shift),
+    "ui.train_m",
+    opts.cut === "shaper"
+      ? undefined
+      : {
+          label: "ui.train_no_undercut",
+          title: "ui.train_note_no_undercut",
+          on: gear.no_undercut,
+          set: (v) => (gear.no_undercut = v),
+        },
+  )}
+  <!-- The depth the undercut question is asked at, so it is offered exactly
+       while that question is being asked — which is now the constraint's
+       business rather than the `auto` toggle's. -->
+  {#if gear.no_undercut && opts.cut !== "shaper"}
       <!-- Automatic is the gear's own dedendum, which asks the same question the
            profile generator answers: is the flank undercut *at all*? A fixed 1
            module — what this used to be — asks whether it is undercut within a
            module of depth, and the two part company at 18 teeth and 22. -->
-      {@render autoNumber(
-        "ui.train_working_tooth_depth",
-        gear.working_depth,
-        gear.dedendum,
-        0.05,
-        undefined,
-        // It used to sit indented under the shift, which said "this belongs to
-        // that" without words. The indent went when it became an `auto` field
-        // like its neighbours, so the note says it instead.
-        t("ui.train_note_working_depth"),
-        "ui.train_m",
-      )}
-    {/if}
-  {:else}
-    <label>
-      <span>{t("ui.train_profile_shift")}</span>
-      <input
-        type="number"
-        value={Number((opts.solvedShift ?? gear.profile_shift.manual).toFixed(4))}
-        disabled
-        class="computed"
-      />
-      <em>{t("ui.train_module")}</em>
-      <FieldNote notes={notes(t("ui.train_note_planet_shift_solved"), null)} />
-    </label>
+    {@render autoNumber(
+      "ui.train_working_tooth_depth",
+      gear.working_depth,
+      gear.dedendum,
+      0.05,
+      undefined,
+      // It used to sit indented under the shift, which said "this belongs to
+      // that" without words. The indent went when it became an `auto` field
+      // like its neighbours, so the note says it instead.
+      t("ui.train_note_working_depth"),
+      "ui.train_m",
+    )}
   {/if}
-  {#if !opts.shiftAbsorbed && !gear.profile_shift.auto}
+  {#if !gear.profile_shift.auto}
     {@const r = opts.cut === "shaper" ? undefined : g?.ranges.profile_shift}
     <p class="hint">
       <!-- A shaper-cut ring's bounds are not the rack's shown here — its own
@@ -697,6 +726,43 @@
      toggle flips, then the stage relieves whatever that has over-specified
      (`relieve`). Stages that have no such rule pass nothing and behave as they
      always have. -->
+<!-- **A number with a bound on it, and nothing deciding it.** The same row as
+     `autoNumber` without the `auto` switch: the bound stands in that column,
+     which is where a switch that qualifies the box belongs whether it says who
+     chose the number or what the number has to satisfy. -->
+{#snippet boundedNumber(
+  key: string,
+  get: () => number,
+  set: (v: number) => void,
+  step: number,
+  unit: string | undefined,
+  note: string | null | undefined,
+  constraint: { label: string; title: string; on: boolean; set: (v: boolean) => void },
+)}
+  <label class="auto">
+    <span class="name">{t(key)}</span>
+    <input
+      type="number"
+      {step}
+      value={get()}
+      oninput={(e) => set(e.currentTarget.valueAsNumber)}
+    />
+    <span class="sw auto">
+      <Switch
+        small
+        label={t(constraint.label)}
+        on={constraint.on}
+        title={t(constraint.title)}
+        set={constraint.set}
+      />
+    </span>
+    <em>{unit ? t(unit) : ""}</em>
+    {#if note !== undefined}
+      <FieldNote notes={notes(note, null)} />
+    {/if}
+  </label>
+{/snippet}
+
 {#snippet autoNumber(
   key: string,
   a: Auto<number>,
@@ -1987,6 +2053,7 @@
                     {
                       cut: hres && hres.gears[j].ring ? "shaper" : "rack",
                       solvedShift: hres?.gears[j].profile_shift,
+                      gearNotes: hres?.gears[j].clamps,
                       onShiftAuto: () => relieveHula(stage, m, stage.gears[j].profile_shift),
                       faceWidth: "none",
                     },
@@ -2061,8 +2128,14 @@
                 </dl>
               {/if}
               {#if hres}
+                <!-- What is left after the fields have taken theirs: a clamp
+                     naming an input is drawn under that input, and this list
+                     keeps the rest — a tip the shaper could not reach, and the
+                     like, which are about the part rather than about a box. -->
                 {@const clamped = [ring, pinion].flatMap((j) =>
-                  hres.gears[j].clamps.map((c) => ({ teeth: hres.gears[j].teeth, note: c })),
+                  hres.gears[j].clamps
+                    .filter((c) => !UNDER_A_FIELD.includes(c.key))
+                    .map((c) => ({ teeth: hres.gears[j].teeth, note: c })),
                 )}
                 {#if clamped.length}
                   <!-- One list for the pair, as every other clamped gear in the
@@ -2290,6 +2363,17 @@
      switch sits in a wrapper for the same reason — a child component's own
      element is out of this stylesheet's reach, and the wrapper is the grid item
      it needs to place. */
+  /* **Every one of them says which row as well as which column.** Naming only
+     the column leaves the row to auto-placement, and auto-placement will not go
+     back: with the box written first and placed in column 3, the switch that
+     belongs in column 2 no longer fits on the cursor's row and starts a new one
+     — which put the toggle and the unit a line below the box they belong to. */
+  label.auto > .name,
+  label.auto > .sw,
+  label.auto > input,
+  label.auto > em {
+    grid-row: 1;
+  }
   label.auto > .name {
     grid-column: 1;
   }

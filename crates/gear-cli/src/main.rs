@@ -567,7 +567,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                     };
                     for (gear, count) in stage.gears.iter_mut().zip(teeth) {
                         gear.teeth = count;
-                        gear.addendum = gear_core::params::Auto::fixed(addendum);
+                        gear.addendum = addendum;
                         gear.profile_shift = gear_core::params::Auto::fixed(x);
                     }
                     for c in &mut stage.cutter {
@@ -677,7 +677,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
         module: stage.module[mesh_index],
         teeth: result.gears[i].teeth,
         profile_shift: result.gears[i].profile_shift,
-        addendum: stage.gears[i].addendum.manual,
+        addendum: stage.gears[i].addendum,
         dedendum: stage.gears[i].dedendum,
         thickness_mod: stage.thickness_mod[mesh_index],
         ..GearParams::default()

@@ -54,9 +54,25 @@ no_undercut: boolean,
  */
 working_depth: Auto<number>, 
 /**
- * Automatic uses [`addendum_for_tip_width`] at `min_tip_width`.
+ * Addendum coefficient, in modules, as asked for.
+ *
+ * Plain, because the only thing an automatic addendum ever computed was
+ * the tallest tooth that keeps a tip [`Self::min_tip_width`] wide — which
+ * is a **bound on the number**, not a source for it, and now says so.
  */
-addendum: Auto<number>, 
+addendum: number, 
+/**
+ * **The tooth may not be taller than its tip is wide.**
+ *
+ * The same shape as [`Self::no_undercut`], on the other end of the tooth:
+ * a constraint the number answers to however it arrived, rather than a
+ * mode the number is only read in. It was the latter, and so
+ * `min_tip_width` went unread on every addendum a designer typed — a
+ * tooth could come to a point and nothing said so.
+ *
+ * Off, the addendum stands as asked and the tip is whatever it is.
+ */
+no_sharp_tip: boolean, 
 /**
  * Minimum transverse tooth tip width, mm.
  */
