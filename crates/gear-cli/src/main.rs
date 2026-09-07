@@ -160,14 +160,16 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
     for (gear, count) in stage.gears.iter_mut().zip(teeth) {
         gear.teeth = count;
     }
-    // A shaper has to be smaller than the ring it cuts; five teeth down clears
-    // the rings this arrangement produces at any size worth building.
+    // **A shaper has to be smaller than the ring it cuts**, and this command
+    // builds rings far smaller than the ones the stage ships with: `hula 18`
+    // asks for a 19-tooth ring, which the stocked default would not fit inside.
+    // So the default stands where it fits and gives way to five teeth under the
+    // ring where it does not — the sizing the comment here has always claimed
+    // and never did, since the count it worked out was discarded unused.
     for (mesh, cutter) in stage.cutter.iter_mut().enumerate() {
         let ring = teeth[mesh * 2].max(teeth[mesh * 2 + 1]);
-        let _ = ring;
-        if let Some(t) = cutter_teeth {
-            cutter.teeth = t;
-        }
+        let stocked = cutter.teeth;
+        cutter.teeth = cutter_teeth.unwrap_or_else(|| stocked.min(ring.saturating_sub(5)).max(4));
     }
 
     let result = match solve_hula_stage(&stage, 1000.0, 2.0) {

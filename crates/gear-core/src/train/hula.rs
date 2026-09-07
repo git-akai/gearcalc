@@ -214,12 +214,12 @@ impl Default for HulaStage {
             // **A shaper is coupled to the shift it has to cut**, not only to
             // the ring's size: the clearance drives the ring's shift up, and a
             // tool that reached its flank at one shift stops reaching it at a
-            // larger one. Twelve teeth cuts the shipped rings clean over the
-            // gaps worth running; a ring far from these counts will want its
-            // own, and says so through its clamps rather than quietly coming out
-            // without a fillet.
+            // larger one. Twenty teeth cuts the shipped rings clean over the
+            // gaps worth running, and is a tool somebody stocks; a ring far
+            // from these counts will want its own, and says so through its
+            // clamps rather than quietly coming out without a fillet.
             cutter: [Cutter {
-                teeth: 12,
+                teeth: 20,
                 ..Cutter::default()
             }; 2],
             // `N ± d` about 61, at four teeth of difference on each mesh —
@@ -865,6 +865,14 @@ mod tests {
             // leaves this one below continuous contact.
             gear.addendum = crate::params::Auto::fixed(0.8);
         }
+        // **The tool follows the rings this fixture builds**, which are a third
+        // the size of the shipped ones. The stocked default would be larger
+        // than the 19-tooth ring here and would cut it no fillet at all — the
+        // fault `a_shaper_larger_than_its_ring_is_reported` exists to catch,
+        // which every test on this fixture would then be quietly running into.
+        for cutter in &mut s.cutter {
+            cutter.teeth = 12;
+        }
         s
     }
 
@@ -941,6 +949,26 @@ mod tests {
             last = j;
         }
         assert!(last > 0.0, "no backlash at any clearance");
+    }
+
+    /// **The stage ships buildable**, tool included.
+    ///
+    /// A default is the one configuration every reader sees first and no test
+    /// otherwise asserts, so the shaper and the rings can drift apart in it
+    /// silently — as they did the moment the tool was sized for the rings this
+    /// module's *fixtures* build rather than for the ones it ships.
+    #[test]
+    fn the_shipped_drive_is_one_its_own_tools_can_cut() {
+        let r =
+            solve_hula_stage(&HulaStage::default(), 1000.0, 2.0).expect("the shipped drive solves");
+        for gear in &r.gears {
+            assert!(
+                gear.clamps.is_empty(),
+                "z{} came out clamped: {:?}",
+                gear.teeth,
+                gear.clamps
+            );
+        }
     }
 
     /// **A shaper larger than its ring cuts nothing**, and the part says so.

@@ -359,9 +359,16 @@
     cut?: "rack" | "shaper";
     /** Present when the shift is solved rather than offered — the planet's. */
     solvedShift?: number;
-    /** False where nothing rates the face width — a crossed pair's contact is a
-     *  point, so no stress depends on it and none can size it. */
-    faceAuto?: boolean;
+    /** **What decides this gear's face width**, which is one question with
+     *  three answers rather than a flag with two.
+     *
+     *  `"rating"` — the default: a stress inverted, so the sources that size it
+     *  are offered as toggles. `"continuity"` — a crossed pair, whose contact is
+     *  a point no stress depends on, so the width comes from ε = 1 instead and
+     *  says which kind of minimum it is. `"none"` — nothing sizes it at all, so
+     *  it is a plain field: no toggles, and no note borrowed from a stage that
+     *  answers a different question. */
+    faceWidth?: "rating" | "continuity" | "none";
     /** Called when this gear's shift is switched between given and automatic,
      *  so a stage whose inputs constrain one another can relieve whichever of
      *  them that has over-specified. */
@@ -489,7 +496,7 @@
       } />
     </p>
   {/if}
-  {#if opts.faceAuto === false}
+  {#if opts.faceWidth === "continuity"}
     <!-- A crossed pair's automatic width is a **geometric** minimum: the width
          at which one tooth pair hands over to the next (ε = 1). The spur
          stage's inverts a stress instead, and the two must not read alike. -->
@@ -518,7 +525,7 @@
       "ui.train_mm",
     )}
   {/if}
-  {#if gear.face_width.auto && opts.faceAuto !== false}
+  {#if gear.face_width.auto && (opts.faceWidth ?? "rating") === "rating"}
     <!-- Four ratings, so four toggles: a rating exists for every combination
          of what fails (bending or contact) and what it is rated against (the
          peak load, against the ultimate, or the cyclic one, against fatigue).
@@ -1127,7 +1134,7 @@
                 {@render gearCard(gearName(i, j), gear, g, {
                   cut: "rack",
                   onShiftAuto: () => relieveSpur(stage, gear.profile_shift),
-                  faceAuto: stage.shaft_angle === 0,
+                  faceWidth: stage.shaft_angle === 0 ? "rating" : "continuity",
                   faceFromContinuity: xres?.crossed?.face_width_for_continuity?.[j],
                   extra: xres ? crossedMember : undefined,
                   extraIndex: j,
@@ -1856,13 +1863,18 @@
                   <em></em>
                 </label>
                 <label>
+                  <span>{t("ui.train_static_friction")}</span>
+                  <input type="number" step="0.01" bind:value={stage.static_friction[m]} />
+                  <em></em>
+                  <FieldNote notes={notes(t("ui.train_note_static_friction"), null)} />
+                </label>
+                <label>
                   <span>{t("ui.train_hula_given_shift")}</span>
                   <select bind:value={stage.given_shift[m]}>
                     <option value="pinion">{t("ui.train_hula_split_pinion")}</option>
                     <option value="ring">{t("ui.train_hula_split_ring")}</option>
                   </select>
                   <em></em>
-                  <FieldNote notes={notes(t("ui.train_hula_note_split"), null)} />
                 </label>
               </div>
               <div class="gears">
@@ -1889,7 +1901,7 @@
                           (stage.optimisation.enabled && stage.gears[j].profile_shift.auto))
                           ? hres.gears[j].profile_shift
                           : undefined,
-                      faceAuto: false,
+                      faceWidth: "none",
                     },
                   )}
                 {/each}
@@ -1899,7 +1911,6 @@
                   <dt>{t("ui.train_hula_operating_pressure_angle")}</dt>
                   <dd>
                     {hres.meshes[m].operating_pressure_angle.toFixed(3)}°
-                    <small>{t("ui.train_hula_note_operating_pressure_angle")}</small>
                   </dd>
                   <dt>{t("ui.train_contact_ratio")}</dt>
                   <dd>
@@ -1908,11 +1919,11 @@
                       <small class="warn">{t("ui.train_note_contact_ratio_below_one")}</small>
                     {/if}
                   </dd>
-                  <dt>{t("ui.train_hula_gap_result")}</dt>
+                  <dt>{t("ui.train_hula_clearance_result")}</dt>
                   <dd>
                     {hres.meshes[m].clearance.toFixed(4)} {t("ui.train_mm")}
                     <small>
-                      {t("ui.train_hula_gap_as_cut", {
+                      {t("ui.train_hula_clearance_as_cut", {
                         value: hres.meshes[m].clearance_as_cut.toFixed(4),
                       })}
                     </small>
@@ -2287,8 +2298,14 @@
     color: var(--muted);
   }
   .out.indent {
-    margin-top: 0.2rem;
     padding-left: 0.9rem;
+  }
+  /* A readout **directly** under its heading hugs it; one further down the
+     section keeps the standard gap. Written as the adjacency it is, rather than
+     folded into `.indent`, which is about the inset and says nothing about what
+     comes above. */
+  h4.mesh + .out {
+    margin-top: 0.2rem;
   }
   .out dt {
     color: var(--muted);
