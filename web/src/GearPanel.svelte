@@ -302,7 +302,14 @@
             <option value={k.key}>{t(k.label)}</option>
           {/each}
         </select>
-        <FieldNote notes={notes(kindNote ? t(kindNote) : null, null)} />
+        <!-- Only where there is one. A note slot is reserved so that a note
+             arriving does not move the controls under it, and what arrives in a
+             field's slot is its complaint about what was typed — which a select
+             cannot have. Two of the three kinds have nothing to say either, so
+             reserving the line for them reserves it for nothing. -->
+        {#if kindNote}
+          <FieldNote notes={notes(t(kindNote), null)} />
+        {/if}
       </label>
     </div>
     <div class="grid">
@@ -426,6 +433,8 @@
         <label>
           <span>{t("ui.gear_cutter_teeth")}</span>
           <input type="number" step="1" min="1" bind:value={tab.cutter.teeth} />
+          <em></em>
+          <FieldNote notes={notes(t("ui.gear_note_cutter_teeth"), null)} />
         </label>
         <label>
           <span>{t("ui.gear_cutter_addendum")}</span>

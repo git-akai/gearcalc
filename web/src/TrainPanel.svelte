@@ -827,13 +827,13 @@
       </label>
       <!-- Offered only here, because it only means something here: a continuous
            drive has no actuation to reverse between. It changes nothing but the
-           cycle count, and the note says how. -->
+           cycle count, and the note says how — whether or not it is on. -->
       {@const act = tab.train.actuation.intermittent}
       {@render switchField(
         "ui.train_reversing",
         act.reversing,
         (v) => (act.reversing = v),
-        act.reversing ? t("ui.train_note_reversing") : null,
+        t("ui.train_note_reversing"),
       )}
     {:else if "continuous" in tab.train.actuation}
       <label>
@@ -859,16 +859,18 @@
          loads every root both ways — but the allowance for it is a fraction on
          an allowable a part is sized against, which this tool asks for rather
          than applies. Off, the stages say where reversal is present and
-         uncorrected. -->
+         uncorrected.
+
+         Its note says what it does whether or not it is on: pressing a button
+         to find out what it does is not an answer, and the slot is reserved
+         either way. -->
     {@render switchField(
       "ui.train_reversed_bending",
       tab.train.reversed_bending,
       (v) => (tab.train.reversed_bending = v),
-      tab.train.reversed_bending
-        ? t("ui.train_note_reversed_bending_on", {
-            coefficient: defaults().reverse_loading_coefficient.toFixed(2),
-          })
-        : null,
+      t("ui.train_note_reversed_bending", {
+        coefficient: defaults().reverse_loading_coefficient.toFixed(2),
+      }),
     )}
   </div>
 
@@ -1563,7 +1565,6 @@
                   <option value="ring">{t("ui.train_ring")}</option>
                 </select>
                 <em></em>
-                <FieldNote notes={notes(null, null)} />
               </label>
               {@render efficiencyToggle(stage.optimisation)}
             </div>
@@ -1574,7 +1575,7 @@
                 <span>{t("ui.train_cutter_teeth")}</span>
                 <input type="number" step="1" min="1" bind:value={stage.cutter.teeth} />
                 <em></em>
-                <FieldNote notes={notes(null, null)} />
+                <FieldNote notes={notes(t("ui.train_note_cutter_teeth"), null)} />
               </label>
               <label>
                 <span>{t("ui.train_cutter_addendum")}</span>
@@ -1808,48 +1809,6 @@
               {@render efficiencyToggle(stage.optimisation)}
             </div>
 
-            {#if hres}
-              <!-- Ordered as the spur and screw readouts are — the distance the
-                   pair runs at, contact, efficiency, backlash — with what only
-                   this arrangement has following on. -->
-              <dl class="out">
-                <dt>{t("ui.train_ratio")}</dt>
-                <dd>
-                  {hres.ratio.toFixed(4)} : 1
-                  <small>{`${t("ui.train_hula_ratio_products", {
-                        numerator: String(hres.ratio_products[0]),
-                        denominator: String(hres.ratio_products[1]),
-                      })} · ${t("ui.train_hula_note_ratio", {
-                        denominator: String(hres.ratio_products[1]),
-                      })}`}</small>
-                </dd>
-                <dt>{t("ui.train_efficiency")}</dt>
-                <dd>
-                  {pct(hres.efficiency.forward)} %
-                  {#if hres.efficiency.backward === 0}
-                    <small class="warn">{t("ui.train_self_locking")}</small>
-                  {/if}
-                  <small>{`${t("ui.train_hula_meshes_alone", {
-                        percent: pct(hres.fixed_carrier_efficiency.forward),
-                      })} · ${t("ui.train_hula_note_circulating")}`}</small>
-                </dd>
-                <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
-                <dd>
-                  {t("ui.train_backlash_at", {
-                    angle: hres.backlash.forward.nominal.toFixed(4),
-                    member: t("ui.train_hula_role_output"),
-                  })}
-                </dd>
-                <dt>{t("ui.train_hula_speeds")}</dt>
-                <dd>
-                  {t("ui.train_hula_speeds_at", {
-                    crank: hres.crank_speed.toFixed(1),
-                    wobble: hres.gears[1].speed.toFixed(3),
-                    output: hres.gears[3].speed.toFixed(4),
-                  })}
-                </dd>
-              </dl>
-            {/if}
 
             {#each [0, 1] as m (m)}
               {@const ring = hres && hres.gears[m * 2].ring ? m * 2 : m * 2 + 1}
@@ -1871,7 +1830,7 @@
                   <span>{t("ui.train_cutter_teeth")}</span>
                   <input type="number" step="1" min="4" bind:value={stage.cutter[m].teeth} />
                   <em></em>
-                  <FieldNote notes={notes(t("ui.train_hula_note_shaper"), null)} />
+                  <FieldNote notes={notes(t("ui.train_note_cutter_teeth"), null)} />
                 </label>
                 <label>
                   <span>{t("ui.train_sliding_friction")}</span>
@@ -1887,6 +1846,35 @@
                   <em></em>
                   <FieldNote notes={notes(t("ui.train_hula_note_split"), null)} />
                 </label>
+              </div>
+              <div class="gears">
+                {#each [ring, pinion] as j (j)}
+                  {@render gearCard(
+                    t(hres && hres.gears[j].ring ? "ui.train_ring" : "ui.train_pinion") +
+                      " — " +
+                      t(
+                        ["ui.train_hula_role_grounded", "ui.train_hula_role_wobble", "ui.train_hula_role_wobble", "ui.train_hula_role_output"][j],
+                      ),
+                    stage.gears[j],
+                    undefined,
+                    {
+                      cut: hres && hres.gears[j].ring ? "shaper" : "rack",
+                      // A shift is an *input* only where it is the member this
+                      // mesh names and is still being read: the other member's
+                      // follows from the crank, and once the split is being
+                      // chosen for efficiency the named one follows too — unless
+                      // it was given, which pins it and leaves the mesh nothing
+                      // to search.
+                      solvedShift:
+                        hres &&
+                        ((stage.given_shift[m] === "ring") !== (hres.gears[j].ring === true) ||
+                          (stage.optimisation.enabled && stage.gears[j].profile_shift.auto))
+                          ? hres.gears[j].profile_shift
+                          : undefined,
+                      faceAuto: false,
+                    },
+                  )}
+                {/each}
               </div>
               {#if hres}
                 <dl class="out indent">
@@ -1938,35 +1926,6 @@
                   </dd>
                 </dl>
               {/if}
-              <div class="gears">
-                {#each [ring, pinion] as j (j)}
-                  {@render gearCard(
-                    t(hres && hres.gears[j].ring ? "ui.train_ring" : "ui.train_pinion") +
-                      " — " +
-                      t(
-                        ["ui.train_hula_role_grounded", "ui.train_hula_role_wobble", "ui.train_hula_role_wobble", "ui.train_hula_role_output"][j],
-                      ),
-                    stage.gears[j],
-                    undefined,
-                    {
-                      cut: hres && hres.gears[j].ring ? "shaper" : "rack",
-                      // A shift is an *input* only where it is the member this
-                      // mesh names and is still being read: the other member's
-                      // follows from the crank, and once the split is being
-                      // chosen for efficiency the named one follows too — unless
-                      // it was given, which pins it and leaves the mesh nothing
-                      // to search.
-                      solvedShift:
-                        hres &&
-                        ((stage.given_shift[m] === "ring") !== (hres.gears[j].ring === true) ||
-                          (stage.optimisation.enabled && stage.gears[j].profile_shift.auto))
-                          ? hres.gears[j].profile_shift
-                          : undefined,
-                      faceAuto: false,
-                    },
-                  )}
-                {/each}
-              </div>
               {#if hres}
                 {@const clamped = [ring, pinion].flatMap((j) =>
                   hres.gears[j].clamps.map((c) => ({ teeth: hres.gears[j].teeth, note: c })),
@@ -1984,6 +1943,51 @@
                 {/if}
               {/if}
             {/each}
+
+            <!-- The drive as a whole, under the meshes it is made of — where every
+                 other stage puts its readout. -->
+            {#if hres}
+              <!-- Ordered as the spur and screw readouts are — the distance the
+                   pair runs at, contact, efficiency, backlash — with what only
+                   this arrangement has following on. -->
+              <dl class="out">
+                <dt>{t("ui.train_ratio")}</dt>
+                <dd>
+                  {hres.ratio.toFixed(4)} : 1
+                  <small>{`${t("ui.train_hula_ratio_products", {
+                        numerator: String(hres.ratio_products[0]),
+                        denominator: String(hres.ratio_products[1]),
+                      })} · ${t("ui.train_hula_note_ratio", {
+                        denominator: String(hres.ratio_products[1]),
+                      })}`}</small>
+                </dd>
+                <dt>{t("ui.train_efficiency")}</dt>
+                <dd>
+                  {pct(hres.efficiency.forward)} %
+                  {#if hres.efficiency.backward === 0}
+                    <small class="warn">{t("ui.train_self_locking")}</small>
+                  {/if}
+                  <small>{`${t("ui.train_hula_meshes_alone", {
+                        percent: pct(hres.fixed_carrier_efficiency.forward),
+                      })} · ${t("ui.train_hula_note_circulating")}`}</small>
+                </dd>
+                <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
+                <dd>
+                  {t("ui.train_backlash_at", {
+                    angle: hres.backlash.forward.nominal.toFixed(4),
+                    member: t("ui.train_hula_role_output"),
+                  })}
+                </dd>
+                <dt>{t("ui.train_hula_speeds")}</dt>
+                <dd>
+                  {t("ui.train_hula_speeds_at", {
+                    crank: hres.crank_speed.toFixed(1),
+                    wobble: hres.gears[1].speed.toFixed(3),
+                    output: hres.gears[3].speed.toFixed(4),
+                  })}
+                </dd>
+              </dl>
+            {/if}
 
             <button
               class="danger small"
@@ -2101,7 +2105,12 @@
   .grid.shared {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    /* The gap *between* fields, which is the one a note is paired against: at
+       0.4rem a note sat nearly as far from its own box as from the next field,
+       which is the reading `--note-gap`/`--field-gap` exist to prevent. The
+       gear cards below this column and the whole gear tab were already using
+       it. */
+    gap: var(--field-gap);
     max-width: 34rem;
   }
   /* The boxes sit further right than a gear card's, toward the middle of the
@@ -2183,7 +2192,7 @@
     display: grid;
     grid-template-columns: 1fr auto 3.5rem;
     align-items: center;
-    gap: 0.4rem;
+    gap: var(--row-gap);
     font-size: 0.85rem;
   }
   .mode > span {
