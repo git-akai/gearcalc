@@ -38,6 +38,7 @@ export type { LoadSharing } from "./core/LoadSharing";
 export type { Material } from "./core/Material";
 export type { MaterialLibrary } from "./core/MaterialLibrary";
 export type { Measure } from "./core/Measure";
+export type { Member } from "./core/Member";
 export type { MeshReport } from "./core/MeshReport";
 export type { Note } from "./core/Note";
 export type { Offset } from "./core/Offset";

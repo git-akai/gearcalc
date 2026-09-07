@@ -40,8 +40,8 @@ pub use planetary::{
     solve_planetary_stage, solve_planetary_stage_with, MeshReport, PlanetResult, PlanetaryResult,
     PlanetaryStage,
 };
-pub(crate) use spur::ShiftAsked;
 pub use spur::{solve_spur_stage, solve_spur_stage_with, SpurStage, StageGear};
+pub(crate) use spur::{undercut_bound, Decided, ShiftAsked};
 pub use worm::{
     solve_crossed_stage, solve_worm_stage, FirstMemberSizing, WormContact, WormMember,
     WormMemberResult, WormResult, WormStage,

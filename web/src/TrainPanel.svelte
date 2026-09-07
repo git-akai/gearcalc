@@ -11,6 +11,7 @@
     type StageGear,
     type SpurStage,
     type Stage,
+    type PlanetaryStage,
     type Optimisation,
     type Value,
     type GearResult,
@@ -38,6 +39,15 @@
       stage.gears.length,
       just,
     );
+  }
+
+  /** **An epicyclic set has two shifts to give, not three.** Its two centre
+   *  distances have to agree, which is one relation among the three — so two
+   *  are a design and the third is whatever they leave. Pinning all three
+   *  over-specifies it, and the one furthest from what was just touched returns
+   *  to automatic to absorb the relation again. */
+  function relievePlanetary(stage: PlanetaryStage, just: Auto<number>) {
+    relieve([stage.sun, stage.planet, stage.ring].map((g) => g.profile_shift), 2, just);
   }
 
   /** **A hula mesh has one shift to give, not two.** The crank offset fixes the
@@ -1690,18 +1700,34 @@
               {/if}
             {/snippet}
 
+            <!-- **One of the three shifts closes the set**, and which one is
+                 read off the toggles rather than named by a control of its own:
+                 the member left automatic absorbs, and the planet is preferred
+                 because it is the one in both meshes. So pinning the planet is
+                 how a designer asks for the sun to close it instead. The
+                 absorbed member is offered no shift control at all — there is
+                 nothing to decide — which is what `shiftAbsorbed` says. -->
             <div class="gears">
-              {@render gearCard(t("ui.train_sun"), stage.sun, pres?.sun, { cut: "rack" })}
+              {@render gearCard(t("ui.train_sun"), stage.sun, pres?.sun, {
+                cut: "rack",
+                shiftAbsorbed: (pres?.absorber ?? "planet") === "sun",
+                onShiftAuto: () => relievePlanetary(stage, stage.sun.profile_shift),
+              })}
               {@render gearCard(t("ui.train_planet"), stage.planet, pres?.planet.gear, {
                 cut: "rack",
                 solvedShift: pres?.planet.profile_shift,
-                shiftAbsorbed: true,
+                shiftAbsorbed: (pres?.absorber ?? "planet") === "planet",
+                onShiftAuto: () => relievePlanetary(stage, stage.planet.profile_shift),
                 extra: planetExtra,
               })}
               <!-- A ring's root and fillet are its cutter's, so it has neither a
                    dedendum nor a root radius of its own (docs/reference.md#internal-gears); the tool
                    is a stage input, above. -->
-              {@render gearCard(t("ui.train_ring"), stage.ring, pres?.ring, { cut: "shaper" })}
+              {@render gearCard(t("ui.train_ring"), stage.ring, pres?.ring, {
+                cut: "shaper",
+                shiftAbsorbed: (pres?.absorber ?? "planet") === "ring",
+                onShiftAuto: () => relievePlanetary(stage, stage.ring.profile_shift),
+              })}
             </div>
 
             {#if pres}

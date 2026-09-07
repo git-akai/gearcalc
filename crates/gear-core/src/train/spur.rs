@@ -152,6 +152,55 @@ pub(crate) struct ShiftAsked {
     pub raised: bool,
 }
 
+/// **How a member's shift came to be**, which is what decides the undercut
+/// bound it answers to.
+///
+/// Three ways, and they want three different answers to the same question —
+/// which is why this is a type rather than a boolean about whether a shift was
+/// typed. See [`undercut_bound`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Decided {
+    /// A designer typed it. Already held to its own bound when it was read.
+    Given,
+    /// A search is choosing it, and may pick any admissible value.
+    Chosen,
+    /// A relation left it — the planet's shift closing an epicyclic set's two
+    /// centre distances, say. Nothing is free to move it.
+    Absorbed,
+}
+
+/// **The undercut bound a member answers to**, or `None` where it answers to
+/// none.
+///
+/// One question, three answers, and each of them is the honest one for how the
+/// number arrived:
+///
+/// | how | bound | why |
+/// |---|---|---|
+/// | [`Decided::Chosen`] | `max(x_min, 0)` | a chooser should not thin a tooth that needed no help |
+/// | [`Decided::Given`] | none | it was held to `x_min` when it was read; re-judging it here rejects legal designs |
+/// | [`Decided::Absorbed`] | `x_min` | nothing can move it, so the only honest question is whether it *does* undercut |
+///
+/// The middle row is a bug this had twice: a search that re-judges a number it
+/// was handed throws away every candidate built on a perfectly legal one. The
+/// last row is the same mistake wearing different clothes — an absorbed shift
+/// clamped to a chooser's floor would break the relation that produced it.
+pub(crate) fn undercut_bound(
+    no_undercut: bool,
+    p: &crate::params::GearParams,
+    depth: f64,
+    how: Decided,
+) -> Option<f64> {
+    if !no_undercut {
+        return None;
+    }
+    match how {
+        Decided::Chosen => Some(automatic_profile_shift(p, depth)),
+        Decided::Given => None,
+        Decided::Absorbed => Some(crate::auto::minimum_profile_shift(p, depth).with_cutter_radius),
+    }
+}
+
 impl ShiftAsked {
     /// **The note a raised shift owes its reader.**
     ///

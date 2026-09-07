@@ -5,9 +5,10 @@
  */
 export type Layout = { 
 /**
- * The planet thickness shift that makes the two centre distances agree.
+ * The three thickness shifts as the set actually runs, sun, planet, ring —
+ * [`Set::shift`] with the absorber's entry filled in by the solve.
  */
-planet_shift: number, 
+shift: [number, number, number], 
 /**
  * The common centre distance, mm — sun-to-planet and planet-to-ring, which
  * are now the same number.

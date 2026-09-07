@@ -86,8 +86,9 @@ impl Teeth {
     ts(export, export_to = "core/")
 )]
 pub struct Layout {
-    /// The planet thickness shift that makes the two centre distances agree.
-    pub planet_shift: f64,
+    /// The three thickness shifts as the set actually runs, sun, planet, ring —
+    /// [`Set::shift`] with the absorber's entry filled in by the solve.
+    pub shift: [f64; 3],
     /// The common centre distance, mm — sun-to-planet and planet-to-ring, which
     /// are now the same number.
     pub centre_distance: f64,
@@ -127,14 +128,44 @@ pub struct Set {
     pub teeth: Teeth,
     /// How many planets. One is legal — it has no neighbour to clear.
     pub planets: u32,
-    /// Thickness shift of the sun, `x + x_s`.
-    pub sun_shift: f64,
-    /// ...and of the ring, acting on its **space** (see [`crate::ring::Ring`]).
-    pub ring_shift: f64,
+    /// Thickness shifts, `x + x_s`, in the order sun, planet, ring — the ring's
+    /// acting on its **space** (see [`crate::ring::Ring`]).
+    ///
+    /// The [`Self::absorber`]'s entry is not read: it is what the solve is for.
+    pub shift: [f64; 3],
+    /// **Which shift closes the set.**
+    ///
+    /// The two centre distances have to agree, and that is one equation among
+    /// three shifts — so two are a design and the third is whatever they leave.
+    /// Which one that is belongs to the caller, not here.
+    pub absorber: Member,
     /// The planet's tip diameter, mm — needed only for planet-to-planet
     /// clearance, which is the one check that cares how big a planet is rather
     /// than how many teeth it has.
     pub planet_tip_diameter: f64,
+}
+
+/// One of the three members, and so one of [`Set::shift`]'s entries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum Member {
+    Sun = 0,
+    Planet = 1,
+    Ring = 2,
+}
+
+impl Member {
+    /// Its place in [`Set::shift`].
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self as usize
+    }
 }
 
 /// The shifts a planet could have, from the involute domain alone.
@@ -153,11 +184,11 @@ pub struct Set {
 pub fn shift_bracket(set: &Set) -> Option<(f64, f64)> {
     let (sum_ext, sum_int) = set.teeth.sums();
     let reach = crate::inv(set.rack.alpha_t) / (2.0 * set.rack.alpha_n.tan());
-    let lo = -reach * sum_ext - set.sun_shift;
+    let lo = -reach * sum_ext - set.shift[Member::Sun.index()];
     // `sum_int` is negative, so this is the *upper* bound; writing it with the
     // signed sum keeps it the same expression as the line above rather than a
     // mirrored one.
-    let hi = set.ring_shift - reach * sum_int;
+    let hi = set.shift[Member::Ring.index()] - reach * sum_int;
     (lo.is_finite() && hi.is_finite() && hi > lo).then_some((lo, hi))
 }
 
@@ -200,23 +231,39 @@ fn pull_in(g: &impl Fn(f64) -> f64, from: f64, toward: f64) -> Option<f64> {
     None
 }
 
-/// Solve for the planet shift that makes the two centre distances equal.
+/// Solve for the shift that makes the two centre distances equal.
+///
+/// # Two of the three are a design and the third is what they leave
+///
+/// One equation, three shifts. Which one closes it is [`Set::absorber`]'s, and
+/// the three cases are not equally hard — which is the whole reason to say so
+/// rather than to solve them all the same way. The planet is in **both**
+/// meshes, so its shift moves both centre distances at once and the residual
+/// has to be driven to zero numerically. The sun is in one mesh only, and so is
+/// the ring: fix the other two shifts and the mesh the absorber is *not* in
+/// gives the distance outright, leaving the absorber's own mesh a shift sum to
+/// hit at a known distance. That is [`crate::mesh::shift_sum_for`] — the same
+/// relation a spur pair reads a given centre distance through, and a closed
+/// form rather than an iteration.
 ///
 /// # Errors
 ///
-/// `None` when no planet shift can serve — either the involute domain admits
-/// none ([`shift_bracket`]), or the residual does not change sign across it,
-/// which for a strictly increasing `g` means the root lies outside the domain.
-/// A tooth count that cannot work is the common case, not an exceptional one:
+/// `None` when no such shift serves — either the involute domain admits none
+/// ([`shift_bracket`]), or the residual does not change sign across it, which
+/// for a strictly increasing `g` means the root lies outside the domain. A
+/// tooth count that cannot work is the common case, not an exceptional one:
 /// most `z_ring` values fail here.
 #[must_use]
 pub fn solve(set: &Set) -> Option<Layout> {
     let (rack, teeth, planets) = (&set.rack, set.teeth, set.planets);
-    let (sun_shift, ring_shift) = (set.sun_shift, set.ring_shift);
     let (sum_ext, sum_int) = teeth.sums();
     if teeth.ring <= teeth.planet || teeth.planet == 0 || teeth.sun == 0 {
         return None;
     }
+    let (sun_shift, ring_shift) = (
+        set.shift[Member::Sun.index()],
+        set.shift[Member::Ring.index()],
+    );
 
     // The two centre distances, each as a function of the planet's shift.
     let ext = |x_p: f64| {
@@ -253,21 +300,49 @@ pub fn solve(set: &Set) -> Option<Layout> {
         _ => f64::NAN,
     };
 
-    let (lo, hi) = shift_bracket(set)?;
-    // The endpoints are on the domain boundary, so bring each just inside before
-    // handing them over — see `pull_in`.
-    let mid = 0.5 * (lo + hi);
-    if !g(mid).is_finite() {
-        return None;
-    }
-    let (lo, hi) = (pull_in(&g, lo, mid)?, pull_in(&g, hi, mid)?);
-    // Newton from zero shift, which is where the answer sits for the ideal ring
-    // and near it for its neighbours; the maintained bracket makes the seed a
-    // convenience rather than a requirement.
-    let x_p = newton_bracketed(g, dg, lo, hi, 0.0_f64.clamp(lo, hi), Tol::default())?;
+    // The absorber, and with it the three shifts the set actually runs at.
+    let sum_x_for = |sum_z: f64, a_w: f64| {
+        crate::mesh::shift_sum_for(rack.mt, rack.alpha_t, rack.alpha_n, sum_z, a_w)
+    };
+    let shift: [f64; 3] = match set.absorber {
+        Member::Planet => {
+            let (lo, hi) = shift_bracket(set)?;
+            // The endpoints are on the domain boundary, so bring each just
+            // inside before handing them over — see `pull_in`.
+            let mid = 0.5 * (lo + hi);
+            if !g(mid).is_finite() {
+                return None;
+            }
+            let (lo, hi) = (pull_in(&g, lo, mid)?, pull_in(&g, hi, mid)?);
+            // Newton from zero shift, which is where the answer sits for the
+            // ideal ring and near it for its neighbours; the maintained bracket
+            // makes the seed a convenience rather than a requirement.
+            let x_p = newton_bracketed(g, dg, lo, hi, 0.0_f64.clamp(lo, hi), Tol::default())?;
+            [sun_shift, x_p, ring_shift]
+        }
+        // The planet's shift is given, so the mesh the absorber is not in fixes
+        // the distance and its own mesh has a shift sum to reach at it.
+        Member::Sun => {
+            let x_p = set.shift[Member::Planet.index()];
+            let (_, _, a_i) = int(x_p)?;
+            [sum_x_for(sum_ext, a_i)? - x_p, x_p, ring_shift]
+        }
+        Member::Ring => {
+            let x_p = set.shift[Member::Planet.index()];
+            let (_, _, a_e) = ext(x_p)?;
+            [sun_shift, x_p, x_p - sum_x_for(sum_int, a_e)?]
+        }
+    };
 
-    let (alpha_w_sun, _, a_e) = ext(x_p)?;
-    let (alpha_w_ring, _, a_i) = int(x_p)?;
+    // **Read back from the three shifts, whichever one was solved.** The two
+    // distances are computed again rather than carried out of the branch above,
+    // so `residual` measures the answer that is being returned rather than an
+    // intermediate the branch happened to hold.
+    let (x_s, x_p, x_r) = (shift[0], shift[1], shift[2]);
+    let (alpha_w_sun, _, a_e) =
+        operating_geometry(rack.mt, rack.alpha_t, rack.alpha_n, sum_ext, x_s + x_p)?;
+    let (alpha_w_ring, _, a_i) =
+        operating_geometry(rack.mt, rack.alpha_t, rack.alpha_n, sum_int, x_p - x_r)?;
 
     let equal_spacing = planets > 0 && (teeth.sun + teeth.ring) % planets == 0;
     let simultaneous_meshing = planets > 0 && teeth.sun % planets == 0 && teeth.ring % planets == 0;
@@ -276,7 +351,7 @@ pub fn solve(set: &Set) -> Option<Layout> {
     });
 
     Some(Layout {
-        planet_shift: x_p,
+        shift,
         centre_distance: a_e,
         alpha_w_sun,
         alpha_w_ring,
@@ -301,20 +376,26 @@ pub fn solve(set: &Set) -> Option<Layout> {
 pub fn ring_candidates(set: &Set, shift_range: (f64, f64), limit: u32) -> Vec<(u32, Layout)> {
     let mut out = Vec::new();
     // `set.teeth.ring` is the one field this ignores: it is what the sweep varies.
+    // **The planet absorbs here whatever the caller's own set does**, because
+    // the completeness argument above is about the planet's shift rising with
+    // the ring's count. Sweeping a set whose sun or ring closes it would be
+    // sweeping the very shift the sweep varies against.
     for ring in (set.teeth.planet + 1)..=limit {
         let candidate = Set {
             teeth: Teeth { ring, ..set.teeth },
+            absorber: Member::Planet,
             ..*set
         };
         let Some(layout) = solve(&candidate) else {
             continue;
         };
-        if layout.planet_shift < shift_range.0 {
+        let needed = layout.shift[Member::Planet.index()];
+        if needed < shift_range.0 {
             continue;
         }
         // Monotone in `z_ring`, so once the required shift passes the top of the
         // range every larger ring does too.
-        if layout.planet_shift > shift_range.1 {
+        if needed > shift_range.1 {
             break;
         }
         out.push((ring, layout));
@@ -1017,8 +1098,8 @@ mod tests {
             rack: rack(),
             teeth: Teeth { sun, planet, ring },
             planets: 3,
-            sun_shift: 0.0,
-            ring_shift: 0.0,
+            shift: [0.0; 3],
+            absorber: Member::Planet,
             planet_tip_diameter: 0.0,
         }
     }
@@ -1037,9 +1118,9 @@ mod tests {
             let ring = Teeth::ideal_ring(sun, planet);
             let l = solve_at(sun, planet, ring).unwrap();
             assert!(
-                l.planet_shift.abs() < 1e-12,
+                l.shift[Member::Planet.index()].abs() < 1e-12,
                 "z={sun}/{planet}/{ring}: shift {} should be zero",
-                l.planet_shift
+                l.shift[Member::Planet.index()]
             );
             // ...and the common centre distance is then the reference one.
             let a_ref = rack().mt * f64::from(sun + planet) / 2.0;
@@ -1109,11 +1190,11 @@ mod tests {
         for ring in 40..=70 {
             if let Some(l) = solve_at(17, 17, ring) {
                 assert!(
-                    l.planet_shift > last,
+                    l.shift[Member::Planet.index()] > last,
                     "z_r={ring}: {} is not above {last}",
-                    l.planet_shift
+                    l.shift[Member::Planet.index()]
                 );
-                last = l.planet_shift;
+                last = l.shift[Member::Planet.index()];
                 seen += 1;
             }
         }
@@ -1181,9 +1262,9 @@ mod tests {
         ] {
             let l = solve_at(17, 17, ring).unwrap();
             assert!(
-                (l.planet_shift - want).abs() < 5e-5,
+                (l.shift[Member::Planet.index()] - want).abs() < 5e-5,
                 "z_r={ring}: {} vs {want}",
-                l.planet_shift
+                l.shift[Member::Planet.index()]
             );
         }
     }
@@ -1244,7 +1325,7 @@ mod tests {
         // sweep stops there rather than sampling on.
         assert_eq!(counts, vec![51, 52, 53], "got {counts:?}");
         for (_, l) in &found {
-            assert!((0.0..=0.5).contains(&l.planet_shift));
+            assert!((0.0..=0.5).contains(&l.shift[Member::Planet.index()]));
             assert!(l.residual < 1e-12);
         }
 
@@ -1264,25 +1345,25 @@ mod tests {
     /// planet has to take up the difference, and only the difference reaches it.
     #[test]
     fn sun_and_ring_shifts_move_the_planet_the_way_they_should() {
-        let base = solve_at(17, 17, 52).unwrap().planet_shift;
+        let base = solve_at(17, 17, 52).unwrap().shift[Member::Planet.index()];
 
         // A more positive sun already widens the external mesh, so the planet
         // needs less of its own shift...
         let sunny = solve(&Set {
-            sun_shift: 0.2,
+            shift: [0.2, 0.0, 0.0],
             ..set_of(17, 17, 52)
         })
         .unwrap()
-        .planet_shift;
+        .shift[Member::Planet.index()];
         assert!(sunny < base, "{sunny} should be below {base}");
 
         // ...and a more positive ring widens its space, which the planet follows.
         let ringy = solve(&Set {
-            ring_shift: 0.2,
+            shift: [0.0, 0.0, 0.2],
             ..set_of(17, 17, 52)
         })
         .unwrap()
-        .planet_shift;
+        .shift[Member::Planet.index()];
         assert!(ringy > base, "{ringy} should be above {base}");
     }
 }

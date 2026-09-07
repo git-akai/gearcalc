@@ -3,6 +3,7 @@ import type { Arrangement } from "./Arrangement";
 import type { Backlash } from "./Backlash";
 import type { Directional } from "./Directional";
 import type { GearResult } from "./GearResult";
+import type { Member } from "./Member";
 import type { MeshReport } from "./MeshReport";
 import type { Note } from "./Note";
 import type { PlanetResult } from "./PlanetResult";
@@ -80,6 +81,15 @@ sun_coprime_with_planets: boolean, ring_coprime_with_planets: boolean, sun: Gear
  * tooth cycles, and the stage's inputs are not in reach by then.
  */
 planets: number, 
+/**
+ * **Which member's shift closed the set** — see
+ * [`PlanetaryStage::absorber`].
+ *
+ * Reported rather than left to be worked out, for the same reason
+ * [`super::SpurResult::clearance`] is: the panel greys the right control by
+ * reading the answer instead of knowing the rule a second time.
+ */
+absorber: Member, 
 /**
  * Anything the stage had to say — including what it did not model.
  */

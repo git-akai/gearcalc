@@ -1888,8 +1888,10 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
             ring: 0,
         },
         planets,
-        sun_shift,
-        ring_shift,
+        // The ring search is the planet's: its completeness rests on the
+        // planet's shift rising with the ring's count.
+        shift: [sun_shift, 0.0, ring_shift],
+        absorber: gear_core::planetary::Member::Planet,
         // A planet's tip diameter at a standard addendum, which is what the
         // clearance column is measured against.
         planet_tip_diameter: module * (f64::from(planet) + 2.0),
@@ -1926,7 +1928,7 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
             .map_or_else(|| "     n/a".to_string(), |c| format!("{c:8.3}"));
         println!(
             "{ring:>6} {:>10.4} {:>12.6} {:>10.1e} {:>9.3} {:>7} {:>7} {clearance:>11}",
-            l.planet_shift,
+            l.shift[gear_core::planetary::Member::Planet.index()],
             l.centre_distance,
             l.residual,
             l.alpha_w_sun.to_degrees(),

@@ -483,8 +483,18 @@ undercut. They combine rather than compete:
 Only shifts left automatic are the optimiser's to move; a given one constrains
 it, as a given centre distance does.
 
-**The bound is not one number, and that is not an inconsistency.** Choosing a
-shift and checking a given one want different answers to the same question. The
+**The bound is not one number, and that is not an inconsistency.** There are
+three ways a shift arrives and each earns a different answer to the same
+question (`train::undercut_bound`):
+
+| how it arrived | bound | why |
+|---|---|---|
+| a search chose it | `max(x_min, 0)` | a chooser should not thin a tooth that needed no help |
+| a designer gave it | none | it was held to `x_min` when it was read; re-judging it here rejects legal designs |
+| a relation left it | `x_min` | nothing can move it, so the only honest question is whether it *does* undercut |
+
+Choosing a shift and checking a given one want different answers to the same
+question. The
 true minimum is negative on any comfortable tooth count — −1.76 at `z = 43` —
 so applying it to a *chooser* would thin a tooth that needed no help, for
 nothing; a search is therefore floored at `max(x_min, 0)`, which is the
@@ -1075,6 +1085,33 @@ x_p ≤  x_r + inv(α_t)(z_r − z_p)/(2 tan α_n)          internal
 
 Required planet shift is **strictly increasing in `z_ring`**, which is what makes
 the ring search provably complete, and `z_r = z_s + 2z_p` gives exactly zero.
+
+**Which of the three shifts closes the set is a choice, and only one of the
+three is hard.** The equality above is one relation among `x_s`, `x_p` and
+`x_r`: two are a design and the third is whatever they leave. The planet is in
+*both* meshes, so its shift moves both distances at once and the residual has to
+be driven to zero numerically — the Newton solve above. The sun is in one mesh
+only, and so is the ring: fix the other two and the mesh the absorber is **not**
+in gives the distance outright, leaving its own mesh a shift sum to reach at a
+known distance. That is `mesh::shift_sum_for`, the same relation a spur pair
+reads a given centre distance through, and a closed form rather than an
+iteration.
+
+Which member absorbs is read off the shift toggles rather than named by a
+control of its own: **the member left automatic absorbs, and the planet is
+preferred**, because it is the one no single mesh's operating angle is a
+statement about and the one this tool has always used. Pinning the planet is
+therefore how a designer asks the sun to close it instead — the same indirection
+by which pinning one of an eccentric drive's two members names the other as the
+one the crank supplies. Pinning all three over-specifies the set; the planet
+gives way, and the front end relieves it as it is created.
+
+An absorbed shift is **checked, not bounded** — nothing is free to move it, so
+the only honest question is whether it actually undercuts, and the bound it
+answers to is `x_min` rather than a chooser's `max(x_min, 0)`
+([`train::undercut_bound`](#efficiency-parallel-axes)). The ring search keeps the
+planet as its absorber whatever the set does, because its completeness argument
+is about the planet's shift rising with the ring's count.
 
 **Layout checks**, all closed form: equal spacing needs `(z_s + z_r) mod N = 0`;
 simultaneous meshing needs `N | z_s` and `N | z_r`; planet clearance is

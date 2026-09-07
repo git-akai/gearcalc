@@ -184,7 +184,10 @@ their circles cross, which is what decides a small tooth difference — and a
 bending rating.
 Verified by simulating the cut — 2.5–2.7 µm across shifts −0.4 … +0.5.
 
-**Planetary sets.** The planet shift that makes the two centre distances agree,
+**Planetary sets.** The shift that makes the two centre distances agree — the
+planet's by default, and the sun's or the ring's where the planet is pinned,
+which is one relation among three shifts and so two of them a design; the sun
+and ring cases are closed form where the planet's needs a solve,
 the ring search, layout checks, Willis kinematics, Pennestrì–Freudenstein
 efficiency in all six arrangements, and backlash referred to the output shaft.
 

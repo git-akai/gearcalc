@@ -260,6 +260,13 @@ pub struct PlanetaryResult {
     /// How many planets the set has — kept because the train needs it to count
     /// tooth cycles, and the stage's inputs are not in reach by then.
     pub planets: u32,
+    /// **Which member's shift closed the set** — see
+    /// [`PlanetaryStage::absorber`].
+    ///
+    /// Reported rather than left to be worked out, for the same reason
+    /// [`super::SpurResult::clearance`] is: the panel greys the right control by
+    /// reading the answer instead of knowing the rule a second time.
+    pub absorber: crate::planetary::Member,
     /// Anything the stage had to say — including what it did not model.
     pub notes: Vec<Note>,
 }
@@ -367,32 +374,34 @@ pub(super) struct Built {
 
 impl PlanetaryStage {
     /// [`Built`] at the two given shifts, or why the set has no geometry there.
-    pub(super) fn built(&self, shifts: [f64; 2]) -> Result<Built, TrainError> {
+    pub(super) fn built(&self, shifts: [f64; 3]) -> Result<Built, TrainError> {
         let stage = self;
         let teeth = stage.teeth();
         let rack = stage.rack();
-        let [sun_shift, ring_shift] = shifts;
 
         // Thickness shifts, since only `x + x_s` reaches the answer (docs/reference.md#tooth-thickness-and-its-equivalent-shift).
-        let thickness = |shift: f64, member: PlanetaryShaft| -> f64 {
-            shift + stage.params(member, 1, shift, 1.0).thickness_shift()
+        let member_of = |i: usize| match i {
+            0 => PlanetaryShaft::Sun,
+            1 => PlanetaryShaft::Carrier,
+            _ => PlanetaryShaft::Ring,
         };
+        let modification = |i: usize| stage.params(member_of(i), 1, 0.0, 1.0).thickness_shift();
         let set = crate::planetary::Set {
             rack,
             teeth,
             planets: stage.planets,
-            sun_shift: thickness(sun_shift, PlanetaryShaft::Sun),
-            ring_shift: thickness(ring_shift, PlanetaryShaft::Ring),
+            shift: std::array::from_fn(|i| shifts[i] + modification(i)),
+            absorber: stage.absorber(),
             // Filled once the planet exists; clearance only reads it.
             planet_tip_diameter: 0.0,
         };
         let layout = crate::planetary::solve(&set).ok_or(TrainError::NoContact)?;
-        // The solve works in thickness shifts, so take the thickness modification
-        // back out to get the planet's profile shift proper.
-        let planet_shift = layout.planet_shift
-            - stage
-                .params(PlanetaryShaft::Carrier, 1, 0.0, 1.0)
-                .thickness_shift();
+        // The solve works in thickness shifts, so take the modification back out
+        // to get each member's profile shift proper. Only the absorber's has
+        // actually moved, but taking it out of all three is the same expression
+        // as putting it in and cannot drift from it.
+        let solved: [f64; 3] = std::array::from_fn(|i| layout.shift[i] - modification(i));
+        let [sun_shift, planet_shift, ring_shift] = solved;
 
         let addendum_of = |member: PlanetaryShaft, g: &StageGear, teeth: u32, shift: f64| -> f64 {
             let with_shift = stage.params(member, teeth, shift, g.addendum.manual);
@@ -467,34 +476,84 @@ impl PlanetaryStage {
     /// Unlike a pair, these two are not free of each other: the planet's shift
     /// absorbs whatever they ask for, and where it cannot the set has no
     /// geometry and the point is simply not admissible.
-    pub(super) fn shifts(&self) -> [f64; 2] {
+    /// **Which member's shift closes the set**, from the toggles rather than
+    /// from a control of its own.
+    ///
+    /// The two centre distances have to agree, which is one relation among
+    /// three shifts: two are a design and the third is what they leave. The
+    /// member that absorbs it is one left automatic, and the planet is
+    /// preferred because it is the member in *both* meshes — the one whose
+    /// shift no single mesh's operating angle is a statement about, and the one
+    /// this stage has always used. Pinning the planet is therefore how a
+    /// designer asks for the sun to close it instead, exactly as pinning one of
+    /// an eccentric drive's two members names the other as the one the crank
+    /// supplies.
+    ///
+    /// With all three given the set is over-specified and something has to give
+    /// way; the planet does, and the front end relieves the over-specification
+    /// as it is created so this is the transient rather than the design.
+    #[must_use]
+    pub fn absorber(&self) -> crate::planetary::Member {
+        use crate::planetary::Member;
+        if self.planet.profile_shift.auto {
+            Member::Planet
+        } else if self.sun.profile_shift.auto {
+            Member::Sun
+        } else if self.ring.profile_shift.auto {
+            Member::Ring
+        } else {
+            Member::Planet
+        }
+    }
+
+    /// What each member asks of its shift, in the solve's order.
+    fn asked(&self) -> [super::ShiftAsked; 3] {
         let sun_base = self.params(
             PlanetaryShaft::Sun,
-            self.teeth().sun,
+            self.sun.teeth,
             0.0,
             self.sun.addendum.manual,
         );
-        let sun_asked = self.sun.shift_asked(&sun_base);
-        // **A ring is never asked about undercut** — its flank is its shaper's
-        // rather than a rack's — so its shift is given or it is the set's to
-        // choose, and nothing floors it either way.
-        let ring_asked = super::ShiftAsked {
-            search_floor: None,
-            given: (!self.ring.profile_shift.auto).then_some(self.ring.profile_shift.manual),
-            settled: if self.ring.profile_shift.auto {
-                0.0
-            } else {
-                self.ring.profile_shift.manual
+        let planet_base = self.params(
+            PlanetaryShaft::Carrier,
+            self.planet.teeth,
+            0.0,
+            self.planet.addendum.manual,
+        );
+        [
+            self.sun.shift_asked(&sun_base),
+            self.planet.shift_asked(&planet_base),
+            // **A ring is never asked about undercut** — its flank is its
+            // shaper's rather than a rack's — so its shift is given or it is
+            // the set's to choose, and nothing floors it either way.
+            super::ShiftAsked {
+                search_floor: None,
+                given: (!self.ring.profile_shift.auto).then_some(self.ring.profile_shift.manual),
+                settled: if self.ring.profile_shift.auto {
+                    0.0
+                } else {
+                    self.ring.profile_shift.manual
+                },
+                raised: false,
             },
-            raised: false,
-        };
-        let plain = [sun_asked.settled, ring_asked.settled];
+        ]
+    }
+
+    pub(super) fn shifts(&self) -> [f64; 3] {
+        let asked = self.asked();
+        let absorbed = self.absorber().index();
+        let plain: [f64; 3] = std::array::from_fn(|i| asked[i].settled);
         if !self.optimisation.enabled {
             return plain;
         }
-        let given = [sun_asked.given, ring_asked.given];
+        // **The absorber is not searched**: its shift is what the other two
+        // leave, so it is neither given nor free and the search never places a
+        // number in it. What it settles at comes back out of `built`, which is
+        // where the equality is closed.
+        let given: [Option<f64>; 3] =
+            std::array::from_fn(|i| (i == absorbed).then_some(plain[i]).or(asked[i].given));
         let freedoms = crate::auto::Freedoms::new(given);
-        let eta0 = |x: [f64; 2]| -> Option<f64> {
+        let eta0 = |x: [f64; 3]| -> Option<f64> {
             let b = self.built(x).ok()?;
             // **The sun and the planet both have to be cuttable**, and the
             // planet especially: its shift is not chosen but absorbed, so a sun
@@ -502,13 +561,32 @@ impl PlanetaryStage {
             // the combination this has to refuse. The ring is not asked — its
             // root is its shaper's — and the set's own internal bounds are the
             // interference flags the mesh reports.
-            // The planet's shift is absorbed rather than chosen, so its own
-            // bound is the one its own control asks for.
+            // **Each member answers to the bound its own arrival earns it** —
+            // chosen, given, or absorbed (`train::undercut_bound`). The absorber
+            // is the interesting one: nothing can move it, so the only honest
+            // question is whether it actually undercuts.
+            let how = |i: usize| {
+                if i == absorbed {
+                    super::Decided::Absorbed
+                } else if asked[i].given.is_some() {
+                    super::Decided::Given
+                } else {
+                    super::Decided::Chosen
+                }
+            };
             let floors = [
-                sun_asked.search_floor,
-                self.planet.no_undercut.then(|| {
-                    crate::auto::automatic_profile_shift(&b.planet.params, self.planet.dedendum)
-                }),
+                super::undercut_bound(
+                    self.sun.no_undercut,
+                    &b.sun.params,
+                    self.sun.dedendum,
+                    how(0),
+                ),
+                super::undercut_bound(
+                    self.planet.no_undercut,
+                    &b.planet.params,
+                    self.planet.dedendum,
+                    how(1),
+                ),
             ];
             if !crate::auto::member_is_buildable(&b.sun, floors[0])
                 || !crate::auto::member_is_buildable(&b.planet, floors[1])
@@ -1047,6 +1125,7 @@ pub fn solve_planetary_stage_with(
     let planet_relative = forward.speeds[0] - forward.speeds[1];
 
     Ok(PlanetaryResult {
+        absorber: stage.absorber(),
         arrangement: stage.arrangement,
         output: forward.output,
         ratio: forward.ratio,
@@ -1277,6 +1356,100 @@ mod tests {
 
     /// The classical ratios, through the whole stage rather than the bare
     /// algebra — so a wiring error between them would show.
+    /// **Any one of the three shifts can close the set**, and the other two are
+    /// then exactly what was asked for.
+    ///
+    /// The relation is that the two centre distances agree, so whichever member
+    /// absorbs it, the answer has to satisfy the same equality — which is what
+    /// `residual` reports and what this checks rather than checking the wiring.
+    /// The two that did not absorb must come back untouched, since a shift a
+    /// designer gave is not the solve's to move.
+    #[test]
+    fn whichever_shift_is_left_automatic_is_the_one_that_closes_the_set() {
+        use crate::planetary::Member;
+        let lib = test_library();
+        let base = PlanetaryStage::default();
+        // The shifts the default set settles at, so each variant below asks for
+        // values a set of these counts can actually be built at.
+        let settled = base.shifts();
+
+        for absorber in [Member::Sun, Member::Planet, Member::Ring] {
+            let mut s = PlanetaryStage::default();
+            // Pin every member but the one meant to absorb.
+            for (i, gear) in [&mut s.sun, &mut s.planet, &mut s.ring]
+                .into_iter()
+                .enumerate()
+            {
+                gear.profile_shift = if i == absorber.index() {
+                    Auto::automatic(0.0)
+                } else {
+                    Auto::fixed(settled[i])
+                };
+            }
+            assert_eq!(
+                s.absorber(),
+                absorber,
+                "the member left automatic should be the one that absorbs"
+            );
+            let r = solve_planetary_stage(&s, 100.0, StageTorques::just(2.0), &lib)
+                .unwrap_or_else(|e| panic!("{absorber:?} could not close the set: {e:?}"));
+            assert_eq!(r.absorber, absorber, "and the result should say which did");
+
+            // The equality actually closed...
+            assert!(
+                r.planet.shift_residual.abs() < 1e-9,
+                "{absorber:?}: the two centre distances differ by {}",
+                r.planet.shift_residual
+            );
+            // ...and the given members were left exactly as given.
+            let got = [
+                r.sun.profile_shift,
+                r.planet.profile_shift,
+                r.ring.profile_shift,
+            ];
+            for i in 0..3 {
+                if i == absorber.index() {
+                    continue;
+                }
+                assert!(
+                    (got[i] - settled[i]).abs() < 1e-9,
+                    "{absorber:?}: member {i} was given {} and came back {}",
+                    settled[i],
+                    got[i]
+                );
+            }
+        }
+    }
+
+    /// **The default set is the planet's**, which is what it has always been.
+    #[test]
+    fn the_planet_closes_the_set_unless_it_is_pinned() {
+        use crate::planetary::Member;
+        assert_eq!(PlanetaryStage::default().absorber(), Member::Planet);
+        let mut s = PlanetaryStage::default();
+        s.planet.profile_shift = Auto::fixed(0.0);
+        assert_eq!(
+            s.absorber(),
+            Member::Sun,
+            "pinning the planet hands it to the sun"
+        );
+        s.sun.profile_shift = Auto::fixed(0.0);
+        // The shipped ring's shift is given, so with the other two pinned as
+        // well nothing is left automatic and the set is over-specified — the
+        // planet gives way, and the panel relieves it as it is created.
+        assert_eq!(
+            s.absorber(),
+            Member::Planet,
+            "over-specified, the planet gives way"
+        );
+        s.ring.profile_shift = Auto::automatic(0.0);
+        assert_eq!(
+            s.absorber(),
+            Member::Ring,
+            "...and a ring left free takes it instead"
+        );
+    }
+
     #[test]
     fn the_stage_reports_the_classical_ratios() {
         let want = [
