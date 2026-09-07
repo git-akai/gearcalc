@@ -16,28 +16,47 @@
     on,
     set,
     title,
-  }: { label: string; on: boolean; set: (v: boolean) => void; title?: string } = $props();
+    small = false,
+  }: {
+    label: string;
+    on: boolean;
+    set: (v: boolean) => void;
+    title?: string;
+    /** The `auto` toggles, which sit inside a field row rather than being one:
+     *  they name a mode rather than the field, and stay out of the way of the
+     *  number they qualify. */
+    small?: boolean;
+  } = $props();
 </script>
 
-<button type="button" class:on aria-pressed={on} onclick={() => set(!on)} {title}>{label}</button>
+<button type="button" class:on class:small aria-pressed={on} onclick={() => set(!on)} {title}
+  >{label}</button
+>
 
 <style>
+  /* Sized as the actuation control's segments are: a switch that carries its
+     own name is a field in its own right, and reads like one. */
   button {
     font: inherit;
-    font-size: 0.7rem;
-    padding: 0.1rem 0.35rem;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
     border: 1px solid var(--rule);
     border-radius: 3px;
     background: none;
     color: var(--muted);
     cursor: pointer;
-    /* A switch is as wide as its own word, not as wide as the column it sits
-       in: in a field row it takes the trailing cell that the `auto` buttons
-       take, and standing alone it takes only what it needs. */
-    justify-self: start;
+    /* As wide as its own word, never as wide as the cell it lands in. Where it
+       sits the row is what decides: an `auto` toggle keeps to the left of the
+       number it qualifies, and a switch that names a field is put at the right
+       edge the inputs share. */
+    justify-self: inherit;
   }
   button:hover {
     background: var(--hover);
+  }
+  button.small {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.35rem;
   }
   button.on {
     background: var(--selected);

@@ -177,6 +177,27 @@
   // The ring path is unchanged; `internal` is now one of three kinds rather
   // than a boolean, and this is the only place that difference is spent.
   const internal = $derived(tab.kind === "internal");
+  /** Which of the amplitude and the centre-distance offset is the input.
+   *
+   *  They are one number read two ways, so exactly one is given and the other
+   *  is solved: `eccentricThrow` being set *is* "the offset is the input", and
+   *  the two toggles are two views of that one piece of state rather than two
+   *  pieces that could disagree. Turning one on seeds it from the geometry the
+   *  other produced, so the gear on screen does not jump. */
+  function sizeByThrow(on: boolean) {
+    if (on) {
+      const cp = "ok" in result ? result.ok.centre_profile : null;
+      tab.eccentricThrow =
+        cp && !isUnavailable(cp) ? cp.sinusoid.amplitude : defaults().gear.eccentric_throw;
+    } else {
+      if ("ok" in result) {
+        tab.params = { ...tab.params, angular_shift: result.ok.angular_shift };
+        raw.angular_shift = String(result.ok.angular_shift);
+      }
+      tab.eccentricThrow = null;
+    }
+  }
+
   const eccentric = $derived(tab.kind === "eccentric");
   const ring = $derived(internal ? solveRing(ringRequest) : null);
 
@@ -308,7 +329,7 @@
             <input type="number" step="0.05" bind:value={tab.mate.profile_shift} />
             <em>{t("ui.gear_m")}</em>
           </label>
-          <label class="check">
+          <label class="switchrow">
             <Switch
               label={t("ui.gear_mate_is_a_ring")}
               on={tab.mate.internal}
@@ -316,48 +337,84 @@
             />
             <small>{t("ui.gear_mate_ring_runs_inside")}</small>
           </label>
-          <!-- The shift amplitude and the centre-distance throw are the same
-               eccentricity, one solved from the other — like a worm stage sized
-               by helix angle or pitch diameter. Switching seeds the new input
-               from the geometry so nothing jumps. -->
-          <label>
-            <span>{t("ui.gear_eccentric_sized_by")}</span>
-            <select
-              value={tab.eccentricThrow === null ? "amplitude" : "throw"}
-              onchange={(e) => {
-                if (e.currentTarget.value === "throw") {
-                  const cp = "ok" in result ? result.ok.centre_profile : null;
-                  tab.eccentricThrow =
-                    cp && !isUnavailable(cp)
-                      ? cp.sinusoid.amplitude
-                      : defaults().gear.eccentric_throw;
-                } else {
-                  if ("ok" in result) {
-                    tab.params = { ...tab.params, angular_shift: result.ok.angular_shift };
-                    raw.angular_shift = String(result.ok.angular_shift);
-                  }
-                  tab.eccentricThrow = null;
-                }
-              }}
-            >
-              <option value="amplitude">{t("ui.gear_eccentric_by_amplitude")}</option>
-              <option value="throw">{t("ui.gear_eccentric_by_throw")}</option>
-            </select>
-          </label>
-          {#if tab.eccentricThrow !== null}
-            <label class:invalid={"error" in result}>
-              <span>{t("ui.gear_centre_distance_throw")}</span>
-              <input type="number" step="0.05" bind:value={tab.eccentricThrow} />
-              <em>{t("ui.gear_mm")}</em>
-              <span class="note">
-                <small class:err={"error" in result}>
-                  {"error" in result ? result.error : t("ui.gear_throw_solves_the_amplitude")}
-                </small>
-              </span>
-            </label>
-          {/if}
         {/if}
-        {#if f.key !== "angular_shift" || tab.eccentricThrow === null}
+        {#if f.key === "angular_shift"}
+          <!-- **The amplitude and the centre-distance offset are one number.**
+               A shift amplitude produces a throw and a throw is delivered by an
+               amplitude, so either can be the input and the other follows —
+               like a worm stage sized by helix angle or by pitch diameter.
+               Two fields with `auto` toggles that flip each other, because that
+               is what every other pair of this kind in the application looks
+               like; it used to be a mode select and a field that appeared, which
+               said the same thing in two controls and reported the solved
+               amplitude a third time further down. Switching seeds the input
+               being turned on from the geometry, so nothing jumps. -->
+          {@const byThrow = tab.eccentricThrow !== null}
+          {@const solved = "ok" in result ? result.ok : null}
+          {@const throwOf = (r: typeof solved) =>
+            r && !isUnavailable(r.centre_profile) ? r.centre_profile.sinusoid.amplitude : null}
+          {@const amplitudeNotes = notesFor(f)}
+          <label class="auto" class:invalid={errors.angular_shift}>
+            <span>{t("ui.gear_field_angular_shift")}</span>
+            <Switch
+              small
+              label={t("ui.gear_auto")}
+              title={t("ui.gear_automatic")}
+              on={byThrow}
+              set={(v) => sizeByThrow(v)}
+            />
+            {#if byThrow}
+              <input
+                type="number"
+                value={solved ? Number(solved.angular_shift.toFixed(4)) : ""}
+                disabled
+                class="computed"
+              />
+            {:else}
+              <input
+                type="number"
+                step="0.05"
+                value={raw.angular_shift}
+                oninput={(e) => onInput("angular_shift", e.currentTarget.value)}
+              />
+            {/if}
+            <em>{t("ui.gear_m")}</em>
+            <span class="note">
+              {#each amplitudeNotes.all as note, i (i)}
+                <small class:err={note.err} class:hidden={i !== amplitudeNotes.shown}
+                  >{note.text}</small
+                >
+              {/each}
+            </span>
+          </label>
+          <label class="auto" class:invalid={byThrow && "error" in result}>
+            <span>{t("ui.gear_centre_distance_throw")}</span>
+            <Switch
+              small
+              label={t("ui.gear_auto")}
+              title={t("ui.gear_automatic")}
+              on={!byThrow}
+              set={(v) => sizeByThrow(!v)}
+            />
+            {#if byThrow}
+              <input type="number" step="0.05" bind:value={tab.eccentricThrow} />
+            {:else}
+              <input
+                type="number"
+                value={throwOf(solved) === null ? "" : Number(throwOf(solved)!.toFixed(4))}
+                disabled
+                class="computed"
+              />
+            {/if}
+            <em>{t("ui.gear_mm")}</em>
+            <span class="note">
+              <small class:err={byThrow && "error" in result}>
+                {byThrow && "error" in result ? result.error : "\u00a0"}
+              </small>
+            </span>
+          </label>
+        {/if}
+        {#if f.key !== "angular_shift"}
           {@const notes = notesFor(f)}
           <label class:invalid={errors[f.key]}>
             <span>{t(f.label)}</span>
@@ -446,11 +503,13 @@
         <em>{t("ui.gear_mm")}</em>
         <small>{t("ui.gear_maximum_deviation_exported_outline_from_true")}</small>
       </label>
-      <Switch
-        label={t("ui.gear_include_reference_circles")}
-        on={tab.referenceCircles}
-        set={(v) => (tab.referenceCircles = v)}
-      />
+      <label class="switchrow">
+        <Switch
+          label={t("ui.gear_include_reference_circles")}
+          on={tab.referenceCircles}
+          set={(v) => (tab.referenceCircles = v)}
+        />
+      </label>
     </div>
     <button class="primary" onclick={saveDxf} disabled={!("ok" in result)}>{t("ui.gear_export_dxf")}</button>
     {#if exportError}
@@ -598,13 +657,6 @@
           </ul>
         {/if}
         <dl>
-          {#if tab.eccentricThrow !== null}
-            <dt>{t("ui.gear_shift_amplitude")}</dt>
-            <dd>
-              {n(s.angular_shift)} module
-              <small>{t("ui.gear_throw_solves_the_amplitude")}</small>
-            </dd>
-          {/if}
           <dt>{t("ui.gear_envelope_eccentricity")}</dt>
           <dd>
             {mm(s.variation.eccentricity)}
@@ -841,8 +893,24 @@
   label.wide {
     grid-template-columns: 1fr 10.5rem;
   }
-  label.check {
-    grid-template-columns: auto 1fr;
+  /* A switch that carries its own name has nothing to put in a label column,
+     so the row is the button alone at the right edge — the same edge every
+     input in this column ends on. */
+  label.switchrow {
+    grid-template-columns: 1fr;
+    justify-items: end;
+  }
+  label.switchrow small {
+    text-align: right;
+  }
+  /* An `auto` toggle takes a column of its own, out of the label's share, so
+     the number keeps the edge every other number here shares — and the
+     trailing cell stays free for the unit. */
+  label.auto {
+    grid-template-columns: 1fr auto 7rem 3.5rem;
+  }
+  label.auto .note {
+    grid-column: 1 / 4;
   }
   label small {
     grid-column: 1 / -1;

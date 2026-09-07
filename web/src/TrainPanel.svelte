@@ -224,15 +224,15 @@
      this width, so a note arriving or leaving — a value going out of range, a
      stage failing to solve — moves nothing below it. The blank candidate is
      what reserves the space when there is no note at all. -->
-<!-- A boolean that belongs in a column of fields: the row's label says what it
-     is, exactly as it does for a number, and the switch says whether it is on.
-     Standing alone — the four width sources below — a switch carries its own
-     name instead and needs no row. -->
+<!-- A boolean that belongs in a column of fields. The switch carries the
+     field's own name rather than a bare "on" beside a label that would then say
+     it twice, and sits at the right edge the inputs share — where the actuation
+     control's buttons sit, which is the other switch of this size in the panel.
+     The four width sources need no row at all: they are a group, and the group
+     has the heading. -->
 {#snippet switchField(key: string, on: boolean, set: (v: boolean) => void, note?: string | null)}
-  <label>
-    <span>{t(key)}</span>
-    <Switch label={t("ui.train_on")} {on} {set} />
-    <em></em>
+  <label class="switchrow">
+    <Switch label={t(key)} {on} {set} />
     {#if note !== undefined}
       {@render noteSlot(notes(note, null))}
     {/if}
@@ -392,7 +392,15 @@
     <span>{t("ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={gear.teeth} />
   </label>
-  {@render autoNumber("ui.train_addendum", gear.addendum, g?.addendum, 0.05)}
+  {@render autoNumber(
+    "ui.train_addendum",
+    gear.addendum,
+    g?.addendum,
+    0.05,
+    undefined,
+    undefined,
+    "ui.train_m",
+  )}
   {#if gear.addendum.auto}
     <label class="sub">
       <span>{t("ui.train_minimum_tip_width")}</span>
@@ -440,13 +448,23 @@
       g?.profile_shift,
       0.05,
       opts.onShiftAuto,
+      undefined,
+      "ui.train_m",
     )}
     {#if gear.profile_shift.auto}
       <!-- Automatic is the gear's own dedendum, which asks the same question the
            profile generator answers: is the flank undercut *at all*? A fixed 1
            module — what this used to be — asks whether it is undercut within a
            module of depth, and the two part company at 18 teeth and 22. -->
-      {@render autoNumber("ui.train_working_tooth_depth", gear.working_depth, gear.dedendum, 0.05)}
+      {@render autoNumber(
+        "ui.train_working_tooth_depth",
+        gear.working_depth,
+        gear.dedendum,
+        0.05,
+        undefined,
+        undefined,
+        "ui.train_m",
+      )}
       <!-- It used to sit indented under the shift, which said "this belongs to
            that" without words. The indent went when it became an `auto` field
            like its neighbours, so the note says it instead. -->
@@ -494,7 +512,15 @@
     <!-- A crossed pair's automatic width is a **geometric** minimum: the width
          at which one tooth pair hands over to the next (ε = 1). The spur
          stage's inverts a stress instead, and the two must not read alike. -->
-    {@render autoNumber("ui.train_face_width", gear.face_width, opts.faceFromContinuity, 0.5)}
+    {@render autoNumber(
+      "ui.train_face_width",
+      gear.face_width,
+      opts.faceFromContinuity,
+      0.5,
+      undefined,
+      undefined,
+      "ui.train_mm",
+    )}
     {@render noteSlot(
       notes(
         opts.faceFromContinuity === undefined
@@ -504,7 +530,15 @@
       ),
     )}
   {:else}
-    {@render autoNumber("ui.train_face_width", gear.face_width, g?.face_width, 0.5)}
+    {@render autoNumber(
+      "ui.train_face_width",
+      gear.face_width,
+      g?.face_width,
+      0.5,
+      undefined,
+      undefined,
+      "ui.train_mm",
+    )}
   {/if}
   {#if gear.face_width.auto && opts.faceAuto !== false}
     <!-- Four ratings, so four toggles: a rating exists for every combination
@@ -628,9 +662,24 @@
   step: number,
   after?: () => void,
   note?: string | null,
+  unit?: string,
 )}
   <label class="auto">
     <span>{t(key)}</span>
+    <!-- **Left of the number it qualifies**, because that is what it qualifies.
+         On the right it took the cell every other row prints its unit in, so an
+         automatic field was the one field that could not say what it was
+         measured in. -->
+    <Switch
+      small
+      label={t("ui.train_auto")}
+      on={a.auto}
+      title={t("ui.train_automatic")}
+      set={(v) => {
+        a.auto = v;
+        after?.();
+      }}
+    />
     {#if a.auto}
       <input
         type="number"
@@ -642,17 +691,7 @@
     {:else}
       <input type="number" {step} bind:value={a.manual} />
     {/if}
-    <button
-      class="toggle"
-      class:on={a.auto}
-      onclick={() => {
-        a.auto = !a.auto;
-        after?.();
-      }}
-      title={t("ui.train_automatic")}
-    >
-      {t("ui.train_auto")}
-    </button>
+    <em>{unit ? t(unit) : ""}</em>
     <!-- Inside the label, because that is where a note is laid out: `.note`
          spans this row's own columns and is right-aligned against them. Placed
          beside the field instead it spans whatever grid it lands in, which is
@@ -1011,6 +1050,8 @@
                 (sres ?? xres)?.centre_distance,
                 0.1,
                 () => relieveSpur(stage, stage.centre_distance),
+                undefined,
+                "ui.train_mm",
               )}
               <!-- **Greyed by the answer, not by a rule kept here.** Whether
                    this is read depends on whether anything is free to absorb it
@@ -1249,7 +1290,15 @@
                   ),
                 )}
               </label>
-              {@render autoNumber("ui.train_c2c_distance", stage.centre_distance, wres?.centre_distance, 0.1)}
+              {@render autoNumber(
+                "ui.train_c2c_distance",
+                stage.centre_distance,
+                wres?.centre_distance,
+                0.1,
+                undefined,
+                undefined,
+                "ui.train_mm",
+              )}
               <label>
                 <span>{t("ui.train_c2c_clearance")}</span>
                 {#if wres && wres.clearance === 0}
@@ -1760,6 +1809,7 @@
                         : ""
                     }`
                   : null,
+                "ui.train_mm",
               )}
               <label>
                 <span>{t("ui.train_c2c_clearance")}</span>
@@ -2095,6 +2145,21 @@
   .grid.shared > label {
     grid-template-columns: 1fr 9rem 3.5rem;
   }
+  /* The `auto` toggle takes a column of its own, out of the label's share, so
+     the number keeps the edge every other number in the panel shares. */
+  label.auto {
+    grid-template-columns: 1fr auto 6rem 3.5rem;
+  }
+  .grid.shared > label.auto {
+    grid-template-columns: 1fr auto 9rem 3.5rem;
+  }
+  .gear label.auto {
+    grid-template-columns: 1fr auto 6.5rem 3.5rem;
+  }
+  /* A note still ends where its number ends. */
+  label.auto .note {
+    grid-column: 1 / 4;
+  }
   /* The **input box** is the anchor, not the text after it. With an `auto`
      trailing column the boxes shifted left or right by however wide a unit
      happened to be — "module" against "°" — so nothing lined up down a column.
@@ -2172,15 +2237,6 @@
   }
   .segmented button.on {
     background: var(--selected);
-  }
-  .toggle {
-    font-size: 0.7rem;
-    padding: 0.1rem 0.35rem;
-    color: var(--muted);
-  }
-  .toggle.on {
-    background: var(--selected);
-    color: var(--fg);
   }
   /* The source of a shipped convention, next to the number it produced —
      the project's rule is to say what a figure is where it is shown. */
@@ -2298,6 +2354,13 @@
     padding-left: 0.8rem;
   }
   /* Four sources now, not two, so the row wraps rather than squeezing them. */
+  /* A switch that carries its own name has nothing to put in a label column,
+     so the row is the button alone at the right edge — the same edge every
+     input in the column ends on. */
+  .switchrow {
+    grid-template-columns: 1fr;
+    justify-items: end;
+  }
   .subtoggles {
     display: flex;
     flex-wrap: wrap;
