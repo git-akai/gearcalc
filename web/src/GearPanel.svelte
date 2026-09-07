@@ -899,15 +899,26 @@
   /* A switch that carries its own name has nothing to put in a label column,
      so the row is the button alone at the right edge — the same edge every
      input in this column ends on. */
+  /* A switch that carries its own name has nothing to put in a label column,
+     so the row is the button alone at the right — but *which* right matters.
+     Every row here keeps a trailing cell for its unit, and every note ends
+     where the inputs end rather than where the row does, so a switch flush to
+     the row's edge would be the one control in the panel lining up with
+     nothing. The empty trailing cell is what puts it on the edge the numbers
+     share. */
   label.switchrow {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 3.5rem;
     justify-items: end;
   }
-  label.switchrow.start {
-    justify-items: start;
-  }
   label.switchrow small {
+    grid-column: 1;
     text-align: right;
+  }
+  /* Except where the switch belongs to the action below it rather than to the
+     column of fields: then it lines up with that button instead. */
+  label.switchrow.start {
+    grid-template-columns: 1fr;
+    justify-items: start;
   }
   /* An `auto` toggle takes a column of its own, out of the label's share, so
      the number keeps the edge every other number here shares — and the
