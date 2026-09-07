@@ -109,6 +109,29 @@ pub struct Gear {
     mean: Tooth,
 }
 
+/// **The shift the `k`th tooth is cut at**, `x + Δx cos θ_k`.
+///
+/// Written so that `Δx = 0` gives `x + 0.0`, which is `x` exactly — the equality
+/// in [`Gear::new`] then collapses every tooth onto one, which is what makes an
+/// ordinary gear cost what it always did.
+///
+/// It is a function rather than a step inside the construction because the
+/// *inversion* needs it too: solving an amplitude from a centre-distance offset
+/// asks what the commanded distance would be at a hundred trial amplitudes, and
+/// building a whole gear to read one number off each tooth is the expensive way
+/// to ask. One law, so the two cannot answer differently.
+#[must_use]
+pub fn shift_at(params: &GearParams, k: u32) -> f64 {
+    let z = params.teeth.max(1);
+    // Folded to the near half of the revolution, so teeth `k` and `z − k` are
+    // given the *same* angle rather than two that agree mathematically and not
+    // in floating point. `cos(τ − t)` is not bit-identical to `cos t`, and the
+    // mirror pairs would then each generate their own tooth — correct, but
+    // ⌈z/2⌉+1 turns into z.
+    let theta = std::f64::consts::TAU * f64::from(k.min(z - k)) / f64::from(z);
+    params.profile_shift + params.angular_shift * theta.cos()
+}
+
 impl Gear {
     /// Build from parameters. The angular shift and the indexing offset are read
     /// from them; everything else is the ordinary single-gear construction.
@@ -119,20 +142,7 @@ impl Gear {
     #[must_use]
     pub fn new(params: GearParams) -> Self {
         let z = params.teeth.max(1);
-
-        // The shift each tooth is cut at. Written so that `Δx = 0` gives
-        // `x + 0.0`, which is `x` exactly — the equality below then collapses
-        // every tooth onto one, which is what makes an ordinary gear cost what
-        // it always did.
-        let shift_at = |k: u32| {
-            // Folded to the near half of the revolution, so teeth `k` and
-            // `z − k` are given the *same* angle rather than two that agree
-            // mathematically and not in floating point. `cos(τ − t)` is not
-            // bit-identical to `cos t`, and the mirror pairs would then each
-            // generate their own tooth — correct, but ⌈z/2⌉+1 turns into z.
-            let theta = std::f64::consts::TAU * f64::from(k.min(z - k)) / f64::from(z);
-            params.profile_shift + params.angular_shift * theta.cos()
-        };
+        let shift_at = |k: u32| shift_at(&params, k);
 
         // Distinct shifts, by exact equality. Nothing is quantised: two teeth
         // share a gear only if their shift is the *same number*, which for a
@@ -856,7 +866,46 @@ impl Gear {
         kind: MeshKind,
         at: MeshSide,
     ) -> Result<CentreProfile, MeshError> {
-        let g = &self.mean;
+        centre_profile_of(
+            &self.mean,
+            self.mean.params.teeth.max(1),
+            // `k` indexes the teeth this gear was built with, so it is in range
+            // by construction and the width is never what limits it.
+            &|k| {
+                self.tooth(usize::try_from(k).unwrap_or(0))
+                    .0
+                    .params
+                    .profile_shift
+            },
+            mate,
+            kind,
+            at,
+        )
+    }
+}
+
+/// **The commanded centre distance around one revolution**, for a gear whose
+/// `k`th tooth is cut at `shift(k)`.
+///
+/// [`Gear::centre_profile`] is this over the teeth it built; the inversion in
+/// [`amplitude_for_throw`] is this over [`shift_at`] directly, without building
+/// any. Nothing here reads a tooth's *form* — only the shift it was cut at, and
+/// the rack the pair shares — so a hundred trial amplitudes cost a hundred
+/// evaluations of a closed form rather than a hundred gears.
+///
+/// # Errors
+///
+/// As [`Gear::centre_profile`].
+fn centre_profile_of(
+    mean: &Tooth,
+    teeth: u32,
+    shift: &dyn Fn(u32) -> f64,
+    mate: &Tooth,
+    kind: MeshKind,
+    at: MeshSide,
+) -> Result<CentreProfile, MeshError> {
+    {
+        let g = mean;
         if !g.params.same_rack_as(&mate.params) {
             return Err(MeshError::Incompatible);
         }
@@ -890,10 +939,9 @@ impl Gear {
         // report zero throw for every amplitude, and λ is not a property of the
         // *pair* at all. It is gated now
         // (`the_commanded_centre_distance_does_not_depend_on_the_indexing`).
-        let commanded = (0..self.which.len())
+        let commanded = (0..teeth)
             .map(|k| {
-                let (tooth, _) = self.tooth(k);
-                let x_e = tooth.params.profile_shift + tooth.params.thickness_shift();
+                let x_e = shift(k) + g.params.thickness_shift();
                 let x_sum = sign_e * x_e + sign_m * x_mate;
                 operating_geometry(g.mt, g.alpha_t, g.alpha_n, z_sum, x_sum)
                     .map(|(_, _, a_w)| a_w)
@@ -1019,12 +1067,26 @@ pub fn amplitude_for_throw(
         return Ok(0.0);
     }
 
+    // **The gear is not built.** Only the shift each tooth is cut at varies with
+    // the amplitude; the rack, the tooth count and the mate are the same at
+    // every trial, and a tooth's *form* never enters a commanded distance at
+    // all. So the mean tooth is built once and each trial is the closed form
+    // over [`shift_at`] — which is what takes this from a hundred milliseconds
+    // to under one, on a panel that re-solves as a designer types.
+    let mean = Tooth::new(params);
     let throw = |dx: f64| {
-        Gear::new(GearParams {
+        let at_dx = GearParams {
             angular_shift: dx,
             ..params
-        })
-        .centre_profile(mate, kind, at)
+        };
+        centre_profile_of(
+            &mean,
+            params.teeth.max(1),
+            &|k| shift_at(&at_dx, k),
+            mate,
+            kind,
+            at,
+        )
         .map(|p| p.sinusoid.amplitude)
     };
     // Surface a pair that does not mesh at all with its own error, rather than
@@ -1070,6 +1132,102 @@ pub fn amplitude_for_throw(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// **The inversion reads the same profile the construction does**, bit for
+    /// bit.
+    ///
+    /// Solving an amplitude from a centre-distance offset used to build a whole
+    /// gear per trial — some seventy of them, each generating every distinct
+    /// tooth — to read one number off each. None of that form enters a commanded
+    /// distance: only the shift a tooth was cut at, and the rack the pair
+    /// shares. So the trials go through [`shift_at`] directly.
+    ///
+    /// The project's standing bar for a reuse like this is that the old case
+    /// comes out *identical* rather than close, because anything less lets a
+    /// reordering of the arithmetic through and the whole claim is that the
+    /// arithmetic is the same.
+    #[test]
+    fn the_commanded_profile_does_not_depend_on_building_the_gear() {
+        let base = GearParams {
+            teeth: 41,
+            angular_shift: 0.0,
+            ..GearParams::default()
+        };
+        let mate = Tooth::new(GearParams {
+            teeth: 40,
+            ..GearParams::default()
+        });
+        let mean = Tooth::new(base);
+        for k in 0..=25 {
+            let dx = f64::from(k) * 0.01;
+            let at_dx = GearParams {
+                angular_shift: dx,
+                ..base
+            };
+            let built = Gear::new(at_dx)
+                .centre_profile(&mate, MeshKind::External, MeshSide::First)
+                .expect("the pair meshes");
+            let direct = centre_profile_of(
+                &mean,
+                41,
+                &|i| shift_at(&at_dx, i),
+                &mate,
+                MeshKind::External,
+                MeshSide::First,
+            )
+            .expect("and so does the closed form");
+            for (a, b, what) in [
+                (
+                    built.sinusoid.amplitude,
+                    direct.sinusoid.amplitude,
+                    "amplitude",
+                ),
+                (built.sinusoid.mean, direct.sinusoid.mean, "mean"),
+                (
+                    built.sinusoid.phase_degrees,
+                    direct.sinusoid.phase_degrees,
+                    "phase",
+                ),
+                (built.sinusoid_error, direct.sinusoid_error, "error"),
+            ] {
+                assert_eq!(
+                    a.to_bits(),
+                    b.to_bits(),
+                    "dx {dx}: {what} differs, {a} against {b}"
+                );
+            }
+        }
+    }
+
+    /// **Solving an amplitude costs like an input**, on a panel that re-solves
+    /// as a designer types.
+    ///
+    /// The bound is loose because wall-clock in a parallel suite measures the
+    /// machine as much as the code; what it is for is the order of magnitude.
+    /// This was 102 ms, and the whole of it was building gears whose teeth
+    /// nothing read.
+    #[test]
+    fn solving_an_amplitude_is_quick_enough_to_type_over() {
+        let base = GearParams {
+            teeth: 41,
+            angular_shift: 0.12,
+            ..GearParams::default()
+        };
+        let mate = Tooth::new(GearParams {
+            teeth: 40,
+            ..GearParams::default()
+        });
+        let start = std::time::Instant::now();
+        for _ in 0..5 {
+            amplitude_for_throw(base, &mate, MeshKind::External, MeshSide::First, 0.05)
+                .expect("reachable");
+        }
+        let each = start.elapsed() / 5;
+        assert!(
+            each < std::time::Duration::from_millis(20),
+            "solving an amplitude took {each:?}"
+        );
+    }
 
     /// **An ordinary gear comes out bit-identical to the construction this
     /// replaced.**

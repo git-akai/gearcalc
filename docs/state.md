@@ -215,7 +215,10 @@ there, so it cannot be read without the word
 ([rationale](rationale.md#unfinished-work-is-knocked-for-not-switched-on)).
 
 One hob, one setting; the root belongs
-to the gear; the commanded centre distance and what a simple crank leaves; and
+to the gear; the commanded centre distance and what a simple crank leaves —
+either the shift amplitude or the centre-distance offset is the input and the
+other is solved, an inversion that reads the shift law directly rather than
+building a gear per trial; and
 inspection data — span and over-pins — as the range it takes around the
 revolution, verified against a caliper reading off the drawn teeth.
 
