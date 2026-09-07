@@ -1148,53 +1148,92 @@ mod tests {
     /// arithmetic is the same.
     #[test]
     fn the_commanded_profile_does_not_depend_on_building_the_gear() {
-        let base = GearParams {
-            teeth: 41,
-            angular_shift: 0.0,
-            ..GearParams::default()
-        };
-        let mate = Tooth::new(GearParams {
-            teeth: 40,
-            ..GearParams::default()
-        });
-        let mean = Tooth::new(base);
-        for k in 0..=25 {
-            let dx = f64::from(k) * 0.01;
-            let at_dx = GearParams {
-                angular_shift: dx,
-                ..base
-            };
-            let built = Gear::new(at_dx)
-                .centre_profile(&mate, MeshKind::External, MeshSide::First)
-                .expect("the pair meshes");
-            let direct = centre_profile_of(
-                &mean,
-                41,
-                &|i| shift_at(&at_dx, i),
-                &mate,
+        // Both arrangements and both sides, because the sign the kind carries is
+        // the one thing in this function that is not shared between them — and a
+        // reuse gated on the external case alone would be gated on the half that
+        // could not go wrong.
+        for (base, mate, kind, at) in [
+            (
+                GearParams {
+                    teeth: 41,
+                    ..GearParams::default()
+                },
+                Tooth::new(GearParams {
+                    teeth: 40,
+                    ..GearParams::default()
+                }),
                 MeshKind::External,
                 MeshSide::First,
-            )
-            .expect("and so does the closed form");
-            for (a, b, what) in [
-                (
-                    built.sinusoid.amplitude,
-                    direct.sinusoid.amplitude,
-                    "amplitude",
-                ),
-                (built.sinusoid.mean, direct.sinusoid.mean, "mean"),
-                (
-                    built.sinusoid.phase_degrees,
-                    direct.sinusoid.phase_degrees,
-                    "phase",
-                ),
-                (built.sinusoid_error, direct.sinusoid_error, "error"),
-            ] {
-                assert_eq!(
-                    a.to_bits(),
-                    b.to_bits(),
-                    "dx {dx}: {what} differs, {a} against {b}"
-                );
+            ),
+            (
+                GearParams {
+                    teeth: 41,
+                    ..GearParams::default()
+                },
+                Tooth::new(GearParams {
+                    teeth: 40,
+                    ..GearParams::default()
+                }),
+                MeshKind::External,
+                MeshSide::Second,
+            ),
+            // The eccentric member inside a ring, which is what an eccentric
+            // drive is: the pinion runs in a wheel with more teeth.
+            (
+                GearParams {
+                    teeth: 40,
+                    ..GearParams::default()
+                },
+                Tooth::new(GearParams {
+                    teeth: 41,
+                    ..GearParams::default()
+                }),
+                MeshKind::Internal,
+                MeshSide::First,
+            ),
+        ] {
+            let teeth = base.teeth;
+            let mean = Tooth::new(base);
+            for k in 0..=25 {
+                let dx = f64::from(k) * 0.01;
+                let at_dx = GearParams {
+                    angular_shift: dx,
+                    ..base
+                };
+                let Ok(built) = Gear::new(at_dx).centre_profile(&mate, kind, at) else {
+                    // An amplitude this pair cannot absorb: both roads have to
+                    // refuse it, and the closed form is asked so that a silent
+                    // difference in *which* cases exist would show up here too.
+                    assert!(
+                        centre_profile_of(&mean, teeth, &|i| shift_at(&at_dx, i), &mate, kind, at)
+                            .is_err(),
+                        "dx {dx}: the built pair refused and the closed form did not"
+                    );
+                    continue;
+                };
+                let direct =
+                    centre_profile_of(&mean, teeth, &|i| shift_at(&at_dx, i), &mate, kind, at)
+                        .expect("and so does the closed form");
+                for (a, b, what) in [
+                    (
+                        built.sinusoid.amplitude,
+                        direct.sinusoid.amplitude,
+                        "amplitude",
+                    ),
+                    (built.sinusoid.mean, direct.sinusoid.mean, "mean"),
+                    (
+                        built.sinusoid.phase_degrees,
+                        direct.sinusoid.phase_degrees,
+                        "phase",
+                    ),
+                    (built.sinusoid_error, direct.sinusoid_error, "error"),
+                ] {
+                    assert_eq!(
+                        a.to_bits(),
+                        b.to_bits(),
+                        "dx {dx}, {kind:?} {at:?}: {what} differs, {a} against {b}"
+                    );
+                }
             }
         }
     }

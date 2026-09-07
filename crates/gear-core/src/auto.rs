@@ -990,11 +990,17 @@ pub fn maximise(dof: usize, objective: &dyn Fn(&[f64]) -> Option<f64>) -> Option
     /// — a thousandth of a module is finer than the tolerance any of this is
     /// ground to, and the surface is flat at that scale anyway.
     const RESOLUTION: f64 = 1e-3;
-    /// A ceiling on the total work. The whole search runs on every keystroke in
-    /// the front end, so it has to cost like an input; sliding along a curved
-    /// constraint is where an unbudgeted pattern search spends its time, and
-    /// the last of that sliding is worth less than a part in a hundred thousand
-    /// of efficiency.
+    /// A ceiling on the total work. Sliding along a curved constraint is where
+    /// an unbudgeted pattern search spends its time, and the last of that
+    /// sliding is worth less than a part in a hundred thousand of efficiency.
+    ///
+    /// These numbers were first chosen when a candidate cost fifty times what it
+    /// does now, so they are worth re-asking rather than inheriting — and they
+    /// have been: raising the sweep, the starts, the budget and the resolution
+    /// together, some fourteen times the work, moves the pair's answer not at
+    /// all to eight decimals, the set's by 2e-7 and the eccentric drive's by
+    /// 4e-5. The search is converged, not budgeted. What made it cheap was
+    /// making a candidate cheap, and there is nothing here left to buy.
     const BUDGET: usize = 220;
     /// How many of the sweep's best points are walked from.
     const STARTS: usize = 2;

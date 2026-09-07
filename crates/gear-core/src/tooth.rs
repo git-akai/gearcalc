@@ -591,7 +591,7 @@ impl Tooth {
     fn check_severed(&mut self) {
         // **Severing is undercut taken to its limit**, so a tooth that is not
         // undercut has nothing to look for — the same guard [`Self::solve_junction`]
-        // opens with, and for the same reason.
+        // opens with, three lines up, and for the same reason.
         //
         // It is worth stating because of what is behind it: a two-thousand-point
         // scan of the trochoid, which ran on *every* tooth this crate built and
@@ -599,10 +599,20 @@ impl Tooth {
         // shifts builds hundreds of teeth to read a radius and a flag off each,
         // so this one guard is most of what those searches were spending.
         //
-        // Gated by sweeping it (`tests/geometry_laws.rs`): over thirty thousand
-        // teeth that are not undercut, across five tooth counts of range and
-        // seven rack proportions, the trochoid never comes within a hundredth of
-        // a radian of the centreline it would have to cross.
+        // The implication is **structural, not observed**. Severing is the two
+        // fillets meeting across the space, and the tool is not allowed a round
+        // that could bring them together: `Rack::wanted_by` caps its tip round
+        // at [`guard::FILLET_FRACTION_OF_MAX`] of the round that would exactly
+        // fill the space between the flanks. So the fillets are held apart by
+        // however much that fraction is short of one, and the only way the
+        // trochoid reaches the centreline is if the *flank* has been consumed —
+        // which is what undercut is.
+        //
+        // That also says how the margin behaves, which a sweep alone would only
+        // guess at: it is a *fraction of the space*, so it narrows with the
+        // tooth and never closes. `tests/geometry_laws.rs` walks it down to
+        // 6e-4 radians on a tooth a twentieth of nominal thickness, still
+        // positive, which is the shape this predicts and not a coincidence.
         if !self.undercut {
             return;
         }

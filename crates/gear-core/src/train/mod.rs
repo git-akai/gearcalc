@@ -1996,12 +1996,15 @@ mod tests {
     /// what they do differs — an epicyclic candidate solves a planet and cuts a
     /// ring where a pair's builds two teeth.
     ///
-    /// The bounds are loose on purpose. Wall-clock in a suite that runs its
-    /// tests in parallel measures the machine as much as the code, and a tight
-    /// bound would fail on a loaded one and teach a reader to ignore it. What
-    /// they are for is the order of magnitude: these have been 800 ms, 100 ms
-    /// and 68 ms at various points, every time because something was built per
-    /// candidate that nothing then read.
+    /// The bounds are loose, but only by about a decade. Wall-clock in a suite
+    /// that runs its tests in parallel measures the machine as much as the
+    /// code, so a bound near the measurement would fail on a loaded one and
+    /// teach a reader to ignore it — while a bound far above it stops catching
+    /// anything. These sit roughly ten times what each search costs (0.7 ms,
+    /// 10 ms and 1.8 ms), which is loose enough for a busy machine and tight
+    /// enough to catch the kind of regression that has actually happened here:
+    /// 800 ms, 100 ms and 68 ms at various points, every time because something
+    /// was built per candidate that nothing then read.
     #[test]
     fn every_search_is_quick_enough_to_type_over() {
         let lib = library();
@@ -2025,7 +2028,7 @@ mod tests {
             optimisation: tuned,
             ..SpurStage::default()
         };
-        each("pair's", 50, &|| {
+        each("pair's", 10, &|| {
             solve_spur_stage(&pair, StageTorques::just(2.0), &lib).unwrap();
         });
 
@@ -2035,7 +2038,7 @@ mod tests {
         };
         set.sun.profile_shift = Auto::automatic(0.0);
         set.ring.profile_shift = Auto::automatic(0.0);
-        each("epicyclic set's", 100, &|| {
+        each("epicyclic set's", 60, &|| {
             solve_planetary_stage(&set, 3000.0, StageTorques::just(2.0), &lib).unwrap();
         });
 
@@ -2043,7 +2046,7 @@ mod tests {
             optimisation: tuned,
             ..HulaStage::default()
         };
-        each("eccentric drive's", 50, &|| {
+        each("eccentric drive's", 20, &|| {
             solve_hula_stage(&drive, 1000.0, 2.0).unwrap();
         });
     }

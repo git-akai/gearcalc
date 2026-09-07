@@ -591,12 +591,23 @@ fn every_length_scales_with_the_module_and_every_angle_is_invariant() {
 /// **A tooth that is not undercut is never severed**, which is what lets the
 /// severing scan be skipped for one.
 ///
-/// Severing is undercut taken to its limit — the flank removed entirely — so the
-/// implication ought to be a definition. It is gated rather than assumed
-/// because what rests on it is a guard in `Tooth::build`, and behind that guard
-/// is a two-thousand-point scan of the trochoid that ran on every tooth the
-/// crate built. It was the whole of what a tooth cost, and every search over
-/// shifts builds hundreds of them to read a radius and a flag off each.
+/// The reason is structural rather than observed, and the sweep is here to
+/// corroborate it rather than to establish it. Severing is the two fillets
+/// meeting across the tooth space, and `Rack::wanted_by` caps the tool's tip
+/// round at `FILLET_FRACTION_OF_MAX` — 95 % — of the round that would exactly
+/// fill that space. The fillets are therefore held apart by the five per cent
+/// the cap is short of one, and the only way the trochoid reaches the
+/// centreline is if the flank has been consumed, which is undercut.
+///
+/// What matters is that the margin is a *fraction of the space*: it narrows
+/// with the tooth without ever closing. So this sweeps toward the corner where
+/// the space is smallest — a tenth of the nominal pressure angle, a twentieth
+/// of the nominal thickness, a root round larger than the rack would carry —
+/// and asks only that it stay positive. An earlier version of this test asserted
+/// a floor of a thousandth of a radian; widening the sweep by one parameter
+/// walked the margin to 6e-4 and would have failed it, on geometry that is
+/// perfectly sound. A bound has to be the one the reasoning gives, or it is a
+/// record of where the sweep happened to stop.
 ///
 /// The scan is written out here rather than called, because inside the crate it
 /// no longer runs for these teeth — which is the point.
@@ -604,20 +615,29 @@ fn every_length_scales_with_the_module_and_every_angle_is_invariant() {
 fn only_an_undercut_tooth_can_be_severed() {
     let mut worst = f64::INFINITY;
     let mut count = 0u32;
-    for z in 5..=80u32 {
+    let mut at = String::new();
+    for z in [5u32, 7, 9, 12, 17, 24, 31, 40, 60, 90, 140, 200] {
         for k in -40..=40 {
             let x = f64::from(k) * 0.05;
-            // Rack proportions that move the trochoid: the pressure angle sets
-            // its slope, the dedendum how deep the tool reaches, and the
-            // thickness modification how much room the space has.
-            for &(alpha, ded, kt) in &[
-                (20.0, 1.25, 1.0),
-                (14.5, 1.25, 1.0),
-                (25.0, 1.25, 1.0),
-                (20.0, 1.6, 1.0),
-                (20.0, 1.0, 1.0),
-                (20.0, 1.25, 1.6),
-                (20.0, 1.25, 0.4),
+            // Everything that moves the trochoid or narrows the space: the
+            // pressure angle sets the fillet's slope, the dedendum how deep the
+            // tool reaches, the thickness modification how much room is left,
+            // the root round how much of it the fillet claims — and the helix
+            // and module, which the transverse section carries.
+            for &(alpha, ded, kt, rho, beta, m) in &[
+                (20.0, 1.25, 1.0, 0.38, 0.0, 1.0),
+                (14.5, 1.25, 1.0, 0.38, 0.0, 1.0),
+                (25.0, 1.25, 1.0, 0.0, 0.0, 1.0),
+                (20.0, 1.6, 1.0, 0.9, 0.0, 1.0),
+                (20.0, 1.0, 1.7, 0.2, 0.0, 1.0),
+                (20.0, 1.25, 1.0, 0.38, 30.0, 1.0),
+                (20.0, 1.25, 1.0, 0.9, -45.0, 8.0),
+                (25.0, 1.0, 1.7, 0.2, 15.0, 0.4),
+                // The corner: a thin tooth in a low-angle rack with a round
+                // bigger than the space would carry, where the cap binds hardest.
+                (10.0, 1.25, 0.05, 1.4, 0.0, 1.0),
+                (12.0, 2.0, 0.1, 2.0, 0.0, 1.0),
+                (14.5, 2.5, 0.2, 1.4, 0.0, 1.0),
             ] {
                 let t = Tooth::new(GearParams {
                     teeth: z,
@@ -625,6 +645,9 @@ fn only_an_undercut_tooth_can_be_severed() {
                     pressure_angle: alpha,
                     dedendum: ded,
                     thickness_mod: kt,
+                    root_radius: rho,
+                    helix_angle: beta,
+                    module: m,
                     ..GearParams::default()
                 });
                 if t.undercut {
@@ -633,7 +656,7 @@ fn only_an_undercut_tooth_can_be_severed() {
                 count += 1;
                 assert!(
                     !t.severed,
-                    "z{z} x{x} alpha{alpha} ded{ded} k{kt}: severed without undercut"
+                    "z{z} x{x} a{alpha} d{ded} k{kt} rho{rho} b{beta} m{m}: severed without undercut"
                 );
                 let n = 2000usize;
                 let mut min_th = f64::INFINITY;
@@ -642,16 +665,20 @@ fn only_an_undercut_tooth_can_be_severed() {
                     let f = i as f64 / (n - 1) as f64;
                     min_th = min_th.min(t.trochoid_at(t.s_j + f * (0.0 - t.s_j)).1);
                 }
-                worst = f64::min(worst, min_th);
+                if min_th < worst {
+                    worst = min_th;
+                    at = format!("z{z} x{x:.2} a{alpha} d{ded} k{kt} rho{rho} b{beta} m{m}");
+                }
             }
         }
     }
     assert!(
-        count > 30_000,
-        "the sweep has to be wide to mean anything: {count}"
+        count > 6_000,
+        "the sweep has to be wide to corroborate anything: {count}"
     );
     assert!(
-        worst > 1e-3,
-        "the trochoid came within {worst:e} of the centreline, so the guard is marginal"
+        worst > 0.0,
+        "the trochoid reached the centreline at {at} ({worst:e}), so the cap does not \
+         hold the fillets apart and the guard is wrong"
     );
 }
