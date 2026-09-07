@@ -499,17 +499,14 @@
       opts.faceFromContinuity,
       0.5,
       undefined,
-      undefined,
+      // Inside the field, not beside it. A note outside its label is not the
+      // label's row and does not get the gap that pairs the two — it sits a
+      // whole field-gap below, reading as a heading for whatever follows.
+      opts.faceFromContinuity === undefined
+        ? t("ui.train_note_no_continuous_width")
+        : t("ui.train_note_face_width_continuity", { width: n(opts.faceFromContinuity) }),
       "ui.train_mm",
     )}
-    <FieldNote notes={
-      notes(
-        opts.faceFromContinuity === undefined
-          ? t("ui.train_note_no_continuous_width")
-          : t("ui.train_note_face_width_continuity", { width: n(opts.faceFromContinuity) }),
-        null,
-      )
-    } />
   {:else}
     {@render autoNumber(
       "ui.train_face_width",
