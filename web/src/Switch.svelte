@@ -43,20 +43,27 @@
     border: 1px solid var(--rule);
     border-radius: 3px;
     background: none;
-    color: var(--muted);
+    /* Full contrast in both states, as the actuation control's segments are:
+       what says a switch is on is the fill behind it, not the strength of its
+       text. Muted-when-off reads as a smaller word rather than an unlit one,
+       and next to a segmented control that never mutes it looked like a
+       different size of type. It is the same size — 0.75rem, both of them. */
+    color: var(--fg);
     cursor: pointer;
-    /* As wide as its own word, never as wide as the cell it lands in. Where it
-       sits the row is what decides: an `auto` toggle keeps to the left of the
-       number it qualifies, and a switch that names a field is put at the right
-       edge the inputs share. */
-    justify-self: inherit;
+    /* Where it sits, the row decides: nothing is asserted here, so a row that
+       wants it at one edge says so with `justify-items` and one that gives it a
+       column of its own gets it at that column's width. */
   }
   button:hover {
     background: var(--hover);
   }
+  /* The `auto` toggles keep the muted, smaller styling they have always had:
+     they name a mode rather than a field, and stay out of the way of the number
+     they qualify. */
   button.small {
     font-size: 0.7rem;
     padding: 0.1rem 0.35rem;
+    color: var(--muted);
   }
   button.on {
     background: var(--selected);

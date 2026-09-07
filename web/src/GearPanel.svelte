@@ -503,7 +503,10 @@
         <em>{t("ui.gear_mm")}</em>
         <small>{t("ui.gear_maximum_deviation_exported_outline_from_true")}</small>
       </label>
-      <label class="switchrow">
+      <!-- Left, with the export button below it: this one belongs to that
+           action rather than to the column of fields above, and lining it up
+           with the button is what says so. -->
+      <label class="switchrow start">
         <Switch
           label={t("ui.gear_include_reference_circles")}
           on={tab.referenceCircles}
@@ -899,6 +902,9 @@
   label.switchrow {
     grid-template-columns: 1fr;
     justify-items: end;
+  }
+  label.switchrow.start {
+    justify-items: start;
   }
   label.switchrow small {
     text-align: right;
