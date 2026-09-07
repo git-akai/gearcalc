@@ -587,3 +587,71 @@ fn every_length_scales_with_the_module_and_every_angle_is_invariant() {
         "an angle moved with the module by {worst_angle:e} rad"
     );
 }
+
+/// **A tooth that is not undercut is never severed**, which is what lets the
+/// severing scan be skipped for one.
+///
+/// Severing is undercut taken to its limit — the flank removed entirely — so the
+/// implication ought to be a definition. It is gated rather than assumed
+/// because what rests on it is a guard in `Tooth::build`, and behind that guard
+/// is a two-thousand-point scan of the trochoid that ran on every tooth the
+/// crate built. It was the whole of what a tooth cost, and every search over
+/// shifts builds hundreds of them to read a radius and a flag off each.
+///
+/// The scan is written out here rather than called, because inside the crate it
+/// no longer runs for these teeth — which is the point.
+#[test]
+fn only_an_undercut_tooth_can_be_severed() {
+    let mut worst = f64::INFINITY;
+    let mut count = 0u32;
+    for z in 5..=80u32 {
+        for k in -40..=40 {
+            let x = f64::from(k) * 0.05;
+            // Rack proportions that move the trochoid: the pressure angle sets
+            // its slope, the dedendum how deep the tool reaches, and the
+            // thickness modification how much room the space has.
+            for &(alpha, ded, kt) in &[
+                (20.0, 1.25, 1.0),
+                (14.5, 1.25, 1.0),
+                (25.0, 1.25, 1.0),
+                (20.0, 1.6, 1.0),
+                (20.0, 1.0, 1.0),
+                (20.0, 1.25, 1.6),
+                (20.0, 1.25, 0.4),
+            ] {
+                let t = Tooth::new(GearParams {
+                    teeth: z,
+                    profile_shift: x,
+                    pressure_angle: alpha,
+                    dedendum: ded,
+                    thickness_mod: kt,
+                    ..GearParams::default()
+                });
+                if t.undercut {
+                    continue;
+                }
+                count += 1;
+                assert!(
+                    !t.severed,
+                    "z{z} x{x} alpha{alpha} ded{ded} k{kt}: severed without undercut"
+                );
+                let n = 2000usize;
+                let mut min_th = f64::INFINITY;
+                for i in 0..n {
+                    #[allow(clippy::cast_precision_loss)]
+                    let f = i as f64 / (n - 1) as f64;
+                    min_th = min_th.min(t.trochoid_at(t.s_j + f * (0.0 - t.s_j)).1);
+                }
+                worst = f64::min(worst, min_th);
+            }
+        }
+    }
+    assert!(
+        count > 30_000,
+        "the sweep has to be wide to mean anything: {count}"
+    );
+    assert!(
+        worst > 1e-3,
+        "the trochoid came within {worst:e} of the centreline, so the guard is marginal"
+    );
+}

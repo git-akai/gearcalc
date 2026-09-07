@@ -188,6 +188,16 @@ Verified by simulating the cut — 2.5–2.7 µm across shifts −0.4 … +0.5.
 the ring search, layout checks, Willis kinematics, Pennestrì–Freudenstein
 efficiency in all six arrangements, and backlash referred to the output shaft.
 
+**A tooth costs what it measures.** Building one ran a two-thousand-point scan of
+its trochoid to ask whether undercut had removed the flank entirely — on every
+tooth, including the great majority that are not undercut at all and so have
+nothing for it to find. Severing is undercut taken to its limit, gated by
+sweeping thirty thousand teeth that are not undercut across seven rack
+proportions, so the scan is skipped for them. A tooth went from 62 µs to 219 ns,
+and with it every search that builds hundreds of teeth to read a radius and a
+flag off each: the pair's from 34 ms to 0.7, the eccentric drive's from 35 to
+1.7, the epicyclic set's from 68 to 10.
+
 **Profile shifts chosen for efficiency.** A stage-level toggle, off by default,
 that chooses the automatic shifts to lose least instead of taking the least that
 clears undercut — which becomes a floor rather than the answer, and is worth up

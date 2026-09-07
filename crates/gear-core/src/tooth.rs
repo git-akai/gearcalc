@@ -589,6 +589,23 @@ impl Tooth {
     /// Any code touching the flank must check [`Tooth::severed`] first — `u_j`
     /// and `u_tip` are NaN in this state and there are only two sections.
     fn check_severed(&mut self) {
+        // **Severing is undercut taken to its limit**, so a tooth that is not
+        // undercut has nothing to look for — the same guard [`Self::solve_junction`]
+        // opens with, and for the same reason.
+        //
+        // It is worth stating because of what is behind it: a two-thousand-point
+        // scan of the trochoid, which ran on *every* tooth this crate built and
+        // was the whole of what a tooth cost. Everything that searches over
+        // shifts builds hundreds of teeth to read a radius and a flag off each,
+        // so this one guard is most of what those searches were spending.
+        //
+        // Gated by sweeping it (`tests/geometry_laws.rs`): over thirty thousand
+        // teeth that are not undercut, across five tooth counts of range and
+        // seven rack proportions, the trochoid never comes within a hundredth of
+        // a radian of the centreline it would have to cross.
+        if !self.undercut {
+            return;
+        }
         let n = search::SEVER_SCAN_SAMPLES;
         let mut min_th = f64::INFINITY;
         let mut min_i = 0usize;

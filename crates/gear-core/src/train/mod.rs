@@ -1987,34 +1987,65 @@ mod tests {
         }
     }
 
-    /// The search runs on every keystroke in the front end, so it has to cost
-    /// like an input and not like a build.
+    /// **Every search runs on every keystroke**, so each has to cost like an
+    /// input and not like a build.
     ///
-    /// The bound is loose on purpose. Wall-clock in a suite that runs its tests
-    /// in parallel measures the machine as much as the code, and a tight bound
-    /// here would fail on a loaded one and teach a reader to ignore it. What it
-    /// is for is the order of magnitude: the eccentric drive's search once cost
-    /// eight tenths of a second, and this is what would have caught it.
+    /// All three, because the point is the slowest one: the pair's search was
+    /// what this was written for, and by the time the epicyclic set had its own
+    /// it was twice as dear and ungated. Each stage names its own bound, since
+    /// what they do differs — an epicyclic candidate solves a planet and cuts a
+    /// ring where a pair's builds two teeth.
+    ///
+    /// The bounds are loose on purpose. Wall-clock in a suite that runs its
+    /// tests in parallel measures the machine as much as the code, and a tight
+    /// bound would fail on a loaded one and teach a reader to ignore it. What
+    /// they are for is the order of magnitude: these have been 800 ms, 100 ms
+    /// and 68 ms at various points, every time because something was built per
+    /// candidate that nothing then read.
     #[test]
-    fn choosing_the_shifts_is_quick_enough_to_type_over() {
+    fn every_search_is_quick_enough_to_type_over() {
         let lib = library();
-        let stage = SpurStage {
-            optimisation: Optimisation {
-                enabled: true,
-                ..Optimisation::default()
-            },
+        let tuned = Optimisation {
+            enabled: true,
+            ..Optimisation::default()
+        };
+        let each = |name: &str, ceiling: u64, f: &dyn Fn()| {
+            let start = std::time::Instant::now();
+            for _ in 0..5 {
+                f();
+            }
+            let took = start.elapsed() / 5;
+            assert!(
+                took < std::time::Duration::from_millis(ceiling),
+                "the {name} search took {took:?}, over its {ceiling} ms"
+            );
+        };
+
+        let pair = SpurStage {
+            optimisation: tuned,
             ..SpurStage::default()
         };
-        let start = std::time::Instant::now();
-        for _ in 0..20 {
-            solve_spur_stage(&stage, StageTorques::just(2.0), &lib).unwrap();
-        }
-        let each = start.elapsed() / 20;
-        assert!(
-            each < std::time::Duration::from_millis(200),
-            "a solve with the optimiser on took {each:?}"
-        );
-        eprintln!("optimised solve: {each:?}");
+        each("pair's", 50, &|| {
+            solve_spur_stage(&pair, StageTorques::just(2.0), &lib).unwrap();
+        });
+
+        let mut set = PlanetaryStage {
+            optimisation: tuned,
+            ..PlanetaryStage::default()
+        };
+        set.sun.profile_shift = Auto::automatic(0.0);
+        set.ring.profile_shift = Auto::automatic(0.0);
+        each("epicyclic set's", 100, &|| {
+            solve_planetary_stage(&set, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+        });
+
+        let drive = HulaStage {
+            optimisation: tuned,
+            ..HulaStage::default()
+        };
+        each("eccentric drive's", 50, &|| {
+            solve_hula_stage(&drive, 1000.0, 2.0).unwrap();
+        });
     }
 
     /// **The root round a designer asked for bounds the shift.**
