@@ -28,6 +28,20 @@
      means the same thing wherever it appears. */
   --note-gap: 0.15rem;
   --field-gap: 0.75rem;
+
+  /* The trailing cell every field row keeps for its unit. Shared because every
+     row template in the application ends with it, and because what stops one
+     cell short of the row — a note, a switch, a standalone hint — has to stop
+     at the *same* place as the input boxes do or it lines up with nothing. The
+     gap before it is part of the same measurement, so both live here and the
+     inset is derived from them: the two panels had drifted a tenth of a rem
+     apart on the gap alone, which put everything measured from it out by the
+     same tenth. */
+  --unit-cell: 3.5rem;
+  --row-gap: 0.4rem;
+  /* What stops one cell short of the row's edge, which is where every input box
+     ends. */
+  --unit-inset: calc(var(--unit-cell) + var(--row-gap));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -68,12 +82,19 @@
   color-scheme: light;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
   font-size: 15px;
 }

@@ -23,7 +23,9 @@
     t,
   } from "./core";
   import { developer, setKind, workspace, type GearTab as Tab } from "./state.svelte";
+  import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
+  import { notes } from "./notes";
   import Viewport from "./Viewport.svelte";
 
   let { tab }: { tab: Tab } = $props();
@@ -75,30 +77,20 @@
     }
   }
 
-  /** A field's note, and every note it could be showing instead.
+  /** **Which** sentences a field has to offer — its bound, or the reason behind
+   *  it, and its complaint when what is typed is outside that bound.
    *
-   *  All of them are rendered, stacked in one grid cell, with the ones that do
-   *  not apply hidden — so the slot is as tall as the tallest note the field
-   *  can produce *at this width*, and a note appearing or disappearing moves
-   *  nothing below it. The blank first candidate is what reserves the space on
-   *  a field that has no note at all right now: an error message arriving as
-   *  you type is exactly the case that used to shift the whole column.
-   *
-   *  Sized by the browser rather than by a line count written down here, so it
-   *  stays right at any window width and cannot be made stale by editing the
-   *  text of a note. */
-  type Note = { text: string; err?: boolean };
-
-  function notesFor(f: FieldSpec): { all: Note[]; shown: number } {
-    const all: Note[] = [{ text: "\u00a0" }];
-    const normal =
+   *  How they are shown is `notes`/`FieldNote`'s: stacked in one cell so the
+   *  slot is as tall as the tallest and nothing moves when the visible one
+   *  changes, sized by the browser rather than by a line count written down
+   *  here. This picks; that draws. */
+  function notesFor(f: FieldSpec) {
+    return notes(
       f.key === "profile_shift" && "ok" in result
         ? shiftNote(result.ok.ranges.profile_shift)
-        : (boundNote(f.key) ?? (internal && f.ringNote ? t(f.ringNote) : (f.note ? t(f.note) : null)));
-    if (normal) all.push({ text: normal });
-    const err = errors[f.key];
-    if (err) all.push({ text: err, err: true });
-    return { all, shown: err ? all.length - 1 : normal ? 1 : 0 };
+        : (boundNote(f.key) ?? (internal && f.ringNote ? t(f.ringNote) : (f.note ? t(f.note) : null))),
+      errors[f.key],
+    );
   }
 
   /** The profile shift's three bounds, as one line of text. For an eccentric
@@ -310,7 +302,7 @@
             <option value={k.key}>{t(k.label)}</option>
           {/each}
         </select>
-        <small>{kindNote ? t(kindNote) : ""}</small>
+        <FieldNote notes={notes(kindNote ? t(kindNote) : null, null)} />
       </label>
     </div>
     <div class="grid">
@@ -322,7 +314,7 @@
           <label>
             <span>{t("ui.gear_mate_teeth")}</span>
             <input type="number" step="1" min="1" bind:value={tab.mate.teeth} />
-            <small>{t("ui.gear_mate_shares_module_angle_helix")}</small>
+            <FieldNote notes={notes(t("ui.gear_mate_shares_module_angle_helix"), null)} />
           </label>
           <label>
             <span>{t("ui.gear_mate_profile_shift")}</span>
@@ -335,7 +327,7 @@
               on={tab.mate.internal}
               set={(v) => (tab.mate.internal = v)}
             />
-            <small>{t("ui.gear_mate_ring_runs_inside")}</small>
+            <FieldNote notes={notes(t("ui.gear_mate_ring_runs_inside"), null)} />
           </label>
         {/if}
         {#if f.key === "angular_shift"}
@@ -379,13 +371,7 @@
               />
             {/if}
             <em>{t("ui.gear_m")}</em>
-            <span class="note">
-              {#each amplitudeNotes.all as note, i (i)}
-                <small class:err={note.err} class:hidden={i !== amplitudeNotes.shown}
-                  >{note.text}</small
-                >
-              {/each}
-            </span>
+            <FieldNote notes={amplitudeNotes} />
           </label>
           <label class="auto" class:invalid={byThrow && "error" in result}>
             <span>{t("ui.gear_centre_distance_throw")}</span>
@@ -407,11 +393,7 @@
               />
             {/if}
             <em>{t("ui.gear_mm")}</em>
-            <span class="note">
-              <small class:err={byThrow && "error" in result}>
-                {byThrow && "error" in result ? result.error : "\u00a0"}
-              </small>
-            </span>
+            <FieldNote notes={notes(null, byThrow && "error" in result ? result.error : null)} />
           </label>
         {/if}
         {#if f.key !== "angular_shift"}
@@ -425,11 +407,7 @@
               oninput={(e) => onInput(f.key, e.currentTarget.value)}
             />
             <em>{f.unit ? t(f.unit) : ""}</em>
-            <span class="note">
-              {#each notes.all as note, i (i)}
-                <small class:err={note.err} class:hidden={i !== notes.shown}>{note.text}</small>
-              {/each}
-            </span>
+            <FieldNote notes={notes} />
           </label>
         {/if}
       {/each}
@@ -501,7 +479,7 @@
         <span>{t("ui.gear_chord_tolerance")}</span>
         <input type="number" step="0.0005" min="0" bind:value={tab.chordTolerance} />
         <em>{t("ui.gear_mm")}</em>
-        <small>{t("ui.gear_maximum_deviation_exported_outline_from_true")}</small>
+        <FieldNote notes={notes(t("ui.gear_maximum_deviation_exported_outline_from_true"), null)} />
       </label>
       <!-- Left, with the export button below it: this one belongs to that
            action rather than to the column of fields above, and lining it up
@@ -886,15 +864,17 @@
     align-items: center;
     /* Column gap spaces the label, box and unit; row gap is what holds a note
        to the box it belongs to. They are not the same measurement. */
-    column-gap: 0.5rem;
+    column-gap: var(--row-gap);
     row-gap: var(--note-gap);
     font-size: 0.85rem;
   }
   /* A select holding words, not a number, needs the room the number column does
-     not: "Internal (ring)" was arriving as "Internal (rin". It takes the unit
-     column's width as well, since a kind has no unit to print. */
+     not: "Internal (ring)" was arriving as "Internal (rin". It takes that room
+     out of the label's share rather than out of the trailing cell, so it still
+     ends where every input and every note in the panel ends — a kind has no
+     unit to print, but the cell is what holds the column together. */
   label.wide {
-    grid-template-columns: 1fr 10.5rem;
+    grid-template-columns: 1fr 10.5rem 3.5rem;
   }
   /* A switch that carries its own name has nothing to put in a label column,
      so the row is the button alone at the right edge — the same edge every
@@ -914,10 +894,7 @@
     flex-direction: column;
     align-items: flex-end;
     /* The unit cell every row keeps, and the gap before it. */
-    padding-right: 3.9rem;
-  }
-  label.switchrow small {
-    text-align: right;
+    padding-right: var(--unit-inset);
   }
   /* Except where the switch belongs to the action below it rather than to the
      column of fields: then it lines up with that button instead. */
@@ -931,32 +908,7 @@
   label.auto {
     grid-template-columns: 1fr auto 7rem 3.5rem;
   }
-  label.auto .note {
-    grid-column: 1 / 4;
-  }
-  label small {
-    grid-column: 1 / -1;
-    font-size: 0.72rem;
-    color: var(--muted);
-  }
-  label small.err {
-    color: var(--warn);
-  }
-  /* Every note a field can show, stacked in one cell: the slot takes the
-     height of the tallest, so nothing moves when the visible one changes. */
-  /* A note belongs to the box above it, so it ends where that box ends: the
-     label and input columns only, right-aligned within them. */
-  label .note {
-    grid-column: 1 / 3;
-    display: grid;
-    text-align: right;
-  }
-  label .note small {
-    grid-area: 1 / 1;
-  }
-  label .note small.hidden {
-    visibility: hidden;
-  }
+
   input[type="number"],
   select {
     font: inherit;

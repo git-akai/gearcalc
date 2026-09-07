@@ -19,7 +19,9 @@
   } from "./core";
   import { developer, trains, library, type TrainTab } from "./state.svelte";
   import { exportTrain, relieve } from "./core";
+  import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
+  import { notes, type Notes } from "./notes";
 
   /** A mesh chooses one shift per gear, and its centre distance is one relation
    *  among them — so at most `gears.length` of {distance, shift…} can be given,
@@ -128,14 +130,6 @@
   /** The candidates for one note slot: a blank to reserve the space, the note
    *  itself when the stage has solved, and the out-of-range message when the
    *  value is outside its bound. All are rendered; see the slot's comment. */
-  type Notes = { all: { text: string; err?: boolean }[]; shown: number };
-
-  function notes(range: string | null, bad: string | null): Notes {
-    const all: Notes["all"] = [{ text: "\u00a0" }];
-    if (range) all.push({ text: range });
-    if (bad) all.push({ text: bad, err: true });
-    return { all, shown: bad ? all.length - 1 : range ? 1 : 0 };
-  }
 
   const pct = (v: number) => (100 * v).toFixed(3);
   const n = (v: number) => v.toFixed(3);
@@ -234,18 +228,11 @@
   <label class="switchrow">
     <Switch label={t(key)} {on} {set} />
     {#if note !== undefined}
-      {@render noteSlot(notes(note, null))}
+      <FieldNote notes={notes(note, null)} />
     {/if}
   </label>
 {/snippet}
 
-{#snippet noteSlot(notes: Notes)}
-  <span class="note">
-    {#each notes.all as note, i (i)}
-      <small class:err={note.err} class:hidden={i !== notes.shown}>{note.text}</small>
-    {/each}
-  </span>
-{/snippet}
 
 <!-- One gear card, used by every stage that has gears. A sun, a planet, a ring
      and a spur gear take the same inputs and produce the same readout, so they
@@ -417,7 +404,7 @@
            here as well, and drifted: this one lost its reason altogether and
            the fillet bound below was abbreviated past the point of saying
            anything. -->
-      {@render noteSlot(
+      <FieldNote notes={
         notes(
           g
             ? t("ui.bound_dedendum", {
@@ -426,19 +413,19 @@
               })
             : null,
           g ? outside(gear.dedendum, g.ranges.dedendum) : null,
-        ),
-      )}
+        )
+      } />
     </label>
     <label class:invalid={g && outside(gear.root_radius, g.ranges.root_radius)}>
       <span>{t("ui.train_root_radius")}</span>
       <input type="number" step="0.01" bind:value={gear.root_radius} />
       <em>{t("ui.train_m")}</em>
-      {@render noteSlot(
+      <FieldNote notes={
         notes(
           g ? t("ui.bound_root_radius", { max: n(g.ranges.root_radius.max ?? 0) }) : null,
           g ? outside(gear.root_radius, g.ranges.root_radius) : null,
-        ),
-      )}
+        )
+      } />
     </label>
   {/if}
   {#if opts.solvedShift === undefined}
@@ -462,17 +449,11 @@
         gear.dedendum,
         0.05,
         undefined,
-        undefined,
+        // It used to sit indented under the shift, which said "this belongs to
+        // that" without words. The indent went when it became an `auto` field
+        // like its neighbours, so the note says it instead.
+        t("ui.train_note_working_depth"),
         "ui.train_m",
-      )}
-      <!-- It used to sit indented under the shift, which said "this belongs to
-           that" without words. The indent went when it became an `auto` field
-           like its neighbours, so the note says it instead. -->
-      {@render noteSlot(
-        notes(
-          t("ui.train_note_working_depth"),
-          null,
-        ),
       )}
     {/if}
   {:else}
@@ -480,7 +461,7 @@
       <span>{t("ui.train_profile_shift")}</span>
       <input type="number" value={Number(opts.solvedShift.toFixed(4))} disabled class="computed" />
       <em>{t("ui.train_module")}</em>
-      {@render noteSlot(notes(t("ui.train_note_planet_shift_solved"), null))}
+      <FieldNote notes={notes(t("ui.train_note_planet_shift_solved"), null)} />
     </label>
   {/if}
   {#if opts.solvedShift === undefined && !gear.profile_shift.auto}
@@ -490,7 +471,7 @@
            base circle, its cutter's reach and the generation limit are what
            limit it (docs/reference.md#internal-gears) — and the core does not report those for a
            stage member yet. It shows no bound rather than the wrong one. -->
-      {@render noteSlot(
+      <FieldNote notes={
         notes(
           opts.cut === "shaper"
             ? null
@@ -504,8 +485,8 @@
                 })
               : null,
           r ? outside(gear.profile_shift.manual, r.bound) : null,
-        ),
-      )}
+        )
+      } />
     </p>
   {/if}
   {#if opts.faceAuto === false}
@@ -521,14 +502,14 @@
       undefined,
       "ui.train_mm",
     )}
-    {@render noteSlot(
+    <FieldNote notes={
       notes(
         opts.faceFromContinuity === undefined
           ? t("ui.train_note_no_continuous_width")
           : t("ui.train_note_face_width_continuity", { width: n(opts.faceFromContinuity) }),
         null,
-      ),
-    )}
+      )
+    } />
   {:else}
     {@render autoNumber(
       "ui.train_face_width",
@@ -697,7 +678,7 @@
          beside the field instead it spans whatever grid it lands in, which is
          the outer one, and lines up with nothing. -->
     {#if note !== undefined}
-      {@render noteSlot(notes(note, null))}
+      <FieldNote notes={notes(note, null)} />
     {/if}
   </label>
 {/snippet}
@@ -723,7 +704,7 @@
       <span>{t("ui.train_min_contact_ratio")}</span>
       <input type="number" step="0.05" bind:value={o.min_contact_ratio} />
       <em>{t("ui.train_epsilon")}</em>
-      {@render noteSlot(notes(t("ui.train_note_min_contact_ratio"), null))}
+      <FieldNote notes={notes(t("ui.train_note_min_contact_ratio"), null)} />
     </label>
   {/if}
 {/snippet}
@@ -819,17 +800,15 @@
         bind:value={tab.train.operating_torque}
       />
       <em>{t("ui.train_nm")}</em>
-    </label>
-    {@render noteSlot(
-      notes(
+      <FieldNote notes={notes(
         "ok" in result && result.ok.operating_torque_percent !== null
           ? t("ui.train_note_operating_torque_percent", {
               percent: result.ok.operating_torque_percent.toFixed(1),
             })
           : null,
         null,
-      ),
-    )}
+      )} />
+    </label>
 
     {#if "intermittent" in tab.train.actuation}
       <label>
@@ -984,28 +963,28 @@
                 <span>{t("ui.train_axis_angle")}</span>
                 <input type="number" step="5" bind:value={stage.shaft_angle} />
                 <em>°</em>
-                {@render noteSlot(
+                <FieldNote notes={
                   notes(
                     stage.shaft_angle === 0
                       ? t("ui.train_note_shafts_parallel")
                       : t("ui.train_note_shafts_crossed"),
                     null,
-                  ),
-                )}
+                  )
+                } />
               </label>
               <label>
                 <span>{t("ui.train_additional_helix_angle")}</span>
                 <input type="number" step="1" bind:value={stage.additional_helix} />
                 <em>°</em>
-                {@render noteSlot(
+                <FieldNote notes={
                   notes(
                     t("ui.train_note_helix_split", {
                       first: n(stage.shaft_angle / 2 + stage.additional_helix),
                       second: n(stage.shaft_angle / 2 - stage.additional_helix),
                     }),
                     null,
-                  ),
-                )}
+                  )
+                } />
               </label>
               <label>
                 <span>{t("ui.train_sliding_friction")}</span>
@@ -1016,12 +995,12 @@
                 <span>{t("ui.train_static_friction")}</span>
                 <input type="number" step="0.01" bind:value={stage.static_friction} />
                 <em></em>
-                {@render noteSlot(
+                <FieldNote notes={
                   notes(
                     t("ui.train_note_static_friction"),
                     null,
-                  ),
-                )}
+                  )
+                } />
               </label>
               <label>
                 <span>{t("ui.train_tooth_thickness_mod")}</span>
@@ -1032,7 +1011,7 @@
                      mesh at zero backlash (docs/rationale.md#inputs-are-the-only-state), so storing both would
                      be storing a constraint that can be broken. Which gear it
                      applies to therefore has to be said. -->
-                {@render noteSlot(
+                <FieldNote notes={
                   notes(
                     t(
                       stage.shaft_angle === 0
@@ -1041,8 +1020,8 @@
                       { first: String(gearNumber(i, 0)), second: String(gearNumber(i, 1)) },
                     ),
                     null,
-                  ),
-                )}
+                  )
+                } />
               </label>
               {@render autoNumber(
                 "ui.train_c2c_distance",
@@ -1095,7 +1074,7 @@
                     </option>
                   </select>
                   <em></em>
-                  {@render noteSlot(notes(t("ui.train_note_load_sharing"), null))}
+                  <FieldNote notes={notes(t("ui.train_note_load_sharing"), null)} />
                 </label>
               {/if}
               {@render efficiencyToggle(stage.optimisation)}
@@ -1266,12 +1245,12 @@
                 <span>{t("ui.train_static_friction")}</span>
                 <input type="number" step="0.01" bind:value={stage.static_friction} />
                 <em></em>
-                {@render noteSlot(
+                <FieldNote notes={
                   notes(
                     t("ui.train_note_static_friction"),
                     null,
-                  ),
-                )}
+                  )
+                } />
               </label>
               <label>
                 <span>{t("ui.train_tooth_thickness_mod")}</span>
@@ -1283,12 +1262,12 @@
                      constraint. What it reaches differs, and the note says so —
                      the pair's play is unchanged *because* of that invariant,
                      which is an answer rather than a gap. -->
-                {@render noteSlot(
+                <FieldNote notes={
                   notes(
                     t("ui.train_note_thickness_mod_worm"),
                     null,
-                  ),
-                )}
+                  )
+                } />
               </label>
               {@render autoNumber(
                 "ui.train_c2c_distance",
@@ -1507,12 +1486,12 @@
                 <span>{t("ui.train_static_friction_sun_planet")}</span>
                 <input type="number" step="0.01" bind:value={stage.static_friction_sun_planet} />
                 <em></em>
-                {@render noteSlot(
+                <FieldNote notes={
                   notes(
                     t("ui.train_note_static_friction"),
                     null,
-                  ),
-                )}
+                  )
+                } />
               </label>
               <label>
                 <span>{t("ui.train_sliding_friction_planet_ring")}</span>
@@ -1523,23 +1502,23 @@
                 <span>{t("ui.train_static_friction_planet_ring")}</span>
                 <input type="number" step="0.01" bind:value={stage.static_friction_planet_ring} />
                 <em></em>
-                {@render noteSlot(
+                <FieldNote notes={
                   notes(
                     t("ui.train_note_static_friction"),
                     null,
-                  ),
-                )}
+                  )
+                } />
               </label>
               <label>
                 <span>{t("ui.train_tooth_thickness_mod")}</span>
                 <input type="number" step="0.05" bind:value={stage.thickness_mod} />
                 <em>{t("ui.train_k")}</em>
-                {@render noteSlot(
+                <FieldNote notes={
                   notes(
                     t("ui.train_note_thickness_mod_planetary"),
                     null,
-                  ),
-                )}
+                  )
+                } />
               </label>
               <label>
                 <span>{t("ui.train_c2c_clearance")}</span>
@@ -1560,7 +1539,7 @@
                 <span>{t("ui.train_minimum_planet_clearance")}</span>
                 <input type="number" step="0.05" bind:value={stage.min_planet_clearance} />
                 <em>{t("ui.train_mm")}</em>
-                {@render noteSlot(notes(t("ui.train_note_planet_clearance"), null))}
+                <FieldNote notes={notes(t("ui.train_note_planet_clearance"), null)} />
               </label>
               <label>
                 <span>{t("ui.train_planets")}</span>
@@ -1584,7 +1563,7 @@
                   <option value="ring">{t("ui.train_ring")}</option>
                 </select>
                 <em></em>
-                {@render noteSlot(notes(null, null))}
+                <FieldNote notes={notes(null, null)} />
               </label>
               {@render efficiencyToggle(stage.optimisation)}
             </div>
@@ -1595,7 +1574,7 @@
                 <span>{t("ui.train_cutter_teeth")}</span>
                 <input type="number" step="1" min="1" bind:value={stage.cutter.teeth} />
                 <em></em>
-                {@render noteSlot(notes(null, null))}
+                <FieldNote notes={notes(null, null)} />
               </label>
               <label>
                 <span>{t("ui.train_cutter_addendum")}</span>
@@ -1786,7 +1765,7 @@
                   <input type="number" step="0.05" bind:value={stage.clearance} />
                 {/if}
                 <em>{t("ui.train_mm")}</em>
-                {@render noteSlot(notes(t("ui.train_hula_note_gap"), null))}
+                <FieldNote notes={notes(t("ui.train_hula_note_gap"), null)} />
               </label>
               <!-- The crank offset is this arrangement's centre distance and is
                    entered as one: automatic derives it from the clearances the
@@ -1837,7 +1816,7 @@
                 <dt>{t("ui.train_ratio")}</dt>
                 <dd>
                   {hres.ratio.toFixed(4)} : 1
-                  {@render noteSlot(
+                  <FieldNote notes={
                     notes(
                       `${t("ui.train_hula_ratio_products", {
                         numerator: String(hres.ratio_products[0]),
@@ -1846,8 +1825,8 @@
                         denominator: String(hres.ratio_products[1]),
                       })}`,
                       null,
-                    ),
-                  )}
+                    )
+                  } />
                 </dd>
                 <dt>{t("ui.train_efficiency")}</dt>
                 <dd>
@@ -1855,14 +1834,14 @@
                   {#if hres.efficiency.backward === 0}
                     <small class="warn">{t("ui.train_self_locking")}</small>
                   {/if}
-                  {@render noteSlot(
+                  <FieldNote notes={
                     notes(
                       `${t("ui.train_hula_meshes_alone", {
                         percent: pct(hres.fixed_carrier_efficiency.forward),
                       })} · ${t("ui.train_hula_note_circulating")}`,
                       null,
-                    ),
-                  )}
+                    )
+                  } />
                 </dd>
                 <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
                 <dd>
@@ -1896,13 +1875,13 @@
                   <span>{t("ui.train_tooth_thickness_mod")}</span>
                   <input type="number" step="0.05" bind:value={stage.thickness_mod[m]} />
                   <em>{t("ui.train_k")}</em>
-                  {@render noteSlot(notes(t("ui.train_hula_note_thickness_mod"), null))}
+                  <FieldNote notes={notes(t("ui.train_hula_note_thickness_mod"), null)} />
                 </label>
                 <label>
                   <span>{t("ui.train_cutter_teeth")}</span>
                   <input type="number" step="1" min="4" bind:value={stage.cutter[m].teeth} />
                   <em></em>
-                  {@render noteSlot(notes(t("ui.train_hula_note_shaper"), null))}
+                  <FieldNote notes={notes(t("ui.train_hula_note_shaper"), null)} />
                 </label>
                 <label>
                   <span>{t("ui.train_sliding_friction")}</span>
@@ -1916,7 +1895,7 @@
                     <option value="ring">{t("ui.train_hula_split_ring")}</option>
                   </select>
                   <em></em>
-                  {@render noteSlot(notes(t("ui.train_hula_note_split"), null))}
+                  <FieldNote notes={notes(t("ui.train_hula_note_split"), null)} />
                 </label>
               </div>
               {#if hres}
@@ -1924,38 +1903,38 @@
                   <dt>{t("ui.train_hula_operating_pressure_angle")}</dt>
                   <dd>
                     {hres.meshes[m].operating_pressure_angle.toFixed(3)}°
-                    {@render noteSlot(
-                      notes(t("ui.train_hula_note_operating_pressure_angle"), null),
-                    )}
+                    <FieldNote notes={
+                      notes(t("ui.train_hula_note_operating_pressure_angle"), null)
+                    } />
                   </dd>
                   <dt>{t("ui.train_contact_ratio")}</dt>
                   <dd>
                     {hres.meshes[m].contact_ratio.toFixed(4)}
-                    {@render noteSlot(
+                    <FieldNote notes={
                       notes(
                         null,
                         hres.meshes[m].contact_ratio < 1
                           ? t("ui.train_note_contact_ratio_below_one")
                           : null,
-                      ),
-                    )}
+                      )
+                    } />
                   </dd>
                   <dt>{t("ui.train_hula_gap_result")}</dt>
                   <dd>
                     {hres.meshes[m].clearance.toFixed(4)} {t("ui.train_mm")}
-                    {@render noteSlot(
+                    <FieldNote notes={
                       notes(
                         t("ui.train_hula_gap_as_cut", {
                           value: hres.meshes[m].clearance_as_cut.toFixed(4),
                         }),
                         null,
-                      ),
-                    )}
+                      )
+                    } />
                   </dd>
                   <dt>{t("ui.train_hula_tip_margin")}</dt>
                   <dd>
                     {hres.meshes[m].tip_margin.toFixed(4)}°
-                    {@render noteSlot(notes(t("ui.train_hula_note_tip_margin"), null))}
+                    <FieldNote notes={notes(t("ui.train_hula_note_tip_margin"), null)} />
                   </dd>
                   <dt>{t("ui.train_hula_interference")}</dt>
                   <dd>
@@ -2156,10 +2135,6 @@
   .gear label.auto {
     grid-template-columns: 1fr auto 6.5rem 3.5rem;
   }
-  /* A note still ends where its number ends. */
-  label.auto .note {
-    grid-column: 1 / 4;
-  }
   /* The **input box** is the anchor, not the text after it. With an `auto`
      trailing column the boxes shifted left or right by however wide a unit
      happened to be — "module" against "°" — so nothing lined up down a column.
@@ -2173,7 +2148,7 @@
     align-items: center;
     /* See GearPanel: the column gap spaces a row, the row gap pairs a note to
        the box above it. */
-    column-gap: 0.4rem;
+    column-gap: var(--row-gap);
     row-gap: var(--note-gap);
     font-size: 0.85rem;
   }
@@ -2379,10 +2354,7 @@
     flex-direction: column;
     align-items: flex-end;
     /* The unit cell every row keeps, and the gap before it. */
-    padding-right: 3.9rem;
-  }
-  .switchrow .note {
-    text-align: right;
+    padding-right: var(--unit-inset);
   }
   .subtoggles {
     display: flex;
@@ -2423,7 +2395,7 @@
     /* A note in its own element rather than inside the label, so it has to undo
        the field gap above it to sit as close as an in-label note does. */
     margin: calc(var(--note-gap) - var(--field-gap)) 0 var(--field-gap);
-    padding-right: 3.9rem;
+    padding-right: var(--unit-inset);
     font-size: 0.72rem;
     color: var(--muted);
     text-align: right;
@@ -2439,34 +2411,6 @@
   .aside.wide {
     margin: 0.2rem 0 0.5rem;
     max-width: 60rem;
-  }
-  /* A note belongs to the box above it, so it ends where that box ends: it
-     spans the label and input columns only, and is right-aligned within them.
-     Running it to the row's full width ended it past the unit, against nothing. */
-  .note {
-    grid-column: 1 / 3;
-    display: grid;
-    text-align: right;
-  }
-  /* A note rendered beside a field rather than inside its label — `auto` fields
-     are their own snippet, so their note is a sibling. It is the same note and
-     has to sit like one: pulled up against the box above, pushed off the field
-     below, and stopped at the same right edge (unit column 3.5rem + its 0.4rem
-     gap) instead of running to the card's full width. */
-  .gear > .note {
-    margin: calc(var(--note-gap) - var(--field-gap)) 0 var(--field-gap);
-    padding-right: 3.9rem;
-  }
-  .note small {
-    grid-area: 1 / 1;
-    font-size: 0.72rem;
-    color: var(--muted);
-  }
-  .note small.hidden {
-    visibility: hidden;
-  }
-  .err {
-    color: var(--warn);
   }
   label.invalid input {
     border-color: var(--warn);
