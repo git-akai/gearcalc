@@ -2211,9 +2211,13 @@
     font-size: 0.75rem;
     font-style: normal;
   }
+  /* The actuation control ends where the switches and the inputs do, for the
+     same reason: its trailing cell is the unit cell every field keeps, left
+     empty. It used to run to the row's edge, which put the one control in the
+     column that lined up with nothing. */
   .mode {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto 3.5rem;
     align-items: center;
     gap: 0.4rem;
     font-size: 0.85rem;
@@ -2355,11 +2359,30 @@
   }
   /* Four sources now, not two, so the row wraps rather than squeezing them. */
   /* A switch that carries its own name has nothing to put in a label column,
-     so the row is the button alone at the right edge — the same edge every
-     input in the column ends on. */
+     so the row is the button alone, at the edge every **input box** in the
+     column ends on — one unit cell in from the row's own edge, which is where
+     the notes end too.
+     That edge rather than the row's, because the row's is where the *unit* cell
+     ends and a unit is short left-aligned text: a button flush to it lines up
+     with the empty air past "mm" rather than with anything drawn.
+     **Laid out as a column of its own rather than as a grid row**, which is not
+     a style choice. As a grid it inherits whatever `grid-template-columns` the
+     container sets, and those selectors carry two classes and an element to
+     this one's single class — so it kept the three-column template underneath
+     and `justify-items` put the button at the end of the *label* column,
+     mid-row, lining up with nothing. Racing that needs a selector naming every
+     container a switch might sit in, and the list goes stale the first time
+     there is a fourth. A flex row cannot be reached by a column template at
+     all. */
   .switchrow {
-    grid-template-columns: 1fr;
-    justify-items: end;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    /* The unit cell every row keeps, and the gap before it. */
+    padding-right: 3.9rem;
+  }
+  .switchrow .note {
+    text-align: right;
   }
   .subtoggles {
     display: flex;

@@ -906,19 +906,24 @@
      the row's edge would be the one control in the panel lining up with
      nothing. The empty trailing cell is what puts it on the edge the numbers
      share. */
+  /* See `TrainPanel`, which carries the reasoning: the button ends where the
+     input boxes end rather than where the row does, and the row is laid out as
+     a flex column so that no container's `grid-template-columns` can reach it. */
   label.switchrow {
-    grid-template-columns: 1fr 3.5rem;
-    justify-items: end;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    /* The unit cell every row keeps, and the gap before it. */
+    padding-right: 3.9rem;
   }
   label.switchrow small {
-    grid-column: 1;
     text-align: right;
   }
   /* Except where the switch belongs to the action below it rather than to the
      column of fields: then it lines up with that button instead. */
   label.switchrow.start {
-    grid-template-columns: 1fr;
-    justify-items: start;
+    align-items: flex-start;
+    padding-right: 0;
   }
   /* An `auto` toggle takes a column of its own, out of the label's share, so
      the number keeps the edge every other number here shares — and the
