@@ -1024,6 +1024,18 @@ does not move the page; a figure that cannot change while you look at it needs
 none of that, and asking for it right-aligns the annotation away from the value
 it belongs to and reserves a line for nothing.
 
+**A mesh reports what a mesh has, and a stage what a stage has.** Efficiency and
+backlash exist at both levels and are different quantities there — a pair's own
+loss against what the arrangement does with it, a pair's own play against what
+that play comes to at a shaft — so each is a row where it belongs and neither is
+mentioned in the other's annotation. A stage whose efficiency note quoted the
+meshes' product was answering, in small type beside the wrong number, a question
+the mesh rows answer in full: the epicyclic set and the eccentric drive both did
+it, and the drive's is the case that shows why it misleads, since the two figures
+are 99 % and 27 % and only one of them is the drive. Both directions are given at
+both levels for the same reason they are given anywhere here — a stage that
+cannot be back-driven says so by reporting the zero, not by omitting the column.
+
 **Checked by measurement**, because screenshots are not pixel-deterministic here:
 every control reports the same `getBoundingClientRect().top` with and without an
 error note.

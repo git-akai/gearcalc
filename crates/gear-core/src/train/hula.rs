@@ -298,6 +298,18 @@ pub struct HulaMesh {
     /// band. The same gap subtends a different angle at each, so the two differ
     /// whenever the tooth counts do.
     pub backlash: [super::Backlash; 2],
+    /// **This pair's own efficiency with the crank held**, 0..1, both
+    /// directions — what the teeth lose, and nothing about the arrangement they
+    /// sit in.
+    ///
+    /// It is emphatically **not** the drive's: the two of these multiply to
+    /// [`HulaResult::fixed_carrier_efficiency`], and the drive's own is that
+    /// figure put through the reduction, which on a high-ratio arrangement
+    /// takes a pair losing under a percent to a drive losing tens of them
+    /// ([`HulaResult::efficiency`]). Reported per mesh for the same reason a
+    /// planetary set reports it per mesh: a stage that loses more than it should
+    /// loses it in one of its meshes, and a single product cannot say which.
+    pub efficiency: Directional<f64>,
 }
 
 /// What a hula stage came to.
@@ -467,7 +479,7 @@ pub fn solve_hula_stage(
         thickness_mod: stage.thickness_mod[mesh],
         ..GearParams::default()
     };
-    let tip_room = |mesh: usize, _offset: f64, shift: [f64; 4]| {
+    let tip_room = |mesh: usize, shift: [f64; 4]| {
         let pair = pairs[mesh];
         let ring = Ring::cut_by(&built(mesh, shift, pair.ring), &stage.cutter[mesh]);
         let pinion = Tooth::new(built(mesh, shift, pair.pinion));
@@ -647,14 +659,15 @@ pub fn solve_hula_stage(
         // when it lies wholly on one side of the pitch point, which at one tooth
         // of difference it does.
         let path = ContactPath::new(&pinion, ring.ra, &mesh);
-        basic.push(Directional::of(|d| {
+        let pair_efficiency = Directional::of(|d| {
             path.as_ref().map_or((0.0, 0.0), |p| {
                 (
                     efficiency(p, &mesh, &pinion, stage.sliding_friction[index], d),
                     efficiency(p, &mesh, &pinion, stage.static_friction[index], d),
                 )
             })
-        }));
+        });
+        basic.push(pair_efficiency);
 
         rolling.push(mesh);
         let report = mesh_with(&ring, &pinion);
@@ -676,6 +689,11 @@ pub fn solve_hula_stage(
             tip_interference: report.as_ref().is_some_and(|m| m.tip_interference),
             tip_margin: report.as_ref().map_or(0.0, |m| m.tip_margin.to_degrees()),
             backlash: [backlash_of(MeshSide::First), backlash_of(MeshSide::Second)],
+            // The sliding figure of the pair the fixed-carrier product is
+            // taken from, rather than a second run of the same integral: one
+            // number, read twice, so a mesh row and the drive's own efficiency
+            // cannot disagree about what this pair loses.
+            efficiency: Directional::of(|d| pair_efficiency.get(d).0),
         });
     }
 

@@ -1645,12 +1645,11 @@
                 <dt>{t("ui.train_efficiency")}</dt>
                 <dd>
                   {bothWays(pres.efficiency)}
-                  <small>
-                    {t("ui.train_fixed_carrier_efficiency", {
-                      percent: pct(pres.fixed_carrier_efficiency.forward),
-                    })}
-                  </small>
                 </dd>
+                <!-- Both shafts the same two plays are seen from, as every other
+                     stage kind names both ends of its own: driving forward the
+                     play is read at the output, and driving backward at the
+                     shaft that was the input. -->
                 <dt>{t("ui.train_backlash")}</dt>
                 <dd>
                   {t("ui.train_at_the_shaft", {
@@ -1660,6 +1659,10 @@
                   <small
                     >({range(pres.backlash.forward.minimum.toFixed(5), pres.backlash.forward.maximum.toFixed(5))})</small
                   >
+                  · {t("ui.train_at_the_shaft", {
+                    angle: pres.backlash.backward.nominal.toFixed(5),
+                    shaft: shaft(pres.arrangement.input),
+                  })}
                 </dd>
                 <dt>{t("ui.train_planet_clearance")}</dt>
                 <dd>
@@ -1689,9 +1692,9 @@
                    the planets, the ring against the planets — so it leads each
                    list. -->
               {#each [
-                [t("ui.train_mesh_sun_planet"), pres.sun_planet, pres.sun_coprime_with_planets],
-                [t("ui.train_mesh_planet_ring"), pres.planet_ring, pres.ring_coprime_with_planets],
-              ] as const as [label, m, coprime] (label)}
+                [t("ui.train_mesh_sun_planet"), pres.sun_planet, pres.sun_coprime_with_planets, "ui.train_the_sun", "ui.train_the_planet"],
+                [t("ui.train_mesh_planet_ring"), pres.planet_ring, pres.ring_coprime_with_planets, "ui.train_the_planet", "ui.train_the_ring"],
+              ] as const as [label, m, coprime, first, second] (label)}
                 <h4 class="mesh">{label}</h4>
                 <dl class="out indent">
                   <dt>{t("ui.train_coprime")}</dt>
@@ -1705,6 +1708,24 @@
                   <dt>{t("ui.train_mesh_efficiency")}</dt>
                   <dd>
                     {bothWays(m.efficiency)}
+                  </dd>
+                  <!-- The pair's own play, which the result has always carried
+                       and the panel never showed. Written as every other mesh
+                       here writes it: one gap, seen from each of its two ends,
+                       with the tolerance band on the first. -->
+                  <dt>{t("ui.train_mesh_backlash")}</dt>
+                  <dd>
+                    {t("ui.train_backlash_at", {
+                      angle: m.backlash[0].nominal.toFixed(5),
+                      member: t(first),
+                    })}
+                    <small
+                      >({range(m.backlash[0].minimum.toFixed(5), m.backlash[0].maximum.toFixed(5))})</small
+                    >
+                    · {t("ui.train_backlash_at", {
+                      angle: m.backlash[1].nominal.toFixed(5),
+                      member: t(second),
+                    })}
                   </dd>
                   <dt>{t("ui.train_contact_stress_at_pitch_point")}</dt>
                   <dd>
@@ -1917,9 +1938,27 @@
                       .filter((x) => x !== null)
                       .join(" · ") || t("ui.train_hula_interference_none")}
                   </dd>
-                  <dt>{t("ui.train_backlash")}</dt>
+                  <dt>{t("ui.train_mesh_efficiency")}</dt>
                   <dd>
-                    {hres.meshes[m].backlash.map((b) => `${b.nominal.toFixed(5)}°`).join(" / ")}
+                    {bothWays(hres.meshes[m].efficiency)}
+                  </dd>
+                  <!-- The same gap seen from each member, written as the spur
+                       and screw readouts write theirs — one gap, two ends, and
+                       the tolerance band on the first of them. The ring leads,
+                       as its card does. -->
+                  <dt>{t("ui.train_mesh_backlash")}</dt>
+                  <dd>
+                    {t("ui.train_backlash_at", {
+                      angle: hres.meshes[m].backlash[1].nominal.toFixed(5),
+                      member: t("ui.train_the_ring"),
+                    })}
+                    <small
+                      >({range(hres.meshes[m].backlash[1].minimum.toFixed(5), hres.meshes[m].backlash[1].maximum.toFixed(5))})</small
+                    >
+                    · {t("ui.train_backlash_at", {
+                      angle: hres.meshes[m].backlash[0].nominal.toFixed(5),
+                      member: t("ui.train_the_pinion"),
+                    })}
                   </dd>
                 </dl>
               {/if}
@@ -1960,19 +1999,26 @@
                 </dd>
                 <dt>{t("ui.train_efficiency")}</dt>
                 <dd>
-                  {pct(hres.efficiency.forward)} %
-                  {#if hres.efficiency.backward === 0}
+                  {bothWays(hres.efficiency)}
+                  {#if hres.efficiency.backward <= 0}
                     <small class="warn">{t("ui.train_self_locking")}</small>
                   {/if}
-                  <small>{`${t("ui.train_hula_meshes_alone", {
-                        percent: pct(hres.fixed_carrier_efficiency.forward),
-                      })} · ${t("ui.train_hula_note_circulating")}`}</small>
                 </dd>
-                <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
+                <!-- The two shafts the same two plays are seen from, which
+                     differ by the whole reduction — so both are named, as the
+                     spur stage names its two members. -->
+                <dt>{t("ui.train_backlash")}</dt>
                 <dd>
-                  {t("ui.train_backlash_at", {
-                    angle: hres.backlash.forward.nominal.toFixed(4),
-                    member: t("ui.train_hula_role_output"),
+                  {t("ui.train_at_the_shaft", {
+                    angle: hres.backlash.forward.nominal.toFixed(5),
+                    shaft: t("ui.train_hula_role_output"),
+                  })}
+                  <small
+                    >({range(hres.backlash.forward.minimum.toFixed(5), hres.backlash.forward.maximum.toFixed(5))})</small
+                  >
+                  · {t("ui.train_at_the_shaft", {
+                    angle: hres.backlash.backward.nominal.toFixed(5),
+                    shaft: t("ui.train_hula_role_crank"),
                   })}
                 </dd>
                 <dt>{t("ui.train_hula_speeds")}</dt>

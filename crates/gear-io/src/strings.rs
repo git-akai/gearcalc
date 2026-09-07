@@ -1238,10 +1238,11 @@ mod tests {
                     }
                 }
                 // A bound no offset can clear: one that is never satisfied.
-                if let Err(e) = hula::solve_with(
-                    &drive([19, 18, 17, 18], 0.3, Offset::Clearance),
-                    &|_, _, _| -1.0,
-                ) {
+                if let Err(e) =
+                    hula::solve_with(&drive([19, 18, 17, 18], 0.3, Offset::Clearance), &|_, _| {
+                        -1.0
+                    })
+                {
                     err(e.note());
                 }
             }

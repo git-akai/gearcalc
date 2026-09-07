@@ -168,7 +168,14 @@ pub enum Split {
 /// tips have where their circles cross is
 /// [`crate::ring::RingMesh::tip_margin`], and a copy of it here would be a
 /// second answer to a question that already has one.
-pub type Bound<'a> = &'a dyn Fn(usize, f64, [f64; 4]) -> f64;
+///
+/// **The offset is not passed**, because the shifts already are it: the same
+/// relation that turns an offset into a shift sum turns the shifts back into
+/// the distance the pair runs at, and a bound reading it does so from the parts
+/// it builds ([`crate::mesh::operating_geometry`], through
+/// [`crate::ring::mesh_with`]). Handing it over as well would be a second copy
+/// of the trial, free to disagree with the first.
+pub type Bound<'a> = &'a dyn Fn(usize, [f64; 4]) -> f64;
 
 /// A drive as its inputs describe it.
 #[derive(Clone, Copy, Debug)]
@@ -412,7 +419,7 @@ impl Geometry {
 /// Every arm of [`Error`]. Each is a drive that cannot exist rather than a
 /// solver that gave up, and each names which mesh could not be made to work.
 pub fn solve(set: &Set) -> Result<Layout, Error> {
-    solve_with(set, &|_, _, _| f64::INFINITY)
+    solve_with(set, &|_, _| f64::INFINITY)
 }
 
 /// The same, with further bounds on the offset — see [`Bound`].
@@ -459,7 +466,7 @@ pub fn solve_with(set: &Set, bound: Bound) -> Result<Layout, Error> {
                     .ok_or(Error::ClearanceUnreachable(mesh))?
                     .max(floor);
                 let shifts_at = |e: f64| shifts_at_offset(set, &geometry, &pairs, e);
-                let supplied = |e: f64| shifts_at(e).map_or(f64::NAN, |x| bound(mesh, e, x));
+                let supplied = |e: f64| shifts_at(e).map_or(f64::NAN, |x| bound(mesh, x));
                 wants[mesh] = if supplied(gap) >= 0.0 {
                     gap
                 } else {
