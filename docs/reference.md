@@ -763,9 +763,12 @@ q_s  = s_Fn / (2 ρ_F)
 |---|---|---|
 | `Y_F` | form factor | Measured off the generated profile, not ISO's Method B closed form |
 | `Y_S` | stress correction | ISO 6336-3 7.2, over the band below |
-| `Y_β` | helix angle | ISO 6336-3 8.3, and **≥ 1 over most of its range** — see below |
+| `Y_β` | helix angle | **Not applied** — half of a pair the 2019 edition revised together; see below |
 | `Y_B` | rim thickness | ISO 6336-3 9.3, where a rim thickness was given |
-| `Y_DT` | deep tooth | **Not applied**, with its formulae recorded in [`state.md`](state.md) |
+| `Y_DT` | deep tooth | **Not applied.** `f_ε`, inside ISO's own `Y_F`, likewise |
+
+Every declined factor's formulae and bands are recorded in
+[`state.md`](state.md), so the decision can be revisited without the standard.
 
 The `Y_S` fit is stated over `1 ≤ q_s < 8`. Outside it the correction is taken
 at the boundary and the stage **says so**, naming the member and the value —
@@ -779,18 +782,14 @@ was calibrated against, which is this crate's own departure — see
 has an edge to report, so unlike `q_s` they are stated here rather than raised
 per gear.
 
-**`Y_β`, and why it is not a discount.**
-
-```text
-Y_β = (1 − ε_β · β/120°) / cos³β        ε_β = b sin|β| / (π m_n)
-```
-
-with `ε_β` held at 1 and `β` at 30° above those. The `1/cos³β` puts it **above
-1** over most of the range ISO's Figure 8 draws — 1,155 at `ε_β = 1` and 1,50 at
-`ε_β = 0,1`, both at `β = 30°` — so omitting it under-predicts a helical root
-stress rather than over-predicting it. Above 25° the standard asks for the
-factor to be confirmed by experience, and the gear says so.
-`Y_β` is exactly 1 at `β = 0`, so a spur rating is untouched.
+**`Y_β` and `f_ε` are one revision, and neither is taken.** The 2019 edition
+modified `Y_β` and `Y_F` together; `f_ε` lives inside that `Y_F`, is `≤ 1`, and
+cancels most of the `1/cos³β` that makes `Y_β` exceed 1. Their product is
+0,73–0,79 at full axial overlap, so applying `Y_β` alone reports a *higher*
+stress than the standard it was taken from. Against ISO 2019 this tool reads
+1,26–1,36× at full overlap and 0,78–0,94× below `ε_β = 0,3` at high helix —
+`tools/iso_6336_3_stack.py`, and
+[rationale](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither).
 
 **`Y_B`**, where a rim thickness `s_R` was given, is `a·ln(c/ratio)` never below
 1 — `(1,6 · 2,242)` against the backup ratio `s_R/h_t` for a rack-cut member and
@@ -827,23 +826,16 @@ pitch ellipse it cuts; then one from the base pitch and one from the path
 length. At `β = 0` both reduce exactly and the virtual gear is rebuilt bit for
 bit identical, so there is no spur branch anywhere in the strength path.
 
-**Minimum face width**, closed form. `σ_H ∝ 1/√b`, and `σ_F ∝ 1/b` for
-everything in `σ_F0` except `Y_β`, whose `ε_β` grows with the face:
+**Minimum face width**, closed form, since `σ_F ∝ 1/b` and `σ_H ∝ 1/√b`:
 
 ```text
-b_min,contact = b (σ_H / σ_allow)²
-b_min,bending = b σ_F / σ_allow                                   (β = 0)
-              = s₀ / (σ_allow·cos³β_c + s₀·k)                     (ε_β ≤ 1)
-              = s₀ (1 − β_c/120) / (σ_allow·cos³β_c)              (ε_β > 1)
+b_min,bending = b σ_F / σ_allow          b_min,contact = b (σ_H / σ_allow)²
 ```
 
-with `s₀ = σ_F·b / Y_β(b)` at the width the stress was measured at,
-`k = β_c sin|β| / (120 π m_n)`, and `β_c = min(|β|, 30°)`. The dependence is
-affine, so this is one step and no iteration; `σ_F(b)` is strictly decreasing, so
-the root is unique and a first answer that has already saturated is the proof
-that the second branch is the one that answers. At `β = 0` the first line *is*
-the second, to the bit — which is why the spur canary did not move when `Y_β`
-arrived. **The width a stress was measured at still cancels either way.**
+**The `b` cancels**, and every factor of `σ_F0` this tool applies is independent
+of the face width. That is worth stating because it was briefly untrue: `Y_β`
+depends on `b` through the overlap ratio, and carrying it turned this division
+into a two-branch solve. Declining `Y_β` gave the invariant back.
 
 independent of the `b` it was evaluated at.
 

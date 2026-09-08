@@ -868,10 +868,10 @@ pub fn solve_planetary_stage_with(
     // cannot know, so it is asked of both and either may speak.
     // The rim under each member, where one was described. Per member rather
     // than per mesh, which is why the planet's two `Bending`s give one entry.
-    let rim_factors = [
-        Some(sun_bending.factors),
-        Some(planet_bending.factors),
-        ring_bending.as_ref().map(|b| b.factors),
+    let rims = [
+        sun_bending.rim,
+        planet_bending.rim,
+        ring_bending.as_ref().and_then(|b| b.rim),
     ];
     let sections = [
         vec![Some(&sun_bending.section)],
@@ -894,7 +894,7 @@ pub fn solve_planetary_stage_with(
         );
         // ...and whether this member's rim is thinner than the clause will
         // rate. One rim per member, so unlike the notch it is asked once.
-        out.extend(rim_factors[i].as_ref().and_then(super::rim_below_minimum));
+        out.extend(super::rim_below_minimum(rims[i]));
         out.extend(cut_by_a_rack[i].and_then(super::undercut_note));
         out.extend(reversal.note_for(reverses[i]));
         // **A bound that moved this member's own number belongs to it**, not to
@@ -918,14 +918,8 @@ pub fn solve_planetary_stage_with(
     // The share this tooth carries where it is rated — exactly 1 unless a
     // sharing model was asked for, so nothing scales by default.
     let stress_at = |b: &super::Bending, on: &Tooth, load: &Load| {
-        bending_stress(
-            &b.section,
-            on,
-            load,
-            StressConcentration::Iso6336,
-            b.factors,
-        )
-        .map(|s| s * b.share)
+        bending_stress(&b.section, on, load, StressConcentration::Iso6336, b.rim)
+            .map(|s| s * b.share)
     };
     let sun_sf = stress_at(&sun_bending, &sun, &probe_load_sp);
     let planet_sf = stress_at(
@@ -954,17 +948,11 @@ pub fn solve_planetary_stage_with(
     // a list: taking the worse of two figures was written out for contact, left
     // out for bending, and is one fold over the list for either.
     let scale = LoadCase::of(scale_case);
-    // **One helix law for the whole set.** `Y_β` is a function of `|β|`, the
-    // normal module and the face width, and the first two are shared by every
-    // member of a planetary set — they have to be, or nothing would mesh — so
-    // both meshes and all three members answer to the same one.
-    let helix = crate::strength::HelixFactor::of(&sun.params);
-    let loading = |bending, contact, carried_at, helix| Loading {
+    let loading = |bending, contact, carried_at| Loading {
         bending,
         contact,
         measured_at: PROBE,
         carried_at,
-        helix,
     };
     let rating = |i: usize, sp: f64, pr: f64| MemberRating {
         material: &mats[i],
@@ -972,12 +960,12 @@ pub fn solve_planetary_stage_with(
         reverses: reverses[i],
         loadings: Loading::both_cases(
             &match i {
-                0 => vec![loading(sun_sf, sp_probe.governing(0), sp, helix)],
+                0 => vec![loading(sun_sf, sp_probe.governing(0), sp)],
                 1 => vec![
-                    loading(planet_sf, sp_probe.governing(1), sp, helix),
-                    loading(planet_ring_sf, pr_probe.governing(0), pr, helix),
+                    loading(planet_sf, sp_probe.governing(1), sp),
+                    loading(planet_ring_sf, pr_probe.governing(0), pr),
                 ],
-                _ => vec![loading(ring_sf, pr_probe.governing(1), pr, helix)],
+                _ => vec![loading(ring_sf, pr_probe.governing(1), pr)],
             },
             scale,
         ),
@@ -994,7 +982,7 @@ pub fn solve_planetary_stage_with(
     // which. The note carries its own contact ratio, so two entries are two
     // findings rather than a repeat.
     for b in [Some(&sun_bending), planet_ring_bending.as_ref()] {
-        notes.extend(b.into_iter().flat_map(|b| b.notes.iter().cloned()));
+        notes.extend(b.and_then(|b| b.note.clone()));
     }
     // **A member's automatic width is the largest requirement of any mesh it is
     // in**, because the narrower face carries the pair — see the spur stage for
@@ -1306,10 +1294,7 @@ mod tests {
                     &built.planet,
                     &Load::new(torque, b),
                     StressConcentration::Iso6336,
-                    crate::strength::BendingFactors {
-                        helix: crate::strength::HelixFactor::of(&built.planet.params),
-                        rim: None,
-                    },
+                    None,
                 )
                 .unwrap()
             };

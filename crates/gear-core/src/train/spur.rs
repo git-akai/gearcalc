@@ -753,7 +753,7 @@ pub fn solve_spur_stage_with(
     let bending = [first, second];
     let sections = [bending[0].section, bending[1].section];
     let load_share = [bending[0].share, bending[1].share];
-    let factors = [bending[0].factors, bending[1].factors];
+    let rims = [bending[0].rim, bending[1].rim];
 
     // Every rating at a probe width, one set per load case. `b_min` does not
     // depend on the `b` it was measured at, so this is still one evaluation per
@@ -771,7 +771,7 @@ pub fn solve_spur_stage_with(
                 &g[i],
                 &li,
                 StressConcentration::Iso6336,
-                factors[i],
+                rims[i],
             )
             .map(|s| s * load_share[i])
         });
@@ -808,7 +808,6 @@ pub fn solve_spur_stage_with(
                 contact: cs.governing(i),
                 measured_at,
                 carried_at,
-                helix: factors[i].helix,
             }]
         }),
     };
@@ -823,7 +822,7 @@ pub fn solve_spur_stage_with(
         let mut out = Vec::new();
         out.extend(super::notch_outside_fit(&sections[i]));
         // ...and whether its rim is thinner than ISO 6336-3 will rate.
-        out.extend(super::rim_below_minimum(&factors[i]));
+        out.extend(super::rim_below_minimum(rims[i]));
         // ...and whether the cutter has eaten into the flank, which no toggle
         // can prevent once a shift is given and `no undercut` is off.
         out.extend(super::undercut_note(&g[i]));
@@ -891,7 +890,7 @@ pub fn solve_spur_stage_with(
                     &g[i],
                     &li,
                     StressConcentration::Iso6336,
-                    factors[i],
+                    rims[i],
                 )
                 .map(|s| s * load_share[i])
             });
@@ -990,11 +989,7 @@ pub fn solve_spur_stage_with(
     // What the sharing model has to say about this mesh, if anything — raised
     // where the section and the share are worked out, so no stage kind has to
     // remember to ask (`train::Bending`). One mesh, so one note at most.
-    // **A pair is one mesh, so one member answers for it.** Both `Bending`s
-    // carry the same mesh-level notes — the sharing band and the helix angle are
-    // the mesh's, not the member's — so taking either gives the list one entry
-    // per finding rather than two.
-    notes.extend(bending[0].notes.iter().cloned());
+    notes.extend(bending[0].note.clone());
 
     Ok(SpurResult {
         ratio: f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth),

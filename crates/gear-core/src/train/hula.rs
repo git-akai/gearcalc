@@ -917,10 +917,9 @@ pub fn solve_hula_stage_with(
             stage.load_sharing,
             stage.gears[pair.ring].rim_thickness,
         );
-        // What the model has to say about this mesh, if anything — the sharing
-        // band and the helix angle both. Both members of a pair are in the same
-        // mesh, so either says it and it is said once.
-        notes.extend(pinion_bending.notes.iter().cloned());
+        // What the sharing model has to say about this mesh, if anything. Both
+        // members of a pair are in the same one, so it is said once.
+        notes.extend(pinion_bending.note.clone());
 
         // The probe pass, at whatever width — a minimum face width does not
         // depend on the width it was measured at.
@@ -939,7 +938,7 @@ pub fn solve_hula_stage_with(
                 &p.pinion,
                 &probe,
                 StressConcentration::Iso6336,
-                b.factors,
+                b.rim,
             )
             .map(|s| s * b.share)
         };
@@ -963,9 +962,6 @@ pub fn solve_hula_stage_with(
                     contact: probe_cs.governing(slot),
                     measured_at: PROBE,
                     carried_at,
-                    // Both members of this mesh carry the same `|β|` and module,
-                    // so the width law is the mesh's rather than the slot's.
-                    helix: pinion_bending.factors.helix,
                 }],
                 scale,
             ),
@@ -1013,7 +1009,7 @@ pub fn solve_hula_stage_with(
             // ...and whether this member's own rim is thinner than the clause
             // will rate. A rim belongs to a member where the mesh-level findings
             // above belong to the pair, so it is asked per slot.
-            member_notes.extend(bendings[slot].and_then(|b| super::rim_below_minimum(&b.factors)));
+            member_notes.extend(bendings[slot].and_then(|b| super::rim_below_minimum(b.rim)));
             // A pinion is rack-cut and can be undercut by the shift the crank
             // leaves it — which is nobody's to move, so it is reported rather
             // than prevented. A ring is not asked.

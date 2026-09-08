@@ -277,8 +277,9 @@ than against the 30° construction. `Y_S` is an ISO fit written in terms of the
 
 ### No ISO/AGMA correction factors
 
-`K_A`, `K_v`, `K_Fβ`/`K_Hβ`, `K_Fα`/`K_Hα`, `Z_ε`, `Z_β` and their relatives are
-not used, and will not be added on request without revisiting this.
+`Y_β`, `f_ε`, `Y_DT`, `K_A`, `K_v`, `K_Fβ`/`K_Hβ`, `K_Fα`/`K_Hα`, `Z_ε`, `Z_β`
+and their relatives are not used, and will not be added on request without
+revisiting this.
 
 **Three reasons, in order of weight.**
 
@@ -291,7 +292,9 @@ not used, and will not be added on request without revisiting this.
    geometry factors lower it, over the *same* face-width physics from opposite
    directions, and all were calibrated against `σ_Flim` values themselves
    back-derived using the whole set. Adopting one is taking the favourable half
-   of a calibration.
+   of a calibration — which this project then went and did, once, and had to
+   measure its way back out of: see
+   [the helix factors are a pair](#the-helix-factors-are-a-pair-and-this-tool-can-take-neither).
 3. **It trades accuracy for precision.** A number that is exactly right about a
    simpler question beats one that is approximately right about a harder one
    while hiding which question it answered.
@@ -305,8 +308,8 @@ geometry.
 **Two of ISO 6336-3's factors are the deliberate exceptions**, and the same
 three tests separate them from the list above rather than a different one: they
 are computed from *this* gear's own geometry rather than looked up against a
-population, dropping them is **unconservative** rather than safe, and their
-bands are reported instead of assumed.
+population, dropping them is **unconservative** rather than safe, and neither is
+half of a balanced pair — nothing else in the model pushes back against either.
 
 `Y_S` is the ratio of peak fillet stress to nominal section stress — a *local*
 effect computed from `s_Fn`, `h_Fe` and `ρ_F`, all measured off our own exact
@@ -315,48 +318,70 @@ real peak. Its notch parameter is clamped into the fit's stated range and
 **reported raw**, because `Y_S` rises with `q_s` and clamping a
 sharper-than-stated notch under-predicts stress.
 
-`Y_β` and `Y_B` joined it on reading the standard, and `Y_β` is a **correction
-to this document** rather than a change of policy: it was listed above, on a
-reading of the factor that ISO 6336-3:2019 does not support. See
-[a helix angle factor is not a discount](#a-helix-angle-factor-is-not-a-discount).
+`Y_B` de-rates a rim too thin to support its own tooth root, moving the failure
+out of the fillet and through the rim — a failure mode nothing else here models
+at all, so there is nothing for it to be balanced against. It is only read where
+a designer gives a rim thickness, and a rim nobody described rates at 1.
 
-### A helix angle factor is not a discount
+### The helix factors are a pair, and this tool can take neither
 
-This project excluded `Y_β` for years on the grounds that it lowers a stress, so
-that omitting it is conservative — the same sentence appeared in `strength.rs`,
-in the paragraph above, and in `state.md`'s known-approximate list, which put
-the omission at "up to ~25 % conservative". It is wrong. ISO 6336-3:2019,
-Formula (66) is
+ISO 6336-3:2019's Foreword lists what changed from the 2006 edition. The first
+two entries are:
 
-```text
-Y_β = (1 − ε_β · β/120°) / cos³β
-```
+> — modification of the `Y_β` factor in Clause 8;
+> — modification of the `Y_F` factor in 6.2.
 
-and the `1/cos³β` is not decoration. Its Figure 8 draws the family over
-`β = 0…40°` and `ε_β = 0,1…1`, and every curve **rises above 1**: the plateau is
-1,50 at `ε_β = 0,1` and 1,155 at `ε_β = 1`, both reached at `β = 30°` where the
-fit stops. The formula reproduces them to 1,5011 and 1,1547, and the figure's
-ordinate starts at 0,9, which the old reading's 0,75 floor would fall clean off.
+**Together.** The revised `Y_F` gained an internal factor `f_ε` over the contact
+and overlap ratios, and the revised `Y_β` gained a `1/cos³β`. One is `≤ 1` and
+the other `≥ 1`, and they are two halves of one revision. Their product is the
+net helical adjustment the standard actually applies:
 
-So omitting `Y_β` does not over-predict a helical root stress by 25 %. It
-**under**-predicts it, by up to 50 % at the worst corner of the figure — the
-unconservative direction, and the one thing this project's whole factor policy
-exists to avoid. The published disagreement about the *sign* of the helix trend,
-cited two paragraphs up as evidence that these factors are empirical, is a
-disagreement this document had silently taken a side in.
+| `ε_β` | `f_ε` | `Y_β` | product |
+|---|---|---|---|
+| 0,1 (β = 25°) | 0,975 | 1,315 | **1,283** |
+| 0,6 (β = 25°) | 0,840 | 1,175 | **0,988** |
+| 1,0 (β = 25°) | 0,715 | 1,063 | **0,760** |
+| 1,0 (β = 30°) | 0,687 | 1,155 | **0,794** |
 
-**What it costs to include.** One genuine complication: `ε_β = b sin|β| / (π m_n)`
-depends on the face width, so `σ_F` is no longer exactly `∝ 1/b` and the width a
-rating asks for is no longer the stress inverted. It still closes in one step,
-because the dependence is affine — `HelixFactor::min_face_width` solves it in
-closed form on either side of the `ε_β = 1` seam — so nothing iterates and a spur
-member, at `β = 0`, gets the old arithmetic to the bit. Both canaries are
-unmoved, which is that claim's gate.
+At **full axial overlap — what a helical gear is proportioned for** — ISO 2019
+*lowers* a root stress by about 21–27 %. So this tool, applying neither, sits
+1,26–1,36× a published ISO 2019 rating: conservative, by close to the "~25 %"
+the documentation had claimed all along for a reason that turned out to be the
+2006 formula.
 
-**What is still owed.** The standard asks for `Y_β` above 25° to "be confirmed by
-experience". It is applied there and the gear says so, exactly as the `Y_S` notch
-band is handled — reported rather than enforced, because refusing to answer is
-also an answer and a worse one.
+**Applying `Y_β` alone was tried and reverted.** It looked like a correction —
+the factor exceeds 1 over most of its own figure, so omitting it *reads* as
+unconservative. Measured against the pair rather than against the half, it moved
+the tool from 1,26–1,36× ISO to 1,29–1,46×: further from the standard, in the
+name of getting closer to it. Three mixings, not one:
+
+1. **Half a revised pair**, as above.
+2. **`Y_F` here is not the `Y_F` `Y_β` corrects.** It is measured off the exact
+   generated profile at an inscribed-parabola section; ISO's is a closed form at
+   a 30° tangent section. A correction fitted to one base does not transfer to
+   another.
+3. **The virtual gear follows the other edition.** This crate uses
+   `z_n = z/cos³β`; ISO 2019 uses `z_n = z/(cos²β_b · cos β)`, a 3,9 % different
+   tooth count at β = 30°.
+
+**Where this leaves the numbers, measured rather than asserted.** Against ISO
+6336-3:2019, at `ε_α ≈ 1,65`:
+
+- **`ε_β ≥ 1`**: this tool reads 1,26–1,36× ISO. Conservative, and that is the
+  designed-for case.
+- **`ε_β ≤ 0,3` with `β ≥ 20°`**: 0,78–0,94×. **Below** ISO — the one regime
+  where the derived model is unconservative against the standard. It is already
+  flagged: a helical stage without full axial overlap raises
+  `stage.overlap_below_one`, for a reason arrived at independently (a gear
+  helical in form that still transfers load like a spur gear). That note is now
+  also the marker for this.
+
+**The rule this taught, which is the general one.** *A factor's direction is not
+a property of the factor. It is a property of the set it was calibrated in.*
+`Y_β > 1` is a true statement about `Y_β` and tells you nothing about whether
+omitting it is safe. The only way to know is to multiply out every factor the
+standard applies and compare against what this tool reports — which is a
+measurement, and is now in `tools/` rather than in anyone's head.
 
 **The policy is about factors that multiply a stress, not about conventions as
 such.** A worm's length and a wormwheel's face width are shipped as

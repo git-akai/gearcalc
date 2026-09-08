@@ -1104,8 +1104,7 @@ fn strength_report(
     use gear_core::metrology::base_helix_angle;
     use gear_core::strength::{
         bending_section, bending_stress, contact_stress, min_face_width_bending,
-        min_face_width_contact, BendingFactors, HelixFactor, Load, RimSupport, StressConcentration,
-        PARALLEL_AXES,
+        min_face_width_contact, Load, RimSupport, StressConcentration, PARALLEL_AXES,
     };
 
     let lib = gear_io::default_library();
@@ -1207,14 +1206,10 @@ fn strength_report(
         };
         let load_g = load.across_mesh(&g1, g);
         let ys = sec.stress_correction(StressConcentration::Iso6336);
-        // `Y_β` from the pair's own helix and module; `Y_B` only where a rim
-        // was named on the command line, since a rim nobody described rates at
-        // 1 and is not the same claim as a thick one.
-        let factors = BendingFactors {
-            helix: HelixFactor::of(&g.params),
-            rim: rim.map(|s| RimSupport::external(s, g.ra - g.rf)),
-        };
-        let Some(sf) = bending_stress(&sec, g, &load_g, StressConcentration::Iso6336, factors)
+        // `Y_B` only where a rim was named on the command line: a rim nobody
+        // described rates at 1 and is not the same claim as a thick one.
+        let rim_support = rim.map(|s| RimSupport::external(s, g.ra - g.rf));
+        let Some(sf) = bending_stress(&sec, g, &load_g, StressConcentration::Iso6336, rim_support)
         else {
             println!(
                 "  {label:<6} {:>8.4} {:>8} {:>9} - stress correction undefined (tangency on the flank)",
@@ -1227,29 +1222,14 @@ fn strength_report(
             sec.form_factor,
             ys.unwrap_or(1.0),
             sf,
-            min_face_width_bending(sf, B, mat.fatigue_allowable.value, factors.helix),
-            min_face_width_bending(sf, B, mat.ultimate_allowable.value, factors.helix),
+            min_face_width_bending(sf, B, mat.fatigue_allowable.value),
+            min_face_width_bending(sf, B, mat.ultimate_allowable.value),
         );
-        // The two member-level factors of `σ_F0`, printed only when they are
-        // doing something: on a spur gear with no rim named they are both
+        // `Y_B`, printed only where a rim was named: on a gear with none it is
         // exactly 1, and a column of ones is noise.
-        if helix != 0.0 || rim.is_some() {
-            println!(
-                "         Y_beta {:.4} (eps_beta {:.4}){}",
-                factors.helix.at(B),
-                factors.helix.overlap_ratio(B),
-                factors.rim.map_or_else(String::new, |r| format!(
-                    "   Y_B {:.4} (s_R/h_t {:.3})",
-                    r.factor(),
-                    r.ratio()
-                )),
-            );
-            if !factors.helix.in_range() {
-                println!(
-                    "         note: ISO 6336-3 asks for Y_beta above 25 deg to be confirmed by experience"
-                );
-            }
-            if factors.rim.is_some_and(|r| !r.in_range()) {
+        if let Some(r) = rim_support {
+            println!("         Y_B {:.4} (s_R/h_t {:.3})", r.factor(), r.ratio());
+            if !r.in_range() {
                 println!(
                     "         note: ISO 6336-3 says a backup ratio at or below 0.5 shall be avoided"
                 );

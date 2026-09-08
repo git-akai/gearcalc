@@ -58,7 +58,6 @@ planet_clearance_below_minimum = "planetas adjacentes afastam-se {gap} mm, abaix
 ring_addendum_clamped = "adendo da engrenagem anular limitado na sua circunferência de base: precisa de mais dentes ou de um adendo menor"
 face_width_no_source = "a largura automática da engrenagem {gear} não tem nenhum critério que a dimensione: todas as fontes estão desligadas, pelo que fica no valor indicado no campo"
 notch_outside_fit = "o parâmetro de entalhe q_s = {q} está fora da faixa 1–8 para que a correção Y_S é definida, pelo que se usa o valor da fronteira: acima da faixa isso subestima a tensão na raiz"
-helix_unconfirmed = "o ângulo de hélice de {beta}° excede os {limit}° acima dos quais a ISO 6336-3 pede que Y_beta seja confirmado pela experiência; o fator continua a ser aplicado, com o valor dado pelo ajuste"
 rim_below_minimum = "a razão de espessura da coroa {ratio} está no mínimo que a ISO 6336-3 avalia ou abaixo dele: a cláusula diz que tal coroa deve ser evitada, e Y_B é indicado além do alcance da norma"
 reversed_bending_uncorrected = "Os dentes sofrem inversão de carga; considere usar o coeficiente de inversão de carga"
 reversed_bending_applied = "Os dentes sofrem inversão de carga; o coeficiente de {fraction} está aplicado"

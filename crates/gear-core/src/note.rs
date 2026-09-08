@@ -120,8 +120,6 @@ pub mod key {
     pub const STAGE_REVERSED_BENDING_APPLIED: &str = "stage.reversed_bending_applied";
     /// `stage.load_sharing_out_of_band`
     pub const STAGE_LOAD_SHARING_OUT_OF_BAND: &str = "stage.load_sharing_out_of_band";
-    /// `stage.helix_unconfirmed`
-    pub const STAGE_HELIX_UNCONFIRMED: &str = "stage.helix_unconfirmed";
     /// `stage.rim_below_minimum`
     pub const STAGE_RIM_BELOW_MINIMUM: &str = "stage.rim_below_minimum";
 
@@ -222,7 +220,6 @@ pub mod key {
         STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE,
         STAGE_FACE_WIDTH_NO_SOURCE,
         STAGE_NOTCH_OUTSIDE_FIT,
-        STAGE_HELIX_UNCONFIRMED,
         STAGE_RIM_BELOW_MINIMUM,
         STAGE_REVERSED_BENDING_UNCORRECTED,
         STAGE_REVERSED_BENDING_APPLIED,

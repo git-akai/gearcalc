@@ -118,7 +118,6 @@ planet_clearance_below_minimum = "adjacent planets clear by {gap} mm, below the 
 ring_addendum_clamped = "ring addendum clamped at its base circle: it needs more teeth or a shorter addendum"
 face_width_no_source = "gear {gear}'s automatic face width has no rating to size it: every source is switched off, so it stands at the width in its box"
 notch_outside_fit = "notch parameter q_s = {q} is outside the 1–8 band the Y_S fit is stated for, so the correction is taken at the boundary: above the band that under-predicts the root stress"
-helix_unconfirmed = "helix angle {beta} deg is above the {limit} deg ISO 6336-3 asks for Y_beta to be confirmed by experience beyond; the factor is still applied, at the value the fit gives"
 rim_below_minimum = "rim backup ratio {ratio} is at or below the minimum ISO 6336-3 will rate: the clause says such a rim shall be avoided, and Y_B is reported past where the standard goes"
 reversed_bending_uncorrected = "Teeth experience load reversal; consider using reverse loading coefficient"
 reversed_bending_applied = "Teeth experience load reversal; the reverse loading coefficient of {fraction} is applied"

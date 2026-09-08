@@ -57,7 +57,6 @@ planet_clearance_below_minimum = "benachbarte Planeten haben {gap} mm Abstand, w
 ring_addendum_clamped = "Kopfhöhe des Hohlrads am Grundkreis begrenzt: es braucht mehr Zähne oder eine kleinere Kopfhöhe"
 face_width_no_source = "die automatische Zahnbreite von Rad {gear} hat keine Tragfähigkeit, die sie bemisst: alle Quellen sind aus, sie bleibt daher auf dem Wert im Feld"
 notch_outside_fit = "die Kerbkennzahl q_s = {q} liegt außerhalb des Bereichs 1–8, für den die Y_S-Näherung gilt, daher wird der Randwert verwendet: oberhalb des Bereichs unterschätzt das die Fußspannung"
-helix_unconfirmed = "der Schrägungswinkel {beta}° liegt über den {limit}°, ab denen ISO 6336-3 eine Bestätigung von Y_beta durch Erfahrung verlangt; der Faktor wird weiterhin mit dem Näherungswert angewendet"
 rim_below_minimum = "das Kranzdickenverhältnis {ratio} liegt auf oder unter dem Mindestwert, den ISO 6336-3 noch bewertet: die Norm verlangt, einen solchen Kranz zu vermeiden, und Y_B wird jenseits ihres Gültigkeitsbereichs angegeben"
 reversed_bending_uncorrected = "Zähne erfahren Lastumkehr; Koeffizient für Lastumkehr erwägen"
 reversed_bending_applied = "Zähne erfahren Lastumkehr; der Koeffizient {fraction} wird angewendet"

@@ -750,21 +750,18 @@ mod tests {
                 }
             }
         }
-        // **The two ISO 6336-3 bands a bending rating can be asked outside.** A
-        // 28° helix is past the 25° the standard asks for `Y_β` to be confirmed
-        // by experience beyond, and a rim half a tooth deep is past the backup
-        // ratio below which it says a design shall be avoided. Both are
-        // ordinary inputs — a helix angle and a rim thickness — rather than
-        // contrived ones, and both are still rated, which is the point of the
-        // messages: the figure is given and the reader is told where it stands.
-        for (helix, rim) in [(28.0_f64, None), (0.0, Some(1.0_f64)), (0.0, None)] {
+        // **A rim thinner than ISO 6336-3 will rate.** Half a tooth deep is
+        // past the backup ratio below which the clause says a design shall be
+        // avoided — an ordinary input rather than a contrived one, and still
+        // rated, which is the point of the message: the figure is given and the
+        // reader is told where it stands.
+        for rim in [Some(1.0_f64), None] {
             let gear = gear_core::train::StageGear {
                 teeth: 23,
                 rim_thickness: rim,
                 ..Default::default()
             };
             let stage = gear_core::train::SpurStage {
-                additional_helix: helix,
                 gears: [gear.clone(), gear],
                 ..Default::default()
             };

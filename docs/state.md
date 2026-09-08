@@ -90,6 +90,7 @@ cargo run --release --bin gear-cli -- verify 100   # the two-sided cutter check
 python3 tools/worm_flank_curvature.py              # ZI vs ZN vs ZA, from the surface
 python3 tools/crossed_path.py                      # the crossed path, from the surfaces
 python3 tools/hula_kinematics.py                   # the hula ratio, from the rolling circles
+python3 tools/iso_6336_3_stack.py                  # where this tool stands against ISO 6336-3, factor by factor
 ```
 
 [`bending-check.html`](bending-check.html) is that last command's figures with
@@ -176,15 +177,18 @@ helical throughout) · efficiency · automatic profile shift and altered addendu
 
 **ISO 6336-3's factors, and which of them are here.** `σ_F0` is
 `F_t/(b·m_n) · Y_F · Y_S · Y_β · Y_B · Y_DT`. `Y_F` is measured off the profile
-this crate generates rather than taken from the standard's closed form; `Y_S`,
-`Y_β` and `Y_B` are applied, each on the same three tests — computed from this
-gear's own geometry, unconservative to omit, band reported rather than assumed;
-`Y_DT` is declined with its formulae recorded below. The `K` and `Z` families
-stay out. A **spur gear with no rim described takes all three at exactly 1**,
-which is why both canaries are unmoved. The one real consequence is that `Y_β`
-grows with the overlap ratio and so with the face width, so a bending rating's
-minimum face width is a closed-form solve rather than a division — affine, one
-step, and the spur case is still the division to the bit.
+this crate generates rather than taken from the standard's closed form. **`Y_S`
+and `Y_B` are applied and everything else is declined**, and the test that
+separates them is not the direction any one factor points: it is whether the
+factor is half of a balanced pair. `Y_S` and `Y_B` are not — nothing else in
+this model pushes back against a notch factor or a thin rim. `Y_β` is: the 2019
+edition revised it and `Y_F` *together*, `f_ε` lives inside that revised `Y_F`,
+and their product is **below 1** for any gear with full axial overlap. Measured
+against a published ISO 2019 rating this tool sits 1.26–1.36× at full overlap
+and 0.78–0.94× at low overlap and high helix — conservative where gears are
+designed, below the standard only in the regime `stage.overlap_below_one`
+already flags. `tools/iso_6336_3_stack.py` multiplies the set out
+([rationale](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither)).
 
 **Crossed axes.** One model rather than a family: the lead angle exact, the path
 of contact from two properties of an involute helicoid, elliptical contact,
@@ -372,7 +376,7 @@ been. They are not a backlog.
 | Item | Why |
 |---|---|
 | **Crossed-axis bending** | The beam formula has no honest reading of a point load on a wide tooth, and choosing an effective width is a convention that multiplies a stress. [rationale](rationale.md#a-worm-stage-reports-no-bending-stress) |
-| **The ISO `K` and `Z` correction factors** | Narrow validated bands, balanced only as a complete set, against `σ_Flim` values this project does not have. [rationale](rationale.md#no-isoagma-correction-factors). `Y_S`, `Y_β` and `Y_B` are the exceptions and are applied; `Y_DT` and `f_ε` are declined and recorded in full below |
+| **ISO/AGMA correction factors** | Narrow validated bands, balanced only as a complete set, against `σ_Flim` values this project does not have. [rationale](rationale.md#no-isoagma-correction-factors). `Y_S` and `Y_B` are the exceptions and are applied, neither being half of a pair; `Y_β`, `f_ε` and `Y_DT` are declined and recorded in full below |
 | **Equal planet load sharing** | The remedy is a mesh-load factor of the kind above. Said in every planetary result's notes. |
 | **An S-N curve per material** | The two points it needs do not exist for six of the eight materials. [rationale](rationale.md#material-data-ships-estimates-deliberately) |
 | **Radial assembly** | Attempted, diagnosed and shelved with its findings; it blocks nothing, and planets are commonly installed axially. |
@@ -398,11 +402,12 @@ been. They are not a backlog.
 
 ## Known-approximate, documented at the call site
 
-- **`Y_β` is applied, and above `β = 25°` the standard asks for it to be
-  confirmed by experience.** The gear says so where it is. It was omitted until
-  ISO 6336-3 was read, on a reading of the factor that made the omission look
-  conservative when it was the opposite — see
-  [corrections](corrections.md).
+- **Helical bending is conservative against ISO 6336-3:2019 by 26–36 %** at
+  full axial overlap, and **below it by up to 22 %** at an overlap ratio under
+  0.3 with a helix over 20° — the one regime where this model runs under the
+  standard, and one `stage.overlap_below_one` already flags. Measured with
+  `tools/iso_6336_3_stack.py`, not asserted; the figure the documentation used
+  to quote was right by accident.
 - **`Y_S` is stated for external spur gears at `α_n = 20°`**, and gives
   "approximate values" for internal gears and other pressure angles by the
   standard's own words. This tool applies it to both, and to a section located
@@ -455,12 +460,34 @@ are named in `strings.rs`'s `UNFIRED` with their evidence.
 
 ## Recorded but not applied: ISO 6336-3's remaining bending factors
 
-Two factors of `σ_F0` are declined, and this section is why plus everything
-needed to change that decision **without the standard in hand**. Both fail the
-same test: they *relieve* a root stress, on inputs this project has no concept
-of, over bands narrower than the designs it is used for. Recording them is not
-a plan to add them — it is so that the next person to ask does not have to buy
-the document to find out what was turned down.
+Three factors of `σ_F0` are declined, and this section is why plus everything
+needed to change that decision **without the standard in hand**. Recording them
+is not a plan to add them — it is so that the next person to ask does not have
+to buy the document to find out what was turned down.
+
+**`Y_β` and `f_ε` are declined as a pair, and that is the whole reason.** The
+2019 Foreword lists its first two changes as a modification of `Y_β` (Clause 8)
+and of `Y_F` (6.2); `f_ε` is inside that revised `Y_F`. Taking one without the
+other was tried and reverted — it moved this tool *away* from the standard —
+and the arithmetic is in `tools/iso_6336_3_stack.py`
+([rationale](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither)).
+Adopting them would mean adopting **both**, and then facing the two mixings that
+remain: this crate's `Y_F` is measured at an inscribed-parabola section where
+`Y_β` is fitted to a 30°-tangent closed form, and its virtual gear uses
+`z_n = z/cos³β` where ISO 2019 uses `z_n = z/(cos²β_b · cos β)`.
+
+### `Y_β`, the helix angle factor (Clause 8)
+
+```text
+Y_β = (1 − ε_β · β/120°) / cos³β
+```
+
+with 1 substituted for `ε_β` above 1 and 30° for `β` above 30°. Above `β = 25°`
+the standard asks for the factor to "be confirmed by experience". Its Figure 8
+plateaus at 1,50 for `ε_β = 0,1` and 1,155 for `ε_β = 1`, both at `β = 30°`,
+which the formula reproduces to 1,5011 and 1,1547 — the check that pins the
+`1/cos³β` term, since the 2006 form would give 0,975 and 0,75 and the figure's
+ordinate starts at 0,9.
 
 ### `Y_DT`, the deep tooth factor (Clause 10)
 
@@ -488,8 +515,9 @@ input already gets — so for everything this tool can verify, `Y_DT` **is** 1.
 
 ### `f_ε`, the load distribution factor inside `Y_F` (6.2, Formulae 10–14)
 
-A multiplier on the form factor rather than a factor beside it, said to give
-"more accurate results for gears with contact ratios `ε_αn ≥ 2,0`".
+`Y_β`'s other half. A multiplier on the form factor rather than a factor beside
+it, said to give "more accurate results for gears with contact ratios
+`ε_αn ≥ 2,0`".
 
 ```text
 f_ε = 1                                    ε_β = 0      and ε_αn < 2
@@ -503,13 +531,15 @@ Both inputs — the overlap ratio and the virtual contact ratio — are already
 computed here, so unlike `Y_DT` this one is reachable today. It is declined
 anyway.
 
-**Why declined.** It answers the same question as the `LoadSharing` model this
-project already ships as a designer-facing option: how the mesh load divides
-while more than one pair is engaged. Adopting `f_ε` would apply *a* sharing model
-unconditionally, inside the form factor, where the existing one is off by
-default and says when it is extrapolating — the opposite of this project's
-stated posture on estimates. It is also a step function: 1 and 0.7 either side
-of `ε_αn = 2` at zero helix, with nothing physical happening at exactly 2.
+**Why declined.** Primarily because `Y_β` is, and the two only mean anything
+together. On its own merits it also answers the same question as the
+`LoadSharing` model this project already ships as a designer-facing option: how
+the mesh load divides while more than one pair is engaged. Adopting `f_ε` would
+apply *a* sharing model unconditionally, inside the form factor, where the
+existing one is off by default and says when it is extrapolating — the opposite
+of this project's stated posture on estimates. It is also a step function: 1 and
+0.7 either side of `ε_αn = 2` at zero helix, with nothing physical happening at
+exactly 2.
 
 **One thing it is worth for, and it is not a small one.** `f_ε = 0.7` for a spur
 mesh at `ε_αn ≥ 2` is an independent corroboration of this project's own
@@ -538,6 +568,10 @@ the same 30 % is the best evidence either of them has.
 Not a queue with a head; this is what a next session would pick from.
 
 - **Further UI work**, as it is asked for.
+- **Multiply the set out before adopting anything else from a standard.**
+  `tools/iso_6336_3_stack.py` is the pattern: a factor's direction is a property
+  of the set it was calibrated in, not of the factor, and this project has been
+  caught by that once.
 - **Wire `rim_thickness` into the boundary and the UI.** The model is complete
   and gated in `gear-core`, the input is a field on `StageGear` so it already
   crosses as a wire type, and `gear-cli strength … <rim>` exercises it. What is
