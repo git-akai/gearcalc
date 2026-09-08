@@ -383,7 +383,7 @@ train_note_contact_ratio_below_one = "unter 1: das Paar verliert zwischen den Z�
 train_note_cutter_teeth = "ein Schneidrad muss kleiner sein als das Hohlrad, das es schneidet"
 train_note_face_width_continuity = "automatisch sind {width} mm, wo der Kontakt durchgehend bleibt (ε = 1) — geometrisch, kein Festigkeitsmindestmaß"
 train_note_helix_split = "jedes Rad trägt {first}° und {second}°, in Summe der Achswinkel"
-train_note_min_contact_ratio = "Die Schranke, an der die Lösung anliegt. Der Gleitverlust sinkt mit der Länge des Eingriffswegs, das verlustärmste Paar ist also stets jenes, dessen Zähne einander gerade noch erreichen — dies verhindert, dass die Suche dorthin läuft. 1,2 ist der übliche Auslegungswert für ein Radpaar."
+train_note_min_contact_ratio = "Der Gleitverlust sinkt mit der Eingriffslänge; 1,2 ist das übliche Auslegungsminimum"
 train_note_no_continuous_width = "der Kontakt bleibt hier bei keiner Breite durchgehend"
 train_note_operating_torque_percent = "{percent} % des Spitzen-Antriebsdrehmoments"
 train_note_optimise_efficiency = "nutzt Profilverschiebungen; andere Eingaben wirken als Grenzen"

@@ -379,7 +379,7 @@ train_note_contact_ratio_below_one = "小于 1：该对齿轮在齿与齿之间�
 train_note_cutter_teeth = "插齿刀必须小于它所切的内齿圈"
 train_note_face_width_continuity = "自动取值为 {width} mm，即接触保持连续之处（ε = 1）——这是几何要求，不是强度下限"
 train_note_helix_split = "两齿轮分别为 {first}° 和 {second}°，之和即轴交角"
-train_note_min_contact_ratio = "结果所抵住的约束。滑动损失随啮合线长度减小，因此损失最小的齿轮副总是轮齿刚好够得着的那一对——此项即用来阻止搜索走到那里。1.2 是一对齿轮通常的设计下限。"
+train_note_min_contact_ratio = "滑动损失随啮合长度减小；1.2 是常用的设计最小值"
 train_note_no_continuous_width = "在此处无论取何齿宽，接触都无法保持连续"
 train_note_operating_torque_percent = "为峰值输入扭矩的 {percent} %"
 train_note_optimise_efficiency = "使用变位系数；其他输入作为限制"

@@ -16,6 +16,7 @@
     type Value,
     type GearResult,
     type Note,
+    type Cutter,
     type WormResult,
     note,
     t,
@@ -424,6 +425,14 @@
     onShiftAuto?: () => void;
     /** The width at which ε = 1, for a crossed pair. */
     faceFromContinuity?: number;
+    /** **The tool this ring is shaped with.**
+     *
+     *  A ring has no meaningful geometry without one, so its cutter belongs in
+     *  its card rather than in a block of its own beside the stage's shared
+     *  inputs — where a reader had to know which of the section's gears it was
+     *  about. Given only for `cut: "shaper"`, which is the only kind of member
+     *  that has one. */
+    cutter?: Cutter;
     /** **This gear's own notes**, where its `GearResult` is not what carries
      *  them — the eccentric drive reports its gears in its own shape. The ones
      *  naming a field are drawn under that field; see `clampNote`. */
@@ -436,6 +445,28 @@
 {@const own = opts.gearNotes ?? g?.notes ?? []}
 <div class="gear">
   <h4>{title}</h4>
+  {#if opts.cutter}
+    <!-- **The tool comes before the part**, because the part's root and fillet
+         are the tool's: a ring's dedendum and root radius are not inputs of its
+         own, and reading the cutter first is reading them. -->
+    <h4 class="cutter">{t("ui.train_ring_cutter")}</h4>
+    <label>
+      <span>{t("ui.train_cutter_teeth")}</span>
+      <input type="number" step="1" min="1" bind:value={opts.cutter.teeth} />
+      <em></em>
+      <FieldNote notes={notes(t("ui.train_note_cutter_teeth"), null)} />
+    </label>
+    <label>
+      <span>{t("ui.train_cutter_addendum")}</span>
+      <input type="number" step="0.05" bind:value={opts.cutter.addendum} />
+      <em>{t("ui.train_m")}</em>
+    </label>
+    <label>
+      <span>{t("ui.train_cutter_tip_round")}</span>
+      <input type="number" step="0.02" bind:value={opts.cutter.tip_round} />
+      <em>{t("ui.train_m")}</em>
+    </label>
+  {/if}
   <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
     <span>{t("ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={gear.teeth} />
@@ -1724,26 +1755,6 @@
               {@render efficiencyToggle(stage.optimisation)}
             </div>
 
-            <h4 class="mesh">{t("ui.train_ring_cutter")}</h4>
-            <div class="grid shared">
-              <label>
-                <span>{t("ui.train_cutter_teeth")}</span>
-                <input type="number" step="1" min="1" bind:value={stage.cutter.teeth} />
-                <em></em>
-                <FieldNote notes={notes(t("ui.train_note_cutter_teeth"), null)} />
-              </label>
-              <label>
-                <span>{t("ui.train_cutter_addendum")}</span>
-                <input type="number" step="0.05" bind:value={stage.cutter.addendum} />
-                <em>{t("ui.train_m")}</em>
-              </label>
-              <label>
-                <span>{t("ui.train_cutter_tip_round")}</span>
-                <input type="number" step="0.02" bind:value={stage.cutter.tip_round} />
-                <em>{t("ui.train_m")}</em>
-              </label>
-            </div>
-
             <!-- The planet's reversal is a *stage* note now, not a readout here:
                  it is the same sentence a reversing drive earns for every gear,
                  and one home for it means the two cannot say different things.
@@ -1785,9 +1796,10 @@
               })}
               <!-- A ring's root and fillet are its cutter's, so it has neither a
                    dedendum nor a root radius of its own (docs/reference.md#internal-gears); the tool
-                   is a stage input, above. -->
+                   it is shaped by leads its card. -->
               {@render gearCard(t("ui.train_ring"), stage.ring, pres?.ring, {
                 cut: "shaper",
+                cutter: stage.cutter,
                 onShiftAuto: () => relievePlanetary(stage, stage.ring.profile_shift),
               })}
             </div>
@@ -2003,7 +2015,13 @@
 
 
             {#each [0, 1] as m (m)}
-              {@const ring = hres && hres.gears[m * 2].ring ? m * 2 : m * 2 + 1}
+              <!-- **Which member is the ring is a tooth count, not a result.**
+                   Two axes one crank offset apart can only be an internal pair,
+                   so the ring is whichever has more teeth — `hula::Teeth::pair`
+                   says the same thing in the core. Reading it off the solve
+                   instead left the cards, and the tool that shapes the ring,
+                   labelled from a stale answer before the first one arrived. -->
+              {@const ring = stage.gears[m * 2].teeth >= stage.gears[m * 2 + 1].teeth ? m * 2 : m * 2 + 1}
               {@const pinion = ring === m * 2 ? m * 2 + 1 : m * 2}
               <h4 class="mesh">{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
               <div class="grid shared">
@@ -2017,12 +2035,6 @@
                   <input type="number" step="0.05" bind:value={stage.thickness_mod[m]} />
                   <em>{t("ui.train_k")}</em>
                   <FieldNote notes={notes(t("ui.train_hula_note_thickness_mod"), null)} />
-                </label>
-                <label>
-                  <span>{t("ui.train_cutter_teeth")}</span>
-                  <input type="number" step="1" min="4" bind:value={stage.cutter[m].teeth} />
-                  <em></em>
-                  <FieldNote notes={notes(t("ui.train_note_cutter_teeth"), null)} />
                 </label>
                 <label>
                   <span>{t("ui.train_sliding_friction")}</span>
@@ -2039,7 +2051,7 @@
               <div class="gears">
                 {#each [ring, pinion] as j (j)}
                   {@render gearCard(
-                    t(hres && hres.gears[j].ring ? "ui.train_ring" : "ui.train_pinion") +
+                    t(j === ring ? "ui.train_ring" : "ui.train_pinion") +
                       " — " +
                       t(
                         ["ui.train_hula_role_grounded", "ui.train_hula_role_wobble", "ui.train_hula_role_wobble", "ui.train_hula_role_output"][j],
@@ -2047,7 +2059,8 @@
                     stage.gears[j],
                     undefined,
                     {
-                      cut: hres && hres.gears[j].ring ? "shaper" : "rack",
+                      cut: j === ring ? "shaper" : "rack",
+                      cutter: j === ring ? stage.cutter[m] : undefined,
                       solvedShift: hres?.gears[j].profile_shift,
                       gearNotes: hres?.gears[j].clamps,
                       onShiftAuto: () => relieveHula(stage, m, stage.gears[j].profile_shift),
@@ -2587,6 +2600,14 @@
     border: 1px solid var(--rule);
     border-radius: 3px;
     padding: 0.5rem 0.7rem;
+  }
+  /* **A section inside a card, not a second card title.** The card's own `h4`
+     names the gear; this one names the tool that shapes it, and stacking two
+     headings at the same size reads as two titles rather than as one opening
+     the other. Smaller, and pulled up against the title it belongs under. */
+  .gear h4.cutter {
+    margin: -0.15rem 0 0.35rem;
+    font-size: 0.7rem;
   }
   .gear h4 {
     margin: 0 0 0.4rem;

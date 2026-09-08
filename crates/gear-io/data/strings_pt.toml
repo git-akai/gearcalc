@@ -384,7 +384,7 @@ train_note_contact_ratio_below_one = "abaixo de 1: o par perde contato entre den
 train_note_cutter_teeth = "uma talhadeira tem de ser menor do que o anel que corta"
 train_note_face_width_continuity = "o valor automático é {width} mm, onde o contato se mantém contínuo (ε = 1) — é geométrico, não um mínimo de resistência"
 train_note_helix_split = "cada engrenagem leva {first}° e {second}°, somando o ângulo entre eixos"
-train_note_min_contact_ratio = "A restrição contra a qual a solução assenta. A perda por deslizamento diminui com o comprimento do percurso de contacto, pelo que o par de menor perda é sempre aquele cujos dentes mal se alcançam — é isto que impede a procura de lá chegar. 1,2 é o mínimo de projecto habitual para um par."
+train_note_min_contact_ratio = "A perda por escorregamento diminui com o comprimento do contacto; 1,2 é o mínimo de projeto habitual"
 train_note_no_continuous_width = "aqui o contato não se mantém contínuo com nenhuma largura"
 train_note_operating_torque_percent = "{percent} % do torque de entrada de pico"
 train_note_optimise_efficiency = "usa correcções de perfil; as outras entradas actuam como limites"
