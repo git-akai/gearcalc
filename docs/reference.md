@@ -1735,6 +1735,15 @@ Seventeen `#[wasm_bindgen]` entry points, JSON in and JSON out, all pure
 functions. Five are not calculations: `defaults`, `strings`, `languages`,
 `resolve_language`, and the geartrain document's two directions.
 
+**A `null` that crosses is not always a `None`.** `serde_json` writes an
+infinity and a NaN as `null`, which is indistinguishable from a field that
+honestly has no value and draws as the same blank — so a figure that has gone
+non-finite arrives looking exactly like one that was never available. The whole
+result is therefore walked in the tests, and a `null` is allowed only at a field
+named as being able to have none: a bending stress with no notch, a
+back-driving load nothing reacts, a bound that does not exist on this geometry.
+Anything else is a number that stopped being one.
+
 Every type that crosses is declared to TypeScript by `ts-rs` into
 `web/src/wire`, generated rather than hand-copied.
 `tools/check_bindings.sh` regenerates and requires no diff.

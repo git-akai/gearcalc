@@ -1944,6 +1944,119 @@ mod tests {
         assert!(worm["members"][1]["speed"].as_f64().unwrap() > 0.0);
     }
 
+    /// **Every number that crosses is a number**, or a `null` at a field that is
+    /// allowed to have none.
+    ///
+    /// `serde_json` writes an infinity and a NaN as `null`, which is
+    /// indistinguishable from an honest `None` and draws as a blank — so a
+    /// figure that has gone non-finite arrives looking exactly like a figure
+    /// that was never available, and the front end shows the same dash for
+    /// both. That is how an automatic face width with no rating to size it came
+    /// to resolve to zero, be divided by, and reach the screen as a row of
+    /// blanks nobody read as wrong (`docs/corrections.md`).
+    ///
+    /// So the whole result is walked rather than sampled, and the **field name**
+    /// is what the allowance is written against: a `null` under a name not on
+    /// the list fails, and the failure names the path. Adding a name here is a
+    /// deliberate act — it says this field can genuinely have no value — which
+    /// is the point of it being a list rather than a rule.
+    #[test]
+    fn every_number_that_crosses_is_a_number() {
+        /// Fields that may honestly carry no value, and why.
+        const ABSENT_IS_MEANINGFUL: &[&str] = &[
+            // A section with no notch has no bending rating: a ring whose cutter
+            // left no fillet is the ordinary way to get here.
+            "bending",
+            "bending_stress",
+            // No back-driving load reaches this gear, because something upstream
+            // reacted it or nothing did.
+            "back_driving_torque",
+            // Nothing held the crank open at the clearance minimum.
+            "binding_mesh",
+            // A single planet has no neighbour to clear.
+            "planet_clearance",
+            // No peak torque, so no fraction of it.
+            "operating_torque_percent",
+            // A crossed pair is not a worm and has no published proportions.
+            "recommended_face_width",
+            // ...and a worm is not a crossed pair, so it has no zone of action
+            // taken from one.
+            "crossed",
+            "parallel_axis_efficiency",
+            // The train solved, so there is no failure to report.
+            "failure",
+            // A bound that does not exist on this geometry — see `auto::Ranges`.
+            "min",
+            "max",
+            // ...and the shift above which the tooth would be pointed, where
+            // the tooth never comes to a point anywhere it can be built.
+            "pointed",
+            // A material value with nothing to say beyond its number.
+            "note",
+        ];
+
+        fn walk(v: &serde_json::Value, path: &str, bad: &mut Vec<String>) {
+            match v {
+                serde_json::Value::Null => {
+                    let field = path
+                        .rsplit('.')
+                        .find(|s| !s.starts_with('['))
+                        .unwrap_or(path);
+                    if !ABSENT_IS_MEANINGFUL.contains(&field) {
+                        bad.push(path.to_string());
+                    }
+                }
+                serde_json::Value::Object(m) => {
+                    for (k, x) in m {
+                        walk(x, &format!("{path}.{k}"), bad);
+                    }
+                }
+                serde_json::Value::Array(a) => {
+                    for (i, x) in a.iter().enumerate() {
+                        walk(x, &format!("{path}.[{i}]"), bad);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Every stage kind the defaults can build, in one train, so the walk
+        // covers every result shape there is.
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let mut stages = d["train"]["stages"].as_array().unwrap().clone();
+        for extra in ["worm_stage", "planetary_stage", "hula_stage"] {
+            stages.push(d[extra].clone());
+        }
+        // ...and the case that started this: a width with nothing to size it.
+        let mut bare = stages[0].clone();
+        for g in bare["gears"].as_array_mut().unwrap() {
+            g["face_width"] = serde_json::json!({ "auto": true, "manual": 6.0 });
+            g["face_sources"] = serde_json::json!({
+                "bending": { "peak": false, "cyclic": false },
+                "contact": { "peak": false, "cyclic": false },
+            });
+        }
+        stages.push(bare);
+
+        for (i, stage) in stages.iter().enumerate() {
+            let train = serde_json::json!({ "train": {
+                "input_speed": 3000.0,
+                "input_torque": 2.0,
+                "back_driving_torque": 0.0,
+                "operating_torque": 1.0,
+                "actuation": { "continuous": { "operating_speed": 3000.0, "runtime_hours": 1.0 } },
+                "stages": [stage],
+            }});
+            let v = solved(&train.to_string());
+            let mut bad = Vec::new();
+            walk(&v, &format!("stage{i}"), &mut bad);
+            assert!(
+                bad.is_empty(),
+                "a figure crossed as null at a field that should always have one: {bad:?}"
+            );
+        }
+    }
+
     #[test]
     fn a_two_stage_train_crosses_the_boundary() {
         // The shape the UI will send: a train, and no library, meaning "use the
