@@ -368,8 +368,7 @@ impl Loading {
     /// second load case is this rather than a second solve. A stage whose flow
     /// does not have that property builds each case's loadings itself, which is
     /// why they are held per case rather than as one list and a factor.
-    #[must_use]
-    pub(crate) fn under(self, k: f64) -> Self {
+    fn under(self, k: f64) -> Self {
         Self {
             bending: self.bending.map(|s| s * k),
             contact: self.contact * k.sqrt(),

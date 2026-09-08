@@ -241,6 +241,50 @@ produces perfectly well.
 *Inherited justifications need re-reading against the code each time they are
 leaned on.*
 
+### A test that never meets the case it is about passes against the fault
+
+A planet's root is rated over two meshes and takes the worse. The test written
+for that had two fixtures and the sun mesh governed in both, so it passed
+unchanged against the code that looked at one mesh — the thing it was written to
+condemn. A third fixture with a narrow ring puts the other mesh in charge, and
+then the old code fails by 2.7×.
+
+The same shape twice more in one session: a sweep asserting that a stage's two
+modules want to be equal had been comparing one drive that transmits against four
+that do not; and a gate on "every number that crosses is a number" found its
+first real absence only because it walked the whole result rather than the fields
+someone thought to check.
+
+*A test for "the worse of two" needs a case each way, and a test for "all of
+them" has to enumerate rather than sample. Where that is hard to arrange, break
+the code and watch the test fail — the only direct evidence that it discriminates
+at all.*
+
+### A `null` that crosses is not always a `None`
+
+`serde_json` writes an infinity and a NaN as `null`, which is indistinguishable
+from a field that honestly has no value and draws as the same blank. A face width
+that resolved to zero made every stress infinite and every minimum a NaN, and the
+whole row reached the screen looking exactly like a row of figures that were
+never available — so the browser was **honest by accident**, while the CLI
+printed `inf` and the generated TypeScript said `number` of a field that could
+arrive `null`.
+
+*Ask what each field can be rather than what it usually is, and let the type say
+it. The gate is a walk over the whole result with an allowance per field name,
+each carrying its reason.*
+
+### A figure that changed is not evidence that today's change moved it
+
+Three documented tables were found stale in one session, and the first was
+diagnosed as a regression from the change in hand — until the previous commit was
+built in a `git worktree` and printed the identical output. It had been stale for
+some time, and the change under suspicion was innocent.
+
+*Before attributing a moved figure to the diff in front of you, run the old code.
+It costs a worktree and a build, and it is the difference between fixing a fault
+and rewriting a correct answer.*
+
 ### Units are a diagnosis
 
 A radial-assembly threshold came out scaling with ring *size* when a
