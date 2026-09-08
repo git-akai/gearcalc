@@ -825,7 +825,8 @@ pub fn solve_spur_stage_with(
             notes
                 .push(Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", (i + 1).to_string()));
         }
-        g.face_sources.largest_of(&probe_widths(i))
+        g.face_sources
+            .width_for(&probe_widths(i), g.face_width.manual)
     });
     let wanted = asks[0].max(asks[1]);
     let widths = [0usize, 1].map(|i| stage.gears[i].face_width.resolve(wanted));

@@ -936,7 +936,10 @@ pub fn solve_hula_stage_with(
                     Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", (i + 1).to_string()),
                 );
             }
-            wanted = wanted.max(g.face_sources.largest_of(&ratings[slot].asks()));
+            wanted = wanted.max(
+                g.face_sources
+                    .width_for(&ratings[slot].asks(), g.face_width.manual),
+            );
         }
         let widths = members.map(|i| stage.gears[i].face_width.resolve(wanted));
         // The narrower member carries the mesh, per the specification, and it is

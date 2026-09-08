@@ -1580,8 +1580,10 @@ extrapolating, which the stage reports.
 **Automatic face width.** Four ratings, four toggles per gear; the width is the
 largest any *enabled* rating asks for. Peak contact is off by default — see
 [rationale](rationale.md#a-contact-pressure-is-not-a-tensile-stress). With none
-enabled there is nothing to invert and the width is zero, which the stage reports
-as a note.
+enabled there is nothing to invert, so the width **stands at the number in its
+box** and the stage says so: an automatic value with nothing to choose between
+has nothing to choose, and the alternative is a zero every rating is then divided
+by.
 
 **Where each figure lives.** At any one instant a mesh has **one** contact
 pressure: the two flanks share a patch, a normal force and an `E*`, and the

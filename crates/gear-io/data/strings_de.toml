@@ -55,7 +55,7 @@ planets_share_load_equally = "es wird angenommen, dass {planets} Planeten die La
 planets_not_evenly_spaced = "{planets} Planeten lassen sich nicht gleichmäßig verteilen: die Zähnezahlen von Sonne und Hohlrad ergeben in Summe kein Vielfaches davon"
 planet_clearance_below_minimum = "benachbarte Planeten haben {gap} mm Abstand, weniger als die geforderten {minimum} mm"
 ring_addendum_clamped = "Kopfhöhe des Hohlrads am Grundkreis begrenzt: es braucht mehr Zähne oder eine kleinere Kopfhöhe"
-face_width_no_source = "die automatische Zahnbreite von Rad {gear} hat keinen Nachweis, der sie bemisst: alle Quellen sind abgeschaltet, sie wird also null"
+face_width_no_source = "die automatische Zahnbreite von Rad {gear} hat keine Tragfähigkeit, die sie bemisst: alle Quellen sind aus, sie bleibt daher auf dem Wert im Feld"
 notch_outside_fit = "die Kerbkennzahl q_s = {q} liegt außerhalb des Bereichs 1–8, für den die Y_S-Näherung gilt, daher wird der Randwert verwendet: oberhalb des Bereichs unterschätzt das die Fußspannung"
 reversed_bending_uncorrected = "Zähne erfahren Lastumkehr; Koeffizient für Lastumkehr erwägen"
 reversed_bending_applied = "Zähne erfahren Lastumkehr; der Koeffizient {fraction} wird angewendet"

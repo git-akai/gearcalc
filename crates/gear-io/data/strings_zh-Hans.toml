@@ -51,7 +51,7 @@ planets_share_load_equally = "假定 {planets} 个行星轮均分载荷；实际
 planets_not_evenly_spaced = "{planets} 个行星轮无法均布：太阳轮与内齿圈的齿数之和不是其倍数"
 planet_clearance_below_minimum = "相邻行星轮的间隙为 {gap} mm，低于所要求的 {minimum} mm"
 ring_addendum_clamped = "内齿圈齿顶高已限制在其基圆处：需要更多齿数或更小的齿顶高"
-face_width_no_source = "齿轮 {gear} 的自动齿宽没有可据以取值的强度校核：所有来源均已关闭，故结果为零"
+face_width_no_source = "齿轮 {gear} 的自动齿宽没有任何强度依据：所有来源均已关闭，因此保持输入框中的数值"
 notch_outside_fit = "缺口参数 q_s = {q} 超出 Y_S 拟合公式适用的 1–8 范围，故取边界值：超出上界时会低估齿根应力"
 reversed_bending_uncorrected = "轮齿承受载荷换向；建议启用载荷换向系数"
 reversed_bending_applied = "轮齿承受载荷换向；已应用系数 {fraction}"

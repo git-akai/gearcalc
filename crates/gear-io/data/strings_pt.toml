@@ -56,7 +56,7 @@ planets_share_load_equally = "assume-se que {planets} planetas repartem a carga 
 planets_not_evenly_spaced = "{planets} planetas não podem ficar igualmente espaçados: a soma dos números de dentes da solar e da anular não é múltipla desse valor"
 planet_clearance_below_minimum = "planetas adjacentes afastam-se {gap} mm, abaixo dos {minimum} mm pedidos"
 ring_addendum_clamped = "adendo da engrenagem anular limitado na sua circunferência de base: precisa de mais dentes ou de um adendo menor"
-face_width_no_source = "a largura automática da engrenagem {gear} não tem nenhum critério que a dimensione: todas as origens estão desligadas, pelo que resulta zero"
+face_width_no_source = "a largura automática da engrenagem {gear} não tem nenhum critério que a dimensione: todas as fontes estão desligadas, pelo que fica no valor indicado no campo"
 notch_outside_fit = "o parâmetro de entalhe q_s = {q} está fora da faixa 1–8 para que a correção Y_S é definida, pelo que se usa o valor da fronteira: acima da faixa isso subestima a tensão na raiz"
 reversed_bending_uncorrected = "Os dentes sofrem inversão de carga; considere usar o coeficiente de inversão de carga"
 reversed_bending_applied = "Os dentes sofrem inversão de carga; o coeficiente de {fraction} está aplicado"

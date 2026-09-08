@@ -851,7 +851,7 @@ pub fn solve_planetary_stage_with(
             no_source
                 .push(Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", name.to_string()));
         }
-        g.face_sources.largest_of(asks)
+        g.face_sources.width_for(asks, g.face_width.manual)
     };
 
     let probe_load_sp = Load::new(sun_torque_per_mesh, PROBE);

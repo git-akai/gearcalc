@@ -408,6 +408,12 @@ been. They are not a backlog.
   no single-pair zone exists, and it relieves the tooth by about a third. The
   stage says so where the figure is shown.
 - **Hardened 4340's fatigue allowable is the weakest number in the library.**
+- **A face width typed as zero describes a gear with no face**, and every
+  rating taken at one is infinite. Those cross the boundary as `null` and the
+  panel draws them blank, so the browser reads correctly; the CLI prints `inf`.
+  It is a degenerate input rather than a reachable state of the controls — the
+  *automatic* width that had no rating to size it used to resolve to zero, and
+  now stands at the number it was given.
 - **A note slot is as tall as the tallest note that field can show.** Every real
   message fits; a validation message longer than its field's bound note would
   still move the controls when it appeared.

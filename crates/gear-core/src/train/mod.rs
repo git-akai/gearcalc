@@ -943,13 +943,25 @@ impl Default for FaceSources {
 }
 
 impl FaceSources {
-    /// The largest width any **enabled** rating asks for.
+    /// **The width to size a member to**: the largest an *enabled* rating asks
+    /// for, or the width the member was given where none is enabled.
     ///
-    /// Zero when none is enabled, which resolves to a zero face width — a
-    /// degenerate gear rather than a wrong one, and said in the stage's notes
-    /// rather than divided by.
+    /// Nothing enabled used to come out **zero**, and the stage then divided by
+    /// it — every stress infinite, every minimum width a NaN. Those cross the
+    /// boundary as `null` and draw as blanks, so a reader saw the note and no
+    /// figures, which is the right outcome reached by accident. The note's
+    /// promise is that the input is *said* rather than divided by, and this is
+    /// what keeps it: an automatic width with nothing to choose between has
+    /// nothing to choose, so it stands at the number already in its box, which
+    /// is on screen beside the toggle that stopped deciding it.
+    ///
+    /// A width a designer **types** as zero is a different thing — it describes
+    /// a gear with no face, and this cannot rescue it. See `docs/state.md`.
     #[must_use]
-    pub fn largest_of(&self, asks: &LoadCase<Widths>) -> f64 {
+    pub fn width_for(&self, asks: &LoadCase<Widths>, given: f64) -> f64 {
+        if !self.any() {
+            return given;
+        }
         let mut want = 0.0_f64;
         for case in [Case::Peak, Case::Cyclic] {
             let w = asks.get(case);
@@ -2413,6 +2425,101 @@ mod tests {
                     assert!((r.gears[i].addendum - built.params.addendum).abs() < 1e-12);
                 }
             }
+        }
+    }
+
+    /// **An automatic width with nothing to size it is said, not divided by.**
+    ///
+    /// The note has promised exactly that since it was written, and the stage
+    /// then resolved the width to zero and divided by it: every stress came out
+    /// infinite and every minimum width a NaN. Both cross the boundary as JSON
+    /// `null` and draw as blanks, so the browser was honest by accident — while
+    /// the CLI printed `inf`, and the generated TypeScript said `number` of a
+    /// field that could arrive `null`.
+    ///
+    /// Asked of all three stage kinds that have the control, because it is one
+    /// rule and this is the shape of a bound reaching the search it was written
+    /// in and no other.
+    #[test]
+    fn a_width_with_no_rating_to_size_it_stands_where_it_was() {
+        let lib = library();
+        let off = FaceSources {
+            bending: LoadCase {
+                peak: false,
+                cyclic: false,
+            },
+            contact: LoadCase {
+                peak: false,
+                cyclic: false,
+            },
+        };
+        const GIVEN: f64 = 7.5;
+        let gear = || StageGear {
+            face_width: Auto::automatic(GIVEN),
+            face_sources: off,
+            ..StageGear::default()
+        };
+
+        let mut spur = SpurStage::default();
+        for g in &mut spur.gears {
+            *g = StageGear {
+                teeth: g.teeth,
+                ..gear()
+            };
+        }
+        let mut set = PlanetaryStage::default();
+        for g in [&mut set.sun, &mut set.planet, &mut set.ring] {
+            *g = StageGear {
+                teeth: g.teeth,
+                profile_shift: g.profile_shift,
+                ..gear()
+            };
+        }
+        let mut hula = HulaStage::default();
+        for g in &mut hula.gears {
+            *g = StageGear {
+                teeth: g.teeth,
+                addendum: g.addendum,
+                dedendum: g.dedendum,
+                ..gear()
+            };
+        }
+
+        let spur_r = solve_spur_stage(&spur, StageTorques::just(2.0), &lib).unwrap();
+        let set_r = solve_planetary_stage(&set, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+        let hula_r = solve_hula_stage(&hula, 1000.0, StageTorques::just(2.0), &lib).unwrap();
+
+        let members: Vec<&GearResult> = spur_r
+            .gears
+            .iter()
+            .chain([&set_r.sun, &set_r.planet.gear, &set_r.ring])
+            .chain(hula_r.gears.iter().map(|g| &g.gear))
+            .collect();
+        assert_eq!(members.len(), 9);
+        for g in members {
+            assert!(
+                (g.face_width - GIVEN).abs() < 1e-12,
+                "a width nothing sizes stands at the number in its box, not {}",
+                g.face_width
+            );
+            // ...and with a width, every figure taken at one is a number.
+            assert!(
+                g.contact_stress.peak.is_finite() && g.min_face_width.peak.contact.is_finite(),
+                "contact: {} and {}",
+                g.contact_stress.peak,
+                g.min_face_width.peak.contact
+            );
+            if let Some(s) = g.bending_stress.peak {
+                assert!(s.is_finite(), "bending: {s}");
+            }
+        }
+        // The note still fires — the point is that it is now the *only* thing
+        // that happens, not that it stopped happening.
+        for (what, notes) in [("spur", &spur_r.notes), ("epicyclic", &set_r.notes)] {
+            assert!(
+                notes.iter().any(|n| n.is(key::STAGE_FACE_WIDTH_NO_SOURCE)),
+                "{what} should still say no rating sizes the width"
+            );
         }
     }
 
