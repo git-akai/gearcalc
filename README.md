@@ -65,7 +65,7 @@ and `wasm-bindgen-cli` together.
 ```bash
 nix develop              # or `direnv allow` once, for automatic entry
 
-cargo nextest run        # the full test suite, 504 tests, ~28 s
+cargo nextest run        # the full test suite, ~26 s
 cargo clippy --all-targets -- --deny warnings
 cargo fmt
 
@@ -144,7 +144,7 @@ nix build .#web          # deployable static site in ./result
 
 ## Notes for anyone changing the geometry
 
-`gear-core::profile` is a port of a Python implementation that was validated to
+`gear-core::tooth` is a port of a Python implementation that was validated to
 5e-4 mm against a full simulation of the generating rack, and the port reproduces
 it to 7.5e-14 mm over a 1188-case grid. Four things in it look like they could
 be tidied and must not be:
@@ -152,8 +152,8 @@ be tidied and must not be:
 1. **The flank continues below the base circle** to its true intersection with the
    trochoid. Clamping it there and bridging the gap — the obvious-looking
    approach — leaves a visible 0.3 mm step on undercut gears.
-   `Gear::with_flank_clamped_at_base` reproduces that fault on purpose, as a negative test
-   fixture; if `legacy_clamp_still_shows_the_junction_step…` ever passes trivially,
+   `Tooth::with_flank_clamped_at_base` reproduces that fault on purpose, as a
+   negative test fixture; if `legacy_clamp_still_shows_the_junction_step…` ever passes trivially,
    the *detection* has broken.
 2. **The fillet fit cap** is `w_tip·cos α / (2(1 − sin α))`. The plausible
    `w_tip / (2 cos α)` is wrong and silently shrinks the fillet on every
@@ -175,21 +175,25 @@ comparing the envelope it leaves.
 
 ## Verification tooling
 
-Three scripts exist to check the Rust against something that shares no code with
-it, and all are run by hand rather than in CI:
+Four scripts check the Rust against something that shares no code with it, and a
+fifth checks the catalogue against the code. All are run by hand rather than in
+CI:
 
 ```bash
 python3 tools/validate_dxf.py <file.dxf> ...   # an export's structure, then its geometry
 python3 tools/worm_flank_curvature.py          # worm flank curvature from the surface itself
 python3 tools/crossed_path.py                  # a crossed pair's path of contact, from the surfaces
 python3 tools/hula_kinematics.py               # a hula stage's ratio, from the rolling circles
+
 python3 tools/check_strings.py                 # every UI message is used, and every used one exists
+python3 tools/check_doc_links.py               # every pointer into the documents resolves
 ```
 
-The second also answers a design question — what choosing a ZI, ZN or ZA worm
-flank actually costs — and its answer is in `docs/reference.md#crossed-axes`.
+`worm_flank_curvature.py` also answers a design question — what choosing a ZI,
+ZN or ZA worm flank actually costs — and its answer is in
+`docs/reference.md#crossed-axes`.
 
-The third builds both crossed flanks as parametric surfaces and takes their
+`crossed_path.py` builds both crossed flanks as parametric surfaces and takes their
 normals by numerical differentiation, so the line of action, the contact ratio
 and conjugate action all come out of differential geometry with nothing about
 gears in the derivation. `gear-core` reaches the same line by a construction in

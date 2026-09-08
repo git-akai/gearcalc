@@ -82,6 +82,13 @@ reproduces the other.
 - **A ring is a gear with a negative tooth count.**
 - A concentric gear is an eccentric one at `Δx = 0`.
 - A parallel pair is a crossed one at `Σ = 0` — though see the caveat below.
+- An unshared bending rating is a shared one at `LoadSharing::None`, which
+  sweeps nothing and takes the point the unshared reading always took.
+- A member in one mesh is a member in a list of one, so a planet in two needs no
+  arm of its own ([the rating](reference.md#load-cases)).
+- A load case is the peak scaled — wherever the stage's power split does not
+  depend on the magnitude passing through it, which is a property each kind
+  claims for itself rather than one assumed of all of them.
 
 This is not tidiness. **Every surviving `match kind` is a place where two answers
 can silently disagree**, and the corrections log is largely a record of exactly
@@ -330,7 +337,8 @@ precedent does not settle.
 
 `ContactPath::load_fraction` takes a `LoadSharing` model, and
 `LoadSharing::LinearRamp` is an explicitly uncalibrated 1/3→2/3 ramp. It is a
-**stage input, off by default**, and it reaches bending alone.
+**stage input, off by default**, on every kind that reports a bending stress,
+and it reaches bending alone.
 
 **Off by default, because it is an estimate.** A calibrated mesh-stiffness model
 would drag in tooth and rim stiffness, deflection under load and manufacturing
@@ -355,7 +363,21 @@ two together instead of evaluating one point.
 **Measured: 0.0–0.2 %** across every ordinary mesh tried. Once sharing is
 allowed the governing point *becomes* the highest point of single-pair contact —
 where the share is exactly 1 — so the answer is the one already reported, and the
-expensive model buys almost nothing for a worst-case number.
+expensive model buys almost nothing for a worst-case number. That is not an
+approximate agreement below the band but an exact one: the single-pair boundary
+is itself a candidate in the sweep, so where the maximum sits there the answer is
+the unshared one to the bit. **A hula stage never leaves that regime** — its
+meshes run just above continuous contact by construction — so the control is
+offered there and provably cannot bite.
+
+**One sweep, both kinds of member.** A ring's load point travels *up* in roll
+away from its tip where an external tooth's travels down, and its flank stops at
+the generation limit; both are the mesh kind's sign again rather than a second
+construction ([a ring is a gear with a negative tooth
+count](#a-ring-is-a-gear-with-a-negative-tooth-count)). A ring had no shared
+section at all until they were one sweep, so a set that switched the model on
+rated one member of an internal mesh under it and the other without — one mesh,
+two answers, which is the fault this whole document is mostly about.
 
 **Where it is not 0.2 %, and the disclosure that costs.** At a **virtual contact
 ratio of 2 or more** there is no single-pair zone at all: two pairs are always
@@ -959,6 +981,22 @@ a planet that is neither. Forcing those into one shape would mean a row of
 `Option`s and a comment apologising for each. What the kinds share is the
 vocabulary — `Backlash`, `TrainError`, the duty cycle — not the shape of their
 answers.
+
+**The vocabulary is the larger half, and it has grown.** A member of any kind is
+a `GearResult`; a parallel-axis mesh of any kind is a `MeshReport`; the rating
+every member gets is `MemberRating` over the meshes it is in. A kind adds its own
+shape *beside* those, never instead of them — a planet is a `GearResult` plus
+what only a planet has, and a hula gear is a `GearResult` plus which side of its
+pair it is. So "its own result type" means the arrangement's own facts, not its
+own copy of everyone's.
+
+The test of the division is what a new kind would cost. It should be new
+*kinematics* — how its shafts relate, where its meshes sit, what carries what —
+and no new rating machinery at all: `MemberRating` and `MeshReport` are keyed on
+members and meshes rather than on named roles, and `planetary::power` takes a
+basic ratio rather than a set of tooth counts. **That claim is untested until
+something tests it**, and it is written here so the next kind is measured against
+it rather than copied from the nearest neighbour.
 
 ### Helical is not a lesser case
 
