@@ -1960,41 +1960,46 @@ mod tests {
     /// the list fails, and the failure names the path. Adding a name here is a
     /// deliberate act — it says this field can genuinely have no value — which
     /// is the point of it being a list rather than a rule.
-    #[test]
-    fn every_number_that_crosses_is_a_number() {
-        /// Fields that may honestly carry no value, and why.
-        const ABSENT_IS_MEANINGFUL: &[&str] = &[
-            // A section with no notch has no bending rating: a ring whose cutter
-            // left no fillet is the ordinary way to get here.
-            "bending",
-            "bending_stress",
-            // No back-driving load reaches this gear, because something upstream
-            // reacted it or nothing did.
-            "back_driving_torque",
-            // Nothing held the crank open at the clearance minimum.
-            "binding_mesh",
-            // A single planet has no neighbour to clear.
-            "planet_clearance",
-            // No peak torque, so no fraction of it.
-            "operating_torque_percent",
-            // A crossed pair is not a worm and has no published proportions.
-            "recommended_face_width",
-            // ...and a worm is not a crossed pair, so it has no zone of action
-            // taken from one.
-            "crossed",
-            "parallel_axis_efficiency",
-            // The train solved, so there is no failure to report.
-            "failure",
-            // A bound that does not exist on this geometry — see `auto::Ranges`.
-            "min",
-            "max",
-            // ...and the shift above which the tooth would be pointed, where
-            // the tooth never comes to a point anywhere it can be built.
-            "pointed",
-            // A material value with nothing to say beyond its number.
-            "note",
-        ];
+    /// Fields that may honestly carry no value, and why.
+    ///
+    /// Shared by both surfaces, because "which fields can be empty" is one
+    /// question about the boundary rather than one per entry point — and a name
+    /// allowed on the geartrain and refused on a gear would be the two halves
+    /// disagreeing about the same field.
+    const ABSENT_IS_MEANINGFUL: &[&str] = &[
+        // A section with no notch has no bending rating: a ring whose cutter
+        // left no fillet is the ordinary way to get here.
+        "bending",
+        "bending_stress",
+        // No back-driving load reaches this gear, because something upstream
+        // reacted it or nothing did.
+        "back_driving_torque",
+        // Nothing held the crank open at the clearance minimum.
+        "binding_mesh",
+        // A single planet has no neighbour to clear.
+        "planet_clearance",
+        // No peak torque, so no fraction of it.
+        "operating_torque_percent",
+        // A crossed pair is not a worm and has no published proportions.
+        "recommended_face_width",
+        // ...and a worm is not a crossed pair, so it has no zone of action
+        // taken from one.
+        "crossed",
+        "parallel_axis_efficiency",
+        // The train solved, so there is no failure to report.
+        "failure",
+        // A bound that does not exist on this geometry — see `auto::Ranges`.
+        "min",
+        "max",
+        // ...and the shift above which the tooth would be pointed, where
+        // the tooth never comes to a point anywhere it can be built.
+        "pointed",
+        // A material value with nothing to say beyond its number.
+        "note",
+    ];
 
+    /// Every `null` in a result, at a field not named above.
+    fn nulls(v: &serde_json::Value, path: &str) -> Vec<String> {
         fn walk(v: &serde_json::Value, path: &str, bad: &mut Vec<String>) {
             match v {
                 serde_json::Value::Null => {
@@ -2019,7 +2024,13 @@ mod tests {
                 _ => {}
             }
         }
+        let mut bad = Vec::new();
+        walk(v, path, &mut bad);
+        bad
+    }
 
+    #[test]
+    fn every_number_that_crosses_is_a_number() {
         // Every stage kind the defaults can build, in one train, so the walk
         // covers every result shape there is.
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
@@ -2048,12 +2059,55 @@ mod tests {
                 "stages": [stage],
             }});
             let v = solved(&train.to_string());
-            let mut bad = Vec::new();
-            walk(&v, &format!("stage{i}"), &mut bad);
+            let bad = nulls(&v, &format!("stage{i}"));
             assert!(
                 bad.is_empty(),
                 "a figure crossed as null at a field that should always have one: {bad:?}"
             );
+        }
+    }
+
+    /// **The same of a gear tab**, which is the other half of the boundary and
+    /// has its own ways for a number to go missing: an eccentric gear withholds
+    /// the measurements that vary around its revolution, a ring's flank is its
+    /// shaper's, and both report bounds that need not exist.
+    #[test]
+    fn every_number_a_gear_reports_is_a_number() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let gear = |p: serde_json::Value| serde_json::json!({ "params": p, "pin_diameter": 1.75 });
+        let mut ordinary: serde_json::Value = serde_json::from_str(REQ).unwrap();
+        let base = ordinary["params"].clone();
+        let mut eccentric = base.clone();
+        eccentric["angular_shift"] = serde_json::json!(0.5);
+        let mut undercut = base.clone();
+        undercut["teeth"] = serde_json::json!(9);
+        undercut["profile_shift"] = serde_json::json!(-0.3);
+        ordinary["pin_diameter"] = serde_json::json!(1.75);
+
+        for (what, req) in [
+            ("as shipped", gear(d["gear"]["params"].clone())),
+            ("the fixture", ordinary),
+            ("eccentric", gear(eccentric)),
+            ("undercut", gear(undercut)),
+        ] {
+            let out = solve_gear_impl(&req.to_string())
+                .unwrap_or_else(|e| panic!("{what} should solve: {e}"));
+            let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+            let bad = nulls(&v, what);
+            assert!(bad.is_empty(), "{what}: {bad:?}");
+            // ...and the case whose measurements vary really does vary, or this
+            // is four ordinary gears wearing four names. An eccentric gear has
+            // no single span: it has a range around the revolution, and both
+            // ends of it are numbers this walk has just been over.
+            if what == "eccentric" {
+                let around = v["span"]["around"].as_array().unwrap_or_else(|| {
+                    panic!("an eccentric gear's span is a range: {}", v["span"])
+                });
+                assert!(
+                    around[0].as_f64().unwrap() < around[1].as_f64().unwrap(),
+                    "and the two ends of it differ: {around:?}"
+                );
+            }
         }
     }
 
