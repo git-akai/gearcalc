@@ -5,13 +5,24 @@ import type { Directional } from "./Directional";
 import type { LoadCase } from "./LoadCase";
 
 /**
- * What one of the two meshes did.
+ * **What one parallel-axis mesh reports**, for any stage kind that has more
+ * than one of them.
+ *
+ * A stage with a single mesh puts these on its own result, because there is no
+ * ambiguity about whose they are; a stage with two has to say which mesh each
+ * belongs to, and both of them were saying it in the same six fields. The
+ * planetary set's `sun_planet`/`planet_ring` and the hula drive's two pairs are
+ * the same report, so it is one type.
+ *
+ * A crossed pair has none of this — its line of action slides rather than
+ * turning, so there is no operating pressure angle and no contact ratio to
+ * report (docs/reference.md#crossed-axes).
  */
 export type MeshReport = { 
 /**
  * Operating pressure angle `α_w`, degrees — see
- * [`crate::train::SpurResult::operating_pressure_angle`], which defines it
- * for every parallel-axis mesh here.
+ * [`SpurResult::operating_pressure_angle`], which defines it for every
+ * parallel-axis mesh here.
  */
 operating_pressure_angle: number, contact_ratios: ContactRatios, 
 /**
@@ -23,7 +34,7 @@ efficiency: Directional<number>,
  * Hertzian contact stress at the pitch point, MPa, in both load cases.
  *
  * The one figure both members of the mesh share. Each member's own rating —
- * taken where its dedendum is loaded alone — sits on its `GearResult`.
+ * taken where its dedendum is loaded alone — sits on its [`GearResult`].
  */
 contact_stress_at_pitch_point: LoadCase<number>, 
 /**
@@ -31,7 +42,7 @@ contact_stress_at_pitch_point: LoadCase<number>,
  */
 relative_radius: number, 
 /**
- * Angular backlash at each member, degrees: the first is the pinion-side
- * member (sun, then planet), the second the other.
+ * Angular backlash at each member, degrees, in the order the mesh was
+ * built: the pinion-side member first, then the other.
  */
 backlash: [Backlash, Backlash], };

@@ -18,6 +18,7 @@
     type Note,
     type Cutter,
     type WormResult,
+    type MeshReport,
     note,
     t,
   } from "./core";
@@ -313,6 +314,63 @@
      happened to the planetary section. What genuinely differs is passed in: a
      ring's root belongs to its cutter, a planet's shift is solved rather than
      chosen, and a member may have something of its own to report. -->
+<!-- **What one parallel-axis mesh reports**, drawn once for every stage that has
+     more than one of them.
+
+     A `MeshReport` is the same six figures whether it is an epicyclic set's
+     sun–planet pair or a hula drive's, and both were drawing them out
+     separately — which is how the axial-overlap warning came to appear on a
+     spur pair alone and the contact-ratio one on a hula alone, though either
+     mesh can be the one that loses contact. Rows rather than a whole list, so a
+     stage with something of its own to say puts it in the same `<dl>` before or
+     after these; `members` names the two ends the one gap is seen from, in the
+     order the mesh was built. -->
+{#snippet meshRows(m: MeshReport | undefined, members: [string, string], helical: boolean)}
+  <dt>{t("ui.train_operating_pressure_angle")}</dt>
+  <dd>{num(m?.operating_pressure_angle, 3)}{m ? "°" : BLANK}</dd>
+  <dt>{t("ui.train_contact_ratio")}</dt>
+  <dd>
+    {#if m}
+      <span class:warn={m.contact_ratios.transverse < 1}>
+        ε<sub>α</sub> {num(m.contact_ratios.transverse, 4)}
+      </span>
+      · ε<sub>β</sub>
+      {num(m.contact_ratios.overlap, 4)} · ε<sub>γ</sub>
+      {num(m.contact_ratios.total, 4)}
+      {#if m.contact_ratios.transverse < 1}
+        <small class="warn">{t("ui.train_note_contact_ratio_below_one")}</small>
+      {:else if helical && m.contact_ratios.overlap < 1}
+        <small class="warn">{t("ui.train_no_full_axial_overlap")}</small>
+      {/if}
+    {/if}
+  </dd>
+  <dt>{t("ui.train_mesh_efficiency")}</dt>
+  <dd>{bothWays(m?.efficiency)}</dd>
+  <!-- One gap, seen from each of its two ends, with the tolerance band on the
+       first — the way every other mesh here writes its play. -->
+  <dt>{t("ui.train_mesh_backlash")}</dt>
+  <dd>
+    {t("ui.train_backlash_at", {
+      angle: num(m?.backlash[0].nominal, 5),
+      member: members[0],
+    })}
+    <small>{range(num(m?.backlash[0].minimum, 5), num(m?.backlash[0].maximum, 5))}</small>
+    · {t("ui.train_backlash_at", {
+      angle: num(m?.backlash[1].nominal, 5),
+      member: members[1],
+    })}
+  </dd>
+  <!-- The one figure both members share: same patch, same normal force, same
+       E*, one instant. Each member's own rating is on its card and is this or
+       worse. -->
+  <dt>{t("ui.train_contact_stress_at_pitch_point")}</dt>
+  <dd>
+    {cases(m?.contact_stress_at_pitch_point, 1)} {m && t("ui.train_mpa")}
+    <small>{t("ui.train_peak_cyclic")}</small>
+    <small>{m ? `ρ ${num(m.relative_radius, 3)} mm` : BLANK}</small>
+  </dd>
+{/snippet}
+
 <!-- What a crossed-axis mesh reports, whether it was entered as a worm drive or
      as a gear pair with its shafts turned: the same mathematics answers both
      (docs/reference.md#crossed-axes), so it is one readout rather than two that drift. -->
@@ -432,21 +490,14 @@
     /** "shaper" for a ring, whose root and fillet are the tool's rather than
      *  inputs of its own; anything else is rack-generated. */
     cut?: "rack" | "shaper";
-    /** **The shift the stage came back with**, where the gear's own
-     *  `GearResult` is not what carries it — the eccentric drive reports its
-     *  gears in its own shape. Shown in the box while `auto` is on, exactly as
-     *  a solved centre distance or addendum is. */
-    solvedShift?: number;
     /** **What decides this gear's face width**, which is one question with
      *  three answers rather than a flag with two.
      *
      *  `"rating"` — the default: a stress inverted, so the sources that size it
      *  are offered as toggles. `"continuity"` — a crossed pair, whose contact is
      *  a point no stress depends on, so the width comes from ε = 1 instead and
-     *  says which kind of minimum it is. `"none"` — nothing sizes it at all, so
-     *  it is a plain field: no toggles, and no note borrowed from a stage that
-     *  answers a different question. */
-    faceWidth?: "rating" | "continuity" | "none";
+     *  says which kind of minimum it is. */
+    faceWidth?: "rating" | "continuity";
     /** Called when this gear's shift is switched between given and automatic,
      *  so a stage whose inputs constrain one another can relieve whichever of
      *  them that has over-specified. */
@@ -461,10 +512,6 @@
      *  about. Given only for `cut: "shaper"`, which is the only kind of member
      *  that has one. */
     cutter?: Cutter;
-    /** **This gear's own notes**, where its `GearResult` is not what carries
-     *  them — the eccentric drive reports its gears in its own shape. The ones
-     *  naming a field are drawn under that field; see `clampNote`. */
-    gearNotes?: Note[];
     /** **What this member's speed has to add to the figure.**
      *
      *  A member with something more to say about a row the shared readout
@@ -483,7 +530,7 @@
     extraIndex?: number;
   },
 )}
-{@const own = opts.gearNotes ?? g?.notes ?? []}
+{@const own = g?.notes ?? []}
 {@const mat = library.materials.material.find((m) => m.name === gear.material)}
 {@const spare = (g?.notes ?? []).filter((n) => !UNDER_A_FIELD.includes(n.key))}
 <div class="gear">
@@ -588,7 +635,7 @@
   {@render autoNumber(
     "ui.train_profile_shift",
     gear.profile_shift,
-    opts.solvedShift ?? g?.profile_shift,
+    g?.profile_shift,
     0.05,
     opts.onShiftAuto,
     undefined,
@@ -1844,7 +1891,6 @@
               })}
               {@render gearCard(t("ui.train_planet"), stage.planet, pres?.planet.gear, {
                 cut: "rack",
-                solvedShift: pres?.planet.profile_shift,
                 onShiftAuto: () => relievePlanetary(stage, stage.planet.profile_shift),
                 // The one thing only a planet's speed has: its teeth turn in
                 // the carrier's frame, and that is the speed they wear at.
@@ -1949,44 +1995,12 @@
               ] as const as [label, m, coprime, first, second] (label)}
                 <h4 class="mesh">{label}</h4>
                 <dl class="out indent">
+                  <!-- The coprime check belongs to a mesh — the sun against the
+                       planets, the ring against the planets — so it leads the
+                       list, and what every parallel-axis mesh reports follows. -->
                   <dt>{t("ui.train_coprime")}</dt>
                   <dd>{coprime === undefined ? BLANK : coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
-                  <dt>{t("ui.train_operating_pressure_angle")}</dt>
-                  <dd>{num(m?.operating_pressure_angle, 3)}°</dd>
-                  <dt>{t("ui.train_contact_ratio")}</dt>
-                  <dd>
-                    ε<sub>α</sub> {num(m?.contact_ratios.transverse, 4)} · ε<sub>β</sub>
-                    {num(m?.contact_ratios.overlap, 4)} · ε<sub>γ</sub>
-                    {num(m?.contact_ratios.total, 4)}
-                  </dd>
-                  <dt>{t("ui.train_mesh_efficiency")}</dt>
-                  <dd>
-                    {bothWays(m?.efficiency)}
-                  </dd>
-                  <!-- The pair's own play, which the result has always carried
-                       and the panel never showed. Written as every other mesh
-                       here writes it: one gap, seen from each of its two ends,
-                       with the tolerance band on the first. -->
-                  <dt>{t("ui.train_mesh_backlash")}</dt>
-                  <dd>
-                    {t("ui.train_backlash_at", {
-                      angle: num(m?.backlash[0].nominal, 5),
-                      member: t(first),
-                    })}
-                    <small
-                      >{range(num(m?.backlash[0].minimum, 5), num(m?.backlash[0].maximum, 5))}</small
-                    >
-                    · {t("ui.train_backlash_at", {
-                      angle: num(m?.backlash[1].nominal, 5),
-                      member: t(second),
-                    })}
-                  </dd>
-                  <dt>{t("ui.train_contact_stress_at_pitch_point")}</dt>
-                  <dd>
-                    {cases(m?.contact_stress_at_pitch_point, 1)} {t("ui.train_mpa")}
-                    <small>{t("ui.train_peak_cyclic")}</small>
-                    <small>ρ {num(m?.relative_radius, 3)} mm</small>
-                  </dd>
+                  {@render meshRows(m, [t(first), t(second)], stage.helix_angle !== 0)}
                 </dl>
               {/each}
 
@@ -2124,14 +2138,11 @@
                         ["ui.train_hula_role_grounded", "ui.train_hula_role_wobble", "ui.train_hula_role_wobble", "ui.train_hula_role_output"][j],
                       ),
                     stage.gears[j],
-                    undefined,
+                    hres?.gears[j].gear,
                     {
                       cut: j === ring ? "shaper" : "rack",
                       cutter: j === ring ? stage.cutter[m] : undefined,
-                      solvedShift: hres?.gears[j].profile_shift,
-                      gearNotes: hres?.gears[j].clamps,
                       onShiftAuto: () => relieveHula(stage, m, stage.gears[j].profile_shift),
-                      faceWidth: "none",
                     },
                   )}
                 {/each}
@@ -2141,17 +2152,15 @@
                    in their mesh's own section beneath its gear cards — the same
                    place a pair's readout stands in its stage. -->
               <dl class="out">
-                <dt>{t("ui.train_operating_pressure_angle")}</dt>
-                <dd>{num(hres?.meshes[m].operating_pressure_angle, 3)}°</dd>
-                <dt>{t("ui.train_contact_ratio")}</dt>
-                <dd>
-                  ε<sub>α</sub> {num(hres?.meshes[m].contact_ratios.transverse, 4)} · ε<sub>β</sub>
-                  {num(hres?.meshes[m].contact_ratios.overlap, 4)} · ε<sub>γ</sub>
-                  {num(hres?.meshes[m].contact_ratios.total, 4)}
-                  {#if hres && hres.meshes[m].contact_ratios.transverse < 1}
-                    <small class="warn">{t("ui.train_note_contact_ratio_below_one")}</small>
-                  {/if}
-                </dd>
+                <!-- What every parallel-axis mesh reports, then what only this
+                     arrangement has — the same order the spur and screw
+                     readouts take. The mesh was built pinion first, so the
+                     pinion leads the pair of backlash figures. -->
+                {@render meshRows(
+                  hres?.meshes[m].report,
+                  [t("ui.train_the_pinion"), t("ui.train_the_ring")],
+                  stage.helix_angle !== 0,
+                )}
                 <dt>{t("ui.train_hula_clearance_result")}</dt>
                 <dd>
                   {num(hres?.meshes[m].clearance, 4)} {t("ui.train_mm")}
@@ -2183,49 +2192,12 @@
                     </span>
                   {/each}
                 </dd>
-                <dt>{t("ui.train_mesh_efficiency")}</dt>
-                <dd>
-                  {bothWays(hres?.meshes[m].efficiency)}
-                </dd>
-                <!-- The same gap seen from each member, written as the spur
-                     and screw readouts write theirs — one gap, two ends, and
-                     the tolerance band on the first of them. The ring leads,
-                     as its card does. -->
-                <dt>{t("ui.train_mesh_backlash")}</dt>
-                <dd>
-                  {t("ui.train_backlash_at", {
-                    angle: num(hres?.meshes[m].backlash[1].nominal, 5),
-                    member: t("ui.train_the_ring"),
-                  })}
-                  <small
-                    >{range(num(hres?.meshes[m].backlash[1].minimum, 5), num(hres?.meshes[m].backlash[1].maximum, 5))}</small
-                  >
-                  · {t("ui.train_backlash_at", {
-                    angle: num(hres?.meshes[m].backlash[0].nominal, 5),
-                    member: t("ui.train_the_pinion"),
-                  })}
-                </dd>
               </dl>
-              <!-- What is left after the fields have taken theirs: a clamp
-                   naming an input is drawn under that input, and this list
-                   keeps the rest — a tip the shaper could not reach, and the
-                   like, which are about the part rather than about a box. -->
-              {@const clamped = [ring, pinion].flatMap((j) =>
-                (hres?.gears[j].clamps ?? [])
-                  .filter((c) => !UNDER_A_FIELD.includes(c.key))
-                  .map((c) => ({ teeth: stage.gears[j].teeth, note: c })),
-              )}
-              {#if clamped.length}
-                <!-- One list for the pair, as every other clamped gear in the
-                     application reports: `.hint` is a note pulled *up* against
-                     the field above it, so a run of them closed on each other
-                     instead of reading as a list. -->
-                <ul class="notes">
-                  {#each clamped as c, i (i)}
-                    <li>z{c.teeth}: {note(c.note)}</li>
-                  {/each}
-                </ul>
-              {/if}
+              <!-- A clamp that is about the part rather than about a box is
+                   drawn on the card that owns it, like every other stage's —
+                   the pair-wide list that used to stand here was the only place
+                   in the application where one gear's finding was filed under
+                   two gears. -->
             {/each}
 
             <!-- The drive as a whole, under the meshes it is made of — where every
@@ -2268,15 +2240,21 @@
                     shaft: t("ui.train_hula_role_crank"),
                   })}
                 </dd>
+                <!-- **The crank alone**, because it is the one shaft here that
+                     is not a gear. The wobble body's speed and the output's are
+                     printed on the cards of the gears that turn at them, and a
+                     row repeating them was the same figure twice on one page. -->
                 <dt>{t("ui.train_hula_speeds")}</dt>
-                <dd>
-                  {t("ui.train_hula_speeds_at", {
-                    crank: num(hres?.crank_speed, 1),
-                    wobble: num(hres?.gears[1].speed, 3),
-                    output: num(hres?.gears[3].speed, 4),
-                  })}
-                </dd>
+                <dd>{num(hres?.crank_speed, 1)} {hres && t("ui.train_rpm")}</dd>
               </dl>
+
+              <!-- What the drive had to say that no one gear owns, as every
+                   other stage kind reports its own. -->
+              {#if (hres?.notes.length ?? 0) > 0}
+                <ul class="notes">
+                  {#each hres?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
+                </ul>
+              {/if}
 
             <button
               class="danger small"

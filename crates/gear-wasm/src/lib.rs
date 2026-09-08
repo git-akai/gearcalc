@@ -1719,7 +1719,13 @@ mod tests {
 
         // The planet's shift is *solved*, not sent: 24 + 2x18 = 60 is the ideal
         // ring, so it comes back as exactly zero with a closed residual.
-        assert!(stage["planet"]["profile_shift"].as_f64().unwrap().abs() < 1e-12);
+        assert!(
+            stage["planet"]["gear"]["profile_shift"]
+                .as_f64()
+                .unwrap()
+                .abs()
+                < 1e-12
+        );
         assert!(stage["planet"]["shift_residual"].as_f64().unwrap() < 1e-12);
         // A planet's root is loaded on both flanks, and with no correction asked
         // for the stage says so rather than derating it out of sight.
@@ -1776,6 +1782,85 @@ mod tests {
         assert_eq!(sharing["values"]["planets"], "3");
         // ...and the output-shaft backlash is a real figure now, not a placeholder.
         assert!(stage["backlash"]["forward"]["nominal"].as_f64().unwrap() > 0.0);
+    }
+
+    /// **A hula stage crosses the boundary carrying its ratings.**
+    ///
+    /// Its own shape and no other kind's: four gears on three shafts, two meshes
+    /// whose reports are nested rather than spread across the mesh, and a
+    /// grounded member that is loaded while it does not turn.
+    ///
+    /// The request is the shipped stage put through `defaults`, so the fields
+    /// this asserts on are the fields a front end actually sends — a hand-typed
+    /// literal here would be a fourth copy of the boundary and would go stale
+    /// the way the hand-written mirror did (`docs/corrections.md`).
+    #[test]
+    fn a_hula_stage_crosses_the_boundary_carrying_its_ratings() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let train = serde_json::json!({"train": {
+            "input_speed": 3000.0,
+            "input_torque": 2.0,
+            "back_driving_torque": 0.0,
+            "operating_torque": 1.0,
+            "actuation": { "continuous": { "operating_speed": 3000.0, "runtime_hours": 1.0 } },
+            "stages": [d["hula_stage"]],
+        }});
+        let v = solved(&train.to_string());
+        let stage = &v["stages"][0];
+        assert_eq!(stage["kind"], "hula");
+
+        // Four gears, each with the geometry the arrangement gives it *and* the
+        // rating every stage member carries.
+        let gears = stage["gears"].as_array().expect("four gears");
+        assert_eq!(gears.len(), 4);
+        for (i, g) in gears.iter().enumerate() {
+            assert!(g["tip_radius"].as_f64().unwrap() > 0.0, "gear {i}");
+            let rated = &g["gear"];
+            assert!(rated["face_width"].as_f64().unwrap() > 0.0, "gear {i}");
+            assert!(rated["torque"].as_f64().unwrap().abs() > 0.0, "gear {i}");
+            assert!(rated["contact_stress"]["peak"].as_f64().unwrap() > 0.0);
+            assert!(
+                rated["material"]["name"].as_str().is_some(),
+                "gear {i} was rated on a material"
+            );
+            // **A grounded gear is loaded**, which is the case a count taken
+            // from a member's own revolutions could not state.
+            assert!(
+                rated["tooth_cycles"]["bending"].as_f64().unwrap() > 0.0,
+                "gear {i} is engaged once a crank turn at least"
+            );
+        }
+        assert_eq!(gears[0]["gear"]["speed"].as_f64().unwrap(), 0.0);
+
+        // Two meshes, each reporting what any parallel-axis mesh reports, under
+        // the one key the panel reads it by.
+        for m in 0..2 {
+            let mesh = &stage["meshes"][m];
+            assert!(
+                mesh["report"]["contact_ratios"]["transverse"]
+                    .as_f64()
+                    .unwrap()
+                    > 0.0
+            );
+            assert!(mesh["report"]["operating_pressure_angle"].as_f64().unwrap() > 0.0);
+            assert!(
+                mesh["report"]["contact_stress_at_pitch_point"]["peak"]
+                    .as_f64()
+                    .unwrap()
+                    > 0.0
+            );
+            assert!(mesh["clearance"].as_f64().unwrap() > 0.0, "mesh {m}");
+        }
+        // The three shafts are in equilibrium, and the drive says so in the
+        // vocabulary a stage says anything in.
+        let sum: f64 = stage["shaft_torques"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t.as_f64().unwrap())
+            .sum();
+        assert!(sum.abs() < 1e-9, "torques must balance, got {sum}");
+        assert!(stage["notes"].is_array(), "a stage carries its own notes");
     }
 
     #[test]

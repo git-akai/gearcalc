@@ -164,10 +164,12 @@ impl Default for PlanetaryStage {
     ts(export, export_to = "core/")
 )]
 pub struct PlanetResult {
-    /// Everything a gear in a stage reports.
+    /// Everything a gear in a stage reports — including **the shift the
+    /// common-centre-distance solve required**, which is a `GearResult`'s
+    /// `profile_shift` like any other member's. It stood beside it as a field
+    /// of its own as well, so one number had two homes and the panel read the
+    /// copy.
     pub gear: GearResult,
-    /// The shift the common-centre-distance solve required.
-    pub profile_shift: f64,
     /// `|a_sun-planet − a_planet-ring|` at that shift, mm. Reported rather than
     /// asserted: it is the one number that says the solve closed.
     pub shift_residual: f64,
@@ -329,7 +331,6 @@ pub(super) struct Built {
     pub(super) ring: Ring,
     pub(super) ring_as_gear: Tooth,
     pub(super) layout: crate::planetary::Layout,
-    pub(super) planet_shift: f64,
     pub(super) sp_mesh: Mesh,
     pub(super) sp_path: ContactPath,
     pub(super) pr_mesh: Mesh,
@@ -414,7 +415,6 @@ impl PlanetaryStage {
             ring,
             ring_as_gear,
             layout,
-            planet_shift,
             sp_mesh,
             sp_path,
             pr_mesh,
@@ -651,7 +651,6 @@ pub fn solve_planetary_stage_with(
         ring,
         ring_as_gear,
         layout,
-        planet_shift,
         sp_mesh,
         sp_path,
         pr_mesh,
@@ -1137,7 +1136,6 @@ pub fn solve_planetary_stage_with(
                 planet.clamps.notes.clone(),
                 gear_notes(1),
             ),
-            profile_shift: planet_shift,
             shift_residual: layout.residual,
             speed_absolute: planet_absolute,
             speed_relative: planet_relative,
@@ -1275,7 +1273,7 @@ mod tests {
         }
         // The ideal ring needs no shift at all, and gets exactly none.
         let ideal = solved(24, 18, 60);
-        assert!(ideal.planet.profile_shift.abs() < 1e-12);
+        assert!(ideal.planet.gear.profile_shift.abs() < 1e-12);
         assert!((ideal.centre_distance_nominal - 21.0).abs() < 1e-12);
     }
 
@@ -1328,7 +1326,7 @@ mod tests {
             // ...and the given members were left exactly as given.
             let got = [
                 r.sun.profile_shift,
-                r.planet.profile_shift,
+                r.planet.gear.profile_shift,
                 r.ring.profile_shift,
             ];
             for i in 0..3 {

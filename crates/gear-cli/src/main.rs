@@ -2054,7 +2054,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                              planet shift {:+.4}",
                             r.centre_distance_nominal,
                             r.planet.shift_residual,
-                            r.planet.profile_shift
+                            r.planet.gear.profile_shift
                         );
                         println!(
                             "eps_a  sun-planet {:.3}   planet-ring {:.3}   \

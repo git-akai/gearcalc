@@ -6,13 +6,13 @@ import type { GearResult } from "./GearResult";
  */
 export type PlanetResult = { 
 /**
- * Everything a gear in a stage reports.
+ * Everything a gear in a stage reports — including **the shift the
+ * common-centre-distance solve required**, which is a `GearResult`'s
+ * `profile_shift` like any other member's. It stood beside it as a field
+ * of its own as well, so one number had two homes and the panel read the
+ * copy.
  */
 gear: GearResult, 
-/**
- * The shift the common-centre-distance solve required.
- */
-profile_shift: number, 
 /**
  * `|a_sun-planet − a_planet-ring|` at that shift, mm. Reported rather than
  * asserted: it is the one number that says the solve closed.

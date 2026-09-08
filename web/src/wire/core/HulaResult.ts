@@ -3,6 +3,7 @@ import type { Backlash } from "./Backlash";
 import type { Directional } from "./Directional";
 import type { HulaGear } from "./HulaGear";
 import type { HulaMesh } from "./HulaMesh";
+import type { Note } from "./Note";
 
 /**
  * What a hula stage came to.
@@ -85,4 +86,10 @@ shaft_torques: [number, number, number],
  * driving forward, the crank driving backward. The same two plays subtend
  * very different angles at the two, by exactly the reduction.
  */
-backlash: Directional<Backlash>, meshes: [HulaMesh, HulaMesh], gears: [HulaGear, HulaGear, HulaGear, HulaGear], };
+backlash: Directional<Backlash>, meshes: [HulaMesh, HulaMesh], gears: [HulaGear, HulaGear, HulaGear, HulaGear], 
+/**
+ * Anything the stage had to say about the design, as every other stage kind
+ * reports it. A note that names one gear rides on that gear instead — see
+ * [`GearResult::notes`].
+ */
+notes: Array<Note>, };
