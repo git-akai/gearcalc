@@ -535,6 +535,15 @@ carry a number, so they reach the reader beside that field rather than in a list
 at the foot of the stage to be matched back up by tooth count. The stage's list
 keeps what is about the stage.
 
+**And where a bound cannot reach, the finding is reported instead.** `no
+undercut` bounds a shift somebody *chooses*; a shift a relation leaves over is
+chosen by nobody — an epicyclic absorber, or a hula pinion whose ring was pinned
+— and answers to no bound at all. The control can be on, the tooth undercut, and
+the two never meet. So every rack-cut stage member says whether its flank has
+been eaten into, which is a remark about the part rather than a clamp: nothing
+was altered, and the tooth is exactly the one the inputs describe. Severing is
+the other side of it and *is* a clamp, since it truncates the profile.
+
 **Where a clearance is read.** A clearance is taken by whatever is free to
 absorb it, and each stage reports what it took rather than leaving a reader to
 work it out. The centre distance absorbs it when the distance is automatic; the

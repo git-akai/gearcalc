@@ -788,6 +788,9 @@ pub fn solve_spur_stage_with(
     let gear_notes = |i: usize| {
         let mut out = Vec::new();
         out.extend(super::notch_outside_fit(&sections[i]));
+        // ...and whether the cutter has eaten into the flank, which no toggle
+        // can prevent once a shift is given and `no undercut` is off.
+        out.extend(super::undercut_note(&g[i]));
         // ...and whether this root is loaded both ways, which for a parallel
         // pair is the drive's doing alone.
         out.extend(reversal.note_for(reverses));

@@ -835,9 +835,12 @@ pub fn solve_planetary_stage_with(
         Some(&planet_section),
         ring_section.as_ref(),
     ];
+    // The two rack-cut members; a ring is not asked about undercut.
+    let cut_by_a_rack = [Some(&sun), Some(&planet), None];
     let gear_notes = |i: usize| {
         let mut out = Vec::new();
         out.extend(sections[i].and_then(super::notch_outside_fit));
+        out.extend(cut_by_a_rack[i].and_then(super::undercut_note));
         out.extend(reversal.note_for(reverses[i]));
         // **A bound that moved this member's own number belongs to it**, not to
         // a list at the foot of the stage that a reader has to match back up by

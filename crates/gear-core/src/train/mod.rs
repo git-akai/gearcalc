@@ -188,6 +188,28 @@ pub(crate) fn notch_outside_fit(section: &crate::strength::RootSection) -> Optio
         .then(|| Note::new(key::STAGE_NOTCH_OUTSIDE_FIT).number("q", section.notch_parameter, 2))
 }
 
+/// **A tooth the cutter has eaten into**, where that is a finding rather than a
+/// clamp.
+///
+/// Severing truncates the profile, so `Tooth` records it as a clamp and every
+/// stage's member list has carried it. Undercut short of severing alters
+/// nothing — the tooth is exactly the one the inputs describe — which is why it
+/// is not a clamp, and why nothing was reporting it: a gear tab has shown it
+/// since undercut existed, and the same gear inside a geartrain said nothing at
+/// all. So it goes where a remark about a member goes, beside the notch band
+/// and the reversed root.
+///
+/// It matters most exactly where a stage cannot prevent it. `no undercut` bounds
+/// a shift somebody chooses; a shift that a *relation* leaves over answers to no
+/// bound at all — a hula pinion whose ring was pinned, an epicyclic absorber —
+/// so the control can be on, the tooth undercut, and the two never meet.
+///
+/// Nothing for a ring: its flank is its shaper's, and undercut is not a question
+/// that can be asked of it.
+pub(crate) fn undercut_note(tooth: &crate::tooth::Tooth) -> Option<Note> {
+    (tooth.undercut && !tooth.severed).then(|| Note::new(key::CLAMP_TOOTH_UNDERCUT))
+}
+
 /// The face width a pair of ratings asks for, at one load case.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

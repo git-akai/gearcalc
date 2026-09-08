@@ -214,7 +214,9 @@ satisfy however it is decided — so they combine, and the automatic shift this
 tool has always offered is the pair of them on at once. A shift given by hand is
 held to the true undercut minimum, which is negative on a comfortable tooth
 count, so a deliberate negative shift survives and only a genuinely undercut one
-is raised — and it says so when it is. A search is floored at the automatic
+is raised — and it says so when it is. Where the bound cannot reach — a shift a
+relation leaves over, which nobody chose — the tooth is reported undercut
+instead, on every rack-cut member of every stage kind. A search is floored at the automatic
 value instead, for a reason that is measured rather than tidy
 ([reference](reference.md#efficiency-parallel-axes)). A ring has only the first
 control: its flank is its shaper's, and undercut is not a question that can be

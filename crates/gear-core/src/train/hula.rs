@@ -961,6 +961,12 @@ pub fn solve_hula_stage_with(
             // about the part.
             let mut member_notes = Vec::new();
             member_notes.extend(sections[slot].and_then(super::notch_outside_fit));
+            // A pinion is rack-cut and can be undercut by the shift the crank
+            // leaves it — which is nobody's to move, so it is reported rather
+            // than prevented. A ring is not asked.
+            if !is_ring {
+                member_notes.extend(super::undercut_note(&p.pinion));
+            }
             member_notes.extend(reversal.note_for(reverses));
             if i == carrier(index) {
                 member_notes.extend(raised[index].clone());
@@ -1410,6 +1416,61 @@ mod tests {
             "the tips are what held it, so they sit at their limit: {}",
             opened.meshes[binding].tip_margin
         );
+    }
+
+    /// **A shift the crank leaves can undercut, and the drive says so.**
+    ///
+    /// `no undercut` bounds a shift somebody chooses. Pin the ring's and the
+    /// pinion's is no longer chosen — it is what the crank's fixed difference
+    /// leaves, and `Σx` is negative on this arrangement, so pinning the ring low
+    /// drives the pinion down past its own floor with nothing able to move it.
+    /// The toggle is on throughout here and the tooth undercuts anyway, which is
+    /// the case a report exists for and a bound cannot reach.
+    #[test]
+    fn a_pinion_the_crank_undercuts_is_reported() {
+        let mut s = stage();
+        for gear in &mut s.gears {
+            assert!(gear.no_undercut, "the fixture asks for no undercut");
+        }
+        // The rings pinned at zero, so each pinion takes the whole of `Σx`.
+        for mesh in 0..2 {
+            let (a, b) = (mesh * 2, mesh * 2 + 1);
+            let ring = if s.gears[a].teeth > s.gears[b].teeth {
+                a
+            } else {
+                b
+            };
+            s.gears[ring].profile_shift = Auto::fixed(0.0);
+        }
+        let r = solve(&s, 1000.0).expect("the drive still solves");
+        let told: Vec<u32> = r
+            .gears
+            .iter()
+            .filter(|g| {
+                g.gear
+                    .notes
+                    .iter()
+                    .any(|n| n.is(crate::note::key::CLAMP_TOOTH_UNDERCUT))
+            })
+            .map(|g| g.teeth)
+            .collect();
+        assert!(
+            !told.is_empty(),
+            "a pinion driven below its floor should say so: shifts {:?}",
+            r.gears.each_ref().map(|g| g.gear.profile_shift)
+        );
+        // ...and a drive whose pinions carry their own shift says nothing.
+        let quiet = solve(&stage(), 1000.0).unwrap();
+        for g in &quiet.gears {
+            assert!(
+                !g.gear
+                    .notes
+                    .iter()
+                    .any(|n| n.is(crate::note::key::CLAMP_TOOTH_UNDERCUT)),
+                "z{} is not undercut and should not say it is",
+                g.teeth
+            );
+        }
     }
 
     /// **A hula pair hunts or it does not**, and at more than one tooth of
