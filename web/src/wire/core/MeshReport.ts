@@ -24,7 +24,19 @@ export type MeshReport = {
  * [`SpurResult::operating_pressure_angle`], which defines it for every
  * parallel-axis mesh here.
  */
-operating_pressure_angle: number, contact_ratios: ContactRatios, 
+operating_pressure_angle: number, 
+/**
+ * Whether the two members' tooth counts share no factor — a hunting pair,
+ * which spreads wear evenly instead of repeatedly bringing the same two
+ * teeth together.
+ *
+ * A property of a *mesh*, which is why it is here: a pair reports one
+ * ([`SpurResult::coprime`], its one mesh being the stage), and a set with
+ * two meshes has two answers. An epicyclic set's separate question — each
+ * central member against the *planet count* — is a different check with a
+ * different reason, and it stays where it is.
+ */
+coprime: boolean, contact_ratios: ContactRatios, 
 /**
  * Mesh efficiency, both drive senses. Equal for a parallel-axis pair, and
  * arrived at rather than copied.

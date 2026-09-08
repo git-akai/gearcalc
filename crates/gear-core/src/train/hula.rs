@@ -1027,6 +1027,7 @@ pub fn solve_hula_stage_with(
         meshes.push(HulaMesh {
             report: MeshReport {
                 operating_pressure_angle: layout.alpha_w[index].to_degrees(),
+                coprime: super::gcd(teeth.0[pair.ring], teeth.0[pair.pinion]) == 1,
                 // **The contact ratio the stage optimises against is the one it
                 // reports.** The pair's own report gives the same number by a
                 // second road; reading it from the path is reading what the
@@ -1381,6 +1382,34 @@ mod tests {
             "the tips are what held it, so they sit at their limit: {}",
             opened.meshes[binding].tip_margin
         );
+    }
+
+    /// **A hula pair hunts or it does not**, and at more than one tooth of
+    /// difference that is a real question.
+    ///
+    /// One tooth of difference is coprime whatever the count, so the check reads
+    /// as vacuous on the arrangement most of these tests use — which is exactly
+    /// why the shipped drive, at four teeth of difference, can fail it: 64 in 60
+    /// shares a factor of four and brings the same two teeth together every
+    /// fifteenth turn.
+    #[test]
+    fn a_pair_that_shares_a_factor_says_so() {
+        let mut s = stage();
+        for (gear, count) in s.gears.iter_mut().zip([64_u32, 60, 56, 60]) {
+            gear.teeth = count;
+            gear.addendum = 0.7;
+        }
+        let shared = solve(&s, 1000.0).unwrap();
+        for m in &shared.meshes {
+            assert!(!m.report.coprime, "60 and 64 share a factor of four");
+        }
+        // One tooth off each end and the same drive hunts.
+        for (gear, count) in s.gears.iter_mut().zip([65_u32, 61, 57, 61]) {
+            gear.teeth = count;
+        }
+        for m in &solve(&s, 1000.0).unwrap().meshes {
+            assert!(m.report.coprime, "61 shares no factor with 65 or 57");
+        }
     }
 
     /// **A mesh is loaded by the shaft it is anchored to**, and the member on

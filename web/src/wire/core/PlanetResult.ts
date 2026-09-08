@@ -19,10 +19,13 @@ gear: GearResult,
  */
 shift_residual: number, 
 /**
- * Speed in the fixed frame, rpm.
- */
-speed_absolute: number, 
-/**
- * Speed **relative to the carrier**, rpm — what its teeth actually see.
+ * Speed **relative to the carrier**, rpm — what its teeth actually see,
+ * and the one figure a `GearResult` has no field for.
+ *
+ * Its speed in the fixed frame is `gear.speed`, like every other member's.
+ * It stood here as well and the two could not disagree, being the same
+ * expression twice — but the copy is what a reader reached for, so when
+ * both were wrong they were wrong together
+ * ([`crate::planetary::Power::planet_speed`]).
  */
 speed_relative: number, };

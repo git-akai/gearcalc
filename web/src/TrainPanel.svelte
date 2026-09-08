@@ -326,6 +326,8 @@
      after these; `members` names the two ends the one gap is seen from, in the
      order the mesh was built. -->
 {#snippet meshRows(m: MeshReport | undefined, members: [string, string], helical: boolean)}
+  <dt>{t("ui.train_coprime")}</dt>
+  <dd>{m === undefined ? BLANK : m.coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
   <dt>{t("ui.train_operating_pressure_angle")}</dt>
   <dd>{num(m?.operating_pressure_angle, 3)}{m ? "°" : BLANK}</dd>
   <dt>{t("ui.train_contact_ratio")}</dt>
@@ -1995,10 +1997,12 @@
               ] as const as [label, m, coprime, first, second] (label)}
                 <h4 class="mesh">{label}</h4>
                 <dl class="out indent">
-                  <!-- The coprime check belongs to a mesh — the sun against the
-                       planets, the ring against the planets — so it leads the
-                       list, and what every parallel-axis mesh reports follows. -->
-                  <dt>{t("ui.train_coprime")}</dt>
+                  <!-- **Two coprime checks, and they are different questions.**
+                       This one is the central member against the *planet count*
+                       — whether the set's meshes come round together — and it
+                       shared a label with the hunting check every mesh reports,
+                       which is the one `meshRows` draws below. -->
+                  <dt>{t("ui.train_coprime_with_planets")}</dt>
                   <dd>{coprime === undefined ? BLANK : coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
                   {@render meshRows(m, [t(first), t(second)], stage.helix_angle !== 0)}
                 </dl>

@@ -136,6 +136,16 @@ pub struct MeshReport {
     /// [`SpurResult::operating_pressure_angle`], which defines it for every
     /// parallel-axis mesh here.
     pub operating_pressure_angle: f64,
+    /// Whether the two members' tooth counts share no factor — a hunting pair,
+    /// which spreads wear evenly instead of repeatedly bringing the same two
+    /// teeth together.
+    ///
+    /// A property of a *mesh*, which is why it is here: a pair reports one
+    /// ([`SpurResult::coprime`], its one mesh being the stage), and a set with
+    /// two meshes has two answers. An epicyclic set's separate question — each
+    /// central member against the *planet count* — is a different check with a
+    /// different reason, and it stays where it is.
+    pub coprime: bool,
     pub contact_ratios: ContactRatios,
     /// Mesh efficiency, both drive senses. Equal for a parallel-axis pair, and
     /// arrived at rather than copied.
@@ -811,7 +821,7 @@ impl StageResult {
                 };
                 count(r.speeds[0], &mut r.sun);
                 count(r.speeds[2], &mut r.ring);
-                let planet = r.planet.speed_absolute;
+                let planet = r.planet.gear.speed;
                 count(planet, &mut r.planet.gear);
             }
             // A hula sets its own speeds — four gears on three shafts, and its
@@ -1126,6 +1136,19 @@ pub struct Cycles {
     /// Engagements one flank sees. A reversing drive shares them between the two
     /// flanks, so each takes half; otherwise it is the same number as `bending`.
     pub contact: f64,
+}
+
+/// The greatest common divisor of two tooth counts.
+///
+/// One home, because it was two: a coprime check is what says whether a pair
+/// hunts, and every stage kind that has a mesh asks it.
+pub(crate) const fn gcd(mut a: u32, mut b: u32) -> u32 {
+    while b != 0 {
+        let t = b;
+        b = a % b;
+        a = t;
+    }
+    a
 }
 
 /// **How often one member of an epicyclic set is engaged**, per revolution of
@@ -2244,7 +2267,7 @@ mod tests {
                         (
                             "planet",
                             p.planet.gear.tooth_cycles.bending,
-                            p.planet.speed_absolute,
+                            p.planet.gear.speed,
                         ),
                     ] {
                         let expected = want(speed, carrier, n);

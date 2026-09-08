@@ -988,17 +988,8 @@ pub fn solve_spur_stage_with(
             with(stage.sliding_friction).once_moving(&with(stage.static_friction))
         },
         backlash,
-        coprime: gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
+        coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
         gears: [gears[0].clone(), gears[1].clone()],
         notes,
     })
-}
-
-const fn gcd(mut a: u32, mut b: u32) -> u32 {
-    while b != 0 {
-        let t = b;
-        b = a % b;
-        a = t;
-    }
-    a
 }

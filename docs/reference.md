@@ -1462,6 +1462,30 @@ the arrangement solved for — they part company exactly where a tip was clamped
 Backlash is the pair's own, through the same `Mesh` relation every stage here
 uses rather than a second one written for this arrangement.
 
+**And it rates them like any other stage's members.** Four gears in a
+`GearResult` each and two meshes in a `MeshReport` each — the same types a
+planetary set reports in — so there is no figure a hula gear has that a spur
+gear does not, and no arithmetic written twice to produce it
+([Load cases](#load-cases)).
+
+What the *arrangement* decides is where the load comes from, and it is not read
+off "this stage's input" the way a pair's is: four gears sit on three shafts,
+and only two of those shafts carry a torque the power flow reports. **Each mesh
+is loaded by whichever of its members sits on the fixed axis** — mesh A by the
+grounded gear's reaction, mesh B by the output's — and the member riding the
+wobble body takes the same mesh force at its own radius. The three shaft torques
+sum to zero, which is what says the two readings agree.
+
+That load is the whole reason the ratings are worth having here. A reduction
+multiplies torque as surely as it divides speed, so a drive turning 2 N·m into
+195 puts its output pair under a load nothing about the input suggests, and the
+grounded member reacts nearly all of it.
+
+**No member of this drive is structurally reversed.** The wobble body carries
+two gears rather than one and each of them meshes once, so — unlike a planet,
+which the sun drives on one flank and the ring on the other — every root here is
+loaded one way unless the drive itself reverses.
+
 **A shaper has to be smaller than the ring it cuts**, and these rings are small.
 A tool larger than its workpiece is clamped down to the ring's own tooth count
 and then reaches none of its flank, leaving no fillet at all — an ordinary
@@ -1565,6 +1589,12 @@ and form factor.
 face carries the pair, so each automatic width resolves to the largest ask any
 member of that mesh has. A member in two meshes — a planet — answers to both.
 
+**And a member is *rated* at its mesh's width too**, not at its own. The load is
+spread over the width the pair actually shares, so that is the width the stress
+belongs to and the width the minimum is inverted at. Rating a member at its own
+tells one that is wider than its mate that it needs face in proportion to how
+much wider it is.
+
 A gear's reported `torque` is the one it carries **driving forward**; a
 back-driving load is reported beside it, not folded into it. The peak *rating*
 still uses whichever direction loads the teeth harder.
@@ -1574,8 +1604,27 @@ still uses whichever direction loads the teeth harder.
 Revolutions first. Intermittent: `(range/360) × Π(ratios between i and output)`
 per actuation. Continuous: `rpm_i × 60 × hours`, where `rpm_i` is that shaft's
 speed scaled from the peak the train was laid out at to the operating speed.
-One engagement per revolution for a simple gear, `N_planets` for a sun or a
-ring; a planet's rotation counts relative to its carrier.
+
+Then engagements, and **one rule covers every arrangement here**: a member's
+teeth are engaged once per revolution *relative to the carrier of its mesh*,
+once for each parallel mesh path.
+
+```text
+engagements_m = |ω_m − ω_carrier| / |ω_input| × N        per input revolution
+```
+
+A simple pair has no carrier and one path, so this is the member's own
+revolutions and nothing more. An epicyclic set has both: in the carrier's frame
+the arm stands still and everything else turns past it, which is what makes the
+relative speed the one that counts — for a sun, a ring, a planet, a hula drive's
+grounded gear and its wobble body alike. The consequence worth stating is the
+one a per-member reading cannot: **a shaft that does not turn is still loaded.**
+A held ring meets a planet once per *carrier* revolution, which is
+`z_s/(z_s + z_r)` of the input's rather than none.
+
+A hula drive is the same statement with one wobble body: `N = 1`, and the crank
+is both the carrier and the shaft the revolutions were counted on, so each gear
+counts how far it turns against the crank.
 
 Counts are then **whole numbers**, and where the rounding happens depends on
 whether the drive reverses:

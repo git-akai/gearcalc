@@ -907,6 +907,17 @@ one [clamp rather than refuse](#clamp-rather-than-refuse-and-say-so) already
 draws: a rating is a question *about* a part, and a part can be perfectly real
 while one question about it has no answer.
 
+**Where the line falls, on the same drive.** A hula pair whose ring has no
+fillet reports every figure but that ring's bending, exactly as above. A hula
+pair with **no path of contact** is refused outright, and the difference is not
+severity — it is that the second describes no mesh. A path is what a contact
+stress, an efficiency and a contact ratio are all taken *on*; without one there
+is no pair for the questions to be about, and the fixed-carrier efficiency that
+would go into the power flow is a zero standing in for a number that does not
+exist. The drive then reports an efficiency, a backlash and a set of speeds
+computed from it, all of them meaningless and none of them saying so. That is
+the failure this rule exists to prevent, not an example of it.
+
 ### A planetary needs the held shaft named
 
 Three shafts means naming two. The specification names one, which does not

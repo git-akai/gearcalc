@@ -81,7 +81,7 @@ cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
 cargo run --bin gear-cli -- crossed 17 23 90       # a crossed pair, swept over the split
 cargo run --bin gear-cli -- planetary 17 17 3      # every ring count that can work
 cargo run --bin gear-cli -- planetstage 24 18 60 3 # a planetary stage, six modes
-cargo run --bin gear-cli -- hula 18 0.2            # a hula drive, offset to teeth
+cargo run --bin gear-cli -- hula 18 0.2            # a hula drive, offset to teeth to ratings
 cargo run --release --bin gear-cli -- meshsweep 60 20 0.8   # roll an internal pair, the control
 cargo run --release --bin gear-cli -- hulasweep 18 0.25     # ...and a hula pair, where the tips cross
 cargo run --release --bin gear-cli -- hulaband 18           # one reduction at every tooth difference
@@ -152,7 +152,8 @@ the second case was added rather than substituted for the first.
 | `gear-core/src/gear.rs` | `Gear` — the assembly, and the only place a gear is drawn. An ordinary gear is `Δx = 0`. |
 | `gear-core/src/plane.rs` | The normal and transverse planes, the two identities that carry an angle between them, and the basic rack they act on. One home, because there were nineteen. |
 | `gear-core/src/hula.rs` | The hula arrangement: the integer ratio, the one crank offset, and the shifts that let both meshes run at it. |
-| `gear-core/src/train/hula.rs` | ...and the stage that builds the parts it describes. |
+| `gear-core/src/train/hula.rs` | ...and the stage that builds the parts it describes, and rates them. |
+| `gear-core/src/train/mod.rs` | What every stage kind shares: the load cases, `MemberRating` — the four questions asked of every member — `MeshReport`, the engagement rule, and the train that strings the stages together. |
 | `crates/gear-io` | File formats: DXF export, the TOML material library and geartrain documents, and the string catalogue. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
@@ -227,10 +228,18 @@ eccentric drive reports that bound rather than acting on it — its crank offset
 is a closed-form solve on the tips, and an addendum moving with the shift would
 put an iteration inside it.
 
-**Every parallel-axis mesh reports its operating pressure angle and all three
-contact ratios**, from one definition and one constructor rather than a copy per
-stage kind. A crossed pair has neither: its line of action slides rather than
-turning, so there is no such angle to report.
+**Every parallel-axis mesh reports the same things**, from one type rather than a
+copy per stage kind: the operating pressure angle, all three contact ratios,
+whether the pair hunts, the efficiency both ways, the contact stress the two
+members share, and the one gap seen from each of its ends. A crossed pair has
+none of it — its line of action slides rather than turning, so there is no such
+angle and no contact ratio to report.
+
+**And every member is rated by the same four questions**, likewise once rather
+than once per stage: two stresses, each against two load cases, and the face
+width each of those would need. What differs between kinds is the stress at a
+probe width and which allowable a reversed root answers to; both arrive as
+values.
 
 **A stage that cannot be built still shows what built it.** A geartrain
 mid-edit is regularly one that will not solve, so every input, note and label
@@ -290,15 +299,25 @@ rating should decide it — the figures are on screen, and the minimum face widt
 each rating asks for is beside them. The two gears of a mesh are rated at different points on the path
 — each where its own dedendum is loaded alone — so they carry different contact
 stresses; the shared pitch-point figure is reported at the mesh. An automatic
-width answers to the mesh, not to one gear. A back-driving load applied at the output
+width answers to the mesh, not to one gear, and so does the width a member is
+*rated* at — the narrower face carries the pair, so that is the width the load
+is spread over. A back-driving load applied at the output
 finds the stage that reacts it, or reports that nothing does. A reversing
 intermittent drive rounds its cycles within one actuation and splits contact
 between the flanks. **Reversed bending is a train-wide switch, off by default**:
 a planet's root is loaded both ways whatever the drive does, a reversing drive
 loads every root both ways, and each gear that one reaches says so beside its own
 numbers — corrected against the reduced allowable only where the switch asks for
-it. A notch parameter outside the band the `Y_S` fit is stated for says so on
-the gear too.
+it. No member of an eccentric drive is reversed structurally: its wobble body
+carries two gears rather than one, and each of them meshes once. A notch
+parameter outside the band the `Y_S` fit is stated for says so on the gear too.
+
+**Tooth cycles follow one rule for every arrangement**: a member is engaged once
+per revolution *relative to the carrier of its mesh*, once for each parallel
+mesh path. A pair has no carrier and one path, so this is its own revolutions; an
+epicyclic set has both, and the consequence a per-member reading cannot state is
+that a shaft which does not turn is still loaded — a held ring meets a planet
+once per carrier revolution.
 
 **Languages.** English, German, Portuguese, Simplified Chinese and Traditional
 Chinese, all compiled in, picked from under the title in the sidebar. **The four
@@ -317,6 +336,11 @@ planetary and **hula** · geartrains exported and
 imported as TOML, inputs only · gear tabs with external and internal kinds — and
 eccentric, in the developer mode — geartrain tabs with spur, worm and planetary
 stages, and hula in the same mode behind the same knock.
+
+**One name, two words.** The core, the CLI and the documents call this
+arrangement the **hula drive**; comments and the design record also call it *the
+eccentric drive*, and the application's own picker says "hula". They are the
+same stage. Worth settling on one before the kind leaves the developer mode.
 
 ---
 
@@ -347,6 +371,8 @@ been. They are not a backlog.
 | Worm profile drawing and DXF | A crossed pair draws as its two helical gears already |
 | A planetary **set's** drawing | The viewport draws single gears; a set needs the carrier and N planets placed. **Not planned** — nothing depends on it, and the set's numbers are all reported without it |
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
+| Load sharing on an epicyclic set's meshes | A spur stage input only. The ramp is an uncalibrated placeholder wherever it is offered, and offering it on two more mesh kinds multiplies where an unvalidated model reaches before the model itself is any better — see the last entry under *Worth doing next* |
+| A planet's root rated against the **ring** mesh as well as the sun's | Its bending comes from the sun mesh alone. Its two flanks see different tangential forces, so the worse of the two is not always the one taken; its *contact* rating already answers to both meshes |
 | `Driven By` as a train direction on a worm stage | Back-driving is reported, not modelled as a train direction |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
 

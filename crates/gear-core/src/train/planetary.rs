@@ -173,9 +173,14 @@ pub struct PlanetResult {
     /// `|a_sun-planet − a_planet-ring|` at that shift, mm. Reported rather than
     /// asserted: it is the one number that says the solve closed.
     pub shift_residual: f64,
-    /// Speed in the fixed frame, rpm.
-    pub speed_absolute: f64,
-    /// Speed **relative to the carrier**, rpm — what its teeth actually see.
+    /// Speed **relative to the carrier**, rpm — what its teeth actually see,
+    /// and the one figure a `GearResult` has no field for.
+    ///
+    /// Its speed in the fixed frame is `gear.speed`, like every other member's.
+    /// It stood here as well and the two could not disagree, being the same
+    /// expression twice — but the copy is what a reader reached for, so when
+    /// both were wrong they were wrong together
+    /// ([`crate::planetary::Power::planet_speed`]).
     pub speed_relative: f64,
 }
 
@@ -1077,6 +1082,7 @@ pub fn solve_planetary_stage_with(
         torques: forward.torques,
         sun_planet: MeshReport {
             operating_pressure_angle: sp_mesh.alpha_w.to_degrees(),
+            coprime: super::gcd(teeth.sun, teeth.planet) == 1,
             contact_ratios: ContactRatios::of(
                 sp_path.contact_ratio,
                 sp_width,
@@ -1095,6 +1101,7 @@ pub fn solve_planetary_stage_with(
         },
         planet_ring: MeshReport {
             operating_pressure_angle: pr_mesh.alpha_w.to_degrees(),
+            coprime: super::gcd(teeth.planet, teeth.ring) == 1,
             contact_ratios: ContactRatios::of(
                 pr_path.contact_ratio,
                 pr_width,
@@ -1115,8 +1122,8 @@ pub fn solve_planetary_stage_with(
         simultaneous_meshing: layout.simultaneous_meshing,
         planet_clearance: clearance,
         planet_clearance_ok: clearance.is_none_or(|g| g >= stage.min_planet_clearance),
-        sun_coprime_with_planets: gcd(teeth.sun, stage.planets.max(1)) == 1,
-        ring_coprime_with_planets: gcd(teeth.ring, stage.planets.max(1)) == 1,
+        sun_coprime_with_planets: super::gcd(teeth.sun, stage.planets.max(1)) == 1,
+        ring_coprime_with_planets: super::gcd(teeth.ring, stage.planets.max(1)) == 1,
         sun: gear_result(
             forward.speeds[PlanetaryShaft::Sun.index_pub()],
             &stage.sun,
@@ -1137,7 +1144,6 @@ pub fn solve_planetary_stage_with(
                 gear_notes(1),
             ),
             shift_residual: layout.residual,
-            speed_absolute: planet_absolute,
             speed_relative: planet_relative,
         },
         planets: stage.planets,
@@ -1152,15 +1158,6 @@ pub fn solve_planetary_stage_with(
         ),
         notes,
     })
-}
-
-const fn gcd(mut a: u32, mut b: u32) -> u32 {
-    while b != 0 {
-        let t = b;
-        b = a % b;
-        a = t;
-    }
-    a
 }
 
 #[cfg(test)]
@@ -1567,7 +1564,7 @@ mod tests {
     fn the_planet_is_reported_as_the_special_case_it_is() {
         let r = solved(24, 18, 60);
         assert!(r.planet.speed_relative.abs() > 0.0);
-        assert!((r.planet.speed_relative - r.planet.speed_absolute).abs() > 1e-9);
+        assert!((r.planet.speed_relative - r.planet.gear.speed).abs() > 1e-9);
     }
 
     /// **A planet's root is loaded both ways, and what to do about it is asked
