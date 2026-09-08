@@ -158,13 +158,16 @@ impl Default for HulaStage {
     fn default() -> Self {
         // **The addendum belongs to the difference, not to the drive.** Four
         // teeth of difference runs at a far lower operating pressure angle than
-        // one does, so a tooth that cleared at one tooth of difference can reach
-        // past the interference limit here. A drive taken to another difference
-        // will want its own proportion, and the interference row is what says
-        // so rather than a number chosen to keep that row quiet.
+        // one does, so a tooth that cleared the involute interference limit at
+        // one tooth of difference reaches past it here: on these counts the
+        // limit sits between 0.70 and 0.75, measured, and the taller tooth
+        // costs efficiency on the way as well — 0.70 keeps 79.6 % where 0.80
+        // keeps 73.1 % and fouls (docs/reference.md#the-hula-drive). A drive
+        // taken to another difference will want its own proportion, and the
+        // interference row is what says so.
         let gear = |teeth: u32| StageGear {
             teeth,
-            addendum: 0.8,
+            addendum: 0.7,
             dedendum: 1.0,
             ..StageGear::default()
         };
