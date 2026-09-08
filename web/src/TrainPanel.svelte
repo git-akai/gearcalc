@@ -1897,8 +1897,9 @@
                 // The one thing only a planet's speed has: its teeth turn in
                 // the carrier's frame, and that is the speed they wear at.
                 speedNote: pres
-                  ? t("ui.train_relative_to_the_carrier", {
+                  ? t("ui.train_relative_to", {
                       speed: pres.planet.speed_relative.toFixed(1),
+                      shaft: t("ui.train_the_carrier"),
                     })
                   : undefined,
               })}
@@ -2147,6 +2148,18 @@
                       cut: j === ring ? "shaper" : "rack",
                       cutter: j === ring ? stage.cutter[m] : undefined,
                       onShiftAuto: () => relieveHula(stage, m, stage.gears[j].profile_shift),
+                      // **What a member's teeth see is its speed against the
+                      // crank**, which is the carrier of both meshes — so the
+                      // fixed-frame figure needs the same annotation a planet's
+                      // does, and for the same reason. The grounded gear is the
+                      // case that makes it worth saying: it stands still and is
+                      // engaged once every crank turn.
+                      speedNote: hres
+                        ? t("ui.train_relative_to", {
+                            speed: (hres.gears[j].gear.speed - hres.crank_speed).toFixed(1),
+                            shaft: t("ui.train_the_crank"),
+                          })
+                        : undefined,
                     },
                   )}
                 {/each}
