@@ -30,8 +30,8 @@
 //! coefficient, and a designer who needs the derating can apply it knowingly.
 
 use super::{
-    allowable, Backlash, Case, ContactRatios, Cycles, GearResult, LoadCase, StageTorques,
-    TrainError, Widths,
+    Backlash, Case, ContactRatios, Cycles, GearResult, LoadCase, MemberRating, MeshReport,
+    StageTorques, TrainError, Widths, PROBE,
 };
 use crate::auto::admissible_ranges;
 use crate::contact::{efficiency, ContactPath, Directional};
@@ -43,8 +43,8 @@ use crate::plane::BasicRack;
 use crate::planetary::{self, Arrangement, PlanetaryShaft, Teeth};
 use crate::ring::{Cutter, Ring};
 use crate::strength::{
-    bending_section, bending_stress, contact_stress, min_face_width_bending,
-    min_face_width_contact, ring_bending_section, Load, StressConcentration, PARALLEL_AXES,
+    bending_section, bending_stress, contact_stress, ring_bending_section, Load,
+    StressConcentration, PARALLEL_AXES,
 };
 use crate::tooth::Tooth;
 use crate::train::{Optimisation, StageGear};
@@ -153,35 +153,6 @@ impl Default for PlanetaryStage {
             },
         }
     }
-}
-
-/// What one of the two meshes did.
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct MeshReport {
-    /// Operating pressure angle `α_w`, degrees — see
-    /// [`crate::train::SpurResult::operating_pressure_angle`], which defines it
-    /// for every parallel-axis mesh here.
-    pub operating_pressure_angle: f64,
-    pub contact_ratios: ContactRatios,
-    /// Mesh efficiency, both drive senses. Equal for a parallel-axis pair, and
-    /// arrived at rather than copied.
-    pub efficiency: Directional<f64>,
-    /// Hertzian contact stress at the pitch point, MPa, in both load cases.
-    ///
-    /// The one figure both members of the mesh share. Each member's own rating —
-    /// taken where its dedendum is loaded alone — sits on its `GearResult`.
-    pub contact_stress_at_pitch_point: LoadCase<f64>,
-    /// Relative radius of curvature at the governing point, mm.
-    pub relative_radius: f64,
-    /// Angular backlash at each member, degrees: the first is the pinion-side
-    /// member (sun, then planet), the second the other.
-    pub backlash: [Backlash; 2],
 }
 
 /// The planet's own answers, which are not the shape of the other two.
@@ -785,7 +756,6 @@ pub fn solve_planetary_stage_with(
 
     // ---- face widths and stresses. `b_min` does not depend on the width it was
     // measured at (docs/reference.md#contact-stress), so one probe evaluation gives every minimum.
-    const PROBE: f64 = 10.0;
     let sp_e = contact_modulus(&mats[0], &mats[1]);
     let pr_e = contact_modulus(&mats[1], &mats[2]);
 
@@ -881,26 +851,6 @@ pub fn solve_planetary_stage_with(
         g.face_sources.largest_of(asks)
     };
 
-    /// The four widths one member's ratings ask for.
-    fn asks_of(
-        sigma_f: Option<f64>,
-        sigma_h: f64,
-        probe: f64,
-        bending_allow: &dyn Fn(Case) -> f64,
-        contact_allow: &dyn Fn(Case) -> f64,
-        scale: &dyn Fn(Case) -> f64,
-    ) -> LoadCase<Widths> {
-        LoadCase::of(|case| {
-            let k = scale(case);
-            Widths {
-                // Two allowables, because a reversed root endures less bending
-                // while its flank pits exactly as it did.
-                bending: sigma_f.map(|s| min_face_width_bending(s * k, probe, bending_allow(case))),
-                contact: min_face_width_contact(sigma_h * k.sqrt(), probe, contact_allow(case)),
-            }
-        })
-    }
-
     let probe_load_sp = Load::new(sun_torque_per_mesh, PROBE);
     let sun_sf = bending_stress(
         &sun_section,
@@ -924,50 +874,34 @@ pub fn solve_planetary_stage_with(
         )
     });
 
-    // Bending takes whatever the reversal leaves; contact takes the material's
-    // own figure, since pitting is compressive on whichever flank carries it.
-    // Borrowed explicitly so the inner closure captures a reference rather than
-    // the materials themselves, and the outer one can be called three times.
-    let materials = &mats;
-    let bending_allow =
-        move |i: usize| move |c: Case| reversal.bending_allowable(&materials[i], c, reverses[i]);
+    // **What each member's ratings come to**, from the probe pass — the same
+    // four questions every stage kind asks of every member it builds, asked
+    // through the one type that answers them (`train::MemberRating`). Bending
+    // takes whatever the reversal leaves; contact takes the material's own
+    // figure, since pitting is compressive on whichever flank carries it, and
+    // both of those live in there rather than in a pair of closures here.
+    //
+    // The planet is in two meshes, so it takes the worse of its two contact
+    // figures — read at the probe width, where the two are directly comparable.
+    let scale = LoadCase::of(scale_case);
+    let stresses: [(Option<f64>, f64); 3] = [
+        (sun_sf, sp_probe.governing(0)),
+        (planet_sf, sp_probe.governing(1).max(pr_probe.governing(0))),
+        (ring_sf, pr_probe.governing(1)),
+    ];
+    let ratings: [MemberRating; 3] = std::array::from_fn(|i| MemberRating {
+        material: &mats[i],
+        bending: stresses[i].0,
+        contact: stresses[i].1,
+        reversal,
+        reverses: reverses[i],
+        scale,
+        measured_at: PROBE,
+    });
     let asks = [
-        ask_of(
-            "sun",
-            &stage.sun,
-            &asks_of(
-                sun_sf,
-                sp_probe.governing(0),
-                PROBE,
-                &bending_allow(0),
-                &|c| allowable(&mats[0], c),
-                &scale_case,
-            ),
-        ),
-        ask_of(
-            "planet",
-            &stage.planet,
-            &asks_of(
-                planet_sf,
-                sp_probe.governing(1).max(pr_probe.governing(0)),
-                PROBE,
-                &bending_allow(1),
-                &|c| allowable(&mats[1], c),
-                &scale_case,
-            ),
-        ),
-        ask_of(
-            "ring",
-            &stage.ring,
-            &asks_of(
-                ring_sf,
-                pr_probe.governing(1),
-                PROBE,
-                &bending_allow(2),
-                &|c| allowable(&mats[2], c),
-                &scale_case,
-            ),
-        ),
+        ask_of("sun", &stage.sun, &ratings[0].asks()),
+        ask_of("planet", &stage.planet, &ratings[1].asks()),
+        ask_of("ring", &stage.ring, &ratings[2].asks()),
     ];
     notes.extend(no_source);
     // **A member's automatic width is the largest requirement of any mesh it is
@@ -1078,68 +1012,58 @@ pub fn solve_planetary_stage_with(
         notes.push(Note::new(key::STAGE_RING_ADDENDUM_CLAMPED));
     }
 
-    let gear_result = |member: PlanetaryShaft,
+    // **The width a member is rated at is its mesh's, not its own.** The
+    // narrower face carries the pair, so that is the width the load is spread
+    // over — and it is the width the reported minimum has to be inverted at, or
+    // a member wider than its mate is told it needs more face than it does, in
+    // proportion to how much wider it is. The planet is in two meshes and takes
+    // the narrower of them, which is the one that governs whichever figure won.
+    let rated_at = [sp_width, sp_width.min(pr_width), pr_width];
+    // **A member's speed is its own.** It used to be read out of the shaft array
+    // by role, which gave the planet the *carrier's* — the shaft it rides rather
+    // than the one it spins on, and on a set with the ring held not even the
+    // same sign.
+    let gear_result = |speed: f64,
                        input: &StageGear,
                        params: &GearParams,
-                       width: f64,
+                       which: usize,
                        torque: f64,
-                       sigma_f: Option<f64>,
-                       sigma_h: f64,
-                       material: &Material,
-                       bending_allow: &dyn Fn(Case) -> f64,
                        clamps: Vec<Note>,
                        notes: Vec<Note>|
      -> GearResult {
         // A load case is a scale on the torque, and every rating is linear or
         // square-root in it — so the peak and cyclic figures are the same
         // expression evaluated at the two scales rather than a second solve.
-        //
-        // **The bending allowable comes in rather than being read off the
-        // material**, so the width the member was given and the minimum reported
-        // here are sized against the same figure. It is the member's own: a root
-        // loaded on both flanks is judged against less, where the train asked for
-        // that correction. Contact reads the material directly, because reversal
-        // does not reach it.
-        let by_case = |case: Case| (scale_case(case), bending_allow(case));
+        // Which is what `MemberRating` is, for every stage kind at once.
+        let rated = ratings[which].at(rated_at[which]);
         GearResult {
             profile_shift: params.profile_shift,
             addendum: params.addendum,
-            face_width: width,
+            face_width: widths[which],
             torque,
             back_driving_torque: torques
                 .peak_backward
                 .map(|t| torque * (t.abs() / torques.peak_forward.abs().max(f64::MIN_POSITIVE))),
-            speed: forward.speeds[member.index_pub()],
+            speed,
             tooth_cycles: Cycles {
                 bending: 0.0,
                 contact: 0.0,
             },
-            bending_stress: LoadCase::of(|c| sigma_f.map(|s| s * by_case(c).0)),
-            contact_stress: LoadCase::of(|c| sigma_h * by_case(c).0.sqrt()),
-            min_face_width: LoadCase::of(|c| {
-                let (k, a) = by_case(c);
-                Widths {
-                    bending: sigma_f.map(|s| min_face_width_bending(s * k, width, a)),
-                    contact: min_face_width_contact(
-                        sigma_h * k.sqrt(),
-                        width,
-                        allowable(material, c),
-                    ),
-                }
-            }),
+            bending_stress: rated.bending_stress,
+            contact_stress: rated.contact_stress,
+            min_face_width: rated.min_face_width,
             clamps,
             notes,
-            material: material.clone(),
+            material: mats[which].clone(),
             ranges: admissible_ranges(params, input.working_depth.resolve(input.dedendum)),
         }
     };
 
-    let scale = |probe: Option<f64>, width: f64| probe.map(|s| s * PROBE / width);
-    let sun_stress = scale(sun_sf, sp_width);
-    let planet_stress = scale(planet_sf, sp_width);
-    let ring_stress = scale(ring_sf, pr_width);
-
-    let planet_relative = forward.speeds[0] - forward.speeds[1];
+    // **The planet's own rotation**, from the kinematics rather than from the
+    // shaft beside it: its absolute speed is not the carrier's, and what its
+    // teeth see is not the sun's speed relative to the carrier
+    // ([`crate::planetary::Power::planet_speed`]).
+    let (planet_absolute, planet_relative) = forward.planet_speed(teeth);
 
     Ok(PlanetaryResult {
         arrangement: stage.arrangement,
@@ -1195,51 +1119,36 @@ pub fn solve_planetary_stage_with(
         sun_coprime_with_planets: gcd(teeth.sun, stage.planets.max(1)) == 1,
         ring_coprime_with_planets: gcd(teeth.ring, stage.planets.max(1)) == 1,
         sun: gear_result(
-            PlanetaryShaft::Sun,
+            forward.speeds[PlanetaryShaft::Sun.index_pub()],
             &stage.sun,
             &sun_params,
-            widths[0],
+            0,
             forward.torques[0] / planets,
-            sun_stress,
-            sp_cs.governing(0),
-            &mats[0],
-            &bending_allow(0),
             sun.clamps.notes.clone(),
             gear_notes(0),
         ),
         planet: PlanetResult {
             gear: gear_result(
-                PlanetaryShaft::Carrier,
+                planet_absolute,
                 &stage.planet,
                 &planet_params,
-                widths[1],
+                1,
                 sp_load.across_mesh(&sun, &planet).torque,
-                planet_stress,
-                // The planet is member 2 of the sun mesh and member 1 of the
-                // ring mesh, so its own root is loaded alone at a different end
-                // of each path. It takes the worse of its two.
-                sp_cs.governing(1).max(pr_cs.governing(0)),
-                &mats[1],
-                &bending_allow(1),
                 planet.clamps.notes.clone(),
                 gear_notes(1),
             ),
             profile_shift: planet_shift,
             shift_residual: layout.residual,
-            speed_absolute: forward.speeds[1],
+            speed_absolute: planet_absolute,
             speed_relative: planet_relative,
         },
         planets: stage.planets,
         ring: gear_result(
-            PlanetaryShaft::Ring,
+            forward.speeds[PlanetaryShaft::Ring.index_pub()],
             &stage.ring,
             &ring_params,
-            widths[2],
+            2,
             forward.torques[2] / planets,
-            ring_stress,
-            pr_cs.governing(1),
-            &mats[2],
-            &bending_allow(2),
             ring.clamps.clone(),
             gear_notes(2),
         ),

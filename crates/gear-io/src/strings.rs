@@ -802,14 +802,29 @@ mod tests {
                     record(&g.notes);
                 }
             }
+            // **The drive is asked for a tip it cannot have, not for a tooth it
+            // cannot build.** A 1.6-module addendum on a one-tooth-difference
+            // internal pair leaves no path of contact at all, so the stage
+            // refuses and the note it was here to fire never gets raised. The
+            // bound bites from the other end instead: the shipped tooth stands,
+            // and a minimum tip width no tooth of that height can meet is what
+            // the drive reports it would have to be cut down to. Which is the
+            // whole point of this note — the eccentric drive says what the
+            // addendum would have to be and leaves it alone.
             let mut drive = gear_core::train::HulaStage::default();
             for g in &mut drive.gears {
-                g.addendum = 1.6;
-                g.min_tip_width = 0.4;
+                g.min_tip_width = 2.0;
             }
-            if let Ok(r) = gear_core::train::solve_hula_stage(&drive, 1000.0, 2.0) {
+            if let Ok(r) = gear_core::train::solve_hula_stage(
+                &drive,
+                1000.0,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
+                record(&r.notes);
                 for g in &r.gears {
-                    record(&g.clamps);
+                    record(&g.gear.clamps);
+                    record(&g.gear.notes);
                 }
             }
         }

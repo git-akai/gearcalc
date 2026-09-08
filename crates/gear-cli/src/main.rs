@@ -149,8 +149,9 @@ fn main() {
 /// would be a second answer to the same question — which is how the two start
 /// disagreeing.
 fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth: Option<u32>) {
-    use gear_core::train::{solve_hula_stage, HulaStage};
+    use gear_core::train::{solve_hula_stage, HulaStage, StageTorques};
 
+    let lib = gear_io::default_library();
     let teeth = [n + 1, n, n - 1, n];
     let mut stage = HulaStage {
         module: [m_outer, m_inner],
@@ -172,10 +173,10 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         cutter.teeth = cutter_teeth.unwrap_or_else(|| stocked.min(ring.saturating_sub(5)).max(4));
     }
 
-    let result = match solve_hula_stage(&stage, 1000.0, 2.0) {
+    let result = match solve_hula_stage(&stage, 1000.0, StageTorques::just(2.0), &lib) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("that drive has no geometry: {e:?}");
+            eprintln!("that drive has no geometry: {e}");
             return;
         }
     };
@@ -198,7 +199,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
     );
     println!(
         "  speeds  crank {:.1}  wobble {:+.3}  output {:+.4} rpm",
-        result.crank_speed, result.gears[1].speed, result.gears[3].speed
+        result.crank_speed, result.gears[1].gear.speed, result.gears[3].gear.speed
     );
     println!(
         "  efficiency {:.3} % forward, {:.3} % back-driven{}   (the two meshes alone, crank held: {:.4})",
@@ -231,31 +232,52 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
                     "{} z{} x{:+.4}",
                     if g.ring { "ring" } else { "pinion" },
                     g.teeth,
-                    g.profile_shift
+                    g.gear.profile_shift
                 ))
                 .collect::<Vec<_>>()
                 .join("  "),
-            mesh.operating_pressure_angle,
+            mesh.report.operating_pressure_angle,
             stage.cutter[index].teeth
         );
         println!(
             "    far-side gap {:.4} mm (as cut {:.4})   contact ratio {:.4}",
-            mesh.clearance, mesh.clearance_as_cut, mesh.contact_ratios.transverse
+            mesh.clearance, mesh.clearance_as_cut, mesh.report.contact_ratios.transverse
         );
         println!(
             "    backlash {:.5} / {:.5} deg   interference: trochoid {}  involute {}  tip {} ({:+.4} deg)",
-            mesh.backlash[0].nominal,
-            mesh.backlash[1].nominal,
+            mesh.report.backlash[0].nominal,
+            mesh.report.backlash[1].nominal,
             mesh.trochoid_interference,
             mesh.involute_interference,
             mesh.tip_interference,
             mesh.tip_margin
         );
+        // What the teeth are worth, which a drive of this kind needs as much as
+        // the geometry: the reduction multiplies the mesh loss, and it multiplies
+        // the torque on the way as well — the output pair carries the whole of it.
+        println!(
+            "    sigma_H {:.1} MPa at the pitch point   rho {:.4} mm",
+            mesh.report.contact_stress_at_pitch_point.peak, mesh.report.relative_radius
+        );
         for gear in &members {
-            for note in &gear.clamps {
+            println!(
+                "    z{:<4} T {:>10.4} Nm  b {:>7.3} mm  sigma_F {:>8}  sigma_H {:>7.1} MPa",
+                gear.teeth,
+                gear.gear.torque,
+                gear.gear.face_width,
+                gear.gear
+                    .bending_stress
+                    .peak
+                    .map_or_else(|| "—".to_string(), |s| format!("{s:.1}")),
+                gear.gear.contact_stress.peak,
+            );
+            for note in gear.gear.clamps.iter().chain(&gear.gear.notes) {
                 println!("    ! z{}: {}", gear.teeth, words().render(note));
             }
         }
+    }
+    for note in &result.notes {
+        println!("  ! {}", words().render(note));
     }
 }
 
@@ -535,7 +557,9 @@ fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, tit
 /// out — the useful statement is which bound stops it, and that is what these
 /// rows are.
 fn hula_band(z0: u32, clearance_in_modules: f64) {
-    use gear_core::train::{solve_hula_stage, HulaStage};
+    use gear_core::train::{solve_hula_stage, HulaStage, StageTorques};
+
+    let lib = gear_io::default_library();
 
     println!(
         "hula, reduction {} : 1 — the same ratio at every tooth difference\n",
@@ -573,15 +597,16 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                     for c in &mut stage.cutter {
                         c.teeth = cutter;
                     }
-                    let Ok(r) = solve_hula_stage(&stage, 1000.0, 2.0) else {
+                    let Ok(r) = solve_hula_stage(&stage, 1000.0, StageTorques::just(2.0), &lib)
+                    else {
                         continue;
                     };
                     let admissible = r.meshes.iter().all(|m| {
-                        m.contact_ratios.transverse >= 1.0
+                        m.report.contact_ratios.transverse >= 1.0
                             && !m.tip_interference
                             && !m.trochoid_interference
                             && !m.involute_interference
-                    }) && r.gears.iter().all(|g| g.clamps.is_empty());
+                    }) && r.gears.iter().all(|g| g.gear.clamps.is_empty());
                     if !admissible {
                         continue;
                     }
@@ -600,8 +625,8 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                 "{d:>3} {n:>6} {module:>7.3} {h:>5.1} {cutter:>6} {x:>+7.2} {:>9.4}% {:>7.2}% {:>8.2} {:>7.4} {:>9.5}",
                 r.fixed_carrier_efficiency.forward * 100.0,
                 r.efficiency.forward * 100.0,
-                r.meshes[0].operating_pressure_angle,
-                r.meshes[0].contact_ratios.transverse,
+                r.meshes[0].report.operating_pressure_angle,
+                r.meshes[0].report.contact_ratios.transverse,
                 r.backlash.forward.nominal
             ),
         }
@@ -654,8 +679,9 @@ fn mesh_sweep(z_ring: u32, z_pinion: u32, ring_addendum: f64, pinion_addendum: f
 /// nobody builds.
 fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     use gear_core::ring::Ring;
-    use gear_core::train::{solve_hula_stage, HulaStage};
+    use gear_core::train::{solve_hula_stage, HulaStage, StageTorques};
 
+    let lib = gear_io::default_library();
     let teeth = [n + 1, n, n - 1, n];
     let mut stage = HulaStage {
         clearance,
@@ -664,10 +690,10 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     for (gear, count) in stage.gears.iter_mut().zip(teeth) {
         gear.teeth = count;
     }
-    let result = match solve_hula_stage(&stage, 1000.0, 2.0) {
+    let result = match solve_hula_stage(&stage, 1000.0, StageTorques::just(2.0), &lib) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("that drive has no geometry: {e:?}");
+            eprintln!("that drive has no geometry: {e}");
             return;
         }
     };
@@ -676,7 +702,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     let params = |i: usize| GearParams {
         module: stage.module[mesh_index],
         teeth: result.gears[i].teeth,
-        profile_shift: result.gears[i].profile_shift,
+        profile_shift: result.gears[i].gear.profile_shift,
         addendum: stage.gears[i].addendum,
         dedendum: stage.gears[i].dedendum,
         thickness_mod: stage.thickness_mod[mesh_index],
@@ -693,11 +719,11 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
             "hula mesh {}  ring z{} x{:+.4}  pinion z{} x{:+.4}   gap asked {clearance} got {:.4} mm   alpha_w {:.2} deg   tip {} ({:+.4} deg)",
             mesh_index + 1,
             result.gears[ring_i].teeth,
-            result.gears[ring_i].profile_shift,
+            result.gears[ring_i].gear.profile_shift,
             result.gears[pinion_i].teeth,
-            result.gears[pinion_i].profile_shift,
+            result.gears[pinion_i].gear.profile_shift,
             m.clearance,
-            m.operating_pressure_angle,
+            m.report.operating_pressure_angle,
             m.tip_interference,
             m.tip_margin
         ),

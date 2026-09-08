@@ -7,14 +7,19 @@
 //! closes algebraically can still be one whose teeth foul, and at one tooth of
 //! difference that is the likely outcome rather than the unlucky one.
 //!
-//! # What this stage reads, and what it does not
+//! # What this stage reads
 //!
-//! A [`StageGear`] describes a gear for every stage kind here, so it carries
-//! more than this one asks of it. Read: the tooth count, the addendum, the
-//! dedendum and the root radius. Not read: the **profile shift**, because a
-//! shift is what the offset spends and [`crate::hula::Split`] says which member
-//! is given it; and everything a rating needs — face width, material,
-//! overrides — which belong with the load cases and arrive with them.
+//! A [`StageGear`] describes a gear for every stage kind here, and this one
+//! reads all of it: the tooth count, the tooth's proportions, the face width
+//! and the ratings that size it, the material and its overrides. The field it
+//! reads *differently* is the **profile shift**, whose `auto` toggle names which
+//! member of a pair carries the one free number the crank leaves rather than
+//! supplying a value ([`crate::hula::Split`]).
+//!
+//! Which is to say the four gears are rated like any others —
+//! [`super::MemberRating`], the same four questions every stage kind asks — and
+//! what is specific to the arrangement is the *load* each of them carries and
+//! how often, not how a tooth answers for it.
 //!
 //! # The three shafts
 //!
@@ -30,35 +35,22 @@
 //! put through, given a basic ratio rather than a set of planetary counts to
 //! derive one from.
 
+use super::{GearResult, LoadCase, MemberRating, MeshReport, StageTorques, TrainError, PROBE};
+use crate::auto::admissible_ranges;
 use crate::contact::{efficiency, ContactPath, Directional, Drive};
 use crate::hula::{self, Offset, Split, Teeth};
-use crate::mesh::{Mesh, MeshError, MeshKind, MeshSide};
-use crate::note::Note;
+use crate::material::{contact_modulus, Material, MaterialLibrary};
+use crate::mesh::{Mesh, MeshKind, MeshSide};
+use crate::note::{key, Note};
 use crate::planetary::{self, Arrangement, PlanetaryShaft};
-
 use crate::ring::{mesh_with, Cutter, Ring};
+use crate::strength::{
+    bending_section, bending_stress, contact_stress, ring_bending_section, Load,
+    StressConcentration, PARALLEL_AXES,
+};
 use crate::tooth::Tooth;
 use crate::train::{Optimisation, StageGear};
 use crate::{Auto, GearParams};
-
-/// Why a hula stage could not be solved.
-///
-/// Its own type rather than a widening of [`super::TrainError`]: a drive that
-/// does not exist and a pair that cannot mesh are different findings, and the
-/// train has no arm to put either in until this stage is one of its kinds.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Error {
-    /// The arrangement has no geometry — see [`crate::hula::Error`].
-    Drive(hula::Error),
-    /// A pair the arrangement produced will not mesh.
-    Mesh(MeshError),
-}
-
-impl From<hula::Error> for Error {
-    fn from(e: hula::Error) -> Self {
-        Self::Drive(e)
-    }
-}
 
 /// A hula stage as its inputs describe it.
 #[derive(Clone, Debug)]
@@ -217,6 +209,13 @@ impl Default for HulaStage {
 }
 
 /// One gear of a solved drive.
+///
+/// The rating is a [`GearResult`], as it is for every other stage kind here, and
+/// what this adds is what the *arrangement* makes of the member: which side of
+/// its pair it is, and the four radii a drive of this kind is read by. The same
+/// shape a planet takes ([`super::PlanetResult`]), for the same reason — a
+/// member with something extra to say says it beside the answer every member
+/// gives, not instead of it.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -229,22 +228,37 @@ pub struct HulaGear {
     /// Whether this member is the ring of its pair — an outcome of the tooth
     /// counts rather than an input.
     pub ring: bool,
-    /// The shift in force, after the split has been applied.
-    pub profile_shift: f64,
     pub pitch_radius: f64,
     pub base_radius: f64,
     /// Tip radius, mm. **Smaller** than the pitch radius on a ring.
     pub tip_radius: f64,
     /// Root radius, mm. Larger than the pitch radius on a ring.
     pub root_radius: f64,
-    /// Speed, rpm. Gear 1 is held, so its speed is zero; gears 2 and 3 share
-    /// the wobble body's.
-    pub speed: f64,
-    /// Anything clamped while this gear was built.
-    pub clamps: Vec<Note>,
+    /// Everything a gear in a stage reports: the shift and addendum it was
+    /// built at, its face width, torque, speed, tooth cycles, stresses and the
+    /// widths its ratings ask for.
+    ///
+    /// Gear 1 is held, so its speed is zero; gears 2 and 3 share the wobble
+    /// body's. All four are engaged once per revolution **relative to the
+    /// crank**, which is what [`super::engagements`] says for every epicyclic
+    /// member.
+    pub gear: GearResult,
 }
 
 /// One mesh of a solved drive.
+///
+/// [`MeshReport`] is what any parallel-axis mesh reports and is the same six
+/// fields a planetary set's two meshes carry; what a hula pair adds is the room
+/// it has — the far-side gap the shift was spent on, and the three ways its
+/// teeth can foul.
+///
+/// **The efficiency on the report is this pair's own, with the crank held** —
+/// what the teeth lose, and nothing about the arrangement they sit in. It is
+/// emphatically not the drive's: the two of them multiply to
+/// [`HulaResult::fixed_carrier_efficiency`], and the drive's own is that figure
+/// put through the reduction, which on a high-ratio arrangement takes a pair
+/// losing under a percent to a drive losing tens of them
+/// ([`HulaResult::efficiency`]).
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -253,15 +267,16 @@ pub struct HulaGear {
     ts(export, export_to = "core/")
 )]
 pub struct HulaMesh {
-    /// Operating pressure angle `α_w`, degrees — see
-    /// [`crate::train::SpurResult::operating_pressure_angle`], which defines it
-    /// for every parallel-axis mesh here.
+    /// The operating pressure angle, the three contact ratios, the efficiency,
+    /// the shared contact stress and the backlash at each member — the pinion
+    /// first, as the mesh was built.
     ///
     /// A one-tooth-difference pair opened far enough to clear itself runs at an
-    /// angle no ordinary pair would — above 50° on the shipped proportions —
-    /// which is a property of the arrangement rather than a fault, and is
-    /// reported for that reason.
-    pub operating_pressure_angle: f64,
+    /// operating pressure angle no ordinary pair would — above 50° on the
+    /// shipped proportions — and its transverse contact ratio sits just above
+    /// continuous contact by construction, which is why a helical drive of this
+    /// kind has to buy its overlap axially.
+    pub report: MeshReport,
     /// Far-side tip gap, mm: the room the wobble body has on the side away from
     /// the mesh, which is what the shift was spent on.
     pub clearance: f64,
@@ -269,11 +284,6 @@ pub struct HulaMesh {
     /// above only where a tip was clamped, and then the difference is what the
     /// clamp cost.
     pub clearance_as_cut: f64,
-    /// The three contact ratios, as every other mesh here reports them. This
-    /// arrangement runs its transverse one just above continuous contact by
-    /// construction, so the axial term is what a helical drive of this kind has
-    /// to buy its overlap with — and reading only the transverse one hid that.
-    pub contact_ratios: super::ContactRatios,
     /// The pinion's tip reaches past where the ring's flank ends.
     pub trochoid_interference: bool,
     /// The ring's tip reaches below where the pinion's flank ends.
@@ -285,23 +295,6 @@ pub struct HulaMesh {
     /// How much room the tips have where their circles cross, as an angle of
     /// pinion rotation, degrees. Negative is the overlap.
     pub tip_margin: f64,
-    /// Angular backlash at each member, degrees — the pinion's first, then the
-    /// ring's: nominal at the running offset, then at each end of the tolerance
-    /// band. The same gap subtends a different angle at each, so the two differ
-    /// whenever the tooth counts do.
-    pub backlash: [super::Backlash; 2],
-    /// **This pair's own efficiency with the crank held**, 0..1, both
-    /// directions — what the teeth lose, and nothing about the arrangement they
-    /// sit in.
-    ///
-    /// It is emphatically **not** the drive's: the two of these multiply to
-    /// [`HulaResult::fixed_carrier_efficiency`], and the drive's own is that
-    /// figure put through the reduction, which on a high-ratio arrangement
-    /// takes a pair losing under a percent to a drive losing tens of them
-    /// ([`HulaResult::efficiency`]). Reported per mesh for the same reason a
-    /// planetary set reports it per mesh: a stage that loses more than it should
-    /// loses it in one of its meshes, and a single product cannot say which.
-    pub efficiency: Directional<f64>,
 }
 
 /// What a hula stage came to.
@@ -371,6 +364,10 @@ pub struct HulaResult {
     pub backlash: Directional<super::Backlash>,
     pub meshes: [HulaMesh; 2],
     pub gears: [HulaGear; 4],
+    /// Anything the stage had to say about the design, as every other stage kind
+    /// reports it. A note that names one gear rides on that gear instead — see
+    /// [`GearResult::notes`].
+    pub notes: Vec<Note>,
 }
 
 /// What a reduction of `ratio` can reach, given meshes that keep `mesh` of what
@@ -396,17 +393,41 @@ pub fn drive_efficiency(ratio: f64, mesh: f64) -> f64 {
     1.0 / (ratio.abs() * (1.0 - mesh) + mesh)
 }
 
-/// Solve a hula stage: the arrangement, then the parts, then the meshes.
+/// Solve a hula stage: the arrangement, then the parts, then what they carry.
 ///
 /// # Errors
 ///
-/// [`crate::hula::Error`], through [`super::TrainError::Hula`] — a drive that
-/// cannot exist rather than a solve that gave up.
+/// [`TrainError`] when the arrangement has no geometry, when a pair it produced
+/// will not mesh or never reaches contact, when a material is not in the
+/// library, or when a rack-cut member is too undercut to rate.
 pub fn solve_hula_stage(
     stage: &HulaStage,
     input_speed: f64,
-    input_torque: f64,
-) -> Result<HulaResult, Error> {
+    torques: StageTorques,
+    lib: &MaterialLibrary,
+) -> Result<HulaResult, TrainError> {
+    solve_hula_stage_with(stage, input_speed, torques, lib, super::Reversal::default())
+}
+
+/// The same, told how the train treats a root loaded on both flanks.
+///
+/// **No member of this drive is structurally reversed.** The wobble body carries
+/// two gears rather than one, and each of them meshes once — so unlike a planet,
+/// which the sun drives on one flank and the ring on the other, every root here
+/// is loaded one way unless the *drive* reverses.
+///
+/// # Errors
+///
+/// As [`solve_hula_stage`].
+#[allow(clippy::too_many_lines)]
+pub fn solve_hula_stage_with(
+    stage: &HulaStage,
+    input_speed: f64,
+    torques: StageTorques,
+    lib: &MaterialLibrary,
+    reversal: super::Reversal,
+) -> Result<HulaResult, TrainError> {
+    let input_torque = torques.peak_forward;
     let teeth = Teeth(stage.gears.each_ref().map(|g| g.teeth));
     // The given shift is the named member's own, so the arrangement is handed
     // the value from where a reader entered it rather than from a second copy.
@@ -619,134 +640,70 @@ pub fn solve_hula_stage(
     let wobble_speed = input_speed * (1.0 - z[0] / z[1]);
     let output_speed = input_speed / layout.ratio.value();
 
-    let mut meshes = Vec::with_capacity(2);
-    // Kept past the loop: the pair's rolling geometry is what refers a play to
-    // a shaft, and that cannot be done one mesh at a time.
-    let mut rolling = Vec::with_capacity(2);
-    // Each pair's own efficiency, with the crank held: sliding, then static.
-    let mut basic: Vec<Directional<(f64, f64)>> = Vec::with_capacity(2);
-    // Filled as each pair is built, since a gear belongs to exactly one mesh
-    // and is finished the moment its own pair is.
-    let mut gears: [Option<HulaGear>; 4] = [None, None, None, None];
     let speed = |i: usize| match i {
         0 => 0.0,
         1 | 2 => wobble_speed,
         _ => output_speed,
     };
 
+    // **The parts, and nothing yet about the load they carry.** What a member is
+    // rated at depends on the torque the power flow gives it, the power flow
+    // depends on the two pairs' efficiencies, and those depend on the geometry —
+    // so the geometry is built first, once, and everything else reads it.
+    struct Pair {
+        ring: Ring,
+        /// The ring twice over, and neither reading is redundant. [`Ring`] is
+        /// the part as its shaper leaves it — the tip it really has, the fillet,
+        /// the clamps — while a `Tooth` built from the same parameters is what
+        /// the mesh's rolling geometry and its bending load are read through.
+        ring_as_gear: Tooth,
+        pinion: Tooth,
+        mesh: Mesh,
+        path: ContactPath,
+        report: Option<crate::ring::RingMesh>,
+        /// This pair's own efficiency with the crank held: sliding, then static.
+        efficiency: Directional<(f64, f64)>,
+    }
+
+    let mut built_pairs = Vec::with_capacity(2);
     for (index, pair) in pairs.iter().enumerate() {
         let params = |i: usize| built(index, layout.shift, i);
-        // The ring twice over, and neither reading is redundant. `Ring` is the
-        // part as its shaper leaves it — the tip it really has, the fillet, the
-        // clamps — while `Mesh` is the pair's rolling geometry, which is where
-        // backlash lives for every stage here. Building the second from the
-        // first's parameters is what keeps one relation in one place.
         let ring = Ring::cut_by(&params(pair.ring), &stage.cutter[index]);
+        let ring_as_gear = Tooth::new(params(pair.ring));
         let pinion = Tooth::new(params(pair.pinion));
-        let mesh = Mesh::new(&pinion, &Tooth::new(params(pair.ring)), MeshKind::Internal)
-            .map_err(Error::Mesh)?;
-
-        // The raised-shift note belongs to whichever member carries this mesh's
-        // free number, and rides that gear's clamps — the channel this stage
-        // already reports a part that did not come out as asked on.
-        let with_raised = |mut notes: Vec<crate::note::Note>, gear: usize| {
-            if gear == carrier(index) {
-                if let Some(n) = raised[index].clone() {
-                    notes.push(n);
-                }
-            }
-            // **The tip width reports here rather than clamping.** A drive that
-            // solved its offset would have to put a tip-width solve inside a
-            // closed-form root-find to hold a tooth down, so this says what the
-            // tooth would have to be and leaves it as asked
-            // (`AddendumAsked::warning`).
-            if let Some(n) = stage.gears[gear]
-                .addendum_asked(&built(index, layout.shift, gear))
-                .warning(teeth.0[gear])
-            {
-                notes.push(n);
-            }
-            notes
-        };
-
-        gears[pair.ring] = Some(HulaGear {
-            teeth: teeth.0[pair.ring],
-            ring: true,
-            profile_shift: layout.shift[pair.ring],
-            pitch_radius: ring.r,
-            base_radius: ring.rb,
-            tip_radius: ring.ra,
-            root_radius: ring.rf,
-            speed: speed(pair.ring),
-            clamps: with_raised(ring.clamps.clone(), pair.ring),
-        });
-        gears[pair.pinion] = Some(HulaGear {
-            teeth: teeth.0[pair.pinion],
-            ring: false,
-            profile_shift: layout.shift[pair.pinion],
-            pitch_radius: pinion.r,
-            base_radius: pinion.rb,
-            tip_radius: pinion.ra,
-            root_radius: pinion.rf,
-            speed: speed(pair.pinion),
-            clamps: with_raised(pinion.clamps.notes.clone(), pair.pinion),
-        });
-
+        let mesh =
+            Mesh::new(&pinion, &ring_as_gear, MeshKind::Internal).map_err(TrainError::Mesh)?;
         // The pair's own loss, with the crank held. The path of contact is the
         // pinion's, and the ring enters through its tip radius and the mesh's
         // signed tooth sum rather than through a case of its own — including
         // when it lies wholly on one side of the pitch point, which at one tooth
         // of difference it does.
-        let path = ContactPath::new(&pinion, ring.ra, &mesh);
-        let pair_efficiency = Directional::of(|d| {
-            path.as_ref().map_or((0.0, 0.0), |p| {
-                (
-                    efficiency(p, &mesh, &pinion, stage.sliding_friction[index], d),
-                    efficiency(p, &mesh, &pinion, stage.static_friction[index], d),
-                )
-            })
+        //
+        // **A pair with no path is a stage with no answer**, as it is for every
+        // other kind here: there is nothing for a rating to be taken on, and a
+        // drive whose teeth never touch is not one a reader should be handed
+        // numbers for.
+        let path = ContactPath::new(&pinion, ring.ra, &mesh).ok_or(TrainError::NoContact)?;
+        let efficiency = Directional::of(|d| {
+            (
+                efficiency(&path, &mesh, &pinion, stage.sliding_friction[index], d),
+                efficiency(&path, &mesh, &pinion, stage.static_friction[index], d),
+            )
         });
-        basic.push(pair_efficiency);
-
-        rolling.push(mesh);
-        let report = mesh_with(&ring, &pinion);
-        let angular =
-            |a: f64, at: MeshSide| mesh.angular_backlash(a, at).unwrap_or(0.0).to_degrees();
-        let backlash_of = |at: MeshSide| super::Backlash {
-            nominal: angular(offset, at),
-            minimum: angular(offset - stage.tolerance_minus, at),
-            maximum: angular(offset + stage.tolerance_plus, at),
-        };
-
-        meshes.push(HulaMesh {
-            operating_pressure_angle: layout.alpha_w[index].to_degrees(),
-            clearance: layout.clearance[index],
-            clearance_as_cut: ring.ra - pinion.ra + offset,
-            contact_ratios: super::ContactRatios::of(
-                report.as_ref().map_or(0.0, |m| m.contact_ratio),
-                // The narrower member carries the mesh, as it does everywhere
-                // else here.
-                stage.gears[pair.ring]
-                    .face_width
-                    .manual
-                    .min(stage.gears[pair.pinion].face_width.manual),
-                stage.helix_angle,
-                stage.module[index],
-            ),
-            trochoid_interference: report.as_ref().is_some_and(|m| m.trochoid_interference),
-            involute_interference: report.as_ref().is_some_and(|m| m.involute_interference),
-            tip_interference: report.as_ref().is_some_and(|m| m.tip_interference),
-            tip_margin: report.as_ref().map_or(0.0, |m| m.tip_margin.to_degrees()),
-            backlash: [backlash_of(MeshSide::First), backlash_of(MeshSide::Second)],
-            // The sliding figure of the pair the fixed-carrier product is
-            // taken from, rather than a second run of the same integral: one
-            // number, read twice, so a mesh row and the drive's own efficiency
-            // cannot disagree about what this pair loses.
-            efficiency: Directional::of(|d| pair_efficiency.get(d).0),
+        built_pairs.push(Pair {
+            report: mesh_with(&ring, &pinion),
+            ring,
+            ring_as_gear,
+            pinion,
+            mesh,
+            path,
+            efficiency,
         });
     }
-
-    let gears = gears.map(|g| g.expect("every gear belongs to a mesh"));
+    // The pair's rolling geometry is what refers a play to a shaft, and each
+    // pair's own loss is what the power flow is taken through.
+    let rolling: Vec<&Mesh> = built_pairs.iter().map(|p| &p.mesh).collect();
+    let basic: Vec<Directional<(f64, f64)>> = built_pairs.iter().map(|p| p.efficiency).collect();
 
     // ---- backlash, referred to whichever shaft is the output.
     //
@@ -875,10 +832,235 @@ pub fn solve_hula_stage(
             .map_or(0.0, |p| p.efficiency),
     });
 
+    let shaft_torques = forward.as_ref().map_or([0.0; 3], |p| p.torques);
+
+    // ---- what the teeth carry, and what they are worth.
+    //
+    // Every stage kind asks the same four questions of every member, so they are
+    // asked here through the same type (`train::MemberRating`); what is this
+    // arrangement's own is where the load comes from. **A mesh is loaded by
+    // whichever of its members sits on the fixed axis** — mesh A by the grounded
+    // gear, mesh B by the output — because those are the two shafts the power
+    // flow reports a torque on. The wobble body's member takes the same mesh
+    // force at its own radius, which is what `Load::across_mesh` is.
+    let materials: Vec<Material> = stage
+        .gears
+        .iter()
+        .map(|g| {
+            lib.get(&g.material)
+                .ok_or_else(|| TrainError::UnknownMaterial(g.material.clone()))
+                .map(|m| m.overridden(&g.material_overrides))
+        })
+        .collect::<Result<_, _>>()?;
+
+    // A load case is a scale on the torque the flow was solved at: every rating
+    // is linear or square-root in it, and the power split does not depend on its
+    // magnitude, so a second case is a scale rather than a second solve.
+    let scale = LoadCase::of(|case| {
+        if input_torque == 0.0 {
+            0.0
+        } else {
+            torques.at(case) / input_torque.abs()
+        }
+    });
+    // No member of this drive is structurally reversed — see
+    // [`solve_hula_stage_with`] — so all four answer to the drive alone.
+    let reverses = reversal.reverses(false);
+
+    let mut notes: Vec<Note> = Vec::new();
+    // Filled a pair at a time, since a gear belongs to exactly one mesh and is
+    // finished the moment its own pair is.
+    let mut gears: [Option<HulaGear>; 4] = [None, None, None, None];
+    let mut meshes = Vec::with_capacity(2);
+
+    for (index, pair) in pairs.iter().enumerate() {
+        let p = &built_pairs[index];
+        // The shaft this mesh is loaded from, and the member it acts on.
+        let anchored_at = [0usize, 3][index];
+        let anchor_torque = shaft_torques[[
+            PlanetaryShaft::Sun.index_pub(),
+            PlanetaryShaft::Ring.index_pub(),
+        ][index]]
+            .abs();
+        let anchor: &Tooth = if pair.ring == anchored_at {
+            &p.ring_as_gear
+        } else {
+            &p.pinion
+        };
+        let pinion_load =
+            |width: f64| Load::new(anchor_torque, width).across_mesh(anchor, &p.pinion);
+
+        // The critical sections. **A rack-cut member with no root section is a
+        // stage with no answer**, as it is everywhere else here; a shaper-cut
+        // ring without one costs its own bending rating and nothing more, since
+        // what it is missing is a fillet to take `Y_S` from and every other
+        // figure is still answerable.
+        let pinion_section =
+            bending_section(&p.pinion, p.path.contact_ratio).ok_or(TrainError::NoRootSection)?;
+        let ring_section = ring_bending_section(&p.ring, p.path.contact_ratio);
+
+        // The probe pass, at whatever width — a minimum face width does not
+        // depend on the width it was measured at.
+        let probe = pinion_load(PROBE);
+        let e_star = contact_modulus(&materials[pair.ring], &materials[pair.pinion]);
+        let probe_cs = contact_stress(&p.path, &p.mesh, &p.pinion, PARALLEL_AXES, &probe, e_star)
+            .ok_or(TrainError::NoContact)?;
+        // The ring's root is rated through the pinion's tooth and the pinion's
+        // load, which is the same tangential force at the same module — the way
+        // a planetary set rates its ring.
+        let bending_at = |section: &crate::strength::RootSection| {
+            bending_stress(section, &p.pinion, &probe, StressConcentration::Iso6336)
+        };
+        // The mesh is built pinion first, so member 0 is the pinion and the two
+        // are in that order everywhere below.
+        let members = [pair.pinion, pair.ring];
+        let sections = [Some(&pinion_section), ring_section.as_ref()];
+        let ratings: [MemberRating; 2] = std::array::from_fn(|slot| MemberRating {
+            material: &materials[members[slot]],
+            bending: sections[slot].and_then(&bending_at),
+            contact: probe_cs.governing(slot),
+            reversal,
+            reverses,
+            scale,
+            measured_at: PROBE,
+        });
+
+        // **A member's automatic width is the largest ask in its mesh**, because
+        // the narrower face carries the pair — see the spur stage for the fault
+        // that avoids.
+        let mut wanted = 0.0_f64;
+        for (slot, &i) in members.iter().enumerate() {
+            let g = &stage.gears[i];
+            if g.face_width.auto && !g.face_sources.any() {
+                notes.push(
+                    Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", (i + 1).to_string()),
+                );
+            }
+            wanted = wanted.max(g.face_sources.largest_of(&ratings[slot].asks()));
+        }
+        let widths = members.map(|i| stage.gears[i].face_width.resolve(wanted));
+        // The narrower member carries the mesh, per the specification, and it is
+        // the width every figure in this mesh is read at.
+        let effective = widths[0].min(widths[1]);
+
+        for (slot, &i) in members.iter().enumerate() {
+            let rated = ratings[slot].at(effective);
+            let input = &stage.gears[i];
+            let params = built(index, layout.shift, i);
+            let is_ring = i == pair.ring;
+            let load = pinion_load(effective);
+            let torque = if is_ring {
+                load.across_mesh(&p.pinion, &p.ring_as_gear).torque
+            } else {
+                load.torque
+            };
+            // What the *rating* has to say about this member, as against what
+            // was done to its geometry — the same split every other stage kind
+            // makes. The shift a designer gave and the addendum's tip-width
+            // bound name inputs, so they belong beside those inputs; a clamp is
+            // about the part.
+            let mut member_notes = Vec::new();
+            member_notes.extend(sections[slot].and_then(super::notch_outside_fit));
+            member_notes.extend(reversal.note_for(reverses));
+            if i == carrier(index) {
+                member_notes.extend(raised[index].clone());
+            }
+            // **The tip width reports here rather than clamping.** A drive that
+            // solved its offset would have to put a tip-width solve inside a
+            // closed-form root-find to hold a tooth down, so this says what the
+            // tooth would have to be and leaves it as asked
+            // (`AddendumAsked::warning`).
+            member_notes.extend(input.addendum_asked(&params).warning(teeth.0[i]));
+
+            let gear = GearResult {
+                profile_shift: layout.shift[i],
+                addendum: params.addendum,
+                face_width: widths[slot],
+                torque,
+                back_driving_torque: torques
+                    .peak_backward
+                    .map(|t| torque * (t.abs() / input_torque.abs().max(f64::MIN_POSITIVE))),
+                speed: speed(i),
+                // Filled by `set_kinematics`, which is the only level that knows
+                // the duty cycle.
+                tooth_cycles: super::Cycles::default(),
+                bending_stress: rated.bending_stress,
+                contact_stress: rated.contact_stress,
+                min_face_width: rated.min_face_width,
+                clamps: if is_ring {
+                    p.ring.clamps.clone()
+                } else {
+                    p.pinion.clamps.notes.clone()
+                },
+                notes: member_notes,
+                material: materials[i].clone(),
+                ranges: admissible_ranges(&params, input.working_depth.resolve(input.dedendum)),
+            };
+            gears[i] = Some(HulaGear {
+                teeth: teeth.0[i],
+                ring: is_ring,
+                pitch_radius: if is_ring { p.ring.r } else { p.pinion.r },
+                base_radius: if is_ring { p.ring.rb } else { p.pinion.rb },
+                tip_radius: if is_ring { p.ring.ra } else { p.pinion.ra },
+                root_radius: if is_ring { p.ring.rf } else { p.pinion.rf },
+                gear,
+            });
+        }
+
+        // The mesh's own figures, at the width its members settled on.
+        let cs = contact_stress(
+            &p.path,
+            &p.mesh,
+            &p.pinion,
+            PARALLEL_AXES,
+            &pinion_load(effective),
+            e_star,
+        )
+        .ok_or(TrainError::NoContact)?;
+        let angular =
+            |a: f64, at: MeshSide| p.mesh.angular_backlash(a, at).unwrap_or(0.0).to_degrees();
+        let backlash_of = |at: MeshSide| super::Backlash {
+            nominal: angular(offset, at),
+            minimum: angular(offset - stage.tolerance_minus, at),
+            maximum: angular(offset + stage.tolerance_plus, at),
+        };
+        meshes.push(HulaMesh {
+            report: MeshReport {
+                operating_pressure_angle: layout.alpha_w[index].to_degrees(),
+                // **The contact ratio the stage optimises against is the one it
+                // reports.** The pair's own report gives the same number by a
+                // second road; reading it from the path is reading what the
+                // efficiency integral and the optimiser's floor both used.
+                contact_ratios: super::ContactRatios::of(
+                    p.path.contact_ratio,
+                    effective,
+                    stage.helix_angle,
+                    stage.module[index],
+                ),
+                // The sliding figure of the pair the fixed-carrier product is
+                // taken from, rather than a second run of the same integral: one
+                // number, read twice, so a mesh row and the drive's own
+                // efficiency cannot disagree about what this pair loses.
+                efficiency: Directional::of(|d| p.efficiency.get(d).0),
+                contact_stress_at_pitch_point: LoadCase::of(|c| {
+                    cs.at_pitch_point * scale.get(c).sqrt()
+                }),
+                relative_radius: cs.relative_radius,
+                backlash: [backlash_of(MeshSide::First), backlash_of(MeshSide::Second)],
+            },
+            clearance: layout.clearance[index],
+            clearance_as_cut: p.ring.ra - p.pinion.ra + offset,
+            trochoid_interference: p.report.as_ref().is_some_and(|m| m.trochoid_interference),
+            involute_interference: p.report.as_ref().is_some_and(|m| m.involute_interference),
+            tip_interference: p.report.as_ref().is_some_and(|m| m.tip_interference),
+            tip_margin: p.report.as_ref().map_or(0.0, |m| m.tip_margin.to_degrees()),
+        });
+    }
+
     Ok(HulaResult {
         fixed_carrier_efficiency,
         efficiency: drive_efficiency,
-        shaft_torques: forward.as_ref().map_or([0.0; 3], |p| p.torques),
+        shaft_torques,
         ratio: layout.ratio.value(),
         ratio_products: [layout.ratio.numerator, layout.ratio.denominator],
         offset_nominal: layout.offset,
@@ -888,7 +1070,8 @@ pub fn solve_hula_stage(
         crank_speed: input_speed,
         backlash,
         meshes: [meshes[0].clone(), meshes[1].clone()],
-        gears,
+        gears: gears.map(|g| g.expect("every gear belongs to a mesh")),
+        notes,
     })
 }
 
@@ -896,6 +1079,14 @@ pub fn solve_hula_stage(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use crate::train::test_library;
+
+    /// The stage at one torque, against the shared test library — the shape
+    /// every assertion below wants, so none of them has to carry a library and
+    /// a load case it has nothing to say about.
+    fn solve(s: &HulaStage, speed: f64) -> Result<HulaResult, TrainError> {
+        solve_hula_stage(s, speed, StageTorques::just(2.0), &test_library())
+    }
 
     /// The arrangement these tests were written against: `N ± 1` about 18,
     /// whose ratio, speeds and losses the assertions below name outright.
@@ -929,7 +1120,7 @@ mod tests {
     /// recompute one.
     #[test]
     fn the_stage_reports_the_arrangements_ratio() {
-        let r = solve_hula_stage(&stage(), 100.0, 2.0).unwrap();
+        let r = solve(&stage(), 100.0).unwrap();
         assert_eq!(r.ratio_products, [324, 1]);
         assert!((r.ratio - 324.0).abs() < 1e-12);
     }
@@ -943,7 +1134,7 @@ mod tests {
     #[test]
     fn the_gap_as_cut_is_the_solved_gap_plus_the_running_clearance() {
         let s = stage();
-        let r = solve_hula_stage(&s, 100.0, 2.0).unwrap();
+        let r = solve(&s, 100.0).unwrap();
         for m in &r.meshes {
             assert!(
                 (m.clearance_as_cut - m.clearance - s.running_clearance).abs() < 1e-9,
@@ -959,7 +1150,7 @@ mod tests {
     /// Which members are rings is read off the counts, not declared.
     #[test]
     fn the_rings_are_the_members_with_more_teeth() {
-        let r = solve_hula_stage(&stage(), 100.0, 2.0).unwrap();
+        let r = solve(&stage(), 100.0).unwrap();
         assert_eq!(
             r.gears.each_ref().map(|g| g.ring),
             [true, false, false, true]
@@ -970,12 +1161,12 @@ mod tests {
     /// input over the ratio. Nothing here is a second kinematic model.
     #[test]
     fn the_speeds_are_the_arrangements() {
-        let r = solve_hula_stage(&stage(), 3240.0, 2.0).unwrap();
-        assert_eq!(r.gears[0].speed, 0.0);
-        assert!((r.gears[1].speed - r.gears[2].speed).abs() < 1e-12);
-        assert!((r.gears[3].speed - 3240.0 / r.ratio).abs() < 1e-9);
+        let r = solve(&stage(), 3240.0).unwrap();
+        assert_eq!(r.gears[0].gear.speed, 0.0);
+        assert!((r.gears[1].gear.speed - r.gears[2].gear.speed).abs() < 1e-12);
+        assert!((r.gears[3].gear.speed - 3240.0 / r.ratio).abs() < 1e-9);
         // The wobble body turns once backwards per z2 crank turns.
-        assert!((r.gears[1].speed + 3240.0 / 18.0).abs() < 1e-9);
+        assert!((r.gears[1].gear.speed + 3240.0 / 18.0).abs() < 1e-9);
     }
 
     /// Backlash comes from the pair's own rolling geometry, so it rises with the
@@ -988,11 +1179,12 @@ mod tests {
                 running_clearance: f64::from(step) * 0.01,
                 ..stage()
             };
-            let r = solve_hula_stage(&s, 100.0, 2.0).unwrap();
-            let j = r.meshes[0].backlash[0].nominal;
+            let r = solve(&s, 100.0).unwrap();
+            let j = r.meshes[0].report.backlash[0].nominal;
             assert!(j >= last, "backlash fell from {last} to {j}");
             assert!(
-                r.meshes[0].backlash[0].minimum <= j && j <= r.meshes[0].backlash[0].maximum,
+                r.meshes[0].report.backlash[0].minimum <= j
+                    && j <= r.meshes[0].report.backlash[0].maximum,
                 "the tolerance band must bracket the nominal"
             );
             last = j;
@@ -1008,14 +1200,13 @@ mod tests {
     /// module's *fixtures* build rather than for the ones it ships.
     #[test]
     fn the_shipped_drive_is_one_its_own_tools_can_cut() {
-        let r =
-            solve_hula_stage(&HulaStage::default(), 1000.0, 2.0).expect("the shipped drive solves");
+        let r = solve(&HulaStage::default(), 1000.0).expect("the shipped drive solves");
         for gear in &r.gears {
             assert!(
-                gear.clamps.is_empty(),
+                gear.gear.clamps.is_empty(),
                 "z{} came out clamped: {:?}",
                 gear.teeth,
-                gear.clamps
+                gear.gear.clamps
             );
         }
     }
@@ -1035,11 +1226,11 @@ mod tests {
             }; 2],
             ..stage()
         };
-        let r = solve_hula_stage(&s, 100.0, 2.0).unwrap();
+        let r = solve(&s, 100.0).unwrap();
         let rings: Vec<&HulaGear> = r.gears.iter().filter(|g| g.ring).collect();
         for ring in rings {
             assert!(
-                !ring.clamps.is_empty(),
+                !ring.gear.clamps.is_empty(),
                 "a ring cut by a tool bigger than itself should have said so"
             );
         }
@@ -1059,7 +1250,7 @@ mod tests {
             for (gear, count) in s.gears.iter_mut().zip(teeth) {
                 gear.teeth = count;
             }
-            let r = solve_hula_stage(&s, 100.0, 2.0).unwrap();
+            let r = solve(&s, 100.0).unwrap();
             let want = r.ratio.abs();
             let got = r.backlash.backward.nominal / r.backlash.forward.nominal;
             assert!(
@@ -1085,11 +1276,11 @@ mod tests {
             for (gear, count) in s.gears.iter_mut().zip(teeth) {
                 gear.teeth = count;
             }
-            let r = solve_hula_stage(&s, 100.0, 2.0).unwrap();
+            let r = solve(&s, 100.0).unwrap();
             // `backlash[0]` is the pinion's, `[1]` the ring's — the mesh was
             // built with the pinion first.
             let at = |mesh: usize, gear: usize| {
-                r.meshes[mesh].backlash[usize::from(r.gears[gear].ring)].nominal
+                r.meshes[mesh].report.backlash[usize::from(r.gears[gear].ring)].nominal
             };
             let want = at(0, 1) * f64::from(teeth[2]) / f64::from(teeth[3]) + at(1, 3);
             let got = r.backlash.forward.nominal;
@@ -1110,7 +1301,7 @@ mod tests {
             tolerance_minus: 0.0,
             ..stage()
         };
-        let r = solve_hula_stage(&tight, 100.0, 2.0).unwrap();
+        let r = solve(&tight, 100.0).unwrap();
         assert!(
             r.backlash.forward.nominal.abs() < 1e-12,
             "a drive with no clearance should have no play, not {}",
@@ -1123,11 +1314,7 @@ mod tests {
                 running_clearance: f64::from(step) * 0.01,
                 ..stage()
             };
-            let j = solve_hula_stage(&s, 100.0, 2.0)
-                .unwrap()
-                .backlash
-                .forward
-                .nominal;
+            let j = solve(&s, 100.0).unwrap().backlash.forward.nominal;
             assert!(j > last, "the output's play fell from {last} to {j}");
             last = j;
         }
@@ -1149,7 +1336,7 @@ mod tests {
     #[test]
     fn the_offset_clears_the_tips_as_well_as_the_far_side() {
         let s = stage();
-        let shipped = solve_hula_stage(&s, 100.0, 2.0).unwrap();
+        let shipped = solve(&s, 100.0).unwrap();
         for mesh in &shipped.meshes {
             assert!(!mesh.tip_interference, "margin {}", mesh.tip_margin);
             assert!(
@@ -1169,7 +1356,7 @@ mod tests {
             clearance: 0.22,
             ..stage()
         };
-        let opened = solve_hula_stage(&tight, 100.0, 2.0).unwrap();
+        let opened = solve(&tight, 100.0).unwrap();
         assert!(
             opened.offset_nominal > shipped.offset_nominal - 1e-9
                 || opened.meshes.iter().all(|m| !m.tip_interference),
@@ -1196,6 +1383,182 @@ mod tests {
         );
     }
 
+    /// **A mesh is loaded by the shaft it is anchored to**, and the member on
+    /// the wobble body takes the same mesh force at its own radius.
+    ///
+    /// Two statements, and the second is what a drive of this kind gets wrong if
+    /// anything does: the four gears are on three shafts, so a torque cannot be
+    /// read off "this stage's input" the way a pair's can. Mesh A is loaded by
+    /// the grounded gear's reaction and mesh B by the output's, both of which
+    /// the power flow reports, and the two shaft torques together with the input
+    /// sum to zero.
+    #[test]
+    fn each_mesh_is_loaded_by_the_shaft_it_is_anchored_to() {
+        let r = solve(&stage(), 1000.0).unwrap();
+        assert!(
+            r.shaft_torques.iter().sum::<f64>().abs() < 1e-9,
+            "the three shafts are in equilibrium: {:?}",
+            r.shaft_torques
+        );
+        // The output carries the input through the reduction and the losses.
+        assert!(
+            (r.shaft_torques[2].abs() - 2.0 * r.ratio.abs() * r.efficiency.forward).abs() < 1e-6,
+            "output {} against 2 Nm through {}:1 at {}",
+            r.shaft_torques[2],
+            r.ratio,
+            r.efficiency.forward
+        );
+        // Within a mesh the two torques are in the ratio of the tooth counts,
+        // which is the mesh force acting at two radii.
+        for mesh in 0..2 {
+            let (a, b) = (mesh * 2, mesh * 2 + 1);
+            let want = f64::from(r.gears[b].teeth) / f64::from(r.gears[a].teeth);
+            let got = r.gears[b].gear.torque / r.gears[a].gear.torque;
+            assert!(
+                (got - want).abs() < 1e-9 * want,
+                "mesh {mesh}: torques in {got}, teeth in {want}"
+            );
+        }
+        // ...and the member on the fixed axis carries its shaft's own torque.
+        for (gear, shaft) in [(0_usize, 0_usize), (3, 2)] {
+            assert!(
+                (r.gears[gear].gear.torque.abs() - r.shaft_torques[shaft].abs()).abs() < 1e-9,
+                "z{} carries {} where its shaft reacts {}",
+                r.gears[gear].teeth,
+                r.gears[gear].gear.torque,
+                r.shaft_torques[shaft]
+            );
+        }
+    }
+
+    /// **Every gear is rated**, in the same four figures every other stage kind
+    /// reports — and a ring without a fillet costs its own bending rather than
+    /// the drive.
+    #[test]
+    fn every_gear_carries_the_ratings_a_stage_member_carries() {
+        let r = solve(&stage(), 1000.0).unwrap();
+        for g in &r.gears {
+            let rated = &g.gear;
+            assert!(rated.face_width > 0.0, "z{}: no face width", g.teeth);
+            assert!(
+                rated.contact_stress.peak > 0.0 && rated.contact_stress.peak.is_finite(),
+                "z{}: contact stress {}",
+                g.teeth,
+                rated.contact_stress.peak
+            );
+            assert!(
+                rated.min_face_width.peak.contact > 0.0,
+                "z{}: a contact stress inverts to a width",
+                g.teeth
+            );
+            assert_eq!(
+                rated.material.name,
+                crate::train::StageGear::default().material,
+                "z{}: the material a member was rated on",
+                g.teeth
+            );
+            // A pinion is rack-cut and has a root section; a ring's is its
+            // shaper's and may have none, which costs the rating and nothing
+            // else.
+            if !g.ring {
+                let sigma = rated
+                    .bending_stress
+                    .peak
+                    .expect("a rack-cut pinion has a root section");
+                assert!(sigma > 0.0 && sigma.is_finite(), "z{}: {sigma}", g.teeth);
+                assert!(rated.min_face_width.peak.bending.is_some());
+            }
+        }
+    }
+
+    /// **A load case is a scale on the torque**, and each rating carries the
+    /// power it is supposed to: bending linear, contact as the square root.
+    #[test]
+    fn a_load_case_scales_the_ratings_it_should() {
+        let s = stage();
+        let lib = test_library();
+        let full = solve_hula_stage(&s, 1000.0, StageTorques::just(2.0), &lib).unwrap();
+        let half = solve_hula_stage(
+            &s,
+            1000.0,
+            StageTorques {
+                peak_forward: 2.0,
+                peak_backward: None,
+                cyclic: 0.5,
+            },
+            &lib,
+        )
+        .unwrap();
+        for (i, g) in half.gears.iter().enumerate() {
+            let peak = &full.gears[i].gear;
+            assert_eq!(
+                g.gear.bending_stress.peak, peak.bending_stress.peak,
+                "z{}: the peak case did not move",
+                g.teeth
+            );
+            // A quarter of the torque is a quarter of the bending and a half of
+            // the contact.
+            if let (Some(cyclic), Some(full_peak)) =
+                (g.gear.bending_stress.cyclic, peak.bending_stress.peak)
+            {
+                assert!(
+                    (cyclic - full_peak / 4.0).abs() < 1e-9 * full_peak,
+                    "z{}: bending {cyclic} against {}",
+                    g.teeth,
+                    full_peak / 4.0
+                );
+            }
+            assert!(
+                (g.gear.contact_stress.cyclic - peak.contact_stress.peak / 2.0).abs()
+                    < 1e-9 * peak.contact_stress.peak,
+                "z{}: contact {} against {}",
+                g.teeth,
+                g.gear.contact_stress.cyclic,
+                peak.contact_stress.peak / 2.0
+            );
+        }
+    }
+
+    /// **An automatic face width answers to the mesh, not to one gear.**
+    ///
+    /// The narrower face carries the pair, so a width that satisfies only its
+    /// own member satisfies nothing — give one of them a weaker material and
+    /// *both* have to grow. The same fault the spur stage's comment describes,
+    /// gated here because a hula's members are paired by tooth count rather than
+    /// by position.
+    #[test]
+    fn an_automatic_width_is_the_largest_ask_in_its_mesh() {
+        let mut s = stage();
+        for g in &mut s.gears {
+            g.face_width = Auto::automatic(0.0);
+        }
+        let even = solve(&s, 1000.0).unwrap();
+        // Mesh A's ring is the weaker member now.
+        s.gears[0].material = "Brass C360".to_string();
+        let mixed = solve(&s, 1000.0).unwrap();
+
+        for mesh in 0..2 {
+            let (a, b) = (mesh * 2, mesh * 2 + 1);
+            assert!(
+                (mixed.gears[a].gear.face_width - mixed.gears[b].gear.face_width).abs() < 1e-9,
+                "mesh {mesh}: the two members resolve to one width, {} and {}",
+                mixed.gears[a].gear.face_width,
+                mixed.gears[b].gear.face_width
+            );
+        }
+        assert!(
+            mixed.gears[1].gear.face_width > even.gears[1].gear.face_width + 1e-9,
+            "the brass ring's ask should have pulled its pinion wider: {} against {}",
+            mixed.gears[1].gear.face_width,
+            even.gears[1].gear.face_width
+        );
+        // ...and the mesh it is not in does not move.
+        assert!(
+            (mixed.gears[2].gear.face_width - even.gears[2].gear.face_width).abs() < 1e-9,
+            "the other mesh has no reason to change"
+        );
+    }
+
     /// **The meshes lose a little and the drive loses a lot**, and the second
     /// does not follow from the first by reading it twice.
     ///
@@ -1205,7 +1568,7 @@ mod tests {
     /// as the drive's is the mistake the pair of them exists to prevent.
     #[test]
     fn the_meshes_lose_a_little_and_the_drive_loses_a_lot() {
-        let r = solve_hula_stage(&stage(), 100.0, 2.0).unwrap();
+        let r = solve(&stage(), 100.0).unwrap();
         let meshes = r.fixed_carrier_efficiency;
         assert!(
             meshes.forward > 0.95 && meshes.forward < 1.0,
@@ -1240,7 +1603,7 @@ mod tests {
             for (gear, count) in s.gears.iter_mut().zip([n + 1, n, n - 1, n]) {
                 gear.teeth = count;
             }
-            let r = solve_hula_stage(&s, 100.0, 2.0).unwrap();
+            let r = solve(&s, 100.0).unwrap();
             assert!(
                 r.efficiency.forward < last,
                 "z {n}: {} did not fall below {last}",
@@ -1267,16 +1630,16 @@ mod tests {
     /// nothing.
     #[test]
     fn a_mesh_whose_contact_never_reaches_the_pitch_point_still_has_a_loss() {
-        let r = solve_hula_stage(&stage(), 100.0, 2.0).unwrap();
+        let r = solve(&stage(), 100.0).unwrap();
         assert!(
             r.fixed_carrier_efficiency.forward < 1.0,
             "a loss of exactly nothing means the path was refused, not computed"
         );
         for mesh in &r.meshes {
             assert!(
-                mesh.contact_ratios.transverse > 1.0,
+                mesh.report.contact_ratios.transverse > 1.0,
                 "and the pair carries its load continuously: {}",
-                mesh.contact_ratios.transverse
+                mesh.report.contact_ratios.transverse
             );
         }
     }
@@ -1305,7 +1668,7 @@ mod tests {
             for (gear, count) in s.gears.iter_mut().zip(z) {
                 gear.teeth = count;
             }
-            solve_hula_stage(&s, 1000.0, 2.0).unwrap()
+            solve(&s, 1000.0).unwrap()
         };
         // Both faces of the wobble body the same kind: the meshes cancel.
         for z in [[19, 18, 17, 18], [17, 18, 19, 18]] {
@@ -1357,7 +1720,7 @@ mod tests {
                 for (gear, count) in s.gears.iter_mut().zip([n + 1, n, n - 1, n]) {
                     gear.teeth = count;
                 }
-                let r = solve_hula_stage(&s, 1000.0, 2.0).unwrap();
+                let r = solve(&s, 1000.0).unwrap();
                 let want = drive_efficiency(r.ratio, r.fixed_carrier_efficiency.forward);
                 assert!(
                     (r.efficiency.forward - want).abs() < 1e-9,
@@ -1410,7 +1773,7 @@ mod tests {
         for (gear, count) in s.gears.iter_mut().zip([8_u32, 7, 6, 7]) {
             gear.teeth = count;
         }
-        let r = solve_hula_stage(&s, 1000.0, 2.0).unwrap();
+        let r = solve(&s, 1000.0).unwrap();
         assert!((r.ratio - 49.0).abs() < 1e-9, "ratio {}", r.ratio);
         // **Above the published figure, and that is the agreement rather than a
         // gap in it.** These are six- and seven-tooth pinions, and their shifts
@@ -1493,25 +1856,25 @@ mod tests {
     /// more.
     #[test]
     fn the_two_meshes_want_the_same_module() {
+        // **On the fixture's own teeth**, rather than on a shorter tooth pinned
+        // at a negative shift. That tooth reached contact only at equality — off
+        // it, the offset opens and the pair's path length goes to nothing — so
+        // what the assertions below compared was one drive against four that do
+        // not transmit. The stage said so from the day it started refusing a
+        // pair with no path; before that the row came back with a contact ratio
+        // of zero and an operating pressure angle to read anyway.
         let worst_angle = |ratio: f64| {
-            let mut s = HulaStage {
+            let s = HulaStage {
                 module: [ratio, 1.0],
                 clearance: 0.30,
-                ..HulaStage::default()
+                ..stage()
             };
-            for (gear, count) in s.gears.iter_mut().zip([19_u32, 18, 17, 18]) {
-                gear.teeth = count;
-                gear.addendum = 0.6;
-                gear.profile_shift = crate::params::Auto::fixed(-0.2);
-            }
-            for c in &mut s.cutter {
-                c.teeth = 14;
-            }
-            let r = solve_hula_stage(&s, 1000.0, 2.0).expect("a drive at every module ratio");
+            let r = solve(&s, 1000.0).expect("a drive at every module ratio");
             (
                 r.meshes[0]
+                    .report
                     .operating_pressure_angle
-                    .max(r.meshes[1].operating_pressure_angle),
+                    .max(r.meshes[1].report.operating_pressure_angle),
                 r.offset_nominal,
             )
         };
@@ -1547,8 +1910,8 @@ mod tests {
         s.gears[2].teeth = 18;
         s.gears[3].teeth = 19;
         assert_eq!(
-            solve_hula_stage(&s, 100.0, 2.0).unwrap_err(),
-            Error::Drive(hula::Error::Locked)
+            solve(&s, 100.0).unwrap_err(),
+            TrainError::Hula(hula::Error::Locked)
         );
     }
     /// **At a held crank, one mesh's split says nothing about the other's.**
@@ -1563,7 +1926,7 @@ mod tests {
     #[test]
     fn a_held_crank_leaves_each_mesh_to_itself() {
         let base = HulaStage::default();
-        let settled = solve_hula_stage(&base, 1000.0, 2.0).expect("the drive solves");
+        let settled = solve(&base, 1000.0).expect("the drive solves");
         let at = |split: f64| {
             let mut s = HulaStage {
                 offset: Auto::fixed(settled.offset_nominal),
@@ -1579,25 +1942,33 @@ mod tests {
                 a
             };
             s.gears[named].profile_shift = Auto::fixed(split);
-            solve_hula_stage(&s, 1000.0, 2.0).expect("solves")
+            solve(&s, 1000.0).expect("solves")
         };
         let (lo, hi) = (at(0.0), at(0.4));
         assert!(
-            (lo.meshes[0].operating_pressure_angle - hi.meshes[0].operating_pressure_angle).abs()
+            (lo.meshes[0].report.operating_pressure_angle
+                - hi.meshes[0].report.operating_pressure_angle)
+                .abs()
                 < 1e-9,
             "the crank fixes each pair's sum, so mesh 0's angle should not move either"
         );
         for field in [
             (
-                lo.meshes[1].operating_pressure_angle,
-                hi.meshes[1].operating_pressure_angle,
+                lo.meshes[1].report.operating_pressure_angle,
+                hi.meshes[1].report.operating_pressure_angle,
             ),
             (
-                lo.meshes[1].contact_ratios.transverse,
-                hi.meshes[1].contact_ratios.transverse,
+                lo.meshes[1].report.contact_ratios.transverse,
+                hi.meshes[1].report.contact_ratios.transverse,
             ),
-            (lo.gears[2].profile_shift, hi.gears[2].profile_shift),
-            (lo.gears[3].profile_shift, hi.gears[3].profile_shift),
+            (
+                lo.gears[2].gear.profile_shift,
+                hi.gears[2].gear.profile_shift,
+            ),
+            (
+                lo.gears[3].gear.profile_shift,
+                hi.gears[3].gear.profile_shift,
+            ),
         ] {
             assert!(
                 (field.0 - field.1).abs() < 1e-12,
@@ -1607,7 +1978,7 @@ mod tests {
             );
         }
         // ...and mesh 0 did move, or the test proved nothing.
-        assert!((lo.gears[0].profile_shift - hi.gears[0].profile_shift).abs() > 1e-6);
+        assert!((lo.gears[0].gear.profile_shift - hi.gears[0].gear.profile_shift).abs() > 1e-6);
     }
 
     /// **The split is worth something**, and choosing it is additive: a drive
@@ -1631,7 +2002,8 @@ mod tests {
                     ..HulaStage::default()
                 },
                 3000.0,
-                2.0,
+                StageTorques::just(2.0),
+                &test_library(),
             )
         };
         // The offset the default drive settles at, then held there.
@@ -1647,9 +2019,9 @@ mod tests {
             [mesh * 2, mesh * 2 + 1]
                 .map(|i| {
                     if r.gears[i].ring {
-                        -r.gears[i].profile_shift
+                        -r.gears[i].gear.profile_shift
                     } else {
-                        r.gears[i].profile_shift
+                        r.gears[i].gear.profile_shift
                     }
                 })
                 .iter()
@@ -1668,7 +2040,7 @@ mod tests {
                 .gears
                 .iter()
                 .zip(&plain.gears)
-                .any(|(t, p)| (t.profile_shift - p.profile_shift).abs() > 1e-6),
+                .any(|(t, p)| (t.gear.profile_shift - p.gear.profile_shift).abs() > 1e-6),
             "the search moved no shift at all"
         );
         assert!(

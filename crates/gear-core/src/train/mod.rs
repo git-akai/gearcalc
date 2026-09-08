@@ -35,9 +35,12 @@ mod planetary;
 mod spur;
 mod worm;
 
-pub use hula::{drive_efficiency, solve_hula_stage, HulaGear, HulaMesh, HulaResult, HulaStage};
+pub use hula::{
+    drive_efficiency, solve_hula_stage, solve_hula_stage_with, HulaGear, HulaMesh, HulaResult,
+    HulaStage,
+};
 pub use planetary::{
-    solve_planetary_stage, solve_planetary_stage_with, MeshReport, PlanetResult, PlanetaryResult,
+    solve_planetary_stage, solve_planetary_stage_with, PlanetResult, PlanetaryResult,
     PlanetaryStage,
 };
 pub use spur::{solve_spur_stage, solve_spur_stage_with, SpurStage, StageGear};
@@ -109,6 +112,46 @@ pub struct Backlash {
     pub maximum: f64,
 }
 
+/// **What one parallel-axis mesh reports**, for any stage kind that has more
+/// than one of them.
+///
+/// A stage with a single mesh puts these on its own result, because there is no
+/// ambiguity about whose they are; a stage with two has to say which mesh each
+/// belongs to, and both of them were saying it in the same six fields. The
+/// planetary set's `sun_planet`/`planet_ring` and the hula drive's two pairs are
+/// the same report, so it is one type.
+///
+/// A crossed pair has none of this — its line of action slides rather than
+/// turning, so there is no operating pressure angle and no contact ratio to
+/// report (docs/reference.md#crossed-axes).
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct MeshReport {
+    /// Operating pressure angle `α_w`, degrees — see
+    /// [`SpurResult::operating_pressure_angle`], which defines it for every
+    /// parallel-axis mesh here.
+    pub operating_pressure_angle: f64,
+    pub contact_ratios: ContactRatios,
+    /// Mesh efficiency, both drive senses. Equal for a parallel-axis pair, and
+    /// arrived at rather than copied.
+    pub efficiency: Directional<f64>,
+    /// Hertzian contact stress at the pitch point, MPa, in both load cases.
+    ///
+    /// The one figure both members of the mesh share. Each member's own rating —
+    /// taken where its dedendum is loaded alone — sits on its [`GearResult`].
+    pub contact_stress_at_pitch_point: LoadCase<f64>,
+    /// Relative radius of curvature at the governing point, mm.
+    pub relative_radius: f64,
+    /// Angular backlash at each member, degrees, in the order the mesh was
+    /// built: the pinion-side member first, then the other.
+    pub backlash: [Backlash; 2],
+}
+
 /// The note a **rating** raises about one member: its notch parameter sits
 /// outside the band the `Y_S` fit is stated for.
 ///
@@ -148,6 +191,102 @@ pub struct Widths {
     pub bending: Option<f64>,
     /// From contact.
     pub contact: f64,
+}
+
+/// The face width every rating is first evaluated at, mm.
+///
+/// Any width will do, and that is the point: `b_min` does not depend on the `b`
+/// it was measured at (docs/reference.md#contact-stress), so one evaluation
+/// gives every minimum and nothing has to be iterated to find the width a
+/// member needs before it is given one.
+pub(crate) const PROBE: f64 = 10.0;
+
+/// **What one member's ratings come to**, at whatever face width is in force.
+///
+/// Every stage kind asks the same four questions of every member it builds —
+/// two stresses, each against two load cases, and the width each of those would
+/// need — and each of them had been writing the arithmetic out for itself. What
+/// genuinely differs between kinds is the *stress at a probe width* and *which
+/// allowable a reversed root answers to*, and both of those arrive here as
+/// values rather than being worked out again.
+///
+/// It is a scale rather than a second solve, and that is exact rather than
+/// convenient: bending is linear in torque and inversely linear in width, and
+/// contact goes as the square root of the first and the inverse square root of
+/// the second (docs/reference.md#load-cases). The spur stage re-evaluates
+/// instead, because its bending section answers to a load-sharing model that
+/// reads the width — see [`crate::strength::bending_section_shared`] — and a
+/// scale would be asserting the linearity the sharing ramp is allowed to break.
+pub(crate) struct MemberRating<'a> {
+    /// The material as used, after any overrides.
+    pub material: &'a Material,
+    /// Root bending stress at [`PROBE`], under the torque the two stresses were
+    /// evaluated at. `None` where the section has no rating — a ring with no
+    /// fillet is the ordinary way to get here.
+    pub bending: Option<f64>,
+    /// This member's **governing** contact stress at [`PROBE`], under the same
+    /// torque: where its own dedendum is loaded alone.
+    pub contact: f64,
+    /// How the train treats a root loaded on both flanks.
+    pub reversal: Reversal,
+    /// ...and whether this member's is.
+    pub reverses: bool,
+    /// Each case's torque as a multiple of the one above.
+    pub scale: LoadCase<f64>,
+    /// The face width the two stresses above were evaluated at, mm.
+    ///
+    /// [`PROBE`] wherever they came from the probe pass, which is every caller
+    /// so far — but a stage that has already settled its widths can hand over
+    /// the figures it ended with instead, and the arithmetic is the same.
+    pub measured_at: f64,
+}
+
+/// The three rating fields of a [`GearResult`], at one face width.
+pub(crate) struct Rated {
+    pub bending_stress: LoadCase<Option<f64>>,
+    pub contact_stress: LoadCase<f64>,
+    pub min_face_width: LoadCase<Widths>,
+}
+
+impl MemberRating<'_> {
+    /// The rating at a given face width.
+    pub(crate) fn at(&self, width: f64) -> Rated {
+        // The width the stresses were measured at over the width in force, which
+        // is the only thing either of them scales by beyond the load case.
+        let by = |case: Case| self.scale.get(case) * self.measured_at / width;
+        Rated {
+            bending_stress: LoadCase::of(|c| self.bending.map(|s| s * by(c))),
+            contact_stress: LoadCase::of(|c| self.contact * by(c).sqrt()),
+            min_face_width: LoadCase::of(|c| Widths {
+                // Two allowables, because a reversed root endures less bending
+                // while its flank pits exactly as it did.
+                bending: self.bending.map(|s| {
+                    crate::strength::min_face_width_bending(
+                        s * by(c),
+                        width,
+                        self.reversal
+                            .bending_allowable(self.material, c, self.reverses),
+                    )
+                }),
+                contact: crate::strength::min_face_width_contact(
+                    self.contact * by(c).sqrt(),
+                    width,
+                    allowable(self.material, c),
+                ),
+            }),
+        }
+    }
+
+    /// The four widths this member's ratings ask for.
+    ///
+    /// Takes no width, because the answer does not depend on one: a minimum
+    /// width is a stress inverted, and the stress it inverts scales with the
+    /// width it was measured at by exactly the amount that cancels
+    /// (docs/reference.md#contact-stress). So this is what lets a stage size a
+    /// member before it has a width to size it at.
+    pub(crate) fn asks(&self) -> LoadCase<Widths> {
+        self.at(self.measured_at).min_face_width
+    }
 }
 
 /// What a stage does to one of its gears.
@@ -315,12 +454,16 @@ pub enum TrainError {
     },
 }
 
-impl From<hula::Error> for TrainError {
-    fn from(e: hula::Error) -> Self {
-        match e {
-            hula::Error::Mesh(m) => Self::Mesh(m),
-            hula::Error::Drive(d) => Self::Hula(d),
-        }
+/// So a hula stage can report its findings in the vocabulary every other stage
+/// kind reports in. It had a refusal type of its own, from before the train had
+/// an arm to put one in; now that it has, the arrangement's own error is a
+/// [`TrainError`] like a mesh's, and the stage returns the same `Result` as
+/// every other solver here — which is what lets it name a material the library
+/// does not have, or a member too undercut to rate, without inventing a second
+/// place to say so.
+impl From<crate::hula::Error> for TrainError {
+    fn from(e: crate::hula::Error) -> Self {
+        Self::Hula(e)
     }
 }
 
@@ -651,32 +794,38 @@ impl StageResult {
                     * (speeds[0] / 60.0 * std::f64::consts::TAU)
                     * (r.members[0].pitch_diameter / 2.0);
             }
-            // A planetary's speeds are not the train's two-member pattern — it
-            // has three shafts and its own kinematics already set them, so only
-            // the cycles are filled here. Sun and ring meet a planet `N` times
-            // per revolution; the planet is the special case of docs/reference.md#trains, and what
-            // fatigues it is its rotation **relative to the carrier**.
-            // A hula sets its own speeds — four gears on three shafts, and its
-            // own kinematics filled them. Nothing else is filled here: a cycle
-            // count is what a fatigue rating consumes, and this stage has none
-            // to consume it, so the arm is empty rather than filling a field
-            // nothing reads.
-            Self::Hula(_) => {}
+            // An epicyclic set's speeds are not the train's two-member pattern —
+            // it has three shafts and its own kinematics already set them, so
+            // only the cycles are filled here, through the one rule both kinds
+            // obey ([`engagements`]). Its members' revolutions scale before they
+            // are counted, including — for a reversing drive — the per-actuation
+            // figure the rounding is applied to.
             Self::Planetary(r) => {
                 let n = f64::from(r.planets.max(1));
-                // Sun and ring meet a planet `N` times per revolution and the
-                // planet turns relative to the carrier, so each member's
-                // revolutions scale before they are counted — including, for a
-                // reversing drive, the per-actuation figure the rounding is
-                // applied to.
-                let scaled = |f: f64| (cycles[0].0 * f, cycles[0].1.map(|(e, a)| (e * f, a)));
-                let (sun_turns, sun_each) = scaled(n);
-                r.sun.tooth_cycles = loaded_cycles(sun_turns, sun_each);
-                r.ring.tooth_cycles = loaded_cycles(sun_turns, sun_each);
-                let carrier_relative =
-                    (r.planet.speed_relative / r.speeds[0].abs().max(f64::MIN_POSITIVE)).abs();
-                let (p_turns, p_each) = scaled(carrier_relative);
-                r.planet.gear.tooth_cycles = loaded_cycles(p_turns, p_each);
+                let carrier = r.speeds[crate::planetary::PlanetaryShaft::Carrier.index_pub()];
+                let input = r.speeds[r.arrangement.input.index_pub()];
+                let count = |member: f64, at: &mut GearResult| {
+                    let f = engagements(member, carrier, input, n);
+                    at.tooth_cycles =
+                        loaded_cycles(cycles[0].0 * f, cycles[0].1.map(|(e, a)| (e * f, a)));
+                };
+                count(r.speeds[0], &mut r.sun);
+                count(r.speeds[2], &mut r.ring);
+                let planet = r.planet.speed_absolute;
+                count(planet, &mut r.planet.gear);
+            }
+            // A hula sets its own speeds — four gears on three shafts, and its
+            // own kinematics filled them. The crank is the carrier of both
+            // meshes *and* the shaft the train counted revolutions on, and the
+            // drive has one wobble body, so the rule reads as "how far each gear
+            // turns against the crank".
+            Self::Hula(r) => {
+                let crank = r.crank_speed;
+                for g in &mut r.gears {
+                    let f = engagements(g.gear.speed, crank, crank, 1.0);
+                    g.gear.tooth_cycles =
+                        loaded_cycles(cycles[0].0 * f, cycles[0].1.map(|(e, a)| (e * f, a)));
+                }
             }
         }
     }
@@ -979,6 +1128,34 @@ pub struct Cycles {
     pub contact: f64,
 }
 
+/// **How often one member of an epicyclic set is engaged**, per revolution of
+/// the shaft the train counted revolutions on.
+///
+/// One rule, and both epicyclic kinds here obey it: a member's teeth are
+/// engaged once per revolution **relative to the carrier**, once for each
+/// parallel mesh path the set has. In the carrier's frame the arm stands still
+/// and everything else turns past it, which is what makes the relative speed the
+/// one that counts — and it is the same sentence for a sun, a ring, a planet, a
+/// grounded gear and a wobble body, so no member is the exception it has to be
+/// remembered for.
+///
+/// It had been three sentences. A sun and a ring counted the *input shaft's*
+/// revolutions, which on an ordinary set with the ring held over-counts the sun
+/// by `(z_s + z_r)/z_r` and the ring — whose teeth are loaded while it does not
+/// turn at all — by the whole of `(z_s + z_r)/z_s`, three and a half times on
+/// the shipped counts. Only the planet was carrier-relative, and it was
+/// referred to the *sun's* speed rather than to the input's, so it was right
+/// only in the arrangements where those are the same shaft.
+///
+/// A ratio of speeds, so their magnitude cancels — but a train whose input shaft
+/// does not turn has no ratio to take, and answers zero.
+fn engagements(member: f64, carrier: f64, input: f64, paths: f64) -> f64 {
+    if input == 0.0 {
+        return 0.0;
+    }
+    ((member - carrier) / input).abs() * paths
+}
+
 /// How many times a tooth is loaded, from how many times it comes round.
 ///
 /// # Why this rounds, and why the rounding is here
@@ -1085,9 +1262,8 @@ pub fn solve_any_with(
         // A hula needs a speed and a torque for the same reason a planetary
         // does: its efficiency is a power flow, and a power flow is not a
         // property of the teeth alone.
-        Stage::Hula(s) => solve_hula_stage(s, input_speed, torques.peak_forward)
-            .map(|r| StageResult::Hula(Box::new(r)))
-            .map_err(TrainError::from),
+        Stage::Hula(s) => solve_hula_stage_with(s, input_speed, torques, lib, reversal)
+            .map(|r| StageResult::Hula(Box::new(r))),
     }
 }
 
@@ -2012,6 +2188,110 @@ mod tests {
         assert!(spur(&r.stages[1]).gears[1].tooth_cycles.bending < first.bending);
     }
 
+    /// **An epicyclic member is engaged once per turn against the carrier**, per
+    /// planet — for every member and both kinds, which is the whole of
+    /// [`engagements`].
+    ///
+    /// Checked against arithmetic the stage shares nothing with: the counts a
+    /// member's own speed and the carrier's give, taken from the result's speed
+    /// array rather than from the rule that filled the cycles. Three things
+    /// would have failed here before it existed, and each was a different way of
+    /// counting the wrong revolutions:
+    ///
+    /// - the **ring** of a set with the ring held is loaded while it does not
+    ///   turn at all, and it counted the *sun's* revolutions — three and a half
+    ///   times too many on these counts;
+    /// - the **sun** counted its own rather than its rotation against the
+    ///   carrier, which is 1.4 times too many;
+    /// - the **planet** was referred to the sun's speed rather than to the input
+    ///   shaft's, right only where those are the same shaft.
+    #[test]
+    fn an_epicyclic_members_cycles_are_its_turns_against_the_carrier() {
+        let lib = library();
+        for (name, stage) in [
+            (
+                "epicyclic",
+                Stage::Planetary(Box::new(PlanetaryStage {
+                    planets: 3,
+                    ..PlanetaryStage::default()
+                })),
+            ),
+            ("hula", Stage::Hula(Box::default())),
+        ] {
+            let train = Train {
+                actuation: Actuation::Continuous {
+                    operating_speed: 3000.0,
+                    runtime_hours: 1.0,
+                },
+                stages: vec![stage],
+                ..two_stage()
+            };
+            let r = solve_train(&train, &lib).unwrap_or_else(|e| panic!("{name}: {e}"));
+            // The revolutions the input shaft turns over the duty, which is what
+            // every member's count is a multiple of.
+            let turns = 3000.0 * 60.0;
+
+            let want = |member: f64, carrier: f64, paths: f64| {
+                (turns * ((member - carrier) / 3000.0).abs() * paths).ceil()
+            };
+            match &r.stages[0] {
+                StageResult::Planetary(p) => {
+                    let carrier = p.speeds[1];
+                    let n = f64::from(p.planets);
+                    for (which, got, speed) in [
+                        ("sun", p.sun.tooth_cycles.bending, p.speeds[0]),
+                        ("ring", p.ring.tooth_cycles.bending, p.speeds[2]),
+                        (
+                            "planet",
+                            p.planet.gear.tooth_cycles.bending,
+                            p.planet.speed_absolute,
+                        ),
+                    ] {
+                        let expected = want(speed, carrier, n);
+                        assert!(
+                            (got - expected).abs() <= 1.0,
+                            "{which}: {got} engagements against {expected}"
+                        );
+                    }
+                    // **A shaft that does not turn is still loaded**, which is
+                    // the case the old rule could not state: it counted the
+                    // input's revolutions, so a held ring came out as though it
+                    // turned with the sun. It meets a planet once per *carrier*
+                    // turn instead, which is `z_s/(z_s + z_r)` of that.
+                    assert_eq!(p.speeds[2], 0.0, "the ring is the held shaft here");
+                    let zs = f64::from(PlanetaryStage::default().sun.teeth);
+                    let zr = f64::from(PlanetaryStage::default().ring.teeth);
+                    assert!(
+                        (p.ring.tooth_cycles.bending
+                            - (turns * zs / (zs + zr) * f64::from(p.planets)).ceil())
+                        .abs()
+                            <= 1.0,
+                        "a held ring counts carrier turns: {}",
+                        p.ring.tooth_cycles.bending
+                    );
+                }
+                StageResult::Hula(h) => {
+                    for g in &h.gears {
+                        let expected = want(g.gear.speed, h.crank_speed, 1.0);
+                        assert!(
+                            (g.gear.tooth_cycles.bending - expected).abs() <= 1.0,
+                            "z{}: {} engagements against {expected}",
+                            g.teeth,
+                            g.gear.tooth_cycles.bending
+                        );
+                    }
+                    // The grounded gear stands still and is engaged once a crank
+                    // turn, which is the whole duty's worth of revolutions.
+                    assert!(
+                        (h.gears[0].gear.tooth_cycles.bending - turns).abs() <= 1.0,
+                        "the grounded gear meets the wobble body once a crank turn"
+                    );
+                }
+                _ => panic!("{name}: wrong kind"),
+            }
+        }
+    }
+
     /// **The tip width is a bound on the addendum, not a target for it.**
     ///
     /// Exercised through a whole stage rather than in isolation: ask for a
@@ -2120,7 +2400,7 @@ mod tests {
             ..HulaStage::default()
         };
         each("eccentric drive's", 20, &|| {
-            solve_hula_stage(&drive, 1000.0, 2.0).unwrap();
+            solve_hula_stage(&drive, 1000.0, StageTorques::just(2.0), &lib).unwrap();
         });
     }
 
@@ -2293,7 +2573,8 @@ mod tests {
             },
             ..HulaStage::default()
         };
-        let r = solve_hula_stage(&drive, 1000.0, 2.0).expect("the drive solves");
+        let r = solve_hula_stage(&drive, 1000.0, StageTorques::just(2.0), &test_library())
+            .expect("the drive solves");
         for (i, g) in r.gears.iter().enumerate() {
             if g.ring {
                 continue;
@@ -2304,7 +2585,7 @@ mod tests {
                     pressure_angle: drive.pressure_angle,
                     helix_angle: drive.helix_angle,
                     teeth: g.teeth,
-                    profile_shift: g.profile_shift,
+                    profile_shift: g.gear.profile_shift,
                     addendum: drive.gears[i].addendum,
                     dedendum: drive.gears[i].dedendum,
                     root_radius: drive.gears[i].root_radius,

@@ -500,6 +500,41 @@ pub struct Power {
     pub rolling_power_sign: f64,
 }
 
+impl Power {
+    /// **The planet's own rotation**, absolute and relative to the carrier.
+    ///
+    /// The planet is not one of the three shafts — [`Power`] is about a set with
+    /// a basic ratio, and a basic ratio does not say how many teeth the thing
+    /// between the two central members has — so its speed is a question for the
+    /// tooth counts, asked here where the rest of the kinematics live.
+    ///
+    /// In the carrier's frame the sun mesh is an ordinary external pair:
+    ///
+    /// ```text
+    /// ω_p − ω_c = −(z_s / z_p) (ω_s − ω_c)
+    /// ```
+    ///
+    /// The ring mesh gives the same number by the other road,
+    /// `+(z_r / z_p)(ω_r − ω_c)`, which is Willis again and is what
+    /// `the_planets_own_speed_is_what_both_of_its_meshes_say` checks.
+    ///
+    /// **The relative figure is the one its teeth see**, and it is not the sun's
+    /// relative speed: the two differ by `z_s/z_p`, which is a third on an
+    /// ordinary set. Nor is its absolute speed the carrier's — the planet spins
+    /// on the arm as well as riding it, and on a set with the ring held the two
+    /// have opposite signs.
+    ///
+    /// Returns `(absolute, relative to the carrier)`, in the unit the speeds
+    /// were given in.
+    #[must_use]
+    pub fn planet_speed(&self, teeth: Teeth) -> (f64, f64) {
+        let carrier = self.speeds[PlanetaryShaft::Carrier.index_pub()];
+        let sun = self.speeds[PlanetaryShaft::Sun.index_pub()];
+        let relative = -(f64::from(teeth.sun) / f64::from(teeth.planet)) * (sun - carrier);
+        (carrier + relative, relative)
+    }
+}
+
 /// The basic, carrier-fixed ratio `i₀ = −z_ring / z_sun`.
 ///
 /// Negative because with the carrier held the sun and ring turn opposite ways —
@@ -777,6 +812,68 @@ mod tests {
                 assert!(
                     p.torques[out] * p.speeds[out] <= 0.0,
                     "i0 {i0}: the output delivers power as well as the input"
+                );
+            }
+        }
+    }
+
+    /// **The planet's own speed is what both of its meshes say.**
+    ///
+    /// [`Power::planet_speed`] reads it off the sun mesh in the carrier's frame;
+    /// this rebuilds it from the *ring* mesh, `+(z_r/z_p)(ω_r − ω_c)`. Different
+    /// pair, different tooth counts, and the two agree only if the relative
+    /// speed is genuinely the planet's rather than the sun's — which is the
+    /// mistake this gates, and the one the stage made: it reported the sun's
+    /// relative speed as the planet's, a third out on an ordinary set, and the
+    /// carrier's absolute speed as the planet's, which on a set with the ring
+    /// held is not even the same sign.
+    #[test]
+    fn the_planets_own_speed_is_what_both_of_its_meshes_say() {
+        for teeth in [
+            Teeth {
+                sun: 24,
+                planet: 18,
+                ring: 60,
+            },
+            Teeth {
+                sun: 17,
+                planet: 17,
+                ring: 51,
+            },
+            Teeth {
+                sun: 40,
+                planet: 10,
+                ring: 60,
+            },
+        ] {
+            for fixed in [
+                PlanetaryShaft::Ring,
+                PlanetaryShaft::Sun,
+                PlanetaryShaft::Carrier,
+            ] {
+                let input = match fixed {
+                    PlanetaryShaft::Ring | PlanetaryShaft::Carrier => PlanetaryShaft::Sun,
+                    PlanetaryShaft::Sun => PlanetaryShaft::Carrier,
+                };
+                let p = power(
+                    basic_ratio(teeth),
+                    Arrangement { input, fixed },
+                    3000.0,
+                    2.0,
+                    1.0,
+                )
+                .unwrap_or_else(|| panic!("{teeth:?} held at {fixed:?} should solve"));
+                let carrier = p.speeds[PlanetaryShaft::Carrier.index_pub()];
+                let ring = p.speeds[PlanetaryShaft::Ring.index_pub()];
+                let want = (f64::from(teeth.ring) / f64::from(teeth.planet)) * (ring - carrier);
+                let (absolute, relative) = p.planet_speed(teeth);
+                assert!(
+                    (relative - want).abs() < 1e-9 * want.abs().max(1.0),
+                    "{teeth:?} held at {fixed:?}: the sun mesh gives {relative}, the ring {want}"
+                );
+                assert!(
+                    (absolute - (carrier + relative)).abs() < 1e-9,
+                    "the absolute speed is the carrier's plus its own spin"
                 );
             }
         }
