@@ -277,21 +277,21 @@ than against the 30° construction. `Y_S` is an ISO fit written in terms of the
 
 ### No ISO/AGMA correction factors
 
-`Y_β`, `K_A`, `K_v`, `K_Fβ`/`K_Hβ`, `K_Fα`/`K_Hα`, `Z_ε`, `Z_β` and their
-relatives are not used, and will not be added on request without revisiting this.
+`K_A`, `K_v`, `K_Fβ`/`K_Hβ`, `K_Fα`/`K_Hα`, `Z_ε`, `Z_β` and their relatives are
+not used, and will not be added on request without revisiting this.
 
 **Three reasons, in order of weight.**
 
 1. **Their validated band is narrow relative to modern designs.** Each carries
-   hard caps — `ε_β ≤ 1`, `β ≤ 30°`, a floor at `Y_β = 0.75`. Those are not
-   physical thresholds; nothing changes in the mechanics at exactly `ε_β = 1`.
-   They are the edges of the data. Outside the band the formula does not fail —
+   hard caps that are not physical thresholds; nothing changes in the mechanics
+   at exactly the edge of the data. Outside the band the formula does not fail —
    it quietly returns the boundary value, which is the worst failure mode
    available.
-2. **They are only balanced as a set.** `Y_β` reduces stress and `K_Fβ` raises
-   it, and they describe the *same* face-width physics from opposite directions.
-   Both were calibrated against `σ_Flim` values themselves back-derived using the
-   whole set. Adopting one is taking the favourable half of a calibration.
+2. **They are only balanced as a set.** `K_Fβ` raises a stress where the
+   geometry factors lower it, over the *same* face-width physics from opposite
+   directions, and all were calibrated against `σ_Flim` values themselves
+   back-derived using the whole set. Adopting one is taking the favourable half
+   of a calibration.
 3. **It trades accuracy for precision.** A number that is exactly right about a
    simpler question beats one that is approximately right about a harder one
    while hiding which question it answered.
@@ -302,19 +302,61 @@ on whether root stress *rises or falls* with helix angle — the sign of the tre
 not merely its size. There would be nothing to disagree about if it were
 geometry.
 
-**Where this leaves the numbers.** Bending here is conservative against a
-published ISO rating by up to roughly 25 % at high helix and overlap. That is the
-deliberate direction, and the tool should not be compared to an ISO rating
-without saying so.
+**Two of ISO 6336-3's factors are the deliberate exceptions**, and the same
+three tests separate them from the list above rather than a different one: they
+are computed from *this* gear's own geometry rather than looked up against a
+population, dropping them is **unconservative** rather than safe, and their
+bands are reported instead of assumed.
 
-**`Y_S` is the deliberate exception**, and the distinction is worth stating
-because it is easy to lump together. `Y_S ≥ 1`: it is the ratio of peak fillet
-stress to nominal section stress, a *local* effect computed from `s_Fn`, `h_Fe`
-and `ρ_F`, all measured off our own exact profile rather than looked up against a
-gear population. Dropping it would not be conservative — it would report a
-nominal stress roughly 1.6–2.1× below the real peak. Its notch parameter is
-clamped into the fit's stated range and **reported raw**, because `Y_S` rises
-with `q_s` and clamping a sharper-than-stated notch under-predicts stress.
+`Y_S` is the ratio of peak fillet stress to nominal section stress — a *local*
+effect computed from `s_Fn`, `h_Fe` and `ρ_F`, all measured off our own exact
+profile. Dropping it would report a nominal stress roughly 1.6–2.1× below the
+real peak. Its notch parameter is clamped into the fit's stated range and
+**reported raw**, because `Y_S` rises with `q_s` and clamping a
+sharper-than-stated notch under-predicts stress.
+
+`Y_β` and `Y_B` joined it on reading the standard, and `Y_β` is a **correction
+to this document** rather than a change of policy: it was listed above, on a
+reading of the factor that ISO 6336-3:2019 does not support. See
+[a helix angle factor is not a discount](#a-helix-angle-factor-is-not-a-discount).
+
+### A helix angle factor is not a discount
+
+This project excluded `Y_β` for years on the grounds that it lowers a stress, so
+that omitting it is conservative — the same sentence appeared in `strength.rs`,
+in the paragraph above, and in `state.md`'s known-approximate list, which put
+the omission at "up to ~25 % conservative". It is wrong. ISO 6336-3:2019,
+Formula (66) is
+
+```text
+Y_β = (1 − ε_β · β/120°) / cos³β
+```
+
+and the `1/cos³β` is not decoration. Its Figure 8 draws the family over
+`β = 0…40°` and `ε_β = 0,1…1`, and every curve **rises above 1**: the plateau is
+1,50 at `ε_β = 0,1` and 1,155 at `ε_β = 1`, both reached at `β = 30°` where the
+fit stops. The formula reproduces them to 1,5011 and 1,1547, and the figure's
+ordinate starts at 0,9, which the old reading's 0,75 floor would fall clean off.
+
+So omitting `Y_β` does not over-predict a helical root stress by 25 %. It
+**under**-predicts it, by up to 50 % at the worst corner of the figure — the
+unconservative direction, and the one thing this project's whole factor policy
+exists to avoid. The published disagreement about the *sign* of the helix trend,
+cited two paragraphs up as evidence that these factors are empirical, is a
+disagreement this document had silently taken a side in.
+
+**What it costs to include.** One genuine complication: `ε_β = b sin|β| / (π m_n)`
+depends on the face width, so `σ_F` is no longer exactly `∝ 1/b` and the width a
+rating asks for is no longer the stress inverted. It still closes in one step,
+because the dependence is affine — `HelixFactor::min_face_width` solves it in
+closed form on either side of the `ε_β = 1` seam — so nothing iterates and a spur
+member, at `β = 0`, gets the old arithmetic to the bit. Both canaries are
+unmoved, which is that claim's gate.
+
+**What is still owed.** The standard asks for `Y_β` above 25° to "be confirmed by
+experience". It is applied there and the gear says so, exactly as the `Y_S` notch
+band is handled — reported rather than enforced, because refusing to answer is
+also an answer and a worse one.
 
 **The policy is about factors that multiply a stress, not about conventions as
 such.** A worm's length and a wormwheel's face width are shipped as

@@ -745,17 +745,62 @@ they change the profile.
 **Critical section: the Lewis parabola.** A cantilever whose outline is a
 parabola with its vertex at the load carries uniform bending stress, so the
 largest such parabola inscribed in the tooth touches where the tooth is weakest.
-`CriticalSection::TangentAngle` retains the 30° tangent for a
-standards-comparable number.
+`CriticalSection::TangentAngle` retains the ISO tangent for a
+standards-comparable number — **30° on an external tooth and 60° on a ring's**
+(ISO 6336-3:2019, 6.1), the angle being a property of the member on
+`ToothOutline` rather than a branch inside the search. A ring's tooth is thick
+at its tip and its fillet is concave, so the 30° tangent that lands part-way up
+an external fillet lands almost at once on a ring's.
+
+**The factors, and which of them are here.**
 
 ```text
-σ_F = F_t / (b · m) · Y_F · Y_S
-q_s = s_Fn / (2 ρ_F)
+σ_F0 = F_t / (b · m_n) · Y_F · Y_S · Y_β · Y_B · Y_DT
+q_s  = s_Fn / (2 ρ_F)
 ```
+
+| | | |
+|---|---|---|
+| `Y_F` | form factor | Measured off the generated profile, not ISO's Method B closed form |
+| `Y_S` | stress correction | ISO 6336-3 7.2, over the band below |
+| `Y_β` | helix angle | ISO 6336-3 8.3, and **≥ 1 over most of its range** — see below |
+| `Y_B` | rim thickness | ISO 6336-3 9.3, where a rim thickness was given |
+| `Y_DT` | deep tooth | **Not applied**, with its formulae recorded in [`state.md`](state.md) |
 
 The `Y_S` fit is stated over `1 ≤ q_s < 8`. Outside it the correction is taken
 at the boundary and the stage **says so**, naming the member and the value —
-above the band that under-predicts, which is the unconservative direction.
+above the band that under-predicts, which is the unconservative direction. The
+same clause (7.1) says the fit is derived from **external spur gears at
+`α_n = 20°`** and gives "approximate values for internal gears and for gears
+having other pressure angles"; this crate applies it to both, which the standard
+sanctions, and to a section located by the parabola rather than the tangent it
+was calibrated against, which is this crate's own departure — see
+[`rationale.md`](rationale.md#no-isoagma-correction-factors). None of the three
+has an edge to report, so unlike `q_s` they are stated here rather than raised
+per gear.
+
+**`Y_β`, and why it is not a discount.**
+
+```text
+Y_β = (1 − ε_β · β/120°) / cos³β        ε_β = b sin|β| / (π m_n)
+```
+
+with `ε_β` held at 1 and `β` at 30° above those. The `1/cos³β` puts it **above
+1** over most of the range ISO's Figure 8 draws — 1,155 at `ε_β = 1` and 1,50 at
+`ε_β = 0,1`, both at `β = 30°` — so omitting it under-predicts a helical root
+stress rather than over-predicting it. Above 25° the standard asks for the
+factor to be confirmed by experience, and the gear says so.
+`Y_β` is exactly 1 at `β = 0`, so a spur rating is untouched.
+
+**`Y_B`**, where a rim thickness `s_R` was given, is `a·ln(c/ratio)` never below
+1 — `(1,6 · 2,242)` against the backup ratio `s_R/h_t` for a rack-cut member and
+`(1,15 · 8,324)` against `s_R/m_n` for a ring. The clause's own breakpoints fall
+out of the fit (`a ln(c/ratio) = 1` at 1,20005 and 3,48887 against its stated 1,2
+and 3,5), so there is no breakpoint in the code. Below a backup ratio of 0,5, or
+1,75 modules on a ring, the standard says the design shall be avoided; the
+figure is still reported and the member says where it stands. A rim nobody
+described is `Y_B = 1` and is **not** the same claim as a thick rim: only the
+former cannot be told its rim is thin.
 
 `ρ_F` is a **fillet** property at any tooth size: when the critical section
 climbs onto the involute flank the notch is still the fillet, read at the
@@ -782,11 +827,23 @@ pitch ellipse it cuts; then one from the base pitch and one from the path
 length. At `β = 0` both reduce exactly and the virtual gear is rebuilt bit for
 bit identical, so there is no spur branch anywhere in the strength path.
 
-**Minimum face width**, closed form, since `σ_F ∝ 1/b` and `σ_H ∝ 1/√b`:
+**Minimum face width**, closed form. `σ_H ∝ 1/√b`, and `σ_F ∝ 1/b` for
+everything in `σ_F0` except `Y_β`, whose `ε_β` grows with the face:
 
 ```text
-b_min,bending = b σ_F / σ_allow          b_min,contact = b (σ_H / σ_allow)²
+b_min,contact = b (σ_H / σ_allow)²
+b_min,bending = b σ_F / σ_allow                                   (β = 0)
+              = s₀ / (σ_allow·cos³β_c + s₀·k)                     (ε_β ≤ 1)
+              = s₀ (1 − β_c/120) / (σ_allow·cos³β_c)              (ε_β > 1)
 ```
+
+with `s₀ = σ_F·b / Y_β(b)` at the width the stress was measured at,
+`k = β_c sin|β| / (120 π m_n)`, and `β_c = min(|β|, 30°)`. The dependence is
+affine, so this is one step and no iteration; `σ_F(b)` is strictly decreasing, so
+the root is unique and a first answer that has already saturated is the proof
+that the second branch is the one that answers. At `β = 0` the first line *is*
+the second, to the bit — which is why the spur canary did not move when `Y_β`
+arrived. **The width a stress was measured at still cancels either way.**
 
 independent of the `b` it was evaluated at.
 

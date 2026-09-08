@@ -174,6 +174,18 @@ backlash, contact path · metrology (span, over-pins, JGMA 116-02 tables) ·
 strength (critical section, form factor, bending stress, Hertz, face width,
 helical throughout) · efficiency · automatic profile shift and altered addendum.
 
+**ISO 6336-3's factors, and which of them are here.** `σ_F0` is
+`F_t/(b·m_n) · Y_F · Y_S · Y_β · Y_B · Y_DT`. `Y_F` is measured off the profile
+this crate generates rather than taken from the standard's closed form; `Y_S`,
+`Y_β` and `Y_B` are applied, each on the same three tests — computed from this
+gear's own geometry, unconservative to omit, band reported rather than assumed;
+`Y_DT` is declined with its formulae recorded below. The `K` and `Z` families
+stay out. A **spur gear with no rim described takes all three at exactly 1**,
+which is why both canaries are unmoved. The one real consequence is that `Y_β`
+grows with the overlap ratio and so with the face width, so a bending rating's
+minimum face width is a closed-form solve rather than a division — affine, one
+step, and the spur case is still the division to the bit.
+
 **Crossed axes.** One model rather than a family: the lead angle exact, the path
 of contact from two properties of an involute helicoid, elliptical contact,
 sliding as a vector, and one friction balance containing both older efficiency
@@ -360,7 +372,7 @@ been. They are not a backlog.
 | Item | Why |
 |---|---|
 | **Crossed-axis bending** | The beam formula has no honest reading of a point load on a wide tooth, and choosing an effective width is a convention that multiplies a stress. [rationale](rationale.md#a-worm-stage-reports-no-bending-stress) |
-| **ISO/AGMA correction factors** | Narrow validated bands, balanced only as a complete set, against `σ_Flim` values this project does not have. [rationale](rationale.md#no-isoagma-correction-factors) |
+| **The ISO `K` and `Z` correction factors** | Narrow validated bands, balanced only as a complete set, against `σ_Flim` values this project does not have. [rationale](rationale.md#no-isoagma-correction-factors). `Y_S`, `Y_β` and `Y_B` are the exceptions and are applied; `Y_DT` and `f_ε` are declined and recorded in full below |
 | **Equal planet load sharing** | The remedy is a mesh-load factor of the kind above. Said in every planetary result's notes. |
 | **An S-N curve per material** | The two points it needs do not exist for six of the eight materials. [rationale](rationale.md#material-data-ships-estimates-deliberately) |
 | **Radial assembly** | Attempted, diagnosed and shelved with its findings; it blocks nothing, and planets are commonly installed axially. |
@@ -386,8 +398,17 @@ been. They are not a backlog.
 
 ## Known-approximate, documented at the call site
 
-- **`Y_β` omitted** — helical bending is conservative against a published ISO
-  rating by up to ~25 %.
+- **`Y_β` is applied, and above `β = 25°` the standard asks for it to be
+  confirmed by experience.** The gear says so where it is. It was omitted until
+  ISO 6336-3 was read, on a reading of the factor that made the omission look
+  conservative when it was the opposite — see
+  [corrections](corrections.md).
+- **`Y_S` is stated for external spur gears at `α_n = 20°`**, and gives
+  "approximate values" for internal gears and other pressure angles by the
+  standard's own words. This tool applies it to both, and to a section located
+  by the inscribed parabola rather than the tangent it was calibrated against.
+  None of the three has an edge to report, so they are stated in
+  [`reference.md`](reference.md#bending) rather than raised per gear.
 - **The axial compression term is omitted** from bending, following ISO rather
   than AGMA. It relieves stress by order 10 %, so leaving it out is conservative;
   do not compare to an AGMA `J` without saying so.
@@ -397,9 +418,9 @@ been. They are not a backlog.
 - **The cut simulation cannot see below the generation limit**: its simulated
   cutter has no fillet of its own, so what it reports there is not evidence
   either way.
-- **The `Y_S` notch band (`1 ≤ q_s < 8`) is a secondary source**, not a reading
-  of ISO 6336-3. It is the only second-hand constant in the geometry path, it is
-  confined to the empirical correction, and whether it was applied is reported.
+- **The `Y_S` notch band is `1 ≤ q_s < 8`**, read from ISO 6336-3:2019, 7.2.
+  It was carried as a citation of a citation for a year and the two agree.
+  Whether a gear falls outside it is reported.
 - **Load sharing above a virtual contact ratio of 2** is the ramp extrapolating:
   no single-pair zone exists, and it relieves the tooth by about a third. Each
   mesh says so where its figure is shown, so a set with one mesh in the band and
@@ -432,13 +453,97 @@ are named in `strings.rs`'s `UNFIRED` with their evidence.
 
 ---
 
+## Recorded but not applied: ISO 6336-3's remaining bending factors
+
+Two factors of `σ_F0` are declined, and this section is why plus everything
+needed to change that decision **without the standard in hand**. Both fail the
+same test: they *relieve* a root stress, on inputs this project has no concept
+of, over bands narrower than the designs it is used for. Recording them is not
+a plan to add them — it is so that the next person to ask does not have to buy
+the document to find out what was turned down.
+
+### `Y_DT`, the deep tooth factor (Clause 10)
+
+Adjusts the nominal root stress where the load is taken at the inner point of
+*triple* pair contact rather than the outer point of single pair contact.
+
+```text
+Y_DT = 1.0                          ε_αn ≤ 2.05,  or ISO tolerance class > 4
+Y_DT = −0.666 · ε_αn + 2.366        2.05 < ε_αn ≤ 2.5  and class ≤ 4
+Y_DT = 0.7                          ε_αn > 2.5         and class ≤ 4
+```
+
+`ε_αn = ε_α / cos²β_b` is the virtual contact ratio this crate already computes
+for the bending section. The two inputs it needs and this project does not have
+are **an ISO tolerance class** (the worse of the pair's, if they differ) and an
+assertion that **actual profile modification for a trapezoidal load distribution
+along the path of contact** has been applied. Both are manufacturing claims
+rather than geometry, and neither can be derived from anything on screen.
+
+**Why declined.** It reaches at most 0.7, so it lowers a root stress by up to
+30 % on the strength of two things a designer asserts rather than draws. Its
+band is 0.45 of contact ratio wide. And the graph it fits (Figure 10) is two
+straight lines, one of which is the constant 1 that a design failing either
+input already gets — so for everything this tool can verify, `Y_DT` **is** 1.
+
+### `f_ε`, the load distribution factor inside `Y_F` (6.2, Formulae 10–14)
+
+A multiplier on the form factor rather than a factor beside it, said to give
+"more accurate results for gears with contact ratios `ε_αn ≥ 2,0`".
+
+```text
+f_ε = 1                                    ε_β = 0      and ε_αn < 2
+f_ε = 0.7                                  ε_β = 0      and ε_αn ≥ 2
+f_ε = √(1 − ε_β + ε_β/ε_αn)                0 < ε_β < 1  and ε_αn < 2
+f_ε = √((1 − ε_β)/2 + ε_β/ε_αn)            0 < ε_β < 1  and ε_αn ≥ 2
+f_ε = ε_αn^(−0.5)                          ε_β ≥ 1
+```
+
+Both inputs — the overlap ratio and the virtual contact ratio — are already
+computed here, so unlike `Y_DT` this one is reachable today. It is declined
+anyway.
+
+**Why declined.** It answers the same question as the `LoadSharing` model this
+project already ships as a designer-facing option: how the mesh load divides
+while more than one pair is engaged. Adopting `f_ε` would apply *a* sharing model
+unconditionally, inside the form factor, where the existing one is off by
+default and says when it is extrapolating — the opposite of this project's
+stated posture on estimates. It is also a step function: 1 and 0.7 either side
+of `ε_αn = 2` at zero helix, with nothing physical happening at exactly 2.
+
+**One thing it is worth for, and it is not a small one.** `f_ε = 0.7` for a spur
+mesh at `ε_αn ≥ 2` is an independent corroboration of this project's own
+measurement — that above a virtual contact ratio of 2 the linear ramp "relieves
+the tooth by about a third", found by sweeping designs and reported in every
+mesh that reaches the band. Two models built on different reasoning landing on
+the same 30 % is the best evidence either of them has.
+
+### And two clauses read but not needed
+
+- **`Y_Sg`, grinding notches in the fillet** (7.3): `Y_Sg = 1.3 Y_S / (1.3 − 0.6
+  √(t_g/ρ_g))`, valid for `√(t_g/ρ_g) < 2.0`, where `t_g` is the notch depth
+  measured perpendicular to the tangent and `ρ_g` its root radius. Nothing here
+  models a grinding notch, and the two inputs are process rather than geometry.
+- **`Y_ST` = 2.0** (7.4), the stress correction factor of the reference test
+  gears the `σ_Flim` values are quoted against. It belongs to the *permissible*
+  stress rather than the applied one, which is
+  [material data](rationale.md#material-data-ships-estimates-deliberately)'s
+  territory and not this crate's.
+
+
+---
+
 ## Worth doing next
 
 Not a queue with a head; this is what a next session would pick from.
 
 - **Further UI work**, as it is asked for.
-- **Read ISO 6336-3** and settle the `Y_S` notch band from the standard rather
-  than from a citation of it.
+- **Wire `rim_thickness` into the boundary and the UI.** The model is complete
+  and gated in `gear-core`, the input is a field on `StageGear` so it already
+  crosses as a wire type, and `gear-cli strength … <rim>` exercises it. What is
+  left is a form field on the gear card, a serde-defaulted `null` in the tab
+  state, and one label plus one unit in five string catalogues. Nothing about
+  it needs the standard in hand.
 - **A calibrated mesh-stiffness model**, which would replace the load-sharing
   ramp rather than the control exposing it.
 - **A planet's root under the ring mesh is rated; its flank's sliding is not**
