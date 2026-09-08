@@ -260,13 +260,6 @@ pub struct PlanetaryResult {
     /// How many planets the set has — kept because the train needs it to count
     /// tooth cycles, and the stage's inputs are not in reach by then.
     pub planets: u32,
-    /// **Which member's shift closed the set** — see
-    /// [`PlanetaryStage::absorber`].
-    ///
-    /// Reported rather than left to be worked out, for the same reason
-    /// [`super::SpurResult::clearance`] is: the panel greys the right control by
-    /// reading the answer instead of knowing the rule a second time.
-    pub absorber: crate::planetary::Member,
     /// Anything the stage had to say — including what it did not model.
     pub notes: Vec<Note>,
 }
@@ -1149,7 +1142,6 @@ pub fn solve_planetary_stage_with(
     let planet_relative = forward.speeds[0] - forward.speeds[1];
 
     Ok(PlanetaryResult {
-        absorber: stage.absorber(),
         arrangement: stage.arrangement,
         output: forward.output,
         ratio: forward.ratio,
@@ -1417,7 +1409,6 @@ mod tests {
             );
             let r = solve_planetary_stage(&s, 100.0, StageTorques::just(2.0), &lib)
                 .unwrap_or_else(|e| panic!("{absorber:?} could not close the set: {e:?}"));
-            assert_eq!(r.absorber, absorber, "and the result should say which did");
 
             // The equality actually closed...
             assert!(

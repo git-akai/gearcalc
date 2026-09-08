@@ -1282,12 +1282,29 @@ two meshes, losing the same 0.85 % between them.
 73 % forward and 63 % back. Four teeth of difference cancels less than one does,
 and that is the whole of the difference: the same code, the same two meshes, and
 a drive that keeps two and a half times what the `N ± 1` arrangement does at a
-comparable size. It carries a shorter tooth with it — 0.7 module rather than 0.8
-— because the addendum belongs to the *difference* rather than to the drive: the
-operating pressure angle at four teeth is far lower, so a tooth that cleared the
-involute interference limit at one tooth of difference reaches past it here. That
-coupling is reported rather than assumed, and a drive taken to another difference
-will want its own proportion.
+comparable size.
+
+**The addendum belongs to the *difference* rather than to the drive**, and the
+shipped 0.8 is above what this difference clears. The operating pressure angle at
+four teeth is far lower than at one, so a tooth that cleared the involute
+interference limit at one tooth of difference reaches past it here — and the
+shipped counts report exactly that, on both meshes. Measured across the
+proportion, on `N ± 4` about 61:
+
+| `h_a` | involute interference | ε_α | the drive |
+|---|---|---|---|
+| 0.60 | clear | 1.19 | 88.0 % |
+| 0.65 | clear | 1.28 | 83.5 % |
+| 0.70 | clear | 1.37 | 79.6 % |
+| 0.75 | **fouls** | 1.46 | 76.2 % |
+| 0.80 | **fouls** | 1.54 | 73.1 % |
+
+So the threshold sits between 0.70 and 0.75, and the taller tooth costs
+efficiency on the way — a longer path is a dearer one
+([Efficiency](#efficiency-parallel-axes)). The default is a starting point that
+shows the coupling rather than one chosen to keep the interference row quiet: it
+is reported rather than assumed, and a drive taken to another difference will
+want its own proportion.
 
 This is the published behaviour of a Wolfrom set — efficiency falls as the
 reduction rises, because the reduction *is* the cancellation — and it is why such

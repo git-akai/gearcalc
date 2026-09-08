@@ -408,15 +408,6 @@
      *  gears in its own shape. Shown in the box while `auto` is on, exactly as
      *  a solved centre distance or addendum is. */
     solvedShift?: number;
-    /** **This gear's shift is the one closing its stage's own relation** — an
-     *  epicyclic set's two centre distances agreeing, say.
-     *
-     *  Not a different kind of control, only a different reason for the number:
-     *  the member that absorbs is the one left automatic, so hiding its toggle
-     *  would hide the only way to hand the job to another member. It says so in
-     *  a note instead, which is worth a line because all three can be automatic
-     *  at once and only one of them is closing anything. */
-    shiftAbsorbed?: boolean;
     /** **What decides this gear's face width**, which is one question with
      *  three answers rather than a flag with two.
      *
@@ -460,16 +451,18 @@
     (v) => (gear.addendum = v),
     0.05,
     "ui.train_m",
-    // What the bound came to, where it had something to say. A hint that names
-    // an input belongs under that input rather than in a list at the foot of
-    // the stage.
-    clampNote(own, FIELD_NOTES.addendum),
+    undefined,
     {
       label: "ui.train_no_sharp_tip",
       title: "ui.train_note_no_sharp_tip",
       on: gear.no_sharp_tip,
       set: (v) => (gear.no_sharp_tip = v),
     },
+    // What the bound came to, where it had something to say. A hint that names
+    // an input belongs under that input rather than in a list at the foot of
+    // the stage — and in the warning colour, because the number in the box is
+    // not the number the gear has.
+    clampNote(own, FIELD_NOTES.addendum),
   )}
   {#if gear.no_sharp_tip}
     <label class="sub">
@@ -520,12 +513,7 @@
     opts.solvedShift ?? g?.profile_shift,
     0.05,
     opts.onShiftAuto,
-    // The one thing an absorbing member has to say that its toggle cannot: all
-    // three can be automatic at once and only one of them closes the set. Where
-    // it has nothing to add, the bound that moved this gear's own shift does.
-    opts.shiftAbsorbed
-      ? t("ui.train_note_shift_closes_the_set")
-      : clampNote(own, FIELD_NOTES.profile_shift),
+    undefined,
     "ui.train_m",
     opts.cut === "shaper"
       ? undefined
@@ -535,6 +523,7 @@
           on: gear.no_undercut,
           set: (v) => (gear.no_undercut = v),
         },
+    clampNote(own, FIELD_NOTES.profile_shift),
   )}
   <!-- The depth the undercut question is asked at, so it is offered exactly
        while that question is being asked — which is now the constraint's
@@ -569,12 +558,11 @@
           opts.cut === "shaper"
             ? null
             : r
-              ? t(r.pointed === null ? "ui.bound_profile_shift" : "ui.bound_profile_shift_pointed", {
+              ? t("ui.bound_profile_shift", {
                   min: n(r.bound.min ?? 0),
                   max: n(r.bound.max ?? 0),
                   undercut: n(r.undercut),
                   sharp: n(r.sharp_rack_undercut),
-                  pointed: n(r.pointed ?? 0),
                 })
               : null,
           r ? outside(gear.profile_shift.manual, r.bound) : null,
@@ -701,14 +689,18 @@
         </span>
       </dd>
     </dl>
-    {#if g.clamps.length || g.notes.length}
+    <!-- What the fields did not take. A note naming an input is drawn under
+         that input, so repeating it here would be the same sentence twice in
+         one card. -->
+    {@const spare = g.notes.filter((n) => !UNDER_A_FIELD.includes(n.key))}
+    {#if g.clamps.length || spare.length}
       <ul class="notes">
         {#each g.clamps as c, i (i)}<li>{t("ui.gear_clamped")} {note(c)}</li>{/each}
         <!-- The rating's own remarks, unprefixed: nothing here was clamped.
              Keyed by position rather than by note key, because two notes of one
              kind on one list is a thing that happens and a keyed list must not
              be what discovers it. -->
-        {#each g.notes as n, i (i)}<li>{note(n)}</li>{/each}
+        {#each spare as n, i (i)}<li>{note(n)}</li>{/each}
       </ul>
     {/if}
   {/if}
@@ -738,6 +730,11 @@
   unit: string | undefined,
   note: string | null | undefined,
   constraint: { label: string; title: string; on: boolean; set: (v: boolean) => void },
+  /** **A bound that actually moved this number.** Rendered in the warning
+   *  colour and in front of the remark, because it is the same kind of finding
+   *  the stage and mesh lists draw attention to and the reader has not got what
+   *  they asked for. */
+  warn?: string | null,
 )}
   <label class="auto">
     <span class="name">{t(key)}</span>
@@ -757,8 +754,8 @@
       />
     </span>
     <em>{unit ? t(unit) : ""}</em>
-    {#if note !== undefined}
-      <FieldNote notes={notes(note, null)} />
+    {#if note !== undefined || warn !== undefined}
+      <FieldNote notes={notes(note ?? null, warn ?? null)} />
     {/if}
   </label>
 {/snippet}
@@ -777,6 +774,8 @@
    *  than competing, and the nearer one to the box is the one that is about
    *  the value rather than about who supplies it. */
   constraint?: { label: string; title: string; on: boolean; set: (v: boolean) => void },
+  /** As `boundedNumber`'s: a bound that moved the number, in warning colour. */
+  warn?: string | null,
 )}
   <label class="auto" class:constrained={constraint !== undefined}>
     <span class="name">{t(key)}</span>
@@ -831,8 +830,8 @@
          spans this row's own columns and is right-aligned against them. Placed
          beside the field instead it spans whatever grid it lands in, which is
          the outer one, and lines up with nothing. -->
-    {#if note !== undefined}
-      <FieldNote notes={notes(note, null)} />
+    {#if note !== undefined || warn !== undefined}
+      <FieldNote notes={notes(note ?? null, warn ?? null)} />
     {/if}
   </label>
 {/snippet}
@@ -1776,13 +1775,11 @@
             <div class="gears">
               {@render gearCard(t("ui.train_sun"), stage.sun, pres?.sun, {
                 cut: "rack",
-                shiftAbsorbed: (pres?.absorber ?? "planet") === "sun",
                 onShiftAuto: () => relievePlanetary(stage, stage.sun.profile_shift),
               })}
               {@render gearCard(t("ui.train_planet"), stage.planet, pres?.planet.gear, {
                 cut: "rack",
                 solvedShift: pres?.planet.profile_shift,
-                shiftAbsorbed: (pres?.absorber ?? "planet") === "planet",
                 onShiftAuto: () => relievePlanetary(stage, stage.planet.profile_shift),
                 extra: planetExtra,
               })}
@@ -1791,7 +1788,6 @@
                    is a stage input, above. -->
               {@render gearCard(t("ui.train_ring"), stage.ring, pres?.ring, {
                 cut: "shaper",
-                shiftAbsorbed: (pres?.absorber ?? "planet") === "ring",
                 onShiftAuto: () => relievePlanetary(stage, stage.ring.profile_shift),
               })}
             </div>
@@ -2082,14 +2078,13 @@
                       })}
                     </small>
                   </dd>
-                  <dt>{t("ui.train_hula_tip_margin")}</dt>
-                  <dd>
-                    {hres.meshes[m].tip_margin.toFixed(4)}°
-                    <small>{t("ui.train_hula_note_tip_margin")}</small>
-                  </dd>
+                  <!-- **Which conditions bite, and nothing when none do.** The
+                       tip margin was a number beside this saying the same thing
+                       in degrees of pinion rotation — the row that reports the
+                       finding is the one worth drawing attention to. -->
                   <dt>{t("ui.train_hula_interference")}</dt>
                   <dd>
-                    {[
+                    {#each [[
                       hres.meshes[m].trochoid_interference
                         ? t("ui.train_hula_interference_trochoid")
                         : null,
@@ -2099,9 +2094,11 @@
                       hres.meshes[m].tip_interference
                         ? t("ui.train_hula_interference_tip")
                         : null,
-                    ]
-                      .filter((x) => x !== null)
-                      .join(" · ") || t("ui.train_hula_interference_none")}
+                    ].filter((x) => x !== null)] as fouling (0)}
+                      <span class:warn={fouling.length > 0}>
+                        {fouling.join(" · ") || t("ui.train_hula_interference_none")}
+                      </span>
+                    {/each}
                   </dd>
                   <dt>{t("ui.train_mesh_efficiency")}</dt>
                   <dd>
