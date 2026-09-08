@@ -910,7 +910,7 @@ pub fn bending_section(g: &Tooth, transverse_contact_ratio: f64) -> Option<RootS
     let v = g.virtual_spur();
     // The virtual gear is a spur gear, so its transverse plane is the normal
     // plane: `v.mt` is m_n and `v.alpha_t` is α_n.
-    let base_pitch = std::f64::consts::PI * v.mt * v.alpha_t.cos();
+    let base_pitch = crate::plane::base_pitch(v.mt, v.alpha_t);
     let cos_bb = base_helix_angle(g).cos();
     let eps_n = transverse_contact_ratio / (cos_bb * cos_bb);
 
@@ -979,7 +979,7 @@ pub fn bending_section_shared(
     }
 
     let v = g.virtual_spur();
-    let base_pitch = std::f64::consts::PI * v.mt * v.alpha_t.cos();
+    let base_pitch = crate::plane::base_pitch(v.mt, v.alpha_t);
     let cos_bb = base_helix_angle(g).cos();
     // The whole cycle in the plane the tooth actually bends in. `d` counts
     // virtual base pitches back from the far end of the path, the same
@@ -1080,7 +1080,7 @@ pub fn ring_bending_section(
     }
     // The virtual ring is a spur ring, so its transverse plane is the normal
     // plane: `v.mt` is m_n and `v.alpha_t` is α_n.
-    let base_pitch = std::f64::consts::PI * v.mt * v.alpha_t.cos();
+    let base_pitch = crate::plane::base_pitch(v.mt, v.alpha_t);
     let cos_bb = ring.base_helix_angle().cos();
     let eps_n = transverse_contact_ratio / (cos_bb * cos_bb);
     // Away from the tip is **up** in roll for a ring, down for an external gear.
@@ -2242,7 +2242,7 @@ mod tests {
 
         // Loaded at the same place, the two must agree exactly.
         let eps = 1.6;
-        let pb = std::f64::consts::PI * g.mt * g.alpha_t.cos();
+        let pb = crate::plane::base_pitch(g.mt, g.alpha_t);
         let a = root_section(&g, g.u_tip - (eps - 1.0) * pb / g.rb).unwrap();
         let b = bending_section(&g, eps).unwrap();
         assert!((a.form_factor - b.form_factor).abs() < 1e-15);
@@ -2319,7 +2319,7 @@ mod tests {
             let v = g.virtual_spur();
             let eps = 1.55;
             let cos_bb = base_helix_angle(&g).cos();
-            let pbn = std::f64::consts::PI * v.mt * v.alpha_t.cos();
+            let pbn = crate::plane::base_pitch(v.mt, v.alpha_t);
 
             let want =
                 root_section(&v, v.u_tip - (eps / (cos_bb * cos_bb) - 1.0) * pbn / v.rb).unwrap();

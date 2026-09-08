@@ -103,7 +103,7 @@ impl ContactPath {
         if !recess.is_finite() || !approach.is_finite() || approach + recess <= 0.0 {
             return None;
         }
-        let base_pitch = std::f64::consts::PI * g1.mt * g1.alpha_t.cos();
+        let base_pitch = crate::plane::base_pitch(g1.mt, g1.alpha_t);
 
         Some(Self {
             approach,

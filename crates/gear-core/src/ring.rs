@@ -1025,7 +1025,7 @@ pub fn mesh_with(ring: &Ring, pinion: &Tooth) -> Option<RingMesh> {
 
     // Contact ratio, from docs/reference.md#path-of-contact-and-contact-ratio's internal form. The path runs from where
     // the ring's tip engages to where the pinion's does.
-    let base_pitch = std::f64::consts::PI * ring.mt * ring.alpha_t.cos();
+    let base_pitch = crate::plane::base_pitch(ring.mt, ring.alpha_t);
     let path = ((pinion.ra * pinion.ra - pinion.rb * pinion.rb)
         .max(0.0)
         .sqrt()

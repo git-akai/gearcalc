@@ -56,6 +56,30 @@ pub fn base_helix_angle(helix_angle: f64, normal_pressure_angle: f64) -> f64 {
     (helix_angle.sin() * normal_pressure_angle.cos()).asin()
 }
 
+/// Base pitch, mm — the distance between successive flanks measured along the
+/// line of action.
+///
+/// ```text
+/// p_b = π m cos α
+/// ```
+///
+/// **Both arguments must be in the same plane**, and saying so is the whole of
+/// what this signature can do about it: `π m_t cos α_t` is the transverse base
+/// pitch and `π m_n cos α_n` the normal one, and they differ by `cos β`. Which
+/// is wanted depends on what is being counted in them — a contact ratio divides
+/// a transverse path, while a bending section measures a **virtual spur gear**,
+/// whose own transverse plane *is* the normal plane, so it passes the pair it
+/// has and gets the normal pitch by construction.
+///
+/// It was written out at six sites, which is the shape the two identities above
+/// had at nineteen. Nothing here is new and no answer moves — the multiplication
+/// is in the order every site already had it, so the refactor is gated on the
+/// digits not changing.
+#[must_use]
+pub fn base_pitch(module: f64, pressure_angle: f64) -> f64 {
+    std::f64::consts::PI * module * pressure_angle.cos()
+}
+
 /// The **basic rack** two meshing gears share: one module, and its pressure
 /// angle in both planes.
 ///

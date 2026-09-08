@@ -55,12 +55,22 @@ list of them is in [rationale.md](rationale.md#where-closed-form-is-impossible).
 m_t = m / cos β              tan α_t = tan α_n / cos β      plane.rs
 r   = m_t z / 2              r_b     = r cos α_t
 sin β_b = sin β · cos α_n                                   plane.rs
+p_b = π m cos α                                             plane.rs
 ```
 
 The two that carry an angle between the normal and transverse planes are
 `crate::plane`'s, in one place: each was written out nine or ten times across
 the crate, which is the shape of a defect this project has recorded more than
 once. A spur gear is `β = 0`, where both reduce exactly.
+
+**The base pitch is there for the same reason**, at six sites rather than
+nineteen — and it carries the plane trap those two do not: its module and its
+pressure angle have to be in the *same* plane, and nothing in a signature of two
+numbers can insist on it. Which plane is wanted follows from what is being
+counted in it. A contact ratio divides a transverse path, so it takes `m_t` and
+`α_t`; a bending section measures the **virtual spur gear**, whose own
+transverse plane *is* the normal plane, so it passes the pair it has and gets
+`p_bn` by construction rather than by remembering to.
 
 ### Tooth thickness and its equivalent shift
 

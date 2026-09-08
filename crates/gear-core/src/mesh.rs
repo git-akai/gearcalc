@@ -743,7 +743,7 @@ mod tests {
                 let alpha_n = mesh.alpha_n;
                 let beta_b = crate::plane::base_helix_angle(beta, alpha_n);
                 let m_n = mesh.mt * beta.cos();
-                let p_bn = std::f64::consts::PI * m_n * alpha_n.cos();
+                let p_bn = crate::plane::base_pitch(m_n, alpha_n);
 
                 for delta in [1e-6_f64, 0.01, 0.05, 0.2] {
                     let a_actual = mesh.a_w + delta;
@@ -778,7 +778,7 @@ mod tests {
         };
         for (z1, z2) in [(17_u32, 51_u32), (25, 41)] {
             let mesh = Mesh::new(&ring(z1), &ring(z2), MeshKind::Internal).unwrap();
-            let p_bn = std::f64::consts::PI * mesh.mt * mesh.alpha_n.cos();
+            let p_bn = crate::plane::base_pitch(mesh.mt, mesh.alpha_n);
             for delta in [0.01_f64, 0.05] {
                 let a_actual = mesh.a_w + delta;
                 let alpha_op = mesh.pressure_angle_at(a_actual).unwrap();

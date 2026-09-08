@@ -1784,7 +1784,7 @@ mod tests {
         let (ra1, ra2) = (r1 + mn, r2 + mn);
         let path_t = (ra1 * ra1 - rb1 * rb1).sqrt() + (ra2 * ra2 - rb2 * rb2).sqrt()
             - (r1 + r2) * alpha_t.sin();
-        let eps_alpha = path_t / (std::f64::consts::PI * mt * alpha_t.cos());
+        let eps_alpha = path_t / crate::plane::base_pitch(mt, alpha_t);
         let bb = crate::plane::base_helix_angle(beta_add, alpha_n);
         let expected = eps_alpha / (bb.cos() * bb.cos());
 
