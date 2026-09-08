@@ -165,22 +165,18 @@ impl Default for PlanetaryStage {
 )]
 pub struct PlanetResult {
     /// Everything a gear in a stage reports — including **the shift the
-    /// common-centre-distance solve required**, which is a `GearResult`'s
-    /// `profile_shift` like any other member's. It stood beside it as a field
-    /// of its own as well, so one number had two homes and the panel read the
-    /// copy.
+    /// common-centre-distance solve required**, which is this member's
+    /// `profile_shift` like any other's, and its speed in the fixed frame.
+    /// What is left below is what no `GearResult` has a field for.
     pub gear: GearResult,
     /// `|a_sun-planet − a_planet-ring|` at that shift, mm. Reported rather than
     /// asserted: it is the one number that says the solve closed.
     pub shift_residual: f64,
-    /// Speed **relative to the carrier**, rpm — what its teeth actually see,
-    /// and the one figure a `GearResult` has no field for.
+    /// Speed **relative to the carrier**, rpm — what its teeth actually see.
     ///
-    /// Its speed in the fixed frame is `gear.speed`, like every other member's.
-    /// It stood here as well and the two could not disagree, being the same
-    /// expression twice — but the copy is what a reader reached for, so when
-    /// both were wrong they were wrong together
-    /// ([`crate::planetary::Power::planet_speed`]).
+    /// The planet is the one member whose fixed-frame speed is not the whole
+    /// story, and it is not the sun's relative speed either: the two differ by
+    /// `z_s/z_p` ([`crate::planetary::Power::planet_speed`]).
     pub speed_relative: f64,
 }
 
