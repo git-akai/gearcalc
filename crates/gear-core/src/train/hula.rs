@@ -1204,10 +1204,38 @@ mod tests {
         let r = solve(&HulaStage::default(), 1000.0).expect("the shipped drive solves");
         for gear in &r.gears {
             assert!(
-                gear.gear.clamps.is_empty(),
-                "z{} came out clamped: {:?}",
+                gear.gear.as_asked(),
+                "z{} did not come out as asked: {:?} {:?}",
                 gear.teeth,
-                gear.gear.clamps
+                gear.gear.clamps,
+                gear.gear.notes
+            );
+        }
+    }
+
+    /// **And it ships at the figures the documents quote for it.**
+    ///
+    /// `docs/reference.md#the-hula-drive` names what the tool ships with — the
+    /// reduction and what the drive keeps in each direction — and prose is the
+    /// copy no test reads, so it goes stale without anything failing. It had:
+    /// the section said 73 % forward and 63 % back while the addendum table five
+    /// lines below it, generated from the same default, said 79.6 %.
+    ///
+    /// A canary rather than an invariant, deliberately. The digits are not a law
+    /// and are free to move — what they are not free to do is move *quietly*,
+    /// and a failure here is the reminder that a paragraph needs rewriting.
+    #[test]
+    fn the_shipped_drive_reports_the_figures_the_documents_quote() {
+        let r = solve(&HulaStage::default(), 1000.0).expect("the shipped drive solves");
+        for (what, got, want) in [
+            ("the reduction", r.ratio, 232.56),
+            ("forward", r.efficiency.forward * 100.0, 79.59),
+            ("backward", r.efficiency.backward * 100.0, 74.33),
+        ] {
+            assert!(
+                (got - want).abs() < 0.01,
+                "{what}: {got:.4} against the documented {want} — \
+                 if this is intended, the hula section quotes it"
             );
         }
     }

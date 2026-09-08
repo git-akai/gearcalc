@@ -372,6 +372,37 @@ pub struct GearResult {
     pub ranges: Ranges,
 }
 
+impl GearResult {
+    /// **Whether this is the gear that was asked for.**
+    ///
+    /// False where a guard moved a dimension ([`Self::clamps`]), and false where
+    /// a bound overrode a number a designer typed or reported that it would have
+    /// to be — the shift raised to clear undercut, and the addendum that a tip
+    /// width cannot carry. Those two live in [`Self::notes`] because that is
+    /// where a note naming an *input* belongs, but they are statements about the
+    /// part rather than about the rating.
+    ///
+    /// The rest of `notes` is deliberately not consulted. A notch outside the
+    /// `Y_S` fit's band or a root loaded on both flanks are remarks about how a
+    /// number was *arrived at*, and a candidate design is not worse for carrying
+    /// one.
+    ///
+    /// One home, because a search choosing between designs wants exactly this
+    /// question and there is more than one such search. Reading the clamp list
+    /// alone was the same question asked with half the evidence, and it changed
+    /// its answer the day the two notes moved out of that list into the one the
+    /// spur stage had always put them in.
+    #[must_use]
+    pub fn as_asked(&self) -> bool {
+        self.clamps.is_empty()
+            && !self.notes.iter().any(|n| {
+                n.is(key::STAGE_SHIFT_RAISED_FOR_UNDERCUT)
+                    || n.is(key::STAGE_ADDENDUM_ABOVE_TIP_WIDTH)
+                    || n.is(key::STAGE_ADDENDUM_HELD_TO_TIP_WIDTH)
+            })
+    }
+}
+
 /// Everything a parallel-axis stage produces.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

@@ -606,7 +606,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                             && !m.tip_interference
                             && !m.trochoid_interference
                             && !m.involute_interference
-                    }) && r.gears.iter().all(|g| g.gear.clamps.is_empty());
+                    }) && r.gears.iter().all(|g| g.gear.as_asked());
                     if !admissible {
                         continue;
                     }

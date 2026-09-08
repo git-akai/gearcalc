@@ -1279,7 +1279,7 @@ two meshes, losing the same 0.85 % between them.
 | `N/N+1/N/N+1` | 37 | 9.8 | 99.17 % | 93.2 % |
 
 **What the tool ships with is `N ± 4` about 61**, reducing 232.6:1 and keeping
-73 % forward and 63 % back. Four teeth of difference cancels less than one does,
+79.6 % forward and 74.3 % back. Four teeth of difference cancels less than one does,
 and that is the whole of the difference: the same code, the same two meshes, and
 a drive that keeps two and a half times what the `N ± 1` arrangement does at a
 comparable size.
@@ -1347,12 +1347,12 @@ addendum, the shaper and each mesh's shift division free (`gear-cli hulaband`):
 
 | d | z | module | meshes | the drive | α_w | backlash out |
 |---|---|---|---|---|---|---|
-| 1 | 18 | 1.000 | 99.32 % | **31.3 %** | 48.0° | 0.396° |
-| 2 | 36 | 0.500 | 99.77 % | **57.7 %** | 33.7° | 0.149° |
-| 3 | 54 | 0.333 | 99.94 % | **83.7 %** | 26.2° | 0.080° |
-| 4 | 72 | 0.250 | 99.98 % | **93.9 %** | 20.0° | 0.047° |
-| 6 | 108 | 0.167 | 99.98 % | **95.1 %** | 16.1° | 0.025° |
-| 9 | 162 | 0.111 | 99.92 % | **79.9 %** | 12.8° | 0.014° |
+| 1 | 18 | 1.000 | 99.350 % | **32.3 %** | 45.1° | 0.378° |
+| 2 | 36 | 0.500 | 99.767 % | **57.1 %** | 33.8° | 0.149° |
+| 3 | 54 | 0.333 | 99.942 % | **84.2 %** | 26.2° | 0.079° |
+| 4 | 72 | 0.250 | 99.980 % | **93.9 %** | 20.0° | 0.047° |
+| 6 | 108 | 0.167 | 99.983 % | **94.7 %** | 17.8° | 0.028° |
+| 9 | 162 | 0.111 | 99.920 % | **79.5 %** | 12.8° | 0.014° |
 
 **These are optimised divisions, and they sit on a bound rather than at an
 optimum.** The *sum* of a mesh's two shifts is never free — the crank offset is
@@ -1361,13 +1361,15 @@ shaper) is what the rows above report. The stationary point of the loss is not
 where they land: on these drives the mesh loses least at divisions of `+2.85`,
 `+2.05` and `−2.55` for one, two and four teeth of difference, and none of the
 three is admissible, because contact has gone discontinuous or the tips have
-fouled well before. Every row sits at `ε ≈ 1.00` with the tip margin at zero
-instead. The loss is still falling when the geometry runs out, so what a designer
-wants to know is which bound stops it — and that is what these are.
+fouled well before. The rows through `d = 5` sit at `ε ≈ 1.01` with the tip
+margin at zero instead; past that the winning row's contact ratio rises again,
+which is the turn-over the last three rows show. The loss is still falling when
+the geometry runs out, so what a designer wants to know is which bound stops it —
+and that is what these are.
 
 Three times better at four teeth of difference than at one, on the same
-reduction in the same envelope — and a sixteenth of the backlash. The mesh
-figures explain it: a one-tooth pair has to be opened to 48° of operating
+reduction in the same envelope — and an eighth of the backlash. The mesh
+figures explain it: a one-tooth pair has to be opened to 45° of operating
 pressure angle to clear itself, and the loss carries `1/z₁ + 1/z₂`, which halves
 as the counts double. It turns over past six, where the contact ratio has grown
 and the path sits further from the pitch point again.
