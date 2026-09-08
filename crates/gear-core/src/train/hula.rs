@@ -46,10 +46,7 @@ use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::planetary::{self, Arrangement, PlanetaryShaft};
 use crate::ring::{mesh_with, Cutter, Ring};
-use crate::strength::{
-    bending_section, bending_stress, contact_stress, ring_bending_section, Load,
-    StressConcentration, PARALLEL_AXES,
-};
+use crate::strength::{bending_stress, contact_stress, Load, StressConcentration, PARALLEL_AXES};
 use crate::tooth::Tooth;
 use crate::train::{Optimisation, StageGear};
 use crate::{Auto, GearParams};
@@ -119,6 +116,15 @@ pub struct HulaStage {
     /// mechanism rather than constrain it.
     #[cfg_attr(feature = "serde", serde(default))]
     pub optimisation: Optimisation,
+    /// How the load is divided while two tooth pairs are engaged.
+    ///
+    /// **Off by default, and it reaches bending only** — see
+    /// [`super::SpurStage::load_sharing`], which is the same input for the same
+    /// reason. One switch for the stage rather than one per mesh: it selects a
+    /// *model*, and a stage running two meshes under two different models of
+    /// the same thing would be reporting a comparison rather than a design.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub load_sharing: crate::contact::LoadSharing,
     /// The shaper each mesh's ring is cut with.
     ///
     /// **A shaper has to be smaller than the ring it cuts**, and the rings here
@@ -180,6 +186,7 @@ impl Default for HulaStage {
             running_clearance: 0.02,
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
+            load_sharing: crate::contact::LoadSharing::None,
             offset: Auto::automatic(0.0),
             optimisation: Optimisation {
                 min_contact_ratio: 1.0,
@@ -897,9 +904,14 @@ pub fn solve_hula_stage_with(
         // ring without one costs its own bending rating and nothing more, since
         // what it is missing is a fillet to take `Y_S` from and every other
         // figure is still answerable.
-        let pinion_section =
-            bending_section(&p.pinion, p.path.contact_ratio).ok_or(TrainError::NoRootSection)?;
-        let ring_section = ring_bending_section(&p.ring, p.path.contact_ratio);
+        let pinion_bending =
+            super::Bending::of(&p.pinion, p.path.contact_ratio, stage.load_sharing)
+                .ok_or(TrainError::NoRootSection)?;
+        let ring_bending =
+            super::Bending::of_ring(&p.ring, p.path.contact_ratio, stage.load_sharing);
+        // What the sharing model has to say about this mesh, if anything. Both
+        // members of a pair are in the same one, so it is said once.
+        notes.extend(pinion_bending.note.clone());
 
         // The probe pass, at whatever width — a minimum face width does not
         // depend on the width it was measured at.
@@ -910,13 +922,17 @@ pub fn solve_hula_stage_with(
         // The ring's root is rated through the pinion's tooth and the pinion's
         // load, which is the same tangential force at the same module — the way
         // a planetary set rates its ring.
-        let bending_at = |section: &crate::strength::RootSection| {
-            bending_stress(section, &p.pinion, &probe, StressConcentration::Iso6336)
+        // The share this tooth carries where it is rated — exactly 1 unless a
+        // sharing model was asked for, so nothing scales by default.
+        let bending_at = |b: &super::Bending| {
+            bending_stress(&b.section, &p.pinion, &probe, StressConcentration::Iso6336)
+                .map(|s| s * b.share)
         };
         // The mesh is built pinion first, so member 0 is the pinion and the two
         // are in that order everywhere below.
         let members = [pair.pinion, pair.ring];
-        let sections = [Some(&pinion_section), ring_section.as_ref()];
+        let bendings = [Some(&pinion_bending), ring_bending.as_ref()];
+        let sections = bendings.map(|b| b.map(|b| &b.section));
         // **Each gear of this stage is in exactly one mesh**, including the two
         // on the wobble body — they are two gears on one shaft, not one gear
         // meeting two mates — so every member's rating is a list of one. The
@@ -928,7 +944,7 @@ pub fn solve_hula_stage_with(
             reverses,
             loadings: Loading::both_cases(
                 &[Loading {
-                    bending: sections[slot].and_then(&bending_at),
+                    bending: bendings[slot].and_then(&bending_at),
                     contact: probe_cs.governing(slot),
                     measured_at: PROBE,
                     carried_at,

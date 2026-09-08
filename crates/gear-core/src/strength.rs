@@ -907,15 +907,90 @@ pub fn bending_stress(
 /// `transverse_contact_ratio` is `ε_α` from [`ContactPath::contact_ratio`].
 #[must_use]
 pub fn bending_section(g: &Tooth, transverse_contact_ratio: f64) -> Option<RootSection> {
-    let v = g.virtual_spur();
-    // The virtual gear is a spur gear, so its transverse plane is the normal
-    // plane: `v.mt` is m_n and `v.alpha_t` is α_n.
-    let base_pitch = crate::plane::base_pitch(v.mt, v.alpha_t);
-    let cos_bb = base_helix_angle(g).cos();
-    let eps_n = transverse_contact_ratio / (cos_bb * cos_bb);
+    bending_section_shared(g, transverse_contact_ratio, LoadSharing::None).map(|(s, _)| s)
+}
 
-    let load_roll = v.u_tip - (eps_n - 1.0) * base_pitch / v.rb;
-    root_section(&v, load_roll)
+/// **Where the load sits on the flank, `d` base pitches back from the far end
+/// of the path** — and whether it sits on generated flank at all.
+///
+/// The one place the two kinds of member differ in any of this. An external
+/// tooth's load point travels **down** in roll away from its tip and a ring's
+/// travels **up**, because a ring's flank runs the other way — which is
+/// [`MeshKind::sign`](crate::mesh::MeshKind::sign) again rather than a second
+/// construction, and it is why one sweep serves both.
+///
+/// A ring also has a limit an external tooth does not: its flank below the
+/// generation limit was never cut by the shaper, so a load point past `u_j` is
+/// not on the part. An external tooth's own limits are `root_section`'s.
+struct LoadPoint<'a, T: ToothOutline + ?Sized> {
+    /// The **virtual spur** member, whose own transverse plane is the normal
+    /// plane the tooth bends in.
+    v: &'a T,
+    /// Its roll parameter at the tip, and its base radius: where `d` is counted
+    /// from, and what turns a base-pitch length into a roll.
+    u_tip: f64,
+    rb: f64,
+    base_pitch: f64,
+    /// `-1` for a tooth, `+1` for a ring's space.
+    sense: f64,
+    /// The rolls the flank actually exists over, where that is narrower than
+    /// what `root_section` will accept.
+    generated: Option<std::ops::RangeInclusive<f64>>,
+}
+
+impl<T: ToothOutline + ?Sized> LoadPoint<'_, T> {
+    fn at(&self, d: f64) -> Option<RootSection> {
+        let roll = self.u_tip + self.sense * d * self.base_pitch / self.rb;
+        if self.generated.as_ref().is_some_and(|r| !r.contains(&roll)) {
+            return None;
+        }
+        root_section(self.v, roll)
+    }
+}
+
+/// The worst section over one mesh cycle, and the share of the load on it.
+///
+/// Shared by every member of every mesh: what a caller supplies is where the
+/// load point is at `d` base pitches ([`LoadPoint`]) and how deep the cycle is.
+/// With sharing off there is nothing to sweep — the tooth carries everything at
+/// the highest point of single-pair contact, `d = ε_n − 1`, which is the
+/// standard conservative reading and the one expression this used to be.
+fn worst_over_cycle<T: ToothOutline + ?Sized>(
+    at: &LoadPoint<T>,
+    eps_n: f64,
+    model: LoadSharing,
+) -> Option<(RootSection, f64)> {
+    if matches!(model, LoadSharing::None) {
+        return Some((at.at(eps_n - 1.0)?, 1.0));
+    }
+    // The candidates the sweep must not miss, then the sweep itself.
+    let mut samples = vec![0.0, eps_n, (eps_n - 1.0).max(0.0), eps_n.min(1.0)];
+    for i in 0..=SHARING_SAMPLES {
+        #[allow(clippy::cast_precision_loss)]
+        let t = i as f64 / SHARING_SAMPLES as f64;
+        samples.push(t * eps_n);
+    }
+
+    let mut best: Option<(RootSection, f64, f64)> = None;
+    for d in samples {
+        let share = crate::contact::load_share(d, eps_n, model);
+        let Some(section) = at.at(d) else {
+            continue;
+        };
+        // The form factor is what the stress is proportional to at a fixed
+        // torque, so the worst point is the largest `Y_F · Y_S · share`. Taking
+        // the factor rather than a stress keeps this independent of the load
+        // case, which is why it is evaluated once per member and not once per
+        // case.
+        let Some(factor) = section.bending_factor(StressConcentration::Iso6336) else {
+            continue;
+        };
+        let weighted = factor * share;
+        if best.is_none_or(|(_, _, w)| weighted > w) {
+            best = Some((section, share, weighted));
+        }
+    }
+    best.map(|(section, share, _)| (section, share))
 }
 
 /// How finely the mesh cycle is sampled when load sharing is enabled.
@@ -974,47 +1049,24 @@ pub fn bending_section_shared(
     transverse_contact_ratio: f64,
     model: LoadSharing,
 ) -> Option<(RootSection, f64)> {
-    if matches!(model, LoadSharing::None) {
-        return Some((bending_section(g, transverse_contact_ratio)?, 1.0));
-    }
-
     let v = g.virtual_spur();
-    let base_pitch = crate::plane::base_pitch(v.mt, v.alpha_t);
     let cos_bb = base_helix_angle(g).cos();
     // The whole cycle in the plane the tooth actually bends in. `d` counts
     // virtual base pitches back from the far end of the path, the same
     // coordinate `contact::load_share` takes.
     let eps_n = transverse_contact_ratio / (cos_bb * cos_bb);
-
-    // The candidates the sweep must not miss, then the sweep itself.
-    let mut at = vec![0.0, eps_n, (eps_n - 1.0).max(0.0), eps_n.min(1.0)];
-    for i in 0..=SHARING_SAMPLES {
-        #[allow(clippy::cast_precision_loss)]
-        let t = i as f64 / SHARING_SAMPLES as f64;
-        at.push(t * eps_n);
-    }
-
-    let mut best: Option<(RootSection, f64, f64)> = None;
-    for d in at {
-        let share = crate::contact::load_share(d, eps_n, model);
-        let load_roll = v.u_tip - d * base_pitch / v.rb;
-        let Some(section) = root_section(&v, load_roll) else {
-            continue;
-        };
-        // The form factor is what the stress is proportional to at a fixed
-        // torque, so the worst point is the largest `Y_F · Y_S · share`. Taking
-        // the factor rather than a stress keeps this independent of the load
-        // case, which is why it is evaluated once per gear and not once per
-        // case.
-        let Some(factor) = section.bending_factor(StressConcentration::Iso6336) else {
-            continue;
-        };
-        let weighted = factor * share;
-        if best.is_none_or(|(_, _, w)| weighted > w) {
-            best = Some((section, share, weighted));
-        }
-    }
-    best.map(|(section, share, _)| (section, share))
+    worst_over_cycle(
+        &LoadPoint {
+            base_pitch: crate::plane::base_pitch(v.mt, v.alpha_t),
+            u_tip: v.u_tip,
+            rb: v.rb,
+            v: &v,
+            sense: -1.0,
+            generated: None,
+        },
+        eps_n,
+        model,
+    )
 }
 
 /// The critical section of a **ring's** tooth, loaded at its highest point of
@@ -1071,6 +1123,27 @@ pub fn ring_bending_section(
     ring: &crate::ring::Ring,
     transverse_contact_ratio: f64,
 ) -> Option<RootSection> {
+    ring_bending_section_shared(ring, transverse_contact_ratio, LoadSharing::None).map(|(s, _)| s)
+}
+
+/// The same for a ring, with the load shared as a model says.
+///
+/// A ring had no sharing variant, so a set that asked for the model got it on
+/// its rack-cut members and not on its ring — one mesh answering two ways. It
+/// is the same sweep: what a ring changes is which way the load point travels
+/// and that its flank stops at the generation limit
+/// (docs/reference.md#internal-gears), and both of those are [`LoadPoint`].
+///
+/// # Errors
+///
+/// `None` for a ring with no usable virtual spur, a non-finite contact ratio,
+/// or a load point past the end of the generated flank.
+#[must_use]
+pub fn ring_bending_section_shared(
+    ring: &crate::ring::Ring,
+    transverse_contact_ratio: f64,
+    model: LoadSharing,
+) -> Option<(RootSection, f64)> {
     if !transverse_contact_ratio.is_finite() {
         return None;
     }
@@ -1080,16 +1153,20 @@ pub fn ring_bending_section(
     }
     // The virtual ring is a spur ring, so its transverse plane is the normal
     // plane: `v.mt` is m_n and `v.alpha_t` is α_n.
-    let base_pitch = crate::plane::base_pitch(v.mt, v.alpha_t);
     let cos_bb = ring.base_helix_angle().cos();
     let eps_n = transverse_contact_ratio / (cos_bb * cos_bb);
-    // Away from the tip is **up** in roll for a ring, down for an external gear.
-    let load_roll = v.u_tip + (eps_n - 1.0) * base_pitch / v.rb;
-    // The load has to land on flank the cutter actually generated.
-    if !(v.u_tip..=v.u_j).contains(&load_roll) {
-        return None;
-    }
-    root_section(&v, load_roll)
+    worst_over_cycle(
+        &LoadPoint {
+            base_pitch: crate::plane::base_pitch(v.mt, v.alpha_t),
+            u_tip: v.u_tip,
+            rb: v.rb,
+            sense: 1.0,
+            generated: Some(v.u_tip..=v.u_j),
+            v: &v,
+        },
+        eps_n,
+        model,
+    )
 }
 
 /// The lengthwise relative curvature of a parallel-axis, uncrowned mesh:

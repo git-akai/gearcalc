@@ -291,8 +291,12 @@ backlash and cycle accumulation; efficiency and backlash in **both** drive
 directions. Contact is `max(elliptical, line)` on **both** mesh kinds now — a
 crossed pair's ellipse lengthens as its shafts come parallel, so the line its
 teeth actually provide is what carries the load there, and rating on the ellipse
-alone under-stated a near-parallel pair eightfold. Load sharing is a stage input,
-off by default, reaching bending alone. Two load cases throughout — a peak against the ultimate allowable
+alone under-stated a near-parallel pair eightfold. Load sharing is a stage input
+on **every kind that reports a bending stress**, off by default, reaching
+bending alone — a ring included, which had no shared section of its own. Below a
+virtual contact ratio of 2 the model finds the point the unshared rating already
+took and reports the same tooth, which is the model rather than a fault; a hula
+stage cannot reach that band at any proportion it can be built at. Two load cases throughout — a peak against the ultimate allowable
 and a cyclic one against fatigue — with the automatic face width sized from any
 of the four ratings a gear chooses. **Neither contact rating is enabled by
 default**: both are computed and shown, but a fresh stage is sized from bending
@@ -381,8 +385,6 @@ been. They are not a backlog.
 | Worm profile drawing and DXF | A crossed pair draws as its two helical gears already |
 | A planetary **set's** drawing | The viewport draws single gears; a set needs the carrier and N planets placed. **Not planned** — nothing depends on it, and the set's numbers are all reported without it |
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
-| Load sharing on an epicyclic set's meshes | A spur stage input only. The ramp is an uncalibrated placeholder wherever it is offered, and offering it on two more mesh kinds multiplies where an unvalidated model reaches before the model itself is any better — see the last entry under *Worth doing next* |
-| A planet's root rated against the **ring** mesh as well as the sun's | Its bending comes from the sun mesh alone. Its two flanks see different tangential forces, so the worse of the two is not always the one taken; its *contact* rating already answers to both meshes |
 | `Driven By` as a train direction on a worm stage | Back-driving is reported, not modelled as a train direction |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
 

@@ -19,6 +19,7 @@
     type Cutter,
     type WormResult,
     type MeshReport,
+    type LoadSharing,
     note,
     t,
   } from "./core";
@@ -1004,6 +1005,32 @@
      The contact ratio comes with it because it is the constraint the answer sits
      against: sliding loss falls with the length of the path, so without a floor
      the least-loss pair is always the one whose teeth barely reach. -->
+<!-- **How the load is divided while two tooth pairs are engaged**, offered by
+     every stage kind that reports a bending stress.
+
+     Off by default and deliberately so: the ramp behind it is an uncalibrated
+     placeholder rather than a stiffness model. Offered rather than hidden,
+     because an estimate a designer chooses is a feature and one applied on
+     their behalf is not — and one field rather than one per kind, because it
+     selects a *model* and a stage running two meshes under two readings of the
+     same thing would be reporting a comparison rather than a design.
+
+     Withheld only where there is no bending stress to reach: a crossed pair
+     contacts at a point, and this touches bending alone. -->
+{#snippet loadSharing(stage: { load_sharing: LoadSharing })}
+  <label>
+    <span>{t("ui.train_load_sharing")}</span>
+    <select bind:value={stage.load_sharing}>
+      <option value="none">{t("ui.train_load_sharing_none")}</option>
+      <option value="linear_ramp">
+        {t("ui.train_load_sharing_linear_ramp")}
+      </option>
+    </select>
+    <em></em>
+    <FieldNote notes={notes(t("ui.train_note_load_sharing"), null)} />
+  </label>
+{/snippet}
+
 {#snippet efficiencyToggle(o: Optimisation, after?: () => void)}
   {@render switchField(
     "ui.train_optimise_efficiency",
@@ -1387,23 +1414,7 @@
                 <em>{t("ui.train_mm")}</em>
               </label>
               {#if stage.shaft_angle === 0}
-                <label>
-                  <span>{t("ui.train_load_sharing")}</span>
-                  <!-- Off by default and deliberately so: the ramp behind it is
-                       an uncalibrated placeholder rather than a stiffness model.
-                       Offered rather than hidden, because an estimate a designer
-                       chooses is a feature and one applied on their behalf is
-                       not — and offered only here, since it reaches bending
-                       alone and a crossed stage reports none. -->
-                  <select bind:value={stage.load_sharing}>
-                    <option value="none">{t("ui.train_load_sharing_none")}</option>
-                    <option value="linear_ramp">
-                      {t("ui.train_load_sharing_linear_ramp")}
-                    </option>
-                  </select>
-                  <em></em>
-                  <FieldNote notes={notes(t("ui.train_note_load_sharing"), null)} />
-                </label>
+                {@render loadSharing(stage)}
               {/if}
               {@render efficiencyToggle(stage.optimisation)}
             </div>
@@ -1894,6 +1905,7 @@
                 </select>
                 <em></em>
               </label>
+              {@render loadSharing(stage)}
               {@render efficiencyToggle(stage.optimisation)}
             </div>
 
@@ -2125,6 +2137,7 @@
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
+              {@render loadSharing(stage)}
               {@render efficiencyToggle(stage.optimisation)}
             </div>
 

@@ -1567,15 +1567,31 @@ everything upstream carries none of it. If the walk reaches the input still
 nonzero, **nothing reacted it** — the train is back-drivable, the load simply
 turns it, and the case is zero at every gear.
 
-**Load sharing.** A stage input, `LoadSharing`, **off by default**. It reaches
-bending alone — a contact rating is already taken where one tooth carries
-everything, so sharing cannot move it — and where it is off the rating is
-`bending_section`'s own answer rather than one that agrees with it. Switched on,
-the mesh cycle is swept for the largest `Y_F · Y_S · share`; the share is
-`contact::load_share`, in base pitches from the far end of the path, so the
-transverse path and the virtual spur gear ask one function rather than two.
-Above a virtual contact ratio of 2 there is no single-pair zone and the ramp is
-extrapolating, which the stage reports.
+**Load sharing.** A stage input, `LoadSharing`, **off by default**, on every
+kind that reports a bending stress. It reaches bending alone — a contact rating
+is already taken where one tooth carries everything, so sharing cannot move it —
+and where it is off the rating is `bending_section`'s own answer rather than one
+that agrees with it. Switched on, the mesh cycle is swept for the largest
+`Y_F · Y_S · share`; the share is `contact::load_share`, in base pitches from
+the far end of the path, so the transverse path and the virtual spur gear ask
+one function rather than two.
+
+**One sweep, both kinds of member.** A ring's load point travels *up* in roll
+away from its tip where an external tooth's travels down, and its flank stops at
+the generation limit — which is the mesh kind's sign again rather than a second
+construction. A ring had no shared section at all before, so a set that switched
+the model on rated one member of an internal mesh under it and the other
+without.
+
+Above a virtual contact ratio of 2 there is no single-pair zone, the ramp never
+reaches a full share, and it relieves the tooth by about a third — which the
+stage reports, per mesh, since a set can have one mesh in the band and one out.
+**Below it the model changes nothing**, and that is the model rather than a
+plumbing fault: the single-pair boundary is in the sweep with a share of exactly
+1, so the maximum is the point the unshared rating already took. A hula stage
+cannot reach the band at any proportion it can be built at — its meshes run just
+above continuous contact by construction — so the control is offered there and
+provably cannot bite.
 
 **Automatic face width.** Four ratings, four toggles per gear; the width is the
 largest any *enabled* rating asks for. Peak contact is off by default — see

@@ -16,10 +16,7 @@ use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
-use crate::strength::{
-    bending_section_shared, bending_stress, contact_stress, Load, StressConcentration,
-    PARALLEL_AXES,
-};
+use crate::strength::{bending_stress, contact_stress, Load, StressConcentration, PARALLEL_AXES};
 use crate::tooth::Tooth;
 
 /// One gear of a stage.
@@ -722,16 +719,14 @@ pub fn solve_spur_stage_with(
     // The critical section, and the share of the load acting on it. With
     // sharing off — the default — this *is* `bending_section` and a share of
     // exactly 1, so the ordinary rating is untouched to the bit.
-    let shared =
-        [0usize, 1].map(|i| bending_section_shared(&g[i], path.contact_ratio, stage.load_sharing));
-    let sections = [
-        shared[0].ok_or(TrainError::NoRootSection)?.0,
-        shared[1].ok_or(TrainError::NoRootSection)?.0,
-    ];
-    let load_share = [
-        shared[0].ok_or(TrainError::NoRootSection)?.1,
-        shared[1].ok_or(TrainError::NoRootSection)?.1,
-    ];
+    let bending =
+        [0usize, 1].map(|i| super::Bending::of(&g[i], path.contact_ratio, stage.load_sharing));
+    let [Some(first), Some(second)] = bending else {
+        return Err(TrainError::NoRootSection);
+    };
+    let bending = [first, second];
+    let sections = [bending[0].section, bending[1].section];
+    let load_share = [bending[0].share, bending[1].share];
 
     // Every rating at a probe width, one set per load case. `b_min` does not
     // depend on the `b` it was measured at, so this is still one evaluation per
@@ -949,21 +944,10 @@ pub fn solve_spur_stage_with(
             ),
         );
     }
-    // **The sharing ramp outside the band it was described in.** It is a
-    // first-order stand-in for a spur mesh with a single-pair zone; at
-    // `ε_n ≥ 2` there is no such zone, the ramp never reaches a full share, and
-    // it relieves the tooth by about a third. That is a large number from an
-    // uncalibrated model, in the unconservative direction — exactly what
-    // `docs/rationale.md` refuses to let pass silently — so the stage says so
-    // where the figure is shown. The model is still the one the designer asked
-    // for; what they are owed is knowing it is extrapolating.
-    if !matches!(stage.load_sharing, LoadSharing::None) {
-        let cos_bb = crate::metrology::base_helix_angle(&g[0]).cos();
-        let eps_n = path.contact_ratio / (cos_bb * cos_bb);
-        if eps_n >= 2.0 {
-            notes.push(Note::new(key::STAGE_LOAD_SHARING_OUT_OF_BAND).number("ratio", eps_n, 3));
-        }
-    }
+    // What the sharing model has to say about this mesh, if anything — raised
+    // where the section and the share are worked out, so no stage kind has to
+    // remember to ask (`train::Bending`). One mesh, so one note at most.
+    notes.extend(bending[0].note.clone());
 
     Ok(SpurResult {
         ratio: f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth),

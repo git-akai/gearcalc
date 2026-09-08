@@ -233,6 +233,84 @@ pub struct Widths {
 /// member needs before it is given one.
 pub(crate) const PROBE: f64 = 10.0;
 
+/// **What one member bends at in one mesh**: the critical section, the share of
+/// the mesh load acting on it, and what the sharing model has to say about
+/// being asked outside the band it was described in.
+///
+/// All three are per *(member, mesh)*, which is why they travel together and
+/// why this is one place rather than one per stage kind. It had been none: the
+/// pair asked for the section and the share inline and raised the note itself,
+/// and the two epicyclic kinds asked for neither — so the one estimate this
+/// crate ships reached one stage of three, and a set that switched the model on
+/// got it on the members it happened to share code with.
+pub(crate) struct Bending {
+    pub section: crate::strength::RootSection,
+    /// Exactly 1 where no sharing model was asked for, so the ordinary rating
+    /// is untouched to the bit.
+    pub share: f64,
+    /// **The ramp outside the band it was described in.** It is a first-order
+    /// stand-in for a mesh with a single-pair zone; at `ε_n ≥ 2` there is no
+    /// such zone, the ramp never reaches a full share, and it relieves the
+    /// tooth by about a third. That is a large number from an uncalibrated
+    /// model, in the unconservative direction — exactly what
+    /// `docs/rationale.md` refuses to let pass silently — so it is said where
+    /// the figure is shown. The model is still the one the designer asked for;
+    /// what they are owed is knowing it is extrapolating.
+    pub note: Option<Note>,
+}
+
+impl Bending {
+    /// For a rack-cut member.
+    pub(crate) fn of(
+        tooth: &crate::tooth::Tooth,
+        contact_ratio: f64,
+        model: crate::contact::LoadSharing,
+    ) -> Option<Self> {
+        let (section, share) =
+            crate::strength::bending_section_shared(tooth, contact_ratio, model)?;
+        let cos_bb = crate::metrology::base_helix_angle(tooth).cos();
+        Some(Self::new(
+            section,
+            share,
+            model,
+            contact_ratio / (cos_bb * cos_bb),
+        ))
+    }
+
+    /// ...and for a ring, whose flank is its shaper's and whose load point
+    /// travels the other way.
+    pub(crate) fn of_ring(
+        ring: &crate::ring::Ring,
+        contact_ratio: f64,
+        model: crate::contact::LoadSharing,
+    ) -> Option<Self> {
+        let (section, share) =
+            crate::strength::ring_bending_section_shared(ring, contact_ratio, model)?;
+        let cos_bb = ring.base_helix_angle().cos();
+        Some(Self::new(
+            section,
+            share,
+            model,
+            contact_ratio / (cos_bb * cos_bb),
+        ))
+    }
+
+    fn new(
+        section: crate::strength::RootSection,
+        share: f64,
+        model: crate::contact::LoadSharing,
+        eps_n: f64,
+    ) -> Self {
+        let out_of_band = !matches!(model, crate::contact::LoadSharing::None) && eps_n >= 2.0;
+        Self {
+            section,
+            share,
+            note: out_of_band
+                .then(|| Note::new(key::STAGE_LOAD_SHARING_OUT_OF_BAND).number("ratio", eps_n, 3)),
+        }
+    }
+}
+
 /// **What one mesh does to one member**: the two stresses it produces there,
 /// and the widths they belong to.
 ///
@@ -2610,6 +2688,138 @@ mod tests {
             assert!(
                 notes.iter().any(|n| n.is(key::STAGE_FACE_WIDTH_NO_SOURCE)),
                 "{what} should still say no rating sizes the width"
+            );
+        }
+    }
+
+    /// **The sharing model reaches every member of every kind that has one.**
+    ///
+    /// It was a spur input only, so the one estimate this crate ships reached
+    /// one stage of three — and a ring had no shared section at all, so even
+    /// that stage would have rated one member of an internal mesh under the
+    /// model and the other without.
+    ///
+    /// Asked as *does switching it on move the number*, member by member, since
+    /// a member the input never reaches reports the same stress either way and
+    /// looks exactly like one the model happens not to relieve. Above a virtual
+    /// contact ratio of 2 there is no single-pair zone, the ramp never reaches a
+    /// full share, and every member it reaches is relieved — so the fixtures are
+    /// chosen to put each mesh there, which for a spur pair and an epicyclic set
+    /// is an ordinary high-contact-ratio tooth.
+    #[test]
+    fn the_sharing_model_reaches_every_member_that_bends() {
+        use crate::contact::LoadSharing;
+        let lib = library();
+        let tall = |g: &StageGear| StageGear {
+            addendum: 1.35,
+            ..g.clone()
+        };
+        let bending_of = |sharing: LoadSharing| {
+            let mut spur = SpurStage {
+                load_sharing: sharing,
+                ..SpurStage::default()
+            };
+            for g in &mut spur.gears {
+                *g = tall(g);
+            }
+            let mut set = PlanetaryStage {
+                load_sharing: sharing,
+                ..PlanetaryStage::default()
+            };
+            set.sun = tall(&set.sun);
+            set.planet = tall(&set.planet);
+            set.ring = tall(&set.ring);
+            // **A hula stage needs a taller tooth than it can be built with**,
+            // and that is the point of the row below rather than a defect in
+            // the fixture: at 1.1 modules its meshes reach `ε_n ≈ 2.02` and its
+            // teeth foul, which the stage reports. The rating path is the one a
+            // buildable stage uses, so this is what says the input reaches it.
+            let mut hula = HulaStage {
+                load_sharing: sharing,
+                ..HulaStage::default()
+            };
+            for g in &mut hula.gears {
+                g.addendum = 1.1;
+            }
+
+            let s = solve_spur_stage(&spur, StageTorques::just(2.0), &lib).unwrap();
+            let p = solve_planetary_stage(&set, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+            let h = solve_hula_stage(&hula, 1000.0, StageTorques::just(2.0), &lib).unwrap();
+            let mut out: Vec<(String, Option<f64>)> = Vec::new();
+            for (i, g) in s.gears.iter().enumerate() {
+                out.push((format!("spur {i}"), g.bending_stress.peak));
+            }
+            for (what, g) in [
+                ("sun", &p.sun),
+                ("planet", &p.planet.gear),
+                ("ring", &p.ring),
+            ] {
+                out.push((what.to_string(), g.bending_stress.peak));
+            }
+            for g in &h.gears {
+                out.push((format!("hula z{}", g.teeth), g.gear.bending_stress.peak));
+            }
+            out
+        };
+
+        let off = bending_of(LoadSharing::None);
+        let on = bending_of(LoadSharing::LinearRamp);
+        assert_eq!(off.len(), on.len());
+        let mut rated = 0;
+        for ((what, a), (_, b)) in off.iter().zip(&on) {
+            let (Some(a), Some(b)) = (a, b) else {
+                continue; // a member with no notch has no bending either way
+            };
+            rated += 1;
+            assert!(
+                b < a,
+                "{what}: sharing must relieve a tooth it reaches — {a} to {b}"
+            );
+        }
+        assert!(
+            rated >= 8,
+            "most members should have a bending rating: {off:?}"
+        );
+    }
+
+    /// **...and below that band it changes nothing, which is not the same as
+    /// not reaching them.**
+    ///
+    /// The ramp's worst point is the largest `Y_F · Y_S · share`, and below
+    /// `ε_n = 2` the single-pair boundary is in the sweep with a share of
+    /// exactly 1 — so the maximum is the point the unshared rating already
+    /// took, and the answer is the one already reported. A hula stage is the
+    /// case worth pinning: **its meshes cannot reach the band at any proportion
+    /// it can be built at**, running just above continuous contact by
+    /// construction, so the control is offered and provably cannot bite there.
+    #[test]
+    fn below_the_band_the_model_reports_the_tooth_it_was_given() {
+        use crate::contact::LoadSharing;
+        let lib = library();
+        let solve = |sharing| {
+            let stage = HulaStage {
+                load_sharing: sharing,
+                ..HulaStage::default()
+            };
+            solve_hula_stage(&stage, 1000.0, StageTorques::just(2.0), &lib).unwrap()
+        };
+        let off = solve(LoadSharing::None);
+        let on = solve(LoadSharing::LinearRamp);
+        for (a, b) in off.gears.iter().zip(&on.gears) {
+            assert_eq!(
+                a.gear.bending_stress.peak, b.gear.bending_stress.peak,
+                "z{}: below the band the model has nothing to find",
+                a.teeth
+            );
+        }
+        // ...and the reason, rather than the symptom: the shipped stage's
+        // meshes are nowhere near the band. If a hula stage ever is, this fails
+        // and the paragraph above needs rewriting.
+        for m in &off.meshes {
+            assert!(
+                m.report.contact_ratios.transverse < 2.0,
+                "a hula mesh above the band would change the claim: {}",
+                m.report.contact_ratios.transverse
             );
         }
     }
