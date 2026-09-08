@@ -1834,8 +1834,9 @@
                  the member left automatic absorbs, and the planet is preferred
                  because it is the one in both meshes. So pinning the planet is
                  how a designer asks for the sun to close it instead. The
-                 absorbed member is offered no shift control at all — there is
-                 nothing to decide — which is what `shiftAbsorbed` says. -->
+                 absorbing member is an automatic one like any other, box and
+                 toggle and all: hiding either would hide the only way to hand
+                 the job on. -->
             <div class="gears">
               {@render gearCard(t("ui.train_sun"), stage.sun, pres?.sun, {
                 cut: "rack",
@@ -2135,92 +2136,96 @@
                   )}
                 {/each}
               </div>
-                <dl class="out indent">
-                  <dt>{t("ui.train_operating_pressure_angle")}</dt>
-                  <dd>{num(hres?.meshes[m].operating_pressure_angle, 3)}°</dd>
-                  <dt>{t("ui.train_contact_ratio")}</dt>
-                  <dd>
-                    ε<sub>α</sub> {num(hres?.meshes[m].contact_ratios.transverse, 4)} · ε<sub>β</sub>
-                    {num(hres?.meshes[m].contact_ratios.overlap, 4)} · ε<sub>γ</sub>
-                    {num(hres?.meshes[m].contact_ratios.total, 4)}
-                    {#if hres && hres.meshes[m].contact_ratios.transverse < 1}
-                      <small class="warn">{t("ui.train_note_contact_ratio_below_one")}</small>
-                    {/if}
-                  </dd>
-                  <dt>{t("ui.train_hula_clearance_result")}</dt>
-                  <dd>
-                    {num(hres?.meshes[m].clearance, 4)} {t("ui.train_mm")}
-                    <small>
-                      {t("ui.train_hula_clearance_as_cut", {
-                        value: num(hres?.meshes[m].clearance_as_cut, 4),
-                      })}
-                    </small>
-                  </dd>
-                  <!-- **Which conditions bite, and nothing when none do.** The
-                       tip margin was a number beside this saying the same thing
-                       in degrees of pinion rotation — the row that reports the
-                       finding is the one worth drawing attention to. -->
-                  <dt>{t("ui.train_hula_interference")}</dt>
-                  <dd>
-                    {#each [[
-                      hres?.meshes[m].trochoid_interference
-                        ? t("ui.train_hula_interference_trochoid")
-                        : null,
-                      hres?.meshes[m].involute_interference
-                        ? t("ui.train_hula_interference_involute")
-                        : null,
-                      hres?.meshes[m].tip_interference
-                        ? t("ui.train_hula_interference_tip")
-                        : null,
-                    ].filter((x) => x !== null)] as fouling (0)}
-                      <span class:warn={fouling.length > 0}>
-                        {fouling.join(" · ") || t("ui.train_hula_interference_none")}
-                      </span>
-                    {/each}
-                  </dd>
-                  <dt>{t("ui.train_mesh_efficiency")}</dt>
-                  <dd>
-                    {bothWays(hres?.meshes[m].efficiency)}
-                  </dd>
-                  <!-- The same gap seen from each member, written as the spur
-                       and screw readouts write theirs — one gap, two ends, and
-                       the tolerance band on the first of them. The ring leads,
-                       as its card does. -->
-                  <dt>{t("ui.train_mesh_backlash")}</dt>
-                  <dd>
-                    {t("ui.train_backlash_at", {
-                      angle: num(hres?.meshes[m].backlash[1].nominal, 5),
-                      member: t("ui.train_the_ring"),
+              <!-- Not indented: an epicyclic set's mesh readouts sit under a
+                   heading of their own and are inset from it, where these stand
+                   in their mesh's own section beneath its gear cards — the same
+                   place a pair's readout stands in its stage. -->
+              <dl class="out">
+                <dt>{t("ui.train_operating_pressure_angle")}</dt>
+                <dd>{num(hres?.meshes[m].operating_pressure_angle, 3)}°</dd>
+                <dt>{t("ui.train_contact_ratio")}</dt>
+                <dd>
+                  ε<sub>α</sub> {num(hres?.meshes[m].contact_ratios.transverse, 4)} · ε<sub>β</sub>
+                  {num(hres?.meshes[m].contact_ratios.overlap, 4)} · ε<sub>γ</sub>
+                  {num(hres?.meshes[m].contact_ratios.total, 4)}
+                  {#if hres && hres.meshes[m].contact_ratios.transverse < 1}
+                    <small class="warn">{t("ui.train_note_contact_ratio_below_one")}</small>
+                  {/if}
+                </dd>
+                <dt>{t("ui.train_hula_clearance_result")}</dt>
+                <dd>
+                  {num(hres?.meshes[m].clearance, 4)} {t("ui.train_mm")}
+                  <small>
+                    {t("ui.train_hula_clearance_as_cut", {
+                      value: num(hres?.meshes[m].clearance_as_cut, 4),
                     })}
-                    <small
-                      >{range(num(hres?.meshes[m].backlash[1].minimum, 5), num(hres?.meshes[m].backlash[1].maximum, 5))}</small
-                    >
-                    · {t("ui.train_backlash_at", {
-                      angle: num(hres?.meshes[m].backlash[0].nominal, 5),
-                      member: t("ui.train_the_pinion"),
-                    })}
-                  </dd>
-                </dl>
-                <!-- What is left after the fields have taken theirs: a clamp
-                     naming an input is drawn under that input, and this list
-                     keeps the rest — a tip the shaper could not reach, and the
-                     like, which are about the part rather than about a box. -->
-                {@const clamped = [ring, pinion].flatMap((j) =>
-                  (hres?.gears[j].clamps ?? [])
-                    .filter((c) => !UNDER_A_FIELD.includes(c.key))
-                    .map((c) => ({ teeth: stage.gears[j].teeth, note: c })),
-                )}
-                {#if clamped.length}
-                  <!-- One list for the pair, as every other clamped gear in the
-                       application reports: `.hint` is a note pulled *up* against
-                       the field above it, so a run of them closed on each other
-                       instead of reading as a list. -->
-                  <ul class="notes">
-                    {#each clamped as c, i (i)}
-                      <li>z{c.teeth}: {note(c.note)}</li>
-                    {/each}
-                  </ul>
-                {/if}
+                  </small>
+                </dd>
+                <!-- **Which conditions bite, and nothing when none do.** The
+                     tip margin was a number beside this saying the same thing
+                     in degrees of pinion rotation — the row that reports the
+                     finding is the one worth drawing attention to. -->
+                <dt>{t("ui.train_hula_interference")}</dt>
+                <dd>
+                  {#each [[
+                    hres?.meshes[m].trochoid_interference
+                      ? t("ui.train_hula_interference_trochoid")
+                      : null,
+                    hres?.meshes[m].involute_interference
+                      ? t("ui.train_hula_interference_involute")
+                      : null,
+                    hres?.meshes[m].tip_interference
+                      ? t("ui.train_hula_interference_tip")
+                      : null,
+                  ].filter((x) => x !== null)] as fouling (0)}
+                    <span class:warn={fouling.length > 0}>
+                      {fouling.join(" · ") || t("ui.train_hula_interference_none")}
+                    </span>
+                  {/each}
+                </dd>
+                <dt>{t("ui.train_mesh_efficiency")}</dt>
+                <dd>
+                  {bothWays(hres?.meshes[m].efficiency)}
+                </dd>
+                <!-- The same gap seen from each member, written as the spur
+                     and screw readouts write theirs — one gap, two ends, and
+                     the tolerance band on the first of them. The ring leads,
+                     as its card does. -->
+                <dt>{t("ui.train_mesh_backlash")}</dt>
+                <dd>
+                  {t("ui.train_backlash_at", {
+                    angle: num(hres?.meshes[m].backlash[1].nominal, 5),
+                    member: t("ui.train_the_ring"),
+                  })}
+                  <small
+                    >{range(num(hres?.meshes[m].backlash[1].minimum, 5), num(hres?.meshes[m].backlash[1].maximum, 5))}</small
+                  >
+                  · {t("ui.train_backlash_at", {
+                    angle: num(hres?.meshes[m].backlash[0].nominal, 5),
+                    member: t("ui.train_the_pinion"),
+                  })}
+                </dd>
+              </dl>
+              <!-- What is left after the fields have taken theirs: a clamp
+                   naming an input is drawn under that input, and this list
+                   keeps the rest — a tip the shaper could not reach, and the
+                   like, which are about the part rather than about a box. -->
+              {@const clamped = [ring, pinion].flatMap((j) =>
+                (hres?.gears[j].clamps ?? [])
+                  .filter((c) => !UNDER_A_FIELD.includes(c.key))
+                  .map((c) => ({ teeth: stage.gears[j].teeth, note: c })),
+              )}
+              {#if clamped.length}
+                <!-- One list for the pair, as every other clamped gear in the
+                     application reports: `.hint` is a note pulled *up* against
+                     the field above it, so a run of them closed on each other
+                     instead of reading as a list. -->
+                <ul class="notes">
+                  {#each clamped as c, i (i)}
+                    <li>z{c.teeth}: {note(c.note)}</li>
+                  {/each}
+                </ul>
+              {/if}
             {/each}
 
             <!-- The drive as a whole, under the meshes it is made of — where every

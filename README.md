@@ -53,7 +53,7 @@ than once.
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
 | `web/` | Svelte 5 + TypeScript + Vite front end. |
 | `web/src/wire/` | **Generated** from the Rust types by `ts-rs`. Never edited by hand. |
-| `docs/` | The four documents, the initial specification, and the JGMA 116-02 tables. |
+| `docs/` | The four documents, and the bending construction drawn. `docs/history/` holds the superseded design record. |
 | `crates/gear-io/data/strings_en.toml` | **Every word the application shows.** Notes and labels alike, one file per language. |
 | `handoff_inbound/` | Prior Python work. **Reference only** — do not build on it. |
 
@@ -65,7 +65,7 @@ and `wasm-bindgen-cli` together.
 ```bash
 nix develop              # or `direnv allow` once, for automatic entry
 
-cargo nextest run        # the full test suite, 501 tests, ~27 s
+cargo nextest run        # the full test suite, 504 tests, ~28 s
 cargo clippy --all-targets -- --deny warnings
 cargo fmt
 
@@ -77,24 +77,19 @@ nix flake check          # everything CI checks: build, clippy, fmt, tests
 This is the fastest way to see what the core is doing.
 
 ```bash
-cargo run --bin gear-cli -- show 17 0.2   # derived geometry for z=17, x=+0.2
-cargo run --bin gear-cli -- sweep         # scan a grid for undercut and clamps
-cargo run --bin gear-cli -- materials     # the material library and its provenance
-cargo run --bin gear-cli -- strength 17 43 2.0   # a worked mesh: bending, contact, efficiency
-cargo run --bin gear-cli -- strength 17 43 2.0 '4340 Hardened Steel' 20   # the same, helical
-cargo run --bin gear-cli -- train                  # a geartrain, end to end
-cargo run --bin gear-cli -- trainfile              # a geartrain to TOML and back
-cargo run --bin gear-cli -- train mixed            # ...with a worm stage in it
-cargo run --bin gear-cli -- worm 1 40 7 90         # a worm pair, both directions
-cargo run --bin gear-cli -- crossed 17 23 90       # a crossed pair, every helix split
-cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
-cargo run --bin gear-cli -- planetary 17 17 3      # every ring count that can work
-cargo run --bin gear-cli -- planetstage 24 18 60 3 # a planetary stage, all six modes
-cargo run --release --bin gear-cli -- verify 100   # two-sided cutter check
+cargo run --bin gear-cli -- show 17 0.2           # derived geometry for z=17, x=+0.2
+cargo run --bin gear-cli -- materials             # the material library and its provenance
+cargo run --bin gear-cli -- strength 17 43 2.0    # a worked mesh: bending, contact, efficiency
+cargo run --bin gear-cli -- train                 # a geartrain, end to end
 ```
 
 `gear-cli strength 17 43 2.0` is the project's regression canary: its figures
 have not moved since milestone 5, through every refactor since.
+
+**[`docs/state.md`](docs/state.md) has the rest of the interesting ones**, and
+`crates/gear-cli/src/main.rs` has all of them in its own module comment, next to
+the code. A third copy here was a third thing to keep in step, and it had already
+fallen out of it — which is the fault the four documents were split up to stop.
 
 ### Translating it
 

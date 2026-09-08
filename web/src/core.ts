@@ -516,22 +516,6 @@ export function dxf(req: GearRequest): { ok: string } | { error: string } {
   }
 }
 
-// --------------------------------------------------------------------- //
-//  Materials
-// --------------------------------------------------------------------- //
-
-export type MaterialClass = "steel" | "brass" | "pom" | "polyamide";
-
-/** One property: its value and its provenance. One number, because an entry
- *  describes a material in one state — the `condition` field names it. */
-export function defaultParams(): GearParams {
-  return defaults().gear.params;
-}
-
-export function defaultCutter(): CutterRef {
-  return defaults().gear.cutter;
-}
-
 export function solveRing(
   req: RingRequest,
 ): { ok: RingSummary } | { error: string } {
@@ -592,6 +576,10 @@ export function exportTrain(
   }
 }
 
+// --------------------------------------------------------------------- //
+//  Materials
+// --------------------------------------------------------------------- //
+
 export function defaultLibrary(): MaterialLibrary {
   return JSON.parse(default_materials()) as MaterialLibrary;
 }
@@ -650,15 +638,6 @@ export function relieve(
       given -= 1;
     }
   }
-}
-
-export type PlanetaryMember = "sun" | "carrier" | "ring";
-
-/** A material figure with its provenance, as Rust's `Value` serialises. */
-export interface ProvenancedValue {
-  value: number;
-  basis: string;
-  note: string | null;
 }
 
 /** A fresh geartrain, one spur stage in it. */

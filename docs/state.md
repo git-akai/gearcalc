@@ -63,6 +63,12 @@ chmod -R u+w public               # symlink into the read-only store
 
 ## Driving the mathematics without a browser
 
+The list below is the interesting ones. **The exhaustive one is the harness's
+own module comment** — `crates/gear-cli/src/main.rs`, next to the code it
+describes, where it cannot fall out of step with the commands it lists. This one
+has (`dump`, `dxf`, `loadcase`, `matrix` and `sweep` are not here), and a
+curated list that reads as exhaustive is the worse of the two failures.
+
 ```bash
 cargo run --bin gear-cli -- show 17 0.2            # one gear's derived geometry
 cargo run --bin gear-cli -- materials              # the library, with each value's basis
@@ -220,6 +226,19 @@ tip` holds it to the tallest that keeps a tip `min_tip_width` wide, where an
 eccentric drive reports that bound rather than acting on it — its crank offset
 is a closed-form solve on the tips, and an addendum moving with the shift would
 put an iteration inside it.
+
+**Every parallel-axis mesh reports its operating pressure angle and all three
+contact ratios**, from one definition and one constructor rather than a copy per
+stage kind. A crossed pair has neither: its line of action slides rather than
+turning, so there is no such angle to report.
+
+**A stage that cannot be built still shows what built it.** A geartrain
+mid-edit is regularly one that will not solve, so every input, note and label
+stands and only the figures go blank — a readout that vanishes takes its label
+with it and moves the page at the moment it most needs to hold still. The
+refusal itself crosses as a `Note` and the stage it happened in, so it reads in
+the catalogue's words like every other message and names where to look
+([rationale](rationale.md#an-input-does-not-wait-on-an-answer)).
 
 **Profile shifts chosen for efficiency.** A stage-level toggle, off by default,
 that chooses the automatic shifts to lose least instead of taking the least that

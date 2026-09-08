@@ -440,9 +440,9 @@ Each stage differs only in what is free and what it is worth:
 The searches share `auto::maximise`: what differs between stages is how many
 numbers are free and what they are worth, not how to look for them, and
 `auto::Freedoms` is the one mapping from what a search hands back onto the full
-set. Each rates the geometry the stage would *build* — the automatic addendum
-resolved, at the distance the pair runs at rather than its zero-backlash one —
-so what is optimised is what is reported.
+set. Each rates the geometry the stage would *build* — the addendum held to the
+tip width it has to keep, at the distance the pair runs at rather than its
+zero-backlash one — so what is optimised is what is reported.
 
 **The same four questions of every chosen shift** (`auto::member_is_buildable`):
 the shift is at or above the least that clears undercut, the flank is not

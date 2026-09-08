@@ -56,6 +56,50 @@ way to ask is to measure the parts rather than the whole: each time, one line of
 the breakdown was ninety-nine per cent of the total and the thing it produced
 was never touched.
 
+### A conditional's reason is narrower than what it guards
+
+**Every guard is written for one thing and then covers everything inside it**,
+and the gap between the two is invisible until someone reads both. Four
+instances, all in one pass and all the same shape:
+
+- `{#if g}` in a gear card meant *this rating needs an answer*. Inside it were
+  the material override boxes, the field notes and every readout's **label** —
+  so a stage that would not build withheld the very controls a designer would
+  reach for to make it build. The material figures it hid are the library's, not
+  the solve's.
+- The `extra` hook's own comment said it was for a member with *no* shared
+  readout. It rendered unconditionally, so the planet — which has one — printed
+  its speed twice and hung the annotation on the copy.
+- `min_tip_width` was read while resolving an automatic addendum, so an addendum
+  typed by hand went unbounded and a tooth could come to a point in silence. The
+  undercut floor had the same shape before it.
+- A ring's `profile_shift.auto` and an eccentric drive's `given_shift` were read
+  in one branch and ignored in the other: live controls that did nothing.
+
+What they have in common is a flag or a guard whose *reason* covers less than its
+*scope*. The question that finds them is not "is this condition right?" but "is
+everything inside it conditional on that?" — and the fix each time was to name
+the two things separately, which is what `auto` versus `no undercut`, and a
+source versus a constraint, now are.
+
+### A search may not re-judge the number it was handed
+
+**A given value is a constraint on a search, not a candidate of it.** The shift
+optimiser applied its floor to pinned gears as well as free ones, so a 43-tooth
+wheel legally pinned at −0.5 — nowhere near undercut, and a whole module below
+the chooser's `max(x_min, 0)` — made every candidate built on it inadmissible.
+The search then found nothing, fell back to doing nothing, and the free gear
+beside it came back at its own floor looking like an answer. Pinning a gear at
+*exactly* its undercut minimum did the same thing, since that is the edge the
+`undercut` flag is decided at.
+
+There is no single right bound, which is why writing one was the mistake: a
+shift arrives three ways and each earns a different answer to the same question
+(`train::undercut_bound`). A search is floored where a chooser should not thin a
+tooth for nothing; a given number carries no bound, having been held to one when
+it was read; and a value a relation left carries the true minimum, because
+nothing can move it and clamping it would break the relation that produced it.
+
 ### A check built from the thing under test measures nothing
 
 The ring cut simulation derived the cutter's tooth the same way the model did, so
@@ -346,6 +390,9 @@ whose units are wrong is wrong however plausible.
 | [reference.md#efficiency-parallel-axes](reference.md#efficiency-parallel-axes) | **Each search asked its own questions of a shift**, so a bound reached the one it was written in and no other | Four things stop a tooth existing: below the undercut floor, undercut anyway, pointed before its tip, or a root round that no longer fits. The pair asked all four. The epicyclic set asked one, of one member. The eccentric drive asked two, of one member — and was choosing a pinion whose root round could not be cut, taking 1.9 points of efficiency less for it than when told not to. Written once as `auto::member_is_buildable`, and the test asks the invariant rather than the wiring: whatever a stage chooses must be cuttable |
 | [rationale.md#notes-must-not-move-the-controls](rationale.md#notes-must-not-move-the-controls) | **A field's note used to draw a readout**, where it right-aligned the annotation away from its value and reserved a line that could never fill | The slot exists so typing does not move the page. A figure that cannot change while you look at it needs none of it. The eccentric drive's readouts had been built that way throughout, and its clamps were a run of the note that is pulled *up* against the field above it — stacked, each closed on the one before instead of reading as a list |
 | — | **A row's alignment lost to a selector two classes stronger, silently** | `.switchrow` set one column and `justify-items: end`; `.grid.shared > label` sets three and carries two classes and an element to that one class, so the three-column template stayed underneath and the switch was placed at the end of the *label* column, mid-row. The gear panel's container has no such rule, which is the only reason identical markup landed correctly there and the fault read as "the gear panel broke the train panel". Racing specificity needs a selector naming every container the row might sit in and goes stale at the fourth; the row is a flex column now, which a column template cannot reach at all. Then `align-items: center`, harmless on the grid it was written for, meant "centre every child horizontally" on that flex column — the override that had been hiding it was the very rule that moved |
+
+| [rationale.md#an-input-does-not-wait-on-an-answer](rationale.md#an-input-does-not-wait-on-an-answer) | **The failure was the one thing the application said in a language nobody chose** | `TrainError` has carried a `note()` since it was written, and its keys are checked in both directions by the string tests — but the WebAssembly boundary mapped the error through `Display`, which is English prose written in Rust. Every other message crosses as `{ key, values }`. It also threw, so a geartrain that would not build — an ordinary thing to be holding mid-edit — arrived as an exception rather than as data, and the panel had nothing to show but a raw sentence. It crosses as a note and a stage number now, and only a boundary that actually broke is still an error |
+| — | **Naming a grid column is not naming a cell** | The box was written before the switches so that the row's `<label>` would target the box — `<button>` is labelable, and with the switches first, clicking a field's *name* pressed its `auto` toggle. Reading order was then restored with `grid-column`, and auto-placement does not go backwards: an item placed in column 3 leaves the cursor past column 2, so the switch that belongs there starts a new row. Every toggle and unit dropped a line below the box it qualifies. Each of them names its row as well now |
 
 ---
 
