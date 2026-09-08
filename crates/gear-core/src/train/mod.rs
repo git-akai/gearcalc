@@ -233,47 +233,114 @@ pub struct Widths {
 /// member needs before it is given one.
 pub(crate) const PROBE: f64 = 10.0;
 
-/// **What one member's ratings come to**, at whatever face width is in force.
+/// **What one mesh does to one member**: the two stresses it produces there,
+/// and the widths they belong to.
+///
+/// A member is not always in one mesh. A planet is in two, and a stage kind
+/// nobody has written yet may put a member in more — so a rating is taken over
+/// *however many there are* rather than over a named pair, and adding a mesh to
+/// a member is adding an entry to a list rather than an arm to an expression.
+///
+/// Both widths are here because they are genuinely two questions. A mesh
+/// carries a member at the narrower of its two members' faces, which differs
+/// from mesh to mesh; and the stresses may have been evaluated somewhere else
+/// entirely — at [`PROBE`], before any width was settled.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Loading {
+    /// Root bending stress this mesh produces on the member, MPa at
+    /// [`Self::measured_at`], under the torque the stage solved at. `None`
+    /// where the section has no rating — a ring with no fillet is the ordinary
+    /// way to get here.
+    pub bending: Option<f64>,
+    /// The member's **governing** contact stress in this mesh, MPa at
+    /// [`Self::measured_at`]: where its own dedendum is loaded alone.
+    pub contact: f64,
+    /// The face width both figures were evaluated at, mm.
+    pub measured_at: f64,
+    /// The width this mesh actually carries the member at, mm.
+    ///
+    /// Equal to [`Self::measured_at`] in two quite different cases, and it is
+    /// worth knowing which: during the probe pass, when no width has been
+    /// settled and none is needed ([`MemberRating::asks`]); and for a stage
+    /// that evaluated its stresses at the width it ended with, where there is
+    /// nothing to scale and the figures are the ones its own arithmetic
+    /// produced, bit for bit.
+    pub carried_at: f64,
+}
+
+impl Loading {
+    /// The two stresses as they stand at [`Self::carried_at`].
+    ///
+    /// Bending is inversely linear in width and contact goes as the inverse
+    /// square root of it, so a change of width is a scale rather than a second
+    /// solve — and where the two widths are equal this is the identity, which
+    /// is what lets a stage that evaluated at its final width keep its own
+    /// digits to the bit.
+    fn at_width(self) -> (Option<f64>, f64) {
+        let by = self.measured_at / self.carried_at;
+        (self.bending.map(|s| s * by), self.contact * by.sqrt())
+    }
+
+    /// **The same loading under `k` times the torque.**
+    ///
+    /// Bending is linear in torque and contact goes as its square root
+    /// (docs/reference.md#load-cases), so where a stage's power split does not
+    /// depend on the *magnitude* of what passes through it — which is every
+    /// kind here, and is a fact about each kind rather than about gearing — the
+    /// second load case is this rather than a second solve. A stage whose flow
+    /// does not have that property builds each case's loadings itself, which is
+    /// why they are held per case rather than as one list and a factor.
+    #[must_use]
+    pub(crate) fn under(self, k: f64) -> Self {
+        Self {
+            bending: self.bending.map(|s| s * k),
+            contact: self.contact * k.sqrt(),
+            ..self
+        }
+    }
+
+    /// Both load cases, for a stage whose ratings scale with the torque.
+    pub(crate) fn both_cases(loadings: &[Self], scale: LoadCase<f64>) -> LoadCase<Vec<Self>> {
+        LoadCase::of(|case| loadings.iter().map(|l| l.under(*scale.get(case))).collect())
+    }
+}
+
+/// **What one member's ratings come to**, over every mesh it is in.
 ///
 /// Every stage kind asks the same four questions of every member it builds —
 /// two stresses, each against two load cases, and the width each of those would
 /// need — and each of them had been writing the arithmetic out for itself. What
-/// genuinely differs between kinds is the *stress at a probe width* and *which
-/// allowable a reversed root answers to*, and both of those arrive here as
-/// values rather than being worked out again.
+/// genuinely differs between kinds is what the meshes do to the member and
+/// which allowable a reversed root answers to, and both arrive here as values.
 ///
-/// It is a scale rather than a second solve, and that is exact rather than
-/// convenient: bending is linear in torque and inversely linear in width, and
-/// contact goes as the square root of the first and the inverse square root of
-/// the second (docs/reference.md#load-cases). The spur stage re-evaluates
-/// instead, because its bending section answers to a load-sharing model that
-/// reads the width — see [`crate::strength::bending_section_shared`] — and a
-/// scale would be asserting the linearity the sharing ramp is allowed to break.
+/// **The worst mesh wins, figure by figure.** A planet's root is loaded by the
+/// sun on one flank and the ring on the other, at different tangential forces
+/// through different sections, and its flanks pit at whichever end of whichever
+/// path is worst — so neither figure is the sun mesh's by right. Taking the
+/// worse of the two was written out for contact and simply omitted for bending;
+/// here it is one fold over a list, which is the same answer for two meshes and
+/// an answer at all for three.
 pub(crate) struct MemberRating<'a> {
     /// The material as used, after any overrides.
     pub material: &'a Material,
-    /// Root bending stress at [`PROBE`], under the torque the two stresses were
-    /// evaluated at. `None` where the section has no rating — a ring with no
-    /// fillet is the ordinary way to get here.
-    pub bending: Option<f64>,
-    /// This member's **governing** contact stress at [`PROBE`], under the same
-    /// torque: where its own dedendum is loaded alone.
-    pub contact: f64,
     /// How the train treats a root loaded on both flanks.
     pub reversal: Reversal,
     /// ...and whether this member's is.
     pub reverses: bool,
-    /// Each case's torque as a multiple of the one above.
-    pub scale: LoadCase<f64>,
-    /// The face width the two stresses above were evaluated at, mm.
+    /// **Every mesh this member is in, in each load case.** One for an ordinary
+    /// gear, two for a planet, and a list rather than a pair so that neither is
+    /// the special case.
     ///
-    /// [`PROBE`] wherever they came from the probe pass, which is every caller
-    /// so far — but a stage that has already settled its widths can hand over
-    /// the figures it ended with instead, and the arithmetic is the same.
-    pub measured_at: f64,
+    /// Per case rather than one list and a factor, because "the second case is
+    /// the first times a number" is a claim about a *stage's power flow* rather
+    /// than about gearing. It holds for every kind here and
+    /// [`Loading::both_cases`] is how they say so; a kind whose flow does not
+    /// scale with what passes through it builds each case for itself, and needs
+    /// nothing added here to do it.
+    pub loadings: LoadCase<Vec<Loading>>,
 }
 
-/// The three rating fields of a [`GearResult`], at one face width.
+/// The three rating fields of a [`GearResult`], over every mesh a member is in.
 pub(crate) struct Rated {
     pub bending_stress: LoadCase<Option<f64>>,
     pub contact_stress: LoadCase<f64>,
@@ -281,30 +348,54 @@ pub(crate) struct Rated {
 }
 
 impl MemberRating<'_> {
-    /// The rating at a given face width.
-    pub(crate) fn at(&self, width: f64) -> Rated {
-        // The width the stresses were measured at over the width in force, which
-        // is the only thing either of them scales by beyond the load case.
-        let by = |case: Case| self.scale.get(case) * self.measured_at / width;
+    /// The rating: each mesh at the width it carries the member at, and the
+    /// worst of them.
+    pub(crate) fn rated(&self) -> Rated {
+        // A bending stress that no mesh could rate stays absent; one that any
+        // mesh could rate is that mesh's worst, and a mesh with no rating does
+        // not make an absence out of a figure another mesh has.
+        let worst = |case: Case| -> (Option<f64>, f64, f64) {
+            let mut bending: Option<f64> = None;
+            let mut contact = 0.0_f64;
+            let mut width = 0.0_f64;
+            for l in self.loadings.get(case) {
+                let (b, c) = l.at_width();
+                if let Some(b) = b {
+                    bending = Some(bending.map_or(b, |had: f64| had.max(b)));
+                }
+                if c >= contact {
+                    contact = c;
+                }
+                width = width.max(l.carried_at);
+            }
+            (bending, contact, width)
+        };
         Rated {
-            bending_stress: LoadCase::of(|c| self.bending.map(|s| s * by(c))),
-            contact_stress: LoadCase::of(|c| self.contact * by(c).sqrt()),
-            min_face_width: LoadCase::of(|c| Widths {
-                // Two allowables, because a reversed root endures less bending
-                // while its flank pits exactly as it did.
-                bending: self.bending.map(|s| {
-                    crate::strength::min_face_width_bending(
-                        s * by(c),
+            bending_stress: LoadCase::of(|c| worst(c).0),
+            contact_stress: LoadCase::of(|c| worst(c).1),
+            min_face_width: LoadCase::of(|c| {
+                // **Each figure is inverted at the width it was taken at**, and
+                // the widest mesh is the one that answers: a minimum is what
+                // this member would need, and it needs enough for every mesh it
+                // is in.
+                let (bending, contact, width) = worst(c);
+                Widths {
+                    // Two allowables, because a reversed root endures less
+                    // bending while its flank pits exactly as it did.
+                    bending: bending.map(|s| {
+                        crate::strength::min_face_width_bending(
+                            s,
+                            width,
+                            self.reversal
+                                .bending_allowable(self.material, c, self.reverses),
+                        )
+                    }),
+                    contact: crate::strength::min_face_width_contact(
+                        contact,
                         width,
-                        self.reversal
-                            .bending_allowable(self.material, c, self.reverses),
-                    )
-                }),
-                contact: crate::strength::min_face_width_contact(
-                    self.contact * by(c).sqrt(),
-                    width,
-                    allowable(self.material, c),
-                ),
+                        allowable(self.material, c),
+                    ),
+                }
             }),
         }
     }
@@ -314,10 +405,10 @@ impl MemberRating<'_> {
     /// Takes no width, because the answer does not depend on one: a minimum
     /// width is a stress inverted, and the stress it inverts scales with the
     /// width it was measured at by exactly the amount that cancels
-    /// (docs/reference.md#contact-stress). So this is what lets a stage size a
-    /// member before it has a width to size it at.
+    /// (docs/reference.md#contact-stress). So a stage can size a member from a
+    /// probe pass, before it has a width to size it at.
     pub(crate) fn asks(&self) -> LoadCase<Widths> {
-        self.at(self.measured_at).min_face_width
+        self.rated().min_face_width
     }
 }
 

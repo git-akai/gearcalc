@@ -30,7 +30,7 @@
 //! coefficient, and a designer who needs the derating can apply it knowingly.
 
 use super::{
-    Backlash, Case, ContactRatios, Cycles, GearResult, LoadCase, MemberRating, MeshReport,
+    Backlash, Case, ContactRatios, Cycles, GearResult, LoadCase, Loading, MemberRating, MeshReport,
     StageTorques, TrainError, Widths, PROBE,
 };
 use crate::auto::admissible_ranges;
@@ -877,6 +877,20 @@ pub fn solve_planetary_stage_with(
         )
     });
 
+    // **The planet's root under the ring mesh**, which is a different section
+    // under a different force: the sun and the ring load its two flanks, and
+    // neither is its rating by right. It had only the sun's, which is the half
+    // of `Loading` that had nowhere to go before a member could be in a list of
+    // meshes rather than in one.
+    let planet_ring_sf = bending_section(&planet, pr_path.contact_ratio).and_then(|section| {
+        bending_stress(
+            &section,
+            &planet,
+            &probe_load_pr,
+            StressConcentration::Iso6336,
+        )
+    });
+
     // **What each member's ratings come to**, from the probe pass — the same
     // four questions every stage kind asks of every member it builds, asked
     // through the one type that answers them (`train::MemberRating`). Bending
@@ -884,23 +898,34 @@ pub fn solve_planetary_stage_with(
     // figure, since pitting is compressive on whichever flank carries it, and
     // both of those live in there rather than in a pair of closures here.
     //
-    // The planet is in two meshes, so it takes the worse of its two contact
-    // figures — read at the probe width, where the two are directly comparable.
+    // **The set is three members over two meshes**, written as which meshes each
+    // member is in. The planet is the one in both, and it is the reason this is
+    // a list: taking the worse of two figures was written out for contact, left
+    // out for bending, and is one fold over the list for either.
     let scale = LoadCase::of(scale_case);
-    let stresses: [(Option<f64>, f64); 3] = [
-        (sun_sf, sp_probe.governing(0)),
-        (planet_sf, sp_probe.governing(1).max(pr_probe.governing(0))),
-        (ring_sf, pr_probe.governing(1)),
-    ];
-    let ratings: [MemberRating; 3] = std::array::from_fn(|i| MemberRating {
+    let loading = |bending, contact, carried_at| Loading {
+        bending,
+        contact,
+        measured_at: PROBE,
+        carried_at,
+    };
+    let rating = |i: usize, sp: f64, pr: f64| MemberRating {
         material: &mats[i],
-        bending: stresses[i].0,
-        contact: stresses[i].1,
         reversal,
         reverses: reverses[i],
-        scale,
-        measured_at: PROBE,
-    });
+        loadings: Loading::both_cases(
+            &match i {
+                0 => vec![loading(sun_sf, sp_probe.governing(0), sp)],
+                1 => vec![
+                    loading(planet_sf, sp_probe.governing(1), sp),
+                    loading(planet_ring_sf, pr_probe.governing(0), pr),
+                ],
+                _ => vec![loading(ring_sf, pr_probe.governing(1), pr)],
+            },
+            scale,
+        ),
+    };
+    let ratings: [MemberRating; 3] = std::array::from_fn(|i| rating(i, PROBE, PROBE));
     let asks = [
         ask_of("sun", &stage.sun, &ratings[0].asks()),
         ask_of("planet", &stage.planet, &ratings[1].asks()),
@@ -1019,9 +1044,9 @@ pub fn solve_planetary_stage_with(
     // narrower face carries the pair, so that is the width the load is spread
     // over — and it is the width the reported minimum has to be inverted at, or
     // a member wider than its mate is told it needs more face than it does, in
-    // proportion to how much wider it is. The planet is in two meshes and takes
-    // the narrower of them, which is the one that governs whichever figure won.
-    let rated_at = [sp_width, sp_width.min(pr_width), pr_width];
+    // proportion to how much wider it is. A member in two meshes answers to each
+    // at that mesh's own width, which is what `Loading` carries and why the
+    // planet no longer needs a width picked for it.
     // **A member's speed is its own.** It used to be read out of the shaft array
     // by role, which gave the planet the *carrier's* — the shaft it rides rather
     // than the one it spins on, and on a set with the ring held not even the
@@ -1038,7 +1063,7 @@ pub fn solve_planetary_stage_with(
         // square-root in it — so the peak and cyclic figures are the same
         // expression evaluated at the two scales rather than a second solve.
         // Which is what `MemberRating` is, for every stage kind at once.
-        let rated = ratings[which].at(rated_at[which]);
+        let rated = rating(which, sp_width, pr_width).rated();
         GearResult {
             profile_shift: params.profile_shift,
             addendum: params.addendum,
@@ -1164,6 +1189,85 @@ pub fn solve_planetary_stage_with(
 mod tests {
     use super::*;
     use crate::train::test_library;
+
+    /// **A planet's root answers to both of its meshes.**
+    ///
+    /// The sun loads one flank and the ring the other, and it had only the
+    /// sun's. The two tangential forces are equal — it is the same planet
+    /// transmitting through — so what separates them is the section each mesh's
+    /// contact ratio puts the load at, and the **width each mesh carries it
+    /// over**: the narrower of that pair's two faces. A narrow ring is the
+    /// ordinary way for the second mesh to be the worse one, and it is what the
+    /// second fixture is.
+    ///
+    /// Both orderings are exercised deliberately. A test that only ever met the
+    /// sun-governed case would pass against a stage that had gone back to
+    /// looking at one mesh, which is exactly what the first draft of this did.
+    #[test]
+    fn a_planets_root_answers_to_both_of_its_meshes() {
+        let lib = test_library();
+        let mut sun_won = false;
+        let mut ring_won = false;
+        for ring_face in [10.0_f64, 3.0] {
+            let stage = PlanetaryStage {
+                ring: StageGear {
+                    teeth: 60,
+                    profile_shift: Auto::fixed(0.0),
+                    face_width: Auto::fixed(ring_face),
+                    ..StageGear::default()
+                },
+                ..PlanetaryStage::default()
+            };
+            let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &lib)
+                .unwrap_or_else(|e| panic!("ring face {ring_face}: {e}"));
+            let got = r
+                .planet
+                .gear
+                .bending_stress
+                .peak
+                .expect("a planet has a root section");
+
+            // The two contributions, rebuilt from what the result reports rather
+            // than from the expression that produced them: each mesh's own
+            // section under its own load, over the width that mesh carries.
+            let built = stage.built(stage.shifts()).unwrap();
+            let planets = f64::from(stage.planets);
+            let sp_width = r.planet.gear.face_width.min(r.sun.face_width);
+            let pr_width = r.planet.gear.face_width.min(r.ring.face_width);
+            let each = |contact_ratio: f64, torque: f64, b: f64| {
+                let section = bending_section(&built.planet, contact_ratio).unwrap();
+                bending_stress(
+                    &section,
+                    &built.planet,
+                    &Load::new(torque, b),
+                    StressConcentration::Iso6336,
+                )
+                .unwrap()
+            };
+            let from_sun = each(
+                built.sp_path.contact_ratio,
+                Load::new((r.torques[0] / planets).abs(), sp_width)
+                    .across_mesh(&built.sun, &built.planet)
+                    .torque,
+                sp_width,
+            );
+            let from_ring = each(
+                built.pr_path.contact_ratio,
+                (r.torques[2] / planets).abs() / built.pr_mesh.ratio(),
+                pr_width,
+            );
+            assert!(
+                (got - from_sun.max(from_ring)).abs() < 1e-9 * got,
+                "ring face {ring_face}: reported {got}, sun {from_sun}, ring {from_ring}"
+            );
+            sun_won |= from_sun > from_ring;
+            ring_won |= from_ring > from_sun;
+        }
+        assert!(
+            sun_won && ring_won,
+            "one fixture each way, or the max is never asked a question"
+        );
+    }
 
     /// **A ring that cannot be rated for bending costs the rating, not the set.**
     ///

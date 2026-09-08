@@ -35,7 +35,9 @@
 //! put through, given a basic ratio rather than a set of planetary counts to
 //! derive one from.
 
-use super::{GearResult, LoadCase, MemberRating, MeshReport, StageTorques, TrainError, PROBE};
+use super::{
+    GearResult, LoadCase, Loading, MemberRating, MeshReport, StageTorques, TrainError, PROBE,
+};
 use crate::auto::admissible_ranges;
 use crate::contact::{efficiency, ContactPath, Directional, Drive};
 use crate::hula::{self, Offset, Split, Teeth};
@@ -915,15 +917,25 @@ pub fn solve_hula_stage_with(
         // are in that order everywhere below.
         let members = [pair.pinion, pair.ring];
         let sections = [Some(&pinion_section), ring_section.as_ref()];
-        let ratings: [MemberRating; 2] = std::array::from_fn(|slot| MemberRating {
+        // **Each gear of this stage is in exactly one mesh**, including the two
+        // on the wobble body — they are two gears on one shaft, not one gear
+        // meeting two mates — so every member's rating is a list of one. The
+        // list is what makes that a fact about this arrangement rather than an
+        // assumption in the machinery.
+        let rating = |slot: usize, carried_at: f64| MemberRating {
             material: &materials[members[slot]],
-            bending: sections[slot].and_then(&bending_at),
-            contact: probe_cs.governing(slot),
             reversal,
             reverses,
-            scale,
-            measured_at: PROBE,
-        });
+            loadings: Loading::both_cases(
+                &[Loading {
+                    bending: sections[slot].and_then(&bending_at),
+                    contact: probe_cs.governing(slot),
+                    measured_at: PROBE,
+                    carried_at,
+                }],
+                scale,
+            ),
+        };
 
         // **A member's automatic width is the largest ask in its mesh**, because
         // the narrower face carries the pair — see the spur stage for the fault
@@ -938,7 +950,7 @@ pub fn solve_hula_stage_with(
             }
             wanted = wanted.max(
                 g.face_sources
-                    .width_for(&ratings[slot].asks(), g.face_width.manual),
+                    .width_for(&rating(slot, PROBE).asks(), g.face_width.manual),
             );
         }
         let widths = members.map(|i| stage.gears[i].face_width.resolve(wanted));
@@ -947,7 +959,7 @@ pub fn solve_hula_stage_with(
         let effective = widths[0].min(widths[1]);
 
         for (slot, &i) in members.iter().enumerate() {
-            let rated = ratings[slot].at(effective);
+            let rated = rating(slot, effective).rated();
             let input = &stage.gears[i];
             let params = built(index, layout.shift, i);
             let is_ring = i == pair.ring;

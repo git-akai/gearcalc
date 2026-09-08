@@ -1608,6 +1608,16 @@ by quoting the factor.
 Bending is per gear for the ordinary reason: each tooth has its own root section
 and form factor.
 
+**A member is rated over every mesh it is in, and the worst one answers.** Most
+members are in one; a planet is in two, and a stage kind not yet written may put
+one in more — so this is a fold over a list rather than a pair of names. The two
+meshes a planet is in carry the *same* tangential force, since it is the same
+planet transmitting through, and what separates them is the section each mesh's
+contact ratio puts the load at and the width that mesh carries it over — the
+narrower of its own pair. A narrow ring is the ordinary way for the second mesh
+to be the worse one: at a 3 mm ring against 10 mm elsewhere, the ring mesh loads
+the planet's root to 45.6 MPa where the sun mesh gives 16.6.
+
 **An automatic face width is sized to the mesh, not to one gear.** The narrower
 face carries the pair, so each automatic width resolves to the largest ask any
 member of that mesh has. A member in two meshes — a planet — answers to both.

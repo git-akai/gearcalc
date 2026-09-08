@@ -7,8 +7,8 @@
 //! the train that strings them together.
 
 use super::{
-    allowable, Backlash, Case, ContactRatios, Cycles, GearResult, LoadCase, SpurResult,
-    StageTorques, TrainError, Widths,
+    Backlash, Case, ContactRatios, Cycles, GearResult, LoadCase, Loading, MemberRating, SpurResult,
+    StageTorques, TrainError, PROBE,
 };
 use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift};
 use crate::contact::{efficiency, ContactPath, Directional, Drive, LoadSharing};
@@ -17,8 +17,8 @@ use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
 use crate::strength::{
-    bending_section_shared, bending_stress, contact_stress, min_face_width_bending,
-    min_face_width_contact, Load, StressConcentration, PARALLEL_AXES,
+    bending_section_shared, bending_stress, contact_stress, Load, StressConcentration,
+    PARALLEL_AXES,
 };
 use crate::tooth::Tooth;
 
@@ -717,7 +717,6 @@ pub fn solve_spur_stage_with(
     // --- face width. `b_min` does not depend on the `b` it was measured at
     // (docs/reference.md#contact-stress), so one evaluation at any width gives every minimum, and
     // nothing has to be iterated.
-    const PROBE: f64 = 10.0;
     let e_star = contact_modulus(&materials[0], &materials[1]);
 
     // The critical section, and the share of the load acting on it. With
@@ -758,25 +757,31 @@ pub fn solve_spur_stage_with(
     // A parallel-axis gear's root is loaded both ways only when the drive
     // reverses; nothing about the pair itself reverses it.
     let reverses = reversal.reverses(false);
-    let probe_widths = |i: usize| -> LoadCase<Widths> {
-        LoadCase::of(|case| {
-            let (cs, sf) = probed.get(case);
-            Widths {
-                bending: sf[i].map(|s| {
-                    let allow = reversal.bending_allowable(&materials[i], case, reverses);
-                    min_face_width_bending(s, PROBE, allow)
-                }),
+    // **A pair is one mesh, so each member is in a list of one** — and it says
+    // so through the same type an epicyclic set's planet says it is in two.
+    // What is this stage's own is that each load case is *evaluated* rather
+    // than scaled: it has its own torque, and nothing here has to claim the
+    // stresses are linear in it (`Loading::both_cases` is that claim, and the
+    // stages that make it are the ones whose power split does not depend on the
+    // magnitude passing through them).
+    let rating = |i: usize,
+                  at: &LoadCase<(crate::strength::ContactStress, [Option<f64>; 2])>,
+                  measured_at: f64,
+                  carried_at: f64| MemberRating {
+        material: &materials[i],
+        reversal,
+        reverses,
+        loadings: LoadCase::of(|case| {
+            let (cs, sf) = at.get(case);
+            vec![Loading {
+                bending: sf[i],
                 // **This gear's** governing point, not the pair's envelope: the
-                // width a gear needs follows from the stress it is rated at. And
-                // the material's own allowable whatever the drive does: pitting
-                // is compressive on whichever flank carries it.
-                contact: min_face_width_contact(
-                    cs.governing(i),
-                    PROBE,
-                    allowable(&materials[i], case),
-                ),
-            }
-        })
+                // width a gear needs follows from the stress it is rated at.
+                contact: cs.governing(i),
+                measured_at,
+                carried_at,
+            }]
+        }),
     };
 
     let mut notes = Vec::new();
@@ -825,8 +830,10 @@ pub fn solve_spur_stage_with(
             notes
                 .push(Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", (i + 1).to_string()));
         }
-        g.face_sources
-            .width_for(&probe_widths(i), g.face_width.manual)
+        g.face_sources.width_for(
+            &rating(i, &probed, PROBE, PROBE).asks(),
+            g.face_width.manual,
+        )
     });
     let wanted = asks[0].max(asks[1]);
     let widths = [0usize, 1].map(|i| stage.gears[i].face_width.resolve(wanted));
@@ -838,19 +845,20 @@ pub fn solve_spur_stage_with(
     // Every rating again, at the width actually in force. Two evaluations
     // rather than one, and the same expression: a load case is a torque, and
     // nothing else about the stage knows which one it is looking at.
-    let rate = |case: Case| -> Result<(crate::strength::ContactStress, [Option<f64>; 2], Load), TrainError> {
-        let load = Load::new(torques.at(case), effective);
-        let cs = contact_stress(&path, &operating, &g[0], PARALLEL_AXES, &load, e_star)
-            .ok_or(TrainError::NoContact)?;
-        let sf = [0usize, 1].map(|i| {
-            let li = load.across_mesh(&g[0], &g[i]);
-            // The share this tooth carries where it is rated — exactly 1 unless
-            // a sharing model was asked for, so nothing scales by default.
-            bending_stress(&sections[i], &g[i], &li, StressConcentration::Iso6336)
-                .map(|s| s * load_share[i])
-        });
-        Ok((cs, sf, load))
-    };
+    let rate =
+        |case: Case| -> Result<(crate::strength::ContactStress, [Option<f64>; 2]), TrainError> {
+            let load = Load::new(torques.at(case), effective);
+            let cs = contact_stress(&path, &operating, &g[0], PARALLEL_AXES, &load, e_star)
+                .ok_or(TrainError::NoContact)?;
+            let sf = [0usize, 1].map(|i| {
+                let li = load.across_mesh(&g[0], &g[i]);
+                // The share this tooth carries where it is rated — exactly 1 unless
+                // a sharing model was asked for, so nothing scales by default.
+                bending_stress(&sections[i], &g[i], &li, StressConcentration::Iso6336)
+                    .map(|s| s * load_share[i])
+            });
+            Ok((cs, sf))
+        };
     let rated = LoadCase {
         peak: rate(Case::Peak)?,
         cyclic: rate(Case::Cyclic)?,
@@ -865,6 +873,9 @@ pub fn solve_spur_stage_with(
     let mut gears = Vec::with_capacity(2);
     for i in 0..2 {
         let load_i = load.across_mesh(&g[0], &g[i]);
+        // Measured at the width in force and carried at it, so nothing scales
+        // and the figures are the ones this stage's own arithmetic produced.
+        let this = rating(i, &rated, effective, effective).rated();
         gears.push(GearResult {
             profile_shift: p[i].profile_shift,
             addendum: p[i].addendum,
@@ -880,25 +891,9 @@ pub fn solve_spur_stage_with(
                 bending: 0.0,
                 contact: 0.0,
             },
-            bending_stress: LoadCase {
-                peak: rated.peak.1[i],
-                cyclic: rated.cyclic.1[i],
-            },
-            contact_stress: LoadCase::of(|case| rated.get(case).0.governing(i)),
-            min_face_width: LoadCase::of(|case| {
-                let (cs, sf, _) = rated.get(case);
-                Widths {
-                    bending: sf[i].map(|s| {
-                        let allow = reversal.bending_allowable(&materials[i], case, reverses);
-                        min_face_width_bending(s, effective, allow)
-                    }),
-                    contact: min_face_width_contact(
-                        cs.governing(i),
-                        effective,
-                        allowable(&materials[i], case),
-                    ),
-                }
-            }),
+            bending_stress: this.bending_stress,
+            contact_stress: this.contact_stress,
+            min_face_width: this.min_face_width,
             clamps: g[i].clamps.notes.clone(),
             notes: gear_notes(i),
             material: materials[i].clone(),
