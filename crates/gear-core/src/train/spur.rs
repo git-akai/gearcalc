@@ -96,6 +96,23 @@ pub struct StageGear {
     pub face_width: Auto<f64>,
     /// Which of the four ratings an automatic face width is sized from.
     pub face_sources: super::FaceSources,
+    /// **Thickness of the rim under this member's teeth, mm** — `s_R`, and with
+    /// it the rim thickness factor `Y_B` (ISO 6336-3:2019, Clause 9).
+    ///
+    /// `None` is the default and means *nobody said*, which is not the same
+    /// claim as a thick rim even though both rate at `Y_B = 1`: a gear whose rim
+    /// was never described cannot be told it is too thin, and one that was can.
+    /// Given, it de-rates the root — a thin rim moves the failure out of the
+    /// fillet and through the rim — and never relieves it.
+    ///
+    /// Measured against the whole tooth depth on a rack-cut member and against
+    /// the normal module on a ring, which is the clause's own distinction and
+    /// the only one: see [`RimSupport`](crate::strength::RimSupport).
+    ///
+    /// It reaches bending alone. A rim under the teeth has nothing to do with
+    /// the pressure between two flanks, so no contact rating reads it.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub rim_thickness: Option<f64>,
     /// Name of a material in the library.
     pub material: String,
     /// Properties replaced for this gear only. Empty means "as the library
@@ -379,6 +396,9 @@ impl Default for StageGear {
             root_radius: 0.38,
             face_width: Auto::fixed(10.0),
             face_sources: super::FaceSources::default(),
+            // A rim nobody described: `Y_B` is 1, and the gear cannot be told
+            // its rim is thin because it has not said what its rim is.
+            rim_thickness: None,
             material: "4340 Hardened Steel".to_string(),
             material_overrides: Overrides::default(),
         }
@@ -719,14 +739,21 @@ pub fn solve_spur_stage_with(
     // The critical section, and the share of the load acting on it. With
     // sharing off — the default — this *is* `bending_section` and a share of
     // exactly 1, so the ordinary rating is untouched to the bit.
-    let bending =
-        [0usize, 1].map(|i| super::Bending::of(&g[i], path.contact_ratio, stage.load_sharing));
+    let bending = [0usize, 1].map(|i| {
+        super::Bending::of(
+            &g[i],
+            path.contact_ratio,
+            stage.load_sharing,
+            stage.gears[i].rim_thickness,
+        )
+    });
     let [Some(first), Some(second)] = bending else {
         return Err(TrainError::NoRootSection);
     };
     let bending = [first, second];
     let sections = [bending[0].section, bending[1].section];
     let load_share = [bending[0].share, bending[1].share];
+    let factors = [bending[0].factors, bending[1].factors];
 
     // Every rating at a probe width, one set per load case. `b_min` does not
     // depend on the `b` it was measured at, so this is still one evaluation per
@@ -739,8 +766,14 @@ pub fn solve_spur_stage_with(
             let li = load.across_mesh(&g[0], &g[i]);
             // The share this tooth carries where it is rated — exactly 1 unless
             // a sharing model was asked for, so nothing scales by default.
-            bending_stress(&sections[i], &g[i], &li, StressConcentration::Iso6336)
-                .map(|s| s * load_share[i])
+            bending_stress(
+                &sections[i],
+                &g[i],
+                &li,
+                StressConcentration::Iso6336,
+                factors[i],
+            )
+            .map(|s| s * load_share[i])
         });
         Ok((cs, sf))
     };
@@ -775,6 +808,7 @@ pub fn solve_spur_stage_with(
                 contact: cs.governing(i),
                 measured_at,
                 carried_at,
+                helix: factors[i].helix,
             }]
         }),
     };
@@ -788,6 +822,8 @@ pub fn solve_spur_stage_with(
     let gear_notes = |i: usize| {
         let mut out = Vec::new();
         out.extend(super::notch_outside_fit(&sections[i]));
+        // ...and whether its rim is thinner than ISO 6336-3 will rate.
+        out.extend(super::rim_below_minimum(&factors[i]));
         // ...and whether the cutter has eaten into the flank, which no toggle
         // can prevent once a shift is given and `no undercut` is off.
         out.extend(super::undercut_note(&g[i]));
@@ -850,8 +886,14 @@ pub fn solve_spur_stage_with(
                 let li = load.across_mesh(&g[0], &g[i]);
                 // The share this tooth carries where it is rated — exactly 1 unless
                 // a sharing model was asked for, so nothing scales by default.
-                bending_stress(&sections[i], &g[i], &li, StressConcentration::Iso6336)
-                    .map(|s| s * load_share[i])
+                bending_stress(
+                    &sections[i],
+                    &g[i],
+                    &li,
+                    StressConcentration::Iso6336,
+                    factors[i],
+                )
+                .map(|s| s * load_share[i])
             });
             Ok((cs, sf))
         };
@@ -948,7 +990,11 @@ pub fn solve_spur_stage_with(
     // What the sharing model has to say about this mesh, if anything — raised
     // where the section and the share are worked out, so no stage kind has to
     // remember to ask (`train::Bending`). One mesh, so one note at most.
-    notes.extend(bending[0].note.clone());
+    // **A pair is one mesh, so one member answers for it.** Both `Bending`s
+    // carry the same mesh-level notes — the sharing band and the helix angle are
+    // the mesh's, not the member's — so taking either gives the list one entry
+    // per finding rather than two.
+    notes.extend(bending[0].notes.iter().cloned());
 
     Ok(SpurResult {
         ratio: f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth),

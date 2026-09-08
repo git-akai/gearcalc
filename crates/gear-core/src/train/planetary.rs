@@ -789,14 +789,29 @@ pub fn solve_planetary_stage_with(
     // Each carries its own section, its own share of the mesh load, and what
     // the sharing model has to say about that mesh.
     let sharing = stage.load_sharing;
-    let sun_bending = super::Bending::of(&sun, sp_path.contact_ratio, sharing)
-        .ok_or(TrainError::NoRootSection)?;
-    let planet_bending = super::Bending::of(&planet, sp_path.contact_ratio, sharing)
-        .ok_or(TrainError::NoRootSection)?;
+    let sun_bending = super::Bending::of(
+        &sun,
+        sp_path.contact_ratio,
+        sharing,
+        stage.sun.rim_thickness,
+    )
+    .ok_or(TrainError::NoRootSection)?;
+    let planet_bending = super::Bending::of(
+        &planet,
+        sp_path.contact_ratio,
+        sharing,
+        stage.planet.rim_thickness,
+    )
+    .ok_or(TrainError::NoRootSection)?;
     // The planet's *other* root: a different section under a different force,
     // since the sun and the ring load its two flanks and neither is its rating
     // by right.
-    let planet_ring_bending = super::Bending::of(&planet, pr_path.contact_ratio, sharing);
+    let planet_ring_bending = super::Bending::of(
+        &planet,
+        pr_path.contact_ratio,
+        sharing,
+        stage.planet.rim_thickness,
+    );
     // **A ring that cannot be rated for bending refuses the rating, not the
     // stage.**
     //
@@ -811,7 +826,12 @@ pub fn solve_planetary_stage_with(
     // Nothing downstream needs telling: a bending stress is already an `Option`
     // for the worm stage's sake, so the width it would have asked for is simply
     // not asked for, and the member's own clamps say why the fillet is missing.
-    let ring_bending = super::Bending::of_ring(&ring, pr_path.contact_ratio, sharing);
+    let ring_bending = super::Bending::of_ring(
+        &ring,
+        pr_path.contact_ratio,
+        sharing,
+        stage.ring.rim_thickness,
+    );
 
     // Every rating is linear or square-root in the torque, and the planetary's
     // power split is **not** a function of its magnitude: `w = sgn(T_s(ω_s − ω_c))`
@@ -846,6 +866,13 @@ pub fn solve_planetary_stage_with(
     // is judged from the one its rating came out of, and the sun mesh is that
     // for a planet unless the ring mesh is worse — which `notch_outside_fit`
     // cannot know, so it is asked of both and either may speak.
+    // The rim under each member, where one was described. Per member rather
+    // than per mesh, which is why the planet's two `Bending`s give one entry.
+    let rim_factors = [
+        Some(sun_bending.factors),
+        Some(planet_bending.factors),
+        ring_bending.as_ref().map(|b| b.factors),
+    ];
     let sections = [
         vec![Some(&sun_bending.section)],
         vec![
@@ -865,6 +892,9 @@ pub fn solve_planetary_stage_with(
                 .filter_map(|s| super::notch_outside_fit(s))
                 .take(1),
         );
+        // ...and whether this member's rim is thinner than the clause will
+        // rate. One rim per member, so unlike the notch it is asked once.
+        out.extend(rim_factors[i].as_ref().and_then(super::rim_below_minimum));
         out.extend(cut_by_a_rack[i].and_then(super::undercut_note));
         out.extend(reversal.note_for(reverses[i]));
         // **A bound that moved this member's own number belongs to it**, not to
@@ -888,7 +918,14 @@ pub fn solve_planetary_stage_with(
     // The share this tooth carries where it is rated — exactly 1 unless a
     // sharing model was asked for, so nothing scales by default.
     let stress_at = |b: &super::Bending, on: &Tooth, load: &Load| {
-        bending_stress(&b.section, on, load, StressConcentration::Iso6336).map(|s| s * b.share)
+        bending_stress(
+            &b.section,
+            on,
+            load,
+            StressConcentration::Iso6336,
+            b.factors,
+        )
+        .map(|s| s * b.share)
     };
     let sun_sf = stress_at(&sun_bending, &sun, &probe_load_sp);
     let planet_sf = stress_at(
@@ -917,11 +954,17 @@ pub fn solve_planetary_stage_with(
     // a list: taking the worse of two figures was written out for contact, left
     // out for bending, and is one fold over the list for either.
     let scale = LoadCase::of(scale_case);
-    let loading = |bending, contact, carried_at| Loading {
+    // **One helix law for the whole set.** `Y_β` is a function of `|β|`, the
+    // normal module and the face width, and the first two are shared by every
+    // member of a planetary set — they have to be, or nothing would mesh — so
+    // both meshes and all three members answer to the same one.
+    let helix = crate::strength::HelixFactor::of(&sun.params);
+    let loading = |bending, contact, carried_at, helix| Loading {
         bending,
         contact,
         measured_at: PROBE,
         carried_at,
+        helix,
     };
     let rating = |i: usize, sp: f64, pr: f64| MemberRating {
         material: &mats[i],
@@ -929,12 +972,12 @@ pub fn solve_planetary_stage_with(
         reverses: reverses[i],
         loadings: Loading::both_cases(
             &match i {
-                0 => vec![loading(sun_sf, sp_probe.governing(0), sp)],
+                0 => vec![loading(sun_sf, sp_probe.governing(0), sp, helix)],
                 1 => vec![
-                    loading(planet_sf, sp_probe.governing(1), sp),
-                    loading(planet_ring_sf, pr_probe.governing(0), pr),
+                    loading(planet_sf, sp_probe.governing(1), sp, helix),
+                    loading(planet_ring_sf, pr_probe.governing(0), pr, helix),
                 ],
-                _ => vec![loading(ring_sf, pr_probe.governing(1), pr)],
+                _ => vec![loading(ring_sf, pr_probe.governing(1), pr, helix)],
             },
             scale,
         ),
@@ -951,7 +994,7 @@ pub fn solve_planetary_stage_with(
     // which. The note carries its own contact ratio, so two entries are two
     // findings rather than a repeat.
     for b in [Some(&sun_bending), planet_ring_bending.as_ref()] {
-        notes.extend(b.and_then(|b| b.note.clone()));
+        notes.extend(b.into_iter().flat_map(|b| b.notes.iter().cloned()));
     }
     // **A member's automatic width is the largest requirement of any mesh it is
     // in**, because the narrower face carries the pair — see the spur stage for
@@ -1263,6 +1306,10 @@ mod tests {
                     &built.planet,
                     &Load::new(torque, b),
                     StressConcentration::Iso6336,
+                    crate::strength::BendingFactors {
+                        helix: crate::strength::HelixFactor::of(&built.planet.params),
+                        rim: None,
+                    },
                 )
                 .unwrap()
             };

@@ -82,6 +82,7 @@ fn main() {
             args.get(3).and_then(|s| s.parse().ok()).unwrap_or(2.0),
             args.get(4).map_or("4340 Hardened Steel", String::as_str),
             args.get(5).and_then(|s| s.parse().ok()).unwrap_or(0.0),
+            args.get(6).and_then(|s| s.parse().ok()),
         ),
         Some("dxf") => dxf(
             args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
@@ -1089,14 +1090,22 @@ fn print_worm_stage(k: usize, st: &gear_core::train::WormStage, s: &gear_core::t
 /// actually consumes the material library. Both gears are rated, because the
 /// pinion is not automatically the worse one — it sees the higher contact
 /// stress but the wheel may have the weaker root.
-fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f64) {
+fn strength_report(
+    z1: u32,
+    z2: u32,
+    torque: f64,
+    material_name: &str,
+    helix: f64,
+    rim: Option<f64>,
+) {
     use gear_core::contact::{efficiency, ContactPath, Drive};
     use gear_core::material::contact_modulus;
     use gear_core::mesh::{Mesh, MeshKind};
     use gear_core::metrology::base_helix_angle;
     use gear_core::strength::{
         bending_section, bending_stress, contact_stress, min_face_width_bending,
-        min_face_width_contact, Load, StressConcentration, PARALLEL_AXES,
+        min_face_width_contact, BendingFactors, HelixFactor, Load, RimSupport, StressConcentration,
+        PARALLEL_AXES,
     };
 
     let lib = gear_io::default_library();
@@ -1198,7 +1207,15 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
         };
         let load_g = load.across_mesh(&g1, g);
         let ys = sec.stress_correction(StressConcentration::Iso6336);
-        let Some(sf) = bending_stress(&sec, g, &load_g, StressConcentration::Iso6336) else {
+        // `Y_β` from the pair's own helix and module; `Y_B` only where a rim
+        // was named on the command line, since a rim nobody described rates at
+        // 1 and is not the same claim as a thick one.
+        let factors = BendingFactors {
+            helix: HelixFactor::of(&g.params),
+            rim: rim.map(|s| RimSupport::external(s, g.ra - g.rf)),
+        };
+        let Some(sf) = bending_stress(&sec, g, &load_g, StressConcentration::Iso6336, factors)
+        else {
             println!(
                 "  {label:<6} {:>8.4} {:>8} {:>9} - stress correction undefined (tangency on the flank)",
                 sec.form_factor, "-", "-"
@@ -1210,9 +1227,34 @@ fn strength_report(z1: u32, z2: u32, torque: f64, material_name: &str, helix: f6
             sec.form_factor,
             ys.unwrap_or(1.0),
             sf,
-            min_face_width_bending(sf, B, mat.fatigue_allowable.value),
-            min_face_width_bending(sf, B, mat.ultimate_allowable.value),
+            min_face_width_bending(sf, B, mat.fatigue_allowable.value, factors.helix),
+            min_face_width_bending(sf, B, mat.ultimate_allowable.value, factors.helix),
         );
+        // The two member-level factors of `σ_F0`, printed only when they are
+        // doing something: on a spur gear with no rim named they are both
+        // exactly 1, and a column of ones is noise.
+        if helix != 0.0 || rim.is_some() {
+            println!(
+                "         Y_beta {:.4} (eps_beta {:.4}){}",
+                factors.helix.at(B),
+                factors.helix.overlap_ratio(B),
+                factors.rim.map_or_else(String::new, |r| format!(
+                    "   Y_B {:.4} (s_R/h_t {:.3})",
+                    r.factor(),
+                    r.ratio()
+                )),
+            );
+            if !factors.helix.in_range() {
+                println!(
+                    "         note: ISO 6336-3 asks for Y_beta above 25 deg to be confirmed by experience"
+                );
+            }
+            if factors.rim.is_some_and(|r| !r.in_range()) {
+                println!(
+                    "         note: ISO 6336-3 says a backup ratio at or below 0.5 shall be avoided"
+                );
+            }
+        }
         if !sec.notch_parameter_in_range() {
             println!(
                 "         note: notch parameter q_s = {:.2} is outside the ISO fit's range, so",

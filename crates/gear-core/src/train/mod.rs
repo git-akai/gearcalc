@@ -78,8 +78,11 @@ impl ContactRatios {
     /// width that carries the pair.
     #[must_use]
     pub fn of(transverse: f64, width: f64, helix_angle: f64, normal_module: f64) -> Self {
+        // `ε_β` is read from the one place that defines it, because the bending
+        // rating now needs the same quantity — `Y_β` is a function of it — and
+        // two copies of the same line are two chances to disagree.
         let overlap =
-            width * helix_angle.to_radians().sin().abs() / (std::f64::consts::PI * normal_module);
+            crate::strength::HelixFactor::new(helix_angle, normal_module).overlap_ratio(width);
         Self {
             transverse,
             overlap,
@@ -248,23 +251,41 @@ pub(crate) struct Bending {
     /// Exactly 1 where no sharing model was asked for, so the ordinary rating
     /// is untouched to the bit.
     pub share: f64,
-    /// **The ramp outside the band it was described in.** It is a first-order
-    /// stand-in for a mesh with a single-pair zone; at `ε_n ≥ 2` there is no
-    /// such zone, the ramp never reaches a full share, and it relieves the
-    /// tooth by about a third. That is a large number from an uncalibrated
-    /// model, in the unconservative direction — exactly what
+    /// **`Y_β` and `Y_B`** — the factors of `σ_F0` that are the member's and its
+    /// blank's rather than its root section's. Both are exactly 1 on a spur
+    /// member whose rim nobody described, which is every gear this crate rated
+    /// before they existed.
+    pub factors: crate::strength::BendingFactors,
+    /// **What this mesh has to say about the model it was rated under.** Both
+    /// entries are the *mesh's*, so a stage raises them once per mesh rather
+    /// than once per member; a member's own findings — its notch band, its rim —
+    /// go in its own list.
+    ///
+    /// The first is the sharing ramp outside the band it was described in. It is
+    /// a first-order stand-in for a mesh with a single-pair zone; at `ε_n ≥ 2`
+    /// there is no such zone, the ramp never reaches a full share, and it
+    /// relieves the tooth by about a third. That is a large number from an
+    /// uncalibrated model, in the unconservative direction — exactly what
     /// `docs/rationale.md` refuses to let pass silently — so it is said where
     /// the figure is shown. The model is still the one the designer asked for;
     /// what they are owed is knowing it is extrapolating.
-    pub note: Option<Note>,
+    ///
+    /// The second is the helix angle past where ISO 6336-3 vouches for `Y_β`
+    /// alone. A list rather than an `Option` because it was one and is two, and
+    /// a third is a `push`.
+    pub notes: Vec<Note>,
 }
 
 impl Bending {
     /// For a rack-cut member.
+    ///
+    /// `rim` is the thickness of the rim under its teeth, mm, or `None` where
+    /// nobody said — see [`crate::strength::RimSupport`].
     pub(crate) fn of(
         tooth: &crate::tooth::Tooth,
         contact_ratio: f64,
         model: crate::contact::LoadSharing,
+        rim: Option<f64>,
     ) -> Option<Self> {
         let (section, share) =
             crate::strength::bending_section_shared(tooth, contact_ratio, model)?;
@@ -274,6 +295,12 @@ impl Bending {
             share,
             model,
             contact_ratio / (cos_bb * cos_bb),
+            crate::strength::BendingFactors {
+                helix: crate::strength::HelixFactor::of(&tooth.params),
+                // An external rim is measured against the whole depth of the
+                // tooth it supports, which is this gear's own tip-to-root.
+                rim: rim.map(|s| crate::strength::RimSupport::external(s, tooth.ra - tooth.rf)),
+            },
         ))
     }
 
@@ -283,6 +310,7 @@ impl Bending {
         ring: &crate::ring::Ring,
         contact_ratio: f64,
         model: crate::contact::LoadSharing,
+        rim: Option<f64>,
     ) -> Option<Self> {
         let (section, share) =
             crate::strength::ring_bending_section_shared(ring, contact_ratio, model)?;
@@ -292,6 +320,12 @@ impl Bending {
             share,
             model,
             contact_ratio / (cos_bb * cos_bb),
+            crate::strength::BendingFactors {
+                helix: crate::strength::HelixFactor::of(&ring.params),
+                // A ring's is measured against the normal module instead. The
+                // clause's two references are the whole of the difference.
+                rim: rim.map(|s| crate::strength::RimSupport::internal(s, ring.params.module)),
+            },
         ))
     }
 
@@ -300,15 +334,47 @@ impl Bending {
         share: f64,
         model: crate::contact::LoadSharing,
         eps_n: f64,
+        factors: crate::strength::BendingFactors,
     ) -> Self {
         let out_of_band = !matches!(model, crate::contact::LoadSharing::None) && eps_n >= 2.0;
+        let mut notes = Vec::new();
+        if out_of_band {
+            notes.push(Note::new(key::STAGE_LOAD_SHARING_OUT_OF_BAND).number("ratio", eps_n, 3));
+        }
+        if !factors.helix.in_range() {
+            notes.push(
+                Note::new(key::STAGE_HELIX_UNCONFIRMED)
+                    .number("beta", factors.helix.helix_angle(), 1)
+                    .number("limit", crate::strength::HELIX_CONFIRMED_TO_DEG, 0),
+            );
+        }
         Self {
             section,
             share,
-            note: out_of_band
-                .then(|| Note::new(key::STAGE_LOAD_SHARING_OUT_OF_BAND).number("ratio", eps_n, 3)),
+            factors,
+            notes,
         }
     }
+}
+
+/// The note a rating raises about one member's **rim**: it is thinner than the
+/// clause will rate.
+///
+/// ISO 6336-3:2019, 9.3 says a backup ratio at or below 0,5 (external) or a rim
+/// below 1,75 normal modules (internal) "shall be avoided" rather than giving a
+/// value for it. `Y_B` still evaluates there and this crate still reports it —
+/// the fit is a logarithm and does not fall over — but a design that far in is
+/// past where the standard will go, and it says so instead of returning a
+/// number that looks like the others.
+///
+/// Beside [`notch_outside_fit`] rather than in [`Bending::notes`] because a rim
+/// belongs to a **member**, where those belong to a mesh: two members of one
+/// mesh have two rims and one helix angle.
+pub(crate) fn rim_below_minimum(factors: &crate::strength::BendingFactors) -> Option<Note> {
+    factors
+        .rim
+        .filter(|r| !r.in_range())
+        .map(|r| Note::new(key::STAGE_RIM_BELOW_MINIMUM).number("ratio", r.ratio(), 2))
 }
 
 /// **What one mesh does to one member**: the two stresses it produces there,
@@ -344,19 +410,34 @@ pub(crate) struct Loading {
     /// nothing to scale and the figures are the ones its own arithmetic
     /// produced, bit for bit.
     pub carried_at: f64,
+    /// **How this member's bending stress moves when the width does.**
+    ///
+    /// `σ_F ∝ 1/b` while every factor of `σ_F0` is width-independent, and `Y_β`
+    /// is the one that is not — so the law travels with the loading rather than
+    /// being assumed by whoever rescales or inverts it. At
+    /// [`HelixFactor::SPUR`](crate::strength::HelixFactor::SPUR) it *is* that
+    /// proportionality, which is why a spur stage's digits do not move.
+    ///
+    /// Contact needs nothing of the sort: no factor of a Hertz pressure depends
+    /// on the face width except the load intensity itself.
+    pub helix: crate::strength::HelixFactor,
 }
 
 impl Loading {
     /// The two stresses as they stand at [`Self::carried_at`].
     ///
-    /// Bending is inversely linear in width and contact goes as the inverse
-    /// square root of it, so a change of width is a scale rather than a second
-    /// solve — and where the two widths are equal this is the identity, which
-    /// is what lets a stage that evaluated at its final width keep its own
-    /// digits to the bit.
+    /// Contact goes as the inverse square root of the width; bending as
+    /// [`Self::helix`] says, which is inversely linear for a spur member and
+    /// slightly steeper for a helical one. Where the two widths are equal both
+    /// are the identity, which is what lets a stage that evaluated at its final
+    /// width keep its own digits to the bit.
     fn at_width(self) -> (Option<f64>, f64) {
         let by = self.measured_at / self.carried_at;
-        (self.bending.map(|s| s * by), self.contact * by.sqrt())
+        (
+            self.bending
+                .map(|s| self.helix.rescale(s, self.measured_at, self.carried_at)),
+            self.contact * by.sqrt(),
+        )
     }
 
     /// **The same loading under `k` times the torque.**
@@ -431,14 +512,20 @@ impl MemberRating<'_> {
         // A bending stress that no mesh could rate stays absent; one that any
         // mesh could rate is that mesh's worst, and a mesh with no rating does
         // not make an absence out of a figure another mesh has.
-        let worst = |case: Case| -> (Option<f64>, f64, f64) {
-            let mut bending: Option<f64> = None;
+        // The helix law travels with the worst bending figure, not with the
+        // member: a member in two meshes takes the worse of two roots, and the
+        // width that root asks for has to be inverted through the same law the
+        // stress was produced under.
+        let worst = |case: Case| -> (Option<(f64, crate::strength::HelixFactor)>, f64, f64) {
+            let mut bending: Option<(f64, crate::strength::HelixFactor)> = None;
             let mut contact = 0.0_f64;
             let mut width = 0.0_f64;
             for l in self.loadings.get(case) {
                 let (b, c) = l.at_width();
                 if let Some(b) = b {
-                    bending = Some(bending.map_or(b, |had: f64| had.max(b)));
+                    if bending.is_none_or(|(had, _)| b > had) {
+                        bending = Some((b, l.helix));
+                    }
                 }
                 if c >= contact {
                     contact = c;
@@ -448,7 +535,7 @@ impl MemberRating<'_> {
             (bending, contact, width)
         };
         Rated {
-            bending_stress: LoadCase::of(|c| worst(c).0),
+            bending_stress: LoadCase::of(|c| worst(c).0.map(|(s, _)| s)),
             contact_stress: LoadCase::of(|c| worst(c).1),
             min_face_width: LoadCase::of(|c| {
                 // **Each figure is inverted at the width it was taken at**, and
@@ -459,12 +546,13 @@ impl MemberRating<'_> {
                 Widths {
                     // Two allowables, because a reversed root endures less
                     // bending while its flank pits exactly as it did.
-                    bending: bending.map(|s| {
+                    bending: bending.map(|(s, helix)| {
                         crate::strength::min_face_width_bending(
                             s,
                             width,
                             self.reversal
                                 .bending_allowable(self.material, c, self.reverses),
+                            helix,
                         )
                     }),
                     contact: crate::strength::min_face_width_contact(

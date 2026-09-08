@@ -904,14 +904,23 @@ pub fn solve_hula_stage_with(
         // ring without one costs its own bending rating and nothing more, since
         // what it is missing is a fillet to take `Y_S` from and every other
         // figure is still answerable.
-        let pinion_bending =
-            super::Bending::of(&p.pinion, p.path.contact_ratio, stage.load_sharing)
-                .ok_or(TrainError::NoRootSection)?;
-        let ring_bending =
-            super::Bending::of_ring(&p.ring, p.path.contact_ratio, stage.load_sharing);
-        // What the sharing model has to say about this mesh, if anything. Both
-        // members of a pair are in the same one, so it is said once.
-        notes.extend(pinion_bending.note.clone());
+        let pinion_bending = super::Bending::of(
+            &p.pinion,
+            p.path.contact_ratio,
+            stage.load_sharing,
+            stage.gears[pair.pinion].rim_thickness,
+        )
+        .ok_or(TrainError::NoRootSection)?;
+        let ring_bending = super::Bending::of_ring(
+            &p.ring,
+            p.path.contact_ratio,
+            stage.load_sharing,
+            stage.gears[pair.ring].rim_thickness,
+        );
+        // What the model has to say about this mesh, if anything — the sharing
+        // band and the helix angle both. Both members of a pair are in the same
+        // mesh, so either says it and it is said once.
+        notes.extend(pinion_bending.notes.iter().cloned());
 
         // The probe pass, at whatever width — a minimum face width does not
         // depend on the width it was measured at.
@@ -925,8 +934,14 @@ pub fn solve_hula_stage_with(
         // The share this tooth carries where it is rated — exactly 1 unless a
         // sharing model was asked for, so nothing scales by default.
         let bending_at = |b: &super::Bending| {
-            bending_stress(&b.section, &p.pinion, &probe, StressConcentration::Iso6336)
-                .map(|s| s * b.share)
+            bending_stress(
+                &b.section,
+                &p.pinion,
+                &probe,
+                StressConcentration::Iso6336,
+                b.factors,
+            )
+            .map(|s| s * b.share)
         };
         // The mesh is built pinion first, so member 0 is the pinion and the two
         // are in that order everywhere below.
@@ -948,6 +963,9 @@ pub fn solve_hula_stage_with(
                     contact: probe_cs.governing(slot),
                     measured_at: PROBE,
                     carried_at,
+                    // Both members of this mesh carry the same `|β|` and module,
+                    // so the width law is the mesh's rather than the slot's.
+                    helix: pinion_bending.factors.helix,
                 }],
                 scale,
             ),
@@ -992,6 +1010,10 @@ pub fn solve_hula_stage_with(
             // about the part.
             let mut member_notes = Vec::new();
             member_notes.extend(sections[slot].and_then(super::notch_outside_fit));
+            // ...and whether this member's own rim is thinner than the clause
+            // will rate. A rim belongs to a member where the mesh-level findings
+            // above belong to the pair, so it is asked per slot.
+            member_notes.extend(bendings[slot].and_then(|b| super::rim_below_minimum(&b.factors)));
             // A pinion is rack-cut and can be undercut by the shift the crank
             // leaves it — which is nobody's to move, so it is reported rather
             // than prevented. A ring is not asked.

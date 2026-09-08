@@ -616,3 +616,106 @@ fn the_closed_form_fillet_curvature_is_what_a_difference_converges_on() {
         }
     }
 }
+
+/// **The tangent construction takes its angle from the member**, 30° on an
+/// external tooth and 60° on a ring's — ISO 6336-3:2019, 6.1 and 6.2.5.
+///
+/// Measured off the tangent the construction actually found rather than read
+/// back off the constant it was given, which is the only version of this test
+/// that can fail: `tangent_direction` is carried on the result precisely
+/// because reconstructing it from the angle once got the sign wrong while the
+/// tangency point was right.
+///
+/// A ring's 60° is the same construction on a tooth that points the other way
+/// and whose fillet is concave, not a second one — which is why it arrives as a
+/// number on `ToothOutline` beside the curves and the frame.
+#[test]
+fn the_tangent_section_is_taken_at_the_angle_its_member_asks_for() {
+    use gear_core::ring::{Cutter, Ring};
+    use gear_core::strength::{
+        root_section_with, CriticalSection, TANGENT_ANGLE_DEG, TANGENT_ANGLE_INTERNAL_DEG,
+    };
+
+    // The angle a tangent direction makes with the tooth centreline, degrees.
+    // The frame has `y` along the centreline toward the tip for both kinds of
+    // member, so this is the same measurement on either.
+    let from_centreline = |t: [f64; 2]| t[0].abs().atan2(t[1].abs()).to_degrees();
+
+    for teeth in [17u32, 40, 150] {
+        let g = Tooth::new(GearParams {
+            teeth,
+            ..Default::default()
+        });
+        let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle)
+            .unwrap_or_else(|| panic!("z={teeth}: an external tooth has a 30° tangent"));
+        let got = from_centreline(sec.tangent_direction);
+        assert!(
+            (got - TANGENT_ANGLE_DEG).abs() < 1e-6,
+            "z={teeth}: external tangent at {got}°, wanted {TANGENT_ANGLE_DEG}°"
+        );
+    }
+
+    for teeth in [40u32, 60, 90] {
+        let ring = Ring::cut_by(
+            &GearParams {
+                teeth,
+                ..Default::default()
+            },
+            &Cutter::default(),
+        );
+        let load = ring.u_j;
+        let sec = root_section_with(&ring, load, CriticalSection::TangentAngle)
+            .unwrap_or_else(|| panic!("z={teeth}: a ring has a 60° tangent"));
+        let got = from_centreline(sec.tangent_direction);
+        assert!(
+            (got - TANGENT_ANGLE_INTERNAL_DEG).abs() < 1e-6,
+            "z={teeth}: ring tangent at {got}°, wanted {TANGENT_ANGLE_INTERNAL_DEG}°"
+        );
+        // The two constructions are genuinely different sections, so the ring's
+        // 60° chord is not the 30° one under another name.
+        assert!(sec.root_chord > 0.0 && sec.root_chord.is_finite());
+    }
+}
+
+/// **The inscribed parabola is still what a section defaults to**, and reading
+/// ISO 6336-3 did not quietly move it.
+///
+/// The standard specifies the 30°/60° tangent and this crate deliberately does
+/// not follow it, for the reasons `CriticalSection::LewisParabola` sets out —
+/// it follows the load point, it is the more conservative of the two, and this
+/// crate computes the exact profile so the tangent's simplification buys
+/// nothing. Filling in the standard's *other* gaps is not a reason to adopt
+/// this one, and the 60° angle added beside the 30° is an extension of the
+/// construction that is **not** the default rather than a step toward making it
+/// one.
+///
+/// Written as a test rather than a comment because the two constructions agree
+/// closely on large teeth, so a default that had drifted would show up in
+/// almost nothing else.
+#[test]
+fn the_default_critical_section_is_still_the_inscribed_parabola() {
+    use gear_core::strength::{root_section, root_section_with, CriticalSection};
+
+    assert_eq!(CriticalSection::default(), CriticalSection::LewisParabola);
+
+    for teeth in [9u32, 17, 60] {
+        let g = Tooth::new(GearParams {
+            teeth,
+            ..Default::default()
+        });
+        let plain = root_section(&g, g.u_tip).unwrap();
+        assert_eq!(plain.method, CriticalSection::LewisParabola);
+        let parabola = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
+        assert_eq!(plain.form_factor, parabola.form_factor);
+
+        // ...and it is the more conservative of the two, which is half of why
+        // it was chosen. The gap widens as the tooth gets worse.
+        let tangent = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
+        assert!(
+            parabola.form_factor > tangent.form_factor,
+            "z={teeth}: the parabola should be the conservative one, {} vs {}",
+            parabola.form_factor,
+            tangent.form_factor
+        );
+    }
+}

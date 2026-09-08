@@ -37,7 +37,8 @@ use crate::tooth::Tooth;
 /// where it matters — on undercut teeth.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CriticalSection {
-    /// The ISO/AGMA 30° tangent (Hofer).
+    /// The ISO/AGMA tangent (Hofer) — 30° on an external tooth, 60° on a ring's
+    /// ([`TANGENT_ANGLE_INTERNAL_DEG`]).
     ///
     /// **Retained but not the default.** Kept because it is what ISO 6336 and
     /// AGMA 2101 specify, so it is the setting to return to for a
@@ -93,13 +94,38 @@ pub enum CriticalSection {
     LewisParabola,
 }
 
-/// The angle the critical-section tangent makes with the tooth centreline.
+/// The angle the critical-section tangent makes with the tooth centreline, for
+/// an **external** tooth.
 ///
 /// 30° is the Hofer construction adopted by ISO 6336 for external gears. It is a
 /// convention, not a derivation — the true peak stress location depends on the
-/// fillet shape — and it is named here rather than buried as a literal so the
-/// 60° internal-gear variant can be added beside it.
+/// fillet shape — and it is named here rather than buried as a literal because
+/// it is one value of two: see [`TANGENT_ANGLE_INTERNAL_DEG`].
 pub const TANGENT_ANGLE_DEG: f64 = 30.0;
+
+/// ...and for a **ring's** tooth.
+///
+/// ISO 6336-3:2019, 6.1: "The chord between the points at which the 30° tangents
+/// contact the root fillets for external gears, or at which the 60° tangents
+/// contact the root fillets for internal gears, defines the section to be used
+/// as the basis for calculation." 6.2.5 says the same thing the other way round,
+/// as a sign convention on the shared construction: an internal gear is
+/// 6.2.4's formulae with the diameters, the manufacturing centre distance and
+/// the tangential angle `θ` all negated, `θ` being 60° rather than 30°.
+///
+/// **Why it is a different angle at all.** A ring's tooth is thick at its tip
+/// and narrows into the rim, the opposite way round from an external tooth, and
+/// its fillet is concave where an external one is convex. The 30° tangent that
+/// lands part-way up an external fillet lands almost immediately on a ring's,
+/// which is no section at all; 60° is where the same reasoning puts it once the
+/// curvature has changed sign.
+///
+/// This is the tangent construction only, and this crate's default critical
+/// section is the inscribed parabola — see [`CriticalSection`]. The parabola
+/// needs no such constant: it finds its own tangency from the load point, and
+/// the frame flip that [`ToothOutline`] describes is the whole of what it needs
+/// told about which way a tooth points.
+pub const TANGENT_ANGLE_INTERNAL_DEG: f64 = 60.0;
 
 /// The critical root section and the load that acts on it.
 ///
@@ -293,6 +319,15 @@ pub trait ToothOutline {
     fn normal_pressure_angle(&self) -> f64;
     /// Whether there is a tooth to rate at all.
     fn is_usable(&self) -> bool;
+    /// The angle [`CriticalSection::TangentAngle`] takes its tangent at,
+    /// degrees — 30° for an external tooth, 60° for a ring's
+    /// ([`TANGENT_ANGLE_INTERNAL_DEG`]).
+    ///
+    /// The last thing that made the construction read the kind of member it was
+    /// running on. Everything else it needs is already here as a curve or a
+    /// frame, which is why this is a number on the same trait rather than a
+    /// branch inside the search.
+    fn tangent_angle_deg(&self) -> f64;
     /// Fillet parameter bracket, ordered `(lo, hi)`.
     fn fillet_bracket(&self) -> (f64, f64);
     /// The fillet parameter where the fillet meets the involute flank.
@@ -324,6 +359,9 @@ impl ToothOutline for Tooth {
     }
     fn is_usable(&self) -> bool {
         !self.severed && self.u_j.is_finite()
+    }
+    fn tangent_angle_deg(&self) -> f64 {
+        TANGENT_ANGLE_DEG
     }
     fn fillet_bracket(&self) -> (f64, f64) {
         (self.s_j, 0.0)
@@ -371,6 +409,9 @@ impl ToothOutline for crate::ring::Ring {
             && self.u_j.is_finite()
             && self.u_tip.is_finite()
             && self.u_j > self.u_tip
+    }
+    fn tangent_angle_deg(&self) -> f64 {
+        TANGENT_ANGLE_INTERNAL_DEG
     }
     fn fillet_bracket(&self) -> (f64, f64) {
         self.fillet
@@ -441,9 +482,10 @@ pub fn root_section_with<T: ToothOutline + ?Sized>(
     let s = match method {
         // Along the fillet the tangent angle to the centreline sweeps from near
         // zero at the junction to 90° at the root circle, so this is monotone
-        // and the bracket is the fillet itself.
+        // and the bracket is the fillet itself. **The angle is the member's**,
+        // 30° or 60°, and the search does not otherwise know which it is on.
         CriticalSection::TangentAngle => {
-            let target = TANGENT_ANGLE_DEG.to_radians().tan();
+            let target = g.tangent_angle_deg().to_radians().tan();
             brent(
                 |s| {
                     let (_, t) = g.fillet_at(s);
@@ -588,9 +630,9 @@ pub fn tip_load_section(g: &Tooth) -> Option<RootSection> {
 ///
 /// # Why this survives the no-correction-factors policy
 ///
-/// docs/reference.md#contact-stress excludes the ISO correction factors — `Y_β`, `K_A`, `K_v`,
-/// `K_Fβ`, `K_Fα`, `Z_ε`, `Z_β`. `Y_S` is kept, and the difference is not
-/// special pleading:
+/// docs/reference.md#contact-stress excludes the ISO correction factors —
+/// `K_A`, `K_v`, `K_Fβ`, `K_Fα`, `Z_ε`, `Z_β`. `Y_S` is kept, and the
+/// difference is not special pleading:
 ///
 /// - **It points the other way.** Those factors are mostly `≤ 1` for bending, so
 ///   omitting them is conservative. `Y_S ≥ 1` — typically 1.6 to 2.1. Dropping
@@ -642,16 +684,33 @@ pub enum StressConcentration {
 /// still returns a value — but [`RootSection::notch_parameter_in_range`] reports
 /// false so a caller can say so.
 ///
-/// # Provenance, which is the whole of what there is to say about it
+/// # Provenance
 ///
-/// `1 ≤ q_s < 8` is the band **quoted in secondary sources** for ISO 6336-3's
-/// `Y_S` fit. The standard itself is paywalled and has not been read for this
-/// project, so this is a citation of a citation and is recorded as one rather
-/// than presented as a reading. It is the only constant in the geometry path
-/// whose basis is second-hand, and it is confined to the empirical correction
-/// where it belongs — no geometry, no solver and no other rating takes it.
+/// **ISO 6336-3:2019, 7.2**, which states Formula (62) as "valid in the range:
+/// `1 ≤ q_s < 8`". Read from the standard; it was for a long time a citation of
+/// a citation, and it is recorded here that the two agree — the second-hand band
+/// was the right one, and is now first-hand.
 ///
-/// **What it can and cannot do to an answer.** It cannot move a number silently:
+/// # What the same clause says about *where* the fit applies
+///
+/// 7.1: the formulae "are based on the data derived from the geometry of
+/// external spur gears with 20° pressure angle, by means of measurement and
+/// calculations using finite element and integral formula methods", and "can
+/// also be used to obtain approximate values for internal gears and for gears
+/// having other pressure angles."
+///
+/// This crate applies `Y_S` to both, so both are approximations the standard
+/// sanctions rather than extrapolations it does not — but they are
+/// approximations, and unlike `q_s` neither has an edge to report, so they are
+/// stated in `docs/reference.md` rather than raised per gear. The third
+/// departure is this crate's own and is the largest: `s_Fn`, `h_Fe` and `ρ_F`
+/// are measured at the inscribed-parabola section by default where the fit was
+/// calibrated against the 30°/60° tangent one. That was a deliberate choice
+/// before this band was read and it stands — see [`CriticalSection`], which sets
+/// out both why and what it costs.
+///
+/// **What the band can and cannot do to an answer.** It cannot move a number
+/// silently:
 /// the clamp's effect is bounded by the fit's own behaviour, the unclamped
 /// figure stays on [`RootSection::notch_parameter`], and whether it was applied
 /// is reported by [`RootSection::notch_parameter_in_range`]. What it does do is
@@ -659,9 +718,6 @@ pub enum StressConcentration {
 /// the unconservative direction, which is exactly why the range is surfaced
 /// rather than swallowed.
 ///
-/// **What would settle it:** reading ISO 6336-3. Until then the honest statement
-/// is the one above, and `docs/rationale.md` carries it beside the other
-/// material this project takes on trust.
 pub const NOTCH_PARAMETER_RANGE: std::ops::Range<f64> = 1.0..8.0;
 
 impl RootSection {
@@ -722,6 +778,333 @@ impl RootSection {
     #[must_use]
     pub fn bending_factor(&self, model: StressConcentration) -> Option<f64> {
         Some(self.form_factor * self.stress_correction(model)?)
+    }
+}
+
+// --------------------------------------------------- the member's factors ---
+
+/// **The helix angle factor `Y_β`**, and the one thing in a bending rating that
+/// depends on the face width the member is carried at.
+///
+/// ISO 6336-3:2019, Clause 8. A helical tooth's contact lines run obliquely
+/// across the flank rather than straight along it, so the bending moment
+/// intensity at the root is not the virtual spur gear's — which is what
+/// [`bending_section`] measures the form on — and `Y_β` is the conversion
+/// between the two.
+///
+/// ```text
+/// Y_β = (1 − ε_β · β/120°) / cos³β        ε_β = b sin|β| / (π m_n)
+/// ```
+///
+/// with `ε_β` held at 1 above it and `β` held at 30° above that, both being
+/// substitutions the clause states (Formula 67 and the sentence under it).
+///
+/// # It is **not** ≤ 1, and this crate used to say it was
+///
+/// The `1/cos³β` term makes `Y_β` exceed 1 over most of the range the standard
+/// draws: its Figure 8 plateaus at 1,50 for `ε_β = 0,1` and 1,155 for
+/// `ε_β = 1`, which this formula reproduces to 1,5011 and 1,1547. Omitting it
+/// therefore **under**-predicts a helical root stress — by half, at the worst
+/// corner of the figure — where the note this replaced claimed the omission was
+/// conservative. See `docs/corrections.md`.
+///
+/// # Why it is kept where the `K` and `Z` families are not
+///
+/// The same three reasons [`StressConcentration`] gives for `Y_S`, and they are
+/// not weaker here. It points the **unconservative** way when dropped, so
+/// dropping it is not the safe default it was taken for. It is **geometry**:
+/// `β` and `ε_β` are this mesh's own, measured off the gears in front of it,
+/// not looked up against a population of test gears. And **its band is
+/// reported** rather than assumed — see [`Self::in_range`].
+///
+/// # A spur member is this at its own degenerate value
+///
+/// At `β = 0` both the overlap ratio and the cosine are exactly 1 and 0, so
+/// `Y_β` is exactly 1 and every expression below collapses onto the arithmetic
+/// it extends, bit for bit. That is why there is no branch for the spur case
+/// and why the canaries do not move.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HelixFactor {
+    /// The member's own `|β|`, degrees — not the clamped one the fit reads.
+    helix_angle: f64,
+    /// Normal module, mm. Read only through `ε_β`, so it is inert at `β = 0`.
+    normal_module: f64,
+}
+
+/// Above this helix angle ISO 6336-3:2019, 8.2 asks for `Y_β` to "be confirmed
+/// by experience" — the fit is still stated to 30°, but the standard declines to
+/// vouch for it alone past here.
+///
+/// Reported rather than enforced, exactly as [`NOTCH_PARAMETER_RANGE`] is: the
+/// formula still evaluates, and a result that leaves the band says so.
+pub const HELIX_CONFIRMED_TO_DEG: f64 = 25.0;
+
+/// Where the `Y_β` fit stops moving: `β` is held here above it (8.3).
+const HELIX_FIT_LIMIT_DEG: f64 = 30.0;
+
+impl Default for HelixFactor {
+    /// A spur member. See [`HelixFactor::SPUR`].
+    fn default() -> Self {
+        Self::SPUR
+    }
+}
+
+impl HelixFactor {
+    /// A spur member: no helix, so no factor and no width dependence.
+    ///
+    /// The module is genuinely unread — `sin 0` zeroes it — so this is the
+    /// general model at `β = 0` rather than a stand-in for one.
+    pub const SPUR: Self = Self {
+        helix_angle: 0.0,
+        normal_module: 1.0,
+    };
+
+    /// From a helix angle in degrees (either hand — only `|β|` is read) and a
+    /// normal module in mm.
+    #[must_use]
+    pub fn new(helix_angle: f64, normal_module: f64) -> Self {
+        Self {
+            helix_angle: helix_angle.abs(),
+            normal_module,
+        }
+    }
+
+    /// ...and from the member's own parameters, which is where both come from.
+    ///
+    /// Takes the parameters rather than a member so that a ring answers it the
+    /// same way a rack-cut tooth does — `Y_β` is a property of the *mesh*, both
+    /// of whose members carry the same `|β|` and the same normal module, and a
+    /// second constructor per kind of member would only be able to disagree.
+    #[must_use]
+    pub fn of(params: &crate::GearParams) -> Self {
+        Self::new(params.helix_angle, params.module)
+    }
+
+    /// `ε_β = b sin|β| / (π m_n)`, the axial overlap a face width `b` buys.
+    ///
+    /// The one definition of the overlap ratio in this crate;
+    /// [`ContactRatios`](crate::train::ContactRatios) reads it from here rather
+    /// than writing the same line again.
+    #[must_use]
+    pub fn overlap_ratio(&self, face_width: f64) -> f64 {
+        face_width * self.helix_angle.to_radians().sin()
+            / (std::f64::consts::PI * self.normal_module)
+    }
+
+    /// `Y_β` at a given face width, mm.
+    #[must_use]
+    pub fn at(&self, face_width: f64) -> f64 {
+        let beta = self.helix_angle.min(HELIX_FIT_LIMIT_DEG);
+        let eps = self.overlap_ratio(face_width).min(1.0);
+        (1.0 - eps * beta / 120.0) / beta.to_radians().cos().powi(3)
+    }
+
+    /// Whether the helix angle is one the standard vouches for on its own.
+    #[must_use]
+    pub fn in_range(&self) -> bool {
+        self.helix_angle <= HELIX_CONFIRMED_TO_DEG
+    }
+
+    /// The member's `|β|`, degrees, as given rather than as the fit reads it.
+    #[must_use]
+    pub fn helix_angle(&self) -> f64 {
+        self.helix_angle
+    }
+
+    /// The same bending stress, re-quoted at a different face width.
+    ///
+    /// `σ_F ∝ Y_β(b)/b`, which is `∝ 1/b` for a spur member and not quite for a
+    /// helical one. Where the two widths are equal both ratios are exactly 1 and
+    /// this is the identity — which is what lets a stage that evaluated its
+    /// stresses at the width it ended with keep its own digits.
+    #[must_use]
+    pub fn rescale(&self, stress: f64, from: f64, to: f64) -> f64 {
+        stress * (from / to) * (self.at(to) / self.at(from))
+    }
+
+    /// The face width at which a bending stress falls to an allowable, mm.
+    ///
+    /// # Why this is not just the stress inverted
+    ///
+    /// It was, and `docs/reference.md#contact-stress` still says the `b` a
+    /// stress was measured at cancels out of the width it asks for. That holds
+    /// while every factor of `σ_F0` is independent of the face width, and `Y_β`
+    /// is the one that is not: a wider face buys overlap, overlap lowers `Y_β`,
+    /// and the stress falls slightly faster than `1/b`.
+    ///
+    /// It still closes in **one step and no iteration**, because the dependence
+    /// is affine. Writing `σ(b) = s₀ · Y_β(b) / b` with
+    /// `s₀ = σ·b / Y_β(b)` taken at the width it was measured at, and
+    /// `Y_β(b) = (1 − k b)/c` with `k = β_c sin|β| / (120 π m_n)` and
+    /// `c = cos³β_c`, the balance `σ(b) = σ_allow` is linear in `b`:
+    ///
+    /// ```text
+    /// b = s₀ / (σ_allow · c + s₀ · k)              while ε_β ≤ 1
+    /// b = s₀ · (1 − β_c/120) / (σ_allow · c)       once ε_β has saturated
+    /// ```
+    ///
+    /// `σ(b)` is strictly decreasing, so the root is unique and which branch
+    /// holds it is decided by testing the first: solving the unsaturated
+    /// relation past its own seam under-states `Y_β`, hence under-states the
+    /// stress, hence returns a width below the true one — so a first answer
+    /// that has already saturated is the proof that the second branch is the
+    /// one that answers.
+    ///
+    /// At `β = 0` this is `k = 0`, `c = 1`, `s₀ = σ·b`, and the whole thing is
+    /// `b · σ / σ_allow` — the relation it generalises, to the bit.
+    #[must_use]
+    pub fn min_face_width(&self, stress: f64, evaluated_at: f64, allowable: f64) -> f64 {
+        let beta = self.helix_angle.min(HELIX_FIT_LIMIT_DEG);
+        let c = beta.to_radians().cos().powi(3);
+        let per_width = self.overlap_ratio(1.0);
+        let k = per_width * beta / 120.0;
+
+        let s0 = stress * evaluated_at / self.at(evaluated_at);
+        let unsaturated = s0 / (allowable * c + s0 * k);
+        if unsaturated * per_width <= 1.0 {
+            unsaturated
+        } else {
+            s0 * (1.0 - beta / 120.0) / (allowable * c)
+        }
+    }
+}
+
+/// **The rim under one member's teeth**, and the factor `Y_B` by which too
+/// little of it de-rates the root.
+///
+/// ISO 6336-3:2019, Clause 9. Where the rim is thin the tooth's root fillet
+/// stops being the weakest path: the crack runs through the rim instead, and the
+/// clause's own words for the remedy are that `Y_B` is "a simplified factor used
+/// to de-rate thin rimmed gears when detailed calculations of stresses in both
+/// tension and compression or experience are not available. For critically
+/// loaded applications this method should be replaced by a more comprehensive
+/// analysis."
+///
+/// # One fit, two references
+///
+/// An external gear's rim is measured against the **whole tooth depth** and a
+/// ring's against the **normal module**, because what the rim has to resist
+/// differs: an external tooth levers against a rim on the far side of its own
+/// height, a ring's tooth hangs off one. Both come out as `Y_B = a ln(c/ratio)`,
+/// never below 1, and the two constants are the whole of the difference — which
+/// is why this is one type with two constructors rather than two factors.
+///
+/// The published breakpoints fall out of the fit rather than being a third and
+/// fourth constant: `Y_B` reaches 1 at `ratio = c·e^(−1/a)`, which is 1,2001 for
+/// an external gear against the stated 1,2 and 3,4886 for a ring against the
+/// stated 3,5. So taking the larger of the fit and 1 reproduces the clause's
+/// case (a) without a branch, and continuously, where testing the breakpoint
+/// would leave a 0,4 % step in a ring's factor.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RimSupport {
+    /// `s_R/h_t` for an external member, `s_R/m_n` for a ring.
+    ratio: f64,
+    fit: RimFit,
+}
+
+/// The constants of one arm of the `Y_B` fit: `Y_B = a ln(c/ratio)`, and the
+/// ratio below which the clause says the design "shall be avoided".
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct RimFit {
+    a: f64,
+    c: f64,
+    floor: f64,
+}
+
+/// External gears, ISO 6336-3:2019, 9.3.1, Formulae (68) and (69): the backup
+/// ratio `s_R/h_t`, full support at 1,2 and to be avoided at or below 0,5.
+const EXTERNAL_RIM: RimFit = RimFit {
+    a: 1.6,
+    c: 2.242,
+    floor: 0.5,
+};
+
+/// Internal gears, 9.3.2, Formulae (70) and (71): the rim thickness in normal
+/// modules `s_R/m_n`, full support at 3,5 and to be avoided at or below 1,75.
+const INTERNAL_RIM: RimFit = RimFit {
+    a: 1.15,
+    c: 8.324,
+    floor: 1.75,
+};
+
+impl RimSupport {
+    /// An external member's rim, against the whole depth of its tooth.
+    ///
+    /// `tooth_depth` is `h_t`, tip to root, in the same units as the thickness.
+    #[must_use]
+    pub fn external(thickness: f64, tooth_depth: f64) -> Self {
+        Self {
+            ratio: thickness / tooth_depth,
+            fit: EXTERNAL_RIM,
+        }
+    }
+
+    /// A ring's rim, against the normal module.
+    #[must_use]
+    pub fn internal(thickness: f64, normal_module: f64) -> Self {
+        Self {
+            ratio: thickness / normal_module,
+            fit: INTERNAL_RIM,
+        }
+    }
+
+    /// The backup ratio as the clause measures it — `s_R/h_t` or `s_R/m_n`,
+    /// depending on which kind of member this is.
+    #[must_use]
+    pub fn ratio(&self) -> f64 {
+        self.ratio
+    }
+
+    /// `Y_B`, never below 1.
+    #[must_use]
+    pub fn factor(&self) -> f64 {
+        (self.fit.a * (self.fit.c / self.ratio).ln()).max(1.0)
+    }
+
+    /// Whether the rim is thick enough for the clause to rate at all.
+    ///
+    /// Below the floor it says the case "shall be avoided" rather than giving a
+    /// value, so — as with the `Y_S` notch band — the formula still answers and
+    /// the caller is told the answer is past where the standard will go.
+    #[must_use]
+    pub fn in_range(&self) -> bool {
+        self.ratio > self.fit.floor
+    }
+}
+
+/// **The factors of ISO 6336-3's `σ_F0` that a root section cannot supply.**
+///
+/// ```text
+/// σ_F0 = F_t/(b · m_n) · Y_F · Y_S · Y_β · Y_B · Y_DT
+/// ```
+///
+/// `Y_F` and `Y_S` are read off the section this crate measured, and are
+/// [`RootSection::bending_factor`]. The rest are properties of the member and
+/// its blank rather than of the shape of its root, so they arrive separately —
+/// and they are grouped rather than passed one by one so that the product is
+/// written down in one place and adding to it is adding a field.
+///
+/// `Y_DT` is not among them, and that is a decision rather than an omission:
+/// see `docs/state.md`, which records the formulae and the two inputs it would
+/// need so the choice can be revisited without the standard in hand.
+///
+/// [`Default`] is a spur member with a rim nobody described — every factor
+/// exactly 1, which is the arithmetic this crate had before any of them existed.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct BendingFactors {
+    /// `Y_β`, and the width law that comes with it.
+    pub helix: HelixFactor,
+    /// `Y_B`. `None` where no rim thickness was given, which is not a thick rim
+    /// asserted but a question not asked — the factor is 1 either way, and only
+    /// this distinguishes them.
+    pub rim: Option<RimSupport>,
+}
+
+impl BendingFactors {
+    /// The product `Y_β · Y_B` at a given face width, mm.
+    #[must_use]
+    pub fn at(&self, face_width: f64) -> f64 {
+        self.helix.at(face_width) * self.rim.map_or(1.0, |r| r.factor())
     }
 }
 
@@ -846,18 +1229,25 @@ impl Load {
 /// about `cos β` (6 % at 20°, 13 % at 30°). Spur gears are unaffected, since the
 /// two sections coincide.
 ///
-/// **No ISO correction factors are applied** — not `Y_β`, and not the `K` and `Z`
-/// families either. This is a standing project policy, set out at the end of
-/// docs/reference.md#contact-stress: their validated bands are narrow against modern designs, they
-/// are only balanced as a complete set against `σ_Flim` values this project does
-/// not have, and they buy precision at the cost of accuracy. Since `Y_β ≤ 1`,
-/// leaving it out over-predicts stress — the safe direction — but it does mean a
-/// helical result here is conservative against a published ISO rating by up to
-/// about 25 % at high helix angle and overlap, and should not be compared to one
-/// without saying so.
+/// # Which of ISO 6336-3's factors are here
 ///
-/// The notch factor `Y_S` is deliberately *not* in that category; see
-/// [`StressConcentration`].
+/// ```text
+/// σ_F0 = F_t/(b · m_n) · Y_F · Y_S · Y_β · Y_B · Y_DT
+/// ```
+///
+/// `Y_F` and `Y_S` come off `section`; `Y_β` and `Y_B` arrive in `factors`, and
+/// are 1 apiece for a spur member with a rim nobody described. `Y_DT` is
+/// declined, with its formulae and the two inputs it needs recorded in
+/// `docs/state.md` rather than left to be looked up again.
+///
+/// **The `K` and `Z` families are still not applied**, and that is unchanged
+/// project policy (docs/reference.md#contact-stress): their validated bands are
+/// narrow against modern designs, they are only balanced as a complete set
+/// against `σ_Flim` values this project does not have, and they buy precision at
+/// the cost of accuracy. What changed is that `Y_β` was being counted among them
+/// on a reading of the factor that the standard does not support — see
+/// [`HelixFactor`] and `docs/corrections.md`. `Y_S` was never in that category;
+/// see [`StressConcentration`].
 ///
 /// Returns `None` when the stress correction is undefined for this section —
 /// see [`RootSection::stress_correction`]. That is not a failure to compute; it
@@ -868,9 +1258,14 @@ pub fn bending_stress(
     g: &Tooth,
     load: &Load,
     model: StressConcentration,
+    factors: BendingFactors,
 ) -> Option<f64> {
     let factor = section.bending_factor(model)?;
-    Some(load.tangential(g) / (load.face_width * g.params.module) * factor)
+    Some(
+        load.tangential(g) / (load.face_width * g.params.module)
+            * factor
+            * factors.at(load.face_width),
+    )
 }
 
 /// The critical section to rate a gear's bending on, loaded at the highest
@@ -982,6 +1377,12 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
         // the factor rather than a stress keeps this independent of the load
         // case, which is why it is evaluated once per member and not once per
         // case.
+        //
+        // **`Y_β` and `Y_B` are deliberately absent from this product**, and
+        // their absence changes nothing: both are constant over a mesh cycle,
+        // so they scale every candidate alike and cannot move which one wins.
+        // Multiplying them in here would cost a sweep's worth of arithmetic to
+        // reach the same `d`.
         let Some(factor) = section.bending_factor(StressConcentration::Iso6336) else {
             continue;
         };
@@ -1387,14 +1788,21 @@ pub fn contact_stress(
 
 /// Minimum face width for a bending stress, mm.
 ///
-/// `σ_F ∝ 1/b`, so `b_min = b · σ_F / σ_allow`.
-///
-/// **The `b` cancels.** Whatever face width the stress was evaluated at, the
-/// answer is the same — which is the invariant worth testing, because it is the
-/// one that catches a stress that did not actually scale the way it should.
+/// **The width the stress was evaluated at still cancels**, which is the
+/// invariant worth testing because it is the one that catches a stress that did
+/// not scale the way it should. What no longer cancels is the width the answer
+/// is *at*: `Y_β` falls as the face buys overlap, so a helical member's stress
+/// runs slightly steeper than `1/b` and the balance is solved rather than
+/// divided. [`HelixFactor::min_face_width`] is that solve, in closed form, and
+/// at [`HelixFactor::SPUR`] it is `b · σ_F / σ_allow` to the bit.
 #[must_use]
-pub fn min_face_width_bending(stress: f64, evaluated_at: f64, allowable: f64) -> f64 {
-    evaluated_at * stress / allowable
+pub fn min_face_width_bending(
+    stress: f64,
+    evaluated_at: f64,
+    allowable: f64,
+    helix: HelixFactor,
+) -> f64 {
+    helix.min_face_width(stress, evaluated_at, allowable)
 }
 
 /// Minimum face width for a contact stress, mm.
@@ -2109,6 +2517,196 @@ mod tests {
         }
     }
 
+    /// **`Y_β` is the curve ISO 6336-3 draws**, checked against the two numbers
+    /// its Figure 8 can be read to and the shape between them.
+    ///
+    /// This is the gate on the whole factor, because the formula it implements
+    /// is a transcription of a paywalled document and the figure is the only
+    /// independent statement of the same thing. Both plateaus land, which is
+    /// what pins the `1/cos³β` term specifically: without it they would be
+    /// 0,975 and 0,75, and the figure's ordinate does not go below 0,9.
+    #[test]
+    fn the_helix_factor_is_the_curve_the_standard_draws() {
+        // A face width chosen to land on a nominated overlap ratio, so the
+        // curves of Figure 8 can be sampled by name.
+        let at = |beta: f64, eps: f64| {
+            let h = HelixFactor::new(beta, 1.0);
+            let width = eps * std::f64::consts::PI / beta.to_radians().sin();
+            (h, h.at(width))
+        };
+
+        // Every curve starts at 1 where there is no helix at all.
+        assert!((HelixFactor::new(0.0, 1.0).at(10.0) - 1.0).abs() < 1e-15);
+
+        // The two plateaus the figure is labelled with, at β = 30° and beyond.
+        assert!(
+            (at(30.0, 0.1).1 - 1.5011).abs() < 5e-4,
+            "{}",
+            at(30.0, 0.1).1
+        );
+        assert!(
+            (at(30.0, 1.0).1 - 1.1547).abs() < 5e-4,
+            "{}",
+            at(30.0, 1.0).1
+        );
+
+        // Flat past 30°: β is held there, so 40° reads as 30° did.
+        let (h30, y30) = at(30.0, 1.0);
+        let wide = 40.0_f64;
+        let h40 = HelixFactor::new(wide, 1.0);
+        let w40 = std::f64::consts::PI / wide.to_radians().sin();
+        assert!(
+            (h40.at(w40) - y30).abs() < 1e-12,
+            "the fit should stop at 30°"
+        );
+        let _ = h30;
+
+        // **Above 1 over most of the range**, which is the finding: the note
+        // this replaced called omitting `Y_β` conservative, and at the top of
+        // the figure omitting it under-states the root stress by half.
+        assert!(at(30.0, 0.1).1 > 1.49);
+
+        // ...and the shallow dip below 1 the figure shows at small angles and
+        // large overlap, which no reading of `1 − ε_β β/120` alone produces.
+        assert!(at(10.0, 1.0).1 < 1.0, "{}", at(10.0, 1.0).1);
+        assert!(at(10.0, 1.0).1 > 0.95);
+
+        // Monotone in β once past the dip, at fixed overlap.
+        let mut last = at(15.0, 1.0).1;
+        for beta in [20.0, 25.0, 30.0] {
+            let y = at(beta, 1.0).1;
+            assert!(y > last, "Y_beta should rise with beta: {beta}° gave {y}");
+            last = y;
+        }
+
+        // The band the standard vouches for on its own, reported not enforced.
+        assert!(HelixFactor::new(25.0, 1.0).in_range());
+        assert!(!HelixFactor::new(25.1, 1.0).in_range());
+    }
+
+    /// **A spur member is the general model at `β = 0`, to the bit.**
+    ///
+    /// Not "agrees to a tolerance" — exactly 1 at every width, and a minimum
+    /// face width that is the bare `b σ / σ_allow` this generalises. It is why
+    /// the `strength 17 43 2.0` canary did not move when `Y_β` arrived.
+    #[test]
+    fn a_spur_member_takes_no_helix_factor_and_no_width_law() {
+        for b in [0.5, 1.0, 10.0, 250.0] {
+            assert_eq!(HelixFactor::SPUR.at(b), 1.0);
+            assert_eq!(HelixFactor::SPUR.overlap_ratio(b), 0.0);
+            assert_eq!(HelixFactor::SPUR.rescale(123.4, b, 7.0), 123.4 * (b / 7.0));
+            assert_eq!(
+                HelixFactor::SPUR.min_face_width(200.0, b, 50.0),
+                b * 200.0 / 50.0
+            );
+        }
+        assert_eq!(HelixFactor::default(), HelixFactor::SPUR);
+        assert_eq!(BendingFactors::default().at(10.0), 1.0);
+    }
+
+    /// **The width a helical rating asks for is the width its stress falls to
+    /// the allowable at** — the closed form inverts the forward law rather than
+    /// approximating it, and it does so on both sides of the overlap seam.
+    ///
+    /// The invariant a plain division cannot satisfy once `Y_β` is in the
+    /// product, and the one that would catch the inversion being written for
+    /// the unsaturated branch alone.
+    #[test]
+    fn the_width_a_bending_rating_asks_for_is_where_its_stress_lands() {
+        let helix = HelixFactor::new(25.0, 1.0);
+        // Where ε_β reaches 1, and so where the two branches meet.
+        let seam = 1.0 / helix.overlap_ratio(1.0);
+        let (mut below, mut above) = (false, false);
+
+        for measured_at in [2.0, 10.0, 60.0] {
+            for allowable in [40.0, 90.0, 150.0, 400.0, 900.0] {
+                let stress = 300.0;
+                let b = helix.min_face_width(stress, measured_at, allowable);
+                let landed = helix.rescale(stress, measured_at, b);
+                assert!(
+                    (landed - allowable).abs() / allowable < 1e-12,
+                    "b={b}: stress lands at {landed}, wanted {allowable}"
+                );
+                if b < seam {
+                    below = true;
+                } else {
+                    above = true;
+                }
+            }
+        }
+        assert!(below && above, "both branches should have been exercised");
+
+        // And the answer does not depend on the width the stress came from,
+        // which is the property the spur case has and this had to keep.
+        let from = |b: f64| {
+            let s = helix.rescale(300.0, 10.0, b);
+            helix.min_face_width(s, b, 120.0)
+        };
+        for b in [1.0, 4.0, 25.0, 300.0] {
+            assert!(
+                (from(b) - from(1.0)).abs() < 1e-9,
+                "b_min drifted with the width it was measured at: {}",
+                from(b)
+            );
+        }
+    }
+
+    /// **`Y_B` is the curve ISO 6336-3 draws**, and its published breakpoints
+    /// are consequences of the fit rather than extra constants.
+    ///
+    /// The clause states case (a) — full support — at 1,2 and 3,5, and states
+    /// the fit separately. That the fit reaches 1 at those very ratios is the
+    /// check that both were transcribed right, and it is what lets the
+    /// implementation take the larger of the two without a breakpoint of its
+    /// own.
+    #[test]
+    fn the_rim_factor_is_the_curve_the_standard_draws() {
+        // Figure 9's two readable endpoints, at the ratios the clause floors at.
+        let thin_external = RimSupport::external(0.5, 1.0);
+        assert!((thin_external.factor() - 2.4).abs() < 0.01);
+        let thin_internal = RimSupport::internal(1.75, 1.0);
+        assert!((thin_internal.factor() - 1.8).abs() < 0.01);
+
+        // **The stated breakpoints fall out of the fit**: `a ln(c/ratio) = 1`
+        // is solved at 1,20005 and 3,48887 against the clause's 1,2 and 3,5, so
+        // the two are the same statement to the precision its constants carry.
+        // That is why the implementation takes the larger of the fit and 1
+        // rather than testing a breakpoint of its own — and it is why 1,2 is
+        // not in the loop below, being a hair inside the sloping arm.
+        assert!((RimSupport::external(1.2, 1.0).factor() - 1.0).abs() < 1e-4);
+        assert!((RimSupport::internal(3.5, 1.0).factor() - 1.0).abs() < 4e-3);
+
+        // Never below 1: a thick rim does not relieve a root, it merely stops
+        // de-rating it.
+        for ratio in [1.21, 2.0, 10.0, 1e6] {
+            assert_eq!(RimSupport::external(ratio, 1.0).factor(), 1.0);
+        }
+        for ratio in [3.5, 6.0, 40.0] {
+            assert_eq!(RimSupport::internal(ratio, 1.0).factor(), 1.0);
+        }
+
+        // Monotone: less rim is never less de-rating.
+        let mut last = 1.0;
+        for ratio in [1.1, 0.9, 0.7, 0.5] {
+            let y = RimSupport::external(ratio, 1.0).factor();
+            assert!(y > last, "Y_B should rise as the rim thins: {ratio}");
+            last = y;
+        }
+
+        // The floor is reported, not enforced — the fit still answers below it.
+        assert!(RimSupport::external(0.51, 1.0).in_range());
+        assert!(!RimSupport::external(0.5, 1.0).in_range());
+        assert!(RimSupport::internal(1.76, 1.0).in_range());
+        assert!(!RimSupport::internal(1.75, 1.0).in_range());
+        assert!(RimSupport::external(0.2, 1.0).factor().is_finite());
+
+        // The reference is the whole of the difference between the two arms:
+        // an external rim is measured against the tooth depth, a ring's against
+        // the module, and each reads back the ratio it was built from.
+        assert!((RimSupport::external(2.25, 2.25).ratio() - 1.0).abs() < 1e-15);
+        assert!((RimSupport::internal(7.0, 2.0).ratio() - 3.5).abs() < 1e-15);
+    }
+
     #[test]
     fn bending_stress_scales_the_way_the_cantilever_model_says() {
         let g = Tooth::new(GearParams {
@@ -2117,7 +2715,14 @@ mod tests {
         });
         let sec = root_section(&g, g.u_tip).unwrap();
         let s = |t: f64, b: f64| {
-            bending_stress(&sec, &g, &Load::new(t, b), StressConcentration::None).unwrap()
+            bending_stress(
+                &sec,
+                &g,
+                &Load::new(t, b),
+                StressConcentration::None,
+                BendingFactors::default(),
+            )
+            .unwrap()
         };
 
         let base = s(1.0, 10.0);
@@ -2140,9 +2745,16 @@ mod tests {
         let (mut bend, mut cont) = (Vec::new(), Vec::new());
         for b in [1.0, 5.0, 12.5, 100.0] {
             let load = Load::new(3.0, b);
-            let sf = bending_stress(&sec, &g1, &load, StressConcentration::None).unwrap();
+            let sf = bending_stress(
+                &sec,
+                &g1,
+                &load,
+                StressConcentration::None,
+                BendingFactors::default(),
+            )
+            .unwrap();
             let sh = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 100_000.0).unwrap();
-            bend.push(min_face_width_bending(sf, b, 200.0));
+            bend.push(min_face_width_bending(sf, b, 200.0, HelixFactor::SPUR));
             cont.push(min_face_width_contact(sh.worst, b, 800.0));
         }
         for v in &bend {

@@ -86,6 +86,24 @@ face_width: Auto<number>,
  */
 face_sources: FaceSources, 
 /**
+ * **Thickness of the rim under this member's teeth, mm** — `s_R`, and with
+ * it the rim thickness factor `Y_B` (ISO 6336-3:2019, Clause 9).
+ *
+ * `None` is the default and means *nobody said*, which is not the same
+ * claim as a thick rim even though both rate at `Y_B = 1`: a gear whose rim
+ * was never described cannot be told it is too thin, and one that was can.
+ * Given, it de-rates the root — a thin rim moves the failure out of the
+ * fillet and through the rim — and never relieves it.
+ *
+ * Measured against the whole tooth depth on a rack-cut member and against
+ * the normal module on a ring, which is the clause's own distinction and
+ * the only one: see [`RimSupport`](crate::strength::RimSupport).
+ *
+ * It reaches bending alone. A rim under the teeth has nothing to do with
+ * the pressure between two flanks, so no contact rating reads it.
+ */
+rim_thickness: number | null, 
+/**
  * Name of a material in the library.
  */
 material: string, 

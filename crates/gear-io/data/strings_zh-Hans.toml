@@ -53,6 +53,8 @@ planet_clearance_below_minimum = "相邻行星轮的间隙为 {gap} mm，低于�
 ring_addendum_clamped = "内齿圈齿顶高已限制在其基圆处：需要更多齿数或更小的齿顶高"
 face_width_no_source = "齿轮 {gear} 的自动齿宽没有任何强度依据：所有来源均已关闭，因此保持输入框中的数值"
 notch_outside_fit = "缺口参数 q_s = {q} 超出 Y_S 拟合公式适用的 1–8 范围，故取边界值：超出上界时会低估齿根应力"
+helix_unconfirmed = "螺旋角 {beta}° 超过 {limit}°，ISO 6336-3 要求在此之上的 Y_beta 需由经验确认；该系数仍按拟合值应用"
+rim_below_minimum = "轮缘支承比 {ratio} 等于或低于 ISO 6336-3 可评定的下限：该条款要求避免这种轮缘，Y_B 的报告值已超出标准适用范围"
 reversed_bending_uncorrected = "轮齿承受载荷换向；建议启用载荷换向系数"
 reversed_bending_applied = "轮齿承受载荷换向；已应用系数 {fraction}"
 

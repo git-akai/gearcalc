@@ -750,6 +750,35 @@ mod tests {
                 }
             }
         }
+        // **The two ISO 6336-3 bands a bending rating can be asked outside.** A
+        // 28° helix is past the 25° the standard asks for `Y_β` to be confirmed
+        // by experience beyond, and a rim half a tooth deep is past the backup
+        // ratio below which it says a design shall be avoided. Both are
+        // ordinary inputs — a helix angle and a rim thickness — rather than
+        // contrived ones, and both are still rated, which is the point of the
+        // messages: the figure is given and the reader is told where it stands.
+        for (helix, rim) in [(28.0_f64, None), (0.0, Some(1.0_f64)), (0.0, None)] {
+            let gear = gear_core::train::StageGear {
+                teeth: 23,
+                rim_thickness: rim,
+                ..Default::default()
+            };
+            let stage = gear_core::train::SpurStage {
+                additional_helix: helix,
+                gears: [gear.clone(), gear],
+                ..Default::default()
+            };
+            if let Ok(r) = gear_core::train::solve_spur_stage(
+                &stage,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
+                record(&r.notes);
+                for g in &r.gears {
+                    record(&g.notes);
+                }
+            }
+        }
         // A **sharp** rack on many teeth, which is where the `Y_S` fit's notch
         // band is left: `q_s` reaches 10.3 at z = 300 with no tip round at all
         // (docs/corrections.md), and the correction is then taken at the
