@@ -1024,6 +1024,25 @@ does not move the page; a figure that cannot change while you look at it needs
 none of that, and asking for it right-aligns the annotation away from the value
 it belongs to and reserves a line for nothing.
 
+**A refusal is data, and a stage that has no answer still has inputs.** A
+geartrain halfway through an edit is regularly one that cannot be built, so the
+panel has to go on showing every control that produced it — and it did not: the
+readouts were guarded on the answer, so a stage that failed took its material
+overrides, its bound notes and every figure's label down with it, and the other
+stages went too, because a train is a chain and one failure leaves none of them
+solved. The rows stand now and their figures are blank, which is also what stops
+the page changing shape at the moment a designer most needs it to hold still.
+Two things were being confused: what a control *is*, which is an input and never
+conditional, and what it *shows*, which may not exist yet. A material's library
+figures are the clearest case — they were read off the result and are in the
+library.
+
+**And the refusal says which stage, in the catalogue's words.** `TrainError`
+already had a `note()` whose keys the string tests check; the boundary threw its
+`Display` instead, which is English written in Rust, making the failure the one
+thing the application said in a language nobody chose. It crosses as a `Note`
+and a stage number now, like every other message.
+
 **A mesh reports what a mesh has, and a stage what a stage has.** Efficiency and
 backlash exist at both levels and are different quantities there — a pair's own
 loss against what the arrangement does with it, a pair's own play against what

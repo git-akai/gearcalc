@@ -723,12 +723,70 @@ pub struct TrainRequest {
     pub materials: Option<gear_core::MaterialLibrary>,
 }
 
+/// What a train solve came to — an answer, or why there is none.
+///
+/// **A refusal is data, not an exception.** A geartrain that cannot be built is
+/// an ordinary thing for a designer to be holding halfway through an edit, and
+/// the front end has to keep showing them every input that produced it. Sent
+/// back as a value for that reason, and as a [`Note`] rather than a sentence
+/// for the reason every other message here is one: the words belong to the
+/// catalogue, and `TrainError`'s `Display` is English written in Rust —
+/// which is what this used to hand over, making the failure the one thing the
+/// application said in a language nobody chose.
+#[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
+pub struct TrainOutcome {
+    pub result: Option<gear_core::train::TrainResult>,
+    pub failure: Option<TrainFailure>,
+}
+
+/// Why a train has no answer, and where.
+#[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
+pub struct TrainFailure {
+    /// The message, as a key and its already-formatted values.
+    pub note: gear_core::note::Note,
+    /// Which stage could not be built, **numbered from one** as the panel
+    /// numbers them. `None` where the fault is the train's own rather than any
+    /// one stage's — an empty train, say.
+    pub stage: Option<u32>,
+}
+
 fn solve_train_impl(input: &str) -> Result<String, String> {
+    use gear_core::note::Explain;
     let req: TrainRequest =
         serde_json::from_str(input).map_err(|e| format!("bad train request: {e}"))?;
     let lib = req.materials.unwrap_or_else(gear_io::default_library);
-    let out = gear_core::train::solve_train(&req.train, &lib).map_err(|e| e.to_string())?;
-    serde_json::to_string(&out).map_err(|e| format!("could not encode result: {e}"))
+    let outcome = match gear_core::train::solve_train(&req.train, &lib) {
+        Ok(result) => TrainOutcome {
+            result: Some(result),
+            failure: None,
+        },
+        Err(e) => {
+            let stage = match &e {
+                gear_core::train::TrainError::InStage { stage, .. } => {
+                    u32::try_from(*stage + 1).ok()
+                }
+                _ => None,
+            };
+            TrainOutcome {
+                result: None,
+                failure: Some(TrainFailure {
+                    note: e.note(),
+                    stage,
+                }),
+            }
+        }
+    };
+    serde_json::to_string(&outcome).map_err(|e| format!("could not encode result: {e}"))
 }
 
 fn default_materials_impl() -> Result<String, String> {
@@ -1161,8 +1219,7 @@ mod tests {
 
         let solve = |doc: &serde_json::Value| {
             let req = serde_json::json!({ "train": doc["train"], "materials": null });
-            let out = solve_train_impl(&req.to_string()).unwrap();
-            serde_json::from_str::<serde_json::Value>(&out).unwrap()
+            solved(&req.to_string())
         };
         assert_eq!(
             solve(&document),
@@ -1638,8 +1695,7 @@ mod tests {
               }
             ]}}"#;
 
-        let out = solve_train_impl(req).expect("a planetary train should solve");
-        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        let v = solved(req);
         let stage = &v["stages"][0];
         assert_eq!(stage["kind"], "planetary");
 
@@ -1759,7 +1815,7 @@ mod tests {
                "wheel":{"face_width":{"auto":true,"manual":10.0},"material":"Brass C360"}}
             ]}}"#;
 
-        let v: serde_json::Value = serde_json::from_str(&solve_train_impl(req).unwrap()).unwrap();
+        let v = solved(req);
         let want = (43.0 / 17.0) * 40.0;
         assert!((v["total_ratio"].as_f64().unwrap() - want).abs() < 1e-9);
 
@@ -1833,7 +1889,7 @@ mod tests {
                ]}
             ]}}"#;
 
-        let v: serde_json::Value = serde_json::from_str(&solve_train_impl(req).unwrap()).unwrap();
+        let v = solved(req);
         assert!((v["total_ratio"].as_f64().unwrap() - 43.0 / 17.0).abs() < 1e-12);
         assert!(v["output_torque"].as_f64().unwrap() > 2.0);
 
@@ -1852,12 +1908,69 @@ mod tests {
         );
     }
 
+    /// **A refusal crosses as data, and as a key rather than as a sentence.**
+    ///
+    /// A geartrain that will not build is an ordinary thing to be holding
+    /// mid-edit, so it comes back in the payload and the panel goes on showing
+    /// every input that produced it. And it comes back as a `Note`, because
+    /// `TrainError`'s `Display` is English written in Rust — handing that over
+    /// made the failure the one thing the application said in a language
+    /// nobody chose. Only a broken boundary is still an error.
+    /// The answer out of a solve that was supposed to have one.
+    ///
+    /// The payload carries `{ result, failure }` now, because a train that will
+    /// not build is data rather than an exception — so a test that expects one
+    /// to build says so here instead of reaching past a `result` that might be
+    /// null and failing somewhere less obvious.
+    fn solved(req: &str) -> serde_json::Value {
+        let v: serde_json::Value = serde_json::from_str(&solve_train_impl(req).unwrap()).unwrap();
+        assert!(
+            v["failure"].is_null(),
+            "this train was expected to solve: {}",
+            v["failure"]
+        );
+        v["result"].clone()
+    }
+
     #[test]
     fn a_train_that_cannot_be_solved_says_why() {
         let bad = r#"{"train":{"input_speed":1.0,"input_torque":1.0,"back_driving_torque":0.0,"operating_torque":1.0,
             "actuation":{"intermittent":{"range_degrees":25.0,"actuations":1000,"reversing":false}},
             "stages":[]}}"#;
-        assert!(solve_train_impl(bad).unwrap_err().contains("no stages"));
+        let v: serde_json::Value = serde_json::from_str(&solve_train_impl(bad).unwrap()).unwrap();
+        assert!(v["result"].is_null(), "an empty train has no answer");
+        assert_eq!(v["failure"]["note"]["key"], "error.train_empty");
+        assert!(
+            v["failure"]["stage"].is_null(),
+            "an empty train's fault is the train's, not any stage's"
+        );
+
+        // ...and where a stage is to blame, it is named — numbered as the panel
+        // numbers them, so the reader is not left counting from zero.
+        let sound: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let mut train = sound["train"].clone();
+        let stage = train["stages"][0].clone();
+        train["stages"] = serde_json::json!([stage.clone(), stage]);
+        train["stages"][1]["centre_distance"] = serde_json::json!({"auto": false, "manual": 0.0});
+        let req = serde_json::json!({ "train": train }).to_string();
+        let v: serde_json::Value = serde_json::from_str(&solve_train_impl(&req).unwrap()).unwrap();
+        assert!(
+            v["result"].is_null(),
+            "a mesh at no distance is not a train"
+        );
+        assert_eq!(
+            v["failure"]["stage"], 2,
+            "the second stage is the one to fix"
+        );
+        assert!(
+            v["failure"]["note"]["key"]
+                .as_str()
+                .is_some_and(|k| k.starts_with("error.")),
+            "the reason should be a catalogue key, got {}",
+            v["failure"]["note"]
+        );
+
+        // A boundary that broke is still an error: nothing a designer typed.
         assert!(solve_train_impl("{ not json").is_err());
     }
 

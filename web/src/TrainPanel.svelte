@@ -102,6 +102,10 @@
   // Every number on screen comes back from Rust. Nothing here computes a
   // result — the project rule — so this is the only place a value is produced.
   const result = $derived(solveTrain(tab.train));
+  /** The answer, where there is one — `undefined` reads through every formatter
+   *  below as a blank rather than as a row that is not there. */
+  const solved = $derived(result.result ?? undefined);
+  const failure = $derived(result.failure);
 
   const mode = $derived<"intermittent" | "continuous">(
     "intermittent" in tab.train.actuation ? "intermittent" : "continuous",
@@ -154,10 +158,25 @@
    *  itself when the stage has solved, and the out-of-range message when the
    *  value is outside its bound. All are rendered; see the slot's comment. */
 
-  const pct = (v: number) => (100 * v).toFixed(3);
-  const n = (v: number) => v.toFixed(3);
+  /** **A figure a stage has only once it has solved.**
+   *
+   *  Blank while it has not, rather than absent: a readout that disappears
+   *  takes its label with it, so the panel a designer is editing changes shape
+   *  under them at the moment they most need it to hold still. Every formatter
+   *  below takes the same `undefined` and answers the same way, so a readout is
+   *  written once and reads either way. */
+  const BLANK = "";
+  const num = (v: number | null | undefined, digits: number) =>
+    v == null ? BLANK : v.toFixed(digits);
+  const count = (v: number | null | undefined) => (v == null ? BLANK : v.toLocaleString());
+  const pct = (v: number | null | undefined) => (v == null ? BLANK : (100 * v).toFixed(3));
+  const n = (v: number | null | undefined) => (v == null ? BLANK : v.toFixed(3));
   /** "lo to hi" — one shape, so the word between two numbers is written once. */
-  const range = (lo: string, hi: string) => t("ui.range", { lo, hi });
+  /** "lo to hi" — one shape, so the word between two numbers is written once,
+   *  and the brackets too: every reader of this wrapped it in a pair, which is
+   *  a pair of brackets that would have been left stranded round a blank. */
+  const range = (lo: string, hi: string) =>
+    lo === BLANK ? BLANK : `(${t("ui.range", { lo, hi })})`;
   /** A planetary shaft's name, from the same key its own option in the
    *  arrangement selects uses — the readout used to print the wire value, which
    *  is an identifier and was never English to begin with. */
@@ -190,11 +209,13 @@
 
   /** A mesh efficiency, both ways round. Two keys rather than one sentence: the
    *  two halves are separated by a bullet the grammar of no language owns. */
-  const bothWays = (e: { forward: number; backward: number }) =>
-    `${t("ui.train_driven_forward", { percent: pct(e.forward) })} · ${t(
-      "ui.train_driven_backward",
-      { percent: pct(e.backward) },
-    )}`;
+  const bothWays = (e: { forward: number; backward: number } | undefined) =>
+    e === undefined
+      ? BLANK
+      : `${t("ui.train_driven_forward", { percent: pct(e.forward) })} · ${t(
+          "ui.train_driven_backward",
+          { percent: pct(e.backward) },
+        )}`;
 
   /** A rating in both load cases, written in the order they are read: what the
    *  part must survive once, then what it must survive for the duty.
@@ -202,10 +223,15 @@
    *  Formatting, not arithmetic — every number here came from Rust. A rating
    *  that does not exist for a member renders as a dash rather than as a zero,
    *  because those are different facts. */
-  const cases = (v: { peak: number | null; cyclic: number | null }, digits: number) =>
-    `${v.peak === null ? "—" : v.peak.toFixed(digits)} / ${
-      v.cyclic === null ? "—" : v.cyclic.toFixed(digits)
-    }`;
+  const cases = (
+    v: { peak: number | null; cyclic: number | null } | undefined,
+    digits: number,
+  ) =>
+    v === undefined
+      ? BLANK
+      : `${v.peak === null ? "—" : v.peak.toFixed(digits)} / ${
+          v.cyclic === null ? "—" : v.cyclic.toFixed(digits)
+        }`;
 
 </script>
 
@@ -271,18 +297,6 @@
      written as a label had a hit area running the width of the row, well
      outside the button a reader can see. There is nothing else in this row to
      focus, so there is nothing for a label to be for. -->
-<!-- **A stage with no answer says so.**
-     
-     A train is a chain, so one stage that cannot be built takes the shaft line
-     with it and *every* stage loses its outputs — the readouts simply were not
-     rendered, and a reader was left with a panel of inputs and no indication
-     that anything had gone wrong beyond one line at the top of the train. The
-     inputs stay live, because they are what has to be edited to fix it; what
-     the stage cannot report, it reports as missing. -->
-{#snippet noResult()}
-  <p class="notes stage-failed">{t("ui.train_no_outputs")}</p>
-{/snippet}
-
 {#snippet switchField(key: string, on: boolean, set: (v: boolean) => void, note?: string | null)}
   <div class="switchrow">
     <span class="control"><Switch label={t(key)} {on} {set} /></span>
@@ -302,7 +316,7 @@
 <!-- What a crossed-axis mesh reports, whether it was entered as a worm drive or
      as a gear pair with its shafts turned: the same mathematics answers both
      (docs/reference.md#crossed-axes), so it is one readout rather than two that drift. -->
-{#snippet screwReadout(r: WormResult, members: [string, string])}
+{#snippet screwReadout(r: WormResult | undefined, members: [string, string])}
 <!-- Ordered to match the spur stage's shared readout — centre distance,
      contact ratio, efficiency, backlash — with what only a screw pair has
      following on. The backlash lives here rather than on the two member cards
@@ -311,14 +325,14 @@
 <dl class="out">
   <dt>{t("ui.train_centre_distance")}</dt>
   <dd>
-    {r.centre_distance.toFixed(4)} mm
-    <small>{t("ui.train_nominal_value", { value: r.centre_distance_nominal.toFixed(4) })}</small>
+    {num(r?.centre_distance, 4)} mm
+    <small>{t("ui.train_nominal_value", { value: num(r?.centre_distance_nominal, 4) })}</small>
   </dd>
-  {#if r.crossed}
+  {#if r?.crossed}
     <dt>{t("ui.train_contact_ratio")}</dt>
     <dd>
       <span class:warn={r.crossed.contact_ratio < 1}>
-        ε {r.crossed.contact_ratio.toFixed(4)}
+        ε {num(r?.crossed.contact_ratio, 4)}
       </span>
       <small>
         {r.crossed.contact_ratio < 1
@@ -338,11 +352,11 @@
   {/if}
   <dt>{t("ui.train_mesh_efficiency")}</dt>
   <dd>
-    {bothWays(r.efficiency)}
-    {#if r.efficiency.backward <= 0}
+    {bothWays(r?.efficiency)}
+    {#if r && r.efficiency.backward <= 0}
       <small class="warn">{t("ui.train_self_locking")}</small>
     {/if}
-    {#if r.crossed?.parallel_axis_efficiency != null}
+    {#if r?.crossed?.parallel_axis_efficiency != null}
       <small>
         {t("ui.train_parallel_shafts_would_give", {
           percent: pct(r.crossed.parallel_axis_efficiency),
@@ -353,40 +367,42 @@
   <dt>{t("ui.train_backlash")}</dt>
   <dd>
     {t("ui.train_backlash_at", {
-      angle: r.backlash.forward.nominal.toFixed(5),
+      angle: num(r?.backlash.forward.nominal, 5),
       member: members[1],
     })}
     <small
-      >({range(r.backlash.forward.minimum.toFixed(5), r.backlash.forward.maximum.toFixed(5))})</small
+      >{range(num(r?.backlash.forward.minimum, 5), num(r?.backlash.forward.maximum, 5))}</small
     >
     · {t("ui.train_backlash_at", {
-      angle: r.backlash.backward.nominal.toFixed(5),
+      angle: num(r?.backlash.backward.nominal, 5),
       member: members[0],
     })}
   </dd>
   <dt>{t("ui.train_self_locks_at")}</dt>
-  <dd>{r.self_locking_friction.toFixed(4)}</dd>
+  <dd>{num(r?.self_locking_friction, 4)}</dd>
   <dt>{t("ui.train_contact_stress")}</dt>
   <dd>
-    {cases({ peak: r.contact.peak.max_pressure, cyclic: r.contact.cyclic.max_pressure }, 1)} {t("ui.train_mpa")}
+    {cases(r && { peak: r.contact.peak.max_pressure, cyclic: r.contact.cyclic.max_pressure }, 1)} {t("ui.train_mpa")}
     <small>{t("ui.train_peak_cyclic")}</small>
     <small>
+      {#if r}
       {t("ui.train_patch", {
-        length: r.contact.peak.patch_length.toFixed(4),
-        width: r.contact.peak.patch_width.toFixed(4),
+        length: num(r.contact.peak.patch_length, 4),
+        width: num(r.contact.peak.patch_width, 4),
       })} ·
       {Math.abs(r.contact.peak.worst_position) < 1e-9
         ? t("ui.train_worst_at_pitch_point")
         : t("ui.train_worst_along_the_path", {
-            position: r.contact.peak.worst_position.toFixed(3),
+            position: num(r.contact.peak.worst_position, 3),
           })}
       · {t("ui.train_pitch_point_alone_gives", {
-        stress: r.contact.peak.at_pitch_point.toFixed(1),
+        stress: num(r.contact.peak.at_pitch_point, 1),
       })}
+      {/if}
     </small>
   </dd>
   <dt>{t("ui.train_sliding_speed")}</dt>
-  <dd>{r.sliding_velocity.toFixed(1)} mm/s</dd>
+  <dd>{num(r?.sliding_velocity, 1)} mm/s</dd>
   <dt>{t("ui.train_bending_stress")}</dt>
   <dd>
     <small>{t("ui.train_not_reported_for_crossed_axes_no")}</small>
@@ -396,10 +412,10 @@
     {t("ui.train_flank_type_zi")}
     <small>{t("ui.train_zn_worm_s_contact_stress_1")}</small>
   </dd>
-  {#if r.crossed}
+  {#if r?.crossed}
     <dt>{t("ui.train_contact_travel")}</dt>
     <dd>
-      {r.crossed.axial_travel[0].toFixed(3)} · {r.crossed.axial_travel[1].toFixed(3)} mm
+      {num(r?.crossed.axial_travel[0], 3)} · {num(r?.crossed.axial_travel[1], 3)} mm
       <small>{t("ui.train_along_each_member_s_own_axis")}</small>
     </dd>
   {/if}
@@ -468,6 +484,8 @@
   },
 )}
 {@const own = opts.gearNotes ?? g?.notes ?? []}
+{@const mat = library.materials.material.find((m) => m.name === gear.material)}
+{@const spare = (g?.notes ?? []).filter((n) => !UNDER_A_FIELD.includes(n.key))}
 <div class="gear">
   <!-- **A heading names the fields under it**, and nothing else — so a card
        whose ring is shaped by a tool opens with that tool's heading and the
@@ -698,88 +716,91 @@
     </select>
   </label>
 
-  {#if g}
-    <div class="props">
-      {@render property(t("ui.train_density"), gear, "density", g.material.density, 10, t("ui.train_kg_m3"))}
-      {@render property(t("ui.train_elastic_modulus"), gear, "elastic_modulus", g.material.elastic_modulus, 100, t("ui.train_mpa"))}
-      {@render property(t("ui.train_poissons_ratio"), gear, "poissons_ratio", g.material.poissons_ratio, 0.01, "")}
-      {@render property(t("ui.train_ultimate_allowable"), gear, "ultimate_allowable", g.material.ultimate_allowable, 10, t("ui.train_mpa"))}
-      {@render property(t("ui.train_fatigue_allowable"), gear, "fatigue_allowable", g.material.fatigue_allowable, 10, t("ui.train_mpa"))}
-    </div>
-    <dl class="out small">
-      <dt>{t("ui.train_torque")}</dt>
-      <dd>{g.torque.toFixed(4)} Nm</dd>
-      <!-- Only where there is one. A back-driving load that nothing reacts
-           reaches no gear, and an empty row is the honest report of that. -->
-      {#if g.back_driving_torque !== null}
-        <dt>{t("ui.train_back_driving_torque")}</dt>
-        <dd>{g.back_driving_torque.toFixed(4)} Nm</dd>
-      {/if}
-      <dt>{t("ui.train_speed")}</dt>
-      <dd>
-        {g.speed.toFixed(1)} {t("ui.train_rpm")}
-        <!-- Where a member's speed has more to say than the number — a planet's
-             teeth see the carrier's frame, not the ground's — it is said here,
-             against the figure it qualifies. -->
-        {#if opts.speedNote}<small>{opts.speedNote}</small>{/if}
-      </dd>
-      <dt>{t("ui.train_tooth_cycles")}</dt>
-      <dd>
-        {g.tooth_cycles.bending.toLocaleString()} / {g.tooth_cycles.contact.toLocaleString()}
-        <small>{t("ui.train_bending_contact")}</small>
-      </dd>
-      <dt>{t("ui.train_bending_stress")}</dt>
-      <dd>
-        {cases(g.bending_stress, 1)} {t("ui.train_mpa")}
-        <small>{t("ui.train_peak_cyclic")}</small>
-      </dd>
-      <!-- Per gear, and genuinely so. The two flanks share one pressure at any
-           instant — the individual curvatures reach Hertz only through their
-           sum — but the two gears are not rated at the same instant: each one's
-           dedendum carries the load alone at its own end of the path, and that
-           is where its pitting is assessed. -->
-      <dt>{t("ui.train_contact_stress")}</dt>
-      <dd>
-        {cases(g.contact_stress, 1)} {t("ui.train_mpa")}
-        <small>{t("ui.train_peak_cyclic")}</small>
-      </dd>
-      <dt>{t("ui.train_min_face_width")}</dt>
-      <dd>
-        <span class="line">
-          {cases({ peak: g.min_face_width.peak.bending, cyclic: g.min_face_width.cyclic.bending }, 3)} mm
-          <small>{t("ui.train_bending_peak_cyclic")}</small>
-        </span>
-        <span class="line">
-          {cases({ peak: g.min_face_width.peak.contact, cyclic: g.min_face_width.cyclic.contact }, 3)} mm
-          <small>{t("ui.train_contact_peak_cyclic")}</small>
-        </span>
-      </dd>
-    </dl>
-    <!-- What the fields did not take. A note naming an input is drawn under
-         that input, so repeating it here would be the same sentence twice in
-         one card. -->
-    {@const spare = g.notes.filter((n) => !UNDER_A_FIELD.includes(n.key))}
-    {#if g.clamps.length || spare.length}
-      <ul class="notes">
-        {#each g.clamps as c, i (i)}<li>{t("ui.gear_clamped")} {note(c)}</li>{/each}
-        <!-- The rating's own remarks, unprefixed: nothing here was clamped.
-             Keyed by position rather than by note key, because two notes of one
-             kind on one list is a thing that happens and a keyed list must not
-             be what discovers it. -->
-        {#each spare as n, i (i)}<li>{note(n)}</li>{/each}
-      </ul>
+  <!-- **The material's own figures are the library's, not the solve's.**
+       Reading them off the result meant that a stage which failed to build hid
+       every override box a designer would reach for to make it build — inputs
+       withheld for want of an answer they do not depend on. -->
+  <div class="props">
+    {@render property(t("ui.train_density"), gear, "density", g?.material.density ?? mat?.density, 10, t("ui.train_kg_m3"))}
+    {@render property(t("ui.train_elastic_modulus"), gear, "elastic_modulus", g?.material.elastic_modulus ?? mat?.elastic_modulus, 100, t("ui.train_mpa"))}
+    {@render property(t("ui.train_poissons_ratio"), gear, "poissons_ratio", g?.material.poissons_ratio ?? mat?.poissons_ratio, 0.01, "")}
+    {@render property(t("ui.train_ultimate_allowable"), gear, "ultimate_allowable", g?.material.ultimate_allowable ?? mat?.ultimate_allowable, 10, t("ui.train_mpa"))}
+    {@render property(t("ui.train_fatigue_allowable"), gear, "fatigue_allowable", g?.material.fatigue_allowable ?? mat?.fatigue_allowable, 10, t("ui.train_mpa"))}
+  </div>
+  <dl class="out small">
+    <dt>{t("ui.train_torque")}</dt>
+    <dd>{num(g?.torque, 4)} {g && "Nm"}</dd>
+    <!-- Only where there is one. A back-driving load that nothing reacts
+         reaches no gear, and an empty row is the honest report of that. -->
+    {#if g?.back_driving_torque != null}
+      <dt>{t("ui.train_back_driving_torque")}</dt>
+      <dd>{num(g.back_driving_torque, 4)} Nm</dd>
     {/if}
-  {:else}
-    <!-- **Only where there is no shared readout**, which is the whole of what
-         this is for: a crossed pair produces no per-gear rating, so `g` is
-         absent exactly when this is the only readout there is. Rendered outside
-         the guard it was free to restate a row the shared one had already
-         printed — the planet did, repeating its speed to hang an annotation on
-         the copy — and nothing could have caught that but reading both. A
-         member that *has* a rating adds to the row it belongs to instead
-         (`speedNote`). -->
-    {@render (opts.extra ?? noExtra)(opts.extraIndex ?? 0)}
+    <dt>{t("ui.train_speed")}</dt>
+    <dd>
+      {num(g?.speed, 1)} {g && t("ui.train_rpm")}
+      <!-- Where a member's speed has more to say than the number — a planet's
+           teeth see the carrier's frame, not the ground's — it is said here,
+           against the figure it qualifies. -->
+      {#if opts.speedNote}<small>{opts.speedNote}</small>{/if}
+    </dd>
+    <dt>{t("ui.train_tooth_cycles")}</dt>
+    <dd>
+      {g ? `${count(g.tooth_cycles.bending)} / ${count(g.tooth_cycles.contact)}` : BLANK}
+      <small>{t("ui.train_bending_contact")}</small>
+    </dd>
+    <dt>{t("ui.train_bending_stress")}</dt>
+    <dd>
+      {cases(g?.bending_stress, 1)} {g && t("ui.train_mpa")}
+      <small>{t("ui.train_peak_cyclic")}</small>
+    </dd>
+    <!-- Per gear, and genuinely so. The two flanks share one pressure at any
+         instant — the individual curvatures reach Hertz only through their
+         sum — but the two gears are not rated at the same instant: each one's
+         dedendum carries the load alone at its own end of the path, and that
+         is where its pitting is assessed. -->
+    <dt>{t("ui.train_contact_stress")}</dt>
+    <dd>
+      {cases(g?.contact_stress, 1)} {g && t("ui.train_mpa")}
+      <small>{t("ui.train_peak_cyclic")}</small>
+    </dd>
+    <dt>{t("ui.train_min_face_width")}</dt>
+    <dd>
+      <span class="line">
+        {cases(g && { peak: g.min_face_width.peak.bending, cyclic: g.min_face_width.cyclic.bending }, 3)} {g && "mm"}
+        <small>{t("ui.train_bending_peak_cyclic")}</small>
+      </span>
+      <span class="line">
+        {cases(g && { peak: g.min_face_width.peak.contact, cyclic: g.min_face_width.cyclic.contact }, 3)} {g && "mm"}
+        <small>{t("ui.train_contact_peak_cyclic")}</small>
+      </span>
+    </dd>
+  </dl>
+  <!-- What the fields did not take. A note naming an input is drawn under
+       that input, so repeating it here would be the same sentence twice in
+       one card. -->
+
+  {#if (g?.clamps.length ?? 0) > 0 || spare.length}
+    <ul class="notes">
+      {#each g?.clamps ?? [] as c, i (i)}<li>{t("ui.gear_clamped")} {note(c)}</li>{/each}
+      <!-- The rating's own remarks, unprefixed: nothing here was clamped.
+           Keyed by position rather than by note key, because two notes of one
+           kind on one list is a thing that happens and a keyed list must not
+           be what discovers it. -->
+      {#each spare as n, i (i)}<li>{note(n)}</li>{/each}
+    </ul>
   {/if}
+{#if !g}
+  <!-- **Only where there is no shared readout**, which is the whole of what
+       this is for: a crossed pair produces no per-gear rating, so `g` is
+       absent exactly when this is the only readout there is. Rendered
+       unconditionally it was free to restate a row the shared one had already
+       printed — the planet did, repeating its speed to hang an annotation on
+       the copy — and nothing could have caught that but reading both. A
+       member that *has* a rating adds to the row it belongs to instead
+       (`speedNote`). -->
+  {@render (opts.extra ?? noExtra)(opts.extraIndex ?? 0)}
+{/if}
 </div>
 {/snippet}
 
@@ -1027,9 +1048,9 @@
       />
       <em>{t("ui.train_nm")}</em>
       <FieldNote notes={notes(
-        "ok" in result && result.ok.operating_torque_percent !== null
+        solved?.operating_torque_percent != null
           ? t("ui.train_note_operating_torque_percent", {
-              percent: result.ok.operating_torque_percent.toFixed(1),
+              percent: solved.operating_torque_percent.toFixed(1),
             })
           : null,
         null,
@@ -1101,57 +1122,68 @@
   </div>
 
   <div class="summary">
-    {#if "error" in result}
-      <p class="error">{result.error}</p>
-    {:else}
-      <dl class="out">
-        <dt>{t("ui.train_total_ratio")}</dt>
-        <dd>
-        {result.ok.total_ratio >= 1
-          ? `${result.ok.total_ratio.toFixed(4)} : 1`
-          : `1 : ${(1 / result.ok.total_ratio).toFixed(4)}`}
-        </dd>
-        <dt>{t("ui.train_output_speed_peak")}</dt>
-        <dd>{result.ok.output_speed.toFixed(1)} {t("ui.train_rpm")}</dd>
-        <dt>{t("ui.train_output_torque_peak")}</dt>
-        <dd>{result.ok.output_torque.toFixed(4)} Nm</dd>
-        <dt>{t("ui.train_total_efficiency")}</dt>
-        <dd>
-        {bothWays(result.ok.total_efficiency)}
-        {#if result.ok.total_efficiency.backward <= 0}
+    <!-- **The rows stand whether or not there is an answer in them.** A
+         readout that vanishes takes its label with it, so the page a designer
+         is editing changes shape at the moment they most need it to hold
+         still; every figure below is blank instead until the train solves. -->
+    <dl class="out">
+      <dt>{t("ui.train_total_ratio")}</dt>
+      <dd>
+        {solved === undefined
+          ? BLANK
+          : solved.total_ratio >= 1
+            ? `${num(solved.total_ratio, 4)} : 1`
+            : `1 : ${num(1 / solved.total_ratio, 4)}`}
+      </dd>
+      <dt>{t("ui.train_output_speed_peak")}</dt>
+      <dd>{num(solved?.output_speed, 1)} {solved && t("ui.train_rpm")}</dd>
+      <dt>{t("ui.train_output_torque_peak")}</dt>
+      <dd>{num(solved?.output_torque, 4)} {solved && "Nm"}</dd>
+      <dt>{t("ui.train_total_efficiency")}</dt>
+      <dd>
+        {bothWays(solved?.total_efficiency)}
+        {#if solved && solved.total_efficiency.backward <= 0}
           <small class="warn">{t("ui.train_cannot_be_back_driven")}</small>
         {/if}
-        </dd>
-        <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
-        <dd>
-        {result.ok.backlash.forward.nominal.toFixed(5)}°
+      </dd>
+      <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
+      <dd>
+        {num(solved?.backlash.forward.nominal, 5)}{solved ? "°" : BLANK}
         <small
-          >({range(result.ok.backlash.forward.minimum.toFixed(5), result.ok.backlash.forward.maximum.toFixed(5))})</small
+          >{range(num(solved?.backlash.forward.minimum, 5), num(solved?.backlash.forward.maximum, 5))}</small
         >
-        </dd>
-        <dt>{t("ui.train_backlash_at_input_shaft")}</dt>
-        <dd>
-          {result.ok.backlash.backward.nominal.toFixed(5)}°
-          <small
-            >({range(result.ok.backlash.backward.minimum.toFixed(5), result.ok.backlash.backward.maximum.toFixed(5))})</small
-          >
-        </dd>
-      </dl>
-      <!-- What the shaft line wants read, which no single stage is in a
-           position to say: an input clamped against its peak, and where — or
-           whether — the back-driving load is reacted. -->
-      {#if result.ok.notes.length}
-        <ul class="notes">
-          {#each result.ok.notes as n, i (i)}<li>{note(n)}</li>{/each}
-        </ul>
-      {/if}
-      {/if}
+      </dd>
+      <dt>{t("ui.train_backlash_at_input_shaft")}</dt>
+      <dd>
+        {num(solved?.backlash.backward.nominal, 5)}{solved ? "°" : BLANK}
+        <small
+          >{range(num(solved?.backlash.backward.minimum, 5), num(solved?.backlash.backward.maximum, 5))}</small
+        >
+      </dd>
+    </dl>
+    <!-- What the shaft line wants read, which no single stage is in a
+         position to say: an input clamped against its peak, and where — or
+         whether — the back-driving load is reacted. And, at the head of it,
+         why there is no answer at all — through the catalogue like every other
+         message, naming the stage where one is to blame. -->
+    {#if failure || (solved?.notes.length ?? 0) > 0}
+      <ul class="notes">
+        {#if failure}
+          <li class="warn">
+            {failure.stage === null
+              ? note(failure.note)
+              : `${stageName(failure.stage - 1)}: ${note(failure.note)}`}
+          </li>
+        {/if}
+        {#each solved?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
+      </ul>
+    {/if}
   </div>
 </section>
 
 <div class="stages">
   {#each tab.train.stages as stage, i (i)}
-    {@const res = "ok" in result ? result.ok.stages[i] : null}
+    {@const res = solved?.stages[i] ?? null}
     <section class="stage">
       {#if stage.kind === "spur"}
         <!-- One stage, two meshes. Crossing the shafts turns a line contact
@@ -1176,7 +1208,6 @@
 
         {#if tab.open[i]}
           <div class="body">
-            {#if !res}{@render noResult()}{/if}
             <div class="grid shared">
               <label>
                 <span>{t("ui.train_normal_module")}</span>
@@ -1365,31 +1396,33 @@
               {/each}
             </div>
 
-            {#if xres}
-              {@render screwReadout(xres, [gearName(i, 0), gearName(i, 1)])}
-              {#if xres.notes.length}
+            {#if stage.shaft_angle !== 0}
+              {@render screwReadout(xres ?? undefined, [gearName(i, 0), gearName(i, 1)])}
+              {#if (xres?.notes.length ?? 0) > 0}
                 <ul class="notes">
-                  {#each xres.notes as n, i (i)}<li>{note(n)}</li>{/each}
+                  {#each xres?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
                 </ul>
               {/if}
             {/if}
 
-            {#if sres}
+            {#if stage.shaft_angle === 0}
               <dl class="out">
                 <dt>{t("ui.train_centre_distance")}</dt>
                 <dd>
-                  {sres.centre_distance.toFixed(4)} mm
-                  <small>{t("ui.train_nominal_value", { value: sres.centre_distance_nominal.toFixed(4) })}</small>
+                  {num(sres?.centre_distance, 4)} {sres && "mm"}
+                  <small>{sres && t("ui.train_nominal_value", { value: num(sres.centre_distance_nominal, 4) })}</small>
                 </dd>
                 <dt>{t("ui.train_operating_pressure_angle")}</dt>
-                <dd>{sres.operating_pressure_angle.toFixed(3)}°</dd>
+                <dd>{num(sres?.operating_pressure_angle, 3)}{sres ? "°" : BLANK}</dd>
                 <dt>{t("ui.train_contact_ratio")}</dt>
                 <dd>
-                  ε<sub>α</sub> {sres.contact_ratios.transverse.toFixed(4)} · ε<sub>β</sub>
-                  {sres.contact_ratios.overlap.toFixed(4)} · ε<sub>γ</sub>
-                  {sres.contact_ratios.total.toFixed(4)}
-                  {#if stage.additional_helix !== 0 && sres.contact_ratios.overlap < 1}
-                    <small class="warn">{t("ui.train_no_full_axial_overlap")}</small>
+                  {#if sres}
+                    ε<sub>α</sub> {num(sres.contact_ratios.transverse, 4)} · ε<sub>β</sub>
+                    {num(sres.contact_ratios.overlap, 4)} · ε<sub>γ</sub>
+                    {num(sres.contact_ratios.total, 4)}
+                    {#if stage.additional_helix !== 0 && sres.contact_ratios.overlap < 1}
+                      <small class="warn">{t("ui.train_no_full_axial_overlap")}</small>
+                    {/if}
                   {/if}
                 </dd>
                 <!-- The one figure both members share: same patch, same normal
@@ -1397,34 +1430,38 @@
                      its card and is this or worse. -->
                 <dt>{t("ui.train_contact_stress_at_pitch_point")}</dt>
                 <dd>
-                  {cases(sres.contact_stress_at_pitch_point, 1)} {t("ui.train_mpa")}
+                  {cases(sres?.contact_stress_at_pitch_point, 1)} {sres && t("ui.train_mpa")}
                   <small>{t("ui.train_peak_cyclic")}</small>
-                  <small>ρ {sres.relative_radius.toFixed(3)} mm</small>
+                  <small>{sres ? `ρ ${num(sres.relative_radius, 3)} mm` : BLANK}</small>
                 </dd>
                 <dt>{t("ui.train_mesh_efficiency")}</dt>
                 <dd>
-                  {bothWays(sres.efficiency)}
+                  {bothWays(sres?.efficiency)}
                 </dd>
                 <dt>{t("ui.train_backlash")}</dt>
                 <dd>
-                  {t("ui.train_backlash_at", {
-                    angle: sres.backlash.forward.nominal.toFixed(5),
-                    member: gearName(i, 1),
-                  })}
+                  {sres
+                    ? t("ui.train_backlash_at", {
+                        angle: num(sres.backlash.forward.nominal, 5),
+                        member: gearName(i, 1),
+                      })
+                    : BLANK}
                   <small
-                    >({range(sres.backlash.forward.minimum.toFixed(5), sres.backlash.forward.maximum.toFixed(5))})</small
+                    >{range(num(sres?.backlash.forward.minimum, 5), num(sres?.backlash.forward.maximum, 5))}</small
                   >
-                  · {t("ui.train_backlash_at", {
-                    angle: sres.backlash.backward.nominal.toFixed(5),
-                    member: gearName(i, 0),
-                  })}
+                  {sres
+                    ? `· ${t("ui.train_backlash_at", {
+                        angle: num(sres.backlash.backward.nominal, 5),
+                        member: gearName(i, 0),
+                      })}`
+                    : BLANK}
                 </dd>
                 <dt>{t("ui.train_coprime")}</dt>
-                <dd>{sres.coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
+                <dd>{sres ? (sres.coprime ? t("ui.train_yes") : t("ui.train_no")) : BLANK}</dd>
               </dl>
-              {#if sres.notes.length}
+              {#if (sres?.notes.length ?? 0) > 0}
                 <ul class="notes">
-                  {#each sres.notes as n, i (i)}<li>{note(n)}</li>{/each}
+                  {#each sres?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
                 </ul>
               {/if}
             {/if}
@@ -1451,7 +1488,6 @@
 
         {#if tab.open[i]}
           <div class="body">
-            {#if !res}{@render noResult()}{/if}
             <div class="grid shared">
               <label>
                 <span>{t("ui.train_normal_module")}</span>
@@ -1608,18 +1644,16 @@
                     {/each}
                   </select>
                 </label>
-                {#if wres}
-                  <dl class="out">
-                    <dt>{t("ui.train_lead_angle")}</dt>
-                    <dd>{wres.lead_angle.toFixed(4)}°</dd>
-                    <dt>{t("ui.train_lead")}</dt>
-                    <dd>{wres.lead.toFixed(4)} mm</dd>
-                    <dt>{t("ui.train_torque")}</dt>
-                    <dd>{wres.members[0].torque.toFixed(4)} N·m</dd>
-                    <dt>{t("ui.train_speed")}</dt>
-                    <dd>{wres.members[0].speed.toFixed(1)} {t("ui.train_rpm")}</dd>
-                  </dl>
-                {/if}
+                <dl class="out">
+                  <dt>{t("ui.train_lead_angle")}</dt>
+                  <dd>{num(wres?.lead_angle, 4)}{wres ? "°" : BLANK}</dd>
+                  <dt>{t("ui.train_lead")}</dt>
+                  <dd>{num(wres?.lead, 4)} {wres && "mm"}</dd>
+                  <dt>{t("ui.train_torque")}</dt>
+                  <dd>{num(wres?.members[0].torque, 4)} {wres && "N·m"}</dd>
+                  <dt>{t("ui.train_speed")}</dt>
+                  <dd>{num(wres?.members[0].speed, 1)} {wres && t("ui.train_rpm")}</dd>
+                </dl>
               </div>
 
               <div class="gear">
@@ -1650,26 +1684,22 @@
                     {/each}
                   </select>
                 </label>
-                {#if wres}
-                  <dl class="out">
-                    <dt>{t("ui.train_pitch_diameter")}</dt>
-                    <dd>{wres.members[1].pitch_diameter.toFixed(4)} mm</dd>
-                    <dt>{t("ui.train_torque")}</dt>
-                    <dd>{wres.members[1].torque.toFixed(4)} N·m</dd>
-                    <dt>{t("ui.train_speed")}</dt>
-                    <dd>{wres.members[1].speed.toFixed(1)} {t("ui.train_rpm")}</dd>
-                  </dl>
-                {/if}
+                <dl class="out">
+                  <dt>{t("ui.train_pitch_diameter")}</dt>
+                  <dd>{num(wres?.members[1].pitch_diameter, 4)} {wres && "mm"}</dd>
+                  <dt>{t("ui.train_torque")}</dt>
+                  <dd>{num(wres?.members[1].torque, 4)} {wres && "N·m"}</dd>
+                  <dt>{t("ui.train_speed")}</dt>
+                  <dd>{num(wres?.members[1].speed, 1)} {wres && t("ui.train_rpm")}</dd>
+                </dl>
               </div>
             </div>
 
-            {#if wres}
-              {@render screwReadout(wres, [t("ui.train_the_worm"), t("ui.train_the_wheel")])}
-              {#if wres.notes.length}
-                <ul class="notes">
-                  {#each wres.notes as n, i (i)}<li>{note(n)}</li>{/each}
-                </ul>
-              {/if}
+            {@render screwReadout(wres ?? undefined, [t("ui.train_the_worm"), t("ui.train_the_wheel")])}
+            {#if (wres?.notes.length ?? 0) > 0}
+              <ul class="notes">
+                {#each wres?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
+              </ul>
             {/if}
 
             <button
@@ -1693,7 +1723,6 @@
         </button>
         {#if tab.open[i]}
           <div class="body">
-            {#if !res}{@render noResult()}{/if}
             <div class="grid shared">
               <label>
                 <span>{t("ui.train_normal_module")}</span>
@@ -1834,31 +1863,32 @@
               })}
             </div>
 
-            {#if pres}
               <dl class="out">
                 <dt>{t("ui.train_ratio")}</dt>
                 <dd>
-                  {pres.ratio.toFixed(4)} : 1
+                  {num(pres?.ratio, 4)} : 1
                   <small>
-                    {t("ui.train_in_held_out", {
-                      input: shaft(pres.arrangement.input),
-                      held: shaft(pres.arrangement.fixed),
-                      output: shaft(pres.output),
-                    })}
+                    {pres &&
+                      t("ui.train_in_held_out", {
+                        input: shaft(pres.arrangement.input),
+                        held: shaft(pres.arrangement.fixed),
+                        output: shaft(pres.output),
+                      })}
                   </small>
                 </dd>
                 <dt>{t("ui.train_centre_distance")}</dt>
                 <dd>
-                  {pres.centre_distance.toFixed(4)} mm
+                  {num(pres?.centre_distance, 4)} {pres && "mm"}
                   <small>
-                    {t("ui.train_common_to_both_meshes", {
-                      residual: pres.planet.shift_residual.toExponential(1),
-                    })}
+                    {pres &&
+                      t("ui.train_common_to_both_meshes", {
+                        residual: pres.planet.shift_residual.toExponential(1),
+                      })}
                   </small>
                 </dd>
                 <dt>{t("ui.train_efficiency")}</dt>
                 <dd>
-                  {bothWays(pres.efficiency)}
+                  {bothWays(pres?.efficiency)}
                 </dd>
                 <!-- Both shafts the same two plays are seen from, as every other
                      stage kind names both ends of its own: driving forward the
@@ -1866,27 +1896,32 @@
                      shaft that was the input. -->
                 <dt>{t("ui.train_backlash")}</dt>
                 <dd>
-                  {t("ui.train_at_the_shaft", {
-                    angle: pres.backlash.forward.nominal.toFixed(5),
-                    shaft: shaft(pres.output),
-                  })}
+                  {pres &&
+                    t("ui.train_at_the_shaft", {
+                      angle: num(pres.backlash.forward.nominal, 5),
+                      shaft: shaft(pres.output),
+                    })}
                   <small
-                    >({range(pres.backlash.forward.minimum.toFixed(5), pres.backlash.forward.maximum.toFixed(5))})</small
+                    >{range(num(pres?.backlash.forward.minimum, 5), num(pres?.backlash.forward.maximum, 5))}</small
                   >
-                  · {t("ui.train_at_the_shaft", {
-                    angle: pres.backlash.backward.nominal.toFixed(5),
-                    shaft: shaft(pres.arrangement.input),
-                  })}
+                  {pres
+                    ? `· ${t("ui.train_at_the_shaft", {
+                        angle: num(pres.backlash.backward.nominal, 5),
+                        shaft: shaft(pres.arrangement.input),
+                      })}`
+                    : BLANK}
                 </dd>
                 <dt>{t("ui.train_planet_clearance")}</dt>
                 <dd>
-                  {pres.planet_clearance === null
-                    ? t("ui.train_one_planet_no_neighbour")
-                    : `${pres.planet_clearance.toFixed(3)} mm`}
-                  {#if pres.planet_clearance !== null}
-                    <small class:warn={!pres.planet_clearance_ok}>
-                      {t(pres.planet_clearance_ok ? "ui.train_meets_the_minimum" : "ui.train_below_the_minimum")}
-                    </small>
+                  {#if pres}
+                    {pres.planet_clearance === null
+                      ? t("ui.train_one_planet_no_neighbour")
+                      : `${num(pres.planet_clearance, 3)} mm`}
+                    {#if pres.planet_clearance !== null}
+                      <small class:warn={!pres.planet_clearance_ok}>
+                        {t(pres.planet_clearance_ok ? "ui.train_meets_the_minimum" : "ui.train_below_the_minimum")}
+                      </small>
+                    {/if}
                   {/if}
                 </dd>
                 <!-- Two separate layout checks, so two rows. Even spacing is
@@ -1895,9 +1930,9 @@
                      fault — it means the planets engage staggered, which is
                      usually preferable. -->
                 <dt>{t("ui.train_even_spacing")}</dt>
-                <dd>{pres.equal_spacing ? t("ui.train_yes") : t("ui.train_no")}</dd>
+                <dd>{pres ? (pres.equal_spacing ? t("ui.train_yes") : t("ui.train_no")) : BLANK}</dd>
                 <dt>{t("ui.train_simultaneous_meshing")}</dt>
-                <dd>{pres.simultaneous_meshing ? t("ui.train_yes") : t("ui.train_no")}</dd>
+                <dd>{pres ? (pres.simultaneous_meshing ? t("ui.train_yes") : t("ui.train_no")) : BLANK}</dd>
               </dl>
 
               <!-- The two meshes, each stacked like a spur stage's readout
@@ -1905,25 +1940,27 @@
                    panel. The coprime check belongs to a mesh — the sun against
                    the planets, the ring against the planets — so it leads each
                    list. -->
+              <!-- Two meshes, always — the set has them whether or not it
+                   solved, so the sections stand and their figures go blank. -->
               {#each [
-                [t("ui.train_mesh_sun_planet"), pres.sun_planet, pres.sun_coprime_with_planets, "ui.train_the_sun", "ui.train_the_planet"],
-                [t("ui.train_mesh_planet_ring"), pres.planet_ring, pres.ring_coprime_with_planets, "ui.train_the_planet", "ui.train_the_ring"],
+                [t("ui.train_mesh_sun_planet"), pres?.sun_planet, pres?.sun_coprime_with_planets, "ui.train_the_sun", "ui.train_the_planet"],
+                [t("ui.train_mesh_planet_ring"), pres?.planet_ring, pres?.ring_coprime_with_planets, "ui.train_the_planet", "ui.train_the_ring"],
               ] as const as [label, m, coprime, first, second] (label)}
                 <h4 class="mesh">{label}</h4>
                 <dl class="out indent">
                   <dt>{t("ui.train_coprime")}</dt>
-                  <dd>{coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
+                  <dd>{coprime === undefined ? BLANK : coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
                   <dt>{t("ui.train_operating_pressure_angle")}</dt>
-                  <dd>{m.operating_pressure_angle.toFixed(3)}°</dd>
+                  <dd>{num(m?.operating_pressure_angle, 3)}°</dd>
                   <dt>{t("ui.train_contact_ratio")}</dt>
                   <dd>
-                    ε<sub>α</sub> {m.contact_ratios.transverse.toFixed(4)} · ε<sub>β</sub>
-                    {m.contact_ratios.overlap.toFixed(4)} · ε<sub>γ</sub>
-                    {m.contact_ratios.total.toFixed(4)}
+                    ε<sub>α</sub> {num(m?.contact_ratios.transverse, 4)} · ε<sub>β</sub>
+                    {num(m?.contact_ratios.overlap, 4)} · ε<sub>γ</sub>
+                    {num(m?.contact_ratios.total, 4)}
                   </dd>
                   <dt>{t("ui.train_mesh_efficiency")}</dt>
                   <dd>
-                    {bothWays(m.efficiency)}
+                    {bothWays(m?.efficiency)}
                   </dd>
                   <!-- The pair's own play, which the result has always carried
                        and the panel never showed. Written as every other mesh
@@ -1932,32 +1969,31 @@
                   <dt>{t("ui.train_mesh_backlash")}</dt>
                   <dd>
                     {t("ui.train_backlash_at", {
-                      angle: m.backlash[0].nominal.toFixed(5),
+                      angle: num(m?.backlash[0].nominal, 5),
                       member: t(first),
                     })}
                     <small
-                      >({range(m.backlash[0].minimum.toFixed(5), m.backlash[0].maximum.toFixed(5))})</small
+                      >{range(num(m?.backlash[0].minimum, 5), num(m?.backlash[0].maximum, 5))}</small
                     >
                     · {t("ui.train_backlash_at", {
-                      angle: m.backlash[1].nominal.toFixed(5),
+                      angle: num(m?.backlash[1].nominal, 5),
                       member: t(second),
                     })}
                   </dd>
                   <dt>{t("ui.train_contact_stress_at_pitch_point")}</dt>
                   <dd>
-                    {cases(m.contact_stress_at_pitch_point, 1)} {t("ui.train_mpa")}
+                    {cases(m?.contact_stress_at_pitch_point, 1)} {t("ui.train_mpa")}
                     <small>{t("ui.train_peak_cyclic")}</small>
-                    <small>ρ {m.relative_radius.toFixed(3)} mm</small>
+                    <small>ρ {num(m?.relative_radius, 3)} mm</small>
                   </dd>
                 </dl>
               {/each}
 
-              {#if pres.notes.length}
+              {#if (pres?.notes.length ?? 0) > 0}
                 <ul class="notes">
-                  {#each pres.notes as n, i (i)}<li>{note(n)}</li>{/each}
+                  {#each pres?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
                 </ul>
               {/if}
-            {/if}
 
             <button
               class="danger small"
@@ -1981,7 +2017,6 @@
         </button>
         {#if tab.open[i]}
           <div class="body">
-            {#if !res}{@render noResult()}{/if}
             <div class="grid shared">
               <label>
                 <span>{t("ui.train_pressure_angle")}</span>
@@ -2100,25 +2135,24 @@
                   )}
                 {/each}
               </div>
-              {#if hres}
                 <dl class="out indent">
                   <dt>{t("ui.train_operating_pressure_angle")}</dt>
-                  <dd>{hres.meshes[m].operating_pressure_angle.toFixed(3)}°</dd>
+                  <dd>{num(hres?.meshes[m].operating_pressure_angle, 3)}°</dd>
                   <dt>{t("ui.train_contact_ratio")}</dt>
                   <dd>
-                    ε<sub>α</sub> {hres.meshes[m].contact_ratios.transverse.toFixed(4)} · ε<sub>β</sub>
-                    {hres.meshes[m].contact_ratios.overlap.toFixed(4)} · ε<sub>γ</sub>
-                    {hres.meshes[m].contact_ratios.total.toFixed(4)}
-                    {#if hres.meshes[m].contact_ratios.transverse < 1}
+                    ε<sub>α</sub> {num(hres?.meshes[m].contact_ratios.transverse, 4)} · ε<sub>β</sub>
+                    {num(hres?.meshes[m].contact_ratios.overlap, 4)} · ε<sub>γ</sub>
+                    {num(hres?.meshes[m].contact_ratios.total, 4)}
+                    {#if hres && hres.meshes[m].contact_ratios.transverse < 1}
                       <small class="warn">{t("ui.train_note_contact_ratio_below_one")}</small>
                     {/if}
                   </dd>
                   <dt>{t("ui.train_hula_clearance_result")}</dt>
                   <dd>
-                    {hres.meshes[m].clearance.toFixed(4)} {t("ui.train_mm")}
+                    {num(hres?.meshes[m].clearance, 4)} {t("ui.train_mm")}
                     <small>
                       {t("ui.train_hula_clearance_as_cut", {
-                        value: hres.meshes[m].clearance_as_cut.toFixed(4),
+                        value: num(hres?.meshes[m].clearance_as_cut, 4),
                       })}
                     </small>
                   </dd>
@@ -2129,13 +2163,13 @@
                   <dt>{t("ui.train_hula_interference")}</dt>
                   <dd>
                     {#each [[
-                      hres.meshes[m].trochoid_interference
+                      hres?.meshes[m].trochoid_interference
                         ? t("ui.train_hula_interference_trochoid")
                         : null,
-                      hres.meshes[m].involute_interference
+                      hres?.meshes[m].involute_interference
                         ? t("ui.train_hula_interference_involute")
                         : null,
-                      hres.meshes[m].tip_interference
+                      hres?.meshes[m].tip_interference
                         ? t("ui.train_hula_interference_tip")
                         : null,
                     ].filter((x) => x !== null)] as fouling (0)}
@@ -2146,7 +2180,7 @@
                   </dd>
                   <dt>{t("ui.train_mesh_efficiency")}</dt>
                   <dd>
-                    {bothWays(hres.meshes[m].efficiency)}
+                    {bothWays(hres?.meshes[m].efficiency)}
                   </dd>
                   <!-- The same gap seen from each member, written as the spur
                        and screw readouts write theirs — one gap, two ends, and
@@ -2155,28 +2189,26 @@
                   <dt>{t("ui.train_mesh_backlash")}</dt>
                   <dd>
                     {t("ui.train_backlash_at", {
-                      angle: hres.meshes[m].backlash[1].nominal.toFixed(5),
+                      angle: num(hres?.meshes[m].backlash[1].nominal, 5),
                       member: t("ui.train_the_ring"),
                     })}
                     <small
-                      >({range(hres.meshes[m].backlash[1].minimum.toFixed(5), hres.meshes[m].backlash[1].maximum.toFixed(5))})</small
+                      >{range(num(hres?.meshes[m].backlash[1].minimum, 5), num(hres?.meshes[m].backlash[1].maximum, 5))}</small
                     >
                     · {t("ui.train_backlash_at", {
-                      angle: hres.meshes[m].backlash[0].nominal.toFixed(5),
+                      angle: num(hres?.meshes[m].backlash[0].nominal, 5),
                       member: t("ui.train_the_pinion"),
                     })}
                   </dd>
                 </dl>
-              {/if}
-              {#if hres}
                 <!-- What is left after the fields have taken theirs: a clamp
                      naming an input is drawn under that input, and this list
                      keeps the rest — a tip the shaper could not reach, and the
                      like, which are about the part rather than about a box. -->
                 {@const clamped = [ring, pinion].flatMap((j) =>
-                  hres.gears[j].clamps
+                  (hres?.gears[j].clamps ?? [])
                     .filter((c) => !UNDER_A_FIELD.includes(c.key))
-                    .map((c) => ({ teeth: hres.gears[j].teeth, note: c })),
+                    .map((c) => ({ teeth: stage.gears[j].teeth, note: c })),
                 )}
                 {#if clamped.length}
                   <!-- One list for the pair, as every other clamped gear in the
@@ -2189,30 +2221,28 @@
                     {/each}
                   </ul>
                 {/if}
-              {/if}
             {/each}
 
             <!-- The drive as a whole, under the meshes it is made of — where every
                  other stage puts its readout. -->
-            {#if hres}
               <!-- Ordered as the spur and screw readouts are — the distance the
                    pair runs at, contact, efficiency, backlash — with what only
                    this arrangement has following on. -->
               <dl class="out">
                 <dt>{t("ui.train_ratio")}</dt>
                 <dd>
-                  {hres.ratio.toFixed(4)} : 1
+                  {num(hres?.ratio, 4)} : 1
                   <small>{`${t("ui.train_hula_ratio_products", {
-                        numerator: String(hres.ratio_products[0]),
-                        denominator: String(hres.ratio_products[1]),
+                        numerator: String(hres?.ratio_products[0]),
+                        denominator: String(hres?.ratio_products[1]),
                       })} · ${t("ui.train_hula_note_ratio", {
-                        denominator: String(hres.ratio_products[1]),
+                        denominator: String(hres?.ratio_products[1]),
                       })}`}</small>
                 </dd>
                 <dt>{t("ui.train_efficiency")}</dt>
                 <dd>
-                  {bothWays(hres.efficiency)}
-                  {#if hres.efficiency.backward <= 0}
+                  {bothWays(hres?.efficiency)}
+                  {#if hres && hres.efficiency.backward <= 0}
                     <small class="warn">{t("ui.train_self_locking")}</small>
                   {/if}
                 </dd>
@@ -2222,27 +2252,26 @@
                 <dt>{t("ui.train_backlash")}</dt>
                 <dd>
                   {t("ui.train_at_the_shaft", {
-                    angle: hres.backlash.forward.nominal.toFixed(5),
+                    angle: num(hres?.backlash.forward.nominal, 5),
                     shaft: t("ui.train_hula_role_output"),
                   })}
                   <small
-                    >({range(hres.backlash.forward.minimum.toFixed(5), hres.backlash.forward.maximum.toFixed(5))})</small
+                    >{range(num(hres?.backlash.forward.minimum, 5), num(hres?.backlash.forward.maximum, 5))}</small
                   >
                   · {t("ui.train_at_the_shaft", {
-                    angle: hres.backlash.backward.nominal.toFixed(5),
+                    angle: num(hres?.backlash.backward.nominal, 5),
                     shaft: t("ui.train_hula_role_crank"),
                   })}
                 </dd>
                 <dt>{t("ui.train_hula_speeds")}</dt>
                 <dd>
                   {t("ui.train_hula_speeds_at", {
-                    crank: hres.crank_speed.toFixed(1),
-                    wobble: hres.gears[1].speed.toFixed(3),
-                    output: hres.gears[3].speed.toFixed(4),
+                    crank: num(hres?.crank_speed, 1),
+                    wobble: num(hres?.gears[1].speed, 3),
+                    output: num(hres?.gears[3].speed, 4),
                   })}
                 </dd>
               </dl>
-            {/if}
 
             <button
               class="danger small"
@@ -2752,12 +2781,6 @@
   .gear label {
     grid-template-columns: 1fr 6.5rem 3.5rem;
     margin-bottom: var(--field-gap);
-  }
-  /* The stage's own "nothing to report", which is a warning rather than a list
-     — it takes the list's colour and spacing and none of its bullet. */
-  .stage-failed {
-    padding-left: 0;
-    list-style: none;
   }
   .notes {
     margin: 0.5rem 0 0;

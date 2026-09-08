@@ -200,6 +200,12 @@ impl Default for HulaStage {
             // clamps rather than quietly coming out without a fillet.
             cutter: [Cutter {
                 teeth: 20,
+                // **The tool cuts to the depth these teeth have.** The shared
+                // default is 1.25, the rack proportion, and it would sink the
+                // rings a quarter of a module below the 1.0 dedendum the
+                // external members here are cut to — a deeper space than the
+                // pair needs and one more thing not to match.
+                addendum: 1.0,
                 ..Cutter::default()
             }; 2],
             // `N ± d` about 61, at four teeth of difference on each mesh —

@@ -83,4 +83,6 @@ export type { RingRequest } from "./wasm/RingRequest";
 export type { RingSummary } from "./wasm/RingSummary";
 export type { SpanOut } from "./wasm/SpanOut";
 export type { ToleranceOut } from "./wasm/ToleranceOut";
+export type { TrainFailure } from "./wasm/TrainFailure";
+export type { TrainOutcome } from "./wasm/TrainOutcome";
 export type { TrainRequest } from "./wasm/TrainRequest";

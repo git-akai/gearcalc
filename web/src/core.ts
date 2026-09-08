@@ -58,6 +58,8 @@ import type {
   ToleranceOut,
   Train,
   TrainResult,
+  TrainOutcome,
+  TrainFailure,
   Variation,
   WormContact,
   WormMember,
@@ -112,6 +114,8 @@ export type {
   ToleranceOut,
   Train,
   TrainResult,
+  TrainOutcome,
+  TrainFailure,
   Variation,
   WormContact,
   WormMember,
@@ -664,15 +668,31 @@ export function defaultTrain(): Train {
 
 /** Solve a whole train. The library is omitted unless the user changed it, in
  *  which case Rust uses the one it ships with. */
-export function solveTrain(
-  train: Train,
-  materials?: MaterialLibrary,
-): { ok: TrainResult } | { error: string } {
+/** **A train that will not build is an answer, not an exception.**
+ *
+ *  A geartrain halfway through an edit is regularly one that cannot be built,
+ *  and the panel has to go on showing every input that produced it — so the
+ *  refusal comes back as a value, carrying a `Note` the catalogue renders and
+ *  the stage it happened in. The `throw` path is for a boundary that broke:
+ *  bad JSON, a panicking module, nothing a designer typed. */
+export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutcome {
   try {
     const body = JSON.stringify({ train, materials: materials ?? null });
-    return { ok: JSON.parse(solve_train(body)) as TrainResult };
+    return JSON.parse(solve_train(body)) as TrainOutcome;
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    return {
+      result: null,
+      failure: {
+        // **This one is the front end's own**, so its words live in the `[ui]`
+        // section rather than in `[error]`, which is the core's: nothing in
+        // Rust can emit it, because it means the call into Rust did not return.
+        note: {
+          key: "ui.train_boundary_failed",
+          values: { detail: e instanceof Error ? e.message : String(e) },
+        },
+        stage: null,
+      },
+    };
   }
 }
 
