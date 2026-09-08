@@ -339,7 +339,7 @@ train_hula_note_ratio = "D = {denominator} is the design rule: the reduction is 
 train_hula_crank_offset = "Crank offset"
 train_hula_running = "running {value} mm"
 train_hula_held_open_by = "held open by mesh {mesh}"
-train_hula_speeds = "Crank speed"
+train_hula_crank = "Crank"
 train_hula_mesh = "Mesh {mesh}"
 train_operating_pressure_angle = "Operating pressure angle"
 train_hula_clearance_result = "Clearance"

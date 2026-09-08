@@ -259,7 +259,7 @@ train_hula_note_ratio = "D = {denominator} é a regra de projeto: a redução re
 train_hula_crank_offset = "Excentricidade da manivela"
 train_hula_running = "em serviço {value} mm"
 train_hula_held_open_by = "aberta pelo engrenamento {mesh}"
-train_hula_speeds = "Velocidade da manivela"
+train_hula_crank = "Manivela"
 train_hula_mesh = "Engrenamento {mesh}"
 train_operating_pressure_angle = "Ângulo de pressão de funcionamento"
 train_hula_clearance_result = "Folga"

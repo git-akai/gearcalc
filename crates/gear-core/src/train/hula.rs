@@ -976,7 +976,15 @@ pub fn solve_hula_stage_with(
             // closed-form root-find to hold a tooth down, so this says what the
             // tooth would have to be and leaves it as asked
             // (`AddendumAsked::warning`).
-            member_notes.extend(input.addendum_asked(&params).warning(teeth.0[i]));
+            //
+            // **A ring is not asked**, exactly as it is not asked about
+            // undercut. The bound reads the tooth a *rack* would leave from
+            // these parameters, which for a ring is a tooth nobody is cutting —
+            // so it was answering a different question and reporting the answer
+            // as this member's. The planetary set never asked it; this did.
+            if !is_ring {
+                member_notes.extend(input.addendum_asked(&params).warning(teeth.0[i]));
+            }
 
             let gear = GearResult {
                 profile_shift: layout.shift[i],
@@ -1415,6 +1423,48 @@ mod tests {
             opened.meshes[binding].tip_margin.abs() < 1e-6,
             "the tips are what held it, so they sit at their limit: {}",
             opened.meshes[binding].tip_margin
+        );
+    }
+
+    /// **A ring is asked neither of the two questions a rack asks.**
+    ///
+    /// Undercut is the one this stage already withheld; the tip width was not,
+    /// and it is the same statement — the bound reads the tooth a *rack* would
+    /// leave from these parameters, and a ring's form is its shaper's, so for a
+    /// ring it was answering a different question and filing the answer under
+    /// this member. It fired on both rings of the shipped stage at a minimum tip
+    /// width of 2 mm, which is what this asks about.
+    #[test]
+    fn a_ring_is_asked_neither_question_a_rack_asks() {
+        use crate::note::key;
+        let mut s = HulaStage::default();
+        for g in &mut s.gears {
+            g.min_tip_width = 2.0;
+        }
+        let r = solve(&s, 1000.0).unwrap();
+        let told = |g: &HulaGear, k: &str| g.gear.notes.iter().any(|n| n.is(k));
+        for g in &r.gears {
+            assert_eq!(
+                told(g, key::STAGE_ADDENDUM_ABOVE_TIP_WIDTH),
+                !g.ring,
+                "z{}: a tip-width bound is a rack's question, and this member \
+                 {} rack-cut",
+                g.teeth,
+                if g.ring { "is not" } else { "is" }
+            );
+            assert!(
+                !told(g, key::CLAMP_TOOTH_UNDERCUT) || !g.ring,
+                "z{}: nor is undercut",
+                g.teeth
+            );
+        }
+        // ...and the bound still reaches the members it is about, or this test
+        // would pass on a stage that had stopped asking anybody.
+        assert!(
+            r.gears
+                .iter()
+                .any(|g| told(g, key::STAGE_ADDENDUM_ABOVE_TIP_WIDTH)),
+            "the pinions should have said their teeth cannot keep a 2 mm tip"
         );
     }
 
