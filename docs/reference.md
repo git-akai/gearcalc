@@ -1273,7 +1273,7 @@ the three-shaft power flow ([Planetary sets](#planetary-sets)) at
 
 | reduction | meshes, crank held | the stage |
 |---|---|---|
-| 144 | 98.74 % | 35.8 % |
+| 144 | 98.80 % | 36.8 % |
 | 324 | 99.15 % | 26.6 % |
 | 900 | 99.48 % | 17.5 % |
 | 2500 | 99.68 % | 11.1 % |
@@ -1444,18 +1444,18 @@ moving them apart only costs. Both meshes run at one offset and each needs
 `e ≥ a_ref cos α_t`, so below equality the larger mesh still binds, the offset
 does not move, and the smaller mesh's reference distance falls away from it;
 above equality the enlarged mesh binds instead and drags the offset up, pushing
-the *other* mesh's angle out by what the first one gained. At `z = 18`, one tooth
-of difference, the worse of the two operating pressure angles reads:
+the *other* mesh's angle out by rather more than the first one gained. At
+`z = 18`, one tooth of difference, `h_a = 0.8` and 0.3 mm of gap:
 
 | m₁/m₂ | 0.80 | 0.90 | **1.00** | 1.10 | 1.30 |
 |---|---|---|---|---|---|
-| offset, mm | 0.704 | 0.704 | **0.704** | 0.774 | 0.915 |
-| α_w, mesh 1 | 57.7° | 53.1° | **48.1°** | 48.1° | 48.1° |
-| α_w, mesh 2 | 48.1° | 48.1° | **48.1°** | 52.6° | 59.1° |
+| offset, mm | 0.807 | 0.807 | **0.807** | 0.879 | 1.022 |
+| α_w, mesh 1 | 62.2° | 58.4° | **54.4°** | 54.0° | 53.3° |
+| α_w, mesh 2 | 54.4° | 54.4° | **54.4°** | 57.7° | 62.6° |
 
 Equal modules is a corner where both bounds are active at once, and the stage
-efficiency falls away either side of it — 30.5 % at equality against 26.6 % at
-0.8 and 27.5 % at 1.1 on the same search. So the design space is
+efficiency falls away either side of it — 26.9 % at equality against 23.1 % at
+0.8 and 25.5 % at 1.1 on the same search. So the design space is
 `(z, d, addendum, shaper, two divisions)` and nothing more: the tooth
 differences are equal because the ratio demands it, the two base counts are equal
 for the same reason, and the modules are equal because the offset is shared.

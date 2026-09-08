@@ -1457,6 +1457,82 @@ mod tests {
         );
     }
 
+    /// **The tables `docs/reference.md#the-hula-stage` prints are the ones this
+    /// code prints.**
+    ///
+    /// Prose is the copy no test reads, and three of that section's tables had
+    /// drifted before this existed: one row of the reduction table, and the
+    /// whole module-ratio table, which had been generated from a fixture the
+    /// tests no longer use — a configuration that does not even transmit away
+    /// from equality.
+    ///
+    /// A canary rather than an invariant. The digits are free to move; what
+    /// they are not free to do is move *quietly*, and a failure here is the
+    /// reminder that a table needs regenerating. Asserted to half of the last
+    /// digit the document prints, since that is the claim it makes.
+    #[test]
+    fn the_documented_tables_are_the_ones_this_code_prints() {
+        // | reduction | meshes, crank held | the stage |
+        for (n, reduction, meshes, keeps) in [
+            (12_u32, 144.0, 98.80, 36.8),
+            (18, 324.0, 99.15, 26.6),
+            (30, 900.0, 99.48, 17.5),
+            (50, 2500.0, 99.68, 11.1),
+        ] {
+            let mut s = stage();
+            for (gear, count) in s.gears.iter_mut().zip([n + 1, n, n - 1, n]) {
+                gear.teeth = count;
+            }
+            let r = solve(&s, 1000.0).unwrap();
+            assert!(
+                (r.ratio.abs() - reduction).abs() < 1e-9,
+                "z{n}: {}",
+                r.ratio
+            );
+            let got = (
+                r.fixed_carrier_efficiency.forward * 100.0,
+                r.efficiency.forward * 100.0,
+            );
+            assert!(
+                (got.0 - meshes).abs() < 0.005 && (got.1 - keeps).abs() < 0.05,
+                "z{n}: the table says {meshes} % / {keeps} %, this gives {:.2} / {:.1}",
+                got.0,
+                got.1
+            );
+        }
+
+        // | m₁/m₂ | offset | α_w mesh 1 | α_w mesh 2 |
+        for (ratio, offset, first, second) in [
+            (0.8_f64, 0.807, 62.2, 54.4),
+            (0.9, 0.807, 58.4, 54.4),
+            (1.0, 0.807, 54.4, 54.4),
+            (1.1, 0.879, 54.0, 57.7),
+            (1.3, 1.022, 53.3, 62.6),
+        ] {
+            let s = HulaStage {
+                module: [ratio, 1.0],
+                clearance: 0.30,
+                ..stage()
+            };
+            let r = solve(&s, 1000.0)
+                .unwrap_or_else(|e| panic!("m {ratio}: the table's row must solve: {e}"));
+            let angles = [
+                r.meshes[0].report.operating_pressure_angle,
+                r.meshes[1].report.operating_pressure_angle,
+            ];
+            assert!(
+                (r.offset_nominal - offset).abs() < 0.0005
+                    && (angles[0] - first).abs() < 0.05
+                    && (angles[1] - second).abs() < 0.05,
+                "m {ratio}: the table says {offset} mm and {first}°/{second}°, \
+                 this gives {:.3} mm and {:.1}°/{:.1}°",
+                r.offset_nominal,
+                angles[0],
+                angles[1]
+            );
+        }
+    }
+
     /// **A ring is asked neither of the two questions a rack asks.**
     ///
     /// Undercut is the one this stage already withheld; the tip width was not,
