@@ -388,12 +388,12 @@ specification takes in and reports out.
 
 ### Crossed axes are one model
 
-A crossed-axis helical pair and a worm drive are both crossed-axis screw
+A crossed-axis helical pair and a worm stage are both crossed-axis screw
 gearing. A worm is a screw gear with very few starts and a high lead angle.
 
 **A crossed gear pair is the spur stage with its shafts turned**, which is the
 specification's own arrangement: `β₁ = Σ/2 + β_add`, `β₂ = Σ/2 − β_add`. Three
-stage kinds, not four. What still differs between a worm drive and a gear pair is
+stage kinds, not four. What still differs between a worm stage and a gear pair is
 **one input**: whether the first member's diameter is given or derived from a
 helix angle.
 
@@ -455,20 +455,20 @@ of convention that multiplies a stress. A concentrated load on a wide tooth is a
 plate problem and the beam formula has no honest reading of it — which is why no
 standard rates it analytically either.
 
-What the stage reports instead is what a worm drive is actually limited by:
+What the stage reports instead is what a worm stage is actually limited by:
 contact stress, sliding velocity, and mesh power loss in both directions. Worm
-drives fail by wear and heat far more often than by tooth breakage.
+stages of this kind fail by wear and heat far more often than by tooth breakage.
 
 ### Two friction coefficients, because there are two questions
 
-Whether a drive turns at all is decided at rest against a **static** coefficient;
+Whether a stage turns at all is decided at rest against a **static** coefficient;
 how well it turns once moving is decided against the **sliding** one.
 `Directional::once_moving` is the whole rule, and the static figure is never
 itself reported — its only job is the sign.
 
 Applied to every stage kind although only a worm is ever near its threshold, for
 the same reason `PARALLEL_AXES` is a named zero: the rule is general and the
-geometry decides whether it bites. The default worm drive is self-locking, which
+geometry decides whether it bites. The default worm stage is self-locking, which
 is the answer a handbook gives.
 
 **A number quoted in a warning is the number the reader will go and change**, so
@@ -907,14 +907,14 @@ one [clamp rather than refuse](#clamp-rather-than-refuse-and-say-so) already
 draws: a rating is a question *about* a part, and a part can be perfectly real
 while one question about it has no answer.
 
-**Where the line falls, on the same drive.** A hula pair whose ring has no
+**Where the line falls, on the same stage.** A hula pair whose ring has no
 fillet reports every figure but that ring's bending, exactly as above. A hula
 pair with **no path of contact** is refused outright, and the difference is not
 severity — it is that the second describes no mesh. A path is what a contact
 stress, an efficiency and a contact ratio are all taken *on*; without one there
 is no pair for the questions to be about, and the fixed-carrier efficiency that
 would go into the power flow is a zero standing in for a number that does not
-exist. The drive then reports an efficiency, a backlash and a set of speeds
+exist. The stage then reports an efficiency, a backlash and a set of speeds
 computed from it, all of them meaningless and none of them saying so. That is
 the failure this rule exists to prevent, not an example of it.
 
@@ -1041,9 +1041,9 @@ loss against what the arrangement does with it, a pair's own play against what
 that play comes to at a shaft — so each is a row where it belongs and neither is
 mentioned in the other's annotation. A stage whose efficiency note quoted the
 meshes' product was answering, in small type beside the wrong number, a question
-the mesh rows answer in full: the epicyclic set and the eccentric drive both did
-it, and the drive's is the case that shows why it misleads, since the two figures
-are 99 % and 27 % and only one of them is the drive. Both directions are given at
+the mesh rows answer in full: the epicyclic set and the hula stage both did
+it, and the stage's is the case that shows why it misleads, since the two figures
+are 99 % and 27 % and only one of them is the stage's. Both directions are given at
 both levels for the same reason they are given anywhere here — a stage that
 cannot be back-driven says so by reporting the zero, not by omitting the column.
 

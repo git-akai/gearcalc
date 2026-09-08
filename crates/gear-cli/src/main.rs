@@ -28,7 +28,7 @@
 //!                             the ring counts that can be made to work, and
 //!                             the planet shift each of them needs
 //! gear-cli hula [N] [clearance] [m_outer] [m_inner] [cutter teeth]
-//!                             a hula drive: the offset both meshes run at, the
+//!                             a hula stage: the offset both meshes run at, the
 //!                             shifts it takes, and what the teeth then do
 //! ```
 
@@ -142,10 +142,10 @@ fn main() {
     }
 }
 
-/// A hula drive, from the arrangement down to what the teeth do.
+/// A hula stage, from the arrangement down to what the teeth do.
 ///
 /// Drives `train::solve_hula_stage` rather than assembling the parts itself:
-/// the stage is where a drive becomes gears, and a harness that built its own
+/// the stage is where an arrangement becomes gears, and a harness that built its own
 /// would be a second answer to the same question — which is how the two start
 /// disagreeing.
 fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth: Option<u32>) {
@@ -176,7 +176,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
     let result = match solve_hula_stage(&stage, 1000.0, StageTorques::just(2.0), &lib) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("that drive has no geometry: {e}");
+            eprintln!("that stage has no geometry: {e}");
             return;
         }
     };
@@ -252,7 +252,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
             mesh.tip_interference,
             mesh.tip_margin
         );
-        // What the teeth are worth, which a drive of this kind needs as much as
+        // What the teeth are worth, which a stage of this kind needs as much as
         // the geometry: the reduction multiplies the mesh loss, and it multiplies
         // the torque on the way as well — the output pair carries the whole of it.
         println!(
@@ -545,7 +545,7 @@ fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, tit
 /// The **sum** of a mesh's two shifts is never free here: the crank offset is
 /// what it is, and that is the arrangement's defining constraint. Only the
 /// division is left, and it is searched rather than solved — because the
-/// unconstrained optimum is not a design. On these drives the mesh loses least
+/// unconstrained optimum is not a design. On these stages the mesh loses least
 /// at a division of `+2.85`, `+2.05`, `−2.55` for one, two and four teeth of
 /// difference, and **none of the three is admissible**: contact has gone
 /// discontinuous or the tips have fouled long before. Every row below sits
@@ -567,7 +567,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
     );
     println!(
         "{:>3} {:>6} {:>7} {:>5} {:>6} {:>7} {:>10} {:>8} {:>8} {:>7} {:>9}",
-        "d", "z", "module", "h_a", "shaper", "x", "meshes", "drive", "alpha_w", "eps", "backlash"
+        "d", "z", "module", "h_a", "shaper", "x", "meshes", "stage", "alpha_w", "eps", "backlash"
     );
     for d in 1..=9u32 {
         let n = z0 * d;
@@ -675,7 +675,7 @@ fn mesh_sweep(z_ring: u32, z_pinion: u32, ring_addendum: f64, pinion_addendum: f
 ///
 /// Through `solve_hula_stage` rather than the arrangement alone, because the
 /// offset answers to the tips as well as to the far-side gap and a harness
-/// rolling the drive before that bound was applied would be measuring one
+/// rolling the stage before that bound was applied would be measuring one
 /// nobody builds.
 fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     use gear_core::ring::Ring;
@@ -693,7 +693,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     let result = match solve_hula_stage(&stage, 1000.0, StageTorques::just(2.0), &lib) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("that drive has no geometry: {e}");
+            eprintln!("that stage has no geometry: {e}");
             return;
         }
     };

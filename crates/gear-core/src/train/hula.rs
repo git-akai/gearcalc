@@ -1,9 +1,9 @@
-//! The hula stage: a drive's geometry, the parts it describes, and what those
+//! The hula stage: its geometry, the parts it describes, and what those
 //! parts do when they are put together.
 //!
 //! [`crate::hula`] solves the arrangement — one crank offset and the four
 //! profile shifts that let both meshes run at it. This builds the gears those
-//! numbers describe and asks each pair what it thinks, because a drive that
+//! numbers describe and asks each pair what it thinks, because a stage that
 //! closes algebraically can still be one whose teeth foul, and at one tooth of
 //! difference that is the likely outcome rather than the unlucky one.
 //!
@@ -76,14 +76,14 @@ pub struct HulaStage {
     pub sliding_friction: [f64; 2],
     /// Coefficient of **static** friction in each mesh, for breaking away.
     ///
-    /// Whether a drive turns at all is decided at rest and against this; how
+    /// Whether a stage turns at all is decided at rest and against this; how
     /// well it does once turning is decided against the sliding coefficient,
     /// which is lower. See [`Directional::once_moving`].
     pub static_friction: [f64; 2],
     /// The smallest far-side tip gap any mesh may run at, mm.
     ///
     /// A minimum, and checked whether or not the offset is taken from it: an
-    /// offset that fails it describes a drive that could be built and would
+    /// offset that fails it describes a stage that could be built and would
     /// foul, which is a thing a designer is owed the number for rather than a
     /// refusal.
     pub clearance: f64,
@@ -104,13 +104,13 @@ pub struct HulaStage {
     /// *what decides* the offset rather than how it was entered — and this is
     /// the one place the two are translated.
     pub offset: Auto<f64>,
-    /// What the drive is asked to optimise, and what it may not do to get
+    /// What the stage is asked to optimise, and what it may not do to get
     /// there. See [`Optimisation`].
     ///
     /// A pair's shift *sum* is fixed by the offset the crank has to reach, so
     /// within a mesh only the division between ring and pinion is free — and
     /// that division is worth real efficiency. The contact ratio defaults lower
-    /// here than the shared default, for a reason that is the drive's rather
+    /// here than the shared default, for a reason that is the stage's rather
     /// than a relaxation of the rule: a mesh of one tooth of difference has a
     /// very short path and sits just above continuous contact at every split it
     /// can be built at, so a pair's usual 1.2 of design margin would forbid the
@@ -130,7 +130,7 @@ pub struct HulaStage {
 }
 
 impl HulaStage {
-    /// **The minimum clearance this drive is actually held to.**
+    /// **The minimum clearance this stage is actually held to.**
     ///
     /// It is what *sets* the crank offset, so it is read only while the offset
     /// is being derived. Given the offset by hand, the far-side gap is whatever
@@ -148,13 +148,13 @@ impl HulaStage {
 
 impl Default for HulaStage {
     fn default() -> Self {
-        // **The addendum belongs to the difference, not to the drive.** Four
+        // **The addendum belongs to the difference, not to the stage.** Four
         // teeth of difference runs at a far lower operating pressure angle than
         // one does, so a tooth that cleared the involute interference limit at
         // one tooth of difference reaches past it here: on these counts the
         // limit sits between 0.70 and 0.75, measured, and the taller tooth
         // costs efficiency on the way as well — 0.70 keeps 79.6 % where 0.80
-        // keeps 73.1 % and fouls (docs/reference.md#the-hula-drive). A drive
+        // keeps 73.1 % and fouls (docs/reference.md#the-hula-stage). A stage
         // taken to another difference will want its own proportion, and the
         // interference row is what says so.
         let gear = |teeth: u32| StageGear {
@@ -208,11 +208,11 @@ impl Default for HulaStage {
     }
 }
 
-/// One gear of a solved drive.
+/// One gear of a solved stage.
 ///
 /// The rating is a [`GearResult`], as it is for every other stage kind here, and
 /// what this adds is what the *arrangement* makes of the member: which side of
-/// its pair it is, and the four radii a drive of this kind is read by. The same
+/// its pair it is, and the four radii a stage of this kind is read by. The same
 /// shape a planet takes ([`super::PlanetResult`]), for the same reason — a
 /// member with something extra to say says it beside the answer every member
 /// gives, not instead of it.
@@ -245,7 +245,7 @@ pub struct HulaGear {
     pub gear: GearResult,
 }
 
-/// One mesh of a solved drive.
+/// One mesh of a solved stage.
 ///
 /// [`MeshReport`] is what any parallel-axis mesh reports and is the same six
 /// fields a planetary set's two meshes carry; what a hula pair adds is the room
@@ -254,10 +254,10 @@ pub struct HulaGear {
 ///
 /// **The efficiency on the report is this pair's own, with the crank held** —
 /// what the teeth lose, and nothing about the arrangement they sit in. It is
-/// emphatically not the drive's: the two of them multiply to
-/// [`HulaResult::fixed_carrier_efficiency`], and the drive's own is that figure
+/// emphatically not the stage's: the two of them multiply to
+/// [`HulaResult::fixed_carrier_efficiency`], and the stage's own is that figure
 /// put through the reduction, which on a high-ratio arrangement takes a pair
-/// losing under a percent to a drive losing tens of them
+/// losing under a percent to a stage losing tens of them
 /// ([`HulaResult::efficiency`]).
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -274,7 +274,7 @@ pub struct HulaMesh {
     /// A one-tooth-difference pair opened far enough to clear itself runs at an
     /// operating pressure angle no ordinary pair would — above 50° on the
     /// shipped proportions — and its transverse contact ratio sits just above
-    /// continuous contact by construction, which is why a helical drive of this
+    /// continuous contact by construction, which is why a helical stage of this
     /// kind has to buy its overlap axially.
     pub report: MeshReport,
     /// Far-side tip gap, mm: the room the wobble body has on the side away from
@@ -315,7 +315,7 @@ pub struct HulaResult {
     pub ratio_products: [i64; 2],
     /// The zero-backlash crank offset, mm.
     pub offset_nominal: f64,
-    /// **The minimum far-side clearance the drive was held to**, zero where the
+    /// **The minimum far-side clearance the stage was held to**, zero where the
     /// crank offset was given instead and the input went unread — the same
     /// question every stage answers about its own clearance (see
     /// [`super::SpurStage::clearance_taken`]).
@@ -329,14 +329,14 @@ pub struct HulaResult {
     /// Mesh efficiency with the **crank held**, 0..1, both directions: the two
     /// pairs' own, multiplied.
     ///
-    /// **It is not the drive's efficiency**, and on a high-ratio arrangement it
-    /// is nowhere near it: the meshes lose under a percent while the drive loses
+    /// **It is not the stage's efficiency**, and on a high-ratio arrangement it
+    /// is nowhere near it: the meshes lose under a percent while the stage loses
     /// tens of them, because power circulates. Both figures are reported for
     /// exactly that reason — one is not a stand-in for the other, and reading
-    /// the mesh figure as the drive's is the mistake this pair of fields exists
+    /// the mesh figure as the stage's is the mistake this pair of fields exists
     /// to prevent.
     pub fixed_carrier_efficiency: Directional<f64>,
-    /// The drive's own efficiency, 0..1, in both directions.
+    /// The stage's own efficiency, 0..1, in both directions.
     ///
     /// It follows from the reduction and the meshes alone:
     ///
@@ -344,7 +344,7 @@ pub struct HulaResult {
     /// η = 1 / [ R(1 − η₀) + η₀ ]
     /// ```
     ///
-    /// — which is [`drive_efficiency`] and is worth reading before choosing
+    /// — which is [`stage_efficiency`] and is worth reading before choosing
     /// tooth counts, because it says what a design *can* reach before any of it
     /// is drawn. At `R = 49` a mesh pair losing 0.27 % gives 88 %; the same pair
     /// at `R = 324` gives 53 %, and losing 0.85 % instead gives 27 %.
@@ -389,7 +389,7 @@ pub struct HulaResult {
 /// This is why a gearbox of this family is built at a few tens to one and not a
 /// few hundreds, and why the ones that reach both are a different mechanism.
 #[must_use]
-pub fn drive_efficiency(ratio: f64, mesh: f64) -> f64 {
+pub fn stage_efficiency(ratio: f64, mesh: f64) -> f64 {
     1.0 / (ratio.abs() * (1.0 - mesh) + mesh)
 }
 
@@ -411,7 +411,7 @@ pub fn solve_hula_stage(
 
 /// The same, told how the train treats a root loaded on both flanks.
 ///
-/// **No member of this drive is structurally reversed.** The wobble body carries
+/// **No member of this stage is structurally reversed.** The wobble body carries
 /// two gears rather than one, and each of them meshes once — so unlike a planet,
 /// which the sun drives on one flank and the ring on the other, every root here
 /// is loaded one way unless the *drive* reverses.
@@ -527,7 +527,7 @@ pub fn solve_hula_stage_with(
     // one at a time.
     //
     // The objective is the product of the two mesh efficiencies, which is what
-    // the drive's own efficiency rises with, so the power flow does not have to
+    // the stage's own efficiency rises with, so the power flow does not have to
     // be run inside the search.
     let split_at = if stage.optimisation.enabled {
         // **The crank is solved once a round, and each mesh is chosen alone.**
@@ -681,7 +681,7 @@ pub fn solve_hula_stage_with(
         //
         // **A pair with no path is a stage with no answer**, as it is for every
         // other kind here: there is nothing for a rating to be taken on, and a
-        // drive whose teeth never touch is not one a reader should be handed
+        // stage whose teeth never touch is not one a reader should be handed
         // numbers for.
         let path = ContactPath::new(&pinion, ring.ra, &mesh).ok_or(TrainError::NoContact)?;
         let efficiency = Directional::of(|d| {
@@ -758,7 +758,7 @@ pub fn solve_hula_stage_with(
 
     // ---- efficiency.
     //
-    // The drive is a three-shaft epicyclic: gears 1 and 4 are the two central
+    // The stage is a three-shaft epicyclic: gears 1 and 4 are the two central
     // members on the fixed axis, the crank is the carrier, and the wobble body
     // is the planet. Its basic ratio is the same two products the reduction is
     // written in, so the power flow is `planetary::power` — a solve about three
@@ -778,7 +778,7 @@ pub fn solve_hula_stage_with(
     };
     let fixed_carrier_efficiency = product(|e| e.0);
     // The same product on the static coefficients. It decides a sign rather
-    // than a figure — whether the drive breaks away at all — and is kept beside
+    // than a figure — whether the stage breaks away at all — and is kept beside
     // the sliding one so no stage kind is the exception.
     let at_rest_meshes = product(|e| e.1);
     let flow = |input: PlanetaryShaft, speed: f64, torque: f64, eta0: f64| {
@@ -796,7 +796,7 @@ pub fn solve_hula_stage_with(
     // Driving backward the output shaft becomes the input, at **the speed and
     // torque the forward solve gave it**; the same shaft stays held. Where no
     // branch has the output absorbing there is no back-driven state at all —
-    // the drive is self-locking, and that is a refusal rather than a low number.
+    // the stage is self-locking, and that is a refusal rather than a low number.
     let reversed = |eta0: f64, forward: &planetary::Power| {
         let out = OUTPUT.index_pub();
         let speed = forward.speeds[out];
@@ -813,7 +813,7 @@ pub fn solve_hula_stage_with(
         input_torque,
         fixed_carrier_efficiency.forward,
     );
-    let drive_efficiency = Directional {
+    let stage_efficiency = Directional {
         forward: forward.as_ref().map_or(0.0, |p| p.efficiency),
         backward: forward
             .as_ref()
@@ -863,8 +863,8 @@ pub fn solve_hula_stage_with(
             torques.at(case) / input_torque.abs()
         }
     });
-    // No member of this drive is structurally reversed — see
-    // [`solve_hula_stage_with`] — so all four answer to the drive alone.
+    // No member of this stage is structurally reversed — see
+    // [`solve_hula_stage_with`] — so all four answer to the train's own reversal alone.
     let reverses = reversal.reverses(false);
 
     let mut notes: Vec<Note> = Vec::new();
@@ -971,7 +971,7 @@ pub fn solve_hula_stage_with(
             if i == carrier(index) {
                 member_notes.extend(raised[index].clone());
             }
-            // **The tip width reports here rather than clamping.** A drive that
+            // **The tip width reports here rather than clamping.** A stage that
             // solved its offset would have to put a tip-width solve inside a
             // closed-form root-find to hold a tooth down, so this says what the
             // tooth would have to be and leaves it as asked
@@ -1046,7 +1046,7 @@ pub fn solve_hula_stage_with(
                 ),
                 // The sliding figure of the pair the fixed-carrier product is
                 // taken from, rather than a second run of the same integral: one
-                // number, read twice, so a mesh row and the drive's own
+                // number, read twice, so a mesh row and the stage's own
                 // efficiency cannot disagree about what this pair loses.
                 efficiency: Directional::of(|d| p.efficiency.get(d).0),
                 contact_stress_at_pitch_point: LoadCase::of(|c| {
@@ -1066,7 +1066,7 @@ pub fn solve_hula_stage_with(
 
     Ok(HulaResult {
         fixed_carrier_efficiency,
-        efficiency: drive_efficiency,
+        efficiency: stage_efficiency,
         shaft_torques,
         ratio: layout.ratio.value(),
         ratio_products: [layout.ratio.numerator, layout.ratio.denominator],
@@ -1132,7 +1132,7 @@ mod tests {
         assert!((r.ratio - 324.0).abs() < 1e-12);
     }
 
-    /// **The parts are built at the offset the drive solved**, and the running
+    /// **The parts are built at the offset the stage solved**, and the running
     /// clearance is the whole of the difference.
     ///
     /// The gap as cut is read off the tips the shaper actually left, while the
@@ -1206,8 +1206,8 @@ mod tests {
     /// silently — as they did the moment the tool was sized for the rings this
     /// module's *fixtures* build rather than for the ones it ships.
     #[test]
-    fn the_shipped_drive_is_one_its_own_tools_can_cut() {
-        let r = solve(&HulaStage::default(), 1000.0).expect("the shipped drive solves");
+    fn the_shipped_stage_is_one_its_own_tools_can_cut() {
+        let r = solve(&HulaStage::default(), 1000.0).expect("the shipped stage solves");
         for gear in &r.gears {
             assert!(
                 gear.gear.as_asked(),
@@ -1221,8 +1221,8 @@ mod tests {
 
     /// **And it ships at the figures the documents quote for it.**
     ///
-    /// `docs/reference.md#the-hula-drive` names what the tool ships with — the
-    /// reduction and what the drive keeps in each direction — and prose is the
+    /// `docs/reference.md#the-hula-stage` names what the tool ships with — the
+    /// reduction and what the stage keeps in each direction — and prose is the
     /// copy no test reads, so it goes stale without anything failing. It had:
     /// the section said 73 % forward and 63 % back while the addendum table five
     /// lines below it, generated from the same default, said 79.6 %.
@@ -1231,8 +1231,8 @@ mod tests {
     /// and are free to move — what they are not free to do is move *quietly*,
     /// and a failure here is the reminder that a paragraph needs rewriting.
     #[test]
-    fn the_shipped_drive_reports_the_figures_the_documents_quote() {
-        let r = solve(&HulaStage::default(), 1000.0).expect("the shipped drive solves");
+    fn the_shipped_stage_reports_the_figures_the_documents_quote() {
+        let r = solve(&HulaStage::default(), 1000.0).expect("the shipped stage solves");
         for (what, got, want) in [
             ("the reduction", r.ratio, 232.56),
             ("forward", r.efficiency.forward * 100.0, 79.59),
@@ -1250,7 +1250,7 @@ mod tests {
     ///
     /// The tool is clamped down to the ring's own tooth count and then reaches
     /// none of its flank, so no fillet is generated. It is an ordinary mistake
-    /// on a drive whose rings are this small, which is why the shipped cutters
+    /// on a stage whose rings are this small, which is why the shipped cutters
     /// are well below the shipped rings.
     #[test]
     fn a_shaper_larger_than_its_ring_is_reported() {
@@ -1326,7 +1326,7 @@ mod tests {
         }
     }
 
-    /// The output's play is the two meshes' plays referred through the drive,
+    /// The output's play is the two meshes' plays referred through the stage,
     /// so it rises with either of them and vanishes with both.
     #[test]
     fn the_outputs_play_is_the_two_meshes_referred() {
@@ -1339,7 +1339,7 @@ mod tests {
         let r = solve(&tight, 100.0).unwrap();
         assert!(
             r.backlash.forward.nominal.abs() < 1e-12,
-            "a drive with no clearance should have no play, not {}",
+            "a stage with no clearance should have no play, not {}",
             r.backlash.forward.nominal
         );
 
@@ -1418,7 +1418,7 @@ mod tests {
         );
     }
 
-    /// **A shift the crank leaves can undercut, and the drive says so.**
+    /// **A shift the crank leaves can undercut, and the stage says so.**
     ///
     /// `no undercut` bounds a shift somebody chooses. Pin the ring's and the
     /// pinion's is no longer chosen — it is what the crank's fixed difference
@@ -1442,7 +1442,7 @@ mod tests {
             };
             s.gears[ring].profile_shift = Auto::fixed(0.0);
         }
-        let r = solve(&s, 1000.0).expect("the drive still solves");
+        let r = solve(&s, 1000.0).expect("the stage still solves");
         let told: Vec<u32> = r
             .gears
             .iter()
@@ -1459,7 +1459,7 @@ mod tests {
             "a pinion driven below its floor should say so: shifts {:?}",
             r.gears.each_ref().map(|g| g.gear.profile_shift)
         );
-        // ...and a drive whose pinions carry their own shift says nothing.
+        // ...and a stage whose pinions carry their own shift says nothing.
         let quiet = solve(&stage(), 1000.0).unwrap();
         for g in &quiet.gears {
             assert!(
@@ -1478,7 +1478,7 @@ mod tests {
     ///
     /// One tooth of difference is coprime whatever the count, so the check reads
     /// as vacuous on the arrangement most of these tests use — which is exactly
-    /// why the shipped drive, at four teeth of difference, can fail it: 64 in 60
+    /// why the shipped stage, at four teeth of difference, can fail it: 64 in 60
     /// shares a factor of four and brings the same two teeth together every
     /// fifteenth turn.
     #[test]
@@ -1492,7 +1492,7 @@ mod tests {
         for m in &shared.meshes {
             assert!(!m.report.coprime, "60 and 64 share a factor of four");
         }
-        // One tooth off each end and the same drive hunts.
+        // One tooth off each end and the same stage hunts.
         for (gear, count) in s.gears.iter_mut().zip([65_u32, 61, 57, 61]) {
             gear.teeth = count;
         }
@@ -1504,7 +1504,7 @@ mod tests {
     /// **A mesh is loaded by the shaft it is anchored to**, and the member on
     /// the wobble body takes the same mesh force at its own radius.
     ///
-    /// Two statements, and the second is what a drive of this kind gets wrong if
+    /// Two statements, and the second is what a stage of this kind gets wrong if
     /// anything does: the four gears are on three shafts, so a torque cannot be
     /// read off "this stage's input" the way a pair's can. Mesh A is loaded by
     /// the grounded gear's reaction and mesh B by the output's, both of which
@@ -1551,7 +1551,7 @@ mod tests {
 
     /// **Every gear is rated**, in the same four figures every other stage kind
     /// reports — and a ring without a fillet costs its own bending rather than
-    /// the drive.
+    /// the stage.
     #[test]
     fn every_gear_carries_the_ratings_a_stage_member_carries() {
         let r = solve(&stage(), 1000.0).unwrap();
@@ -1677,15 +1677,15 @@ mod tests {
         );
     }
 
-    /// **The meshes lose a little and the drive loses a lot**, and the second
+    /// **The meshes lose a little and the stage loses a lot**, and the second
     /// does not follow from the first by reading it twice.
     ///
     /// Power circulates: at 324:1 the two pairs lose 0.85 % between them while
-    /// the drive loses nearly three quarters of what it is given. That gap is
+    /// the stage loses nearly three quarters of what it is given. That gap is
     /// the whole reason both figures are reported, and reading the mesh figure
-    /// as the drive's is the mistake the pair of them exists to prevent.
+    /// as the stage's is the mistake the pair of them exists to prevent.
     #[test]
-    fn the_meshes_lose_a_little_and_the_drive_loses_a_lot() {
+    fn the_meshes_lose_a_little_and_the_stage_loses_a_lot() {
         let r = solve(&stage(), 100.0).unwrap();
         let meshes = r.fixed_carrier_efficiency;
         assert!(
@@ -1699,12 +1699,12 @@ mod tests {
         );
         assert!(
             r.efficiency.forward > 0.0 && r.efficiency.forward < 0.5,
-            "the drive loses far more than its meshes: {}",
+            "the stage loses far more than its meshes: {}",
             r.efficiency.forward
         );
         assert!(
             1.0 - r.efficiency.forward > 20.0 * (1.0 - meshes.forward),
-            "the circulating power is the point: drive {} against meshes {}",
+            "the circulating power is the point: stage {} against meshes {}",
             r.efficiency.forward,
             meshes.forward
         );
@@ -1769,9 +1769,9 @@ mod tests {
     /// the model. Both families here have the *same* two meshes losing the same
     /// 0.85 % between them; they differ only in whether the wobble body carries
     /// two faces of the same kind. Where it does, the two meshes nearly cancel,
-    /// `D = ±1`, the ratio is `z²` and the drive keeps a quarter of what it is
+    /// `D = ±1`, the ratio is `z²` and the stage keeps a quarter of what it is
     /// given. Where it does not, `D ≈ 2z`, the ratio is about `z/2` and the
-    /// drive keeps ninety-odd percent — an ordinary gearbox.
+    /// stage keeps ninety-odd percent — an ordinary gearbox.
     ///
     /// It is the published behaviour of a Wolfrom set: efficiency falls as the
     /// reduction rises, because the reduction *is* the cancellation and
@@ -1827,7 +1827,7 @@ mod tests {
     /// reductions and four friction coefficients says the closed form is the
     /// same statement, which is what makes it safe to design against.
     #[test]
-    fn the_drive_efficiency_is_the_reduction_and_the_meshes() {
+    fn the_stage_efficiency_is_the_reduction_and_the_meshes() {
         for n in [7_u32, 12, 18] {
             for mu in [0.08, 0.04, 0.02, 0.01] {
                 let mut s = HulaStage {
@@ -1839,7 +1839,7 @@ mod tests {
                     gear.teeth = count;
                 }
                 let r = solve(&s, 1000.0).unwrap();
-                let want = drive_efficiency(r.ratio, r.fixed_carrier_efficiency.forward);
+                let want = stage_efficiency(r.ratio, r.fixed_carrier_efficiency.forward);
                 assert!(
                     (r.efficiency.forward - want).abs() < 1e-9,
                     "z {n} mu {mu}: solve {} against the relation {want}",
@@ -1880,7 +1880,7 @@ mod tests {
         );
         // ...and this stage, at that reduction and that mesh efficiency.
         assert!(
-            (drive_efficiency(49.0, optimised) - 0.890).abs() < 1e-3,
+            (stage_efficiency(49.0, optimised) - 0.890).abs() < 1e-3,
             "the relation should return the figure it was read from"
         );
         let mut s = HulaStage {
@@ -1897,18 +1897,18 @@ mod tests {
         // gap in it.** These are six- and seven-tooth pinions, and their shifts
         // are left automatic, so they carry the shift such counts need to exist
         // at all — meshes better than the gearbox's 99.73 %, and by the relation
-        // a drive that keeps more than its 89 %. What the comparison establishes
+        // a stage that keeps more than its 89 %. What the comparison establishes
         // is the relation, which the three assertions above check against the
         // published pair directly; this one checks the stage lands where the
         // relation says it should for the teeth it actually has.
         assert!(
             r.efficiency.forward > 0.89 && r.efficiency.forward < 0.93,
-            "a drive of this reduction with meshes this good keeps {}",
+            "a stage of this reduction with meshes this good keeps {}",
             r.efficiency.forward
         );
         let implied_here = 1.0 - implied(r.efficiency.forward, 49.0);
         assert!(
-            (drive_efficiency(49.0, implied_here) - r.efficiency.forward).abs() < 1e-9,
+            (stage_efficiency(49.0, implied_here) - r.efficiency.forward).abs() < 1e-9,
             "the solve and the relation have to be the same statement"
         );
     }

@@ -25,7 +25,7 @@ ratio_products: [bigint, bigint],
  */
 offset_nominal: number, 
 /**
- * **The minimum far-side clearance the drive was held to**, zero where the
+ * **The minimum far-side clearance the stage was held to**, zero where the
  * crank offset was given instead and the input went unread — the same
  * question every stage answers about its own clearance (see
  * [`super::SpurStage::clearance_taken`]).
@@ -47,16 +47,16 @@ crank_speed: number,
  * Mesh efficiency with the **crank held**, 0..1, both directions: the two
  * pairs' own, multiplied.
  *
- * **It is not the drive's efficiency**, and on a high-ratio arrangement it
- * is nowhere near it: the meshes lose under a percent while the drive loses
+ * **It is not the stage's efficiency**, and on a high-ratio arrangement it
+ * is nowhere near it: the meshes lose under a percent while the stage loses
  * tens of them, because power circulates. Both figures are reported for
  * exactly that reason — one is not a stand-in for the other, and reading
- * the mesh figure as the drive's is the mistake this pair of fields exists
+ * the mesh figure as the stage's is the mistake this pair of fields exists
  * to prevent.
  */
 fixed_carrier_efficiency: Directional<number>, 
 /**
- * The drive's own efficiency, 0..1, in both directions.
+ * The stage's own efficiency, 0..1, in both directions.
  *
  * It follows from the reduction and the meshes alone:
  *
@@ -64,7 +64,7 @@ fixed_carrier_efficiency: Directional<number>,
  * η = 1 / [ R(1 − η₀) + η₀ ]
  * ```
  *
- * — which is [`drive_efficiency`] and is worth reading before choosing
+ * — which is [`stage_efficiency`] and is worth reading before choosing
  * tooth counts, because it says what a design *can* reach before any of it
  * is drawn. At `R = 49` a mesh pair losing 0.27 % gives 88 %; the same pair
  * at `R = 324` gives 53 %, and losing 0.85 % instead gives 27 %.

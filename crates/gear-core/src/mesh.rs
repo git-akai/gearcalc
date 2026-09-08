@@ -109,7 +109,7 @@ pub fn operating_geometry(
 /// housing has the distance and wants the sum. The inversion is closed —
 /// `cos α_w = a_ref cos α_t / a_w`, then the involute relation solved for the
 /// sum — and it is here rather than at either call site because both an
-/// external pair fitted to a given centre distance and an eccentric drive
+/// external pair fitted to a given centre distance and a hula stage
 /// fitting two meshes to one crank offset need the same step.
 ///
 /// `None` when the distance is below the base-circle limit, where no operating

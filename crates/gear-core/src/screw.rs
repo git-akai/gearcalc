@@ -1,6 +1,6 @@
-//! Crossed-axis screw gearing — the worm drive and the crossed-helical pair.
+//! Crossed-axis screw gearing — the worm stage and the crossed-helical pair.
 //!
-//! A worm drive is not a separate kind of gearing. It is a screw pair with few
+//! A worm stage is not a separate kind of gearing. It is a screw pair with few
 //! starts, a small lead angle and (usually) a throated wheel, and the same
 //! mathematics covers a crossed-helical pair with none of those properties
 //! (docs/reference.md#crossed-axes). So there is one module, and the worm stage and a
@@ -79,14 +79,14 @@ pub struct ScrewParams {
     pub normal_module: f64,
     /// Normal pressure angle, radians. Shared.
     pub normal_pressure_angle: f64,
-    /// Shaft angle `Σ`, radians. 90° is the ordinary worm drive.
+    /// Shaft angle `Σ`, radians. 90° is the ordinary worm stage.
     pub shaft_angle: f64,
     /// Starts on the worm, `z₁`.
     pub starts: u32,
     /// Teeth on the wheel, `z₂`.
     pub wheel_teeth: u32,
     /// The worm's pitch diameter, mm. This is a free input — it is what sets
-    /// the lead angle, and with it the efficiency and whether the drive can be
+    /// the lead angle, and with it the efficiency and whether the pair can be
     /// back-driven at all.
     pub worm_pitch_diameter: f64,
 }
@@ -303,7 +303,7 @@ impl Screw {
         }
     }
 
-    /// The coefficient of friction at which the drive stops being back-driveable
+    /// The coefficient of friction at which the pair stops being back-driveable
     /// — `cos α_n tan γ` for a right-angle worm.
     ///
     /// **Reported rather than compared against silently**, because it is the
@@ -984,7 +984,7 @@ impl CrossedPath {
     /// average the efficiency comes from.
     ///
     /// [`Screw::self_locking_friction`] is the closed form for the *pitch
-    /// point*; along the path there is more sliding, so the drive locks at a
+    /// point*; along the path there is more sliding, so the pair locks at a
     /// slightly **lower** friction than the pitch point alone would say. The two
     /// must not be mixed: a threshold quoted beside an efficiency has to be the
     /// friction at which *that* efficiency reaches zero, or a pair reads as
@@ -1699,7 +1699,7 @@ mod tests {
         );
     }
 
-    /// A worm drive's efficiency is dominated by the lead angle, not by the
+    /// A worm stage's efficiency is dominated by the lead angle, not by the
     /// friction coefficient — which is the design fact the number exists to
     /// show.
     /// **The path of contact, against the two things that fix it.**
@@ -2039,7 +2039,7 @@ mod tests {
     /// rotations are the same, so the slip is the same and friction opposes it
     /// the same way. That single sign is the whole of the difference, and it has
     /// to give back the classical backward efficiency — and with it the friction
-    /// at which the drive stops being back-driveable, which is the model's
+    /// at which the pair stops being back-driveable, which is the model's
     /// sharpest result and the one most easily lost.
     #[test]
     fn back_driving_reproduces_the_classical_formula_and_its_locking_threshold() {

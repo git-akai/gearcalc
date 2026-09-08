@@ -118,7 +118,7 @@
       m === "intermittent"
         ? { intermittent: { range_degrees: 25, actuations: 1000, reversing: false } }
         : // The operating speed starts at the peak, which is the one value that
-          // is certainly admissible and asserts nothing about the drive.
+          // is certainly admissible and asserts nothing about the stage.
           { continuous: { operating_speed: tab.train.input_speed, runtime_hours: 1000 } };
   }
 
@@ -318,7 +318,7 @@
      more than one of them.
 
      A `MeshReport` is the same six figures whether it is an epicyclic set's
-     sun–planet pair or a hula drive's, and both were drawing them out
+     sun–planet pair or a hula stage's, and both were drawing them out
      separately — which is how the axial-overlap warning came to appear on a
      spur pair alone and the contact-ratio one on a hula alone, though either
      mesh can be the one that loses contact. Rows rather than a whole list, so a
@@ -373,7 +373,7 @@
   </dd>
 {/snippet}
 
-<!-- What a crossed-axis mesh reports, whether it was entered as a worm drive or
+<!-- What a crossed-axis mesh reports, whether it was entered as a worm stage or
      as a gear pair with its shafts turned: the same mathematics answers both
      (docs/reference.md#crossed-axes), so it is one readout rather than two that drift. -->
 {#snippet screwReadout(r: WormResult | undefined, members: [string, string])}
@@ -2217,7 +2217,7 @@
                    two gears. -->
             {/each}
 
-            <!-- The drive as a whole, under the meshes it is made of — where every
+            <!-- The stage as a whole, under the meshes it is made of — where every
                  other stage puts its readout. -->
               <!-- Ordered as the spur and screw readouts are — the distance the
                    pair runs at, contact, efficiency, backlash — with what only
@@ -2265,7 +2265,7 @@
                 <dd>{num(hres?.crank_speed, 1)} {hres && t("ui.train_rpm")}</dd>
               </dl>
 
-              <!-- What the drive had to say that no one gear owns, as every
+              <!-- What the stage had to say that no one gear owns, as every
                    other stage kind reports its own. -->
               {#if (hres?.notes.length ?? 0) > 0}
                 <ul class="notes">

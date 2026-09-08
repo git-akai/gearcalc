@@ -77,7 +77,7 @@ use crate::note::{key, Note};
 use crate::params::Auto;
 use crate::screw::{CrossedPath, Screw, ScrewParams, ZoneLimit};
 
-/// The proportions a worm drive is conventionally given.
+/// The proportions a worm stage is conventionally given.
 ///
 /// **These are conventions, not derivations, and they are shipped deliberately.**
 /// docs/reference.md#contact-stress's standing policy refuses published *rating* factors, and the reason is
@@ -95,7 +95,7 @@ use crate::screw::{CrossedPath, Screw, ScrewParams, ZoneLimit};
 ///
 /// # What they are for
 ///
-/// A real worm drive has an enveloping wheel that wraps the worm, and both
+/// A real worm stage has an enveloping wheel that wraps the worm, and both
 /// dimensions are about **covering the zone of action**: the worm must be long
 /// enough for the wheel to run off neither end, and the wheel wide enough to
 /// take the thread but not so wide that its outer corners hang past where the
@@ -201,7 +201,7 @@ pub struct WormStage {
     pub sliding_friction: f64,
     /// Coefficient of **static** friction, for breaking away.
     ///
-    /// Whether a drive turns at all is decided at rest and against this; how
+    /// Whether a stage turns at all is decided at rest and against this; how
     /// well it does once turning is decided against the sliding coefficient,
     /// which is lower. See [`Directional::once_moving`] — the static figure's
     /// only job is the sign, and it is never itself reported as an efficiency.
@@ -220,12 +220,12 @@ pub struct WormStage {
     ///
     /// It is offered because a designer specifying this pair is specifying those
     /// parts, and a stage document that could not record them would be
-    /// describing a drive nobody could make.
+    /// describing a stage nobody could make.
     pub thickness_mod: f64,
     /// Starts on the worm.
     pub starts: u32,
     /// How the first member's size is fixed — the *only* thing that
-    /// distinguishes a worm drive from a crossed gear pair.
+    /// distinguishes a worm stage from a crossed gear pair.
     pub sizing: FirstMemberSizing,
     /// Teeth on the wheel.
     pub wheel_teeth: u32,
@@ -310,7 +310,7 @@ pub struct WormMemberResult {
 
 /// What the path of contact says about a crossed-axis mesh.
 ///
-/// Reported for a worm drive as well as for a crossed gear pair, because both
+/// Reported for a worm stage as well as for a crossed gear pair, because both
 /// are the same construction here: docs/reference.md#crossed-axes takes **both flanks as involute
 /// helicoids on cylinders**, and that is where the stage's contact stress,
 /// efficiency and backlash already come from. See [`crossed_mesh`] for why a
@@ -323,7 +323,7 @@ pub struct WormMemberResult {
     ts(export, export_to = "core/")
 )]
 pub struct CrossedMesh {
-    /// Tooth pairs in contact. **Below 1 the drive loses contact between one
+    /// Tooth pairs in contact. **Below 1 the pair loses contact between one
     /// pair and the next**, which is a failure of kind rather than of margin.
     pub contact_ratio: f64,
     /// What ended the zone: the teeth, or the face they are cut on.
@@ -341,7 +341,7 @@ pub struct CrossedMesh {
     /// stage has no addendum input. The figures above are then a lower bound.
     pub tooth_height_assumed: bool,
     /// What the same teeth would lose with their shafts brought **parallel**, as
-    /// an efficiency — `None` for a worm drive, whose single-start thread is not
+    /// an efficiency — `None` for a worm stage, whose single-start thread is not
     /// a parallel-axis gear.
     ///
     /// Reported for comparison: crossing shafts adds sliding, so this is the
@@ -464,7 +464,7 @@ pub struct WormResult {
 
 /// How the first member's size is fixed.
 ///
-/// **This is the whole of the difference between a worm drive and a crossed gear
+/// **This is the whole of the difference between a worm stage and a crossed gear
 /// pair**, and it is worth being explicit about because the mathematics is
 /// otherwise identical — docs/reference.md#crossed-axes argued they are one thing, and this is where that
 /// argument is cashed.
@@ -544,7 +544,7 @@ impl WormStage {
 /// Solve a **crossed gear pair** — a [`super::SpurStage`] whose shafts are not
 /// parallel.
 ///
-/// It is the same mesh as a worm drive and is solved by the same code, because
+/// It is the same mesh as a worm stage and is solved by the same code, because
 /// it *is* the same thing: crossed-axis screw gearing. The only difference is
 /// which of the first member's diameter and helix angle is the input (docs/reference.md#crossed-axes),
 /// and a gear's diameter follows from its teeth, so the helix angle is what is
@@ -945,7 +945,7 @@ pub fn solve_worm_stage(
     // width, which is what makes shipping a convention here honest (see
     // `proportions`).
     //
-    // **Only for a worm drive.** These describe a worm carrying an enveloping
+    // **Only for a worm stage.** These describe a worm carrying an enveloping
     // wheel, and a crossed gear pair has neither — its members are two helical
     // gears touching at a point, with nothing wrapped round anything. docs/reference.md#crossed-axes
     // makes the first member's sizing the definition of which machine this is,
@@ -1616,7 +1616,7 @@ mod tests {
         assert!((wider.crossed.unwrap().contact_ratio - w.contact_ratio).abs() < 1e-12);
     }
 
-    /// **A worm drive reports the same path, and says what it assumed to.**
+    /// **A worm stage reports the same path, and says what it assumed to.**
     ///
     /// Every other figure a worm stage gives comes from a model in which both
     /// flanks are involute helicoids on cylinders, so withholding the one that

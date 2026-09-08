@@ -36,7 +36,7 @@ mod spur;
 mod worm;
 
 pub use hula::{
-    drive_efficiency, solve_hula_stage, solve_hula_stage_with, HulaGear, HulaMesh, HulaResult,
+    solve_hula_stage, solve_hula_stage_with, stage_efficiency, HulaGear, HulaMesh, HulaResult,
     HulaStage,
 };
 pub use planetary::{
@@ -118,7 +118,7 @@ pub struct Backlash {
 /// A stage with a single mesh puts these on its own result, because there is no
 /// ambiguity about whose they are; a stage with two has to say which mesh each
 /// belongs to, and both of them were saying it in the same six fields. The
-/// planetary set's `sun_planet`/`planet_ring` and the hula drive's two pairs are
+/// planetary set's `sun_planet`/`planet_ring` and the hula stage's two pairs are
 /// the same report, so it is one type.
 ///
 /// A crossed pair has none of this — its line of action slides rather than
@@ -501,7 +501,7 @@ pub enum TrainError {
     NoRootSection,
     /// The train has no stages, so there is nothing to accumulate.
     Empty,
-    /// A hula drive that has no geometry — see [`crate::hula::Error`].
+    /// A hula stage that has no geometry — see [`crate::hula::Error`].
     Hula(crate::hula::Error),
     /// **Which stage could not be solved**, wrapped around why.
     ///
@@ -563,7 +563,7 @@ impl std::fmt::Display for TrainError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Mesh(e) => write!(f, "{e}"),
-            Self::Hula(e) => write!(f, "the drive has no geometry: {e:?}"),
+            Self::Hula(e) => write!(f, "the arrangement has no geometry: {e:?}"),
             Self::Screw(e) => match e {
                 crate::screw::ScrewError::NotPositive => {
                     write!(f, "a module, diameter or tooth count is not positive")
@@ -2475,7 +2475,7 @@ mod tests {
             optimisation: tuned,
             ..HulaStage::default()
         };
-        each("eccentric drive's", 20, &|| {
+        each("hula stage's", 20, &|| {
             solve_hula_stage(&drive, 1000.0, StageTorques::just(2.0), &lib).unwrap();
         });
     }
@@ -2592,7 +2592,7 @@ mod tests {
     ///
     /// The bound that matters is not any single one but that every stage asks
     /// the same questions. They did not: the root round bounded a pair and not
-    /// an epicyclic set, and the eccentric drive checked its pinion for a
+    /// an epicyclic set, and the hula stage checked its pinion for a
     /// pointed tip but never for the round it was given — so it was returning a
     /// pinion nobody could cut, and a worse answer for it.
     ///
@@ -2640,7 +2640,7 @@ mod tests {
         cuttable(&built.sun.params, "the sun");
         cuttable(&built.planet.params, "the planet");
 
-        // The eccentric drive's rack-generated members are its pinions; its
+        // The hula stage's rack-generated members are its pinions; its
         // rings are the shaper's and are not asked.
         let drive = HulaStage {
             optimisation: Optimisation {
@@ -2650,7 +2650,7 @@ mod tests {
             ..HulaStage::default()
         };
         let r = solve_hula_stage(&drive, 1000.0, StageTorques::just(2.0), &test_library())
-            .expect("the drive solves");
+            .expect("the stage solves");
         for (i, g) in r.gears.iter().enumerate() {
             if g.ring {
                 continue;
@@ -2668,7 +2668,7 @@ mod tests {
                     thickness_mod: drive.thickness_mod[i / 2],
                     ..GearParams::default()
                 },
-                "the drive's pinion",
+                "the stage's pinion",
             );
         }
     }

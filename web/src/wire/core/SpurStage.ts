@@ -59,7 +59,7 @@ sliding_friction: number,
 /**
  * Coefficient of **static** friction, for breaking away.
  *
- * Whether a drive turns at all is decided at rest and against this; how
+ * Whether a stage turns at all is decided at rest and against this; how
  * well it does once turning is decided against the sliding coefficient,
  * which is lower. See [`Directional::once_moving`] — the static figure's
  * only job is the sign, and it is never itself reported as an efficiency.

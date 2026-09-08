@@ -1,10 +1,13 @@
-//! The hula drive: two internal meshes sharing one crank offset.
+//! The hula arrangement: two internal meshes sharing one crank offset.
+//!
+//! The *stage* that builds the parts this describes is [`crate::train::hula`];
+//! what is here is the geometry it closes, which knows nothing about loads.
 //!
 //! Four gears in two pairs. Gears 1 and 4 sit on the fixed axis — 1 grounded, 4
 //! the output — while gears 2 and 3 ride a body carried on an eccentric crank.
 //! Every pair here is therefore separated by the *same* distance, the crank's
-//! offset, and that one shared number is what makes the drive a drive rather
-//! than two independent meshes.
+//! offset, and that one shared number is what makes the arrangement one
+//! mechanism rather than two independent meshes.
 //!
 //! # The ratio is integer arithmetic
 //!
@@ -59,7 +62,7 @@
 //! With ordinary proportions their tip circles *overlap* on the side away from
 //! the mesh — at `h = 0.8` and no shift the gap is `−0.6 m` — and a wobble body
 //! cannot orbit through that. The gap is what the shift is spent on, and it is
-//! the reason a drive of this kind runs at operating pressure angles no ordinary
+//! the reason an arrangement of this kind runs at operating pressure angles no ordinary
 //! pair would.
 //!
 //! The two conditions that bite *inside* the mesh — a tip reaching past a flank —
@@ -69,7 +72,7 @@
 use crate::plane::BasicRack;
 use crate::solve::{brent, newton_bracketed, Tol};
 
-/// The four tooth counts, in the order the drive is read: the grounded gear,
+/// The four tooth counts, in the order the arrangement is read: the grounded gear,
 /// the two that ride the wobble body, then the output.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Teeth(pub [u32; 4]);
@@ -88,7 +91,7 @@ pub struct Pair {
 
 /// A reduction, as the two products it comes from.
 ///
-/// Kept as integers because it *is* integers: a drive whose denominator is 1
+/// Kept as integers because it *is* integers: an arrangement whose denominator is 1
 /// reduces by exactly `z₂z₄`, and rounding that to a float and back is how a
 /// ratio starts disagreeing with the teeth it was counted from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -177,7 +180,7 @@ pub enum Split {
 /// of the trial, free to disagree with the first.
 pub type Bound<'a> = &'a dyn Fn(usize, [f64; 4]) -> f64;
 
-/// A drive as its inputs describe it.
+/// An arrangement as its inputs describe it.
 #[derive(Clone, Copy, Debug)]
 pub struct Set {
     pub teeth: Teeth,
@@ -194,14 +197,14 @@ pub struct Set {
     ///
     /// Always a **minimum** and always checked, whether or not the offset is
     /// taken from it: a given offset that fails it is reported rather than
-    /// refused, because it describes a drive that could be built and would
+    /// refused, because it describes an arrangement that could be built and would
     /// foul, which is a thing a designer is owed the number for.
     pub clearance: f64,
     pub offset: Offset,
     pub split: [Split; 2],
 }
 
-/// What a drive's geometry came to.
+/// What an arrangement's geometry came to.
 #[derive(Clone, Copy, Debug)]
 pub struct Layout {
     /// The crank offset, mm — the centre distance of both meshes.
@@ -219,7 +222,7 @@ pub struct Layout {
     pub ratio: Ratio,
 }
 
-/// Why a drive has no geometry.
+/// Why an arrangement has no geometry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error {
     /// `z₂z₄ = z₁z₃`. The two meshes step by the same amount and cancel, so the
@@ -239,7 +242,7 @@ pub enum Error {
 }
 
 impl crate::note::Explain for Error {
-    /// Why the drive has no geometry, as a key and the mesh it happened in —
+    /// Why the arrangement has no geometry, as a key and the mesh it happened in —
     /// the same currency a clamp uses, so one channel carries every reason a
     /// reader sees.
     fn note(&self) -> crate::note::Note {
@@ -389,7 +392,7 @@ impl Geometry {
     /// The smallest offset that gives this mesh `wanted` of gap.
     ///
     /// Returns the domain floor when the mesh already has more than it asked
-    /// for there — the mesh is then not what holds the drive open, and saying
+    /// for there — the mesh is then not what holds the arrangement open, and saying
     /// so is the difference between "no solution" and "not this one's problem".
     fn offset_for_clearance(&self, wanted: f64) -> Option<f64> {
         // The involute domain, from the base-circle limit to the tangent's
@@ -411,12 +414,12 @@ impl Geometry {
     }
 }
 
-/// Solve a drive: one offset, and the four shifts that let both meshes run at
+/// Solve an arrangement: one offset, and the four shifts that let both meshes run at
 /// it.
 ///
 /// # Errors
 ///
-/// Every arm of [`Error`]. Each is a drive that cannot exist rather than a
+/// Every arm of [`Error`]. Each is an arrangement that cannot exist rather than a
 /// solver that gave up, and each names which mesh could not be made to work.
 pub fn solve(set: &Set) -> Result<Layout, Error> {
     solve_with(set, &|_, _| f64::INFINITY)
@@ -485,7 +488,7 @@ pub fn solve_with(set: &Set, bound: Bound) -> Result<Layout, Error> {
                     }
                     // **A bound is met, not approached.** A root finder lands
                     // on either side of zero, and the side it lands on is the
-                    // difference between a drive that clears its tips and one
+                    // difference between an arrangement that clears its tips and one
                     // reported as fouling by a picometre. Stepping to the
                     // satisfied side costs a part in a hundred million of the
                     // offset, which is nothing a gear can tell.
@@ -532,7 +535,7 @@ pub fn solve_with(set: &Set, bound: Bound) -> Result<Layout, Error> {
 mod tests {
     use super::*;
 
-    /// The drive the rest of the tests vary: the arrangement that reduces by
+    /// The arrangement the rest of the tests vary: the one that reduces by
     /// `z²`, at the proportions a one-tooth-difference pair needs.
     fn set(teeth: [u32; 4]) -> Set {
         Set {
@@ -611,12 +614,12 @@ mod tests {
         }
     }
 
-    /// A denominator of zero is a drive whose meshes step by the same amount and
+    /// A denominator of zero is an arrangement whose meshes step by the same amount and
     /// cancel. The output cannot turn, which is a refusal and not a large
     /// number — and four of the sixteen arrangements are exactly this, so it is
     /// an ordinary mistake rather than an exotic one.
     #[test]
-    fn a_drive_whose_meshes_cancel_is_refused() {
+    fn an_arrangement_whose_meshes_cancel_is_refused() {
         assert_eq!(Teeth([17, 18, 18, 17]).ratio(), Err(Error::Locked));
         assert_eq!(solve(&set([17, 18, 18, 17])).unwrap_err(), Error::Locked);
     }
@@ -682,15 +685,15 @@ mod tests {
     /// The mesh that asked for the most sits exactly at the minimum; the other
     /// has more than it asked for. Neither is short.
     ///
-    /// **Every drive here has two meshes that differ**, and that is the whole
-    /// point of the list: a drive whose pairs share a module and a tooth
+    /// **Every arrangement here has two meshes that differ**, and that is the
+    /// whole point of the list: one whose pairs share a module and a tooth
     /// difference has two identical meshes, so the larger requirement and the
     /// smaller are the same number and taking either passes. An axis nobody
     /// turns is an axis nobody tests, and this one decides whether a mesh is
     /// left fouling.
     #[test]
     fn the_binding_mesh_sits_at_the_clearance_minimum() {
-        let drives = [
+        let arrangements = [
             // unequal modules: the pairs want different offsets
             Set {
                 module: [1.3, 1.0],
@@ -710,7 +713,7 @@ mod tests {
             // the symmetric case, where either answer is the same answer
             set(n_squared(18)),
         ];
-        for s in drives {
+        for s in arrangements {
             let l = solve(&s).unwrap();
             let held = l.binding.unwrap();
             assert!(
@@ -738,7 +741,7 @@ mod tests {
     /// The gap rises with the offset, in both meshes and over the whole domain.
     ///
     /// It is what makes the root unique and taking the larger of the two
-    /// requirements safe — open the drive out for the mesh that needs it and the
+    /// requirements safe — open the arrangement out for the mesh that needs it and the
     /// other one gains too. Sampled here; the analytic statement is
     /// [`Geometry::d_clearance`], whose two terms are both positive.
     #[test]
@@ -767,7 +770,7 @@ mod tests {
     /// gap, so the sum can be moved anywhere without disturbing either. Gated
     /// bit-exactly, because it is the property an efficiency-optimal
     /// distribution will stand on — if the split moved the clearance, choosing
-    /// it for efficiency would quietly close the drive up.
+    /// it for efficiency would quietly close the arrangement up.
     #[test]
     fn the_split_moves_neither_offset_nor_clearance() {
         let base = set(n_squared(18));
@@ -821,7 +824,7 @@ mod tests {
     /// Nothing here counts to one: the difference enters only through the
     /// reference centre distance, so an arrangement built from `z, z ± 2` solves
     /// through the same expressions and reduces by `z²/4` — a quarter of the
-    /// one-tooth drive, which is the arithmetic of `D = 4` rather than a
+    /// one-tooth arrangement, which is the arithmetic of `D = 4` rather than a
     /// separate model.
     #[test]
     fn a_two_tooth_difference_needs_no_new_code() {

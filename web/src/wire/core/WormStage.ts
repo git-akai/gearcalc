@@ -27,7 +27,7 @@ sliding_friction: number,
 /**
  * Coefficient of **static** friction, for breaking away.
  *
- * Whether a drive turns at all is decided at rest and against this; how
+ * Whether a stage turns at all is decided at rest and against this; how
  * well it does once turning is decided against the sliding coefficient,
  * which is lower. See [`Directional::once_moving`] — the static figure's
  * only job is the sign, and it is never itself reported as an efficiency.
@@ -48,7 +48,7 @@ static_friction: number,
  *
  * It is offered because a designer specifying this pair is specifying those
  * parts, and a stage document that could not record them would be
- * describing a drive nobody could make.
+ * describing a stage nobody could make.
  */
 thickness_mod: number, 
 /**
@@ -57,7 +57,7 @@ thickness_mod: number,
 starts: number, 
 /**
  * How the first member's size is fixed — the *only* thing that
- * distinguishes a worm drive from a crossed gear pair.
+ * distinguishes a worm stage from a crossed gear pair.
  */
 sizing: FirstMemberSizing, 
 /**

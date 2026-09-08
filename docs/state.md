@@ -81,7 +81,7 @@ cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
 cargo run --bin gear-cli -- crossed 17 23 90       # a crossed pair, swept over the split
 cargo run --bin gear-cli -- planetary 17 17 3      # every ring count that can work
 cargo run --bin gear-cli -- planetstage 24 18 60 3 # a planetary stage, six modes
-cargo run --bin gear-cli -- hula 18 0.2            # a hula drive, offset to teeth to ratings
+cargo run --bin gear-cli -- hula 18 0.2            # a hula stage, offset to teeth to ratings
 cargo run --release --bin gear-cli -- meshsweep 60 20 0.8   # roll an internal pair, the control
 cargo run --release --bin gear-cli -- hulasweep 18 0.25     # ...and a hula pair, where the tips cross
 cargo run --release --bin gear-cli -- hulaband 18           # one reduction at every tooth difference
@@ -205,7 +205,7 @@ nothing for it to find. Severing is undercut taken to its limit, gated by
 sweeping thirty thousand teeth that are not undercut across seven rack
 proportions, so the scan is skipped for them. A tooth went from 62 µs to 219 ns,
 and with it every search that builds hundreds of teeth to read a radius and a
-flag off each: the pair's from 34 ms to 0.7, the eccentric drive's from 35 to
+flag off each: the pair's from 34 ms to 0.7, the hula stage's from 35 to
 1.7, the epicyclic set's from 68 to 10.
 
 **Two controls on a profile shift, and they are not the same kind of thing.**
@@ -220,13 +220,13 @@ instead, on every rack-cut member of every stage kind. A search is floored at th
 value instead, for a reason that is measured rather than tidy
 ([reference](reference.md#efficiency-parallel-axes)). A ring has only the first
 control: its flank is its shaper's, and undercut is not a question that can be
-asked of it. The eccentric drive's "shift given on" select is gone with it — a
+asked of it. The hula stage's "shift given on" select is gone with it — a
 mesh has one shift to give, and which member gives it is what the toggles say.
 
 The addendum carries the same pair, on the other end of the tooth: `no sharp
 tip` holds it to the tallest that keeps a tip `min_tip_width` wide, where an
 `auto` toggle used to *be* that tooth and left a typed addendum unbounded. The
-eccentric drive reports that bound rather than acting on it — its crank offset
+hula stage reports that bound rather than acting on it — its crank offset
 is a closed-form solve on the tips, and an addendum moving with the shift would
 put an iteration inside it.
 
@@ -258,7 +258,7 @@ to 1.6 points of mesh efficiency on an ordinary pair. Whatever is given
 constrains the search instead of being overruled by it: a shift is that gear's, a
 centre distance fixes the two shifts' sum, and pinning all three is relieved
 visibly rather than silently ignored. The spur pair, the planetary set and the
-eccentric drive each have their own free variables and their own objective over
+hula stage each have their own free variables and their own objective over
 one shared search; the worm stage has no profile shift to choose. Two bounds that
 never bit near zero shift do here — a contact-ratio floor, which is a stage input
 because the answer sits against it, and bottom clearance, which reads the
@@ -285,7 +285,7 @@ building a gear per trial; and
 inspection data — span and over-pins — as the range it takes around the
 revolution, verified against a caliper reading off the drawn teeth.
 
-**Trains.** Spur/helical, worm, planetary and eccentric-drive stages in one
+**Trains.** Spur/helical, worm, planetary and hula stages in one
 train — the last behind the developer knock, as the eccentric gear is; torque,
 backlash and cycle accumulation; efficiency and backlash in **both** drive
 directions. Contact is `max(elliptical, line)` on **both** mesh kinds now — a
@@ -310,7 +310,7 @@ between the flanks. **Reversed bending is a train-wide switch, off by default**:
 a planet's root is loaded both ways whatever the drive does, a reversing drive
 loads every root both ways, and each gear that one reaches says so beside its own
 numbers — corrected against the reduced allowable only where the switch asks for
-it. No member of an eccentric drive is reversed structurally: its wobble body
+it. No member of a hula stage is reversed structurally: its wobble body
 carries two gears rather than one, and each of them meshes once. A notch
 parameter outside the band the `Y_S` fit is stated for says so on the gear too.
 
@@ -339,10 +339,18 @@ imported as TOML, inputs only · gear tabs with external and internal kinds — 
 eccentric, in the developer mode — geartrain tabs with spur, worm and planetary
 stages, and hula in the same mode behind the same knock.
 
-**One name, two words.** The core, the CLI and the documents call this
-arrangement the **hula drive**; comments and the design record also call it *the
-eccentric drive*, and the application's own picker says "hula". They are the
-same stage. Worth settling on one before the kind leaves the developer mode.
+**One word for a stage kind, and it is "stage".** This arrangement was the
+**hula stage** in the core and the CLI and *the eccentric drive* in comments and
+half the documents, which put "eccentric" on two unrelated features — this and
+the angularly varying profile shift — and left a reader matching them up. It is
+the hula stage throughout now, and no stage kind is a "drive": a worm stage, not
+a worm drive.
+
+"Drive" is kept for the two senses that are not a stage kind, because there it is
+the right word and nothing else is: **which way power flows** (`Drive::Forward`,
+driven forward, back-driving, a drive flank against a coast flank) and **how the
+train is actuated** (a reversing drive, whether the drive reverses). Neither
+names a part of a geartrain, so neither collides with the rule above.
 
 ---
 

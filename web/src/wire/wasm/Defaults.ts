@@ -30,7 +30,7 @@ train: Train,
  */
 spur_stage: Stage, worm_stage: Stage, planetary_stage: Stage, 
 /**
- * The hula drive (docs/reference.md#the-hula-drive). Offered only behind
+ * The hula stage (docs/reference.md#the-hula-stage). Offered only behind
  * the interface's developer mode, which is a decision about what to put in
  * front of a reader rather than about the mathematics — so it crosses the
  * boundary like the other three and the front end decides who sees it.

@@ -3,7 +3,7 @@
 /**
  * How the first member's size is fixed.
  *
- * **This is the whole of the difference between a worm drive and a crossed gear
+ * **This is the whole of the difference between a worm stage and a crossed gear
  * pair**, and it is worth being explicit about because the mathematics is
  * otherwise identical — docs/reference.md#crossed-axes argued they are one thing, and this is where that
  * argument is cashed.

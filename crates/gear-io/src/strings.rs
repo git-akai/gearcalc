@@ -777,7 +777,7 @@ mod tests {
         }
         // **Both ends of a tooth pushed past what it can carry.** A tall
         // addendum on a small pinion comes to a point, so the tip-width bound
-        // cuts it down — and the eccentric drive reports the same finding
+        // cuts it down — and the hula stage reports the same finding
         // rather than acting on it, since holding the tooth would put a solve
         // inside its closed-form crank solve.
         {
@@ -808,8 +808,8 @@ mod tests {
             // refuses and the note it was here to fire never gets raised. The
             // bound bites from the other end instead: the shipped tooth stands,
             // and a minimum tip width no tooth of that height can meet is what
-            // the drive reports it would have to be cut down to. Which is the
-            // whole point of this note — the eccentric drive says what the
+            // the stage reports it would have to be cut down to. Which is the
+            // whole point of this note — the hula stage says what the
             // addendum would have to be and leaves it alone.
             let mut drive = gear_core::train::HulaStage::default();
             for g in &mut drive.gears {
@@ -1259,7 +1259,7 @@ mod tests {
                 err(e.note());
             }
 
-            // A hula drive, refused five ways. Each is reachable from ordinary
+            // A hula stage, refused five ways. Each is reachable from ordinary
             // inputs rather than contrived: two meshes that cancel, a pair whose
             // gears have the same tooth count, a crank offset under the base
             // circles, a clearance no offset can give, and a bound no offset can

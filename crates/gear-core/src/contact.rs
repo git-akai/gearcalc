@@ -389,7 +389,7 @@ impl Directional<f64> {
 ///
 /// What does remain a limit is the single friction coefficient itself, and the
 /// fact that a crossed-axis mesh is a genuinely different question — there the
-/// lengthwise component is not zero, it dominates, and it is why a worm drive
+/// lengthwise component is not zero, it dominates, and it is why a worm stage
 /// can self-lock.
 #[must_use]
 pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Tooth, friction: f64, drive: Drive) -> f64 {

@@ -69,7 +69,7 @@ pub struct PlanetaryStage {
     pub sliding_friction_sun_planet: f64,
     /// Coefficient of **static** friction, for breaking away.
     ///
-    /// Whether a drive turns at all is decided at rest and against this; how
+    /// Whether a stage turns at all is decided at rest and against this; how
     /// well it does once turning is decided against the sliding coefficient,
     /// which is lower. See [`Directional::once_moving`] — the static figure's
     /// only job is the sign, and it is never itself reported as an efficiency.
@@ -78,7 +78,7 @@ pub struct PlanetaryStage {
     pub sliding_friction_planet_ring: f64,
     /// Coefficient of **static** friction, for breaking away.
     ///
-    /// Whether a drive turns at all is decided at rest and against this; how
+    /// Whether a stage turns at all is decided at rest and against this; how
     /// well it does once turning is decided against the sliding coefficient,
     /// which is lower. See [`Directional::once_moving`] — the static figure's
     /// only job is the sign, and it is never itself reported as an efficiency.
@@ -446,7 +446,7 @@ impl PlanetaryStage {
     /// shift no single mesh's operating angle is a statement about, and the one
     /// this stage has always used. Pinning the planet is therefore how a
     /// designer asks for the sun to close it instead, exactly as pinning one of
-    /// an eccentric drive's two members names the other as the one the crank
+    /// a hula stage's two members names the other as the one the crank
     /// supplies.
     ///
     /// With all three given the set is over-specified and something has to give

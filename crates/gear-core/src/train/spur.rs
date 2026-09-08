@@ -157,7 +157,7 @@ fn coefficient<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> 
 /// survives; a −2.0 there genuinely undercuts and is raised.
 ///
 /// Getting this wrong is measurable rather than a matter of taste: flooring the
-/// *search* at the true minimum let the eccentric drive's split walk out to
+/// *search* at the true minimum let the hula stage's split walk out to
 /// −1.79 and come back with **less** drive efficiency than it started with.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ShiftAsked {
@@ -281,7 +281,7 @@ impl AddendumAsked {
     /// **The same finding where the stage cannot act on it**, which is a report
     /// rather than a clamp.
     ///
-    /// An eccentric drive solves its crank offset from a gap written in the
+    /// A hula stage solves its crank offset from a gap written in the
     /// tips, in closed form with an analytic derivative. An addendum that moved
     /// with the shift — which moves with the offset — would put a tip-width
     /// solve inside that root-find and take the derivative away with it. Not
@@ -438,7 +438,7 @@ pub struct SpurStage {
     pub sliding_friction: f64,
     /// Coefficient of **static** friction, for breaking away.
     ///
-    /// Whether a drive turns at all is decided at rest and against this; how
+    /// Whether a stage turns at all is decided at rest and against this; how
     /// well it does once turning is decided against the sliding coefficient,
     /// which is lower. See [`Directional::once_moving`] — the static figure's
     /// only job is the sign, and it is never itself reported as an efficiency.

@@ -388,7 +388,7 @@ same expression without its tip-angle weighting fail those.
 
 **What it is worth depends entirely on what the mesh feeds.** On an ordinary
 pair it is three to eight hundredths of a point — 98.32 % to 98.35 % on 17/43,
-98.08 % to 98.16 % on 13/61 — which is real and small. On a drive whose reduction
+98.08 % to 98.16 % on 13/61 — which is real and small. On a stage whose reduction
 comes from two meshes nearly cancelling it is worth thirty to fifty times that at
 the output, because `η = 1/[R(1 − η₀) + η₀]` multiplies the mesh loss by the
 reduction. That is the whole reason a high-ratio design bothers to optimise its
@@ -408,7 +408,7 @@ What is already given constrains the search rather than being overruled by it:
 |---|---|
 | a profile shift | that gear's, exactly |
 | a centre distance | the two shifts' signed *sum*, through `mesh::shift_sum_for` |
-| a crank offset | the same, on each of the eccentric drive's two meshes |
+| a crank offset | the same, on each of the hula stage's two meshes |
 
 A pair has two shifts to choose, so any two of `{a, x₁, x₂}` fix the third and
 pinning all three is a contradiction rather than a tighter specification. The
@@ -420,7 +420,7 @@ Two bounds have never had to bite before, because near zero shift they do not:
 - **A contact ratio floor.** Loss falls monotonically with the length of the
   path, so the least-loss pair is always the one whose teeth barely reach and the
   floor is the answer rather than a guard. It is therefore a stage input. 1.2 is
-  the usual design minimum for a pair; the eccentric drive defaults to continuous
+  the usual design minimum for a pair; the hula stage defaults to continuous
   contact instead, because a mesh of one tooth of difference has so short a path
   that 1.2 would forbid the mechanism rather than constrain it.
 - **Bottom clearance.** A tip that passes the mating root circle bottoms out. The
@@ -434,7 +434,7 @@ Each stage differs only in what is free and what it is worth:
 |---|---|---|
 | spur | both shifts | the mesh's own efficiency |
 | planetary | the sun's and the ring's, the planet's following | `η₀`, since `power` rises with it either way |
-| eccentric | each mesh's division of its shift | the two meshes' product |
+| hula | each mesh's division of its shift | the two meshes' product |
 | worm | — | no profile shift exists to choose |
 
 The searches share `auto::maximise`: what differs between stages is how many
@@ -455,7 +455,7 @@ to the pair rather than to one member.
 
 They were once asked stage by stage, which meant a bound reached the search it
 was written in and no other: the root round bounded a pair and not an epicyclic
-set, and the eccentric drive was choosing a pinion nobody could cut and taking
+set, and the hula stage was choosing a pinion nobody could cut and taking
 1.9 points of efficiency less for it.
 
 **The first two of the four are a choice, and the other two are not.** Undercut
@@ -505,8 +505,8 @@ about centre distance or balance and not a mistake about undercut. A shift that
 silence.
 
 That asymmetry is measured rather than argued: flooring the **search** at the
-true minimum let the eccentric drive's split walk out to −1.79 and come back
-with less drive efficiency than it started with.
+true minimum let the hula stage's split walk out to −1.79 and come back
+with less stage efficiency than it started with.
 
 A ring has neither control's second half: its flank is its shaper's rather than
 a rack's, so it is given or it is the stage's to choose, and undercut is not a
@@ -521,8 +521,8 @@ number is always the designer's, and the bound holds it down to the tallest
 tooth that keeps the tip. It bites exactly — the tallest that clears, not an
 arbitrary shorter one — and says so when it does.
 
-**Not every bound an input creates needs a solver behind it.** The eccentric
-drive solves its crank offset from a gap written in the tips, in closed form
+**Not every bound an input creates needs a solver behind it.** The hula
+stage solves its crank offset from a gap written in the tips, in closed form
 with an analytic derivative; an addendum that moved with the shift — which moves
 with the offset — would put a tip-width solve inside that root-find and take the
 derivative away with it. So there the bound *reports*: it says what the tooth
@@ -549,13 +549,13 @@ absorb it, and each stage reports what it took rather than leaving a reader to
 work it out. The centre distance absorbs it when the distance is automatic; the
 shifts absorb it when they are being chosen, closing the pair to zero backlash a
 clearance *inside* a given housing; and with neither free the input goes unread
-and the answer says zero. The eccentric drive's minimum clearance is the same
+and the answer says zero. The hula stage's minimum clearance is the same
 question asked of its crank: it is what *sets* the offset, so a given offset
 leaves it unread.
 
 ## Crossed axes
 
-One model covers a worm drive and a crossed helical pair; they differ in **one
+One model covers a worm stage and a crossed helical pair; they differ in **one
 input**, whether the first member's diameter is given or derived from a helix
 angle.
 
@@ -617,7 +617,7 @@ At the pitch point this **is** the classical screw formula to 1e-12:
 self-locking ⟺ μ ≥ cos α_n tan γ
 ```
 
-**Two friction coefficients.** Whether a drive turns at all is decided at rest
+**Two friction coefficients.** Whether a stage turns at all is decided at rest
 against a **static** coefficient; how well it turns once moving is decided
 against the **sliding** one. `Directional::once_moving` is the whole rule, and
 the static figure is never itself reported.
@@ -1024,7 +1024,7 @@ by `δ` and the ring's by `δ z_p/z_r`. Written as intervals of `δ` both have t
 same period, one pinion pitch, so one period decides it, and the margin is the
 gap between them: negative is the overlap.
 
-It is the condition that decides a one-tooth difference. On a hula drive at
+It is the condition that decides a one-tooth difference. On a hula stage at
 `z = 18` the tips foul at 134° from the line of centres until the far-side gap
 reaches about a quarter of a module, while every other condition is content
 throughout — verified by rolling the two outlines through a tooth and measuring
@@ -1134,7 +1134,7 @@ control of its own: **the member left automatic absorbs, and the planet is
 preferred**, because it is the one no single mesh's operating angle is a
 statement about and the one this tool has always used. Pinning the planet is
 therefore how a designer asks the sun to close it instead — the same indirection
-by which pinning one of an eccentric drive's two members names the other as the
+by which pinning one of a hula stage's two members names the other as the
 one the crank supplies. Pinning all three over-specifies the set; the planet
 gives way, and the front end relieves it as it is created.
 
@@ -1196,13 +1196,13 @@ at the ring.
 
 ---
 
-## The hula drive
+## The hula stage
 
 Four gears in two pairs, all on one crank. Gears 1 and 4 sit on the fixed axis —
 1 grounded, 4 the output — while gears 2 and 3 ride a body carried on an
 eccentric, so **both pairs are separated by the same distance**, the crank's
-offset, and that shared number is what makes the arrangement a drive rather than
-two independent meshes.
+offset, and that shared number is what makes the arrangement one mechanism
+rather than two independent meshes.
 
 ```text
 ratio        R = z₂z₄ / D,      D = z₂z₄ − z₁z₃          (Willis, both meshes)
@@ -1227,7 +1227,7 @@ teeth, and every arrangement describes itself — the sixteen are one code path.
 
 **The offset answers to every bound, not just the gap.** The far-side gap is one
 requirement and the room the tips have where their circles cross
-([Limits](#limits)) is another; both rise with the offset, so the drive opens out
+([Limits](#limits)) is another; both rise with the offset, so the stage opens out
 until the one that asked for most is met and the rest have more than they asked
 for. The tips bind below about a quarter of a module of gap, and the gap above
 it — so a design asking for less than the tips allow is answered with what can be
@@ -1241,7 +1241,7 @@ shifts reaches either quantity above: the operating pressure angle takes it
 through [`operating_geometry`](#signed-relations-both-mesh-kinds), and in the gap
 both tips move together with the sum, so it cancels. The offset therefore decides
 the difference and **the sum is free** — one spare number per mesh that no
-geometry claims. So the drive has exactly three unknowns, the offset and one
+geometry claims. So the stage has exactly three unknowns, the offset and one
 split per mesh, and each names what decides it; a system where every unknown
 carries its own source cannot be over- or under-determined, which is why there is
 no constraint count to check and no solve order to choose.
@@ -1250,18 +1250,18 @@ no constraint count to check and no solve order to choose.
 its pinion very nearly fill each other, and with ordinary proportions their tip
 circles *overlap* on the side away from the mesh — at `h = 0.8` and no shift the
 gap is `−0.6 m`. A wobble body cannot orbit through that, so the gap is what the
-shift is spent on, and it is why a drive of this kind runs at operating pressure
+shift is spent on, and it is why a stage of this kind runs at operating pressure
 angles no ordinary pair would: 57° at `z = 18`, one tooth of difference and half
 a millimetre of gap. Two teeth of difference is far kinder — 26° for the same gap
 — at a quarter of the ratio, since `D = 4`.
 
 **Two efficiencies, because one is not the other.** Each pair's own comes from
 [`contact::efficiency`](#efficiency-parallel-axes) with the crank held, and the
-two multiply — 99.15 % together on the shipped counts. The *drive's* comes from
+two multiply — 99.15 % together on the shipped counts. The *stage's* comes from
 the three-shaft power flow ([Planetary sets](#planetary-sets)) at
 `i₀ = z₂z₄/(z₁z₃)`, and it is nowhere near the first, because power circulates:
 
-| reduction | meshes, crank held | the drive |
+| reduction | meshes, crank held | the stage |
 |---|---|---|
 | 144 | 98.74 % | 35.8 % |
 | 324 | 99.15 % | 26.6 % |
@@ -1270,7 +1270,7 @@ the three-shaft power flow ([Planetary sets](#planetary-sets)) at
 
 The nearer the two meshes come to cancelling — which is what buys the reduction —
 the more power goes round between them before any reaches the output, so a
-*better* pair of meshes at a *higher* ratio is a worse drive. Every one of these
+*better* pair of meshes at a *higher* ratio is a worse stage. Every one of these
 is self-locking: below half efficiency forward, the reversed flow has no state
 where the output absorbs.
 
@@ -1280,7 +1280,7 @@ kind cancel, reduce by `z²`, and keep about a quarter; those carrying one of ea
 cancel nothing, reduce by about `z/2`, and keep ninety-odd percent — on the same
 two meshes, losing the same 0.85 % between them.
 
-| arrangement | `D` | ratio | meshes | the drive |
+| arrangement | `D` | ratio | meshes | the stage |
 |---|---|---|---|---|
 | `N+1/N/N−1/N` | 1 | 324 | 99.15 % | 26.6 % |
 | `N/N+1/N/N−1` | −1 | −323 | 99.15 % | 26.4 % |
@@ -1290,17 +1290,17 @@ two meshes, losing the same 0.85 % between them.
 **What the tool ships with is `N ± 4` about 61**, reducing 232.6:1 and keeping
 79.6 % forward and 74.3 % back. Four teeth of difference cancels less than one does,
 and that is the whole of the difference: the same code, the same two meshes, and
-a drive that keeps two and a half times what the `N ± 1` arrangement does at a
+a stage that keeps two and a half times what the `N ± 1` arrangement does at a
 comparable size.
 
 It carries a shorter tooth with it — 0.7 module rather than the 0.8 an `N ± 1`
-drive takes — because **the addendum belongs to the *difference* rather than to
-the drive**. The operating pressure angle at four teeth is far lower than at
+stage takes — because **the addendum belongs to the *difference* rather than to
+the stage**. The operating pressure angle at four teeth is far lower than at
 one, so a tooth that cleared the involute interference limit at one tooth of
 difference reaches past it here. Measured across the proportion, on `N ± 4`
 about 61:
 
-| `h_a` | involute interference | ε_α | the drive |
+| `h_a` | involute interference | ε_α | the stage |
 |---|---|---|---|
 | 0.60 | clear | 1.19 | 88.0 % |
 | 0.65 | clear | 1.28 | 83.5 % |
@@ -1311,12 +1311,12 @@ about 61:
 The threshold sits between 0.70 and 0.75, so 0.7 is the last proportion that
 ships clean — and the taller tooth costs efficiency on the way as well, since a
 longer path is a dearer one ([Efficiency](#efficiency-parallel-axes)). That
-coupling is reported rather than assumed, and a drive taken to another
+coupling is reported rather than assumed, and a stage taken to another
 difference will want its own proportion.
 
 This is the published behaviour of a Wolfrom set — efficiency falls as the
 reduction rises, because the reduction *is* the cancellation — and it is why such
-drives are used where their efficiency does not matter. A **three-ring reducer**
+stages of this family are used where their efficiency does not matter. A **three-ring reducer**
 reaches a high ratio at high efficiency by not doing this at all: its rings are
 carried on a parallelogram of cranks and *translate without rotating*, so its
 reduction comes from one mesh's tooth difference with nothing to cancel against,
@@ -1354,7 +1354,7 @@ difference `d` — the same ratio, the same pitch diameters, the same crank offs
 reached with `d` times the teeth at a `d`th of the module. At 324:1, with the
 addendum, the shaper and each mesh's shift division free (`gear-cli hulaband`):
 
-| d | z | module | meshes | the drive | α_w | backlash out |
+| d | z | module | meshes | the stage | α_w | backlash out |
 |---|---|---|---|---|---|---|
 | 1 | 18 | 1.000 | 99.350 % | **32.3 %** | 45.1° | 0.378° |
 | 2 | 36 | 0.500 | 99.767 % | **57.1 %** | 33.8° | 0.149° |
@@ -1367,7 +1367,7 @@ addendum, the shaper and each mesh's shift division free (`gear-cli hulaband`):
 optimum.** The *sum* of a mesh's two shifts is never free — the crank offset is
 what it is — so only the division is, and searching it (with the addendum and the
 shaper) is what the rows above report. The stationary point of the loss is not
-where they land: on these drives the mesh loses least at divisions of `+2.85`,
+where they land: on these stages the mesh loses least at divisions of `+2.85`,
 `+2.05` and `−2.55` for one, two and four teeth of difference, and none of the
 three is admissible, because contact has gone discontinuous or the tips have
 fouled well before. The rows through `d = 5` sit at `ε ≈ 1.01` with the tip
@@ -1394,7 +1394,7 @@ each pair's own shifts**, not tie the two pairs together.
 
 Optimised that way, each pair on its own at `z = 36`, `h_a = 0.6`, `μ = 0.08`:
 
-| d | reduction | α_w | the pair keeps | the drive keeps | m₁/m₂ |
+| d | reduction | α_w | the pair keeps | the stage keeps | m₁/m₂ |
 |---|---|---|---|---|---|
 | 2 | 324 | 34.8° | 99.875 % | 54.7 % | 1.0000 |
 | 3 | 144 | 27.2° | 99.949 % | 86.5 % | 1.0000 |
@@ -1402,7 +1402,7 @@ Optimised that way, each pair on its own at `z = 36`, `h_a = 0.6`, `μ = 0.08`:
 | 5 | 51.8 | 22.7° | 99.956 % | 95.0 % | 1.0000 |
 
 **The module ratio comes out exactly one** — not because the meshes are tied but
-because a drive's two pairs are near twins, `(z+d, z)` against `(z, z−d)`, whose
+because a stage's two pairs are near twins, `(z+d, z)` against `(z, z−d)`, whose
 independent optima land at the same operating pressure angle. Equal modules is a
 coincidence of that near-symmetry, and the table below is what it costs to depart
 from it.
@@ -1411,7 +1411,7 @@ from it.
 that produces non-interfering geometry — gets the *sum* right and the *division*
 wrong:
 
-| d | least loss (Σx, x_ring, x_pinion) | least shift | drive, best | drive, least |
+| d | least loss (Σx, x_ring, x_pinion) | least shift | stage, best | stage, least |
 |---|---|---|---|---|
 | 2 | −0.20, +0.40, +0.20 | −0.20, +0.05, −0.15 | 54.65 % | 49.83 % |
 | 3 | −0.10, +0.55, +0.45 | −0.10, +0.15, +0.05 | 86.48 % | 78.50 % |
@@ -1421,7 +1421,7 @@ wrong:
 The **sum is identical** at `d = 2, 3, 4` — a constraint sets it, and the default
 finds it. The whole difference is that the optimum raises *both* shifts together
 by 0.4 to 0.65 while holding their difference, and the default has no reason to.
-That is worth 1.4 to 8 points of drive efficiency, and it is the freedom
+That is worth 1.4 to 8 points of stage efficiency, and it is the freedom
 [`efficient_split`](#efficiency-parallel-axes) exists for: at `d = 4` and `d = 5`
 it lands on the sweep's answer (0.510 against 0.500, 0.436 against 0.425, the
 efficiencies agreeing to 1e−7). At `d = 2` and `d = 3` it reports no root,
@@ -1443,7 +1443,7 @@ of difference, the worse of the two operating pressure angles reads:
 | α_w, mesh 1 | 57.7° | 53.1° | **48.1°** | 48.1° | 48.1° |
 | α_w, mesh 2 | 48.1° | 48.1° | **48.1°** | 52.6° | 59.1° |
 
-Equal modules is a corner where both bounds are active at once, and the drive
+Equal modules is a corner where both bounds are active at once, and the stage
 efficiency falls away either side of it — 30.5 % at equality against 26.6 % at
 0.8 and 27.5 % at 1.1 on the same search. So the design space is
 `(z, d, addendum, shaper, two divisions)` and nothing more: the tooth
@@ -1460,12 +1460,12 @@ Two things follow, and they are the practical content of the whole section.
 **A reduction near fifty is where this family works**; the same optimised meshes
 at 324:1 would keep 53 %, and no mesh a designer can cut reaches 90 % there.
 And **profile shift is the lever**, worth more here than anywhere else in this
-tool: a third of a percent of mesh loss is 20 points of drive efficiency at these
+tool: a third of a percent of mesh loss is 20 points of stage efficiency at these
 ratios, which is the published 68.5 % → 89.0 % and matches the sensitivity this
-model shows — half a point of mesh efficiency at 324:1 takes the drive from
+model shows — half a point of mesh efficiency at 324:1 takes the stage from
 26.6 % to 46.8 %.
 
-**The stage builds what the arrangement describes.** A drive that closes
+**The stage builds what the arrangement describes.** A stage that closes
 algebraically can still be one whose teeth foul, so each ring is cut by its
 shaper and each pair is asked what it thinks: the contact ratio, the two
 interference conditions, and the gap measured on the tips as cut beside the one
@@ -1488,11 +1488,11 @@ wobble body takes the same mesh force at its own radius. The three shaft torques
 sum to zero, which is what says the two readings agree.
 
 That load is the whole reason the ratings are worth having here. A reduction
-multiplies torque as surely as it divides speed, so a drive turning 2 N·m into
+multiplies torque as surely as it divides speed, so a stage turning 2 N·m into
 195 puts its output pair under a load nothing about the input suggests, and the
 grounded member reacts nearly all of it.
 
-**No member of this drive is structurally reversed.** The wobble body carries
+**No member of this stage is structurally reversed.** The wobble body carries
 two gears rather than one and each of them meshes once, so — unlike a planet,
 which the sun drives on one flank and the ring on the other — every root here is
 loaded one way unless the drive itself reverses.
@@ -1505,7 +1505,7 @@ well below the shipped rings.
 
 Both terms of `dC/dα_w` are positive (`Σz < 0`), so the gap rises strictly with
 the operating pressure angle and hence with the offset. The root is unique, and
-taking the larger of the two meshes' requirements is safe: opening the drive out
+taking the larger of the two meshes' requirements is safe: opening the stage out
 for the mesh that needs it gives the other one more as well. The two conditions
 that bite *inside* a mesh — a tip reaching past a flank — belong to the pair and
 are asked at [`ring::mesh_with`](#limits) rather than restated here.
@@ -1627,13 +1627,13 @@ engagements_m = |ω_m − ω_carrier| / |ω_input| × N        per input revolut
 A simple pair has no carrier and one path, so this is the member's own
 revolutions and nothing more. An epicyclic set has both: in the carrier's frame
 the arm stands still and everything else turns past it, which is what makes the
-relative speed the one that counts — for a sun, a ring, a planet, a hula drive's
+relative speed the one that counts — for a sun, a ring, a planet, a hula stage's
 grounded gear and its wobble body alike. The consequence worth stating is the
 one a per-member reading cannot: **a shaft that does not turn is still loaded.**
 A held ring meets a planet once per *carrier* revolution, which is
 `z_s/(z_s + z_r)` of the input's rather than none.
 
-A hula drive is the same statement with one wobble body: `N = 1`, and the crank
+A hula stage is the same statement with one wobble body: `N = 1`, and the crank
 is both the carrier and the shaft the revolutions were counted on, so each gear
 counts how far it turns against the crank.
 

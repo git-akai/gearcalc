@@ -1010,7 +1010,7 @@ pub fn maximise(dof: usize, objective: &dyn Fn(&[f64]) -> Option<f64>) -> Option
     /// does now, so they are worth re-asking rather than inheriting — and they
     /// have been: raising the sweep, the starts, the budget and the resolution
     /// together, some fourteen times the work, moves the pair's answer not at
-    /// all to eight decimals, the set's by 2e-7 and the eccentric drive's by
+    /// all to eight decimals, the set's by 2e-7 and the hula stage's by
     /// 4e-5. The search is converged, not budgeted. What made it cheap was
     /// making a candidate cheap, and there is nothing here left to buy.
     const BUDGET: usize = 220;

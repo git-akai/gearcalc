@@ -11,7 +11,7 @@ import type { LoadCase } from "./LoadCase";
  * A stage with a single mesh puts these on its own result, because there is no
  * ambiguity about whose they are; a stage with two has to say which mesh each
  * belongs to, and both of them were saying it in the same six fields. The
- * planetary set's `sun_planet`/`planet_ring` and the hula drive's two pairs are
+ * planetary set's `sun_planet`/`planet_ring` and the hula stage's two pairs are
  * the same report, so it is one type.
  *
  * A crossed pair has none of this — its line of action slides rather than

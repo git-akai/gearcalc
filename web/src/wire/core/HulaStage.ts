@@ -34,7 +34,7 @@ sliding_friction: [number, number],
 /**
  * Coefficient of **static** friction in each mesh, for breaking away.
  *
- * Whether a drive turns at all is decided at rest and against this; how
+ * Whether a stage turns at all is decided at rest and against this; how
  * well it does once turning is decided against the sliding coefficient,
  * which is lower. See [`Directional::once_moving`].
  */
@@ -43,7 +43,7 @@ static_friction: [number, number],
  * The smallest far-side tip gap any mesh may run at, mm.
  *
  * A minimum, and checked whether or not the offset is taken from it: an
- * offset that fails it describes a drive that could be built and would
+ * offset that fails it describes a stage that could be built and would
  * foul, which is a thing a designer is owed the number for rather than a
  * refusal.
  */
@@ -68,13 +68,13 @@ running_clearance: number, tolerance_plus: number, tolerance_minus: number,
  */
 offset: Auto<number>, 
 /**
- * What the drive is asked to optimise, and what it may not do to get
+ * What the stage is asked to optimise, and what it may not do to get
  * there. See [`Optimisation`].
  *
  * A pair's shift *sum* is fixed by the offset the crank has to reach, so
  * within a mesh only the division between ring and pinion is free — and
  * that division is worth real efficiency. The contact ratio defaults lower
- * here than the shared default, for a reason that is the drive's rather
+ * here than the shared default, for a reason that is the stage's rather
  * than a relaxation of the rule: a mesh of one tooth of difference has a
  * very short path and sits just above continuous contact at every split it
  * can be built at, so a pair's usual 1.2 of design margin would forbid the

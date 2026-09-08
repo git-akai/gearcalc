@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The hula drive's ratio, integrated from the rolling pitch circles.
+"""The hula stage's ratio, integrated from the rolling pitch circles.
 
 `gear_core::hula` reports a ratio as two integer products, `R = z2 z4 / D` with
 `D = z2 z4 - z1 z3`, which is Willis applied to both meshes. This reaches the

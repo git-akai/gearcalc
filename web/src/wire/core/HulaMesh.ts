@@ -2,7 +2,7 @@
 import type { MeshReport } from "./MeshReport";
 
 /**
- * One mesh of a solved drive.
+ * One mesh of a solved stage.
  *
  * [`MeshReport`] is what any parallel-axis mesh reports and is the same six
  * fields a planetary set's two meshes carry; what a hula pair adds is the room
@@ -11,10 +11,10 @@ import type { MeshReport } from "./MeshReport";
  *
  * **The efficiency on the report is this pair's own, with the crank held** —
  * what the teeth lose, and nothing about the arrangement they sit in. It is
- * emphatically not the drive's: the two of them multiply to
- * [`HulaResult::fixed_carrier_efficiency`], and the drive's own is that figure
+ * emphatically not the stage's: the two of them multiply to
+ * [`HulaResult::fixed_carrier_efficiency`], and the stage's own is that figure
  * put through the reduction, which on a high-ratio arrangement takes a pair
- * losing under a percent to a drive losing tens of them
+ * losing under a percent to a stage losing tens of them
  * ([`HulaResult::efficiency`]).
  */
 export type HulaMesh = { 
@@ -26,7 +26,7 @@ export type HulaMesh = {
  * A one-tooth-difference pair opened far enough to clear itself runs at an
  * operating pressure angle no ordinary pair would — above 50° on the
  * shipped proportions — and its transverse contact ratio sits just above
- * continuous contact by construction, which is why a helical drive of this
+ * continuous contact by construction, which is why a helical stage of this
  * kind has to buy its overlap axially.
  */
 report: MeshReport, 

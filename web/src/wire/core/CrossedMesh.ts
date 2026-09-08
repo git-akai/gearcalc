@@ -4,7 +4,7 @@ import type { ZoneLimit } from "./ZoneLimit";
 /**
  * What the path of contact says about a crossed-axis mesh.
  *
- * Reported for a worm drive as well as for a crossed gear pair, because both
+ * Reported for a worm stage as well as for a crossed gear pair, because both
  * are the same construction here: docs/reference.md#crossed-axes takes **both flanks as involute
  * helicoids on cylinders**, and that is where the stage's contact stress,
  * efficiency and backlash already come from. See [`crossed_mesh`] for why a
@@ -12,7 +12,7 @@ import type { ZoneLimit } from "./ZoneLimit";
  */
 export type CrossedMesh = { 
 /**
- * Tooth pairs in contact. **Below 1 the drive loses contact between one
+ * Tooth pairs in contact. **Below 1 the pair loses contact between one
  * pair and the next**, which is a failure of kind rather than of margin.
  */
 contact_ratio: number, 
@@ -40,7 +40,7 @@ axial_travel: [number, number],
 tooth_height_assumed: boolean, 
 /**
  * What the same teeth would lose with their shafts brought **parallel**, as
- * an efficiency — `None` for a worm drive, whose single-start thread is not
+ * an efficiency — `None` for a worm stage, whose single-start thread is not
  * a parallel-axis gear.
  *
  * Reported for comparison: crossing shafts adds sliding, so this is the
