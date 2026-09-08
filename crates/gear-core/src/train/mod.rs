@@ -301,6 +301,18 @@ pub enum TrainError {
     Empty,
     /// A hula drive that has no geometry — see [`crate::hula::Error`].
     Hula(crate::hula::Error),
+    /// **Which stage could not be solved**, wrapped around why.
+    ///
+    /// A train is a chain: a stage that fails takes the shaft line with it, so
+    /// every stage after it has no speed or torque to be solved at and the
+    /// second pass — which rates *every* stage against the efficiencies
+    /// downstream — cannot run at all. So the whole train has no answer, and
+    /// the least a reader is owed is which of its stages is the one to look at.
+    InStage {
+        /// Zero-based, as the stages are indexed; the front end numbers from 1.
+        stage: usize,
+        cause: Box<TrainError>,
+    },
 }
 
 impl From<hula::Error> for TrainError {
@@ -331,6 +343,10 @@ impl crate::note::Explain for TrainError {
             }
             Self::NoRootSection => Note::new(key::ERROR_TRAIN_NO_ROOT_SECTION),
             Self::Empty => Note::new(key::ERROR_TRAIN_EMPTY),
+            // The stage number belongs to the reader rather than to the reason,
+            // so the note is the cause's and the number reaches the front end
+            // through the error's own shape.
+            Self::InStage { cause, .. } => cause.note(),
         }
     }
 }
@@ -373,6 +389,7 @@ impl std::fmt::Display for TrainError {
             Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
             Self::NoRootSection => write!(f, "the tooth is too undercut to have a root section"),
             Self::Empty => write!(f, "the geartrain has no stages"),
+            Self::InStage { stage, cause } => write!(f, "stage {}: {cause}", stage + 1),
         }
     }
 }
@@ -1338,7 +1355,12 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
             let mut speed = train.input_speed;
             let mut out = Vec::with_capacity(train.stages.len());
             for (k, stage) in train.stages.iter().enumerate() {
-                let r = solve_any_with(stage, speed, torques(k), lib, reversal)?;
+                let r = solve_any_with(stage, speed, torques(k), lib, reversal).map_err(|e| {
+                    TrainError::InStage {
+                        stage: k,
+                        cause: Box::new(e),
+                    }
+                })?;
                 speed /= r.ratio();
                 out.push(r);
             }
@@ -2380,6 +2402,47 @@ mod tests {
             "asked for {asked}, ran at {}",
             r.centre_distance
         );
+    }
+
+    /// **A train that cannot be solved says which stage stopped it.**
+    ///
+    /// The chain is why it has no answer at all: a stage that fails takes the
+    /// shaft line with it, so the stages after it have no speed to be solved at
+    /// and the pass that rates every stage against the efficiencies downstream
+    /// cannot run. That is a fair reason to return nothing, and no reason at
+    /// all to leave a reader hunting for which of five stages is the one to
+    /// edit — the number was there at the point of failure and simply was not
+    /// kept.
+    #[test]
+    fn a_train_that_fails_names_the_stage_that_failed() {
+        let mut train = two_stage();
+        train.stages.push(Stage::Spur(SpurStage::default()));
+        assert!(
+            solve_train(&train, &library()).is_ok(),
+            "three good stages solve"
+        );
+
+        // A centre distance of zero is not a mesh, and it is the middle stage's.
+        let Stage::Spur(s) = &mut train.stages[1] else {
+            panic!("the stage this test set up is a spur one")
+        };
+        s.centre_distance = Auto::fixed(0.0);
+
+        let e = solve_train(&train, &library()).expect_err("a mesh at no distance is not a train");
+        let TrainError::InStage { stage, cause } = &e else {
+            panic!("the failure should name the stage it happened in, got {e:?}")
+        };
+        assert_eq!(*stage, 1, "the middle stage is the one that failed");
+        // ...and the reason is the stage's own, unchanged by being carried.
+        assert!(
+            matches!(**cause, TrainError::Mesh(_)),
+            "the cause should be the mesh's, got {cause:?}"
+        );
+        // The note a reader sees is the cause's, so nothing is invented to
+        // carry the number.
+        use crate::note::Explain;
+        assert_eq!(e.note().key, cause.note().key);
+        assert!(e.to_string().starts_with("stage 2: "), "{e}");
     }
 
     /// Both shifts given leaves the optimiser nothing to choose, and it says so

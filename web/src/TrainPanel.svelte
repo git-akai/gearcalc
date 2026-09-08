@@ -271,6 +271,18 @@
      written as a label had a hit area running the width of the row, well
      outside the button a reader can see. There is nothing else in this row to
      focus, so there is nothing for a label to be for. -->
+<!-- **A stage with no answer says so.**
+     
+     A train is a chain, so one stage that cannot be built takes the shaft line
+     with it and *every* stage loses its outputs — the readouts simply were not
+     rendered, and a reader was left with a panel of inputs and no indication
+     that anything had gone wrong beyond one line at the top of the train. The
+     inputs stay live, because they are what has to be edited to fix it; what
+     the stage cannot report, it reports as missing. -->
+{#snippet noResult()}
+  <p class="notes stage-failed">{t("ui.train_no_outputs")}</p>
+{/snippet}
+
 {#snippet switchField(key: string, on: boolean, set: (v: boolean) => void, note?: string | null)}
   <div class="switchrow">
     <span class="control"><Switch label={t(key)} {on} {set} /></span>
@@ -437,19 +449,35 @@
      *  them — the eccentric drive reports its gears in its own shape. The ones
      *  naming a field are drawn under that field; see `clampNote`. */
     gearNotes?: Note[];
-    /** A readout only this member has; given the member's position. */
+    /** **What this member's speed has to add to the figure.**
+     *
+     *  A member with something more to say about a row the shared readout
+     *  already prints says it *on* that row. The planet said it on a second one
+     *  instead: an `extra` block repeating the speed with the annotation
+     *  attached, so the card carried the same figure twice and only the copy
+     *  was explained. `extra` is for a readout the shared one does not have —
+     *  which is a crossed pair's, where there is no `GearResult` and no shared
+     *  readout at all. */
+    speedNote?: string;
+    /** A readout only this member has; given the member's position.
+     *
+     *  Rendered whether or not the shared readout above it did, so anything it
+     *  prints that the shared one also prints appears twice. */
     extra?: Snippet<[number]>;
     extraIndex?: number;
   },
 )}
 {@const own = opts.gearNotes ?? g?.notes ?? []}
 <div class="gear">
-  <h4>{title}</h4>
+  <!-- **A heading names the fields under it**, and nothing else — so a card
+       whose ring is shaped by a tool opens with that tool's heading and the
+       gear's own comes back above the gear's own fields. Every card reads the
+       same way: heading, then the fields it named. -->
   {#if opts.cutter}
     <!-- **The tool comes before the part**, because the part's root and fillet
          are the tool's: a ring's dedendum and root radius are not inputs of its
          own, and reading the cutter first is reading them. -->
-    <h4 class="cutter">{t("ui.train_ring_cutter")}</h4>
+    <h4>{t("ui.train_ring_cutter")}</h4>
     <label>
       <span>{t("ui.train_cutter_teeth")}</span>
       <input type="number" step="1" min="1" bind:value={opts.cutter.teeth} />
@@ -467,6 +495,7 @@
       <em>{t("ui.train_m")}</em>
     </label>
   {/if}
+  <h4 class:later={opts.cutter !== undefined}>{title}</h4>
   <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
     <span>{t("ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={gear.teeth} />
@@ -687,7 +716,13 @@
         <dd>{g.back_driving_torque.toFixed(4)} Nm</dd>
       {/if}
       <dt>{t("ui.train_speed")}</dt>
-      <dd>{g.speed.toFixed(1)} {t("ui.train_rpm")}</dd>
+      <dd>
+        {g.speed.toFixed(1)} {t("ui.train_rpm")}
+        <!-- Where a member's speed has more to say than the number — a planet's
+             teeth see the carrier's frame, not the ground's — it is said here,
+             against the figure it qualifies. -->
+        {#if opts.speedNote}<small>{opts.speedNote}</small>{/if}
+      </dd>
       <dt>{t("ui.train_tooth_cycles")}</dt>
       <dd>
         {g.tooth_cycles.bending.toLocaleString()} / {g.tooth_cycles.contact.toLocaleString()}
@@ -734,10 +769,17 @@
         {#each spare as n, i (i)}<li>{note(n)}</li>{/each}
       </ul>
     {/if}
+  {:else}
+    <!-- **Only where there is no shared readout**, which is the whole of what
+         this is for: a crossed pair produces no per-gear rating, so `g` is
+         absent exactly when this is the only readout there is. Rendered outside
+         the guard it was free to restate a row the shared one had already
+         printed — the planet did, repeating its speed to hang an annotation on
+         the copy — and nothing could have caught that but reading both. A
+         member that *has* a rating adds to the row it belongs to instead
+         (`speedNote`). -->
+    {@render (opts.extra ?? noExtra)(opts.extraIndex ?? 0)}
   {/if}
-  <!-- Outside the guard above: a crossed pair produces no per-gear rating, so
-       `g` is absent exactly when this readout is the only one there is. -->
-  {@render (opts.extra ?? noExtra)(opts.extraIndex ?? 0)}
 </div>
 {/snippet}
 
@@ -1134,6 +1176,7 @@
 
         {#if tab.open[i]}
           <div class="body">
+            {#if !res}{@render noResult()}{/if}
             <div class="grid shared">
               <label>
                 <span>{t("ui.train_normal_module")}</span>
@@ -1408,6 +1451,7 @@
 
         {#if tab.open[i]}
           <div class="body">
+            {#if !res}{@render noResult()}{/if}
             <div class="grid shared">
               <label>
                 <span>{t("ui.train_normal_module")}</span>
@@ -1649,6 +1693,7 @@
         </button>
         {#if tab.open[i]}
           <div class="body">
+            {#if !res}{@render noResult()}{/if}
             <div class="grid shared">
               <label>
                 <span>{t("ui.train_normal_module")}</span>
@@ -1755,27 +1800,6 @@
               {@render efficiencyToggle(stage.optimisation)}
             </div>
 
-            <!-- The planet's reversal is a *stage* note now, not a readout here:
-                 it is the same sentence a reversing drive earns for every gear,
-                 and one home for it means the two cannot say different things.
-                 What stays is what is only true of a planet — the speed its
-                 teeth actually see, relative to the carrier. -->
-            {#snippet planetExtra(_j: number)}
-              {#if pres}
-                <dl class="out small">
-                  <dt>{t("ui.train_speed")}</dt>
-                  <dd>
-                    {pres.planet.speed_absolute.toFixed(1)} {t("ui.train_rpm")}
-                    <small>
-                      {t("ui.train_relative_to_the_carrier", {
-                        speed: pres.planet.speed_relative.toFixed(1),
-                      })}
-                    </small>
-                  </dd>
-                </dl>
-              {/if}
-            {/snippet}
-
             <!-- **One of the three shifts closes the set**, and which one is
                  read off the toggles rather than named by a control of its own:
                  the member left automatic absorbs, and the planet is preferred
@@ -1792,7 +1816,13 @@
                 cut: "rack",
                 solvedShift: pres?.planet.profile_shift,
                 onShiftAuto: () => relievePlanetary(stage, stage.planet.profile_shift),
-                extra: planetExtra,
+                // The one thing only a planet's speed has: its teeth turn in
+                // the carrier's frame, and that is the speed they wear at.
+                speedNote: pres
+                  ? t("ui.train_relative_to_the_carrier", {
+                      speed: pres.planet.speed_relative.toFixed(1),
+                    })
+                  : undefined,
               })}
               <!-- A ring's root and fillet are its cutter's, so it has neither a
                    dedendum nor a root radius of its own (docs/reference.md#internal-gears); the tool
@@ -1951,6 +1981,7 @@
         </button>
         {#if tab.open[i]}
           <div class="body">
+            {#if !res}{@render noResult()}{/if}
             <div class="grid shared">
               <label>
                 <span>{t("ui.train_pressure_angle")}</span>
@@ -2601,13 +2632,11 @@
     border-radius: 3px;
     padding: 0.5rem 0.7rem;
   }
-  /* **A section inside a card, not a second card title.** The card's own `h4`
-     names the gear; this one names the tool that shapes it, and stacking two
-     headings at the same size reads as two titles rather than as one opening
-     the other. Smaller, and pulled up against the title it belongs under. */
-  .gear h4.cutter {
-    margin: -0.15rem 0 0.35rem;
-    font-size: 0.7rem;
+  /* A second heading in a card opens a second section, so it needs the gap
+     between sections above it — the first one is against the card's own top
+     padding and needs none. */
+  .gear h4.later {
+    margin-top: 0.8rem;
   }
   .gear h4 {
     margin: 0 0 0.4rem;
@@ -2723,6 +2752,12 @@
   .gear label {
     grid-template-columns: 1fr 6.5rem 3.5rem;
     margin-bottom: var(--field-gap);
+  }
+  /* The stage's own "nothing to report", which is a warning rather than a list
+     — it takes the list's colour and spacing and none of its bullet. */
+  .stage-failed {
+    padding-left: 0;
+    list-style: none;
   }
   .notes {
     margin: 0.5rem 0 0;
