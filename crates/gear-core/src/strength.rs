@@ -1010,9 +1010,13 @@ const SHARING_SAMPLES: usize = 200;
 ///
 /// # With sharing off this *is* [`bending_section`]
 ///
-/// Not "agrees with to a tolerance" — it returns that call, and a share of
-/// exactly 1. Sharing is off by default everywhere, so the ordinary rating path
-/// is untouched and costs what it always did.
+/// Not "agrees with to a tolerance" — that call is *this* one at
+/// [`LoadSharing::None`], which sweeps nothing and takes the highest point of
+/// single-pair contact with a share of exactly 1. Sharing is off by default
+/// everywhere, so the ordinary rating path is untouched and costs what it always
+/// did. It reads the other way round from how it was written, which is the point
+/// of writing it that way: the unshared rating is the shared one at its own
+/// degenerate value rather than a second construction beside it.
 ///
 /// # What sharing changes, and what it does not
 ///

@@ -826,8 +826,9 @@ pub fn solve_planetary_stage_with(
         }
     };
 
-    // An automatic width with every source switched off has nothing to invert
-    // and comes out zero. Said rather than divided by, as in the spur stage.
+    // An automatic width with every source switched off stands at the number in
+    // its box, as in the spur stage (`FaceSources::width_for`).
+    //
     // **Which members are loaded on both flanks.** The planet structurally —
     // sun on one flank, ring on the other, whatever the drive does — and all
     // three when the drive itself reverses. A reversing drive does not make a

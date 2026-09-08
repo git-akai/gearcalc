@@ -144,6 +144,32 @@ a step in the quantity the clamp exists to keep smooth. `min(asked, 0.95 × max)
 is monotone in what was asked for; `if asked > max { 0.95 × max }` is not. Gated
 as that law rather than against a threshold.
 
+### A stage kind is a "stage"
+
+A worm stage, a hula stage; never a worm drive or an eccentric drive.
+
+**Why:** one arrangement carried two names — the hula stage in the core and the
+CLI, *the eccentric drive* in comments and half the documents — which put
+"eccentric" on two unrelated features, this and the angularly varying profile
+shift, and left a reader to work out that they were not related. A name that has
+to be disambiguated in the reader's head is a name that will be
+disambiguated wrongly.
+
+**"Drive" survives in exactly two senses**, and in both it is the right word and
+nothing else is:
+
+- **which way power flows** — `Drive::Forward`, driven forward, back-driving, a
+  drive flank against a coast flank;
+- **how the train is actuated** — a reversing drive, whether the drive reverses.
+
+Neither names a part of a geartrain, so neither collides with the rule. And
+where the thing being named is not a stage, it is not called one: `hula.rs`
+describes an **arrangement** — four tooth counts, one crank offset and the
+shifts that close it, knowing nothing about loads — and `screw.rs` a **pair**.
+
+**What would change it:** nothing about the word. If a future kind is genuinely
+not a stage of a geartrain, it needs its own noun rather than this one stretched.
+
 ### Say what is not modelled, next to the number
 
 A worm stage shows no bending stress and says why on screen. A ring shows the

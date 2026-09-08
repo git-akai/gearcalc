@@ -9,6 +9,11 @@ design record risky enough to keep putting off.
     tools/check_doc_links.py            # exits non-zero and names what is broken
     tools/check_doc_links.py --list     # what points where, for a restructure
 
+Both directions of pointer are checked: `docs/<file>.md#<anchor>` as the code
+writes it, and `[text](<file>.md#<anchor>)` as one document writes another. The
+second was missed for a while, and a link between two documents rotted in
+exactly the way this script exists to prevent.
+
 # Why anchors rather than numbers
 
 A pointer to `docs/rationale.md#the-lewis-parabola` survives an inserted section;
@@ -46,6 +51,9 @@ SOURCES = (
 
 # `docs/rationale.md#one-hob-one-setting`, in prose or in a doc comment.
 LINK = re.compile(r"docs/([a-z0-9_-]+)\.md#([a-z0-9-]+)")
+# ...and the Markdown form one document uses to point at another, or at itself:
+# `[the Lewis parabola](rationale.md#the-lewis-parabola)`, `[above](#anchors)`.
+CROSS = re.compile(r"\]\((?:\./)?([a-z0-9_-]*)(?:\.md)?#([a-z0-9-]+)\)")
 # The form being migrated away from: a bare section number.
 LEGACY = re.compile(r"§\d[\d.]*")
 
@@ -61,7 +69,12 @@ def anchors(path):
         text = re.sub(r"`([^`]*)`", r"\1", text)          # code spans
         text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)  # links
         slug = re.sub(r"[^\w\s-]", "", text.lower())
-        slug = re.sub(r"[\s_]+", "-", slug).strip("-")
+        # **Runs are not collapsed**, because GitHub does not collapse them: a
+        # heading with an em dash between two spaces loses the dash and keeps
+        # both spaces, so `ratings — and` anchors as `ratings--and`. Collapsing
+        # here would report a link that works as broken, and — worse — accept
+        # one that does not.
+        slug = slug.replace("_", "-").replace(" ", "-").strip("-")
         out[slug] = text
     return out
 
@@ -79,7 +92,13 @@ def main():
             continue
         rel = src.relative_to(ROOT)
         for n, line in enumerate(text.splitlines(), 1):
-            for doc, anchor in LINK.findall(line):
+            here = src.stem if src.suffix == ".md" else None
+            cross = [
+                (doc or here, anchor)
+                for doc, anchor in CROSS.findall(line)
+                if (doc or here) is not None
+            ]
+            for doc, anchor in LINK.findall(line) + cross:
                 used.add((doc, anchor))
                 if doc not in docs:
                     broken.append(f"{rel}:{n}  docs/{doc}.md does not exist")

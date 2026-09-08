@@ -819,8 +819,9 @@ pub fn solve_spur_stage_with(
     let asks = [0usize, 1].map(|i| {
         let g = &stage.gears[i];
         // An automatic width with every source switched off has nothing to
-        // invert, and comes out zero. Said rather than divided by: the input
-        // that produced it is on screen, and this is what it did.
+        // invert, so it stands at the number in its box and the stage says so
+        // (`FaceSources::width_for`). Said rather than divided by, which is
+        // what it was: a zero width made every stress infinite.
         if g.face_width.auto && !g.face_sources.any() {
             notes
                 .push(Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", (i + 1).to_string()));

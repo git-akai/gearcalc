@@ -25,7 +25,7 @@ And the checks that live outside the Rust suite:
 ```bash
 tools/check_bindings.sh           # the generated TypeScript matches the Rust
 tools/check_bindings.sh --write   # ...or regenerate it
-tools/check_doc_links.py          # every pointer from code into the documents resolves
+tools/check_doc_links.py          # every pointer into the documents resolves, from code and from each other
 tools/check_strings.py            # every ui message is used, and every use has a message
 cd web && npm run check           # typecheck the front end
 ```
@@ -150,10 +150,10 @@ the second case was added rather than substituted for the first.
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. `serde` and `ts-rs`, both optional and both about the shape a type takes when it leaves. |
 | `gear-core/src/tooth.rs` | `Tooth` — one tooth's form, at one shift, cut by one `Rack`. Not a gear. |
 | `gear-core/src/gear.rs` | `Gear` — the assembly, and the only place a gear is drawn. An ordinary gear is `Δx = 0`. |
-| `gear-core/src/plane.rs` | The normal and transverse planes, the two identities that carry an angle between them, and the basic rack they act on. One home, because there were nineteen. |
+| `gear-core/src/plane.rs` | The normal and transverse planes, the identities that carry a quantity between them, and the basic rack they act on. One home, because the two angles had nineteen and the base pitch six. |
 | `gear-core/src/hula.rs` | The hula arrangement: the integer ratio, the one crank offset, and the shifts that let both meshes run at it. |
 | `gear-core/src/train/hula.rs` | ...and the stage that builds the parts it describes, and rates them. |
-| `gear-core/src/train/mod.rs` | What every stage kind shares: the load cases, `MemberRating` — the four questions asked of every member — `MeshReport`, the engagement rule, and the train that strings the stages together. |
+| `gear-core/src/train/mod.rs` | What every stage kind shares: the load cases, `MemberRating` — every mesh a member is in, and the worst of them — `Bending`, `MeshReport`, the engagement rule, and the train that strings the stages together. |
 | `crates/gear-io` | File formats: DXF export, the TOML material library and geartrain documents, and the string catalogue. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
@@ -214,12 +214,12 @@ satisfy however it is decided — so they combine, and the automatic shift this
 tool has always offered is the pair of them on at once. A shift given by hand is
 held to the true undercut minimum, which is negative on a comfortable tooth
 count, so a deliberate negative shift survives and only a genuinely undercut one
-is raised — and it says so when it is. Where the bound cannot reach — a shift a
-relation leaves over, which nobody chose — the tooth is reported undercut
-instead, on every rack-cut member of every stage kind. A search is floored at the automatic
+is raised — and it says so when it is. A search is floored at the automatic
 value instead, for a reason that is measured rather than tidy
-([reference](reference.md#efficiency-parallel-axes)). A ring has only the first
-control: its flank is its shaper's, and undercut is not a question that can be
+([reference](reference.md#efficiency-parallel-axes)). Where the bound cannot
+reach at all — a shift a *relation* leaves over, which nobody chose and nothing
+can move — the tooth is reported undercut instead, on every rack-cut member of
+every stage kind. A ring has only the first control: its flank is its shaper's, and undercut is not a question that can be
 asked of it. The hula stage's "shift given on" select is gone with it — a
 mesh has one shift to give, and which member gives it is what the toggles say.
 
@@ -237,11 +237,15 @@ members share, and the one gap seen from each of its ends. A crossed pair has
 none of it — its line of action slides rather than turning, so there is no such
 angle and no contact ratio to report.
 
-**And every member is rated by the same four questions**, likewise once rather
-than once per stage: two stresses, each against two load cases, and the face
-width each of those would need. What differs between kinds is the stress at a
-probe width and which allowable a reversed root answers to; both arrive as
-values.
+**And every member is rated over every mesh it is in**, likewise once rather
+than once per stage: two stresses against two load cases, the face width each of
+those would need, and the worst mesh answering figure by figure. Most members are
+in one mesh, a planet is in two, and adding a third is adding a list entry rather
+than an arm to an expression. The loadings are held **per load case** rather than
+as one list and a factor, because "the second case is the first times a number"
+is a claim about a stage's *power flow* and not about gearing — every kind here
+can make it, and one that could not would build each case for itself with nothing
+added.
 
 **A stage that cannot be built still shows what built it.** A geartrain
 mid-edit is regularly one that will not solve, so every input, note and label
@@ -338,23 +342,13 @@ proof-read before anyone leans on it. Correcting one changes no calculation:
 DXF with exact arcs for external *and* internal gears, written to the published
 R2000 minimum so a reader that repairs nothing still opens it — confirmed
 importing into SOLIDWORKS · geartrain stages: spur/helical, crossed, worm,
-planetary and **hula** · geartrains exported and
-imported as TOML, inputs only · gear tabs with external and internal kinds — and
-eccentric, in the developer mode — geartrain tabs with spur, worm and planetary
-stages, and hula in the same mode behind the same knock.
+planetary and **hula**, the last behind the developer knock · geartrains
+exported and imported as TOML, inputs only · gear tabs with external and internal
+kinds, and eccentric in the same developer mode.
 
-**One word for a stage kind, and it is "stage".** This arrangement was the
-**hula stage** in the core and the CLI and *the eccentric drive* in comments and
-half the documents, which put "eccentric" on two unrelated features — this and
-the angularly varying profile shift — and left a reader matching them up. It is
-the hula stage throughout now, and no stage kind is a "drive": a worm stage, not
-a worm drive.
-
-"Drive" is kept for the two senses that are not a stage kind, because there it is
-the right word and nothing else is: **which way power flows** (`Drive::Forward`,
-driven forward, back-driving, a drive flank against a coast flank) and **how the
-train is actuated** (a reversing drive, whether the drive reverses). Neither
-names a part of a geartrain, so neither collides with the rule above.
+**One word for a stage kind, and it is "stage"** — a worm stage, a hula stage,
+never a drive ([rationale](rationale.md#a-stage-kind-is-a-stage)). "Drive" names
+which way power flows and how the train is actuated, and nothing else.
 
 ---
 
@@ -407,15 +401,18 @@ been. They are not a backlog.
   of ISO 6336-3. It is the only second-hand constant in the geometry path, it is
   confined to the empirical correction, and whether it was applied is reported.
 - **Load sharing above a virtual contact ratio of 2** is the ramp extrapolating:
-  no single-pair zone exists, and it relieves the tooth by about a third. The
-  stage says so where the figure is shown.
+  no single-pair zone exists, and it relieves the tooth by about a third. Each
+  mesh says so where its figure is shown, so a set with one mesh in the band and
+  one out names which. **Below the band it changes nothing** — the single-pair
+  boundary is in the sweep at a share of exactly 1, so the maximum is the point
+  the unshared rating already took — and a hula stage cannot reach the band at
+  any proportion it can be built at.
 - **Hardened 4340's fatigue allowable is the weakest number in the library.**
 - **A face width typed as zero describes a gear with no face**, and every
   rating taken at one is infinite. Those cross the boundary as `null` and the
   panel draws them blank, so the browser reads correctly; the CLI prints `inf`.
-  It is a degenerate input rather than a reachable state of the controls — the
-  *automatic* width that had no rating to size it used to resolve to zero, and
-  now stands at the number it was given.
+  A degenerate input rather than a reachable state of the controls: an automatic
+  width with no rating to size it stands at the number it was given.
 - **A note slot is as tall as the tallest note that field can show.** Every real
   message fits; a validation message longer than its field's bound note would
   still move the controls when it appeared.
@@ -443,4 +440,13 @@ Not a queue with a head; this is what a next session would pick from.
 - **Read ISO 6336-3** and settle the `Y_S` notch band from the standard rather
   than from a citation of it.
 - **A calibrated mesh-stiffness model**, which would replace the load-sharing
-  ramp rather than the control now exposing it.
+  ramp rather than the control exposing it.
+- **A planet's root under the ring mesh is rated; its flank's sliding is not**
+  — the fixed-carrier efficiency takes each mesh once, which is right, but no
+  member reports what *it* loses. Nothing depends on it and nothing is wrong;
+  it is the next thing a member-over-meshes model makes askable.
+- **The stage kinds that need more than three shafts.** `MemberRating` and
+  `MeshReport` are per member and per mesh rather than per named role, and
+  `planetary::power` takes a basic ratio rather than a set of tooth counts — so
+  a fourth kind should be new *kinematics* and no new rating machinery. That
+  claim is untested until something tests it.
