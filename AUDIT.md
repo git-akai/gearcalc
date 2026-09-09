@@ -40,13 +40,14 @@ against a broken tree is recorded here as `written, not proven`.
 
 **Phase 0 — build the instrument.** Done, gate run and passed.
 **Phase 1 — truth-up the documents.** Done, gate run and passed.
-**Phase 2 — the number ledger.** Next.
+**Phase 2 — the number ledger.** In progress. One finding out of it already
+closed (F23), which is why the ledger is being read rather than skimmed.
 
 | Phase | What it does | State |
 |---|---|---|
 | 0 | Golden corpus, figure provenance, `CLAUDE.md` | **done** — gate proven |
 | 1 | Truth-up the documents against the code | **done** — gate proven |
-| 2 | The number ledger | **next** |
+| 2 | The number ledger | **in progress** |
 | 3 | Unify what is written twice | not started |
 | 4 | The optimiser | not started |
 | 5 | Consolidate the tests | not started |
@@ -61,7 +62,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 533 tests** (was 531; the two new ones hold the command table).
+**Suite: 534 tests** (was 531: two hold the command table, one holds F23).
 
 ---
 
@@ -133,6 +134,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F20 | `state.md` derived a figure by hand from rounded output, and it was wrong | drift | 0 | **closed** |
 | F21 | The figure checker cannot see figures in prose, only in tables | gap | 5 | open |
 | F22 | The tense rule as written forbade 127 sentences it was not aimed at | drift | 1 | **closed** — the rule was narrowed, not the prose |
+| F23 | The gear tab and a stage member bounded the same gear differently | gap | 2 | **closed** — and logged in `corrections.md` |
+| F24 | The golden corpus covers the CLI, not the wasm boundary | gap | 5 | open |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so

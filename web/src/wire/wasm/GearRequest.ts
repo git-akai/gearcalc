@@ -30,8 +30,9 @@ reference_circles?: boolean,
 /**
  * Depth, in modules, at which the undercut question is asked.
  *
- * `None` takes [`WORKING_DEPTH_BY_DEFAULT`]. Optional for the same reason:
- * the gear tab has no control for it, so it is genuinely absent.
+ * `None` takes [`working_depth_for`] — the gear's own dedendum. Optional
+ * for the same reason as the fields around it: the gear tab has no control
+ * for it, so it is genuinely absent rather than defaulted on the far side.
  */
 working_depth?: number, 
 /**

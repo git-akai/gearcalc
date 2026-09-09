@@ -52,8 +52,9 @@ pub struct GearRequest {
     pub reference_circles: Option<bool>,
     /// Depth, in modules, at which the undercut question is asked.
     ///
-    /// `None` takes [`WORKING_DEPTH_BY_DEFAULT`]. Optional for the same reason:
-    /// the gear tab has no control for it, so it is genuinely absent.
+    /// `None` takes [`working_depth_for`] — the gear's own dedendum. Optional
+    /// for the same reason as the fields around it: the gear tab has no control
+    /// for it, so it is genuinely absent rather than defaulted on the far side.
     #[serde(default)]
     #[cfg_attr(feature = "typescript", ts(optional))]
     pub working_depth: Option<f64>,
@@ -97,9 +98,25 @@ pub struct MateRef {
 
 /// The depth the undercut question is asked at when a request does not say.
 ///
-/// One module — the classical rule's own assumption, and the gear tab has no
-/// control for it. A *stage* does, and follows its own dedendum instead (docs/reference.md#automatic-values).
-const WORKING_DEPTH_BY_DEFAULT: f64 = 1.0;
+/// **The gear's own dedendum**, which is what a stage does and for the reason a
+/// stage does it: that is the depth the profile generator's `undercut` flag
+/// actually answers about, so the reported threshold and the reported flag agree
+/// by construction (docs/reference.md#automatic-values).
+///
+/// This was a fixed one module — the classical rule — on the argument that the
+/// gear tab has no control for it. Having no control is a reason to *derive* the
+/// value, not to pick a convention: the two differ by a quarter of a module on
+/// an ordinary gear, and they differ in **sign**. A default 17-tooth gear on the
+/// ISO 53 rack read "undercut below `x = −0.2443`" on the gear tab and "below
+/// `+0.0057`" as a member of a stage, and the generator agrees with the second —
+/// at `x = −0.1` it reports the flank undercut while the tab's own threshold
+/// said it was not.
+///
+/// `docs/rationale.md#a-control-that-exposes-an-assumption-must-not-default-to-it`
+/// records that correction; it had been applied to one of the two surfaces.
+fn working_depth_for(params: &GearParams) -> f64 {
+    params.dedendum
+}
 
 /// Reference circles go into a drawing unless a request says otherwise.
 const REFERENCE_CIRCLES_BY_DEFAULT: bool = true;
@@ -358,7 +375,8 @@ fn summarise(ecc: &gear_core::gear::Gear, req: &GearRequest, params: GearParams)
         // onto the swept interval from that amplitude (docs/reference.md#angularly-varying-profile-shift).
         ranges: gear_core::auto::admissible_ranges(
             &params,
-            req.working_depth.unwrap_or(WORKING_DEPTH_BY_DEFAULT),
+            req.working_depth
+                .unwrap_or_else(|| working_depth_for(&params)),
         ),
         pitch_radius: g.r,
         base_radius: g.rb,
@@ -1180,6 +1198,73 @@ mod tests {
     const REQ: &str = r#"{"params":{"module":1.0,"pressure_angle":20.0,"teeth":17,
         "profile_shift":0.2,"helix_angle":0.0,"addendum":1.0,"dedendum":1.25,
         "root_radius":0.38,"thickness_mod":1.0},"pin_diameter":1.75}"#;
+
+    /// **One gear, one answer, whichever surface asks it.**
+    ///
+    /// A gear tab and a stage member describe the same part, so the bounds they
+    /// report on that part have to agree. They did not: the undercut threshold
+    /// is asked at a *working depth*, a stage passed its gear's own dedendum,
+    /// and the gear tab passed a fixed one module. On the default 17-tooth gear
+    /// that is `x = −0.2443` against `+0.0057` — different by a quarter of a
+    /// module and different in sign.
+    ///
+    /// The generator settles which was right: at `x = −0.1` it reports the flank
+    /// undercut, so the tab's own threshold contradicted the tab's own flag.
+    /// `docs/rationale.md#a-control-that-exposes-an-assumption-must-not-default-to-it`
+    /// records that correction being made; it had reached one of the two
+    /// surfaces.
+    ///
+    /// Written as an equality between the two paths rather than against either
+    /// number, because the number is a consequence and the agreement is the
+    /// claim. 533 tests passed against the disagreement.
+    #[test]
+    fn a_gear_tab_and_a_stage_member_bound_the_same_gear_alike() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let mut stage = d["spur_stage"].clone();
+        // Whatever the shipped default gear is, asked of both surfaces. Read
+        // rather than written down, so this cannot drift from the defaults.
+        let teeth = stage["gears"][0]["teeth"].clone();
+        let dedendum = stage["gears"][0]["dedendum"].clone();
+        // A shift the stage will not move, so both surfaces describe one gear.
+        stage["gears"][0]["profile_shift"] = serde_json::json!({"auto": false, "manual": 0.0});
+
+        let train = serde_json::json!({
+            "train": {
+                "input_speed": 1000.0, "input_torque": 1.0,
+                "back_driving_torque": 0.0, "operating_torque": 0.0,
+                "actuation": { "continuous": { "operating_speed": 1000.0, "runtime_hours": 1.0 } },
+                "stages": [stage],
+            },
+            "materials": null
+        });
+        let solved: serde_json::Value =
+            serde_json::from_str(&solve_train_impl(&train.to_string()).unwrap()).unwrap();
+        let member = &solved["result"]["stages"][0]["gears"][0]["ranges"]["profile_shift"];
+        assert!(
+            member.is_object(),
+            "the stage's gear has no ranges: {member}"
+        );
+
+        let tab_req = serde_json::json!({
+            "params": {
+                "module": 1.0, "pressure_angle": 20.0, "teeth": teeth,
+                "profile_shift": 0.0, "helix_angle": 0.0, "addendum": 1.0,
+                "dedendum": dedendum, "root_radius": 0.38, "thickness_mod": 1.0
+            }
+        });
+        let tab: serde_json::Value =
+            serde_json::from_str(&solve_gear_impl(&tab_req.to_string()).unwrap()).unwrap();
+        let tab = &tab["ranges"]["profile_shift"];
+
+        for field in ["undercut", "sharp_rack_undercut", "min", "max"] {
+            let (a, b) = (&member[field], &tab[field]);
+            assert_eq!(
+                a, b,
+                "{field}: a stage member says {a}, the gear tab says {b} — \
+                 the same gear, bounded two ways"
+            );
+        }
+    }
 
     /// **A geartrain survives the round trip to a file and back — as answers,
     /// not just as bytes.**
