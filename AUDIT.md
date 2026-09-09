@@ -64,7 +64,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 547 tests** (was 531).
+**Suite: 548 tests** (was 531).
 
 ---
 
@@ -144,10 +144,11 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F28 | A search bound acted as a design limit on the eccentric throw | gap | 2 | **closed** — the bound is now the buildable one |
 | F29 | The golden corpus was written from a stale binary and the check caught it | holds | — | **closed** — see Phase 2 notes |
 | F30 | A self-locking worm's wheel reported 2.2e307 N·m | gap | 3 | **closed** — and logged in `corrections.md` |
-| F31 | No CLI train sets a back-driving load, so the corpus never exercises one | gap | 3 | open |
+| F31 | No CLI train sets a back-driving load, so the corpus never exercises one | gap | 3 | **closed** — `train mixed` reacts one |
 | F32 | `StageResult` has no kind-independent `members()` | gap | 3 | **closed** |
 | F34 | `Widths::contact` was not optional, so "no rating sizes this face" had no way to be said | gap | 3 | **closed** |
 | F35 | A set reported back-driving torques from the forward distribution — the ring 6 % low | gap | 3 | **closed** — and logged in `corrections.md` |
+| F41 | ...and the hula stage had the same fault | gap | 3 | **closed** — found by finishing the sweep |
 | F36 | `SpurResult` re-declared `MeshReport`'s seven fields, and the panel re-drew them | gap | 3 | **closed** |
 | F37 | A given crank offset was not the offset the stage ran at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F38 | The reported clearance was the input echoed, not the gap run at | gap | 3 | **closed** — and logged in `corrections.md` |
@@ -612,10 +613,22 @@ this list.
 passed against the exact fault they were written to condemn.
 
 **Pass 8 was added mid-audit**, from a standing rule stated after the plan was
-written: *a geartrain has no forward.* It found F35 on its first sweep — an
-epicyclic set that solved its reverse power flow, used it for the efficiency and
-discarded its torques. The rule is now
-`docs/rationale.md#direction-is-the-readers-not-the-mechanisms`, and the sweep
-is not finished: `back_driving_torques`' upstream walk, the worm's two
-per-member expressions and the hula stage's power flow have not been read
-against it.
+written: *a geartrain has no forward.* The rule is
+`docs/rationale.md#direction-is-the-readers-not-the-mechanisms`. **The sweep is
+complete**; four sites read, two of them faults:
+
+| Site | Verdict |
+|---|---|
+| An epicyclic set's member torques | **F35.** Solved the reverse for its efficiency, discarded its torques, reported the forward distribution scaled. Ring 6 % low |
+| A hula stage's member torques | **F41.** The same, found by finishing the sweep rather than by a second symptom — a hula stage *is* an epicyclic power flow |
+| `back_driving_torques`' upstream walk | **Sound.** It looked asymmetric and is not: the forward walk stores the torque at stage `k`'s input shaft counting every *upstream* loss but not stage `k`'s own, and the backward walk stores it counting every *downstream* loss but not stage `k`'s own. The same convention, read the other way |
+| The worm's two per-member expressions | **Sound**, and checked by the same degenerate test the fixes are gated on: at zero friction its two members' torque ratio is the tooth ratio in both directions. Its forward output torque carries the stage's own loss and its backward one does not, which is that convention again |
+
+One question the sweep raised and did **not** settle, stated so it is not
+re-derived: whether a member's back-driving torque should carry its *own*
+stage's backward efficiency. The convention above says no — the load is referred
+kinematically to the input shaft, and the loss is applied on the way to the next
+stage — which is what makes a self-locking stage report the reaction it holds
+rather than an attenuated transmission. That is coherent, it is what
+`docs/reference.md#load-cases` states, and nothing measures whether it is what a
+designer wants.

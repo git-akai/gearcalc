@@ -2772,6 +2772,42 @@ mod tests {
     /// the two distributions coincide**, because with `η₀ = 1` there is no loss
     /// for the direction to place. So the difference *is* the efficiency, and
     /// that is checkable without knowing either number.
+    /// **And the hula stage, which is an epicyclic power flow and had the same
+    /// fault.** Its two central gears stand in for the sun and the ring.
+    #[test]
+    fn a_back_driven_hula_distributes_torque_by_its_own_solve() {
+        let lib = library();
+        let ratios = |mu: f64| {
+            let h = HulaStage {
+                sliding_friction: [mu; 2],
+                static_friction: [mu; 2],
+                ..HulaStage::default()
+            };
+            let mut t = two_stage();
+            t.back_driving_torque = 0.5;
+            t.stages = vec![Stage::Worm(WormStage::default()), Stage::Hula(Box::new(h))];
+            let r = solve_train(&t, &lib).expect("a train that solves");
+            let s = r.stages[1].as_hula().expect("a hula stage");
+            let back = |g: &HulaGear| g.gear.back_driving_torque.expect("the stage reacts it");
+            (
+                s.gears[3].gear.torque / s.gears[0].gear.torque,
+                back(&s.gears[3]) / back(&s.gears[0]),
+            )
+        };
+        let (forward, backward) = ratios(0.0);
+        assert!(
+            (forward - backward).abs() < 1e-9,
+            "with no friction the stage distributes torque alike either way, \
+             but forward gives {forward} and backward {backward}"
+        );
+        let (forward, backward) = ratios(0.08);
+        assert!(
+            (forward - backward).abs() / forward.abs() > 1e-3,
+            "with friction the two directions must place the loss differently, \
+             but both give {forward}"
+        );
+    }
+
     #[test]
     fn a_back_driven_set_distributes_torque_by_its_own_solve() {
         let lib = library();

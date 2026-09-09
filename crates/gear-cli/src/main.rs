@@ -1088,7 +1088,18 @@ fn train_report(mixed: bool) {
     let train = Train {
         input_speed: 3000.0,
         input_torque: 2.0,
-        back_driving_torque: 0.0,
+        // **The mixed train carries a back-driving load and the plain one does
+        // not**, so the corpus covers both. Mixed is the one with the worm
+        // stage, which self-locks — so the load is *reacted* rather than
+        // passing through, which is the case the whole feature exists for and
+        // the one every fault in it has been in.
+        //
+        // Every train this harness shipped set this to zero, so
+        // `tools/check_golden.sh` recorded a path nothing ever walked: a
+        // self-locking worm's wheel reported 2.2e307 N·m and an epicyclic set's
+        // ring 6 % low, and the corpus could not have shown either
+        // (`docs/corrections.md`).
+        back_driving_torque: if mixed { 0.6 } else { 0.0 },
         operating_torque: 2.0,
         reversed_bending: false,
         actuation: Actuation::Continuous {

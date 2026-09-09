@@ -853,6 +853,33 @@ pub fn solve_hula_stage_with(
 
     let shaft_torques = forward.as_ref().map_or([0.0; 3], |p| p.torques);
 
+    // **The reverse is the same flow with the roles swapped**, and its shaft
+    // torques are the ones a back-driving load puts on the members — not the
+    // forward ones scaled. `reversed` is already solved above for its
+    // efficiency; this reads the torques it had all along.
+    //
+    // Which shaft drives decides where `η₀` multiplies, so the distribution
+    // changes shape and not merely scale. An epicyclic set had the same fault
+    // and its ring came out 6 % low (`docs/corrections.md`); this arrangement
+    // *is* an epicyclic power flow, so it had it too.
+    //
+    // Normalised so the shaft the load was referred to carries what
+    // `back_driving_torques` referred there, a power flow being linear in the
+    // torque through it.
+    let back_shaft_torques = forward
+        .as_ref()
+        .and_then(|f| reversed(fixed_carrier_efficiency.backward, f))
+        .zip(torques.peak_backward)
+        .map(|(b, applied)| {
+            let at_input = b.torques[CRANK.index_pub()];
+            let scale = if at_input == 0.0 {
+                0.0
+            } else {
+                applied / at_input
+            };
+            b.torques.map(|t| t * scale)
+        });
+
     // ---- what the teeth carry, and what they are worth.
     //
     // Every stage kind asks the same four questions of every member, so they are
@@ -908,6 +935,15 @@ pub fn solve_hula_stage_with(
         };
         let pinion_load =
             |width: f64| Load::new(anchor_torque, width).across_mesh(anchor, &p.pinion);
+        // ...and the same anchor read off the **reverse** flow, for the load a
+        // back-driving torque puts on this mesh.
+        let back_anchor_torque = back_shaft_torques.map(|t| {
+            t[[
+                PlanetaryShaft::Sun.index_pub(),
+                PlanetaryShaft::Ring.index_pub(),
+            ][index]]
+                .abs()
+        });
 
         // The critical sections. **A rack-cut member with no root section is a
         // stage with no answer**, as it is everywhere else here; a shaper-cut
@@ -1050,7 +1086,18 @@ pub fn solve_hula_stage_with(
                 rated,
                 face_width: widths[slot],
                 torque,
-                back_driving_torque: torques.referred_like(torque),
+                // This member's share of the **reverse** flow, at its own
+                // radius — the same projection its forward torque takes, on the
+                // torques that solve produced rather than on the forward ones
+                // scaled.
+                back_driving_torque: back_anchor_torque.map(|t| {
+                    let at_anchor = Load::new(t, widths[slot]);
+                    if is_ring {
+                        at_anchor.across_mesh(anchor, &p.ring_as_gear).torque
+                    } else {
+                        at_anchor.across_mesh(anchor, &p.pinion).torque
+                    }
+                }),
                 speed: speed(i),
                 material: materials[i].clone(),
                 clamps: if is_ring {

@@ -1,6 +1,7 @@
 train  in 3000 rpm / 2.000 Nm peak   ->   out 29.7 rpm / 122.994 Nm peak
-       operating 2.000 Nm (100.0 % of peak)   back-driving 0.000 Nm at the output
+       operating 2.000 Nm (100.0 % of peak)   back-driving 0.600 Nm at the output
        total ratio 101.1765:1   total efficiency 60.782 % forward / 0.000 % backward  (cannot be back-driven)
+       note: the back-driving load is reacted at stage 2, which cannot be driven backward; stages before it carry none of it
        backlash at the output shaft  0.15610 deg  (min 0.11342, max 0.19878)
        backlash at the input shaft   15.79344 deg  (min 11.47505, max 20.11231)
 
@@ -16,7 +17,7 @@ stage 2  worm  z 1/40  ratio 40.0000  a 23.7273 mm  lead angle 8.2132 deg
   efficiency  forward 61.805 %  backward 0.000 %  (self-locking)
   contact  peak 4587.0 MPa  cyclic 4587.0 MPa   patch 2.1634 x 1.2743 mm   sliding 439.2 mm/s
   member     b mm   T fwd Nm   T bwd Nm       rpm   cycles bend/contact   material
-  worm     13.539     4.9751          -    1186.0   5.693e7 /  5.693e7   4340 Hardened Steel
-  wheel     4.690   122.9936          -      29.7   1.423e6 /  1.423e6   Brass C360
+  worm     13.539     4.9751     0.0150    1186.0   5.693e7 /  5.693e7   4340 Hardened Steel
+  wheel     4.690   122.9936     0.6000      29.7   1.423e6 /  1.423e6   Brass C360
   bending not reported, flank type ZI - see docs/reference.md#crossed-axes
   note: self-locking: static μ 0.160 against a threshold of 0.1327, so the wheel cannot back-drive the worm
