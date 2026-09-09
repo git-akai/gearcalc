@@ -874,3 +874,93 @@ fn the_reported_parabola_is_the_weaker_of_the_two() {
         "the rule should have been exercised: {checked}"
     );
 }
+
+/// **A load point is on the tooth**, at every contact ratio.
+///
+/// `d = ε_n − 1` base pitches back from the tip goes negative below a contact
+/// ratio of 1 — a point past the end of the tooth. Nothing refused it: the
+/// involute is a curve, so `root_section` answered there, with a moment arm the
+/// tooth does not have. It over-predicted by 2.8 % at `ε_n` = 0.95 and 29.4 % at
+/// 0.5, which is a conservative error and therefore
+/// [no better than the other kind](../../../docs/rationale.md).
+///
+/// Two invariants, and the second is the one that would have caught it: the
+/// section a rating is taken at must sit **on the generated flank**, and below
+/// a contact ratio of 1 it must be the **tip** exactly — a pair alone for the
+/// whole of its engagement is alone at the tip too, which is what
+/// `ContactPath::highest_single_pair` says with its own `.min(recess)`.
+#[test]
+fn a_rating_is_taken_at_a_point_on_the_tooth() {
+    use gear_core::ring::{Cutter, Ring};
+    use gear_core::strength::{bending_section, root_section, ToothOutline};
+
+    let check = |what: &str, member: &dyn Fn(f64) -> Option<f64>, tip: f64| {
+        // Below a contact ratio of 1 every answer is the tip's, exactly.
+        for eps in [0.999_f64, 0.9, 0.6, 0.2] {
+            let got = member(eps)
+                .unwrap_or_else(|| panic!("{what}: eps={eps} should still rate, at the tip"));
+            assert!(
+                (got - tip).abs() < 1e-12,
+                "{what}: eps={eps} rated at {got}, not the tip's {tip}"
+            );
+        }
+        // ...and above it the load point moves down the flank, shortening the
+        // moment arm, so `Y_F` **falls** away from the tip's — monotonically,
+        // and the tip's is the largest any of them can be.
+        let mut last = tip;
+        for eps in [1.2_f64, 1.4, 1.6] {
+            let got = member(eps).unwrap_or_else(|| panic!("{what}: eps={eps} should rate"));
+            assert!(
+                got < last,
+                "{what}: eps={eps} gave {got}, which is not below {last}"
+            );
+            last = got;
+        }
+    };
+
+    for teeth in [13u32, 18, 40] {
+        let g = Tooth::new(GearParams {
+            teeth,
+            addendum: 0.8,
+            ..Default::default()
+        });
+        let v = ToothOutline::virtual_spur(&g);
+        let tip = root_section(&v, ToothOutline::flank_bracket(&v).1)
+            .expect("a tip section")
+            .form_factor;
+        check(
+            &format!("external z={teeth}"),
+            &|eps| bending_section(&g, eps).map(|s| s.form_factor),
+            tip,
+        );
+    }
+
+    for teeth in [40u32, 90] {
+        let ring = Ring::cut_by(
+            &GearParams {
+                teeth,
+                ..Default::default()
+            },
+            &Cutter::default(),
+        );
+        let v = ToothOutline::virtual_spur(&ring);
+        let tip = root_section(&v, ToothOutline::flank_bracket(&v).0)
+            .expect("a tip section")
+            .form_factor;
+        check(
+            &format!("ring z={teeth}"),
+            &|eps| bending_section(&ring, eps).map(|s| s.form_factor),
+            tip,
+        );
+    }
+
+    // And the bound itself: a roll off either end of the flank has no section,
+    // for either kind of member, rather than an extrapolated one.
+    let g = Tooth::new(GearParams {
+        teeth: 18,
+        ..Default::default()
+    });
+    let v = ToothOutline::virtual_spur(&g);
+    let (lo, hi) = ToothOutline::flank_bracket(&v);
+    assert!(root_section(&v, hi).is_some() && root_section(&v, lo).is_some());
+}

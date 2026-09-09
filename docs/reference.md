@@ -890,7 +890,6 @@ the part rather than a second model.
 | Module the section is measured in | normal module | transverse module; the helical conversion is the caller's, as it is for a rack-cut tooth |
 | Fillet bracket | `(s_j, 0)`, root at 0 | `(min(s_root, s_j), max(...))`, root at `s_root` — which is why `fillet_root()` is a method and not an endpoint a caller picks |
 | Load point travels | **down** in roll from the tip | **up** — `MeshKind::sign`, not a second construction |
-| Flank limit | the tooth's own | also the **generation limit** — a shaper-cut fact, not a second check: a ring's flank below it was never cut, and the limit reaches into the working flank on ordinary designs |
 | Rateable at all | a severed tooth is not | a cut that left **no fillet** is not — no fillet, no `ρ_f` |
 | Undercut | asked, and bounded by `no undercut` | **not asked** — a ring's flank is its shaper's, and undercut is not a question that can be put to it |
 | Rim factor `Y_B` | measured against the whole tooth depth `s_R/h_t` | against the normal module `s_R/m_n` — the clause's two references, one fit |
@@ -903,6 +902,13 @@ load-sharing sweep, the width law and the reversal rule. So is the entry point �
 `bending_section_shared` is generic over `ToothOutline`, where it used to be two
 near-identical functions, and `train::Bending::of` likewise. What a new kind of
 member has to supply to be rated is that trait and nothing else.
+
+One row that used to be here is gone. A ring carried a *generated* roll range
+that an external tooth did not, on the reading that only a shaper-cut flank
+stops before its bracket does. Both stop, and at the two ends of the same
+bracket: an external involute runs from its fillet junction to its tip, a ring's
+from its tip to the generation limit. `flank_bracket` was always the answer for
+both, and the separate range was a duplicate of it for one.
 
 **Three of the rows above are one fact.** Where the tip is on the flank bracket
 (`tip_at_high_roll`) says where the load point is counted from, which way it

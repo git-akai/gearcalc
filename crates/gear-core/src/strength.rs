@@ -487,23 +487,6 @@ pub trait ToothOutline {
     fn transverse_pressure_angle(&self) -> f64;
     /// Base helix angle, radians.
     fn base_helix_angle(&self) -> f64;
-    /// The rolls a load point may sit at, where the flank **stops existing**
-    /// before [`Self::flank_bracket`] would say.
-    ///
-    /// `None` for a rack-cut tooth and the generated flank for a ring, and that
-    /// asymmetry is a manufacturing fact rather than an oversight: a ring's
-    /// flank below its generation limit was never cut by the shaper, and the
-    /// limit reaches up into the *working* flank on ordinary designs
-    /// (`docs/reference.md#internal-gears`). A rack-cut tooth's involute runs
-    /// down to its fillet with nothing missing in between.
-    ///
-    /// **It is not the same as bounding the load point to the flank**, and
-    /// applying it to an external tooth was tried: a hula stage's pinion is
-    /// rated at a contact ratio high enough to put `d = ε_n − 1` below its
-    /// fillet junction, and bounding it there refuses a stage that builds and
-    /// runs. That the load point can leave the involute at all is a real gap and
-    /// is recorded in `docs/state.md`; it is not this method's to close.
-    fn generated_rolls(&self) -> Option<std::ops::RangeInclusive<f64>>;
     /// **Which end of [`Self::flank_bracket`] the tooth tip is at.**
     ///
     /// The one genuine asymmetry between a rack-cut tooth and a ring, and three
@@ -575,9 +558,6 @@ impl ToothOutline for Tooth {
     fn base_helix_angle(&self) -> f64 {
         crate::metrology::base_helix_angle(self)
     }
-    fn generated_rolls(&self) -> Option<std::ops::RangeInclusive<f64>> {
-        None
-    }
     fn tip_at_high_roll(&self) -> bool {
         // An external tooth's flank runs from its fillet junction out to its
         // tip, so the tip is the far end and the load travels back down.
@@ -648,9 +628,6 @@ impl ToothOutline for crate::ring::Ring {
     }
     fn base_helix_angle(&self) -> f64 {
         crate::ring::Ring::base_helix_angle(self)
-    }
-    fn generated_rolls(&self) -> Option<std::ops::RangeInclusive<f64>> {
-        Some(self.u_tip..=self.u_j)
     }
     fn tip_at_high_roll(&self) -> bool {
         // A ring's tip is at its *smallest* radius and so its smallest roll,
@@ -1468,15 +1445,22 @@ struct LoadPoint<'a, T: ToothOutline + ?Sized> {
     /// `-1` for a tooth, `+1` for a ring's space — one fact,
     /// [`ToothOutline::tip_at_high_roll`], not a second construction.
     sense: f64,
-    /// The rolls the flank exists over, where that is narrower than what
-    /// `root_section` will accept — [`ToothOutline::generated_rolls`].
-    generated: Option<std::ops::RangeInclusive<f64>>,
+    // The flank the roll must land on is read from `v` rather than stored: it is
+    // `flank_bracket`, and it is the same question for both kinds of member.
 }
 
 impl<T: ToothOutline + ?Sized> LoadPoint<'_, T> {
     fn at(&self, d: f64) -> Option<RootSection> {
         let roll = self.u_tip + self.sense * d * self.base_pitch / self.rb;
-        if self.generated.as_ref().is_some_and(|r| !r.contains(&roll)) {
+        // **The load point has to be on the flank**, and `flank_bracket` is
+        // where the flank is for either kind of member: an external tooth's
+        // involute runs from its fillet junction to its tip, and a ring's from
+        // its tip to the generation limit its shaper stopped at. This was a
+        // separate `generated` range carried for the ring alone, on the reading
+        // that only a shaper-cut flank stops early. Both stop; they stop at the
+        // two ends of the same bracket.
+        let (lo, hi) = self.v.flank_bracket();
+        if roll < lo.min(hi) || roll > lo.max(hi) {
             return None;
         }
         root_section(self.v, roll)
@@ -1496,10 +1480,10 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
     model: LoadSharing,
 ) -> Option<(RootSection, f64)> {
     if matches!(model, LoadSharing::None) {
-        return Some((at.at(eps_n - 1.0)?, 1.0));
+        return Some((at.at(highest_single_pair(eps_n))?, 1.0));
     }
     // The candidates the sweep must not miss, then the sweep itself.
-    let mut samples = vec![0.0, eps_n, (eps_n - 1.0).max(0.0), eps_n.min(1.0)];
+    let mut samples = vec![0.0, eps_n, highest_single_pair(eps_n), eps_n.min(1.0)];
     for i in 0..=SHARING_SAMPLES {
         #[allow(clippy::cast_precision_loss)]
         let t = i as f64 / SHARING_SAMPLES as f64;
@@ -1532,6 +1516,30 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
         }
     }
     best.map(|(section, share, _)| (section, share))
+}
+
+/// **The highest point of single-pair contact**, in base pitches back from the
+/// far end of the path.
+///
+/// `ε_n − 1` — and **held at the tip**, because a pair that is alone for the
+/// whole of its engagement is alone at the tip too. Below a contact ratio of 1
+/// the unclamped expression is negative, which is a load point *past the end of
+/// the tooth*: `root_section` answers there by extrapolating the involute beyond
+/// the tip, and reports a longer moment arm than the tooth has.
+///
+/// The clamp is not invented here. It is
+/// [`ContactPath::highest_single_pair`](crate::contact::ContactPath::highest_single_pair)'s
+/// own `.min(recess)`, in the coordinate this sweep counts in — the path of
+/// contact has always known where its end is, and this expression is the same
+/// point reached without the mate. The sharing sweep already clamped it in its
+/// sample list while the unshared branch did not, which is the shape of the bug:
+/// **one quantity, computed twice, agreeing until it mattered.**
+///
+/// A mesh below a contact ratio of 1 is already reported
+/// (`stage.transverse_contact_ratio_below_one`); what this fixes is that it was
+/// also rated at a point on no tooth.
+fn highest_single_pair(eps_n: f64) -> f64 {
+    (eps_n - 1.0).max(0.0)
 }
 
 /// How finely the mesh cycle is sampled when load sharing is enabled.
@@ -1623,7 +1631,6 @@ pub fn bending_section_shared<T: ToothOutline>(
             u_tip,
             rb: v.base_radius(),
             sense,
-            generated: v.generated_rolls(),
             v: &v,
         },
         eps_n,

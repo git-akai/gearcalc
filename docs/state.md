@@ -443,15 +443,15 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   whose first term is `Y_F`. It relieved the canary by 10.1 % and 12.2 %, which
   is the size the debt had been carrying. **ISO omits it**, so the ISO
   comparison set omits it too and a number from that set is not an AGMA `J`.
-- **A load point can leave the involute on a rack-cut tooth.** `d = ε_n − 1`
-  base pitches back from the tip is not bounded by the flank on an external
-  member, so a mesh with a high enough contact ratio is rated at a roll below
-  the fillet junction, where `root_section` extrapolates the involute. A ring
-  *is* bounded, by its generation limit, which is a manufacturing fact rather
-  than the same check. Bounding both was tried and refuses a hula stage that
-  builds and runs, so the bound is not the fix — **a debt**, size unmeasured,
-  and the honest fix is a load point taken from the path of contact rather than
-  counted in base pitches from the tip.
+- **The load point is on the flank, and used not to be.** `d = ε_n − 1` base
+  pitches back from the tip goes **negative below a contact ratio of 1** — a
+  load point past the end of the tooth, where `root_section` answered by
+  extrapolating the involute beyond the tip and reporting a longer moment arm
+  than the tooth has. Held at the tip now, which is
+  `ContactPath::highest_single_pair`'s own `.min(recess)` in the coordinate the
+  sweep counts in. Measured over-prediction: 0.06 % at `ε_n` = 0.999, 2.8 % at
+  0.95, 11.4 % at 0.8, 29.4 % at 0.5. The shipped hula stage's meshes sit at
+  0.998 and 0.996, so its figures move −0.12 % and −0.25 %.
 - **A ZN worm's contact stress is 1–15 % below the reported ZI figure.**
 - **A ring's flank below its generation limit is not a generated involute** —
   about 0.08 mm on ordinary designs. Flagged per part.
