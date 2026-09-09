@@ -713,7 +713,9 @@ pub fn solve_spur_stage_with(
         ratio: f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth),
         centre_distance_nominal: mesh.a_w,
         centre_distance: centre,
-        clearance,
+        // The gap the pair runs at, which is the two distances above it and a
+        // subtraction rather than the input echoed back.
+        clearance: centre - mesh.a_w,
         mesh: MeshReport {
             operating_pressure_angle: mesh.alpha_w.to_degrees(),
             coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,

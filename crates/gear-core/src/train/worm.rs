@@ -1086,7 +1086,9 @@ pub fn solve_worm_stage(
         ratio: s.ratio,
         centre_distance_nominal: s.centre_distance,
         centre_distance: centre,
-        clearance: stage.clearance_taken(),
+        // As on a parallel stage: the running distance less the geometric
+        // one, rather than the input read back.
+        clearance: centre - s.centre_distance,
         lead_angle: s.lead_angle.to_degrees(),
         wheel_lead_angle: s.wheel_lead_angle.to_degrees(),
         helix_angle: s.worm_helix_angle.to_degrees(),

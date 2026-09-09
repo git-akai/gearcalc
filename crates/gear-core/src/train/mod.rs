@@ -978,11 +978,19 @@ pub struct SpurResult {
     pub ratio: f64,
     /// Zero-backlash centre distance, mm.
     pub centre_distance_nominal: f64,
-    /// **The clearance the stage opened by**, which is zero where nothing was
-    /// free to absorb it — see [`SpurStage::clearance_taken`], the one place
-    /// that is decided. Reported so a reader is told the input went unread
-    /// rather than left to work it out, and so the panel can grey the field by
-    /// reading the answer instead of knowing the rule a second time.
+    /// **The clearance the pair actually runs at**, which is
+    /// `centre_distance − centre_distance_nominal` and is derived rather than
+    /// echoed.
+    ///
+    /// A centre distance is the **true** distance and a clearance is what
+    /// portion of it is clearance, so these three numbers are two facts and a
+    /// subtraction — and reporting the input back is a fourth place the same
+    /// quantity can be said, which was wrong whenever the distance was given.
+    /// A pair told to run at 30.3 mm whose shifts put it at 30.0057 has 0.294 mm
+    /// of clearance; it used to report 0.02, the number in the box, or zero.
+    ///
+    /// Derived, so the panel can still grey the input by reading the answer,
+    /// and so the answer cannot disagree with the two numbers above it.
     pub clearance: f64,
     /// The centre distance actually used, including clearance.
     pub centre_distance: f64,
@@ -2608,6 +2616,70 @@ mod tests {
         );
     }
 
+    /// **The reported clearance is the gap the stage runs at.**
+    ///
+    /// A centre distance is the true distance and a clearance is what portion of
+    /// it is clearance, so the three numbers are two facts and a subtraction.
+    /// `clearance` was the *input* echoed back instead, gated by whether
+    /// anything was free to absorb it — which is right only when the distance is
+    /// automatic, because then the running distance was built by adding it.
+    ///
+    /// Given a distance, it was wrong every way it could be: a pair told to run
+    /// at 30.3 mm whose shifts put it at 30.0057 has 0.294 mm of clearance, and
+    /// it reported 0.02 with the optimiser on and 0.000 with it off.
+    ///
+    /// Asserted as the identity rather than against those figures, so it says
+    /// the same thing on every kind and at every distance.
+    #[test]
+    fn the_reported_clearance_is_the_gap_the_stage_runs_at() {
+        let lib = library();
+        let mut checked = 0u32;
+        for distance in [None, Some(30.3_f64), Some(30.5)] {
+            for clearance in [0.0_f64, 0.02, 0.20] {
+                for optimiser in [false, true] {
+                    let mut sp = SpurStage {
+                        clearance,
+                        ..SpurStage::default()
+                    };
+                    sp.optimisation.enabled = optimiser;
+                    if let Some(a) = distance {
+                        sp.centre_distance = Auto::fixed(a);
+                    }
+                    let mut t = two_stage();
+                    t.stages = vec![Stage::Spur(sp), Stage::Worm(WormStage::default())];
+                    let Ok(r) = solve_train(&t, &lib) else {
+                        continue;
+                    };
+
+                    let s = r.stages[0].as_spur().expect("a spur stage");
+                    checked += 1;
+                    assert!(
+                        (s.clearance - (s.centre_distance - s.centre_distance_nominal)).abs()
+                            < 1e-12,
+                        "spur at a={distance:?} clearance={clearance} optimiser={optimiser}: \
+                         reports {} of clearance between {} and {}",
+                        s.clearance,
+                        s.centre_distance_nominal,
+                        s.centre_distance
+                    );
+                    // ...and the same identity on the kind that has no shift to
+                    // absorb anything, which is where an echoed input and a
+                    // derived gap part company hardest.
+                    let w = r.stages[1].as_worm().expect("a worm stage");
+                    assert!(
+                        (w.clearance - (w.centre_distance - w.centre_distance_nominal)).abs()
+                            < 1e-12,
+                        "worm: reports {} between {} and {}",
+                        w.clearance,
+                        w.centre_distance_nominal,
+                        w.centre_distance
+                    );
+                }
+            }
+        }
+        assert!(checked >= 12, "only {checked} configurations solved");
+    }
+
     fn two_stage() -> Train {
         Train {
             input_speed: 3000.0,
@@ -3763,9 +3835,29 @@ mod tests {
             ..SpurStage::default()
         };
 
-        // Nothing free: the input is not read, and the answer reports that.
+        // **Nothing free to absorb it, so the shifts do not move — and the gap
+        // is whatever the housing leaves.** Here that is the 0.05 the fixture
+        // built the housing out of, so the number matches the input by
+        // arithmetic rather than because the input was read.
+        //
+        // This used to assert `clearance == 0.0`, on the reading that an unread
+        // input should report as nothing. It is a *gap*, and the gap is
+        // 0.05: a centre distance is the true distance and a clearance is what
+        // portion of it is clearance, so the pair cannot run 0.05 mm wide of its
+        // own nominal and report none.
         let pinned = solve_spur_stage(&at(false), StageTorques::just(2.0), &lib).unwrap();
-        assert!(pinned.clearance == 0.0, "read {}", pinned.clearance);
+        assert!(
+            (pinned.clearance - (pinned.centre_distance - pinned.centre_distance_nominal)).abs()
+                < 1e-12,
+            "read {} against a gap of {}",
+            pinned.clearance,
+            pinned.centre_distance - pinned.centre_distance_nominal
+        );
+        assert!(
+            (pinned.clearance - 0.05).abs() < 1e-9,
+            "the housing is 0.05 outside the nominal, so the gap is 0.05, not {}",
+            pinned.clearance
+        );
 
         // The shifts free: they take it, and the backlash is the one asked for.
         let chosen = solve_spur_stage(&at(true), StageTorques::just(2.0), &lib).unwrap();

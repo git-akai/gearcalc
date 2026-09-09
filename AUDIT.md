@@ -65,7 +65,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 544 tests** (was 531).
+**Suite: 545 tests** (was 531).
 
 ---
 
@@ -151,6 +151,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F35 | A planetary's member torques carry a forward efficiency; whether a backward load should is unexamined | gap | 5 | open |
 | F36 | `SpurResult` re-declared `MeshReport`'s seven fields, and the panel re-drew them | gap | 3 | **closed** |
 | F37 | A given crank offset was not the offset the stage ran at | gap | 3 | **closed** — and logged in `corrections.md` |
+| F38 | The reported clearance was the input echoed, not the gap run at | gap | 3 | **closed** — and logged in `corrections.md` |
+| F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | open — scheduled, see above |
 | F33 | A crossed pair's members said nothing about their own teeth | gap | 3 | **closed** — and logged in `corrections.md` |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
@@ -497,6 +499,70 @@ field's own documentation described the spur behaviour, not its own.
 **Still to do:** the mesh half — every mesh-level figure traced to its
 expression across the four kinds. The member half is `StageResult::members()`
 and the stage half is done.
+
+---
+
+## The clearance paradigm, and what each kind is short of it
+
+**The model, as stated:** a centre distance is the **true** distance, and a
+clearance says what portion of it is clearance. So
+
+```text
+centre distance = zero-backlash distance + clearance
+zero-backlash distance = f(the shifts)
+```
+
+— two relations in three unknowns, so **any two of the three are given and the
+third follows**, and there are three working modes:
+
+| | Given | Derived |
+|---|---|---|
+| **1** | clearance, shifts | the distance: nominal + clearance |
+| **2** | the distance, shifts | the clearance: distance − nominal |
+| **3** | the distance, clearance | the shifts, solved to reach `distance − clearance` |
+
+### Where each kind stands
+
+| kind | distance input | clearance input | 1 | 2 | 3 |
+|---|---|---|---|---|---|
+| spur | `Auto<f64>` | `f64` | ✅ | geometry right, **was mis-reported** | only with the shift optimiser **on** |
+| worm | `Auto<f64>` | `f64` | ✅ | geometry right, **was mis-reported** | ✗ — nothing inside the stage is free unless the worm's diameter is |
+| planetary | **none** | `f64` | ✅ | ✗ | ✗ |
+| hula | `offset: Auto<f64>` | `running_clearance: f64` | ✅ | ✗ | ✗ |
+
+**Done (F38).** Mode 2's reporting, on the two kinds that report a clearance at
+all: it is `centre_distance − centre_distance_nominal` now, derived rather than
+echoed. It was the input read back where something was free to absorb it and
+**zero otherwise** — so a pair told to run at 30.3 mm whose shifts put it at
+30.0057 reported 0.02 or 0.000 against an actual gap of 0.294.
+
+### What the paradigm still needs — scheduled, not done
+
+1. **`clearance` becomes `Auto<f64>`, as the distance already is.** Mode 2 is
+   "the clearance is *derived*", and a plain `f64` has no way to say that. With
+   both `Auto`, the mode falls out of which two are given, exactly as the pair's
+   `{a, x₁, x₂}` already does — and the over-determined corner gets the same
+   visible relief the front end already gives that one.
+2. **Mode 3 without the optimiser (spur).** A given distance and a given
+   clearance should solve the shifts to reach `a − clearance` whether or not the
+   stage is optimising for efficiency. `mesh::shift_sum_for` is already the
+   function, and the optimiser path already calls it; what is missing is the
+   plain path calling it too. **This is the largest of the four and the only one
+   that moves an answer.**
+3. **A planetary needs a centre-distance input.** It has none: the common
+   distance falls out of the shift relation. The machinery is there — the set
+   already solves *one* shift to make two distances agree, and already picks
+   which member absorbs — so a target distance is one more constraint on the
+   same solve rather than new kinematics.
+4. **A worm's mode 3 needs a free variable named.** A worm has no profile shift,
+   so nothing inside the stage can move to meet a given distance at a given
+   clearance. `FirstMemberSizing` is the candidate — the worm's diameter — and
+   whether that is the intended absorber is a design question rather than a
+   defect.
+
+Item 4 is a question; 1–3 are work. None of them changes the mathematics — they
+change which of three related numbers a designer states and which the tool
+derives.
 
 ---
 

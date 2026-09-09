@@ -16,11 +16,19 @@ ratio: number,
  */
 centre_distance_nominal: number, 
 /**
- * **The clearance the stage opened by**, which is zero where nothing was
- * free to absorb it — see [`SpurStage::clearance_taken`], the one place
- * that is decided. Reported so a reader is told the input went unread
- * rather than left to work it out, and so the panel can grey the field by
- * reading the answer instead of knowing the rule a second time.
+ * **The clearance the pair actually runs at**, which is
+ * `centre_distance − centre_distance_nominal` and is derived rather than
+ * echoed.
+ *
+ * A centre distance is the **true** distance and a clearance is what
+ * portion of it is clearance, so these three numbers are two facts and a
+ * subtraction — and reporting the input back is a fourth place the same
+ * quantity can be said, which was wrong whenever the distance was given.
+ * A pair told to run at 30.3 mm whose shifts put it at 30.0057 has 0.294 mm
+ * of clearance; it used to report 0.02, the number in the box, or zero.
+ *
+ * Derived, so the panel can still grey the input by reading the answer,
+ * and so the answer cannot disagree with the two numbers above it.
  */
 clearance: number, 
 /**
