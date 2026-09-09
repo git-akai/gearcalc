@@ -747,10 +747,18 @@ parabola with its vertex at the load carries uniform bending stress, so the
 largest such parabola inscribed in the tooth touches where the tooth is weakest.
 `CriticalSection::TangentAngle` retains the ISO tangent for a
 standards-comparable number — **30° on an external tooth and 60° on a ring's**
-(ISO 6336-3:2019, 6.1), the angle being a property of the member on
-`ToothOutline` rather than a branch inside the search. A ring's tooth is thick
-at its tip and its fillet is concave, so the 30° tangent that lands part-way up
-an external fillet lands almost at once on a ring's.
+(ISO 6336-3:2019, 6.1). A ring's tooth is thick at its tip and its fillet is
+concave, so the 30° tangent that lands part-way up an external fillet lands
+almost at once on a ring's.
+
+**Where the internal/external difference lives, in each construction.** The
+tangent method reads the angle off `ToothOutline`, so its two members share one
+solve, one bracket and one monotone condition and differ in that single number —
+not in a test inside the search. The parabola reads no angle at all: its
+tangency condition `X·Y′ + 2X′(y_v − Y) = 0` is odd in `y`, so negating the
+frame leaves its zero set untouched and the *same* equation serves a tooth
+pointing either way. So the default path does not consult the angle, and a
+ring's 60° is reachable only by asking for the tangent construction explicitly.
 
 **The factors, and which of them are here.**
 

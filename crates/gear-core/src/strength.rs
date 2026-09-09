@@ -15,11 +15,22 @@
 //!
 //! # The construction
 //!
-//! The **30° tangent method** (Hofer): the critical section is the chord between
-//! the two points on the root fillet where the tangent makes 30° to the tooth
-//! centreline. Along the fillet that angle sweeps monotonically from near zero at
-//! the flank junction to 90° where it meets the root circle, so the tangency
-//! point exists, is unique, and is bracketed by construction.
+//! Two constructions, and a caller picks between them — [`CriticalSection`],
+//! which sets out at length why the default is the second.
+//!
+//! The **tangent method** (Hofer): the critical section is the chord between the
+//! two points on the root fillet where the tangent makes a fixed angle to the
+//! tooth centreline — 30° on an external tooth, 60° on a ring's. Along the
+//! fillet that angle sweeps monotonically from near zero at the flank junction
+//! to 90° where it meets the root circle, so the tangency point exists, is
+//! unique, and is bracketed by construction. The two kinds of member differ in
+//! that **one number** and in nothing else the search can see.
+//!
+//! The **inscribed parabola** (Lewis), the default: the largest constant-strength
+//! parabola with its vertex at the load. It takes no angle — the fixed angle is
+//! exactly the convention it exists to avoid — and the two kinds of member do not
+//! differ in even one number, because its tangency condition is odd in `y` and
+//! the frame flip below is the whole of what it is told.
 //!
 //! Everything is done in **tooth coordinates**: `y` along the tooth centreline
 //! pointing outward, `x` across it, origin at the gear axis.
@@ -323,10 +334,17 @@ pub trait ToothOutline {
     /// degrees — 30° for an external tooth, 60° for a ring's
     /// ([`TANGENT_ANGLE_INTERNAL_DEG`]).
     ///
-    /// The last thing that made the construction read the kind of member it was
-    /// running on. Everything else it needs is already here as a curve or a
-    /// frame, which is why this is a number on the same trait rather than a
-    /// branch inside the search.
+    /// **Read by that construction and by nothing else.**
+    /// [`CriticalSection::LewisParabola`], which is the default, never asks:
+    /// its tangency condition carries no angle at all, and what it needs to
+    /// know about which way a tooth points is the frame flip this trait already
+    /// describes.
+    ///
+    /// It is the **one** quantity in the tangent construction whose value
+    /// depends on the kind of member, which is why it is a number here rather
+    /// than a test inside the search — the solve reads a target and does not
+    /// otherwise know what it is running on. Before it existed the search took
+    /// 30° from a constant and was simply wrong on a ring.
     fn tangent_angle_deg(&self) -> f64;
     /// Fillet parameter bracket, ordered `(lo, hi)`.
     fn fillet_bracket(&self) -> (f64, f64);
