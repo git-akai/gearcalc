@@ -163,15 +163,23 @@ const COMMANDS: &[Command] = &[
     },
     Command {
         name: "shifts",
-        args: "[z1] [z2]",
-        summary: "the shifts a pair loses least at, free and against a given centre distance (9, 37)",
-        run: |a| shifts_report(arg(a, 1, 9), arg(a, 2, 37)),
-        // **Two pairs, because the documented table has two rows** — and because
-        // the corpus had never walked the crate's one optimiser at all: no
-        // `gear-cli` command set `Optimisation::enabled`, so every answer it
-        // chooses was outside the change detector. That is the fault
-        // `docs/corrections.md` records of `back_driving_torque`, met again.
-        record: Record::Cases(&["shifts 9 37", "shifts 17 43"]),
+        args: "[z1] [z2] | epicyclic",
+        summary: "the shifts a pair loses least at, free and against a given centre distance (9, 37); `epicyclic` asks the two kinds that choose more than two",
+        run: |a| {
+            if a.get(1).map(String::as_str) == Some("epicyclic") {
+                epicyclic_shifts_report();
+            } else {
+                shifts_report(arg(a, 1, 9), arg(a, 2, 37));
+            }
+        },
+        // **Two pairs, because the documented table has two rows** — and an
+        // epicyclic case because the corpus had never walked the crate's one
+        // optimiser at all: no `gear-cli` command set `Optimisation::enabled`,
+        // so every answer it chooses was outside the change detector. That is
+        // the fault `docs/corrections.md` records of `back_driving_torque`, met
+        // again, and it is worth covering **each kind that searches** rather
+        // than the one whose table is documented.
+        record: Record::Cases(&["shifts 9 37", "shifts 17 43", "shifts epicyclic"]),
         slow: false
     },
     Command {
@@ -1158,6 +1166,87 @@ fn shifts_report(z1: u32, z2: u32) {
         match solved(true, Some(a)) {
             Ok(r) => row(&format!("{a:.4}"), &r),
             Err(e) => println!("{a:.4}: {e}"),
+        }
+    }
+}
+
+/// **What the two epicyclic kinds choose, and whether their tools leave it.**
+///
+/// A set and a hula stage each search more than one shift, against a constraint
+/// their planet or their crank closes. The figure beside each is the one that
+/// went missing: **is the part the search chose the part its tool cuts?** A ring
+/// is asked of its cutter rather than of a rack, and until it was asked at all
+/// the search walked past the shift where its space stops being the space asked
+/// for — 26 of 30 sets swept came back with a ring the cutter had to alter.
+fn epicyclic_shifts_report() {
+    use gear_core::params::Auto;
+    use gear_core::train::{
+        solve_hula_stage, solve_planetary_stage, HulaStage, Optimisation, PlanetaryStage,
+        StageTorques,
+    };
+
+    let lib = gear_io::default_library();
+    let on = Optimisation {
+        enabled: true,
+        ..Optimisation::default()
+    };
+
+    println!("epicyclic sets  z_sun/z_planet, ring = sun + 2 planet\n");
+    println!(
+        "{:<12} {:>9} {:>9} {:>9} {:>11} {:>16}",
+        "z_s/z_p", "x sun", "x planet", "x ring", "eta0 fwd", "cut as asked"
+    );
+    for (sun, planet) in [(11u32, 18u32), (13, 25), (17, 17), (24, 18), (31, 21)] {
+        let mut set = PlanetaryStage {
+            optimisation: on,
+            ..PlanetaryStage::default()
+        };
+        set.sun.teeth = sun;
+        set.planet.teeth = planet;
+        set.ring.teeth = sun + 2 * planet;
+        set.sun.profile_shift = Auto::automatic(0.0);
+        set.ring.profile_shift = Auto::automatic(0.0);
+        match solve_planetary_stage(&set, 1000.0, StageTorques::just(2.0), &lib) {
+            Ok(r) => println!(
+                "{:<12} {:>9.4} {:>9.4} {:>9.4} {:>10.4} % {:>16}",
+                format!("{sun}/{planet}"),
+                r.sun.profile_shift,
+                r.planet.gear.profile_shift,
+                r.ring.profile_shift,
+                100.0 * r.fixed_carrier_efficiency.forward,
+                // A clamp on any member is the tool declining to make what was
+                // asked for, which is what the search may not choose.
+                [&r.sun, &r.planet.gear, &r.ring]
+                    .iter()
+                    .all(|g| g.clamps.is_empty())
+            ),
+            Err(e) => println!("{sun}/{planet}: {e}"),
+        }
+    }
+
+    println!("\nhula stages  N teeth of difference\n");
+    println!(
+        "{:<12} {:>9} {:>9} {:>11} {:>16}",
+        "N", "x mesh 1", "x mesh 2", "eta fwd", "cut as asked"
+    );
+    for n in [12u32, 18, 30] {
+        let mut stage = HulaStage {
+            optimisation: on,
+            ..HulaStage::default()
+        };
+        for (gear, count) in stage.gears.iter_mut().zip([n + 1, n, n - 1, n]) {
+            gear.teeth = count;
+        }
+        match solve_hula_stage(&stage, 1000.0, StageTorques::just(2.0), &lib) {
+            Ok(r) => println!(
+                "{:<12} {:>9.4} {:>9.4} {:>10.4} % {:>16}",
+                n,
+                r.gears[1].gear.profile_shift,
+                r.gears[2].gear.profile_shift,
+                100.0 * r.efficiency.forward,
+                r.gears.iter().all(|g| g.gear.clamps.is_empty())
+            ),
+            Err(e) => println!("{n}: {e}"),
         }
     }
 }

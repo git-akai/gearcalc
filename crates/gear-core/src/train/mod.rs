@@ -2703,6 +2703,64 @@ mod tests {
         assert!(checked >= 6, "only {checked} members carried the load");
     }
 
+    /// **A search may not choose a part its tool has to alter.**
+    ///
+    /// `member_is_buildable` says this of a rack-cut member and declines to say
+    /// it of a ring, on the reading that a rack's four questions mean nothing to
+    /// one. True — and it left a ring asked *nothing at all*, so the search was
+    /// free to walk past the shift where the shaper stops leaving the space that
+    /// shift asked for. It did: **26 of these 30 sets** came back with a ring
+    /// the cutter had capped, the shipped 13/25 choosing 2.35 modules where its
+    /// space caps at 1.94. The efficiency reported for them is the efficiency of
+    /// a part nobody makes.
+    ///
+    /// A ring is asked of its **cutter** instead (`auto::ring_is_cut_as_asked`),
+    /// which is the one question it has an answer to, and it is free: every
+    /// caller has already cut the ring to get the mesh it is scoring.
+    ///
+    /// Both epicyclic kinds, because the last time a rule reached one of them
+    /// and not the other it cost a second entry in `docs/corrections.md`.
+    #[test]
+    fn a_search_chooses_only_parts_its_tool_leaves_alone() {
+        let lib = library();
+        let mut checked = 0u32;
+        for sun in [11_u32, 13, 17, 19, 24, 31] {
+            for planet in [14_u32, 17, 18, 21, 25] {
+                let mut set = PlanetaryStage {
+                    optimisation: Optimisation {
+                        enabled: true,
+                        ..Optimisation::default()
+                    },
+                    ..PlanetaryStage::default()
+                };
+                set.sun.teeth = sun;
+                set.planet.teeth = planet;
+                set.ring.teeth = sun + 2 * planet;
+                set.sun.profile_shift = Auto::automatic(0.0);
+                set.ring.profile_shift = Auto::automatic(0.0);
+                let Ok(r) = solve_planetary_stage(&set, 1000.0, StageTorques::just(2.0), &lib)
+                else {
+                    continue;
+                };
+                checked += 1;
+                for (name, g) in [
+                    ("sun", &r.sun),
+                    ("planet", &r.planet.gear),
+                    ("ring", &r.ring),
+                ] {
+                    assert!(
+                        g.clamps.is_empty(),
+                        "{sun}/{planet}: the search chose a {name} at x = {} that its \
+                         tool had to alter — {:?}",
+                        g.profile_shift,
+                        g.clamps.iter().map(|c| c.key.clone()).collect::<Vec<_>>()
+                    );
+                }
+            }
+        }
+        assert!(checked >= 25, "only {checked} sets solved at all");
+    }
+
     /// **Ask for the centre distance the tool chose and get the gears it chose.**
     ///
     /// A stage with the shift optimiser on and no centre distance picks both;
@@ -2903,6 +2961,12 @@ mod tests {
         // shifts themselves, so the walk slides along a curved bound instead of
         // climbing an axis. **This is a known fault** (F50): the bound is the
         // measured spread over the sweep below, not a claim of convergence.
+        //
+        // What *is* a law is the sign. More effort searching the same set cannot
+        // lose an answer it already had, so a set may only improve — and it
+        // could not always say that: while the box was a guess the refined
+        // search came back **worse** on three of these thirty, by up to 1.1e-5,
+        // which is a search whose answer depends on where its own sweep fell.
         let mut worst_set = 0.0_f64;
         for sun in [11_u32, 13, 17, 19, 24, 31] {
             for planet in [14_u32, 17, 18, 21, 25] {
@@ -2951,9 +3015,15 @@ mod tests {
                 };
                 worst_set = worst_set.max((refined - shipped).abs());
                 assert!(
-                    (refined - shipped).abs() < 3e-4,
-                    "{sun}/{planet}: the set's search moves by {}, past the \
-                     spread F50 records — it has got worse, not better",
+                    refined > shipped - converged,
+                    "{sun}/{planet}: fourteen times the work came back {} worse, \
+                     so the answer is the sweep's rather than the surface's",
+                    shipped - refined
+                );
+                assert!(
+                    refined - shipped < 4e-4,
+                    "{sun}/{planet}: the set's search leaves {} on the table, \
+                     past the spread F50 records — it has got worse, not better",
                     refined - shipped
                 );
             }

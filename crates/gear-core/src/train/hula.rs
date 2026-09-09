@@ -583,14 +583,16 @@ pub fn solve_hula_stage_with(
             let pinion_params = params(pair.pinion);
             let pinion = Tooth::new(pinion_params);
             // The pinion is rack-generated and so is asked the four questions
-            // every chosen shift is asked; the ring is shaper-cut and is not,
-            // and the pair's own bound is the tip margin below. Whether the
-            // undercut two of the four are asked at all is the pinion's own
-            // `no undercut`, exactly as it is on a pair.
+            // every chosen shift is asked; the ring is shaper-cut and is asked
+            // of its cutter instead, which is the one question it has an answer
+            // to. Whether the undercut two of the four are asked at all is the
+            // pinion's own `no undercut`, exactly as it is on a pair.
             let pinion_floor = stage.gears[pair.pinion].no_undercut.then(|| {
                 crate::auto::automatic_profile_shift(&pinion_params, pinion_params.dedendum)
             });
-            if !crate::auto::member_is_buildable(&pinion, pinion_floor) {
+            if !crate::auto::member_is_buildable(&pinion, pinion_floor)
+                || !crate::auto::ring_is_cut_as_asked(&ring)
+            {
                 return None;
             }
             // A split that fouls the tips at this offset is not admissible at
@@ -617,6 +619,23 @@ pub fn solve_hula_stage_with(
             ))
         };
 
+        // What a mesh's searched shift may take, from the guards on the member
+        // that carries it. The carrier is the pinion wherever anything is left
+        // to search — a ring's shift given by hand leaves that mesh nothing —
+        // so this is a rack-cut member's interval, and it answers if it is ever
+        // not.
+        let split_box = |mesh: usize| -> Option<(f64, f64)> {
+            let i = carrier(mesh);
+            crate::auto::searchable_shift(
+                &|x| {
+                    let mut shift = [0.0; 4];
+                    shift[i] = x;
+                    built(mesh, shift, i)
+                },
+                asked(mesh).search_floor,
+            )
+        };
+
         let mut at = given;
         for _ in 0..ROUNDS {
             let Ok(layout) = hula::solve_with(&set_at(at), &tip_room) else {
@@ -630,15 +649,14 @@ pub fn solve_hula_stage_with(
                 if pinned[index].is_some() {
                     continue;
                 }
-                // The fallback interval, and `auto::Search::fallback_box` says
-                // what it would take to state a real one here.
-                if let Some(free) =
-                    crate::auto::maximise(&[crate::auto::Search::SHIPPED.fallback_box], &|free| {
-                        let mut trial = next;
-                        trial[index] = free[0];
-                        eta_one(trial, held, index)
-                    })
-                {
+                let Some(range) = split_box(index) else {
+                    continue;
+                };
+                if let Some(free) = crate::auto::maximise(&[range], &|free| {
+                    let mut trial = next;
+                    trial[index] = free[0];
+                    eta_one(trial, held, index)
+                }) {
                     next[index] = free[0];
                 }
             }

@@ -890,6 +890,42 @@ pub fn member_is_buildable(tooth: &Tooth, floor: Option<f64>) -> bool {
     undercut_ok && !tooth.severed && root_radius_fits(&tooth.params, tooth.params.dedendum)
 }
 
+/// **Whether a shaper-cut member is the part its cutter would leave.**
+///
+/// The counterpart of [`member_is_buildable`], and the answer to the question
+/// that one declines: *a ring is not asked* the four a rack asks, because its
+/// root and its fillet are its shaper's rather than inputs of its own — so it is
+/// asked of the **tool** instead, and this is where.
+///
+/// [`crate::Ring`] records every guard that altered its geometry, so the
+/// question is already answered by the time a candidate exists: a space capped
+/// against the pitch, a space raised off zero, a tip lifted to the base circle,
+/// a root past where the two flanks close. **Any of them means the tool did not
+/// leave the shape the shift asked for**, which is exactly what
+/// [`member_is_buildable`] refuses on a rack-cut member and for the same reason:
+/// a search may hand back a part somebody has to make, and a shift it has to be
+/// talked out of is not one.
+///
+/// # Why this is not a list of guards
+///
+/// It asks whether *anything* was altered rather than naming which alterations
+/// count. A list would be a list to keep in step, and the distinction it would
+/// draw does not exist: every entry in `clamps` is by definition a place the
+/// geometry is not what was asked for. A cutter too large for its ring is
+/// altered as surely as a space too wide, and a set whose tool cannot cut it has
+/// nothing to optimise — it falls back to the plain shifts, which is what an
+/// inadmissible pair does too, and the clamp is still reported to the reader.
+///
+/// # It costs nothing
+///
+/// Every caller has already built the ring — its clamps are read off the same
+/// construction the mesh and the path come from — so this is a field lookup
+/// rather than a second cut.
+#[must_use]
+pub fn ring_is_cut_as_asked(ring: &crate::ring::Ring) -> bool {
+    ring.clamps.is_empty()
+}
+
 /// **What the search may not do**, as opposed to what it is trying to achieve.
 ///
 /// Each field eliminates a range of shifts rather than reshaping the surface
@@ -1171,18 +1207,6 @@ pub struct Search {
     pub budget: usize,
     /// How many of the sweep's best points are walked from.
     pub starts: usize,
-    /// **The interval a caller uses when it cannot say what its own is.**
-    ///
-    /// A guess at where shifts live, and named as one. Every caller that *can*
-    /// state its box does ([`searchable_shift`]), and the one that cannot is the
-    /// epicyclic set: two of its three shifts are searched, one of them the
-    /// ring's, and **this crate has no admissible range for a ring's shift** —
-    /// its flank is its shaper's, so the rack algebra
-    /// [`admissible_profile_shift`] is written in says nothing about it, and
-    /// applying it anyway caps a ring at about 1.2 modules where the sets here
-    /// want 1.9 to 2.4. `AUDIT.md` F54 carries that gap; until it is closed a
-    /// set sweeps this and pays for it (F50).
-    pub fallback_box: (f64, f64),
     /// The walk's first step, as a fraction of the sweep's own spacing.
     ///
     /// **The sweep chose the region; the walk only refines inside it.** A first
@@ -1196,7 +1220,6 @@ impl Search {
     /// What every caller in the crate uses.
     pub const SHIPPED: Self = Self {
         scan: 12,
-        fallback_box: (-3.0, 3.0),
         resolution: 1e-3,
         budget: 220,
         starts: 2,
@@ -1235,7 +1258,6 @@ impl Search {
             budget,
             starts: start_count,
             first_step,
-            fallback_box: _,
         } = *self;
         let dof = box_.len();
 

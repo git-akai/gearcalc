@@ -72,11 +72,16 @@ not even monotone in its own effort (F50).
 objective is not unimodal in the division either — the trough is where the
 automatic addendum cap engages. That names the repair rather than blocking it.
 
-*Step 2, first item done.* The search sweeps the box its shifts can take rather
-than a guess at one, closing **F52, F53, F56, F57** and half of F19. It could
-not reach an epicyclic set: there is no admissible range for a ring's shift to
-give it (**F54**), and that is what blocks F50 — so **F54 is the next thing to
-do**.
+*Step 2, first two items done.* The search sweeps the box its shifts can take
+rather than a guess at one (**F52, F53, F56, F57**, and half of F19), and a ring
+is asked of its **cutter** rather than of a rack (**F54**) — which turned out to
+be the whole of what a set needed, the range having existed all along. 26 of 30
+sets were returning a ring the cutter had altered; none are now. The last guessed
+interval has left the crate.
+
+*Next.* **F50** — a set's search is now one-signed but still under-searches by up
+to 3.2e-4. What is left is the coordinate problem: item 3 below, splitting the
+box at the regime boundary the addendum cap draws, and then the closed form.
 
 | Phase | What it does | State |
 |---|---|---|
@@ -85,7 +90,7 @@ do**.
 | 2 | The number ledger | **done** — gates proven |
 | 3 | Unify what is written twice | **done** |
 | 3b | The direction sweep, second half — the ratings | **done** — gate proven |
-| 4 | The optimiser | **in progress** — steps 1 and 2's first item done, gates proven; F54 next |
+| 4 | The optimiser | **in progress** — step 1 and two of step 2's items done, gates proven; F50 next |
 | 5 | Consolidate the tests | not started |
 | 6 | Front end and payload | not started |
 
@@ -98,7 +103,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 554 tests** (was 531). **Golden corpus: 25 cases** (was 22).
+**Suite: 555 tests** (was 531). **Golden corpus: 26 cases** (was 22).
 
 ---
 
@@ -186,8 +191,9 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F51 | The hula stage's shift search cannot be asked for an effort, so it is the one search with no convergence gate | gap | 4 | open — see Phase 4 |
 | F52 | A given centre distance drops the optimiser onto the undercut floor — the tool's own recommended distance, typed back, costs 0.42 points | gap | 4 | **closed** — and logged in `corrections.md` |
 | F53 | The division objective is bimodal at the addendum cap and the search takes the lower peak | gap | 4 | **closed** — " |
-| F54 | There is no admissible range for a **ring's** shift, so a set's search cannot be given its box | gap | 4 | open — it is what blocks F50 |
+| F54 | A ring was asked nothing, so the search chose rings its cutter had to alter — 26 of 30 sets | gap | 4 | **closed** — and logged in `corrections.md`; the premise was wrong, see below |
 | F55 | A centre distance no admissible shifts can reach is answered rather than refused | gap | 4 | open |
+| F58 | The hula stage's shift optimiser moves no answer over a band of tooth differences, on or off | holds? | 4 | open — observed, not yet diagnosed |
 | F56 | No CLI command drove the optimiser, so its answers were outside the corpus | gap | 4 | **closed** — `gear-cli shifts`, which also closes F19's first row |
 | F57 | `check_figures.py` had `check_golden.sh`'s stale-binary fault | drift | 4 | **closed** — and logged in `corrections.md` |
 | F2 | The worm stage is outside the shared member vocabulary | gap | 3 | **closed** — option B; a crossed member is a `GearResult`, a worm's is not and says why |
@@ -836,23 +842,60 @@ last step of a different grid. A 9/9 pair *looks* worse by 8.0e-5 and is not:
 the old answer was the fallback and its contact ratio of **1.19718** is below the
 1.2 the stage asked for, so it was never an admissible answer at all.
 
-**F54 is what stopped it reaching a set.** Two of a set's three shifts are
-searched and one of them is the ring's, and this crate has no admissible range
-for a ring's shift: `admissible_profile_shift` is rack algebra, and applying it
-to a ring caps it at about 1.2 modules where the sets measured here want 1.9 to
-2.4 — so the box would exclude the answer. Measured: doing it anyway costs every
-set between 1e-5 and 4.5e-4 of `η₀`. The set and the hula stage sweep
-`Search::fallback_box` and it says so.
+#### F54, and the premise it was written on was wrong
+
+It was recorded as *there is no admissible range for a ring's shift*, and the
+question put back was the right one: **can a ring ask of its cutter rather than
+of a new rack?** It can, and asking it turned the finding inside out.
+
+**Two of the four questions carry over unchanged, and one has no answer.** A
+ring's *space* is where the mating pinion's tooth goes and is generated the way a
+tooth is, so it takes the identical expression and the same two guards —
+`Ring::cut_by` says so where it applies them. `admissible_profile_shift`
+therefore **already bounds a ring**, `[−2.130, 1.942]` on the shipped set, and
+there was never a second range to write. What has no answer is the *round*: a
+ring specifies none, its fillet being its cutter's tip.
+
+So the earlier reading — "give the ring a range" — meant reading a **rack's**
+bound onto it, which caps it near 1.2 modules and costs every set 1e-5 to 4.5e-4.
+That was the wrong repair, and measuring it is what said so.
+
+**The right one is one line.** `auto::ring_is_cut_as_asked` asks the ring what
+its cutter did: [`Ring`] records every guard that altered its geometry, so a
+candidate that clamped anything is a shift the tool had to be talked out of —
+which is exactly what `member_is_buildable` refuses on a rack-cut member. It is
+free, because every caller has already cut the ring to get the mesh it is
+scoring.
+
+| | before | after |
+|---|---|---|
+| sets returning a ring the cutter altered | **26 of 30** | **0 of 30** |
+| the shipped 13/25's ring | x = 2.35, space capped at 1.94 | x = 1.94, pressed against the cap |
+| `η₀`, all 30 | — | falls 4e-7 to 6.2e-4 — the part is now one that exists |
+| more effort finding a *worse* answer | 3 of 30 | **none**, and it is asserted |
+
+The efficiencies fall, and that is the answer being right rather than large: the
+higher figures were the efficiency of a part nobody makes. The hula stage is
+asked the same question in the same place, for the reason
+`docs/corrections.md` records of the last rule that reached one epicyclic kind
+and not the other.
+
+**`Search::fallback_box` is gone with it** — every caller states its own box now,
+so the last of the guessed intervals has left the crate.
+
+**F50 is not closed by this.** The set's spread is 3.2e-4 and one fixture (13/18)
+loses 1.2e-4 to under-search, but the *character* has changed: every move is now
+one-signed, so more effort only ever helps. That is asserted as a law beside the
+canary. What is left is the coordinate problem alone.
 
 #### Still to do
 
 So step 2's work is:
 
 1. ~~Give `maximise` its box.~~ **Done for a pair; F54 blocks the set.**
-2. **Give a ring an admissible shift range (F54).** It is what a set's box needs
-   and the crate does not have it. A ring's flank is its shaper's, so the bound
-   is the shaper's reach rather than a rack's thickness and depth, and `ring.rs`
-   is where it belongs. **This is the first thing to do**: F50 waits on it.
+2. ~~Give a ring an admissible shift range.~~ **Done, and the premise was
+   wrong** — the range already existed; what was missing was the cutter's
+   question. See F54 above.
 3. **Split the box at the regime boundaries.** The addendum cap's onset is the
    shift at which the tip reaches its minimum width, and
    `addendum_for_tip_width` is already the closed-form solve for it. Cut the

@@ -727,6 +727,42 @@ is the answer a handbook gives.
 the self-locking note names the *static* coefficient — the one that actually
 decides it.
 
+### A ring is asked of its cutter, not of a rack
+
+A ring's flank, root and fillet are its **shaper's** rather than inputs of its
+own, which is why it has no dedendum input and why
+[`auto::member_is_buildable`] declines to ask it a rack's four questions. That
+declining was read for a while as *a ring is not asked anything*, and it left the
+one thing a search needs unasked.
+
+**Two of the questions do carry over, unchanged.** A ring's *space* is where the
+mating pinion's tooth goes and is generated the way a tooth is, so it takes the
+identical expression — `m_t(π/2 + 2(x + x_s) tan α)` — and the same two guards on
+it. So `admissible_profile_shift` already bounds a ring's shift and there was
+never a second range to write. Reading a *rack's* bound onto a ring instead caps
+it near 1.2 modules where an epicyclic set wants 1.9, which is the shift bound of
+a tool that is not cutting it.
+
+**What does not carry over is the round**, and that is the one to ask the cutter.
+A rack-cut member is asked whether the fillet *it specifies* still fits; a ring
+specifies none, so the question is whether the **tool left the shape the shift
+asked for** — which the ring has already answered by the time any candidate
+exists, in the clamps it records. Any of them means it did not.
+
+**Measured, and it is the whole of why this matters.** Nothing asked, an
+epicyclic set's search walked past the shift where its ring's space stops being
+the space asked for: **26 of 30 sets** returned a ring the cutter had capped, one
+of them at 2.35 modules against a cap of 1.94. The efficiency reported for those
+is the efficiency of a part nobody makes.
+
+**What would change this:** a second shaper-cut member. There is one rule and
+one place, and the split between "asked of a rack" and "asked of a tool" is a
+`match` on which tool cuts the member — the tool being the parameter rather than
+the branch, which is what [find the parameter](#find-the-parameter-not-the-branch)
+asks. A third kind would be the moment to make the round question itself take a
+tool, so that the rack is the `z → ∞` case of it, as it already is in
+[`crate::shaper`].
+
 ### A ring is a gear with a negative tooth count
 
 Every internal *meshing* relation is the external one under that sign: the tooth

@@ -524,8 +524,9 @@ impl PlanetaryStage {
             // **The sun and the planet both have to be cuttable**, and the
             // planet especially: its shift is not chosen but absorbed, so a sun
             // and a ring that ask for more than a planet can carry is exactly
-            // the combination this has to refuse. The ring is not asked — its
-            // root is its shaper's — and the set's own internal bounds are the
+            // the combination this has to refuse. The ring is asked the one
+            // question it can answer — whether its cutter left the shape the
+            // shift asked for — and the set's own internal bounds are the
             // interference flags the mesh reports.
             // **Each member answers to the bound its own arrival earns it** —
             // chosen, given, or absorbed (`train::undercut_bound`). The absorber
@@ -556,6 +557,15 @@ impl PlanetaryStage {
             ];
             if !crate::auto::member_is_buildable(&b.sun, floors[0])
                 || !crate::auto::member_is_buildable(&b.planet, floors[1])
+                // **And the ring is asked of its cutter**, which is the question
+                // it has an answer to (`auto::ring_is_cut_as_asked`). It used to
+                // be asked nothing at all, on the reading that a rack's four
+                // questions mean nothing to it — true, and it left the search
+                // free to walk past the shift where the tool stops leaving the
+                // space asked for. It did: the shipped 13/25 set chose a ring at
+                // **2.35 modules** where its space caps at 1.94, so the part the
+                // search optimised is not the part the cutter makes.
+                || !crate::auto::ring_is_cut_as_asked(&b.ring)
             {
                 return None;
             }
@@ -583,13 +593,59 @@ impl PlanetaryStage {
         if freedoms.count() == 0 {
             return plain;
         }
-        // **This set cannot say where its own shifts live**, so it sweeps the
-        // fallback interval and `auto::Search::fallback_box` says why: two of
-        // the three shifts are searched, one of them the ring's, and there is no
-        // admissible range for a ring's shift to give (`AUDIT.md` F54). The pair
-        // search states its box and is converged; this one does not and is not
-        // (F50), and those are the same sentence.
-        let box_ = freedoms.boxes([search.fallback_box; 3]);
+        // **Where each member's shift can sit, asked of the tool that cuts it.**
+        //
+        // The sun and the planet are rack-cut and answer `auto::searchable_shift`
+        // whole. A ring is asked **one** of its questions and not the other, and
+        // that is the same split `auto::member_is_buildable` already makes: its
+        // *space* is generated the way a tooth is and takes the identical
+        // expression, so the thickness pair bounds it unchanged; its *fillet* is
+        // its shaper's tip round rather than an input of its own, so "does the
+        // round asked for still fit" is a question it has no answer to.
+        //
+        // Asking it anyway is what this used to do, and it capped a ring near
+        // 1.2 modules where these sets want 1.9 — the shift bound of a rack that
+        // is not cutting it.
+        let member_kind = |i: usize| {
+            [
+                PlanetaryShaft::Sun,
+                PlanetaryShaft::Carrier,
+                PlanetaryShaft::Ring,
+            ][i]
+        };
+        let params = |i: usize, x: f64| {
+            let (teeth, addendum) = [
+                (self.sun.teeth, self.sun.addendum),
+                (self.planet.teeth, self.planet.addendum),
+                (self.ring.teeth, self.ring.addendum),
+            ][i];
+            self.params(member_kind(i), teeth, x, addendum)
+        };
+        let Some(per_member) = (0..3)
+            // **Each member asked of the tool that cuts it.**
+            .map(|i| match member_kind(i) {
+                // Shaper-cut. Its *space* is generated the way a tooth is and
+                // takes the identical expression, so `admissible_profile_shift`
+                // already bounds it — the same two guards read on the space,
+                // which is what `Ring::cut_by` says where it applies them. What
+                // a ring has no answer to is the round: that is its cutter's,
+                // and it is asked of the cut instead (`ring_is_cut_as_asked`).
+                PlanetaryShaft::Ring => {
+                    let p = params(i, 0.0);
+                    let b = crate::auto::admissible_ranges(&p, p.dedendum)
+                        .profile_shift
+                        .bound;
+                    let (lo, hi) = (b.min?, b.max?);
+                    (lo < hi).then_some((lo, hi))
+                }
+                // Rack-cut, and asked all of it.
+                _ => crate::auto::searchable_shift(&|x| params(i, x), asked[i].search_floor),
+            })
+            .collect::<Option<Vec<_>>>()
+        else {
+            return plain;
+        };
+        let box_ = freedoms.boxes([per_member[0], per_member[1], per_member[2]]);
         search
             .maximise(&box_, &|free| eta0(freedoms.place(free)))
             .map(|free| freedoms.place(&free))
