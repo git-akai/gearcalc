@@ -1936,7 +1936,7 @@ mod tests {
                     // effect is the fraction of a per cent the rationale
                     // measured. At or above it there is no such zone — two pairs
                     // are always engaged — the ramp never reaches 1, and it
-                    // relieves the tooth by a third. That second regime is the
+                    // moves the tooth's figure either way. That second regime is the
                     // one the ramp was never calibrated for, and the stage says
                     // so rather than letting the number pass as a rating.
                     let eps_n = eps / crate::metrology::base_helix_angle(&g).cos().powi(2);

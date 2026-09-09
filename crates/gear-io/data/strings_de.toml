@@ -44,7 +44,7 @@ shift_raised_for_undercut = "z{teeth}: Profilverschiebung auf {shift} angehoben,
 addendum_held_to_tip_width = "z{teeth}: Kopfhöhe auf {addendum} begrenzt"
 addendum_above_tip_width = "z{teeth}: höher als die Kopfdicke zulässt — {addendum} würde sie wahren"
 transverse_contact_ratio_below_one = "Profilüberdeckung {ratio}: unter 1, der Eingriff verliert zwischen den Zähnen den Kontakt"
-load_sharing_out_of_band = "Lastaufteilung bei einer virtuellen Überdeckung von {ratio}: ohne Einzeleingriffsbereich extrapoliert die Rampe und entlastet den Zahn um etwa ein Drittel"
+load_sharing_out_of_band = "Lastaufteilung bei einer virtuellen Überdeckung von {ratio}: ohne Einzeleingriffsbereich extrapoliert die Rampe, und ihre Wirkung auf den Wert hat keine feste Richtung — gemessen zwischen 24 % Entlastung und 15 % Erhöhung"
 crossed_face_width_as_entered = "Zahnbreite von Rad {member} wie eingegeben: keine Breite ergibt eine volle Überdeckung"
 crossed_contact_ratio_below_one = "Überdeckung {ratio}: unter 1, das Paar verliert zwischen den Zähnen den Kontakt"
 self_locking = "selbsthemmend: Haftreibung μ {friction} gegenüber einer Grenze von {threshold}, das Rad kann die Schnecke also nicht rücktreiben"
@@ -57,8 +57,8 @@ planet_clearance_below_minimum = "benachbarte Planeten haben {gap} mm Abstand, w
 ring_addendum_clamped = "Kopfhöhe des Hohlrads am Grundkreis begrenzt: es braucht mehr Zähne oder eine kleinere Kopfhöhe"
 face_width_no_source = "die automatische Zahnbreite von Rad {gear} hat keine Tragfähigkeit, die sie bemisst: alle Quellen sind aus, sie bleibt daher auf dem Wert im Feld"
 rim_below_minimum = "das Kranzdickenverhältnis {ratio} liegt auf oder unter dem Mindestwert, den ISO 6336-3 noch bewertet: die Norm verlangt, einen solchen Kranz zu vermeiden, und Y_B wird jenseits ihres Gültigkeitsbereichs angegeben"
-reversed_bending_uncorrected = "Zähne erfahren Lastumkehr; Koeffizient für Lastumkehr erwägen"
-reversed_bending_applied = "Zähne erfahren Lastumkehr; der Koeffizient {fraction} wird angewendet"
+reversed_bending_uncorrected = "dieser Zahnfuß wird auf beiden Flanken belastet und gegen den einseitigen zulässigen Wert bewertet: Wechselbiegung einschalten, um gegen den reduzierten Wert zu bewerten"
+reversed_bending_applied = "dieser Zahnfuß wird auf beiden Flanken belastet und gegen {fraction} des einseitigen zulässigen Werts bewertet"
 
 [train]
 operating_torque_clamped = "Betriebsdrehmoment auf {torque} Nm begrenzt: es kann den Spitzenwert nicht überschreiten"

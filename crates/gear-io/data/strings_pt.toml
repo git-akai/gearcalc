@@ -45,7 +45,7 @@ shift_raised_for_undercut = "z{teeth}: desvio de perfil elevado para {shift} par
 addendum_held_to_tip_width = "z{teeth}: adendo limitado a {addendum}"
 addendum_above_tip_width = "z{teeth}: mais alto do que a largura do topo permite — {addendum} mantê-la-ia"
 transverse_contact_ratio_below_one = "razão de contato transversal {ratio}: abaixo de 1, o engrenamento perde contato entre dentes"
-load_sharing_out_of_band = "partilha de carga com razão de contato virtual de {ratio}: sem zona de contato de um só par, a rampa está a extrapolar e alivia o dente em cerca de um terço"
+load_sharing_out_of_band = "partilha de carga com razão de contacto virtual de {ratio}: sem zona de contacto de um só par, a rampa está a extrapolar, e o seu efeito no valor não tem direção fixa — medido entre um alívio de 24 % e um aumento de 15 %"
 crossed_face_width_as_entered = "largura do dente da engrenagem {member} conforme introduzida: nenhuma largura dá uma razão de contato completa"
 crossed_contact_ratio_below_one = "razão de contato {ratio}: abaixo de 1, o par perde contato entre dentes"
 self_locking = "autobloqueio: μ estático {friction} contra um limiar de {threshold}, portanto a coroa não consegue retroacionar o parafuso sem-fim"
@@ -58,8 +58,8 @@ planet_clearance_below_minimum = "planetas adjacentes afastam-se {gap} mm, abaix
 ring_addendum_clamped = "adendo da engrenagem anular limitado na sua circunferência de base: precisa de mais dentes ou de um adendo menor"
 face_width_no_source = "a largura automática da engrenagem {gear} não tem nenhum critério que a dimensione: todas as fontes estão desligadas, pelo que fica no valor indicado no campo"
 rim_below_minimum = "a razão de espessura da coroa {ratio} está no mínimo que a ISO 6336-3 avalia ou abaixo dele: a cláusula diz que tal coroa deve ser evitada, e Y_B é indicado além do alcance da norma"
-reversed_bending_uncorrected = "Os dentes sofrem inversão de carga; considere usar o coeficiente de inversão de carga"
-reversed_bending_applied = "Os dentes sofrem inversão de carga; o coeficiente de {fraction} está aplicado"
+reversed_bending_uncorrected = "esta raiz é carregada em ambos os flancos e está a ser avaliada contra a tensão admissível unidirecional: ative a flexão alternada para a avaliar contra a reduzida"
+reversed_bending_applied = "esta raiz é carregada em ambos os flancos e é avaliada contra {fraction} da tensão admissível unidirecional"
 
 [train]
 operating_torque_clamped = "torque de operação limitado a {torque} Nm: não pode exceder o pico"

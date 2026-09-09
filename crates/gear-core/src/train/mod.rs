@@ -228,9 +228,12 @@ pub(crate) struct Bending {
     pub rim: Option<crate::strength::RimSupport>,
     /// **The ramp outside the band it was described in.** It is a first-order
     /// stand-in for a mesh with a single-pair zone; at `ε_n ≥ 2` there is no
-    /// such zone, the ramp never reaches a full share, and it relieves the
-    /// tooth by about a third. That is a large number from an uncalibrated
-    /// model, in the unconservative direction — exactly what
+    /// such zone and the ramp never reaches a full share. **What that does to
+    /// the figure has no fixed direction**: measured across high-contact-ratio
+    /// spur designs it runs from a 24 % relief to a 15 % *increase*, because
+    /// the swept maximum is a product of a form factor rising toward the tip
+    /// and a share falling away there, and which wins is the tooth's business.
+    /// A large number either way from an uncalibrated model — exactly what
     /// `docs/rationale.md` refuses to let pass silently — so it is said where
     /// the figure is shown. The model is still the one the designer asked for;
     /// what they are owed is knowing it is extrapolating.

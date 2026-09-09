@@ -40,7 +40,7 @@ shift_raised_for_undercut = "z{teeth}：變位係數已提高到 {shift} 以避�
 addendum_held_to_tip_width = "z{teeth}：齒頂高已限制為 {addendum}"
 addendum_above_tip_width = "z{teeth}：高於齒頂厚所允許的值——{addendum} 可保證"
 transverse_contact_ratio_below_one = "端面接觸比 {ratio}：小於 1，嚙合在齒與齒之間會脫離接觸"
-load_sharing_out_of_band = "虛擬接觸比為 {ratio} 時的負載分配：不存在單齒嚙合區，斜坡模型屬於外推，會使輪齒應力降低約三分之一"
+load_sharing_out_of_band = "虛擬接觸比為 {ratio} 時的負載分配：不存在單齒嚙合區，斜坡模型屬於外推，其對結果的影響方向不固定——實測介於降低 24 % 與升高 15 % 之間"
 crossed_face_width_as_entered = "齒輪 {member} 採用輸入的齒寬：沒有任何齒寬能給出完整的接觸比"
 crossed_contact_ratio_below_one = "接觸比 {ratio}：小於 1，該對齒輪在齒與齒之間會脫離接觸"
 self_locking = "自鎖：靜摩擦係數 μ {friction}，閾值為 {threshold}，因此蝸輪無法反驅蝸桿"
@@ -53,8 +53,8 @@ planet_clearance_below_minimum = "相鄰行星輪的間隙為 {gap} mm，低於�
 ring_addendum_clamped = "內齒輪齒頂高已限制在其基圓處：需要更多齒數或更小的齒頂高"
 face_width_no_source = "齒輪 {gear} 的自動齒寬沒有任何強度依據：所有來源均已關閉，因此保持輸入框中的數值"
 rim_below_minimum = "輪緣支承比 {ratio} 等於或低於 ISO 6336-3 可評定的下限：該條款要求避免這種輪緣，Y_B 的報告值已超出標準適用範圍"
-reversed_bending_uncorrected = "輪齒承受負載換向；建議啟用負載換向係數"
-reversed_bending_applied = "輪齒承受負載換向；已套用係數 {fraction}"
+reversed_bending_uncorrected = "該齒根兩側齒面均受載，但仍按單向許用應力評定：開啟雙向彎曲後將按折減後的許用應力評定"
+reversed_bending_applied = "該齒根兩側齒面均受載，按單向許用應力的 {fraction} 倍評定"
 
 [train]
 operating_torque_clamped = "工作扭矩已限制為 {torque} Nm：不得超過峰值"

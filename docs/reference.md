@@ -1724,7 +1724,8 @@ the model on rated one member of an internal mesh under it and the other
 without.
 
 Above a virtual contact ratio of 2 there is no single-pair zone, the ramp never
-reaches a full share, and it relieves the tooth by about a third — which the
+reaches a full share, and it moves the figure by up to a quarter in *either*
+direction — which the
 stage reports, per mesh, since a set can have one mesh in the band and one out.
 **Below it the model changes nothing**, and that is the model rather than a
 plumbing fault: the single-pair boundary is in the sweep with a share of exactly

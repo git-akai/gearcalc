@@ -467,7 +467,9 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   more reason the comparison set is a comparison rather than the default, since
   `K_f`'s constants are functions of `α_n`.
 - **Load sharing above a virtual contact ratio of 2** is the ramp extrapolating:
-  no single-pair zone exists, and it relieves the tooth by about a third. Each
+  no single-pair zone exists, and what it does to the figure has **no fixed
+  direction** — measured from a 24 % relief to a 15 % increase across
+  high-contact-ratio spur designs. Each
   mesh says so where its figure is shown, so a set with one mesh in the band and
   one out names which. **Below the band it changes nothing** — the single-pair
   boundary is in the sweep at a share of exactly 1, so the maximum is the point
@@ -718,7 +720,10 @@ exactly 2.
 **One thing it is worth for, and it is not a small one.** `f_ε = 0.7` for a spur
 mesh at `ε_αn ≥ 2` is an independent corroboration of this project's own
 measurement — that above a virtual contact ratio of 2 the linear ramp "relieves
-the tooth by about a third", found by sweeping designs and reported in every
+the tooth by about a third" as it then measured — the two agreeing on a number
+this project has since re-measured at 12–24 % under a different notch model,
+which is a coincidence worth less than it looked but still not nothing. Found by
+sweeping designs and reported in every
 mesh that reaches the band. Two models built on different reasoning landing on
 the same 30 % is the best evidence either of them has.
 
