@@ -4,7 +4,7 @@ Where the project stands, what to run, and what is left. **Version 0.2.0** — t
 minor bump is the bending model: the notch factor, the fillet radius it reads
 and the parabola's selection rule all moved to one source, which moved the
 strength canary and changed `bending_stress`, `min_face_width_bending`,
-`StressConcentration` and `RootSection`.
+`RootStressModel` (which was `StressConcentration`) and `RootSection`.
 
 **This is the only document allowed to talk about the present**, and saying so is
 what lets the others stop hedging. [`reference.md`](reference.md) states what the
@@ -172,6 +172,7 @@ the second case was added rather than substituted for the first.
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. `serde` and `ts-rs`, both optional and both about the shape a type takes when it leaves. |
 | `gear-core/src/tooth.rs` | `Tooth` — one tooth's form, at one shift, cut by one `Rack`. Not a gear. |
 | `gear-core/src/gear.rs` | `Gear` — the assembly, and the only place a gear is drawn. An ordinary gear is `Δx = 0`. |
+| `gear-core/src/strength.rs` | The bending model: the critical section both kinds of member share, the notch factors and which fillet radius each reads, and the Hertz contact beside it. |
 | `gear-core/src/plane.rs` | The normal and transverse planes, the identities that carry a quantity between them, and the basic rack they act on. One home, because the two angles had nineteen and the base pitch six. |
 | `gear-core/src/hula.rs` | The hula arrangement: the integer ratio, the one crank offset, and the shifts that let both meshes run at it. |
 | `gear-core/src/train/hula.rs` | ...and the stage that builds the parts it describes, and rates them. |
@@ -517,8 +518,9 @@ notch factor came from neither. ISO's `ρ_F` is the radius *at the critical
 section*; Dolan and Broghamer's `ρ_f` is *"the minimum radius of the fillets"*
 (confirmed independently of the paper, in the Virginia Tech survey of the same
 literature). This tool read it at the fillet **junction**, which is the flattest
-point the fillet has — 1.4–4.1× the minimum on an external tooth, 2.1–6.3× on a
-ring. `q_s` is inverse in it, which is the whole of why a ring's sat on the floor
+point the fillet has — **up to 16.6× the minimum** on an external tooth and
+11.3× on a ring over the matrix population (study 7 prints nine designs apiece,
+whose middle of the range is 1.4–4.1 and 2.1–6.3). `q_s` is inverse in it, which is the whole of why a ring's sat on the floor
 of `Y_S`'s band with two in three clamped.
 
 ### What changed
@@ -545,16 +547,22 @@ The strength canary moved once, deliberately: `σ_F` 69.2 / 63.4 → **74.3 / 63
 factor stayed in bending. **The ring is the change worth having.** Against the
 coherent ISO set (60° tangent + `Y_S`), `gear-cli matrix` study 5:
 
-| ring, `Y_F·K_f` over `Y_F·Y_S` | before | after |
+| ring, the parabola set over the ISO set | before | after |
 |---|---|---|
-| range | 0.789 – 1.226 | **1.026 – 1.194** |
-| mean | 0.877 | **1.081** |
+| range | 0.789 – 1.226 | **0.901 – 1.163** |
+| mean | 0.877 | **0.970** |
+| spread | 0.437 | **0.262** |
 
-It has gone from straddling 1 with a spread of 0.44 — sometimes a fifth below
-the standard's own construction, the unconservative direction — to sitting
-consistently just above it with less than half the spread. Two models built on
-different reasoning now agree on a ring to within about 10 %, where before they
-disagreed by up to 25 % and could not agree on the sign.
+Closer to agreement on both counts: the mean has moved from 12 % out to 3 %, and
+the spread is down by two fifths. The remaining 3 % is **expected and has a
+name** — the ISO set does not take the axial compression term, so it reports the
+higher number, and a ratio a little under 1 is that difference showing up where
+it should.
+
+The external population reads 0.510 – 1.128, mean 0.827, and the wider spread
+there is the same thing seen on a population that includes small and undercut
+teeth, where the two constructions genuinely disagree about where the section
+is.
 
 ### And one thing the sweep found on the way
 
@@ -616,7 +624,7 @@ for that construction and are named rather than buried so this is visible.
 
 ### The ISO set is still there, whole
 
-`CriticalSection::TangentAngle` + `StressConcentration::Iso6336` is the other
+`CriticalSection::TangentAngle` + `RootStressModel::Iso6336` is the other
 coherent pair — ISO's section at ISO's angle, `ρ_F` at that section, `Y_S` fitted
 on exactly that — and is what to switch to for a number comparable with a
 published ISO rating. `gear-cli matrix` runs both, on both kinds of member.

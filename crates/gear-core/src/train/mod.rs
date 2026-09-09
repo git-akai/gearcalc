@@ -295,9 +295,9 @@ impl Bending {
 /// past where the standard will go, and it says so instead of returning a
 /// number that looks like the others.
 ///
-/// Beside [`notch_outside_fit`] rather than in [`Bending::note`] because a rim
-/// belongs to a **member**, where that one belongs to a mesh: two members of one
-/// mesh have two rims and one sharing model.
+/// A **member's** finding rather than a mesh's, which is why it is here and not
+/// in [`Bending::note`]: two members of one mesh have two rims and one sharing
+/// model between them.
 pub(crate) fn rim_below_minimum(rim: Option<crate::strength::RimSupport>) -> Option<Note> {
     rim.filter(|r| !r.in_range())
         .map(|r| Note::new(key::STAGE_RIM_BELOW_MINIMUM).number("ratio", r.ratio(), 2))

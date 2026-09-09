@@ -76,13 +76,10 @@ pub enum CriticalSection {
     /// tooth the tangency sits higher up the fillet, the section is narrower,
     /// and `Y_F` comes out 0.6–31 % larger, most on undercut teeth.
     ///
-    /// **That is `Y_F` alone, and it does not survive `Y_S`.** A narrower
-    /// section at the same notch radius is a *smaller* `q_s`, and `Y_S` rises
-    /// with `q_s` — so the product a stress is actually proportional to comes
-    /// out **below** the tangent construction's on average: 0.943 over the
-    /// external population, 0.877 over the ring one (`gear-cli matrix`, study
-    /// 5). Any claim that this construction is "the conservative one" is a claim
-    /// about `Y_F`, and the number a designer feels is `Y_F · Y_S`.
+    /// **That is `Y_F` alone, and it is not what a designer feels.** The number
+    /// a stress is proportional to is the whole bending factor, and a narrower
+    /// section changes the notch factor too. Any claim that this construction is
+    /// "the conservative one" is a claim about `Y_F`.
     ///
     /// # Divergence from the standards
     ///
@@ -116,7 +113,7 @@ pub enum CriticalSection {
     /// |---|---|---|
     /// | tangency on the **flank** | 12.9 % | **100 %** |
     /// | `Y_F` parabola/tangent | mean 1.055 | mean 1.425 |
-    /// | `Y_F·Y_S` parabola/tangent | mean 0.943 | mean 0.877 |
+    /// | whole factor, each set's own | mean 0.827 | mean 0.970 |
     /// | mean `q_s` | 1.95 vs 3.17 | **1.00** vs 4.94 |
     /// | outside the `Y_S` band | 19.2 % | **66.9 %** |
     /// | Spearman ρ on `Y_F` | **0.993** | **0.537** |

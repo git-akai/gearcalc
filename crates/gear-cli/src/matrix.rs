@@ -504,3 +504,120 @@ pub fn fillet_radius_readings(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// **The documents quote these figures, so the code has to keep printing
+    /// them.**
+    ///
+    /// `docs/state.md` and `strength.rs` both carry study 5's aggregates as the
+    /// evidence for which bending model is the default. Numbers in prose drift —
+    /// this project has caught it twice, once in the hula stage's tables and
+    /// once here, when the axial compression term moved the ring's mean from
+    /// 1.081 to 0.970 and three documents went on quoting the old one for a
+    /// commit. A quoted figure with nothing asserting it is a comment.
+    ///
+    /// Wide tolerances deliberately: this pins the *claims* — that the parabola
+    /// lands on a ring's flank every time, that the two sets agree on a ring to
+    /// within a few percent, that `q_s` collapses under the parabola — not the
+    /// last digit of a population mean.
+    #[test]
+    fn the_studies_report_the_figures_the_documents_quote() {
+        let ext = parting(Member::External, &population_for(Member::External));
+        let ring = parting(Member::Internal, &population_for(Member::Internal));
+
+        assert_eq!(ring.n, 160, "the ring population");
+        assert_eq!(
+            ring.on_flank, ring.n,
+            "a ring's parabola lands on the flank every time"
+        );
+        #[allow(clippy::cast_precision_loss)]
+        let ext_flank = ext.on_flank as f64 / ext.n as f64;
+        assert!(
+            (0.10..0.16).contains(&ext_flank),
+            "external flank tangencies ~12.9%, got {:.1}%",
+            100.0 * ext_flank
+        );
+
+        // `Y_F` alone: the parabola's section is the narrower one, much more so
+        // on a ring.
+        assert!(
+            (ext.form[2] - 1.055).abs() < 0.02,
+            "external Y_F {:?}",
+            ext.form
+        );
+        assert!(
+            (ring.form[2] - 1.425).abs() < 0.05,
+            "ring Y_F {:?}",
+            ring.form
+        );
+
+        // The whole factor, each set carrying its own notch model: the ring is
+        // the one that matters, and it agrees to a few percent.
+        assert!(
+            (ring.factor[2] - 0.970).abs() < 0.03,
+            "ring set ratio {:?}",
+            ring.factor
+        );
+        assert!(
+            (ext.factor[2] - 0.827).abs() < 0.05,
+            "external set ratio {:?}",
+            ext.factor
+        );
+
+        // And why `Y_S` does not belong on a parabola section: `q_s` collapses
+        // to the floor of its band, where the tangent section sits inside it.
+        assert!(
+            ring.notch[0] < 1.2 && ring.notch[1] > 4.0,
+            "ring q_s parabola {:.3} vs tangent {:.3}",
+            ring.notch[0],
+            ring.notch[1]
+        );
+        #[allow(clippy::cast_precision_loss)]
+        let ring_out = ring.notch_out[0] as f64 / ring.n as f64;
+        assert!(
+            ring_out > 0.6,
+            "two rings in three leave the Y_S band under the parabola, got {:.1}%",
+            100.0 * ring_out
+        );
+    }
+
+    /// **The fillet is flattest at its junction and tightest at its root**, and
+    /// the gap between them is what made reading `ρ_f` at the junction wrong.
+    ///
+    /// `docs/state.md` quotes the range over the whole population — 1.0–16.6×
+    /// on an external tooth and 1.6–11.3× on a ring, where study 7's printed
+    /// sample of nine designs apiece shows only the middle of it. `gear-core`
+    /// gates that the root *is* the minimum; this gates the **size**, which is
+    /// the number the argument rests on, and gates it over the population so a
+    /// sample cannot flatter it.
+    #[test]
+    fn the_junction_is_the_flattest_point_by_the_factor_documented() {
+        for (member, floor, reach) in [
+            (Member::External, 1.0_f64, 16.6_f64),
+            (Member::Internal, 1.6, 11.3),
+        ] {
+            let mut seen = (f64::INFINITY, f64::NEG_INFINITY);
+            for p in population_for(member) {
+                if let Some((j, m, _)) = fillet_radius_readings(member, p, 400) {
+                    let r = j / m;
+                    seen = (seen.0.min(r), seen.1.max(r));
+                }
+            }
+            assert!(
+                seen.0 >= floor * 0.99,
+                "{}: the junction is never tighter than the root, got {:.3}",
+                member.name(),
+                seen.0
+            );
+            assert!(
+                (seen.1 - reach).abs() / reach < 0.1,
+                "{}: junction/minimum reaches {:.2}, documented as {reach}",
+                member.name(),
+                seen.1
+            );
+        }
+    }
+}

@@ -83,8 +83,11 @@ cargo run --bin gear-cli -- strength 17 43 2.0    # a worked mesh: bending, cont
 cargo run --bin gear-cli -- train                 # a geartrain, end to end
 ```
 
-`gear-cli strength 17 43 2.0` is the project's regression canary: its figures
-have not moved since milestone 5, through every refactor since.
+`gear-cli strength 17 43 2.0` is the project's regression canary. Its contact,
+curvature and efficiency figures have not moved since milestone 5, through every
+refactor since; its two **bending** figures moved once, when the bending model
+was matched to a single source ([`state.md`](docs/state.md#the-canaries) records
+the step and why).
 
 **[`docs/state.md`](docs/state.md) has the rest of the interesting ones**, and
 `crates/gear-cli/src/main.rs` has all of them in its own module comment, next to
