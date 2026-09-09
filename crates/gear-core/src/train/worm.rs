@@ -744,7 +744,7 @@ pub fn solve_crossed_stage(
         lib,
     )
     .ok()
-    .map(|r| r.efficiency.forward);
+    .map(|r| r.mesh.efficiency.forward);
 
     // ...and the zone as the widths in use actually leave it. The tips are known
     // here — a crossed pair carries its tooth form — so nothing is assumed.
@@ -2325,7 +2325,8 @@ mod tests {
         for clearance in [0.08_f64, 0.04, 0.02, 0.01, 0.005] {
             let parallel = solve_spur_stage(&stage(0.0, clearance), StageTorques::just(2.0), &lib)
                 .expect("a parallel pair")
-                .backlash
+                .mesh
+                .backlash_by_drive()
                 .forward
                 .nominal;
             // As close to parallel as the screw model will go. The pair is still
@@ -2397,7 +2398,8 @@ mod tests {
         let shortfall = |clearance: f64| {
             let parallel = solve_spur_stage(&stage(0.0, clearance), StageTorques::just(2.0), &lib)
                 .expect("a parallel pair")
-                .backlash
+                .mesh
+                .backlash_by_drive()
                 .forward
                 .nominal;
             let crossed =
@@ -2512,13 +2514,13 @@ mod tests {
             )
             .expect("a stage");
             assert_eq!(
-                r.efficiency.forward.to_bits(),
-                reference.efficiency.forward.to_bits(),
+                r.mesh.efficiency.forward.to_bits(),
+                reference.mesh.efficiency.forward.to_bits(),
                 "static μ {statik} moved a parallel stage"
             );
             assert_eq!(
-                r.efficiency.backward.to_bits(),
-                reference.efficiency.backward.to_bits()
+                r.mesh.efficiency.backward.to_bits(),
+                reference.mesh.efficiency.backward.to_bits()
             );
         }
     }

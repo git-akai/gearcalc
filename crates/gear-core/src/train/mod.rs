@@ -164,6 +164,24 @@ pub struct MeshReport {
     pub backlash: [Backlash; 2],
 }
 
+impl MeshReport {
+    /// The one gap, read by **drive direction** rather than by member.
+    ///
+    /// `backlash` is per member — "the one gap seen from each of its ends" — and
+    /// a *stage* reports it per direction, because the output of a forward drive
+    /// is the second member and of a backward drive the first. Two indexings of
+    /// two numbers, and this is the conversion, in one place: it was written out
+    /// in the spur stage as a `match` inside a `Directional::of`, which is the
+    /// same mapping stated a second time.
+    #[must_use]
+    pub fn backlash_by_drive(&self) -> Directional<Backlash> {
+        Directional {
+            forward: self.backlash[1],
+            backward: self.backlash[0],
+        }
+    }
+}
+
 /// **A tooth the cutter has eaten into**, where that is a finding rather than a
 /// clamp.
 ///
@@ -968,41 +986,22 @@ pub struct SpurResult {
     pub clearance: f64,
     /// The centre distance actually used, including clearance.
     pub centre_distance: f64,
-    /// **Operating pressure angle `α_w`, degrees** — the angle the profile
-    /// shifts put the pair at, measured at the zero-backlash distance beside
-    /// it rather than at the running one.
+    /// **What this pair's one mesh reports**, in the type every other kind
+    /// reports a parallel-axis mesh in.
     ///
-    /// The nominal one because it is the design quantity: it is what the shifts
-    /// decide and what interference and tip thickness are judged against, and
-    /// an assembly clearance of a few hundredths moves it without changing any
-    /// of that. Reported by every stage that has a parallel-axis mesh, in the
-    /// same units and from the same place ([`crate::mesh::Mesh::alpha_w`]); a
-    /// crossed pair has no such angle, its line of action sliding rather than
-    /// turning (docs/reference.md#crossed-axes).
-    pub operating_pressure_angle: f64,
-    pub contact_ratios: ContactRatios,
-    /// Hertzian contact stress at the pitch point, MPa, in both load cases.
+    /// Seven fields used to sit here loose — the operating pressure angle, the
+    /// three contact ratios, whether the pair hunts, the shared contact stress
+    /// and relative radius, the efficiency and the backlash — which made the
+    /// parallel-axis stage the one kind not using the type named for what a
+    /// parallel-axis mesh reports. The front end had the same split: a
+    /// `meshRows` snippet for the kinds carrying a `MeshReport`, and the same
+    /// rows written out again for this one.
     ///
-    /// The one figure the two members genuinely share: same patch, same normal
-    /// force, same `E*`. Each gear's own rating sits on [`GearResult`] and is
-    /// this or worse, depending on where its dedendum is loaded alone.
-    pub contact_stress_at_pitch_point: LoadCase<f64>,
-    /// Relative radius of curvature at the worst point on the path, mm.
-    pub relative_radius: f64,
-    /// Mesh efficiency, 0..1, in both drive directions.
-    ///
-    /// The two are equal for a parallel-axis stage, and they are computed
-    /// independently rather than copied — see
-    /// [`crate::contact::efficiency`] for why they come out that way.
-    pub efficiency: Directional<f64>,
-    /// Angular backlash at whichever gear is the output in each direction,
-    /// degrees: gear 2 driving forward, gear 1 driving backward. The same tooth
-    /// gap subtends a different angle at each, so these differ whenever the
-    /// tooth counts do.
-    pub backlash: Directional<Backlash>,
-    /// Whether the tooth counts share no factor — a hunting ratio, which spreads
-    /// wear evenly instead of repeatedly pairing the same teeth.
-    pub coprime: bool,
+    /// A spur pair's efficiency and backlash **are** its mesh's — one mesh, no
+    /// carrier — so they are read through here rather than stored a second
+    /// time, and `StageResult::efficiency` is where every kind is made to agree
+    /// about which level it is being asked for.
+    pub mesh: MeshReport,
     pub gears: [GearResult; 2],
     /// Anything the stage had to say about the design.
     pub notes: Vec<crate::note::Note>,
@@ -1292,7 +1291,7 @@ impl StageResult {
     #[must_use]
     pub fn efficiency(&self) -> Directional<f64> {
         match self {
-            Self::Spur(r) => r.efficiency,
+            Self::Spur(r) => r.mesh.efficiency,
             Self::Worm(r) => r.efficiency,
             Self::Planetary(r) => r.efficiency,
             Self::Hula(r) => r.efficiency,
@@ -1307,7 +1306,7 @@ impl StageResult {
     #[must_use]
     pub fn backlash(&self) -> Directional<Backlash> {
         match self {
-            Self::Spur(r) => r.backlash,
+            Self::Spur(r) => r.mesh.backlash_by_drive(),
             Self::Worm(r) => r.backlash,
             Self::Planetary(r) => r.backlash,
             Self::Hula(r) => r.backlash,
@@ -2649,13 +2648,13 @@ mod tests {
         // Every stage produced real numbers.
         for s in r.stages.iter().map(spur) {
             assert!(s.centre_distance > 0.0);
-            assert!(s.contact_ratios.transverse > 1.0);
-            assert!(s.efficiency.forward > 0.9 && s.efficiency.forward < 1.0);
+            assert!(s.mesh.contact_ratios.transverse > 1.0);
+            assert!(s.mesh.efficiency.forward > 0.9 && s.mesh.efficiency.forward < 1.0);
             assert_eq!(
-                s.efficiency.forward, s.efficiency.backward,
+                s.mesh.efficiency.forward, s.mesh.efficiency.backward,
                 "a parallel-axis stage is as efficient driven either way"
             );
-            assert!(s.contact_stress_at_pitch_point.peak > 0.0);
+            assert!(s.mesh.contact_stress_at_pitch_point.peak > 0.0);
             for g in &s.gears {
                 assert!(g.face_width > 0.0);
                 assert!(g.bending_stress.peak.unwrap() > 0.0);
@@ -2828,7 +2827,7 @@ mod tests {
         let mut previous: Option<(f64, f64)> = None;
         for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
             let r = solve_spur_stage(&stage(clearance), StageTorques::just(2.0), &lib).unwrap();
-            let eps = r.contact_ratios.transverse;
+            let eps = r.mesh.contact_ratios.transverse;
             let bending = r.gears[0].bending_stress.peak.expect("a rateable tooth");
             if let Some((was_eps, was_bending)) = previous {
                 assert!(
@@ -2850,9 +2849,15 @@ mod tests {
     fn a_spur_stage_has_exactly_zero_overlap_and_a_helical_one_does_not() {
         let lib = library();
         let spur = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib).unwrap();
-        assert_eq!(spur.contact_ratios.overlap, 0.0, "must be exactly zero");
-        assert_eq!(spur.contact_ratios.total, spur.contact_ratios.transverse);
-        assert!(!spur.contact_ratios.has_full_axial_overlap());
+        assert_eq!(
+            spur.mesh.contact_ratios.overlap, 0.0,
+            "must be exactly zero"
+        );
+        assert_eq!(
+            spur.mesh.contact_ratios.total,
+            spur.mesh.contact_ratios.transverse
+        );
+        assert!(!spur.mesh.contact_ratios.has_full_axial_overlap());
 
         let helical = solve_spur_stage(
             &SpurStage {
@@ -2863,8 +2868,8 @@ mod tests {
             &lib,
         )
         .unwrap();
-        assert!(helical.contact_ratios.overlap > 0.0);
-        assert!(helical.contact_ratios.total > helical.contact_ratios.transverse);
+        assert!(helical.mesh.contact_ratios.overlap > 0.0);
+        assert!(helical.mesh.contact_ratios.total > helical.mesh.contact_ratios.transverse);
     }
 
     /// The last stage dominates output backlash, which is the design consequence
@@ -3634,6 +3639,7 @@ mod tests {
         let loss = |on: bool| {
             1.0 - solve_spur_stage(&stage(on), StageTorques::just(2.0), &lib)
                 .unwrap()
+                .mesh
                 .efficiency
                 .forward
         };
@@ -3931,9 +3937,9 @@ mod tests {
 
         assert!((manual.centre_distance - auto.centre_distance_nominal).abs() < 1e-12);
         // At the zero-backlash distance there is, by construction, no backlash.
-        assert!(manual.backlash.forward.nominal.abs() < 1e-9);
+        assert!(manual.mesh.backlash_by_drive().forward.nominal.abs() < 1e-9);
         // Whereas the automatic one carries its clearance into real backlash.
-        assert!(auto.backlash.forward.nominal > 0.0);
+        assert!(auto.mesh.backlash_by_drive().forward.nominal > 0.0);
     }
 
     /// An override has to reach the arithmetic, not just the display — and each
@@ -4028,6 +4034,7 @@ mod tests {
             }
             solve_spur_stage(&s, StageTorques::just(2.0), &lib)
                 .unwrap()
+                .mesh
                 .contact_stress_at_pitch_point
                 .peak
         };
@@ -4282,7 +4289,7 @@ mod tests {
         let base = solved(false, [Overrides::default(), Overrides::default()]);
         let soft_first = solved(false, [modulus(70_000.0), Overrides::default()]);
         let soft_second = solved(false, [Overrides::default(), modulus(70_000.0)]);
-        let pitch = |r: &SpurResult| r.contact_stress_at_pitch_point.peak;
+        let pitch = |r: &SpurResult| r.mesh.contact_stress_at_pitch_point.peak;
         for (r, which) in [(&soft_first, "gear 1"), (&soft_second, "gear 2")] {
             assert!(
                 pitch(r) < pitch(&base),
@@ -4327,7 +4334,7 @@ mod tests {
         let half = allowable(0.5 * super::allowable(&wide.gears[1].material, Case::Cyclic));
         let derated = solved(false, [Overrides::default(), half]);
         assert_eq!(
-            derated.contact_stress_at_pitch_point, wide.contact_stress_at_pitch_point,
+            derated.mesh.contact_stress_at_pitch_point, wide.mesh.contact_stress_at_pitch_point,
             "an allowable is not a stress and must not move one"
         );
         let contact_width = |r: &SpurResult| {

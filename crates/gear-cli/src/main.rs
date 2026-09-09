@@ -1184,14 +1184,14 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
         st.additional_helix,
         s.ratio,
         s.centre_distance,
-        if s.coprime { "  coprime" } else { "" }
+        if s.mesh.coprime { "  coprime" } else { "" }
     );
     println!(
         "  contact ratio  transverse {:.4}   overlap {:.4}   total {:.4}{}",
-        s.contact_ratios.transverse,
-        s.contact_ratios.overlap,
-        s.contact_ratios.total,
-        if st.additional_helix != 0.0 && !s.contact_ratios.has_full_axial_overlap() {
+        s.mesh.contact_ratios.transverse,
+        s.mesh.contact_ratios.overlap,
+        s.mesh.contact_ratios.total,
+        if st.additional_helix != 0.0 && !s.mesh.contact_ratios.has_full_axial_overlap() {
             "   <- no full axial overlap"
         } else {
             ""
@@ -1199,17 +1199,17 @@ fn print_spur_stage(k: usize, st: &gear_core::train::SpurStage, s: &gear_core::t
     );
     println!(
         "  efficiency {:.3} % forward / {:.3} % backward",
-        100.0 * s.efficiency.forward,
-        100.0 * s.efficiency.backward
+        100.0 * s.mesh.efficiency.forward,
+        100.0 * s.mesh.efficiency.backward
     );
     // One pressure, printed once. The pair shares a patch, a normal force and an
     // `E*`, so there is no second number to print per gear — what a gear has of
     // its own is the allowable, and therefore `b_min`.
     println!(
         "  contact at the pitch point  sigma_H {:.1} / {:.1} MPa peak/cyclic   rho {:.3} mm",
-        s.contact_stress_at_pitch_point.peak,
-        s.contact_stress_at_pitch_point.cyclic,
-        s.relative_radius
+        s.mesh.contact_stress_at_pitch_point.peak,
+        s.mesh.contact_stress_at_pitch_point.cyclic,
+        s.mesh.relative_radius
     );
     println!(
         "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>21} {:>21} {:>9} {:>21}",

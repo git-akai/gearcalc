@@ -1297,7 +1297,10 @@
           <span class="teeth">z {stage.gears[0].teeth} / {stage.gears[1].teeth}</span>
           {#if sres ?? xres}
             <span class="ratio">{(sres ?? xres)?.ratio.toFixed(4)} : 1</span>
-            <span class="eff">{pct((sres ?? xres)?.efficiency.forward ?? 0)} %</span>
+            <!-- A spur pair's stage efficiency is its mesh's — one mesh, no
+                 carrier — so it is read through `mesh` rather than stored
+                 twice. A crossed pair's is the screw result's own. -->
+            <span class="eff">{pct((sres ? sres.mesh.efficiency : xres?.efficiency)?.forward ?? 0)} %</span>
           {/if}
         </button>
 
@@ -1491,52 +1494,19 @@
                   {num(sres?.centre_distance, 4)} {sres && "mm"}
                   <small>{sres && t("ui.train_nominal_value", { value: num(sres.centre_distance_nominal, 4) })}</small>
                 </dd>
-                <dt>{t("ui.train_operating_pressure_angle")}</dt>
-                <dd>{num(sres?.operating_pressure_angle, 3)}{sres ? "°" : BLANK}</dd>
-                <dt>{t("ui.train_contact_ratio")}</dt>
-                <dd>
-                  {#if sres}
-                    ε<sub>α</sub> {num(sres.contact_ratios.transverse, 4)} · ε<sub>β</sub>
-                    {num(sres.contact_ratios.overlap, 4)} · ε<sub>γ</sub>
-                    {num(sres.contact_ratios.total, 4)}
-                    {#if stage.additional_helix !== 0 && sres.contact_ratios.overlap < 1}
-                      <small class="warn">{t("ui.train_no_full_axial_overlap")}</small>
-                    {/if}
-                  {/if}
-                </dd>
-                <!-- The one figure both members share: same patch, same normal
-                     force, same E*, one instant. Each gear's own rating is on
-                     its card and is this or worse. -->
-                <dt>{t("ui.train_contact_stress_at_pitch_point")}</dt>
-                <dd>
-                  {cases(sres?.contact_stress_at_pitch_point, 1)} {sres && t("ui.train_mpa")}
-                  <small>{t("ui.train_peak_cyclic")}</small>
-                  <small>{sres ? `ρ ${num(sres.relative_radius, 3)} mm` : BLANK}</small>
-                </dd>
-                <dt>{t("ui.train_mesh_efficiency")}</dt>
-                <dd>
-                  {bothWays(sres?.efficiency)}
-                </dd>
-                <dt>{t("ui.train_backlash")}</dt>
-                <dd>
-                  {sres
-                    ? t("ui.train_backlash_at", {
-                        angle: num(sres.backlash.forward.nominal, 5),
-                        member: gearName(i, 1),
-                      })
-                    : BLANK}
-                  <small
-                    >{range(num(sres?.backlash.forward.minimum, 5), num(sres?.backlash.forward.maximum, 5))}</small
-                  >
-                  {sres
-                    ? `· ${t("ui.train_backlash_at", {
-                        angle: num(sres.backlash.backward.nominal, 5),
-                        member: gearName(i, 0),
-                      })}`
-                    : BLANK}
-                </dd>
-                <dt>{t("ui.train_coprime")}</dt>
-                <dd>{sres ? (sres.coprime ? t("ui.train_yes") : t("ui.train_no")) : BLANK}</dd>
+                <!-- What every parallel-axis mesh reports, drawn by the one
+                     snippet that draws it. These rows were written out again
+                     here, which made the parallel-axis stage the only kind not
+                     using `meshRows` — the same split the Rust side had, where
+                     `SpurResult` re-declared `MeshReport`'s seven fields rather
+                     than holding one. The snippet is also the better readout: it
+                     warns on a transverse contact ratio below one, which this
+                     copy did not. -->
+                {@render meshRows(
+                  sres?.mesh,
+                  [gearName(i, 0), gearName(i, 1)],
+                  stage.additional_helix !== 0,
+                )}
               </dl>
               {#if (sres?.notes.length ?? 0) > 0}
                 <ul class="notes">

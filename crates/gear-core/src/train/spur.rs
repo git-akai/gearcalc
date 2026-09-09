@@ -7,11 +7,11 @@
 //! the train that strings them together.
 
 use super::{
-    Backlash, Case, ContactRatios, GearResult, LoadCase, Loading, MemberRating, SpurResult,
-    StageGear, StageTorques, TrainError, PROBE,
+    Backlash, Case, ContactRatios, GearResult, LoadCase, Loading, MemberRating, MeshReport,
+    SpurResult, StageGear, StageTorques, TrainError, PROBE,
 };
 use crate::auto::automatic_profile_shift;
-use crate::contact::{efficiency, ContactPath, Directional, Drive, LoadSharing};
+use crate::contact::{efficiency, ContactPath, Directional, LoadSharing};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
@@ -676,17 +676,17 @@ pub fn solve_spur_stage_with(
     // Reported by direction rather than by member: the output of a forward
     // drive is gear 2, of a backward drive gear 1, and the same gap subtends a
     // different angle at each.
-    let backlash = Directional::of(|d| {
-        let at = match d {
-            Drive::Forward => MeshSide::Second,
-            Drive::Backward => MeshSide::First,
-        };
-        Backlash {
-            nominal: angular(centre, at),
-            minimum: angular(centre - stage.tolerance_minus, at),
-            maximum: angular(centre + stage.tolerance_plus, at),
-        }
-    });
+    // **Per member, which is what the gap is.** A mesh has one gap and two ends
+    // to see it from; which end is the *output* is a question about the drive,
+    // and `MeshReport::backlash_by_drive` is the one place that turns the first
+    // reading into the second. It used to be a `match` from `Drive` to
+    // `MeshSide` written out here as well.
+    let at_member = |at: MeshSide| Backlash {
+        nominal: angular(centre, at),
+        minimum: angular(centre - stage.tolerance_minus, at),
+        maximum: angular(centre + stage.tolerance_plus, at),
+    };
+    let backlash = [at_member(MeshSide::First), at_member(MeshSide::Second)];
 
     if stage.additional_helix != 0.0 && !contact_ratios.has_full_axial_overlap() {
         notes.push(Note::new(key::STAGE_OVERLAP_BELOW_ONE).number(
@@ -713,25 +713,31 @@ pub fn solve_spur_stage_with(
         ratio: f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth),
         centre_distance_nominal: mesh.a_w,
         centre_distance: centre,
-        operating_pressure_angle: mesh.alpha_w.to_degrees(),
         clearance,
-        contact_ratios,
-        contact_stress_at_pitch_point: LoadCase {
-            peak: rated.peak.0.at_pitch_point,
-            cyclic: rated.cyclic.0.at_pitch_point,
+        mesh: MeshReport {
+            operating_pressure_angle: mesh.alpha_w.to_degrees(),
+            coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
+            contact_ratios,
+            // Breaking away is decided at rest, running is decided sliding —
+            // one rule, applied to every stage kind (`Directional::once_moving`).
+            // A parallel-axis mesh is never near the threshold, so this passes
+            // the sliding figure through and always will; it is here so there is
+            // no stage kind the rule has to be remembered for.
+            efficiency: {
+                let with =
+                    |mu: f64| Directional::of(|d| efficiency(&path, &operating, &g[0], mu, d));
+                with(stage.sliding_friction).once_moving(&with(stage.static_friction))
+            },
+            contact_stress_at_pitch_point: LoadCase {
+                peak: rated.peak.0.at_pitch_point,
+                cyclic: rated.cyclic.0.at_pitch_point,
+            },
+            relative_radius: rated.peak.0.relative_radius,
+            // Per member, in the order the mesh was built — which
+            // `MeshReport::backlash_by_drive` is the one place that turns into
+            // the per-direction reading a stage reports.
+            backlash,
         },
-        relative_radius: rated.peak.0.relative_radius,
-        // Breaking away is decided at rest, running is decided sliding — one
-        // rule, applied to every stage kind (`Directional::once_moving`). A
-        // parallel-axis mesh is never near the threshold, so this passes the
-        // sliding figure through and always will; it is here so there is no
-        // stage kind the rule has to be remembered for.
-        efficiency: {
-            let with = |mu: f64| Directional::of(|d| efficiency(&path, &operating, &g[0], mu, d));
-            with(stage.sliding_friction).once_moving(&with(stage.static_friction))
-        },
-        backlash,
-        coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
         gears: [gears[0].clone(), gears[1].clone()],
         notes,
     })

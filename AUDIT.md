@@ -41,9 +41,10 @@ against a broken tree is recorded here as `written, not proven`.
 **Phase 0 — build the instrument.** Done, gate run and passed.
 **Phase 1 — truth-up the documents.** Done, gate run and passed.
 **Phase 2 — the number ledger.** Done. Four findings, three of them bugs.
-**Phase 3 — unify what is written twice.** In progress: F3 and F4 closed, and
-F30 fell out of F3. **F2 (the worm member) is the next unit**, and F32 is
-blocked on it.
+**Phase 3 — unify what is written twice.** In progress. F2, F3, F4, F32, F33,
+F34 and F36 closed; F30 fell out of F3 and F33 out of F2. What remains is the
+rest of protocol pass 3 — the *mesh* and *stage* halves of the walk, the member
+half now being `StageResult::members()`.
 
 | Phase | What it does | State |
 |---|---|---|
@@ -148,6 +149,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F32 | `StageResult` has no kind-independent `members()` | gap | 3 | **closed** |
 | F34 | `Widths::contact` was not optional, so "no rating sizes this face" had no way to be said | gap | 3 | **closed** |
 | F35 | A planetary's member torques carry a forward efficiency; whether a backward load should is unexamined | gap | 5 | open |
+| F36 | `SpurResult` re-declared `MeshReport`'s seven fields, and the panel re-drew them | gap | 3 | **closed** |
 | F33 | A crossed pair's members said nothing about their own teeth | gap | 3 | **closed** — and logged in `corrections.md` |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
@@ -438,6 +440,50 @@ answered "no". Nothing measures it.
 first-class without claiming a worm's are gears, and the `Option` is the same
 "a question that cannot be put to this member" the crate already expresses with
 `bending_stress: LoadCase<Option<f64>>`.
+
+---
+
+## Protocol pass 3 — scoping by the output
+
+Run mechanically rather than by reading: every result type's fields extracted,
+then grouped by name to find the ones more than one type declares. Two clusters
+came out.
+
+**`SpurResult` re-declared all seven of `MeshReport`'s fields (F36).** The type
+named for what a parallel-axis mesh reports was used by the planetary, hula and
+screw kinds and **not** by the parallel-axis stage. The front end had the same
+split, and worse: a `meshRows` snippet for the kinds that carry a `MeshReport`,
+and the same rows hand-written again for this one — which had drifted, since the
+snippet warns on a transverse contact ratio below one and the copy did not.
+
+Closed by giving `SpurResult` a `mesh: MeshReport` and the panel a call to
+`meshRows`. Two things fell out:
+
+- **A spur pair's efficiency and backlash *are* its mesh's** — one mesh, no
+  carrier — so they are read through it rather than stored twice, and
+  `StageResult::efficiency` is where the kinds are made to agree about which
+  level is being asked for.
+- **The two backlash shapes met.** A mesh reports the gap per *member*
+  (`[Backlash; 2]`); a stage reports it per *drive direction*. Two indexings of
+  two numbers, and the mapping was written out in the spur solver as a `match`
+  from `Drive` to `MeshSide`. It is `MeshReport::backlash_by_drive` now, in one
+  place.
+
+**`WormMemberResult` duplicates six of `GearResult`'s fields** — torque,
+back-driving torque, speed, cycles, face width, material. That one is **left**,
+and deliberately: those six are what a worm's members have, and a worm's `gear`
+is `None`, so they cannot move inside it. For a crossed pair they exist twice and
+agree by construction, the inner being built from the outer. It is the price of
+option B and is recorded rather than fixed.
+
+Everything else the grouping found — `ratio`, `efficiency`, `backlash`,
+`centre_distance`, `clearance`, `notes` on each stage result — is each kind
+computing its own, already unified at the *reading* end by `StageResult`'s
+accessors. That is the intended shape, not duplication.
+
+**Still to do:** the mesh and stage halves of the walk — every field of every
+result traced back to the expression that produced it, rather than grouped by
+name. The member half is `StageResult::members()` and is done.
 
 ---
 

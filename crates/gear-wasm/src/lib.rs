@@ -2265,7 +2265,7 @@ mod tests {
         assert!((g0["speed"].as_f64().unwrap() - 3000.0).abs() < 1e-9);
         // Spur stage: the overlap ratio is exactly zero, not merely small.
         assert_eq!(
-            v["stages"][0]["contact_ratios"]["overlap"]
+            v["stages"][0]["mesh"]["contact_ratios"]["overlap"]
                 .as_f64()
                 .unwrap(),
             0.0
