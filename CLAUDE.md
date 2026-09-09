@@ -4,12 +4,16 @@ A **map**, not a summary. The four documents in `docs/` say what the tool
 computes, why, what was once wrong and what is built; this says where things are
 and what it costs to change them.
 
-It exists because the project is 13,700 lines of code carrying 10,300 lines of
-comment, alongside 9,300 lines of standalone document — **prose outweighs code
-about 1.5 to 1**. That ratio is the reason the model decisions here are auditable
-and it is not a target to reduce. What it does mean is that finding the right
-file matters more here than in most codebases, and until this file existed there
-was no way to do it but read the crate.
+It exists because the project is about 14,000 lines of code carrying 10,700
+lines of comment, alongside 5,100 lines of standalone document — **prose
+outweighs code a little over 1 to 1**. That ratio is the reason the model
+decisions here are auditable and it is not a target to reduce. What it does mean
+is that finding the right file matters more here than in most codebases, and
+until this file existed there was no way to do it but read the crate.
+
+*(The first version of this paragraph said 1.5 to 1, having counted
+`docs/history/`, which is the **superseded** design record that nothing points
+at. A ratio quoted from a `wc` over a glob is a figure like any other.)*
 
 > An audit is in progress. [`AUDIT.md`](AUDIT.md) carries its state, its
 > findings and what has been decided. Read it before starting work, and delete
@@ -123,7 +127,7 @@ string catalogues is what five languages costs.
 
 ## Which check catches what
 
-Seven checks in five different ways. `nix flake check` is **not** all of them.
+Eleven checks in six different ways. `nix flake check` is **not** all of them.
 
 | Run | Catches | In CI |
 |---|---|---|
@@ -135,8 +139,8 @@ Seven checks in five different ways. `nix flake check` is **not** all of them.
 | `tools/check_bindings.sh` | `web/src/wire` still matches the Rust it is generated from | yes |
 | `tools/check_doc_links.py` | every pointer into the documents resolves, both from code and between documents | yes |
 | `tools/check_strings.py` | every `ui.` message is used and every use has a message | yes |
-| `tools/check_golden.sh` | **any number the harness prints that moved.** A change detector, not a correctness gate: a diff is a question | not yet |
-| `tools/check_figures.py` | every figure the documents print is one the code still prints | not yet |
+| `tools/check_golden.sh` | **any number the harness prints that moved.** A change detector, not a correctness gate: a diff is a question | yes |
+| `tools/check_figures.py` | every figure the documents print is one the code still prints | yes |
 | `python3 tools/validate_dxf.py` | an export read back by a parser that shares no code with the writer | yes |
 | `tools/worm_flank_curvature.py` · `crossed_path.py` · `hula_kinematics.py` · `iso_6336_3_stack.py` | the crate against derivations that share no code with it | no — by hand |
 

@@ -28,6 +28,18 @@ project cheaper to work on without spending the prose that makes it auditable.
 3. Run the checks in [`CLAUDE.md`](CLAUDE.md) to confirm the tree is where this
    file says it is. If they disagree, this file is wrong — fix it first.
 
+**Two rules arrived after the plan was written**, and both are now in
+`docs/rationale.md` rather than only here, because they govern the tool and not
+just this audit:
+
+- **A geartrain has no forward** — the reverse is the same construction with the
+  roles swapped, asserted rather than written. It is protocol pass 8, and it
+  found two bugs in four sites.
+- **A centre distance is the true distance and a clearance is what portion of it
+  is clearance** — two relations in three unknowns, so any two of {distance,
+  clearance, shifts} are given and the third follows. Fully stated below; one
+  part done, the rest scheduled as F39.
+
 Every phase carries a **gate**, and a phase is not done until its gate has been
 run *against the fault it is meant to catch*. That is this project's own rule
 (`docs/corrections.md`, "A check built from the thing under test measures
@@ -41,9 +53,10 @@ against a broken tree is recorded here as `written, not proven`.
 **Phase 0 — build the instrument.** Done, gate run and passed.
 **Phase 1 — truth-up the documents.** Done, gate run and passed.
 **Phase 2 — the number ledger.** Done. Four findings, three of them bugs.
-**Phase 3 — unify what is written twice.** Done. F2, F3, F4, F32, F33, F34,
-F36, F37, F38 and F40 closed, and four of them were bugs.
-**Phase 4 — the optimiser.** Next, and it carries F19 and F1's second half.
+**Phase 3 — unify what is written twice.** Done, with pass 8 folded in. F2, F3,
+F4, F31, F32, F33, F34, F35, F36, F37, F38, F40 and F41 closed — **six of them
+bugs** (F30, F33, F35, F37, F38, F41).
+**Phase 4 — the optimiser.** Next. The brief is below.
 
 | Phase | What it does | State |
 |---|---|---|
@@ -525,6 +538,65 @@ that build one.
 (F30, F33, F37, F38) and one a claim in the documents that was false of the code
 (F2). The golden corpus is unchanged across all of it except where a change was
 the point.
+
+---
+
+## Phase 4 — the brief, written to be picked up cold
+
+**Q3 was answered "attempt the closed form".** What that means concretely:
+
+### What is there now
+
+`auto::maximise` (`crates/gear-core/src/auto.rs`) is the crate's only optimiser:
+a bounded box sweep followed by a multi-start pattern walk, carrying six tuned
+numbers — `SPAN` 3.0, `SCAN` 6, `RESOLUTION` 1e-3, `BUDGET` 220, `STARTS` 2, and
+a first step of `spacing/8`. Every stage that chooses profile shifts for
+efficiency calls it. `docs/rationale.md#where-closed-form-is-impossible` names it
+as the tenth item beside the nine bracketed solves, which Phase 1 added.
+
+### The two steps, in order
+
+1. **Assert the convergence claim.** A comment in `auto.rs` says that raising
+   the sweep, the starts, the budget and the resolution together — some fourteen
+   times the work — moves the pair's answer not at all to eight decimals, the
+   set's by 2e-7 and the hula stage's by 4e-5. **Nothing asserts it.** A
+   slow-tier test that re-runs the documented tables at that budget and asserts
+   those bounds converts the argument into a gate, and stands on its own
+   whatever step 2 finds.
+2. **Attempt the closed form.** Half of the problem already has one: at a fixed
+   shift *sum*, the stationary condition for the **division** is derived and
+   solved directly (`efficient_split`, and
+   `docs/reference.md#efficiency-parallel-axes` states it). What the search is
+   left doing is the **sum** — and every row of every table this project prints
+   reports the sum landing *against a constraint* rather than at a stationary
+   point.
+
+   So the question to settle is: **is the loss monotone in the shift sum up to
+   whichever constraint binds first?** If it is, the sum becomes a
+   one-dimensional bracketed search against the active bound, the crate has no
+   optimiser left, and six tuned numbers go with it.
+
+### What the acceptance has to be
+
+- **Identical answers on every documented table**, to the digits the document
+  prints. The tables are in `docs/reference.md#the-hula-stage` and
+  `#efficiency-parallel-axes`; two of them are gated by
+  `the_documented_tables_are_the_ones_this_code_prints` and one by
+  `tools/check_figures.py`.
+- **The golden corpus unchanged**, or every moved figure explained.
+- **F19 closed on the way.** Five tables in `reference.md` still have no command
+  that reproduces them (`:360`, `:1435`, `:1455`, `:1550`, `:1567`), and all five
+  are `maximise`'s answers. They were deferred to this phase precisely because
+  any command written for them before the search changes would be written twice.
+
+### The trap to expect
+
+The bounds are what the answer sits on, so **a change to the search is a change
+to which bound binds**. `docs/rationale.md#an-input-limit-means-could-this-gear-exist`
+and Q4's caveat both bear on this: widening a guard moves the returned answer
+even though it admits no new shape a designer would type. If the closed form
+lands the answer somewhere new, check whether it is a better optimum or a
+different constraint before believing it.
 
 ---
 
