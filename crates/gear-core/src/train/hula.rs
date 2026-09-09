@@ -38,7 +38,6 @@
 use super::{
     GearResult, LoadCase, Loading, MemberRating, MeshReport, StageTorques, TrainError, PROBE,
 };
-use crate::auto::admissible_ranges;
 use crate::contact::{efficiency, ContactPath, Directional, Drive};
 use crate::hula::{self, Offset, Split, Teeth};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
@@ -1033,30 +1032,23 @@ pub fn solve_hula_stage_with(
                 member_notes.extend(input.addendum_asked(&params).warning(teeth.0[i]));
             }
 
-            let gear = GearResult {
+            let gear = GearResult::of(super::MemberFacts {
                 profile_shift: layout.shift[i],
-                addendum: params.addendum,
+                params: &params,
+                input,
+                rated,
                 face_width: widths[slot],
                 torque,
-                back_driving_torque: torques
-                    .peak_backward
-                    .map(|t| torque * (t.abs() / input_torque.abs().max(f64::MIN_POSITIVE))),
+                back_driving_torque: torques.referred_like(torque),
                 speed: speed(i),
-                // Filled by `set_kinematics`, which is the only level that knows
-                // the duty cycle.
-                tooth_cycles: super::Cycles::default(),
-                bending_stress: rated.bending_stress,
-                contact_stress: rated.contact_stress,
-                min_face_width: rated.min_face_width,
+                material: materials[i].clone(),
                 clamps: if is_ring {
                     p.ring.clamps.clone()
                 } else {
                     p.pinion.clamps.notes.clone()
                 },
                 notes: member_notes,
-                material: materials[i].clone(),
-                ranges: admissible_ranges(&params, input.working_depth.resolve(input.dedendum)),
-            };
+            });
             gears[i] = Some(HulaGear {
                 teeth: teeth.0[i],
                 ring: is_ring,

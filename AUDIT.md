@@ -41,14 +41,16 @@ against a broken tree is recorded here as `written, not proven`.
 **Phase 0 — build the instrument.** Done, gate run and passed.
 **Phase 1 — truth-up the documents.** Done, gate run and passed.
 **Phase 2 — the number ledger.** Done. Four findings, three of them bugs.
-**Phase 3 — unify what is written twice.** Next.
+**Phase 3 — unify what is written twice.** In progress: F3 and F4 closed, and
+F30 fell out of F3. **F2 (the worm member) is the next unit**, and F32 is
+blocked on it.
 
 | Phase | What it does | State |
 |---|---|---|
 | 0 | Golden corpus, figure provenance, `CLAUDE.md` | **done** — gate proven |
 | 1 | Truth-up the documents against the code | **done** — gate proven |
 | 2 | The number ledger | **done** — gates proven |
-| 3 | Unify what is written twice | **next** |
+| 3 | Unify what is written twice | **in progress** |
 | 4 | The optimiser | not started |
 | 5 | Consolidate the tests | not started |
 | 6 | Front end and payload | not started |
@@ -62,7 +64,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 539 tests** (was 531; the new ones hold F8, F23, F25, F27 and F28).
+**Suite: 540 tests** (was 531; the new ones hold F8, F23, F25, F27, F28 and F30).
 
 ---
 
@@ -114,8 +116,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 |---|---|---|---|---|
 | F1 | The crate has one optimiser and the solve inventory omits it | gap | 1, 4 | **half closed** — inventory names it; the closed form is Phase 4 |
 | F2 | The worm stage is outside the shared member vocabulary | gap | 3 | open |
-| F3 | `GearResult` assembled three times, one field by two formulas | gap | 3 | open |
-| F4 | `StageGear` — a shared input type — lives in `train/spur.rs` | drift | 3 | open |
+| F3 | `GearResult` assembled three times, one field by two formulas | gap | 3 | **closed** — one `GearResult::of`, and the shared rule is `StageTorques::referred_like` |
+| F4 | `StageGear` — a shared input type — lives in `train/spur.rs` | drift | 3 | **closed** — moved, with its `Default`, `AddendumAsked` and serde helpers; `spur.rs` 1017 → 730 lines |
 | F5 | No ledger of the numbers that are not model constants | gap | 2 | **closed** |
 | F6 | The face-width invariance test runs a model the tool does not ship | gap | 5 | open |
 | F7 | ~212 documented figures, one gate | gap | 0 | **part closed** — mechanism built; 5 tables still ungated (F19) |
@@ -141,6 +143,9 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F27 | `SEVER_SCAN_SAMPLES` could not resolve what it looked for | gap | 2 | **closed** — the scan became a solve |
 | F28 | A search bound acted as a design limit on the eccentric throw | gap | 2 | **closed** — the bound is now the buildable one |
 | F29 | The golden corpus was written from a stale binary and the check caught it | holds | — | **closed** — see Phase 2 notes |
+| F30 | A self-locking worm's wheel reported 2.2e307 N·m | gap | 3 | **closed** — and logged in `corrections.md` |
+| F31 | No CLI train sets a back-driving load, so the corpus never exercises one | gap | 3 | open |
+| F32 | `StageResult` has no kind-independent `members()` | gap | 3 | open — blocked on F2 |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so

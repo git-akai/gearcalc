@@ -30,10 +30,9 @@
 //! coefficient, and a designer who needs the derating can apply it knowingly.
 
 use super::{
-    Backlash, Case, ContactRatios, Cycles, GearResult, LoadCase, Loading, MemberRating, MeshReport,
+    Backlash, Case, ContactRatios, GearResult, LoadCase, Loading, MemberRating, MeshReport,
     StageTorques, TrainError, Widths, PROBE,
 };
-use crate::auto::admissible_ranges;
 use crate::contact::{efficiency, ContactPath, Directional};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
@@ -1104,28 +1103,19 @@ pub fn solve_planetary_stage_with(
         // square-root in it — so the peak and cyclic figures are the same
         // expression evaluated at the two scales rather than a second solve.
         // Which is what `MemberRating` is, for every stage kind at once.
-        let rated = rating(which, sp_width, pr_width).rated();
-        GearResult {
+        GearResult::of(super::MemberFacts {
             profile_shift: params.profile_shift,
-            addendum: params.addendum,
+            params,
+            input,
+            rated: rating(which, sp_width, pr_width).rated(),
             face_width: widths[which],
             torque,
-            back_driving_torque: torques
-                .peak_backward
-                .map(|t| torque * (t.abs() / torques.peak_forward.abs().max(f64::MIN_POSITIVE))),
+            back_driving_torque: torques.referred_like(torque),
             speed,
-            tooth_cycles: Cycles {
-                bending: 0.0,
-                contact: 0.0,
-            },
-            bending_stress: rated.bending_stress,
-            contact_stress: rated.contact_stress,
-            min_face_width: rated.min_face_width,
+            material: mats[which].clone(),
             clamps,
             notes,
-            material: mats[which].clone(),
-            ranges: admissible_ranges(params, input.working_depth.resolve(input.dedendum)),
-        }
+        })
     };
 
     // **The planet's own rotation**, from the kinematics rather than from the

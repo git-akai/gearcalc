@@ -24,11 +24,13 @@
 //!   derived, because a meshing pair must sum to 2. The invariant is unwritable
 //!   rather than merely tested.
 
-use crate::auto::Ranges;
+use crate::auto::{addendum_for_tip_width, automatic_profile_shift, Ranges};
 use crate::contact::{Directional, Drive};
-use crate::material::{Material, MaterialLibrary};
+use crate::material::{Material, MaterialLibrary, Overrides};
 use crate::mesh::MeshError;
 use crate::note::{key, Note};
+use crate::params::{Auto, GearParams};
+use crate::tooth::Tooth;
 
 mod hula;
 mod planetary;
@@ -43,7 +45,7 @@ pub use planetary::{
     solve_planetary_stage, solve_planetary_stage_with, PlanetResult, PlanetaryResult,
     PlanetaryStage,
 };
-pub use spur::{solve_spur_stage, solve_spur_stage_with, SpurStage, StageGear};
+pub use spur::{solve_spur_stage, solve_spur_stage_with, SpurStage};
 pub(crate) use spur::{undercut_bound, Decided, ShiftAsked};
 pub use worm::{
     solve_crossed_stage, solve_worm_stage, FirstMemberSizing, WormContact, WormMember,
@@ -484,6 +486,278 @@ impl MemberRating<'_> {
     }
 }
 
+/// **What a gear's addendum comes to**, once its bound has had its say.
+///
+/// The same shape as [`ShiftAsked`] and for the same reason: two stages were
+/// working it out for themselves, in the same four lines, and the answer has
+/// two halves — the number to build with, and whether it is the number that was
+/// asked for.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct AddendumAsked {
+    /// The coefficient to build with, in modules.
+    pub used: f64,
+    /// Whether the bound cut it down, and so whether the tooth is the one that
+    /// was asked for.
+    pub clamped: bool,
+}
+impl AddendumAsked {
+    /// The note a clamped addendum owes its reader, if it was clamped.
+    pub(crate) fn note(&self, teeth: u32) -> Option<crate::note::Note> {
+        self.clamped.then(|| {
+            crate::note::Note::new(crate::note::key::STAGE_ADDENDUM_HELD_TO_TIP_WIDTH)
+                .count("teeth", teeth)
+                .number("addendum", self.used, 4)
+        })
+    }
+
+    /// **The same finding where the stage cannot act on it**, which is a report
+    /// rather than a clamp.
+    ///
+    /// A hula stage solves its crank offset from a gap written in the
+    /// tips, in closed form with an analytic derivative. An addendum that moved
+    /// with the shift — which moves with the offset — would put a tip-width
+    /// solve inside that root-find and take the derivative away with it. Not
+    /// every bound an input creates needs a solver behind it: this one says
+    /// what the tooth would have to be and leaves the number alone.
+    pub(crate) fn warning(&self, teeth: u32) -> Option<crate::note::Note> {
+        self.clamped.then(|| {
+            crate::note::Note::new(crate::note::key::STAGE_ADDENDUM_ABOVE_TIP_WIDTH)
+                .count("teeth", teeth)
+                .number("addendum", self.used, 4)
+        })
+    }
+}
+
+/// A shift clears undercut unless it is told not to — and a document written
+/// before the question was asked separately meant exactly that.
+#[cfg(feature = "serde")]
+const fn yes() -> bool {
+    true
+}
+/// A coefficient that used to be an `Auto` and is now a number.
+///
+/// Read either shape: a document written before the addendum's bound was split
+/// from its value holds `{ auto, manual }`, and the number it meant is the
+/// `manual` one — with `auto` on, it meant "and hold it to the tip width",
+/// which [`StageGear::no_sharp_tip`] says now and defaults to.
+#[cfg(feature = "serde")]
+fn coefficient<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
+    #[derive(serde::Deserialize)]
+    #[serde(untagged)]
+    enum Either {
+        Number(f64),
+        WasAuto { manual: f64 },
+    }
+    Ok(match <Either as serde::Deserialize>::deserialize(d)? {
+        Either::Number(v) | Either::WasAuto { manual: v } => v,
+    })
+}
+
+// -------------------------------------------------- the shared member ---
+//
+// `StageGear` is what *every* stage kind describes a member with, so it lives
+// here with the rest of the shared vocabulary rather than in the kind that
+// happened to need it first. It was declared in `spur.rs` and re-exported from
+// this module, which read as though the parallel-axis stage owned it — and this
+// module's own comment says it holds "what every stage kind shares".
+
+/// One gear of a stage.
+///
+/// Note what is *absent*: module, pressure angle and helix angle live on the
+/// stage, because they are shared.
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct StageGear {
+    pub teeth: u32,
+    /// The shift, and who decides it: **automatic means the stage does**, not
+    /// that undercut does. What it resolves to when nothing else constrains it
+    /// is [`StageGear::no_undercut`]'s business.
+    pub profile_shift: Auto<f64>,
+    /// **The shift may not go below the least that clears undercut.**
+    ///
+    /// A constraint rather than a source, which is what lets it combine with
+    /// everything else: it bounds a shift a designer typed, a shift the stage
+    /// solved from a centre distance or a crank offset, and a shift the
+    /// efficiency search chose, all in the same words.
+    ///
+    /// The bound is the **true** minimum from [`minimum_profile_shift`], which
+    /// on a comfortable tooth count is negative — so a deliberate negative
+    /// shift is left alone and only a genuinely undercut one is raised. That is
+    /// deliberate: negative shift is a decision about centre distance or
+    /// balance, and this is a question about undercut. Where the *stage* is
+    /// choosing and nothing else decides, the answer is instead
+    /// [`automatic_profile_shift`] — the same bound taken no lower than zero,
+    /// because a shift chosen for no reason should not thin a tooth that needed
+    /// no help.
+    ///
+    /// Off, the gear may undercut, and the searches stop asking
+    /// ([`crate::auto::member_is_buildable`]).
+    ///
+    /// **Meaningless on a ring**, whose flank is its shaper's rather than a
+    /// rack's, and which is never asked — see `member_is_buildable`.
+    #[cfg_attr(feature = "serde", serde(default = "yes"))]
+    pub no_undercut: bool,
+    /// Depth, in modules, at which the undercut question is asked.
+    ///
+    /// **Automatic is the gear's own dedendum**, which makes this ask the same
+    /// question the profile generator answers: *is the flank undercut at all?*
+    /// A fixed 1 module — the classical rule, and what this used to default to —
+    /// asks a narrower one, *is it undercut within a module of depth?*, and the
+    /// two have different answers: at α = 20° with a sharp rack they part at 18
+    /// teeth and 22 (docs/reference.md#automatic-values). Following the dedendum rather than naming a number
+    /// also means a gear cut shallower is asked about the depth it actually has.
+    pub working_depth: Auto<f64>,
+    /// Addendum coefficient, in modules, as asked for.
+    ///
+    /// Plain, because the only thing an automatic addendum ever computed was
+    /// the tallest tooth that keeps a tip [`Self::min_tip_width`] wide — which
+    /// is a **bound on the number**, not a source for it, and now says so.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "coefficient"))]
+    pub addendum: f64,
+    /// **The tooth may not be taller than its tip is wide.**
+    ///
+    /// The same shape as [`Self::no_undercut`], on the other end of the tooth:
+    /// a constraint the number answers to however it arrived, rather than a
+    /// mode the number is only read in. It was the latter, and so
+    /// `min_tip_width` went unread on every addendum a designer typed — a
+    /// tooth could come to a point and nothing said so.
+    ///
+    /// Off, the addendum stands as asked and the tip is whatever it is.
+    #[cfg_attr(feature = "serde", serde(default = "yes"))]
+    pub no_sharp_tip: bool,
+    /// Minimum transverse tooth tip width, mm.
+    pub min_tip_width: f64,
+    pub dedendum: f64,
+    pub root_radius: f64,
+    /// Automatic takes the larger of the enabled minimums below.
+    pub face_width: Auto<f64>,
+    /// Which of the four ratings an automatic face width is sized from.
+    pub face_sources: FaceSources,
+    /// **Thickness of the rim under this member's teeth, mm** — `s_R`, and with
+    /// it the rim thickness factor `Y_B` (ISO 6336-3:2019, Clause 9).
+    ///
+    /// `None` is the default and means *nobody said*, which is not the same
+    /// claim as a thick rim even though both rate at `Y_B = 1`: a gear whose rim
+    /// was never described cannot be told it is too thin, and one that was can.
+    /// Given, it de-rates the root — a thin rim moves the failure out of the
+    /// fillet and through the rim — and never relieves it.
+    ///
+    /// Measured against the whole tooth depth on a rack-cut member and against
+    /// the normal module on a ring, which is the clause's own distinction and
+    /// the only one: see [`RimSupport`](crate::strength::RimSupport).
+    ///
+    /// It reaches bending alone. A rim under the teeth has nothing to do with
+    /// the pressure between two flanks, so no contact rating reads it.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub rim_thickness: Option<f64>,
+    /// Name of a material in the library.
+    pub material: String,
+    /// Properties replaced for this gear only. Empty means "as the library
+    /// says" — see [`Overrides`].
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub material_overrides: Overrides,
+}
+
+impl StageGear {
+    /// **The addendum this gear builds at**, at a given shift.
+    ///
+    /// The bound is an upper one — a taller tooth is a sharper tooth — so the
+    /// answer is the smaller of what was asked and what the tip width allows.
+    /// It depends on the shift, which is why it is asked per built tooth rather
+    /// than once per gear.
+    ///
+    /// A tooth already thinner than `min_tip_width` at its base circle has no
+    /// admissible addendum at all ([`addendum_for_tip_width`] returns `None`);
+    /// there is nothing to clamp to, so the number stands and the tooth's own
+    /// `pointed` reporting is what says it is wrong.
+    pub(crate) fn addendum_asked(&self, at_shift: &crate::params::GearParams) -> AddendumAsked {
+        let asked = self.addendum;
+        if !self.no_sharp_tip {
+            return AddendumAsked {
+                used: asked,
+                clamped: false,
+            };
+        }
+        let ceiling = addendum_for_tip_width(
+            &Tooth::new(GearParams {
+                addendum: asked,
+                ..*at_shift
+            }),
+            self.min_tip_width,
+        );
+        let used = ceiling.map_or(asked, |c| asked.min(c));
+        AddendumAsked {
+            used,
+            clamped: used < asked - 1e-12,
+        }
+    }
+
+    /// [`ShiftAsked`], for this gear at its own working depth.
+    pub(crate) fn shift_asked(&self, base: &crate::params::GearParams) -> ShiftAsked {
+        let depth = self.working_depth.resolve(self.dedendum);
+        if !self.no_undercut {
+            // Nothing asked of the shift. Given, it is taken as typed; left to
+            // the stage with no objective either, there is no reason to move
+            // the tooth at all.
+            let given = (!self.profile_shift.auto).then_some(self.profile_shift.manual);
+            return ShiftAsked {
+                search_floor: None,
+                given,
+                settled: given.unwrap_or(0.0),
+                raised: false,
+            };
+        }
+        if self.profile_shift.auto {
+            let floor = automatic_profile_shift(base, depth);
+            return ShiftAsked {
+                search_floor: Some(floor),
+                given: None,
+                settled: floor,
+                raised: false,
+            };
+        }
+        // Given, and held to the true minimum rather than to the search's — a
+        // negative shift somebody meant is not an undercut one. Nothing is
+        // choosing it, so it carries no search bound.
+        let typed = self.profile_shift.manual;
+        let used = typed.max(crate::auto::minimum_profile_shift(base, depth).with_cutter_radius);
+        ShiftAsked {
+            search_floor: None,
+            given: Some(used),
+            settled: used,
+            raised: used > typed,
+        }
+    }
+}
+
+impl Default for StageGear {
+    fn default() -> Self {
+        Self {
+            teeth: 17,
+            profile_shift: Auto::automatic(0.0),
+            no_undercut: true,
+            working_depth: Auto::automatic(1.0),
+            addendum: 1.0,
+            no_sharp_tip: true,
+            min_tip_width: 0.1,
+            dedendum: 1.25,
+            root_radius: 0.38,
+            face_width: Auto::fixed(10.0),
+            face_sources: FaceSources::default(),
+            // A rim nobody described: `Y_B` is 1, and the gear cannot be told
+            // its rim is thin because it has not said what its rim is.
+            rim_thickness: None,
+            material: "4340 Hardened Steel".to_string(),
+            material_overrides: Overrides::default(),
+        }
+    }
+}
+
 /// What a stage does to one of its gears.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -557,7 +831,82 @@ pub struct GearResult {
     pub ranges: Ranges,
 }
 
+/// The facts a stage has about one of its members, gathered so that assembling
+/// a [`GearResult`] is one expression rather than one per stage kind.
+///
+/// # Why this exists
+///
+/// Three kinds built a `GearResult` field by field, listing the same seventeen
+/// names each time. Sixteen agreed. The seventeenth did not: `back_driving_torque`
+/// was the mesh projection of the backward torque in the spur stage and this
+/// gear's forward torque scaled by `|t| / |forward|` in the other two — the same
+/// number wherever the projection is linear, which it is, **except in sign**.
+/// A stage with a negative ratio gave a signed figure from one kind and a
+/// magnitude from another, for the field beside `torque`, which is signed.
+///
+/// That is the fault `docs/corrections.md` opens with: a duplicated formula is a
+/// place where two answers can differ, and nothing compared these two.
+pub(crate) struct MemberFacts<'a> {
+    /// The shift in force — which for a hula gear is the layout's, not the
+    /// parameters', so it is given rather than read.
+    pub profile_shift: f64,
+    pub params: &'a GearParams,
+    pub input: &'a StageGear,
+    pub rated: Rated,
+    /// The width this member is *rated at*, which is its mesh's rather than its
+    /// own ([`Widths`]).
+    pub face_width: f64,
+    /// Driving forward, at peak.
+    pub torque: f64,
+    /// Filled here where the stage knows it, and by [`TrainResult`] where the
+    /// shaft line does. A planet's is neither its carrier's nor its sun's.
+    pub speed: f64,
+    /// This member's share of a back-driving load, if one is reacted here.
+    ///
+    /// **Given rather than derived**, and that is the finding. Three kinds
+    /// referred the load by scaling this member's *forward* torque
+    /// ([`StageTorques::referred_like`]), which is exact wherever the forward
+    /// torque is a geometric projection or the two directional efficiencies
+    /// agree — true of every parallel-axis kind. A worm stage is neither: its
+    /// wheel's forward torque carries a forward efficiency of 62 % that a
+    /// backward load does not share, and its backward efficiency is zero. So it
+    /// supplies its own, and the constructor holds no formula that a kind could
+    /// need to disagree with.
+    pub back_driving_torque: Option<f64>,
+    pub material: Material,
+    pub clamps: Vec<Note>,
+    pub notes: Vec<Note>,
+}
+
 impl GearResult {
+    /// One member's result, from what the stage knows about it.
+    ///
+    /// Every stage kind comes through here, so a field cannot be filled two ways
+    /// — see [`MemberFacts`] for the one that was.
+    pub(crate) fn of(f: MemberFacts) -> Self {
+        Self {
+            profile_shift: f.profile_shift,
+            addendum: f.params.addendum,
+            face_width: f.face_width,
+            torque: f.torque,
+            back_driving_torque: f.back_driving_torque,
+            speed: f.speed,
+            // Filled by `set_kinematics`, which is the only level that knows the
+            // duty cycle and where this gear sits in the shaft line.
+            tooth_cycles: Cycles::default(),
+            bending_stress: f.rated.bending_stress,
+            contact_stress: f.rated.contact_stress,
+            min_face_width: f.rated.min_face_width,
+            clamps: f.clamps,
+            notes: f.notes,
+            material: f.material,
+            ranges: crate::auto::admissible_ranges(
+                f.params,
+                f.input.working_depth.resolve(f.input.dedendum),
+            ),
+        }
+    }
+
     /// **Whether this is the gear that was asked for.**
     ///
     /// False where a guard moved a dimension ([`Self::clamps`]), and false where
@@ -1258,6 +1607,29 @@ impl StageTorques {
     /// Everything at one torque, and nothing back-driving — the shape a caller
     /// wants when it is asking about a single load.
     #[must_use]
+    /// A member's share of the back-driving load, referred as its forward
+    /// torque was.
+    ///
+    /// The load enters at the far end and `back_driving_torques` refers it to
+    /// **this stage's input shaft** before anything else happens to it — so
+    /// within a stage the question is only how the input shaft's torque reaches
+    /// a member, and the answer is the same path the forward torque took.
+    ///
+    /// Valid where that path is a geometric projection (a parallel-axis mesh
+    /// carries one tangential force, so `T_i = T_in · z_i/z_in` with no
+    /// efficiency in it) or where the two directional efficiencies agree — which
+    /// covers every kind whose meshes are parallel. **A worm is the exception**
+    /// and says so where it computes its own.
+    pub fn referred_like(&self, member_torque: f64) -> Option<f64> {
+        self.peak_backward.map(|t| {
+            if self.peak_forward == 0.0 {
+                0.0
+            } else {
+                member_torque * (t / self.peak_forward)
+            }
+        })
+    }
+
     pub fn just(torque: f64) -> Self {
         Self {
             peak_forward: torque,
@@ -1946,9 +2318,6 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::material::Overrides;
-    use crate::params::Auto;
-    use crate::tooth::Tooth;
 
     fn library() -> MaterialLibrary {
         super::test_library()
@@ -1964,6 +2333,61 @@ mod tests {
         match s {
             Stage::Spur(st) => st,
             _ => panic!("this train's stages are all spur"),
+        }
+    }
+
+    /// **A back-driving load is the load, wherever it is read.**
+    ///
+    /// It enters at the output and `back_driving_torques` refers it to each
+    /// stage's input shaft. So the member *on* the output shaft must report the
+    /// applied torque itself — no efficiency, because within a stage nothing has
+    /// happened to it yet; the loss is applied between stages, on the walk up.
+    ///
+    /// The worm stage divided by its own backward efficiency here, on the
+    /// reading that the mesh loses something carrying the load. It does, and
+    /// that loss was already counted. A worm's backward efficiency is **zero**
+    /// whenever it self-locks — which is the case a worm is chosen for — so the
+    /// wheel reported **2.2e307 N·m**. Finite, so it crossed as a number rather
+    /// than as the `null` an infinity becomes, and drew on screen as a figure.
+    ///
+    /// Asserted against the load rather than against 0.5, so it says the same
+    /// thing at any torque, and on a self-locking stage specifically because
+    /// that is where the old form was unbounded.
+    #[test]
+    fn a_self_locking_worm_reports_the_load_it_reacts() {
+        let lib = library();
+        for applied in [0.5_f64, 3.0, 12.5] {
+            let mut train = two_stage();
+            train.stages = vec![Stage::Worm(WormStage::default())];
+            train.back_driving_torque = applied;
+
+            let r = solve_train(&train, &lib).expect("a train that solves");
+            let w = r.stages[0].as_worm().expect("a worm stage");
+            assert!(
+                w.efficiency.backward <= 0.0,
+                "this fixture must self-lock or it does not reach the fault"
+            );
+
+            let wheel = w.members[1]
+                .back_driving_torque
+                .expect("the stage reacts the load, so its output member carries it");
+            assert!(
+                (wheel - applied).abs() < 1e-9,
+                "the wheel is on the output shaft and the load is {applied} N·m, \
+                 but it reports {wheel}"
+            );
+
+            // ...and the worm sees it referred by the ratio, which is the shaft
+            // the walk refers to.
+            let worm = w.members[0]
+                .back_driving_torque
+                .expect("likewise the input member");
+            assert!(
+                (worm * w.ratio - wheel).abs() < 1e-9,
+                "the two members disagree about one load: {worm} at the worm \
+                 against {wheel} at the wheel, on a ratio of {}",
+                w.ratio
+            );
         }
     }
 

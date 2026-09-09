@@ -959,6 +959,11 @@ pub fn solve_worm_stage(
     let members = [
         WormMemberResult {
             torque: input_torque,
+            // The input member sits on the shaft the load was referred to, so
+            // this is that figure unchanged. `StageTorques::referred_like` is
+            // deliberately **not** used on either member here: it scales a
+            // member's *forward* torque, and a worm's carries a forward
+            // efficiency of 62 % that a backward load does not share.
             back_driving_torque: torques.peak_backward,
             speed: 0.0,
             tooth_cycles: Cycles::default(),
@@ -969,12 +974,21 @@ pub fn solve_worm_stage(
         },
         WormMemberResult {
             torque: output_torque,
-            // Referred across the mesh the same way the forward torque is: the
-            // load is on the wheel, so the worm sees it divided by the ratio and
-            // by whatever the mesh loses carrying it there.
-            back_driving_torque: torques
-                .peak_backward
-                .map(|t| t * s.ratio / efficiency.backward.max(f64::MIN_POSITIVE)),
+            // **The load is on the wheel**, and `back_driving_torques` has
+            // already referred it to this stage's input shaft — so bringing it
+            // back to the output member is that referral inverted, which is the
+            // ratio and nothing else.
+            //
+            // It used to divide by the backward efficiency as well, on the
+            // reading that the mesh loses something carrying the load. It does,
+            // and that loss is applied *between* stages, where the walk
+            // multiplies by `backward` on its way up. Applying it here counted
+            // it twice — and a worm's backward efficiency is **zero** whenever
+            // the stage self-locks, which is the case a worm is chosen for. The
+            // wheel of the shipped worm stage reported **2.2e307 N·m**: finite,
+            // so it crossed the boundary as a number rather than as the `null`
+            // an infinity would have become, and drew on screen as a figure.
+            back_driving_torque: torques.peak_backward.map(|t| t * s.ratio),
             speed: 0.0,
             tooth_cycles: Cycles::default(),
             face_width: widths[1],

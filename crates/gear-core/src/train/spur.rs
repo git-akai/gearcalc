@@ -7,145 +7,17 @@
 //! the train that strings them together.
 
 use super::{
-    Backlash, Case, ContactRatios, Cycles, GearResult, LoadCase, Loading, MemberRating, SpurResult,
-    StageTorques, TrainError, PROBE,
+    Backlash, Case, ContactRatios, GearResult, LoadCase, Loading, MemberRating, SpurResult,
+    StageGear, StageTorques, TrainError, PROBE,
 };
-use crate::auto::{addendum_for_tip_width, admissible_ranges, automatic_profile_shift};
+use crate::auto::automatic_profile_shift;
 use crate::contact::{efficiency, ContactPath, Directional, Drive, LoadSharing};
-use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
+use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
 use crate::strength::{bending_stress, contact_stress, Load, RootStressModel, PARALLEL_AXES};
 use crate::tooth::Tooth;
-
-/// One gear of a stage.
-///
-/// Note what is *absent*: module, pressure angle and helix angle live on the
-/// stage, because they are shared.
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct StageGear {
-    pub teeth: u32,
-    /// The shift, and who decides it: **automatic means the stage does**, not
-    /// that undercut does. What it resolves to when nothing else constrains it
-    /// is [`StageGear::no_undercut`]'s business.
-    pub profile_shift: Auto<f64>,
-    /// **The shift may not go below the least that clears undercut.**
-    ///
-    /// A constraint rather than a source, which is what lets it combine with
-    /// everything else: it bounds a shift a designer typed, a shift the stage
-    /// solved from a centre distance or a crank offset, and a shift the
-    /// efficiency search chose, all in the same words.
-    ///
-    /// The bound is the **true** minimum from [`minimum_profile_shift`], which
-    /// on a comfortable tooth count is negative — so a deliberate negative
-    /// shift is left alone and only a genuinely undercut one is raised. That is
-    /// deliberate: negative shift is a decision about centre distance or
-    /// balance, and this is a question about undercut. Where the *stage* is
-    /// choosing and nothing else decides, the answer is instead
-    /// [`automatic_profile_shift`] — the same bound taken no lower than zero,
-    /// because a shift chosen for no reason should not thin a tooth that needed
-    /// no help.
-    ///
-    /// Off, the gear may undercut, and the searches stop asking
-    /// ([`crate::auto::member_is_buildable`]).
-    ///
-    /// **Meaningless on a ring**, whose flank is its shaper's rather than a
-    /// rack's, and which is never asked — see `member_is_buildable`.
-    #[cfg_attr(feature = "serde", serde(default = "yes"))]
-    pub no_undercut: bool,
-    /// Depth, in modules, at which the undercut question is asked.
-    ///
-    /// **Automatic is the gear's own dedendum**, which makes this ask the same
-    /// question the profile generator answers: *is the flank undercut at all?*
-    /// A fixed 1 module — the classical rule, and what this used to default to —
-    /// asks a narrower one, *is it undercut within a module of depth?*, and the
-    /// two have different answers: at α = 20° with a sharp rack they part at 18
-    /// teeth and 22 (docs/reference.md#automatic-values). Following the dedendum rather than naming a number
-    /// also means a gear cut shallower is asked about the depth it actually has.
-    pub working_depth: Auto<f64>,
-    /// Addendum coefficient, in modules, as asked for.
-    ///
-    /// Plain, because the only thing an automatic addendum ever computed was
-    /// the tallest tooth that keeps a tip [`Self::min_tip_width`] wide — which
-    /// is a **bound on the number**, not a source for it, and now says so.
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "coefficient"))]
-    pub addendum: f64,
-    /// **The tooth may not be taller than its tip is wide.**
-    ///
-    /// The same shape as [`Self::no_undercut`], on the other end of the tooth:
-    /// a constraint the number answers to however it arrived, rather than a
-    /// mode the number is only read in. It was the latter, and so
-    /// `min_tip_width` went unread on every addendum a designer typed — a
-    /// tooth could come to a point and nothing said so.
-    ///
-    /// Off, the addendum stands as asked and the tip is whatever it is.
-    #[cfg_attr(feature = "serde", serde(default = "yes"))]
-    pub no_sharp_tip: bool,
-    /// Minimum transverse tooth tip width, mm.
-    pub min_tip_width: f64,
-    pub dedendum: f64,
-    pub root_radius: f64,
-    /// Automatic takes the larger of the enabled minimums below.
-    pub face_width: Auto<f64>,
-    /// Which of the four ratings an automatic face width is sized from.
-    pub face_sources: super::FaceSources,
-    /// **Thickness of the rim under this member's teeth, mm** — `s_R`, and with
-    /// it the rim thickness factor `Y_B` (ISO 6336-3:2019, Clause 9).
-    ///
-    /// `None` is the default and means *nobody said*, which is not the same
-    /// claim as a thick rim even though both rate at `Y_B = 1`: a gear whose rim
-    /// was never described cannot be told it is too thin, and one that was can.
-    /// Given, it de-rates the root — a thin rim moves the failure out of the
-    /// fillet and through the rim — and never relieves it.
-    ///
-    /// Measured against the whole tooth depth on a rack-cut member and against
-    /// the normal module on a ring, which is the clause's own distinction and
-    /// the only one: see [`RimSupport`](crate::strength::RimSupport).
-    ///
-    /// It reaches bending alone. A rim under the teeth has nothing to do with
-    /// the pressure between two flanks, so no contact rating reads it.
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub rim_thickness: Option<f64>,
-    /// Name of a material in the library.
-    pub material: String,
-    /// Properties replaced for this gear only. Empty means "as the library
-    /// says" — see [`Overrides`].
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub material_overrides: Overrides,
-}
-
-/// A shift clears undercut unless it is told not to — and a document written
-/// before the question was asked separately meant exactly that.
-#[cfg(feature = "serde")]
-const fn yes() -> bool {
-    true
-}
-
-/// A coefficient that used to be an `Auto` and is now a number.
-///
-/// Read either shape: a document written before the addendum's bound was split
-/// from its value holds `{ auto, manual }`, and the number it meant is the
-/// `manual` one — with `auto` on, it meant "and hold it to the tip width",
-/// which [`StageGear::no_sharp_tip`] says now and defaults to.
-#[cfg(feature = "serde")]
-fn coefficient<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
-    #[derive(serde::Deserialize)]
-    #[serde(untagged)]
-    enum Either {
-        Number(f64),
-        WasAuto { manual: f64 },
-    }
-    Ok(match <Either as serde::Deserialize>::deserialize(d)? {
-        Either::Number(v) | Either::WasAuto { manual: v } => v,
-    })
-}
 
 /// **What a gear's two shift controls come to**, read once so every stage reads
 /// them the same way.
@@ -264,144 +136,6 @@ impl ShiftAsked {
                 .count("teeth", teeth)
                 .number("shift", self.settled, 4)
         })
-    }
-}
-
-/// **What a gear's addendum comes to**, once its bound has had its say.
-///
-/// The same shape as [`ShiftAsked`] and for the same reason: two stages were
-/// working it out for themselves, in the same four lines, and the answer has
-/// two halves — the number to build with, and whether it is the number that was
-/// asked for.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct AddendumAsked {
-    /// The coefficient to build with, in modules.
-    pub used: f64,
-    /// Whether the bound cut it down, and so whether the tooth is the one that
-    /// was asked for.
-    pub clamped: bool,
-}
-
-impl AddendumAsked {
-    /// The note a clamped addendum owes its reader, if it was clamped.
-    pub(crate) fn note(&self, teeth: u32) -> Option<crate::note::Note> {
-        self.clamped.then(|| {
-            crate::note::Note::new(crate::note::key::STAGE_ADDENDUM_HELD_TO_TIP_WIDTH)
-                .count("teeth", teeth)
-                .number("addendum", self.used, 4)
-        })
-    }
-
-    /// **The same finding where the stage cannot act on it**, which is a report
-    /// rather than a clamp.
-    ///
-    /// A hula stage solves its crank offset from a gap written in the
-    /// tips, in closed form with an analytic derivative. An addendum that moved
-    /// with the shift — which moves with the offset — would put a tip-width
-    /// solve inside that root-find and take the derivative away with it. Not
-    /// every bound an input creates needs a solver behind it: this one says
-    /// what the tooth would have to be and leaves the number alone.
-    pub(crate) fn warning(&self, teeth: u32) -> Option<crate::note::Note> {
-        self.clamped.then(|| {
-            crate::note::Note::new(crate::note::key::STAGE_ADDENDUM_ABOVE_TIP_WIDTH)
-                .count("teeth", teeth)
-                .number("addendum", self.used, 4)
-        })
-    }
-}
-
-impl StageGear {
-    /// **The addendum this gear builds at**, at a given shift.
-    ///
-    /// The bound is an upper one — a taller tooth is a sharper tooth — so the
-    /// answer is the smaller of what was asked and what the tip width allows.
-    /// It depends on the shift, which is why it is asked per built tooth rather
-    /// than once per gear.
-    ///
-    /// A tooth already thinner than `min_tip_width` at its base circle has no
-    /// admissible addendum at all ([`addendum_for_tip_width`] returns `None`);
-    /// there is nothing to clamp to, so the number stands and the tooth's own
-    /// `pointed` reporting is what says it is wrong.
-    pub(crate) fn addendum_asked(&self, at_shift: &crate::params::GearParams) -> AddendumAsked {
-        let asked = self.addendum;
-        if !self.no_sharp_tip {
-            return AddendumAsked {
-                used: asked,
-                clamped: false,
-            };
-        }
-        let ceiling = addendum_for_tip_width(
-            &Tooth::new(GearParams {
-                addendum: asked,
-                ..*at_shift
-            }),
-            self.min_tip_width,
-        );
-        let used = ceiling.map_or(asked, |c| asked.min(c));
-        AddendumAsked {
-            used,
-            clamped: used < asked - 1e-12,
-        }
-    }
-
-    /// [`ShiftAsked`], for this gear at its own working depth.
-    pub(crate) fn shift_asked(&self, base: &crate::params::GearParams) -> ShiftAsked {
-        let depth = self.working_depth.resolve(self.dedendum);
-        if !self.no_undercut {
-            // Nothing asked of the shift. Given, it is taken as typed; left to
-            // the stage with no objective either, there is no reason to move
-            // the tooth at all.
-            let given = (!self.profile_shift.auto).then_some(self.profile_shift.manual);
-            return ShiftAsked {
-                search_floor: None,
-                given,
-                settled: given.unwrap_or(0.0),
-                raised: false,
-            };
-        }
-        if self.profile_shift.auto {
-            let floor = automatic_profile_shift(base, depth);
-            return ShiftAsked {
-                search_floor: Some(floor),
-                given: None,
-                settled: floor,
-                raised: false,
-            };
-        }
-        // Given, and held to the true minimum rather than to the search's — a
-        // negative shift somebody meant is not an undercut one. Nothing is
-        // choosing it, so it carries no search bound.
-        let typed = self.profile_shift.manual;
-        let used = typed.max(crate::auto::minimum_profile_shift(base, depth).with_cutter_radius);
-        ShiftAsked {
-            search_floor: None,
-            given: Some(used),
-            settled: used,
-            raised: used > typed,
-        }
-    }
-}
-
-impl Default for StageGear {
-    fn default() -> Self {
-        Self {
-            teeth: 17,
-            profile_shift: Auto::automatic(0.0),
-            no_undercut: true,
-            working_depth: Auto::automatic(1.0),
-            addendum: 1.0,
-            no_sharp_tip: true,
-            min_tip_width: 0.1,
-            dedendum: 1.25,
-            root_radius: 0.38,
-            face_width: Auto::fixed(10.0),
-            face_sources: super::FaceSources::default(),
-            // A rim nobody described: `Y_B` is 1, and the gear cannot be told
-            // its rim is thin because it has not said what its rim is.
-            rim_thickness: None,
-            material: "4340 Hardened Steel".to_string(),
-            material_overrides: Overrides::default(),
-        }
     }
 }
 
@@ -910,34 +644,21 @@ pub fn solve_spur_stage_with(
         // Measured at the width in force and carried at it, so nothing scales
         // and the figures are the ones this stage's own arithmetic produced.
         let this = rating(i, &rated, effective, effective).rated();
-        gears.push(GearResult {
+        gears.push(GearResult::of(super::MemberFacts {
             profile_shift: p[i].profile_shift,
-            addendum: p[i].addendum,
+            params: &p[i],
+            input: &stage.gears[i],
+            rated: this,
             face_width: widths[i],
             torque: load_i.torque,
-            back_driving_torque: torques
-                .peak_backward
-                .map(|t| Load::new(t, effective).across_mesh(&g[0], &g[i]).torque),
-            // Filled in by `solve_train`, which is the only level that knows the
-            // duty cycle and where this gear sits in the shaft line.
+            back_driving_torque: torques.referred_like(load_i.torque),
+            // Filled in by `solve_train`, which is the only level that knows
+            // where this gear sits in the shaft line.
             speed: 0.0,
-            tooth_cycles: Cycles {
-                bending: 0.0,
-                contact: 0.0,
-            },
-            bending_stress: this.bending_stress,
-            contact_stress: this.contact_stress,
-            min_face_width: this.min_face_width,
+            material: materials[i].clone(),
             clamps: g[i].clamps.notes.clone(),
             notes: gear_notes(i),
-            material: materials[i].clone(),
-            ranges: admissible_ranges(
-                &p[i],
-                stage.gears[i]
-                    .working_depth
-                    .resolve(stage.gears[i].dedendum),
-            ),
-        });
+        }));
     }
 
     // --- contact ratios. eps_beta needs the face width, which is why it could
