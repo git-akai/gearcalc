@@ -965,6 +965,74 @@ impl Pinned {
             - usize::from(self.shift[1].is_some())
             - usize::from(self.sum.is_some())
     }
+
+    /// **The pair's two shifts, from the numbers left free.**
+    ///
+    /// `sign` is the mesh's, so gear 2 enters the sum negated for a ring and the
+    /// two orderings are one expression rather than a branch on the kind.
+    fn place(&self, sign: f64, free: &[f64]) -> [f64; 2] {
+        match (self.shift[0], self.shift[1], self.sum) {
+            (Some(a), Some(b), _) => [a, b],
+            (Some(a), None, Some(s)) => [a, (s - a) / sign],
+            (None, Some(b), Some(s)) => [s - sign * b, b],
+            (Some(a), None, None) => [a, free[0]],
+            (None, Some(b), None) => [free[0], b],
+            // Only the sum is pinned: the free coordinate is the division, taken
+            // as gear 1's shift with gear 2's following.
+            (None, None, Some(s)) => [free[0], (s - free[0]) / sign],
+            // **The sum and the division, not the two shifts.** Those are the
+            // pair's own coordinates: the sum alone sets the operating pressure
+            // angle and so the length of the path, while the division only
+            // moves the path's two ends against each other. In the shifts
+            // themselves that structure lies along a diagonal, and a search
+            // that moves one shift at a time can only zig-zag up it — here each
+            // axis is one of the two effects, and the flat one is flat.
+            (None, None, None) => [
+                (free[0] + free[1]) / 2.0,
+                (free[0] - free[1]) / (2.0 * sign),
+            ],
+        }
+    }
+
+    /// **...and the box those free numbers live in**, given what each gear's own
+    /// shift may be.
+    ///
+    /// This is [`Self::place`] read backwards, and it is written directly
+    /// beneath it on the same seven cases for that reason: the two are one
+    /// decision seen from its two ends, and forty lines apart they are two
+    /// places to edit and one to forget. `None` where the cases leave the free
+    /// coordinate nothing to take.
+    fn box_of(&self, sign: f64, per_gear: [(f64, f64); 2]) -> Option<Vec<(f64, f64)>> {
+        let (a, b) = (per_gear[0], per_gear[1]);
+        // Gear 2 as it enters the *sum*, negated for a ring and reordered so the
+        // interval still runs low to high.
+        let (lo, hi) = (sign * b.0, sign * b.1);
+        let signed = (lo.min(hi), lo.max(hi));
+        let overlap = |x: (f64, f64), y: (f64, f64)| -> Option<(f64, f64)> {
+            let (lo, hi) = (x.0.max(y.0), x.1.min(y.1));
+            (lo < hi).then_some((lo, hi))
+        };
+        match (self.shift[0], self.shift[1], self.sum) {
+            // Nothing free, so nothing to sweep.
+            (Some(_), Some(_), _) | (Some(_), None, Some(_)) | (None, Some(_), Some(_)) => {
+                Some(Vec::new())
+            }
+            // One shift free: its own interval, and nothing else bears on it.
+            (Some(_), None, None) => Some(vec![b]),
+            (None, Some(_), None) => Some(vec![a]),
+            // The sum is pinned, so gear 2 follows gear 1 — which makes gear 2's
+            // interval a second bound on gear 1 rather than an axis of its own.
+            (None, None, Some(s)) => Some(vec![overlap(a, (s - signed.1, s - signed.0))?]),
+            // Both free, in the pair's own coordinates. The rectangle that
+            // *contains* the rotated interval, since a point outside the
+            // admissible set is refused by the objective anyway — a tight hull
+            // would be a second statement of the same constraint.
+            (None, None, None) => Some(vec![
+                (a.0 + signed.0, a.1 + signed.1),
+                (a.0 - signed.1, a.1 - signed.0),
+            ]),
+        }
+    }
 }
 
 /// The profile shifts a pair loses least at, given what is already pinned and a
@@ -1059,38 +1127,15 @@ pub fn shifts_for_efficiency(
     };
 
     // The pair that a set of free coordinates describes, given what is pinned.
-    let place = |free: &[f64]| -> [f64; 2] {
-        match (pinned.shift[0], pinned.shift[1], pinned.sum) {
-            (Some(a), Some(b), _) => [a, b],
-            (Some(a), None, Some(s)) => [a, (s - a) / sign],
-            (None, Some(b), Some(s)) => [s - sign * b, b],
-            (Some(a), None, None) => [a, free[0]],
-            (None, Some(b), None) => [free[0], b],
-            // Only the sum is pinned: the free coordinate is the division, taken
-            // as gear 1's shift with gear 2's following.
-            (None, None, Some(s)) => [free[0], (s - free[0]) / sign],
-            // **The sum and the division, not the two shifts.** Those are the
-            // pair's own coordinates: the sum alone sets the operating pressure
-            // angle and so the length of the path, while the division only
-            // moves the path's two ends against each other. In the shifts
-            // themselves that structure lies along a diagonal, and a search
-            // that moves one shift at a time can only zig-zag up it — here each
-            // axis is one of the two effects, and the flat one is flat.
-            (None, None, None) => [
-                (free[0] + free[1]) / 2.0,
-                (free[0] - free[1]) / (2.0 * sign),
-            ],
-        }
-    };
-
     if pinned.freedoms() == 0 {
-        let x = place(&[]);
+        let x = pinned.place(sign, &[]);
         return loss_at(x).map(|_| x);
     }
 
     // **The box the search sweeps is the one the shifts can actually take**, per
-    // member, from [`searchable_shift`] — which is the same rule the objective
-    // below enforces rather than a second reading of it.
+    // member, from [`searchable_shift`] — the same rule the objective enforces
+    // rather than a second reading of it — and turned into the free
+    // coordinates' own by [`Pinned::box_of`].
     //
     // It used to sweep a fixed `±3` modules, which is a guess at where shifts
     // live rather than a statement of it, and the guess is what
@@ -1098,33 +1143,10 @@ pub fn shifts_for_efficiency(
     // be narrower than the sweep's own step, at which point the search reports
     // that no admissible pair exists because its grid fell either side of one.
     let side = |i: usize| searchable_shift(&|x| pair([x, x])[i], floor[i]);
-    let (a, b) = (side(0)?, side(1)?);
-    // Gear 2 as it enters the *sum*, which for a ring is negated — so the two
-    // orderings are one expression rather than a branch on the mesh kind.
-    let signed = (sign * b.0, sign * b.1);
-    let signed = (signed.0.min(signed.1), signed.0.max(signed.1));
-    let overlap = |x: (f64, f64), y: (f64, f64)| -> Option<(f64, f64)> {
-        let (lo, hi) = (x.0.max(y.0), x.1.min(y.1));
-        (lo < hi).then_some((lo, hi))
-    };
-    let box_: Vec<(f64, f64)> = match (pinned.shift[0], pinned.shift[1], pinned.sum) {
-        // One shift left free: its own interval, and nothing else bears on it.
-        (Some(_), None, None) => vec![b],
-        (None, Some(_), None) => vec![a],
-        // The sum is pinned, so gear 2 follows gear 1 — and gear 2's interval
-        // is a second bound on gear 1 rather than an axis of its own.
-        (None, None, Some(s)) => vec![overlap(a, (s - signed.1, s - signed.0))?],
-        // Both free, in the pair's own coordinates: the sum, and the difference
-        // about it. The rectangle that contains the rotated interval, since a
-        // point outside the admissible set is refused by the objective anyway.
-        _ => vec![
-            (a.0 + signed.0, a.1 + signed.1),
-            (a.0 - signed.1, a.1 - signed.0),
-        ],
-    };
+    let box_ = pinned.box_of(sign, [side(0)?, side(1)?])?;
     search
-        .maximise(&box_, &|free| loss_at(place(free)))
-        .map(|free| place(&free))
+        .maximise(&box_, &|free| loss_at(pinned.place(sign, free)))
+        .map(|free| pinned.place(sign, &free))
 }
 
 /// **Coordinate descent over a few free numbers**, refined about the best.
