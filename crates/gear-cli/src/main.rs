@@ -1727,6 +1727,39 @@ fn matrix_report() {
             .collect();
         println!("  z={teeth:<4} {}", cells.join("   "));
     }
+
+    // **The fillet radius the notch factor is fed.** The crate reads it at the
+    // junction when the parabola tangency is on the flank; the source the ring
+    // model comes from defines it as the minimum over the whole fillet. `q_s`
+    // is linear in it, so the gap between the two is the gap in `q_s`.
+    println!("\n== 7. fillet radius: at the junction vs the fillet's minimum ==");
+    println!(
+        "{:<9} {:>5} {:>7} {:>12} {:>10} {:>9} {:>9}",
+        "member", "z", "x", "at junction", "minimum", "ratio", "min at"
+    );
+    for member in [matrix::Member::External, matrix::Member::Internal] {
+        let counts: &[u32] = match member {
+            matrix::Member::External => &[17, 40, 100],
+            matrix::Member::Internal => &[40, 90, 160],
+        };
+        for &teeth in counts {
+            for shift in [-0.3_f64, 0.0, 0.3] {
+                let p = GearParams {
+                    teeth,
+                    profile_shift: shift,
+                    ..Default::default()
+                };
+                if let Some((j, m, at)) = matrix::fillet_radius_readings(member, p, 2000) {
+                    println!(
+                        "{:<9} {teeth:>5} {shift:>+7.1} {j:>12.4} {m:>10.4} {:>9.3} {:>9.2}",
+                        member.name(),
+                        j / m,
+                        at
+                    );
+                }
+            }
+        }
+    }
 }
 
 /// Compare the three load cases on a few ordinary meshes.

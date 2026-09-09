@@ -1318,13 +1318,41 @@ pub fn bending_section_shared(
 /// [`CriticalSection::LewisParabola`] gives. So this shares the construction
 /// rather than reimplementing it: see [`ToothOutline`].
 ///
+/// # Where this follows the paper, and where it does not
+///
+/// **Followed.** The paper searches *both* curves — "for the stress analysis of
+/// internal gears, both involute and trochoid geometry are used in checking for
+/// the smallest inscribed parabola in the tooth" — so a tangency on the involute
+/// flank is anticipated by the model rather than a symptom of misapplying it.
+/// Measured, a ring's lands there every time (`gear-cli matrix`, study 5), and
+/// that is the source's own case rather than this crate's departure. The load
+/// point is the highest point of single tooth loading in both.
+///
+/// **Not followed, and neither is documented as a choice anywhere else.**
+///
+/// - **The selection rule.** The paper compares the two results and takes "the
+///   smaller x coordinate", which "identifies the weaker inscribed parabola".
+///   [`root_section_with`] searches the fillet and uses the flank only when the
+///   fillet has no solution. The two agree whenever one curve has no tangency —
+///   which is every ring — and can differ on an external tooth, where the fillet
+///   usually does.
+/// - **The fillet radius.** The paper's `ρ_f` is "the minimum radius of
+///   curvature of the fillet curve"; ISO's `ρ_F` is the radius *at the critical
+///   section*. This crate reads it at the fillet **junction** when the tangency
+///   is on the flank, which is neither, and is the largest value the fillet
+///   takes: 1.4–6.3× the minimum (`gear-cli matrix`, study 7). `q_s` is inverse
+///   in it, so a ring's comes out at the floor of the `Y_S` band and two in
+///   three are clamped.
+///
 /// Two things the paper adds are handled differently here, both deliberately:
 ///
-/// - **Its stress-concentration factor is an extrapolation of Dolan–Broghamer.**
-///   This crate uses ISO 6336's `Y_S` instead, for the reason
-///   [`StressConcentration`] sets out — it is written in the geometry we measure,
-///   and a ring's `s_Fn`, `h_Fe` and `ρ_F` come off the generated profile exactly
-///   as an external gear's do. So the notch factor needs no internal case at all.
+/// - **Its stress-concentration factor is an extrapolation of Dolan–Broghamer**,
+///   `K_f = H + (t_c/ρ_f)^L · (t_c/h)^M`. This crate uses ISO 6336's `Y_S`
+///   instead, for the reason [`StressConcentration`] sets out. The two are the
+///   same shape — both are functions of thickness over fillet radius and
+///   thickness over height — but they are **fitted to different definitions of
+///   the fillet radius**, which is the bullet above and is why the substitution
+///   is not as free as it looks.
 /// - **Its axial compression term is omitted**, as it is for external teeth. The
 ///   radial component of the load compresses the tooth — the same sense either
 ///   way round, since both teeth point away from their rim — so including it

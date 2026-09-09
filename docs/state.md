@@ -512,16 +512,65 @@ parabola is *below* the tangent construction on both populations, 0.943 external
 and 0.877 internal. The doc comments said "more conservative, everywhere"; they
 say `Y_F` now.
 
-**What would settle it.** A ring's bending model cites Savage, Rubadeux & Coe
-(NASA TM-107012), which chooses the inscribed parabola deliberately for internal
-teeth — so the construction is not an unprincipled transplant, and the paper is
-the place to check whether its parabola also lands on the flank or whether
-something in the inscribing differs. Failing that, the honest options are to
-make `TangentAngle` the default **for rings only** — ISO's construction, ISO's
-angle, `Y_S` used where it was calibrated, 1.2 % out of band instead of 66.9 % —
-or to keep one construction for both and say plainly that a ring's is running
-outside the notch fit's domain most of the time. It is a model decision and is
-being left to one.
+### What the source says
+
+Savage, Rubadeux & Coe, NASA TM-107012 / ARL-TR-838, has been read.
+
+**The construction is vindicated.** "For the stress analysis of internal gears,
+both involute and trochoid geometry are used in checking for the smallest
+inscribed parabola in the tooth." A tangency on the involute flank is
+*anticipated* by the model — it is one of the two curves it is told to search —
+so a ring landing there every time is the source's own case, not a
+misapplication of it. The load point is the highest point of single tooth
+loading in both.
+
+**Two divergences it exposes, neither previously written down.**
+
+1. **The selection rule.** The paper compares the two searches and takes "the
+   smaller x coordinate", which "identifies the weaker inscribed parabola".
+   This crate searches the fillet and falls back to the flank only when the
+   fillet has no solution. The two agree whenever one curve has no tangency —
+   which is every ring — so this does **not** affect ring results. It can affect
+   an external tooth, where the fillet usually does have one and the flank is
+   never consulted.
+
+2. **The fillet radius, and this is the one that matters.** The paper's `ρ_f` is
+   *"the minimum radius of curvature of the fillet curve"*. ISO's `ρ_F` is the
+   radius **at the critical section**. This crate reads it at the fillet
+   **junction** whenever the tangency is on the flank — which is neither
+   definition, and is the **largest** value the fillet takes anywhere:
+
+   | member | junction / minimum |
+   |---|---|
+   | external | 1.37 – 4.12 |
+   | ring | **2.09 – 6.30** |
+
+   `q_s = s_Fn/(2ρ_F)` is inverse in it, so this is the whole of why a ring's
+   `q_s` sits at the floor of the `Y_S` band. The junction was chosen to remove
+   a discontinuity ([corrections](corrections.md)) and it does remove one; what
+   was never checked is whether it is the right point on the fillet, and by
+   either source's definition it is not.
+
+**So the model is three sources deep and matched to none of them**: Lewis's
+section by way of Savage, ISO's notch factor, and a fillet radius that is this
+crate's own. The notch factors are the same *shape* — `K_f = H + (t_c/ρ_f)^L ·
+(t_c/h)^M` against `Y_S = (1.2 + 0.13L)·q_s^(1/(1.21+2.3/L))`, both functions of
+thickness over fillet radius and thickness over height — which is what made the
+substitution look free. They are fitted to different definitions of that radius.
+
+**The options, and this is a model decision.**
+
+- **`TangentAngle` as the ring default.** One model throughout: ISO's section at
+  ISO's angle, `ρ_F` at that section, `Y_S` fitted on exactly that. `q_s` 4.94,
+  1.2 % out of band. Costs a default that differs by member kind.
+- **Savage's model in full for rings** — parabola, `ρ_f` as the fillet minimum,
+  Dolan–Broghamer `K_f`, and its axial compression term. Also coherent, and it
+  is what the citation actually describes. Costs an empirical fit this project
+  declined once already, and its own validation.
+- **Patching `ρ_F` to the fillet minimum while keeping `Y_S`** would be a fourth
+  mixed set, and would move the external canary too. It is the tempting one and
+  it is the [`Y_β` mistake](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither)
+  in another costume.
 
 
 ---

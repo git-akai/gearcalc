@@ -448,3 +448,43 @@ pub fn ring_flank_thickness(p: GearParams, samples: usize) -> Vec<(f64, f64)> {
         })
         .collect()
 }
+
+/// **The fillet radius the notch factor is fed**, two ways of reading it.
+///
+/// Savage, Rubadeux & Coe define `ρ_f` in their stress concentration factor as
+/// "the **minimum** radius of curvature of the fillet curve" — a property of the
+/// whole fillet, well defined wherever the parabola's tangency happened to land.
+/// This crate reads the curvature at the fillet **junction** when the tangency is
+/// on the flank, which is a different quantity, and `q_s = s_Fn/(2ρ_F)` is
+/// linear in it.
+///
+/// Returns `(at the junction, minimum over the fillet, where the minimum is as a
+/// fraction of the bracket)`, mm.
+pub fn fillet_radius_readings(
+    on: Member,
+    p: GearParams,
+    samples: usize,
+) -> Option<(f64, f64, f64)> {
+    let read = |g: &dyn ToothOutline| {
+        let (lo, hi) = g.fillet_bracket();
+        let at_junction = g.fillet_curvature(g.fillet_junction());
+        let mut best = (f64::INFINITY, 0.0);
+        for i in 0..=samples {
+            #[allow(clippy::cast_precision_loss)]
+            let t = i as f64 / samples as f64;
+            let s = lo + (hi - lo) * t;
+            let r = g.fillet_curvature(s);
+            if r.is_finite() && r < best.0 {
+                best = (r, t);
+            }
+        }
+        (at_junction.is_finite() && best.0.is_finite()).then_some((at_junction, best.0, best.1))
+    };
+    match on {
+        Member::External => read(&Tooth::new(p)),
+        Member::Internal => {
+            let r = Ring::cut_by(&p, &Cutter::default());
+            r.fillet.is_some().then(|| read(&r)).flatten()
+        }
+    }
+}
