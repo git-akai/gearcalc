@@ -62,7 +62,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 536 tests** (was 531; the five new ones hold F8, F23 and F25).
+**Suite: 538 tests** (was 531; the new ones hold F8, F23, F25 and F27).
 
 ---
 
@@ -138,6 +138,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F24 | The golden corpus covers the CLI, not the wasm boundary | gap | 5 | open |
 | F25 | `load_share`'s two ramps do not meet above ε = 2 | gap | 2 | **closed** — and logged in `corrections.md` |
 | F26 | No sampling constant had a convergence gate | gap | 2 | in progress |
+| F27 | `SEVER_SCAN_SAMPLES` could not resolve what it looked for | gap | 2 | **closed** — the scan became a solve |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so
@@ -282,7 +283,7 @@ a guard needs a reading of *could this gear exist?*
 | Constant | State |
 |---|---|
 | `SHARING_SAMPLES` 200 | **gated.** `the_sharing_sweep_has_converged` quadruples it; < 1e-4. Finding it failed is what produced F25 |
-| `SEVER_SCAN_SAMPLES` 2000 | **open.** Decides a *boolean* — a severed tooth read as unsevered is the worst kind of sampling failure |
+| `SEVER_SCAN_SAMPLES` 2000 | **gone.** It decided a boolean and was measured ten times too coarse for the case that matters, and no count fixes that — the window closes to zero at the threshold. Replaced by a bracketed solve on `dθ/ds` (F27) |
 | `PATH_SAMPLES` 2048 (worm) | **open.** The crossed path's average; `the_path_average_has_converged` exists in `screw.rs` — check whether it covers this constant or a different one |
 | `mesh POINTS` 2700, `FLOOR` 2e-4 | **open.** And the floor is the shape `docs/corrections.md` warns about — "a bound records where the sweep stopped" |
 | `outline` `MAX_SUBDIVISION_DEPTH` 14, `DEFAULT_CHORD_TOLERANCE` 1e-3 | **holds.** The tolerance is an *input* with a stated meaning (a sagitta in mm), and the depth is a safety stop on it |

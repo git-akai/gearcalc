@@ -93,7 +93,7 @@ of a gear is worth more than knowing what it does.
 |---|---|
 | `crates/gear-io` | DXF export · the TOML material library and geartrain documents · the string catalogues |
 | `crates/gear-wasm` | The boundary. 17 entry points, JSON in and JSON out, all pure |
-| `crates/gear-cli` | The development harness. 21 subcommands; `main.rs`'s module comment lists them |
+| `crates/gear-cli` | The development harness. `gear-cli help` prints its subcommands, from the `COMMANDS` table that *is* its dispatch |
 | `web/src` | Svelte 5 + TypeScript. Layout and event handling **only** |
 | `web/src/wire` | **Generated** by `ts-rs`. Never edited by hand |
 | `tools/` | The checks that live outside the Rust suite |
@@ -114,7 +114,7 @@ string catalogues is what five languages costs.
 | **A note the solve emits** | `note.rs` (the key) · the site that raises it · 5 × `strings_*.toml` | `cargo nextest run` — `gear_io::strings` checks both directions by *firing every note* |
 | **A UI string with no `Note` behind it** | 5 × `strings_*.toml` · the `.svelte` that reads it | `tools/check_strings.py` |
 | **A material** | `crates/gear-io/data/materials_default.toml` | `cargo nextest run` — every non-datasheet value must carry a note saying what it is |
-| **A CLI subcommand** | `gear-cli/src/main.rs` (dispatch **and** module comment) · `tools/check_golden.sh`'s case list | `tools/check_golden.sh --write` |
+| **A CLI subcommand** | one row in `gear-cli/src/main.rs`'s `COMMANDS`, carrying how its output is recorded | `tools/check_golden.sh --write` — the script asks the binary, so there is no second list |
 | **A type that crosses the boundary** | the Rust type | `tools/check_bindings.sh --write`, then `cd web && npm run check` |
 | **A documented figure** | the document | `tools/check_figures.py` — and tag the block with what generates it |
 | **A language** | one new `strings_<code>.toml` · the list in `gear-io/src/strings.rs` | `cargo nextest run` — a translation that falls behind English's key set fails |
@@ -127,7 +127,7 @@ Seven checks in five different ways. `nix flake check` is **not** all of them.
 
 | Run | Catches | In CI |
 |---|---|---|
-| `cargo nextest run` | 531 tests: laws, independent verifications, invariants, canaries, negative fixtures | via `nix flake check` |
+| `cargo nextest run` | The suite: laws, independent verifications, invariants, canaries, negative fixtures. **No count is quoted here** — a number that dates belongs in `docs/state.md`, and this file had one stale within an hour of being written | via `nix flake check` |
 | `cargo clippy --all-targets -- --deny warnings` | `unwrap` in production is a warning, and warnings are denied | " |
 | `cargo fmt --check` | | " |
 | `nix build .#web` | **the site — `flake check` does not cover it**, and it carries a fixed-output hash over `web/package-lock.json` that nothing else consults | yes |

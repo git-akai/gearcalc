@@ -611,6 +611,99 @@ fn every_length_scales_with_the_module_and_every_angle_is_invariant() {
 ///
 /// The scan is written out here rather than called, because inside the crate it
 /// no longer runs for these teeth — which is the point.
+/// **A tooth reported unsevered does not cross its own centreline.**
+///
+/// Severing is the trochoid reaching the tooth's centreline, and the crate finds
+/// it by **solving** for the minimum of `θ` — a root of `dθ/ds`, which is exact
+/// — and testing its sign. This is the independent check on that: a dense scan
+/// over undercut teeth, asserting nothing the crate called unsevered dips below
+/// zero anywhere.
+///
+/// It is worth having because the solve replaced a 2000-point scan, and a scan
+/// is what this is. The count that scan used could not be justified — measured,
+/// the negative excursion narrows to a twentieth of a thousandth of the interval
+/// as a tooth approaches severing, where 2000 samples resolve half a thousandth,
+/// and no larger count closes that gap because the window shrinks to zero. What
+/// a scan can still do is confirm the solve from outside, which is what it does
+/// here.
+///
+/// It is the same shape as `only_an_undercut_tooth_can_be_severed` above and
+/// asks the opposite question of the other half of the population.
+///
+/// Only unsevered teeth can be re-scanned: severing overwrites `s_j` with the
+/// crossing it found and sets `u_j` to NaN, so the original interval is gone.
+/// That is the case that matters — a *missed* crossing is the fault, and a
+/// found one has already been bracketed by a guaranteed solve.
+#[test]
+fn a_tooth_called_unsevered_is_not_severed_at_a_finer_scan() {
+    const DENSE: usize = 40_000;
+    let mut undercut = 0u32;
+    let mut worst = f64::INFINITY;
+    let mut at = String::new();
+
+    for z in [3u32, 5, 7, 9, 12, 17, 24] {
+        for k in -40..=20 {
+            let x = f64::from(k) * 0.05;
+            for &(alpha, ded, kt, rho, beta, m) in &[
+                (20.0, 1.25, 1.0, 0.38, 0.0, 1.0),
+                (14.5, 1.25, 1.0, 0.38, 0.0, 1.0),
+                (25.0, 1.25, 1.0, 0.0, 0.0, 1.0),
+                (20.0, 1.6, 1.0, 0.9, 0.0, 1.0),
+                (20.0, 1.0, 1.7, 0.2, 0.0, 1.0),
+                (20.0, 1.25, 1.0, 0.38, 30.0, 1.0),
+                (20.0, 1.25, 1.0, 0.9, -45.0, 8.0),
+                (25.0, 1.0, 1.7, 0.2, 15.0, 0.4),
+            ] {
+                let g = Tooth::new(GearParams {
+                    module: m,
+                    teeth: z,
+                    profile_shift: x,
+                    pressure_angle: alpha,
+                    helix_angle: beta,
+                    dedendum: ded,
+                    thickness_mod: kt,
+                    root_radius: rho,
+                    ..Default::default()
+                });
+                if !g.undercut || g.severed {
+                    continue;
+                }
+                undercut += 1;
+                // The interval the crate scans, sampled a hundred times finer.
+                let mut min_th = f64::INFINITY;
+                for i in 0..DENSE {
+                    #[allow(clippy::cast_precision_loss)]
+                    let t = i as f64 / (DENSE - 1) as f64;
+                    let th = g.trochoid_at(g.s_j + t * (0.0 - g.s_j)).1;
+                    min_th = min_th.min(th);
+                }
+                if min_th < worst {
+                    worst = min_th;
+                    at = format!(
+                        "z={z} x={x:+.2} a={alpha} ded={ded} k={kt} rho={rho} b={beta} m={m}"
+                    );
+                }
+                assert!(
+                    min_th > 0.0,
+                    "{at}: called unsevered, but a {DENSE}-point scan finds \
+                     theta = {min_th} on the trochoid — the 2000-point scan \
+                     missed a crossing"
+                );
+            }
+        }
+    }
+
+    assert!(
+        undercut > 200,
+        "only {undercut} undercut-but-unsevered teeth in the sweep; \
+         this test needs a population to mean anything"
+    );
+    // Reported rather than asserted against a floor, for the reason the test
+    // above gives at length: the margin is a fraction of the space, so it
+    // narrows with the tooth and a threshold would record this sweep instead.
+    println!("{undercut} undercut, unsevered teeth; closest approach {worst:.3e} rad at {at}");
+}
+
 #[test]
 fn only_an_undercut_tooth_can_be_severed() {
     let mut worst = f64::INFINITY;
@@ -681,4 +774,78 @@ fn only_an_undercut_tooth_can_be_severed() {
         "the trochoid reached the centreline at {at} ({worst:e}), so the cap does not \
          hold the fillets apart and the guard is wrong"
     );
+}
+
+/// **The trochoid's `θ` turns once, which is what lets severing be solved.**
+///
+/// `Tooth::sever` finds the least `θ` as a root of `dθ/ds` rather than as the
+/// smallest of a sample. That is only valid where the slope changes sign at most
+/// once on the interval — otherwise a bracketed solve lands on whichever turning
+/// point it happens to bracket, and the minimum it reports is not the minimum.
+///
+/// So the shape is asserted rather than assumed, over the population that
+/// reaches this code: every undercut tooth in the sweep, counting sign changes
+/// of a finite difference. Zero changes is a monotone `θ` and is admissible too
+/// — the code falls back to the endpoints when the slope does not bracket.
+///
+/// If this ever fails, `sever` needs the bracket narrowing to the branch it
+/// means, not a finer sample count.
+#[test]
+fn the_trochoid_turns_once() {
+    let mut worst = 0usize;
+    let mut at = String::new();
+    let mut cases = 0u32;
+    for z in [3u32, 5, 7, 9, 12, 17, 24, 40] {
+        for k in -60..=20 {
+            let x = f64::from(k) * 0.05;
+            for &(alpha, ded, kt, rho, beta) in &[
+                (20.0, 1.25, 1.0, 0.38, 0.0),
+                (14.5, 1.25, 1.0, 0.38, 0.0),
+                (25.0, 1.25, 1.0, 0.0, 0.0),
+                (20.0, 1.6, 1.0, 0.9, 0.0),
+                (20.0, 1.0, 1.7, 0.2, 0.0),
+                (20.0, 1.25, 1.0, 0.38, 30.0),
+            ] {
+                let g = Tooth::new(GearParams {
+                    teeth: z,
+                    profile_shift: x,
+                    pressure_angle: alpha,
+                    dedendum: ded,
+                    thickness_mod: kt,
+                    root_radius: rho,
+                    helix_angle: beta,
+                    ..Default::default()
+                });
+                if !g.undercut || g.severed {
+                    continue;
+                }
+                cases += 1;
+                const N: u32 = 4000;
+                let mut prev: Option<bool> = None;
+                let mut changes = 0usize;
+                for i in 0..N {
+                    let t = |j: u32| g.s_j + (f64::from(j) / f64::from(N)) * (0.0 - g.s_j);
+                    let rising = g.trochoid_at(t(i + 1)).1 > g.trochoid_at(t(i)).1;
+                    if prev.is_some_and(|p| p != rising) {
+                        changes += 1;
+                    }
+                    prev = Some(rising);
+                }
+                if changes > worst {
+                    worst = changes;
+                    at = format!("z={z} x={x:+.2} a={alpha} ded={ded} k={kt} rho={rho} b={beta}");
+                }
+                assert!(
+                    changes <= 1,
+                    "{at}: dtheta/ds changes sign {changes} times — theta is not \
+                     unimodal here, so solving for its minimum is not valid"
+                );
+            }
+        }
+    }
+    assert!(
+        cases > 500,
+        "only {cases} undercut teeth; too few to mean anything"
+    );
+    println!("{cases} undercut teeth; most turns in theta: {worst} at {at}");
 }

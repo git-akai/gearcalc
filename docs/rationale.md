@@ -264,9 +264,26 @@ search**, which is named below rather than left out of the count.
 | 6 | Contact ellipse aspect ratio `κ` | Brent in `ln κ` |
 | 7 | Cutter travel at a ring's flank/fillet junction | Brent on the trochoid's radius |
 | 8 | Cutter travel where a ring's fillet reaches mid-space | Brent on the trochoid's angle |
+| 9b | Where a severed tooth's trochoid is least | Brent on `dθ/ds`, analytic |
 
 The involute function is not algebraically invertible, and that single fact
 causes #1, #2 and #4.
+
+**#9b replaced a scan, and the reason is the general one.** Severing is the
+trochoid reaching the tooth's centreline, and it used to be found by sampling
+`θ` at two thousand points and taking the least. A scan has a resolution and the
+thing it looks for does not: the negative excursion narrows to nothing as a
+tooth approaches severing — measured at a twentieth of a thousandth of the
+interval where the scan resolved half a thousandth — so the count was ten times
+too coarse for the case that matters and **no larger count fixes it**, because
+the window closes to zero. What a boolean flipping costs is also different in
+kind from a figure moving.
+
+`θ` is unimodal along that interval, measured over three thousand undercut teeth
+and gated as `the_trochoid_turns_once`, so its minimum is a root of the slope
+and the slope is closed form. The answer moved by 1.8e-15 mm across the whole
+shipped population and no tooth changed classification, which is what a
+refinement rather than a correction looks like.
 
 **#6 had a tempting alternative and refusing it is the same decision as the
 rest.** Hertz's aspect-ratio relation has widely used closed forms —

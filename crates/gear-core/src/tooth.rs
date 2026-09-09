@@ -63,8 +63,6 @@ mod search {
     pub const CROSSING_NUDGE_MODULES: f64 = 1e-6;
     /// Maximum expansion steps before declaring no bracket exists.
     pub const MAX_STEPS: u32 = 200;
-    /// Samples used to scan the fillet for a centreline crossing (severed tooth).
-    pub const SEVER_SCAN_SAMPLES: usize = 2000;
     /// Samples per section when estimating arc length for point allocation.
     pub const LENGTH_SAMPLES: usize = 60;
     /// Minimum share of the total point budget any one section receives.
@@ -512,6 +510,31 @@ impl Tooth {
         (f64::hypot(xf, yf), xf.atan2(yf) - (s - self.ac) / self.r)
     }
 
+    /// `dθ/ds` along the trochoid, in closed form.
+    ///
+    /// Differentiating [`Self::trochoid_at`]'s second component directly:
+    /// with `d = √(s² + b_c²)` and `k = 1 + ρ/d`,
+    ///
+    /// ```text
+    /// k′ = −ρ s / d³      x′ = k − ρ s²/d³      y′ = ρ s b_c / d³
+    /// θ′ = (y x′ − x y′)/(x² + y²) − 1/r
+    /// ```
+    ///
+    /// It exists so severing can be **solved** rather than scanned. A scan for
+    /// the minimum of `θ` has a resolution, and the negative excursion it is
+    /// looking for narrows to nothing at the severing threshold — measured at a
+    /// twentieth of a thousandth of the interval, where a 2000-point scan
+    /// resolves half a thousandth. No sample count fixes that; a root does.
+    #[must_use]
+    pub fn trochoid_theta_slope(&self, s: f64) -> f64 {
+        let d = f64::hypot(s, self.bc);
+        let k = 1.0 + self.rho / d;
+        let (x, y) = (k * s, self.r - k * self.bc);
+        let dk = -self.rho * s / (d * d * d);
+        let (dx, dy) = (dk * s + k, -dk * self.bc);
+        (y * dx - x * dy) / (x * x + y * y) - 1.0 / self.r
+    }
+
     // ---------------------------------------------------------------- //
 
     /// Where the involute flank meets the trochoid fillet.
@@ -616,25 +639,40 @@ impl Tooth {
         if !self.undercut {
             return;
         }
-        let n = search::SEVER_SCAN_SAMPLES;
-        let mut min_th = f64::INFINITY;
-        let mut min_i = 0usize;
-        for i in 0..n {
-            #[allow(clippy::cast_precision_loss)]
-            let t = i as f64 / (n - 1) as f64;
-            let s = self.s_j + t * (0.0 - self.s_j);
-            let th = self.trochoid_at(s).1;
-            if th < min_th {
-                min_th = th;
-                min_i = i;
-            }
-        }
-        if min_th >= 0.0 || min_i >= n - 1 {
+        // **Where `θ` is least, solved rather than scanned.**
+        //
+        // `θ` is unimodal along this interval — measured, one sign change in
+        // `dθ/ds` across three thousand undercut teeth, and gated as
+        // `the_trochoid_turns_once` — so its minimum is a root of the slope and
+        // needs no resolution at all. It used to be the smallest of 2000
+        // samples, and that count could not be justified: the negative
+        // excursion narrows to nothing as a tooth approaches severing, to a
+        // twentieth of a thousandth of this interval on the cases measured,
+        // where 2000 samples resolve half a thousandth. A scan ten times
+        // coarser than the thing it looks for reports *unsevered* on a tooth
+        // that is severed — a boolean flipping rather than a figure moving, and
+        // no larger count removes it because the window closes to zero.
+        let (a, b) = (self.s_j, 0.0);
+        let s_min = brent(
+            |s| self.trochoid_theta_slope(s),
+            a,
+            b,
+            Tol::default(),
+        )
+        // Not bracketed means the slope keeps its sign, so `θ` is monotone here
+        // and its least value is at whichever end it runs down to.
+        .unwrap_or(if self.trochoid_at(a).1 <= self.trochoid_at(b).1 {
+            a
+        } else {
+            b
+        });
+        // The far end is mid-space, where the two half-profiles meet. A minimum
+        // sitting there is not a severed tooth: there is no crossing to find
+        // between it and itself.
+        if self.trochoid_at(s_min).1 >= 0.0 || s_min == b {
             return;
         }
-        #[allow(clippy::cast_precision_loss)]
-        let s_at = |i: usize| self.s_j + (i as f64 / (n - 1) as f64) * (0.0 - self.s_j);
-        let Some(s_c) = brent(|s| self.trochoid_at(s).1, s_at(min_i), 0.0, Tol::default()) else {
+        let Some(s_c) = brent(|s| self.trochoid_at(s).1, s_min, b, Tol::default()) else {
             return;
         };
         self.severed = true;
