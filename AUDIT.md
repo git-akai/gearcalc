@@ -61,7 +61,10 @@ Q5 below, which settled the one question pass 8 had raised and not resolved.
 F42, F43, F44, F45, F46 and F49 closed — **all six bugs**, and F47, F48 recorded
 open. The half pass 8 missed is that it swept the *reported* torques and not the
 *ratings* built from them.
-**Phase 4 — the optimiser.** In progress. Step 1 done: the convergence claim is
+**Phase 4 — the optimiser.** In progress. Step 2 measured: F52 and F53 found, and
+the closed form's question answered — the loss is *not* monotone in the sum, for
+a reason that names the repair rather than blocking it. Step 1 done: the
+convergence claim is
 now a value something can raise and a gate that raises it, and **the claim was
 half false** — a pair's search is converged to 4.1e-7, an epicyclic set's is not
 converged at all and is not even monotone in its own effort (F50). The
@@ -173,6 +176,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 |---|---|---|---|---|
 | F1 | The crate has one optimiser and the solve inventory omits it | gap | 1, 4 | **half closed** — inventory names it; the closed form is Phase 4 |
 | F51 | The hula stage's shift search cannot be asked for an effort, so it is the one search with no convergence gate | gap | 4 | open — see Phase 4 |
+| F52 | A given centre distance drops the optimiser onto the undercut floor — the tool's own recommended distance, typed back, costs 0.42 points | gap | 4 | open — measured, see Phase 4 |
+| F53 | The division objective is bimodal at the addendum cap and the search takes the lower peak | gap | 4 | open — measured, see Phase 4 |
 | F2 | The worm stage is outside the shared member vocabulary | gap | 3 | **closed** — option B; a crossed member is a `GearResult`, a worm's is not and says why |
 | F3 | `GearResult` assembled three times, one field by two formulas | gap | 3 | **closed** — one `GearResult::of`, and the shared rule is `StageTorques::referred_like` |
 | F4 | `StageGear` — a shared input type — lives in `train/spur.rs` | drift | 3 | **closed** — moved, with its `Default`, `AddendumAsked` and serde helpers; `spur.rs` 1017 → 730 lines |
@@ -675,18 +680,10 @@ as the tenth item beside the nine bracketed solves, which Phase 1 added.
 ### The two steps, in order
 
 1. **Assert the convergence claim. Done — and it is half false (F50).**
-2. **Attempt the closed form.** Half of the problem already has one: at a fixed
-   shift *sum*, the stationary condition for the **division** is derived and
-   solved directly (`efficient_split`, and
-   `docs/reference.md#efficiency-parallel-axes` states it). What the search is
-   left doing is the **sum** — and every row of every table this project prints
-   reports the sum landing *against a constraint* rather than at a stationary
-   point.
-
-   So the question to settle is: **is the loss monotone in the shift sum up to
-   whichever constraint binds first?** If it is, the sum becomes a
-   one-dimensional bracketed search against the active bound, the crate has no
-   optimiser left, and six tuned numbers go with it.
+2. **Attempt the closed form.** The question was: *is the loss monotone in the
+   shift sum up to whichever constraint binds first?* **Measured, and the answer
+   is no** — but the reason is not the physics, and it names the repair. See
+   "Step 2, measured" below.
 
 ### Step 1, run — and what it found
 
@@ -737,6 +734,99 @@ cannot be asked for an effort and has no gate. The other two kinds each have a
 `built`, `pair_of`, `carrier`, `set_with` and `tip_room` out of that function
 onto `HulaStage`, which is a refactor worth doing on its own account — that
 function is the longest in the crate.
+
+### Step 2, measured — and the two faults it found first
+
+Swept a 9/37 pair: the shift sum from 0.9 to 1.8 in steps of 0.005, and at each
+sum the division searched as the tool searches it, scored by solving the stage at
+what it chose. Everything below is from that sweep and from a brute 1-mm-per-
+thousand scan of the same admissible interval.
+
+**The loss is not monotone in the sum, and the objective is not even unimodal in
+the division.** At a sum of 1.21 the efficiency against the pinion's shift has
+*two* peaks — 0.9764578 at `x₁ = 0.478` and **0.9766037 at `x₁ = 0.674`** — with
+a trough between them at `x₁ ≈ 0.545`.
+
+**The trough is exactly where the automatic addendum cap engages.** Below it the
+addendum coefficient is 1.0000; at 0.550 it is 0.9959 and falling, because the
+tooth would come to a point and `addendum_asked` caps it. Capping shortens the
+tip, which shortens the path of contact, which cuts the sliding loss faster than
+the shift alone does — so past the cap the efficiency *rises again*. The two
+regimes are the two peaks.
+
+This is not a discontinuity in gearing. It is the tool's own design rule folded
+into the objective: `params_at` re-derives the addendum at every trial shift, on
+the stated principle that "the geometry that is rated is the geometry that is
+built". That principle is right and is not in question. What follows from it is
+that **the objective is piecewise, with a slope reversal at a boundary the crate
+can compute in closed form** — which is the shape of the repair rather than an
+obstacle to it.
+
+#### F52 — a given centre distance drops the optimiser onto the undercut floor
+
+`maximise` opens with a grid at multiples of `span/scan` = **0.5** across
+`[−3, 3]`. Pin the sum and the admissible interval in `x₁` is about **0.19 wide**
+and contains no multiple of 0.5 — so the sweep collects nothing, `maximise`
+returns `None`, and `SpurStage::shifts` falls back to `asked.settled`, the
+undercut floor. **The opening scan's step is acting as a feasibility filter.**
+
+Measured on the shipped path, a 9/37 pair with the shift optimiser **on**:
+
+| centre distance | shifts returned | η forward |
+|---|---|---|
+| automatic | 0.8301 / 0.8398 | **0.977062** |
+| 24.1 mm given | 0.6855 / 0.5607 | 0.976649 |
+| 24.2 mm given | 0.4736 / 0.0000 | 0.976271 |
+| **24.420 mm given** — the distance the tool itself chose | 0.4736 / 0.0000 | **0.972895** |
+
+The last row is the finding in one line: **type in the centre distance the tool
+just recommended and it returns a worse gear**, by 0.42 points of efficiency, at
+shifts that do not reach the distance asked for. Not idempotent under its own
+output, which is F37's fault in a different organ.
+
+#### F53 — the division search returns whichever peak it met first
+
+Where both peaks exist the search takes the lower one. At a given distance of
+24.0 mm it returns `x₁ = 0.4746` for 0.9764666 where the brute scan of the same
+admissible interval gives `x₁ = 0.672` for 0.9765912 — **1.2e-4 of efficiency**,
+and a pinion shift 0.20 modules away. Above 24.1 mm it finds the higher peak, so
+the fault is confined to the band where both exist.
+
+### The repair these three findings agree on
+
+F50 (a set's search is not converged), F52 and F53 have one cause: **the search
+is given a box it has no business choosing and a resolution that then decides
+feasibility.** `span` = 3.0 and `scan` = 6 are a guess at where shifts live; the
+crate already computes where they actually live, in closed form, in
+`admissible_ranges` — the same bound the gear card draws and the same one F28
+replaced a constant with.
+
+So step 2's work is:
+
+1. **Give `maximise` its box.** One `Bound` per axis, supplied by the caller from
+   `admissible_profile_shift` and the pinned sum, rather than `span`. The opening
+   scan then spans the admissible set by construction and cannot miss it, and
+   `span` — a tuned number — goes.
+2. **Split the box at the regime boundaries.** The addendum cap's onset is the
+   shift at which the tip reaches its minimum width, and
+   `addendum_for_tip_width` is already the closed-form solve for it. Cut the
+   division's interval there and each piece is smooth.
+3. **Then the closed form applies, piecewise.** On a smooth piece the division's
+   stationary condition is `contact::split_residual`, already derived and already
+   bracketed by `efficient_split`. Solve each piece and take the best. **The
+   division stops being searched at all.**
+4. **Ask the sum the same question.** With the division closed-form at every sum,
+   the sum is one dimension against the active bound — which is what step 2 set
+   out to establish, now with the reason the first attempt would have failed.
+
+That sequence also answers F50: a set's admissible region is a curve because its
+box is wrong, not because its geometry is hostile.
+
+**This moves answers**, which the earlier steps deliberately did not. Every moved
+figure in the golden corpus and in `reference.md`'s five tables has to be
+explained as a *better* optimum rather than a different one — and the test for
+that is F52's row above: the answer at a given distance must equal the answer the
+free search finds at that distance.
 
 ### What the acceptance has to be
 
