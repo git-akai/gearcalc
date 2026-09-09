@@ -1730,7 +1730,7 @@ mod tests {
                 rated.contact_stress.peak
             );
             assert!(
-                rated.min_face_width.peak.contact > 0.0,
+                rated.min_face_width.peak.contact.is_some_and(|c| c > 0.0),
                 "z{}: a contact stress inverts to a width",
                 g.teeth
             );

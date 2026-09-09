@@ -304,24 +304,29 @@ pub struct WormMemberResult {
     /// an enveloping wheel, and there is neither.
     pub recommended_face_width: Option<f64>,
     pub pitch_diameter: f64,
-    /// Guards that altered this member's tooth form, and what the rating has to
-    /// say about it — the two lists a `GearResult` keeps apart, kept apart here.
+    /// This member as a gear, where it **is** one.
     ///
-    /// **Empty for a worm stage, and that is the difference between the two
-    /// arrangements this type serves.** A worm is a thread and its wheel is the
-    /// envelope of one, so neither is cut by a rack and neither has a profile
-    /// shift, a dedendum or a buildable range to report. A **crossed gear pair**
-    /// is two helical gears: its members are rack-cut, its designer types those
-    /// numbers, and every other stage kind says when a cutter has eaten into a
-    /// flank (`docs/corrections.md`, "A gear in a geartrain never said it was
-    /// undercut"). This one said nothing — the same pair reported
-    /// `clamp.tooth_undercut` with its shafts parallel and nothing at all with
-    /// them crossed, because the translation into the equivalent worm stage
-    /// dropped the tooth form on the way.
+    /// `Some` for a **crossed gear pair**, whose two members are ordinary
+    /// helical gears: rack-cut, with a profile shift, a dedendum and a root
+    /// round the designer typed, a buildable range those sit inside, and clamps
+    /// when a cutter has eaten into a flank. Everything a spur stage's member
+    /// reports, reported the same way and by the same type.
+    ///
+    /// `None` for a **worm stage**. A worm is a thread and its wheel is the
+    /// envelope of one, so neither is cut by a rack. A profile shift and an
+    /// admissible range are not values those members are missing — they are
+    /// questions that cannot be put to them, and inventing answers is what a
+    /// ring's "no dedendum input; it has a cutter" already refuses.
+    ///
+    /// **The two arrangements share this result type and do not share this
+    /// field**, which is the whole of what separates them. It was found by
+    /// discarding the crossed half: `solve_crossed_stage` translates a
+    /// `SpurStage` into an equivalent `WormStage` and the translation threw the
+    /// tooth form away, so a crossed pinion could not say its flank was
+    /// undercut where the same pinion with parallel shafts could
+    /// (`docs/corrections.md`).
     #[cfg_attr(feature = "serde", serde(default))]
-    pub clamps: Vec<Note>,
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub notes: Vec<Note>,
+    pub gear: Option<super::GearResult>,
     /// The material as used, after any overrides.
     pub material: Material,
 }
@@ -681,9 +686,46 @@ pub fn solve_crossed_stage(
     // that has the `StageGear`s to build them from — which is the whole of why
     // the translation lost them.
     for i in 0..2 {
-        let tooth = crate::tooth::Tooth::new(stage.base_params(i));
-        result.members[i].clamps = tooth.clamps.notes.clone();
-        result.members[i].notes = super::undercut_note(&tooth).into_iter().collect();
+        let params = stage.base_params(i);
+        let tooth = crate::tooth::Tooth::new(params);
+        let m = &result.members[i];
+        result.members[i].gear = Some(super::GearResult::of(super::MemberFacts {
+            profile_shift: params.profile_shift,
+            params: &params,
+            input: &stage.gears[i],
+            rated: super::Rated {
+                // **No bending, and that is a decision rather than a gap.** The
+                // tooth a beam formula would measure is not the tooth this mesh
+                // loads: a crossed pair's contact is a *point* tracking
+                // diagonally across the flank, and a cantilever loaded across
+                // its whole face has no honest reading of it
+                // (docs/rationale.md#a-worm-stage-reports-no-bending-stress).
+                bending_stress: super::LoadCase::of(|_| None),
+                // The mesh's figure, which is the members' figure: two flanks
+                // share one patch, one normal force and one `E*`
+                // (docs/rationale.md#one-pressure-two-ratings--and-the-curvature-is-not-what-separates-them).
+                // Both members are rated at the same point here because a point
+                // contact has only the one.
+                contact_stress: super::LoadCase::of(|c| result.contact.get(c).max_pressure),
+                // **Neither rating sizes this face.** Bending is not taken, and
+                // inverting a contact stress for a width assumes the stress
+                // depends on the width — a point contact's does not. What sizes
+                // a crossed pair's face is continuity, `ε = 1`, and that is a
+                // geometric minimum reported as its own figure rather than
+                // smuggled into this one.
+                min_face_width: super::LoadCase::of(|_| super::Widths {
+                    bending: None,
+                    contact: None,
+                }),
+            },
+            face_width: m.face_width,
+            torque: m.torque,
+            back_driving_torque: m.back_driving_torque,
+            speed: m.speed,
+            material: m.material.clone(),
+            clamps: tooth.clamps.notes.clone(),
+            notes: super::undercut_note(&tooth).into_iter().collect(),
+        }));
     }
 
     result.notes.extend(notes);
@@ -1010,11 +1052,8 @@ pub fn solve_worm_stage(
             recommended_face_width: recommended[0],
             pitch_diameter: s.worm_pitch_diameter,
             material: materials[0].clone(),
-            // A thread is not cut by a rack, so there is no guard to have
-            // altered it and no undercut to report. `solve_crossed_stage` fills
-            // these for a crossed *gear* pair, whose members are.
-            clamps: Vec::new(),
-            notes: Vec::new(),
+            // A worm is a thread; see [`WormMemberResult::gear`].
+            gear: None,
         },
         WormMemberResult {
             torque: output_torque,
@@ -1039,8 +1078,7 @@ pub fn solve_worm_stage(
             recommended_face_width: recommended[1],
             pitch_diameter: s.wheel_pitch_diameter,
             material: materials[1].clone(),
-            clamps: Vec::new(),
-            notes: Vec::new(),
+            gear: None,
         },
     ];
 

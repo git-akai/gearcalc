@@ -9,6 +9,16 @@ export type Widths = {
  */
 bending: number | null, 
 /**
- * From contact.
+ * From contact. `None` where no contact *rating* sizes this member's face.
+ *
+ * Optional for the same reason `bending` is, and it took a crossed pair to
+ * make the case reachable: inverting a stress for a width assumes the
+ * stress depends on the width, and a **point** contact's peak pressure does
+ * not depend on it at all. A crossed pair's automatic width comes from
+ * continuity instead — `ε = 1`, a *geometric* minimum, reported as its own
+ * figure and labelled as the other kind of answer because the two differ by
+ * 2.4× (`docs/state.md`). Putting that number here would be the mixing this
+ * project refuses; putting a zero here would be a width nobody needs, which
+ * `docs/corrections.md` has already been caught by once.
  */
-contact: number, };
+contact: number | null, };

@@ -1174,17 +1174,36 @@ that is a *gear* is a `GearResult`; a parallel-axis mesh of any kind is a
 `MeshReport`; the rating every member gets is `MemberRating` over the meshes it
 is in.
 
-**"That is a gear" is a real qualification and not a hedge.** A worm is a thread
-and its wheel is the envelope of one: neither is cut by a rack, so neither has a
-profile shift, a dedendum, an admissible range or an undercut flank, and a
-`GearResult` for them would be a row of absences with a comment apologising for
-each. `WormMemberResult` is what those two members genuinely have. What was
-*not* a good reason for the distinction is the one that produced it: the same
-type also serves a **crossed gear pair**, whose members are two ordinary helical
-gears — and they inherited the thread's poverty rather than the gear's
-vocabulary, so a crossed pinion could not say its flank had been eaten into
-([corrections.md](corrections.md)). Where a crossed member has something to say,
-it says it. A kind adds its own
+**"That is a gear" is a real qualification and not a hedge**, and it is a field
+rather than a comment: `WormMemberResult::gear` is `Some` for a crossed pair and
+`None` for a worm stage. Those two arrangements share a result type and that is
+the whole of what separates them.
+
+A worm is a thread and its wheel is the envelope of one: neither is cut by a
+rack, so a profile shift, a dedendum, an admissible range and an undercut flank
+are not values those members are *missing* — they are questions that cannot be
+put to them, and inventing answers is what a ring's "no dedendum input; it has a
+cutter" already refuses. A **crossed gear pair**'s members are two ordinary
+helical gears, and they had inherited the thread's poverty rather than the
+gear's vocabulary: a crossed pinion could not say its flank had been eaten into
+where the same pinion with parallel shafts could
+([corrections.md](corrections.md)).
+
+**What the qualification then buys is the walk.** `StageResult::members()` is
+every member of a stage that is a gear, whatever kind the stage is, and it is
+the accessor a sweep over "every number every member reports" needs. Written
+field-path by field-path across five kinds, that sweep can only miss the kind
+nobody named — which is how one of the four expressions for a back-driving
+torque came to be unbounded and stay so.
+
+**And it found that no quantitative law crosses the kinds.** A parallel-axis
+member's forward torque is a geometric projection with no efficiency in it, so
+its backward share is the same fraction for both members of a pair. A screw
+pair's output torque carries a forward efficiency the backward load does not
+share, so its two members differ by exactly `1/η_forward` — by construction, and
+correctly. The invariant that does hold everywhere is the weaker one, and it is
+the one asserted: every member of a stage that reacts a load reports a share of
+it, finite, and signed like its own torque. A kind adds its own
 shape *beside* those, never instead of them — a planet is a `GearResult` plus
 what only a planet has, and a hula gear is a `GearResult` plus which side of its
 pair it is. So "its own result type" means the arrangement's own facts, not its

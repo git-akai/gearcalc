@@ -197,8 +197,18 @@ pub(crate) fn undercut_note(tooth: &crate::tooth::Tooth) -> Option<Note> {
 pub struct Widths {
     /// From bending. `None` where the section has no rating.
     pub bending: Option<f64>,
-    /// From contact.
-    pub contact: f64,
+    /// From contact. `None` where no contact *rating* sizes this member's face.
+    ///
+    /// Optional for the same reason `bending` is, and it took a crossed pair to
+    /// make the case reachable: inverting a stress for a width assumes the
+    /// stress depends on the width, and a **point** contact's peak pressure does
+    /// not depend on it at all. A crossed pair's automatic width comes from
+    /// continuity instead — `ε = 1`, a *geometric* minimum, reported as its own
+    /// figure and labelled as the other kind of answer because the two differ by
+    /// 2.4× (`docs/state.md`). Putting that number here would be the mixing this
+    /// project refuses; putting a zero here would be a width nobody needs, which
+    /// `docs/corrections.md` has already been caught by once.
+    pub contact: Option<f64>,
 }
 
 /// The face width every rating is first evaluated at, mm.
@@ -464,11 +474,11 @@ impl MemberRating<'_> {
                                 .bending_allowable(self.material, c, self.reverses),
                         )
                     }),
-                    contact: crate::strength::min_face_width_contact(
+                    contact: Some(crate::strength::min_face_width_contact(
                         contact,
                         width,
                         allowable(self.material, c),
-                    ),
+                    )),
                 }
             }),
         }
@@ -1304,6 +1314,31 @@ impl StageResult {
         }
     }
 
+    /// **Every member of this stage that is a gear**, whatever kind it is.
+    ///
+    /// The kind-independent accessors beside this one — [`Self::ratio`],
+    /// [`Self::efficiency`], [`Self::backlash`] — say what every stage has. This
+    /// says what every *member* has, and it is the one that was missing: a sweep
+    /// over "every number every member reports" had to know the five kinds and
+    /// name their fields, which is how a formula comes to be written five times
+    /// and one of them to be wrong (`docs/corrections.md`, and F30 of the audit
+    /// that added this).
+    ///
+    /// A worm stage contributes **nothing** here, and that is the qualification
+    /// rather than an omission: a worm is a thread and its wheel is the envelope
+    /// of one, so neither is a gear in the sense the rest of this vocabulary
+    /// means. A crossed *gear* pair contributes both of its members
+    /// ([`WormMemberResult::gear`]).
+    #[must_use]
+    pub fn members(&self) -> Vec<&GearResult> {
+        match self {
+            Self::Spur(r) => r.gears.iter().collect(),
+            Self::Planetary(r) => vec![&r.sun, &r.planet.gear, &r.ring],
+            Self::Hula(r) => r.gears.iter().map(|g| &g.gear).collect(),
+            Self::Worm(r) => r.members.iter().filter_map(|m| m.gear.as_ref()).collect(),
+        }
+    }
+
     /// The hula result, if that is what this is.
     #[must_use]
     pub fn as_hula(&self) -> Option<&HulaResult> {
@@ -1483,7 +1518,9 @@ impl FaceSources {
                 }
             }
             if *self.contact.get(case) {
-                want = want.max(w.contact);
+                if let Some(c) = w.contact {
+                    want = want.max(c);
+                }
             }
         }
         want
@@ -2451,16 +2488,124 @@ mod tests {
         let screw = angled.stages[0]
             .as_worm()
             .expect("a crossed pair answers as a screw result");
-        let crossed: Vec<&str> = screw.members[0]
+        let gear = screw.members[0]
+            .gear
+            .as_ref()
+            .expect("a crossed pair's members are gears");
+        let crossed: Vec<&str> = gear
             .clamps
             .iter()
-            .chain(&screw.members[0].notes)
+            .chain(&gear.notes)
             .map(|n| n.key.as_str())
             .collect();
         assert!(
             crossed.contains(&"clamp.tooth_undercut"),
             "the same pinion, shafts crossed, says {crossed:?} — an axis angle \
              is not what decides whether a cutter ate into a flank"
+        );
+    }
+
+    /// **Every member of a stage that reacts a load reports its share of it.**
+    ///
+    /// A walk over `StageResult::members()` rather than over five named field
+    /// paths, which is what that accessor is for: the fault it is looking for is
+    /// a member quietly missing a figure, and a sweep that names the kinds can
+    /// only miss it in the kind nobody named. F30 — a self-locking worm's wheel
+    /// reporting 2.2e307 N·m — was in the fifth.
+    ///
+    /// The claim is deliberately the weak one: **present, finite, and signed
+    /// like the stage's.** A *quantitative* law across kinds does not exist, and
+    /// finding that out is what this test cost. A parallel-axis member's forward
+    /// torque is a geometric projection with no efficiency in it, so the ratio
+    /// of backward to forward is the same for both members. A screw pair's
+    /// output torque carries a forward efficiency that the backward load does
+    /// not share, so its two members differ by exactly `1/η_forward` — by
+    /// construction, and correctly. See [`StageTorques::referred_like`].
+    #[test]
+    fn every_member_of_a_reacting_stage_reports_its_share() {
+        let lib = library();
+        let mut train = two_stage();
+        train.back_driving_torque = 0.5;
+        // **A self-locking stage at the input end**, or nothing reacts the load
+        // and the case is correctly zero at every gear — which would leave this
+        // walking an empty list and passing for the wrong reason. The load
+        // enters at the output and walks up; a worm stops it, and every stage
+        // between it and the output carries it.
+        train.stages.insert(0, Stage::Worm(WormStage::default()));
+        train.stages.push(Stage::Planetary(Box::default()));
+        train.stages.push(Stage::Spur(SpurStage {
+            shaft_angle: 90.0,
+            ..SpurStage::default()
+        }));
+
+        let r = solve_train(&train, &lib).expect("a train that solves");
+        let (mut checked, mut kinds) = (0u32, 0u32);
+        for (k, stage) in r.stages.iter().enumerate() {
+            let members = stage.members();
+            if members.is_empty() {
+                continue;
+            }
+            kinds += 1;
+            for g in members {
+                let back = g.back_driving_torque.unwrap_or_else(|| {
+                    panic!("stage {k}: a member of a stage that reacts the load reports none")
+                });
+                checked += 1;
+                assert!(
+                    back.is_finite(),
+                    "stage {k}: a member reports {back} N·m of back-driving torque"
+                );
+                assert!(
+                    g.torque == 0.0 || back.signum() == g.torque.signum(),
+                    "stage {k}: {back} against a forward torque of {} — a reacted \
+                     load that turns a gear the other way from the drive is a \
+                     claim, not a rounding",
+                    g.torque
+                );
+            }
+        }
+        assert!(kinds >= 3, "only {kinds} stage kinds contributed members");
+        assert!(checked >= 6, "only {checked} members carried the load");
+    }
+
+    /// **A parallel-axis pair's two members share one tangential force**, so the
+    /// load they react is in the ratio of their tooth counts — and nothing about
+    /// efficiency enters, because within a stage the load has not been
+    /// attenuated yet.
+    ///
+    /// The quantitative half of the walk above, asserted where a quantitative
+    /// law exists.
+    #[test]
+    fn a_parallel_pairs_reacted_load_is_in_the_tooth_count_ratio() {
+        let lib = library();
+        let mut train = two_stage();
+        train.back_driving_torque = 0.5;
+        train.stages.insert(0, Stage::Worm(WormStage::default()));
+
+        let r = solve_train(&train, &lib).expect("a train that solves");
+        let mut checked = 0u32;
+        for (k, stage) in r.stages.iter().enumerate() {
+            let Some(spur) = stage.as_spur() else {
+                continue;
+            };
+            let (Some(a), Some(b)) = (
+                spur.gears[0].back_driving_torque,
+                spur.gears[1].back_driving_torque,
+            ) else {
+                continue;
+            };
+            checked += 1;
+            let want = spur.ratio;
+            assert!(
+                (b / a - want).abs() < 1e-9 * want.abs(),
+                "stage {k}: the two members react {a} and {b}, a ratio of {}, \
+                 where the pair steps up by {want}",
+                b / a
+            );
+        }
+        assert!(
+            checked >= 2,
+            "only {checked} parallel stages carried the load"
         );
     }
 
@@ -3164,8 +3309,9 @@ mod tests {
             );
             // ...and with a width, every figure taken at one is a number.
             assert!(
-                g.contact_stress.peak.is_finite() && g.min_face_width.peak.contact.is_finite(),
-                "contact: {} and {}",
+                g.contact_stress.peak.is_finite()
+                    && g.min_face_width.peak.contact.is_some_and(f64::is_finite),
+                "contact: {} and {:?}",
                 g.contact_stress.peak,
                 g.min_face_width.peak.contact
             );
@@ -4075,11 +4221,12 @@ mod tests {
                 for case in [Case::Peak, Case::Cyclic] {
                     let asks = g.min_face_width.get(case);
                     if *sources.contact.get(case) {
-                        assert!(
-                            effective >= asks.contact * (1.0 - 1e-9),
-                            "gear {i} {case:?} contact needs {} mm, mesh carries {effective}",
-                            asks.contact
-                        );
+                        if let Some(c) = asks.contact {
+                            assert!(
+                                effective >= c * (1.0 - 1e-9),
+                                "gear {i} {case:?} contact needs {c} mm, mesh carries {effective}"
+                            );
+                        }
                     }
                     if let (true, Some(b)) = (*sources.bending.get(case), asks.bending) {
                         assert!(
@@ -4183,10 +4330,14 @@ mod tests {
             derated.contact_stress_at_pitch_point, wide.contact_stress_at_pitch_point,
             "an allowable is not a stress and must not move one"
         );
-        let (was, now) = (
-            wide.gears[1].min_face_width.cyclic.contact,
-            derated.gears[1].min_face_width.cyclic.contact,
-        );
+        let contact_width = |r: &SpurResult| {
+            r.gears[1]
+                .min_face_width
+                .cyclic
+                .contact
+                .expect("a spur member is contact-rated")
+        };
+        let (was, now) = (contact_width(&wide), contact_width(&derated));
         assert!(
             (now / was - 4.0).abs() < 1e-9,
             "halving the allowable should quadruple the width: {was} to {now}"

@@ -64,7 +64,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 541 tests** (was 531; the new ones hold F8, F23, F25, F27, F28, F30 and F33).
+**Suite: 543 tests** (was 531).
 
 ---
 
@@ -75,7 +75,7 @@ Settled at the outset, recorded here so they are not re-litigated.
 | | Question | Answer |
 |---|---|---|
 | **Q1** | Is there a compatibility contract on the wire types, the geartrain TOML, the DXF or the CLI's output? | **None.** Any such change is permitted. |
-| **Q2** | Bring `WormMemberResult` inside `GearResult`, or record why a crossed member cannot be one? | **Bring it inside** — on principle, and as a stress test of the claim that a stage kind should be new kinematics and no new rating machinery. **The experiment ran and the premise did not survive it — see below.** |
+| **Q2** | Bring `WormMemberResult` inside `GearResult`, or record why a crossed member cannot be one? | Answered **bring it inside**; the experiment showed the premise was two propositions with opposite answers, and it was re-answered **B** — `gear: Option<GearResult>`, `Some` for a crossed pair, `None` for a worm. Done. |
 | **Q3** | Assert the optimiser's convergence claim, or attempt the closed form? | **Attempt the closed form.** The learnings are worth the effort on their own; assert convergence first regardless, since that step stands alone. |
 | **Q4** | Loosen the guard conventions toward true degeneracy limits, or document them as conventions? | **Loosen — cautiously.** With the caveat below, which is a constraint on the work and not a preference. |
 
@@ -115,7 +115,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | | Finding | Kind | Phase | State |
 |---|---|---|---|---|
 | F1 | The crate has one optimiser and the solve inventory omits it | gap | 1, 4 | **half closed** — inventory names it; the closed form is Phase 4 |
-| F2 | The worm stage is outside the shared member vocabulary | gap | 3 | **re-opened as a question** — the experiment changed the premise; see "Q2 revisited" |
+| F2 | The worm stage is outside the shared member vocabulary | gap | 3 | **closed** — option B; a crossed member is a `GearResult`, a worm's is not and says why |
 | F3 | `GearResult` assembled three times, one field by two formulas | gap | 3 | **closed** — one `GearResult::of`, and the shared rule is `StageTorques::referred_like` |
 | F4 | `StageGear` — a shared input type — lives in `train/spur.rs` | drift | 3 | **closed** — moved, with its `Default`, `AddendumAsked` and serde helpers; `spur.rs` 1017 → 730 lines |
 | F5 | No ledger of the numbers that are not model constants | gap | 2 | **closed** |
@@ -145,7 +145,9 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F29 | The golden corpus was written from a stale binary and the check caught it | holds | — | **closed** — see Phase 2 notes |
 | F30 | A self-locking worm's wheel reported 2.2e307 N·m | gap | 3 | **closed** — and logged in `corrections.md` |
 | F31 | No CLI train sets a back-driving load, so the corpus never exercises one | gap | 3 | open |
-| F32 | `StageResult` has no kind-independent `members()` | gap | 3 | open — blocked on Q2 |
+| F32 | `StageResult` has no kind-independent `members()` | gap | 3 | **closed** |
+| F34 | `Widths::contact` was not optional, so "no rating sizes this face" had no way to be said | gap | 3 | **closed** |
+| F35 | A planetary's member torques carry a forward efficiency; whether a backward load should is unexamined | gap | 5 | open |
 | F33 | A crossed pair's members said nothing about their own teeth | gap | 3 | **closed** — and logged in `corrections.md` |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
@@ -392,7 +394,39 @@ F33 is closed — a crossed member reports its clamps and its undercut note — 
 `GearResult`" to "a member of any kind **that is a gear**", with the
 qualification argued rather than asserted.
 
-### The question, restated
+### Answered: B, and what it took
+
+`WormMemberResult::gear: Option<GearResult>` — `Some` for a crossed pair, `None`
+for a worm stage — and `StageResult::members()` on the back of it. Two things
+fell out that were not foreseen:
+
+**`Widths::contact` had to become optional (F34).** A crossed member's face is
+sized by neither rating: bending is not taken at all, and inverting a contact
+stress for a width assumes the stress depends on the width, which a *point*
+contact's does not. The alternatives were a zero — the exact fault
+`corrections.md` records under "said rather than divided by" — or the continuity
+minimum, which is a *geometric* answer and would be the mixing this project
+refuses. One construction site, one reader, and `width_for` already handled the
+optional `bending` the same way.
+
+**The null-walk gate fired, and was then made narrower.** Two new absences had
+to be named with their reasons, which is the gate working. But `contact` is also
+a tooth-cycle count and a face-width toggle, so allowing the bare name would
+have stopped the gate noticing if either of those went absent. Allowances may be
+dotted paths now, and this one is `min_face_width.peak.contact`.
+
+**And a claim did not survive the walk.** The first draft of
+`every_member_of_a_reacting_stage_reports_its_share` asserted that a stage's
+members agree on the ratio of backward to forward torque. They do not, and the
+disagreement is exactly `1/η_forward` on a screw pair — by construction and
+correctly, since its output torque carries a forward efficiency the backward
+load does not share. The quantitative law holds for parallel-axis kinds and is
+asserted there; across kinds only the weak claim holds. **F35 is the question
+that leaves**: a planetary's member torques also carry a forward efficiency, and
+whether a backward load should be scaled by it is the same question the worm
+answered "no". Nothing measures it.
+
+### The question as it was put
 
 | | Option | What it costs, what it buys |
 |---|---|---|

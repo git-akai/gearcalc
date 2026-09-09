@@ -2081,6 +2081,22 @@ mod tests {
         "pointed",
         // A material value with nothing to say beyond its number.
         "note",
+        // A worm stage's members are not gears: a worm is a thread and its
+        // wheel is the envelope of one, so a profile shift and a buildable
+        // range are questions that cannot be put to them. A crossed *gear*
+        // pair's members are gears and this is `Some` there — the same field
+        // separating the two arrangements that share the result type.
+        "gear",
+        // ...and where no rating sizes a face, no width is asked for. A point
+        // contact's peak pressure does not depend on the face width at all, so
+        // there is nothing to invert; a crossed pair's width comes from
+        // continuity instead, and says so under its own name.
+        //
+        // **Written as a path rather than as a field**, because `contact` is
+        // also a tooth-cycle count and a face-width toggle, and allowing the
+        // bare name would stop this noticing if either of those went absent.
+        "min_face_width.peak.contact",
+        "min_face_width.cyclic.contact",
     ];
 
     /// Every `null` in a result, at a field not named above.
@@ -2092,7 +2108,18 @@ mod tests {
                         .rsplit('.')
                         .find(|s| !s.starts_with('['))
                         .unwrap_or(path);
-                    if !ABSENT_IS_MEANINGFUL.contains(&field) {
+                    // A bare name matches the field wherever it appears; a
+                    // dotted entry has to match the tail of the path, so an
+                    // allowance can be as narrow as the case that earned it.
+                    let bare = path.replace(['[', ']'], "");
+                    let allowed = ABSENT_IS_MEANINGFUL.iter().any(|a| {
+                        if a.contains('.') {
+                            bare.ends_with(a)
+                        } else {
+                            *a == field
+                        }
+                    });
+                    if !allowed {
                         bad.push(path.to_string());
                     }
                 }
