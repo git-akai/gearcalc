@@ -62,7 +62,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 534 tests** (was 531: two hold the command table, one holds F23).
+**Suite: 536 tests** (was 531; the five new ones hold F8, F23 and F25).
 
 ---
 
@@ -136,6 +136,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F22 | The tense rule as written forbade 127 sentences it was not aimed at | drift | 1 | **closed** — the rule was narrowed, not the prose |
 | F23 | The gear tab and a stage member bounded the same gear differently | gap | 2 | **closed** — and logged in `corrections.md` |
 | F24 | The golden corpus covers the CLI, not the wasm boundary | gap | 5 | open |
+| F25 | `load_share`'s two ramps do not meet above ε = 2 | gap | 2 | **closed** — and logged in `corrections.md` |
+| F26 | No sampling constant had a convergence gate | gap | 2 | in progress |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so

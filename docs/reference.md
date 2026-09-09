@@ -1730,6 +1730,14 @@ Above a virtual contact ratio of 2 there is no single-pair zone, the ramp never
 reaches a full share, and it moves the figure by up to a quarter in *either*
 direction — which the
 stage reports, per mesh, since a set can have one mesh in the band and one out.
+
+The share is `RAMP_MIN + (RAMP_MAX − RAMP_MIN)·t` with
+`t = min(d, ε_αn − d)/(ε_αn − 1)` clamped to `[0,1]`, and it is written as that
+`min` rather than as two ramps because above `ε_αn = 2` the two overlap and do
+**not** meet where they are split. It is the entering and leaving ramps of one
+expression, continuous everywhere, and identical to the two-branch form below
+`ε_αn = 2` — where the single-pair plateau covers the whole region they could
+differ in.
 **Below it the model changes nothing**, and that is the model rather than a
 plumbing fault: the single-pair boundary is in the sweep with a share of exactly
 1, so the maximum is the point the unshared rating already took. A hula stage

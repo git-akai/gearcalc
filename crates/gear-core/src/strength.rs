@@ -1475,15 +1475,16 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
     at: &LoadPoint<T>,
     eps_n: f64,
     model: LoadSharing,
+    samples_wanted: usize,
 ) -> Option<(RootSection, f64)> {
     if matches!(model, LoadSharing::None) {
         return Some((at.at(highest_single_pair(eps_n))?, 1.0));
     }
     // The candidates the sweep must not miss, then the sweep itself.
     let mut samples = vec![0.0, eps_n, highest_single_pair(eps_n), eps_n.min(1.0)];
-    for i in 0..=SHARING_SAMPLES {
+    for i in 0..=samples_wanted {
         #[allow(clippy::cast_precision_loss)]
-        let t = i as f64 / SHARING_SAMPLES as f64;
+        let t = i as f64 / samples_wanted as f64;
         samples.push(t * eps_n);
     }
 
@@ -1549,6 +1550,20 @@ fn highest_single_pair(eps_n: f64) -> f64 {
 /// ([rationale](../../../docs/rationale.md)), and the tip. So the sampling
 /// refines an answer it is already guaranteed not to miss, which is why no
 /// tolerance is attached to it.
+/// Points swept along the mesh cycle when load sharing is allowed to move the
+/// governing point.
+///
+/// **The four candidates that must not be missed are seeded explicitly**, not
+/// hoped for — the two ends of the path, the highest point of single-pair
+/// contact, and the end of the single-pair zone — which is why the unshared
+/// answer is reproduced *exactly* below a virtual contact ratio of 2 rather than
+/// to a tolerance. What this count is for is the interior maximum inside the
+/// band, where the product of a rising form factor and a falling share turns
+/// over somewhere with no closed form.
+///
+/// A bound records where a sweep stopped, so this one is measured:
+/// `the_sharing_sweep_has_converged` quadruples it and asserts the answer moves
+/// by less than a part in ten thousand.
 const SHARING_SAMPLES: usize = 200;
 
 /// The critical section to rate bending on, and the share of the load acting
@@ -1599,6 +1614,21 @@ pub fn bending_section_shared<T: ToothOutline>(
     transverse_contact_ratio: f64,
     model: LoadSharing,
 ) -> Option<(RootSection, f64)> {
+    bending_section_shared_with(g, transverse_contact_ratio, model, SHARING_SAMPLES)
+}
+
+/// ...at a stated sweep resolution.
+///
+/// Exists so [`SHARING_SAMPLES`] can be *measured* rather than asserted. A
+/// resolution is a bound on where a sweep stopped, and this project has been
+/// caught taking one of those for a statement about the thing.
+#[must_use]
+pub fn bending_section_shared_with<T: ToothOutline>(
+    g: &T,
+    transverse_contact_ratio: f64,
+    model: LoadSharing,
+    samples: usize,
+) -> Option<(RootSection, f64)> {
     if !transverse_contact_ratio.is_finite() {
         return None;
     }
@@ -1632,6 +1662,7 @@ pub fn bending_section_shared<T: ToothOutline>(
         },
         eps_n,
         model,
+        samples,
     )
 }
 
@@ -1882,6 +1913,57 @@ mod tests {
     use super::*;
     use crate::mesh::MeshKind;
     use crate::GearParams;
+
+    /// **The sharing sweep's resolution has converged.**
+    ///
+    /// `SHARING_SAMPLES` is 200, and a bound taken from a measurement is a
+    /// record of the parameters that were swept rather than a statement about
+    /// the thing — `docs/corrections.md`, "A bound records where the sweep
+    /// stopped". So the count is quadrupled and the answer must not move.
+    ///
+    /// The band this is about is `ε_n ≥ 2`, where there is no single-pair zone
+    /// and the maximum is at an interior point of a smooth product with no
+    /// closed form. **Below the band it cannot move at any resolution**, because
+    /// the four points that can win are seeded into the sweep explicitly rather
+    /// than hoped for — which is asserted here as an exact equality, since that
+    /// is what "the unshared answer is the same answer" means.
+    #[test]
+    fn the_sharing_sweep_has_converged() {
+        for teeth in [12_u32, 17, 43, 97] {
+            for beta in [0.0_f64, 20.0] {
+                let g = Tooth::new(GearParams {
+                    teeth,
+                    helix_angle: beta,
+                    // A high-contact-ratio tooth, so the band is reachable.
+                    addendum: 1.35,
+                    ..Default::default()
+                });
+                for eps in [1.2_f64, 1.9, 2.1, 2.6] {
+                    let at = |n: usize| {
+                        bending_section_shared_with(&g, eps, LoadSharing::LinearRamp, n).map(
+                            |(s, f)| s.bending_factor(RootStressModel::DolanBroghamer).unwrap() * f,
+                        )
+                    };
+                    let (Some(coarse), Some(fine)) = (at(SHARING_SAMPLES), at(4 * SHARING_SAMPLES))
+                    else {
+                        continue;
+                    };
+                    assert!(
+                        (fine - coarse).abs() / coarse < 1e-4,
+                        "z={teeth} β={beta} ε={eps}: quadrupling the sweep moved the \
+                         governing factor {coarse} -> {fine}, so 200 is not converged"
+                    );
+                    // Refining can only *find* a larger maximum, never a
+                    // smaller one, so a fine sweep below a coarse one would mean
+                    // the two are not sampling the same function.
+                    assert!(
+                        fine >= coarse * (1.0 - 1e-12),
+                        "z={teeth} ε={eps}: a finer sweep found a smaller maximum"
+                    );
+                }
+            }
+        }
+    }
 
     /// **Load sharing is off by default, and off means untouched.**
     ///

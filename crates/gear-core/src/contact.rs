@@ -841,12 +841,27 @@ pub fn load_share(d: f64, contact_ratio: f64, model: LoadSharing) -> f64 {
             }
             // Near the far end the tooth is entering; near the origin end it is
             // leaving. Both ramps run from `RAMP_MIN` at the extreme to
-            // `RAMP_MAX` where the single-pair zone begins.
-            let t = if d < contact_ratio - 1.0 {
-                d / double
-            } else {
-                (contact_ratio - d) / double
-            };
+            // `RAMP_MAX` where the single-pair zone begins, so what a point is
+            // worth is set by **the nearer end it is ramping from**.
+            //
+            // Written as a `min` rather than as two branches because above a
+            // contact ratio of 2 the branches do not meet. There the plateau is
+            // empty and the two ramps overlap, and the old split at
+            // `d = ε − 1` took the entering ramp all the way to `RAMP_MAX`
+            // while the leaving ramp reached only `(ε−1)⁻¹` of the way — a
+            // **step of 0.030 in the share at ε = 2.1**, growing with the
+            // ratio, at a point where nothing physical happens.
+            //
+            // Below ε = 2 the two forms are identical, and not to a tolerance:
+            // outside the plateau either `d < ε − 1 ≤ 1 < ε − d` or
+            // `d > 1 ≥ ε − 1 > ε − d`, so the `min` picks exactly the term the
+            // branch did. Gated as that equality over the whole domain.
+            //
+            // The model is still the uncalibrated extrapolation `LoadSharing`
+            // documents above ε = 2. What it is not any more is discontinuous —
+            // "a value becoming a different value across a boundary the physics
+            // does not have is the defect" (`docs/corrections.md`).
+            let t = d.min(contact_ratio - d) / double;
             RAMP_MIN + (RAMP_MAX - RAMP_MIN) * t.clamp(0.0, 1.0)
         }
     }
@@ -878,6 +893,86 @@ pub enum LoadSharing {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// **The share is continuous, and below `ε = 2` it is what it always was.**
+    ///
+    /// Two claims, and the second is why the first was safe to make. The linear
+    /// ramp used to split at `d = ε − 1`, which is where the single-pair zone
+    /// begins — fine while that zone exists. Above `ε = 2` it does not: the two
+    /// ramps overlap, the entering one reached `RAMP_MAX` at that point while
+    /// the leaving one reached only `(ε−1)⁻¹` of the way, and the share **stepped
+    /// by 0.030 at ε = 2.1**, growing with the ratio, where nothing physical
+    /// happens.
+    ///
+    /// It surfaced as a convergence failure rather than as a wrong number: the
+    /// bending sweep's maximum sat on the high side of the jump, so refining the
+    /// sweep kept finding a slightly larger answer and never settled. *A
+    /// discontinuity in the model reads as a resolution problem in whatever
+    /// samples it.*
+    ///
+    /// Asserted **exactly** below `ε = 2`, because it is an identity and not a
+    /// tolerance: outside the plateau either `d < ε − 1 ≤ 1 < ε − d` or
+    /// `d > 1 ≥ ε − 1 > ε − d`, so `min` picks the very term the branch picked.
+    #[test]
+    fn the_load_share_is_continuous_and_unchanged_below_two() {
+        // The form this replaced, kept here as the thing being compared against.
+        let branched = |d: f64, eps: f64| {
+            let double = (eps - 1.0).max(f64::MIN_POSITIVE);
+            if d >= eps - 1.0 && d <= 1.0 {
+                return 1.0;
+            }
+            let t = if d < eps - 1.0 {
+                d / double
+            } else {
+                (eps - d) / double
+            };
+            RAMP_MIN + (RAMP_MAX - RAMP_MIN) * t.clamp(0.0, 1.0)
+        };
+
+        for eps in [1.05_f64, 1.2, 1.4, 1.6, 1.8, 1.999] {
+            for i in 0..=2000 {
+                let d = eps * f64::from(i) / 2000.0;
+                let (now, was) = (
+                    load_share(d, eps, LoadSharing::LinearRamp),
+                    branched(d, eps),
+                );
+                assert_eq!(
+                    now.to_bits(),
+                    was.to_bits(),
+                    "eps={eps} d={d}: below a contact ratio of 2 the share moved"
+                );
+            }
+        }
+
+        // ...and above it, the step is gone. Measured across the seam rather
+        // than at it, since a jump is a statement about a neighbourhood.
+        for eps in [2.001_f64, 2.1, 2.6, 3.0, 4.0] {
+            let seam = eps - 1.0;
+            let h = 1e-9;
+            let (below, at, above) = (
+                load_share(seam - h, eps, LoadSharing::LinearRamp),
+                load_share(seam, eps, LoadSharing::LinearRamp),
+                load_share(seam + h, eps, LoadSharing::LinearRamp),
+            );
+            assert!(
+                (below - at).abs() < 1e-8 && (above - at).abs() < 1e-8,
+                "eps={eps}: the share steps across d = eps-1: {below} / {at} / {above}"
+            );
+            // The old form did step there, which is what makes this a check —
+            // and by exactly the amount the two ramps failed to meet by, which
+            // is a law rather than a threshold and so says the same thing at
+            // every ratio. It vanishes as `ε → 2`, where the plateau closes to
+            // a point and there was never anything to disagree about.
+            let was_step = (branched(seam - h, eps) - branched(seam, eps)).abs();
+            let predicted = (RAMP_MAX - RAMP_MIN) * (1.0 - 1.0 / (eps - 1.0));
+            assert!(
+                (was_step - predicted).abs() < 1e-6,
+                "eps={eps}: the old step was {was_step}, the two ramps miss each \
+                 other by {predicted} — if these disagree, this test is not \
+                 measuring the fault it names"
+            );
+        }
+    }
     use crate::mesh::MeshKind;
     use crate::GearParams;
 
