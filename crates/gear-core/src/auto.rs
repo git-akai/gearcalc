@@ -1343,10 +1343,31 @@ pub struct Search {
     /// — a thousandth of a module is finer than the tolerance any of this is
     /// ground to, and the surface is flat at that scale anyway.
     pub resolution: f64,
-    /// A ceiling on the total work. Sliding along a curved constraint is where
-    /// an unbudgeted pattern search spends its time — and where it binds, it is
-    /// the *coordinates* that are wrong rather than the ceiling that is low, so
-    /// raising it is not the repair.
+    /// A ceiling on the total work, **shared across every start**.
+    ///
+    /// Sliding along a curved constraint is where an unbudgeted pattern search
+    /// spends its time, and this is a cap on that sliding. It is measured, and
+    /// what the measurement says is that it is a *truncation* rather than a
+    /// guard:
+    ///
+    /// - a **pair** converges well inside it — its answer is the same at ten and
+    ///   at a hundred times this, to 4e-7 — and pays for the extra in nothing
+    ///   but time, **24×** of it, which is what a keystroke does not have
+    ///   (`every_search_is_quick_enough_to_type_over`);
+    /// - an **epicyclic set** does not. At ten times this its answer stops
+    ///   moving; at this it is short by up to **3.2e-4** of `η₀`, because its
+    ///   walk is still sliding along the curve its planet's absorption draws
+    ///   when the pool runs out.
+    ///
+    /// So one number cannot serve both, and raising it is not the repair: the
+    /// set is not short of budget, it is short of a direction to climb. `AUDIT.md`
+    /// F50 carries what to do instead.
+    ///
+    /// **Being shared is itself a defect** — a later start runs on whatever an
+    /// earlier one left, so the answer depends on the order the starts happen to
+    /// come in. It is recorded rather than fixed because dividing the pool makes
+    /// each walk shorter and the truncation worse, and multiplying it is the
+    /// 24× above.
     pub budget: usize,
     /// How many of the sweep's best points are walked from.
     pub starts: usize,

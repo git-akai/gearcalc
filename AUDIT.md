@@ -85,9 +85,8 @@ happened to write it. It closed **F59** — three kinds, three different answers
 the same question — and moved no number anywhere, which is what makes it an
 extraction rather than a change.
 
-*Next.* **F50** — a set's search is now one-signed but still under-searches by up
-to 3.2e-4. What is left is the coordinate problem: item 3 below, splitting the
-box at the regime boundary the addendum cap draws, and then the closed form. It
+*F50, diagnosed.* A set's search is one-signed now but still under-searches by up
+to 3.2e-4, and the mechanism is measured rather than guessed — see below. It
 lands **once** now rather than three times, which is the reason to have done the
 extraction first.
 
@@ -842,6 +841,40 @@ quarter-module a standard tooth leaves externally and against the two circles'
 own separation internally. **No number moved**, on any kind, which is what says
 it is an extraction.
 
+#### F50, measured: what closes the gap and what it costs
+
+Four knobs, on the four sets that move most:
+
+| | 11/18 | 13/18 | 13/17 | 24/14 |
+|---|---|---|---|---|
+| shipped | 0.970464 | 0.972258 | 0.971529 | 0.972330 |
+| **starts ×6** | *no change* | *no change* | *no change* | *no change* |
+| **budget ×10** | 0.970775 | 0.972382 | 0.971587 | 0.972345 |
+| everything ×3 | 0.970776 | 0.972382 | 0.971587 | 0.972345 |
+
+**More starting points buy nothing**, so it is not a basin the search is failing
+to reach — that theory is dead. **It is the budget**, and at ten times it the
+answer stops moving: the walk terminates on its own resolution and a hundredfold
+budget costs the same as tenfold. So `BUDGET` is not a guard on this kind, it is
+a **truncation** — the walk is cut off mid-climb.
+
+**And raising it is still not the repair.** A pair converges well inside the
+current budget and pays for a bigger one in nothing but time — **24×** of it,
+which took the pair's search from 0.7 ms to 17 ms and failed
+`every_search_is_quick_enough_to_type_over`, a gate that is right to fail. One
+number cannot serve a search that converges and one that slides.
+
+So the set is **not short of budget; it is short of a direction to climb.** Its
+walk zig-zags along the curve its planet's absorption draws, taking many small
+diagonal steps where one along the curve would do. That is the coordinate
+problem, now with the mechanism nailed rather than inferred.
+
+**A second defect fell out of the same measurement**, recorded on the constant:
+the budget is a pool *shared across starts*, so a later walk runs on whatever an
+earlier one left and the answer depends on the order the starts come in.
+Dividing the pool makes each walk shorter and the truncation worse; multiplying
+it is the 24×. Neither is a fix, and it stays until the sliding does.
+
 ### The repair these three findings agree on
 
 F50 (a set's search is not converged), F52 and F53 have one cause: **the search
@@ -928,15 +961,21 @@ So step 2's work is:
 2. ~~Give a ring an admissible shift range.~~ **Done, and the premise was
    wrong** — the range already existed; what was missing was the cutter's
    question. See F54 above.
-3. **Split the box at the regime boundaries.** The addendum cap's onset is the
+3. **Stop the walk sliding (F50).** It is a pattern search taking diagonal steps
+   along a curve; what it wants is a step *along the active bound*. The bound is
+   known in closed form wherever it is one of the guards, so this is a direction
+   to add to `directions` rather than a new kind of search — and it is what makes
+   the budget a guard again instead of a truncation. **Do not raise `BUDGET`:**
+   measured, that costs a pair 24× and buys it nothing.
+4. **Split the box at the regime boundaries.** The addendum cap's onset is the
    shift at which the tip reaches its minimum width, and
    `addendum_for_tip_width` is already the closed-form solve for it. Cut the
    division's interval there and each piece is smooth.
-4. **Then the closed form applies, piecewise.** On a smooth piece the division's
+5. **Then the closed form applies, piecewise.** On a smooth piece the division's
    stationary condition is `contact::split_residual`, already derived and already
    bracketed by `efficient_split`. Solve each piece and take the best. **The
    division stops being searched at all.**
-5. **Ask the sum the same question.** With the division closed-form at every sum,
+6. **Ask the sum the same question.** With the division closed-form at every sum,
    the sum is one dimension against the active bound — which is what step 2 set
    out to establish, now with the reason the first attempt would have failed.
 
