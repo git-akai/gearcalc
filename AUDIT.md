@@ -41,18 +41,17 @@ against a broken tree is recorded here as `written, not proven`.
 **Phase 0 — build the instrument.** Done, gate run and passed.
 **Phase 1 — truth-up the documents.** Done, gate run and passed.
 **Phase 2 — the number ledger.** Done. Four findings, three of them bugs.
-**Phase 3 — unify what is written twice.** In progress. F2, F3, F4, F32, F33,
-F34 and F36 closed; F30 fell out of F3 and F33 out of F2. What remains is the
-rest of protocol pass 3 — the *mesh* and *stage* halves of the walk, the member
-half now being `StageResult::members()`.
+**Phase 3 — unify what is written twice.** Done. F2, F3, F4, F32, F33, F34,
+F36, F37, F38 and F40 closed, and four of them were bugs.
+**Phase 4 — the optimiser.** Next, and it carries F19 and F1's second half.
 
 | Phase | What it does | State |
 |---|---|---|
 | 0 | Golden corpus, figure provenance, `CLAUDE.md` | **done** — gate proven |
 | 1 | Truth-up the documents against the code | **done** — gate proven |
 | 2 | The number ledger | **done** — gates proven |
-| 3 | Unify what is written twice | **in progress** |
-| 4 | The optimiser | not started |
+| 3 | Unify what is written twice | **done** |
+| 4 | The optimiser | **next** |
 | 5 | Consolidate the tests | not started |
 | 6 | Front end and payload | not started |
 
@@ -65,7 +64,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 545 tests** (was 531).
+**Suite: 546 tests** (was 531).
 
 ---
 
@@ -153,6 +152,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F37 | A given crank offset was not the offset the stage ran at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F38 | The reported clearance was the input echoed, not the gap run at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | open — scheduled, see above |
+| F40 | The tolerance band was built four times and its direction asserted nowhere | gap | 3 | **closed** |
 | F33 | A crossed pair's members said nothing about their own teeth | gap | 3 | **closed** — and logged in `corrections.md` |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
@@ -496,9 +496,34 @@ such rule at all — applied unconditionally, so a given crank offset became the
 nominal one and the stage ran 20 µm wider than the number typed (F37). The
 field's own documentation described the spur behaviour, not its own.
 
-**Still to do:** the mesh half — every mesh-level figure traced to its
-expression across the four kinds. The member half is `StageResult::members()`
-and the stage half is done.
+**The mesh half.** Every field of `MeshReport`, traced across the three kinds
+that build one.
+
+- **`efficiency`** — all four kinds apply `Directional::once_moving`, the
+  static-versus-sliding rule. *Recorded because the first read said otherwise:*
+  a `grep | head` truncated at ten lines and hid the planetary's call, and the
+  finding was half-written before the untruncated grep contradicted it. A
+  measurement taken through a pipe that can silently drop the answer is not a
+  measurement.
+- **`backlash`** — one construction written **four times**, once per kind, each
+  closing over its own way of turning a distance into an angle. That closure is
+  what genuinely differs; the three lines around it were not.
+  `Backlash::banded` now, and the direction is gated on every kind (F40): less
+  centre distance is less room and so less play, which nothing anywhere had
+  asserted.
+- **`contact_stress_at_pitch_point`** — two routes. The spur stage solves the
+  contact twice, once per load case; the planetary and hula stages solve once
+  and scale by `√(torque ratio)`. Both are right, since `σ_H ∝ √T` exactly, and
+  the second is what `LoadCase`'s own contract licenses. **Left as it is** and
+  recorded: collapsing it would mean either an extra solve on two kinds or a
+  scaling on the kind that already has both figures in hand.
+- **`operating_pressure_angle`, `coprime`, `relative_radius`, `contact_ratios`**
+  — one expression each, differing only in which mesh they are asked of.
+
+**Phase 3 is done.** Nine findings out of it, of which four were bugs
+(F30, F33, F37, F38) and one a claim in the documents that was false of the code
+(F2). The golden corpus is unchanged across all of it except where a change was
+the point.
 
 ---
 

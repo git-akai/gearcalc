@@ -681,10 +681,10 @@ pub fn solve_spur_stage_with(
     // and `MeshReport::backlash_by_drive` is the one place that turns the first
     // reading into the second. It used to be a `match` from `Drive` to
     // `MeshSide` written out here as well.
-    let at_member = |at: MeshSide| Backlash {
-        nominal: angular(centre, at),
-        minimum: angular(centre - stage.tolerance_minus, at),
-        maximum: angular(centre + stage.tolerance_plus, at),
+    let at_member = |at: MeshSide| {
+        Backlash::banded(centre, stage.tolerance_minus, stage.tolerance_plus, |d| {
+            angular(d, at)
+        })
     };
     let backlash = [at_member(MeshSide::First), at_member(MeshSide::Second)];
 

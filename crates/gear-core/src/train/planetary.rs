@@ -999,10 +999,10 @@ pub fn solve_planetary_stage_with(
     let angular = |mesh: &Mesh, a: f64, at: MeshSide| -> f64 {
         mesh.angular_backlash(a, at).unwrap_or(0.0).to_degrees()
     };
-    let backlash_of = |mesh: &Mesh, at: MeshSide| Backlash {
-        nominal: angular(mesh, centre, at),
-        minimum: angular(mesh, centre - stage.tolerance_minus, at),
-        maximum: angular(mesh, centre + stage.tolerance_plus, at),
+    let backlash_of = |mesh: &Mesh, at: MeshSide| {
+        Backlash::banded(centre, stage.tolerance_minus, stage.tolerance_plus, |d| {
+            angular(mesh, d, at)
+        })
     };
 
     // ---- layout.

@@ -976,23 +976,12 @@ pub fn solve_worm_stage(
             Drive::Forward => MeshSide::Second,
             Drive::Backward => MeshSide::First,
         };
-        Backlash {
-            nominal: angular_backlash(&s, stage, centre - s.centre_distance, at).to_degrees(),
-            minimum: angular_backlash(
-                &s,
-                stage,
-                centre - stage.tolerance_minus - s.centre_distance,
-                at,
-            )
-            .to_degrees(),
-            maximum: angular_backlash(
-                &s,
-                stage,
-                centre + stage.tolerance_plus - s.centre_distance,
-                at,
-            )
-            .to_degrees(),
-        }
+        // The screw law takes the *separation* from the geometric distance
+        // rather than the distance itself, which is the only thing that differs
+        // from a parallel stage's band.
+        Backlash::banded(centre, stage.tolerance_minus, stage.tolerance_plus, |d| {
+            angular_backlash(&s, stage, d - s.centre_distance, at).to_degrees()
+        })
     });
 
     let mut notes = Vec::new();

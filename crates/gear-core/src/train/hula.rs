@@ -1083,10 +1083,10 @@ pub fn solve_hula_stage_with(
         .ok_or(TrainError::NoContact)?;
         let angular =
             |a: f64, at: MeshSide| p.mesh.angular_backlash(a, at).unwrap_or(0.0).to_degrees();
-        let backlash_of = |at: MeshSide| super::Backlash {
-            nominal: angular(offset, at),
-            minimum: angular(offset - stage.tolerance_minus, at),
-            maximum: angular(offset + stage.tolerance_plus, at),
+        let backlash_of = |at: MeshSide| {
+            super::Backlash::banded(offset, stage.tolerance_minus, stage.tolerance_plus, |d| {
+                angular(d, at)
+            })
         };
         meshes.push(HulaMesh {
             report: MeshReport {

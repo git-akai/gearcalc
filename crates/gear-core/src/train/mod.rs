@@ -114,6 +114,29 @@ pub struct Backlash {
     pub maximum: f64,
 }
 
+impl Backlash {
+    /// The band a centre-distance tolerance opens around a nominal distance.
+    ///
+    /// **One construction, because the sign convention is one claim.** A
+    /// *smaller* centre distance leaves less room and so less play, and a larger
+    /// one more — so `minus` gives the minimum and `plus` the maximum, and
+    /// getting that backwards produces a band that reads perfectly well and is
+    /// inside out.
+    ///
+    /// It was written out four times, once per stage kind, each closing over its
+    /// own way of turning a distance into an angle. That is the part that
+    /// genuinely differs — a parallel mesh, a screw pair and a crank each reach
+    /// it differently — so it is the argument, and the three lines around it are
+    /// not.
+    pub fn banded(nominal: f64, minus: f64, plus: f64, angular: impl Fn(f64) -> f64) -> Self {
+        Self {
+            nominal: angular(nominal),
+            minimum: angular(nominal - minus),
+            maximum: angular(nominal + plus),
+        }
+    }
+}
+
 /// **What one parallel-axis mesh reports**, for any stage kind that has more
 /// than one of them.
 ///
@@ -2678,6 +2701,59 @@ mod tests {
             }
         }
         assert!(checked >= 12, "only {checked} configurations solved");
+    }
+
+    /// **A tolerance band opens the way round it says it does**, on every kind
+    /// that reports one.
+    ///
+    /// Less centre distance is less room and so less play. That is one claim,
+    /// and it was written out four times — once per stage kind, each closing
+    /// over its own way of turning a distance into an angle. Getting it
+    /// backwards in one of them would have produced a band that reads perfectly
+    /// well and is inside out, and nothing anywhere asserted the direction.
+    ///
+    /// `Backlash::banded` is the one construction now; this is the claim it
+    /// makes, checked through all four kinds rather than at the constructor,
+    /// because the argument each passes is the part that could still be wrong.
+    #[test]
+    fn a_tolerance_band_widens_with_the_centre_distance() {
+        let lib = library();
+        let mut train = two_stage();
+        train.stages = vec![
+            Stage::Spur(SpurStage::default()),
+            Stage::Worm(WormStage::default()),
+            Stage::Planetary(Box::default()),
+            Stage::Hula(Box::default()),
+            Stage::Spur(SpurStage {
+                shaft_angle: 90.0,
+                ..SpurStage::default()
+            }),
+        ];
+        let r = solve_train(&train, &lib).expect("a train of every kind");
+
+        let mut checked = 0u32;
+        let mut check = |what: &str, b: &Backlash| {
+            checked += 1;
+            assert!(
+                b.minimum <= b.nominal && b.nominal <= b.maximum,
+                "{what}: the band runs {} … {} … {}, which is not an order",
+                b.minimum,
+                b.nominal,
+                b.maximum
+            );
+            assert!(
+                b.maximum > b.minimum,
+                "{what}: a tolerance that opens nothing — {} either way",
+                b.minimum
+            );
+        };
+
+        for (k, stage) in r.stages.iter().enumerate() {
+            let d = stage.backlash();
+            check(&format!("stage {k} forward"), &d.forward);
+            check(&format!("stage {k} backward"), &d.backward);
+        }
+        assert!(checked >= 10, "only {checked} bands checked");
     }
 
     fn two_stage() -> Train {
