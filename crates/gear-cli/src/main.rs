@@ -163,10 +163,10 @@ const COMMANDS: &[Command] = &[
     },
     Command {
         name: "train",
-        args: "[mixed]",
-        summary: "a two-stage geartrain, end to end; `mixed` puts a worm stage in it",
-        run: |a| train_report(a.get(1).map(String::as_str) == Some("mixed")),
-        record: Record::Cases(&["train", "train mixed"]),
+        args: "[mixed|held]",
+        summary: "a two-stage geartrain, end to end; `mixed` puts a worm stage in it, `held` back-drives that worm harder than the drive does",
+        run: |a| train_report(a.get(1).map(String::as_str)),
+        record: Record::Cases(&["train", "train mixed", "train held"]),
         slow: false
     },
     Command {
@@ -1073,7 +1073,7 @@ fn train_file_report(path: Option<&str>) {
     }
 }
 
-fn train_report(mixed: bool) {
+fn train_report(mode: Option<&str>) {
     use gear_core::params::Auto;
     use gear_core::train::{
         solve_train, Actuation, SpurStage, Stage, StageGear, StageResult, Train, WormStage,
@@ -1088,25 +1088,32 @@ fn train_report(mixed: bool) {
     let train = Train {
         input_speed: 3000.0,
         input_torque: 2.0,
-        // **The mixed train carries a back-driving load and the plain one does
-        // not**, so the corpus covers both. Mixed is the one with the worm
-        // stage, which self-locks — so the load is *reacted* rather than
-        // passing through, which is the case the whole feature exists for and
-        // the one every fault in it has been in.
+        // **Three trains, because a back-driving load has three regimes** and
+        // the corpus has to walk all of them. `train` reacts none of it;
+        // `train mixed` reacts a load the drive still outweighs; `train held` is
+        // the worm holding more than it is driving, which is what a self-locking
+        // worm is chosen to do and is the only regime in which the *peak* load
+        // case is the backward one.
         //
         // Every train this harness shipped set this to zero, so
         // `tools/check_golden.sh` recorded a path nothing ever walked: a
         // self-locking worm's wheel reported 2.2e307 N·m and an epicyclic set's
-        // ring 6 % low, and the corpus could not have shown either
+        // ring 6 % low, and the corpus could not have shown either. Then the
+        // load it did walk was one the drive outweighed, so the corpus still
+        // could not show a stage rated at `η_forward` of what it was holding
         // (`docs/corrections.md`).
-        back_driving_torque: if mixed { 0.6 } else { 0.0 },
+        back_driving_torque: match mode {
+            Some("held") => 400.0,
+            Some("mixed") => 0.6,
+            _ => 0.0,
+        },
         operating_torque: 2.0,
         reversed_bending: false,
         actuation: Actuation::Continuous {
             operating_speed: 2400.0,
             runtime_hours: 1000.0,
         },
-        stages: if mixed {
+        stages: if matches!(mode, Some("mixed" | "held")) {
             vec![
                 Stage::Spur(SpurStage {
                     gears: [auto_width(17), auto_width(43)],

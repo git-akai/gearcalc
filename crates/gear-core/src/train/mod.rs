@@ -425,8 +425,19 @@ impl Loading {
     }
 
     /// Both load cases, for a stage whose ratings scale with the torque.
-    pub(crate) fn both_cases(loadings: &[Self], scale: LoadCase<f64>) -> LoadCase<Vec<Self>> {
-        LoadCase::of(|case| loadings.iter().map(|l| l.under(*scale.get(case))).collect())
+    ///
+    /// **The scale is the mesh's, not the stage's.** Each loading is evaluated
+    /// at the torque its own mesh carries and carries the fraction of that the
+    /// other case is ([`LoadCase::as_fraction_of_peak`]) — because which
+    /// direction loads a mesh hardest is a fact about that mesh, and a set's two
+    /// meshes need not agree about it (`StageTorques::on_mesh`).
+    pub(crate) fn both_cases(loadings: &[(Self, LoadCase<f64>)]) -> LoadCase<Vec<Self>> {
+        LoadCase::of(|case| {
+            loadings
+                .iter()
+                .map(|(l, scale)| l.under(*scale.get(case)))
+                .collect()
+        })
     }
 }
 
@@ -1655,20 +1666,62 @@ pub struct StageTorques {
 }
 
 impl StageTorques {
-    /// The torque to rate a load case at.
+    /// **What one mesh carries, in each load case** — a load case being a torque
+    /// *and a direction*.
     ///
-    /// The peak case takes whichever direction loads the teeth harder. Both have
-    /// already been attenuated by the efficiencies on their own way here, so
-    /// either can be the larger and either can be absent.
+    /// `forward` is what this mesh carries driving forward and `backward` what
+    /// it carries being driven, each already distributed by the stage's own
+    /// construction. The peak is the worse of them and the operating case is
+    /// the forward one at the duty torque, since that is the load the train
+    /// runs at.
+    ///
+    /// # The order matters
+    ///
+    /// The peak is taken **after** each direction's distribution rather than
+    /// before it. Taking the larger of the two *shaft* torques first and pushing
+    /// that one magnitude through the forward construction is the same answer
+    /// only where the distribution does not depend on which way the stage is
+    /// driven — true of a parallel-axis mesh, which carries one tangential force
+    /// whichever way it turns, and false of an epicyclic set, where which shaft
+    /// drives decides on which side `η₀` multiplies, and of a screw pair, whose
+    /// output torque carries a forward efficiency a backward load does not
+    /// share. Both were rated the wrong way round; `docs/corrections.md` records
+    /// what it cost.
+    ///
+    /// # Zero is a load
+    ///
+    /// A stage may be driven forward at zero torque and back-driven at a real
+    /// one, so the operating fraction is taken against the *forward* peak and
+    /// the case torques against nothing at all. A stage carrying nothing in
+    /// either direction rates at zero, which is the answer and not a failure.
+    #[must_use]
+    pub fn on_mesh(&self, forward: f64, backward: Option<f64>) -> LoadCase<f64> {
+        LoadCase {
+            peak: forward.abs().max(backward.unwrap_or(0.0).abs()),
+            cyclic: forward.abs() * self.duty_fraction(),
+        }
+    }
+
+    /// The duty torque as a fraction of the peak driving **forward** — what a
+    /// forward-carried load scales by to reach the operating case. Zero peak is
+    /// zero duty, which is the only reading that does not divide by it.
+    fn duty_fraction(&self) -> f64 {
+        if self.peak_forward == 0.0 {
+            0.0
+        } else {
+            (self.cyclic / self.peak_forward).abs()
+        }
+    }
+
+    /// The torque to rate a load case at, on the shaft the stage was handed.
+    ///
+    /// [`Self::on_mesh`] asked of the input shaft itself, which is the mesh load
+    /// wherever the distribution is a direction-independent projection.
     #[must_use]
     pub fn at(&self, case: Case) -> f64 {
-        match case {
-            Case::Peak => self
-                .peak_forward
-                .abs()
-                .max(self.peak_backward.unwrap_or(0.0).abs()),
-            Case::Cyclic => self.cyclic.abs(),
-        }
+        *self
+            .on_mesh(self.peak_forward, self.peak_backward)
+            .get(case)
     }
 
     /// Everything at one torque, and nothing back-driving — the shape a caller
@@ -1780,6 +1833,31 @@ impl<T> LoadCase<T> {
         LoadCase {
             peak: f(self.peak),
             cyclic: f(self.cyclic),
+        }
+    }
+}
+
+impl LoadCase<f64> {
+    /// Each case as a multiple of the peak — what a figure evaluated at the peak
+    /// scales by to reach the other case.
+    ///
+    /// A rating is evaluated once, at the worst torque the mesh carries, and the
+    /// operating case is that scaled; so this is the companion of
+    /// [`StageTorques::on_mesh`], which says what those two torques are. **A
+    /// zero peak is zero everywhere** — a mesh carrying nothing is a load and
+    /// not a division to guard against.
+    #[must_use]
+    pub fn as_fraction_of_peak(&self) -> Self {
+        if self.peak == 0.0 {
+            Self {
+                peak: 0.0,
+                cyclic: 0.0,
+            }
+        } else {
+            Self {
+                peak: 1.0,
+                cyclic: self.cyclic / self.peak,
+            }
         }
     }
 }
@@ -2403,58 +2481,85 @@ mod tests {
         }
     }
 
-    /// **A back-driving load is the load, wherever it is read.**
+    /// **A back-driving load is the load, and the reverse is the forward
+    /// construction with the roles swapped.**
     ///
-    /// It enters at the output and `back_driving_torques` refers it to each
-    /// stage's input shaft. So the member *on* the output shaft must report the
-    /// applied torque itself — no efficiency, because within a stage nothing has
-    /// happened to it yet; the loss is applied between stages, on the walk up.
+    /// It enters at the output. The member *on* that shaft carries the applied
+    /// torque itself — nothing has happened to it yet — and the member at the
+    /// other end carries it referred by the ratio and cut by the mesh's loss
+    /// **the backward way**, exactly as driving forward the output member
+    /// carries the input's referred by the ratio and cut by the forward loss.
+    /// One construction, read from either end.
     ///
-    /// The worm stage divided by its own backward efficiency here, on the
-    /// reading that the mesh loses something carrying the load. It does, and
-    /// that loss was already counted. A worm's backward efficiency is **zero**
-    /// whenever it self-locks — which is the case a worm is chosen for — so the
-    /// wheel reported **2.2e307 N·m**. Finite, so it crossed as a number rather
-    /// than as the `null` an infinity becomes, and drew on screen as a figure.
+    /// Two things this has caught, in opposite directions. It once *divided* by
+    /// the backward efficiency, and a worm's is **zero** whenever it self-locks
+    /// — the case a worm is chosen for — so the wheel reported **2.2e307 N·m**:
+    /// finite, so it crossed the boundary as a number rather than as the `null`
+    /// an infinity becomes, and drew on screen as a figure. The correction
+    /// dropped the factor altogether, which left the *worm* claiming a shaft
+    /// torque a locked mesh does not deliver.
     ///
-    /// Asserted against the load rather than against 0.5, so it says the same
-    /// thing at any torque, and on a self-locking stage specifically because
-    /// that is where the old form was unbounded.
+    /// **Both ends of the friction range**, because a self-locking worm alone
+    /// cannot tell "times `η_backward`" from "times nought": the loose fixture
+    /// is what makes the factor a factor.
     #[test]
     fn a_self_locking_worm_reports_the_load_it_reacts() {
         let lib = library();
-        for applied in [0.5_f64, 3.0, 12.5] {
-            let mut train = two_stage();
-            train.stages = vec![Stage::Worm(WormStage::default())];
-            train.back_driving_torque = applied;
+        // A worm that locks, and one loose enough to be driven backward — with a
+        // locking worm behind it either way, since a load exists only where
+        // something reacts it and a train that can be back-driven end to end
+        // carries none of it.
+        for friction in [0.16_f64, 0.02] {
+            for applied in [0.5_f64, 3.0, 12.5] {
+                let mut train = two_stage();
+                train.stages = vec![
+                    Stage::Worm(WormStage::default()),
+                    Stage::Worm(WormStage {
+                        sliding_friction: friction,
+                        static_friction: friction,
+                        ..WormStage::default()
+                    }),
+                ];
+                train.back_driving_torque = applied;
 
-            let r = solve_train(&train, &lib).expect("a train that solves");
-            let w = r.stages[0].as_worm().expect("a worm stage");
-            assert!(
-                w.efficiency.backward <= 0.0,
-                "this fixture must self-lock or it does not reach the fault"
-            );
+                let r = solve_train(&train, &lib).expect("a train that solves");
+                let w = r.stages[1].as_worm().expect("a worm stage");
+                let locks = w.efficiency.self_locking();
+                assert_eq!(
+                    locks,
+                    friction > 0.1,
+                    "the fixture must span both sides of the threshold"
+                );
 
-            let wheel = w.members[1]
-                .back_driving_torque
-                .expect("the stage reacts the load, so its output member carries it");
-            assert!(
-                (wheel - applied).abs() < 1e-9,
-                "the wheel is on the output shaft and the load is {applied} N·m, \
-                 but it reports {wheel}"
-            );
+                let wheel = w.members[1]
+                    .back_driving_torque
+                    .expect("the stage reacts the load, so its output member carries it");
+                assert!(
+                    (wheel - applied).abs() < 1e-9,
+                    "the wheel is on the output shaft and the load is {applied} N·m, \
+                     but it reports {wheel}"
+                );
 
-            // ...and the worm sees it referred by the ratio, which is the shaft
-            // the walk refers to.
-            let worm = w.members[0]
-                .back_driving_torque
-                .expect("likewise the input member");
-            assert!(
-                (worm * w.ratio - wheel).abs() < 1e-9,
-                "the two members disagree about one load: {worm} at the worm \
-                 against {wheel} at the wheel, on a ratio of {}",
-                w.ratio
-            );
+                // ...and the worm carries it referred by the ratio and attenuated
+                // by the loss the mesh takes carrying it that way.
+                let worm = w.members[0]
+                    .back_driving_torque
+                    .expect("likewise the input member");
+                let want = wheel / w.ratio * w.efficiency.backward.max(0.0);
+                assert!(
+                    (worm - want).abs() < 1e-9 * applied,
+                    "the worm reports {worm} where {wheel} at the wheel over a \
+                     ratio of {} at {:.4} backward efficiency is {want}",
+                    w.ratio,
+                    w.efficiency.backward
+                );
+                assert_eq!(
+                    locks,
+                    worm == 0.0,
+                    "a locked mesh delivers nothing to the worm's shaft, and an \
+                     unlocked one delivers something: {worm} N·m at μ = {friction}"
+                );
+            }
         }
     }
 
@@ -2596,6 +2701,187 @@ mod tests {
         }
         assert!(kinds >= 3, "only {kinds} stage kinds contributed members");
         assert!(checked >= 6, "only {checked} members carried the load");
+    }
+
+    /// **A member is rated at the load it carries, whichever way it carries it.**
+    ///
+    /// Every rating here is linear in the member's own torque, or the square root
+    /// of it, so with the duty torque set to the peak the two load cases stand in
+    /// exactly the ratio of the two torques the member reports — its forward one,
+    /// and the worse of that and its share of a back-driving load. Checkable from
+    /// the outputs alone, without knowing what any of them should be.
+    ///
+    /// **The fault it is for.** A load case was collapsed to one magnitude *at
+    /// the stage's input shaft* and that magnitude pushed through the forward
+    /// construction. That is the same answer only where the distribution does not
+    /// depend on direction — a parallel-axis mesh carries one tangential force
+    /// whichever way it turns — and an epicyclic set is not such a stage: which
+    /// shaft drives decides on which side `η₀` multiplies. Measured on the shipped
+    /// set, a back-driven ring was rated **6.0 % low** in bending and 3.0 % low in
+    /// contact; on the hula stage, whose reduction is far larger, **41 % low** and
+    /// 23 % low. The member torques themselves had already been put right
+    /// (`docs/corrections.md`); the ratings had not, and nothing compared them.
+    ///
+    /// Every kind that reports per-member stresses is walked, through
+    /// `StageResult::members()` rather than five named paths, for the reason that
+    /// accessor exists.
+    #[test]
+    fn a_member_is_rated_at_the_load_it_carries() {
+        let lib = library();
+        // **Both sides of the maximum.** A small load leaves every member loaded
+        // hardest driving forward, where the law reads "the two cases are equal"
+        // and is a control; a large one puts every member on the backward
+        // distribution, which is the case the fault was in.
+        let (mut checked, mut dominated, mut forward_won) = (0u32, 0u32, 0u32);
+        for applied in [1.0e2_f64, 1.0e10] {
+            let mut train = two_stage();
+            train.back_driving_torque = applied;
+            train.operating_torque = train.input_torque;
+            train.stages.insert(0, Stage::Worm(WormStage::default()));
+            train.stages.push(Stage::Planetary(Box::default()));
+            train.stages.push(Stage::Hula(Box::default()));
+
+            let r = solve_train(&train, &lib).expect("a train that solves");
+            for (k, stage) in r.stages.iter().enumerate() {
+                for (i, g) in stage.members().iter().enumerate() {
+                    let Some(back) = g.back_driving_torque else {
+                        continue;
+                    };
+                    let forward = g.torque.abs();
+                    assert!(
+                        forward > 0.0,
+                        "stage {k} member {i} carries nothing driving forward, so \
+                     this law has no ratio to check"
+                    );
+                    let want = forward.max(back.abs()) / forward;
+                    if want > 1.0 {
+                        dominated += 1;
+                    } else {
+                        forward_won += 1;
+                    }
+                    checked += 1;
+                    if let (Some(peak), Some(cyclic)) =
+                        (g.bending_stress.peak, g.bending_stress.cyclic)
+                    {
+                        assert!(
+                            (peak / cyclic - want).abs() < 1e-9 * want,
+                            "stage {k} member {i}: bending {peak} against {cyclic} is \
+                         {}, where {forward} N·m forward and {back} N·m backward \
+                         make {want}",
+                            peak / cyclic
+                        );
+                    }
+                    let (peak, cyclic) = (g.contact_stress.peak, g.contact_stress.cyclic);
+                    assert!(
+                        (peak / cyclic - want.sqrt()).abs() < 1e-9 * want,
+                        "stage {k} member {i}: contact {peak} against {cyclic} is {}, \
+                     where the torques make {}",
+                        peak / cyclic,
+                        want.sqrt()
+                    );
+                }
+            }
+        }
+        assert!(checked >= 18, "only {checked} members carried the load");
+        assert!(
+            dominated >= 9 && forward_won >= 9,
+            "{dominated} members were loaded harder backward and {forward_won} \
+             harder forward — both sides of the maximum have to be reached or \
+             this only checks one of them"
+        );
+    }
+
+    /// **The same torque on the wheel is the same rating, whichever end it came
+    /// from.**
+    ///
+    /// A screw pair is the other kind whose distribution depends on direction:
+    /// driving forward the wheel carries the worm's torque stepped up *and cut by
+    /// the mesh's own loss*, while a back-driving load arrives at the wheel
+    /// already. So a stage rated at `max(T_in, T_back)` and then stepped up and
+    /// cut once is rating a back-driven pair at `η_forward` of its load — 62 % of
+    /// it on the shipped worm.
+    ///
+    /// Asserted by building the same wheel torque twice, from either end, and
+    /// demanding one answer. The forward train is the definition; the back-driven
+    /// one is the claim.
+    #[test]
+    fn a_worm_is_rated_at_the_torque_on_its_wheel_from_either_end() {
+        let lib = library();
+        let load = 400.0;
+
+        let driven = |input_torque: f64, back: f64| {
+            let mut train = two_stage();
+            train.input_torque = input_torque;
+            train.operating_torque = input_torque;
+            train.back_driving_torque = back;
+            train.stages = vec![Stage::Worm(WormStage::default())];
+            let r = solve_train(&train, &lib).expect("a train that solves");
+            let w = r.stages[0].as_worm().expect("a worm stage");
+            (w.contact.peak.max_pressure, w.ratio, w.efficiency.forward)
+        };
+
+        // Driven backward at `load` on the wheel, with nothing at all coming the
+        // other way — zero is a torque, and a stage carrying none of it forward
+        // still carries this.
+        let (from_output, ratio, eta) = driven(0.0, load);
+        // ...and driven forward hard enough to put the same torque on the wheel.
+        let (from_input, _, _) = driven(load / (ratio * eta), 0.0);
+
+        assert!(
+            (from_output - from_input).abs() < 1e-6 * from_input,
+            "the same {load} N·m on the wheel rates at {from_output} MPa reached \
+             from the output and {from_input} MPa reached from the input"
+        );
+    }
+
+    /// **Zero is a torque.**
+    ///
+    /// A train has an operating torque as well as a peak, and nothing stops it
+    /// being nought: a mechanism that is held rather than driven runs at no load
+    /// and still has to be rated for the peak it sees. Every parallel-axis kind
+    /// answered; a worm stage returned `NoContact` and took the whole train down
+    /// with it, because the Hertz point solution refused a zero force where the
+    /// limit is a closed form — the patch closes to a point and the pressure with
+    /// it (`crate::hertz::elliptical_contact`).
+    ///
+    /// Asserted on every kind rather than on the one that failed, since what is
+    /// being claimed is a property of the tool and not a patch to a stage.
+    #[test]
+    fn a_stage_carrying_nothing_is_a_stage() {
+        let lib = library();
+        for stage in [
+            Stage::Spur(SpurStage::default()),
+            Stage::Worm(WormStage::default()),
+            Stage::Planetary(Box::default()),
+            Stage::Hula(Box::default()),
+        ] {
+            let mut train = two_stage();
+            train.stages = vec![stage];
+            train.operating_torque = 0.0;
+            let r = solve_train(&train, &lib)
+                .unwrap_or_else(|e| panic!("a stage at no operating load: {e:?}"));
+            // A worm's members are not gears, so the walk below is empty there
+            // and the claim is the stage's own — which is the one that failed.
+            if let Some(w) = r.stages[0].as_worm() {
+                assert_eq!(w.contact.cyclic.max_pressure, 0.0);
+                assert!(w.contact.peak.max_pressure > 0.0);
+            }
+            for (i, g) in r.stages[0].members().iter().enumerate() {
+                assert_eq!(
+                    g.contact_stress.cyclic, 0.0,
+                    "member {i} carries nothing and reports a stress"
+                );
+                assert!(
+                    g.bending_stress.cyclic.is_none_or(|s| s == 0.0),
+                    "member {i} carries nothing and reports {:?}",
+                    g.bending_stress.cyclic
+                );
+                assert!(
+                    g.contact_stress.peak > 0.0,
+                    "member {i} still has a peak to survive"
+                );
+            }
+        }
     }
 
     /// **A parallel-axis pair's two members share one tangential force**, so the
@@ -4656,12 +4942,19 @@ mod tests {
             "this worm was meant to lock: backward efficiency {}",
             worm.efficiency.backward
         );
-        for m in &worm.members {
-            assert!(
-                m.back_driving_torque.is_some_and(|t| t > 0.0),
-                "the stage that reacts the load carries it"
-            );
-        }
+        // The wheel is on the shaft the load enters by and carries all of it;
+        // the worm is at the far end of a mesh that cannot pass it, so its shaft
+        // carries **none** — which is what a locked stage means and is not the
+        // same as the case being absent (`a_self_locking_worm_reports_the_load_it_reacts`).
+        assert_eq!(
+            worm.members
+                .iter()
+                .map(|m| m.back_driving_torque)
+                .collect::<Vec<_>>(),
+            vec![Some(0.0), Some(5.0)],
+            "the stage that reacts the load carries it, on the member the load \
+             is on"
+        );
         for s in &r.stages[..2] {
             for g in &spur(s).gears {
                 assert_eq!(

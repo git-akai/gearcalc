@@ -54,14 +54,21 @@ esac
 #
 # The full run insists on release all the same, because two of the slow cases are
 # minutes rather than seconds without it.
+#
+# **Built every time, never merely found.** This used to take whatever binary
+# was already on disk and only build when there was none, which is how a corpus
+# comes to be written from code that no longer exists — the fault
+# `docs/corrections.md` records under a stale binary, met a second time in the
+# instrument written to catch it. A command added to the table was invisible
+# until something else forced a rebuild, and `--write` then *deleted* its golden
+# file. Cargo is incremental, so an up-to-date tree pays nothing for this.
 bin="$root/target/release/gear-cli"
+profile=(--release)
 if $fast && [[ ! -x "$bin" && -x "$root/target/debug/gear-cli" ]]; then
   bin="$root/target/debug/gear-cli"
+  profile=()
 fi
-if [[ ! -x "$bin" ]]; then
-  cargo build --release --manifest-path "$root/Cargo.toml" --bin gear-cli >/dev/null
-  bin="$root/target/release/gear-cli"
-fi
+cargo build "${profile[@]}" --manifest-path "$root/Cargo.toml" --bin gear-cli >/dev/null
 
 slug() { echo "$1" | tr ' /' '__'; }
 

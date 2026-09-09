@@ -1821,8 +1821,19 @@ tells one that is wider than its mate that it needs face in proportion to how
 much wider it is.
 
 A gear's reported `torque` is the one it carries **driving forward**; a
-back-driving load is reported beside it, not folded into it. The peak *rating*
-still uses whichever direction loads the teeth harder.
+back-driving load is reported beside it, not folded into it. Each is that
+direction's own construction with the roles swapped — so a member at the far end
+of a mesh carries the load referred by the ratio and cut by the loss the mesh
+takes carrying it *that* way, which for a locked mesh is nought.
+
+The peak *rating* uses whichever direction loads the teeth harder, **member by
+member and mesh by mesh** — the maximum is taken after each direction's
+distribution, never before it. A parallel-axis pair distributes one tangential
+force the same way whichever end drives, so for it the two orders agree; a screw
+pair and an epicyclic set distribute differently, and for them they do not.
+
+The operating case may legitimately be **zero**, and a stage carrying nothing
+rates at nothing rather than refusing to answer.
 
 ### Tooth cycles
 

@@ -899,16 +899,6 @@ pub fn solve_hula_stage_with(
         })
         .collect::<Result<_, _>>()?;
 
-    // A load case is a scale on the torque the flow was solved at: every rating
-    // is linear or square-root in it, and the power split does not depend on its
-    // magnitude, so a second case is a scale rather than a second solve.
-    let scale = LoadCase::of(|case| {
-        if input_torque == 0.0 {
-            0.0
-        } else {
-            torques.at(case) / input_torque.abs()
-        }
-    });
     // No member of this stage is structurally reversed — see
     // [`solve_hula_stage_with`] — so all four answer to the train's own reversal alone.
     let reverses = reversal.reverses(false);
@@ -934,7 +924,7 @@ pub fn solve_hula_stage_with(
             &p.pinion
         };
         let pinion_load =
-            |width: f64| Load::new(anchor_torque, width).across_mesh(anchor, &p.pinion);
+            |torque: f64, width: f64| Load::new(torque, width).across_mesh(anchor, &p.pinion);
         // ...and the same anchor read off the **reverse** flow, for the load a
         // back-driving torque puts on this mesh.
         let back_anchor_torque = back_shaft_torques.map(|t| {
@@ -944,6 +934,14 @@ pub fn solve_hula_stage_with(
             ][index]]
                 .abs()
         });
+        // **What this mesh carries, in each load case** — the worse of the two
+        // directions, taken after each one's own distribution rather than before
+        // it (`StageTorques::on_mesh`). A hula arrangement is an epicyclic power
+        // flow, so which shaft drives changes the shape of the split and not
+        // only its size; its two meshes need not agree about which direction
+        // loads them hardest, which is why the scale is the mesh's.
+        let mesh_torque = torques.on_mesh(anchor_torque, back_anchor_torque);
+        let scale = mesh_torque.as_fraction_of_peak();
 
         // The critical sections. **A rack-cut member with no root section is a
         // stage with no answer**, as it is everywhere else here; a shaper-cut
@@ -969,7 +967,7 @@ pub fn solve_hula_stage_with(
 
         // The probe pass, at whatever width — a minimum face width does not
         // depend on the width it was measured at.
-        let probe = pinion_load(PROBE);
+        let probe = pinion_load(mesh_torque.peak, PROBE);
         let e_star = contact_modulus(&materials[pair.ring], &materials[pair.pinion]);
         let probe_cs = contact_stress(&p.path, &p.mesh, &p.pinion, PARALLEL_AXES, &probe, e_star)
             .ok_or(TrainError::NoContact)?;
@@ -1001,15 +999,15 @@ pub fn solve_hula_stage_with(
             material: &materials[members[slot]],
             reversal,
             reverses,
-            loadings: Loading::both_cases(
-                &[Loading {
+            loadings: Loading::both_cases(&[(
+                Loading {
                     bending: bendings[slot].and_then(&bending_at),
                     contact: probe_cs.governing(slot),
                     measured_at: PROBE,
                     carried_at,
-                }],
+                },
                 scale,
-            ),
+            )]),
         };
 
         // **A member's automatic width is the largest ask in its mesh**, because
@@ -1038,7 +1036,7 @@ pub fn solve_hula_stage_with(
             let input = &stage.gears[i];
             let params = built(index, layout.shift, i);
             let is_ring = i == pair.ring;
-            let load = pinion_load(effective);
+            let load = pinion_load(anchor_torque, effective);
             let torque = if is_ring {
                 load.across_mesh(&p.pinion, &p.ring_as_gear).torque
             } else {
@@ -1124,7 +1122,7 @@ pub fn solve_hula_stage_with(
             &p.mesh,
             &p.pinion,
             PARALLEL_AXES,
-            &pinion_load(effective),
+            &pinion_load(mesh_torque.peak, effective),
             e_star,
         )
         .ok_or(TrainError::NoContact)?;

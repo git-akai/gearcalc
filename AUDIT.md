@@ -56,6 +56,11 @@ against a broken tree is recorded here as `written, not proven`.
 **Phase 3 — unify what is written twice.** Done, with pass 8 folded in. F2, F3,
 F4, F31, F32, F33, F34, F35, F36, F37, F38, F40 and F41 closed — **six of them
 bugs** (F30, F33, F35, F37, F38, F41).
+**Phase 3b — the direction sweep, second half.** Done. Opened by the answer to
+Q5 below, which settled the one question pass 8 had raised and not resolved.
+F42, F43, F44, F45, F46 and F49 closed — **all six bugs**, and F47, F48 recorded
+open. The half pass 8 missed is that it swept the *reported* torques and not the
+*ratings* built from them.
 **Phase 4 — the optimiser.** Next. The brief is below.
 
 | Phase | What it does | State |
@@ -64,6 +69,7 @@ bugs** (F30, F33, F35, F37, F38, F41).
 | 1 | Truth-up the documents against the code | **done** — gate proven |
 | 2 | The number ledger | **done** — gates proven |
 | 3 | Unify what is written twice | **done** |
+| 3b | The direction sweep, second half — the ratings | **done** — gate proven |
 | 4 | The optimiser | **next** |
 | 5 | Consolidate the tests | not started |
 | 6 | Front end and payload | not started |
@@ -77,7 +83,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 548 tests** (was 531).
+**Suite: 552 tests** (was 531). **Golden corpus: 23 cases** (was 22).
 
 ---
 
@@ -91,6 +97,40 @@ Settled at the outset, recorded here so they are not re-litigated.
 | **Q2** | Bring `WormMemberResult` inside `GearResult`, or record why a crossed member cannot be one? | Answered **bring it inside**; the experiment showed the premise was two propositions with opposite answers, and it was re-answered **B** — `gear: Option<GearResult>`, `Some` for a crossed pair, `None` for a worm. Done. |
 | **Q3** | Assert the optimiser's convergence claim, or attempt the closed form? | **Attempt the closed form.** The learnings are worth the effort on their own; assert convergence first regardless, since that step stands alone. |
 | **Q4** | Loosen the guard conventions toward true degeneracy limits, or document them as conventions? | **Loosen — cautiously.** With the caveat below, which is a constraint on the work and not a preference. |
+| **Q5** | Should a member's back-driving torque carry its *own* stage's backward efficiency? | **Yes — and the question was too narrow.** See below. |
+
+### Q5, and why it reopened Phase 3
+
+Pass 8 raised this and did not settle it; the convention in the code said *no*,
+on the reading that the load is referred kinematically and the loss applied on
+the way to the next stage. The answer given:
+
+> The geartrain should have no concept of forward and backward, and all methods
+> should be bi-directional. Zero is a valid torque, as it is a valid speed. A
+> geartrain could, theoretically, be non-forward drivable and only
+> back-drivable. Forward and reverse are only semantics to aid the end user, and
+> while duplicating computation costs more compute, the benefits for future
+> geartrains with more complex power flows are usually worth the cost.
+
+So the test is **role-swap symmetry**, not a convention to be chosen: driving
+forward, a stage's output member carries its input's torque referred by the ratio
+and cut by the forward loss; being driven, the *same construction with the roles
+swapped* puts the backward loss on the member the load leaves by. Read that way
+the answer is yes, and the number a stage reports becomes the number it hands to
+the stage before it rather than that number before its own loss.
+
+Asking it of every site rather than of the one that raised it found **five more
+faults**, of which four were in ratings rather than reports — the half pass 8 had
+not swept. They are F42 to F46, and two further findings the sweep turned up are
+F47 and F48. Three consequences of the answer are now standing rules and are
+recorded in `docs/rationale.md` rather than only here:
+
+1. **A load case is a torque *and a direction*.** The peak is the worse of the
+   two, taken **after** each direction's own distribution and never before it.
+2. **Zero is a load.** A stage carrying nothing rates at nothing and still
+   solves; a degenerate limit with a closed form is a value, not a refusal.
+3. **A mesh's peak is the mesh's.** Two meshes of one stage need not agree about
+   which direction loads them hardest, so the scale is per mesh.
 
 ### Q4's caveat, in full
 
@@ -168,6 +208,14 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | open — scheduled, see above |
 | F40 | The tolerance band was built four times and its direction asserted nowhere | gap | 3 | **closed** |
 | F33 | A crossed pair's members said nothing about their own teeth | gap | 3 | **closed** — and logged in `corrections.md` |
+| F42 | A locked mesh reported a torque on the shaft it delivers nothing to | gap | 3b | **closed** — and logged in `corrections.md` |
+| F43 | A worm was rated at `η_forward` of the load it was holding — 17 % low | gap | 3b | **closed** — " |
+| F44 | A back-driven set rated its ring 6.0 % low in bending, 3.0 % in contact | gap | 3b | **closed** — " |
+| F45 | ...and the hula stage 41 % and 23 % low, the same fault | gap | 3b | **closed** — " |
+| F46 | A zero force was refused, so a stage at rest could not be solved | gap | 3b | **closed** — " |
+| F47 | `Directional::self_locking` asks a directional question one way only | gap | 6 | open — see Phase 3b |
+| F48 | A screw mesh that transmits nothing reports no flank load | gap | 5 | open — see Phase 3b |
+| F49 | `check_golden.sh` recorded the corpus from whatever binary was on disk | drift | 3b | **closed** — and logged in `corrections.md` |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so
@@ -199,7 +247,7 @@ model serve both kinds of member.
 
 ## Phase 0 — what was built, and the evidence it works
 
-**`tools/check_golden.sh`** · 22 recorded outputs, 9,213 lines, 144 KB. Every
+**`tools/check_golden.sh`** · 23 recorded outputs. Every
 `gear-cli` subcommand, one invocation each plus a second where the first left a
 regime uncovered. `dump` is a digest — 10.9 MB of raw profile points is a file
 nobody reads a diff of. `bending` is deliberately absent: its output *is*
@@ -541,6 +589,70 @@ the point.
 
 ---
 
+## Phase 3b — the direction sweep, second half
+
+Pass 8 swept the sites that *report* a torque. It did not sweep the sites that
+*rate* one, and every kind whose distribution depends on direction had the fault
+in both halves — the reports were corrected in Phase 3 and the ratings were left
+behind, in the same functions, with nothing comparing them.
+
+**The rule the fix is written from.** A load case is a torque and a direction.
+The peak is the worse of the two, taken **after** each direction's own
+distribution. Collapsing them to one magnitude at the input shaft first is the
+same answer only where the distribution is direction-independent, which is a
+parallel-axis mesh and nothing else here — so the spur stage is unchanged to the
+bit and is the control.
+
+| Site | Was | Is | Cost of the fault |
+|---|---|---|---|
+| `StageTorques::at` | `max` of two shaft torques | `on_mesh(forward, backward)`, asked of the input shaft — the general rule, of which `at` is one case | — |
+| `Loading::both_cases` | one scale for the stage | one per mesh, since two meshes need not agree about which direction loads them hardest | — |
+| planetary | forward distribution at a backward magnitude | each mesh probed at its own peak, cyclic scaled from it | ring **6.0 %** low bending, 3.0 % contact |
+| hula | " | " | **41 %** low bending, **23 %** contact |
+| worm, rating | `max(T_in, T_back) · i · η_forward` | the worse of `T_in · i · η_forward` and `T_back · i` | **17 %** low — 5803.9 MPa where 6813.6 |
+| worm, member | the load referred, before its own loss | ...and after it, which is the number handed to the stage before | 0.0150 N·m on a shaft delivering nothing |
+| `hertz::elliptical_contact` | zero load refused | the limit, taken | a worm stage at rest would not solve |
+
+> **Gate, run.** Both new gates against the pre-fix tree in a detached worktree.
+> `a_member_is_rated_at_the_load_it_carries` named stage 3 member 2 and printed
+> the ratio it expected against the one it got;
+> `a_worm_is_rated_at_the_torque_on_its_wheel_from_either_end` printed
+> **5803.9 against 6813.6 MPa**. Both pass on the fixed tree. The zero-load gate
+> was run against the fault by construction — the test that reaches it was
+> written first and failed with `NoContact`.
+
+**The corpus could not have shown any of it, and now can.** `train mixed` carried
+a back-driving load the drive still outweighed, so the *peak* case was never the
+backward one anywhere in the corpus. `gear-cli train held` is the third regime:
+the same train holding 400 N·m at its output, which is what a self-locking worm
+is for. Two golden files moved and both are the fix — the worm's back-driving
+torque to zero, and a self-locking crossed helix split from "the teeth never come
+into contact" to its actual geometry at `0.000 %`.
+
+### What this sweep found and did not fix
+
+- **F47 — `Directional::self_locking` is `backward <= 0.0`.** A stage that cannot
+  be driven *forward* has no such flag and no note of its own; it is described
+  only by `STAGE_LOW_MESH_EFFICIENCY` reading `0.0 %`. That is the exact case the
+  answer to Q5 names — *a geartrain could be non-forward drivable and only
+  back-drivable* — and the vocabulary cannot say it. Reachable today:
+  `gear-cli crossed 17 23 90` at a 9°/81° split. Deferred because the flag
+  crosses the boundary and is read by the panel, so it is a Phase 6 change.
+- **F48 — a screw mesh that transmits nothing reports no flank load.** A worm
+  stage rates contact from the wheel's torque, `T_in · i · η_forward`, and the
+  flanks of a forward-locked pair are pressed by whatever holds it while that
+  product is zero. **Measured:** `normal_force(T_in, First, μ)` and
+  `normal_force(T_in · i · η, Second, μ)` agree to the bit at four geometries
+  spanning μ = 0.03 to 0.30 and η = 0.11 to 0.78 — the two routes are one
+  balance, and the *clamp* in `Directional::once_moving` is what breaks the
+  identity by zeroing the numerator while the denominator stays finite. So the
+  robust form is to rate from the torque the stage is **given**, on the member it
+  is given on, which is never degenerate and is identical everywhere else. Not
+  done here because the backward direction arrives on the other member and the
+  driving flank swaps with it, which is a decision rather than a transcription.
+
+---
+
 ## Phase 4 — the brief, written to be picked up cold
 
 **Q3 was answered "attempt the closed form".** What that means concretely:
@@ -672,7 +784,7 @@ this list.
 
 | # | Pass | The question |
 |---|---|---|
-| 8 | Direction | Which reverse cases are **written** rather than asserted? A mechanism has no forward; the reverse is the same construction with the roles swapped, and where the answers differ that difference is an output. Sweep for a second expression rather than a second evaluation. |
+| 8 | Direction | Which reverse cases are **written** rather than asserted? A mechanism has no forward; the reverse is the same construction with the roles swapped, and where the answers differ that difference is an output. Sweep for a second expression rather than a second evaluation — **and sweep the ratings as well as the reports**, which are two readings of one quantity through different functions. Phase 3b is what the first run of this pass missed. |
 | 1 | Baseline | What is true right now, mechanically? |
 | 2 | Written twice | Where can two answers differ? |
 | 3 | Scope by output | Where does each reported number come from? Scope by the **output**, never by a construction — an audit scoped by a construction reports silence as agreement. |
@@ -696,11 +808,20 @@ complete**; four sites read, two of them faults:
 | `back_driving_torques`' upstream walk | **Sound.** It looked asymmetric and is not: the forward walk stores the torque at stage `k`'s input shaft counting every *upstream* loss but not stage `k`'s own, and the backward walk stores it counting every *downstream* loss but not stage `k`'s own. The same convention, read the other way |
 | The worm's two per-member expressions | **Sound**, and checked by the same degenerate test the fixes are gated on: at zero friction its two members' torque ratio is the tooth ratio in both directions. Its forward output torque carries the stage's own loss and its backward one does not, which is that convention again |
 
-One question the sweep raised and did **not** settle, stated so it is not
-re-derived: whether a member's back-driving torque should carry its *own*
-stage's backward efficiency. The convention above says no — the load is referred
-kinematically to the input shaft, and the loss is applied on the way to the next
-stage — which is what makes a self-locking stage report the reaction it holds
-rather than an attenuated transmission. That is coherent, it is what
-`docs/reference.md#load-cases` states, and nothing measures whether it is what a
-designer wants.
+One question the sweep raised and did not settle — whether a member's
+back-driving torque should carry its *own* stage's backward efficiency — is
+**Q5**, and it is answered above: yes, because the test is role-swap symmetry
+rather than a convention to be chosen. Answering it reopened the sweep as
+Phase 3b, and the four rows below are only half of what the pass had to cover.
+
+**The row that read `Sound` and was not.** "The worm's two per-member
+expressions" was checked against a degenerate test — at zero friction the two
+members' torque ratio is the tooth ratio in both directions — and at zero
+friction `η_forward = η_backward = 1`, so the very factor in question is
+invisible. *A degenerate case cannot discriminate a factor that is one there.*
+Both sides of the self-locking threshold now.
+
+**And the sweep was scoped by the output, but by the wrong output.** It asked
+where each *reported* torque comes from and never asked where each *rating* does,
+which is a second reading of the same numbers through a different function. Four
+of the five faults Phase 3b found are in that second half.

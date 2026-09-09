@@ -30,8 +30,8 @@
 //! coefficient, and a designer who needs the derating can apply it knowingly.
 
 use super::{
-    Backlash, Case, ContactRatios, GearResult, LoadCase, Loading, MemberRating, MeshReport,
-    StageTorques, TrainError, Widths, PROBE,
+    Backlash, ContactRatios, GearResult, LoadCase, Loading, MemberRating, MeshReport, StageTorques,
+    TrainError, Widths, PROBE,
 };
 use crate::contact::{efficiency, ContactPath, Directional};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
@@ -783,8 +783,24 @@ pub fn solve_planetary_stage_with(
         Some((b.torques[shaft] / planets) * (applied / at_input))
     };
 
+    // **What each mesh carries, in each load case.** Driving forward it is the
+    // shaft's torque shared among the planets; being driven it is the reverse
+    // solve's, which is a different *shape* and not merely a different size. So
+    // the peak is taken per mesh, after each direction's own distribution —
+    // `StageTorques::on_mesh` argues the order, and this set is one of the two
+    // kinds where the two orders differ.
     let sun_torque_per_mesh = (forward.torques[0] / planets).abs();
     let ring_torque_per_mesh = (forward.torques[2] / planets).abs();
+    let sp_torque = torques.on_mesh(
+        sun_torque_per_mesh,
+        backward_share(PlanetaryShaft::Sun.index_pub()),
+    );
+    // Quoted at the planet, which is the member the ring mesh's loads are read
+    // through, so both directions take the same projection.
+    let pr_torque = torques.on_mesh(
+        ring_torque_per_mesh / pr_mesh.ratio(),
+        backward_share(PlanetaryShaft::Ring.index_pub()).map(|t| t / pr_mesh.ratio()),
+    );
 
     // ---- face widths and stresses. `b_min` does not depend on the width it was
     // measured at (docs/reference.md#contact-stress), so one probe evaluation gives every minimum.
@@ -796,7 +812,7 @@ pub fn solve_planetary_stage_with(
         &sp_mesh,
         &sun,
         PARALLEL_AXES,
-        &Load::new(sun_torque_per_mesh, PROBE),
+        &Load::new(sp_torque.peak, PROBE),
         sp_e,
     )
     .ok_or(TrainError::NoContact)?;
@@ -805,7 +821,7 @@ pub fn solve_planetary_stage_with(
         &pr_mesh,
         &planet,
         PARALLEL_AXES,
-        &Load::new(ring_torque_per_mesh / pr_mesh.ratio(), PROBE),
+        &Load::new(pr_torque.peak, PROBE),
         pr_e,
     )
     .ok_or(TrainError::NoContact)?;
@@ -859,18 +875,13 @@ pub fn solve_planetary_stage_with(
         stage.ring.rim_thickness,
     );
 
-    // Every rating is linear or square-root in the torque, and the planetary's
-    // power split is **not** a function of its magnitude: `w = sgn(T_s(ω_s − ω_c))`
-    // and back-driving reverses both factors, so the branch is the same one. A
-    // load case is therefore a scale on the forward torques rather than a second
-    // kinematic solve.
-    let scale_case = |case: Case| {
-        if torques.peak_forward == 0.0 {
-            0.0
-        } else {
-            torques.at(case) / torques.peak_forward.abs()
-        }
-    };
+    // Every rating is linear or square-root in the torque, and the set's power
+    // split does not depend on the *magnitude* passing through it, so once each
+    // mesh's peak torque is known the other case is a scale rather than a second
+    // kinematic solve. **The two directions are not** — they are two solves, and
+    // `sp_torque` / `pr_torque` are where that was done.
+    let sp_scale = sp_torque.as_fraction_of_peak();
+    let pr_scale = pr_torque.as_fraction_of_peak();
 
     // An automatic width with every source switched off stands at the number in
     // its box, as in the spur stage (`FaceSources::width_for`).
@@ -920,8 +931,8 @@ pub fn solve_planetary_stage_with(
         g.face_sources.width_for(asks, g.face_width.manual)
     };
 
-    let probe_load_sp = Load::new(sun_torque_per_mesh, PROBE);
-    let probe_load_pr = Load::new(ring_torque_per_mesh / pr_mesh.ratio(), PROBE);
+    let probe_load_sp = Load::new(sp_torque.peak, PROBE);
+    let probe_load_pr = Load::new(pr_torque.peak, PROBE);
     // The share this tooth carries where it is rated — exactly 1 unless a
     // sharing model was asked for, so nothing scales by default.
     // **`F_t` is the mesh's**, so a member is named only to say which reference
@@ -962,7 +973,6 @@ pub fn solve_planetary_stage_with(
     // member is in. The planet is the one in both, and it is the reason this is
     // a list: taking the worse of two figures was written out for contact, left
     // out for bending, and is one fold over the list for either.
-    let scale = LoadCase::of(scale_case);
     let loading = |bending, contact, carried_at| Loading {
         bending,
         contact,
@@ -973,17 +983,14 @@ pub fn solve_planetary_stage_with(
         material: &mats[i],
         reversal,
         reverses: reverses[i],
-        loadings: Loading::both_cases(
-            &match i {
-                0 => vec![loading(sun_sf, sp_probe.governing(0), sp)],
-                1 => vec![
-                    loading(planet_sf, sp_probe.governing(1), sp),
-                    loading(planet_ring_sf, pr_probe.governing(0), pr),
-                ],
-                _ => vec![loading(ring_sf, pr_probe.governing(1), pr)],
-            },
-            scale,
-        ),
+        loadings: Loading::both_cases(&match i {
+            0 => vec![(loading(sun_sf, sp_probe.governing(0), sp), sp_scale)],
+            1 => vec![
+                (loading(planet_sf, sp_probe.governing(1), sp), sp_scale),
+                (loading(planet_ring_sf, pr_probe.governing(0), pr), pr_scale),
+            ],
+            _ => vec![(loading(ring_sf, pr_probe.governing(1), pr), pr_scale)],
+        }),
     };
     let ratings: [MemberRating; 3] = std::array::from_fn(|i| rating(i, PROBE, PROBE));
     let asks = [
@@ -1014,8 +1021,13 @@ pub fn solve_planetary_stage_with(
     let sp_width = widths[0].min(widths[1]);
     let pr_width = widths[1].min(widths[2]);
 
-    let sp_load = Load::new(sun_torque_per_mesh, sp_width);
-    let pr_load = Load::new(ring_torque_per_mesh / pr_mesh.ratio(), pr_width);
+    // **At the peak each mesh actually carries**, so the figures the mesh report
+    // scales from are the ones the worse direction produces. The torque a member
+    // is *labelled* with is its forward one, which is a different question and
+    // is taken from `sp_forward` below.
+    let sp_load = Load::new(sp_torque.peak, sp_width);
+    let pr_load = Load::new(pr_torque.peak, pr_width);
+    let sp_forward = Load::new(sun_torque_per_mesh, sp_width);
     let sp_cs = contact_stress(&sp_path, &sp_mesh, &sun, PARALLEL_AXES, &sp_load, sp_e)
         .ok_or(TrainError::NoContact)?;
     let pr_cs = contact_stress(&pr_path, &pr_mesh, &planet, PARALLEL_AXES, &pr_load, pr_e)
@@ -1174,7 +1186,7 @@ pub fn solve_planetary_stage_with(
             ),
             efficiency: sp_eff,
             contact_stress_at_pitch_point: LoadCase::of(|c| {
-                sp_cs.at_pitch_point * scale_case(c).sqrt()
+                sp_cs.at_pitch_point * sp_scale.get(c).sqrt()
             }),
             relative_radius: sp_cs.relative_radius,
             backlash: [
@@ -1193,7 +1205,7 @@ pub fn solve_planetary_stage_with(
             ),
             efficiency: pr_eff,
             contact_stress_at_pitch_point: LoadCase::of(|c| {
-                pr_cs.at_pitch_point * scale_case(c).sqrt()
+                pr_cs.at_pitch_point * pr_scale.get(c).sqrt()
             }),
             relative_radius: pr_cs.relative_radius,
             backlash: [
@@ -1223,7 +1235,7 @@ pub fn solve_planetary_stage_with(
                 &stage.planet,
                 &planet_params,
                 1,
-                sp_load.across_mesh(&sun, &planet).torque,
+                sp_forward.across_mesh(&sun, &planet).torque,
                 // **A planet is not one of the three shafts**, so its share is
                 // the sun's carried across the mesh they share — the same
                 // projection its forward torque takes, on the backward figure.

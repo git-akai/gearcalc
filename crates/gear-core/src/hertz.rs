@@ -104,15 +104,23 @@ impl EllipticalContact {
 /// modulus in MPa, from [`crate::material::contact_modulus`] — the same `E*`
 /// the line-contact formula in [`crate::strength`] takes.
 ///
-/// # The degenerate case is a value, not an error
+/// # The degenerate cases are values, not errors
 ///
 /// A zero curvature in one direction returns an infinite semi-axis and zero
 /// pressure — the line-contact limit, reached exactly rather than approached.
 ///
+/// **A zero load is a load.** The patch closes to a point and the pressure with
+/// it, which is the limit of `a, b ∝ F^⅓` and `p = 3F/2πab ∝ F^⅓` taken at zero
+/// rather than an expression that happens to read `0/0` there. It is reached
+/// whenever a stage is asked what it does at rest — a train's operating torque
+/// may legitimately be nought — and refusing it cost a worm stage its whole
+/// solve (`docs/corrections.md`).
+///
 /// # Errors
 ///
 /// `None` if a curvature is negative, if both are zero (the bodies do not
-/// touch at a point at all), or if the load or modulus is not positive.
+/// touch at a point at all), if the load is negative, or if the modulus is not
+/// positive.
 ///
 /// # Examples
 ///
@@ -142,7 +150,7 @@ pub fn elliptical_contact(
     if !flat_or_curved(curvature_x) || !flat_or_curved(curvature_y) {
         return None;
     }
-    if !positive(load) || !positive(e_star) {
+    if !flat_or_curved(load) || !positive(e_star) {
         return None;
     }
     // The larger curvature sets the short axis; the smaller one, which may be
@@ -177,6 +185,17 @@ pub fn elliptical_contact(
     let major = (load * shape / (PI * e_star * c_long)).cbrt();
     let minor = kappa * major;
 
+    // The pressure is `F^⅓` times a constant, so its limit at no load is zero —
+    // taken here because the expression below reads `0/0` there and nowhere
+    // else. The approach follows it, `r_f` of a point being the same 0/0.
+    if load == 0.0 {
+        return Some(EllipticalContact {
+            semi_x: 0.0,
+            semi_y: 0.0,
+            max_pressure: 0.0,
+            approach: 0.0,
+        });
+    }
     let max_pressure = 3.0 * load / (2.0 * PI * major * minor);
     let approach = max_pressure * major * minor * r_f(major * major, minor * minor, 0.0)? / e_star;
 
@@ -695,9 +714,42 @@ mod tests {
     fn impossible_contacts_are_refused_rather_than_returning_nonsense() {
         assert!(elliptical_contact(0.0, 0.0, 100.0, 113_000.0).is_none());
         assert!(elliptical_contact(-0.1, 0.5, 100.0, 113_000.0).is_none());
-        assert!(elliptical_contact(0.1, 0.5, 0.0, 113_000.0).is_none());
+        assert!(elliptical_contact(0.1, 0.5, -1.0, 113_000.0).is_none());
         assert!(elliptical_contact(0.1, 0.5, 100.0, 0.0).is_none());
         assert!(elliptical_contact(f64::NAN, 0.5, 100.0, 113_000.0).is_none());
+    }
+
+    /// **No load is a load, and the limit is reached rather than invented.**
+    ///
+    /// A zero force used to be refused alongside a negative one. It is not
+    /// impossible — it is the rest state, which a train asked for its operating
+    /// case at nought reaches, and refusing it cost a worm stage its whole solve.
+    /// The patch closes as `P^⅓` and the pressure with it, so the value at zero
+    /// is the limit of the values approaching it, which is what this asserts
+    /// rather than merely that a zero came back.
+    #[test]
+    fn no_load_is_the_limit_of_a_small_one() {
+        let at = |load| elliptical_contact(0.1, 0.4, load, 113_000.0).expect("a real contact");
+        let rest = at(0.0);
+        assert_eq!(
+            (rest.semi_x, rest.semi_y, rest.max_pressure, rest.approach),
+            (0.0, 0.0, 0.0, 0.0)
+        );
+        // Approached from above: each figure falls monotonically toward it and
+        // gets arbitrarily close, so nothing steps at the end.
+        let mut load = 1.0;
+        let mut previous = at(load);
+        for _ in 0..30 {
+            load /= 4.0;
+            let here = at(load);
+            assert!(here.max_pressure < previous.max_pressure);
+            assert!(here.semi_major() < previous.semi_major());
+            previous = here;
+        }
+        assert!(
+            previous.max_pressure < 1e-3 && previous.semi_major() < 1e-6,
+            "the approach stalled at {previous:?}"
+        );
     }
 
     /// **The two models cross exactly once, and the larger is the answer on

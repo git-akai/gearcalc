@@ -983,9 +983,39 @@ directions distribute torque identically**, because there is no loss for a
 direction to place. So a model in which they still differ is wrong, and a model
 in which they *never* differ has thrown the direction away.
 
+**A load case is a torque *and a direction*.** It follows, and it is where the
+rule was hardest to see: a stage's peak is the worse of driving and being driven,
+and the maximum has to be taken **after** each direction's own distribution
+rather than before it. Collapsing the two shaft torques to one magnitude first
+and pushing that through the forward construction is the same answer only where
+the distribution is direction-independent — a parallel-axis mesh carries one
+tangential force whichever way it turns — and every kind for which it is *not*
+had this fault in its ratings after the same fault had been corrected in its
+reports. `StageTorques::on_mesh` is the one place it is written; a back-driven
+worm was rated at `η_forward` of the load it was holding, and a back-driven set's
+ring 6 % low in bending, which is the same 6 % the reported torques had been.
+
+**And the peak belongs to the mesh, not the stage.** Two meshes of one stage need
+not agree about which direction loads them hardest, so a set's sun mesh and ring
+mesh carry their own.
+
+**Zero is a torque, as it is a speed.** A mechanism that is held rather than
+driven runs at no load and still has to be rated for the peak it sees, and a
+train may legitimately be non-forward drivable and only back-drivable. So no
+construction here may assume a direction carries something: a rating at zero is
+zero, not a refusal. The Hertz point solution refused a zero force where its own
+limit is closed form, and took a worm stage's whole solve with it.
+
 **What would change this:** nothing. Where a mechanism genuinely has a preferred
 direction, that is a fact about its geometry — a worm's lead angle against its
 friction — and shows up as an answer, not as an arm of a branch.
+
+**Where this is still one-sided.** `Directional::self_locking` reads
+`backward <= 0.0`, so a stage that cannot be driven *forward* has no flag and no
+note of its own — it is described only by a mesh efficiency reading `0.0 %`. It
+is reachable (`gear-cli crossed 17 23 90`, at a 9°/81° helix split) and it is
+recorded rather than fixed, because the flag crosses the boundary and is read by
+the panel.
 
 ### A load exists only where it is reacted
 

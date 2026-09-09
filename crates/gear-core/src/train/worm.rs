@@ -61,7 +61,7 @@
 //! tests below — and part company by 0.21 % at the default clearance. That step
 //! at `Σ = 0` is the degeneracy, not a seam in the code.
 
-use super::{solve_spur_stage, Backlash, Case, Cycles, LoadCase, StageTorques, TrainError};
+use super::{solve_spur_stage, Backlash, Cycles, LoadCase, StageTorques, TrainError};
 
 /// Quadrature points for the path-averaged friction balance.
 ///
@@ -963,12 +963,23 @@ pub fn solve_worm_stage(
         })
     };
 
-    // Both cases at the shaft the rating is taken on. `Case::Peak` is the worse
-    // of driving and being driven; `Case::Cyclic` is the operating load, which
-    // may legitimately be zero.
+    // **Both cases on the wheel, and the peak is the worse of two directions.**
+    //
+    // Driving forward the wheel carries the worm's torque stepped up and cut by
+    // the mesh's own loss; being driven it carries the applied load itself,
+    // which `back_driving_torques` has referred to this stage's input shaft and
+    // which this brings back by the ratio alone. Those are two constructions,
+    // not one magnitude, and taking the larger *shaft* torque before choosing
+    // between them rated a back-driven pair at `η_forward` of its load — 62 % of
+    // it on the shipped worm, so 79 % of the contact stress. See
+    // `StageTorques::on_mesh` and `docs/corrections.md`.
+    let wheel_torque = torques.on_mesh(
+        input_torque * s.ratio * efficiency.forward,
+        torques.peak_backward.map(|t| t * s.ratio),
+    );
     let contact = LoadCase {
-        peak: rate(torques.at(Case::Peak) * s.ratio * efficiency.forward)?,
-        cyclic: rate(torques.at(Case::Cyclic) * s.ratio * efficiency.forward)?,
+        peak: rate(wheel_torque.peak)?,
+        cyclic: rate(wheel_torque.cyclic)?,
     };
 
     let backlash = Directional::of(|d| {
@@ -1029,12 +1040,25 @@ pub fn solve_worm_stage(
     let members = [
         WormMemberResult {
             torque: input_torque,
-            // The input member sits on the shaft the load was referred to, so
-            // this is that figure unchanged. `StageTorques::referred_like` is
-            // deliberately **not** used on either member here: it scales a
-            // member's *forward* torque, and a worm's carries a forward
-            // efficiency of 62 % that a backward load does not share.
-            back_driving_torque: torques.peak_backward,
+            // **The reverse is the same construction with the roles swapped.**
+            // Driving forward this member is the input and the wheel carries its
+            // torque stepped up and cut by the mesh's loss; being driven the
+            // wheel is the input and this member carries the applied load
+            // stepped *down* and cut by the mesh's loss the other way. So the
+            // figure here is the load referred to this shaft and then attenuated
+            // by this stage's own backward efficiency — which is what the walk
+            // multiplies by on its way to the stage before this one, so the
+            // number a worm reports is the number it hands on.
+            //
+            // A self-locking worm's backward efficiency is zero and this reads
+            // **zero**, which is the answer: nothing reaches the worm's shaft.
+            // What the mesh holds is on the wheel, and the wheel reports it.
+            // `StageTorques::referred_like` is deliberately not used on either
+            // member: it scales a member's *forward* torque, and a worm's
+            // carries a forward efficiency a backward load does not share.
+            back_driving_torque: torques
+                .peak_backward
+                .map(|t| t * efficiency.backward.max(0.0)),
             speed: 0.0,
             tooth_cycles: Cycles::default(),
             face_width: widths[0],
@@ -1051,15 +1075,15 @@ pub fn solve_worm_stage(
             // back to the output member is that referral inverted, which is the
             // ratio and nothing else.
             //
-            // It used to divide by the backward efficiency as well, on the
+            // It used to *divide* by the backward efficiency here, on the
             // reading that the mesh loses something carrying the load. It does,
-            // and that loss is applied *between* stages, where the walk
-            // multiplies by `backward` on its way up. Applying it here counted
-            // it twice — and a worm's backward efficiency is **zero** whenever
-            // the stage self-locks, which is the case a worm is chosen for. The
-            // wheel of the shipped worm stage reported **2.2e307 N·m**: finite,
-            // so it crossed the boundary as a number rather than as the `null`
-            // an infinity would have become, and drew on screen as a figure.
+            // and the loss belongs on the member the load leaves by rather than
+            // the one it arrives at — a worm's backward efficiency is **zero**
+            // whenever the stage self-locks, which is the case a worm is chosen
+            // for, and the wheel of the shipped worm stage reported
+            // **2.2e307 N·m**: finite, so it crossed the boundary as a number
+            // rather than as the `null` an infinity would have become, and drew
+            // on screen as a figure.
             back_driving_torque: torques.peak_backward.map(|t| t * s.ratio),
             speed: 0.0,
             tooth_cycles: Cycles::default(),

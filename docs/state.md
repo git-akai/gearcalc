@@ -114,6 +114,7 @@ cargo run --bin gear-cli -- materials              # the library, with each valu
 cargo run --bin gear-cli -- strength 17 43 2.0     # a worked mesh, end to end
 cargo run --bin gear-cli -- train                  # a two-stage train
 cargo run --bin gear-cli -- train mixed            # ...with a worm stage in it
+cargo run --bin gear-cli -- train held             # ...that worm holding more than it drives
 cargo run --bin gear-cli -- trainfile [path]       # a train to TOML and back, answers compared
 cargo run --bin gear-cli -- worm 1 40 7 90         # a worm pair, both directions
 cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
