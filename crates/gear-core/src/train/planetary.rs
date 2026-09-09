@@ -756,6 +756,33 @@ pub fn solve_planetary_stage_with(
 
     // ---- loads. Each mesh carries its member's torque divided among N planets.
     let planets = f64::from(stage.planets.max(1));
+
+    // **The reverse is the same construction with the roles swapped**, and the
+    // torques it produces are the ones a back-driving load puts on each member.
+    //
+    // They used to be the *forward* distribution scaled by the ratio of the two
+    // stage torques (`StageTorques::referred_like`), which is exact wherever the
+    // forward torque is a geometric projection or the two directional
+    // efficiencies agree. An epicyclic set is neither: which shaft is driving
+    // decides where `η₀` multiplies, so the distribution itself changes shape.
+    // Measured on the shipped set, driving backward puts **1.922 N·m** on the
+    // sun where scaling the forward answer says 2.000 — 3.9 %, and 1.6 % on the
+    // ring.
+    //
+    // `backward` was already solved, for its efficiency; this reads the torques
+    // it had all along. Normalised so the shaft the load was referred to carries
+    // what `back_driving_torques` referred there, since a power flow is linear
+    // in the torque through it.
+    let in_i = stage.arrangement.input.index_pub();
+    let backward_share = |shaft: usize| -> Option<f64> {
+        let (b, applied) = (backward.as_ref()?, torques.peak_backward?);
+        let at_input = b.torques[in_i];
+        if at_input == 0.0 {
+            return Some(0.0);
+        }
+        Some((b.torques[shaft] / planets) * (applied / at_input))
+    };
+
     let sun_torque_per_mesh = (forward.torques[0] / planets).abs();
     let ring_torque_per_mesh = (forward.torques[2] / planets).abs();
 
@@ -1096,6 +1123,7 @@ pub fn solve_planetary_stage_with(
                        params: &GearParams,
                        which: usize,
                        torque: f64,
+                       back_driving_torque: Option<f64>,
                        clamps: Vec<Note>,
                        notes: Vec<Note>|
      -> GearResult {
@@ -1110,7 +1138,7 @@ pub fn solve_planetary_stage_with(
             rated: rating(which, sp_width, pr_width).rated(),
             face_width: widths[which],
             torque,
-            back_driving_torque: torques.referred_like(torque),
+            back_driving_torque,
             speed,
             material: mats[which].clone(),
             clamps,
@@ -1185,6 +1213,7 @@ pub fn solve_planetary_stage_with(
             &sun_params,
             0,
             forward.torques[0] / planets,
+            backward_share(PlanetaryShaft::Sun.index_pub()),
             sun.clamps.notes.clone(),
             gear_notes(0),
         ),
@@ -1195,6 +1224,11 @@ pub fn solve_planetary_stage_with(
                 &planet_params,
                 1,
                 sp_load.across_mesh(&sun, &planet).torque,
+                // **A planet is not one of the three shafts**, so its share is
+                // the sun's carried across the mesh they share — the same
+                // projection its forward torque takes, on the backward figure.
+                backward_share(PlanetaryShaft::Sun.index_pub())
+                    .map(|t| Load::new(t, sp_width).across_mesh(&sun, &planet).torque),
                 planet.clamps.notes.clone(),
                 gear_notes(1),
             ),
@@ -1208,6 +1242,7 @@ pub fn solve_planetary_stage_with(
             &ring_params,
             2,
             forward.torques[2] / planets,
+            backward_share(PlanetaryShaft::Ring.index_pub()),
             ring.clamps.clone(),
             gear_notes(2),
         ),

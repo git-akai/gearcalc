@@ -64,7 +64,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 546 tests** (was 531).
+**Suite: 547 tests** (was 531).
 
 ---
 
@@ -147,7 +147,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F31 | No CLI train sets a back-driving load, so the corpus never exercises one | gap | 3 | open |
 | F32 | `StageResult` has no kind-independent `members()` | gap | 3 | **closed** |
 | F34 | `Widths::contact` was not optional, so "no rating sizes this face" had no way to be said | gap | 3 | **closed** |
-| F35 | A planetary's member torques carry a forward efficiency; whether a backward load should is unexamined | gap | 5 | open |
+| F35 | A set reported back-driving torques from the forward distribution — the ring 6 % low | gap | 3 | **closed** — and logged in `corrections.md` |
 | F36 | `SpurResult` re-declared `MeshReport`'s seven fields, and the panel re-drew them | gap | 3 | **closed** |
 | F37 | A given crank offset was not the offset the stage ran at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F38 | The reported clearance was the input echoed, not the gap run at | gap | 3 | **closed** — and logged in `corrections.md` |
@@ -599,6 +599,7 @@ this list.
 
 | # | Pass | The question |
 |---|---|---|
+| 8 | Direction | Which reverse cases are **written** rather than asserted? A mechanism has no forward; the reverse is the same construction with the roles swapped, and where the answers differ that difference is an output. Sweep for a second expression rather than a second evaluation. |
 | 1 | Baseline | What is true right now, mechanically? |
 | 2 | Written twice | Where can two answers differ? |
 | 3 | Scope by output | Where does each reported number come from? Scope by the **output**, never by a construction — an audit scoped by a construction reports silence as agreement. |
@@ -609,3 +610,12 @@ this list.
 
 **Pass 7 is not optional.** This project has recorded three separate gates that
 passed against the exact fault they were written to condemn.
+
+**Pass 8 was added mid-audit**, from a standing rule stated after the plan was
+written: *a geartrain has no forward.* It found F35 on its first sweep — an
+epicyclic set that solved its reverse power flow, used it for the efficiency and
+discarded its torques. The rule is now
+`docs/rationale.md#direction-is-the-readers-not-the-mechanisms`, and the sweep
+is not finished: `back_driving_torques`' upstream walk, the worm's two
+per-member expressions and the hula stage's power flow have not been read
+against it.

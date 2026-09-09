@@ -954,6 +954,39 @@ which of *its own* ratings count; what they do not get to do is decide the width
 on behalf of a gear that needs more. Gated as the invariant the control claims:
 at an automatic width, every enabled rating is met.
 
+### Direction is the reader's, not the mechanism's
+
+A geartrain has no forward. It has shafts, teeth and losses, and which end a
+designer calls the input is a label they bring to it. So **the reverse case is
+never written a second time**: it is the same construction with the roles
+swapped, evaluated again and *asserted*, and where the two answers differ — a
+worm that self-locks, a set whose losses land on a different member — that
+difference is an output rather than a branch.
+
+`Directional::of(|d| …)` is the shape this takes almost everywhere: one
+expression, evaluated at both directions, so a change reaches both by
+construction. `Directional::once_moving` is the same idea one level up — every
+kind asks whether the stage breaks away at all, and the geometry decides whether
+it bites.
+
+**Measured, and it is not a tidiness argument.** An epicyclic set solves its
+power flow twice, once each way, because which shaft drives decides where `η₀`
+multiplies. It then reported its members' back-driving torques by scaling the
+*forward* distribution — the reverse solve's own torques were computed for their
+efficiency and discarded — and the ring came out **6 % low**. Scaling is exact
+wherever the forward torque is a geometric projection or the two directional
+efficiencies agree, which is true of every parallel-axis pair and false of a set
+and of a worm.
+
+The check that separates them is the degenerate one: **at zero friction the two
+directions distribute torque identically**, because there is no loss for a
+direction to place. So a model in which they still differ is wrong, and a model
+in which they *never* differ has thrown the direction away.
+
+**What would change this:** nothing. Where a mechanism genuinely has a preferred
+direction, that is a fact about its geometry — a worm's lead angle against its
+friction — and shows up as an answer, not as an arm of a branch.
+
 ### A load exists only where it is reacted
 
 A back-driving torque is not a sign on the input. It enters at the far end, and

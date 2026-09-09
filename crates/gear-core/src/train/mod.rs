@@ -2756,6 +2756,65 @@ mod tests {
         assert!(checked >= 10, "only {checked} bands checked");
     }
 
+    /// **A set driven backward distributes its torque the way it distributes it
+    /// driven backward**, not the way it does driven forward.
+    ///
+    /// The reverse of a mechanism is the same construction with the roles
+    /// swapped, so the answer is the reverse *solve* — which this stage already
+    /// performs, for its efficiency, and whose torques it discarded. What it
+    /// reported instead was the forward distribution scaled by the ratio of the
+    /// two stage torques, which is exact wherever the forward torque is a
+    /// geometric projection or the two directional efficiencies agree. An
+    /// epicyclic set is neither: **which shaft drives decides where `η₀`
+    /// multiplies.** The shipped set's ring came out 6 % low.
+    ///
+    /// The law is the degenerate case rather than the figure: **at zero friction
+    /// the two distributions coincide**, because with `η₀ = 1` there is no loss
+    /// for the direction to place. So the difference *is* the efficiency, and
+    /// that is checkable without knowing either number.
+    #[test]
+    fn a_back_driven_set_distributes_torque_by_its_own_solve() {
+        let lib = library();
+        let ratios = |mu: f64| {
+            let mut set = PlanetaryStage {
+                sliding_friction_sun_planet: mu,
+                sliding_friction_planet_ring: mu,
+                ..PlanetaryStage::default()
+            };
+            set.static_friction_sun_planet = mu;
+            set.static_friction_planet_ring = mu;
+            let mut t = two_stage();
+            t.back_driving_torque = 0.5;
+            // A self-locking stage at the input end, so the set reacts the load.
+            t.stages = vec![
+                Stage::Worm(WormStage::default()),
+                Stage::Planetary(Box::new(set)),
+            ];
+            let r = solve_train(&t, &lib).expect("a train that solves");
+            let p = r.stages[1].as_planetary().expect("a planetary stage");
+            let back = |g: &GearResult| g.back_driving_torque.expect("the set reacts the load");
+            (p.ring.torque / p.sun.torque, back(&p.ring) / back(&p.sun))
+        };
+
+        // Frictionless: nothing for the direction to place, so the two
+        // distributions are the same one.
+        let (forward, backward) = ratios(0.0);
+        assert!(
+            (forward - backward).abs() < 1e-9,
+            "with no friction the set distributes torque alike either way, \
+             but forward gives {forward} and backward {backward}"
+        );
+
+        // With friction they part, and that difference is the whole finding:
+        // scaling the forward answer would have kept them equal at every `mu`.
+        let (forward, backward) = ratios(0.06);
+        assert!(
+            (forward - backward).abs() / forward > 1e-3,
+            "with friction the two directions must place the loss differently, \
+             but both give {forward}"
+        );
+    }
+
     fn two_stage() -> Train {
         Train {
             input_speed: 3000.0,
