@@ -747,9 +747,10 @@ parabola with its vertex at the load carries uniform bending stress, so the
 largest such parabola inscribed in the tooth touches where the tooth is weakest.
 `CriticalSection::TangentAngle` retains the ISO tangent for a
 standards-comparable number — **30° on an external tooth and 60° on a ring's**
-(ISO 6336-3:2019, 6.1). A ring's tooth is thick at its tip and its fillet is
-concave, so the 30° tangent that lands part-way up an external fillet lands
-almost at once on a ring's.
+(ISO 6336-3:2019, 6.1). Not because the tooth points the other way round — a
+ring's tooth widens from tip to root as an external one does — but because the
+shaper leaves it a fillet that curls into the rim, and the tooth flares into it
+faster. Both angles are conventions, neither derived.
 
 **Where the internal/external difference lives, in each construction.** The
 tangent method reads the angle off `ToothOutline`, so its two members share one

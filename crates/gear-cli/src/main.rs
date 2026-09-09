@@ -1564,91 +1564,169 @@ fn bending_report() {
 /// Precision study of the bending-model matrix. Text, so the numbers can be
 /// read before anything is drawn from them.
 fn matrix_report() {
-    let pop = matrix::population();
-    println!("population: {} designs\n", pop.len());
-
-    println!("== 1. continuity ==");
-    println!(
-        "{:<24} {:>18} {:>10} {:>22}",
-        "model", "worst z step", "at z", "worst x step (fine)"
-    );
-    for m in matrix::MATRIX {
-        let (step, at) = matrix::continuity_in_tooth_count(m);
-        let xs = matrix::continuity_in_profile_shift(m, 120);
+    // **Both kinds of member, through one harness.** A ring is the same four
+    // studies rather than a second set beside them, which is the only way the
+    // two answers can be compared at all — and comparing them is the point,
+    // because the crate rates a ring by the construction it chose for an
+    // external tooth.
+    for member in [matrix::Member::External, matrix::Member::Internal] {
+        let pop = matrix::population_for(member);
         println!(
-            "{:<24} {:>17.4}% {:>10} {:>21.5}%",
-            m.name(),
-            100.0 * step,
-            at,
-            100.0 * xs
+            "\n################ {} ({} designs, tangent at {:.0}°) ################\n",
+            member.name().to_uppercase(),
+            pop.len(),
+            member.tangent_angle()
         );
-    }
 
-    println!("\n== 2. rank agreement (Spearman) ==");
-    for i in 0..matrix::MATRIX.len() {
-        for j in (i + 1)..matrix::MATRIX.len() {
-            let (r, n) = matrix::rank_correlation(matrix::MATRIX[i], matrix::MATRIX[j], &pop);
+        println!("== 1. continuity ==");
+        println!(
+            "{:<24} {:>18} {:>10} {:>22}",
+            "model", "worst z step", "at z", "worst x step (fine)"
+        );
+        let fine_at = match member {
+            matrix::Member::External => 120,
+            matrix::Member::Internal => 60,
+        };
+        for m in matrix::MATRIX {
+            let (step, at) = matrix::continuity_in_tooth_count(m, member);
+            let xs = matrix::continuity_in_profile_shift(m, member, fine_at);
             println!(
-                "  {:<22} vs {:<22} rho = {r:.6}  (n={n})",
-                matrix::MATRIX[i].name(),
-                matrix::MATRIX[j].name()
+                "{:<24} {:>17.4}% {:>10} {:>21.5}%",
+                m.name(member),
+                100.0 * step,
+                at,
+                100.0 * xs
             );
         }
-    }
 
-    for thresh in [0.0_f64, 0.002, 0.01] {
-        println!(
-            "\n== 3. gradient sign agreement, ignoring effects below {:.1}% ==",
-            100.0 * thresh
-        );
-        println!(
-            "  {:<48} {:>7} {:>7} {:>7}",
-            "", "shift", "fillet", "dedend"
-        );
+        println!("\n== 2. rank agreement (Spearman) ==");
         for i in 0..matrix::MATRIX.len() {
             for j in (i + 1)..matrix::MATRIX.len() {
-                let g =
-                    matrix::gradient_agreement(matrix::MATRIX[i], matrix::MATRIX[j], &pop, thresh);
+                let (r, n) =
+                    matrix::rank_correlation(matrix::MATRIX[i], matrix::MATRIX[j], member, &pop);
                 println!(
-                    "  {:<22} vs {:<22} {:6.1}% {:6.1}% {:6.1}%",
-                    matrix::MATRIX[i].name(),
-                    matrix::MATRIX[j].name(),
-                    100.0 * g[0],
-                    100.0 * g[1],
-                    100.0 * g[2]
+                    "  {:<22} vs {:<22} rho = {r:.6}  (n={n})",
+                    matrix::MATRIX[i].name(member),
+                    matrix::MATRIX[j].name(member)
                 );
             }
         }
-    }
 
-    println!("\n== 4. divergence across the matrix, by tooth count (x=0, rho=0.38) ==");
-    println!("{:>6} {:>12}", "z", "spread");
-    for teeth in [9u32, 12, 17, 25, 40, 70, 120, 250] {
-        let p = GearParams {
-            teeth,
-            ..Default::default()
-        };
-        if let Some(d) = matrix::divergence(p) {
-            println!("{teeth:>6} {:>11.2}%", 100.0 * d);
-        }
-    }
-    println!("\n   worst divergence over the whole population:");
-    let mut worst = (0.0_f64, GearParams::default());
-    for p in &pop {
-        if let Some(d) = matrix::divergence(*p) {
-            if d > worst.0 {
-                worst = (d, *p);
+        for thresh in [0.0_f64, 0.01] {
+            println!(
+                "\n== 3. gradient sign agreement, ignoring effects below {:.1}% ==",
+                100.0 * thresh
+            );
+            println!(
+                "  {:<48} {:>7} {:>7} {:>7}",
+                "", "shift", "fillet", "dedend"
+            );
+            for i in 0..matrix::MATRIX.len() {
+                for j in (i + 1)..matrix::MATRIX.len() {
+                    let g = matrix::gradient_agreement(
+                        matrix::MATRIX[i],
+                        matrix::MATRIX[j],
+                        member,
+                        &pop,
+                        thresh,
+                    );
+                    println!(
+                        "  {:<22} vs {:<22} {:6.1}% {:6.1}% {:6.1}%",
+                        matrix::MATRIX[i].name(member),
+                        matrix::MATRIX[j].name(member),
+                        100.0 * g[0],
+                        100.0 * g[1],
+                        100.0 * g[2]
+                    );
+                }
             }
         }
+
+        println!("\n== 4. divergence across the matrix, by tooth count (x=0) ==");
+        println!("{:>6} {:>12}", "z", "spread");
+        let counts: &[u32] = match member {
+            matrix::Member::External => &[9, 12, 17, 25, 40, 70, 120, 250],
+            matrix::Member::Internal => &[40, 48, 60, 72, 90, 120, 160, 220],
+        };
+        for &teeth in counts {
+            let p = GearParams {
+                teeth,
+                ..Default::default()
+            };
+            if let Some(d) = matrix::divergence(member, p) {
+                println!("{teeth:>6} {:>11.2}%", 100.0 * d);
+            }
+        }
+        let mut worst = (0.0_f64, GearParams::default());
+        for p in &pop {
+            if let Some(d) = matrix::divergence(member, *p) {
+                if d > worst.0 {
+                    worst = (d, *p);
+                }
+            }
+        }
+        println!(
+            "   worst over the population: {:.2}% at z={} x={:+.1} alpha={}",
+            100.0 * worst.0,
+            worst.1.teeth,
+            worst.1.profile_shift,
+            worst.1.pressure_angle
+        );
+
+        // **5. Where the default parts from the standard's construction.** The
+        // crate rates on the inscribed parabola; ISO specifies the tangent. This
+        // is the size of that choice, on the number a designer actually feels.
+        println!(
+            "\n== 5. parabola against the {:.0}° tangent ==",
+            member.tangent_angle()
+        );
+        let d = matrix::parting(member, &pop);
+        #[allow(clippy::cast_precision_loss)]
+        let pct = |k: usize| 100.0 * k as f64 / d.n as f64;
+        println!("  designs rated by both        {}", d.n);
+        println!(
+            "  parabola tangency on flank   {} ({:.1}%)",
+            d.on_flank,
+            pct(d.on_flank)
+        );
+        println!(
+            "  Y_F   parabola/tangent       {:.3} .. {:.3}   mean {:.3}",
+            d.form[0], d.form[1], d.form[2]
+        );
+        println!(
+            "  Y_F·Y_S parabola/tangent     {:.3} .. {:.3}   mean {:.3}",
+            d.factor[0], d.factor[1], d.factor[2]
+        );
+        println!(
+            "  mean q_s                     {:.3} parabola, {:.3} tangent",
+            d.notch[0], d.notch[1]
+        );
+        println!(
+            "  outside the Y_S band         {} parabola ({:.1}%), {} tangent ({:.1}%)",
+            d.notch_out[0],
+            pct(d.notch_out[0]),
+            d.notch_out[1],
+            pct(d.notch_out[1])
+        );
     }
-    println!(
-        "   {:.2}% at z={} x={:+.1} rho={} alpha={}",
-        100.0 * worst.0,
-        worst.1.teeth,
-        worst.1.profile_shift,
-        worst.1.root_radius,
-        worst.1.pressure_angle
-    );
+
+    // Which end of a ring's tooth is the thick one — the question the cantilever
+    // picture rests on, and one worth measuring rather than asserting.
+    println!("\n== 6. a ring tooth along its generated flank (tip -> root) ==");
+    for teeth in [40u32, 90, 160] {
+        let t = matrix::ring_flank_thickness(
+            GearParams {
+                teeth,
+                ..Default::default()
+            },
+            4,
+        );
+        let cells: Vec<String> = t
+            .iter()
+            .map(|(r, w)| format!("r {r:.3} w {w:.4}"))
+            .collect();
+        println!("  z={teeth:<4} {}", cells.join("   "));
+    }
 }
 
 /// Compare the three load cases on a few ordinary meshes.

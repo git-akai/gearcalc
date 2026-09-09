@@ -86,6 +86,7 @@ cargo run --release --bin gear-cli -- meshsweep 60 20 0.8   # roll an internal p
 cargo run --release --bin gear-cli -- hulasweep 18 0.25     # ...and a hula pair, where the tips cross
 cargo run --release --bin gear-cli -- hulaband 18           # one reduction at every tooth difference
 cargo run --bin gear-cli -- bending                 # the bending construction, drawn
+cargo run --release --bin gear-cli -- matrix        # the bending matrix, on external teeth and on rings
 cargo run --release --bin gear-cli -- verify 100   # the two-sided cutter check
 python3 tools/worm_flank_curvature.py              # ZI vs ZN vs ZA, from the surface
 python3 tools/crossed_path.py                      # the crossed path, from the surfaces
@@ -455,6 +456,73 @@ are named in `strings.rs`'s `UNFIRED` with their evidence.
   overlap, which may shadow it entirely.
 - `stage.ring_addendum_clamped` — needs a planetary ring whose tip clamps, and
   the set solves its own ring addendum.
+
+---
+
+## An open finding: the parabola on a ring
+
+**Not acted on.** The default critical section is the inscribed Lewis parabola
+for every member, external and internal, and it still is. This records what
+measuring it found, because the measurement was not possible until the 60°
+internal tangent existed — before that a ring's tangent section was taken at
+30°, so there was no baseline to compare against.
+
+`gear-cli matrix` now runs its four studies on both kinds of member, plus a
+fifth that puts the two constructions against each other:
+
+| | external (1508) | ring (160) |
+|---|---|---|
+| parabola tangency on the **flank** | 12.9 % | **100 %** |
+| `Y_F` parabola/tangent | 1.006–1.312, mean 1.055 | 1.273–1.690, mean **1.425** |
+| `Y_F·Y_S` parabola/tangent | 0.740–1.351, mean 0.943 | 0.789–1.226, mean **0.877** |
+| mean `q_s`, parabola vs tangent | 1.95 vs 3.17 | **1.00** vs 4.94 |
+| outside the `Y_S` band | 19.2 % vs 5.8 % | **66.9 %** vs 1.2 % |
+| Spearman ρ, `Y_F` | **0.993** | **0.537** |
+| Spearman ρ, `Y_F·Y_S` | 0.891 | **0.289** |
+
+**What it says about tooth strengths.** A ring's reported bending factor is on
+average **12 % below** what the 60° tangent gives, spanning 21 % below to 23 %
+above — so the choice of construction is worth about ±20 % on a ring's root
+stress, against about ±6 % on the mean for an external tooth. Lower is the
+unconservative direction.
+
+**Three things worth separating.**
+
+1. **The parabola lands on the flank for every ring.** Already known for
+   `z ≥ 40` (see [corrections](corrections.md)); now measured across shift and
+   pressure angle too, and it is universal. `s_Fn` is then read across a point
+   on the involute while `ρ_F` falls back to the fillet junction — a documented,
+   continuous fallback, but two different places, and on a ring it is not the
+   exception it is externally.
+2. **`q_s` collapses to the bottom of the `Y_S` band.** Mean 1.00 against the
+   tangent construction's 4.94, with **two rings in three clamped**. Clamping
+   below the band is the conservative direction, but it means most rings are
+   rated with a fitted factor held at its boundary rather than evaluated.
+3. **The ranking argument does not transfer.** The stated reason the parabola's
+   divergence from the standard is "principled rather than consequential" is
+   ρ = 0.993 — an **external** measurement. On rings it is 0.537 on `Y_F` and
+   0.289 on the product, and one pair of models in the matrix orders ring
+   designs in *opposite* directions (ρ = −0.399).
+
+**And one correction that falls out of it regardless.** "The parabola is the
+more conservative construction" is a claim about `Y_F` and does not survive
+`Y_S`: a narrower section at the same notch radius is a smaller `q_s`, and `Y_S`
+rises with `q_s`. On the product — the number a stress is proportional to — the
+parabola is *below* the tangent construction on both populations, 0.943 external
+and 0.877 internal. The doc comments said "more conservative, everywhere"; they
+say `Y_F` now.
+
+**What would settle it.** A ring's bending model cites Savage, Rubadeux & Coe
+(NASA TM-107012), which chooses the inscribed parabola deliberately for internal
+teeth — so the construction is not an unprincipled transplant, and the paper is
+the place to check whether its parabola also lands on the flank or whether
+something in the inscribing differs. Failing that, the honest options are to
+make `TangentAngle` the default **for rings only** — ISO's construction, ISO's
+angle, `Y_S` used where it was calibrated, 1.2 % out of band instead of 66.9 % —
+or to keep one construction for both and say plainly that a ring's is running
+outside the notch fit's domain most of the time. It is a model decision and is
+being left to one.
+
 
 ---
 

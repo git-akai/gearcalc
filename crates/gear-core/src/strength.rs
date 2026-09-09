@@ -71,10 +71,18 @@ pub enum CriticalSection {
     /// centreline, and taking the tangency with the fillet, finds where the real
     /// tooth is weakest *relative to that uniform-strength shape*.
     ///
-    /// Unlike the 30° tangent this **follows the load point**, which is the
-    /// property the cantilever model is supposed to have. It is consistently
-    /// more conservative: the tangency sits higher up the fillet, the section is
-    /// narrower, and `Y_F` comes out 2–14% larger, most on undercut teeth.
+    /// Unlike the tangent construction this **follows the load point**, which is
+    /// the property the cantilever model is supposed to have. On an external
+    /// tooth the tangency sits higher up the fillet, the section is narrower,
+    /// and `Y_F` comes out 0.6–31 % larger, most on undercut teeth.
+    ///
+    /// **That is `Y_F` alone, and it does not survive `Y_S`.** A narrower
+    /// section at the same notch radius is a *smaller* `q_s`, and `Y_S` rises
+    /// with `q_s` — so the product a stress is actually proportional to comes
+    /// out **below** the tangent construction's on average: 0.943 over the
+    /// external population, 0.877 over the ring one (`gear-cli matrix`, study
+    /// 5). Any claim that this construction is "the conservative one" is a claim
+    /// about `Y_F`, and the number a designer feels is `Y_F · Y_S`.
     ///
     /// # Divergence from the standards
     ///
@@ -89,15 +97,40 @@ pub enum CriticalSection {
     ///   of the observed range — the direction the parabola moves the section.
     ///   (The authors note large test deformations may contribute, so this is
     ///   support rather than proof.)
-    /// - It is the more conservative of the two, everywhere.
+    /// - It gives the larger `Y_F` of the two, everywhere.
     ///
-    /// Against that: it changes ranking very little — Spearman ρ = 0.993 against
-    /// the 30° tangent over 1521 designs, with identical gradient direction
-    /// wherever a parameter moves the answer by 1% or more — so the choice is
-    /// principled rather than consequential. And **`Y_S` is calibrated against
-    /// the 30° construction**, so pairing the two mixes conventions; where the
-    /// parabola leaves the fillet the pairing is refused outright, see
-    /// [`RootSection::stress_correction`].
+    /// Against that: on an **external** tooth it changes ranking very little —
+    /// Spearman ρ = 0.993 against the 30° tangent over 1521 designs, with
+    /// identical gradient direction wherever a parameter moves the answer by 1 %
+    /// or more — so the choice is principled rather than consequential. And
+    /// **`Y_S` is calibrated against the tangent construction**, so pairing the
+    /// two mixes conventions.
+    ///
+    /// # On a ring, none of that paragraph holds
+    ///
+    /// Measured over 160 ring designs against the 60° tangent
+    /// (`gear-cli matrix`, and it could not be measured at all until the 60°
+    /// angle existed, since the ring's tangent section was being taken at 30°):
+    ///
+    /// | | external | ring |
+    /// |---|---|---|
+    /// | tangency on the **flank** | 12.9 % | **100 %** |
+    /// | `Y_F` parabola/tangent | mean 1.055 | mean 1.425 |
+    /// | `Y_F·Y_S` parabola/tangent | mean 0.943 | mean 0.877 |
+    /// | mean `q_s` | 1.95 vs 3.17 | **1.00** vs 4.94 |
+    /// | outside the `Y_S` band | 19.2 % | **66.9 %** |
+    /// | Spearman ρ on `Y_F` | **0.993** | **0.537** |
+    ///
+    /// The parabola's tangency lands on the involute flank for **every** ring in
+    /// the population, so `s_Fn` is read across the flank while `ρ_F` falls back
+    /// to the fillet junction — two different places — and the `q_s` that comes
+    /// out sits at the bottom of the `Y_S` fit's band, clamped for two rings in
+    /// three. The ranking argument that justifies this default externally is not
+    /// available internally: ρ = 0.537 on `Y_F`, 0.289 on the product, and one
+    /// pair of models in the matrix orders ring designs in *opposite* directions.
+    ///
+    /// **This is a recorded finding, not a settled model** — see
+    /// `docs/state.md`. Nothing here has been changed on the strength of it.
     ///
     /// For a number to compare against a published ISO or AGMA rating, switch to
     /// [`CriticalSection::TangentAngle`].
@@ -124,12 +157,15 @@ pub const TANGENT_ANGLE_DEG: f64 = 30.0;
 /// 6.2.4's formulae with the diameters, the manufacturing centre distance and
 /// the tangential angle `θ` all negated, `θ` being 60° rather than 30°.
 ///
-/// **Why it is a different angle at all.** A ring's tooth is thick at its tip
-/// and narrows into the rim, the opposite way round from an external tooth, and
-/// its fillet is concave where an external one is convex. The 30° tangent that
-/// lands part-way up an external fillet lands almost immediately on a ring's,
-/// which is no section at all; 60° is where the same reasoning puts it once the
-/// curvature has changed sign.
+/// **Why it is a different angle at all.** Not because the tooth points the
+/// other way round. A ring's tooth widens from tip to root exactly as an
+/// external one does — 0.967 mm to 2.569 mm along the flank at z = 40, module 1
+/// (`gear-cli matrix`, study 6) — so the cantilever picture is the same picture,
+/// and an earlier revision of this comment had it backwards. What differs is the
+/// fillet the shaper leaves, which curls into the rim rather than away from it,
+/// and how fast the tooth flares into it. 60° is ISO's convention for that form
+/// as 30° is for the rack-cut one; neither is derived, which is what makes them
+/// conventions rather than results.
 ///
 /// This is the tangent construction only, and this crate's default critical
 /// section is the inscribed parabola — see [`CriticalSection`]. The parabola
