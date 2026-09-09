@@ -58,14 +58,6 @@ use crate::params::GearParams;
 use crate::solve::{brent, Tol};
 use crate::tooth::{Rack, Tooth};
 
-/// Largest angular-shift amplitude [`amplitude_for_throw`] will search to, in
-/// modules. Not a design limit — a search bound: a throw that needs more than
-/// two modules of shift swing is past anything this tool is meant to size, and
-/// the geometry has almost always run out well before it (`centre_profile`
-/// stops returning a profile). Named so it is one number rather than a literal
-/// buried in a loop.
-const MAX_SEARCH_AMPLITUDE: f64 = 2.0;
-
 /// The mean, amplitude and phase of a pure sinusoid, in the units it is read in.
 ///
 /// A named struct rather than `[f64; 3]`, because the three carry **different
@@ -1093,14 +1085,37 @@ pub fn amplitude_for_throw(
     // as "throw unreachable".
     throw(0.0)?;
 
-    // The feasible amplitudes are `[0, dx_max]`. If the whole search range is
+    // **The search runs to where the gear stops being buildable**, which is a
+    // number this crate already computes, rather than to a constant.
+    //
+    // It was a flat two modules, described as a search bound rather than a
+    // design limit on the reasoning that "the geometry has almost always run
+    // out well before it". Almost: at z = 17 and z = 30 the mesh gives out at
+    // 1.2 and 1.4, and the bisection below finds that. At **z = 60 it is
+    // feasible to 2.1**, so the constant was the binding constraint and a throw
+    // of 2.30 mm was reported unreachable on a pair that reaches it — a search
+    // bound acting as a design limit, which is what
+    // `docs/rationale.md#an-input-limit-means-could-this-gear-exist` refuses.
+    //
+    // `admissible_ranges` is the same bound the gear card draws, so the search
+    // and the field agree by construction instead of by coincidence.
+    let ceiling = crate::auto::admissible_ranges(&params, params.dedendum)
+        .angular_shift
+        .max
+        .filter(|v| v.is_finite() && *v > 0.0)
+        .unwrap_or(0.0);
+    if ceiling <= 0.0 {
+        return Err(MeshError::OutsideInvoluteDomain);
+    }
+
+    // The feasible amplitudes are `[0, dx_max]`. If the whole range is
     // feasible, `dx_max` is the range end; otherwise bisect for where the mesh
     // gives out. Bisection needs no tolerance — it converges to the last
     // representable feasible amplitude on its own.
-    let dx_max = if throw(MAX_SEARCH_AMPLITUDE).is_ok() {
-        MAX_SEARCH_AMPLITUDE
+    let dx_max = if throw(ceiling).is_ok() {
+        ceiling
     } else {
-        let (mut lo, mut hi) = (0.0, MAX_SEARCH_AMPLITUDE);
+        let (mut lo, mut hi) = (0.0, ceiling);
         for _ in 0..64 {
             let mid = 0.5 * (lo + hi);
             if throw(mid).is_ok() {
@@ -1132,6 +1147,70 @@ pub fn amplitude_for_throw(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// **A throw the geometry reaches is a throw the search reaches.**
+    ///
+    /// `amplitude_for_throw` used to search a flat two modules of amplitude,
+    /// called a search bound rather than a design limit on the reasoning that
+    /// the mesh gives out well before it. At small tooth counts it does — 1.2 at
+    /// z = 17, 1.4 at z = 30, both found by the bisection. At **z = 60 the pair
+    /// is feasible to 2.1**, so the constant bound, not the geometry, and a
+    /// throw of 2.30 mm came back unreachable on a pair that reaches it.
+    ///
+    /// Written as the property rather than against those numbers: whatever
+    /// amplitude the *profile* still builds at, the inversion must find the
+    /// throw it produces. That is checkable without knowing where either gives
+    /// out, and it stays true when the guards move.
+    #[test]
+    fn the_throw_search_reaches_every_amplitude_the_mesh_does() {
+        let mate = Tooth::new(GearParams {
+            teeth: 43,
+            ..Default::default()
+        });
+        for z in [17u32, 30, 60] {
+            let params = GearParams {
+                teeth: z,
+                ..Default::default()
+            };
+            let throw_at = |dx: f64| {
+                Gear::new(GearParams {
+                    angular_shift: dx,
+                    ..params
+                })
+                .centre_profile(&mate, MeshKind::External, MeshSide::First)
+                .map(|q| q.sinusoid.amplitude)
+            };
+
+            // Walk out to the last amplitude whose profile still exists.
+            let mut feasible = 0.0f64;
+            let mut dx = 0.05f64;
+            while dx < 40.0 {
+                if throw_at(dx).is_ok() {
+                    feasible = dx;
+                } else {
+                    break;
+                }
+                dx += 0.05;
+            }
+            assert!(feasible > 0.0, "z={z}: no feasible amplitude at all");
+
+            // ...and the throw it gives must be recoverable.
+            let target = throw_at(feasible).expect("feasible by construction");
+            let found =
+                amplitude_for_throw(params, &mate, MeshKind::External, MeshSide::First, target)
+                    .unwrap_or_else(|e| {
+                        panic!(
+                            "z={z}: throw {target} is produced at dx={feasible} and the \
+                        inversion refused it: {e:?}"
+                        )
+                    });
+            let got = throw_at(found).expect("the inversion must return a buildable dx");
+            assert!(
+                (got - target).abs() < 1e-6,
+                "z={z}: asked for a throw of {target}, got {got} at dx={found}"
+            );
+        }
+    }
 
     /// **The inversion reads the same profile the construction does**, bit for
     /// bit.

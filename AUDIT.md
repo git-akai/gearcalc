@@ -139,6 +139,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F25 | `load_share`'s two ramps do not meet above ε = 2 | gap | 2 | **closed** — and logged in `corrections.md` |
 | F26 | No sampling constant had a convergence gate | gap | 2 | in progress |
 | F27 | `SEVER_SCAN_SAMPLES` could not resolve what it looked for | gap | 2 | **closed** — the scan became a solve |
+| F28 | A search bound acted as a design limit on the eccentric throw | gap | 2 | **closed** — the bound is now the buildable one |
+| F29 | The golden corpus was written from a stale binary and the check caught it | holds | — | **closed** — see Phase 2 notes |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so
@@ -284,8 +286,8 @@ a guard needs a reading of *could this gear exist?*
 |---|---|
 | `SHARING_SAMPLES` 200 | **gated.** `the_sharing_sweep_has_converged` quadruples it; < 1e-4. Finding it failed is what produced F25 |
 | `SEVER_SCAN_SAMPLES` 2000 | **gone.** It decided a boolean and was measured ten times too coarse for the case that matters, and no count fixes that — the window closes to zero at the threshold. Replaced by a bracketed solve on `dθ/ds` (F27) |
-| `PATH_SAMPLES` 2048 (worm) | **open.** The crossed path's average; `the_path_average_has_converged` exists in `screw.rs` — check whether it covers this constant or a different one |
-| `mesh POINTS` 2700, `FLOOR` 2e-4 | **open.** And the floor is the shape `docs/corrections.md` warns about — "a bound records where the sweep stopped" |
+| `PATH_SAMPLES` 2048 (worm) | **holds, and it was already right**: a second-order convergence *law* is asserted, which fixes what any count is worth. It only ever turned the crossed-pair axis, though, so a worm fixture was added — the same rule, the other end of the family |
+| `mesh POINTS` 2700, `FLOOR` 2e-4 | **holds, with the law now asserted.** The floor is still a record of this sweep; what makes it honest is the claim beneath it, that refining the drawing shrinks the residual — which is what separates a discretisation from a disagreement |
 | `outline` `MAX_SUBDIVISION_DEPTH` 14, `DEFAULT_CHORD_TOLERANCE` 1e-3 | **holds.** The tolerance is an *input* with a stated meaning (a sagitta in mm), and the depth is a safety stop on it |
 | `verify` FLANK 600 / ROUND 300 / TIP 120 / DENSE 3000 / SCAN 400, `MAX_PHASES` 4000, `MAX_ROTATION_STEP` 1e-3 | **open**, and lower priority: `verify` is the instrument rather than the model, and `phase_resolution_has_converged` covers the one that matters most |
 | `tooth` `LENGTH_SAMPLES` 60, `MIN_SECTION_SHARE` 0.004, `MIN_SECTION_POINTS` 3 | **holds.** Point *allocation* between sections, which moves no answer — the outline's accuracy is the chord tolerance's job |
@@ -297,8 +299,8 @@ a guard needs a reading of *could this gear exist?*
 | `auto` SPAN 3.0 / SCAN 6 / RESOLUTION 1e-3 / BUDGET 220 / STARTS 2 | **admitted** in `rationale.md` (Phase 1). Phase 4 attempts to retire them |
 | `tooth` `BASE_CROSS_GROWTH` 1.6, `CROSSING_GROWTH` 1.4, `MAX_STEPS` 200 | **holds**, and it is already well said: bracket-expansion heuristics before a *guaranteed bracketed* solve, so any values that find a bracket give the same root |
 | `POINTED_TOOTH_MAX_ROLL` 50.0 | **holds.** A bracket end at α ≈ 88.9°, stated as such |
-| `gear` `MAX_SEARCH_AMPLITUDE` 2.0 | **open** — a bracket end for the throw inversion; check it cannot be reached by a legal design |
-| `train/hula` ROUNDS 3, SETTLED 1e-3 | **open** — an outer iteration nobody has measured |
+| `gear` `MAX_SEARCH_AMPLITUDE` 2.0 | **gone.** It could be reached: at z = 60 the mesh is feasible to 2.1, so the constant bound rather than the geometry and a reachable throw came back unreachable. Replaced by `admissible_ranges`' own bound — one constant fewer, and the search now agrees with the field the gear card draws (F28) |
+| `train/hula` ROUNDS 3, SETTLED 1e-3 | **holds, measured.** Quadrupling the cap to 12 changes neither `gear-cli hula 18 0.2` nor `hulaband 18` — a band of tooth differences — by a digit, so the loop settles on its own and the cap never binds |
 | `CROSSING_NUDGE_MODULES` 1e-6, `MIN_FILLET_MODULES` 1e-9, `TIP_ABOVE_BASE_FRACTION` 1e-9, `SAME_RACK` 1e-9 | **holds.** Degeneracy epsilons, each at the scale of the quantity it separates |
 
 ### Guard conventions — Q4's three conditions apply

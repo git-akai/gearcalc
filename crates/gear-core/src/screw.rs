@@ -2192,13 +2192,26 @@ mod tests {
     /// digit this crate reports.
     #[test]
     fn the_path_average_has_converged() {
+        // **Both members of the family, because the quadrature is shared and
+        // only one of them was ever turned.** A crossed gear pair at 45°/45° is
+        // a mild integrand; a worm at one start is the other end of the same
+        // model — a lead angle a fifth of it, and the sliding that dominates the
+        // balance an order larger. The convergence *order* is a property of the
+        // rule, but the constant in front of it is a property of the integrand,
+        // and `PATH_SAMPLES` is spent on both.
+        for (starts, wheel_teeth, split_deg) in [(17_u32, 23_u32, 45.0_f64), (1, 40, 82.0)] {
+            path_average_converges_for(starts, wheel_teeth, split_deg);
+        }
+    }
+
+    fn path_average_converges_for(starts: u32, wheel_teeth: u32, split_deg: f64) {
         let mn = 1.0;
         let s = Screw::new(&ScrewParams {
             normal_module: mn,
             shaft_angle: 90.0f64.to_radians(),
-            starts: 17,
-            wheel_teeth: 23,
-            worm_pitch_diameter: 17.0 * mn / (45.0f64.to_radians()).cos(),
+            starts,
+            wheel_teeth,
+            worm_pitch_diameter: f64::from(starts) * mn / (split_deg.to_radians()).cos(),
             ..ScrewParams::default()
         })
         .expect("a buildable pair");
@@ -2224,15 +2237,16 @@ mod tests {
             let ratio = previous / here;
             assert!(
                 (3.0..5.0).contains(&ratio),
-                "{samples} samples: the error fell by {ratio}, not the four a \
-                 second-order rule gives — the integrand is not what is assumed"
+                "z {starts}/{wheel_teeth}, {samples} samples: the error fell by \
+                 {ratio}, not the four a second-order rule gives — the integrand \
+                 is not what is assumed"
             );
             previous = here;
         }
         // ...and at that order, this is comfortably below anything reported.
         assert!(
             error(2048) < 1e-9,
-            "2048 samples still leaves {}",
+            "z {starts}/{wheel_teeth}: 2048 samples still leaves {}",
             error(2048)
         );
     }

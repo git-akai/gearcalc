@@ -599,9 +599,15 @@ mod tests {
     fn the_loaded_flank_sits_halfway_and_the_outlines_agree() {
         // The outline is an inscribed polyline and the half-width table bins by
         // radius, so a measured play is always a little *under* the true one.
-        // The residual is a resolution, not a percentage: it sits near 1.3e-4
-        // rad at this point count whatever the play, and falls as the count
-        // rises (1.0e-4 at three times as many points).
+        // The residual is a **resolution, not a percentage**: it sits near
+        // 1.3e-4 rad at this point count whatever the play.
+        //
+        // `FLOOR` is therefore a record of where this sweep stopped rather than
+        // a fact about the geometry, which `docs/corrections.md` names as a way
+        // to write a gate that breaks on the next parameter someone adds. What
+        // makes it honest is the law asserted beneath it: **refining the drawing
+        // shrinks the residual**, which is what separates a discretisation from
+        // a disagreement, and is checkable without knowing either number.
         const POINTS: usize = 2700;
         const FLOOR: f64 = 2e-4;
 
@@ -615,6 +621,35 @@ mod tests {
             crate::verify::contact_phase_from_outlines(a, b, at, sign, POINTS)
                 .expect("the outlines must reach each other")
         };
+
+        // **The residual is a resolution.** Measured once, on one pair at one
+        // separation, because the claim is about the *drawing* rather than about
+        // any particular mesh — and a finer drawing is the expensive half.
+        {
+            let (a, b) = (g(17), g(43));
+            let mesh = Mesh::new(&a, &b, MeshKind::External).unwrap();
+            let at = mesh.a_w + 0.30;
+            let law = mesh.angular_backlash(at, MeshSide::Second).unwrap();
+            let residual = |n: usize| {
+                let drive = crate::verify::contact_phase_from_outlines(&a, &b, at, 1.0, n)
+                    .expect("the outlines must reach each other");
+                let coast = crate::verify::contact_phase_from_outlines(&a, &b, at, -1.0, n)
+                    .expect("the outlines must reach each other");
+                law - (drive - coast)
+            };
+            let (coarse, fine) = (residual(POINTS), residual(3 * POINTS));
+            assert!(
+                fine < coarse,
+                "tripling the drawing left the residual at {fine} against {coarse} \
+                 — it is not a discretisation, it is a disagreement"
+            );
+            assert!(
+                fine > 0.0,
+                "a finer drawing overshot the law by {}, which an inscribed \
+                 polyline cannot do",
+                -fine
+            );
+        }
 
         for (z1, z2) in [(17_u32, 43_u32), (23, 31)] {
             let (a, b) = (g(z1), g(z2));
