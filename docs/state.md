@@ -20,9 +20,18 @@ and it is the one file expected to be rewritten rather than amended.
 ```bash
 nix develop                       # or `direnv allow` once
 cargo nextest run                 # the suite
-nix flake check                   # what CI runs: build, clippy --deny warnings, fmt, tests
+nix flake check                   # build, clippy --deny warnings, fmt, tests
+nix build .#web                   # ...and the site, which flake check does NOT cover
 cd web && npm run dev             # the application
 ```
+
+**`nix flake check` is not all of what CI runs**, and reading it as though it
+were has cost one red build. The workflow also runs `nix build .#web` and the
+front end's own `npm run check`, and the site build carries a **fixed-output
+hash over `web/package-lock.json`** (`npmDepsHash` in `flake.nix`) that nothing
+else consults — so any change to that lockfile, a version bump included, breaks
+the site build alone and passes everything a developer usually runs. Before
+pushing, run all four.
 
 And the checks that live outside the Rust suite:
 
