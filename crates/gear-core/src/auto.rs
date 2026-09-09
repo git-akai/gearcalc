@@ -926,6 +926,130 @@ pub fn ring_is_cut_as_asked(ring: &crate::ring::Ring) -> bool {
     ring.clamps.is_empty()
 }
 
+/// **A member of a mesh a search is considering, and the tool that cut it.**
+///
+/// The tool is the parameter rather than the branch: a rack-cut member answers
+/// the four questions [`member_is_buildable`] asks, a shaper-cut one answers of
+/// its cutter ([`ring_is_cut_as_asked`]), and nothing above here needs to know
+/// which it is holding.
+#[derive(Clone, Copy, Debug)]
+pub enum Cut<'a> {
+    /// Rack-generated. `floor` is the least shift that clears undercut, and
+    /// `None` where the designer has said this member may undercut.
+    ByRack {
+        tooth: &'a Tooth,
+        floor: Option<f64>,
+    },
+    /// Shaper-generated — a ring, whose root and fillet are its cutter's.
+    ByShaper { ring: &'a crate::ring::Ring },
+}
+
+impl Cut<'_> {
+    /// Whether this member is the part the shift asked for.
+    #[must_use]
+    pub fn is_as_asked(&self) -> bool {
+        match self {
+            Self::ByRack { tooth, floor } => member_is_buildable(tooth, *floor),
+            Self::ByShaper { ring } => ring_is_cut_as_asked(ring),
+        }
+    }
+
+    /// Tip radius, mm.
+    #[must_use]
+    pub fn tip_radius(&self) -> f64 {
+        match self {
+            Self::ByRack { tooth, .. } => tooth.ra,
+            Self::ByShaper { ring } => ring.ra,
+        }
+    }
+
+    /// Root radius, mm.
+    #[must_use]
+    pub fn root_radius(&self) -> f64 {
+        match self {
+            Self::ByRack { tooth, .. } => tooth.rf,
+            Self::ByShaper { ring } => ring.rf,
+        }
+    }
+}
+
+/// **One mesh offered to a search: may it be chosen, and what does it lose?**
+///
+/// # Why this is not a stage's question
+///
+/// Three stage kinds each wrote this out, and between them they answered it
+/// three different ways: the pair asked whether its teeth bottom out, the
+/// epicyclic set and the hula stage did not; the pair and the set asked whether
+/// each member could be cut, and a ring was asked nothing by anybody
+/// (`docs/corrections.md`). **A constraint belongs to the mesh, not to the
+/// arrangement it sits in** — a mesh that bottoms out is a mesh that bottoms
+/// out whether a carrier is turning around it or not — so it is asked once here
+/// and every kind that builds a mesh gets it.
+///
+/// What a stage kind still owns is what it genuinely does own: how its meshes
+/// are *assembled* — at a clearance-opened centre distance, from a shaper cut,
+/// around a crank — and which of them a candidate has. Those are the mechanics.
+/// This is what is asked of the result.
+///
+/// # It costs nothing to ask
+///
+/// Every field is a reference to something the caller has already built to score
+/// the candidate at all. Nothing here cuts a tooth or solves a mesh.
+pub struct MeshTrial<'a> {
+    /// The two members, in the order the mesh was built.
+    pub members: [Cut<'a>; 2],
+    /// The mesh as it **runs**, opened by whatever clearance the stage assembles
+    /// at — not as the shifts leave it, or the search would optimise a contact
+    /// ratio nobody measures.
+    pub mesh: &'a crate::mesh::Mesh,
+    /// The path of contact on that mesh, read through member 1.
+    pub path: &'a crate::contact::ContactPath,
+    /// The transverse contact ratio this mesh must keep. Loss falls
+    /// monotonically with path length, so without it the least-loss mesh is
+    /// always the one whose teeth barely reach and the constraint *is* the
+    /// answer; how much margin a design wants over continuous contact is the
+    /// stage's decision, not this one's.
+    pub min_contact_ratio: f64,
+    pub friction: f64,
+}
+
+impl MeshTrial<'_> {
+    /// What this mesh keeps, driving forward — or `None` where it is not a mesh
+    /// a search may choose at all.
+    ///
+    /// The three refusals are the three ways a mesh can fail to be one: a member
+    /// the tool would not leave as asked, a tooth that reaches past the root
+    /// circle it runs into, and contact that does not stay continuous.
+    #[must_use]
+    pub fn efficiency(&self) -> Option<f64> {
+        if !self.members.iter().all(Cut::is_as_asked) {
+            return None;
+        }
+        let gap = self.mesh.bottom_clearance(
+            self.members.map(|m| m.tip_radius()),
+            self.members.map(|m| m.root_radius()),
+        );
+        if gap.iter().any(|g| *g < 0.0) {
+            return None;
+        }
+        if self.path.contact_ratio < self.min_contact_ratio {
+            return None;
+        }
+        let Cut::ByRack { tooth, .. } = self.members[0] else {
+            // The path and the efficiency integral are read through member 1,
+            // which every mesh here builds pinion-first — a ring is never it.
+            return None;
+        };
+        Some(crate::contact::efficiency(
+            self.path,
+            self.mesh,
+            tooth,
+            self.friction,
+            crate::contact::Drive::Forward,
+        ))
+    }
+}
+
 /// **What the search may not do**, as opposed to what it is trying to achieve.
 ///
 /// Each field eliminates a range of shifts rather than reshaping the surface
@@ -1092,38 +1216,35 @@ pub fn shifts_for_efficiency(
         }
         let [pa, pb] = pair(x);
         let (a, b) = (Tooth::new(pa), Tooth::new(pb));
-        if !member_is_buildable(&a, floor[0]) || !member_is_buildable(&b, floor[1]) {
-            return None;
-        }
         // **The pair as it runs, not as its shifts leave it.** The stage opens
         // the zero-backlash distance by its assembly clearance and rates
         // contact there (docs/reference.md#centre-distance-and-backlash); so
         // does this, or the search would optimise a contact ratio nobody
         // measures and settle just under the floor it was given.
+        //
+        // That opening is the whole of what a *pair* contributes: how its mesh
+        // is assembled. What is then asked of the mesh belongs to the mesh
+        // ([`MeshTrial`]) and is the same question every kind asks.
         let zero_backlash = crate::mesh::Mesh::new(&a, &b, kind).ok()?;
         let mesh = zero_backlash.at(zero_backlash.a_w + clearance).ok()?;
-        // **The teeth have to reach the bottom of the space and stop.** A tip
-        // that passes the mating root circle is a tooth that bottoms out, and
-        // no amount of efficiency redeems it. The dedendum already carries the
-        // gap — a standard 1.25 module against a 1 module addendum *is* the
-        // 0.25 of bottom clearance — so this reads the clearance the designer
-        // specified rather than inventing a second input for it.
-        //
-        // It never bites near zero shift, which is why the stages have not
-        // needed it: it is the constraint that appears the moment a pair is
-        // pushed out, and it is what stops the search pushing further.
-        if mesh.a_w - a.ra - b.rf < 0.0 || mesh.a_w - b.ra - a.rf < 0.0 {
-            return None;
-        }
         let path = crate::contact::ContactPath::new(&a, b.ra, &mesh)?;
-        // The floor is what stops the search walking off the end of a
-        // shortening path. Loss falls monotonically with path length — every
-        // millimetre of profile that touches is a millimetre that slides — so
-        // without a floor the least-loss pair is always the one whose teeth
-        // barely reach, and the constraint is the answer.
-        (path.contact_ratio >= min_contact_ratio).then(|| {
-            crate::contact::efficiency(&path, &mesh, &a, friction, crate::contact::Drive::Forward)
-        })
+        MeshTrial {
+            members: [
+                Cut::ByRack {
+                    tooth: &a,
+                    floor: floor[0],
+                },
+                Cut::ByRack {
+                    tooth: &b,
+                    floor: floor[1],
+                },
+            ],
+            mesh: &mesh,
+            path: &path,
+            min_contact_ratio,
+            friction,
+        }
+        .efficiency()
     };
 
     // The pair that a set of free coordinates describes, given what is pinned.

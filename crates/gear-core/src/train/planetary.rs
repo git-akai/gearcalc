@@ -555,39 +555,42 @@ impl PlanetaryStage {
                     how(1),
                 ),
             ];
-            if !crate::auto::member_is_buildable(&b.sun, floors[0])
-                || !crate::auto::member_is_buildable(&b.planet, floors[1])
-                // **And the ring is asked of its cutter**, which is the question
-                // it has an answer to (`auto::ring_is_cut_as_asked`). It used to
-                // be asked nothing at all, on the reading that a rack's four
-                // questions mean nothing to it — true, and it left the search
-                // free to walk past the shift where the tool stops leaving the
-                // space asked for. It did: the shipped 13/25 set chose a ring at
-                // **2.35 modules** where its space caps at 1.94, so the part the
-                // search optimised is not the part the cutter makes.
-                || !crate::auto::ring_is_cut_as_asked(&b.ring)
-            {
-                return None;
-            }
-            if b.sp_path.contact_ratio < self.optimisation.min_contact_ratio
-                || b.pr_path.contact_ratio < self.optimisation.min_contact_ratio
-            {
-                return None;
-            }
+            // **What a set contributes is which meshes it has and how they are
+            // assembled**; what is asked of each of them belongs to the mesh
+            // (`auto::MeshTrial`) and is the same question a pair asks. Asked
+            // here for itself, this set answered two of the three: a ring was
+            // asked nothing at all, and no member was asked whether its teeth
+            // reach past the root circle they run into.
+            let sun = crate::auto::Cut::ByRack {
+                tooth: &b.sun,
+                floor: floors[0],
+            };
+            let planet = crate::auto::Cut::ByRack {
+                tooth: &b.planet,
+                floor: floors[1],
+            };
+            let trial = |members, mesh, path, friction| {
+                crate::auto::MeshTrial {
+                    members,
+                    mesh,
+                    path,
+                    min_contact_ratio: self.optimisation.min_contact_ratio,
+                    friction,
+                }
+                .efficiency()
+            };
             Some(
-                efficiency(
-                    &b.sp_path,
+                trial(
+                    [sun, planet],
                     &b.sp_mesh,
-                    &b.sun,
+                    &b.sp_path,
                     self.sliding_friction_sun_planet,
-                    crate::contact::Drive::Forward,
-                ) * efficiency(
-                    &b.pr_path,
+                )? * trial(
+                    [planet, crate::auto::Cut::ByShaper { ring: &b.ring }],
                     &b.pr_mesh,
-                    &b.planet,
+                    &b.pr_path,
                     self.sliding_friction_planet_ring,
-                    crate::contact::Drive::Forward,
-                ),
+                )?,
             )
         };
         if freedoms.count() == 0 {

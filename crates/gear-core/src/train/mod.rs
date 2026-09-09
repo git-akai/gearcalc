@@ -2703,6 +2703,143 @@ mod tests {
         assert!(checked >= 6, "only {checked} members carried the load");
     }
 
+    /// **Every kind that searches asks the same of its meshes.**
+    ///
+    /// A constraint belongs to the mesh, not to the arrangement around it: a
+    /// mesh whose teeth reach past the root circle they run into bottoms out
+    /// whether a carrier is turning about it or not. Three kinds each wrote the
+    /// question out for themselves and between them answered it three ways — the
+    /// pair asked about bottoming, neither epicyclic kind did; the pair and the
+    /// set asked whether each member could be cut, and a ring was asked by
+    /// nobody.
+    ///
+    /// `auto::MeshTrial` is the one place now, and this is the claim that says
+    /// so from the outside: **whatever each kind chose, the mesh it chose is one
+    /// the shared contract admits.** A kind that stops asking chooses something
+    /// that fails here; a kind added later that never asks fails here the first
+    /// time its answer is pushed against a bound.
+    #[test]
+    fn every_kind_that_searches_asks_the_same_of_its_meshes() {
+        use crate::auto::Search;
+        let lib = library();
+        let mut checked = 0u32;
+
+        // --- a pair, rebuilt through the stage's own constructors.
+        for teeth in [[9_u32, 37], [17, 43], [12, 29]] {
+            let stage = SpurStage {
+                gears: [0, 1].map(|i| StageGear {
+                    teeth: teeth[i],
+                    ..SpurStage::default().gears[i].clone()
+                }),
+                optimisation: Optimisation {
+                    enabled: true,
+                    ..Optimisation::default()
+                },
+                ..SpurStage::default()
+            };
+            let x = stage.shifts_at(&Search::SHIPPED);
+            let g = [0, 1].map(|i| Tooth::new(stage.params_at(i, x[i])));
+            let zero = crate::mesh::Mesh::new(&g[0], &g[1], crate::mesh::MeshKind::External)
+                .expect("the pair meshes");
+            let mesh = zero
+                .at(zero.a_w + stage.clearance_taken())
+                .expect("...at its running distance");
+            for (i, gap) in mesh
+                .bottom_clearance([g[0].ra, g[1].ra], [g[0].rf, g[1].rf])
+                .iter()
+                .enumerate()
+            {
+                assert!(
+                    *gap > 0.0,
+                    "{teeth:?}: gear {i}'s tip bottoms out by {} mm at the shifts \
+                     the search chose",
+                    -gap
+                );
+                checked += 1;
+            }
+        }
+
+        // --- an epicyclic set, both of its meshes.
+        for (sun, planet) in [(17_u32, 17_u32), (24, 18), (13, 25)] {
+            let mut set = PlanetaryStage {
+                optimisation: Optimisation {
+                    enabled: true,
+                    ..Optimisation::default()
+                },
+                ..PlanetaryStage::default()
+            };
+            set.sun.teeth = sun;
+            set.planet.teeth = planet;
+            set.ring.teeth = sun + 2 * planet;
+            set.sun.profile_shift = Auto::automatic(0.0);
+            set.ring.profile_shift = Auto::automatic(0.0);
+            let b = set
+                .built(set.shifts_at(&Search::SHIPPED))
+                .expect("the set has geometry");
+            let gaps = [
+                b.sp_mesh
+                    .bottom_clearance([b.sun.ra, b.planet.ra], [b.sun.rf, b.planet.rf]),
+                b.pr_mesh
+                    .bottom_clearance([b.planet.ra, b.ring.ra], [b.planet.rf, b.ring.rf]),
+            ];
+            for (m, mesh) in gaps.iter().enumerate() {
+                for (i, gap) in mesh.iter().enumerate() {
+                    assert!(
+                        *gap > 0.0,
+                        "{sun}/{planet}: mesh {m} member {i} bottoms out by {} mm",
+                        -gap
+                    );
+                    checked += 1;
+                }
+            }
+        }
+
+        // --- a hula stage, from what it reports rather than from what built it.
+        // Its two meshes share one crank, so the offset *is* their centre
+        // distance, and the two radii are on the members' own cards.
+        for n in [12_u32, 18, 30] {
+            let mut stage = HulaStage {
+                optimisation: Optimisation {
+                    enabled: true,
+                    ..Optimisation::default()
+                },
+                ..HulaStage::default()
+            };
+            for (gear, count) in stage.gears.iter_mut().zip([n + 1, n, n - 1, n]) {
+                gear.teeth = count;
+            }
+            let Ok(r) = solve_hula_stage(&stage, 1000.0, StageTorques::just(2.0), &lib) else {
+                continue;
+            };
+            for mesh in 0..2 {
+                // The ring is the member of the pair with more teeth, which the
+                // stage's own inputs say and its cards echo as the larger tip.
+                let (ring, pinion) = {
+                    let (a, b) = (&r.gears[mesh * 2], &r.gears[mesh * 2 + 1]);
+                    if stage.gears[mesh * 2].teeth > stage.gears[mesh * 2 + 1].teeth {
+                        (a, b)
+                    } else {
+                        (b, a)
+                    }
+                };
+                let gaps = [
+                    (ring.root_radius - r.offset) - pinion.tip_radius,
+                    (ring.tip_radius - r.offset) - pinion.root_radius,
+                ];
+                for (i, gap) in gaps.iter().enumerate() {
+                    assert!(
+                        *gap > 0.0,
+                        "N {n} mesh {mesh} member {i} bottoms out by {} mm",
+                        -gap
+                    );
+                    checked += 1;
+                }
+            }
+        }
+
+        assert!(checked >= 20, "only {checked} tooth spaces were measured");
+    }
+
     /// **A search may not choose a part its tool has to alter.**
     ///
     /// `member_is_buildable` says this of a rack-cut member and declines to say

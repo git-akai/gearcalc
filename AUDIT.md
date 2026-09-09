@@ -79,9 +79,17 @@ be the whole of what a set needed, the range having existed all along. 26 of 30
 sets were returning a ring the cutter had altered; none are now. The last guessed
 interval has left the crate.
 
+*Step 2, third item.* **What is asked of a mesh is asked once** (`MeshTrial`), so
+a constraint reaches every arrangement that builds one rather than the one that
+happened to write it. It closed **F59** — three kinds, three different answers to
+the same question — and moved no number anywhere, which is what makes it an
+extraction rather than a change.
+
 *Next.* **F50** — a set's search is now one-signed but still under-searches by up
 to 3.2e-4. What is left is the coordinate problem: item 3 below, splitting the
-box at the regime boundary the addendum cap draws, and then the closed form.
+box at the regime boundary the addendum cap draws, and then the closed form. It
+lands **once** now rather than three times, which is the reason to have done the
+extraction first.
 
 | Phase | What it does | State |
 |---|---|---|
@@ -103,7 +111,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 555 tests** (was 531). **Golden corpus: 26 cases** (was 22).
+**Suite: 557 tests** (was 531). **Golden corpus: 26 cases** (was 22).
 
 ---
 
@@ -194,6 +202,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F54 | A ring was asked nothing, so the search chose rings its cutter had to alter — 26 of 30 sets | gap | 4 | **closed** — and logged in `corrections.md`; the premise was wrong, see below |
 | F55 | A centre distance no admissible shifts can reach is answered rather than refused | gap | 4 | open |
 | F58 | The hula stage's shift optimiser moves no answer over a band of tooth differences, on or off | holds? | 4 | open — observed, not yet diagnosed |
+| F59 | Three kinds each wrote out what to ask of a mesh, and answered it three ways | gap | 4 | **closed** — `auto::MeshTrial`, and logged in `corrections.md` |
+| F60 | A hula pair's tip margin and an internal mesh's interference flags are asked by one kind each | gap | 5 | open — the next candidates for the mesh level |
 | F56 | No CLI command drove the optimiser, so its answers were outside the corpus | gap | 4 | **closed** — `gear-cli shifts`, which also closes F19's first row |
 | F57 | `check_figures.py` had `check_golden.sh`'s stale-binary fault | drift | 4 | **closed** — and logged in `corrections.md` |
 | F2 | The worm stage is outside the shared member vocabulary | gap | 3 | **closed** — option B; a crossed member is a `GearResult`, a worm's is not and says why |
@@ -809,6 +819,28 @@ Where both peaks exist the search takes the lower one. At a given distance of
 admissible interval gives `x₁ = 0.672` for 0.9765912 — **1.2e-4 of efficiency**,
 and a pinion shift 0.20 modules away. Above 24.1 mm it finds the higher peak, so
 the fault is confined to the band where both exist.
+
+#### Done: one place for what a mesh is asked
+
+The direction that produced it: *optimisation is something that can happen at any
+mesh, with different constraints and results depending on the mechanics — aiming
+at solutions not specific to a mesh type or a stage type allows extension without
+duplication.* Run as pass 2 over the three search sites, it found them answering
+one question three ways (F59, and `docs/rationale.md` now carries the rule).
+
+| asked of a mesh | pair | set | hula |
+|---|---|---|---|
+| each member cut as asked | rack only | rack only | rack only |
+| a ring asked of its cutter | — | ✗ | ✗ |
+| the teeth clear the bottom of the space | ✓ | ✗ | ✗ |
+| contact stays continuous | ✓ | ✓ | ✓ |
+
+All four are `auto::MeshTrial`'s now, and every kind hands it the meshes its own
+kinematics assembled. `Mesh::bottom_clearance` is one expression for both mesh
+kinds — `s·a_w − r_a − s·r_f`, the sign doing the work — gated against the
+quarter-module a standard tooth leaves externally and against the two circles'
+own separation internally. **No number moved**, on any kind, which is what says
+it is an extraction.
 
 ### The repair these three findings agree on
 

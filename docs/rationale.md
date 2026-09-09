@@ -727,6 +727,42 @@ is the answer a handbook gives.
 the self-locking note names the *static* coefficient — the one that actually
 decides it.
 
+### A constraint belongs to the mesh, not to the arrangement around it
+
+A mesh whose teeth reach past the root circle they run into bottoms out whether
+a carrier is turning about it or not. So **what is asked of a mesh is asked
+once**, in one place, and every arrangement that builds one gets it —
+`auto::MeshTrial`. What a stage kind owns is what it genuinely does own: which
+meshes a candidate has, and how each is *assembled* — at a clearance-opened
+centre distance, from a shaper cut, around a crank. Those are its mechanics.
+What is asked of the result is not.
+
+**Written per kind, they disagreed.** Three kinds each spelled the question out
+and between them answered it three ways: the parallel pair asked whether its
+teeth bottom out and neither epicyclic kind did; the pair and the set asked
+whether each member could be cut as asked, and a ring was asked by nobody. Each
+gap was invisible from inside the kind that had it, because the kind that got it
+right was somewhere else.
+
+**The tool is the parameter, not the branch.** A member arrives as a `Cut`: a
+rack-generated one answers the four questions
+[`auto::member_is_buildable`](#a-ring-is-asked-of-its-cutter-not-of-a-rack) asks,
+a shaper-generated one answers of its cutter, and nothing above needs to know
+which it is holding. The same discipline runs through the geometry it reads:
+`Mesh::bottom_clearance` is one expression for an external and an internal mesh
+with the sign doing the work, which is
+[a ring is a gear with a negative tooth count](#a-ring-is-a-gear-with-a-negative-tooth-count)
+read on radii.
+
+**What this buys is extension without duplication.** A fourth arrangement adds
+kinematics and the meshes those kinematics assemble; it inherits every question,
+and a question added later reaches it without anybody remembering to go and look.
+
+**What would change this:** a constraint that is genuinely the arrangement's
+rather than the mesh's — a hula pair's tip margin at a *held* crank is one, and
+it stays where it is for that reason. The test is whether the question can be
+put to a mesh that does not know what is turning around it.
+
 ### A ring is asked of its cutter, not of a rack
 
 A ring's flank, root and fillet are its **shaper's** rather than inputs of its

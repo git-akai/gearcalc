@@ -38,7 +38,7 @@
 use super::{
     GearResult, LoadCase, Loading, MemberRating, MeshReport, StageTorques, TrainError, PROBE,
 };
-use crate::contact::{efficiency, ContactPath, Directional, Drive};
+use crate::contact::{efficiency, ContactPath, Directional};
 use crate::hula::{self, Offset, Split, Teeth};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
@@ -590,11 +590,7 @@ pub fn solve_hula_stage_with(
             let pinion_floor = stage.gears[pair.pinion].no_undercut.then(|| {
                 crate::auto::automatic_profile_shift(&pinion_params, pinion_params.dedendum)
             });
-            if !crate::auto::member_is_buildable(&pinion, pinion_floor)
-                || !crate::auto::ring_is_cut_as_asked(&ring)
-            {
-                return None;
-            }
+
             // A split that fouls the tips at this offset is not admissible at
             // it — read off the pair already in hand rather than through
             // `tip_room`, which would cut the ring a second time, and cutting a
@@ -607,16 +603,26 @@ pub fn solve_hula_stage_with(
             let mesh =
                 Mesh::new(&pinion, &Tooth::new(params(pair.ring)), MeshKind::Internal).ok()?;
             let path = ContactPath::new(&pinion, ring.ra, &mesh)?;
-            if path.contact_ratio < stage.optimisation.min_contact_ratio {
-                return None;
+            // **What this arrangement contributes is the crank that assembled
+            // the mesh**, and the tip margin above, which is the pair's own
+            // bound at a held offset. What is asked of the mesh once it exists
+            // belongs to the mesh (`auto::MeshTrial`), so the pinion's four
+            // questions, the ring's one and the bottom of both spaces are the
+            // same three a pair and a set are held to.
+            crate::auto::MeshTrial {
+                members: [
+                    crate::auto::Cut::ByRack {
+                        tooth: &pinion,
+                        floor: pinion_floor,
+                    },
+                    crate::auto::Cut::ByShaper { ring: &ring },
+                ],
+                mesh: &mesh,
+                path: &path,
+                min_contact_ratio: stage.optimisation.min_contact_ratio,
+                friction: stage.sliding_friction[index],
             }
-            Some(efficiency(
-                &path,
-                &mesh,
-                &pinion,
-                stage.sliding_friction[index],
-                Drive::Forward,
-            ))
+            .efficiency()
         };
 
         // What a mesh's searched shift may take, from the guards on the member

@@ -357,6 +357,45 @@ impl Mesh {
         Ok(j * self.tooth_sum().abs() / (a_actual * z))
     }
 
+    /// **The radial gap at the bottom of each tooth space**, mm: how much clear
+    /// air is left between one member's tip and the other's root, measured along
+    /// the line of centres. Returned per member, in the order the mesh was built
+    /// — `[under gear 1's tip, under gear 2's tip]`.
+    ///
+    /// # One expression, and the sign does the work
+    ///
+    /// ```text
+    /// under gear 1's tip:   s·a_w − r_a1 − s·r_f2
+    /// under gear 2's tip:   s·a_w − s·r_a2 − r_f1        s = +1 external, −1 internal
+    /// ```
+    ///
+    /// That is docs/rationale.md#a-ring-is-a-gear-with-a-negative-tooth-count
+    /// read on *radii* rather than on tooth counts:
+    /// an internal mesh's second member has its centre outside the first's teeth
+    /// and its root beyond its own pitch circle, and negating its two radii is
+    /// the whole of the difference. Written the other way it is two formulas
+    /// that agree nowhere and have to be kept in step.
+    ///
+    /// # What a negative value means
+    ///
+    /// The tooth bottoms out: it reaches past the root circle it runs into, and
+    /// no amount of efficiency redeems it. The dedendum already carries the gap
+    /// — a standard 1.25 module against a 1 module addendum *is* the 0.25 of
+    /// bottom clearance — so this reports the gap rather than applying a
+    /// convention to it, and a caller that must not choose such a pair compares
+    /// it against zero.
+    ///
+    /// It never bites near zero shift, which is why it went unnoticed in every
+    /// stage kind but the one that pushes a pair out (`docs/corrections.md`).
+    #[must_use]
+    pub fn bottom_clearance(&self, tips: [f64; 2], roots: [f64; 2]) -> [f64; 2] {
+        let s = self.kind.sign();
+        [
+            s * self.a_w - tips[0] - s * roots[1],
+            s * self.a_w - s * tips[1] - roots[0],
+        ]
+    }
+
     /// Gear 2's tooth count, signed: negative when gear 2 is a ring.
     ///
     /// See [`MeshKind::sign`] for why the sign lives on the tooth count rather
@@ -524,6 +563,72 @@ impl std::error::Error for MeshError {}
 mod tests {
     use super::*;
     use crate::GearParams;
+
+    /// **The bottom clearance a standard tooth leaves is the standard figure**,
+    /// and it is the same expression on a ring.
+    ///
+    /// A basic rack with a 1-module addendum against a 1.25-module dedendum
+    /// leaves exactly a quarter of a module of air under each tip: the
+    /// convention *is* `h_f − h_a`, so an unshifted standard pair at its
+    /// reference distance is a closed-form check that shares no algebra with
+    /// [`Mesh::bottom_clearance`].
+    ///
+    /// The internal half cannot be checked against the same convention — a
+    /// ring's root is wherever its shaper's tip reached rather than a dedendum
+    /// anybody typed — so it is checked against the geometry directly: place the
+    /// two circles on the line of centres and measure between them. That is the
+    /// definition, written out, and it is what the signed form has to reproduce.
+    #[test]
+    fn the_bottom_clearance_is_the_gap_the_dedendum_leaves() {
+        let gear = |teeth: u32| {
+            crate::Tooth::new(GearParams {
+                teeth,
+                ..Default::default()
+            })
+        };
+        let d = GearParams::default();
+        let want = d.module * (d.dedendum - d.addendum);
+
+        for (z1, z2) in [(17_u32, 43_u32), (9, 20), (31, 31)] {
+            let (a, b) = (gear(z1), gear(z2));
+            let m = Mesh::new(&a, &b, MeshKind::External).expect("a standard pair meshes");
+            let got = m.bottom_clearance([a.ra, b.ra], [a.rf, b.rf]);
+            for (i, g) in got.iter().enumerate() {
+                assert!(
+                    (g - want).abs() < 1e-12,
+                    "{z1}/{z2} member {i}: {g} where a standard tooth leaves {want}"
+                );
+            }
+        }
+
+        // Internal, against the distance between the two circles rather than
+        // against a convention. The ring's root lies *outside* its pitch circle,
+        // so the point of its root circle nearest the pinion's centre is
+        // `r_f2 − a_w` away, and the gap under the pinion's tip is what is left
+        // over. The other tip is the ring's, reaching inward.
+        let pinion = gear(20);
+        let ring = crate::ring::Ring::cut_by(
+            &GearParams {
+                teeth: 60,
+                ..Default::default()
+            },
+            &crate::ring::Cutter::default(),
+        );
+        let ring_as_gear = crate::Tooth::new(ring.params);
+        let m = Mesh::new(&pinion, &ring_as_gear, MeshKind::Internal).expect("an internal pair");
+        let got = m.bottom_clearance([pinion.ra, ring.ra], [pinion.rf, ring.rf]);
+        let by_hand = [(ring.rf - m.a_w) - pinion.ra, (ring.ra - m.a_w) - pinion.rf];
+        for (i, (g, w)) in got.iter().zip(by_hand).enumerate() {
+            assert!(
+                (g - w).abs() < 1e-12,
+                "internal member {i}: {g} where the circles are {w} apart"
+            );
+        }
+        assert!(
+            by_hand.iter().all(|g| *g > 0.0),
+            "this fixture is meant to have room at the bottom: {by_hand:?}"
+        );
+    }
 
     /// **The operating mesh is the same pair, moved — and it is not the mesh to
     /// ask about backlash.**
