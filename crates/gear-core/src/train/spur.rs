@@ -308,6 +308,13 @@ impl SpurStage {
     /// the one it meshes with — and what a designer has already given is handed
     /// over as pinned rather than overridden.
     pub(super) fn shifts(&self) -> [f64; 2] {
+        self.shifts_at(&crate::auto::Search::SHIPPED)
+    }
+
+    /// As [`Self::shifts`], at a stated search effort — which is what makes
+    /// "the shipped effort is converged" a claim something can raise and check
+    /// rather than a comment (`auto::Search`).
+    pub(super) fn shifts_at(&self, search: &crate::auto::Search) -> [f64; 2] {
         let asked = [0, 1].map(|i| self.gears[i].shift_asked(&self.base_params(i)));
         let floor = asked.map(|a| a.search_floor);
         let given = asked.map(|a| a.given);
@@ -341,6 +348,7 @@ impl SpurStage {
             },
             &crate::auto::Pinned { shift: given, sum },
             self.sliding_friction,
+            search,
         )
         .unwrap_or_else(|| asked.map(|a| a.settled))
     }

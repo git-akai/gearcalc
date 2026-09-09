@@ -330,11 +330,30 @@ is derived and solved directly
 doing is the sum, and every row of every table this project prints reports the
 sum landing on a bound rather than at a stationary point.
 
+**And the search is converged only where its coordinates are the problem's.**
+The six numbers are an input now (`auto::Search`) rather than constants in the
+loop, because "these are enough" is a claim about them and a claim nothing can
+raise is a claim nothing can check. Raised, it holds for a pair — fourteen times
+the work moves its efficiency by at most 4.1e-7 and no shift by more than one
+step of the stopping resolution — and fails for an epicyclic set, where it moves
+`η₀` by up to 2.4e-4 at a sun shift 0.30 modules away, in **both** directions.
+More effort finding a worse answer is not a budget that is too small; it is a
+walk whose result depends on where its sweep happened to put it.
+
+A pair is searched in the pair's own two directions: the shift sum, which sets
+the operating pressure angle and so the whole length of the path, and the
+division, which only moves the path's two ends against each other. One of those
+is flat and it is an axis. A set is handed two of its three raw shifts, and its
+admissible region is bounded by a curve the optimum lies against — so the walk
+slides along the bound rather than climbing to it.
+
 **What would change this:** establishing that the loss is monotone in the sum up
 to whichever constraint binds first. If it is, the sum becomes a one-dimensional
-bracketed search against the active bound and the crate has no optimiser left.
-That is being attempted rather than assumed, and until it lands, this section
-describes ten things and not nine.
+bracketed search against the active bound and the crate has no optimiser left —
+and the same question asked of a set is the same repair, since *finding the
+coordinate the constraint is flat in* is what both need. That is being attempted
+rather than assumed, and until it lands, this section describes ten things and
+not nine.
 
 ### The Lewis parabola over the 30° tangent
 

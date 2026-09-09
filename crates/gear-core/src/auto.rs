@@ -890,6 +890,7 @@ pub fn shifts_for_efficiency(
     bounds: &Bounds,
     pinned: &Pinned,
     friction: f64,
+    search: &Search,
 ) -> Option<[f64; 2]> {
     let Bounds {
         floor,
@@ -975,7 +976,9 @@ pub fn shifts_for_efficiency(
         let x = place(&[]);
         return loss_at(x).map(|_| x);
     }
-    maximise(pinned.freedoms(), &|free| loss_at(place(free))).map(|free| place(&free))
+    search
+        .maximise(pinned.freedoms(), &|free| loss_at(place(free)))
+        .map(|free| place(&free))
 }
 
 /// **Coordinate descent over a few free numbers**, refined about the best.
@@ -994,152 +997,241 @@ pub fn shifts_for_efficiency(
 /// together, so only the search is common.
 #[must_use]
 pub fn maximise(dof: usize, objective: &dyn Fn(&[f64]) -> Option<f64>) -> Option<Vec<f64>> {
+    Search::SHIPPED.maximise(dof, objective)
+}
+
+/// **How hard [`maximise`] looks**, as a value rather than as six constants
+/// inside its loop.
+///
+/// # Why these are a parameter
+///
+/// "This search is converged" is a claim *about* these numbers, and a claim
+/// nothing can raise is a claim nothing can check. They were first chosen when a
+/// candidate cost fifty times what it does now, so they are worth re-asking
+/// rather than inheriting — and asking means running the same searches at a
+/// budget nobody would ship and comparing. That is
+/// `the_search_is_converged_not_budgeted`, which is the only reason this type
+/// exists; [`Search::SHIPPED`] is what every caller uses.
+///
+/// None of them is a model constant. Each says how much work to spend, and the
+/// answer they are spending it on is decided by the objective and its
+/// constraints alone — so raising any of them may only sharpen an answer, never
+/// move it somewhere else.
+///
+/// # What checking it found
+///
+/// The comment this replaces claimed all three of the crate's searches were
+/// converged — "the pair's answer not at all to eight decimals, the set's by
+/// 2e-7". **Half of that is true.** A pair's is converged: over fourteen tooth
+/// pairs, fourteen times the work moves its efficiency by at most 4.1e-7 and
+/// every shift by less than one step of `resolution`. An epicyclic set's is
+/// not: over thirty sets it moves `η₀` by up to **2.4e-4**, with the sun's shift
+/// **0.30 modules** away — a visibly different gear — and it moves in *both*
+/// directions, so more effort sometimes finds a worse answer than the shipped
+/// budget did. No budget fixes that.
+///
+/// The difference is coordinates rather than effort. A pair is searched in the
+/// pair's own two directions, the shift sum and the division, so its flat
+/// direction is an axis; a set is searched in two of its three raw shifts,
+/// which are nobody's natural coordinate, and its walk slides along a curved
+/// bound instead of climbing. `AUDIT.md` F50 carries the sweep and what is to
+/// be done about it.
+#[derive(Clone, Copy, Debug)]
+pub struct Search {
     /// Shifts of interest span a couple of modules either way.
-    const SPAN: f64 = 3.0;
+    pub span: f64,
     /// Steps per side of the opening sweep.
-    const SCAN: i32 = 6;
+    pub scan: i32,
     /// Below this the answer has stopped moving in any units a tooth is cut in
     /// — a thousandth of a module is finer than the tolerance any of this is
     /// ground to, and the surface is flat at that scale anyway.
-    const RESOLUTION: f64 = 1e-3;
+    pub resolution: f64,
     /// A ceiling on the total work. Sliding along a curved constraint is where
-    /// an unbudgeted pattern search spends its time, and the last of that
-    /// sliding is worth less than a part in a hundred thousand of efficiency.
-    ///
-    /// These numbers were first chosen when a candidate cost fifty times what it
-    /// does now, so they are worth re-asking rather than inheriting — and they
-    /// have been: raising the sweep, the starts, the budget and the resolution
-    /// together, some fourteen times the work, moves the pair's answer not at
-    /// all to eight decimals, the set's by 2e-7 and the hula stage's by
-    /// 4e-5. The search is converged, not budgeted. What made it cheap was
-    /// making a candidate cheap, and there is nothing here left to buy.
-    const BUDGET: usize = 220;
+    /// an unbudgeted pattern search spends its time — and where it binds, it is
+    /// the *coordinates* that are wrong rather than the ceiling that is low, so
+    /// raising it is not the repair.
+    pub budget: usize,
     /// How many of the sweep's best points are walked from.
-    const STARTS: usize = 2;
+    pub starts: usize,
+    /// The walk's first step, as a fraction of the sweep's own spacing.
+    ///
+    /// **The sweep chose the region; the walk only refines inside it.** A first
+    /// step near the spacing lets a walk cross into a neighbouring basin on a
+    /// marginal improvement and then settle there, which on 9/37 costs the
+    /// summit — so it starts well below that and climbs the ridge it was put on.
+    pub first_step: f64,
+}
 
-    // **Every direction, not one axis at a time.** These surfaces have flat
-    // ridges and their optima sit against constraints, and at such a corner no
-    // single coordinate can improve while a diagonal still can — a search that
-    // moved one number at a time would stop short and report the point it
-    // stopped at.
-    let mut directions: Vec<Vec<f64>> = vec![vec![]];
-    for _ in 0..dof {
-        directions = directions
-            .iter()
-            .flat_map(|d| {
-                [-1.0, 0.0, 1.0].map(|c| {
-                    let mut next = d.clone();
-                    next.push(c);
-                    next
-                })
-            })
-            .collect();
-    }
-    directions.retain(|d| d.iter().any(|c| *c != 0.0));
+impl Search {
+    /// What every caller in the crate uses.
+    pub const SHIPPED: Self = Self {
+        span: 3.0,
+        scan: 6,
+        resolution: 1e-3,
+        budget: 220,
+        starts: 2,
+        first_step: 1.0 / 8.0,
+    };
 
-    // **Sweep the box, then walk from the best few points of it.**
-    //
-    // One walk is not enough and neither is one start. Constraints carve the
-    // admissible set into regions, and because the answer lies *against* a
-    // constraint rather than in a bowl, the ridge a walk ends on is decided by
-    // the point it began at — the sweep's own best is regularly on a different
-    // ridge from the highest one. Walking from several of its best points and
-    // keeping the best result is what makes the answer the surface's rather
-    // than the starting point's.
-    let spacing = SPAN / f64::from(SCAN);
-    let mut scanned: Vec<(Vec<f64>, f64)> = Vec::new();
-    let mut corner = vec![-SCAN; dof];
-    loop {
-        let at: Vec<f64> = corner.iter().map(|c| f64::from(*c) * spacing).collect();
-        if let Some(value) = objective(&at) {
-            scanned.push((at, value));
+    /// The same search asked to work `k` times as hard in every direction at
+    /// once: a finer sweep, more starts of it, a longer walk and a finer stop.
+    ///
+    /// One knob, because the claim being checked is about the whole of the
+    /// effort and raising one number at a time would let another bind instead.
+    #[must_use]
+    pub fn refined(k: u32) -> Self {
+        let k = k.max(1) as usize;
+        Self {
+            scan: Self::SHIPPED.scan * i32::try_from(k).unwrap_or(i32::MAX),
+            budget: Self::SHIPPED.budget * k * k,
+            starts: Self::SHIPPED.starts * k,
+            #[allow(clippy::cast_precision_loss)]
+            resolution: Self::SHIPPED.resolution / k as f64,
+            ..Self::SHIPPED
         }
-        let mut axis = 0;
-        while axis < dof {
-            corner[axis] += 1;
-            if corner[axis] <= SCAN {
+    }
+
+    /// As [`maximise`], at this effort.
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
+    pub fn maximise(
+        &self,
+        dof: usize,
+        objective: &dyn Fn(&[f64]) -> Option<f64>,
+    ) -> Option<Vec<f64>> {
+        let Self {
+            span,
+            scan,
+            resolution,
+            budget,
+            starts: start_count,
+            first_step,
+        } = *self;
+
+        // **Every direction, not one axis at a time.** These surfaces have flat
+        // ridges and their optima sit against constraints, and at such a corner no
+        // single coordinate can improve while a diagonal still can — a search that
+        // moved one number at a time would stop short and report the point it
+        // stopped at.
+        let mut directions: Vec<Vec<f64>> = vec![vec![]];
+        for _ in 0..dof {
+            directions = directions
+                .iter()
+                .flat_map(|d| {
+                    [-1.0, 0.0, 1.0].map(|c| {
+                        let mut next = d.clone();
+                        next.push(c);
+                        next
+                    })
+                })
+                .collect();
+        }
+        directions.retain(|d| d.iter().any(|c| *c != 0.0));
+
+        // **Sweep the box, then walk from the best few points of it.**
+        //
+        // One walk is not enough and neither is one start. Constraints carve the
+        // admissible set into regions, and because the answer lies *against* a
+        // constraint rather than in a bowl, the ridge a walk ends on is decided by
+        // the point it began at — the sweep's own best is regularly on a different
+        // ridge from the highest one. Walking from several of its best points and
+        // keeping the best result is what makes the answer the surface's rather
+        // than the starting point's.
+        let spacing = span / f64::from(scan);
+        let mut scanned: Vec<(Vec<f64>, f64)> = Vec::new();
+        let mut corner = vec![-scan; dof];
+        loop {
+            let at: Vec<f64> = corner.iter().map(|c| f64::from(*c) * spacing).collect();
+            if let Some(value) = objective(&at) {
+                scanned.push((at, value));
+            }
+            let mut axis = 0;
+            while axis < dof {
+                corner[axis] += 1;
+                if corner[axis] <= scan {
+                    break;
+                }
+                corner[axis] = -scan;
+                axis += 1;
+            }
+            if axis == dof {
                 break;
             }
-            corner[axis] = -SCAN;
-            axis += 1;
         }
-        if axis == dof {
-            break;
-        }
-    }
-    // **The best points of the sweep, and its outermost ones.**
-    //
-    // Loss falls with the length of the path and the path shortens as the shifts
-    // grow, so the answer is regularly the largest shifts a design admits —
-    // pressed against whichever bound stops them, with a dip in between that a
-    // walk started anywhere inside will settle into instead. Measured on 9/37:
-    // a local peak at a sum of 1.1, a trough at 1.4, and the true summit at
-    // 1.6 where the root round runs out. Starting from the extremes of the
-    // admissible set as well as from its best interior points is what reaches
-    // the second one.
-    scanned.sort_by(|a, b| b.1.total_cmp(&a.1));
-    let mut starts: Vec<Vec<f64>> = scanned
-        .iter()
-        .take(STARTS)
-        .map(|(at, _)| at.clone())
-        .collect();
-    for axis in 0..dof {
-        for far in [f64::max, f64::min] {
-            if let Some((at, _)) = scanned.iter().reduce(|a, b| {
-                if far(a.0[axis], b.0[axis]) == a.0[axis] {
-                    a
-                } else {
-                    b
+        // **The best points of the sweep, and its outermost ones.**
+        //
+        // Loss falls with the length of the path and the path shortens as the shifts
+        // grow, so the answer is regularly the largest shifts a design admits —
+        // pressed against whichever bound stops them, with a dip in between that a
+        // walk started anywhere inside will settle into instead. Measured on 9/37:
+        // a local peak at a sum of 1.1, a trough at 1.4, and the true summit at
+        // 1.6 where the root round runs out. Starting from the extremes of the
+        // admissible set as well as from its best interior points is what reaches
+        // the second one.
+        scanned.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let mut starts: Vec<Vec<f64>> = scanned
+            .iter()
+            .take(start_count)
+            .map(|(at, _)| at.clone())
+            .collect();
+        for axis in 0..dof {
+            for far in [f64::max, f64::min] {
+                if let Some((at, _)) = scanned.iter().reduce(|a, b| {
+                    if far(a.0[axis], b.0[axis]) == a.0[axis] {
+                        a
+                    } else {
+                        b
+                    }
+                }) {
+                    starts.push(at.clone());
                 }
-            }) {
-                starts.push(at.clone());
             }
         }
-    }
-    starts.dedup();
+        starts.dedup();
 
-    let mut best: Option<(Vec<f64>, f64)> = None;
-    let mut spent = 0usize;
-    for from in starts {
-        let Some(value) = objective(&from) else {
-            continue;
-        };
-        let (mut at, mut here) = (from, value);
-        // **The sweep chose the region; the walk only refines inside it.** A
-        // first step near the sweep's own spacing lets a walk cross into a
-        // neighbouring basin on a marginal improvement and then settle there,
-        // which on 9/37 costs the summit — so it starts well below that spacing
-        // and climbs the ridge it was put on.
-        let mut step = spacing / 8.0;
-        while step > RESOLUTION && spent < BUDGET {
-            // Every direction is tried from the *same* point and the best taken,
-            // rather than the first that happens to improve: otherwise the step
-            // a direction is judged by depends on which came before it, and the
-            // walk wanders instead of climbing.
-            let mut local: Option<(Vec<f64>, f64)> = None;
-            for d in &directions {
-                let trial: Vec<f64> = at.iter().zip(d).map(|(a, c)| a + c * step).collect();
-                spent += 1;
-                let Some(value) = objective(&trial) else {
-                    continue;
-                };
-                if local.as_ref().is_none_or(|l| value > l.1) {
-                    local = Some((trial, value));
+        let mut best: Option<(Vec<f64>, f64)> = None;
+        let mut spent = 0usize;
+        for from in starts {
+            let Some(value) = objective(&from) else {
+                continue;
+            };
+            let (mut at, mut here) = (from, value);
+            // **The sweep chose the region; the walk only refines inside it.** A
+            // first step near the sweep's own spacing lets a walk cross into a
+            // neighbouring basin on a marginal improvement and then settle there,
+            // which on 9/37 costs the summit — so it starts well below that spacing
+            // and climbs the ridge it was put on.
+            let mut step = spacing * first_step;
+            while step > resolution && spent < budget {
+                // Every direction is tried from the *same* point and the best taken,
+                // rather than the first that happens to improve: otherwise the step
+                // a direction is judged by depends on which came before it, and the
+                // walk wanders instead of climbing.
+                let mut local: Option<(Vec<f64>, f64)> = None;
+                for d in &directions {
+                    let trial: Vec<f64> = at.iter().zip(d).map(|(a, c)| a + c * step).collect();
+                    spent += 1;
+                    let Some(value) = objective(&trial) else {
+                        continue;
+                    };
+                    if local.as_ref().is_none_or(|l| value > l.1) {
+                        local = Some((trial, value));
+                    }
+                }
+                match local {
+                    Some((to, value)) if value > here => {
+                        at = to;
+                        here = value;
+                    }
+                    _ => step /= 2.0,
                 }
             }
-            match local {
-                Some((to, value)) if value > here => {
-                    at = to;
-                    here = value;
-                }
-                _ => step /= 2.0,
+            if best.as_ref().is_none_or(|b| here > b.1) {
+                best = Some((at, here));
             }
         }
-        if best.as_ref().is_none_or(|b| here > b.1) {
-            best = Some((at, here));
-        }
+        best.map(|(at, _)| at)
     }
-    best.map(|(at, _)| at)
 }
 
 #[cfg(test)]
@@ -1802,6 +1894,7 @@ mod tests {
                 },
                 &Pinned::default(),
                 0.08,
+                &Search::SHIPPED,
             )
             .expect("a pair that can be built");
 
@@ -1892,6 +1985,7 @@ mod tests {
             },
             &pinned,
             0.08,
+            &Search::SHIPPED,
         )
         .unwrap();
         assert!((x[0] - 0.3).abs() < 1e-12, "the given shift moved: {x:?}");
@@ -1917,6 +2011,7 @@ mod tests {
             },
             &both,
             0.08,
+            &Search::SHIPPED,
         )
         .unwrap();
         assert!(

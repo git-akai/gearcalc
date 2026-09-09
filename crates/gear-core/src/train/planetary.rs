@@ -500,6 +500,12 @@ impl PlanetaryStage {
     }
 
     pub(super) fn shifts(&self) -> [f64; 3] {
+        self.shifts_at(&crate::auto::Search::SHIPPED)
+    }
+
+    /// As [`Self::shifts`], at a stated search effort — see `auto::Search`, and
+    /// `SpurStage::shifts_at` for why the effort is a parameter at all.
+    pub(super) fn shifts_at(&self, search: &crate::auto::Search) -> [f64; 3] {
         let asked = self.asked();
         let absorbed = self.absorber().index();
         let plain: [f64; 3] = std::array::from_fn(|i| asked[i].settled);
@@ -577,7 +583,8 @@ impl PlanetaryStage {
         if freedoms.count() == 0 {
             return plain;
         }
-        crate::auto::maximise(freedoms.count(), &|free| eta0(freedoms.place(free)))
+        search
+            .maximise(freedoms.count(), &|free| eta0(freedoms.place(free)))
             .map(|free| freedoms.place(&free))
             .unwrap_or(plain)
     }

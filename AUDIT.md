@@ -61,7 +61,11 @@ Q5 below, which settled the one question pass 8 had raised and not resolved.
 F42, F43, F44, F45, F46 and F49 closed — **all six bugs**, and F47, F48 recorded
 open. The half pass 8 missed is that it swept the *reported* torques and not the
 *ratings* built from them.
-**Phase 4 — the optimiser.** Next. The brief is below.
+**Phase 4 — the optimiser.** In progress. Step 1 done: the convergence claim is
+now a value something can raise and a gate that raises it, and **the claim was
+half false** — a pair's search is converged to 4.1e-7, an epicyclic set's is not
+converged at all and is not even monotone in its own effort (F50). The
+diagnosis points straight at step 2, and the brief below is updated with it.
 
 | Phase | What it does | State |
 |---|---|---|
@@ -70,7 +74,7 @@ open. The half pass 8 missed is that it swept the *reported* torques and not the
 | 2 | The number ledger | **done** — gates proven |
 | 3 | Unify what is written twice | **done** |
 | 3b | The direction sweep, second half — the ratings | **done** — gate proven |
-| 4 | The optimiser | **next** |
+| 4 | The optimiser | **in progress** — step 1 done, gate proven; step 2 next |
 | 5 | Consolidate the tests | not started |
 | 6 | Front end and payload | not started |
 
@@ -83,7 +87,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 552 tests** (was 531). **Golden corpus: 23 cases** (was 22).
+**Suite: 553 tests** (was 531). **Golden corpus: 23 cases** (was 22).
 
 ---
 
@@ -168,6 +172,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | | Finding | Kind | Phase | State |
 |---|---|---|---|---|
 | F1 | The crate has one optimiser and the solve inventory omits it | gap | 1, 4 | **half closed** — inventory names it; the closed form is Phase 4 |
+| F51 | The hula stage's shift search cannot be asked for an effort, so it is the one search with no convergence gate | gap | 4 | open — see Phase 4 |
 | F2 | The worm stage is outside the shared member vocabulary | gap | 3 | **closed** — option B; a crossed member is a `GearResult`, a worm's is not and says why |
 | F3 | `GearResult` assembled three times, one field by two formulas | gap | 3 | **closed** — one `GearResult::of`, and the shared rule is `StageTorques::referred_like` |
 | F4 | `StageGear` — a shared input type — lives in `train/spur.rs` | drift | 3 | **closed** — moved, with its `Default`, `AddendumAsked` and serde helpers; `spur.rs` 1017 → 730 lines |
@@ -216,6 +221,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F47 | `Directional::self_locking` asks a directional question one way only | gap | 6 | open — see Phase 3b |
 | F48 | A screw mesh that transmits nothing reports no flank load | gap | 5 | open — see Phase 3b |
 | F49 | `check_golden.sh` recorded the corpus from whatever binary was on disk | drift | 3b | **closed** — and logged in `corrections.md` |
+| F50 | The optimiser's convergence claim is half true: a set's search is not converged and no budget makes it so | gap | 4 | open — measured, gated as a canary, see Phase 4 |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so
@@ -668,13 +674,7 @@ as the tenth item beside the nine bracketed solves, which Phase 1 added.
 
 ### The two steps, in order
 
-1. **Assert the convergence claim.** A comment in `auto.rs` says that raising
-   the sweep, the starts, the budget and the resolution together — some fourteen
-   times the work — moves the pair's answer not at all to eight decimals, the
-   set's by 2e-7 and the hula stage's by 4e-5. **Nothing asserts it.** A
-   slow-tier test that re-runs the documented tables at that budget and asserts
-   those bounds converts the argument into a gate, and stands on its own
-   whatever step 2 finds.
+1. **Assert the convergence claim. Done — and it is half false (F50).**
 2. **Attempt the closed form.** Half of the problem already has one: at a fixed
    shift *sum*, the stationary condition for the **division** is derived and
    solved directly (`efficient_split`, and
@@ -687,6 +687,56 @@ as the tenth item beside the nine bracketed solves, which Phase 1 added.
    whichever constraint binds first?** If it is, the sum becomes a
    one-dimensional bracketed search against the active bound, the crate has no
    optimiser left, and six tuned numbers go with it.
+
+### Step 1, run — and what it found
+
+The six numbers were constants inside `maximise`'s loop, so the claim beside
+them could not be raised and could not be checked. They are `auto::Search` now,
+a value with `Search::SHIPPED` for every caller and `Search::refined(k)` for the
+gate; `SpurStage::shifts_at` and `PlanetaryStage::shifts_at` take one. The
+golden corpus is unchanged across the whole refactor, which is what makes "this
+moved no number" a diff rather than a claim.
+
+**A pair's search is converged. An epicyclic set's is not.**
+
+| | fixtures | worst move in the objective | worst move in a shift |
+|---|---|---|---|
+| pair, `shifts_for_efficiency` | 14 tooth pairs | **4.1e-7** (9/20) | under one step of `resolution` |
+| set, `PlanetaryStage::shifts` | 30 sun/planet combinations | **2.4e-4** (11/18) | **0.30 modules** (11/14, the sun) |
+
+Three sets — 11/14, 11/17, 11/18 — leave 6e-5 to 2.4e-4 of `η₀` on the table,
+and 13/25 another 4.7e-6 at a sun shift 0.19 modules away. Worse, the movement
+is **not one-signed**: at 11/21, 11/25 and 17/17 the *refined* search returns a
+worse answer than the shipped one, by up to 1.1e-5. A search whose answer is not
+monotone in its own effort cannot be fixed by raising the effort.
+
+**The diagnosis is coordinates, not budget**, and the pair is the control that
+says so. `shifts_for_efficiency` searches the pair's *own* two directions — the
+shift sum, which sets the operating pressure angle and so the length of the
+path, and the division, which only moves the path's two ends against each other
+— so the flat direction is an axis and the walk climbs it. `PlanetaryStage`
+hands `Freedoms` two of its three raw shifts, which are nobody's natural
+coordinate: the admissible region is bounded by a curve, the optimum lies
+against it, and the walk slides along it on a budget that is a ceiling on
+exactly that sliding.
+
+So the set needs the same treatment the pair already has, which is the *same
+question* step 2 asks — find the coordinate the constraint is flat in, and
+search along the bound rather than across it. **F50 is therefore not separate
+work; it is step 2 asked of the set instead of the pair.**
+
+The gate is `the_search_is_converged_not_budgeted`: a law for the pair, and for
+the set a **canary pinned at the measured spread** so the fault can only get
+smaller, with an assertion that fails once it is fixed and tells the reader to
+replace the canary with the law.
+
+**F51, and it is why the hula stage is absent from the table.** Its shift search
+lives inside `solve_hula_stage_with` rather than in a chooser of its own, so it
+cannot be asked for an effort and has no gate. The other two kinds each have a
+`shifts()` the tests already call directly; giving the hula one means lifting
+`built`, `pair_of`, `carrier`, `set_with` and `tip_room` out of that function
+onto `HulaStage`, which is a refactor worth doing on its own account — that
+function is the longest in the crate.
 
 ### What the acceptance has to be
 

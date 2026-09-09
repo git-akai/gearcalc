@@ -2703,6 +2703,180 @@ mod tests {
         assert!(checked >= 6, "only {checked} members carried the load");
     }
 
+    /// **The search is converged where its coordinates are the problem's, and
+    /// not where they are not.**
+    ///
+    /// `auto::Search` carries six numbers that say how hard to look, and the
+    /// claim beside them was that raising them together buys nothing — "the
+    /// pair's answer not at all to eight decimals, the set's by 2e-7". That was
+    /// a comment: the numbers were constants inside the loop, so nothing could
+    /// raise them and nothing could check it. They are a value for this reason
+    /// alone, and checking it found the claim half true.
+    ///
+    /// **The claim is about the objective, not about the point.** These surfaces
+    /// have flat ridges and their optima sit against constraints, so two
+    /// different shifts can be equally good and demanding that the *shift* not
+    /// move would assert something the model does not say. What a converged
+    /// search means is that more effort finds nothing better — and nothing
+    /// worse either, since more effort searching the same set cannot lose an
+    /// answer it already had, and a search that does depends on its own step
+    /// size for more than speed.
+    ///
+    /// **A pair converges and a set does not**, and the difference is
+    /// coordinates. A pair is searched in its *own* two directions — the shift
+    /// sum, which sets the operating pressure angle, and the division, which
+    /// moves the path's ends against each other — so the flat direction is an
+    /// axis and a walk climbs rather than zig-zags. A set is searched in two of
+    /// its three raw shifts, which is nobody's natural coordinate: its
+    /// admissible region is bounded by a curve and the optimum lies against it,
+    /// so the walk slides. `AUDIT.md` F50 carries the size, the sweep and what
+    /// is to be done; the bound below is a **canary on a known fault**, pinned
+    /// so it can only get smaller.
+    #[test]
+    fn the_search_is_converged_not_budgeted() {
+        use crate::auto::Search;
+        let lib = library();
+        // Fourteen times the work: a sweep of 18 a side, four starts, nine times
+        // the walk and a third of the stopping distance.
+        let hard = Search::refined(3);
+        // A part in a million of efficiency — three orders below anything a mesh
+        // is measured to. Measured across the pairs below, the worst is 4.1e-7
+        // at 9/20 and every shift agrees to within one step of the search's own
+        // resolution, so this is a ceiling on the last refinement rather than a
+        // tolerance chosen to be met.
+        let converged = 1e-6;
+
+        // --- pairs. 9/37 is the fixture whose surface has a second summit
+        // beyond a trough, so it is the one that punishes a short walk.
+        let mut worst_pair = 0.0_f64;
+        for teeth in [
+            [9_u32, 37],
+            [9, 20],
+            [11, 41],
+            [12, 29],
+            [13, 31],
+            [17, 43],
+            [17, 17],
+            [20, 20],
+            [23, 61],
+            [31, 37],
+            [41, 43],
+            [10, 51],
+            [14, 22],
+            [16, 33],
+        ] {
+            let stage = SpurStage {
+                gears: [0, 1].map(|i| StageGear {
+                    teeth: teeth[i],
+                    ..SpurStage::default().gears[i].clone()
+                }),
+                optimisation: Optimisation {
+                    enabled: true,
+                    ..Optimisation::default()
+                },
+                ..SpurStage::default()
+            };
+            // Scored by solving the stage at the shifts each search chose, so
+            // the objective is the one the tool reports rather than a second
+            // spelling of it.
+            let at = |x: [f64; 2]| {
+                let fixed = SpurStage {
+                    gears: [0, 1].map(|i| StageGear {
+                        profile_shift: Auto::fixed(x[i]),
+                        ..stage.gears[i].clone()
+                    }),
+                    optimisation: Optimisation::default(),
+                    ..stage.clone()
+                };
+                solve_spur_stage(&fixed, StageTorques::just(2.0), &lib)
+                    .map(|r| r.mesh.efficiency.forward)
+            };
+            let (Ok(shipped), Ok(refined)) = (
+                at(stage.shifts_at(&Search::SHIPPED)),
+                at(stage.shifts_at(&hard)),
+            ) else {
+                panic!("{teeth:?}: both answers must be buildable pairs");
+            };
+            worst_pair = worst_pair.max((refined - shipped).abs());
+            assert!(
+                (refined - shipped).abs() < converged,
+                "{teeth:?}: fourteen times the work moves the pair's efficiency \
+                 by {}, which is more than the search claims to be converged to",
+                refined - shipped
+            );
+        }
+        assert!(
+            worst_pair > 0.0,
+            "every pair gave bit-identical answers at both efforts, so this \
+             fixture never made the search work"
+        );
+
+        // --- sets. Two free shifts tied by one centre distance, searched in the
+        // shifts themselves, so the walk slides along a curved bound instead of
+        // climbing an axis. **This is a known fault** (F50): the bound is the
+        // measured spread over the sweep below, not a claim of convergence.
+        let mut worst_set = 0.0_f64;
+        for sun in [11_u32, 13, 17, 19, 24, 31] {
+            for planet in [14_u32, 17, 18, 21, 25] {
+                let mut set = PlanetaryStage {
+                    optimisation: Optimisation {
+                        enabled: true,
+                        ..Optimisation::default()
+                    },
+                    ..PlanetaryStage::default()
+                };
+                set.sun.teeth = sun;
+                set.planet.teeth = planet;
+                set.ring.teeth = sun + 2 * planet;
+                set.sun.profile_shift = Auto::automatic(0.0);
+                set.ring.profile_shift = Auto::automatic(0.0);
+                let eta0 = |x: [f64; 3]| {
+                    let b = set.built(x).ok()?;
+                    let one = |path, mesh, g, mu| {
+                        crate::contact::efficiency(
+                            path,
+                            mesh,
+                            g,
+                            mu,
+                            crate::contact::Drive::Forward,
+                        )
+                    };
+                    Some(
+                        one(
+                            &b.sp_path,
+                            &b.sp_mesh,
+                            &b.sun,
+                            set.sliding_friction_sun_planet,
+                        ) * one(
+                            &b.pr_path,
+                            &b.pr_mesh,
+                            &b.planet,
+                            set.sliding_friction_planet_ring,
+                        ),
+                    )
+                };
+                let (Some(shipped), Some(refined)) = (
+                    eta0(set.shifts_at(&Search::SHIPPED)),
+                    eta0(set.shifts_at(&hard)),
+                ) else {
+                    continue;
+                };
+                worst_set = worst_set.max((refined - shipped).abs());
+                assert!(
+                    (refined - shipped).abs() < 3e-4,
+                    "{sun}/{planet}: the set's search moves by {}, past the \
+                     spread F50 records — it has got worse, not better",
+                    refined - shipped
+                );
+            }
+        }
+        assert!(
+            worst_set > converged,
+            "the set's search now converges to {worst_set}, which is F50 fixed \
+             — replace this canary with the law the pairs are held to"
+        );
+    }
+
     /// **A member is rated at the load it carries, whichever way it carries it.**
     ///
     /// Every rating here is linear in the member's own torque, or the square root
