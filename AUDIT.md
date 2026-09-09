@@ -61,17 +61,22 @@ Q5 below, which settled the one question pass 8 had raised and not resolved.
 F42, F43, F44, F45, F46 and F49 closed — **all six bugs**, and F47, F48 recorded
 open. The half pass 8 missed is that it swept the *reported* torques and not the
 *ratings* built from them.
-**Phase 4 — the optimiser.** In progress. Step 2's first item is done — the search
-sweeps the box the shifts can take rather than a guess at one — and it closed F52,
-F53, F56 and F57 and half of F19. What it could **not** reach is an epicyclic set,
-because there is no admissible range for a ring's shift to give it (F54), and
-that is what blocks F50. Step 2 measured: the loss is *not* monotone in the sum,
-for a reason that names the repair rather than blocking it. Step 1 done: the
-convergence claim is
-now a value something can raise and a gate that raises it, and **the claim was
-half false** — a pair's search is converged to 4.1e-7, an epicyclic set's is not
-converged at all and is not even monotone in its own effort (F50). The
-diagnosis points straight at step 2, and the brief below is updated with it.
+**Phase 4 — the optimiser.** In progress.
+
+*Step 1, done.* The six tuned numbers are `auto::Search`, a value a gate can
+raise, and raising it showed the claim beside them **half false**: a pair's
+search is converged to 4.0e-7, an epicyclic set's is not converged at all and is
+not even monotone in its own effort (F50).
+
+*Step 2, measured.* The loss is **not** monotone in the shift sum, and the
+objective is not unimodal in the division either — the trough is where the
+automatic addendum cap engages. That names the repair rather than blocking it.
+
+*Step 2, first item done.* The search sweeps the box its shifts can take rather
+than a guess at one, closing **F52, F53, F56, F57** and half of F19. It could
+not reach an epicyclic set: there is no admissible range for a ring's shift to
+give it (**F54**), and that is what blocks F50 — so **F54 is the next thing to
+do**.
 
 | Phase | What it does | State |
 |---|---|---|
@@ -80,7 +85,7 @@ diagnosis points straight at step 2, and the brief below is updated with it.
 | 2 | The number ledger | **done** — gates proven |
 | 3 | Unify what is written twice | **done** |
 | 3b | The direction sweep, second half — the ratings | **done** — gate proven |
-| 4 | The optimiser | **in progress** — step 1 done, gate proven; step 2 next |
+| 4 | The optimiser | **in progress** — steps 1 and 2's first item done, gates proven; F54 next |
 | 5 | Consolidate the tests | not started |
 | 6 | Front end and payload | not started |
 
