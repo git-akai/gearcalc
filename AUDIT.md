@@ -65,7 +65,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 543 tests** (was 531).
+**Suite: 544 tests** (was 531).
 
 ---
 
@@ -150,6 +150,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F34 | `Widths::contact` was not optional, so "no rating sizes this face" had no way to be said | gap | 3 | **closed** |
 | F35 | A planetary's member torques carry a forward efficiency; whether a backward load should is unexamined | gap | 5 | open |
 | F36 | `SpurResult` re-declared `MeshReport`'s seven fields, and the panel re-drew them | gap | 3 | **closed** |
+| F37 | A given crank offset was not the offset the stage ran at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F33 | A crossed pair's members said nothing about their own teeth | gap | 3 | **closed** — and logged in `corrections.md` |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
@@ -481,9 +482,21 @@ Everything else the grouping found — `ratio`, `efficiency`, `backlash`,
 computing its own, already unified at the *reading* end by `StageResult`'s
 accessors. That is the intended shape, not duplication.
 
-**Still to do:** the mesh and stage halves of the walk — every field of every
-result traced back to the expression that produced it, rather than grouped by
-name. The member half is `StageResult::members()` and is done.
+**The stage half, traced rather than grouped.** Asking where each kind's
+*clearance* rule lives found three methods called `clearance_taken` — and two of
+them answer one question while the third answers another. A spur stage's and a
+worm stage's is the assembly clearance added to a centre distance; the hula
+stage's is the **far-side gap** that sets its crank, which is a geometric
+requirement and not running play. The name collides; the rule does not.
+
+What the trace then found is that the hula stage's *running* clearance had no
+such rule at all — applied unconditionally, so a given crank offset became the
+nominal one and the stage ran 20 µm wider than the number typed (F37). The
+field's own documentation described the spur behaviour, not its own.
+
+**Still to do:** the mesh half — every mesh-level figure traced to its
+expression across the four kinds. The member half is `StageResult::members()`
+and the stage half is done.
 
 ---
 

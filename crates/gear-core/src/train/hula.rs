@@ -504,7 +504,18 @@ pub fn solve_hula_stage_with(
     let asked_offset = if stage.offset.auto {
         Offset::Clearance
     } else {
-        Offset::Given(stage.offset.manual)
+        // **A given offset is the offset to run at**, which is what this
+        // field says it is and what a given centre distance is on every other
+        // kind. The arrangement solves the *zero-backlash* offset, and the
+        // running clearance is added back below — so what is handed to the
+        // solve is the given number with that clearance taken out of it, the
+        // same shape as the spur stage's `manual - clearance_taken()`.
+        //
+        // It used to hand the given number straight in, which made it the
+        // nominal offset instead: a designer who read the reported offset off
+        // an automatic solve and typed it back got a stage 20 µm wider, and the
+        // field's own documentation described the other behaviour.
+        Offset::Given(stage.offset.manual - stage.running_clearance)
     };
     let set_with = |value: [f64; 2], offset: Offset| hula::Set {
         teeth,
@@ -1177,6 +1188,53 @@ mod tests {
         let r = solve(&stage(), 100.0).unwrap();
         assert_eq!(r.ratio_products, [324, 1]);
         assert!((r.ratio - 324.0).abs() < 1e-12);
+    }
+
+    /// **Typing back the offset the tool reported gives the same stage.**
+    ///
+    /// `HulaStage::offset` says a given number "is the distance to run at",
+    /// which is what a given centre distance is on every other kind — where the
+    /// zero-backlash geometry is derived by taking the absorbed clearance back
+    /// out of it (`SpurStage`'s `manual - clearance_taken()`).
+    ///
+    /// This one handed the given number straight to the solve, which made it the
+    /// *nominal* offset instead, and the running clearance was then added on
+    /// top. So a designer who read the reported offset off an automatic solve
+    /// and typed it back got a stage 20 µm wider — and reading it back again
+    /// would have widened it again.
+    ///
+    /// Idempotence is the property rather than the arithmetic, because it is the
+    /// one a user meets: what the tool reports is what the tool accepts.
+    #[test]
+    fn a_given_offset_is_the_one_the_tool_reported() {
+        for running_clearance in [0.0_f64, 0.02, 0.15] {
+            let auto = HulaStage {
+                running_clearance,
+                ..stage()
+            };
+            let free = solve(&auto, 1000.0).expect("the automatic stage solves");
+
+            let given = HulaStage {
+                offset: Auto::fixed(free.offset),
+                ..auto.clone()
+            };
+            let again = solve(&given, 1000.0).expect("and so does the stage it describes");
+
+            assert!(
+                (again.offset - free.offset).abs() < 1e-12,
+                "clearance {running_clearance}: reported {} and accepted it as {}",
+                free.offset,
+                again.offset
+            );
+            // ...and the geometry underneath it, not merely the label.
+            assert!(
+                (again.offset_nominal - free.offset_nominal).abs() < 1e-12,
+                "clearance {running_clearance}: the zero-backlash offset moved, \
+                 {} to {}",
+                free.offset_nominal,
+                again.offset_nominal
+            );
+        }
     }
 
     /// **The parts are built at the offset the stage solved**, and the running
@@ -2289,9 +2347,11 @@ mod tests {
                 &test_library(),
             )
         };
-        // The offset the default drive settles at, then held there.
+        // The offset the default drive settles at, then held there. The
+        // *running* one, because that is what a given offset means — see
+        // `HulaStage::offset`.
         let free = run(HulaStage::default().offset, false).expect("the ordinary drive solves");
-        let held = Auto::fixed(free.offset_nominal);
+        let held = Auto::fixed(free.offset);
 
         let plain = run(held, false).expect("the held drive solves");
         let tuned = run(held, true).expect("the tuned drive solves");
