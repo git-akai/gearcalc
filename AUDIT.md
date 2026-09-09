@@ -261,6 +261,66 @@ therefore part of Phase 4's acceptance rather than a task of its own.
 
 ---
 
+## Phase 2 — the number ledger
+
+Every numeric constant in production, sorted by **what kind of claim it makes**.
+The sort is the work: a model constant needs a citation, a convergence bound
+needs a measurement, a search parameter needs a derivation or an admission, and
+a guard needs a reading of *could this gear exist?*
+
+### Model constants — cited, and not in question
+
+`K_f`'s `0.331 / 0.436 / 0.324 / 0.492 / 0.261 / 0.545` (Dolan and Broghamer) ·
+`TANGENT_ANGLE_DEG` 30 and `TANGENT_ANGLE_INTERNAL_DEG` 60 (ISO 6336-3:2019,
+6.1) · `REVERSED_BENDING_FRACTION` 0.7 (ISO 6336-5, and a Goodman statement) ·
+`RAMP_MIN`/`RAMP_MAX` 1/3, 2/3 (the uncalibrated ramp, disclosed as such) ·
+`elliptic::TOL` 2.4e-3 and `MAX_STEPS` 200 (Carlson's own stated bound) ·
+`PARALLEL_AXES` 0.0 (a named zero, not a tolerance).
+
+### Convergence bounds — each needs a measurement
+
+| Constant | State |
+|---|---|
+| `SHARING_SAMPLES` 200 | **gated.** `the_sharing_sweep_has_converged` quadruples it; < 1e-4. Finding it failed is what produced F25 |
+| `SEVER_SCAN_SAMPLES` 2000 | **open.** Decides a *boolean* — a severed tooth read as unsevered is the worst kind of sampling failure |
+| `PATH_SAMPLES` 2048 (worm) | **open.** The crossed path's average; `the_path_average_has_converged` exists in `screw.rs` — check whether it covers this constant or a different one |
+| `mesh POINTS` 2700, `FLOOR` 2e-4 | **open.** And the floor is the shape `docs/corrections.md` warns about — "a bound records where the sweep stopped" |
+| `outline` `MAX_SUBDIVISION_DEPTH` 14, `DEFAULT_CHORD_TOLERANCE` 1e-3 | **holds.** The tolerance is an *input* with a stated meaning (a sagitta in mm), and the depth is a safety stop on it |
+| `verify` FLANK 600 / ROUND 300 / TIP 120 / DENSE 3000 / SCAN 400, `MAX_PHASES` 4000, `MAX_ROTATION_STEP` 1e-3 | **open**, and lower priority: `verify` is the instrument rather than the model, and `phase_resolution_has_converged` covers the one that matters most |
+| `tooth` `LENGTH_SAMPLES` 60, `MIN_SECTION_SHARE` 0.004, `MIN_SECTION_POINTS` 3 | **holds.** Point *allocation* between sections, which moves no answer — the outline's accuracy is the chord tolerance's job |
+
+### Search parameters — a derivation or an admission
+
+| Constant | State |
+|---|---|
+| `auto` SPAN 3.0 / SCAN 6 / RESOLUTION 1e-3 / BUDGET 220 / STARTS 2 | **admitted** in `rationale.md` (Phase 1). Phase 4 attempts to retire them |
+| `tooth` `BASE_CROSS_GROWTH` 1.6, `CROSSING_GROWTH` 1.4, `MAX_STEPS` 200 | **holds**, and it is already well said: bracket-expansion heuristics before a *guaranteed bracketed* solve, so any values that find a bracket give the same root |
+| `POINTED_TOOTH_MAX_ROLL` 50.0 | **holds.** A bracket end at α ≈ 88.9°, stated as such |
+| `gear` `MAX_SEARCH_AMPLITUDE` 2.0 | **open** — a bracket end for the throw inversion; check it cannot be reached by a legal design |
+| `train/hula` ROUNDS 3, SETTLED 1e-3 | **open** — an outer iteration nobody has measured |
+| `CROSSING_NUDGE_MODULES` 1e-6, `MIN_FILLET_MODULES` 1e-9, `TIP_ABOVE_BASE_FRACTION` 1e-9, `SAME_RACK` 1e-9 | **holds.** Degeneracy epsilons, each at the scale of the quantity it separates |
+
+### Guard conventions — Q4's three conditions apply
+
+Read against *could this gear exist?* rather than *would anyone want it?* None
+has been moved yet; each needs the three conditions checked and recorded.
+
+| Constant | The reading |
+|---|---|
+| `MIN_TOOTH_THICKNESS_MODULES` 0.02 | The degeneracy limit is 0. 0.02 mm of tooth at module 1 is thin but cuttable — **candidate to loosen**, and the first to check for Q4's "trades space" caveat, since the shift optimiser walks against this wall |
+| `MAX_TOOTH_THICKNESS_FRACTION_OF_PITCH` 0.95 | The degeneracy limit is 1 (a tooth filling the pitch leaves no space). **Candidate**, same caveat |
+| `MAX_CUTTER_DEPTH_FRACTION_OF_R` 0.9 | The limit is 1 — a cutter reaching the axis. **Candidate**, but a root circle at 0.95 r is a part nobody makes and the 0.9 may be buying conditioning rather than taste |
+| `MIN_CUTTER_DEPTH_MODULES` 0.05 | A positive depth is the limit. **Candidate** |
+| `MIN_PRESSURE_ANGLE_DEG` 0.5 | `rationale.md` already says 2° produces a valid section; the *limit* is 0. **Candidate** |
+| `FILLET_FRACTION_OF_MAX` 0.95 | **Leave alone.** This is the number the crate's own margin argument depends on — the fillets are held apart by the five per cent, so the margin is a fraction of the space and never closes. A magic number with a derivation attached, which is what they should all look like |
+
+**Order of work.** The convergence bounds first, because a missing gate there is
+how F25 was hiding. The guard conventions last, because Q4's caveat makes each
+one a measurement rather than an edit, and because loosening a wall the shift
+optimiser presses against interacts with Phase 4.
+
+---
+
 ## The protocol
 
 The seven passes, so a later audit runs the same thing rather than reinventing
