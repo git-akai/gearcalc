@@ -40,15 +40,15 @@ against a broken tree is recorded here as `written, not proven`.
 
 **Phase 0 — build the instrument.** Done, gate run and passed.
 **Phase 1 — truth-up the documents.** Done, gate run and passed.
-**Phase 2 — the number ledger.** In progress. One finding out of it already
-closed (F23), which is why the ledger is being read rather than skimmed.
+**Phase 2 — the number ledger.** Done. Four findings, three of them bugs.
+**Phase 3 — unify what is written twice.** Next.
 
 | Phase | What it does | State |
 |---|---|---|
 | 0 | Golden corpus, figure provenance, `CLAUDE.md` | **done** — gate proven |
 | 1 | Truth-up the documents against the code | **done** — gate proven |
-| 2 | The number ledger | **in progress** |
-| 3 | Unify what is written twice | not started |
+| 2 | The number ledger | **done** — gates proven |
+| 3 | Unify what is written twice | **next** |
 | 4 | The optimiser | not started |
 | 5 | Consolidate the tests | not started |
 | 6 | Front end and payload | not started |
@@ -62,7 +62,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 538 tests** (was 531; the new ones hold F8, F23, F25 and F27).
+**Suite: 539 tests** (was 531; the new ones hold F8, F23, F25, F27 and F28).
 
 ---
 
@@ -116,7 +116,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F2 | The worm stage is outside the shared member vocabulary | gap | 3 | open |
 | F3 | `GearResult` assembled three times, one field by two formulas | gap | 3 | open |
 | F4 | `StageGear` — a shared input type — lives in `train/spur.rs` | drift | 3 | open |
-| F5 | No ledger of the numbers that are not model constants | gap | 2 | open |
+| F5 | No ledger of the numbers that are not model constants | gap | 2 | **closed** |
 | F6 | The face-width invariance test runs a model the tool does not ship | gap | 5 | open |
 | F7 | ~212 documented figures, one gate | gap | 0 | **part closed** — mechanism built; 5 tables still ungated (F19) |
 | F8 | The CLI list chosen to be exhaustive is not | drift | 1 | **closed** — the table *is* the dispatch |
@@ -137,7 +137,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F23 | The gear tab and a stage member bounded the same gear differently | gap | 2 | **closed** — and logged in `corrections.md` |
 | F24 | The golden corpus covers the CLI, not the wasm boundary | gap | 5 | open |
 | F25 | `load_share`'s two ramps do not meet above ε = 2 | gap | 2 | **closed** — and logged in `corrections.md` |
-| F26 | No sampling constant had a convergence gate | gap | 2 | in progress |
+| F26 | No sampling constant had a convergence gate | gap | 2 | **closed** |
 | F27 | `SEVER_SCAN_SAMPLES` could not resolve what it looked for | gap | 2 | **closed** — the scan became a solve |
 | F28 | A search bound acted as a design limit on the eccentric throw | gap | 2 | **closed** — the bound is now the buildable one |
 | F29 | The golden corpus was written from a stale binary and the check caught it | holds | — | **closed** — see Phase 2 notes |
@@ -303,24 +303,49 @@ a guard needs a reading of *could this gear exist?*
 | `train/hula` ROUNDS 3, SETTLED 1e-3 | **holds, measured.** Quadrupling the cap to 12 changes neither `gear-cli hula 18 0.2` nor `hulaband 18` — a band of tooth differences — by a digit, so the loop settles on its own and the cap never binds |
 | `CROSSING_NUDGE_MODULES` 1e-6, `MIN_FILLET_MODULES` 1e-9, `TIP_ABOVE_BASE_FRACTION` 1e-9, `SAME_RACK` 1e-9 | **holds.** Degeneracy epsilons, each at the scale of the quantity it separates |
 
-### Guard conventions — Q4's three conditions apply
+### Guard conventions — Q4's caveat decided the whole class
 
-Read against *could this gear exist?* rather than *would anyone want it?* None
-has been moved yet; each needs the three conditions checked and recorded.
+Read against *could this gear exist?*, all five could be widened: each sits
+inside the limit where the shape stops existing (the axis; zero and the whole
+pitch). **None was**, and it is one shared reason rather than five.
 
-| Constant | The reading |
+**This tool searches, and the optimum sits on these bounds.** The loss falls
+monotonically with the length of the path, so the least-loss pair is always the
+one whose teeth barely reach — `auto::Freedoms`' own words are that constraints
+"say which parts of the plane the answer is not allowed to come from", and
+`reference.md#the-hula-stage` reports that "the loss is still falling when the
+geometry runs out". Widening a guard therefore does not merely admit a shape a
+designer might type. It **moves the answer the tool returns** onto a thinner
+tooth, a deeper cut, a root nearer the axis — silently, on a control nobody
+touched.
+
+That is Q4's caveat exactly: *losing solutions that are more probable for ones
+that are less probable is not an improvement.* Condition 1 fails — not because
+the reachable set shrinks, but because the *returned* set moves, which is the
+thing the caveat is about.
+
+| Constant | Verdict |
 |---|---|
-| `MIN_TOOTH_THICKNESS_MODULES` 0.02 | The degeneracy limit is 0. 0.02 mm of tooth at module 1 is thin but cuttable — **candidate to loosen**, and the first to check for Q4's "trades space" caveat, since the shift optimiser walks against this wall |
-| `MAX_TOOTH_THICKNESS_FRACTION_OF_PITCH` 0.95 | The degeneracy limit is 1 (a tooth filling the pitch leaves no space). **Candidate**, same caveat |
-| `MAX_CUTTER_DEPTH_FRACTION_OF_R` 0.9 | The limit is 1 — a cutter reaching the axis. **Candidate**, but a root circle at 0.95 r is a part nobody makes and the 0.9 may be buying conditioning rather than taste |
-| `MIN_CUTTER_DEPTH_MODULES` 0.05 | A positive depth is the limit. **Candidate** |
-| `MIN_PRESSURE_ANGLE_DEG` 0.5 | `rationale.md` already says 2° produces a valid section; the *limit* is 0. **Candidate** |
-| `FILLET_FRACTION_OF_MAX` 0.95 | **Leave alone.** This is the number the crate's own margin argument depends on — the fillets are held apart by the five per cent, so the margin is a fraction of the space and never closes. A magic number with a derivation attached, which is what they should all look like |
+| `MIN_TOOTH_THICKNESS_MODULES` 0.02 | convention, kept — the shift search presses on it |
+| `MAX_TOOTH_THICKNESS_FRACTION_OF_PITCH` 0.95 | " |
+| `MAX_CUTTER_DEPTH_FRACTION_OF_R` 0.9 | " — and a root at a twentieth of the pitch radius is not a part |
+| `MIN_CUTTER_DEPTH_MODULES` 0.05 | convention, kept; the gain from widening is nil |
+| `MIN_PRESSURE_ANGLE_DEG` 0.5 | convention, kept. Its stated reason was also wrong — the degeneracy at small `α` is `x_s = π(k−1)/(4 tan α)` running away, not the involute failing |
+| `FILLET_FRACTION_OF_MAX` 0.95 | untouched by design: the five per cent *is* the margin argument |
 
-**Order of work.** The convergence bounds first, because a missing gate there is
-how F25 was hiding. The guard conventions last, because Q4's caveat makes each
-one a measurement rather than an edit, and because loosening a wall the shift
-optimiser presses against interacts with Phase 4.
+Written into `docs/reference.md#input-ranges` and `params::guard`'s preamble,
+which had called the whole group degeneracy tolerances when five of the eight
+are conventions. **The rule this produced is narrower than the one an input
+field follows**: a *given* number is held to what can exist, a *chosen* one to
+what can be made, and where those differ a guard is the second.
+
+Recorded as a success of Q4's rule rather than a failure to act on it.
+
+**Phase 2 is done.** Four findings out of it — F23, F25, F27, F28 — of which
+three were bugs and one a constant that could not be justified. Two constants
+are gone entirely (`SEVER_SCAN_SAMPLES`, `MAX_SEARCH_AMPLITUDE`), two gained
+gates, three were measured and left alone, and five were reclassified from
+degeneracy tolerances to conventions with their reason written down.
 
 ---
 

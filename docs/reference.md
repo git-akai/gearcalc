@@ -163,6 +163,30 @@ guards begin to clamp.
 | Root radius | `ρ ≤ 0.95 · min(b_d, ρ_max)/m_t` | the round must fit both the depth and the space |
 | Angular shift | see below | one tool must reach every tooth |
 
+**The five degeneracy fractions are conventions, and they are kept as such.**
+`params::guard` holds them — a smallest cutter depth and a largest, a smallest
+tooth thickness and a largest, and a smallest pressure angle — and each sits
+*inside* the limit where the shape actually stops existing: the depth limit is
+the axis, the thickness limits are zero and the whole pitch. Read against
+[could this gear exist?](rationale.md#an-input-limit-means-could-this-gear-exist)
+every one of them could be widened.
+
+They are not, and the reason is that **this tool searches**. The optimum of a
+shift search sits *against* a bound rather than in a bowl — the loss falls
+monotonically with the length of the path, so the least-loss pair is always the
+one whose teeth barely reach, and every row of every table in
+[Efficiency](#efficiency-parallel-axes) reports which bound stopped it. Widening
+a guard therefore does not merely admit a shape a designer might type; it moves
+the answer the tool *returns* onto a thinner tooth, a deeper cut, a root nearer
+the axis. That trades a design somebody could make for one nobody would, and it
+does it silently, on a control the designer did not touch.
+
+So the rule these follow is narrower than the one an input field follows: a
+*given* number is held to what can exist, and a *chosen* one is held to what can
+be made. Where those differ the guard is the second, and it is a convention with
+its reason written down rather than a degeneracy tolerance — which is what
+`params::guard`'s own preamble had called the whole group.
+
 **Profile shift.** The specification's `\|x\| ≤ 2` is wrong in three directions at
 once, because every real bound depends on something a constant cannot see. Each
 guard is linear in `x`, so the admissible interval is an intersection of

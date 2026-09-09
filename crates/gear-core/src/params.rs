@@ -222,9 +222,22 @@ impl Clamps {
 /// Limits for the guard rails in [`crate::tooth`].
 ///
 /// Named and gathered so they are auditable in one place rather than scattered
-/// as bare literals through the geometry. They are tolerances on *degeneracy*,
-/// chosen to be far outside any real design, not tuning parameters that change
-/// a valid result.
+/// as bare literals through the geometry.
+///
+/// **Two kinds live here and they answer different questions.** The last three
+/// — the fillet fraction, the fillet floor and the tip-above-base fraction — are
+/// tolerances on *degeneracy*, at the scale of the quantity they separate, and
+/// no design is near them. The first five are **conventions**: each sits inside
+/// the limit where the shape stops existing, and each could be widened without
+/// admitting anything impossible.
+///
+/// They are kept because this tool **searches**. A shift search's optimum sits
+/// against a bound rather than in a bowl, so widening one does not merely admit
+/// a shape a designer might type — it moves the answer the tool *returns* onto
+/// a thinner tooth or a deeper cut, silently, on a control nobody touched. A
+/// given number is held to what can exist; a chosen one is held to what can be
+/// made, and where those differ these are the second
+/// (docs/reference.md#input-ranges).
 pub(crate) mod guard {
     /// Smallest pressure angle that still generates a usable flank, degrees.
     /// Below this the base circle approaches the pitch circle and the involute
