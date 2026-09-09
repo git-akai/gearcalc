@@ -250,7 +250,8 @@ number. Deleted, not reworded.
 ### Where closed form is impossible
 
 Nine scalar solves, each monotone, each bracketed, none an optimiser, none with
-a tuning parameter. Everything else in the crate is algebraic.
+a tuning parameter. Everything else in the crate is algebraic — **except one
+search**, which is named below rather than left out of the count.
 
 | # | Solve | Method |
 |---|---|---|
@@ -281,6 +282,42 @@ count is impossible" and a NaN silently reaching a stress figure.
 
 **What would change this:** nothing in prospect. A published closed form that is
 a *solution* rather than a fit would retire one of the nine; none is known.
+
+### ...and the one thing in the crate that is none of the above
+
+**`auto::maximise` is a search, and it has tuning parameters.** The paragraph
+above says "each monotone, each bracketed, none an optimiser, none with a tuning
+parameter", and that is true of the nine solves and was read for a while as
+though it were true of the crate. It is not. Every stage that chooses profile
+shifts for efficiency calls a bounded box sweep followed by a multi-start pattern
+walk, carrying a search span, a scan step, a stopping resolution, a work budget,
+a start count and a first step size. The tables in
+[reference.md](reference.md#efficiency-parallel-axes) that report what a shift
+division is worth are its answers.
+
+It is named here because an inventory that quietly omits its one exception is
+worse than no inventory: the exception is exactly what a reader of this section
+would want to know about.
+
+**Why it is a search rather than a solve.** The objective is smooth but its
+optimum sits *against a constraint* rather than in a bowl, and which constraint
+binds changes across the domain — undercut, a pointed tip, a root round that no
+longer fits, a contact ratio floor, bottom clearance. A bracketed scalar solve
+needs a monotone residual with a sign change, and a constraint boundary is where
+the admissible set ends rather than where a derivative vanishes.
+
+**Half of it is already closed form**, and that is the reason to think the rest
+might be: at a fixed shift *sum*, the stationary condition for the **division**
+is derived and solved directly
+([reference.md](reference.md#efficiency-parallel-axes)). What the search is left
+doing is the sum, and every row of every table this project prints reports the
+sum landing on a bound rather than at a stationary point.
+
+**What would change this:** establishing that the loss is monotone in the sum up
+to whichever constraint binds first. If it is, the sum becomes a one-dimensional
+bracketed search against the active bound and the crate has no optimiser left.
+That is being attempted rather than assumed, and until it lands, this section
+describes ten things and not nine.
 
 ### The Lewis parabola over the 30° tangent
 

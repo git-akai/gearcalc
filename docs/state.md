@@ -9,9 +9,18 @@ strength canary and changed `bending_stress`, `min_face_width_bending`,
 **This is the only document allowed to talk about the present**, and saying so is
 what lets the others stop hedging. [`reference.md`](reference.md) states what the
 tool computes, [`rationale.md`](rationale.md) why each model is the one chosen,
-and [`corrections.md`](corrections.md) what was once wrong. None of those should
-contain the words "now", "still" or "currently"; this file is where that belongs,
-and it is the one file expected to be rewritten rather than amended.
+and [`corrections.md`](corrections.md) what was once wrong. What belongs here and
+nowhere else is a claim that **dates**: what is built, what is not, what is
+planned, what version this is, and what to run. This is the one file expected to
+be rewritten rather than amended.
+
+That rule was once written as a ban on the words "now", "still" and "currently",
+and read literally it forbids 127 sentences across the other three — nearly all
+of them either ordinary English ("`Y_β` above 25° must still be confirmed by
+experience") or a model's history stated where the model is argued ("the shaper
+caps now, by the same rule"). Neither dates. **The word was never the fault**:
+the fault is a document hedging about a present it is not the one to describe,
+and that is what this says instead.
 
 ---
 
@@ -88,11 +97,16 @@ chmod -R u+w public               # symlink into the read-only store
 
 ## Driving the mathematics without a browser
 
-The list below is the interesting ones. **The exhaustive one is the harness's
-own module comment** — `crates/gear-cli/src/main.rs`, next to the code it
-describes, where it cannot fall out of step with the commands it lists. This one
-has (`dump`, `dxf`, `loadcase`, `matrix` and `sweep` are not here), and a
-curated list that reads as exhaustive is the worse of the two failures.
+The list below is the interesting ones. **The exhaustive one is
+`gear-cli help`**, which prints the harness's own dispatch table — so the list
+*is* the code and there is nothing to keep in step.
+
+That was not always true. This paragraph used to name the harness's module
+comment instead, "next to the code it describes, where it cannot fall out of
+step with the commands it lists". It had fallen out of step by eight of
+twenty-one. **Proximity is not a mechanism**, and a curated list that reads as
+exhaustive is the worse of the two failures — which is why the fix was to make
+one list rather than to correct the second one.
 
 ```bash
 cargo run --bin gear-cli -- show 17 0.2            # one gear's derived geometry
@@ -119,11 +133,13 @@ python3 tools/hula_kinematics.py                   # the hula ratio, from the ro
 python3 tools/iso_6336_3_stack.py                  # where this tool stands against ISO 6336-3, factor by factor
 ```
 
-[`bending-check.html`](bending-check.html) is that last command's figures with
+[`bending-check.html`](bending-check.html) is `gear-cli bending`'s figures with
 the prose that reads them, kept because the bending construction is far easier
 to judge by looking than by reading an assertion. It is a **document with
-generated figures in it**, not a stored answer: re-run the command and paste the
-body back in if the construction ever moves.
+generated figures in it**, not a stored answer — and it says so in its own first
+line, a `figures-verbatim` marker that `tools/check_figures.py` reads. If the
+construction moves, that check fails and names the file; re-run the command and
+paste the body back in.
 
 The last two share no code with the crate — that is their whole purpose.
 `crossed_path.py` builds both flanks as parametric surfaces and reaches the line
@@ -190,15 +206,19 @@ the second case was added rather than substituted for the first.
 
 ## Layout
 
+**The complete map is [`CLAUDE.md`](../CLAUDE.md)** — all 27 modules of
+`gear-core`, each with what it owns and, more usefully, what it must *not* know.
+This table named seven of them and read as though it named all of them, which is
+the same failure the harness's command list had.
+
+What is kept here is the entries that carry a **decision** rather than a
+location: where a boundary is drawn, and what a directory is not for.
+
 | Path | Role |
 |---|---|
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. `serde` and `ts-rs`, both optional and both about the shape a type takes when it leaves. |
-| `gear-core/src/tooth.rs` | `Tooth` — one tooth's form, at one shift, cut by one `Rack`. Not a gear. |
 | `gear-core/src/gear.rs` | `Gear` — the assembly, and the only place a gear is drawn. An ordinary gear is `Δx = 0`. |
 | `gear-core/src/strength.rs` | The bending model: the critical section both kinds of member share, the notch factors and which fillet radius each reads, and the Hertz contact beside it. |
-| `gear-core/src/plane.rs` | The normal and transverse planes, the identities that carry a quantity between them, and the basic rack they act on. One home, because the two angles had nineteen and the base pitch six. |
-| `gear-core/src/hula.rs` | The hula arrangement: the integer ratio, the one crank offset, and the shifts that let both meshes run at it. |
-| `gear-core/src/train/hula.rs` | ...and the stage that builds the parts it describes, and rates them. |
 | `gear-core/src/train/mod.rs` | What every stage kind shares: the load cases, `MemberRating` — every mesh a member is in, and the worst of them — `Bending`, `MeshReport`, the engagement rule, and the train that strings the stages together. |
 | `crates/gear-io` | File formats: DXF export, the TOML material library and geartrain documents, and the string catalogue. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |

@@ -929,7 +929,6 @@ of the face width. That is worth stating because it was briefly untrue: `Y_β`
 depends on `b` through the overlap ratio, and carrying it turned this division
 into a two-branch solve. Declining `Y_β` gave the invariant back.
 
-independent of the `b` it was evaluated at.
 
 ---
 

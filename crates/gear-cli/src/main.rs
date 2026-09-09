@@ -3,34 +3,14 @@
 //! Exists so the mathematics can be driven and inspected without a browser.
 //!
 //! ```text
-//! gear-cli show   [z] [x]     print the derived geometry of one gear
-//! gear-cli sweep              scan a parameter grid for clamps and undercut
-//! gear-cli materials          the material library, with each value's basis
-//! gear-cli strength [z1] [z2] [torque] [material] [helix]
-//!                             a worked mesh: bending, contact, efficiency
-//! gear-cli train              a two-stage geartrain, end to end
-//! gear-cli trainfile [path]   export a geartrain to TOML, read it back, and
-//!                             show that both solve to the same answers
-//! gear-cli crossed [z1] [z2] [shaft angle]
-//!                             a crossed gear pair, swept over the helix split
-//! gear-cli planetstage [z_sun] [z_planet] [z_ring] [N] [helix]
-//!                             a planetary stage, end to end
-//! gear-cli hulaband [z] [clearance in modules]
-//!                             the same reduction at every tooth difference, to
-//!                             see what the difference of one costs
-//! gear-cli meshsweep [z_ring] [z_pinion] [ring addendum] [pinion addendum]
-//!                             roll an ordinary internal pair through a tooth —
-//!                             the control the hula sweep is read against
-//! gear-cli hulasweep [N] [clearance] [mesh]
-//!                             the same roll, on a hula pair, where the tip
-//!                             circles cross and the pitch point is outside both
-//! gear-cli planetary [z_sun] [z_planet] [N] [x_sun] [x_ring]
-//!                             the ring counts that can be made to work, and
-//!                             the planet shift each of them needs
-//! gear-cli hula [N] [clearance] [m_outer] [m_inner] [cutter teeth]
-//!                             a hula stage: the offset both meshes run at, the
-//!                             shifts it takes, and what the teeth then do
+//! gear-cli help          every subcommand, its arguments and its defaults
 //! ```
+//!
+//! **The list is [`COMMANDS`], and `help` prints it.** It used to be written out
+//! here as well, and `docs/state.md` pointed at this comment as the exhaustive
+//! one — "next to the code it describes, where it cannot fall out of step with
+//! the commands it lists". It had fallen out of step by eight of twenty-one.
+//! Proximity is not a mechanism; a table that *is* the dispatch is.
 
 mod diagram;
 mod matrix;
@@ -48,98 +28,330 @@ fn words() -> gear_io::strings::Catalogue {
     gear_io::strings::Catalogue::english()
 }
 
-fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    match args.first().map(String::as_str) {
-        Some("sweep") => sweep(),
-        Some("dump") => dump(),
-        Some("bending") => bending_report(),
-        Some("matrix") => matrix_report(),
-        Some("loadcase") => loadcase_report(),
-        Some("materials") => materials(),
-        Some("train") => train_report(args.get(1).map(String::as_str) == Some("mixed")),
-        Some("trainfile") => train_file_report(args.get(1).map(String::as_str)),
-        Some("crossed") => crossed_report(
-            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
-            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(23),
-            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(90.0),
-        ),
-        Some("wormstage") => worm_stage_report(
-            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(1),
-            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(40),
-            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(7.0),
-            args.get(4).and_then(|s| s.parse().ok()).unwrap_or(2.0),
-        ),
-        Some("worm") => worm_report(
-            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(1),
-            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(40),
-            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(7.0),
-            args.get(4).and_then(|s| s.parse().ok()).unwrap_or(90.0),
-        ),
-        Some("strength") => strength_report(
-            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
-            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(43),
-            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(2.0),
-            args.get(4).map_or("4340 Hardened Steel", String::as_str),
-            args.get(5).and_then(|s| s.parse().ok()).unwrap_or(0.0),
-            args.get(6).and_then(|s| s.parse().ok()),
-        ),
-        Some("dxf") => dxf(
-            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
-            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.0),
-            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1e-3),
-        ),
-        Some("planetstage") => planetary_stage_report(
-            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(24),
-            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(18),
-            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(60),
-            args.get(4).and_then(|s| s.parse().ok()).unwrap_or(3),
-            args.get(5).and_then(|s| s.parse().ok()).unwrap_or(0.0),
-        ),
-        Some("planetary") => planetary_report(
-            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17),
-            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(17),
-            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(3),
-            args.get(4).and_then(|s| s.parse().ok()).unwrap_or(0.0),
-            args.get(5).and_then(|s| s.parse().ok()).unwrap_or(0.0),
-        ),
-        Some("verify") => verify(
-            args.get(1)
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(usize::MAX),
-        ),
-        Some("hula") => hula_report(
-            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(18),
-            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.5),
-            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1.0),
-            args.get(4).and_then(|s| s.parse().ok()).unwrap_or(1.0),
-            args.get(5).and_then(|s| s.parse().ok()),
-        ),
-        Some("hulaband") => hula_band(
-            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(18),
-            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.30),
-        ),
-        Some("meshsweep") => mesh_sweep(
-            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(40),
-            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(20),
-            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(1.0),
-            args.get(4).and_then(|s| s.parse().ok()).unwrap_or(1.0),
-        ),
-        Some("hulasweep") => hula_sweep(
-            args.get(1).and_then(|s| s.parse().ok()).unwrap_or(18),
-            args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.2),
-            args.get(3).and_then(|s| s.parse().ok()).unwrap_or(0),
-        ),
-        Some("show") | None => {
-            let teeth = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(17);
-            let x = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+/// One subcommand: what it is called, what it takes, what it does, and how to
+/// run it.
+///
+/// **The table below is the dispatch**, so the list and the code cannot
+/// disagree. They had: `docs/state.md` pointed at this module's own comment as
+/// the exhaustive list, "next to the code it describes, where it cannot fall out
+/// of step with the commands it lists" — and it listed thirteen of twenty-one.
+/// Proximity is not a mechanism. The same table shape, for the same reason, is
+/// what the front end's gear kinds and stage kinds became.
+struct Command {
+    name: &'static str,
+    /// The arguments as a reader would type them, defaults in the summary.
+    args: &'static str,
+    summary: &'static str,
+    run: fn(&[String]),
+    /// How `tools/check_golden.sh` records what this prints.
+    record: Record,
+    /// Slow enough that a working-tree run may skip it. About a minute between
+    /// the five that are.
+    slow: bool,
+}
+
+/// How a command's output is kept, so that a change in it is a diff.
+///
+/// **A field rather than a list in the shell script**, which is where it started
+/// and where it would have rotted: a command added here with no line added there
+/// is invisible, which is the same shape as the eight commands this module's own
+/// comment had stopped listing. The script asks the binary now
+/// (`gear-cli --golden-cases`), so the corpus cannot be missing a command that
+/// exists.
+enum Record {
+    /// In full, at these invocations. More than one where a single call would
+    /// leave a whole regime uncovered.
+    Cases(&'static [&'static str]),
+    /// As a digest of the output, with the reason. A checked-in file nobody
+    /// reads a diff of is a change detector that detects nothing.
+    Digest(&'static str, &'static str),
+    /// Not by `check_golden.sh` at all, and by what instead.
+    Elsewhere(&'static str),
+}
+
+/// A positional argument, or its default. Written out forty times before this
+/// existed, which made adding one a matter of copying the incantation.
+fn arg<T: std::str::FromStr>(args: &[String], n: usize, default: T) -> T {
+    args.get(n).and_then(|s| s.parse().ok()).unwrap_or(default)
+}
+
+/// ...and one that is genuinely optional, where absent is not a default value
+/// but a different question.
+fn opt<T: std::str::FromStr>(args: &[String], n: usize) -> Option<T> {
+    args.get(n).and_then(|s| s.parse().ok())
+}
+
+const COMMANDS: &[Command] = &[
+    Command {
+        name: "show",
+        args: "[z] [x]",
+        summary: "one gear's derived geometry (17, 0)",
+        run: |a| {
             show(GearParams {
-                teeth,
-                profile_shift: x,
+                teeth: arg(a, 1, 17),
+                profile_shift: arg(a, 2, 0.0),
                 ..Default::default()
             });
+        },
+        record: Record::Cases(&["show 17 0.2", "show 9 -0.3"]),
+        slow: false
+    },
+    Command {
+        name: "sweep",
+        args: "",
+        summary: "scan a parameter grid for clamps, undercut and severing",
+        run: |_| sweep(),
+        record: Record::Cases(&["sweep"]),
+        slow: false
+    },
+    Command {
+        name: "dump",
+        args: "",
+        summary: "every sampled profile point, for an external check",
+        run: |_| dump(),
+        record: Record::Digest("dump", "10.9 MB of raw profile points; every figure in it is one another command derives and prints in ten"),
+        slow: false
+    },
+    Command {
+        name: "materials",
+        args: "",
+        summary: "the material library, with each value's basis",
+        run: |_| materials(),
+        record: Record::Cases(&["materials"]),
+        slow: false
+    },
+    Command {
+        name: "strength",
+        args: "[z1] [z2] [torque] [material] [helix] [rim]",
+        summary: "a worked mesh: bending, contact, efficiency (17, 43, 2 N·m)",
+        run: |a| {
+            strength_report(
+                arg(a, 1, 17),
+                arg(a, 2, 43),
+                arg(a, 3, 2.0),
+                a.get(4).map_or("4340 Hardened Steel", String::as_str),
+                arg(a, 5, 0.0),
+                opt(a, 6),
+            );
+        },
+        record: Record::Cases(&["strength 17 43 2.0"]),
+        slow: false
+    },
+    Command {
+        name: "bending",
+        args: "",
+        summary: "the bending construction drawn tooth by tooth — the body of docs/bending-check.html",
+        run: |_| bending_report(),
+        record: Record::Elsewhere("its output *is* `docs/bending-check.html`, checked verbatim by `tools/check_figures.py`"),
+        slow: false
+    },
+    Command {
+        name: "matrix",
+        args: "",
+        summary: "the bending-model matrix on external teeth and on rings — the ISO comparison",
+        run: |_| matrix_report(),
+        record: Record::Cases(&["matrix"]),
+        slow: true
+    },
+    Command {
+        name: "loadcase",
+        args: "",
+        summary: "a stage's two load cases side by side",
+        run: |_| loadcase_report(),
+        record: Record::Cases(&["loadcase"]),
+        slow: false
+    },
+    Command {
+        name: "train",
+        args: "[mixed]",
+        summary: "a two-stage geartrain, end to end; `mixed` puts a worm stage in it",
+        run: |a| train_report(a.get(1).map(String::as_str) == Some("mixed")),
+        record: Record::Cases(&["train", "train mixed"]),
+        slow: false
+    },
+    Command {
+        name: "trainfile",
+        args: "[path]",
+        summary: "a train to TOML and back, both answers compared",
+        run: |a| train_file_report(a.get(1).map(String::as_str)),
+        record: Record::Cases(&["trainfile"]),
+        slow: false
+    },
+    Command {
+        name: "dxf",
+        args: "[z] [x] [chord tolerance]",
+        summary: "a gear exported to DXF, on stdout (17, 0, 1e-3)",
+        run: |a| dxf(arg(a, 1, 17), arg(a, 2, 0.0), arg(a, 3, 1e-3)),
+        record: Record::Cases(&["dxf 17 0.2 0.001"]),
+        slow: false
+    },
+    Command {
+        name: "worm",
+        args: "[starts] [z_wheel] [d_worm] [shaft angle]",
+        summary: "a worm pair, both directions (1, 40, 7 mm, 90°)",
+        run: |a| worm_report(arg(a, 1, 1), arg(a, 2, 40), arg(a, 3, 7.0), arg(a, 4, 90.0)),
+        record: Record::Cases(&["worm 1 40 7 90"]),
+        slow: false
+    },
+    Command {
+        name: "wormstage",
+        args: "[starts] [z_wheel] [d_worm] [torque]",
+        summary: "a worm stage, end to end (1, 40, 7 mm, 2 N·m)",
+        run: |a| {
+            worm_stage_report(arg(a, 1, 1), arg(a, 2, 40), arg(a, 3, 7.0), arg(a, 4, 2.0));
+        },
+        record: Record::Cases(&["wormstage 1 40 7 2"]),
+        slow: false
+    },
+    Command {
+        name: "crossed",
+        args: "[z1] [z2] [shaft angle]",
+        summary: "a crossed pair, swept over the helix split (17, 23, 90°)",
+        run: |a| crossed_report(arg(a, 1, 17), arg(a, 2, 23), arg(a, 3, 90.0)),
+        record: Record::Cases(&["crossed 17 23 90"]),
+        slow: false
+    },
+    Command {
+        name: "planetary",
+        args: "[z_sun] [z_planet] [N] [x_sun] [x_ring]",
+        summary: "every ring count that can work, and the planet shift each needs (17, 17, 3)",
+        run: |a| {
+            planetary_report(
+                arg(a, 1, 17),
+                arg(a, 2, 17),
+                arg(a, 3, 3),
+                arg(a, 4, 0.0),
+                arg(a, 5, 0.0),
+            );
+        },
+        record: Record::Cases(&["planetary 17 17 3"]),
+        slow: false
+    },
+    Command {
+        name: "planetstage",
+        args: "[z_sun] [z_planet] [z_ring] [N] [helix]",
+        summary: "a planetary stage in all six arrangements (24, 18, 60, 3)",
+        run: |a| {
+            planetary_stage_report(
+                arg(a, 1, 24),
+                arg(a, 2, 18),
+                arg(a, 3, 60),
+                arg(a, 4, 3),
+                arg(a, 5, 0.0),
+            );
+        },
+        record: Record::Cases(&["planetstage 24 18 60 3"]),
+        slow: false
+    },
+    Command {
+        name: "hula",
+        args: "[N] [clearance] [m_outer] [m_inner] [cutter teeth]",
+        summary: "a hula stage: the offset, the shifts it takes, and what the teeth then do (18, 0.5)",
+        run: |a| {
+            hula_report(
+                arg(a, 1, 18),
+                arg(a, 2, 0.5),
+                arg(a, 3, 1.0),
+                arg(a, 4, 1.0),
+                opt(a, 5),
+            );
+        },
+        record: Record::Cases(&["hula 18 0.2"]),
+        slow: false
+    },
+    Command {
+        name: "hulaband",
+        args: "[N] [clearance in modules]",
+        summary: "one reduction at every tooth difference, to see what the difference of one costs (18, 0.30)",
+        run: |a| hula_band(arg(a, 1, 18), arg(a, 2, 0.30)),
+        record: Record::Cases(&["hulaband 18"]),
+        slow: true
+    },
+    Command {
+        name: "meshsweep",
+        args: "[z_ring] [z_pinion] [ring addendum] [pinion addendum]",
+        summary: "roll an ordinary internal pair through a tooth — the control (40, 20)",
+        run: |a| {
+            mesh_sweep(arg(a, 1, 40), arg(a, 2, 20), arg(a, 3, 1.0), arg(a, 4, 1.0));
+        },
+        record: Record::Cases(&["meshsweep 60 20 0.8"]),
+        slow: true
+    },
+    Command {
+        name: "hulasweep",
+        args: "[N] [clearance] [mesh]",
+        summary: "the same roll on a hula pair, where the tip circles cross (18, 0.2)",
+        run: |a| hula_sweep(arg(a, 1, 18), arg(a, 2, 0.2), arg(a, 3, 0)),
+        record: Record::Cases(&["hulasweep 18 0.25"]),
+        slow: true
+    },
+    Command {
+        name: "verify",
+        args: "[cases]",
+        summary: "the two-sided cutter check over a parameter grid (all of it)",
+        run: |a| verify(arg(a, 1, usize::MAX)),
+        record: Record::Cases(&["verify 100"]),
+        slow: true
+    },
+];
+
+fn help() {
+    let width = COMMANDS.iter().map(|c| c.name.len() + c.args.len()).max();
+    println!("gear-cli — drive the mathematics without a browser\n");
+    for c in COMMANDS {
+        let call = format!("{} {}", c.name, c.args);
+        println!(
+            "  {call:<width$}   {}",
+            c.summary,
+            width = width.unwrap_or(0) + 1
+        );
+    }
+}
+
+/// What `tools/check_golden.sh` should run and how to keep each one.
+///
+/// `speed \t keep \t invocation \t why`, one per line. A flag rather than a
+/// subcommand so that "every subcommand is recorded" stays a statement with no
+/// exception carved out of it for the one that lists them.
+///
+/// **A command kept elsewhere is on this list too**, with `keep = none` and its
+/// reason, so the check can end by saying what it did *not* record and why. A
+/// coverage claim that omits its own exceptions is the shape of the fault this
+/// whole table replaced.
+fn golden_cases() {
+    for c in COMMANDS {
+        let speed = if c.slow { "slow" } else { "fast" };
+        match c.record {
+            Record::Cases(cases) => {
+                for case in cases {
+                    println!("{speed}\tfull\t{case}\t");
+                }
+            }
+            Record::Digest(case, why) => println!("{speed}\tdigest\t{case}\t{why}"),
+            Record::Elsewhere(why) => println!("{speed}\tnone\t{}\t{why}", c.name),
         }
-        Some(other) => eprintln!("unknown command {other:?}; try `show` or `sweep`"),
+    }
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    // No argument at all is `show`, which is the cheapest useful thing here and
+    // was the default before this table existed.
+    let name = args.first().map_or("show", String::as_str);
+    if matches!(name, "help" | "-h" | "--help") {
+        help();
+        return;
+    }
+    if name == "--golden-cases" {
+        golden_cases();
+        return;
+    }
+    match COMMANDS.iter().find(|c| c.name == name) {
+        Some(c) => (c.run)(&args),
+        None => {
+            eprintln!("unknown command {name:?}\n");
+            help();
+        }
     }
 }
 
@@ -2329,5 +2541,56 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
             "\nA worm is the same geometry with the first member's diameter chosen instead \
              of its helix;\nthe split above is the freedom two gears have and a worm does not."
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// **Every subcommand is recorded, or says where instead.**
+    ///
+    /// The table is the dispatch, so this cannot be a check that the two agree —
+    /// there is only one of them now. What it checks is the thing that replaced
+    /// the drift: that adding a command cannot leave the golden corpus quietly
+    /// short of it, because the decision is a field and the field has no
+    /// default.
+    #[test]
+    fn every_command_says_how_its_output_is_kept() {
+        for c in COMMANDS {
+            match c.record {
+                Record::Cases(cases) => {
+                    assert!(!cases.is_empty(), "{}: Cases with no case", c.name);
+                    for case in cases {
+                        assert!(
+                            case.split_whitespace().next() == Some(c.name),
+                            "{}: golden case {case:?} invokes something else",
+                            c.name
+                        );
+                    }
+                }
+                Record::Digest(case, why) => {
+                    assert!(case.split_whitespace().next() == Some(c.name));
+                    assert!(!why.is_empty(), "{}: a digest needs its reason", c.name);
+                }
+                Record::Elsewhere(why) => {
+                    assert!(!why.is_empty(), "{}: needs to say where instead", c.name);
+                }
+            }
+        }
+    }
+
+    /// Names are unique, and `help` can lay them out.
+    ///
+    /// Trivial, and it is here because a table is exactly the shape that grows a
+    /// duplicate on a copied row — at which point the second one is unreachable
+    /// and nothing says so.
+    #[test]
+    fn command_names_are_unique() {
+        let mut seen: Vec<&str> = COMMANDS.iter().map(|c| c.name).collect();
+        let before = seen.len();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(before, seen.len(), "a command name is listed twice");
     }
 }

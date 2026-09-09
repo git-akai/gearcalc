@@ -39,13 +39,14 @@ against a broken tree is recorded here as `written, not proven`.
 ## Status
 
 **Phase 0 — build the instrument.** Done, gate run and passed.
-**Phase 1 — truth-up the documents.** Next.
+**Phase 1 — truth-up the documents.** Done, gate run and passed.
+**Phase 2 — the number ledger.** Next.
 
 | Phase | What it does | State |
 |---|---|---|
 | 0 | Golden corpus, figure provenance, `CLAUDE.md` | **done** — gate proven |
-| 1 | Truth-up the documents against the code | **next** |
-| 2 | The number ledger | not started |
+| 1 | Truth-up the documents against the code | **done** — gate proven |
+| 2 | The number ledger | **next** |
 | 3 | Unify what is written twice | not started |
 | 4 | The optimiser | not started |
 | 5 | Consolidate the tests | not started |
@@ -55,9 +56,12 @@ against a broken tree is recorded here as `written, not proven`.
 production code · 10,346 lines of comment in that code · 9,348 lines of
 standalone document · 4 `expect` in production, no `unwrap` · 1.49 MB wasm.
 
-Phases 0 and 1 change no behaviour. Phases 2 onward are gated on the golden
-corpus, which is what makes "this refactor moved no number" a diff rather than a
-claim.
+Phases 0 and 1 changed no answer: the golden corpus is byte-identical across
+both except where `gear-cli matrix` gained a printed spread, which was the point.
+Phases 2 onward are gated on that corpus, which is what makes "this refactor
+moved no number" a diff rather than a claim.
+
+**Suite: 533 tests** (was 531; the two new ones hold the command table).
 
 ---
 
@@ -107,17 +111,17 @@ existed. `F` numbers are stable; nothing is renumbered.
 
 | | Finding | Kind | Phase | State |
 |---|---|---|---|---|
-| F1 | The crate has one optimiser and the solve inventory omits it | gap | 1, 4 | open |
+| F1 | The crate has one optimiser and the solve inventory omits it | gap | 1, 4 | **half closed** — inventory names it; the closed form is Phase 4 |
 | F2 | The worm stage is outside the shared member vocabulary | gap | 3 | open |
 | F3 | `GearResult` assembled three times, one field by two formulas | gap | 3 | open |
 | F4 | `StageGear` — a shared input type — lives in `train/spur.rs` | drift | 3 | open |
 | F5 | No ledger of the numbers that are not model constants | gap | 2 | open |
 | F6 | The face-width invariance test runs a model the tool does not ship | gap | 5 | open |
 | F7 | ~212 documented figures, one gate | gap | 0 | **part closed** — mechanism built; 5 tables still ungated (F19) |
-| F8 | The CLI list chosen to be exhaustive is not | drift | 1 | open |
-| F9 | The Layout table names 7 of 27 modules | drift | 1 | open |
+| F8 | The CLI list chosen to be exhaustive is not | drift | 1 | **closed** — the table *is* the dispatch |
+| F9 | The Layout table names 7 of 27 modules | drift | 1 | **closed** — the map is `CLAUDE.md`; `state.md` keeps the decisions |
 | F10 | `bending-check.html` regenerates by hand | drift | 0 | **closed** — `figures-verbatim`, checked exactly |
-| F11 | An orphaned sentence fragment in `reference.md` | drift | 1 | open |
+| F11 | An orphaned sentence fragment in `reference.md` | drift | 1 | **closed** |
 | F12 | The inline tests never had the integration tests' consolidation | gap | 5 | open |
 | F13 | Five production modules carry no inline tests, invisibly | holds | 5 | open |
 | F14 | The two unfired notes need their evidence re-dated | holds | 5 | open |
@@ -125,9 +129,10 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F16 | One stage input touches eleven files | holds | 6 | open |
 | F17 | 1.49 MB wasm carrying a simulator no browser path reaches | drift | 6 | open |
 | F18 | `CLAUDE.md` is empty | gap | 0 | **closed** |
-| F19 | Five documented tables have no command that reproduces them | gap | 1 | open |
+| F19 | Five documented tables have no command that reproduces them | gap | 4 | open — moved to Phase 4, see below |
 | F20 | `state.md` derived a figure by hand from rounded output, and it was wrong | drift | 0 | **closed** |
 | F21 | The figure checker cannot see figures in prose, only in tables | gap | 5 | open |
+| F22 | The tense rule as written forbade 127 sentences it was not aimed at | drift | 1 | **closed** — the rule was narrowed, not the prose |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so
@@ -200,6 +205,54 @@ of the eleven checks catches.
   quoted in prose is invisible to it. One such block was found and tagged by
   hand; there will be others. Phase 5 should widen it or the "5 ungated" number
   is an undercount.
+
+---
+
+## Phase 1 — the documents against the code
+
+**F8, closed, and the fix is structural.** `gear-cli`'s subcommands are a
+`COMMANDS` table that *is* the dispatch: name, argument shape, summary, handler,
+and how the golden corpus records it. `gear-cli help` prints it, `state.md`
+points at that, and the module comment no longer restates anything. Two tests
+hold it — every command says how its output is kept, and names are unique.
+
+The same move closed a hole the corpus had: its case list lived in the shell
+script, where a command added in Rust would have been invisible. It is a field on
+`Command` now, and `check_golden.sh` asks the binary (`--golden-cases`). A
+command recorded *elsewhere* is on that list too, with its reason, and the check
+prints it — a coverage claim that omits its own exceptions is how a partial check
+comes to read as a complete one.
+
+> **Gate, run.** Pointed `sweep`'s golden case at `show`, ran the suite:
+> `every_command_says_how_its_output_is_kept` failed and named it. Restored.
+
+Also collapsed on the way: `args.get(n).and_then(|s| s.parse().ok()).unwrap_or(d)`
+was written out forty times and is `arg(a, n, d)`.
+
+**F22, and it is the one place this phase declined to act.** `state.md` said the
+other three documents "should not contain the words now, still or currently".
+Read literally that forbids 127 sentences, and reading them showed nearly all are
+either ordinary English (`Y_β` above 25° "must still be confirmed by experience")
+or a model's history stated where the model is argued ("the shaper caps now, by
+the same rule"). Neither *dates*. **The word was never the fault**; hedging about
+a present another document owns is. So the rule was narrowed to say that, and no
+prose was rewritten — a 127-line sweep with a real chance of damage and no effect
+on the tool is the shape of change this audit is supposed to refuse.
+
+**F19, deferred to Phase 4 with its reasons.** Five tables in
+`reference.md` still have nothing that regenerates them:
+
+| Table | What it would need |
+|---|---|
+| `:360` least loss vs least shift, 9/37 and 17/43 | a command that sweeps a pair's shift sum for least loss — the optimiser's own question |
+| `:1435` the four hula arrangements | `hula` cannot be given four arbitrary tooth counts |
+| `:1455` addendum against involute interference | `hula` takes no addendum argument |
+| `:1550` each pair optimised alone at `z = 36` | a per-pair optimum, which `hulaband` does not report |
+| `:1567` least loss against least shift, per tooth difference | as above |
+
+Each is an answer of `auto::maximise`, which **Phase 4 is about to change**. Any
+command written for them now would be written twice. Regenerating these is
+therefore part of Phase 4's acceptance rather than a task of its own.
 
 ---
 

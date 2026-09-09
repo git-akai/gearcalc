@@ -21,6 +21,13 @@
 # One script for both directions, as `check_bindings.sh` is, and for the same
 # reason: a check whose fix is a different command is a check people skip.
 #
+# **The corpus is the harness's own table.** Each subcommand declares how its
+# output is kept — in full at named invocations, as a digest, or somewhere else
+# entirely — as a field on `Command` in `crates/gear-cli/src/main.rs`, and this
+# script asks the binary (`--golden-cases`) rather than carrying a second copy.
+# A list here would be a list to keep in step, which is the fault that made this
+# whole audit phase necessary.
+#
 # **Determinism was measured, not assumed.** Every command below gives identical
 # output on two consecutive runs, and identical output from a debug and a release
 # build. If that ever stops being true the offending command does not belong
@@ -39,63 +46,6 @@ case "${1:-}" in
   *) echo "usage: check_golden.sh [--write|--fast]" >&2; exit 2 ;;
 esac
 
-# ---------------------------------------------------------------- the corpus
-#
-# One invocation per subcommand, plus a second where the first would leave a
-# whole regime uncovered — `show 9 -0.3` is an undercut tooth, which `show 17
-# 0.2` is not.
-#
-# **This list is expected to match the harness's own dispatch**, and today it is
-# kept in step by hand, which is the fault `docs/state.md` records against the
-# harness's module comment (audit F8). Phase 1 derives both from one table in
-# `main.rs`; until then, a command added without a line here is invisible.
-FAST_CASES=(
-  "show 17 0.2"
-  "show 9 -0.3"
-  "sweep"
-  "materials"
-  "strength 17 43 2.0"
-  "train"
-  "train mixed"
-  "trainfile"
-  "worm 1 40 7 90"
-  "wormstage 1 40 7 2"
-  "crossed 17 23 90"
-  "planetary 17 17 3"
-  "planetstage 24 18 60 3"
-  "hula 18 0.2"
-  "loadcase"
-  "dump"
-  "dxf 17 0.2 0.001"
-)
-
-# Recorded as a digest rather than in full.
-#
-# `dump` is a raw export of every sampled profile point — 10.9 MB, and every
-# figure in it is one some other command derives from and prints in ten. A
-# checked-in file that size is one nobody reads a diff of, which makes it a
-# change detector that detects nothing. The digest moves if any point does, and
-# that is the whole job.
-DIGEST_CASES=("dump")
-
-# Deliberately **not** here: `bending`.
-#
-# Its output is the body of `docs/bending-check.html`, verbatim — so a golden
-# copy would be a third copy of it, and the useful check is against the document
-# rather than against a recording. `tools/check_figures.py` owns it (audit F10).
-
-# Together about a minute. Kept in the default run because the audit's whole
-# premise is that a partial check reading as a complete one is the worse failure.
-SLOW_CASES=(
-  "matrix"
-  "verify 100"
-  "hulaband 18"
-  "meshsweep 60 20 0.8"
-  "hulasweep 18 0.25"
-)
-
-cases=("${FAST_CASES[@]}")
-$fast || cases+=("${SLOW_CASES[@]}")
 
 # **Either profile will do, and that is a measurement rather than a hope**: every
 # case here gives byte-identical output from a debug and a release build, which
@@ -118,19 +68,31 @@ slug() { echo "$1" | tr ' /' '__'; }
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 
-is_digest() {
-  local c
-  for c in "${DIGEST_CASES[@]}"; do [[ "$c" == "$1" ]] && return 0; done
-  return 1
-}
+# `speed \t keep \t invocation \t why`, from the harness itself.
+cases=()
+skipped=()
+elsewhere=()
+while IFS=$'\t' read -r speed keep case why; do
+  if [[ "$keep" == none ]]; then
+    elsewhere+=("$case — $why")
+    continue
+  fi
+  if $fast && [[ "$speed" == slow ]]; then
+    skipped+=("$case")
+    continue
+  fi
+  cases+=("$keep|$case")
+done < <("$bin" --golden-cases)
 
-for case in "${cases[@]}"; do
+for entry in "${cases[@]}"; do
+  keep="${entry%%|*}"
+  case="${entry#*|}"
   out="$scratch/$(slug "$case").txt"
   # 2>&1 deliberately: a command that starts printing to stderr has changed what
   # it says, and that is exactly what this exists to notice.
   # shellcheck disable=SC2086
   "$bin" $case >"$out" 2>&1
-  if is_digest "$case"; then
+  if [[ "$keep" == digest ]]; then
     # The shape as well as the hash, so a diff says *how* it moved rather than
     # only that it did — a bare hash tells you nothing you can act on.
     printf 'gear-cli %s\n  sha256 %s\n  %s lines, %s bytes\n' \
@@ -148,8 +110,8 @@ if [[ "$mode" == write ]]; then
     exit 2
   fi
   mkdir -p "$store"
-  # Removed rather than overwritten, so a command dropped from the list takes its
-  # golden file with it instead of leaving one nothing regenerates.
+  # Removed rather than overwritten, so a command dropped from the table takes
+  # its golden file with it instead of leaving one nothing regenerates.
   rm -f "$store"/*.txt
   cp "$scratch"/*.txt "$store/"
   echo "tools/golden: $(ls "$store"/*.txt | wc -l) files written"
@@ -166,7 +128,8 @@ status=0
 if $fast; then
   # Compare only what was run. Named individually rather than by a directory
   # diff, so a skipped case cannot read as a passing one.
-  for case in "${cases[@]}"; do
+  for entry in "${cases[@]}"; do
+    case="${entry#*|}"
     f="$(slug "$case").txt"
     if [[ ! -f "$store/$f" ]]; then
       echo "no golden for: gear-cli $case" >&2
@@ -176,7 +139,7 @@ if $fast; then
     fi
   done
   echo
-  echo "SKIPPED ${#SLOW_CASES[@]} slow commands (${SLOW_CASES[*]}) — this run is NOT the whole corpus" >&2
+  echo "SKIPPED ${#skipped[@]} slow commands (${skipped[*]}) — this run is NOT the whole corpus" >&2
 else
   diff -r -u "$store" "$scratch" || status=1
 fi
@@ -190,3 +153,8 @@ if [[ $status -ne 0 ]]; then
 fi
 
 echo "tools/golden: $(ls "$store"/*.txt | wc -l) recorded outputs, all unchanged"
+# What is deliberately not here, said out loud. A coverage claim that omits its
+# own exceptions is how a partial check comes to read as a complete one.
+for e in "${elsewhere[@]}"; do
+  echo "  not recorded here: $e"
+done
