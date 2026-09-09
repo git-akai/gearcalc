@@ -22,7 +22,7 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "gear-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "gear-core",
  "gear-io",
@@ -30,7 +30,7 @@ dependencies = [
 
 [[package]]
 name = "gear-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "ts-rs",
@@ -38,7 +38,7 @@ dependencies = [
 
 [[package]]
 name = "gear-io"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "gear-core",
  "serde",
@@ -47,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "gear-wasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "gear-core",
  "gear-io",

@@ -946,7 +946,6 @@ pub fn solve_hula_stage_with(
         // are in that order everywhere below.
         let members = [pair.pinion, pair.ring];
         let bendings = [Some(&pinion_bending), ring_bending.as_ref()];
-        let sections = bendings.map(|b| b.map(|b| &b.section));
         // **Each gear of this stage is in exactly one mesh**, including the two
         // on the wobble body — they are two gears on one shaft, not one gear
         // meeting two mates — so every member's rating is a list of one. The
@@ -1005,7 +1004,6 @@ pub fn solve_hula_stage_with(
             // bound name inputs, so they belong beside those inputs; a clamp is
             // about the part.
             let mut member_notes = Vec::new();
-            member_notes.extend(sections[slot].and_then(super::notch_outside_fit));
             // ...and whether this member's own rim is thinner than the clause
             // will rate. A rim belongs to a member where the mesh-level findings
             // above belong to the pair, so it is asked per slot.

@@ -1240,13 +1240,6 @@ fn strength_report(
                 );
             }
         }
-        if !sec.notch_parameter_in_range() {
-            println!(
-                "         note: notch parameter q_s = {:.2} is outside the ISO fit's range, so",
-                sec.notch_parameter
-            );
-            println!("               Y_S was clamped and the stress is UNDER-predicted");
-        }
     }
 
     // --- contact. One pressure at any instant, two ratings: each gear is judged

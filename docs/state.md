@@ -1,6 +1,10 @@
 # State
 
-Where the project stands, what to run, and what is left.
+Where the project stands, what to run, and what is left. **Version 0.2.0** — the
+minor bump is the bending model: the notch factor, the fillet radius it reads
+and the parabola's selection rule all moved to one source, which moved the
+strength canary and changed `bending_stress`, `min_face_width_bending`,
+`StressConcentration` and `RootSection`.
 
 **This is the only document allowed to talk about the present**, and saying so is
 what lets the others stop hedging. [`reference.md`](reference.md) states what the
@@ -411,30 +415,47 @@ been. They are not a backlog.
 
 ## Known-approximate, documented at the call site
 
+Each entry carries a **size and a sign**, not just a direction. "Conservative"
+is a description of an error, never an excuse for one
+([rationale](rationale.md#a-conservative-answer-is-not-a-free-one)) — an entry
+whose size is unmeasured is a debt still owed, and is marked as one.
+
 - **Helical bending is conservative against ISO 6336-3:2019 by 26–36 %** at
   full axial overlap, and **below it by up to 22 %** at an overlap ratio under
   0.3 with a helix over 20° — the one regime where this model runs under the
   standard, and one `stage.overlap_below_one` already flags. Measured with
   `tools/iso_6336_3_stack.py`, not asserted; the figure the documentation used
   to quote was right by accident.
-- **`Y_S` is stated for external spur gears at `α_n = 20°`**, and gives
-  "approximate values" for internal gears and other pressure angles by the
-  standard's own words. This tool applies it to both, and to a section located
-  by the inscribed parabola rather than the tangent it was calibrated against.
-  None of the three has an edge to report, so they are stated in
-  [`reference.md`](reference.md#bending) rather than raised per gear.
-- **The axial compression term is omitted** from bending, following ISO rather
-  than AGMA. It relieves stress by order 10 %, so leaving it out is conservative;
-  do not compare to an AGMA `J` without saying so.
+- **`K_f`'s calibration contained no undercut teeth.** Dolan and Broghamer's
+  photoelastic specimens "contained various standard gear teeth but did not
+  include any undercut gears", and this tool rates undercut teeth. Size
+  unmeasured, sign unknown — **a debt**. It is not raised per gear because an
+  undercut tooth already says so on its own account.
+- **The axial compression term is omitted** from bending. **This is the largest
+  open debt in the model and it is now an incoherence as well as a bias.** The
+  radial component of the tooth load compresses the tooth, reducing the net
+  tensile stress at the tension fillet by order 10 %; omitting it over-predicts
+  by about that much. It was omitted to follow ISO, which omits it — but the
+  section and the notch factor are no longer ISO's, and Savage's `J` includes
+  the term: `J = 1 / [K_f · (cos φ_C/cos φ) · (6h/t_c² − tan φ_C/t_c)]`, of which
+  this tool computes the first product and drops the subtraction. Every
+  ingredient is already measured — `φ_C` is the load angle, `t_c` the root chord
+  — so this is arithmetic rather than research, and "it is the conservative
+  direction" is not a reason to leave it. **Do not compare to an AGMA `J`
+  without saying so.**
 - **A ZN worm's contact stress is 1–15 % below the reported ZI figure.**
 - **A ring's flank below its generation limit is not a generated involute** —
   about 0.08 mm on ordinary designs. Flagged per part.
 - **The cut simulation cannot see below the generation limit**: its simulated
   cutter has no fillet of its own, so what it reports there is not evidence
   either way.
-- **The `Y_S` notch band is `1 ≤ q_s < 8`**, read from ISO 6336-3:2019, 7.2.
-  It was carried as a citation of a citation for a year and the two agree.
-  Whether a gear falls outside it is reported.
+- **`Y_S`'s notch band, `1 ≤ q_s < 8`**, read from ISO 6336-3:2019, 7.2 — it
+  was a citation of a citation for a year and the two agree. It bounds the **ISO
+  comparison set only**; no stage applies `Y_S`, so no stage reports the band.
+  `K_f` states none. And ISO's own 7.1: `Y_S` is derived from external spur
+  gears at `α_n = 20°` and gives "approximate values" elsewhere — which is one
+  more reason the comparison set is a comparison rather than the default, since
+  `K_f`'s constants are functions of `α_n`.
 - **Load sharing above a virtual contact ratio of 2** is the ramp extrapolating:
   no single-pair zone exists, and it relieves the tooth by about a third. Each
   mesh says so where its figure is shown, so a set with one mesh in the band and
@@ -442,6 +463,12 @@ been. They are not a backlog.
   boundary is in the sweep at a share of exactly 1, so the maximum is the point
   the unshared rating already took — and a hula stage cannot reach the band at
   any proportion it can be built at.
+- **The unshared convention — full load at the highest point of single-pair
+  contact — is not always the conservative reading.** A member whose form factor
+  rises steeply toward its tip can be governed there instead, at a partial share
+  but a longer moment arm: a planetary ring comes out **2.4 % higher** with
+  sharing on than off. Measured, not assumed, and it is why the sharing sweep
+  asserts reach rather than relief.
 - **Hardened 4340's fatigue allowable is the weakest number in the library.**
 - **A face width typed as zero describes a gear with no face**, and every
   rating taken at one is infinite. Those cross the boundary as `null` and the
@@ -656,6 +683,74 @@ measurement — that above a virtual contact ratio of 2 the linear ramp "relieve
 the tooth by about a third", found by sweeping designs and reported in every
 mesh that reaches the band. Two models built on different reasoning landing on
 the same 30 % is the best evidence either of them has.
+
+### The permissible-stress side, none of which is built
+
+`σ_F < σ_FP` is ISO's check, and this tool computes the left side its own way
+and compares it against a material allowable from its own library. **The whole
+right-hand side of 6336-3 is unused**, and it is recorded here as a structure
+rather than a set of formulae because what makes it unusable is its inputs, not
+its arithmetic. Clause 5.4.3:
+
+```text
+σ_FP = σ_Flim · Y_ST · Y_NT / S_Fmin · Y_δrelT · Y_RrelT · Y_X
+```
+
+| | | why it is not here |
+|---|---|---|
+| `σ_Flim` | nominal bending stress number, from reference test gears (ISO 6336-5) | The values this tool would need do not exist for six of its eight materials; the library ships datasheet figures with provenance instead |
+| `Y_ST` | 2.0, the reference test gears' own stress correction (7.4) | Meaningful only against a `σ_Flim` quoted with it |
+| `Y_NT` | life factor, S-N interpolation (Clause 12) | Needs the two S-N points `σ_Flim` carries |
+| `Y_δrelT` | relative notch sensitivity (Clause 13) | The ratio of this gear's notch sensitivity to the test gear's — a *relative* factor with no meaning away from that test gear |
+| `Y_RrelT` | relative surface factor (Clause 14) | Likewise, and needs a fillet roughness this tool does not model |
+| `Y_X` | size factor (Clause 15) | Likewise relative |
+| `S_Fmin` | minimum safety factor | A contract between manufacturer and customer (Clause 4), not a property of a gear |
+
+Four of the seven are **relative** factors, defined as ratios against a standard
+reference test gear. They are not portable: adopting one without `σ_Flim` and
+`Y_ST` is taking a ratio and dropping its denominator. That is the same error as
+[the helix factors](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither),
+and it is why the permissible side is all-or-nothing.
+
+For limited life, 5.4.4.3 gives
+`σ_FP = σ_FP,ref · (3·10⁶/N_L)^exp` with
+`exp = 0.4037·log(σ_FP,stat/σ_FP,ref)` for through-hardened steels and
+`0.2876·log(...)` for surface-hardened, nitrided and cast irons — recorded
+because it is the one piece of that clause that needs only two stress numbers
+and a cycle count, all of which this tool has.
+
+### Annex B, `Y_M`, and the reversed-bending fraction this tool does use
+
+This tool derates a fully reversed root to **0.7** of its one-directional
+allowable, a Goodman/Haigh statement rather than a rating factor. ISO 6336-5
+uses the same 0.7. Annex B offers a finer method and is recorded in case it is
+ever wanted:
+
+```text
+Y_M = 1 / (1 − R · (1−M)/(1+M))        R = −1.2 for equal loads both flanks
+                                       R = −1.2 · F_Rlow/F_Rhigh otherwise
+```
+
+`M` is the mean-stress sensitivity, from Annex B's Table B.1: case hardened
+`0.8 − 0.15·Y_S` (endurance) / 0.7 (static); case hardened and shot peened
+0.4 / 0.6; nitrided 0.3 / 0.3; induction or flame hardened 0.4 / 0.6; not
+surface hardened 0.3 / 0.5; cast steel 0.4 / 0.6. It applies to the
+**permissible** stress, not the applied one — so it belongs to the section
+above, and inherits its problem. Note also that its own opening line says the
+annex "does not conform with ISO 6336-5", which covers reverse loading with the
+flat 0.7 this tool already uses.
+
+### Clause 6.2's closed-form `Y_F`, which this tool replaces rather than declines
+
+Method B computes the form factor from a closed form — Formulae (26)–(32) for a
+hob-cut external gear, and (33)–(61) for a shaper-cut external or internal one,
+including a transcendental solve for `θ` said to converge in about five
+iterations and a Newton iteration for the auxiliary angle `ψ`. None of it is
+here, and not because it was judged: this tool **generates the profile** and
+measures `s_Fn`, `h_Fe` and `ρ` off it, which is what lets undercut, profile
+shift and thickness modification flow through without special cases. The closed
+form is what one writes when one cannot do that. It is named here only so a
+future reader knows it was read and set aside rather than missed.
 
 ### And two clauses read but not needed
 

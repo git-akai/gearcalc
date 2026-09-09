@@ -809,9 +809,11 @@ coherent set, reached by asking for the tangent section and `Y_S` together.
 Every declined factor's formulae and bands are recorded in
 [`state.md`](state.md), so the decision can be revisited without the standard.
 
-The `Y_S` fit is stated over `1 ≤ q_s < 8`. Outside it the correction is taken
-at the boundary and the stage **says so**, naming the member and the value —
-above the band that under-predicts, which is the unconservative direction. The
+The `Y_S` fit is stated over `1 ≤ q_s < 8`, and outside it the correction is
+taken at the boundary. **No stage reports that any more**, because no stage
+applies `Y_S`: the band belongs to a fit reached only by asking for the ISO set
+explicitly, and a note about a factor the rating does not use is worse than no
+note. `K_f` states no band. The
 same clause (7.1) says the fit is derived from **external spur gears at
 `α_n = 20°`** and gives "approximate values for internal gears and for gears
 having other pressure angles"; this crate applies it to both, which the standard
@@ -864,6 +866,32 @@ One power of `cos β` from the oblique section and two from the curvature of the
 pitch ellipse it cuts; then one from the base pitch and one from the path
 length. At `β = 0` both reduce exactly and the virtual gear is rebuilt bit for
 bit identical, so there is no spur branch anywhere in the strength path.
+
+**What is left that differs between an external tooth and a ring.** One
+construction, one notch factor, one load-point rule and one width law serve both;
+the list below is everything the code still branches on, and each entry is a
+*value* on [`ToothOutline`](../crates/gear-core/src/strength.rs) or a fact about
+the part rather than a second model.
+
+| | external | ring |
+|---|---|---|
+| Frame | `y` is the radius | `y` is the **negated** radius (`flip_y`) — and the parabola's tangency condition is odd in `y`, so the same equation serves both |
+| Tangent angle | 30° | 60° — read only by `CriticalSection::TangentAngle`; the parabola asks for no angle |
+| Cut by | a rack | a pinion shaper, so the fillet is a different trochoid and `Cutter` describes the tool |
+| Module the section is measured in | normal module | transverse module; the helical conversion is the caller's, as it is for a rack-cut tooth |
+| Fillet bracket | `(s_j, 0)`, root at 0 | `(min(s_root, s_j), max(...))`, root at `s_root` — which is why `fillet_root()` is a method and not an endpoint a caller picks |
+| Load point travels | **down** in roll from the tip | **up** — `MeshKind::sign`, not a second construction |
+| Flank limit | the tooth's own | also the **generation limit**: a load point past `u_j` is not on the part, so the rating is refused there |
+| Rateable at all | a severed tooth is not | a cut that left **no fillet** is not — no fillet, no `ρ_f` |
+| Undercut | asked, and bounded by `no undercut` | **not asked** — a ring's flank is its shaper's, and undercut is not a question that can be put to it |
+| Rim factor `Y_B` | measured against the whole tooth depth `s_R/h_t` | against the normal module `s_R/m_n` — the clause's two references, one fit |
+| Rated through | its own tooth and load | the **pinion's** tooth and load, being the same tangential force at the same module |
+| Span over teeth | reported | not derived; between-pins only |
+| Own buildable range | shown | not shown — a rack's range is not a ring's |
+
+Everything else — the parabola search, the weaker-tangency rule, `ρ_f` at the
+fillet's minimum, `K_f`, the load-sharing sweep, the width law, the reversal
+rule — is one code path taking both.
 
 **Minimum face width**, closed form, since `σ_F ∝ 1/b` and `σ_H ∝ 1/√b`:
 
@@ -1660,7 +1688,7 @@ kind that reports a bending stress. It reaches bending alone — a contact ratin
 is already taken where one tooth carries everything, so sharing cannot move it —
 and where it is off the rating is `bending_section`'s own answer rather than one
 that agrees with it. Switched on, the mesh cycle is swept for the largest
-`Y_F · Y_S · share`; the share is `contact::load_share`, in base pitches from
+`Y_F · K_f · share`; the share is `contact::load_share`, in base pitches from
 the far end of the path, so the transverse path and the virtual spur gear ask
 one function rather than two.
 

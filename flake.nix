@@ -70,7 +70,7 @@
           # crane's eval-time "placeholder value" warning, which is emitted
           # while inspecting the root manifest and is cosmetic.
           pname = "gears";
-          version = "0.1.0";
+          version = "0.2.0";
           buildInputs = [ ];
           nativeBuildInputs = [ ];
         };
@@ -113,7 +113,7 @@
         in
         pkgs.buildNpmPackage {
           pname = "gears-web";
-          version = "0.1.0";
+          version = "0.2.0";
           src = ./web;
           npmDepsHash = "sha256-jFq5QcK1NF5FQJA5Sv3e0/WYNAdhsX6beOu7c47CMsI=";
 

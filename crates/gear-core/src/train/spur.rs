@@ -813,14 +813,11 @@ pub fn solve_spur_stage_with(
     };
 
     let mut notes = Vec::new();
-    // The `Y_S` fit is stated over a band, and a section outside it is reported
-    // rather than silently taking the boundary value — see `notch_outside_fit`.
     // What the rating has to say about each gear. Per gear, because that is
     // whose it is — and because two gears raising the same note would give one
     // stage-level list two entries with one key.
     let gear_notes = |i: usize| {
         let mut out = Vec::new();
-        out.extend(super::notch_outside_fit(&sections[i]));
         // ...and whether its rim is thinner than ISO 6336-3 will rate.
         out.extend(super::rim_below_minimum(rims[i]));
         // ...and whether the cutter has eaten into the flank, which no toggle

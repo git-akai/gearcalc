@@ -776,10 +776,10 @@ mod tests {
                 }
             }
         }
-        // A **sharp** rack on many teeth, which is where the `Y_S` fit's notch
-        // band is left: `q_s` reaches 10.3 at z = 300 with no tip round at all
-        // (docs/corrections.md), and the correction is then taken at the
-        // boundary rather than extrapolated.
+        // A **sharp** rack on many teeth, and a blunt one on few: the extremes
+        // of the fillet the notch factor is read off, kept in the sweep because
+        // the clamps a cutter raises live out here even though the `Y_S` band
+        // that first brought this case no longer belongs to any stage.
         for (teeth, root_radius) in [(300_u32, 0.0_f64), (17, 0.38)] {
             let gear = gear_core::train::StageGear {
                 teeth,

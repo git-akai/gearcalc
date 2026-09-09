@@ -56,9 +56,9 @@ impl Member {
 
     /// This member's critical section under one construction, loaded at its tip.
     ///
-    /// Tip loading for both, which is [`tip_load_section`](gear_core::strength)'s
-    /// standalone-gear case: without a mate there is no outer point of
-    /// single-pair contact, and the tip is the conservative choice.
+    /// Tip loading for both: without a mate there is no outer point of
+    /// single-pair contact, so the tip is the one point both members define
+    /// the same way, which is what makes the two populations comparable.
     pub fn section(self, p: GearParams, method: CriticalSection) -> Option<RootSection> {
         match self {
             Self::External => {

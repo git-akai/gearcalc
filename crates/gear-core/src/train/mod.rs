@@ -162,32 +162,6 @@ pub struct MeshReport {
     pub backlash: [Backlash; 2],
 }
 
-/// The note a **rating** raises about one member: its notch parameter sits
-/// outside the band the `Y_S` fit is stated for.
-///
-/// `Y_S` is an empirical fit over `q_s = s_Fn / 2ρ_F`, stated for `1 ≤ q_s < 8`.
-/// Outside it the formula still evaluates and
-/// [`stress_correction`](crate::strength::RootSection::stress_correction)
-/// clamps to the boundary — which for a notch *sharper* than the fit covers
-/// **under-predicts** the stress, since `Y_S` rises with `q_s`. That is the
-/// unconservative direction, and it is why
-/// [`notch_parameter_in_range`](crate::strength::RootSection::notch_parameter_in_range)
-/// exists.
-///
-/// It existed and nothing asked it. `docs/rationale.md` has said all along that
-/// the range is "reported, not assumed", and that a result leaving the band
-/// says so "instead of quietly returning a boundary value" — a promise with
-/// nothing enforcing it, which is the shape of half of `docs/corrections.md`.
-/// This is what asks.
-///
-/// Not a *clamp* on the part, so not in the member's clamp list: no geometry was
-/// moved. It is the stage saying which member it is reporting a fitted number
-/// outside the fit for.
-pub(crate) fn notch_outside_fit(section: &crate::strength::RootSection) -> Option<Note> {
-    (!section.notch_parameter_in_range())
-        .then(|| Note::new(key::STAGE_NOTCH_OUTSIDE_FIT).number("q", section.notch_parameter, 2))
-}
-
 /// **A tooth the cutter has eaten into**, where that is a finding rather than a
 /// clamp.
 ///

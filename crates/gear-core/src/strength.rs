@@ -729,16 +729,6 @@ fn finish<T: ToothOutline + ?Sized>(
     })
 }
 
-/// The critical root section with the load at the tooth tip.
-///
-/// This is the standalone-gear case: without a mating gear there is no outer
-/// point of single-pair contact, and tip loading is both the conservative choice
-/// and the one the classical tabulated factors assume.
-#[must_use]
-pub fn tip_load_section(g: &Tooth) -> Option<RootSection> {
-    root_section(g, g.u_tip)
-}
-
 /// How root stress concentration is accounted for.
 ///
 /// Kept as an explicit choice rather than folded into the stress calculation so

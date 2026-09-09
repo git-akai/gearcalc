@@ -862,10 +862,6 @@ pub fn solve_planetary_stage_with(
     // What the rating has to say about each member, kept **on** the member: two
     // of them raising the same note would give one list two entries under one
     // key, which is not something a keyed list can draw.
-    // The section each member's *notch* is judged from. A member in two meshes
-    // is judged from the one its rating came out of, and the sun mesh is that
-    // for a planet unless the ring mesh is worse — which `notch_outside_fit`
-    // cannot know, so it is asked of both and either may speak.
     // The rim under each member, where one was described. Per member rather
     // than per mesh, which is why the planet's two `Bending`s give one entry.
     let rims = [
@@ -873,25 +869,10 @@ pub fn solve_planetary_stage_with(
         planet_bending.rim,
         ring_bending.as_ref().and_then(|b| b.rim),
     ];
-    let sections = [
-        vec![Some(&sun_bending.section)],
-        vec![
-            Some(&planet_bending.section),
-            planet_ring_bending.as_ref().map(|b| &b.section),
-        ],
-        vec![ring_bending.as_ref().map(|b| &b.section)],
-    ];
     // The two rack-cut members; a ring is not asked about undercut.
     let cut_by_a_rack = [Some(&sun), Some(&planet), None];
     let gear_notes = |i: usize| {
         let mut out = Vec::new();
-        out.extend(
-            sections[i]
-                .iter()
-                .flatten()
-                .filter_map(|s| super::notch_outside_fit(s))
-                .take(1),
-        );
         // ...and whether this member's rim is thinner than the clause will
         // rate. One rim per member, so unlike the notch it is asked once.
         out.extend(super::rim_below_minimum(rims[i]));

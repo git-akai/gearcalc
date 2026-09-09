@@ -188,6 +188,41 @@ itself a discontinuity.** Refusing to answer looked like caution when the bendin
 correction hit a flank tangency. It was a cliff: a number becoming no number,
 with nothing physical happening at that tooth count.
 
+### A conservative answer is not a free one
+
+**A conservative result is no less wrong than an aggressive one.** Both are
+errors, both carry engineering risk, and only one of them is habitually excused.
+That habit is the more dangerous of the two, because a bias that is always
+forgiven is a bias nobody measures, and because the errors *stack*: a tool that
+rounds every judgement toward safety, five judgements deep, does not produce a
+safe answer — it produces an unknown one, wearing a reassuring sign. The gear it
+sizes is heavier, larger and more expensive than the design required, and the
+margin it claims to hold is not the margin it holds.
+
+So "the safe direction" is **not a reason** to omit a factor, keep an
+approximation, or prefer a model. Where this document says a choice is
+conservative, that is a statement of its *direction* and never of its
+justification, and it should be read as a debt: an error of known sign and
+unknown size, still to be paid off. The justification always has to be
+somewhere else — that the model is the right one, that the input is the one that
+was measured, that the fit is the one calibrated to the geometry it is fed.
+
+This project has been caught by the opposite mistake and by this one in the same
+session. `Y_β` was excluded for years on a reading that made the omission look
+conservative, and adopting it turned out to move the tool *further* from the
+standard it was taken from ([the helix factors are a
+pair](#the-helix-factors-are-a-pair-and-this-tool-can-take-neither)). The notch
+factor was fed a fillet radius from the flattest point of the fillet — which
+under-predicted, and would have been defended the other way round had it
+over-predicted. Neither was found by asking which way the error pointed. Both
+were found by asking which model the number belonged to.
+
+**How to apply it.** Every known bias is written down with its size and sign, in
+`state.md`'s "Known-approximate" list, not merely with its direction. A factor
+is applied or declined on whether it belongs to the model in use, and the
+argument is made on that ground alone. An unmeasured conservative bias is a
+defect with a note attached, and it stays on the list until somebody measures it.
+
 ### Prefer a law to a threshold
 
 When a model's limit has to be disclosed, find the property that makes the
@@ -271,9 +306,12 @@ touches where the real tooth is weakest.
 `CriticalSection::TangentAngle` is retained, unused by default, for a number
 comparable with a published rating.
 
-**What would change this:** a calibration of `Y_S` against the parabola rather
-than against the 30° construction. `Y_S` is an ISO fit written in terms of the
-30° section, which is the one thing tying the two together.
+**And the notch factor now matches it.** For a long time the parabola section
+was paired with ISO's `Y_S`, which is fitted to the 30°/60° tangent section —
+half of one calibration against half of another. The section's own source
+(Savage, Rubadeux & Coe) carries Dolan and Broghamer's `K_f`, and that is what
+is applied. See [the notch factor is not a free
+choice](#no-isoagma-correction-factors).
 
 ### No ISO/AGMA correction factors
 
@@ -590,7 +628,7 @@ Not a gap. Three reasons that are differences in kind, not factors:
 
 **And the contact path does not unblock it**, which an earlier audit predicted it
 would. The path gives the load's position along the *profile*;
-`σ_F = F_t/(b·m)·Y_F·Y_S` is a cantilever loaded across its whole **face**, and a
+`σ_F = F_t/(b·m)·Y_F·K_f` is a cantilever loaded across its whole **face**, and a
 crossed pair's load is a point. Choosing an effective width is exactly the sort
 of convention that multiplies a stress. A concentrated load on a wide tooth is a
 plate problem and the beam formula has no honest reading of it — which is why no
@@ -656,8 +694,10 @@ Reading the involute's own curvature there is not a notch radius — it jumps
 best-fit `R/ρ` is 3.11…1.24 for a rack-cut external gear and 1.71…2.12 for a ring
 on a 20-tooth shaper, departing from any circle by 26 µm down to 0.7 µm. At the
 critical section the ratio to the tool's own round is 1.47–2.52 external and
-3.55–4.26 on a ring, so using the tool's `ρ` would inflate `q_s` — and `Y_S` with
-it — by that factor.
+3.55–4.26 on a ring, so using the tool's `ρ` in place of the generated fillet's
+would inflate any notch factor by that factor. **Which point on the fillet is
+read matters as much**, and for the same reason: junction against minimum is
+another 1.4–6.3× (see [`state.md`](state.md)).
 
 ### An eccentric gear is an ordinary gear with `Δx = 0`
 
@@ -1023,7 +1063,7 @@ than left in a document.
 
 ### A rating that cannot be taken costs the rating, not the stage
 
-A ring whose cut leaves no fillet has no notch, so no `Y_S`, so no bending
+A ring whose cut leaves no fillet has no notch, so no `ρ_f`, so no bending
 number. Its geometry is not in doubt — it draws, it exports and it meshes — and
 neither is anything else the stage reports: the ratio, both contact stresses,
 the efficiencies, the cycles, and the other members' bending are all still
