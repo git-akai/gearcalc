@@ -1169,9 +1169,22 @@ a planet that is neither. Forcing those into one shape would mean a row of
 vocabulary — `Backlash`, `TrainError`, the duty cycle — not the shape of their
 answers.
 
-**The vocabulary is the larger half, and it has grown.** A member of any kind is
-a `GearResult`; a parallel-axis mesh of any kind is a `MeshReport`; the rating
-every member gets is `MemberRating` over the meshes it is in. A kind adds its own
+**The vocabulary is the larger half, and it has grown.** A member of any kind
+that is a *gear* is a `GearResult`; a parallel-axis mesh of any kind is a
+`MeshReport`; the rating every member gets is `MemberRating` over the meshes it
+is in.
+
+**"That is a gear" is a real qualification and not a hedge.** A worm is a thread
+and its wheel is the envelope of one: neither is cut by a rack, so neither has a
+profile shift, a dedendum, an admissible range or an undercut flank, and a
+`GearResult` for them would be a row of absences with a comment apologising for
+each. `WormMemberResult` is what those two members genuinely have. What was
+*not* a good reason for the distinction is the one that produced it: the same
+type also serves a **crossed gear pair**, whose members are two ordinary helical
+gears — and they inherited the thread's poverty rather than the gear's
+vocabulary, so a crossed pinion could not say its flank had been eaten into
+([corrections.md](corrections.md)). Where a crossed member has something to say,
+it says it. A kind adds its own
 shape *beside* those, never instead of them — a planet is a `GearResult` plus
 what only a planet has, and a hula gear is a `GearResult` plus which side of its
 pair it is. So "its own result type" means the arrangement's own facts, not its

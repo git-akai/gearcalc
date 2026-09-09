@@ -304,6 +304,24 @@ pub struct WormMemberResult {
     /// an enveloping wheel, and there is neither.
     pub recommended_face_width: Option<f64>,
     pub pitch_diameter: f64,
+    /// Guards that altered this member's tooth form, and what the rating has to
+    /// say about it — the two lists a `GearResult` keeps apart, kept apart here.
+    ///
+    /// **Empty for a worm stage, and that is the difference between the two
+    /// arrangements this type serves.** A worm is a thread and its wheel is the
+    /// envelope of one, so neither is cut by a rack and neither has a profile
+    /// shift, a dedendum or a buildable range to report. A **crossed gear pair**
+    /// is two helical gears: its members are rack-cut, its designer types those
+    /// numbers, and every other stage kind says when a cutter has eaten into a
+    /// flank (`docs/corrections.md`, "A gear in a geartrain never said it was
+    /// undercut"). This one said nothing — the same pair reported
+    /// `clamp.tooth_undercut` with its shafts parallel and nothing at all with
+    /// them crossed, because the translation into the equivalent worm stage
+    /// dropped the tooth form on the way.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub clamps: Vec<Note>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub notes: Vec<Note>,
     /// The material as used, after any overrides.
     pub material: Material,
 }
@@ -647,6 +665,27 @@ pub fn solve_crossed_stage(
     }
 
     let mut result = solve_worm_stage(&equivalent, torques, lib)?;
+
+    // **A crossed pair's members are rack-cut gears, and say so.**
+    //
+    // The equivalent worm stage above carries no tooth form — a worm is a thread
+    // — so nothing in `solve_worm_stage` can report a clamp or an undercut
+    // flank. For a worm that is right. For a crossed pair it is a loss: these
+    // are two helical gears, the designer typed their shift, dedendum and root
+    // round, and every other stage kind says when a cutter has eaten into a
+    // flank. This one did not, and the same pair reported `clamp.tooth_undercut`
+    // with its shafts parallel and nothing at all with them crossed
+    // (`docs/corrections.md`).
+    //
+    // Built here rather than in the worm solver because this is the only side
+    // that has the `StageGear`s to build them from — which is the whole of why
+    // the translation lost them.
+    for i in 0..2 {
+        let tooth = crate::tooth::Tooth::new(stage.base_params(i));
+        result.members[i].clamps = tooth.clamps.notes.clone();
+        result.members[i].notes = super::undercut_note(&tooth).into_iter().collect();
+    }
+
     result.notes.extend(notes);
 
     // ...and the zone as the widths in use actually leave it.
@@ -971,6 +1010,11 @@ pub fn solve_worm_stage(
             recommended_face_width: recommended[0],
             pitch_diameter: s.worm_pitch_diameter,
             material: materials[0].clone(),
+            // A thread is not cut by a rack, so there is no guard to have
+            // altered it and no undercut to report. `solve_crossed_stage` fills
+            // these for a crossed *gear* pair, whose members are.
+            clamps: Vec::new(),
+            notes: Vec::new(),
         },
         WormMemberResult {
             torque: output_torque,
@@ -995,6 +1039,8 @@ pub fn solve_worm_stage(
             recommended_face_width: recommended[1],
             pitch_diameter: s.wheel_pitch_diameter,
             material: materials[1].clone(),
+            clamps: Vec::new(),
+            notes: Vec::new(),
         },
     ];
 

@@ -2391,6 +2391,79 @@ mod tests {
         }
     }
 
+    /// **Crossing the shafts does not stop a gear being a gear.**
+    ///
+    /// A crossed pair is a spur stage with an axis angle, and it is solved by
+    /// translating it into the equivalent screw pair — which carries no tooth
+    /// form, because a worm is a thread. So the translation dropped the shift,
+    /// the dedendum and the root round on the way, and with them everything the
+    /// members had to say about themselves: **the same pair reported
+    /// `clamp.tooth_undercut` with its shafts parallel and nothing at all with
+    /// them crossed.**
+    ///
+    /// `docs/corrections.md` records that gap being closed once already — "a gear
+    /// in a geartrain never said it was undercut … reported now on every
+    /// rack-cut member of every stage kind". It reached four kinds of five.
+    ///
+    /// The shaft angle is the helix angle doubled, so a crossed pair's teeth are
+    /// genuinely *different* teeth from the parallel pair's — at 45° of helix a
+    /// 9-tooth pinion is not undercut at all, because the transverse pressure
+    /// angle has risen to 27°. So this is not an equality between the two
+    /// answers. It is the claim that **the crossed member reports its own
+    /// tooth's clamps**, checked at a shaft angle mild enough that the tooth is
+    /// undercut on both sides of the comparison.
+    #[test]
+    fn a_crossed_pair_says_what_a_parallel_one_says_about_its_teeth() {
+        let lib = library();
+        let pair = |shaft_angle: f64| {
+            let mut sp = SpurStage {
+                shaft_angle,
+                ..SpurStage::default()
+            };
+            // Small enough at zero shift to be eaten into by a standard rack.
+            sp.gears[0].teeth = 9;
+            sp.gears[0].profile_shift = Auto::fixed(0.0);
+            sp.gears[0].no_undercut = false;
+            sp.gears[1].teeth = 23;
+            let mut t = two_stage();
+            t.stages = vec![Stage::Spur(sp)];
+            t
+        };
+
+        let flat = solve_train(&pair(0.0), &lib).expect("the parallel pair solves");
+        let spur = flat.stages[0]
+            .as_spur()
+            .expect("parallel answers as a spur result");
+        let said: Vec<&str> = spur.gears[0]
+            .clamps
+            .iter()
+            .chain(&spur.gears[0].notes)
+            .map(|n| n.key.as_str())
+            .collect();
+        assert!(
+            said.contains(&"clamp.tooth_undercut"),
+            "the fixture must undercut its pinion or it checks nothing: {said:?}"
+        );
+
+        // 20°: a 10° helix, so the transverse geometry is near enough the
+        // parallel one that the same pinion is still undercut.
+        let angled = solve_train(&pair(20.0), &lib).expect("the crossed pair solves");
+        let screw = angled.stages[0]
+            .as_worm()
+            .expect("a crossed pair answers as a screw result");
+        let crossed: Vec<&str> = screw.members[0]
+            .clamps
+            .iter()
+            .chain(&screw.members[0].notes)
+            .map(|n| n.key.as_str())
+            .collect();
+        assert!(
+            crossed.contains(&"clamp.tooth_undercut"),
+            "the same pinion, shafts crossed, says {crossed:?} — an axis angle \
+             is not what decides whether a cutter ate into a flank"
+        );
+    }
+
     fn two_stage() -> Train {
         Train {
             input_speed: 3000.0,

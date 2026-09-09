@@ -64,7 +64,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 540 tests** (was 531; the new ones hold F8, F23, F25, F27, F28 and F30).
+**Suite: 541 tests** (was 531; the new ones hold F8, F23, F25, F27, F28, F30 and F33).
 
 ---
 
@@ -75,7 +75,7 @@ Settled at the outset, recorded here so they are not re-litigated.
 | | Question | Answer |
 |---|---|---|
 | **Q1** | Is there a compatibility contract on the wire types, the geartrain TOML, the DXF or the CLI's output? | **None.** Any such change is permitted. |
-| **Q2** | Bring `WormMemberResult` inside `GearResult`, or record why a crossed member cannot be one? | **Bring it inside** — on principle, and as a stress test of the claim that a stage kind should be new kinematics and no new rating machinery. |
+| **Q2** | Bring `WormMemberResult` inside `GearResult`, or record why a crossed member cannot be one? | **Bring it inside** — on principle, and as a stress test of the claim that a stage kind should be new kinematics and no new rating machinery. **The experiment ran and the premise did not survive it — see below.** |
 | **Q3** | Assert the optimiser's convergence claim, or attempt the closed form? | **Attempt the closed form.** The learnings are worth the effort on their own; assert convergence first regardless, since that step stands alone. |
 | **Q4** | Loosen the guard conventions toward true degeneracy limits, or document them as conventions? | **Loosen — cautiously.** With the caveat below, which is a constraint on the work and not a preference. |
 
@@ -115,7 +115,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | | Finding | Kind | Phase | State |
 |---|---|---|---|---|
 | F1 | The crate has one optimiser and the solve inventory omits it | gap | 1, 4 | **half closed** — inventory names it; the closed form is Phase 4 |
-| F2 | The worm stage is outside the shared member vocabulary | gap | 3 | open |
+| F2 | The worm stage is outside the shared member vocabulary | gap | 3 | **re-opened as a question** — the experiment changed the premise; see "Q2 revisited" |
 | F3 | `GearResult` assembled three times, one field by two formulas | gap | 3 | **closed** — one `GearResult::of`, and the shared rule is `StageTorques::referred_like` |
 | F4 | `StageGear` — a shared input type — lives in `train/spur.rs` | drift | 3 | **closed** — moved, with its `Default`, `AddendumAsked` and serde helpers; `spur.rs` 1017 → 730 lines |
 | F5 | No ledger of the numbers that are not model constants | gap | 2 | **closed** |
@@ -145,7 +145,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F29 | The golden corpus was written from a stale binary and the check caught it | holds | — | **closed** — see Phase 2 notes |
 | F30 | A self-locking worm's wheel reported 2.2e307 N·m | gap | 3 | **closed** — and logged in `corrections.md` |
 | F31 | No CLI train sets a back-driving load, so the corpus never exercises one | gap | 3 | open |
-| F32 | `StageResult` has no kind-independent `members()` | gap | 3 | open — blocked on F2 |
+| F32 | `StageResult` has no kind-independent `members()` | gap | 3 | open — blocked on Q2 |
+| F33 | A crossed pair's members said nothing about their own teeth | gap | 3 | **closed** — and logged in `corrections.md` |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so
@@ -351,6 +352,58 @@ three were bugs and one a constant that could not be justified. Two constants
 are gone entirely (`SEVER_SCAN_SAMPLES`, `MAX_SEARCH_AMPLITUDE`), two gained
 gates, three were measured and left alone, and five were reclassified from
 degeneracy tolerances to conventions with their reason written down.
+
+---
+
+## Q2 revisited — what the experiment found
+
+Q2 was answered **bring `WormMemberResult` inside `GearResult`**, on principle
+and as a stress test of the rationale's claim that a stage kind should be new
+kinematics and no new rating machinery. The stress test ran. **The premise it
+was answered on turned out to be wrong, so the question needs answering again
+with what is now known.**
+
+### What was not known when Q2 was answered
+
+**`WormResult` is fed by two different input types.** A *worm stage* is a
+`WormStage`, whose members are `WormMember` — a face width and a material,
+nothing else. A *crossed gear pair* is a `SpurStage`, whose members are
+`StageGear` — shift, addendum, dedendum, root radius, working depth, face
+sources, rim thickness, both toggles. `solve_crossed_stage` translates the
+second into the first and throws the difference away.
+
+So "bring it inside" is two different propositions:
+
+- For a **worm stage**, a `GearResult` would be mostly absences. A worm is a
+  thread and its wheel is the envelope of one; neither is rack-cut, so a profile
+  shift, a dedendum, an admissible range and an undercut flag are not values
+  those members are missing — they are questions that cannot be put to them.
+  Forcing the type would be inventing them, which is what a ring's "no dedendum
+  input; it has a cutter" already refuses.
+- For a **crossed pair**, a `GearResult` is fully available and was being
+  discarded. That half was a real loss and is fixed (F33): a crossed pinion said
+  nothing when a cutter had eaten into its flank, where the same pinion with its
+  shafts parallel said so.
+
+### What has been done regardless of the answer
+
+F33 is closed — a crossed member reports its clamps and its undercut note — and
+`rationale.md`'s claim is corrected from "a member of any kind is a
+`GearResult`" to "a member of any kind **that is a gear**", with the
+qualification argued rather than asserted.
+
+### The question, restated
+
+| | Option | What it costs, what it buys |
+|---|---|---|
+| **A** | **Leave it.** `WormMemberResult` stays its own shape; the qualification is documented. | Nothing more to do. F32 (`StageResult::members()`) stays impossible, so the "walk every member of every stage" sweep has to special-case one kind — which is the sweep `docs/corrections.md` recommends and which found F30. |
+| **B** | **`WormMemberResult { gear: Option<GearResult>, … }`** — `Some` for a crossed pair, `None` for a worm. | Matches `PlanetResult`/`HulaGear`. Makes `members()` writable and the crossed pair's ranges, notes and per-gear ratings reachable. Costs an `Option` the front end must read, and a wire-type change. |
+| **C** | **Split the result types**: a crossed pair returns something with `GearResult` members, a worm stage returns what it has. | The cleanest statement — two arrangements, two shapes — and `members()` is total on four kinds of five. Costs a new result type and a new branch in the front end, against a rationale entry that says a crossed pair is *not* its own kind. |
+
+**Recommendation: B.** It is the only one that makes a crossed pair's members
+first-class without claiming a worm's are gears, and the `Option` is the same
+"a question that cannot be put to this member" the crate already expresses with
+`bending_stress: LoadCase<Option<f64>>`.
 
 ---
 
