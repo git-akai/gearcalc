@@ -16,7 +16,7 @@ use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
-use crate::strength::{bending_stress, contact_stress, Load, StressConcentration, PARALLEL_AXES};
+use crate::strength::{bending_stress, contact_stress, Load, RootStressModel, PARALLEL_AXES};
 use crate::tooth::Tooth;
 
 /// One gear of a stage.
@@ -768,9 +768,9 @@ pub fn solve_spur_stage_with(
             // a sharing model was asked for, so nothing scales by default.
             bending_stress(
                 &sections[i],
-                &g[i],
-                &li,
-                StressConcentration::DolanBroghamer,
+                li.tangential(&g[i]),
+                li.face_width,
+                RootStressModel::DolanBroghamer,
                 rims[i],
             )
             .map(|s| s * load_share[i])
@@ -884,9 +884,9 @@ pub fn solve_spur_stage_with(
                 // a sharing model was asked for, so nothing scales by default.
                 bending_stress(
                     &sections[i],
-                    &g[i],
-                    &li,
-                    StressConcentration::DolanBroghamer,
+                    li.tangential(&g[i]),
+                    li.face_width,
+                    RootStressModel::DolanBroghamer,
                     rims[i],
                 )
                 .map(|s| s * load_share[i])

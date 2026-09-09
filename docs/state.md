@@ -119,16 +119,24 @@ caught more in their areas than the suite has.
 
 | | |
 |---|---|
-| `gear-cli strength 17 43 2.0` | `σ_F` 74.3 / 63.8 MPa · `σ_H` 692.7 MPa · ρ 1.723 mm · η 98.741 % |
+| `gear-cli strength 17 43 2.0` | `σ_F` 66.8 / 56.0 MPa · `σ_H` 692.7 MPa · ρ 1.723 mm · η 98.741 % |
 | `gear-cli wormstage 1 40 7 2` | η 61.805 % forward, 0.000 % backward (self-locking) · backlash 0.15512° at the wheel (min 0.11342, max 0.19683), 6.20497° at the worm |
 
-**The strength canary has moved once, deliberately.** `σ_F` 69.2 / 63.4 →
-74.3 / 63.8 when the notch factor became Dolan and Broghamer's `K_f`, read at
-the fillet's own minimum radius, in place of ISO's `Y_S` read at the critical
-section — the two halves of the section construction this tool actually uses
-finally matched to one another. **`σ_H`, ρ and η did not move**, which is the
-check that a notch factor stayed in bending where it belongs, and the whole worm
-canary did not move either, a worm stage reporting no bending stress at all.
+**The strength canary has moved twice, both deliberately, and both are the same
+model arriving in two commits.**
+
+1. `σ_F` 69.2 / 63.4 → 74.3 / 63.8, when the notch factor became Dolan and
+   Broghamer's `K_f` read at the fillet's own minimum radius, in place of ISO's
+   `Y_S` read at the critical section.
+2. → **66.8 / 56.0**, when the **axial compression term** arrived — the second
+   half of the same `J`, relieving by 10.1 % and 12.2 %.
+
+Taken together the pair moves the canary from 69.2 / 63.4 to 66.8 / 56.0: one
+factor up, one down, and the tool is no longer stacking the conservative halves
+of two models ([rationale](rationale.md#a-conservative-answer-is-not-a-free-one)).
+**`σ_H`, ρ and η did not move at either step**, which is the check that a
+bending model stayed in bending, and the whole worm canary did not move either,
+a worm stage reporting no bending stress at all.
 
 **The worm canary has moved four times, all deliberately**, and the reasons are
 worth keeping because each was a model change rather than a fix:
@@ -431,18 +439,19 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   include any undercut gears", and this tool rates undercut teeth. Size
   unmeasured, sign unknown — **a debt**. It is not raised per gear because an
   undercut tooth already says so on its own account.
-- **The axial compression term is omitted** from bending. **This is the largest
-  open debt in the model and it is now an incoherence as well as a bias.** The
-  radial component of the tooth load compresses the tooth, reducing the net
-  tensile stress at the tension fillet by order 10 %; omitting it over-predicts
-  by about that much. It was omitted to follow ISO, which omits it — but the
-  section and the notch factor are no longer ISO's, and Savage's `J` includes
-  the term: `J = 1 / [K_f · (cos φ_C/cos φ) · (6h/t_c² − tan φ_C/t_c)]`, of which
-  this tool computes the first product and drops the subtraction. Every
-  ingredient is already measured — `φ_C` is the load angle, `t_c` the root chord
-  — so this is arithmetic rather than research, and "it is the conservative
-  direction" is not a reason to leave it. **Do not compare to an AGMA `J`
-  without saying so.**
+- **The axial compression term is applied**, being the second term of the `J`
+  whose first term is `Y_F`. It relieved the canary by 10.1 % and 12.2 %, which
+  is the size the debt had been carrying. **ISO omits it**, so the ISO
+  comparison set omits it too and a number from that set is not an AGMA `J`.
+- **A load point can leave the involute on a rack-cut tooth.** `d = ε_n − 1`
+  base pitches back from the tip is not bounded by the flank on an external
+  member, so a mesh with a high enough contact ratio is rated at a roll below
+  the fillet junction, where `root_section` extrapolates the involute. A ring
+  *is* bounded, by its generation limit, which is a manufacturing fact rather
+  than the same check. Bounding both was tried and refuses a hula stage that
+  builds and runs, so the bound is not the fix — **a debt**, size unmeasured,
+  and the honest fix is a load point taken from the path of contact rather than
+  counted in base pitches from the tip.
 - **A ZN worm's contact stress is 1–15 % below the reported ZI figure.**
 - **A ring's flank below its generation limit is not a generated involute** —
   about 0.08 mm on ordinary designs. Flagged per part.
@@ -517,6 +526,7 @@ of `Y_S`'s band with two in three clamped.
 | | before | after |
 |---|---|---|
 | notch factor | ISO `Y_S`, fitted to the tangent section | Dolan–Broghamer `K_f`, fitted to this one |
+| load resolution | bending term only | **both** terms of Savage's `J`: `Y_F − axial compression` |
 | fillet radius it reads | at the junction (neither definition) | the fillet's **minimum**, `ρ_f` |
 | when both curves have a tangency | fillet wins | the **weaker** wins, per the paper |
 | pressure angles covered | 20° ("approximate" elsewhere, ISO 7.1) | `α_n` is an argument of the fit |
@@ -583,6 +593,26 @@ specimens "contained various standard gear teeth but did not include any undercu
 gears", and this tool rates undercut teeth. That is the same class of limit as
 `Y_S`'s 20°-only origin. It is not raised per gear because an undercut tooth
 already says so on its own account.
+
+### Is the tangent construction still earning its place?
+
+Asked directly, because nothing in a *rating* reaches it: no stage, no wasm
+entry point and no part of the application selects `CriticalSection` or
+`RootStressModel`, so from the product's side both ISO pieces are unreachable.
+
+**They are kept, and the reason is not sentiment.** `gear-cli matrix` is a
+shipped, documented command that runs both coherent sets over both kinds of
+member, and it is the only way this tool can be checked against a published
+standard. That check has been worth having three times in short order: it is
+what showed `Y_β` was half a pair, what showed the parabola set was landing
+*below* the tangent set on rings, and what measured the junction-versus-minimum
+fillet radius. A tool with no second opinion has no way to find those.
+
+So the ISO pieces are not dead code — they are the instrument. What would make
+them dead is the matrix command going away, and the two should then go together.
+
+The two constants (30° and 60°) and `ToothOutline::tangent_angle_deg` exist only
+for that construction and are named rather than buried so this is visible.
 
 ### The ISO set is still there, whole
 

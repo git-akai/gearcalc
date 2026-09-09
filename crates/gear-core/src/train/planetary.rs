@@ -42,7 +42,7 @@ use crate::params::{Auto, GearParams};
 use crate::plane::BasicRack;
 use crate::planetary::{self, Arrangement, PlanetaryShaft, Teeth};
 use crate::ring::{Cutter, Ring};
-use crate::strength::{bending_stress, contact_stress, Load, StressConcentration, PARALLEL_AXES};
+use crate::strength::{bending_stress, contact_stress, Load, RootStressModel, PARALLEL_AXES};
 use crate::tooth::Tooth;
 use crate::train::{Optimisation, StageGear};
 
@@ -826,7 +826,7 @@ pub fn solve_planetary_stage_with(
     // Nothing downstream needs telling: a bending stress is already an `Option`
     // for the worm stage's sake, so the width it would have asked for is simply
     // not asked for, and the member's own clamps say why the fillet is missing.
-    let ring_bending = super::Bending::of_ring(
+    let ring_bending = super::Bending::of(
         &ring,
         pr_path.contact_ratio,
         sharing,
@@ -898,30 +898,32 @@ pub fn solve_planetary_stage_with(
     let probe_load_pr = Load::new(ring_torque_per_mesh / pr_mesh.ratio(), PROBE);
     // The share this tooth carries where it is rated — exactly 1 unless a
     // sharing model was asked for, so nothing scales by default.
-    let stress_at = |b: &super::Bending, on: &Tooth, load: &Load| {
+    // **`F_t` is the mesh's**, so a member is named only to say which reference
+    // cylinder it is read at — and the ring, which has no rack-cut tooth, is no
+    // longer handed the planet's to stand in for one.
+    let stress_at = |b: &super::Bending, ft: f64, load: &Load| {
         bending_stress(
             &b.section,
-            on,
-            load,
-            StressConcentration::DolanBroghamer,
+            ft,
+            load.face_width,
+            RootStressModel::DolanBroghamer,
             b.rim,
         )
         .map(|s| s * b.share)
     };
-    let sun_sf = stress_at(&sun_bending, &sun, &probe_load_sp);
-    let planet_sf = stress_at(
-        &planet_bending,
-        &planet,
-        &probe_load_sp.across_mesh(&sun, &planet),
-    );
-    // A ring's root is rated through the planet's tooth and the planet's load,
-    // which is the same tangential force at the same module.
+    // One tangential force per mesh, read at either member's reference cylinder
+    // because they are equal there — so the ring's rating asks nothing of the
+    // planet beyond the mesh they are both in.
+    let ft_sp = probe_load_sp.tangential(&sun);
+    let ft_pr = probe_load_pr.tangential(&planet);
+    let sun_sf = stress_at(&sun_bending, ft_sp, &probe_load_sp);
+    let planet_sf = stress_at(&planet_bending, ft_sp, &probe_load_sp);
     let ring_sf = ring_bending
         .as_ref()
-        .and_then(|b| stress_at(b, &planet, &probe_load_pr));
+        .and_then(|b| stress_at(b, ft_pr, &probe_load_pr));
     let planet_ring_sf = planet_ring_bending
         .as_ref()
-        .and_then(|b| stress_at(b, &planet, &probe_load_pr));
+        .and_then(|b| stress_at(b, ft_pr, &probe_load_pr));
 
     // **What each member's ratings come to**, from the probe pass — the same
     // four questions every stage kind asks of every member it builds, asked
@@ -1278,9 +1280,9 @@ mod tests {
                     crate::strength::bending_section(&built.planet, contact_ratio).unwrap();
                 bending_stress(
                     &section,
-                    &built.planet,
-                    &Load::new(torque, b),
-                    StressConcentration::DolanBroghamer,
+                    Load::new(torque, b).tangential(&built.planet),
+                    b,
+                    RootStressModel::DolanBroghamer,
                     None,
                 )
                 .unwrap()

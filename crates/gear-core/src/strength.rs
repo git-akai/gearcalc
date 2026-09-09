@@ -54,7 +54,7 @@ pub enum CriticalSection {
     /// **Retained but not the default.** Kept because it is what ISO 6336 and
     /// AGMA 2101 specify, so it is the setting to return to for a
     /// standards-comparable number, and because
-    /// [`StressConcentration::Iso6336`] is a fit calibrated against *this*
+    /// [`RootStressModel::Iso6336`] is a fit calibrated against *this*
     /// construction.
     ///
     /// Its weakness is that it is **independent of where the load acts**, which
@@ -191,7 +191,7 @@ pub struct RootSection {
     /// the perpendicular to the tooth centreline.
     pub load_angle: f64,
     /// Radius of curvature of the fillet **at the critical section**, `ρ_F` —
-    /// ISO 6336-3's definition, and what [`StressConcentration::Iso6336`] is
+    /// ISO 6336-3's definition, and what [`RootStressModel::Iso6336`] is
     /// fitted to.
     ///
     /// At the tangency when that is on the fillet; at the fillet's junction with
@@ -199,7 +199,7 @@ pub struct RootSection {
     /// curvature, which is what makes it a notch radius.
     pub fillet_curvature: f64,
     /// **The minimum radius of curvature of the fillet curve**, `ρ_f` — Dolan
-    /// and Broghamer's definition, and what [`StressConcentration::DolanBroghamer`]
+    /// and Broghamer's definition, and what [`RootStressModel::DolanBroghamer`]
     /// is fitted to.
     ///
     /// A property of the whole fillet rather than of a point on it, so it is
@@ -217,12 +217,42 @@ pub struct RootSection {
     pub min_fillet_curvature: f64,
     /// Normal pressure angle of the basic rack, radians.
     ///
-    /// Carried because [`StressConcentration::DolanBroghamer`]'s constants are
+    /// Carried because [`RootStressModel::DolanBroghamer`]'s constants are
     /// functions of it — it is the one notch fit here that covers a pressure
     /// angle other than 20°, and it can only do so if it is told.
     pub pressure_angle: f64,
-    /// Tooth form factor `Y_F`.
+    /// Tooth form factor `Y_F` — the **bending** term alone.
     pub form_factor: f64,
+    /// **The axial compression term**, in the same units as [`Self::form_factor`]
+    /// and subtracted from it.
+    ///
+    /// ```text
+    /// sin α_Fen / ( (s_Fn/m) · cos α_n )
+    /// ```
+    ///
+    /// The tooth load acts along the line of action, not across the tooth. Its
+    /// across-tooth component bends the root, which is `Y_F`; its **along-tooth**
+    /// component pushes the tooth into its own rim, and that compression
+    /// subtracts from the tensile stress at the loaded flank's fillet — which is
+    /// the fillet a tooth cracks from. It is the second term of Savage,
+    /// Rubadeux & Coe's `J`, `6h/t_c² − tan φ_C/t_c`, of which `Y_F` is the
+    /// first, and it relieves the root by order 10 %.
+    ///
+    /// Carried separately rather than folded into `Y_F` because `Y_F` has a
+    /// definition of its own that this crate is checked against — the rack limit,
+    /// and ISO's Method B — and because [`RootStressModel::Iso6336`] does not
+    /// take it: ISO omits the term, so a comparable number must omit it too.
+    /// [`RootSection::bending_factor`] is where the two are combined, per model.
+    ///
+    /// On a reversed root each flank takes its turn as the loaded one and the
+    /// compression relieves whichever is in tension, so there is no case here.
+    pub axial_compression: f64,
+    /// Transverse module of the plane the section was measured in, mm.
+    ///
+    /// Carried so that a stress can be had from a section and a load alone: on
+    /// the virtual spur member every rating is taken on, this is `m_n`, and it
+    /// is the `m_n` of `F_t/(b·m_n)`.
+    pub module: f64,
     /// Notch parameter `q_s = s_Fn / (2 ρ_F)`, the input to stress correction.
     pub notch_parameter: f64,
     /// Which construction located this section.
@@ -385,8 +415,15 @@ fn flank_point_and_load_direction(g: &Tooth, roll: f64) -> ([f64; 2], [f64; 2]) 
 /// comes out positive either way. The root chord and the load angle only involve
 /// `x`. Nothing else in the construction reads an absolute `y`.
 pub trait ToothOutline {
-    /// Normal module, mm.
-    fn module(&self) -> f64;
+    /// **Transverse module of the plane this outline is drawn in**, mm.
+    ///
+    /// Transverse rather than normal because that is the plane
+    /// [`Self::fillet_at`] and [`Self::flank_at`] return coordinates in, and the
+    /// form factor divides lengths measured there by it. On the **virtual spur**
+    /// member every rating is taken on, the helix is zero and the two moduli
+    /// coincide — so this is `m_n` wherever it matters, reached by the
+    /// definition that is true of a raw helical member as well.
+    fn transverse_module(&self) -> f64;
     /// Normal pressure angle, radians.
     fn normal_pressure_angle(&self) -> f64;
     /// Whether there is a tooth to rate at all.
@@ -436,11 +473,61 @@ pub trait ToothOutline {
     fn fillet_curvature(&self, s: f64) -> f64;
     /// Radius of curvature of the involute flank at roll `u`, mm — `r_b u`.
     fn flank_curvature(&self, u: f64) -> f64;
+
+    // ---- what a *rating* needs beyond the outline -------------------- //
+    //
+    // The rating sweeps a load point along the flank, and everything it needs
+    // to do that is here rather than in a function per kind of member. The two
+    // used to be two near-identical functions; they differ in one fact, and it
+    // is [`Self::tip_at_high_roll`].
+
+    /// Base radius, mm.
+    fn base_radius(&self) -> f64;
+    /// Transverse pressure angle, radians.
+    fn transverse_pressure_angle(&self) -> f64;
+    /// Base helix angle, radians.
+    fn base_helix_angle(&self) -> f64;
+    /// The rolls a load point may sit at, where the flank **stops existing**
+    /// before [`Self::flank_bracket`] would say.
+    ///
+    /// `None` for a rack-cut tooth and the generated flank for a ring, and that
+    /// asymmetry is a manufacturing fact rather than an oversight: a ring's
+    /// flank below its generation limit was never cut by the shaper, and the
+    /// limit reaches up into the *working* flank on ordinary designs
+    /// (`docs/reference.md#internal-gears`). A rack-cut tooth's involute runs
+    /// down to its fillet with nothing missing in between.
+    ///
+    /// **It is not the same as bounding the load point to the flank**, and
+    /// applying it to an external tooth was tried: a hula stage's pinion is
+    /// rated at a contact ratio high enough to put `d = ε_n − 1` below its
+    /// fillet junction, and bounding it there refuses a stage that builds and
+    /// runs. That the load point can leave the involute at all is a real gap and
+    /// is recorded in `docs/state.md`; it is not this method's to close.
+    fn generated_rolls(&self) -> Option<std::ops::RangeInclusive<f64>>;
+    /// **Which end of [`Self::flank_bracket`] the tooth tip is at.**
+    ///
+    /// The one genuine asymmetry between a rack-cut tooth and a ring, and three
+    /// things fall out of it rather than being stated three times: where the
+    /// load point is counted *from*, which way it travels as the mesh turns —
+    /// down in roll for a tooth, up for a ring — and, since the bracket is the
+    /// generated flank either way, where it stops being on the part.
+    fn tip_at_high_roll(&self) -> bool;
+    /// The **virtual spur** member: the one whose own transverse plane is the
+    /// normal plane this member bends in. A spur member is itself.
+    fn virtual_spur(&self) -> Self
+    where
+        Self: Sized;
+    /// How this member's rim is measured against its teeth, given a thickness.
+    ///
+    /// ISO 6336-3, 9.3: a backup ratio against the whole tooth depth for an
+    /// external member, a rim thickness in normal modules for a ring. One fit,
+    /// two references, and this is the only place the difference lives.
+    fn rim_support(&self, thickness: f64) -> RimSupport;
 }
 
 impl ToothOutline for Tooth {
-    fn module(&self) -> f64 {
-        self.params.module
+    fn transverse_module(&self) -> f64 {
+        self.mt
     }
     fn normal_pressure_angle(&self) -> f64 {
         self.alpha_n
@@ -479,15 +566,35 @@ impl ToothOutline for Tooth {
     fn flank_curvature(&self, u: f64) -> f64 {
         self.rb * u
     }
+    fn base_radius(&self) -> f64 {
+        self.rb
+    }
+    fn transverse_pressure_angle(&self) -> f64 {
+        self.alpha_t
+    }
+    fn base_helix_angle(&self) -> f64 {
+        crate::metrology::base_helix_angle(self)
+    }
+    fn generated_rolls(&self) -> Option<std::ops::RangeInclusive<f64>> {
+        None
+    }
+    fn tip_at_high_roll(&self) -> bool {
+        // An external tooth's flank runs from its fillet junction out to its
+        // tip, so the tip is the far end and the load travels back down.
+        true
+    }
+    fn virtual_spur(&self) -> Self {
+        Tooth::virtual_spur(self)
+    }
+    fn rim_support(&self, thickness: f64) -> RimSupport {
+        RimSupport::external(thickness, self.ra - self.rf)
+    }
 }
 
 /// A ring's tooth, in the same frame — which for a ring means `y` negated,
 /// because its tooth points inward.
 impl ToothOutline for crate::ring::Ring {
-    fn module(&self) -> f64 {
-        // The transverse module is the normal one for the spur case, and a
-        // helical ring's bending is rated on its virtual spur section just as an
-        // external gear's is; that conversion belongs to the caller.
+    fn transverse_module(&self) -> f64 {
         self.mt
     }
     fn normal_pressure_angle(&self) -> f64 {
@@ -532,6 +639,29 @@ impl ToothOutline for crate::ring::Ring {
     }
     fn flank_curvature(&self, u: f64) -> f64 {
         self.rb * u
+    }
+    fn base_radius(&self) -> f64 {
+        self.rb
+    }
+    fn transverse_pressure_angle(&self) -> f64 {
+        self.alpha_t
+    }
+    fn base_helix_angle(&self) -> f64 {
+        crate::ring::Ring::base_helix_angle(self)
+    }
+    fn generated_rolls(&self) -> Option<std::ops::RangeInclusive<f64>> {
+        Some(self.u_tip..=self.u_j)
+    }
+    fn tip_at_high_roll(&self) -> bool {
+        // A ring's tip is at its *smallest* radius and so its smallest roll,
+        // and the load travels up from it.
+        false
+    }
+    fn virtual_spur(&self) -> Self {
+        crate::ring::Ring::virtual_spur(self)
+    }
+    fn rim_support(&self, thickness: f64) -> RimSupport {
+        RimSupport::internal(thickness, self.params.module)
     }
 }
 
@@ -703,9 +833,12 @@ fn finish<T: ToothOutline + ?Sized>(
     // the fillet ever gets. See `RootSection::min_fillet_curvature`.
     let min_fillet_radius = g.fillet_curvature(g.fillet_root());
 
-    let m = g.module();
-    let form_factor = 6.0 * (moment_arm / m) * load_angle.cos()
-        / ((root_chord / m).powi(2) * g.normal_pressure_angle().cos());
+    let m = g.transverse_module();
+    let alpha_n = g.normal_pressure_angle();
+    let form_factor =
+        6.0 * (moment_arm / m) * load_angle.cos() / ((root_chord / m).powi(2) * alpha_n.cos());
+    // ...and the along-tooth half of the same load. See `axial_compression`.
+    let axial_compression = load_angle.sin() / ((root_chord / m) * alpha_n.cos());
 
     Some(RootSection {
         s,
@@ -720,8 +853,10 @@ fn finish<T: ToothOutline + ?Sized>(
         load_angle,
         fillet_curvature: fillet_radius,
         min_fillet_curvature: min_fillet_radius,
-        pressure_angle: g.normal_pressure_angle(),
+        pressure_angle: alpha_n,
         form_factor,
+        axial_compression,
+        module: m,
         tangency,
         tangent_direction,
         load_point,
@@ -729,7 +864,14 @@ fn finish<T: ToothOutline + ?Sized>(
     })
 }
 
-/// How root stress concentration is accounted for.
+/// **Which published bending model a root stress is taken under.**
+///
+/// It began as a choice of stress concentration factor and is now a choice of
+/// *set*: each variant names a notch factor **and** whether the axial
+/// compression term is taken, because the two travel together in the sources
+/// they come from and cannot be mixed without meaning something neither source
+/// says. This project has twice paid for mixing halves of calibrations
+/// (`docs/rationale.md`), and a type that made it easy was part of how.
 ///
 /// Kept as an explicit choice rather than folded into the stress calculation so
 /// that a run can be repeated without it. The form factor is measured off exact
@@ -755,10 +897,10 @@ fn finish<T: ToothOutline + ?Sized>(
 ///   [`RootSection::notch_parameter_in_range`]; a result that leaves the fit's
 ///   band says so instead of quietly returning a boundary value.
 ///
-/// It remains a fit, and [`StressConcentration::None`] exists so any result can
+/// It remains a fit, and [`RootStressModel::FormFactorOnly`] exists so any result can
 /// be re-run without it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum StressConcentration {
+pub enum RootStressModel {
     /// ISO 6336-3.
     ///
     /// ```text
@@ -828,7 +970,7 @@ pub enum StressConcentration {
     /// work (1955) agreed, Chabert, Dang Tran and Mathis (1972) were
     /// "substantially in agreement", and Wilcox and Coleman's finite-element
     /// study (1973) found results "only a few percent different" — but it is a
-    /// fit, and [`StressConcentration::None`] exists so any result can be
+    /// fit, and [`RootStressModel::FormFactorOnly`] exists so any result can be
     /// re-run without it.
     ///
     /// **Its models contained no undercut teeth.** Dolan and Broghamer's
@@ -840,11 +982,13 @@ pub enum StressConcentration {
     /// mistaken for a validated case.
     #[default]
     DolanBroghamer,
-    /// No correction: report the form factor alone.
+    /// The bending term alone: `Y_F`, no notch factor and no axial relief.
     ///
-    /// This is the control case. If a stress figure looks wrong, comparing the
-    /// two says whether the geometry or the fit is responsible.
-    None,
+    /// The control case. If a stress figure looks wrong, comparing against this
+    /// says whether the geometry or the fit is responsible — and it is the one
+    /// variant with no empirical content at all, so it is what the rack-limit
+    /// gate is written against.
+    FormFactorOnly,
 }
 
 /// Range of the notch parameter over which the ISO `Y_S` fit is stated.
@@ -921,12 +1065,12 @@ impl RootSection {
     /// unconservative, which is why [`RootSection::notch_parameter_in_range`]
     /// exists and should be surfaced rather than swallowed.
     #[must_use]
-    pub fn stress_correction(&self, model: StressConcentration) -> Option<f64> {
+    pub fn stress_correction(&self, model: RootStressModel) -> Option<f64> {
         match model {
-            StressConcentration::None => Some(1.0),
+            RootStressModel::FormFactorOnly => Some(1.0),
             // **Each fit reads the radius it was fitted to**, which is the whole
             // reason both are carried: `ρ_f` here, `ρ_F` below.
-            StressConcentration::DolanBroghamer => {
+            RootStressModel::DolanBroghamer => {
                 let a = self.pressure_angle;
                 let h = 0.331 - 0.436 * a;
                 let l = 0.324 - 0.492 * a;
@@ -935,7 +1079,7 @@ impl RootSection {
                 let by_height = self.root_chord / self.moment_arm;
                 Some(h + by_radius.powf(l) * by_height.powf(m))
             }
-            StressConcentration::Iso6336 => {
+            RootStressModel::Iso6336 => {
                 let l = self.root_chord / self.moment_arm;
                 let q = self
                     .notch_parameter
@@ -951,13 +1095,33 @@ impl RootSection {
         NOTCH_PARAMETER_RANGE.contains(&self.notch_parameter)
     }
 
-    /// `Y_F · Y_S`: the full geometry factor multiplying `F_t / (b m)`.
+    /// **The whole geometry factor multiplying `F_t / (b · m_n)`**, under one
+    /// model.
     ///
-    /// `None` where the correction is undefined; see
+    /// ```text
+    /// Dolan–Broghamer  (Y_F − axial) · K_f     Savage's J, both of its terms
+    /// ISO 6336         Y_F · Y_S               ISO omits the axial term
+    /// form factor only Y_F
+    /// ```
+    ///
+    /// The axial term belongs to the model rather than to the section, which is
+    /// why it is applied here and carried separately on
+    /// [`Self::axial_compression`]: taking ISO's notch factor *and* AGMA's load
+    /// resolution would be a third model that neither source states.
+    ///
+    /// This is also the quantity a load-sharing sweep maximises, so both terms
+    /// have to be in it — the axial relief varies along the mesh cycle exactly
+    /// as the bending does.
+    ///
+    /// `None` where the notch factor is undefined; see
     /// [`RootSection::stress_correction`].
     #[must_use]
-    pub fn bending_factor(&self, model: StressConcentration) -> Option<f64> {
-        Some(self.form_factor * self.stress_correction(model)?)
+    pub fn bending_factor(&self, model: RootStressModel) -> Option<f64> {
+        let bending = match model {
+            RootStressModel::DolanBroghamer => self.form_factor - self.axial_compression,
+            RootStressModel::Iso6336 | RootStressModel::FormFactorOnly => self.form_factor,
+        };
+        Some(bending * self.stress_correction(model)?)
     }
 }
 
@@ -1169,10 +1333,25 @@ impl Load {
 /// Tooth root bending stress, MPa.
 ///
 /// ```text
-/// σ_F = F_t / (b · m_n) · Y_F · Y_S
+/// σ_F = F_t / (b · m_n) · (bending factor) · Y_B
 /// ```
 ///
-/// `F_t` in newtons and `b`, `m` in millimetres give N/mm² = MPa directly.
+/// `F_t` in newtons and `b`, `m` in millimetres give N/mm² = MPa directly. The
+/// module is the section's own ([`RootSection::module`]).
+///
+/// # It takes a force, not a gear
+///
+/// **`F_t` is a property of the mesh, and equal for both of its members**:
+/// `F_t = 2000 T/d`, and across a mesh both the torque and the diameter scale by
+/// the tooth ratio, so the two cancel exactly. Taking the force says that, where
+/// taking a member and asking it for one does not — and a ring, which has no
+/// rack-cut tooth of its own to ask, used to be rated by handing this function
+/// **the mating pinion's** tooth. That produced the right number for the right
+/// reason and read like an accident, and it meant the ring's rating reached
+/// outside itself for a quantity that was never the pinion's to begin with.
+///
+/// A caller with a member and a torque still has [`Load::tangential`]; what it
+/// no longer has to do is find a member for a section that is not one.
 ///
 /// # Helical gears
 ///
@@ -1206,7 +1385,7 @@ impl Load {
 ///
 /// **The `K` and `Z` families are not applied either**, and that is the same
 /// policy (docs/reference.md#contact-stress). `Y_S` and `Y_B` are the two
-/// exceptions and neither is half of anything; see [`StressConcentration`] and
+/// exceptions and neither is half of anything; see [`RootStressModel`] and
 /// [`RimSupport`].
 ///
 /// Returns `None` when the stress correction is undefined for this section —
@@ -1215,14 +1394,14 @@ impl Load {
 #[must_use]
 pub fn bending_stress(
     section: &RootSection,
-    g: &Tooth,
-    load: &Load,
-    model: StressConcentration,
+    tangential_force: f64,
+    face_width: f64,
+    model: RootStressModel,
     rim: Option<RimSupport>,
 ) -> Option<f64> {
     let factor = section.bending_factor(model)?;
     let y_b = rim.map_or(1.0, |r| r.factor());
-    Some(load.tangential(g) / (load.face_width * g.params.module) * factor * y_b)
+    Some(tangential_force / (face_width * section.module) * factor * y_b)
 }
 
 /// The critical section to rate a gear's bending on, loaded at the highest
@@ -1258,7 +1437,10 @@ pub fn bending_stress(
 ///
 /// `transverse_contact_ratio` is `ε_α` from [`ContactPath::contact_ratio`].
 #[must_use]
-pub fn bending_section(g: &Tooth, transverse_contact_ratio: f64) -> Option<RootSection> {
+pub fn bending_section<T: ToothOutline>(
+    g: &T,
+    transverse_contact_ratio: f64,
+) -> Option<RootSection> {
     bending_section_shared(g, transverse_contact_ratio, LoadSharing::None).map(|(s, _)| s)
 }
 
@@ -1278,15 +1460,16 @@ struct LoadPoint<'a, T: ToothOutline + ?Sized> {
     /// The **virtual spur** member, whose own transverse plane is the normal
     /// plane the tooth bends in.
     v: &'a T,
-    /// Its roll parameter at the tip, and its base radius: where `d` is counted
-    /// from, and what turns a base-pitch length into a roll.
+    /// Where `d` is counted from, and what turns a base-pitch length into a
+    /// roll.
     u_tip: f64,
     rb: f64,
     base_pitch: f64,
-    /// `-1` for a tooth, `+1` for a ring's space.
+    /// `-1` for a tooth, `+1` for a ring's space — one fact,
+    /// [`ToothOutline::tip_at_high_roll`], not a second construction.
     sense: f64,
-    /// The rolls the flank actually exists over, where that is narrower than
-    /// what `root_section` will accept.
+    /// The rolls the flank exists over, where that is narrower than what
+    /// `root_section` will accept — [`ToothOutline::generated_rolls`].
     generated: Option<std::ops::RangeInclusive<f64>>,
 }
 
@@ -1340,7 +1523,7 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
         // so they scale every candidate alike and cannot move which one wins.
         // Multiplying them in here would cost a sweep's worth of arithmetic to
         // reach the same `d`.
-        let Some(factor) = section.bending_factor(StressConcentration::DolanBroghamer) else {
+        let Some(factor) = section.bending_factor(RootStressModel::DolanBroghamer) else {
             continue;
         };
         let weighted = factor * share;
@@ -1406,152 +1589,41 @@ const SHARING_SAMPLES: usize = 200;
 /// `None` where [`bending_section`] has none: a tooth with no usable form, or a
 /// load point past the end of the generated flank.
 #[must_use]
-pub fn bending_section_shared(
-    g: &Tooth,
-    transverse_contact_ratio: f64,
-    model: LoadSharing,
-) -> Option<(RootSection, f64)> {
-    let v = g.virtual_spur();
-    let cos_bb = base_helix_angle(g).cos();
-    // The whole cycle in the plane the tooth actually bends in. `d` counts
-    // virtual base pitches back from the far end of the path, the same
-    // coordinate `contact::load_share` takes.
-    let eps_n = transverse_contact_ratio / (cos_bb * cos_bb);
-    worst_over_cycle(
-        &LoadPoint {
-            base_pitch: crate::plane::base_pitch(v.mt, v.alpha_t),
-            u_tip: v.u_tip,
-            rb: v.rb,
-            v: &v,
-            sense: -1.0,
-            generated: None,
-        },
-        eps_n,
-        model,
-    )
-}
-
-/// The critical section of a **ring's** tooth, loaded at its highest point of
-/// single-pair contact.
-///
-/// # The model, and where it comes from
-///
-/// Savage, Rubadeux & Coe, *Bending Strength Model for Internal Spur Gear Teeth*
-/// (NASA TM-107012 / ARL-TR-838, 1995). Its construction is the inscribed Lewis
-/// constant-strength parabola — the same one this crate already uses for an
-/// external tooth, and the paper explicitly prefers it to the straight-line
-/// tangent that earlier internal models used, for the reason
-/// [`CriticalSection::LewisParabola`] gives. So this shares the construction
-/// rather than reimplementing it: see [`ToothOutline`].
-///
-/// # Where this follows the paper, and where it does not
-///
-/// **Followed.** The paper searches *both* curves — "for the stress analysis of
-/// internal gears, both involute and trochoid geometry are used in checking for
-/// the smallest inscribed parabola in the tooth" — so a tangency on the involute
-/// flank is anticipated by the model rather than a symptom of misapplying it.
-/// Measured, a ring's lands there every time (`gear-cli matrix`, study 5), and
-/// that is the source's own case rather than this crate's departure. The load
-/// point is the highest point of single tooth loading in both.
-///
-/// **Not followed, and neither is documented as a choice anywhere else.**
-///
-/// - **The selection rule.** The paper compares the two results and takes "the
-///   smaller x coordinate", which "identifies the weaker inscribed parabola".
-///   [`root_section_with`] searches the fillet and uses the flank only when the
-///   fillet has no solution. The two agree whenever one curve has no tangency —
-///   which is every ring — and can differ on an external tooth, where the fillet
-///   usually does.
-/// - **The fillet radius.** The paper's `ρ_f` is "the minimum radius of
-///   curvature of the fillet curve"; ISO's `ρ_F` is the radius *at the critical
-///   section*. This crate reads it at the fillet **junction** when the tangency
-///   is on the flank, which is neither, and is the largest value the fillet
-///   takes: 1.4–6.3× the minimum (`gear-cli matrix`, study 7). `q_s` is inverse
-///   in it, so a ring's comes out at the floor of the `Y_S` band and two in
-///   three are clamped.
-///
-/// Two things the paper adds are handled differently here, both deliberately:
-///
-/// - **Its stress-concentration factor is an extrapolation of Dolan–Broghamer**,
-///   `K_f = H + (t_c/ρ_f)^L · (t_c/h)^M`. This crate uses ISO 6336's `Y_S`
-///   instead, for the reason [`StressConcentration`] sets out. The two are the
-///   same shape — both are functions of thickness over fillet radius and
-///   thickness over height — but they are **fitted to different definitions of
-///   the fillet radius**, which is the bullet above and is why the substitution
-///   is not as free as it looks.
-/// - **Its axial compression term is omitted**, as it is for external teeth. The
-///   radial component of the load compresses the tooth — the same sense either
-///   way round, since both teeth point away from their rim — so including it
-///   would relieve the stress by order 10 %. Leaving it out is the conservative
-///   direction and the consistent one; ISO omits it too. Do not compare a number
-///   from here to an AGMA `J` without saying so.
-///
-/// # The load point
-///
-/// The highest point of single-pair contact, one base pitch back from the far end
-/// of the path — measured from the ring's own tip, so it needs only this ring's
-/// geometry and the contact ratio, exactly as [`bending_section`] does. The one
-/// difference is the **sign**: a ring's tip is at its *smallest* roll parameter,
-/// so moving away from the tip means increasing `u` where an external gear
-/// decreases it.
-///
-/// # Helical rings
-///
-/// Rated on the **virtual spur ring** — [`crate::ring::Ring::virtual_spur`] —
-/// exactly as [`bending_section`] rates a helical external gear on its virtual
-/// spur gear, and for the same reason: `F_t` is transverse while `m_n` is normal,
-/// and that pairing is only consistent if `Y_F` is measured on the normal
-/// section. The virtual contact ratio `ε_αn = ε_α / cos²β_b` goes with it. A spur
-/// ring is that construction at `β = 0`, where the virtual ring *is* the ring.
-///
-/// # Errors
-///
-/// `None` when the load point falls past the end of the generated flank, or the
-/// tooth has no usable form.
-#[must_use]
-pub fn ring_bending_section(
-    ring: &crate::ring::Ring,
-    transverse_contact_ratio: f64,
-) -> Option<RootSection> {
-    ring_bending_section_shared(ring, transverse_contact_ratio, LoadSharing::None).map(|(s, _)| s)
-}
-
-/// The same for a ring, with the load shared as a model says.
-///
-/// A ring had no sharing variant, so a set that asked for the model got it on
-/// its rack-cut members and not on its ring — one mesh answering two ways. It
-/// is the same sweep: what a ring changes is which way the load point travels
-/// and that its flank stops at the generation limit
-/// (docs/reference.md#internal-gears), and both of those are [`LoadPoint`].
-///
-/// # Errors
-///
-/// `None` for a ring with no usable virtual spur, a non-finite contact ratio,
-/// or a load point past the end of the generated flank.
-#[must_use]
-pub fn ring_bending_section_shared(
-    ring: &crate::ring::Ring,
+pub fn bending_section_shared<T: ToothOutline>(
+    g: &T,
     transverse_contact_ratio: f64,
     model: LoadSharing,
 ) -> Option<(RootSection, f64)> {
     if !transverse_contact_ratio.is_finite() {
         return None;
     }
-    let v = ring.virtual_spur();
+    let v = g.virtual_spur();
     if !v.is_usable() {
         return None;
     }
-    // The virtual ring is a spur ring, so its transverse plane is the normal
-    // plane: `v.mt` is m_n and `v.alpha_t` is α_n.
-    let cos_bb = ring.base_helix_angle().cos();
+    // The whole cycle in the plane the tooth actually bends in. `d` counts
+    // virtual base pitches back from the far end of the path, the same
+    // coordinate `contact::load_share` takes.
+    let cos_bb = g.base_helix_angle().cos();
     let eps_n = transverse_contact_ratio / (cos_bb * cos_bb);
+    // The tip, the direction of travel and the limit are one fact read three
+    // ways; see `ToothOutline::tip_at_high_roll`.
+    let (lo, hi) = v.flank_bracket();
+    let (u_tip, sense) = if v.tip_at_high_roll() {
+        (hi, -1.0)
+    } else {
+        (lo, 1.0)
+    };
     worst_over_cycle(
         &LoadPoint {
-            base_pitch: crate::plane::base_pitch(v.mt, v.alpha_t),
-            u_tip: v.u_tip,
-            rb: v.rb,
-            sense: 1.0,
-            generated: Some(v.u_tip..=v.u_j),
+            base_pitch: crate::plane::base_pitch(
+                v.transverse_module(),
+                v.transverse_pressure_angle(),
+            ),
+            u_tip,
+            rb: v.base_radius(),
+            sense,
+            generated: v.generated_rolls(),
             v: &v,
         },
         eps_n,
@@ -1845,7 +1917,7 @@ mod tests {
                     // The rating is proportional to `Y_F · Y_S · share`, so that
                     // product is what may not rise.
                     let of = |s: &RootSection, f: f64| {
-                        s.bending_factor(StressConcentration::Iso6336).unwrap() * f
+                        s.bending_factor(RootStressModel::Iso6336).unwrap() * f
                     };
                     let (was, now) = (of(&plain, 1.0), of(&shared, fraction));
                     assert!(
@@ -2049,9 +2121,15 @@ mod tests {
     fn stress_correction_can_be_switched_off_for_comparison() {
         let g = Tooth::new(GearParams::default());
         let sec = root_section(&g, g.u_tip).unwrap();
-        assert!((sec.stress_correction(StressConcentration::None).unwrap() - 1.0).abs() < 1e-15);
         assert!(
-            (sec.bending_factor(StressConcentration::None).unwrap() - sec.form_factor).abs()
+            (sec.stress_correction(RootStressModel::FormFactorOnly)
+                .unwrap()
+                - 1.0)
+                .abs()
+                < 1e-15
+        );
+        assert!(
+            (sec.bending_factor(RootStressModel::FormFactorOnly).unwrap() - sec.form_factor).abs()
                 < 1e-15,
             "with no correction the bending factor must be the form factor alone"
         );
@@ -2068,7 +2146,7 @@ mod tests {
                 ..Default::default()
             });
             let sec = root_section_with(&g, g.u_tip, CriticalSection::TangentAngle).unwrap();
-            let ys = sec.stress_correction(StressConcentration::Iso6336).unwrap();
+            let ys = sec.stress_correction(RootStressModel::Iso6336).unwrap();
             assert!(
                 ys > last,
                 "rho={root_radius}: Y_S {ys} did not exceed {last} for a blunter fillet"
@@ -2230,29 +2308,18 @@ mod tests {
         let mut sharper = base;
         sharper.notch_parameter = 500.0;
         // Both clamp to the same q_s, so the correction stops rising.
-        let a = sharp
-            .stress_correction(StressConcentration::Iso6336)
-            .unwrap();
-        let b = sharper
-            .stress_correction(StressConcentration::Iso6336)
-            .unwrap();
+        let a = sharp.stress_correction(RootStressModel::Iso6336).unwrap();
+        let b = sharper.stress_correction(RootStressModel::Iso6336).unwrap();
         assert!((a - b).abs() < 1e-12, "clamp is not holding: {a} vs {b}");
 
         let mut blunt = base;
         blunt.notch_parameter = 0.1;
         assert!(!blunt.notch_parameter_in_range());
-        let at_floor = blunt
-            .stress_correction(StressConcentration::Iso6336)
-            .unwrap();
+        let at_floor = blunt.stress_correction(RootStressModel::Iso6336).unwrap();
         let mut at_one = base;
         at_one.notch_parameter = 1.0;
         assert!(
-            (at_floor
-                - at_one
-                    .stress_correction(StressConcentration::Iso6336)
-                    .unwrap())
-            .abs()
-                < 1e-12
+            (at_floor - at_one.stress_correction(RootStressModel::Iso6336).unwrap()).abs() < 1e-12
         );
     }
 
@@ -2330,7 +2397,7 @@ mod tests {
             });
             let sec = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola).unwrap();
             let ys = sec
-                .stress_correction(StressConcentration::Iso6336)
+                .stress_correction(RootStressModel::Iso6336)
                 .expect("the correction is defined on either side of the seam");
             (
                 sec.tangency_on_flank,
@@ -2408,10 +2475,8 @@ mod tests {
         );
 
         // The correction is defined, and so is the whole factor.
-        assert!(sec
-            .stress_correction(StressConcentration::Iso6336)
-            .is_some());
-        assert!(sec.bending_factor(StressConcentration::Iso6336).is_some());
+        assert!(sec.stress_correction(RootStressModel::Iso6336).is_some());
+        assert!(sec.bending_factor(RootStressModel::Iso6336).is_some());
         assert!(sec.notch_parameter_in_range());
     }
 
@@ -2565,7 +2630,15 @@ mod tests {
         });
         let sec = root_section(&g, g.u_tip).unwrap();
         let s = |t: f64, b: f64| {
-            bending_stress(&sec, &g, &Load::new(t, b), StressConcentration::None, None).unwrap()
+            let load = Load::new(t, b);
+            bending_stress(
+                &sec,
+                load.tangential(&g),
+                b,
+                RootStressModel::FormFactorOnly,
+                None,
+            )
+            .unwrap()
         };
 
         let base = s(1.0, 10.0);
@@ -2588,7 +2661,14 @@ mod tests {
         let (mut bend, mut cont) = (Vec::new(), Vec::new());
         for b in [1.0, 5.0, 12.5, 100.0] {
             let load = Load::new(3.0, b);
-            let sf = bending_stress(&sec, &g1, &load, StressConcentration::None, None).unwrap();
+            let sf = bending_stress(
+                &sec,
+                load.tangential(&g1),
+                b,
+                RootStressModel::FormFactorOnly,
+                None,
+            )
+            .unwrap();
             let sh = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 100_000.0).unwrap();
             bend.push(min_face_width_bending(sf, b, 200.0));
             cont.push(min_face_width_contact(sh.worst, b, 800.0));

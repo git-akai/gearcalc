@@ -242,49 +242,28 @@ pub(crate) struct Bending {
 }
 
 impl Bending {
-    /// For a rack-cut member.
+    /// **For any member that bends**, rack-cut or shaper-cut.
     ///
     /// `rim` is the thickness of the rim under its teeth, mm, or `None` where
-    /// nobody said — see [`crate::strength::RimSupport`].
-    pub(crate) fn of(
-        tooth: &crate::tooth::Tooth,
+    /// nobody said — see [`crate::strength::RimSupport`]. Which reference that
+    /// thickness is measured against is the member's own business
+    /// ([`ToothOutline::rim_support`]), as the direction its load point travels
+    /// is; this was two functions and they differed in nothing else.
+    pub(crate) fn of<T: crate::strength::ToothOutline>(
+        member: &T,
         contact_ratio: f64,
         model: crate::contact::LoadSharing,
         rim: Option<f64>,
     ) -> Option<Self> {
         let (section, share) =
-            crate::strength::bending_section_shared(tooth, contact_ratio, model)?;
-        let cos_bb = crate::metrology::base_helix_angle(tooth).cos();
+            crate::strength::bending_section_shared(member, contact_ratio, model)?;
+        let cos_bb = member.base_helix_angle().cos();
         Some(Self::new(
             section,
             share,
             model,
             contact_ratio / (cos_bb * cos_bb),
-            // An external rim is measured against the whole depth of the tooth
-            // it supports, which is this gear's own tip-to-root.
-            rim.map(|s| crate::strength::RimSupport::external(s, tooth.ra - tooth.rf)),
-        ))
-    }
-
-    /// ...and for a ring, whose flank is its shaper's and whose load point
-    /// travels the other way.
-    pub(crate) fn of_ring(
-        ring: &crate::ring::Ring,
-        contact_ratio: f64,
-        model: crate::contact::LoadSharing,
-        rim: Option<f64>,
-    ) -> Option<Self> {
-        let (section, share) =
-            crate::strength::ring_bending_section_shared(ring, contact_ratio, model)?;
-        let cos_bb = ring.base_helix_angle().cos();
-        Some(Self::new(
-            section,
-            share,
-            model,
-            contact_ratio / (cos_bb * cos_bb),
-            // A ring's is measured against the normal module instead. The
-            // clause's two references are the whole of the difference.
-            rim.map(|s| crate::strength::RimSupport::internal(s, ring.params.module)),
+            rim.map(|s| member.rim_support(s)),
         ))
     }
 

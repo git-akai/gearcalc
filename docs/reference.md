@@ -795,8 +795,17 @@ H = 0.331 − 0.436·α_n    L = 0.324 − 0.492·α_n    M = 0.261 + 0.545·α_
 ```
 
 `α_n` in radians, and **`ρ_f` is the minimum radius of curvature of the fillet
-curve**, not the radius at the section. The ISO product below is the other
-coherent set, reached by asking for the tangent section and `Y_S` together.
+curve**, not the radius at the section.
+
+**The load acts along the line of action, not across the tooth**, and both terms
+say so. Its across-tooth component bends the root — that is `Y_F` — and its
+along-tooth component pushes the tooth into its rim, relieving the tension
+fillet by order 10 %. The two are the `6h/t_c² − tan φ_C/t_c` of Savage's `J`.
+Carrying them separately is what lets the ISO set omit the second, as ISO does;
+`RootStressModel` names the pair, not just the notch factor, for that reason.
+
+The ISO product below is the other coherent set, reached by asking for the
+tangent section and `Y_S` together.
 
 | | | |
 |---|---|---|
@@ -881,17 +890,26 @@ the part rather than a second model.
 | Module the section is measured in | normal module | transverse module; the helical conversion is the caller's, as it is for a rack-cut tooth |
 | Fillet bracket | `(s_j, 0)`, root at 0 | `(min(s_root, s_j), max(...))`, root at `s_root` — which is why `fillet_root()` is a method and not an endpoint a caller picks |
 | Load point travels | **down** in roll from the tip | **up** — `MeshKind::sign`, not a second construction |
-| Flank limit | the tooth's own | also the **generation limit**: a load point past `u_j` is not on the part, so the rating is refused there |
+| Flank limit | the tooth's own | also the **generation limit** — a shaper-cut fact, not a second check: a ring's flank below it was never cut, and the limit reaches into the working flank on ordinary designs |
 | Rateable at all | a severed tooth is not | a cut that left **no fillet** is not — no fillet, no `ρ_f` |
 | Undercut | asked, and bounded by `no undercut` | **not asked** — a ring's flank is its shaper's, and undercut is not a question that can be put to it |
 | Rim factor `Y_B` | measured against the whole tooth depth `s_R/h_t` | against the normal module `s_R/m_n` — the clause's two references, one fit |
-| Rated through | its own tooth and load | the **pinion's** tooth and load, being the same tangential force at the same module |
 | Span over teeth | reported | not derived; between-pins only |
 | Own buildable range | shown | not shown — a rack's range is not a ring's |
 
-Everything else — the parabola search, the weaker-tangency rule, `ρ_f` at the
-fillet's minimum, `K_f`, the load-sharing sweep, the width law, the reversal
-rule — is one code path taking both.
+Everything else is **one code path taking both**: the parabola search, the
+weaker-tangency rule, `ρ_f` at the fillet's minimum, `K_f`, the axial term, the
+load-sharing sweep, the width law and the reversal rule. So is the entry point —
+`bending_section_shared` is generic over `ToothOutline`, where it used to be two
+near-identical functions, and `train::Bending::of` likewise. What a new kind of
+member has to supply to be rated is that trait and nothing else.
+
+**Three of the rows above are one fact.** Where the tip is on the flank bracket
+(`tip_at_high_roll`) says where the load point is counted from, which way it
+travels, and therefore which end the rating walks toward — stated once rather
+than three times, which is [find the parameter, not the
+branch](rationale.md#find-the-parameter-not-the-branch) applied to the one
+asymmetry that is real.
 
 **Minimum face width**, closed form, since `σ_F ∝ 1/b` and `σ_H ∝ 1/√b`:
 

@@ -19,7 +19,7 @@
 
 use gear_core::ring::{Cutter, Ring};
 use gear_core::strength::{
-    root_section_with, CriticalSection, RootSection, StressConcentration, ToothOutline,
+    root_section_with, CriticalSection, RootSection, RootStressModel, ToothOutline,
 };
 use gear_core::{GearParams, Tooth};
 
@@ -77,7 +77,7 @@ impl Member {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Model {
     pub section: CriticalSection,
-    pub concentration: StressConcentration,
+    pub concentration: RootStressModel,
 }
 
 impl Model {
@@ -90,9 +90,9 @@ impl Model {
             CriticalSection::LewisParabola => "parabola".to_string(),
         };
         let concentration = match self.concentration {
-            StressConcentration::None => "Y_F only",
-            StressConcentration::Iso6336 => "Y_F·Y_S",
-            StressConcentration::DolanBroghamer => "Y_F·K_f",
+            RootStressModel::FormFactorOnly => "Y_F only",
+            RootStressModel::Iso6336 => "Y_F·Y_S",
+            RootStressModel::DolanBroghamer => "Y_F·K_f",
         };
         format!("{section} · {concentration}")
     }
@@ -112,19 +112,19 @@ impl Model {
 pub const MATRIX: [Model; 4] = [
     Model {
         section: CriticalSection::TangentAngle,
-        concentration: StressConcentration::None,
+        concentration: RootStressModel::FormFactorOnly,
     },
     Model {
         section: CriticalSection::TangentAngle,
-        concentration: StressConcentration::Iso6336,
+        concentration: RootStressModel::Iso6336,
     },
     Model {
         section: CriticalSection::LewisParabola,
-        concentration: StressConcentration::None,
+        concentration: RootStressModel::FormFactorOnly,
     },
     Model {
         section: CriticalSection::LewisParabola,
-        concentration: StressConcentration::DolanBroghamer,
+        concentration: RootStressModel::DolanBroghamer,
     },
 ];
 
@@ -412,8 +412,8 @@ pub fn parting(on: Member, pop: &[GearParams]) -> Parting {
         // *sets* is the question; comparing one notch model across two sections
         // is what mixing looks like.
         let (Some(fa), Some(ft)) = (
-            para.bending_factor(StressConcentration::DolanBroghamer),
-            tan.bending_factor(StressConcentration::Iso6336),
+            para.bending_factor(RootStressModel::DolanBroghamer),
+            tan.bending_factor(RootStressModel::Iso6336),
         ) else {
             continue;
         };

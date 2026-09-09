@@ -187,7 +187,7 @@ fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f6
     use gear_core::contact::ContactPath;
     use gear_core::mesh::{Mesh, MeshKind};
     use gear_core::ring::{Cutter, Ring};
-    use gear_core::strength::{bending_section, ring_bending_section, StressConcentration};
+    use gear_core::strength::{bending_section, RootStressModel};
 
     let pinion = Tooth::new(GearParams {
         teeth: 25,
@@ -213,7 +213,7 @@ fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f6
         },
     );
     let j = |s: Option<gear_core::strength::RootSection>| {
-        s.and_then(|s| s.bending_factor(StressConcentration::Iso6336))
+        s.and_then(|s| s.bending_factor(RootStressModel::Iso6336))
             .map(|f| 1.0 / f)
     };
 
@@ -228,7 +228,7 @@ fn j_factors_at(z: u32, cutter_teeth: u32, beta: f64) -> (Option<f64>, Option<f6
     let internal = Mesh::new(&pinion, &wheel, MeshKind::Internal)
         .ok()
         .and_then(|m| ContactPath::new(&pinion, ring.ra, &m))
-        .and_then(|p| j(ring_bending_section(&ring, p.contact_ratio)));
+        .and_then(|p| j(bending_section(&ring, p.contact_ratio)));
     (external, internal)
 }
 
@@ -328,7 +328,7 @@ fn a_huge_ring_cut_by_a_huge_shaper_rates_as_a_rack_tooth() {
 #[test]
 fn a_helical_ring_is_rated_on_its_virtual_spur_section() {
     use gear_core::ring::{Cutter, Ring};
-    use gear_core::strength::{ring_bending_section, StressConcentration};
+    use gear_core::strength::{bending_section, RootStressModel};
 
     let of = |beta: f64| {
         Ring::cut_by(
@@ -343,10 +343,10 @@ fn a_helical_ring_is_rated_on_its_virtual_spur_section() {
 
     // The spur case goes through the same virtual route; that it *is* the ring
     // at zero helix is asserted on its own below.
-    let spur = ring_bending_section(&of(0.0), 1.7).unwrap();
+    let spur = bending_section(&of(0.0), 1.7).unwrap();
     let mut last = spur.form_factor;
     for beta in [5.0, 15.0, 25.0, 35.0] {
-        let sec = ring_bending_section(&of(beta), 1.7)
+        let sec = bending_section(&of(beta), 1.7)
             .unwrap_or_else(|| panic!("beta={beta}: a helical ring must still be rated"));
         assert!(
             sec.form_factor > 0.0 && sec.form_factor.is_finite(),
@@ -354,8 +354,7 @@ fn a_helical_ring_is_rated_on_its_virtual_spur_section() {
             sec.form_factor
         );
         assert!(
-            sec.stress_correction(StressConcentration::Iso6336)
-                .is_some(),
+            sec.stress_correction(RootStressModel::Iso6336).is_some(),
             "beta={beta}: the notch factor must be defined too"
         );
         // The virtual ring grows with helix (`z_n = z/cos³β`), and a bigger ring
@@ -442,7 +441,7 @@ fn the_rack_limit_holds_at_a_helix_angle() {
 #[test]
 fn a_rings_rating_is_continuous_over_its_useful_range() {
     use gear_core::ring::{Cutter, Ring};
-    use gear_core::strength::{ring_bending_section, StressConcentration};
+    use gear_core::strength::{bending_section, RootStressModel};
 
     for contact_ratio in [1.5, 1.7, 1.9] {
         let mut previous: Option<f64> = None;
@@ -454,10 +453,10 @@ fn a_rings_rating_is_continuous_over_its_useful_range() {
                 },
                 &Cutter::default(),
             );
-            let sec = ring_bending_section(&ring, contact_ratio)
+            let sec = bending_section(&ring, contact_ratio)
                 .unwrap_or_else(|| panic!("eps={contact_ratio} z={z}: no section"));
             let factor = sec
-                .bending_factor(StressConcentration::Iso6336)
+                .bending_factor(RootStressModel::Iso6336)
                 .unwrap_or_else(|| panic!("eps={contact_ratio} z={z}: no rating"));
             // The notch radius is the fillet's, whichever curve the section
             // landed on — so it stays a plausible fillet size rather than
@@ -502,7 +501,7 @@ fn a_rings_rating_is_continuous_over_its_useful_range() {
 #[test]
 fn a_generated_fillet_is_much_flatter_than_the_tool_that_cut_it() {
     use gear_core::ring::{Cutter, Ring};
-    use gear_core::strength::{bending_section, ring_bending_section};
+    use gear_core::strength::bending_section;
 
     const RHO: f64 = 0.2;
 
@@ -534,7 +533,7 @@ fn a_generated_fillet_is_much_flatter_than_the_tool_that_cut_it() {
                 tip_round: RHO,
             },
         );
-        let sec = ring_bending_section(&ring, 1.8).unwrap();
+        let sec = bending_section(&ring, 1.8).unwrap();
         let ratio = sec.fillet_curvature / RHO;
         assert!(
             (2.5..6.0).contains(&ratio),

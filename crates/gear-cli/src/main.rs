@@ -1104,7 +1104,7 @@ fn strength_report(
     use gear_core::metrology::base_helix_angle;
     use gear_core::strength::{
         bending_section, bending_stress, contact_stress, min_face_width_bending,
-        min_face_width_contact, Load, RimSupport, StressConcentration, PARALLEL_AXES,
+        min_face_width_contact, Load, RimSupport, RootStressModel, PARALLEL_AXES,
     };
 
     let lib = gear_io::default_library();
@@ -1184,8 +1184,8 @@ fn strength_report(
     // --- bending, each gear at its own highest point of single-pair contact
     println!("bending");
     println!(
-        "  {:<6} {:>8} {:>8} {:>9} {:>10} {:>10}",
-        "gear", "Y_F", "K_f", "sigma_F", "b_min fat", "b_min ult"
+        "  {:<6} {:>8} {:>8} {:>8} {:>9} {:>10} {:>10}",
+        "gear", "Y_F", "-axial", "K_f", "sigma_F", "b_min fat", "b_min ult"
     );
     let reversed = Mesh::new(&g2, &g1, MeshKind::External).ok();
     for (label, g, p) in [
@@ -1205,26 +1205,27 @@ fn strength_report(
             continue;
         };
         let load_g = load.across_mesh(&g1, g);
-        let ys = sec.stress_correction(StressConcentration::DolanBroghamer);
+        let ys = sec.stress_correction(RootStressModel::DolanBroghamer);
         // `Y_B` only where a rim was named on the command line: a rim nobody
         // described rates at 1 and is not the same claim as a thick one.
         let rim_support = rim.map(|s| RimSupport::external(s, g.ra - g.rf));
         let Some(sf) = bending_stress(
             &sec,
-            g,
-            &load_g,
-            StressConcentration::DolanBroghamer,
+            load_g.tangential(g),
+            load_g.face_width,
+            RootStressModel::DolanBroghamer,
             rim_support,
         ) else {
             println!(
-                "  {label:<6} {:>8.4} {:>8} {:>9} - stress correction undefined (tangency on the flank)",
-                sec.form_factor, "-", "-"
+                "  {label:<6} {:>8.4} {:>8.4} {:>8} - notch factor undefined",
+                sec.form_factor, sec.axial_compression, "-"
             );
             continue;
         };
         println!(
-            "  {label:<6} {:>8.4} {:>8.4} {:>7.1} MPa {:>8.3} mm {:>8.3} mm",
+            "  {label:<6} {:>8.4} {:>8.4} {:>8.4} {:>7.1} MPa {:>8.3} mm {:>8.3} mm",
             sec.form_factor,
+            sec.axial_compression,
             ys.unwrap_or(1.0),
             sf,
             min_face_width_bending(sf, B, mat.fatigue_allowable.value),
@@ -1768,7 +1769,7 @@ fn matrix_report() {
 fn loadcase_report() {
     use gear_core::contact::{ContactPath, LoadSharing};
     use gear_core::mesh::{Mesh, MeshKind};
-    use gear_core::strength::{root_section, StressConcentration};
+    use gear_core::strength::{root_section, RootStressModel};
 
     let meshes = [
         ("pinion 17 : 17", 17u32, 17u32, 0.0_f64),
@@ -1808,8 +1809,7 @@ fn loadcase_report() {
         // The bending factor is proportional to stress for a fixed torque, so
         // ratios of (factor x load fraction) are ratios of stress.
         let factor = |roll: f64| {
-            root_section(&g1, roll)
-                .and_then(|s| s.bending_factor(StressConcentration::DolanBroghamer))
+            root_section(&g1, roll).and_then(|s| s.bending_factor(RootStressModel::DolanBroghamer))
         };
 
         let Some(a) = factor(path.roll_at(path.tip())) else {

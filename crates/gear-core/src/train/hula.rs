@@ -46,7 +46,7 @@ use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::planetary::{self, Arrangement, PlanetaryShaft};
 use crate::ring::{mesh_with, Cutter, Ring};
-use crate::strength::{bending_stress, contact_stress, Load, StressConcentration, PARALLEL_AXES};
+use crate::strength::{bending_stress, contact_stress, Load, RootStressModel, PARALLEL_AXES};
 use crate::tooth::Tooth;
 use crate::train::{Optimisation, StageGear};
 use crate::{Auto, GearParams};
@@ -911,7 +911,7 @@ pub fn solve_hula_stage_with(
             stage.gears[pair.pinion].rim_thickness,
         )
         .ok_or(TrainError::NoRootSection)?;
-        let ring_bending = super::Bending::of_ring(
+        let ring_bending = super::Bending::of(
             &p.ring,
             p.path.contact_ratio,
             stage.load_sharing,
@@ -935,9 +935,9 @@ pub fn solve_hula_stage_with(
         let bending_at = |b: &super::Bending| {
             bending_stress(
                 &b.section,
-                &p.pinion,
-                &probe,
-                StressConcentration::DolanBroghamer,
+                probe.tangential(&p.pinion),
+                probe.face_width,
+                RootStressModel::DolanBroghamer,
                 b.rim,
             )
             .map(|s| s * b.share)
