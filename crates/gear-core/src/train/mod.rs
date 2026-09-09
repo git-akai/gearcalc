@@ -2703,6 +2703,94 @@ mod tests {
         assert!(checked >= 6, "only {checked} members carried the load");
     }
 
+    /// **Ask for the centre distance the tool chose and get the gears it chose.**
+    ///
+    /// A stage with the shift optimiser on and no centre distance picks both;
+    /// with a distance given it picks the shifts that reach it. Those are the
+    /// same question asked twice, so at the distance the free search *itself*
+    /// settled on the two must agree — and the second must not be worse anywhere
+    /// short of it, since a nearer distance is a shift sum the free search
+    /// passed through on its way.
+    ///
+    /// **It did not.** `auto::maximise` opened on a grid at multiples of half a
+    /// module across a fixed `±3`; pin the sum and the admissible interval in one
+    /// shift can be a tenth of that and fall between two grid points, at which
+    /// point the search reports *no admissible pair* and the stage drops to its
+    /// undercut floor. A 9/37 pair asked for the 24.42 mm it had just
+    /// recommended came back at **97.289 %** against the **97.706 %** it offered
+    /// unasked, at shifts that do not reach the distance at all. The sweep's
+    /// resolution had become a feasibility test (`docs/corrections.md`).
+    ///
+    /// The box is the members' own admissible interval now
+    /// (`auto::searchable_shift`), so the sweep spans the answer by construction.
+    #[test]
+    fn a_given_distance_gets_the_gears_the_free_search_would_choose() {
+        let lib = library();
+        for teeth in [[9_u32, 37], [17, 43], [12, 29], [23, 61]] {
+            let stage = SpurStage {
+                gears: [0, 1].map(|i| StageGear {
+                    teeth: teeth[i],
+                    ..SpurStage::default().gears[i].clone()
+                }),
+                optimisation: Optimisation {
+                    enabled: true,
+                    ..Optimisation::default()
+                },
+                ..SpurStage::default()
+            };
+            let free = solve_spur_stage(&stage, StageTorques::just(2.0), &lib)
+                .expect("the pair solves with the distance free");
+
+            let at = |a: f64| {
+                solve_spur_stage(
+                    &SpurStage {
+                        centre_distance: Auto::fixed(a),
+                        ..stage.clone()
+                    },
+                    StageTorques::just(2.0),
+                    &lib,
+                )
+                .expect("...and with it given")
+            };
+
+            // At the distance it chose: the same answer, to the search's own
+            // stopping distance in the shifts it is reading.
+            let given = at(free.centre_distance);
+            for i in 0..2 {
+                let (a, b) = (free.gears[i].profile_shift, given.gears[i].profile_shift);
+                assert!(
+                    (a - b).abs() < crate::auto::Search::SHIPPED.resolution,
+                    "{teeth:?} gear {i}: free chose {a} and {:.6} mm given chose {b}",
+                    free.centre_distance
+                );
+            }
+
+            // ...and on the way there, every distance is answered rather than
+            // refused, with an efficiency that climbs toward the free answer
+            // rather than collapsing to the floor.
+            let mut last = 0.0;
+            let steps = 12;
+            for k in 1..=steps {
+                let a = free.centre_distance
+                    - (free.centre_distance - stage.module * 0.5 * f64::from(teeth[0] + teeth[1]))
+                        * f64::from(steps - k)
+                        / f64::from(steps);
+                let here = at(a).mesh.efficiency.forward;
+                assert!(
+                    here > last - 1e-9,
+                    "{teeth:?}: {a:.4} mm gives {here}, below the {last} a tighter \
+                     distance gave — the search dropped out somewhere between"
+                );
+                last = here;
+            }
+            assert!(
+                (last - free.mesh.efficiency.forward).abs() < 1e-6,
+                "{teeth:?}: the last step reaches {last} where the free answer is {}",
+                free.mesh.efficiency.forward
+            );
+        }
+    }
+
     /// **The search is converged where its coordinates are the problem's, and
     /// not where they are not.**
     ///
@@ -4299,8 +4387,14 @@ mod tests {
                 );
                 continue;
             }
+            // **To the search's own stopping distance**, not to the bit. The
+            // claim is about the *bound* — a larger round admits less shift —
+            // and what reads it is a search that stops when its answer has
+            // settled to `auto::Search::resolution`. Asserting past that asserts
+            // where the walk happened to halt, which is not a fact about
+            // gearing.
             assert!(
-                sum <= last + 1e-9,
+                sum <= last + crate::auto::Search::SHIPPED.resolution,
                 "round {rho} bought shift: sum {sum} against {last}"
             );
             fell = fell || sum < last - 1e-6;

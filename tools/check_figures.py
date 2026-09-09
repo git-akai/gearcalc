@@ -98,17 +98,28 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _bin():
-    """Release if it is there, else debug -- the two print the same bytes.
+    """The harness, **built** -- release if that is what is there, else debug.
 
-    Measured, not assumed, and `tools/check_golden.sh` says the same thing at
-    more length. It matters because CI builds debug and a documented figure is
-    not worth a second toolchain pass to check.
+    The two print the same bytes, measured rather than assumed, and
+    `tools/check_golden.sh` says so at more length. It matters because CI builds
+    debug and a documented figure is not worth a second toolchain pass to check.
+
+    It is *built* rather than merely found, which it was not: a command added to
+    the harness was invisible here until something else forced a rebuild, so a
+    figure tagged with it read as drifted when the document was right and the
+    binary was old. That is the stale-binary fault `docs/corrections.md` records,
+    met in the second of the two instruments written to catch drift -- the first
+    was `check_golden.sh`, and the fix is the same one. Cargo is incremental, so
+    an up-to-date tree pays nothing.
     """
-    for profile in ("release", "debug"):
-        p = ROOT / "target" / profile / "gear-cli"
-        if p.exists():
-            return p
-    return ROOT / "target" / "release" / "gear-cli"
+    profile = "debug" if (ROOT / "target" / "debug" / "gear-cli").exists() and not (
+        ROOT / "target" / "release" / "gear-cli"
+    ).exists() else "release"
+    argv = ["cargo", "build", "--bin", "gear-cli"]
+    if profile == "release":
+        argv.append("--release")
+    subprocess.run(argv, cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
+    return ROOT / "target" / profile / "gear-cli"
 
 
 BIN = _bin()

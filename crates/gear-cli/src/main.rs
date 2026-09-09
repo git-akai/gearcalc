@@ -162,6 +162,19 @@ const COMMANDS: &[Command] = &[
         slow: false
     },
     Command {
+        name: "shifts",
+        args: "[z1] [z2]",
+        summary: "the shifts a pair loses least at, free and against a given centre distance (9, 37)",
+        run: |a| shifts_report(arg(a, 1, 9), arg(a, 2, 37)),
+        // **Two pairs, because the documented table has two rows** — and because
+        // the corpus had never walked the crate's one optimiser at all: no
+        // `gear-cli` command set `Optimisation::enabled`, so every answer it
+        // chooses was outside the change detector. That is the fault
+        // `docs/corrections.md` records of `back_driving_torque`, met again.
+        record: Record::Cases(&["shifts 9 37", "shifts 17 43"]),
+        slow: false
+    },
+    Command {
         name: "train",
         args: "[mixed|held]",
         summary: "a two-stage geartrain, end to end; `mixed` puts a worm stage in it, `held` back-drives that worm harder than the drive does",
@@ -1070,6 +1083,82 @@ fn train_file_report(path: Option<&str>) {
             );
         }
         (a, b) => println!("a train did not solve: {:?} / {:?}", a.err(), b.err()),
+    }
+}
+
+/// **What choosing a pair's shifts for efficiency is worth**, and what it costs.
+///
+/// The body of `docs/reference.md#efficiency-parallel-axes`'s first table, and
+/// the only command that drives `auto::shifts_for_efficiency` — so it is also
+/// what puts the crate's one search inside the golden corpus.
+///
+/// The distance sweep is the second half and is the law rather than the table: a
+/// pair told to run at the distance the free search chose must come back with
+/// the gears the free search chose. It did not, and `AUDIT.md` F52 says what
+/// that cost.
+fn shifts_report(z1: u32, z2: u32) {
+    use gear_core::params::Auto;
+    use gear_core::train::{solve_spur_stage, Optimisation, SpurStage, StageGear, StageTorques};
+
+    let lib = gear_io::default_library();
+    let stage = |on: bool, at: Option<f64>| SpurStage {
+        gears: [z1, z2].map(|teeth| StageGear {
+            teeth,
+            ..StageGear::default()
+        }),
+        centre_distance: at.map_or(Auto::automatic(0.0), Auto::fixed),
+        optimisation: Optimisation {
+            enabled: on,
+            ..Optimisation::default()
+        },
+        ..SpurStage::default()
+    };
+    let solved =
+        |on: bool, at: Option<f64>| solve_spur_stage(&stage(on, at), StageTorques::just(2.0), &lib);
+
+    println!("pair z {z1}/{z2}  module 1  alpha 20 deg  mu 0.06\n");
+    println!(
+        "{:<34} {:>9} {:>9} {:>9} {:>9} {:>10}",
+        "", "x1", "x2", "sum", "eps", "eta fwd"
+    );
+    let row = |name: &str, r: &gear_core::train::SpurResult| {
+        println!(
+            "{name:<34} {:>9.4} {:>9.4} {:>9.4} {:>9.4} {:>9.3} %",
+            r.gears[0].profile_shift,
+            r.gears[1].profile_shift,
+            r.gears[0].profile_shift + r.gears[1].profile_shift,
+            r.mesh.contact_ratios.transverse,
+            100.0 * r.mesh.efficiency.forward
+        );
+    };
+    let (Ok(floor), Ok(best)) = (solved(false, None), solved(true, None)) else {
+        eprintln!("that pair has no answer");
+        return;
+    };
+    row("least shift that clears undercut", &floor);
+    row("least loss", &best);
+    println!(
+        "\n  the trade: {:.2} points of efficiency for {:.2} of contact ratio",
+        100.0 * (best.mesh.efficiency.forward - floor.mesh.efficiency.forward),
+        floor.mesh.contact_ratios.transverse - best.mesh.contact_ratios.transverse
+    );
+
+    // **The same question asked the other way.** A given centre distance fixes
+    // the shift sum and leaves the division; at the distance the free search
+    // itself chose, the two must agree.
+    println!("\ncentre distance given, shifts chosen to reach it");
+    println!(
+        "{:<34} {:>9} {:>9} {:>9} {:>9} {:>10}",
+        "a mm", "x1", "x2", "sum", "eps", "eta fwd"
+    );
+    let free_at = best.centre_distance;
+    let tight = f64::from(z1 + z2) / 2.0 + floor.clearance;
+    for k in 0..=6 {
+        let a = tight + (free_at - tight) * f64::from(k) / 6.0;
+        match solved(true, Some(a)) {
+            Ok(r) => row(&format!("{a:.4}"), &r),
+            Err(e) => println!("{a:.4}: {e}"),
+        }
     }
 }
 

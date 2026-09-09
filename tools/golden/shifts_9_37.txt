@@ -1,0 +1,17 @@
+pair z 9/37  module 1  alpha 20 deg  mu 0.06
+
+                                          x1        x2       sum       eps    eta fwd
+least shift that clears undercut      0.4736    0.0000    0.4736    1.3280    97.561 %
+least loss                            0.8303    0.8394    1.6697    1.2525    97.706 %
+
+  the trade: 0.15 points of efficiency for 0.08 of contact ratio
+
+centre distance given, shifts chosen to reach it
+a mm                                      x1        x2       sum       eps    eta fwd
+23.0200                               0.4736    0.0000    0.4736    1.7372    96.979 %
+23.2533                               0.4736    0.0000    0.4736    1.5156    97.321 %
+23.4866                               0.4758    0.0243    0.5001    1.3269    97.567 %
+23.7199                               0.4751    0.2979    0.7730    1.3283    97.621 %
+23.9532                               0.4755    0.5840    1.0595    1.3390    97.645 %
+24.1866                               0.7238    0.6349    1.3587    1.2665    97.678 %
+24.4199                               0.8298    0.8399    1.6697    1.2527    97.706 %

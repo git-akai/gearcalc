@@ -732,6 +732,65 @@ pub fn root_radius_fits(p: &GearParams, working_depth: f64) -> bool {
         .admits(p.root_radius)
 }
 
+/// **The interval a search may choose one member's shift from**, or `None` where
+/// there is none.
+///
+/// # It is narrower than what a designer may type, and deliberately
+///
+/// [`admissible_profile_shift`] answers *could this gear exist?* — the range the
+/// generator builds without refusing, which is the range the gear card draws.
+/// A search is held to a narrower question, *could this gear be cut as
+/// specified?*, because the shifts it hands back are shifts nobody asked for:
+/// past a certain shift the cutter's tip round no longer fits the space and the
+/// generator **clamps** it, which is a fair answer to a number a designer typed
+/// and not one to a number the tool chose on their behalf
+/// ([`member_is_buildable`] says the same of undercut and a severed tip).
+///
+/// # Why it is bisected rather than derived
+///
+/// The bound is closed form — `ρ_max` is `k · min(m(h_f − x), ρ_fit)` and both
+/// terms are linear in `x` — but writing that here would be a second statement
+/// of a rule [`admissible_ranges`] already makes, and *one idea written down
+/// twice is a place two answers can differ*. So the residual is read off that
+/// one rule and a bracketed solve finds where it vanishes: `ρ_max` falls
+/// monotonically as the cutter is drawn out, so the root is unique and the
+/// bracket is the admissible interval itself.
+///
+/// `at(x)` builds this member at a trial shift, which the caller can do and this
+/// cannot — the same shape [`shifts_for_efficiency`] takes its pair in.
+#[must_use]
+pub fn searchable_shift(at: &dyn Fn(f64) -> GearParams, floor: Option<f64>) -> Option<(f64, f64)> {
+    let round_fits = |x: f64| {
+        let p = at(x);
+        let m = admissible_ranges(&p, p.dedendum).root_radius.max?;
+        Some(m - p.root_radius)
+    };
+    let base = at(0.0);
+    let bound = admissible_ranges(&base, base.dedendum).profile_shift.bound;
+    let lo = bound.min?.max(floor.unwrap_or(f64::NEG_INFINITY));
+    let hi = bound.max?;
+    if lo >= hi {
+        return None;
+    }
+    if round_fits(hi)? >= 0.0 {
+        return Some((lo, hi));
+    }
+    if round_fits(lo)? < 0.0 {
+        // The round asked for does not fit anywhere this member could be cut,
+        // which is an answer about the round rather than about the shift.
+        return None;
+    }
+    // `NaN` where the bound is unanswerable, so the bracket fails rather than
+    // reading an absence as a sign change.
+    let ceiling = brent(
+        |x| round_fits(x).unwrap_or(f64::NAN),
+        lo,
+        hi,
+        Tol::default(),
+    )?;
+    (lo < ceiling).then_some((lo, ceiling))
+}
+
 /// **Which of a fixed set of numbers a search still has to choose.**
 ///
 /// A stage hands its searcher some numbers already decided and some not, and
@@ -758,6 +817,22 @@ impl<const N: usize> Freedoms<N> {
     #[must_use]
     pub fn count(&self) -> usize {
         self.given.iter().filter(|g| g.is_none()).count()
+    }
+
+    /// The box the search sweeps, from a bound on each of the `N` numbers —
+    /// only the ones left free, in the order [`Self::place`] reads them.
+    ///
+    /// A search's opening sweep is a resolution across an interval, so the
+    /// interval has to be the one the number can take. Where it is a guess
+    /// instead, the resolution becomes a feasibility test and a narrow
+    /// admissible set falls between two grid points (`docs/corrections.md`).
+    #[must_use]
+    pub fn boxes(&self, per_number: [(f64, f64); N]) -> Vec<(f64, f64)> {
+        self.given
+            .iter()
+            .zip(per_number)
+            .filter_map(|(g, b)| g.is_none().then_some(b))
+            .collect()
     }
 
     /// The full set, with `free` read into the places left open in order.
@@ -976,8 +1051,43 @@ pub fn shifts_for_efficiency(
         let x = place(&[]);
         return loss_at(x).map(|_| x);
     }
+
+    // **The box the search sweeps is the one the shifts can actually take**, per
+    // member, from [`searchable_shift`] — which is the same rule the objective
+    // below enforces rather than a second reading of it.
+    //
+    // It used to sweep a fixed `±3` modules, which is a guess at where shifts
+    // live rather than a statement of it, and the guess is what
+    // `docs/corrections.md` records: pin the sum and the admissible interval can
+    // be narrower than the sweep's own step, at which point the search reports
+    // that no admissible pair exists because its grid fell either side of one.
+    let side = |i: usize| searchable_shift(&|x| pair([x, x])[i], floor[i]);
+    let (a, b) = (side(0)?, side(1)?);
+    // Gear 2 as it enters the *sum*, which for a ring is negated — so the two
+    // orderings are one expression rather than a branch on the mesh kind.
+    let signed = (sign * b.0, sign * b.1);
+    let signed = (signed.0.min(signed.1), signed.0.max(signed.1));
+    let overlap = |x: (f64, f64), y: (f64, f64)| -> Option<(f64, f64)> {
+        let (lo, hi) = (x.0.max(y.0), x.1.min(y.1));
+        (lo < hi).then_some((lo, hi))
+    };
+    let box_: Vec<(f64, f64)> = match (pinned.shift[0], pinned.shift[1], pinned.sum) {
+        // One shift left free: its own interval, and nothing else bears on it.
+        (Some(_), None, None) => vec![b],
+        (None, Some(_), None) => vec![a],
+        // The sum is pinned, so gear 2 follows gear 1 — and gear 2's interval
+        // is a second bound on gear 1 rather than an axis of its own.
+        (None, None, Some(s)) => vec![overlap(a, (s - signed.1, s - signed.0))?],
+        // Both free, in the pair's own coordinates: the sum, and the difference
+        // about it. The rectangle that contains the rotated interval, since a
+        // point outside the admissible set is refused by the objective anyway.
+        _ => vec![
+            (a.0 + signed.0, a.1 + signed.1),
+            (a.0 - signed.1, a.1 - signed.0),
+        ],
+    };
     search
-        .maximise(pinned.freedoms(), &|free| loss_at(place(free)))
+        .maximise(&box_, &|free| loss_at(place(free)))
         .map(|free| place(&free))
 }
 
@@ -996,8 +1106,11 @@ pub fn shifts_for_efficiency(
 /// epicyclic has two meshes whose shifts a shared centre distance ties
 /// together, so only the search is common.
 #[must_use]
-pub fn maximise(dof: usize, objective: &dyn Fn(&[f64]) -> Option<f64>) -> Option<Vec<f64>> {
-    Search::SHIPPED.maximise(dof, objective)
+pub fn maximise(
+    box_: &[(f64, f64)],
+    objective: &dyn Fn(&[f64]) -> Option<f64>,
+) -> Option<Vec<f64>> {
+    Search::SHIPPED.maximise(box_, objective)
 }
 
 /// **How hard [`maximise`] looks**, as a value rather than as six constants
@@ -1038,9 +1151,14 @@ pub fn maximise(dof: usize, objective: &dyn Fn(&[f64]) -> Option<f64>) -> Option
 /// be done about it.
 #[derive(Clone, Copy, Debug)]
 pub struct Search {
-    /// Shifts of interest span a couple of modules either way.
-    pub span: f64,
-    /// Steps per side of the opening sweep.
+    /// Steps across each axis of the opening sweep, so `scan + 1` points a side.
+    ///
+    /// **Across the caller's own box**, not across a guess at one. It used to
+    /// sweep a fixed `±3` modules at this many steps a side, which put its grid
+    /// at multiples of half a module — and where a caller's admissible interval
+    /// is narrower than that and falls between two of them, the sweep collected
+    /// *nothing* and the search reported that no admissible point exists. A
+    /// resolution had become a feasibility test (`docs/corrections.md`).
     pub scan: i32,
     /// Below this the answer has stopped moving in any units a tooth is cut in
     /// — a thousandth of a module is finer than the tolerance any of this is
@@ -1053,6 +1171,18 @@ pub struct Search {
     pub budget: usize,
     /// How many of the sweep's best points are walked from.
     pub starts: usize,
+    /// **The interval a caller uses when it cannot say what its own is.**
+    ///
+    /// A guess at where shifts live, and named as one. Every caller that *can*
+    /// state its box does ([`searchable_shift`]), and the one that cannot is the
+    /// epicyclic set: two of its three shifts are searched, one of them the
+    /// ring's, and **this crate has no admissible range for a ring's shift** —
+    /// its flank is its shaper's, so the rack algebra
+    /// [`admissible_profile_shift`] is written in says nothing about it, and
+    /// applying it anyway caps a ring at about 1.2 modules where the sets here
+    /// want 1.9 to 2.4. `AUDIT.md` F54 carries that gap; until it is closed a
+    /// set sweeps this and pays for it (F50).
+    pub fallback_box: (f64, f64),
     /// The walk's first step, as a fraction of the sweep's own spacing.
     ///
     /// **The sweep chose the region; the walk only refines inside it.** A first
@@ -1065,8 +1195,8 @@ pub struct Search {
 impl Search {
     /// What every caller in the crate uses.
     pub const SHIPPED: Self = Self {
-        span: 3.0,
-        scan: 6,
+        scan: 12,
+        fallback_box: (-3.0, 3.0),
         resolution: 1e-3,
         budget: 220,
         starts: 2,
@@ -1096,17 +1226,18 @@ impl Search {
     #[allow(clippy::too_many_lines)]
     pub fn maximise(
         &self,
-        dof: usize,
+        box_: &[(f64, f64)],
         objective: &dyn Fn(&[f64]) -> Option<f64>,
     ) -> Option<Vec<f64>> {
         let Self {
-            span,
             scan,
             resolution,
             budget,
             starts: start_count,
             first_step,
+            fallback_box: _,
         } = *self;
+        let dof = box_.len();
 
         // **Every direction, not one axis at a time.** These surfaces have flat
         // ridges and their optima sit against constraints, and at such a corner no
@@ -1137,11 +1268,20 @@ impl Search {
         // ridge from the highest one. Walking from several of its best points and
         // keeping the best result is what makes the answer the surface's rather
         // than the starting point's.
-        let spacing = span / f64::from(scan);
+        // **The box is the caller's**, so the sweep's step is a fraction of the
+        // interval a number can actually take rather than of a guess at one. The
+        // smallest interval decides the walk's own scale, since a step that
+        // crosses a narrow axis in one stride is not a refinement of anything.
+        let step_on = |axis: usize| (box_[axis].1 - box_[axis].0) / f64::from(scan);
+        let spacing = (0..dof).map(step_on).fold(f64::INFINITY, f64::min);
         let mut scanned: Vec<(Vec<f64>, f64)> = Vec::new();
-        let mut corner = vec![-scan; dof];
+        let mut corner = vec![0i32; dof];
         loop {
-            let at: Vec<f64> = corner.iter().map(|c| f64::from(*c) * spacing).collect();
+            let at: Vec<f64> = corner
+                .iter()
+                .enumerate()
+                .map(|(axis, c)| box_[axis].0 + f64::from(*c) * step_on(axis))
+                .collect();
             if let Some(value) = objective(&at) {
                 scanned.push((at, value));
             }
@@ -1151,7 +1291,7 @@ impl Search {
                 if corner[axis] <= scan {
                     break;
                 }
-                corner[axis] = -scan;
+                corner[axis] = 0;
                 axis += 1;
             }
             if axis == dof {

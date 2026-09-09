@@ -381,22 +381,38 @@ above its undercut floor.** The loss is an integral along the *whole* path, so a
 longer path is a dearer one; positive shift shortens it, the contact ratio falls
 toward unity, and the loss falls with it.
 
+<!-- figures: gear-cli shifts 9 37 -->
+<!-- figures: gear-cli shifts 17 43 -->
+
 | pair | least loss | least shift that clears undercut |
 |---|---|---|
-| 9/37 | 97.62 % at `Σx = +1.20`, ε 1.36 | 96.83 % at `Σx = −0.65`, ε 1.65 |
-| 17/43 | 98.47 % at `Σx = +1.25`, ε 1.48 | 96.87 % at `Σx = −1.20`, ε 3.04 |
+| 9/37 | **97.706 %** at `Σx = 1.6697`, ε 1.2525 | 97.561 % at `Σx = 0.4736`, ε 1.3280 |
+| 17/43 | **98.488 %** at `Σx = 1.2566`, ε 1.4626 | 98.345 % at `Σx = 0.0057`, ε 1.5993 |
 
-The optimum is **interior** — stepping either shift further makes it worse — so
-nothing holds it there but the loss turning over. This matters because the
-automatic shift this crate has always offered is the *undercut* one, the least
-that clears, and that is a **floor rather than an answer**: on 17/43 it gives up
-1.6 points of mesh efficiency. A pinion small enough to need shift to exist does
-not change the direction, only where the shift goes — at 9 teeth the floor pins
-`x₁` at +0.50 and the optimum puts the rest on its wheel.
+**Where the optimum sits is the pair's own answer, not a rule.** On 17/43 it is
+*interior* — every neighbouring shift, in either member or both, is worse and
+buildable, so nothing holds it there but the loss turning over. On 9/37 it is
+**against a constraint**: every direction that would improve it describes a tooth
+that cannot be cut, and the search stops where the geometry runs out rather than
+where the derivative vanishes. That difference is why choosing the shifts is a
+search and not a solve, and [rationale.md](rationale.md#and-the-one-thing-in-the-crate-that-is-none-of-the-above)
+argues it at length.
 
-What it buys the efficiency with is contact ratio, 3.04 down to 1.48, and that is
-a trade a designer may not want: fewer teeth sharing the load, and a noisier pair.
-The tool reports both and decides neither.
+This matters because the automatic shift this crate has always offered is the
+*undercut* one, the least that clears, and that is a **floor rather than an
+answer**. A pinion small enough to need shift to exist does not change the
+direction, only where the shift goes — at 9 teeth the floor pins `x₁` at +0.47
+and the optimum puts a comparable amount on its wheel.
+
+What it buys the efficiency with is contact ratio, and that is a trade a designer
+may not want: fewer teeth sharing the load, and a noisier pair. The tool reports
+both and decides neither.
+
+**The same question, asked with the centre distance given**, must give the same
+answer at the distance the free search chose — it fixes the shift *sum* and
+leaves only the division, which is the search's own second coordinate.
+`gear-cli shifts` prints that sweep beside the table, and
+`a_given_distance_gets_the_gears_the_free_search_would_choose` holds it.
 
 **The division of a pair's shift is free, and the loss claims it.** Two shifts
 reach the operating pressure angle only through their signed *sum*, so a centre

@@ -583,8 +583,15 @@ impl PlanetaryStage {
         if freedoms.count() == 0 {
             return plain;
         }
+        // **This set cannot say where its own shifts live**, so it sweeps the
+        // fallback interval and `auto::Search::fallback_box` says why: two of
+        // the three shifts are searched, one of them the ring's, and there is no
+        // admissible range for a ring's shift to give (`AUDIT.md` F54). The pair
+        // search states its box and is converged; this one does not and is not
+        // (F50), and those are the same sentence.
+        let box_ = freedoms.boxes([search.fallback_box; 3]);
         search
-            .maximise(freedoms.count(), &|free| eta0(freedoms.place(free)))
+            .maximise(&box_, &|free| eta0(freedoms.place(free)))
             .map(|free| freedoms.place(&free))
             .unwrap_or(plain)
     }

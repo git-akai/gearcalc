@@ -112,6 +112,7 @@ one list rather than to correct the second one.
 cargo run --bin gear-cli -- show 17 0.2            # one gear's derived geometry
 cargo run --bin gear-cli -- materials              # the library, with each value's basis
 cargo run --bin gear-cli -- strength 17 43 2.0     # a worked mesh, end to end
+cargo run --bin gear-cli -- shifts 9 37            # the shifts a pair loses least at
 cargo run --bin gear-cli -- train                  # a two-stage train
 cargo run --bin gear-cli -- train mixed            # ...with a worm stage in it
 cargo run --bin gear-cli -- train held             # ...that worm holding more than it drives

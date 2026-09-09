@@ -61,9 +61,12 @@ Q5 below, which settled the one question pass 8 had raised and not resolved.
 F42, F43, F44, F45, F46 and F49 closed — **all six bugs**, and F47, F48 recorded
 open. The half pass 8 missed is that it swept the *reported* torques and not the
 *ratings* built from them.
-**Phase 4 — the optimiser.** In progress. Step 2 measured: F52 and F53 found, and
-the closed form's question answered — the loss is *not* monotone in the sum, for
-a reason that names the repair rather than blocking it. Step 1 done: the
+**Phase 4 — the optimiser.** In progress. Step 2's first item is done — the search
+sweeps the box the shifts can take rather than a guess at one — and it closed F52,
+F53, F56 and F57 and half of F19. What it could **not** reach is an epicyclic set,
+because there is no admissible range for a ring's shift to give it (F54), and
+that is what blocks F50. Step 2 measured: the loss is *not* monotone in the sum,
+for a reason that names the repair rather than blocking it. Step 1 done: the
 convergence claim is
 now a value something can raise and a gate that raises it, and **the claim was
 half false** — a pair's search is converged to 4.1e-7, an epicyclic set's is not
@@ -90,7 +93,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 553 tests** (was 531). **Golden corpus: 23 cases** (was 22).
+**Suite: 554 tests** (was 531). **Golden corpus: 25 cases** (was 22).
 
 ---
 
@@ -176,8 +179,12 @@ existed. `F` numbers are stable; nothing is renumbered.
 |---|---|---|---|---|
 | F1 | The crate has one optimiser and the solve inventory omits it | gap | 1, 4 | **half closed** — inventory names it; the closed form is Phase 4 |
 | F51 | The hula stage's shift search cannot be asked for an effort, so it is the one search with no convergence gate | gap | 4 | open — see Phase 4 |
-| F52 | A given centre distance drops the optimiser onto the undercut floor — the tool's own recommended distance, typed back, costs 0.42 points | gap | 4 | open — measured, see Phase 4 |
-| F53 | The division objective is bimodal at the addendum cap and the search takes the lower peak | gap | 4 | open — measured, see Phase 4 |
+| F52 | A given centre distance drops the optimiser onto the undercut floor — the tool's own recommended distance, typed back, costs 0.42 points | gap | 4 | **closed** — and logged in `corrections.md` |
+| F53 | The division objective is bimodal at the addendum cap and the search takes the lower peak | gap | 4 | **closed** — " |
+| F54 | There is no admissible range for a **ring's** shift, so a set's search cannot be given its box | gap | 4 | open — it is what blocks F50 |
+| F55 | A centre distance no admissible shifts can reach is answered rather than refused | gap | 4 | open |
+| F56 | No CLI command drove the optimiser, so its answers were outside the corpus | gap | 4 | **closed** — `gear-cli shifts`, which also closes F19's first row |
+| F57 | `check_figures.py` had `check_golden.sh`'s stale-binary fault | drift | 4 | **closed** — and logged in `corrections.md` |
 | F2 | The worm stage is outside the shared member vocabulary | gap | 3 | **closed** — option B; a crossed member is a `GearResult`, a worm's is not and says why |
 | F3 | `GearResult` assembled three times, one field by two formulas | gap | 3 | **closed** — one `GearResult::of`, and the shared rule is `StageTorques::referred_like` |
 | F4 | `StageGear` — a shared input type — lives in `train/spur.rs` | drift | 3 | **closed** — moved, with its `Default`, `AddendumAsked` and serde helpers; `spur.rs` 1017 → 730 lines |
@@ -195,7 +202,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F16 | One stage input touches eleven files | holds | 6 | open |
 | F17 | 1.49 MB wasm carrying a simulator no browser path reaches | drift | 6 | open |
 | F18 | `CLAUDE.md` is empty | gap | 0 | **closed** |
-| F19 | Five documented tables have no command that reproduces them | gap | 4 | open — moved to Phase 4, see below |
+| F19 | Five documented tables have no command that reproduces them | gap | 4 | **part closed** — `:360` regenerates from `gear-cli shifts`; four remain |
 | F20 | `state.md` derived a figure by hand from rounded output, and it was wrong | drift | 0 | **closed** |
 | F21 | The figure checker cannot see figures in prose, only in tables | gap | 5 | open |
 | F22 | The tense rule as written forbade 127 sentences it was not aimed at | drift | 1 | **closed** — the rule was narrowed, not the prose |
@@ -801,21 +808,55 @@ crate already computes where they actually live, in closed form, in
 `admissible_ranges` — the same bound the gear card draws and the same one F28
 replaced a constant with.
 
+#### Done: the box, and what it reached
+
+**A pair's search now sweeps the interval its shifts can take.**
+`auto::searchable_shift` states that interval once — the admissible range, the
+caller's floor, and the shift past which the root round asked for no longer
+fits, the last **bisected off `admissible_ranges` rather than re-derived beside
+it**, since one idea written twice is a place two answers can differ. `Search`
+lost its `span` and its `scan` became steps across the caller's box.
+
+| | before | after |
+|---|---|---|
+| 9/37 at the distance it chose (24.42 mm) | 97.289 %, shifts that do not reach it | **97.706 %**, the free answer to 1e-6 |
+| 9/37 at 24.2 mm | 97.627 % | **97.680 %** |
+| 9/37 free, bimodal division at 24.0 mm | 97.647 % | **97.648 %**, the higher peak |
+| pair convergence, worst of 14 | 4.1e-7 | **4.0e-7** |
+| the epicyclic set, the hula stage | — | **unchanged to the bit** |
+
+The one regression is 1.4e-5 on 9/37 at 23.5 mm, a grid artifact, against gains
+three orders larger; and a handful of pairs move by 1e-9 to 2e-9, which is the
+last step of a different grid. A 9/9 pair *looks* worse by 8.0e-5 and is not:
+the old answer was the fallback and its contact ratio of **1.19718** is below the
+1.2 the stage asked for, so it was never an admissible answer at all.
+
+**F54 is what stopped it reaching a set.** Two of a set's three shifts are
+searched and one of them is the ring's, and this crate has no admissible range
+for a ring's shift: `admissible_profile_shift` is rack algebra, and applying it
+to a ring caps it at about 1.2 modules where the sets measured here want 1.9 to
+2.4 — so the box would exclude the answer. Measured: doing it anyway costs every
+set between 1e-5 and 4.5e-4 of `η₀`. The set and the hula stage sweep
+`Search::fallback_box` and it says so.
+
+#### Still to do
+
 So step 2's work is:
 
-1. **Give `maximise` its box.** One `Bound` per axis, supplied by the caller from
-   `admissible_profile_shift` and the pinned sum, rather than `span`. The opening
-   scan then spans the admissible set by construction and cannot miss it, and
-   `span` — a tuned number — goes.
-2. **Split the box at the regime boundaries.** The addendum cap's onset is the
+1. ~~Give `maximise` its box.~~ **Done for a pair; F54 blocks the set.**
+2. **Give a ring an admissible shift range (F54).** It is what a set's box needs
+   and the crate does not have it. A ring's flank is its shaper's, so the bound
+   is the shaper's reach rather than a rack's thickness and depth, and `ring.rs`
+   is where it belongs. **This is the first thing to do**: F50 waits on it.
+3. **Split the box at the regime boundaries.** The addendum cap's onset is the
    shift at which the tip reaches its minimum width, and
    `addendum_for_tip_width` is already the closed-form solve for it. Cut the
    division's interval there and each piece is smooth.
-3. **Then the closed form applies, piecewise.** On a smooth piece the division's
+4. **Then the closed form applies, piecewise.** On a smooth piece the division's
    stationary condition is `contact::split_residual`, already derived and already
    bracketed by `efficient_split`. Solve each piece and take the best. **The
    division stops being searched at all.**
-4. **Ask the sum the same question.** With the division closed-form at every sum,
+5. **Ask the sum the same question.** With the division closed-form at every sum,
    the sum is one dimension against the active bound — which is what step 2 set
    out to establish, now with the reason the first attempt would have failed.
 

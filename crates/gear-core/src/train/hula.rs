@@ -630,11 +630,15 @@ pub fn solve_hula_stage_with(
                 if pinned[index].is_some() {
                     continue;
                 }
-                if let Some(free) = crate::auto::maximise(1, &|free| {
-                    let mut trial = next;
-                    trial[index] = free[0];
-                    eta_one(trial, held, index)
-                }) {
+                // The fallback interval, and `auto::Search::fallback_box` says
+                // what it would take to state a real one here.
+                if let Some(free) =
+                    crate::auto::maximise(&[crate::auto::Search::SHIPPED.fallback_box], &|free| {
+                        let mut trial = next;
+                        trial[index] = free[0];
+                        eta_one(trial, held, index)
+                    })
+                {
                     next[index] = free[0];
                 }
             }
