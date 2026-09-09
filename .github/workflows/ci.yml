@@ -66,6 +66,27 @@ jobs:
       - name: Typecheck the front end
         run: nix develop --command bash -c 'cd web && npm ci && npm run check'
 
+      # Everything the harness prints, and every figure the documents quote.
+      #
+      # The suite asserts properties, which means it can only notice a number
+      # some test names. `docs/corrections.md` records three documented tables
+      # found stale in one session and a figure misattributed to the change in
+      # hand — both found by running the old code and reading *all* of its
+      # output, which is what these two do mechanically.
+      #
+      # One release build serves both, and the corpus is run **whole** — about a
+      # minute, of which the figure check would have paid for two commands
+      # anyway. `--fast` exists for a working tree, not for here: a partial check
+      # that reads as a complete one is the failure this project keeps recording.
+      - name: The harness prints what it printed, and the documents quote it
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            cargo build --release --bin gear-cli
+            tools/check_golden.sh
+            tools/check_figures.py
+          '
+
       # Read an exported DXF back with ezdxf. The Rust tests can only show the
       # writer agrees with itself; this shows an unrelated parser gets the same
       # gear out.

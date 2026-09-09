@@ -1,0 +1,5 @@
+100 cases
+  worst penetration        0.000000e0 mm   
+  worst deviation          5.710682e-4 mm   z=3 x=+0.0 a=14.5 b=20 rho=0
+  worst fillet envelope    1.489205e-6 mm
+  worst sdf vs polyline    5.384400e-7 mm

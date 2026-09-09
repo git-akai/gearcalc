@@ -1,0 +1,27 @@
+worm   z 1/40  module 1  alpha_n 20.0 deg  shaft angle 90.0 deg
+       ratio 40.0000:1   centre distance 23.7073 mm
+
+geometry
+  lead angle          worm   8.2132 deg    wheel  81.7868 deg
+  helix angle         worm  81.7868 deg    wheel   8.2132 deg
+  pitch diameter      worm   7.0000 mm     wheel  40.4145 mm
+  lead 3.1741 mm   axial module 1.01036 mm
+  sliding at the pitch point   1.0104 x the worm's pitch line speed
+
+efficiency          worm driving   wheel driving
+  mu 0.00           100.000 %      100.000 %
+  mu 0.02            86.882 %       84.993 %
+  mu 0.04            76.751 %       70.078 %
+  mu 0.06            68.691 %       55.254 %
+  mu 0.10            56.677 %       25.874 %
+  self-locks at mu >= 0.1356   (cos alpha_n tan gamma)
+
+contact   4340 Hardened Steel on Brass C360,  E* 70811 MPa
+  worm torque 2.000 Nm  ->  wheel torque 54.953 Nm at mu 0.06
+  relative curvature   along 0.081615 /mm   across 0.173242 /mm
+  patch  1.6328 x 0.9898 mm   (rated on the wheel's torque)
+  peak pressure               3487.4 MPa
+  sliding speed at 3000 rpm   1111.0 mm/s
+  bending                     not reported - see docs/reference.md#crossed-axes
+  flank type   ZI (involute helicoid). A ZN worm's contact stress is
+                        1-15 % lower, rising with lead angle - see docs/reference.md#crossed-axes

@@ -1688,13 +1688,25 @@ fn matrix_report() {
             d.on_flank,
             pct(d.on_flank)
         );
+        // **The spread is printed rather than left to be subtracted.**
+        // `docs/state.md` quotes it as evidence for which bending model is the
+        // default, and quoted it by taking the difference of the two ends by
+        // hand — so it was a figure this harness did not print, in a table this
+        // harness is named as the source of. A number a document derives from
+        // output is a number that drifts on its own schedule.
         println!(
-            "  Y_F   parabola/tangent       {:.3} .. {:.3}   mean {:.3}",
-            d.form[0], d.form[1], d.form[2]
+            "  Y_F   parabola/tangent       {:.3} .. {:.3}   mean {:.3}   spread {:.3}",
+            d.form[0],
+            d.form[1],
+            d.form[2],
+            d.form[1] - d.form[0]
         );
         println!(
-            "  Y_F·K_f / Y_F·Y_S            {:.3} .. {:.3}   mean {:.3}",
-            d.factor[0], d.factor[1], d.factor[2]
+            "  Y_F·K_f / Y_F·Y_S            {:.3} .. {:.3}   mean {:.3}   spread {:.3}",
+            d.factor[0],
+            d.factor[1],
+            d.factor[2],
+            d.factor[1] - d.factor[0]
         );
         println!(
             "  mean q_s                     {:.3} parabola, {:.3} tangent",

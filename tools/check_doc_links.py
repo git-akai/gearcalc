@@ -47,6 +47,10 @@ SOURCES = (
     + sorted((ROOT / "web/src").glob("*.svelte"))
     + sorted(DOCS.glob("*.md"))
     + [ROOT / "README.md"]
+    # The two root-level working documents. `CLAUDE.md` is a map of the crate and
+    # points into all four documents; a map with a dead pointer is worse than no
+    # map, since it is trusted. `AUDIT.md` goes when the audit does.
+    + [p for p in (ROOT / "CLAUDE.md", ROOT / "AUDIT.md") if p.exists()]
 )
 
 # `docs/rationale.md#one-hob-one-setting`, in prose or in a doc comment.

@@ -1,0 +1,22 @@
+train  in 3000 rpm / 2.000 Nm peak   ->   out 497.4 rpm / 11.626 Nm peak
+       operating 2.000 Nm (100.0 % of peak)   back-driving 0.000 Nm at the output
+       total ratio 6.0317:1   total efficiency 96.375 % forward / 96.375 % backward
+       backlash at the output shaft  0.07280 deg  (min -0.00000, max 0.14599)
+       backlash at the input shaft   0.43912 deg  (min -0.00000, max 0.88059)
+
+stage 1  spur  z 17/43  beta 0 deg  ratio 2.5294  a_w 30.0257 mm  coprime
+  contact ratio  transverse 1.5993   overlap 0.0000   total 1.5993
+  efficiency 98.345 % forward / 98.345 % backward
+  contact at the pitch point  sigma_H 2097.6 / 2097.6 MPa peak/cyclic   rho 1.733 mm
+  gear          x     b mm   T fwd Nm   T bwd Nm   sigma_F peak/cyclic   sigma_H peak/cyclic       rpm   cycles bend/contact
+  1        0.0057    0.895     2.0000          -     750.0 /    750.0    2308.6 /   2308.6    3000.0   1.440e8 /  1.440e8
+  2        0.0000    0.895     5.0588          -     635.0 /    635.0    2097.6 /   2097.6    1186.0   5.693e7 /  5.693e7
+
+stage 2  spur  z 13/31  beta 15 deg  ratio 2.3846  a_w 22.9511 mm  coprime
+  contact ratio  transverse 1.4144   overlap 0.2228   total 1.6372   <- no full axial overlap
+  efficiency 97.996 % forward / 97.996 % backward
+  contact at the pitch point  sigma_H 2297.6 / 2297.6 MPa peak/cyclic   rho 1.407 mm
+  gear          x     b mm   T fwd Nm   T bwd Nm   sigma_F peak/cyclic   sigma_H peak/cyclic       rpm   cycles bend/contact
+  1        0.1586    2.704     4.9751          -     750.0 /    750.0    2618.4 /   2618.4    1186.0   5.693e7 /  5.693e7
+  2        0.0000    2.704    11.8637          -     719.0 /    719.0    2297.6 /   2297.6     497.4   2.387e7 /  2.387e7
+  note: overlap ratio 0.223: below 1, helical in form but loaded like a spur gear

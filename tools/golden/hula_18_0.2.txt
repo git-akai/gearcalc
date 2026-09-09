@@ -1,0 +1,21 @@
+hula  z 19/18/17/18  module 1/1  alpha 20 deg  clearance 0.2 mm
+  ratio 324 / 1 = +324.0000   crank offset 0.739688 mm (running 0.759688)   held open by mesh 1
+  speeds  crank 1000.0  wobble -55.556  output +3.0864 rpm
+  efficiency 30.194 % forward, 0.000 % back-driven  (self-locking)   (the two meshes alone, crank held: 0.9928)
+  backlash at the output 0.410575 deg (min 0.000000, max 0.827909)   at the crank 133.0262 deg
+
+  mesh 1  ring z19 x+0.4375  pinion z18 x+0.0000   alpha_w 50.566 deg   shaper z14
+    far-side gap 0.2772 mm (as cut 0.2972)   contact ratio 0.9982
+    backlash 0.21115 / 0.20004 deg   interference: trochoid false  involute false  tip false (+0.0000 deg)
+    sigma_H 605.5 MPa at the pitch point   rho 7.4959 mm
+    z19   T   193.6575 Nm  b  10.000 mm  sigma_F        —  sigma_H  1272.3 MPa
+    ! z19: flank and fillet do not meet: cutter does not reach this ring's flank; profile not generated
+    z18   T   183.4650 Nm  b  10.000 mm  sigma_F   6423.4  sigma_H  3091.1 MPa
+
+  mesh 2  pinion z17 x+0.0000  ring z18 x+0.4375   alpha_w 50.566 deg   shaper z13
+    far-side gap 0.2772 mm (as cut 0.2972)   contact ratio 0.9963
+    backlash 0.22357 / 0.21115 deg   interference: trochoid false  involute false  tip false (+0.0101 deg)
+    sigma_H 661.0 MPa at the pitch point   rho 6.2406 mm
+    z17   T   184.7876 Nm  b  10.000 mm  sigma_F   6916.1  sigma_H  3498.5 MPa
+    z18   T   195.6575 Nm  b  10.000 mm  sigma_F        —  sigma_H  1364.1 MPa
+    ! z18: flank and fillet do not meet: cutter does not reach this ring's flank; profile not generated

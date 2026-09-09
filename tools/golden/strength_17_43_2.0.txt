@@ -1,0 +1,25 @@
+mesh   z 17/43  module 1  a_w 30.0000 mm
+       operating pressure angle 20.000 deg  contact ratio 1.6211
+load   2 Nm on gear 1  ->  F_n 250.4 N along the line of action
+       F_t 235.3 N at the reference circle,  face width 10 mm
+material  4340 Hardened Steel  [contains estimates - see `gear-cli materials`]
+       E 190000 MPa   nu 0.29   ultimate 1365.0 MPa   fatigue 750.0 MPa
+
+bending
+  gear        Y_F   -axial      K_f   sigma_F  b_min fat  b_min ult
+  1        1.7200   0.1746   1.8369    66.8 MPa    0.891 mm    0.489 mm
+  2        1.3955   0.1714   1.9444    56.0 MPa    0.747 mm    0.410 mm
+
+contact   E* 103723 MPa (like on like)
+  at the pitch point          629.9 MPa
+  gear 1 single-pair          692.7 MPa   -> rated at   692.7 MPa
+  gear 2 single-pair          607.2 MPa   -> rated at   629.9 MPa
+  relative radius             1.723 mm
+  b_min against fatigue       8.529 mm
+  b_min against ultimate      2.575 mm
+
+efficiency (equal in both directions for a parallel-axis mesh)
+  mu 0.02   99.580 %
+  mu 0.04   99.160 %
+  mu 0.06   98.741 %
+  mu 0.10   97.901 %

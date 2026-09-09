@@ -1,0 +1,11 @@
+module 1  z 17  alpha 20  x +0.2  beta 0  k 1
+  pitch radius       8.500000
+  base radius        7.987387
+  tip radius         9.700000
+  root radius        7.450000
+  tooth thick.       1.716384  (transverse, at pitch)
+  fillet radius      0.380000
+  L                  0.568222  (no undercut)
+  junction r         8.007573
+  severed        false       
+  profile points         6614

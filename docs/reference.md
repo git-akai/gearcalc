@@ -149,6 +149,7 @@ On an eccentric gear the root is not a circle and is subdivided like a flank.
 Every bound is closed form, and each sits exactly where the generator's own
 guards begin to clamp.
 
+<!-- figures-exempt: input bounds are a specification of what the generator accepts, held in `params::guard`, not a figure any command prints -->
 | Input | Bound | From |
 |---|---|---|
 | Normal module | `m > 0` | every radius collapses at zero |
@@ -1411,6 +1412,7 @@ two multiply — 99.15 % together on the shipped counts. The *stage's* comes fro
 the three-shaft power flow ([Planetary sets](#planetary-sets)) at
 `i₀ = z₂z₄/(z₁z₃)`, and it is nowhere near the first, because power circulates:
 
+<!-- figures-by-test: the_documented_tables_are_the_ones_this_code_prints -->
 | reduction | meshes, crank held | the stage |
 |---|---|---|
 | 144 | 98.80 % | 36.8 % |
@@ -1504,6 +1506,7 @@ difference `d` — the same ratio, the same pitch diameters, the same crank offs
 reached with `d` times the teeth at a `d`th of the module. At 324:1, with the
 addendum, the shaper and each mesh's shift division free (`gear-cli hulaband`):
 
+<!-- figures: gear-cli hulaband 18 -->
 | d | z | module | meshes | the stage | α_w | backlash out |
 |---|---|---|---|---|---|---|
 | 1 | 18 | 1.000 | 99.350 % | **32.3 %** | 45.1° | 0.378° |
@@ -1587,6 +1590,7 @@ above equality the enlarged mesh binds instead and drags the offset up, pushing
 the *other* mesh's angle out by rather more than the first one gained. At
 `z = 18`, one tooth of difference, `h_a = 0.8` and 0.3 mm of gap:
 
+<!-- figures-by-test: the_documented_tables_are_the_ones_this_code_prints -->
 | m₁/m₂ | 0.80 | 0.90 | **1.00** | 1.10 | 1.30 |
 |---|---|---|---|---|---|
 | offset, mm | 0.807 | 0.807 | **0.807** | 0.879 | 1.022 |

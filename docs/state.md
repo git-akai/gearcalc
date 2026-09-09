@@ -40,8 +40,20 @@ tools/check_bindings.sh           # the generated TypeScript matches the Rust
 tools/check_bindings.sh --write   # ...or regenerate it
 tools/check_doc_links.py          # every pointer into the documents resolves, from code and from each other
 tools/check_strings.py            # every ui message is used, and every use has a message
+tools/check_golden.sh             # every number the harness prints, against what it printed before
+tools/check_golden.sh --write     # ...or accept what it prints now
+tools/check_figures.py            # every figure these documents quote is one the code still prints
+tools/check_figures.py --list     # ...and which tables nothing yet generates
 cd web && npm run check           # typecheck the front end
 ```
+
+`check_golden.sh` is a **change detector, not a correctness gate**: a diff is a
+question — did you mean to move that? — and the answer is often yes. It exists
+because the suite can only notice a number some test names, and three documented
+tables have gone stale between two commits that no test was looking at.
+`check_figures.py` is the other half: a documented figure carries a marker naming
+the command that regenerates it, so provenance is in the document rather than in
+anyone's head.
 
 ## Two copies in one browser
 
@@ -126,6 +138,8 @@ they give ε = 1.777921670 and 1.777921669562.
 Two figures have survived every refactor unchanged, and between them they have
 caught more in their areas than the suite has.
 
+<!-- figures: gear-cli strength 17 43 2.0 -->
+<!-- figures: gear-cli wormstage 1 40 7 2 -->
 | | |
 |---|---|
 | `gear-cli strength 17 43 2.0` | `σ_F` 66.8 / 56.0 MPa · `σ_H` 692.7 MPa · ρ 1.723 mm · η 98.741 % |
@@ -558,11 +572,12 @@ The strength canary moved once, deliberately: `σ_F` 69.2 / 63.4 → **74.3 / 63
 factor stayed in bending. **The ring is the change worth having.** Against the
 coherent ISO set (60° tangent + `Y_S`), `gear-cli matrix` study 5:
 
+<!-- figures-bold: gear-cli matrix -->
 | ring, the parabola set over the ISO set | before | after |
 |---|---|---|
 | range | 0.789 – 1.226 | **0.901 – 1.163** |
 | mean | 0.877 | **0.970** |
-| spread | 0.437 | **0.262** |
+| spread | 0.437 | **0.261** |
 
 Closer to agreement on both counts: the mean has moved from 12 % out to 3 %, and
 the spread is down by two fifths. The remaining 3 % is **expected and has a
@@ -570,6 +585,7 @@ name** — the ISO set does not take the axial compression term, so it reports t
 higher number, and a ratio a little under 1 is that difference showing up where
 it should.
 
+<!-- figures: gear-cli matrix -->
 The external population reads 0.510 – 1.128, mean 0.827, and the wider spread
 there is the same thing seen on a population that includes small and undercut
 teeth, where the two constructions genuinely disagree about where the section

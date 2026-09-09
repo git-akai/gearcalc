@@ -295,6 +295,8 @@ whose units are wrong is wrong however plausible.
 
 ## The log
 
+<!-- figures-exempt: a record of what this project believed and got wrong; these figures are history and must not be regenerated -->
+
 | Where | What was wrong | How it surfaced |
 |---|---|---|
 | [4.3](reference.md#automatic-values) | Working depth modelled as a constraint on the form radius | Would not reproduce the classical z=17 result; the correct reading substitutes `h_w` for `h_f` in the cutter-depth term |
