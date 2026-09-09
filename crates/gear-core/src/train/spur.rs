@@ -770,7 +770,7 @@ pub fn solve_spur_stage_with(
                 &sections[i],
                 &g[i],
                 &li,
-                StressConcentration::Iso6336,
+                StressConcentration::DolanBroghamer,
                 rims[i],
             )
             .map(|s| s * load_share[i])
@@ -889,7 +889,7 @@ pub fn solve_spur_stage_with(
                     &sections[i],
                     &g[i],
                     &li,
-                    StressConcentration::Iso6336,
+                    StressConcentration::DolanBroghamer,
                     rims[i],
                 )
                 .map(|s| s * load_share[i])

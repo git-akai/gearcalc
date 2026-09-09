@@ -311,12 +311,38 @@ are computed from *this* gear's own geometry rather than looked up against a
 population, dropping them is **unconservative** rather than safe, and neither is
 half of a balanced pair — nothing else in the model pushes back against either.
 
-`Y_S` is the ratio of peak fillet stress to nominal section stress — a *local*
-effect computed from `s_Fn`, `h_Fe` and `ρ_F`, all measured off our own exact
-profile. Dropping it would report a nominal stress roughly 1.6–2.1× below the
-real peak. Its notch parameter is clamped into the fit's stated range and
-**reported raw**, because `Y_S` rises with `q_s` and clamping a
-sharper-than-stated notch under-predicts stress.
+A notch factor is the ratio of peak fillet stress to nominal section stress — a
+*local* effect computed from the tooth's own `s_Fn`, `h_Fe` and fillet radius,
+all measured off our exact profile. Dropping it would report a nominal stress
+roughly 1.6–2.1× below the real peak.
+
+**Which notch factor is not a free choice**, and that is the whole lesson of
+this section applied one level down. The critical section here is the inscribed
+Lewis parabola searched over both curves, which is Savage, Rubadeux & Coe's
+construction; the notch factor that model carries is Dolan and Broghamer's
+`K_f`, read at `ρ_f`, the minimum radius of the fillet. `Y_S` is fitted to ISO's
+tangent section and to `ρ_F` measured *at* that section. Pairing one with the
+other is taking half of a calibration — the same error as `Y_β`, one level
+smaller, and it was live for as long. `RootSection` carries both radii and each
+fit reads its own; `CriticalSection::TangentAngle` with `Y_S` is the ISO set,
+whole, for a comparable number.
+
+`Y_S`'s notch parameter is clamped into the fit's stated range and **reported
+raw**, because `Y_S` rises with `q_s` and clamping a sharper-than-stated notch
+under-predicts stress. `K_f` states no band and clamps nothing.
+
+**A mechanics-derived factor was looked for and does not exist for this
+geometry.** Neuber's notch theory is genuinely elasticity-derived, but every
+form of it needs a notch depth and a net section, and a gear fillet is a
+transition from tooth to rim rather than a notch cut into a prismatic bar —
+choosing that depth reintroduces exactly the convention the search was meant to
+remove. Heywood is semi-empirical; critical-distance methods are
+material-dependent, which is refused elsewhere in this document. What `K_f` has
+instead is corroboration across methods and decades — photoelastic (Jacobson,
+1955), analytical (Chabert, Dang Tran and Mathis, 1972) and finite-element
+(Wilcox and Coleman, 1973, "only a few percent different"). See
+[`state.md`](state.md) for the full record, including that Dolan and Broghamer's
+specimens contained no undercut teeth and this tool rates them.
 
 `Y_B` de-rates a rim too thin to support its own tooth root, moving the failure
 out of the fillet and through the rim — a failure mode nothing else here models

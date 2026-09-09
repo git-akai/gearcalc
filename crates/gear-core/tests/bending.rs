@@ -719,3 +719,159 @@ fn the_default_critical_section_is_still_the_inscribed_parabola() {
         );
     }
 }
+
+/// **The fillet is tightest at its root**, which is what lets `ρ_f` — the
+/// minimum radius of curvature of the fillet curve — be read at one point
+/// instead of searched for.
+///
+/// Dolan and Broghamer's stress concentration factor is a function of "the
+/// minimum radius of the fillets", so the crate has to produce that minimum.
+/// It reads it at [`ToothOutline::fillet_root`] on the physical argument that a
+/// trochoid is closest to the tool's own corner radius where the corner cut
+/// deepest and flattens as it sweeps up toward the flank. That is an argument,
+/// not a proof, so this sweeps the whole fillet on both kinds of member and
+/// checks nothing anywhere is smaller.
+#[test]
+fn the_fillet_is_tightest_at_its_root() {
+    use gear_core::ring::{Cutter, Ring};
+    use gear_core::strength::ToothOutline;
+
+    let check = |what: &str, g: &dyn ToothOutline| {
+        let (lo, hi) = g.fillet_bracket();
+        let at_root = g.fillet_curvature(g.fillet_root());
+        assert!(
+            at_root.is_finite() && at_root > 0.0,
+            "{what}: rho_f {at_root}"
+        );
+        for i in 0..=2000 {
+            let t = f64::from(i) / 2000.0;
+            let r = g.fillet_curvature(lo + (hi - lo) * t);
+            if !r.is_finite() {
+                continue;
+            }
+            assert!(
+                r >= at_root * (1.0 - 1e-9),
+                "{what}: fillet radius {r} at t={t} is below the root's {at_root}"
+            );
+        }
+        // ...and the junction is the flat end, which is the other half of why
+        // reading `rho_f` there was wrong: it is the largest value, not the
+        // smallest.
+        let at_junction = g.fillet_curvature(g.fillet_junction());
+        assert!(
+            at_junction >= at_root,
+            "{what}: junction {at_junction} below root {at_root}"
+        );
+    };
+
+    for teeth in [9u32, 17, 40, 100, 250] {
+        for shift in [-0.3_f64, 0.0, 0.4] {
+            for root_radius in [0.1_f64, 0.25, 0.38] {
+                let g = Tooth::new(GearParams {
+                    teeth,
+                    profile_shift: shift,
+                    root_radius,
+                    ..Default::default()
+                });
+                check(
+                    &format!("external z={teeth} x={shift} rho={root_radius}"),
+                    &g,
+                );
+            }
+        }
+    }
+    for teeth in [40u32, 60, 90, 160] {
+        for shift in [-0.3_f64, 0.0, 0.4] {
+            let ring = Ring::cut_by(
+                &GearParams {
+                    teeth,
+                    profile_shift: shift,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            );
+            if ring.fillet.is_some() {
+                check(&format!("ring z={teeth} x={shift}"), &ring);
+            }
+        }
+    }
+}
+
+/// **The weaker of the two inscribed parabolas is the one reported.**
+///
+/// Savage, Rubadeux & Coe search the involute and the trochoid and take "the
+/// smaller x coordinate", which "identifies the weaker inscribed parabola" —
+/// `x = s_Fn²/(4 h_Fe)`. Both candidates share a load point and so share
+/// `cos α_Fen`, which makes a smaller `x` exactly a larger `Y_F`.
+///
+/// The crate used to take the fillet whenever it had a solution and consult the
+/// flank only otherwise. This asserts the rule directly: whichever curve the
+/// section came from, no tangency on the *other* curve is weaker.
+#[test]
+fn the_reported_parabola_is_the_weaker_of_the_two() {
+    use gear_core::solve::{brent, Tol};
+    use gear_core::strength::{root_section_with, CriticalSection, ToothOutline};
+
+    let mut checked = 0;
+    for teeth in [9u32, 13, 17, 25, 40, 80, 150, 300] {
+        for shift in [-0.3_f64, 0.0, 0.3, 0.6] {
+            let g = Tooth::new(GearParams {
+                teeth,
+                profile_shift: shift,
+                ..Default::default()
+            });
+            let Some(got) = root_section_with(&g, g.u_tip, CriticalSection::LewisParabola) else {
+                continue;
+            };
+            // Rebuild the condition here rather than reaching into the crate, so
+            // this is a check on the rule and not a restatement of the code.
+            let (load_point, dir) = ToothOutline::load_at(&g, g.u_tip);
+            let vertex = load_point[1] + (-load_point[0] / dir[0]) * dir[1];
+            let condition = |q: [f64; 2], t: [f64; 2]| q[0] * t[1] + 2.0 * t[0] * (vertex - q[1]);
+            let (flo, fhi) = ToothOutline::fillet_bracket(&g);
+            let (ulo, uhi) = ToothOutline::flank_bracket(&g);
+            let other = [
+                brent(
+                    |s| {
+                        let (q, t) = ToothOutline::fillet_at(&g, s);
+                        condition(q, t)
+                    },
+                    flo,
+                    fhi,
+                    Tol::default(),
+                )
+                .map(|s| ToothOutline::fillet_at(&g, s)),
+                brent(
+                    |u| {
+                        let (q, t) = ToothOutline::flank_at(&g, u);
+                        condition(q, t)
+                    },
+                    ulo,
+                    uhi,
+                    Tol::default(),
+                )
+                .map(|u| ToothOutline::flank_at(&g, u)),
+            ];
+            for cand in other.into_iter().flatten() {
+                let chord = 2.0 * cand.0[0].abs();
+                let arm = vertex - cand.0[1];
+                if arm <= 0.0 {
+                    continue;
+                }
+                // x = s_Fn^2 / (4 h): smaller is weaker, and the reported one
+                // must be no stronger than any candidate.
+                let x_cand = chord * chord / (4.0 * arm);
+                let x_got = got.root_chord * got.root_chord / (4.0 * got.moment_arm);
+                assert!(
+                    x_got <= x_cand * (1.0 + 1e-9),
+                    "z={teeth} x={shift}: reported x {x_got} is stronger than a candidate's {x_cand}"
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(
+        checked > 20,
+        "the rule should have been exercised: {checked}"
+    );
+}

@@ -190,12 +190,37 @@ pub struct RootSection {
     /// Load application angle, `α_Fen`: the angle between the load direction and
     /// the perpendicular to the tooth centreline.
     pub load_angle: f64,
-    /// Radius of curvature of the fillet at the critical section, `ρ_F`.
+    /// Radius of curvature of the fillet **at the critical section**, `ρ_F` —
+    /// ISO 6336-3's definition, and what [`StressConcentration::Iso6336`] is
+    /// fitted to.
     ///
     /// At the tangency when that is on the fillet; at the fillet's junction with
     /// the flank when the tangency has climbed above it. Always a *fillet*
     /// curvature, which is what makes it a notch radius.
     pub fillet_curvature: f64,
+    /// **The minimum radius of curvature of the fillet curve**, `ρ_f` — Dolan
+    /// and Broghamer's definition, and what [`StressConcentration::DolanBroghamer`]
+    /// is fitted to.
+    ///
+    /// A property of the whole fillet rather than of a point on it, so it is
+    /// defined wherever the critical section ended up and needs no fallback when
+    /// that is on the flank. It is read at [`ToothOutline::fillet_root`], the
+    /// deepest point, where the cut is tightest — gated by
+    /// `the_fillet_is_tightest_at_its_root`, which sweeps the whole fillet and
+    /// checks nothing is smaller.
+    ///
+    /// **The two radii are not close.** The junction is the flattest point the
+    /// fillet has and the root the tightest, and between them they differ by
+    /// 1.4–4.1× on an external tooth and 2.1–6.3× on a ring
+    /// (`gear-cli matrix`, study 7). A notch factor fed the wrong one is wrong
+    /// by that much, which is why each model reads its own.
+    pub min_fillet_curvature: f64,
+    /// Normal pressure angle of the basic rack, radians.
+    ///
+    /// Carried because [`StressConcentration::DolanBroghamer`]'s constants are
+    /// functions of it — it is the one notch fit here that covers a pressure
+    /// angle other than 20°, and it can only do so if it is told.
+    pub pressure_angle: f64,
     /// Tooth form factor `Y_F`.
     pub form_factor: f64,
     /// Notch parameter `q_s = s_Fn / (2 ρ_F)`, the input to stress correction.
@@ -384,6 +409,15 @@ pub trait ToothOutline {
     fn tangent_angle_deg(&self) -> f64;
     /// Fillet parameter bracket, ordered `(lo, hi)`.
     fn fillet_bracket(&self) -> (f64, f64);
+    /// The fillet parameter at its **deepest** point, where it meets the root.
+    ///
+    /// The other end of [`Self::fillet_junction`]'s bracket, and the point the
+    /// fillet is tightest at — so it is where `ρ_f`, the *minimum* radius of
+    /// curvature of the fillet curve, is read. Named rather than taken as an
+    /// endpoint of [`Self::fillet_bracket`] because which endpoint that is
+    /// differs between a rack-cut tooth and a ring, and a caller that guessed
+    /// would be right on one of them.
+    fn fillet_root(&self) -> f64;
     /// The fillet parameter where the fillet meets the involute flank.
     ///
     /// The notch does not stop existing when the critical section climbs above
@@ -422,6 +456,10 @@ impl ToothOutline for Tooth {
     }
     fn fillet_junction(&self) -> f64 {
         self.s_j
+    }
+    fn fillet_root(&self) -> f64 {
+        // Rack travel zero is the tooth centreline: the deepest the corner cut.
+        0.0
     }
     fn flank_bracket(&self) -> (f64, f64) {
         (self.u_j, self.u_tip)
@@ -473,6 +511,9 @@ impl ToothOutline for crate::ring::Ring {
     }
     fn fillet_junction(&self) -> f64 {
         self.fillet.map_or(0.0, |f| f.s_j)
+    }
+    fn fillet_root(&self) -> f64 {
+        self.fillet.map_or(0.0, |f| f.s_root)
     }
     fn flank_bracket(&self) -> (f64, f64) {
         (self.u_tip, self.u_j)
@@ -561,31 +602,50 @@ pub fn root_section_with<T: ToothOutline + ?Sized>(
         // teeth touch the fillet, larger ones the flank.
         CriticalSection::LewisParabola => {
             let condition = |q: [f64; 2], t: [f64; 2]| q[0] * t[1] + 2.0 * t[0] * (vertex - q[1]);
-            let on_fillet = brent(
-                |s| {
-                    let (q, t) = g.fillet_at(s);
-                    condition(q, t)
-                },
-                fillet_lo,
-                fillet_hi,
-                Tol::default(),
-            );
-            match on_fillet {
-                Some(s) => s,
-                None => {
-                    let (flank_lo, flank_hi) = g.flank_bracket();
-                    let u = brent(
-                        |u| {
-                            let (q, t) = g.flank_at(u);
-                            condition(q, t)
-                        },
-                        flank_lo,
-                        flank_hi,
-                        Tol::default(),
-                    )?;
-                    return finish(g, method, u, true, load_point, dir, crossing, vertex);
+            let (flank_lo, flank_hi) = g.flank_bracket();
+            // **Both curves, and the weaker wins.** Savage, Rubadeux & Coe:
+            // "both involute and trochoid geometry are used in checking for the
+            // smallest inscribed parabola in the tooth", and "the smaller x
+            // coordinate identifies the weaker inscribed parabola", where
+            // `x = s_Fn²/(4 h_Fe)`. Both candidates share a load point, so they
+            // share `cos α_Fen`, and a smaller `x` is exactly a larger `Y_F` —
+            // so the rule is the higher form factor, which is also the higher
+            // stress.
+            //
+            // It used to search the fillet and fall back to the flank only if
+            // that found nothing. The two agree whenever one curve has no
+            // tangency, which is every ring; they can differ on an external
+            // tooth, where the fillet usually has one and the flank was never
+            // consulted.
+            let candidates = [
+                brent(
+                    |s| {
+                        let (q, t) = g.fillet_at(s);
+                        condition(q, t)
+                    },
+                    fillet_lo,
+                    fillet_hi,
+                    Tol::default(),
+                )
+                .and_then(|s| finish(g, method, s, false, load_point, dir, crossing, vertex)),
+                brent(
+                    |u| {
+                        let (q, t) = g.flank_at(u);
+                        condition(q, t)
+                    },
+                    flank_lo,
+                    flank_hi,
+                    Tol::default(),
+                )
+                .and_then(|u| finish(g, method, u, true, load_point, dir, crossing, vertex)),
+            ];
+            return candidates.into_iter().flatten().reduce(|a, b| {
+                if b.form_factor > a.form_factor {
+                    b
+                } else {
+                    a
                 }
-            }
+            });
         }
     };
 
@@ -639,6 +699,9 @@ fn finish<T: ToothOutline + ?Sized>(
     // jumps from 0.61 mm to 22.9 mm across a single tooth at z = 150→151, while
     // the junction's runs smoothly through 0.6095, 0.6081, 0.6067.
     let fillet_radius = g.fillet_curvature(if on_flank { g.fillet_junction() } else { s });
+    // ...and `ρ_f`, which is not a point on the section at all but the tightest
+    // the fillet ever gets. See `RootSection::min_fillet_curvature`.
+    let min_fillet_radius = g.fillet_curvature(g.fillet_root());
 
     let m = g.module();
     let form_factor = 6.0 * (moment_arm / m) * load_angle.cos()
@@ -656,6 +719,8 @@ fn finish<T: ToothOutline + ?Sized>(
         moment_arm,
         load_angle,
         fillet_curvature: fillet_radius,
+        min_fillet_curvature: min_fillet_radius,
+        pressure_angle: g.normal_pressure_angle(),
         form_factor,
         tangency,
         tangent_direction,
@@ -723,8 +788,68 @@ pub enum StressConcentration {
     /// within about 8% of finite-element results; a genuinely geometry-exact
     /// notch stress needs FEA or a critical-distance method, and the latter is
     /// material-dependent, so neither belongs in a high-level design tool.
-    #[default]
     Iso6336,
+    /// **Dolan and Broghamer**, as curve-fitted by AGMA, and the default.
+    ///
+    /// ```text
+    /// K_f = H + (s_Fn/ρ_f)^L · (s_Fn/h_Fe)^M
+    /// H = 0.331 − 0.436·α_n     L = 0.324 − 0.492·α_n     M = 0.261 + 0.545·α_n
+    /// ```
+    ///
+    /// with `α_n` in radians, and **`ρ_f` the minimum radius of curvature of
+    /// the fillet curve** — [`RootSection::min_fillet_curvature`], not the
+    /// radius at the section.
+    ///
+    /// # Why this is the default rather than `Y_S`
+    ///
+    /// Not because it is better in the abstract. Because it is the notch factor
+    /// that belongs to the **section this crate actually computes**. The
+    /// critical section here is the inscribed Lewis parabola, searched over both
+    /// the fillet and the flank and resolved to the weaker — which is Savage,
+    /// Rubadeux & Coe's construction (NASA TM-107012), and Dolan and Broghamer's
+    /// factor is the one that model carries. `Y_S` is fitted to ISO's 30°/60°
+    /// tangent section and to `ρ_F` measured *at* that section; feeding it a
+    /// parabola section, and on a ring a flank one, is taking half of a
+    /// calibration. This project has made that mistake once already and it is
+    /// written up in `docs/rationale.md`.
+    ///
+    /// Three further things recommend it here, all of which are about *this*
+    /// tool rather than about the fit:
+    ///
+    /// - **It is written in `α_n`.** `Y_S` is stated for external spur gears at
+    ///   20° and is "approximate" elsewhere by ISO's own words (6336-3, 7.1).
+    ///   This crate offers 14.5°, 20° and 25°, and the AGMA fit's constants are
+    ///   linear in the pressure angle, so all three are inside it. At 20° the
+    ///   constants come out 0.179 / 0.152 / 0.451 against Dolan and Broghamer's
+    ///   own published 20° equation, `0.18 + (t/ρ)^0.15 (t/h)^0.45`.
+    /// - **It needs no band.** `Y_S` is stated over `1 ≤ q_s < 8` and a ring
+    ///   sits below it two times in three; `K_f` is a product of powers with no
+    ///   stated range, so nothing is clamped and nothing is extrapolated past a
+    ///   boundary the fit names.
+    /// - **It is the same factor for both members.** Savage's internal model is
+    ///   explicitly "an extension of the model for an external gear tooth", so
+    ///   one notch factor serves a rack-cut tooth and a ring, as one section
+    ///   construction already does.
+    ///
+    /// # What it is, and what it is not
+    ///
+    /// A 1942 photoelastic curve fit, and it stays one. Its independent
+    /// corroboration is unusually good for its age — Jacobson's photoelastic
+    /// work (1955) agreed, Chabert, Dang Tran and Mathis (1972) were
+    /// "substantially in agreement", and Wilcox and Coleman's finite-element
+    /// study (1973) found results "only a few percent different" — but it is a
+    /// fit, and [`StressConcentration::None`] exists so any result can be
+    /// re-run without it.
+    ///
+    /// **Its models contained no undercut teeth.** Dolan and Broghamer's
+    /// photoelastic specimens "contained various standard gear teeth but did not
+    /// include any undercut gears", and this crate rates undercut teeth. That is
+    /// the same class of limit as `Y_S`'s 20°-only origin, it is not reported
+    /// per gear because an undercut tooth is already reported per gear
+    /// (`clamp.tooth_undercut`), and it is recorded here so the two are not
+    /// mistaken for a validated case.
+    #[default]
+    DolanBroghamer,
     /// No correction: report the form factor alone.
     ///
     /// This is the control case. If a stress figure looks wrong, comparing the
@@ -809,6 +934,17 @@ impl RootSection {
     pub fn stress_correction(&self, model: StressConcentration) -> Option<f64> {
         match model {
             StressConcentration::None => Some(1.0),
+            // **Each fit reads the radius it was fitted to**, which is the whole
+            // reason both are carried: `ρ_f` here, `ρ_F` below.
+            StressConcentration::DolanBroghamer => {
+                let a = self.pressure_angle;
+                let h = 0.331 - 0.436 * a;
+                let l = 0.324 - 0.492 * a;
+                let m = 0.261 + 0.545 * a;
+                let by_radius = self.root_chord / self.min_fillet_curvature;
+                let by_height = self.root_chord / self.moment_arm;
+                Some(h + by_radius.powf(l) * by_height.powf(m))
+            }
             StressConcentration::Iso6336 => {
                 let l = self.root_chord / self.moment_arm;
                 let q = self
@@ -1214,7 +1350,7 @@ fn worst_over_cycle<T: ToothOutline + ?Sized>(
         // so they scale every candidate alike and cannot move which one wins.
         // Multiplying them in here would cost a sweep's worth of arithmetic to
         // reach the same `d`.
-        let Some(factor) = section.bending_factor(StressConcentration::Iso6336) else {
+        let Some(factor) = section.bending_factor(StressConcentration::DolanBroghamer) else {
             continue;
         };
         let weighted = factor * share;

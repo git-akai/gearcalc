@@ -1185,7 +1185,7 @@ fn strength_report(
     println!("bending");
     println!(
         "  {:<6} {:>8} {:>8} {:>9} {:>10} {:>10}",
-        "gear", "Y_F", "Y_S", "sigma_F", "b_min fat", "b_min ult"
+        "gear", "Y_F", "K_f", "sigma_F", "b_min fat", "b_min ult"
     );
     let reversed = Mesh::new(&g2, &g1, MeshKind::External).ok();
     for (label, g, p) in [
@@ -1205,12 +1205,17 @@ fn strength_report(
             continue;
         };
         let load_g = load.across_mesh(&g1, g);
-        let ys = sec.stress_correction(StressConcentration::Iso6336);
+        let ys = sec.stress_correction(StressConcentration::DolanBroghamer);
         // `Y_B` only where a rim was named on the command line: a rim nobody
         // described rates at 1 and is not the same claim as a thick one.
         let rim_support = rim.map(|s| RimSupport::external(s, g.ra - g.rf));
-        let Some(sf) = bending_stress(&sec, g, &load_g, StressConcentration::Iso6336, rim_support)
-        else {
+        let Some(sf) = bending_stress(
+            &sec,
+            g,
+            &load_g,
+            StressConcentration::DolanBroghamer,
+            rim_support,
+        ) else {
             println!(
                 "  {label:<6} {:>8.4} {:>8} {:>9} - stress correction undefined (tangency on the flank)",
                 sec.form_factor, "-", "-"
@@ -1694,7 +1699,7 @@ fn matrix_report() {
             d.form[0], d.form[1], d.form[2]
         );
         println!(
-            "  Y_F·Y_S parabola/tangent     {:.3} .. {:.3}   mean {:.3}",
+            "  Y_F·K_f / Y_F·Y_S            {:.3} .. {:.3}   mean {:.3}",
             d.factor[0], d.factor[1], d.factor[2]
         );
         println!(
@@ -1702,7 +1707,7 @@ fn matrix_report() {
             d.notch[0], d.notch[1]
         );
         println!(
-            "  outside the Y_S band         {} parabola ({:.1}%), {} tangent ({:.1}%)",
+            "  q_s outside Y_S's band       {} parabola ({:.1}%), {} tangent ({:.1}%)",
             d.notch_out[0],
             pct(d.notch_out[0]),
             d.notch_out[1],
@@ -1810,7 +1815,8 @@ fn loadcase_report() {
         // The bending factor is proportional to stress for a fixed torque, so
         // ratios of (factor x load fraction) are ratios of stress.
         let factor = |roll: f64| {
-            root_section(&g1, roll).and_then(|s| s.bending_factor(StressConcentration::Iso6336))
+            root_section(&g1, roll)
+                .and_then(|s| s.bending_factor(StressConcentration::DolanBroghamer))
         };
 
         let Some(a) = factor(path.roll_at(path.tip())) else {

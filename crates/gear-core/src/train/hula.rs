@@ -937,7 +937,7 @@ pub fn solve_hula_stage_with(
                 &b.section,
                 &p.pinion,
                 &probe,
-                StressConcentration::Iso6336,
+                StressConcentration::DolanBroghamer,
                 b.rim,
             )
             .map(|s| s * b.share)

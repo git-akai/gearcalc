@@ -918,8 +918,14 @@ pub fn solve_planetary_stage_with(
     // The share this tooth carries where it is rated — exactly 1 unless a
     // sharing model was asked for, so nothing scales by default.
     let stress_at = |b: &super::Bending, on: &Tooth, load: &Load| {
-        bending_stress(&b.section, on, load, StressConcentration::Iso6336, b.rim)
-            .map(|s| s * b.share)
+        bending_stress(
+            &b.section,
+            on,
+            load,
+            StressConcentration::DolanBroghamer,
+            b.rim,
+        )
+        .map(|s| s * b.share)
     };
     let sun_sf = stress_at(&sun_bending, &sun, &probe_load_sp);
     let planet_sf = stress_at(
@@ -1293,7 +1299,7 @@ mod tests {
                     &section,
                     &built.planet,
                     &Load::new(torque, b),
-                    StressConcentration::Iso6336,
+                    StressConcentration::DolanBroghamer,
                     None,
                 )
                 .unwrap()

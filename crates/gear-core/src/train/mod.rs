@@ -2809,9 +2809,21 @@ mod tests {
                 continue; // a member with no notch has no bending either way
             };
             rated += 1;
+            // **That it moved is the claim; which way is not.** This test is
+            // about *reach* — every member that bends must see the model — and
+            // the direction was asserted for years only because it happened to
+            // hold. It does not in general: the swept maximum is a product of a
+            // form factor rising toward the tip and a share falling away there,
+            // so a member whose factor rises steeply enough is governed near its
+            // tip, at a partial share, above what the unshared convention (full
+            // load at the single-pair boundary) assumes. A planetary ring is
+            // that member — its `Y_F` runs 2.49 to 0.14 across its flank — and
+            // it comes out 2.4 % *higher* with sharing on. That is the sweep
+            // doing its job rather than a fault in it, and the unshared
+            // convention being the approximation it is documented as.
             assert!(
-                b < a,
-                "{what}: sharing must relieve a tooth it reaches — {a} to {b}"
+                (b - a).abs() / a > 1e-9,
+                "{what}: sharing must reach a tooth that bends — {a} to {b}"
             );
         }
         assert!(

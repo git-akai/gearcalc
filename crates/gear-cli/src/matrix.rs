@@ -92,6 +92,7 @@ impl Model {
         let concentration = match self.concentration {
             StressConcentration::None => "Y_F only",
             StressConcentration::Iso6336 => "Y_F·Y_S",
+            StressConcentration::DolanBroghamer => "Y_F·K_f",
         };
         format!("{section} · {concentration}")
     }
@@ -104,6 +105,10 @@ impl Model {
     }
 }
 
+/// The models compared, and note that two of them are **coherent sets** rather
+/// than free combinations: the tangent section carries ISO's `Y_S`, which is
+/// fitted to it, and the parabola carries Dolan and Broghamer's `K_f`, which is
+/// what Savage's construction carries. The bare form factors are the controls.
 pub const MATRIX: [Model; 4] = [
     Model {
         section: CriticalSection::TangentAngle,
@@ -119,7 +124,7 @@ pub const MATRIX: [Model; 4] = [
     },
     Model {
         section: CriticalSection::LewisParabola,
-        concentration: StressConcentration::Iso6336,
+        concentration: StressConcentration::DolanBroghamer,
     },
 ];
 
@@ -372,12 +377,19 @@ pub struct Parting {
     pub on_flank: usize,
     /// `Y_F(parabola) / Y_F(tangent)`: least, greatest, mean.
     pub form: [f64; 3],
-    /// The same for `Y_F · Y_S`, which is what a bending stress is proportional
-    /// to at a fixed load — so this, not `Y_F`, is the number a designer feels.
+    /// The same for the two **coherent sets** — `Y_F·K_f` over `Y_F·Y_S`, each
+    /// section carrying the notch factor fitted to it. This, not `Y_F`, is what
+    /// a bending stress is proportional to, so it is the number a designer
+    /// feels.
     pub factor: [f64; 3],
-    /// Notch parameter `q_s` under each construction, mean: parabola, tangent.
+    /// ISO's notch parameter `q_s` under each section, mean: parabola, tangent.
+    ///
+    /// Reported for the tangent section because that is where `Y_S` is used and
+    /// where the band applies; reported for the parabola because it is the
+    /// evidence that `Y_S` does **not** belong there.
     pub notch: [f64; 2],
-    /// ...and how many designs left the `Y_S` fit's `1 ≤ q_s < 8` band, each way.
+    /// ...and how many designs leave `Y_S`'s `1 ≤ q_s < 8` band, each way.
+    /// Only the tangent column is a live concern; `K_f` states no band.
     pub notch_out: [usize; 2],
 }
 
@@ -395,8 +407,12 @@ pub fn parting(on: Member, pop: &[GearParams]) -> Parting {
         ) else {
             continue;
         };
+        // Each section with the notch factor fitted to it: the parabola with
+        // Dolan and Broghamer's, the tangent with ISO's. Comparing the two
+        // *sets* is the question; comparing one notch model across two sections
+        // is what mixing looks like.
         let (Some(fa), Some(ft)) = (
-            para.bending_factor(StressConcentration::Iso6336),
+            para.bending_factor(StressConcentration::DolanBroghamer),
             tan.bending_factor(StressConcentration::Iso6336),
         ) else {
             continue;

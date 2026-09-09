@@ -745,6 +745,13 @@ they change the profile.
 **Critical section: the Lewis parabola.** A cantilever whose outline is a
 parabola with its vertex at the load carries uniform bending stress, so the
 largest such parabola inscribed in the tooth touches where the tooth is weakest.
+**Both the fillet and the flank are searched and the weaker tangency wins** —
+Savage, Rubadeux & Coe: "both involute and trochoid geometry are used in checking
+for the smallest inscribed parabola", and "the smaller x coordinate identifies
+the weaker inscribed parabola", `x = s_Fn²/(4 h_Fe)`. Both candidates share a
+load point and so share `cos α_Fen`, which makes a smaller `x` exactly a larger
+`Y_F`. A ring's tangency is on the flank every time, which is one of the two
+cases the model is told to search rather than a departure from it.
 `CriticalSection::TangentAngle` retains the ISO tangent for a
 standards-comparable number — **30° on an external tooth and 60° on a ring's**
 (ISO 6336-3:2019, 6.1). Not because the tooth points the other way round — a
@@ -761,17 +768,40 @@ frame leaves its zero set untouched and the *same* equation serves a tooth
 pointing either way. So the default path does not consult the angle, and a
 ring's 60° is reachable only by asking for the tangent construction explicitly.
 
-**The factors, and which of them are here.**
+**Two fillet radii, and each fit reads its own.** `ρ_F` is the radius **at the
+critical section** — ISO's definition, and what `Y_S` was fitted to; on a flank
+tangency it falls back to the fillet junction. `ρ_f` is the **minimum** over the
+whole fillet — Dolan and Broghamer's definition, and what `K_f` was fitted to;
+it is defined wherever the section ended up and needs no fallback. They are not
+close: the junction is the flattest point the fillet has and the root the
+tightest, and they differ by 1.4–4.1× on an external tooth and 2.1–6.3× on a
+ring. `RootSection` carries both so that neither fit can be fed the other's.
+
+**The ISO factors, for the comparable number.**
 
 ```text
 σ_F0 = F_t / (b · m_n) · Y_F · Y_S · Y_β · Y_B · Y_DT
 q_s  = s_Fn / (2 ρ_F)
 ```
 
+**The default is not this product.** It is Savage, Rubadeux & Coe's, which is
+the Lewis parabola section this crate already computes together with the notch
+factor that belongs to it:
+
+```text
+σ_F = F_t / (b · m_n) · Y_F · K_f · Y_B
+K_f = H + (s_Fn/ρ_f)^L · (s_Fn/h_Fe)^M
+H = 0.331 − 0.436·α_n    L = 0.324 − 0.492·α_n    M = 0.261 + 0.545·α_n
+```
+
+`α_n` in radians, and **`ρ_f` is the minimum radius of curvature of the fillet
+curve**, not the radius at the section. The ISO product below is the other
+coherent set, reached by asking for the tangent section and `Y_S` together.
+
 | | | |
 |---|---|---|
 | `Y_F` | form factor | Measured off the generated profile, not ISO's Method B closed form |
-| `Y_S` | stress correction | ISO 6336-3 7.2, over the band below |
+| `Y_S` | stress correction | ISO 6336-3 7.2, over the band below. **Not the default** — see above |
 | `Y_β` | helix angle | **Not applied** — half of a pair the 2019 edition revised together; see below |
 | `Y_B` | rim thickness | ISO 6336-3 9.3, where a rim thickness was given |
 | `Y_DT` | deep tooth | **Not applied.** `f_ε`, inside ISO's own `Y_F`, likewise |

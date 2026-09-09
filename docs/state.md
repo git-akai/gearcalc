@@ -115,8 +115,16 @@ caught more in their areas than the suite has.
 
 | | |
 |---|---|
-| `gear-cli strength 17 43 2.0` | `σ_F` 69.2 / 63.4 MPa · `σ_H` 692.7 MPa · ρ 1.723 mm · η 98.741 % |
+| `gear-cli strength 17 43 2.0` | `σ_F` 74.3 / 63.8 MPa · `σ_H` 692.7 MPa · ρ 1.723 mm · η 98.741 % |
 | `gear-cli wormstage 1 40 7 2` | η 61.805 % forward, 0.000 % backward (self-locking) · backlash 0.15512° at the wheel (min 0.11342, max 0.19683), 6.20497° at the worm |
+
+**The strength canary has moved once, deliberately.** `σ_F` 69.2 / 63.4 →
+74.3 / 63.8 when the notch factor became Dolan and Broghamer's `K_f`, read at
+the fillet's own minimum radius, in place of ISO's `Y_S` read at the critical
+section — the two halves of the section construction this tool actually uses
+finally matched to one another. **`σ_H`, ρ and η did not move**, which is the
+check that a notch factor stayed in bending where it belongs, and the whole worm
+canary did not move either, a worm stage reporting no bending stress at all.
 
 **The worm canary has moved four times, all deliberately**, and the reasons are
 worth keeping because each was a model change rather than a fix:
@@ -459,121 +467,105 @@ are named in `strings.rs`'s `UNFIRED` with their evidence.
 
 ---
 
-## An open finding: the parabola on a ring
+## One bending model, and it is the NASA one
 
-**Not acted on.** The default critical section is the inscribed Lewis parabola
-for every member, external and internal, and it still is. This records what
-measuring it found, because the measurement was not possible until the 60°
-internal tangent existed — before that a ring's tangent section was taken at
-30°, so there was no baseline to compare against.
+**Settled.** The critical section is the inscribed Lewis parabola and the notch
+factor is Dolan and Broghamer's `K_f`, on **both** kinds of member. They belong
+together: Savage, Rubadeux & Coe (NASA TM-107012), whose internal model is
+explicitly "an extension of the model for an external gear tooth", carry exactly
+that pair. The tool had been carrying half of it.
 
-`gear-cli matrix` now runs its four studies on both kinds of member, plus a
-fifth that puts the two constructions against each other:
+**What was wrong, and it was one thing wearing three faces.** The section came
+from Savage; the notch factor came from ISO; and the fillet radius fed to the
+notch factor came from neither. ISO's `ρ_F` is the radius *at the critical
+section*; Dolan and Broghamer's `ρ_f` is *"the minimum radius of the fillets"*
+(confirmed independently of the paper, in the Virginia Tech survey of the same
+literature). This tool read it at the fillet **junction**, which is the flattest
+point the fillet has — 1.4–4.1× the minimum on an external tooth, 2.1–6.3× on a
+ring. `q_s` is inverse in it, which is the whole of why a ring's sat on the floor
+of `Y_S`'s band with two in three clamped.
 
-| | external (1508) | ring (160) |
+### What changed
+
+| | before | after |
 |---|---|---|
-| parabola tangency on the **flank** | 12.9 % | **100 %** |
-| `Y_F` parabola/tangent | 1.006–1.312, mean 1.055 | 1.273–1.690, mean **1.425** |
-| `Y_F·Y_S` parabola/tangent | 0.740–1.351, mean 0.943 | 0.789–1.226, mean **0.877** |
-| mean `q_s`, parabola vs tangent | 1.95 vs 3.17 | **1.00** vs 4.94 |
-| outside the `Y_S` band | 19.2 % vs 5.8 % | **66.9 %** vs 1.2 % |
-| Spearman ρ, `Y_F` | **0.993** | **0.537** |
-| Spearman ρ, `Y_F·Y_S` | 0.891 | **0.289** |
+| notch factor | ISO `Y_S`, fitted to the tangent section | Dolan–Broghamer `K_f`, fitted to this one |
+| fillet radius it reads | at the junction (neither definition) | the fillet's **minimum**, `ρ_f` |
+| when both curves have a tangency | fillet wins | the **weaker** wins, per the paper |
+| pressure angles covered | 20° ("approximate" elsewhere, ISO 7.1) | `α_n` is an argument of the fit |
+| a stated band to fall outside | `1 ≤ q_s < 8` | none; `K_f` is a product of powers |
 
-**What it says about tooth strengths.** A ring's reported bending factor is on
-average **12 % below** what the 60° tangent gives, spanning 21 % below to 23 %
-above — so the choice of construction is worth about ±20 % on a ring's root
-stress, against about ±6 % on the mean for an external tooth. Lower is the
-unconservative direction.
+`ρ_f` is read at the fillet's deepest point on the physical argument that a
+trochoid is closest to the tool's own corner radius where the corner cut deepest
+and flattens toward the flank. That is an argument, so
+`the_fillet_is_tightest_at_its_root` sweeps the whole fillet on both kinds of
+member and checks nothing anywhere is smaller.
 
-**Three things worth separating.**
+### What it did to the numbers
 
-1. **The parabola lands on the flank for every ring.** Already known for
-   `z ≥ 40` (see [corrections](corrections.md)); now measured across shift and
-   pressure angle too, and it is universal. `s_Fn` is then read across a point
-   on the involute while `ρ_F` falls back to the fillet junction — a documented,
-   continuous fallback, but two different places, and on a ring it is not the
-   exception it is externally.
-2. **`q_s` collapses to the bottom of the `Y_S` band.** Mean 1.00 against the
-   tangent construction's 4.94, with **two rings in three clamped**. Clamping
-   below the band is the conservative direction, but it means most rings are
-   rated with a fitted factor held at its boundary rather than evaluated.
-3. **The ranking argument does not transfer.** The stated reason the parabola's
-   divergence from the standard is "principled rather than consequential" is
-   ρ = 0.993 — an **external** measurement. On rings it is 0.537 on `Y_F` and
-   0.289 on the product, and one pair of models in the matrix orders ring
-   designs in *opposite* directions (ρ = −0.399).
+The strength canary moved once, deliberately: `σ_F` 69.2 / 63.4 → **74.3 / 63.8**
+— conservative, and `σ_H`, ρ and η did not move, which is the check that a notch
+factor stayed in bending. **The ring is the change worth having.** Against the
+coherent ISO set (60° tangent + `Y_S`), `gear-cli matrix` study 5:
 
-**And one correction that falls out of it regardless.** "The parabola is the
-more conservative construction" is a claim about `Y_F` and does not survive
-`Y_S`: a narrower section at the same notch radius is a smaller `q_s`, and `Y_S`
-rises with `q_s`. On the product — the number a stress is proportional to — the
-parabola is *below* the tangent construction on both populations, 0.943 external
-and 0.877 internal. The doc comments said "more conservative, everywhere"; they
-say `Y_F` now.
+| ring, `Y_F·K_f` over `Y_F·Y_S` | before | after |
+|---|---|---|
+| range | 0.789 – 1.226 | **1.026 – 1.194** |
+| mean | 0.877 | **1.081** |
 
-### What the source says
+It has gone from straddling 1 with a spread of 0.44 — sometimes a fifth below
+the standard's own construction, the unconservative direction — to sitting
+consistently just above it with less than half the spread. Two models built on
+different reasoning now agree on a ring to within about 10 %, where before they
+disagreed by up to 25 % and could not agree on the sign.
 
-Savage, Rubadeux & Coe, NASA TM-107012 / ARL-TR-838, has been read.
+### And one thing the sweep found on the way
 
-**The construction is vindicated.** "For the stress analysis of internal gears,
-both involute and trochoid geometry are used in checking for the smallest
-inscribed parabola in the tooth." A tangency on the involute flank is
-*anticipated* by the model — it is one of the two curves it is told to search —
-so a ring landing there every time is the source's own case, not a
-misapplication of it. The load point is the highest point of single tooth
-loading in both.
+A planetary ring's bending comes out **2.4 % higher** with load sharing on than
+off. Sharing was assumed to relieve every tooth it reaches, and that was an
+observation rather than an invariant: the swept maximum is a product of a form
+factor rising toward the tip and a share falling away there, and a ring's `Y_F`
+runs 2.49 to 0.14 across its flank, so it is governed near its tip at a partial
+share — above what the unshared convention (full load at the single-pair
+boundary) assumes. The sweep is doing its job; the convention is the
+approximation. `the_sharing_model_reaches_every_member_that_bends` asserts reach
+now, not direction, and says why.
 
-**Two divergences it exposes, neither previously written down.**
+### On mechanics-derived alternatives, which were looked for
 
-1. **The selection rule.** The paper compares the two searches and takes "the
-   smaller x coordinate", which "identifies the weaker inscribed parabola".
-   This crate searches the fillet and falls back to the flank only when the
-   fillet has no solution. The two agree whenever one curve has no tangency —
-   which is every ring — so this does **not** affect ring results. It can affect
-   an external tooth, where the fillet usually does have one and the flank is
-   never consulted.
+`K_f` stays a 1942 photoelastic curve fit, and the search for something derived
+instead came up empty for a reason worth recording. **Neuber's notch theory** is
+genuinely elasticity-derived — it interpolates between closed-form deep-hyperbolic
+and shallow-elliptical solutions — but every form of it needs a **notch depth**
+and a net section, and a gear fillet is a transition from tooth to rim rather
+than a notch cut into a prismatic bar. Choosing that depth is a convention, which
+is the thing the exercise was meant to remove; the interpolation is also reported
+to underestimate by about 9 % in bending. **Heywood** is semi-empirical rather
+than derived. **Critical-distance methods** are material-dependent, which
+`rationale.md` already refuses. No elasticity-derived stress concentration factor
+for a gear fillet appears in the literature surveyed, and the surveys of that
+literature report photoelastic and finite-element work throughout.
 
-2. **The fillet radius, and this is the one that matters.** The paper's `ρ_f` is
-   *"the minimum radius of curvature of the fillet curve"*. ISO's `ρ_F` is the
-   radius **at the critical section**. This crate reads it at the fillet
-   **junction** whenever the tangency is on the flank — which is neither
-   definition, and is the **largest** value the fillet takes anywhere:
+What `K_f` has instead is corroboration across methods and decades: Jacobson's
+photoelastic work (1955) agreed with it, Chabert, Dang Tran and Mathis (1972)
+were "substantially in agreement", and Wilcox and Coleman's finite-element study
+(1973) found results "only a few percent different".
 
-   | member | junction / minimum |
-   |---|---|
-   | external | 1.37 – 4.12 |
-   | ring | **2.09 – 6.30** |
+**Its limit, recorded rather than discovered later.** Dolan and Broghamer's
+specimens "contained various standard gear teeth but did not include any undercut
+gears", and this tool rates undercut teeth. That is the same class of limit as
+`Y_S`'s 20°-only origin. It is not raised per gear because an undercut tooth
+already says so on its own account.
 
-   `q_s = s_Fn/(2ρ_F)` is inverse in it, so this is the whole of why a ring's
-   `q_s` sits at the floor of the `Y_S` band. The junction was chosen to remove
-   a discontinuity ([corrections](corrections.md)) and it does remove one; what
-   was never checked is whether it is the right point on the fillet, and by
-   either source's definition it is not.
+### The ISO set is still there, whole
 
-**So the model is three sources deep and matched to none of them**: Lewis's
-section by way of Savage, ISO's notch factor, and a fillet radius that is this
-crate's own. The notch factors are the same *shape* — `K_f = H + (t_c/ρ_f)^L ·
-(t_c/h)^M` against `Y_S = (1.2 + 0.13L)·q_s^(1/(1.21+2.3/L))`, both functions of
-thickness over fillet radius and thickness over height — which is what made the
-substitution look free. They are fitted to different definitions of that radius.
-
-**The options, and this is a model decision.**
-
-- **`TangentAngle` as the ring default.** One model throughout: ISO's section at
-  ISO's angle, `ρ_F` at that section, `Y_S` fitted on exactly that. `q_s` 4.94,
-  1.2 % out of band. Costs a default that differs by member kind.
-- **Savage's model in full for rings** — parabola, `ρ_f` as the fillet minimum,
-  Dolan–Broghamer `K_f`, and its axial compression term. Also coherent, and it
-  is what the citation actually describes. Costs an empirical fit this project
-  declined once already, and its own validation.
-- **Patching `ρ_F` to the fillet minimum while keeping `Y_S`** would be a fourth
-  mixed set, and would move the external canary too. It is the tempting one and
-  it is the [`Y_β` mistake](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither)
-  in another costume.
-
-
----
+`CriticalSection::TangentAngle` + `StressConcentration::Iso6336` is the other
+coherent pair — ISO's section at ISO's angle, `ρ_F` at that section, `Y_S` fitted
+on exactly that — and is what to switch to for a number comparable with a
+published ISO rating. `gear-cli matrix` runs both, on both kinds of member.
+**What is not offered as a default is a mixture**, and the two notch models read
+different fillet radii off the same `RootSection` precisely so that neither can
+be quietly fed the other's.
 
 ## Recorded but not applied: ISO 6336-3's remaining bending factors
 
