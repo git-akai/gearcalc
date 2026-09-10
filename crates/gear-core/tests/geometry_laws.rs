@@ -12,6 +12,7 @@
 #![allow(clippy::unwrap_used)]
 
 use gear_core::gear::Gear;
+use gear_core::note::key;
 use gear_core::{inv, inv_from_roll, GearParams, Tooth};
 
 mod common;
@@ -195,33 +196,116 @@ fn thickness_modification_equals_an_equivalent_profile_shift() {
     }
 }
 
-/// Thickness modification is a *thickness* quantity. It must leave every radial
-/// dimension untouched — that separation is the rule the implementation rests on.
+/// **A thickness modification changes a thickness, and nothing radial.**
+///
+/// The rule the whole crate is built on: *radial* quantities take plain `x` and
+/// *thickness* quantities take `x + x_s` — `docs/reference.md#tooth-thickness-and-its-equivalent-shift`
+/// argues it, and everything from the root circle to the cutter's plunge rests
+/// on the separation.
+///
+/// # One law, two kinds, and they are asserted at the same standard now
+///
+/// A ring says the same thing in `ring::tests::a_thickness_modification_moves_no_radius_on_a_ring`,
+/// and it says it far better: three tooth counts by three shifts by four values
+/// of `k`, the cutter's plunge as well as the radii, and a carve-out for the one
+/// place the rule genuinely bends — a space that closes on itself, where the
+/// root is truncated by the profile rather than placed by the tool.
+///
+/// This half asserted the same law on **one gear**: the default tooth count, the
+/// default shift, one module, no helix, three values of `k`. Everything the law
+/// could plausibly interact with was at its default, which is the fault
+/// `tests/common` exists for — *an axis nobody turns is an axis nobody tests* —
+/// met in the weaker of two statements of one rule.
+///
+/// The two are not merged, and deliberately: a ring needs a cutter to be cut by
+/// and has a limit an external gear does not. What they now share is the
+/// standard.
 #[test]
 fn thickness_modification_leaves_radial_dimensions_alone() {
-    let base = Tooth::new(GearParams::default());
-    for k in [0.7_f64, 1.0, 1.3] {
-        let g = Tooth::new(GearParams {
-            thickness_mod: k,
-            ..Default::default()
-        });
-        assert!(
-            (g.r - base.r).abs() < 1e-15,
-            "pitch radius moved with k={k}"
-        );
-        assert!(
-            (g.rb - base.rb).abs() < 1e-15,
-            "base radius moved with k={k}"
-        );
-        assert!(
-            (g.ra - base.ra).abs() < 1e-15,
-            "tip radius moved with k={k}"
-        );
-        assert!(
-            (g.rf - base.rf).abs() < 1e-15,
-            "root radius moved with k={k}"
-        );
+    let mut checked = 0u32;
+    for base_params in grid() {
+        let base = Tooth::new(base_params);
+        for k in [0.6_f64, 0.85, 1.0, 1.15, 1.4] {
+            let g = Tooth::new(GearParams {
+                thickness_mod: k,
+                ..base_params
+            });
+            // **The pitch and base circles are exact, always.** They are
+            // `m·z/2` and `r·cos α_t` — the tooth form does not enter them, so
+            // no guard can move them and there is no case to carve out.
+            for (name, got, want) in [
+                ("pitch radius", g.r, base.r),
+                ("base radius", g.rb, base.rb),
+            ] {
+                assert_eq!(
+                    got.to_bits(),
+                    want.to_bits(),
+                    "z={} x={} a={} b={}: {name} moved from {want} to {got} at k={k}",
+                    base_params.teeth,
+                    base_params.profile_shift,
+                    base_params.pressure_angle,
+                    base_params.helix_angle
+                );
+            }
+
+            // **The tip and root are exact too, unless the profile truncated
+            // them.** A tooth thin enough is *severed* — undercut so deep the
+            // flank is cut away — or comes to a point before its addendum, and
+            // then the radius is set by the shape that is left rather than by
+            // the number asked for. How much is left is a function of the tooth
+            // thickness, so of `k`; that is a different guard with its own note,
+            // and it is the exact mirror of the one a ring has, where a space
+            // closing on itself truncates the root.
+            //
+            // The sweep found it: three teeth at 14.5° and a shift of −0.5 are
+            // severed, and the tip sits at 0.173 mm at `k = 0.6` against
+            // 0.208 mm at 1.0. One law, two kinds, one place each where it bends
+            // and the same reason both times.
+            let truncated = |t: &Tooth| {
+                t.severed
+                    || t.clamps
+                        .notes
+                        .iter()
+                        .any(|n| n.is(key::CLAMP_TIP_CAPPED_POINTED))
+            };
+            if truncated(&g) || truncated(&base) {
+                assert!(
+                    g.ra > 0.0 && g.rf > 0.0 && g.ra.is_finite() && g.rf.is_finite(),
+                    "z={} k={k}: a truncated tooth has no radii: ra={} rf={}",
+                    base_params.teeth,
+                    g.ra,
+                    g.rf
+                );
+                checked += 1;
+                continue;
+            }
+            for (name, got, want) in [
+                ("tip radius", g.ra, base.ra),
+                ("root radius", g.rf, base.rf),
+            ] {
+                assert_eq!(
+                    got.to_bits(),
+                    want.to_bits(),
+                    "z={} x={} a={} b={}: {name} moved from {want} to {got} at k={k}",
+                    base_params.teeth,
+                    base_params.profile_shift,
+                    base_params.pressure_angle,
+                    base_params.helix_angle
+                );
+            }
+            // ...while the thing it *is* about did move, or this is asserting
+            // that a control does nothing.
+            if (k - 1.0).abs() > 1e-12 {
+                assert!(
+                    (g.st - base.st).abs() > 1e-9,
+                    "z={} k={k}: the tooth thickness did not move either",
+                    base_params.teeth
+                );
+            }
+            checked += 1;
+        }
     }
+    assert!(checked > 500, "only {checked} gears were swept");
 }
 
 /// A meshing pair must satisfy `k1 + k2 = 2`. The consequence relied on
