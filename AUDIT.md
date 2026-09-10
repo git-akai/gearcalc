@@ -98,7 +98,16 @@ and no budget with the walk.
 *F50, closed.* A set's search was running **one start of six** — the budget was a
 pool and the first walk spent it. Per walk, quadrupling the budget now moves no
 answer by a bit, and the set's spread at fourteen times the effort is **1.5e-6**
-where it was 3.2e-4. It cost eight times the time on a pair, which is F61.
+where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
+F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
+declines it for want of an exact repair.
+
+**Phase 5 — the tests.** Done. Eight passes of mutation, thirteen findings, and
+**two live wrong numbers** among them: an epicyclic set that never asked its own
+internal mesh whether the teeth foul (F60), and a screw pair that reported no
+flank load when it could not transmit (F48). F12 and F61 were measured and their
+premises did not hold; both are recorded as declines with the counting beside
+them.
 
 | Phase | What it does | State |
 |---|---|---|
@@ -108,8 +117,8 @@ where it was 3.2e-4. It cost eight times the time on a pair, which is F61.
 | 3 | Unify what is written twice | **done** |
 | 3b | The direction sweep, second half — the ratings | **done** — gate proven |
 | 4 | The optimiser | **done** — gates proven; the closed form weighed and declined, with its derivation kept |
-| 5 | Consolidate the tests | **in progress** — seven passes run; F61 and F48 remain |
-| 6 | Front end and payload | not started |
+| 5 | Consolidate the tests | **done** — eight passes, gates proven; two live wrong numbers |
+| 6 | Front end and payload | **next** — F15, F16, F17, F39, F47 |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
 production code · 10,346 lines of comment in that code · 9,348 lines of
@@ -120,11 +129,11 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 560 tests** (was 531). **Golden corpus: 27 cases** (was 22).
+**Suite: 564 tests** (was 531). **Golden corpus: 27 cases** (was 22).
 
-### Phase 5 so far, and what is left
+### Phase 5, in full
 
-Six passes, and the instrument for all of them is **mutation**: perturb one
+Eight passes, and the instrument for all of them is **mutation**: perturb one
 production quantity, run the whole suite *and* the corpus *and* the figure
 check, record what fires. The scripts are throwaway by design — three lines of
 `sed`, a build, a `nextest` run, restore — and the only part worth carrying
@@ -149,19 +158,37 @@ for each mutation:
 | 5 | the five modules with no inline tests | F13, F71 |
 | 6 | F12, by counting rather than by reading | F12 |
 | 7 | F60 — the *reporting* side of "a constraint belongs to the mesh" | F60, and a live wrong answer |
+| 8 | F48 and F61 — the two findings carried in from earlier phases | F48, a second live wrong answer; F61 measured and declined |
 
-**Open, and Phase 5's remaining work:**
+**Phase 5's remaining work:**
 
-- **F61** — a pair pays eight times over for starts that all land on the same
-  point. Measured under F50; the repair is to stop a walk that has arrived
-  somewhere already walked, not to cut the budget back.
-- **F48** — a screw mesh that transmits nothing reports no flank load. Carried
-  from Phase 3b.
+Nothing. The three that stood open at the sixth pass are closed: F60 by the
+`TipRoom` extraction, F48 by rating a screw mesh at the load it was given, and
+F61 by measurement — see the eighth pass below, which is a decline rather than a
+change.
 
 **The question that produced most of this phase**, asked six times and answered
 yes six times: *is there an opt-in path the harness never switches on?* F31, F56,
 F67, F24, F71 and the sixth in `docs/corrections.md`'s last row. It is protocol
 pass 6 and it is worth asking first, not last.
+
+### What is open when Phase 5 closes
+
+| | Finding | Phase |
+|---|---|---|
+| F15 | `TrainPanel.svelte` is 2,848 lines, four hand-written stage forms | 6 |
+| F16 | One stage input touches eleven files | 6 |
+| F17 | 1.49 MB wasm carrying a simulator no browser path reaches | 6 |
+| F39 | The clearance paradigm — `Auto` clearance, mode 3 without the optimiser, a planetary distance | 6 |
+| F47 | `Directional::self_locking` asks a directional question one way only | 6 |
+| F51 | The hula stage's shift search cannot be asked for an effort | 4, deferred |
+| F55 | A centre distance no admissible shifts can reach is answered rather than refused | 4, deferred |
+| F58 | The hula shift optimiser moves no answer over a band of tooth differences | 4, deferred |
+| F7, F19, F21 | Figures and tables still ungated — the count is known, the tagging is not done | 0, 4 |
+
+Phase 6 is the front end and the payload, and F47 is the one core change waiting
+on it: the self-locking flag crosses the boundary and the panel reads it, so
+asking the question in both directions is a wire change.
 
 ---
 
@@ -302,10 +329,10 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F45 | ...and the hula stage 41 % and 23 % low, the same fault | gap | 3b | **closed** — " |
 | F46 | A zero force was refused, so a stage at rest could not be solved | gap | 3b | **closed** — " |
 | F47 | `Directional::self_locking` asks a directional question one way only | gap | 6 | open — see Phase 3b |
-| F48 | A screw mesh that transmits nothing reports no flank load | gap | 5 | open — see Phase 3b |
+| F48 | A screw mesh that transmits nothing reports no flank load | **gap** | 5 | **closed** — rated at the load it was given, on the member given; and the back-driving flank with it |
 | F49 | `check_golden.sh` recorded the corpus from whatever binary was on disk | drift | 3b | **closed** — and logged in `corrections.md` |
 | F50 | The optimiser's convergence claim was half true: a set's search ran one start of six | gap | 4 | **closed** — and logged in `corrections.md` |
-| F61 | A pair pays eight times over for starts that all land on the same point | gap | 5 | open — measured, see Phase 4 |
+| F61 | A pair pays eight times over for starts that all land on the same point | holds | 5 | **closed — measured and declined**; the premise is out by an order and no exact repair exists |
 | F62 | The walk took no step at all on a narrow box, so the answer was the sweep's grid | gap | 4 | **closed** — and logged in `corrections.md` |
 | F63 | Three documents said the division is solved; it is searched, and the solver has no production caller | drift | 4 | **closed** — and logged in `corrections.md` |
 | F64 | `split_residual` is derived at fixed tip radii, which the default tip cap breaks | gap | 4 | **closed** — stated where it lives; the corrected rate is below |
@@ -1572,6 +1599,65 @@ records this fault happening once before, to the axial-overlap warning.
 
 > **Gate, run.** A set reporting no tip room fails two tests; the refusal
 > relieved fails a third and moves two corpus files.
+
+
+### Phase 5, eighth pass — the two carried findings
+
+**F48, closed, and it was a live wrong number.** A screw pair's contact was rated
+from the torque on its **wheel**, `T_in · i · η_forward` — the conservative
+reading of the friction balance, and everywhere the pair transmits the same
+number as the input torque read on the worm. `Directional::once_moving` clamps a
+locked pair's efficiency to zero, so that product is zero and a forward-locked
+pair reported **no flank load at all**.
+
+It was in the corpus the whole time. `gear-cli crossed 17 23 90` prints a 9°/81°
+split that cannot drive forward at µ = 0.06, and it printed `0.0` between
+neighbours reading 1273. It prints 1176.1 now.
+
+| what moved | by |
+|---|---|
+| the locked split | 0.0 → **1176.1 MPa** |
+| the splits that do transmit | under 0.03 % |
+| a near-parallel crossed pair's pitch-point rating | 1 % — the wheel torque carried a **path** efficiency into a **pitch-point** balance |
+| the back-driven worm's peak | −0.8 %, onto its own flank |
+
+Three faults, one change. The first is the degeneracy. The second is that the
+wheel torque mixes two models. The third is that rating *along* the path from the
+output torque holds the output fixed while the moment arm varies — the constant
+is the input torque, which is what the shaft delivers at every instant.
+
+And the half of F43 that was left: `Screw::normal_force` took `Flank::Driving`
+unconditionally, so a back-driving load was balanced on the driving flank. The
+direction is a parameter of the balance now, exactly as it already was of the
+efficiency three functions away.
+
+> **Gate, run.** Two laws: a pair that transmits nothing still has its flanks
+> pressed, and a back-driving load reaches the wheel undiminished — the second
+> asserting both that the flank swap moves the rating by half a percent *and*
+> that this is at least five times smaller than the fault it is being told apart
+> from, since a bound without the second half is a tolerance rather than a test.
+
+**F61, measured and declined.** The finding said a pair pays eight times over for
+starts that all land on the same point. Counted, on the shipped search:
+
+| | walks | evaluations | spent re-finding an answer already found |
+|---|---|---|---|
+| a pair, both shifts free | 5.0 | 1,480 | **28 %** |
+| a pair, shift sum pinned | 3.4 | 113 | 23 % |
+| an epicyclic set | 4.8 | 2,718 | **2.4 %** |
+
+So the premise is out by an order — a quarter of the cheap case, and almost none
+of the dear one, because a set's walks genuinely land in different places, which
+is why it has the multi-start. And the walks that duplicate on a pair are the
+ones that **confirm** the summit: the sweep's own best point lands on the lower
+ridge and it is an outermost start that reaches the top, so the starts are all
+earning their keep even when four of five agree.
+
+**No exact repair exists.** The trajectories converge to within 10–300 ULP of one
+another and not to the same bits, so a cache of visited states or a memoised
+objective never fires; anything coarser trades a guaranteed answer for a guess
+about which walk was going to matter. Declined on the same footing as Q3's closed
+form — with the measurement written down so it is not re-derived.
 
 
 ---
