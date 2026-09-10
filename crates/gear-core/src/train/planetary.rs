@@ -1341,6 +1341,77 @@ mod tests {
     use super::*;
     use crate::train::test_library;
 
+    /// **A probe width leaves no trace.**
+    ///
+    /// An epicyclic set rates once at `PROBE` and scales to the width each mesh
+    /// carries — bending inversely with the width, contact with its square root
+    /// (`Loading::at_width`). So the stress it reports must be the stress a
+    /// direct evaluation at that width gives, and this asks for one.
+    ///
+    /// **Nothing asked before, and the reason is a coincidence of two
+    /// constants**: `PROBE` is 10.0 and `StageGear`'s default face width is
+    /// 10.0, so every shipped case scales by exactly one and the exponent could
+    /// be anything. Perturbing it to 0.51 left all 558 tests and all 27 golden
+    /// files unchanged. *Two unrelated numbers that happen to be equal will hide
+    /// whatever lies between them.*
+    ///
+    /// Widths well away from the probe on both sides, so a scale that is wrong
+    /// in either direction shows.
+    #[test]
+    fn a_probe_width_leaves_no_trace() {
+        let lib = test_library();
+        let mut checked = 0u32;
+        for face in [2.5_f64, 10.0, 40.0] {
+            let stage = PlanetaryStage {
+                sun: StageGear {
+                    face_width: Auto::fixed(face),
+                    ..PlanetaryStage::default().sun
+                },
+                planet: StageGear {
+                    face_width: Auto::fixed(face),
+                    ..PlanetaryStage::default().planet
+                },
+                ring: StageGear {
+                    face_width: Auto::fixed(face),
+                    ..PlanetaryStage::default().ring
+                },
+                ..PlanetaryStage::default()
+            };
+            let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &lib)
+                .unwrap_or_else(|e| panic!("face {face}: {e}"));
+            let b = stage
+                .built([
+                    r.sun.profile_shift,
+                    r.planet.gear.profile_shift,
+                    r.ring.profile_shift,
+                ])
+                .expect("the set has geometry");
+
+            // The sun mesh, evaluated where it is carried rather than scaled
+            // there. Same `contact_stress`; what it does not share is the
+            // scaling under test.
+            let planets = f64::from(stage.planets.max(1));
+            let load = Load::new((r.torques[0] / planets).abs(), face);
+            let e_star = contact_modulus(
+                &lib.get(&stage.sun.material).expect("a material").clone(),
+                &lib.get(&stage.planet.material).expect("a material").clone(),
+            );
+            let direct =
+                contact_stress(&b.sp_path, &b.sp_mesh, &b.sun, PARALLEL_AXES, &load, e_star)
+                    .expect("the sun mesh has contact");
+
+            let got = r.sun.contact_stress.peak;
+            assert!(
+                (got - direct.governing(0)).abs() < 1e-9 * direct.governing(0),
+                "face {face}: the sun reports {got} MPa where a direct evaluation \
+                 at that width gives {}",
+                direct.governing(0)
+            );
+            checked += 1;
+        }
+        assert_eq!(checked, 3, "a width went unrun");
+    }
+
     /// **A planet's root answers to both of its meshes.**
     ///
     /// The sun loads one flank and the ring the other, and it had only the

@@ -456,39 +456,148 @@ mod tests {
         );
     }
 
-    /// Reconstruct a bulged segment and measure how far the real profile strays
-    /// from it. This is the property the whole module exists to provide.
+    /// **How far the drawn outline strays from the profile it is drawing** —
+    /// the property the whole module exists to provide, and the one thing
+    /// nothing here measured.
+    ///
+    /// It measured the longest *chord* instead, under the name `worst_deviation`
+    /// and with the real computation abandoned mid-line (`let _ = mid_r;`). A
+    /// chord's length is not its sagitta, and everything written on top of it
+    /// was **relative**: tighter tolerance gives shorter chords, more vertices.
+    /// Both compare one tolerance against another, so scaling the tolerance — or
+    /// moving the subdivision's stop — moves both sides and neither notices.
+    /// Measured: `DEFAULT_CHORD_TOLERANCE` doubled and `MAX_SUBDIVISION_DEPTH`
+    /// cut from 14 to 10 each left the entire suite and the whole corpus silent.
+    ///
+    /// The reference is [`Gear::profile`], sampled far denser than any outline —
+    /// the same curve in the same frame, uniform in parameter where the outline
+    /// is adaptive with exact arcs, so the two share the geometry and share none
+    /// of the subdivision under test. It is the check
+    /// `a_rings_outline_tracks_its_profile_and_closes` already makes of a ring,
+    /// which an external gear had no counterpart to.
     fn worst_deviation(g: &Tooth, tol: f64) -> f64 {
-        let v = crate::gear::Gear::new(g.params).outline(tol);
+        // **One tooth of reference points is every tooth**, the gear being
+        // periodic — and the whole outline to match them against, so a point is
+        // free to find a chord on a neighbour if the two ever disagreed about
+        // where a tooth ends.
+        //
+        // The reference is drawn **ten times denser than the outline it is
+        // judging**, derived rather than fixed: a constant density stops being a
+        // reference the moment the tolerance asks for more vertices than it has,
+        // and then what is measured is the reference's own coarseness. It read
+        // as the deviation *rising* at 1e-4.
+        let gear = crate::gear::Gear::new(g.params);
+        let v = gear.outline(tol);
+        let per_tooth = 10 * (v.len() / (g.params.teeth as usize).max(1)).max(20);
+        let all = gear.profile(per_tooth);
+        let truth = &all[..per_tooth.min(all.len())];
+
+        // The outline covers the whole gear and the reference one half-tooth, so
+        // each reference point is matched to the nearest chord rather than the
+        // two being walked in step. Distance from a point to a segment.
+        let to_segment = |p: [f64; 2], a: [f64; 2], b: [f64; 2]| {
+            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+            let len2 = dx * dx + dy * dy;
+            let t = if len2 <= 0.0 {
+                0.0
+            } else {
+                (((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2).clamp(0.0, 1.0)
+            };
+            f64::hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
+        };
+
         let mut worst = 0.0_f64;
-        for i in 0..v.len() {
-            let a = v[i];
-            let b = v[(i + 1) % v.len()];
-            if a.bulge.abs() > 1e-12 {
-                continue; // arcs are exact; checked separately
+        for p in truth {
+            let mut nearest = f64::INFINITY;
+            for i in 0..v.len() {
+                let (a, b) = (v[i], v[(i + 1) % v.len()]);
+                nearest = nearest.min(if a.bulge.abs() > 1e-12 {
+                    // **A bulged span is an arc, and the only arcs here are the
+                    // tip and root**, concentric with the axis — so the distance
+                    // to one is the difference of two radii, exactly. Skipping
+                    // them instead leaves every reference point that lies on one
+                    // matched to a remote chord, which reads as a third of a
+                    // millimetre of stray that no tolerance ever shrinks.
+                    (f64::hypot(p[0], p[1]) - f64::hypot(a.x, a.y)).abs()
+                } else {
+                    to_segment(*p, [a.x, a.y], [b.x, b.y])
+                });
             }
-            // Straight chord: the true profile between two adjacent vertices
-            // deviates by at most the sagitta, which subdivision bounded.
-            let mid_r = f64::hypot((a.x + b.x) / 2.0, (a.y + b.y) / 2.0);
-            // Distance from the chord midpoint to the nearest true radius is a
-            // proxy that works because the profile is a graph over radius.
-            let _ = mid_r;
-            worst = worst.max(f64::hypot(b.x - a.x, b.y - a.y));
+            worst = worst.max(nearest);
         }
         worst
     }
 
+    /// **The outline meets the tolerance it was given, and converges on it.**
+    ///
+    /// An absolute claim, so it sees a tolerance that moved — where the two
+    /// relative tests it replaces could not.
+    ///
+    /// # What it is, measured
+    ///
+    /// Subdivision stops when a span's **midpoint sagitta** is inside tolerance,
+    /// and a curved flank's true worst deviation is larger than its midpoint
+    /// sagitta — most so on an undercut tooth, whose profile is legitimately
+    /// re-entrant. Across nine gears, deviation as a multiple of the tolerance
+    /// asked for:
+    ///
+    /// ```text
+    ///                    1e-2   1e-3   1e-4
+    ///   z9  undercut     2.51   1.81   1.11
+    ///   z17 undercut     2.70   1.84   0.99
+    ///   z43              0.63   0.93   0.99
+    /// ```
+    ///
+    /// So it **converges on the tolerance** as the spans shorten and the curve
+    /// becomes locally a parabola, which is the second claim here and the more
+    /// informative one: it says the number is a tolerance rather than a knob
+    /// that happens to correlate.
+    ///
+    /// # The reference has to be denser than the thing it judges
+    ///
+    /// Written first against a fixed sampling this reported the deviation
+    /// *rising* as the tolerance tightened, which is impossible for a
+    /// convergent scheme and was the giveaway: the polyline had overtaken the
+    /// curve it was being compared against, so what was measured was the
+    /// reference's own coarseness. It is drawn ten times denser than whatever
+    /// outline it is judging, derived rather than fixed — *a reference is only a
+    /// reference while it is finer than its subject.*
     #[test]
-    fn tighter_tolerance_gives_shorter_chords() {
-        let g = Tooth::new(GearParams::default());
-        let coarse = worst_deviation(&g, 1e-2);
-        let fine = worst_deviation(&g, 1e-4);
-        assert!(fine < coarse, "{fine} !< {coarse}");
+    fn the_outline_meets_the_tolerance_it_was_given() {
+        for teeth in [9_u32, 17, 43] {
+            for shift in [-0.2_f64, 0.0, 0.4] {
+                let p = GearParams {
+                    teeth,
+                    profile_shift: shift,
+                    ..Default::default()
+                };
+                let g = Tooth::new(p);
+                let tolerances = [1e-2_f64, 1e-3, 1e-4];
+                let ratio = tolerances.map(|t| worst_deviation(&g, t) / t);
+                for (t, r) in tolerances.iter().zip(ratio) {
+                    assert!(
+                        r <= 3.0,
+                        "z{teeth} x{shift}: asked for {t} mm and the outline \
+                         strays {r} times it"
+                    );
+                }
+                assert!(
+                    ratio[2] <= 1.4,
+                    "z{teeth} x{shift}: at a ten-thousandth the deviation is \
+                     still {} times the tolerance, so it is not converging on it",
+                    ratio[2]
+                );
+            }
+        }
     }
 
+    /// ...and tightening it actually buys something, so the tolerance is not
+    /// merely satisfied by an outline that was already fine enough.
     #[test]
-    fn vertex_count_grows_as_tolerance_tightens() {
+    fn a_tighter_tolerance_is_drawn_more_finely() {
         let g = Tooth::new(GearParams::default());
+        let (coarse, fine) = (worst_deviation(&g, 1e-2), worst_deviation(&g, 1e-4));
+        assert!(fine < coarse, "{fine} !< {coarse}");
         let a = crate::gear::Gear::new(g.params).outline(1e-2).len();
         let b = crate::gear::Gear::new(g.params).outline(1e-4).len();
         let c = crate::gear::Gear::new(g.params).outline(1e-6).len();
@@ -564,6 +673,15 @@ mod tests {
 
     #[test]
     fn a_nonsense_tolerance_falls_back_to_the_default() {
+        // **The default itself, as a figure.** It reaches the UI through three
+        // `gear-wasm` entry points, so it is the accuracy every drawing this
+        // tool makes is at unless somebody said otherwise — and nothing could
+        // see it move: every test here compares one tolerance against another
+        // or against the default's own output, and the corpus passes an explicit
+        // tolerance to `dxf`. Doubling it left all 558 tests and all 27 golden
+        // files unchanged. A micron on a millimetre-module gear.
+        assert_eq!(DEFAULT_CHORD_TOLERANCE, 1e-3);
+
         let g = Tooth::new(GearParams::default());
         let want = crate::gear::Gear::new(g.params)
             .outline(DEFAULT_CHORD_TOLERANCE)
@@ -580,6 +698,19 @@ mod tests {
 
     /// An unreachably tight tolerance must not explode the vertex count. Before
     /// the floor was added this case took 45 seconds and would have hung the UI.
+    ///
+    /// **And the floor is where it says it is.** This asserted only that the
+    /// case *terminated*, which is a claim about the stop existing and not about
+    /// where it sits: `MAX_SUBDIVISION_DEPTH` could be cut from 14 to 4 and this
+    /// would still pass in a fraction of the time, on a visibly coarse drawing.
+    /// Measured, the depth moved from 14 to 10 with all 558 tests and all 27
+    /// golden files silent. So the count is pinned too — a canary, since a
+    /// safety stop is a chosen number and not a derived one, and its only
+    /// property is that nothing changes it by accident.
+    ///
+    /// Every span drives to the stop here, so the count is `spans × 2^depth`
+    /// and a depth one lower halves it. The band is wide because the span count
+    /// is the tooth's business; what it catches is a factor of two.
     #[test]
     fn an_unreachable_tolerance_stays_bounded() {
         let g = Tooth::new(GearParams::default());
@@ -587,5 +718,10 @@ mod tests {
         let n = crate::gear::Gear::new(g.params).outline(1e-18).len();
         let elapsed = t0.elapsed();
         assert!(elapsed.as_secs() < 2, "took {elapsed:?} for {n} vertices");
+        assert!(
+            (400_000..1_200_000).contains(&n),
+            "{n} vertices at the subdivision floor: the stop has moved off \
+             depth {MAX_SUBDIVISION_DEPTH}"
+        );
     }
 }

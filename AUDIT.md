@@ -120,7 +120,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 558 tests** (was 531). **Golden corpus: 27 cases** (was 22).
+**Suite: 559 tests** (was 531). **Golden corpus: 27 cases** (was 22).
 
 ---
 
@@ -271,6 +271,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F65 | Five rating constants could be perturbed with the whole suite silent | gap | 5 | **closed** — measured; four are the corpus's and it is now in the pre-push list |
 | F66 | The load-sharing ramp's constants were guarded by a test written in terms of them | gap | 5 | **closed** — pinned as figures |
 | F67 | The harness turned three of a gear's eleven controls | gap | 5 | **closed** — `sweep` turns every gear axis, `train toggles` every stage one |
+| F68 | `Loading::at_width`'s exponent was hidden by `PROBE` equalling the default face width | gap | 5 | **closed** — and logged in `corrections.md` |
+| F69 | The outline's own promise was untested; its `worst_deviation` measured chord length | gap | 5 | **closed** — " |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so
@@ -1233,6 +1235,55 @@ in 59 ms) and `gear-cli train toggles` turns every stage one.
 > everywhere. Measured against the *recorded* corpus, not against a case list
 > with a missing file — the first run of this check reported a false catch for
 > exactly that reason.
+
+### Phase 5, second pass — the laws, not the constants
+
+The same question asked of the crate's stated *proportionalities*, which are
+load-bearing: a stage rates once and scales, so a wrong exponent is a wrong
+answer everywhere the widths or the torques differ.
+
+| stated law | tests failing when broken |
+|---|---|
+| `Loading::under` — contact goes as √torque | 2 |
+| `Loading::under` — bending is linear in torque | 1, and the corpus |
+| `min_face_width_contact` — the square | 3, and the corpus |
+| **`Loading::at_width` — contact goes as 1/√width** | **0** |
+| Willis's basic ratio | 7, and the corpus |
+| the span's nominal | 3 |
+| **the outline's chord tolerance** | **0** |
+| **the subdivision's stop** | **0** |
+
+**F68 — a probe width and a default face width happened to be the same number.**
+`PROBE` is 10.0 and `StageGear`'s default face width is 10.0, so every shipped
+case scales by exactly one and the exponent could have been anything. *Two
+unrelated numbers that happen to be equal will hide whatever lies between them.*
+
+**F69 — the outline's own promise was untested, and its test was named for it.**
+`worst_deviation` returned the longest **chord**, with the real computation
+abandoned mid-line: `let _ = mid_r;` sits in the committed source where the
+distance to the profile was going to be worked out. Everything built on it was
+relative — tighter tolerance, shorter chords, more vertices — and a relative test
+cannot see a scale move.
+
+Measured properly, against the gear's own dense sampler, the outline is inside
+**3×** its tolerance and converges on it: 2.7× at 1e-2, 1.8× at 1e-3, 0.99× at
+1e-4, worst on an undercut tooth. Subdivision stops on a span's *midpoint*
+sagitta and a re-entrant flank's worst deviation exceeds it, which is the
+mechanism and is worth a designer knowing.
+
+> **And the first version of that measurement measured the reference.** It
+> reported three times the tolerance, and the shape was the giveaway — the
+> deviation *rose* as the tolerance tightened, which is impossible for a
+> convergent scheme. The polyline had overtaken the curve it was compared
+> against. The reference is derived from the outline's own vertex count now, ten
+> times denser than whatever it judges. *A reference is only a reference while it
+> is finer than its subject.*
+
+> **Gate, run.** Loosening the subdivision test by 3× fails the new law and
+> nothing else; doubling `DEFAULT_CHORD_TOLERANCE` fails the fallback test;
+> cutting `MAX_SUBDIVISION_DEPTH` from 14 to 10 fails the bounded-count test.
+> Each of the three was silent across all 558 tests and all 27 golden files
+> before.
 
 **F6, closed on the way.** The face-width invariance ran on `FormFactorOnly`
 alone, the one notch model no stage rates with — it ships through
