@@ -260,6 +260,8 @@ pub struct GearSummary {
     pub root_diameter: f64,
     pub tooth_thickness: f64,
     pub fillet_radius: f64,
+    /// Transverse pressure angle, **degrees** — a number a designer reads, so
+    /// it crosses in the unit they read it in. `gear_core` works in radians.
     pub transverse_pressure_angle: f64,
     pub cutter_tip_width: f64,
     /// Whether **any** tooth is undercut / severed — for a concentric gear that
@@ -494,6 +496,8 @@ impl CutterRef {
 pub struct RingSummary {
     pub teeth: u32,
     pub transverse_module: f64,
+    /// Transverse pressure angle, **degrees** — a number a designer reads, so
+    /// it crosses in the unit they read it in. `gear_core` works in radians.
     pub transverse_pressure_angle: f64,
     /// Pitch, base, tip and root radii, mm. The tip is **inside** the pitch
     /// circle and the root outside it. These are what the viewport draws with.

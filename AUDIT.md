@@ -102,8 +102,15 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
-**Phase 6 — the front end and the payload.** In progress. **F39 is closed on all
-four items.** The last is the worm, which has no profile shift, so its *size*
+**Phase 6 — the front end and the payload.** In progress. **Angular units are
+unambiguous** (F80): four names meant degrees in one module and radians in the
+next, and eight angles stated no unit at all. One of the four had already cost a
+live bug — in a call site that read perfectly well and was wrong, against a field
+that was *correctly documented one line above*. The radian one carries `_rad`
+now, `tools/check_units.py` enforces it, and a second bug turned up in a fixture
+that had been building 0.0087° pairs while calling them 0.5°.
+
+**F39 is closed on all four items.** The last is the worm, which has no profile shift, so its *size*
 absorbs a given distance — and a screw pair's centre distance turns out not to be
 monotone in that size: it has a minimum at `tan γ = (z₁/z₂)^⅓`, closed form at a
 right angle, so a target above it is reached by **two** different worms and the
@@ -379,6 +386,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F38 | The reported clearance was the input echoed, not the gap run at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | **closed for all four items** — item 4's *minimum* (the worm's size absorbs a distance) is done; its *ideal*, a wheel with helical inputs and an interference check, is recorded as F79 |
 | F79 | No mesh kind has a tip-to-flank interference check, which a worm wheel's absorbing shift would need — and which would serve every kind | gap | — | **open**, scoped |
+| F80 | Four angular names meant degrees in one module and radians in the next, and eight angles stated no unit at all — one of them cost a live bug | **gap** | 6 | **closed** — `_rad` where a name would mean both, and `tools/check_units.py` keeps it true; a second bug found in a fixture |
 | F78 | A planetary set's freedoms written as one flat group left it over-determined — its shifts carry a relation of their own that a pair's do not | gap | 6 | **closed** — the shift limit is read from the distance's toggle; the relief test checks every group now |
 | F75 | The optimiser's fallback discarded the *centre distance* along with the optimisation whenever its own constraints admitted nothing | **gap** | 6 | **closed** — the fallback is what the constraints imply, not what the stage would build unasked |
 | F76 | The over-constraint rule lived in the panel as three per-kind functions, untested in either language | gap | 6 | **closed** — `Stage::freedoms` and `Stage::relieved`, gates proven |
@@ -2136,6 +2144,56 @@ group it had just relieved; it checks *every* group now, which is what makes
 `gear-cli planetstage` prints the given-distance table, so the path is in the
 change detector — the seventh time this audit has had to add a case for *an
 opt-in the harness never switches on*.
+
+### F80 — angular units, made unambiguous
+
+Raised by the units bug the worm sizing caught, and audited rather than patched:
+the bug was a symptom.
+
+**The convention was already right and already there.** Degrees where a designer
+states a number — a stage input, a gear input, anything crossing the boundary —
+and radians from `plane.rs` inwards, converted once at the edge.
+`BasicRack::new(module, pressure_angle_deg, helix_angle_deg)` had been naming the
+unit in its *parameters* all along.
+
+**What was wrong was four names that meant both**, and eight angles that stated
+no unit at all:
+
+| name | degrees in | radians in |
+|---|---|---|
+| `shaft_angle` | `train/spur.rs`, `train/worm.rs` | `screw.rs` ×2 |
+| `lead_angle`, `wheel_lead_angle` | `WormResult` | `Screw` |
+| `wheel_helix_angle` | `WormResult` | `Screw` |
+| `pressure_angle` | `params.rs`, `hula.rs`, 4 × `train/` | `strength.rs` |
+
+**The bug's shape is the argument for fixing the names rather than the prose.**
+`Screw::least_distance_lead_angle` was written to take radians;
+`WormStage::shaft_angle` holds degrees; the call site read perfectly well to its
+author and was wrong. The field was **documented** — correctly, one line above
+the declaration. Documentation is not what a reader checks; the name is.
+
+So the radian one carries `_rad` wherever a name would otherwise mean both, and
+`tools/check_units.py` enforces both halves: every angular field states its unit,
+and no name is used in two. **47 fields, all stating one unit.**
+
+> **Gates, run.** Removing `radians` from one doc comment is named and fails;
+> stripping the `_rad` from `shaft_angle` reproduces the original collision
+> exactly and fails, printing all four sites.
+
+**And it found a second live one, in a fixture.**
+`a_near_parallel_crossed_pair_is_rated_on_the_line_its_teeth_have` built its
+stages with `shaft_angle: sigma_deg.to_radians()` into a **degrees** field, and
+the same mistake again on the helix. So "crossed 0.5°" was a pair at Σ =
+**0.0087°** and "crossed 1°" one at 0.0175° — the same point twice, against a
+comment saying the two cases exist *because the answer has to be different at the
+two ends*. Corrected, and it passes at the angles it names, so the test is now
+the one it always claimed to be.
+
+**A newtype was weighed and declined**, on Q3's footing: `Deg(f64)`/`Rad(f64)`
+would make the confusion impossible rather than visible, and it touches 47 fields
+— most crossing the boundary through `ts-rs` — to remove a fault a suffix and a
+check already remove. Recorded in `rationale.md` with what would change the
+arithmetic.
 
 ### F39, item 4 — a worm sized by its housing
 

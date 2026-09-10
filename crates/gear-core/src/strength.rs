@@ -184,8 +184,8 @@ pub struct RootSection {
     /// Bending moment arm from the critical section to where the load line
     /// crosses the tooth centreline, `h_Fe`.
     pub moment_arm: f64,
-    /// Load application angle, `α_Fen`: the angle between the load direction and
-    /// the perpendicular to the tooth centreline.
+    /// Load application angle, `α_Fen`, radians: the angle between the load
+    /// direction and the perpendicular to the tooth centreline.
     pub load_angle: f64,
     /// Radius of curvature of the fillet **at the critical section**, `ρ_F` —
     /// ISO 6336-3's definition, and what [`RootStressModel::Iso6336`] is
@@ -217,7 +217,7 @@ pub struct RootSection {
     /// Carried because [`RootStressModel::DolanBroghamer`]'s constants are
     /// functions of it — it is the one notch fit here that covers a pressure
     /// angle other than 20°, and it can only do so if it is told.
-    pub pressure_angle: f64,
+    pub pressure_angle_rad: f64,
     /// Tooth form factor `Y_F` — the **bending** term alone.
     pub form_factor: f64,
     /// **The axial compression term**, in the same units as [`Self::form_factor`]
@@ -827,7 +827,7 @@ fn finish<T: ToothOutline + ?Sized>(
         load_angle,
         fillet_curvature: fillet_radius,
         min_fillet_curvature: min_fillet_radius,
-        pressure_angle: alpha_n,
+        pressure_angle_rad: alpha_n,
         form_factor,
         axial_compression,
         module: m,
@@ -1045,7 +1045,7 @@ impl RootSection {
             // **Each fit reads the radius it was fitted to**, which is the whole
             // reason both are carried: `ρ_f` here, `ρ_F` below.
             RootStressModel::DolanBroghamer => {
-                let a = self.pressure_angle;
+                let a = self.pressure_angle_rad;
                 let h = 0.331 - 0.436 * a;
                 let l = 0.324 - 0.492 * a;
                 let m = 0.261 + 0.545 * a;

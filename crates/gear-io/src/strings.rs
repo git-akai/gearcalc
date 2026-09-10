@@ -1301,8 +1301,8 @@ mod tests {
             ] {
                 let sp = ScrewParams {
                     normal_module: module,
-                    normal_pressure_angle: 20.0_f64.to_radians(),
-                    shaft_angle: sigma.to_radians(),
+                    normal_pressure_angle_rad: 20.0_f64.to_radians(),
+                    shaft_angle_rad: sigma.to_radians(),
                     starts,
                     wheel_teeth: 40,
                     worm_pitch_diameter: dia,

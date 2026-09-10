@@ -19,7 +19,7 @@ centre_distance: number,
  */
 alpha_w_sun: number, 
 /**
- * ...and of the planet–ring mesh.
+ * ...and of the planet–ring mesh, radians.
  */
 alpha_w_ring: number, 
 /**

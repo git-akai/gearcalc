@@ -78,9 +78,9 @@ pub struct ScrewParams {
     /// Normal module, mm. Shared by both members.
     pub normal_module: f64,
     /// Normal pressure angle, radians. Shared.
-    pub normal_pressure_angle: f64,
+    pub normal_pressure_angle_rad: f64,
     /// Shaft angle `Σ`, radians. 90° is the ordinary worm stage.
-    pub shaft_angle: f64,
+    pub shaft_angle_rad: f64,
     /// Starts on the worm, `z₁`.
     pub starts: u32,
     /// Teeth on the wheel, `z₂`.
@@ -95,8 +95,8 @@ impl Default for ScrewParams {
     fn default() -> Self {
         Self {
             normal_module: 1.0,
-            normal_pressure_angle: 20.0_f64.to_radians(),
-            shaft_angle: std::f64::consts::FRAC_PI_2,
+            normal_pressure_angle_rad: 20.0_f64.to_radians(),
+            shaft_angle_rad: std::f64::consts::FRAC_PI_2,
             starts: 1,
             wheel_teeth: 17,
             worm_pitch_diameter: 7.0,
@@ -108,15 +108,15 @@ impl Default for ScrewParams {
 #[derive(Clone, Copy, Debug)]
 pub struct Screw {
     /// Worm lead angle `γ₁`, radians — from the transverse plane.
-    pub lead_angle: f64,
+    pub lead_angle_rad: f64,
     /// Wheel lead angle `γ₂`, radians. `γ₁ + γ₂ = 180° − Σ`.
-    pub wheel_lead_angle: f64,
+    pub wheel_lead_angle_rad: f64,
     /// Worm helix angle `β₁ = 90° − γ₁`, radians — from the axis.
-    pub worm_helix_angle: f64,
+    pub worm_helix_angle_rad: f64,
     /// Wheel helix angle `β₂ = Σ − β₁`, radians. The specification lists this as
     /// an output "calculated from worm helix angle + axis angle", which is what
     /// `Σ = β₁ + β₂` says.
-    pub wheel_helix_angle: f64,
+    pub wheel_helix_angle_rad: f64,
     /// Lead — how far a point on the thread advances per worm revolution, mm.
     pub lead: f64,
     /// Axial module of the worm, `m_x = m_n / cos γ₁`, mm.
@@ -129,11 +129,11 @@ pub struct Screw {
     /// Sliding speed at the pitch point, as a multiple of the worm's own pitch
     /// line speed. `1/cos γ₁` for the ordinary 90° drive.
     pub sliding_ratio: f64,
-    /// Normal pressure angle, carried through because the force balance needs
-    /// it and nothing else here does.
-    pub normal_pressure_angle: f64,
+    /// Normal pressure angle, radians — carried through because the force
+    /// balance needs it and nothing else here does.
+    pub normal_pressure_angle_rad: f64,
     /// Shaft angle `Σ`, radians.
-    pub shaft_angle: f64,
+    pub shaft_angle_rad: f64,
 }
 
 /// Why a screw pair could not be built.
@@ -189,8 +189,8 @@ impl Screw {
             || !positive(p.worm_pitch_diameter)
             || p.starts == 0
             || p.wheel_teeth == 0
-            || !p.normal_pressure_angle.is_finite()
-            || !p.shaft_angle.is_finite()
+            || !p.normal_pressure_angle_rad.is_finite()
+            || !p.shaft_angle_rad.is_finite()
         {
             return Err(ScrewError::NotPositive);
         }
@@ -201,12 +201,12 @@ impl Screw {
         if sin_gamma_1 >= 1.0 {
             return Err(ScrewError::WormTooThin);
         }
-        let lead_angle = sin_gamma_1.asin();
+        let lead_angle_rad = sin_gamma_1.asin();
 
-        let worm_helix_angle = std::f64::consts::FRAC_PI_2 - lead_angle;
-        let wheel_helix_angle = p.shaft_angle - worm_helix_angle;
-        let wheel_lead_angle = std::f64::consts::FRAC_PI_2 - wheel_helix_angle;
-        let sin_gamma_2 = wheel_lead_angle.sin();
+        let worm_helix_angle_rad = std::f64::consts::FRAC_PI_2 - lead_angle_rad;
+        let wheel_helix_angle_rad = p.shaft_angle_rad - worm_helix_angle_rad;
+        let wheel_lead_angle_rad = std::f64::consts::FRAC_PI_2 - wheel_helix_angle_rad;
+        let sin_gamma_2 = wheel_lead_angle_rad.sin();
         if sin_gamma_2 <= 0.0 {
             return Err(ScrewError::ShaftAngleImpossible);
         }
@@ -217,17 +217,17 @@ impl Screw {
         // Sliding at the pitch point, per unit of the worm's pitch line speed.
         // v_s = (1 − k cos Σ) ŷ + k sin Σ ẑ with k = v₂/v₁ = sin γ₁ / sin γ₂.
         let k = sin_gamma_1 / sin_gamma_2;
-        let sliding_ratio = (1.0 - 2.0 * k * p.shaft_angle.cos() + k * k).sqrt();
+        let sliding_ratio = (1.0 - 2.0 * k * p.shaft_angle_rad.cos() + k * k).sqrt();
         if sliding_ratio <= 0.0 {
             return Err(ScrewError::AxesAreParallel);
         }
 
-        let axial_module = p.normal_module / lead_angle.cos();
+        let axial_module = p.normal_module / lead_angle_rad.cos();
         Ok(Self {
-            lead_angle,
-            wheel_lead_angle,
-            worm_helix_angle,
-            wheel_helix_angle,
+            lead_angle_rad,
+            wheel_lead_angle_rad,
+            worm_helix_angle_rad,
+            wheel_helix_angle_rad,
             lead: f64::from(p.starts) * std::f64::consts::PI * axial_module,
             axial_module,
             worm_pitch_diameter: p.worm_pitch_diameter,
@@ -235,15 +235,15 @@ impl Screw {
             centre_distance: 0.5 * (p.worm_pitch_diameter + wheel_pitch_diameter),
             ratio: f64::from(p.wheel_teeth) / f64::from(p.starts),
             sliding_ratio,
-            normal_pressure_angle: p.normal_pressure_angle,
-            shaft_angle: p.shaft_angle,
+            normal_pressure_angle_rad: p.normal_pressure_angle_rad,
+            shaft_angle_rad: p.shaft_angle_rad,
         })
     }
 
     /// `v₂/v₁` at the pitch point — the surface speeds, not the shaft speeds.
     #[must_use]
     pub fn velocity_ratio(&self) -> f64 {
-        self.lead_angle.sin() / self.wheel_lead_angle.sin()
+        self.lead_angle_rad.sin() / self.wheel_lead_angle_rad.sin()
     }
 
     /// Mesh efficiency, both drive directions, from a force balance at the
@@ -350,10 +350,10 @@ impl Screw {
             // the flank — friction has to overcome the normal term, whichever
             // side of the balance it started on.
             let (sin_gamma, slide, sign) = match drive {
-                Drive::Forward => (self.wheel_lead_angle.sin(), self.slide_on(2), -1.0),
-                Drive::Backward => (self.lead_angle.sin(), self.slide_on(1), 1.0),
+                Drive::Forward => (self.wheel_lead_angle_rad.sin(), self.slide_on(2), -1.0),
+                Drive::Backward => (self.lead_angle_rad.sin(), self.slide_on(1), 1.0),
             };
-            self.normal_pressure_angle.cos() * sin_gamma / (sign * slide)
+            self.normal_pressure_angle_rad.cos() * sin_gamma / (sign * slide)
         })
     }
 
@@ -389,20 +389,20 @@ impl Screw {
     pub fn least_distance_lead_angle(
         starts: u32,
         wheel_teeth: u32,
-        shaft_angle: f64,
+        shaft_angle_rad: f64,
     ) -> Option<f64> {
         let (z1, z2) = (f64::from(starts), f64::from(wheel_teeth));
-        if !(z1 > 0.0 && z2 > 0.0 && shaft_angle.is_finite()) {
+        if !(z1 > 0.0 && z2 > 0.0 && shaft_angle_rad.is_finite()) {
             return None;
         }
         let right_angle = std::f64::consts::FRAC_PI_2;
-        if (shaft_angle - right_angle).abs() < 1e-12 {
+        if (shaft_angle_rad - right_angle).abs() < 1e-12 {
             return Some((z1 / z2).cbrt().atan());
         }
         // `d(2a)/dγ`, whose root is the turning point. Both terms are finite
         // only where each member still has a diameter, which is the bracket.
         let slope = |gamma: f64| {
-            let beta2 = shaft_angle - right_angle + gamma;
+            let beta2 = shaft_angle_rad - right_angle + gamma;
             let (s, c) = (gamma.sin(), gamma.cos());
             let (sb, cb) = (beta2.sin(), beta2.cos());
             if s.abs() < 1e-12 || cb.abs() < 1e-12 {
@@ -411,7 +411,7 @@ impl Screw {
             z2 * sb / (cb * cb) - z1 * c / (s * s)
         };
         // γ ∈ (0, 90°) and |β₂| < 90°, so γ < 180° − Σ.
-        let hi = right_angle.min(std::f64::consts::PI - shaft_angle) - 1e-9;
+        let hi = right_angle.min(std::f64::consts::PI - shaft_angle_rad) - 1e-9;
         let lo = 1e-9;
         (lo < hi).then(|| crate::solve::brent(slope, lo, hi, crate::solve::Tol::default()))?
     }
@@ -419,7 +419,7 @@ impl Screw {
     /// The sliding direction resolved on member `which`'s velocity direction.
     fn slide_on(&self, which: u8) -> f64 {
         let k = self.velocity_ratio();
-        let cos_sigma = self.shaft_angle.cos();
+        let cos_sigma = self.shaft_angle_rad.cos();
         if which == 1 {
             (1.0 - k * cos_sigma) / self.sliding_ratio
         } else {
@@ -435,10 +435,10 @@ impl Screw {
             Flank::Driving => 1.0,
             Flank::BackDriving => -1.0,
         };
-        let cos_alpha = self.normal_pressure_angle.cos();
+        let cos_alpha = self.normal_pressure_angle_rad.cos();
         (
-            sign * cos_alpha * self.lead_angle.sin() + friction * self.slide_on(1),
-            sign * cos_alpha * self.wheel_lead_angle.sin() + friction * self.slide_on(2),
+            sign * cos_alpha * self.lead_angle_rad.sin() + friction * self.slide_on(1),
+            sign * cos_alpha * self.wheel_lead_angle_rad.sin() + friction * self.slide_on(2),
         )
     }
 
@@ -497,9 +497,9 @@ impl Screw {
     #[must_use]
     pub fn contact_curvatures(&self) -> Option<(f64, f64)> {
         pitch_point_curvatures(
-            self.shaft_angle,
-            self.normal_pressure_angle,
-            self.worm_helix_angle,
+            self.shaft_angle_rad,
+            self.normal_pressure_angle_rad,
+            self.worm_helix_angle_rad,
             self.worm_pitch_diameter / 2.0,
             self.wheel_pitch_diameter / 2.0,
         )
@@ -645,12 +645,12 @@ impl Screw {
     /// angle and `n̂_z` is `sin β_b1` by construction.
     #[must_use]
     pub fn contact_normal(&self) -> Option<[f64; 3]> {
-        let alpha_n = self.normal_pressure_angle;
+        let alpha_n = self.normal_pressure_angle_rad;
         let bb = |beta: f64| crate::plane::base_helix_angle(beta, alpha_n);
-        let bb1 = bb(self.worm_helix_angle);
-        let bb2 = bb(self.shaft_angle - self.worm_helix_angle);
+        let bb1 = bb(self.worm_helix_angle_rad);
+        let bb2 = bb(self.shaft_angle_rad - self.worm_helix_angle_rad);
 
-        let (sin_sigma, cos_sigma) = self.shaft_angle.sin_cos();
+        let (sin_sigma, cos_sigma) = self.shaft_angle_rad.sin_cos();
         if sin_sigma.abs() < f64::EPSILON {
             return None;
         }
@@ -710,9 +710,9 @@ impl Screw {
             self.worm_pitch_diameter / 2.0,
             self.wheel_pitch_diameter / 2.0,
         );
-        let beta_1 = self.worm_helix_angle;
-        let beta_2 = self.shaft_angle - beta_1;
-        let alpha_n = self.normal_pressure_angle;
+        let beta_1 = self.worm_helix_angle_rad;
+        let beta_2 = self.shaft_angle_rad - beta_1;
+        let alpha_n = self.normal_pressure_angle_rad;
         let base =
             |r: f64, beta: f64| r * crate::plane::transverse_pressure_angle(alpha_n, beta).cos();
         let (rb1, rb2) = (base(r1, beta_1), base(r2, beta_2));
@@ -722,7 +722,7 @@ impl Screw {
         // 1. The direction — `Screw::contact_normal`, which the backlash
         //    projection uses too. It owes nothing to the centre distance.
         let n = self.contact_normal()?;
-        let (sin_sigma, cos_sigma) = self.shaft_angle.sin_cos();
+        let (sin_sigma, cos_sigma) = self.shaft_angle_rad.sin_cos();
         let axis_1 = [0.0, 0.0, 1.0];
         let axis_2 = [0.0, sin_sigma, cos_sigma];
         let pitch = [r1, 0.0, 0.0];
@@ -780,7 +780,7 @@ impl Screw {
     /// images and every length is the same on either — so the first found is
     /// taken.
     fn mesh_branch(&self, n: [f64; 3], rb1: f64, rb2: f64) -> Option<(f64, f64)> {
-        let (sin_sigma, cos_sigma) = self.shaft_angle.sin_cos();
+        let (sin_sigma, cos_sigma) = self.shaft_angle_rad.sin_cos();
         let axis_1 = [0.0, 0.0, 1.0];
         let axis_2 = [0.0, sin_sigma, cos_sigma];
         let centre_2 = [self.centre_distance, 0.0, 0.0];
@@ -809,14 +809,14 @@ impl Screw {
     /// Normal module, recovered from the pitch geometry it was built with.
     #[must_use]
     pub fn normal_module(&self) -> f64 {
-        self.axial_module * self.lead_angle.cos()
+        self.axial_module * self.lead_angle_rad.cos()
     }
 
     /// `π m_n cos α_n` — the pitch the contact point advances by between one
     /// tooth pair and the next, measured in the plane the contact is a point in.
     #[must_use]
     pub fn normal_base_pitch(&self) -> f64 {
-        std::f64::consts::PI * self.normal_module() * self.normal_pressure_angle.cos()
+        std::f64::consts::PI * self.normal_module() * self.normal_pressure_angle_rad.cos()
     }
 }
 
@@ -951,11 +951,11 @@ impl CrossedPath {
     /// member's axis per unit of travel along the path.
     fn axial_rate(screw: &Screw, i: usize) -> f64 {
         let beta = if i == 0 {
-            screw.worm_helix_angle
+            screw.worm_helix_angle_rad
         } else {
-            screw.shaft_angle - screw.worm_helix_angle
+            screw.shaft_angle_rad - screw.worm_helix_angle_rad
         };
-        crate::plane::base_helix_angle(beta, screw.normal_pressure_angle).sin()
+        crate::plane::base_helix_angle(beta, screw.normal_pressure_angle_rad).sin()
     }
 
     /// Half the path a face of width `b` can hold, in path units.
@@ -983,7 +983,11 @@ impl CrossedPath {
         let axis = if i == 0 {
             [0.0, 0.0, 1.0]
         } else {
-            [0.0, screw.shaft_angle.sin(), screw.shaft_angle.cos()]
+            [
+                0.0,
+                screw.shaft_angle_rad.sin(),
+                screw.shaft_angle_rad.cos(),
+            ]
         };
         let origin = if i == 0 {
             [0.0; 3]
@@ -999,10 +1003,10 @@ impl CrossedPath {
     /// `r = √(r_b² + (ρ_n cos β_b)²)`, the same relation the zone is bounded by.
     #[must_use]
     pub fn radii_at(&self, s: f64, screw: &Screw) -> [f64; 2] {
-        let alpha_n = screw.normal_pressure_angle;
+        let alpha_n = screw.normal_pressure_angle_rad;
         let beta = [
-            screw.worm_helix_angle,
-            screw.shaft_angle - screw.worm_helix_angle,
+            screw.worm_helix_angle_rad,
+            screw.shaft_angle_rad - screw.worm_helix_angle_rad,
         ];
         let r = [
             screw.worm_pitch_diameter / 2.0,
@@ -1033,9 +1037,9 @@ impl CrossedPath {
             return None;
         }
         let skew = ruling_skew(
-            screw.shaft_angle,
-            screw.normal_pressure_angle,
-            screw.worm_helix_angle,
+            screw.shaft_angle_rad,
+            screw.normal_pressure_angle_rad,
+            screw.worm_helix_angle_rad,
         )?;
         crate::hertz::relative_curvatures((1.0 / rho[0], 0.0), (1.0 / rho[1], 0.0), skew)
     }
@@ -1054,7 +1058,11 @@ impl CrossedPath {
             ],
             normal: self.normal,
             axis_1: [0.0, 0.0, 1.0],
-            axis_2: [0.0, screw.shaft_angle.sin(), screw.shaft_angle.cos()],
+            axis_2: [
+                0.0,
+                screw.shaft_angle_rad.sin(),
+                screw.shaft_angle_rad.cos(),
+            ],
             centre_2: [self.centre_distance, 0.0, 0.0],
         }
     }
@@ -1160,7 +1168,11 @@ impl CrossedPath {
     /// rather than applied: see [`CrossedPath`]'s last section.
     #[must_use]
     pub fn axial_travel(&self, screw: &Screw) -> [f64; 2] {
-        let axis_2 = [0.0, screw.shaft_angle.sin(), screw.shaft_angle.cos()];
+        let axis_2 = [
+            0.0,
+            screw.shaft_angle_rad.sin(),
+            screw.shaft_angle_rad.cos(),
+        ];
         let along = self.normal;
         [
             (self.length * along[2]).abs(),
@@ -1283,24 +1295,25 @@ enum Flank {
 /// touch at a point.
 #[must_use]
 pub fn pitch_point_curvatures(
-    shaft_angle: f64,
-    normal_pressure_angle: f64,
+    shaft_angle_rad: f64,
+    normal_pressure_angle_rad: f64,
     helix_angle_1: f64,
     pitch_radius_1: f64,
     pitch_radius_2: f64,
 ) -> Option<(f64, f64)> {
     let usable = |v: f64| v.is_finite() && v > 0.0;
-    if !usable(pitch_radius_1) || !usable(pitch_radius_2) || !normal_pressure_angle.is_finite() {
+    if !usable(pitch_radius_1) || !usable(pitch_radius_2) || !normal_pressure_angle_rad.is_finite()
+    {
         return None;
     }
 
     let beta_1 = helix_angle_1;
-    let beta_2 = shaft_angle - beta_1;
-    let (rho_n_1, beta_b_1) = flank_curvature(pitch_radius_1, beta_1, normal_pressure_angle)?;
-    let (rho_n_2, beta_b_2) = flank_curvature(pitch_radius_2, beta_2, normal_pressure_angle)?;
+    let beta_2 = shaft_angle_rad - beta_1;
+    let (rho_n_1, beta_b_1) = flank_curvature(pitch_radius_1, beta_1, normal_pressure_angle_rad)?;
+    let (rho_n_2, beta_b_2) = flank_curvature(pitch_radius_2, beta_2, normal_pressure_angle_rad)?;
     let _ = (beta_b_1, beta_b_2);
 
-    let skew = ruling_skew(shaft_angle, normal_pressure_angle, beta_1)?;
+    let skew = ruling_skew(shaft_angle_rad, normal_pressure_angle_rad, beta_1)?;
 
     crate::hertz::relative_curvatures((1.0 / rho_n_1, 0.0), (1.0 / rho_n_2, 0.0), skew)
 }
@@ -1313,8 +1326,8 @@ pub fn pitch_point_curvatures(
 /// built around. Shared by the pitch-point curvatures and by every point of the
 /// path, because it is a property of the *pair*: the rulings are fixed
 /// directions, so the skew does not vary along the contact.
-fn ruling_skew(shaft_angle: f64, alpha_n: f64, beta_1: f64) -> Option<f64> {
-    let (ruling_1, ruling_2) = rulings(shaft_angle, alpha_n, beta_1)?;
+fn ruling_skew(shaft_angle_rad: f64, alpha_n: f64, beta_1: f64) -> Option<f64> {
+    let (ruling_1, ruling_2) = rulings(shaft_angle_rad, alpha_n, beta_1)?;
     Some(norm(cross(ruling_1, ruling_2)).atan2(dot(ruling_1, ruling_2)))
 }
 
@@ -1327,13 +1340,13 @@ fn ruling_skew(shaft_angle: f64, alpha_n: f64, beta_1: f64) -> Option<f64> {
 ///
 /// Each ruling is that member's axis with its `n̂` component removed. Nothing
 /// here asserts the base helix angle; that it comes out is the check.
-fn rulings(shaft_angle: f64, alpha_n: f64, beta_1: f64) -> Option<([f64; 3], [f64; 3])> {
+fn rulings(shaft_angle_rad: f64, alpha_n: f64, beta_1: f64) -> Option<([f64; 3], [f64; 3])> {
     let (sin_b1, cos_b1) = beta_1.sin_cos();
     let p_hat = [0.0, cos_b1, -sin_b1];
     let (sin_a, cos_a) = alpha_n.sin_cos();
     let n_hat = [sin_a, cos_a * p_hat[1], cos_a * p_hat[2]];
 
-    let (sin_sigma, cos_sigma) = shaft_angle.sin_cos();
+    let (sin_sigma, cos_sigma) = shaft_angle_rad.sin_cos();
     Some((
         project_out([0.0, 0.0, 1.0], n_hat)?,
         project_out([0.0, sin_sigma, cos_sigma], n_hat)?,
@@ -1506,7 +1519,7 @@ mod tests {
 
         // Frictionless, the balance is F_t/(cos α_n sin γ) exactly.
         let tangential = 2000.0 * torque / s.worm_pitch_diameter;
-        let ideal = tangential / (s.normal_pressure_angle.cos() * s.lead_angle.sin());
+        let ideal = tangential / (s.normal_pressure_angle_rad.cos() * s.lead_angle_rad.sin());
         assert!(
             (s.normal_force(torque, MeshSide::First, 0.0, Drive::Forward) - ideal).abs()
                 < 1e-12 * ideal
@@ -1564,8 +1577,8 @@ mod tests {
     fn the_lead_angle_is_the_fixed_point_the_iteration_would_have_found() {
         for (starts, d1) in [(1u32, 7.0), (2, 7.0), (4, 12.0), (1, 30.0), (9, 40.0)] {
             let s = worm(starts, 30, d1);
-            let m_x = 1.0 / s.lead_angle.cos();
-            let residual = s.lead_angle.tan() - f64::from(starts) * m_x / d1;
+            let m_x = 1.0 / s.lead_angle_rad.cos();
+            let residual = s.lead_angle_rad.tan() - f64::from(starts) * m_x / d1;
             assert!(
                 residual.abs() < 1e-15,
                 "starts={starts} d={d1}: tan γ − z m_x/d = {residual}"
@@ -1583,15 +1596,15 @@ mod tests {
                 starts: 2,
                 wheel_teeth: 41,
                 worm_pitch_diameter: 9.0,
-                shaft_angle: f64::to_radians(sigma_deg),
+                shaft_angle_rad: f64::to_radians(sigma_deg),
                 ..Default::default()
             })
             .unwrap();
             let implied = 41.0 * 1.0 / s.wheel_pitch_diameter;
             assert!(
-                (s.wheel_lead_angle.sin() - implied).abs() < 1e-14,
+                (s.wheel_lead_angle_rad.sin() - implied).abs() < 1e-14,
                 "Σ={sigma_deg}: sin γ₂ {} vs z₂m_n/d₂ {implied}",
-                s.wheel_lead_angle.sin()
+                s.wheel_lead_angle_rad.sin()
             );
         }
     }
@@ -1611,7 +1624,7 @@ mod tests {
                 starts,
                 wheel_teeth: teeth,
                 worm_pitch_diameter: d1,
-                shaft_angle: f64::to_radians(sigma),
+                shaft_angle_rad: f64::to_radians(sigma),
                 ..Default::default()
             })
             .unwrap();
@@ -1633,14 +1646,14 @@ mod tests {
         for sigma_deg in [90.0, 60.0, 120.0, 46.0] {
             let sigma = f64::to_radians(sigma_deg);
             let s = Screw::new(&ScrewParams {
-                shaft_angle: sigma,
+                shaft_angle_rad: sigma,
                 worm_pitch_diameter: 11.0,
                 ..Default::default()
             })
             .unwrap();
-            assert!((s.worm_helix_angle + s.wheel_helix_angle - sigma).abs() < 1e-15);
+            assert!((s.worm_helix_angle_rad + s.wheel_helix_angle_rad - sigma).abs() < 1e-15);
             assert!(
-                (s.lead_angle + s.wheel_lead_angle - (PI - sigma)).abs() < 1e-15,
+                (s.lead_angle_rad + s.wheel_lead_angle_rad - (PI - sigma)).abs() < 1e-15,
                 "γ₁ + γ₂ should be 180° − Σ"
             );
         }
@@ -1657,7 +1670,7 @@ mod tests {
                 starts: 2,
                 wheel_teeth: 41,
                 worm_pitch_diameter: 9.0,
-                shaft_angle: sigma,
+                shaft_angle_rad: sigma,
                 ..Default::default()
             })
             .unwrap();
@@ -1697,8 +1710,8 @@ mod tests {
     fn the_ninety_degree_case_reproduces_the_classical_screw_formulas() {
         for (starts, d1) in [(1u32, 7.0), (2, 9.0), (4, 12.0), (1, 25.0)] {
             let s = worm(starts, 41, d1);
-            let cos_alpha = s.normal_pressure_angle.cos();
-            let (tan_g, cot_g) = (s.lead_angle.tan(), 1.0 / s.lead_angle.tan());
+            let cos_alpha = s.normal_pressure_angle_rad.cos();
+            let (tan_g, cot_g) = (s.lead_angle_rad.tan(), 1.0 / s.lead_angle_rad.tan());
             for mu in [0.0, 0.02, 0.05, 0.1, 0.2] {
                 let e = Directional::of(|d| s.efficiency(mu, d));
                 let forward = (cos_alpha - mu * tan_g) / (cos_alpha + mu * cot_g);
@@ -1728,17 +1741,17 @@ mod tests {
                 starts: 2,
                 wheel_teeth: 37,
                 worm_pitch_diameter: 10.0,
-                shaft_angle: f64::to_radians(sigma_deg),
+                shaft_angle_rad: f64::to_radians(sigma_deg),
                 ..Default::default()
             })
             .unwrap();
             for mu in [0.0, 0.03, 0.08, 0.15] {
                 let e = Directional::of(|d| s.efficiency(mu, d));
                 // Per unit normal force and unit worm pitch line speed.
-                let cos_alpha = s.normal_pressure_angle.cos();
+                let cos_alpha = s.normal_pressure_angle_rad.cos();
                 let k = s.velocity_ratio();
-                let slide_on_1 = (1.0 - k * s.shaft_angle.cos()) / s.sliding_ratio;
-                let power_in = (cos_alpha * s.lead_angle.sin() + mu * slide_on_1) * 1.0;
+                let slide_on_1 = (1.0 - k * s.shaft_angle_rad.cos()) / s.sliding_ratio;
+                let power_in = (cos_alpha * s.lead_angle_rad.sin() + mu * slide_on_1) * 1.0;
                 let power_out = e.forward * power_in;
                 let loss = mu * s.sliding_ratio;
                 assert!(
@@ -1756,7 +1769,7 @@ mod tests {
     fn a_frictionless_screw_pair_loses_nothing() {
         for sigma_deg in [90.0, 60.0, 120.0] {
             let s = Screw::new(&ScrewParams {
-                shaft_angle: f64::to_radians(sigma_deg),
+                shaft_angle_rad: f64::to_radians(sigma_deg),
                 worm_pitch_diameter: 8.0,
                 ..Default::default()
             })
@@ -1788,10 +1801,10 @@ mod tests {
             let closed = s.locking_friction();
 
             // The classical pair, at the right angle they are written for.
-            let cos_alpha = s.normal_pressure_angle.cos();
+            let cos_alpha = s.normal_pressure_angle_rad.cos();
             let classical = Directional {
-                forward: cos_alpha / s.lead_angle.tan(),
-                backward: cos_alpha * s.lead_angle.tan(),
+                forward: cos_alpha / s.lead_angle_rad.tan(),
+                backward: cos_alpha * s.lead_angle_rad.tan(),
             };
 
             for drive in Drive::BOTH {
@@ -1861,7 +1874,7 @@ mod tests {
             let distance = |g: f64| -> Option<f64> {
                 Screw::new(&ScrewParams {
                     normal_module: m_n,
-                    shaft_angle: sigma,
+                    shaft_angle_rad: sigma,
                     starts,
                     wheel_teeth: wheel,
                     worm_pitch_diameter: d_of(g),
@@ -1933,9 +1946,9 @@ mod tests {
         })
         .unwrap();
         assert!(
-            s.lead_angle.to_degrees() > 86.0,
+            s.lead_angle_rad.to_degrees() > 86.0,
             "the thread should be nearly circumferential: γ₁ = {}",
-            s.lead_angle.to_degrees()
+            s.lead_angle_rad.to_degrees()
         );
 
         let threshold = s.locking_friction();
@@ -1967,7 +1980,7 @@ mod tests {
         let steep = worm(4, 41, 9.0);
         let shallow = worm(1, 41, 25.0);
         assert!(
-            steep.lead_angle > shallow.lead_angle,
+            steep.lead_angle_rad > shallow.lead_angle_rad,
             "more starts on a smaller worm is the steeper thread"
         );
 
@@ -2018,7 +2031,7 @@ mod tests {
             let d1 = f64::from(starts) * mn / (90.0f64.to_radians() - beta).sin();
             let s = Screw::new(&ScrewParams {
                 normal_module: mn,
-                shaft_angle: sigma_deg * std::f64::consts::PI / 180.0,
+                shaft_angle_rad: sigma_deg * std::f64::consts::PI / 180.0,
                 starts,
                 wheel_teeth: teeth,
                 worm_pitch_diameter: d1,
@@ -2027,13 +2040,16 @@ mod tests {
             .expect("a buildable pair");
 
             let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
-            let betas = [s.worm_helix_angle, s.shaft_angle - s.worm_helix_angle];
+            let betas = [
+                s.worm_helix_angle_rad,
+                s.shaft_angle_rad - s.worm_helix_angle_rad,
+            ];
             let path = s
                 .path_of_contact(r[0] + mn, r[1] + mn)
                 .expect("a crossed pair has a path of contact");
 
             for i in 0..2 {
-                let alpha_n = s.normal_pressure_angle;
+                let alpha_n = s.normal_pressure_angle_rad;
                 let alpha_t = crate::plane::transverse_pressure_angle(alpha_n, betas[i]);
                 let bb = crate::plane::base_helix_angle(betas[i], alpha_n);
                 let classical = r[i] * alpha_t.sin() / bb.cos();
@@ -2090,8 +2106,8 @@ mod tests {
             let d1 = f64::from(z1) * mn / (std::f64::consts::FRAC_PI_2 - beta_1).sin();
             let s = Screw::new(&ScrewParams {
                 normal_module: mn,
-                normal_pressure_angle: alpha_n,
-                shaft_angle: sigma,
+                normal_pressure_angle_rad: alpha_n,
+                shaft_angle_rad: sigma,
                 starts: z1,
                 wheel_teeth: z2,
                 worm_pitch_diameter: d1,
@@ -2120,7 +2136,7 @@ mod tests {
     #[test]
     fn the_zone_shrinks_with_the_teeth_that_make_it() {
         let s = Screw::new(&ScrewParams {
-            shaft_angle: 90.0f64.to_radians(),
+            shaft_angle_rad: 90.0f64.to_radians(),
             starts: 17,
             wheel_teeth: 23,
             worm_pitch_diameter: 17.0 / (45.0f64.to_radians()).cos(),
@@ -2161,7 +2177,7 @@ mod tests {
             let beta = beta_deg.to_radians();
             let s = Screw::new(&ScrewParams {
                 normal_module: mn,
-                shaft_angle: 90.0f64.to_radians(),
+                shaft_angle_rad: 90.0f64.to_radians(),
                 starts: 17,
                 wheel_teeth: 23,
                 worm_pitch_diameter: 17.0 * mn / (std::f64::consts::FRAC_PI_2 - beta).sin(),
@@ -2174,10 +2190,13 @@ mod tests {
                 .expect("a path of contact");
             let travel = path.axial_travel(&s);
 
-            let alpha_n = s.normal_pressure_angle;
-            for (i, member_beta) in [s.worm_helix_angle, s.shaft_angle - s.worm_helix_angle]
-                .into_iter()
-                .enumerate()
+            let alpha_n = s.normal_pressure_angle_rad;
+            for (i, member_beta) in [
+                s.worm_helix_angle_rad,
+                s.shaft_angle_rad - s.worm_helix_angle_rad,
+            ]
+            .into_iter()
+            .enumerate()
             {
                 let bb = crate::plane::base_helix_angle(member_beta, alpha_n);
                 let expected = path.length * bb.sin().abs();
@@ -2228,7 +2247,7 @@ mod tests {
             let beta = beta_deg.to_radians();
             let s = Screw::new(&ScrewParams {
                 normal_module: mn,
-                shaft_angle: sigma_deg.to_radians(),
+                shaft_angle_rad: sigma_deg.to_radians(),
                 starts,
                 wheel_teeth: teeth,
                 worm_pitch_diameter: f64::from(starts) * mn
@@ -2299,7 +2318,7 @@ mod tests {
             let beta = beta_deg.to_radians();
             let s = Screw::new(&ScrewParams {
                 normal_module: mn,
-                shaft_angle: sigma_deg.to_radians(),
+                shaft_angle_rad: sigma_deg.to_radians(),
                 starts,
                 wheel_teeth: teeth,
                 worm_pitch_diameter: f64::from(starts) * mn
@@ -2348,7 +2367,7 @@ mod tests {
             let beta = beta_deg.to_radians();
             let s = Screw::new(&ScrewParams {
                 normal_module: mn,
-                shaft_angle: sigma_deg.to_radians(),
+                shaft_angle_rad: sigma_deg.to_radians(),
                 starts,
                 wheel_teeth: teeth,
                 worm_pitch_diameter: f64::from(starts) * mn
@@ -2423,7 +2442,7 @@ mod tests {
         let beta_1 = sigma / 2.0 + beta_add.to_radians();
         let s = Screw::new(&ScrewParams {
             normal_module: mn,
-            shaft_angle: sigma,
+            shaft_angle_rad: sigma,
             starts: z1,
             wheel_teeth: z2,
             worm_pitch_diameter: f64::from(z1) * mn / (std::f64::consts::FRAC_PI_2 - beta_1).sin(),
@@ -2504,7 +2523,7 @@ mod tests {
         let mn = 1.0;
         let s = Screw::new(&ScrewParams {
             normal_module: mn,
-            shaft_angle: 90.0f64.to_radians(),
+            shaft_angle_rad: 90.0f64.to_radians(),
             starts,
             wheel_teeth,
             worm_pitch_diameter: f64::from(starts) * mn / (split_deg.to_radians()).cos(),
@@ -2561,7 +2580,7 @@ mod tests {
             let beta: f64 = beta_deg.to_radians();
             let s = Screw::new(&ScrewParams {
                 normal_module: mn,
-                shaft_angle: sigma_deg.to_radians(),
+                shaft_angle_rad: sigma_deg.to_radians(),
                 starts: 17,
                 wheel_teeth: 23,
                 worm_pitch_diameter: 17.0 * mn / (std::f64::consts::FRAC_PI_2 - beta).sin(),
@@ -2640,8 +2659,8 @@ mod tests {
                         let d1 = f64::from(z1) * mn / (std::f64::consts::FRAC_PI_2 - beta_1).sin();
                         let Ok(s) = Screw::new(&ScrewParams {
                             normal_module: mn,
-                            normal_pressure_angle: alpha_n,
-                            shaft_angle: sigma,
+                            normal_pressure_angle_rad: alpha_n,
+                            shaft_angle_rad: sigma,
                             starts: z1,
                             wheel_teeth: z2,
                             worm_pitch_diameter: d1,
@@ -2692,8 +2711,8 @@ mod tests {
             let build = || {
                 Screw::new(&ScrewParams {
                     normal_module: mn,
-                    normal_pressure_angle: alpha_n,
-                    shaft_angle: sigma,
+                    normal_pressure_angle_rad: alpha_n,
+                    shaft_angle_rad: sigma,
                     starts: 17,
                     wheel_teeth: 43,
                     worm_pitch_diameter: d1,
@@ -2722,11 +2741,11 @@ mod tests {
     #[test]
     fn parallel_axes_have_no_line_of_action() {
         let mut s = Screw::new(&ScrewParams {
-            shaft_angle: 90.0f64.to_radians(),
+            shaft_angle_rad: 90.0f64.to_radians(),
             ..ScrewParams::default()
         })
         .expect("a buildable pair");
-        s.shaft_angle = 0.0;
+        s.shaft_angle_rad = 0.0;
         assert!(s.path_of_contact(10.0, 20.0).is_none());
     }
 
@@ -2740,7 +2759,7 @@ mod tests {
             assert!(
                 e > previous,
                 "z₁={starts} d={d1}: γ={:.2}° gave {e}, below the previous {previous}",
-                s.lead_angle.to_degrees()
+                s.lead_angle_rad.to_degrees()
             );
             previous = e;
         }
@@ -2774,7 +2793,7 @@ mod tests {
         );
         // Parallel axes leave the wheel with no lead angle at all.
         assert!(Screw::new(&ScrewParams {
-            shaft_angle: 0.0,
+            shaft_angle_rad: 0.0,
             ..Default::default()
         })
         .is_err());

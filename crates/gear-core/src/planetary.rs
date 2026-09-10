@@ -94,7 +94,7 @@ pub struct Layout {
     pub centre_distance: f64,
     /// Operating pressure angle of the sun–planet mesh, radians.
     pub alpha_w_sun: f64,
-    /// ...and of the planet–ring mesh.
+    /// ...and of the planet–ring mesh, radians.
     pub alpha_w_ring: f64,
     /// Residual `|a_ext − a_int|` at the returned shift, mm.
     ///

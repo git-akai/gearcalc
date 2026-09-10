@@ -2373,7 +2373,7 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
         starts,
         wheel_teeth,
         worm_pitch_diameter: worm_diameter,
-        shaft_angle: shaft_angle_deg.to_radians(),
+        shaft_angle_rad: shaft_angle_deg.to_radians(),
         ..Default::default()
     };
     let s = match Screw::new(&params) {
@@ -2389,7 +2389,7 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
         starts,
         wheel_teeth,
         params.normal_module,
-        params.normal_pressure_angle.to_degrees(),
+        params.normal_pressure_angle_rad.to_degrees(),
         shaft_angle_deg
     );
     println!(
@@ -2400,13 +2400,13 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
     println!("geometry");
     println!(
         "  lead angle          worm {:8.4} deg    wheel {:8.4} deg",
-        s.lead_angle.to_degrees(),
-        s.wheel_lead_angle.to_degrees()
+        s.lead_angle_rad.to_degrees(),
+        s.wheel_lead_angle_rad.to_degrees()
     );
     println!(
         "  helix angle         worm {:8.4} deg    wheel {:8.4} deg",
-        s.worm_helix_angle.to_degrees(),
-        s.wheel_helix_angle.to_degrees()
+        s.worm_helix_angle_rad.to_degrees(),
+        s.wheel_helix_angle_rad.to_degrees()
     );
     println!(
         "  pitch diameter      worm {:8.4} mm     wheel {:8.4} mm",
@@ -2500,7 +2500,7 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
                     Ok(s) => println!(
                         "  {target:9.4}  d1 {:8.4} mm   lead angle {:7.4} deg   ran at {:9.4}",
                         stage.first_pitch_diameter(),
-                        s.lead_angle.to_degrees(),
+                        s.lead_angle_rad.to_degrees(),
                         s.centre_distance
                     ),
                 }
@@ -2944,7 +2944,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
         match solve_worm_stage(&stage, StageTorques::just(2.0), &lib) {
             Err(e) => println!(
                 "{beta1:>7.1} {:>7.1}  {e}",
-                g.wheel_helix_angle.to_degrees()
+                g.wheel_helix_angle_rad.to_degrees()
             ),
             Ok(r) => {
                 any = true;
@@ -2968,7 +2968,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
                 };
                 println!(
                     "{beta1:>7.1} {:>7.1} {:>9.4} {:>9.4} {:>10.4} {:>10.4} {eta} {:>9.1} {:>13}",
-                    g.wheel_helix_angle.to_degrees(),
+                    g.wheel_helix_angle_rad.to_degrees(),
                     g.worm_pitch_diameter,
                     g.wheel_pitch_diameter,
                     g.centre_distance,

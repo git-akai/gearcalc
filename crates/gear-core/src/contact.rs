@@ -29,7 +29,7 @@ pub struct ContactPath {
     pub operating_radius_1: f64,
     /// Base radius of gear 1.
     pub base_radius_1: f64,
-    /// Operating pressure angle.
+    /// Operating pressure angle, radians.
     pub alpha_w: f64,
     /// Pressure angle at each gear's **tip**, radians, gear 1 first.
     ///

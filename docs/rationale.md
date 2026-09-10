@@ -177,6 +177,42 @@ shifts that close it, knowing nothing about loads — and `screw.rs` a **pair**.
 **What would change it:** nothing about the word. If a future kind is genuinely
 not a stage of a geartrain, it needs its own noun rather than this one stretched.
 
+### Degrees where a designer states a number, radians in the mathematics
+
+Both units are right and the tool needs both: a drawing says 20°, and every
+trigonometric expression wants 0.349. So a *stage input*, a *gear input* and
+anything crossing the boundary are in **degrees**, and everything from
+`plane.rs` inwards is in **radians**, converted once at the edge —
+`BasicRack::new(module, pressure_angle_deg, helix_angle_deg)` is where that
+happens for a rack, and `WormStage::geometry` for a screw pair.
+
+**What is not right is a name that means both.** This crate had four —
+`shaft_angle`, `lead_angle`, `wheel_helix_angle` and `pressure_angle` each
+denoted degrees in one module and radians in the next — and eight further angles
+that stated no unit at all.
+
+It cost a real bug, and the shape of it is the argument.
+`Screw::least_distance_lead_angle` was written to take a shaft angle in radians;
+`WormStage::shaft_angle` holds degrees; the call site read perfectly well to its
+author and was wrong. The field was **documented**. Documentation is not what a
+reader checks — the *name* is.
+
+So the radian one carries `_rad` wherever the name would otherwise mean both
+(`lead_angle_rad`, `shaft_angle_rad`, `pressure_angle_rad`), a mismatched call
+site reads wrong instead of reading fine, and `tools/check_units.py` keeps it
+true: every angular field states its unit, and no name is used in two.
+
+Greek names — `alpha_n`, `alpha_t`, `alpha_w`, `beta` — are radians by
+mathematical convention, and still say so. A reader who does not know that
+convention is exactly the reader the sentence is for.
+
+**Why not a newtype.** `Deg(f64)` and `Rad(f64)` would make the confusion
+impossible rather than merely visible, which is stronger. It is declined for now
+on the same footing as Q3's closed form: it touches forty-seven fields, most of
+which cross the boundary through `ts-rs`, to remove a fault that a suffix and a
+check already remove. If a third unit ever appears — gradians, or turns — that
+arithmetic changes.
+
 ### Say what is not modelled, next to the number
 
 A worm stage shows no bending stress and says why on screen. A ring shows the

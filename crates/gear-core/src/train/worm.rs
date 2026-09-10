@@ -656,8 +656,8 @@ impl WormStage {
         }
         Screw::new(&ScrewParams {
             normal_module: self.module,
-            normal_pressure_angle: self.pressure_angle.to_radians(),
-            shaft_angle: self.shaft_angle.to_radians(),
+            normal_pressure_angle_rad: self.pressure_angle.to_radians(),
+            shaft_angle_rad: self.shaft_angle.to_radians(),
             starts: self.starts,
             wheel_teeth: self.wheel_teeth,
             worm_pitch_diameter: self.first_pitch_diameter(),
@@ -990,11 +990,12 @@ pub fn solve_worm_stage(
     // line that has not grown at all (`docs/corrections.md`).
     let line_length = [
         widths[0]
-            / crate::plane::base_helix_angle(s.worm_helix_angle, s.normal_pressure_angle).cos(),
+            / crate::plane::base_helix_angle(s.worm_helix_angle_rad, s.normal_pressure_angle_rad)
+                .cos(),
         widths[1]
             / crate::plane::base_helix_angle(
-                s.shaft_angle - s.worm_helix_angle,
-                s.normal_pressure_angle,
+                s.shaft_angle_rad - s.worm_helix_angle_rad,
+                s.normal_pressure_angle_rad,
             )
             .cos(),
     ]
@@ -1240,10 +1241,10 @@ pub fn solve_worm_stage(
         // As on a parallel stage: the running distance less the geometric
         // one, rather than the input read back.
         clearance: centre - s.centre_distance,
-        lead_angle: s.lead_angle.to_degrees(),
-        wheel_lead_angle: s.wheel_lead_angle.to_degrees(),
-        helix_angle: s.worm_helix_angle.to_degrees(),
-        wheel_helix_angle: s.wheel_helix_angle.to_degrees(),
+        lead_angle: s.lead_angle_rad.to_degrees(),
+        wheel_lead_angle: s.wheel_lead_angle_rad.to_degrees(),
+        helix_angle: s.worm_helix_angle_rad.to_degrees(),
+        wheel_helix_angle: s.wheel_helix_angle_rad.to_degrees(),
         lead: s.lead,
         axial_module: s.axial_module,
         crossed: crossed_mesh(&s, &members, None, None, centre),
@@ -1526,11 +1527,16 @@ mod tests {
         // A near-parallel crossed pair, and the worm the canary is taken on.
         // Which term governs is the assertion; the two cases are here because
         // the answer has to be different at the two ends.
+        // **Degrees, because that is what these two fields are.** Both used to
+        // be handed `sigma_deg.to_radians()`, so "crossed 0.5°" built a pair at
+        // Σ = 0.0087° and "crossed 1°" one at 0.0175° — the same point twice,
+        // against a comment saying the two cases exist because the answer
+        // differs at the two ends.
         let crossed = |sigma_deg: f64| WormStage {
-            shaft_angle: sigma_deg.to_radians(),
+            shaft_angle: sigma_deg,
             starts: 17,
             wheel_teeth: 23,
-            sizing: Auto::fixed(FirstMemberSizing::HelixAngle(sigma_deg.to_radians() / 2.0)),
+            sizing: Auto::fixed(FirstMemberSizing::HelixAngle(sigma_deg / 2.0)),
             ..Default::default()
         };
         let worm = WormStage {
@@ -1564,11 +1570,15 @@ mod tests {
             let force =
                 s.normal_force(2.0, MeshSide::First, stage.sliding_friction, Drive::Forward);
             let (along, across) = s.contact_curvatures().unwrap();
-            let betas = [s.worm_helix_angle, s.shaft_angle - s.worm_helix_angle];
+            let betas = [
+                s.worm_helix_angle_rad,
+                s.shaft_angle_rad - s.worm_helix_angle_rad,
+            ];
             let line_length = (0..2)
                 .map(|i| {
                     r.members[i].face_width
-                        / crate::plane::base_helix_angle(betas[i], s.normal_pressure_angle).cos()
+                        / crate::plane::base_helix_angle(betas[i], s.normal_pressure_angle_rad)
+                            .cos()
                 })
                 .fold(f64::MAX, f64::min);
 
@@ -2311,14 +2321,14 @@ mod tests {
                     };
                     let Ok(a) = by_angle.geometry() else { continue };
                     assert!(
-                        (a.lead_angle.to_degrees() - (90.0 - beta1)).abs() < 1e-9,
+                        (a.lead_angle_rad.to_degrees() - (90.0 - beta1)).abs() < 1e-9,
                         "z={z1}/{z2} S={sigma} b={beta1}: lead angle {}",
-                        a.lead_angle.to_degrees()
+                        a.lead_angle_rad.to_degrees()
                     );
                     assert!(
-                        (a.wheel_helix_angle.to_degrees() - (sigma - beta1)).abs() < 1e-9,
+                        (a.wheel_helix_angle_rad.to_degrees() - (sigma - beta1)).abs() < 1e-9,
                         "z={z1}/{z2} S={sigma} b={beta1}: wheel helix {}",
-                        a.wheel_helix_angle.to_degrees()
+                        a.wheel_helix_angle_rad.to_degrees()
                     );
 
                     // ...and handing the derived diameter back as a diameter is
@@ -2330,7 +2340,7 @@ mod tests {
                         ..by_angle.clone()
                     };
                     let b = by_diameter.geometry().unwrap();
-                    assert_eq!(a.lead_angle, b.lead_angle);
+                    assert_eq!(a.lead_angle_rad, b.lead_angle_rad);
                     assert_eq!(a.wheel_pitch_diameter, b.wheel_pitch_diameter);
                     assert_eq!(a.centre_distance, b.centre_distance);
                 }
@@ -2366,9 +2376,9 @@ mod tests {
                 .unwrap_or_else(|e| panic!("Sigma={sigma}: {e}"));
             // ...leaving the mate a spur gear.
             assert!(
-                s.wheel_helix_angle.abs() < 1e-9,
+                s.wheel_helix_angle_rad.abs() < 1e-9,
                 "Sigma={sigma}: wheel helix {}",
-                s.wheel_helix_angle.to_degrees()
+                s.wheel_helix_angle_rad.to_degrees()
             );
             // Its pitch diameter is then the plain `z m_n`, no helix correction.
             assert!((s.wheel_pitch_diameter - 23.0).abs() < 1e-12);

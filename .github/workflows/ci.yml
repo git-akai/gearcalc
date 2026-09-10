@@ -87,6 +87,13 @@ jobs:
             tools/check_figures.py
           '
 
+      # Every angle says what unit it is in, and no name means both. The crate
+      # works in degrees where a designer states a number and radians in the
+      # mathematics, which is right; a *name* that means one in one module and
+      # the other in the next is how that becomes a bug, and it did.
+      - name: Angular units are unambiguous
+        run: nix develop --command tools/check_units.py
+
       # **The payload, executed.** Everything above checks the boundary without
       # running it: the binding check compares its generated *shape* against the
       # Rust, the suite exercises `gear-core` natively, and the corpus records

@@ -145,9 +145,9 @@ pub enum MeshError {
 #[derive(Clone, Copy, Debug)]
 pub struct Mesh {
     pub kind: MeshKind,
-    /// Transverse pressure angle of the (shared) reference rack.
+    /// Transverse pressure angle of the (shared) reference rack, radians.
     pub alpha_t: f64,
-    /// Normal pressure angle.
+    /// Normal pressure angle, radians.
     pub alpha_n: f64,
     /// Transverse module, shared by both members.
     ///

@@ -37,7 +37,12 @@ pitch_radius: number, base_radius: number, tip_radius: number, root_radius: numb
  * because doubling a number is arithmetic and arithmetic belongs here: the
  * UI displays what Rust computed and nothing else (docs/rationale.md#the-stack).
  */
-pitch_diameter: number, base_diameter: number, tip_diameter: number, root_diameter: number, tooth_thickness: number, fillet_radius: number, transverse_pressure_angle: number, cutter_tip_width: number, 
+pitch_diameter: number, base_diameter: number, tip_diameter: number, root_diameter: number, tooth_thickness: number, fillet_radius: number, 
+/**
+ * Transverse pressure angle, **degrees** — a number a designer reads, so
+ * it crosses in the unit they read it in. `gear_core` works in radians.
+ */
+transverse_pressure_angle: number, cutter_tip_width: number, 
 /**
  * Whether **any** tooth is undercut / severed — for a concentric gear that
  * is its only tooth; for an eccentric one the short teeth can while the mean

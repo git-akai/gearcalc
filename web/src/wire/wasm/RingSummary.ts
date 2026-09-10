@@ -6,7 +6,12 @@ import type { PinsOut } from "./PinsOut";
 /**
  * What the UI shows for a ring.
  */
-export type RingSummary = { teeth: number, transverse_module: number, transverse_pressure_angle: number, 
+export type RingSummary = { teeth: number, transverse_module: number, 
+/**
+ * Transverse pressure angle, **degrees** — a number a designer reads, so
+ * it crosses in the unit they read it in. `gear_core` works in radians.
+ */
+transverse_pressure_angle: number, 
 /**
  * Pitch, base, tip and root radii, mm. The tip is **inside** the pitch
  * circle and the root outside it. These are what the viewport draws with.
