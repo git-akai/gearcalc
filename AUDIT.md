@@ -102,7 +102,15 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
-**Phase 6 — the front end and the payload.** In progress. **Angular units are
+**Phase 6 — the front end and the payload.** Done. Every finding it carried is
+closed, and **three of the five premises did not survive being counted** — F17's
+simulator was never in the payload, F15's four forms share sixteen labels of
+thirty-five to fifty-three, and F16's eleven files are four hand edits and five
+recordings. What the phase actually found is elsewhere: nothing had ever executed
+the payload (F72), the over-constraint rule lived untested in the panel (F76),
+and four angular names meant degrees in one module and radians in the next (F80).
+
+**Angular units are
 unambiguous** (F80): four names meant degrees in one module and radians in the
 next, and eight angles stated no unit at all. One of the four had already cost a
 live bug — in a call site that read perfectly well and was wrong, against a field
@@ -180,7 +188,7 @@ them.
 | 3b | The direction sweep, second half — the ratings | **done** — gate proven |
 | 4 | The optimiser | **done** — gates proven; the closed form weighed and declined, with its derivation kept |
 | 5 | Consolidate the tests | **done** — eight passes, gates proven; two live wrong numbers |
-| 6 | Front end and payload | **in progress** — F17, F47 closed; F15, F16, F39 open |
+| 6 | Front end and payload | **done** — F15, F16, F17, F39, F47 closed, plus F72–F78 and F80 out of them; F79 opened and scoped |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
 production code · 10,346 lines of comment in that code · 9,348 lines of
@@ -234,23 +242,23 @@ yes six times: *is there an opt-in path the harness never switches on?* F31, F56
 F67, F24, F71 and the sixth in `docs/corrections.md`'s last row. It is protocol
 pass 6 and it is worth asking first, not last.
 
-### What is open when Phase 5 closes
+### What is open when Phase 6 closes
+
+Phase 6's own five are all closed; what remains is what earlier phases deferred,
+plus the one Phase 6 opened.
 
 | | Finding | Phase |
 |---|---|---|
-| F15 | `TrainPanel.svelte` is 2,848 lines, four hand-written stage forms | 6 |
-| F16 | One stage input touches eleven files | 6 |
-| F17 | 1.49 MB wasm carrying a simulator no browser path reaches | 6 — **closed**, and the premise was false |
-| F39 | The clearance paradigm — `Auto` clearance, mode 3 without the optimiser, a planetary distance | 6 |
-| F47 | `Directional::self_locking` asks a directional question one way only | 6 — **closed** |
+| F79 | No mesh kind has a tip-to-flank interference check — the wider half of F39's item 4, and it would serve every kind | 6, opened |
 | F51 | The hula stage's shift search cannot be asked for an effort | 4, deferred |
 | F55 | A centre distance no admissible shifts can reach is answered rather than refused | 4, deferred |
 | F58 | The hula shift optimiser moves no answer over a band of tooth differences | 4, deferred |
 | F7, F19, F21 | Figures and tables still ungated — the count is known, the tagging is not done | 0, 4 |
 
-Phase 6 is the front end and the payload, and F47 is the one core change waiting
-on it: the self-locking flag crosses the boundary and the panel reads it, so
-asking the question in both directions is a wire change.
+**Phase 7 is what is left**, and it is four deferred findings and one new one
+rather than a sweep of its own. F79 is the largest and the only one that adds
+mathematics; F55 and F58 are both about a search saying *no answer* clearly; F51
+is a refactor the hula stage wants anyway; F7/F19/F21 are tagging.
 
 ---
 
@@ -358,8 +366,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F12 | The inline tests never had the integration tests' consolidation | holds | 5 | **closed** — the premise was measured and does not hold; one law asserted at two standards, levelled |
 | F13 | Five production modules carry no inline tests, invisibly | holds | 5 | **closed** — four are covered elsewhere, measured; the fifth hid a dead branch |
 | F14 | The two unfired notes need their evidence re-dated | **gap** | 5 | **closed** — one was never fired *at*; the other re-searched at 7× the breadth |
-| F15 | `TrainPanel.svelte` is 2,848 lines, four hand-written stage forms | gap | 6 | open |
-| F16 | One stage input touches eleven files | holds | 6 | open |
+| F15 | `TrainPanel.svelte` is 2,848 lines, four hand-written stage forms | gap | 6 | **closed — the premise is softer than it reads**; the forms share sixteen labels of thirty-five to fifty-three and the file was already factored. The real duplication was one missing row snippet, written out 34 times |
+| F16 | One stage input touches eleven files | holds | 6 | **closed — measured**; four hand edits, three documents and five recordings, and no strings unless the label is new |
 | F17 | 1.49 MB wasm carrying a simulator no browser path reaches | drift | 6 | **closed — the premise was false**; the payload is 1.21 MB and the simulator was never in it |
 | F72 | Nothing ever executed the payload: the boundary's shape was checked, `gear-core`'s values were checked, and the `.wasm` the browser downloads was run by nothing | **gap** | 6 | **closed** — `tools/check_wasm.sh`, gates proven |
 | F73 | The wasm build was written out three times — flake, npm script, payload check — so a check could measure a module nobody downloads | gap | 6 | **closed** — `tools/build_wasm.sh` is the one recipe |
@@ -2194,6 +2202,85 @@ would make the confusion impossible rather than visible, and it touches 47 field
 — most crossing the boundary through `ts-rs` — to remove a fault a suffix and a
 check already remove. Recorded in `rationale.md` with what would change the
 arithmetic.
+
+### F15 and F16 — measured, and both premises are softer than they read
+
+Both findings describe a *cost*, and both were recorded by reading rather than by
+counting. Counted, neither says what it appears to.
+
+#### F15 — "four hand-written stage forms" is not four copies of one
+
+The four forms are 1,042 of the file's 2,900 lines. What they **share** is not
+much, and that is the answer rather than an obstacle:
+
+| | labels and fields | unique to it |
+|---|---|---|
+| spur | 35 | 9 |
+| worm | 46 | 21 |
+| planetary | 53 | 32 |
+| hula | 37 | 13 |
+
+**Sixteen things are common to all four**, and the largest identical run between
+any two forms is 21 lines. The "shared header" turns out to be *two* fields —
+the module and the pressure angle — after which every kind diverges: spur has a
+shaft angle and an additional helix, worm a shaft angle, planetary and hula a
+helix angle; the frictions are one pair, one pair, **two** pairs and an array.
+
+The forms are hand-written because the stages genuinely differ, and the file is
+**already factored**: about 700 lines of shared snippets (`gearCard` 388,
+`screwReadout` 106, `autoNumber` 94, `meshRows` 72, `property` 51,
+`boundedNumber` 50) serve the 1,042 lines of per-kind form.
+
+**So a declaration language is declined**, and the counting is why. To replace
+forms that share sixteen labels out of thirty-five to fifty-three, the
+declaration would have to express sections, per-member cards, conditional
+fields, notes and readouts — a configuration dialect harder to read than the
+markup it replaced, to remove duplication that is not there. This is Q4's
+caveat one level up: *the relative complexity could multiply for little gain.*
+
+**What was actually duplicated**, found by looking for repeated runs rather than
+assuming them: three blocks, each written four times — the pressure-angle field,
+the static-friction note, and the tolerance pair. All three are the same missing
+thing: the row family had `autoNumber` (a value the tool may supply) and
+`boundedNumber` (a value with a range), and **not the plain one**. So it was
+written out by hand thirty-four times, and had already drifted — some rows
+carried a `FieldNote` and some did not, for no reason but which form they were
+in.
+
+`numberField` is that third member. **2,900 → 2,765 lines**, and the built
+bundle 177.4 → 169.4 kB. Three narrowings had to be carried into `{@const}`
+first, which the type-checker named exactly.
+
+> **And a check caught one of eight.** The first pass mapped units through a
+> table that knew only millimetres and degrees, so eight rows silently lost
+> theirs. `tools/check_strings.py` reported **one** — `ui.train_hours`, the only
+> unit that appeared nowhere else — and the other seven were invisible to it
+> because their keys are used elsewhere too. A coverage check on a *catalogue*
+> cannot see a message that is still used somewhere. Redone from the original
+> markup with no table at all: whatever unit cell was there becomes the argument,
+> and an unrecognised one stops the script rather than defaulting to blank.
+
+#### F16 — "eleven files" is four hand edits and five recordings
+
+Measured on a real one: `PlanetaryStage::centre_distance`, added for F39's third
+item, touched thirteen files. Sorted by what they cost:
+
+| | files | what they are |
+|---|---|---|
+| substance | 4 | the stage's file, the layout, `train/mod.rs`'s freedom and toggle, the panel's control |
+| harness and documents | 3 | a `gear-cli` case so the corpus sees it, `reference.md`, `AUDIT.md` |
+| **regenerated or recorded** | 5 | two wire types, two golden files, the boundary record — all a `--write` |
+| one line | 1 | a JSON fixture |
+
+And **no string files at all**, because it reused a label. The five-catalogue
+cost lands only when the *word* is new, which is what five languages costs and
+is not reducible.
+
+So the reducible part is the four, and three of those are irreducible too: the
+field, its use, and the control have to be written. The remaining one is
+`train/mod.rs`'s toggle accessor, which a macro could derive from the freedom
+declaration — a saving of two lines per input against a macro nobody can grep.
+**Declined, with the counting.**
 
 ### F39, item 4 — a worm sized by its housing
 

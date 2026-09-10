@@ -601,23 +601,16 @@
     <!-- **The tool comes before the part**, because the part's root and fillet
          are the tool's: a ring's dedendum and root radius are not inputs of its
          own, and reading the cutter first is reading them. -->
+    {@const cut = opts.cutter}
     <h4>{t("ui.train_ring_cutter")}</h4>
     <label>
       <span>{t("ui.train_cutter_teeth")}</span>
-      <input type="number" step="1" min="1" bind:value={opts.cutter.teeth} />
+      <input type="number" step="1" min="1" bind:value={cut.teeth} />
       <em></em>
       <FieldNote notes={notes(t("ui.train_note_cutter_teeth"), null)} />
     </label>
-    <label>
-      <span>{t("ui.train_cutter_addendum")}</span>
-      <input type="number" step="0.05" bind:value={opts.cutter.addendum} />
-      <em>{t("ui.train_m")}</em>
-    </label>
-    <label>
-      <span>{t("ui.train_cutter_tip_round")}</span>
-      <input type="number" step="0.02" bind:value={opts.cutter.tip_round} />
-      <em>{t("ui.train_m")}</em>
-    </label>
+    {@render numberField("ui.train_cutter_addendum", () => cut.addendum, (v) => (cut.addendum = v), 0.05, "ui.train_m")}
+    {@render numberField("ui.train_cutter_tip_round", () => cut.tip_round, (v) => (cut.tip_round = v), 0.02, "ui.train_m")}
   {/if}
   <h4 class:later={opts.cutter !== undefined}>{title}</h4>
   <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
@@ -929,6 +922,38 @@
      `autoNumber` without the `auto` switch: the bound stands in that column,
      which is where a switch that qualifies the box belongs whether it says who
      chose the number or what the number has to satisfy. -->
+<!-- **A plain number with a label and a unit** — the third of the row family.
+     `autoNumber` is one whose source can be the tool, `boundedNumber` one with a
+     range on it, and this is one that is simply typed. It was the only member
+     written out by hand, thirty-four times, and the shape had already drifted:
+     some carried a `FieldNote` and some did not for no reason but which form
+     they happened to be in.
+
+     Bound through a getter and a setter rather than an object, because a plain
+     `f64` has no object to hold an `auto` flag in — which is the same reason
+     `autoNumber` can take one and this cannot. -->
+{#snippet numberField(
+  key: string,
+  get: () => number,
+  set: (v: number) => void,
+  step: number,
+  /** Catalogue key for the unit, `"°"` for the degree sign, or omitted for a
+   *  bare number — the same three cases every other row in this family has. */
+  unit?: string,
+  /** A note under the field, already rendered. Omitted draws none at all, which
+   *  is different from drawing an empty one: the row keeps its height. */
+  note?: string | null,
+)}
+  <label>
+    <span>{t(key)}</span>
+    <input type="number" {step} bind:value={get, set} />
+    <em>{unit === "°" ? "°" : unit ? t(unit) : ""}</em>
+    {#if note !== undefined}
+      <FieldNote notes={notes(note ?? null, null)} />
+    {/if}
+  </label>
+{/snippet}
+
 {#snippet boundedNumber(
   key: string,
   get: () => number,
@@ -1149,26 +1174,14 @@
 
 <section class="train">
   <div class="grid shared">
-    <label>
-      <span>{t("ui.train_input_speed_peak")}</span>
-      <input type="number" step="100" bind:value={tab.train.input_speed} />
-      <em>{t("ui.train_rpm")}</em>
-    </label>
-    <label>
-      <span>{t("ui.train_input_torque_peak")}</span>
-      <input type="number" step="0.01" bind:value={tab.train.input_torque} />
-      <em>{t("ui.train_nm")}</em>
-    </label>
+    {@render numberField("ui.train_input_speed_peak", () => tab.train.input_speed, (v) => (tab.train.input_speed = v), 100, "ui.train_rpm")}
+    {@render numberField("ui.train_input_torque_peak", () => tab.train.input_torque, (v) => (tab.train.input_torque = v), 0.01, "ui.train_nm")}
     <!-- A load applied at the *output*, trying to turn the train the other way.
          It is not a sign on the input torque: it enters at the far end and is
          attenuated by each stage's backward efficiency on the way up, and on a
          train that can be back-driven it is reacted by nothing and reaches no
          gear at all. The train says which of those happened. -->
-    <label>
-      <span>{t("ui.train_back_driving_torque_peak")}</span>
-      <input type="number" step="0.01" bind:value={tab.train.back_driving_torque} />
-      <em>{t("ui.train_nm")}</em>
-    </label>
+    {@render numberField("ui.train_back_driving_torque_peak", () => tab.train.back_driving_torque, (v) => (tab.train.back_driving_torque = v), 0.01, "ui.train_nm")}
 
     <div class="mode">
       <span>{t("ui.train_actuation")}</span>
@@ -1209,24 +1222,20 @@
     </label>
 
     {#if "intermittent" in tab.train.actuation}
+      {@const act = tab.train.actuation.intermittent}
       <label>
         <span>{t("ui.train_actuation_range")}</span>
         <input
           type="number"
           step="1"
-          bind:value={tab.train.actuation.intermittent.range_degrees}
+          bind:value={act.range_degrees}
         />
         <em>{t("ui.train_at_output")}</em>
       </label>
-      <label>
-        <span>{t("ui.train_actuation_count")}</span>
-        <input type="number" step="100" bind:value={tab.train.actuation.intermittent.actuations} />
-        <em></em>
-      </label>
+      {@render numberField("ui.train_actuation_count", () => act.actuations, (v) => (act.actuations = v), 100, "")}
       <!-- Offered only here, because it only means something here: a continuous
            drive has no actuation to reverse between. It changes nothing but the
            cycle count, and the note says how — whether or not it is on. -->
-      {@const act = tab.train.actuation.intermittent}
       {@render switchField(
         "ui.train_reversing",
         act.reversing,
@@ -1234,21 +1243,18 @@
         t("ui.train_note_reversing"),
       )}
     {:else if "continuous" in tab.train.actuation}
+      {@const cont = tab.train.actuation.continuous}
       <label>
         <span>{t("ui.train_operating_speed")}</span>
         <input
           type="number"
           step="100"
           max={tab.train.input_speed}
-          bind:value={tab.train.actuation.continuous.operating_speed}
+          bind:value={cont.operating_speed}
         />
         <em>{t("ui.train_rpm")}</em>
       </label>
-      <label>
-        <span>{t("ui.train_runtime")}</span>
-        <input type="number" step="100" bind:value={tab.train.actuation.continuous.runtime_hours} />
-        <em>{t("ui.train_hours")}</em>
-      </label>
+      {@render numberField("ui.train_runtime", () => cont.runtime_hours, (v) => (cont.runtime_hours = v), 100, "ui.train_hours")}
     {/if}
 
     <!-- Last, and train-wide, because it is one decision about how every gear
@@ -1363,16 +1369,8 @@
         {#if tab.open[i]}
           <div class="body">
             <div class="grid shared">
-              <label>
-                <span>{t("ui.train_normal_module")}</span>
-                <input type="number" step="0.1" bind:value={stage.module} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              <label>
-                <span>{t("ui.train_pressure_angle")}</span>
-                <input type="number" step="0.5" bind:value={stage.pressure_angle} />
-                <em>°</em>
-              </label>
+              {@render numberField("ui.train_normal_module", () => stage.module, (v) => (stage.module = v), 0.1, "ui.train_mm")}
+              {@render numberField("ui.train_pressure_angle", () => stage.pressure_angle, (v) => (stage.pressure_angle = v), 0.5, "°")}
               <label>
                 <span>{t("ui.train_axis_angle")}</span>
                 <input type="number" step="5" bind:value={stage.shaft_angle} />
@@ -1400,22 +1398,8 @@
                   )
                 } />
               </label>
-              <label>
-                <span>{t("ui.train_sliding_friction")}</span>
-                <input type="number" step="0.01" bind:value={stage.sliding_friction} />
-                <em></em>
-              </label>
-              <label>
-                <span>{t("ui.train_static_friction")}</span>
-                <input type="number" step="0.01" bind:value={stage.static_friction} />
-                <em></em>
-                <FieldNote notes={
-                  notes(
-                    t("ui.train_note_static_friction"),
-                    null,
-                  )
-                } />
-              </label>
+              {@render numberField("ui.train_sliding_friction", () => stage.sliding_friction, (v) => (stage.sliding_friction = v), 0.01, "")}
+              {@render numberField("ui.train_static_friction", () => stage.static_friction, (v) => (stage.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
               <label>
                 <span>{t("ui.train_tooth_thickness_mod")}</span>
                 <input type="number" step="0.05" bind:value={stage.thickness_mod} />
@@ -1595,37 +1579,11 @@
         {#if tab.open[i]}
           <div class="body">
             <div class="grid shared">
-              <label>
-                <span>{t("ui.train_normal_module")}</span>
-                <input type="number" step="0.1" bind:value={stage.module} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              <label>
-                <span>{t("ui.train_pressure_angle")}</span>
-                <input type="number" step="0.5" bind:value={stage.pressure_angle} />
-                <em>°</em>
-              </label>
-              <label>
-                <span>{t("ui.train_axis_angle")}</span>
-                <input type="number" step="1" bind:value={stage.shaft_angle} />
-                <em>°</em>
-              </label>
-              <label>
-                <span>{t("ui.train_sliding_friction")}</span>
-                <input type="number" step="0.01" bind:value={stage.sliding_friction} />
-                <em></em>
-              </label>
-              <label>
-                <span>{t("ui.train_static_friction")}</span>
-                <input type="number" step="0.01" bind:value={stage.static_friction} />
-                <em></em>
-                <FieldNote notes={
-                  notes(
-                    t("ui.train_note_static_friction"),
-                    null,
-                  )
-                } />
-              </label>
+              {@render numberField("ui.train_normal_module", () => stage.module, (v) => (stage.module = v), 0.1, "ui.train_mm")}
+              {@render numberField("ui.train_pressure_angle", () => stage.pressure_angle, (v) => (stage.pressure_angle = v), 0.5, "°")}
+              {@render numberField("ui.train_axis_angle", () => stage.shaft_angle, (v) => (stage.shaft_angle = v), 1, "°")}
+              {@render numberField("ui.train_sliding_friction", () => stage.sliding_friction, (v) => (stage.sliding_friction = v), 0.01, "")}
+              {@render numberField("ui.train_static_friction", () => stage.static_friction, (v) => (stage.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
               <label>
                 <span>{t("ui.train_tooth_thickness_mod")}</span>
                 <input type="number" step="0.05" bind:value={stage.thickness_mod} />
@@ -1671,11 +1629,7 @@
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
-              <label>
-                <span>{t("ui.train_worm_axial_clearance")}</span>
-                <input type="number" step="0.01" bind:value={stage.axial_clearance} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
+              {@render numberField("ui.train_worm_axial_clearance", () => stage.axial_clearance, (v) => (stage.axial_clearance = v), 0.01, "ui.train_mm")}
             </div>
 
             <div class="gears">
@@ -1743,11 +1697,7 @@
                   <!-- No recommendation exists for a crossed pair, so there is
                        nothing for an automatic toggle to take: showing one
                        would lock the field to a value nothing computed. -->
-                  <label>
-                    <span>{t("ui.train_length")}</span>
-                    <input type="number" step="1" bind:value={stage.worm.face_width.manual} />
-                    <em>{t("ui.train_mm")}</em>
-                  </label>
+                  {@render numberField("ui.train_length", () => stage.worm.face_width.manual, (v) => (stage.worm.face_width.manual = v), 1, "ui.train_mm")}
                 {:else}
                   {@render autoNumber(
                     "ui.train_length",
@@ -1791,11 +1741,7 @@
                   <input type="number" step="1" bind:value={stage.wheel_teeth} />
                 </label>
                 {#if wres && wres.members[1].recommended_face_width == null}
-                  <label>
-                    <span>{t("ui.train_face_width")}</span>
-                    <input type="number" step="1" bind:value={stage.wheel.face_width.manual} />
-                    <em>{t("ui.train_mm")}</em>
-                  </label>
+                  {@render numberField("ui.train_face_width", () => stage.wheel.face_width.manual, (v) => (stage.wheel.face_width.manual = v), 1, "ui.train_mm")}
                 {:else}
                   {@render autoNumber(
                     "ui.train_face_width",
@@ -1852,64 +1798,14 @@
         {#if tab.open[i]}
           <div class="body">
             <div class="grid shared">
-              <label>
-                <span>{t("ui.train_normal_module")}</span>
-                <input type="number" step="0.1" bind:value={stage.module} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              <label>
-                <span>{t("ui.train_pressure_angle")}</span>
-                <input type="number" step="0.5" bind:value={stage.pressure_angle} />
-                <em>°</em>
-              </label>
-              <label>
-                <span>{t("ui.train_helix_angle")}</span>
-                <input type="number" step="1" bind:value={stage.helix_angle} />
-                <em>°</em>
-              </label>
-              <label>
-                <span>{t("ui.train_sliding_friction_sun_planet")}</span>
-                <input type="number" step="0.01" bind:value={stage.sliding_friction_sun_planet} />
-                <em></em>
-              </label>
-              <label>
-                <span>{t("ui.train_static_friction_sun_planet")}</span>
-                <input type="number" step="0.01" bind:value={stage.static_friction_sun_planet} />
-                <em></em>
-                <FieldNote notes={
-                  notes(
-                    t("ui.train_note_static_friction"),
-                    null,
-                  )
-                } />
-              </label>
-              <label>
-                <span>{t("ui.train_sliding_friction_planet_ring")}</span>
-                <input type="number" step="0.01" bind:value={stage.sliding_friction_planet_ring} />
-                <em></em>
-              </label>
-              <label>
-                <span>{t("ui.train_static_friction_planet_ring")}</span>
-                <input type="number" step="0.01" bind:value={stage.static_friction_planet_ring} />
-                <em></em>
-                <FieldNote notes={
-                  notes(
-                    t("ui.train_note_static_friction"),
-                    null,
-                  )
-                } />
-              </label>
-              <label>
-                <span>{t("ui.train_tooth_thickness_mod")}</span>
-                <input type="number" step="0.05" bind:value={stage.thickness_mod} />
-                <em>{t("ui.train_k")}</em>
-                <FieldNote notes={
-                  notes(
-                    t("ui.train_note_thickness_mod_planetary"),
-                    null,
-                  )
-                } />
-              </label>
+              {@render numberField("ui.train_normal_module", () => stage.module, (v) => (stage.module = v), 0.1, "ui.train_mm")}
+              {@render numberField("ui.train_pressure_angle", () => stage.pressure_angle, (v) => (stage.pressure_angle = v), 0.5, "°")}
+              {@render numberField("ui.train_helix_angle", () => stage.helix_angle, (v) => (stage.helix_angle = v), 1, "°")}
+              {@render numberField("ui.train_sliding_friction_sun_planet", () => stage.sliding_friction_sun_planet, (v) => (stage.sliding_friction_sun_planet = v), 0.01, "")}
+              {@render numberField("ui.train_static_friction_sun_planet", () => stage.static_friction_sun_planet, (v) => (stage.static_friction_sun_planet = v), 0.01, "", t("ui.train_note_static_friction"))}
+              {@render numberField("ui.train_sliding_friction_planet_ring", () => stage.sliding_friction_planet_ring, (v) => (stage.sliding_friction_planet_ring = v), 0.01, "")}
+              {@render numberField("ui.train_static_friction_planet_ring", () => stage.static_friction_planet_ring, (v) => (stage.static_friction_planet_ring = v), 0.01, "", t("ui.train_note_static_friction"))}
+              {@render numberField("ui.train_tooth_thickness_mod", () => stage.thickness_mod, (v) => (stage.thickness_mod = v), 0.05, "ui.train_k", t("ui.train_note_thickness_mod_planetary"))}
               <!-- **A set has a centre distance like every other kind now.**
                    Automatic, the common distance is whatever the shifts leave,
                    which is what this stage always did. Given, each mesh has a
@@ -1943,12 +1839,7 @@
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
-              <label>
-                <span>{t("ui.train_minimum_planet_clearance")}</span>
-                <input type="number" step="0.05" bind:value={stage.min_planet_clearance} />
-                <em>{t("ui.train_mm")}</em>
-                <FieldNote notes={notes(t("ui.train_note_planet_clearance"), null)} />
-              </label>
+              {@render numberField("ui.train_minimum_planet_clearance", () => stage.min_planet_clearance, (v) => (stage.min_planet_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_planet_clearance"))}
               <label>
                 <span>{t("ui.train_planets")}</span>
                 <input type="number" step="1" min="1" bind:value={stage.planets} />
@@ -2146,16 +2037,8 @@
         {#if tab.open[i]}
           <div class="body">
             <div class="grid shared">
-              <label>
-                <span>{t("ui.train_pressure_angle")}</span>
-                <input type="number" step="0.5" bind:value={stage.pressure_angle} />
-                <em>°</em>
-              </label>
-              <label>
-                <span>{t("ui.train_helix_angle")}</span>
-                <input type="number" step="1" bind:value={stage.helix_angle} />
-                <em>°</em>
-              </label>
+              {@render numberField("ui.train_pressure_angle", () => stage.pressure_angle, (v) => (stage.pressure_angle = v), 0.5, "°")}
+              {@render numberField("ui.train_helix_angle", () => stage.helix_angle, (v) => (stage.helix_angle = v), 1, "°")}
               <label>
                 <span>{t("ui.train_hula_gap")}</span>
                 {#if hres && hres.clearance === 0}
@@ -2227,28 +2110,10 @@
               {@const pinion = ring === m * 2 ? m * 2 + 1 : m * 2}
               <h4 class="mesh">{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
               <div class="grid shared">
-                <label>
-                  <span>{t("ui.train_normal_module")}</span>
-                  <input type="number" step="0.05" bind:value={stage.module[m]} />
-                  <em>{t("ui.train_mm")}</em>
-                </label>
-                <label>
-                  <span>{t("ui.train_tooth_thickness_mod")}</span>
-                  <input type="number" step="0.05" bind:value={stage.thickness_mod[m]} />
-                  <em>{t("ui.train_k")}</em>
-                  <FieldNote notes={notes(t("ui.train_hula_note_thickness_mod"), null)} />
-                </label>
-                <label>
-                  <span>{t("ui.train_sliding_friction")}</span>
-                  <input type="number" step="0.01" bind:value={stage.sliding_friction[m]} />
-                  <em></em>
-                </label>
-                <label>
-                  <span>{t("ui.train_static_friction")}</span>
-                  <input type="number" step="0.01" bind:value={stage.static_friction[m]} />
-                  <em></em>
-                  <FieldNote notes={notes(t("ui.train_note_static_friction"), null)} />
-                </label>
+                {@render numberField("ui.train_normal_module", () => stage.module[m], (v) => (stage.module[m] = v), 0.05, "ui.train_mm")}
+                {@render numberField("ui.train_tooth_thickness_mod", () => stage.thickness_mod[m], (v) => (stage.thickness_mod[m] = v), 0.05, "ui.train_k", t("ui.train_hula_note_thickness_mod"))}
+                {@render numberField("ui.train_sliding_friction", () => stage.sliding_friction[m], (v) => (stage.sliding_friction[m] = v), 0.01, "")}
+                {@render numberField("ui.train_static_friction", () => stage.static_friction[m], (v) => (stage.static_friction[m] = v), 0.01, "", t("ui.train_note_static_friction"))}
               </div>
               <div class="gears">
                 {#each [ring, pinion] as j (j)}
