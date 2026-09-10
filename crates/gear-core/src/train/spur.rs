@@ -206,7 +206,7 @@ pub struct SpurStage {
     /// being chosen. Given a distance with nothing free, it is not read at all
     /// and the backlash is a consequence; `solve_spur_stage` is where that
     /// happens and is the whole of the rule.
-    pub clearance: f64,
+    pub clearance: Auto<f64>,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
     /// What the stage is asked to optimise, and what it may not do to get
@@ -242,7 +242,7 @@ impl Default for SpurStage {
             thickness_mod: 1.0,
             optimisation: super::Optimisation::default(),
             centre_distance: Auto::automatic(0.0),
-            clearance: 0.02,
+            clearance: Auto::fixed(0.02),
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
             load_sharing: LoadSharing::None,
@@ -294,7 +294,12 @@ impl SpurStage {
         let asked = [0, 1].map(|i| self.gears[i].shift_asked(&self.base_params(i)));
         let floor = asked.map(|a| a.search_floor);
         let given = asked.map(|a| a.given);
-        let sum = (!self.centre_distance.auto)
+        // **Mode 3 needs both of them given.** A distance with an *automatic*
+        // clearance is the designer asking what gap their shifts leave — mode 2
+        // — and solving the shifts from the distance would answer a question
+        // they did not ask. So the sum is pinned only when the clearance is a
+        // number they stated.
+        let sum = (!self.centre_distance.auto && !self.clearance.auto)
             .then(|| {
                 let rack = crate::plane::BasicRack::new(
                     self.module,
@@ -307,7 +312,7 @@ impl SpurStage {
                     rack.alpha_t,
                     rack.alpha_n,
                     sum_z,
-                    self.centre_distance.manual - self.clearance,
+                    self.centre_distance.manual - self.clearance.manual,
                 )
             })
             .flatten();
@@ -350,7 +355,12 @@ impl SpurStage {
             &crate::auto::Bounds {
                 floor,
                 min_contact_ratio: self.optimisation.min_contact_ratio,
-                clearance: self.clearance,
+                // **The gap the designer nominated**, which is a number they
+                // stated even where the *reported* clearance is derived from a
+                // given distance. It is a guard on the trial mesh — the teeth
+                // must not bottom out — so what it wants is the intended gap,
+                // not whatever a candidate's shifts happen to leave.
+                clearance: self.clearance.manual,
             },
             &crate::auto::Pinned { shift: given, sum },
             self.sliding_friction,
@@ -485,7 +495,13 @@ pub fn solve_spur_stage_with(
     // dead. Removing it moved no test and no recorded figure — which is what a
     // conditional that decides nothing does, while suggesting there are two
     // answers here.
-    let clearance = stage.clearance;
+    // The number in the box. Read here only where the distance is automatic —
+    // which is the branch below — and there the clearance is what *makes* the
+    // distance, so it is an input by definition. With both automatic nothing
+    // would determine either, and `Stage::relieved` is what stops a designer
+    // reaching that state; a hand-written document that does reach it gets the
+    // value it wrote rather than a refusal.
+    let clearance = stage.clearance.manual;
     let centre = if stage.centre_distance.auto {
         mesh.a_w + clearance
     } else {

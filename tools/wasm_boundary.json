@@ -76,7 +76,10 @@
         "auto": true,
         "manual": 0
        },
-       "clearance": "0.020000000000000000",
+       "clearance": {
+        "auto": false,
+        "manual": "0.020000000000000000"
+       },
        "tolerance_plus": "0.020000000000000000",
        "tolerance_minus": "0.020000000000000000",
        "optimisation": {
@@ -182,7 +185,10 @@
       "auto": true,
       "manual": 0
      },
-     "clearance": "0.020000000000000000",
+     "clearance": {
+      "auto": false,
+      "manual": "0.020000000000000000"
+     },
      "tolerance_plus": "0.020000000000000000",
      "tolerance_minus": "0.020000000000000000",
      "optimisation": {
@@ -290,7 +296,10 @@
       "auto": true,
       "manual": 0
      },
-     "clearance": "0.020000000000000000",
+     "clearance": {
+      "auto": false,
+      "manual": "0.020000000000000000"
+     },
      "tolerance_plus": "0.020000000000000000",
      "tolerance_minus": "0.020000000000000000",
      "axial_clearance": "0.040000000000000001",
@@ -343,7 +352,10 @@
       "min_contact_ratio": "1.2000000000000000"
      },
      "load_sharing": "none",
-     "clearance": "0.020000000000000000",
+     "clearance": {
+      "auto": false,
+      "manual": "0.020000000000000000"
+     },
      "tolerance_plus": "0.020000000000000000",
      "tolerance_minus": "0.020000000000000000",
      "min_planet_clearance": "0.29999999999999999",
@@ -494,7 +506,10 @@
       "0.16000000000000000"
      ],
      "clearance": "0.29999999999999999",
-     "running_clearance": "0.020000000000000000",
+     "running_clearance": {
+      "auto": false,
+      "manual": "0.020000000000000000"
+     },
      "tolerance_plus": "0.020000000000000000",
      "tolerance_minus": "0.020000000000000000",
      "offset": {
@@ -5000,7 +5015,10 @@
        "auto": false,
        "manual": "0.10000000000000001"
       },
-      "clearance": "0.020000000000000000",
+      "clearance": {
+       "auto": true,
+       "manual": "0.020000000000000000"
+      },
       "tolerance_plus": "0.020000000000000000",
       "tolerance_minus": "0.020000000000000000",
       "optimisation": {
@@ -5012,7 +5030,7 @@
        {
         "teeth": 17,
         "profile_shift": {
-         "auto": true,
+         "auto": false,
          "manual": "0.10000000000000001"
         },
         "no_undercut": true,
@@ -5111,7 +5129,10 @@
        "auto": false,
        "manual": "0.10000000000000001"
       },
-      "clearance": "0.020000000000000000",
+      "clearance": {
+       "auto": false,
+       "manual": "0.020000000000000000"
+      },
       "tolerance_plus": "0.020000000000000000",
       "tolerance_minus": "0.020000000000000000",
       "axial_clearance": "0.040000000000000001",
@@ -5167,7 +5188,10 @@
        "min_contact_ratio": "1.2000000000000000"
       },
       "load_sharing": "none",
-      "clearance": "0.020000000000000000",
+      "clearance": {
+       "auto": false,
+       "manual": "0.020000000000000000"
+      },
       "tolerance_plus": "0.020000000000000000",
       "tolerance_minus": "0.020000000000000000",
       "min_planet_clearance": "0.29999999999999999",
@@ -5321,7 +5345,10 @@
        "0.16000000000000000"
       ],
       "clearance": "0.29999999999999999",
-      "running_clearance": "0.020000000000000000",
+      "running_clearance": {
+       "auto": false,
+       "manual": "0.020000000000000000"
+      },
       "tolerance_plus": "0.020000000000000000",
       "tolerance_minus": "0.020000000000000000",
       "offset": {
@@ -5848,7 +5875,7 @@
    }
   },
   "export_train": {
-   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\ninput_speed = 30000.0\ninput_torque = 0.1\nback_driving_torque = 0.0\noperating_torque = 0.1\nreversed_bending = false\n\n[train.actuation.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[[train.stages]]\nkind = \"spur\"\nmodule = 1.0\npressure_angle = 20.0\nshaft_angle = 0.0\nadditional_helix = 0.0\nsliding_friction = 0.08\nstatic_friction = 0.16\nthickness_mod = 1.0\nclearance = 0.02\ntolerance_plus = 0.02\ntolerance_minus = 0.02\nload_sharing = \"none\"\n\n[train.stages.centre_distance]\nauto = true\nmanual = 0.0\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.gears]]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.gears.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.gears.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.gears.face_sources.bending]\npeak = true\ncyclic = true\n\n[train.stages.gears.face_sources.contact]\npeak = false\ncyclic = false\n\n[train.stages.gears.material_overrides]\n\n[[train.stages.gears]]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.gears.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.gears.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.gears.face_sources.bending]\npeak = true\ncyclic = true\n\n[train.stages.gears.face_sources.contact]\npeak = false\ncyclic = false\n\n[train.stages.gears.material_overrides]\n"
+   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\ninput_speed = 30000.0\ninput_torque = 0.1\nback_driving_torque = 0.0\noperating_torque = 0.1\nreversed_bending = false\n\n[train.actuation.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[[train.stages]]\nkind = \"spur\"\nmodule = 1.0\npressure_angle = 20.0\nshaft_angle = 0.0\nadditional_helix = 0.0\nsliding_friction = 0.08\nstatic_friction = 0.16\nthickness_mod = 1.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\nload_sharing = \"none\"\n\n[train.stages.centre_distance]\nauto = true\nmanual = 0.0\n\n[train.stages.clearance]\nauto = false\nmanual = 0.02\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.gears]]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.gears.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.gears.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.gears.face_sources.bending]\npeak = true\ncyclic = true\n\n[train.stages.gears.face_sources.contact]\npeak = false\ncyclic = false\n\n[train.stages.gears.material_overrides]\n\n[[train.stages.gears]]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.gears.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.gears.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.gears.face_sources.bending]\npeak = true\ncyclic = true\n\n[train.stages.gears.face_sources.contact]\npeak = false\ncyclic = false\n\n[train.stages.gears.material_overrides]\n"
   },
   "import_train": {
    "ok": {
@@ -5880,7 +5907,10 @@
         "auto": true,
         "manual": 0
        },
-       "clearance": "0.020000000000000000",
+       "clearance": {
+        "auto": false,
+        "manual": "0.020000000000000000"
+       },
        "tolerance_plus": "0.020000000000000000",
        "tolerance_minus": "0.020000000000000000",
        "optimisation": {

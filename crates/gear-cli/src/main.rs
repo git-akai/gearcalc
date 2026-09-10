@@ -841,7 +841,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                     let mut stage = HulaStage {
                         module: [module; 2],
                         clearance: clearance_in_modules * module,
-                        running_clearance: 0.02 * module,
+                        running_clearance: gear_core::params::Auto::fixed(0.02 * module),
                         tolerance_plus: 0.02 * module,
                         tolerance_minus: 0.02 * module,
                         ..HulaStage::default()

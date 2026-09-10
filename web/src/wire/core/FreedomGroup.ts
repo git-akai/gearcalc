@@ -29,10 +29,29 @@ import type { Freedom } from "./Freedom";
  */
 export type FreedomGroup = { 
 /**
- * How many of `order` may be given before the set is over-determined.
+ * How many of `order` may be **given** before the set is over-determined.
  */
 given_at_most: number, 
 /**
+ * How many of `order` may be **automatic** before it is under-determined.
+ *
+ * The mirror of `given_at_most`, and it is needed for a real case rather
+ * than for symmetry: a centre distance is *nominal + clearance* and an
+ * automatic clearance is *distance − nominal*, so with both automatic
+ * neither has anything to derive from. One of the two has to be a number
+ * somebody gave.
+ *
+ * A kind that has **no** distance input yet says `0` here — its clearance
+ * can never be derived, because there is nothing to derive it from. That is
+ * the same statement, counted, and it stops being true on its own when the
+ * input arrives.
+ */
+automatic_at_most: number, 
+/**
  * The inputs in the argument, **relief order, least precious first**.
+ *
+ * One order serves both directions: too many given turns the first one that
+ * is not being touched automatic, and too many automatic pins the first one
+ * that is not being touched. The same walk, read the other way.
  */
 order: Array<Freedom>, };

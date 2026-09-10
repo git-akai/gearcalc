@@ -1378,6 +1378,8 @@ impl Default for Stage {
 pub enum Freedom {
     /// The distance the stage's members run at.
     CentreDistance,
+    /// What portion of that distance is running play.
+    Clearance,
     /// One member's profile shift.
     Shift(usize),
 }
@@ -1414,9 +1416,26 @@ pub enum Freedom {
     ts(export, export_to = "core/")
 )]
 pub struct FreedomGroup {
-    /// How many of `order` may be given before the set is over-determined.
+    /// How many of `order` may be **given** before the set is over-determined.
     pub given_at_most: usize,
+    /// How many of `order` may be **automatic** before it is under-determined.
+    ///
+    /// The mirror of `given_at_most`, and it is needed for a real case rather
+    /// than for symmetry: a centre distance is *nominal + clearance* and an
+    /// automatic clearance is *distance − nominal*, so with both automatic
+    /// neither has anything to derive from. One of the two has to be a number
+    /// somebody gave.
+    ///
+    /// A kind that has **no** distance input yet says `0` here — its clearance
+    /// can never be derived, because there is nothing to derive it from. That is
+    /// the same statement, counted, and it stops being true on its own when the
+    /// input arrives.
+    pub automatic_at_most: usize,
     /// The inputs in the argument, **relief order, least precious first**.
+    ///
+    /// One order serves both directions: too many given turns the first one that
+    /// is not being touched automatic, and too many automatic pins the first one
+    /// that is not being touched. The same walk, read the other way.
     pub order: Vec<Freedom>,
 }
 
@@ -1429,13 +1448,23 @@ impl Stage {
     fn auto_mut(&mut self, f: Freedom) -> Option<&mut Auto<f64>> {
         match (self, f) {
             (Self::Spur(s), Freedom::CentreDistance) => Some(&mut s.centre_distance),
+            (Self::Spur(s), Freedom::Clearance) => Some(&mut s.clearance),
             (Self::Spur(s), Freedom::Shift(i)) => s.gears.get_mut(i).map(|g| &mut g.profile_shift),
+            (Self::Worm(w), Freedom::CentreDistance) => Some(&mut w.centre_distance),
+            (Self::Worm(w), Freedom::Clearance) => Some(&mut w.clearance),
+            (Self::Planetary(p), Freedom::Clearance) => Some(&mut p.clearance),
             (Self::Planetary(p), Freedom::Shift(i)) => match i {
                 0 => Some(&mut p.sun.profile_shift),
                 1 => Some(&mut p.planet.profile_shift),
                 2 => Some(&mut p.ring.profile_shift),
                 _ => None,
             },
+            // **The crank offset is this kind's centre distance.** Its own
+            // documentation says so — "the same shape every stage's centre
+            // distance has, because it is the same decision" — so it answers to
+            // the same name here rather than to one of its own.
+            (Self::Hula(h), Freedom::CentreDistance) => Some(&mut h.offset),
+            (Self::Hula(h), Freedom::Clearance) => Some(&mut h.running_clearance),
             (Self::Hula(h), Freedom::Shift(i)) => h.gears.get_mut(i).map(|g| &mut g.profile_shift),
             _ => None,
         }
@@ -1468,25 +1497,49 @@ impl Stage {
     pub fn relieved(&self, just: Freedom) -> Self {
         let mut out = self.clone();
         for group in self.freedoms() {
-            // Counted with the same accessor that does the relieving, so a
-            // freedom this kind does not have is absent from both.
-            let mut given = 0usize;
-            for f in &group.order {
-                if out.auto_mut(*f).is_some_and(|a| !a.auto) {
-                    given += 1;
+            // **One walk, both directions.** Too many given turns one automatic;
+            // too many automatic pins one. Each time it is the first in relief
+            // order that the designer is not this moment touching, so the answer
+            // depends on the order the *stage* declares and never on the order
+            // the toggles happened to be turned in.
+            for wanted in [false, true] {
+                let limit = if wanted {
+                    group.given_at_most
+                } else {
+                    group.automatic_at_most
+                };
+                // Counted with the same accessor that does the moving, so a
+                // freedom this kind does not have is absent from both.
+                let mut over = 0usize;
+                for f in &group.order {
+                    if out.auto_mut(*f).is_some_and(|a| a.auto != wanted) {
+                        over += 1;
+                    }
                 }
-            }
-            for f in &group.order {
-                if given <= group.given_at_most {
-                    break;
-                }
-                if *f == just {
-                    continue;
-                }
-                if let Some(a) = out.auto_mut(*f) {
-                    if !a.auto {
-                        a.auto = true;
-                        given -= 1;
+                // **`just` is a preference; the relation is a law.** Two
+                // passes: the first spares the input the designer is this
+                // moment touching, and the second — reached only when sparing
+                // it leaves the group unsatisfiable — does not.
+                //
+                // It is reached today by exactly one case, and that case is
+                // honest rather than awkward: a planetary set's clearance is the
+                // only input in its group, because the set has no distance to
+                // derive a clearance *from*. Asking for it to be derived has no
+                // answer, and the toggle snapping back is the tool saying so.
+                for spare_just in [true, false] {
+                    for f in &group.order {
+                        if over <= limit {
+                            break;
+                        }
+                        if spare_just && *f == just {
+                            continue;
+                        }
+                        if let Some(a) = out.auto_mut(*f) {
+                            if a.auto != wanted {
+                                a.auto = wanted;
+                                over -= 1;
+                            }
+                        }
                     }
                 }
             }
@@ -1506,37 +1559,74 @@ impl Stage {
     /// rather than one for the stage.
     #[must_use]
     pub fn freedoms(&self) -> Vec<FreedomGroup> {
-        // **Every group here is a single relation**, so exactly one of its
-        // inputs is the one the others decide. Written once rather than as a
-        // count per kind, because a count per kind is a count to get wrong —
-        // and the first draft did, by one, on the kind with the most tests.
+        // **A single relation** among its inputs, so exactly one of them is the
+        // one the others decide. Written once rather than as a count per kind,
+        // because a count per kind is a count to get wrong — and the first draft
+        // did, by one, on the kind with the most tests.
+        //
+        // Says nothing about how many may be *automatic*: every input in one of
+        // these has a rule of its own to fall back on, so leaving them all
+        // automatic is a design with nothing pinned rather than a contradiction.
         let one_relation = |order: Vec<Freedom>| FreedomGroup {
             given_at_most: order.len() - 1,
+            automatic_at_most: order.len(),
             order,
+        };
+        // **Two ways of saying one number, so one of them must be said.** A
+        // distance is nominal + clearance and an automatic clearance is
+        // distance − nominal; with both automatic neither has anything to derive
+        // from. `distance` is `None` for a kind that has no such input yet, and
+        // then the clearance can never be derived at all — which the count says
+        // by itself rather than by a special case.
+        let distance_and_clearance = |distance: Option<Freedom>| FreedomGroup {
+            given_at_most: 1 + usize::from(distance.is_some()),
+            automatic_at_most: usize::from(distance.is_some()),
+            order: std::iter::once(Freedom::Clearance)
+                .chain(distance)
+                .collect(),
         };
         match self {
             // A pair's distance and its two shifts: `a = f(x₁ + x₂) + clearance`
             // is one relation, so two of the three may be given. The distance
             // comes first because it is the one a designer expects to give way
             // when they pin both shifts.
-            Self::Spur(s) => vec![one_relation(
-                std::iter::once(Freedom::CentreDistance)
-                    .chain((0..s.gears.len()).map(Freedom::Shift))
-                    .collect(),
-            )],
+            Self::Spur(s) => vec![
+                one_relation(
+                    std::iter::once(Freedom::CentreDistance)
+                        .chain(std::iter::once(Freedom::Clearance))
+                        .chain((0..s.gears.len()).map(Freedom::Shift))
+                        .collect(),
+                ),
+                distance_and_clearance(Some(Freedom::CentreDistance)),
+            ],
             // **An epicyclic set has two shifts to give, not three.** Its two
             // centre distances have to agree, which is one relation among the
             // three shifts. It has no distance input of its own — the common
             // distance falls out — which is F39's third item.
-            Self::Planetary(_) => vec![one_relation((0..3).map(Freedom::Shift).collect())],
+            // **No centre-distance input yet** (F39's third item), so its
+            // clearance has nothing to be derived from and must be given. The
+            // count says so; when the input arrives it says something else.
+            Self::Planetary(_) => vec![
+                one_relation((0..3).map(Freedom::Shift).collect()),
+                distance_and_clearance(None),
+            ],
             // **One relation per mesh.** The crank offset fixes the difference
             // of a pair's two shifts, so pinning both over-specifies that mesh
             // — the same triangle a pair's distance and two shifts make, one
             // freedom smaller — and the other mesh is a separate argument.
+            // The crank offset is this kind's centre distance — the same
+            // decision under another name, as its own documentation says.
             Self::Hula(h) => (0..h.gears.len() / 2)
                 .map(|m| one_relation(vec![Freedom::Shift(2 * m), Freedom::Shift(2 * m + 1)]))
+                .chain(std::iter::once(distance_and_clearance(Some(
+                    Freedom::CentreDistance,
+                ))))
                 .collect(),
-            Self::Worm(_) => Vec::new(),
+            // A screw stage has no profile shift, so nothing inside it is free
+            // to absorb a distance and there is no shift group at all. Its
+            // distance and its clearance are still two ways of saying one
+            // number, and that much holds for every kind.
+            Self::Worm(_) => vec![distance_and_clearance(Some(Freedom::CentreDistance))],
         }
     }
 }
@@ -3019,7 +3109,7 @@ mod tests {
             let bounds = Bounds {
                 floor: asked.map(|a| a.search_floor),
                 min_contact_ratio: stage.optimisation.min_contact_ratio,
-                clearance: stage.clearance,
+                clearance: stage.clearance.manual,
             };
             let pair = |q: [f64; 2]| [0, 1].map(|i| stage.params_at(i, q[i]));
             // The stage's own answer at a shift pair, and `None` where the pair
@@ -3132,7 +3222,7 @@ mod tests {
             let zero = crate::mesh::Mesh::new(&g[0], &g[1], crate::mesh::MeshKind::External)
                 .expect("the pair meshes");
             let mesh = zero
-                .at(zero.a_w + stage.clearance)
+                .at(zero.a_w + stage.clearance.manual)
                 .expect("...at its running distance");
             for (i, gap) in mesh
                 .bottom_clearance([g[0].ra, g[1].ra], [g[0].rf, g[1].rf])
@@ -3976,26 +4066,28 @@ mod tests {
             Stage::Hula(Box::new(hula)),
         ] {
             let n = members(&stage);
-            let groups = stage.freedoms();
-            let mut seen = Vec::new();
-            for g in &groups {
-                assert!(
-                    g.given_at_most < g.order.len(),
-                    "a group that cannot be over-determined is not a group: {g:?}"
-                );
+            for g in &stage.freedoms() {
                 assert!(
                     !g.order.is_empty(),
                     "a group with no inputs relieves nothing: {g:?}"
+                );
+                assert!(
+                    g.given_at_most < g.order.len() || g.automatic_at_most < g.order.len(),
+                    "a group neither bound can bite on is not a group: {g:?}"
+                );
+                // **The two bounds have to be jointly satisfiable.** Every input
+                // is either given or automatic, so the counts always sum to
+                // `order.len()` — and a group demanding fewer than that in total
+                // is one no arrangement of toggles can satisfy, which would leave
+                // relief flipping the same input back and forth forever.
+                assert!(
+                    g.given_at_most + g.automatic_at_most >= g.order.len(),
+                    "no arrangement of toggles satisfies {g:?}"
                 );
                 for f in &g.order {
                     if let Freedom::Shift(i) = f {
                         assert!(*i < n, "Shift({i}) but this stage has {n} members");
                     }
-                    assert!(
-                        !seen.contains(f),
-                        "{f:?} is in two groups, so relieving one could break the other"
-                    );
-                    seen.push(*f);
                 }
             }
         }
@@ -4090,6 +4182,77 @@ mod tests {
         }
     }
 
+    /// **A distance and a clearance cannot both be derived**, and relief pins one
+    /// of them rather than leaving the stage undetermined.
+    ///
+    /// The under-constrained mirror of the over-constrained case, and the reason
+    /// [`FreedomGroup`] bounds automatics as well as givens. A distance is
+    /// *nominal + clearance*; an automatic clearance is *distance − nominal*.
+    /// With both automatic neither has anything to derive from, and there is no
+    /// answer to give — so one of them is pinned, in the same relief order and
+    /// by the same walk.
+    ///
+    /// The planetary is the case worth reading twice: it has **no** distance
+    /// input yet, so its clearance can never be derived at all, and the same
+    /// count says so without a special case. When F39's third item gives it one,
+    /// the declaration stops saying that on its own.
+    #[test]
+    fn a_distance_and_a_clearance_are_never_both_left_automatic() {
+        let mut checked = 0u32;
+        for stage in [
+            Stage::Spur(SpurStage::default()),
+            Stage::Worm(WormStage::default()),
+            Stage::Planetary(Box::default()),
+            Stage::Hula(Box::default()),
+        ] {
+            let Some(group) = stage
+                .freedoms()
+                .into_iter()
+                .find(|g| g.automatic_at_most < g.order.len())
+            else {
+                panic!("every kind has a clearance, so every kind bounds it");
+            };
+
+            // Both automatic — or, for a kind with no distance, the clearance
+            // alone — which is the state that has no answer.
+            let mut loose = stage.clone();
+            for f in &group.order {
+                if let Some(a) = loose.auto_mut(*f) {
+                    a.auto = true;
+                }
+            }
+
+            // Relief pins one, and never the one being touched.
+            for just in &group.order {
+                let mut fixed = loose.relieved(*just);
+                let automatic = group
+                    .order
+                    .iter()
+                    .filter(|f| fixed.auto_mut(**f).is_some_and(|a| a.auto))
+                    .count();
+                assert!(
+                    automatic <= group.automatic_at_most,
+                    "{automatic} left automatic, at most {} allowed: {group:?}",
+                    group.automatic_at_most
+                );
+                // `just` is spared **wherever sparing it leaves an answer**.
+                // A group whose only input is the one being touched has none,
+                // and the planetary's clearance is exactly that: with no
+                // distance to derive it from, asking for it to be derived has
+                // no answer and the toggle snapping back is the tool saying so.
+                let could_spare = group.order.len() > group.automatic_at_most + 1;
+                if could_spare {
+                    assert!(
+                        fixed.auto_mut(*just).is_some_and(|a| a.auto),
+                        "{just:?} was just set automatic and something else could have given"
+                    );
+                }
+                checked += 1;
+            }
+        }
+        assert!(checked >= 7, "only {checked} cases");
+    }
+
     /// **The declared limit is the stage's actual freedom** — asserted by giving
     /// exactly that many and requiring every one of them to be honoured, then
     /// giving one more and requiring that it cannot be.
@@ -4112,7 +4275,7 @@ mod tests {
 
         let solve = |pin_shifts: bool| {
             let mut sp = SpurStage {
-                clearance,
+                clearance: Auto::fixed(clearance),
                 centre_distance: Auto::fixed(asked),
                 ..SpurStage::default()
             };
@@ -4151,11 +4314,23 @@ mod tests {
             "with both shifts pinned as well, the clearance cannot also be {clearance}: got {over}"
         );
 
-        // ...and the group says exactly that many.
+        // ...and the group says exactly that many: four inputs bound by one
+        // relation, so three may stand and the distance is the first to give.
         let groups = Stage::Spur(SpurStage::default()).freedoms();
-        assert_eq!(groups.len(), 1);
-        assert_eq!(groups[0].given_at_most, 2);
-        assert_eq!(groups[0].order[0], Freedom::CentreDistance);
+        let relation = &groups[0];
+        assert_eq!(relation.order.len(), 4);
+        assert_eq!(relation.given_at_most, 3);
+        assert_eq!(relation.order[0], Freedom::CentreDistance);
+        assert!(relation.order.contains(&Freedom::Clearance));
+
+        // And the second group is the one that stops *both* ways of saying the
+        // distance being left automatic at once.
+        let both = groups
+            .iter()
+            .find(|g| g.automatic_at_most < g.order.len())
+            .expect("a distance and a clearance cannot both be derived");
+        assert_eq!(both.automatic_at_most, 1);
+        assert_eq!(both.order[0], Freedom::Clearance);
     }
 
     /// **A given distance and a given clearance decide the shifts — with the
@@ -4191,7 +4366,7 @@ mod tests {
                     let mut sums = Vec::new();
                     for optimiser in [false, true] {
                         let mut sp = SpurStage {
-                            clearance,
+                            clearance: Auto::fixed(clearance),
                             centre_distance: Auto::fixed(a + clearance),
                             ..SpurStage::default()
                         };
@@ -4250,7 +4425,7 @@ mod tests {
             for clearance in [0.0_f64, 0.02, 0.20] {
                 for optimiser in [false, true] {
                     let mut sp = SpurStage {
-                        clearance,
+                        clearance: Auto::fixed(clearance),
                         ..SpurStage::default()
                     };
                     sp.optimisation.enabled = optimiser;
@@ -4653,7 +4828,7 @@ mod tests {
     fn a_parallel_stage_is_rated_at_the_centre_distance_it_runs_at() {
         let lib = library();
         let stage = |clearance: f64| SpurStage {
-            clearance,
+            clearance: Auto::fixed(clearance),
             ..SpurStage::default()
         };
         let mut previous: Option<(f64, f64)> = None;
@@ -4713,7 +4888,7 @@ mod tests {
 
         let loosen = |k: usize| {
             let mut t = base.clone();
-            spur_input(&mut t.stages[k]).clearance *= 4.0;
+            spur_input(&mut t.stages[k]).clearance.manual *= 4.0;
             solve_train(&t, &lib).unwrap().backlash.forward.nominal
         };
 
@@ -5614,7 +5789,7 @@ mod tests {
                 ..Optimisation::default()
             },
             centre_distance: Auto::fixed(asked),
-            clearance: 0.05,
+            clearance: Auto::fixed(0.05),
             ..SpurStage::default()
         };
 
@@ -5664,7 +5839,7 @@ mod tests {
                         enabled: on,
                         ..Optimisation::default()
                     },
-                    clearance: 0.05,
+                    clearance: Auto::fixed(0.05),
                     ..SpurStage::default()
                 },
                 StageTorques::just(2.0),
@@ -5802,7 +5977,7 @@ mod tests {
         let manual = solve_spur_stage(
             &SpurStage {
                 centre_distance: Auto::fixed(auto.centre_distance_nominal),
-                clearance: 0.5,
+                clearance: Auto::fixed(0.5),
                 ..SpurStage::default()
             },
             StageTorques::just(2.0),

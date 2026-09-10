@@ -56,7 +56,7 @@ clearance: number,
  * the same distance by construction, so a clearance on each could be set
  * to disagree about a distance that is physically single.
  */
-running_clearance: number, tolerance_plus: number, tolerance_minus: number, 
+running_clearance: Auto<number>, tolerance_plus: number, tolerance_minus: number, 
 /**
  * **The crank offset, or automatic.**
  *

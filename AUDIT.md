@@ -102,8 +102,15 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
-**Phase 6 — the front end and the payload.** In progress. **The toggle model is
-built** (F76): which of a stage's inputs argue with each other, how many may
+**Phase 6 — the front end and the payload.** In progress. **The clearance is an
+`Auto` on all four kinds** (F39 item 1, F77) — a plain number could not say
+"derived", so the box was read in some states and silently disregarded in others.
+It needed a second bound on a freedom group, `automatic_at_most`: a distance and
+a clearance cannot *both* be derived, since each is defined from the other. The
+planetary declares `0` there because it has no distance input yet, which is the
+same statement counted rather than special-cased.
+
+**The toggle model is built** (F76): which of a stage's inputs argue with each other, how many may
 stand and which gives way first are `Stage::freedoms` and `Stage::relieved` in
 `gear-core`, where they can be tested — they were three untested functions in the
 panel, one per stage kind, restating a relation the core already enforces. A worm
@@ -354,9 +361,10 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F36 | `SpurResult` re-declared `MeshReport`'s seven fields, and the panel re-drew them | gap | 3 | **closed** |
 | F37 | A given crank offset was not the offset the stage ran at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F38 | The reported clearance was the input echoed, not the gap run at | gap | 3 | **closed** — and logged in `corrections.md` |
-| F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | **part closed** — mode 3 works with the optimiser off (item 2, the largest); items 1, 3 and 4 open, and item 4 now has its answer |
+| F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | **part closed** — items 1 and 2 done; item 3 (a planetary distance) open, item 4 (a worm's absorber) answered and open |
 | F75 | The optimiser's fallback discarded the *centre distance* along with the optimisation whenever its own constraints admitted nothing | **gap** | 6 | **closed** — the fallback is what the constraints imply, not what the stage would build unasked |
 | F76 | The over-constraint rule lived in the panel as three per-kind functions, untested in either language | gap | 6 | **closed** — `Stage::freedoms` and `Stage::relieved`, gates proven |
+| F77 | A plain `f64` clearance could not say "derived", so the box was read in some states and silently disregarded in others | gap | 6 | **closed** — `Auto<f64>` on all four kinds, and `FreedomGroup` bounds automatics as well as givens |
 | F40 | The tolerance band was built four times and its direction asserted nowhere | gap | 3 | **closed** |
 | F33 | A crossed pair's members said nothing about their own teeth | gap | 3 | **closed** — and logged in `corrections.md` |
 | F42 | A locked mesh reported a torque on the shaft it delivers nothing to | gap | 3b | **closed** — and logged in `corrections.md` |
@@ -1992,6 +2000,59 @@ profile shift) with an automatic shift that absorbs the distance *in preference
 to* the diameter. That wants an interference check — worm tip to flank, flank to
 undercut junction — which if closed form is worth having for every mesh kind and
 not only this one.
+
+### F39, item 1 — the clearance is an `Auto`, on all four kinds
+
+**Why it was a fault and not a nicety.** A plain `f64` clearance cannot say
+"derive this", so the box was read in some states and silently disregarded in
+others: with a distance given *and* the shifts given, the reported clearance is
+`distance − nominal` and the number typed in the box reaches nothing. That is
+exactly the *accept an input and quietly disregard it* the relief exists to
+prevent, met on the one input the relief could not see.
+
+**What it changed in the solve**, which is one thing and worth stating plainly:
+mode 3 now requires the clearance to be **given**. A distance with an automatic
+clearance is a designer asking what gap their shifts leave — mode 2 — and
+solving the shifts from the distance would answer a question they did not ask.
+Every shipped default is still `Auto::fixed(0.02)`, so **the golden corpus is
+unchanged** apart from the exported TOML growing by nine lines, which is the
+`Auto` table `centre_distance` already writes.
+
+**The state that could not exist before.** Distance automatic *and* clearance
+automatic: a distance is nominal + clearance and a derived clearance is
+distance − nominal, so neither has anything to derive from. Answered by giving
+`FreedomGroup` a second bound, `automatic_at_most`, and having relief walk the
+same order in both directions — too many given turns one automatic, too many
+automatic pins one.
+
+| kind | the group that bounds automatics | `automatic_at_most` |
+|---|---|---|
+| spur, worm, hula | `[clearance, centre distance]` | 1 |
+| planetary | `[clearance]` — it has no distance input | **0** |
+
+The planetary's row is the one to read twice. It has no centre-distance input
+yet (item 3), so its clearance can never be derived, and **the count says so
+without a special case** — when the input arrives the declaration stops saying it
+on its own. The hula's crank offset answers to `Freedom::CentreDistance`, which
+its own documentation had already argued: *"the same shape every stage's centre
+distance has, because it is the same decision."*
+
+**And it turned up a rule the model needed.** A planetary's clearance is the only
+input in its group, so if the designer sets it automatic there is nothing else to
+pin — and sparing the toggle they just touched leaves the group unsatisfiable.
+Relief takes two passes now: the first spares `just`, the second is reached only
+when sparing it has no answer. **`just` is a preference; the relation is a law.**
+The toggle snapping back is the tool saying *this cannot be derived*, which is
+true, and it is the only case that reaches the second pass today.
+
+> **Gates, run.** Running only the given direction fails the new law; declaring
+> one more automatic than a kind can afford fails it too. Both mutations were
+> silent across the whole suite before it existed.
+
+**The panel lost a rule with it.** The clearance field was a bare box greyed when
+the answer was *exactly zero* — "nothing absorbed this", said by a coincidence of
+value. It is an ordinary `autoNumber` now, the same control as the distance above
+it, on all four kinds.
 
 ### The toggle model, built
 

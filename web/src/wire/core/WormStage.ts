@@ -72,7 +72,7 @@ centre_distance: Auto<number>,
  * Added to the centre distance, mm. Forced to zero when the centre
  * distance is set by hand, as in a spur stage.
  */
-clearance: number, tolerance_plus: number, tolerance_minus: number, 
+clearance: Auto<number>, tolerance_plus: number, tolerance_minus: number, 
 /**
  * Axial play of the worm, mm. The dominant source of backlash in a worm
  * drive, and one a spur stage has no equivalent of.

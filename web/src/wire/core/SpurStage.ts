@@ -83,7 +83,7 @@ centre_distance: Auto<number>,
  * and the backlash is a consequence; `solve_spur_stage` is where that
  * happens and is the whole of the rule.
  */
-clearance: number, tolerance_plus: number, tolerance_minus: number, 
+clearance: Auto<number>, tolerance_plus: number, tolerance_minus: number, 
 /**
  * What the stage is asked to optimise, and what it may not do to get
  * there. See [`super::Optimisation`].

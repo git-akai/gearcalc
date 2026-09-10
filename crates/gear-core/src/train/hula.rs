@@ -90,7 +90,7 @@ pub struct HulaStage {
     /// **One number, because there is one crank.** Both meshes are separated by
     /// the same distance by construction, so a clearance on each could be set
     /// to disagree about a distance that is physically single.
-    pub running_clearance: f64,
+    pub running_clearance: Auto<f64>,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
     /// **The crank offset, or automatic.**
@@ -182,7 +182,7 @@ impl Default for HulaStage {
             // the line of centres; three tenths clears at every tooth count
             // tried, and the margin is reported so a design can be taken closer.
             clearance: 0.3,
-            running_clearance: 0.02,
+            running_clearance: Auto::fixed(0.02),
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
             load_sharing: crate::contact::LoadSharing::None,
@@ -505,7 +505,7 @@ pub fn solve_hula_stage_with(
         // nominal offset instead: a designer who read the reported offset off
         // an automatic solve and typed it back got a stage 20 µm wider, and the
         // field's own documentation described the other behaviour.
-        Offset::Given(stage.offset.manual - stage.running_clearance)
+        Offset::Given(stage.offset.manual - stage.running_clearance.manual)
     };
     let set_with = |value: [f64; 2], offset: Offset| hula::Set {
         teeth,
@@ -663,7 +663,7 @@ pub fn solve_hula_stage_with(
     };
     let set = set_at(split_at);
     let layout = hula::solve_with(&set, &tip_room)?;
-    let offset = layout.offset + stage.running_clearance;
+    let offset = layout.offset + stage.running_clearance.manual;
 
     // Kinematics. The crank is the carrier of both meshes; the wobble body
     // follows from the first mesh with gear 1 held, and the output from the
@@ -1272,7 +1272,7 @@ mod tests {
     fn a_given_offset_is_the_one_the_tool_reported() {
         for running_clearance in [0.0_f64, 0.02, 0.15] {
             let auto = HulaStage {
-                running_clearance,
+                running_clearance: Auto::fixed(running_clearance),
                 ..stage()
             };
             let free = solve(&auto, 1000.0).expect("the automatic stage solves");
@@ -1312,14 +1312,14 @@ mod tests {
         let r = solve(&s, 100.0).unwrap();
         for m in &r.meshes {
             assert!(
-                (m.clearance_as_cut - m.clearance - s.running_clearance).abs() < 1e-9,
+                (m.clearance_as_cut - m.clearance - s.running_clearance.manual).abs() < 1e-9,
                 "as cut {} against {} + {}",
                 m.clearance_as_cut,
                 m.clearance,
-                s.running_clearance
+                s.running_clearance.manual
             );
         }
-        assert!((r.offset - r.offset_nominal - s.running_clearance).abs() < 1e-12);
+        assert!((r.offset - r.offset_nominal - s.running_clearance.manual).abs() < 1e-12);
     }
 
     /// Which members are rings is read off the counts, not declared.
@@ -1351,7 +1351,7 @@ mod tests {
         let mut last = 0.0;
         for step in 0..8 {
             let s = HulaStage {
-                running_clearance: f64::from(step) * 0.01,
+                running_clearance: Auto::fixed(f64::from(step) * 0.01),
                 ..stage()
             };
             let r = solve(&s, 100.0).unwrap();
@@ -1499,7 +1499,7 @@ mod tests {
     #[test]
     fn the_outputs_play_is_the_two_meshes_referred() {
         let tight = HulaStage {
-            running_clearance: 0.0,
+            running_clearance: Auto::fixed(0.0),
             tolerance_plus: 0.0,
             tolerance_minus: 0.0,
             ..stage()
@@ -1514,7 +1514,7 @@ mod tests {
         let mut last = 0.0;
         for step in 1..8 {
             let s = HulaStage {
-                running_clearance: f64::from(step) * 0.01,
+                running_clearance: Auto::fixed(f64::from(step) * 0.01),
                 ..stage()
             };
             let j = solve(&s, 100.0).unwrap().backlash.forward.nominal;

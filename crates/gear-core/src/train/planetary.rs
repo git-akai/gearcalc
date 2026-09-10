@@ -101,7 +101,7 @@ pub struct PlanetaryStage {
     #[cfg_attr(feature = "serde", serde(default))]
     pub load_sharing: crate::contact::LoadSharing,
     /// Added to the common centre distance, mm — the running clearance.
-    pub clearance: f64,
+    pub clearance: Auto<f64>,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
     /// Smallest acceptable gap between adjacent planets' tip circles, mm.
@@ -137,7 +137,7 @@ impl Default for PlanetaryStage {
                 input: PlanetaryShaft::Sun,
                 fixed: PlanetaryShaft::Ring,
             },
-            clearance: 0.02,
+            clearance: Auto::fixed(0.02),
             optimisation: Optimisation::default(),
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
@@ -1107,7 +1107,7 @@ pub fn solve_planetary_stage_with(
         .ok_or(TrainError::NoContact)?;
 
     // ---- centre distance and backlash.
-    let centre = layout.centre_distance + stage.clearance;
+    let centre = layout.centre_distance + stage.clearance.manual;
     let angular = |mesh: &Mesh, a: f64, at: MeshSide| -> f64 {
         mesh.angular_backlash(a, at).unwrap_or(0.0).to_degrees()
     };
@@ -1861,7 +1861,7 @@ mod tests {
 
         // More clearance opens both meshes, so the output must loosen.
         let loose = PlanetaryStage {
-            clearance: base.clearance + 0.05,
+            clearance: Auto::fixed(base.clearance.manual + 0.05),
             ..base.clone()
         };
         let loose = solve_planetary_stage(&loose, 3000.0, StageTorques::just(2.0), &lib).unwrap();
@@ -1878,7 +1878,7 @@ mod tests {
 
         // At the zero-backlash centre distance there is no play at all.
         let exact = PlanetaryStage {
-            clearance: 0.0,
+            clearance: Auto::fixed(0.0),
             tolerance_plus: 0.0,
             tolerance_minus: 0.0,
             ..base

@@ -233,7 +233,7 @@ pub struct WormStage {
     pub centre_distance: Auto<f64>,
     /// Added to the centre distance, mm. Forced to zero when the centre
     /// distance is set by hand, as in a spur stage.
-    pub clearance: f64,
+    pub clearance: Auto<f64>,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
     /// Axial play of the worm, mm. The dominant source of backlash in a worm
@@ -256,7 +256,7 @@ impl Default for WormStage {
             sizing: FirstMemberSizing::PitchDiameter(7.0),
             wheel_teeth: 40,
             centre_distance: Auto::automatic(0.0),
-            clearance: 0.02,
+            clearance: Auto::fixed(0.02),
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
             axial_clearance: 0.04,
@@ -1215,7 +1215,7 @@ impl WormStage {
     #[must_use]
     pub fn clearance_taken(&self) -> f64 {
         if self.centre_distance.auto {
-            self.clearance
+            self.clearance.manual
         } else {
             0.0
         }
@@ -1435,7 +1435,7 @@ mod tests {
                 sizing: FirstMemberSizing::PitchDiameter(d1),
                 axial_clearance: 0.04,
                 // isolate the axial term: no clearance on the centre distance
-                clearance: 0.0,
+                clearance: Auto::fixed(0.0),
                 tolerance_plus: 0.0,
                 tolerance_minus: 0.0,
                 ..Default::default()
@@ -1467,7 +1467,7 @@ mod tests {
     #[test]
     fn the_centre_distance_tolerance_moves_the_backlash_the_right_way() {
         let stage = WormStage {
-            clearance: 0.0,
+            clearance: Auto::fixed(0.0),
             axial_clearance: 0.0,
             tolerance_plus: 0.05,
             tolerance_minus: 0.05,
@@ -1733,7 +1733,7 @@ mod tests {
         // ...and it is *exactly* half once the clearance is taken away, which
         // pins the shortfall on the slide rather than on the arithmetic.
         let tight = |face: Auto<f64>| SpurStage {
-            clearance: 0.0,
+            clearance: Auto::fixed(0.0),
             ..stage(face)
         };
         let centred =
@@ -2368,7 +2368,7 @@ mod tests {
         let stage = |sigma: f64, clearance: f64| SpurStage {
             shaft_angle: sigma,
             additional_helix: 20.0,
-            clearance,
+            clearance: Auto::fixed(clearance),
             gears: [
                 StageGear {
                     teeth: 17,
@@ -2443,7 +2443,7 @@ mod tests {
         let stage = |sigma: f64, clearance: f64| SpurStage {
             shaft_angle: sigma,
             additional_helix: 20.0,
-            clearance,
+            clearance: Auto::fixed(clearance),
             gears: [
                 StageGear {
                     teeth: 17,
@@ -2610,7 +2610,7 @@ mod tests {
     #[test]
     fn a_worm_stage_is_rated_at_the_centre_distance_it_runs_at() {
         let stage = |clearance: f64| WormStage {
-            clearance,
+            clearance: Auto::fixed(clearance),
             ..WormStage::default()
         };
         let mut previous: Option<(f64, f64)> = None;
@@ -2657,7 +2657,7 @@ mod tests {
         let stage = |sigma: f64, clearance: f64| SpurStage {
             shaft_angle: sigma,
             additional_helix: 20.0,
-            clearance,
+            clearance: Auto::fixed(clearance),
             gears: [
                 StageGear {
                     teeth: 17,

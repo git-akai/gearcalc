@@ -337,6 +337,22 @@ A shift a designer **gave** is never one of the numbers being chosen: it stands,
 and the other member takes the whole of the rest. Where no admissible pair of
 shifts reaches the distance at all, there is no answer to give.
 
+**The clearance is an `Auto` like the distance, because it is the same kind of
+number.** Either may be the one given and the other the one derived — that is
+what modes 1 and 2 are — and a plain number could not say which it was, so the
+box was read in some states and silently disregarded in others. What it cannot
+be is **derived at the same time as the distance**: a distance is nominal +
+clearance and a derived clearance is distance − nominal, so with both automatic
+neither has anything to derive from.
+
+That is one of the two bounds `train::FreedomGroup` carries. The other counts how
+many may be *given*, and the pair of them is what makes an over- or
+under-determined stage resolve itself: too many given turns one automatic, too
+many automatic pins one, in the order the stage declares. A kind with **no**
+distance input says `automatic_at_most = 0` for its clearance and so can never
+derive it — which is the planetary today, and is the same statement counted
+rather than special-cased.
+
 The objective and the constraints are not the same kind of thing, and failing at
 one must not discard the other: where the optimiser's own conditions — a minimum
 contact ratio, a tool that leaves the members alone — admit nothing, the stage

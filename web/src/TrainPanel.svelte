@@ -1446,22 +1446,23 @@
                 undefined,
                 "ui.train_mm",
               )}
-              <!-- **Greyed by the answer, not by a rule kept here.** Whether
-                   this is read depends on whether anything is free to absorb it
-                   — the distance when it is automatic, the shifts when they are
-                   being chosen — and that is decided once, in the solve, which
-                   reports what it took (`SpurStage::clearance_taken`). Reading
-                   it back is what keeps the panel from having to know the same
-                   rule a second time and drift from it. -->
-              <label>
-                <span>{t("ui.train_c2c_clearance")}</span>
-                {#if (sres ?? xres) && (sres ?? xres)?.clearance === 0}
-                  <input type="number" value={0} disabled class="computed" />
-                {:else}
-                  <input type="number" step="0.01" bind:value={stage.clearance} />
-                {/if}
-                <em>{t("ui.train_mm")}</em>
-              </label>
+              <!-- **The same shape as the distance above it, because it is the
+                   same decision.** A centre distance is the true distance and a
+                   clearance is what portion of it is play, so either may be the
+                   one given and the other the one derived — which is what an
+                   `Auto` says and what a plain number could not. It used to be
+                   a bare box greyed on the answer being exactly zero, which
+                   said "nothing absorbed this" by a coincidence of value.
+                   `Stage::relieved` is what stops both being left automatic. -->
+              {@render autoNumber(
+                "ui.train_c2c_clearance",
+                stage.clearance,
+                (sres ?? xres)?.clearance,
+                0.01,
+                () => relieveStage(stage, "clearance"),
+                undefined,
+                "ui.train_mm",
+              )}
               <label>
                 <span>{t("ui.train_c2c_tolerance_plus")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
@@ -1651,15 +1652,15 @@
                 undefined,
                 "ui.train_mm",
               )}
-              <label>
-                <span>{t("ui.train_c2c_clearance")}</span>
-                {#if wres && wres.clearance === 0}
-                  <input type="number" value={0} disabled class="computed" />
-                {:else}
-                  <input type="number" step="0.01" bind:value={stage.clearance} />
-                {/if}
-                <em>{t("ui.train_mm")}</em>
-              </label>
+{@render autoNumber(
+                "ui.train_c2c_clearance",
+                stage.clearance,
+                wres?.clearance,
+                0.01,
+                () => relieveStage(stage, "clearance"),
+                undefined,
+                "ui.train_mm",
+              )}
               <label>
                 <span>{t("ui.train_c2c_tolerance_plus")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
@@ -1887,11 +1888,15 @@
                   )
                 } />
               </label>
-              <label>
-                <span>{t("ui.train_c2c_clearance")}</span>
-                <input type="number" step="0.01" bind:value={stage.clearance} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
+{@render autoNumber(
+                "ui.train_c2c_clearance",
+                stage.clearance,
+                pres ? pres.centre_distance - pres.centre_distance_nominal : undefined,
+                0.01,
+                () => relieveStage(stage, "clearance"),
+                undefined,
+                "ui.train_mm",
+              )}
               <label>
                 <span>{t("ui.train_c2c_tolerance_plus")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
@@ -2148,11 +2153,18 @@
                   : null,
                 "ui.train_mm",
               )}
-              <label>
-                <span>{t("ui.train_c2c_clearance")}</span>
-                <input type="number" step="0.01" bind:value={stage.running_clearance} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
+              <!-- The crank offset above is this kind's centre distance, and
+                   this is what portion of it is play — the same pair of numbers
+                   every other kind has, so the same pair of controls. -->
+              {@render autoNumber(
+                "ui.train_c2c_clearance",
+                stage.running_clearance,
+                hres ? hres.offset - hres.offset_nominal : undefined,
+                0.01,
+                () => relieveStage(stage, "clearance"),
+                undefined,
+                "ui.train_mm",
+              )}
               <label>
                 <span>{t("ui.train_c2c_tolerance_plus")}</span>
                 <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
