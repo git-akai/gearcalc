@@ -1027,9 +1027,23 @@ fn defaults_impl() -> Result<String, String> {
     // opening the panel wants to see the width the rating asks for. Seeded at
     // 5 mm so the field has something to fall back to when the toggle is
     // turned off.
+    //
+    // **Every kind the panel offers**, which it was not: the rule reached the
+    // parallel pair and the epicyclic set, and a hula stage opened at a *fixed*
+    // 10 mm while a worm's members were automatic but seeded at ten. So the same
+    // panel answered the same question three ways depending on which stage a
+    // designer had picked. Nothing could see it — `defaults()` is the boundary's
+    // own, and no golden case reaches it. See the test below.
+    const UI_SEED: f64 = 5.0;
     let ui_gear = |g: &gear_core::train::StageGear| gear_core::train::StageGear {
-        face_width: gear_core::params::Auto::automatic(5.0),
+        face_width: gear_core::params::Auto::automatic(UI_SEED),
         ..g.clone()
+    };
+    // A worm's members are threads rather than rack-cut gears, so they are their
+    // own type — and the same question put to them wants the same answer.
+    let ui_member = |m: &gear_core::train::WormMember| gear_core::train::WormMember {
+        face_width: gear_core::params::Auto::automatic(UI_SEED),
+        ..m.clone()
     };
     let spur = {
         let d = SpurStage::default();
@@ -1045,6 +1059,21 @@ fn defaults_impl() -> Result<String, String> {
             planet: ui_gear(&d.planet),
             ring: ui_gear(&d.ring),
             ..d
+        }
+    };
+    let worm = {
+        let d = WormStage::default();
+        WormStage {
+            worm: ui_member(&d.worm),
+            wheel: ui_member(&d.wheel),
+            ..d
+        }
+    };
+    let hula = {
+        let d = gear_core::train::HulaStage::default();
+        gear_core::train::HulaStage {
+            gears: d.gears.each_ref().map(ui_gear),
+            ..d.clone()
         }
     };
 
@@ -1076,9 +1105,9 @@ fn defaults_impl() -> Result<String, String> {
             stages: vec![Stage::Spur(spur.clone())],
         },
         spur_stage: Stage::Spur(spur),
-        worm_stage: Stage::Worm(WormStage::default()),
+        worm_stage: Stage::Worm(worm),
         planetary_stage: Stage::Planetary(Box::new(planetary)),
-        hula_stage: Stage::Hula(Box::default()),
+        hula_stage: Stage::Hula(Box::new(hula)),
         reverse_loading_coefficient: gear_core::material::REVERSED_BENDING_FRACTION,
     };
     serde_json::to_string(&defaults).map_err(|e| format!("could not encode defaults: {e}"))
@@ -2139,6 +2168,77 @@ mod tests {
         let mut bad = Vec::new();
         walk(v, path, &mut bad);
         bad
+    }
+
+    /// **The numbers this boundary invents, as figures.**
+    ///
+    /// Every field in the panel starts at a value, and rule 1 says that value is
+    /// one of the tool's own: *if a number appears in the UI, Rust computed it —
+    /// a default is one of those numbers.* Most of them are `gear-core`'s and
+    /// the golden corpus sees them, because `gear-cli` builds its stages from
+    /// the same `Default`. **These are not.** They exist only here — the tab's
+    /// tooth count, the pin, the throw, the face width a fresh panel seeds, the
+    /// speed and torque a fresh train carries — and they reach a designer
+    /// without passing anything that could notice them moving.
+    ///
+    /// Measured: changing any of the four probed left **every test, the whole
+    /// corpus and the binding check silent**. So they are pinned here, which is
+    /// what a canary is for — none of them is derived, and the only property
+    /// they have is that nobody changes them by accident.
+    ///
+    /// A figure that *is* forwarded from the core is deliberately not repeated:
+    /// pinning it twice would make this the second place to edit, and the corpus
+    /// already holds the first.
+    #[test]
+    fn the_defaults_this_boundary_invents_are_the_ones_it_shipped() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+
+        // The gear tab.
+        assert_eq!(d["gear"]["params"]["teeth"], 9);
+        assert_eq!(d["gear"]["pin_diameter"], 1.75);
+        assert_eq!(d["gear"]["eccentric_throw"], 0.1);
+        assert_eq!(d["gear"]["reference_circles"], true);
+
+        // A fresh train: a small motor, and no derating nobody asked for.
+        assert_eq!(d["train"]["input_speed"], 30_000.0);
+        assert_eq!(d["train"]["input_torque"], 0.1);
+        assert_eq!(d["train"]["operating_torque"], 0.1);
+        assert_eq!(d["train"]["back_driving_torque"], 0.0);
+        assert_eq!(d["train"]["reversed_bending"], false);
+
+        // **The face width a panel seeds, on every gear of every stage kind it
+        // offers.** It is the one number here that is not written once: the
+        // core's default is a plain 10 mm and the tab wants the width the rating
+        // asks for, so each gear is rebuilt with an automatic 5 mm — and a walk
+        // is what says all of them were.
+        let mut seeded = 0;
+        let mut walk = vec![
+            &d["spur_stage"],
+            &d["planetary_stage"],
+            &d["hula_stage"],
+            &d["worm_stage"],
+        ];
+        walk.extend(d["train"]["stages"].as_array().unwrap());
+        for stage in walk {
+            for key in ["gears", "sun", "planet", "ring", "worm", "wheel"] {
+                let members: Vec<&serde_json::Value> = match stage[key].as_array() {
+                    Some(a) => a.iter().collect(),
+                    None if stage[key].is_object() => vec![&stage[key]],
+                    None => vec![],
+                };
+                for g in members {
+                    if let Some(w) = g.get("face_width") {
+                        assert_eq!(w["auto"], true, "a seeded width is not automatic");
+                        assert_eq!(w["manual"], 5.0, "a seeded width is not 5 mm");
+                        seeded += 1;
+                    }
+                }
+            }
+        }
+        // Two on a pair, three on a set, four on a hula stage, two on a worm,
+        // and the pair again inside the train — every member of every kind the
+        // panel can open.
+        assert_eq!(seeded, 13, "a member's width went unseeded");
     }
 
     #[test]

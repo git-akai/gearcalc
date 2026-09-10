@@ -120,7 +120,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 559 tests** (was 531). **Golden corpus: 27 cases** (was 22).
+**Suite: 560 tests** (was 531). **Golden corpus: 27 cases** (was 22).
 
 ---
 
@@ -237,7 +237,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F21 | The figure checker cannot see figures in prose, only in tables | gap | 5 | open |
 | F22 | The tense rule as written forbade 127 sentences it was not aimed at | drift | 1 | **closed** — the rule was narrowed, not the prose |
 | F23 | The gear tab and a stage member bounded the same gear differently | gap | 2 | **closed** — and logged in `corrections.md` |
-| F24 | The golden corpus covers the CLI, not the wasm boundary | gap | 5 | open |
+| F24 | The golden corpus covers the CLI, not the wasm boundary | gap | 5 | **closed** — measured; the values and shape are covered, the boundary's *own* defaults were not |
 | F25 | `load_share`'s two ramps do not meet above ε = 2 | gap | 2 | **closed** — and logged in `corrections.md` |
 | F26 | No sampling constant had a convergence gate | gap | 2 | **closed** |
 | F27 | `SEVER_SCAN_SAMPLES` could not resolve what it looked for | gap | 2 | **closed** — the scan became a solve |
@@ -273,6 +273,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F67 | The harness turned three of a gear's eleven controls | gap | 5 | **closed** — `sweep` turns every gear axis, `train toggles` every stage one |
 | F68 | `Loading::at_width`'s exponent was hidden by `PROBE` equalling the default face width | gap | 5 | **closed** — and logged in `corrections.md` |
 | F69 | The outline's own promise was untested; its `worst_deviation` measured chord length | gap | 5 | **closed** — " |
+| F70 | The panel seeded a face width automatically for two stage kinds of four | gap | 5 | **closed** — and logged in `corrections.md` |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so
@@ -1284,6 +1285,48 @@ mechanism and is worth a designer knowing.
 > cutting `MAX_SUBDIVISION_DEPTH` from 14 to 10 fails the bounded-count test.
 > Each of the three was silent across all 558 tests and all 27 golden files
 > before.
+
+### Phase 5, third pass — the boundary
+
+**F24 said the corpus covers the CLI and not the wasm boundary. Measured, most
+of it is covered** — and by the right things rather than by luck. The boundary's
+*shape* is `tools/check_bindings.sh`'s, since `ts-rs` generates the front end's
+types from the Rust ones; its *values* are `gear-core`'s, and the corpus sees
+them because `gear-cli` builds its stages from the same `Default`. Two defaults
+probed at random — `min_tip_width`, `min_contact_ratio` — were both caught.
+
+**What is not covered is the handful of numbers the boundary invents.** Rule 1
+is that if a number appears in the UI, Rust computed it, *and a default is one of
+those numbers*. These exist only in `defaults_impl`:
+
+| | seen by |
+|---|---|
+| the gear tab's tooth count, 9 | **nothing** |
+| the pin diameter, 1.75 mm | **nothing** |
+| the eccentric throw, 0.1 | **nothing** |
+| the face width a fresh panel seeds | **nothing** |
+| a fresh train's 30,000 rpm and 0.1 N·m | **nothing** |
+
+Not a test, not the corpus, not the binding check. Pinned as figures now.
+
+**F70, which writing that canary found.** The rule beside the code is that a
+designer opening a stage should see *the width the rating asks for*, seeded at
+5 mm. It had reached a parallel pair and an epicyclic set:
+
+| kind the panel opens | the width it started at |
+|---|---|
+| spur, planetary | automatic, 5 mm seed |
+| worm | automatic, 10 mm seed |
+| **hula** | **fixed, 10 mm** |
+
+Three answers to one question, decided by which stage a designer happened to
+pick — and a fresh hula panel showing a width nobody chose and no rating sized.
+Found by writing the test to walk **every member of every kind the panel
+offers** rather than the two the rule had reached.
+
+> **Gate, run.** Each of the four boundary defaults perturbed again: all four now
+> fail `the_defaults_this_boundary_invents_are_the_ones_it_shipped`, and each was
+> silent across the whole suite, the whole corpus and the binding check before.
 
 **F6, closed on the way.** The face-width invariance ran on `FormFactorOnly`
 alone, the one notch model no stage rates with — it ships through
