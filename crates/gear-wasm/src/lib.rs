@@ -1839,6 +1839,7 @@ mod tests {
                "sliding_friction_planet_ring":0.06,"static_friction_planet_ring":0.16,
                "thickness_mod":1.0,"planets":3,
                "arrangement":{"input":"sun","fixed":"ring"},
+               "centre_distance":{"auto":true,"manual":0.0},
                "clearance":{"auto":false,"manual":0.02},"tolerance_plus":0.02,"tolerance_minus":0.02,
                "min_planet_clearance":0.3,
                "cutter":{"teeth":20,"addendum":1.25,"tip_round":0.2},

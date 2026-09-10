@@ -101,6 +101,19 @@ pub struct PlanetaryStage {
     #[cfg_attr(feature = "serde", serde(default))]
     pub load_sharing: crate::contact::LoadSharing,
     /// Added to the common centre distance, mm — the running clearance.
+    /// **The distance the sun runs from a planet, or automatic.**
+    ///
+    /// The same shape and the same decision every other stage's centre distance
+    /// has. Automatic, the common distance is whatever the shifts leave — which
+    /// is what this stage has always done. Given, each mesh has a shift sum it
+    /// must reach to run at it, and both of those are closed form
+    /// ([`crate::mesh::shift_sum_for`]), so a target makes the layout *easier*:
+    /// it removes the iteration rather than adding to it.
+    ///
+    /// Two equations instead of one means **two** of the three shifts are
+    /// absorbed rather than one, which is the same accounting a pair does — see
+    /// [`crate::train::FreedomGroup`].
+    pub centre_distance: Auto<f64>,
     pub clearance: Auto<f64>,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
@@ -137,6 +150,7 @@ impl Default for PlanetaryStage {
                 input: PlanetaryShaft::Sun,
                 fixed: PlanetaryShaft::Ring,
             },
+            centre_distance: Auto::automatic(0.0),
             clearance: Auto::fixed(0.02),
             optimisation: Optimisation::default(),
             tolerance_plus: 0.02,
@@ -201,6 +215,14 @@ pub struct PlanetaryResult {
     pub ratio: f64,
     /// The common centre distance, zero-backlash, mm — sun-to-planet and
     /// planet-to-ring, which the planet's shift has made the same number.
+    /// **What portion of the running distance is clearance**, mm — derived, as
+    /// every other kind's is.
+    ///
+    /// `centre_distance − centre_distance_nominal`, so it cannot disagree with
+    /// the two numbers it sits between. A set had no distance *input* until F39's
+    /// third item, so this was the one kind with no gap to report; with one, the
+    /// same three modes apply here as anywhere else.
+    pub clearance: f64,
     pub centre_distance_nominal: f64,
     /// ...and the one actually used, including clearance.
     pub centre_distance: f64,
@@ -363,6 +385,10 @@ impl PlanetaryStage {
             planets: stage.planets,
             shift: std::array::from_fn(|i| shifts[i] + modification(i)),
             absorber: stage.absorber(),
+            // **The nominal distance**, which is what the shifts have to reach;
+            // the clearance is added to it afterwards, exactly as a pair's is.
+            distance: (!stage.centre_distance.auto)
+                .then_some(stage.centre_distance.manual - stage.clearance.manual),
             // Filled once the planet exists; clearance only reads it.
             planet_tip_diameter: 0.0,
         };
@@ -499,6 +525,58 @@ impl PlanetaryStage {
         ]
     }
 
+    /// The **nominal** distance the shifts have to reach, where one was given —
+    /// the distance typed less the clearance it is opened by, exactly as a
+    /// parallel pair reads its own.
+    fn nominal_distance(&self) -> Option<f64> {
+        (!self.centre_distance.auto && !self.clearance.auto)
+            .then_some(self.centre_distance.manual - self.clearance.manual)
+    }
+
+    /// **The three shifts that put both meshes at `target`.**
+    ///
+    /// Two closed-form sums and one freedom, taken as the planet's shift. A
+    /// shift a designer *gave* fixes that freedom — through whichever mesh it is
+    /// in — and where none was given the freedom follows the same rule a pair's
+    /// division does: the even split of the external mesh's sum, projected onto
+    /// what the two members can be cut at ([`crate::auto::divide_shift_sum`]),
+    /// so a member against its undercut floor holds there while the other
+    /// absorbs.
+    ///
+    /// `None` where no such geometry exists — the distance is below a base
+    /// circle limit, or no admissible pair of external shifts reaches its sum.
+    fn shifts_reaching(&self, target: f64, asked: &[super::ShiftAsked; 3]) -> Option<[f64; 3]> {
+        let rack = self.rack();
+        let teeth = self.teeth();
+        let sum_x = |sum_z: f64| {
+            crate::mesh::shift_sum_for(rack.mt, rack.alpha_t, rack.alpha_n, sum_z, target)
+        };
+        let sum_ext = f64::from(teeth.sun) + f64::from(teeth.planet);
+        let sum_int = f64::from(teeth.ring) - f64::from(teeth.planet);
+        let (s_ext, s_int) = (sum_x(sum_ext)?, sum_x(-sum_int)?);
+
+        let given = [0, 1, 2].map(|i| asked[i].given);
+        let x_p = match given {
+            [_, Some(p), _] => p,
+            [Some(sun), None, _] => s_ext - sun,
+            [None, None, Some(ring)] => s_int + ring,
+            [None, None, None] => {
+                let at = |i: usize, x: f64| {
+                    let (member, count) = if i == 0 {
+                        (PlanetaryShaft::Sun, teeth.sun)
+                    } else {
+                        (PlanetaryShaft::Carrier, teeth.planet)
+                    };
+                    let g = if i == 0 { &self.sun } else { &self.planet };
+                    self.params(member, count, x, g.addendum)
+                };
+                let floor = [asked[0].search_floor, asked[1].search_floor];
+                crate::auto::divide_shift_sum(&at, 1.0, s_ext, floor)?[1]
+            }
+        };
+        Some([s_ext - x_p, x_p, x_p - s_int])
+    }
+
     pub(super) fn shifts(&self) -> [f64; 3] {
         self.shifts_at(&crate::auto::Search::SHIPPED)
     }
@@ -509,6 +587,24 @@ impl PlanetaryStage {
         let asked = self.asked();
         let absorbed = self.absorber().index();
         let plain: [f64; 3] = std::array::from_fn(|i| asked[i].settled);
+
+        // **A given centre distance is two equations, and it leaves one
+        // freedom.** Each mesh has a shift sum it must reach to run at that
+        // distance and both are closed form, so the sun's and the ring's shifts
+        // are read off the planet's — which is the coordinate this stage has
+        // always treated as the special one, being the member in both meshes.
+        //
+        // Honoured whether or not the stage is optimising, for the reason the
+        // parallel pair's is: the relation belongs to the geometry and never to
+        // the optimiser. **What is not yet done is searching that one freedom**
+        // — with a target the objective is a function of the planet's shift
+        // alone, which is a one-dimensional search this pass does not add.
+        if let Some(target) = self.nominal_distance() {
+            if let Some(x) = self.shifts_reaching(target, &asked) {
+                return x;
+            }
+        }
+
         if !self.optimisation.enabled {
             return plain;
         }
@@ -1241,6 +1337,7 @@ pub fn solve_planetary_stage_with(
         arrangement: stage.arrangement,
         output: forward.output,
         ratio: forward.ratio,
+        clearance: centre - layout.centre_distance,
         centre_distance_nominal: layout.centre_distance,
         centre_distance: centre,
         fixed_carrier_efficiency: eta0,
@@ -1580,6 +1677,140 @@ mod tests {
             &test_library(),
         )
         .unwrap()
+    }
+
+    /// **With a distance given, only one shift is free** — asserted against what
+    /// the set actually does, not against the number the declaration carries.
+    ///
+    /// A set's two distances must agree, which is one relation among its three
+    /// shifts. Give it a distance as well and there is a second — each mesh must
+    /// reach *that* distance — so one shift is a design and two are absorbed.
+    /// `Stage::freedoms` says so by reading the distance's toggle, and this is
+    /// what makes that reading true rather than declared: give **two** shifts at
+    /// a given distance and one of them cannot survive.
+    ///
+    /// Checking the declaration against the declaration is what
+    /// `docs/corrections.md` calls a check built from the thing under test. The
+    /// first version of this did exactly that and passed against a limit hard
+    /// -wired to the wrong number.
+    #[test]
+    fn a_given_distance_leaves_a_set_one_free_shift() {
+        let lib = super::super::test_library();
+        let base = PlanetaryStage::default();
+        let free = solve_planetary_stage(&base, 3000.0, StageTorques::just(2.0), &lib)
+            .expect("the shipped set solves");
+        let asked = free.centre_distance + 0.1;
+
+        // One shift given — the ring's, as the shipped set has it — and every
+        // given number stands.
+        let mut one = base.clone();
+        one.centre_distance = Auto::fixed(asked);
+        let r = solve_planetary_stage(&one, 3000.0, StageTorques::just(2.0), &lib)
+            .expect("one free shift is enough");
+        assert!((r.centre_distance - asked).abs() < 1e-9);
+        assert!((r.ring.profile_shift - one.ring.profile_shift.manual).abs() < 1e-12);
+
+        // A second shift given, and it cannot also stand: three relations'
+        // worth of demands on two freedoms.
+        let mut two = one.clone();
+        two.sun.profile_shift = Auto::fixed(r.sun.profile_shift + 0.25);
+        let over = solve_planetary_stage(&two, 3000.0, StageTorques::just(2.0), &lib)
+            .expect("it still builds; it just cannot honour everything");
+        let honoured = [
+            (over.centre_distance - asked).abs() < 1e-9,
+            (over.sun.profile_shift - two.sun.profile_shift.manual).abs() < 1e-9,
+            (over.ring.profile_shift - two.ring.profile_shift.manual).abs() < 1e-9,
+        ];
+        assert!(
+            honoured.iter().any(|ok| !ok),
+            "a distance and two shifts were all honoured, so the set has more \
+             freedom than its declaration claims: {honoured:?}"
+        );
+
+        // ...and the declaration says the same thing, read from the toggles.
+        use super::super::{Freedom, Stage};
+        let flat = Stage::Planetary(Box::new(one.clone()));
+        let shifts = flat
+            .freedoms()
+            .into_iter()
+            .find(|g| g.order.iter().all(|f| matches!(f, Freedom::Shift(_))))
+            .expect("a set declares a group over its shifts");
+        assert_eq!(shifts.given_at_most, 1, "a given distance leaves one shift");
+
+        let mut loose = one.clone();
+        loose.centre_distance = Auto::automatic(0.0);
+        let free_group = Stage::Planetary(Box::new(loose))
+            .freedoms()
+            .into_iter()
+            .find(|g| g.order.iter().all(|f| matches!(f, Freedom::Shift(_))))
+            .expect("a set declares a group over its shifts");
+        assert_eq!(
+            free_group.given_at_most, 2,
+            "with the distance free, two shifts are a design"
+        );
+    }
+
+    /// **A set runs at the centre distance it was given**, and both of its
+    /// meshes do — which is the whole of F39's third item.
+    ///
+    /// A planetary set had no distance input at all: the common distance was
+    /// whatever the shifts left. Given one, each mesh has a shift sum it must
+    /// reach to run at it, and both of those are closed form — so a target makes
+    /// the layout *easier* and the Newton iteration disappears.
+    ///
+    /// Three claims. The distance asked for is the distance run at; the two
+    /// meshes agree there to the bit (`residual`, which is the layout's own
+    /// measure of whether it closed); and a shift the designer **gave** is
+    /// untouched, since with one freedom left it is the freedom.
+    #[test]
+    fn a_set_runs_at_the_centre_distance_it_was_given() {
+        let lib = super::super::test_library();
+        let base = PlanetaryStage::default();
+        let free = solve_planetary_stage(&base, 3000.0, StageTorques::just(2.0), &lib)
+            .expect("the shipped set solves");
+
+        let mut checked = 0u32;
+        for step in -2..=4 {
+            let asked = free.centre_distance + 0.2 * f64::from(step);
+            let mut stage = base.clone();
+            stage.centre_distance = Auto::fixed(asked);
+            let Ok(r) = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &lib) else {
+                // A distance no set can reach is refused, not answered — which
+                // is the honest end of the range rather than a gap in it.
+                continue;
+            };
+            checked += 1;
+
+            assert!(
+                (r.centre_distance - asked).abs() < 1e-9,
+                "asked {asked}, ran at {}",
+                r.centre_distance
+            );
+            assert!(
+                (r.clearance - stage.clearance.manual).abs() < 1e-9,
+                "the clearance asked for should be the clearance left: {}",
+                r.clearance
+            );
+
+            // Both meshes at that distance, measured by the layout rather than
+            // asserted from the same expression that placed the shifts.
+            let built = stage.built(stage.shifts()).expect("it just solved");
+            assert!(
+                built.layout.residual < 1e-12,
+                "the two meshes disagree by {} at a given distance",
+                built.layout.residual
+            );
+
+            // The ring's shift is given on the shipped set, so it is the one
+            // freedom a target leaves and must come back untouched.
+            assert!(
+                (r.ring.profile_shift - stage.ring.profile_shift.manual).abs() < 1e-12,
+                "a given shift moved: {} for {}",
+                r.ring.profile_shift,
+                stage.ring.profile_shift.manual
+            );
+        }
+        assert!(checked >= 5, "only {checked} distances were reachable");
     }
 
     /// **The constraint that makes it a planetary set**: sun-to-planet and

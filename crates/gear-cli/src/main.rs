@@ -2590,6 +2590,9 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
         // planet's shift rising with the ring's count.
         shift: [sun_shift, 0.0, ring_shift],
         absorber: gear_core::planetary::Member::Planet,
+        // The ring search asks which distances the counts *can* reach, so it
+        // names none of its own.
+        distance: None,
         // A planet's tip diameter at a standard addendum, which is what the
         // clearance column is measured against.
         planet_tip_diameter: module * (f64::from(planet) + 2.0),
@@ -2797,7 +2800,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
     if !shown {
         return;
     }
-    let stage = base;
+    let stage = base.clone();
     if let Ok(r) = solve_planetary_stage(
         &stage,
         3000.0,
@@ -2807,6 +2810,50 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
         println!();
         for note in &r.notes {
             println!("note: {}", words().render(note));
+        }
+    }
+
+    // **A given centre distance**, which the set had no input for until F39's
+    // third item. Two equations instead of one, both closed form, so the
+    // iteration disappears and one shift is left free — and the row that says
+    // it worked is `residual`, the layout's own measure of whether the two
+    // meshes closed at the distance asked for.
+    //
+    // Here rather than nowhere because a path the harness never walks is a path
+    // the change detector cannot see, which this project has recorded six times.
+    let free = solve_planetary_stage(
+        &base,
+        3000.0,
+        gear_core::train::StageTorques::just(2.0),
+        &lib,
+    );
+    if let Ok(free) = free {
+        println!("\ncentre distance given, shifts chosen to reach it");
+        println!(
+            "{:<12} {:>9} {:>9} {:>9} {:>11} {:>9}",
+            "a mm", "x_sun", "x_planet", "x_ring", "residual", "eta_0"
+        );
+        for step in -2..=2 {
+            let asked = free.centre_distance + 0.1 * f64::from(step);
+            let mut stage = base.clone();
+            stage.centre_distance = gear_core::Auto::fixed(asked);
+            match solve_planetary_stage(
+                &stage,
+                3000.0,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
+                Err(e) => println!("{asked:<12.4} {e}"),
+                Ok(r) => println!(
+                    "{:<12.4} {:>9.4} {:>9.4} {:>9.4} {:>11.1e} {:>9.4}",
+                    r.centre_distance,
+                    r.sun.profile_shift,
+                    r.planet.gear.profile_shift,
+                    r.ring.profile_shift,
+                    r.planet.shift_residual,
+                    r.fixed_carrier_efficiency.forward
+                ),
+            }
         }
     }
 }

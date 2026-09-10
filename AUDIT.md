@@ -102,8 +102,15 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
-**Phase 6 — the front end and the payload.** In progress. **The clearance is an
-`Auto` on all four kinds** (F39 item 1, F77) — a plain number could not say
+**Phase 6 — the front end and the payload.** In progress. **A planetary set has
+a centre distance** (F39 item 3) — the one kind whose geometry a housing most
+constrains was the one kind that could not be told about one. A target makes the
+layout *easier*: two closed-form sums instead of one Newton iteration, and one
+shift left free. It also found **F78**: a set's shifts carry a relation of their
+own that a pair's do not, so its two constraints nest, and writing them flat left
+the stage over-determined with two groups fighting.
+
+**The clearance is an `Auto` on all four kinds** (F39 item 1, F77) — a plain number could not say
 "derived", so the box was read in some states and silently disregarded in others.
 It needed a second bound on a freedom group, `automatic_at_most`: a distance and
 a clearance cannot *both* be derived, since each is defined from the other. The
@@ -361,7 +368,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F36 | `SpurResult` re-declared `MeshReport`'s seven fields, and the panel re-drew them | gap | 3 | **closed** |
 | F37 | A given crank offset was not the offset the stage ran at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F38 | The reported clearance was the input echoed, not the gap run at | gap | 3 | **closed** — and logged in `corrections.md` |
-| F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | **part closed** — items 1 and 2 done; item 3 (a planetary distance) open, item 4 (a worm's absorber) answered and open |
+| F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | **part closed** — items 1, 2 and 3 done; item 4 (a worm's absorber) answered and open |
+| F78 | A planetary set's freedoms written as one flat group left it over-determined — its shifts carry a relation of their own that a pair's do not | gap | 6 | **closed** — the shift limit is read from the distance's toggle; the relief test checks every group now |
 | F75 | The optimiser's fallback discarded the *centre distance* along with the optimisation whenever its own constraints admitted nothing | **gap** | 6 | **closed** — the fallback is what the constraints imply, not what the stage would build unasked |
 | F76 | The over-constraint rule lived in the panel as three per-kind functions, untested in either language | gap | 6 | **closed** — `Stage::freedoms` and `Stage::relieved`, gates proven |
 | F77 | A plain `f64` clearance could not say "derived", so the box was read in some states and silently disregarded in others | gap | 6 | **closed** — `Auto<f64>` on all four kinds, and `FreedomGroup` bounds automatics as well as givens |
@@ -2053,6 +2061,71 @@ true, and it is the only case that reaches the second pass today.
 the answer was *exactly zero* — "nothing absorbed this", said by a coincidence of
 value. It is an ordinary `autoNumber` now, the same control as the distance above
 it, on all four kinds.
+
+### F39, item 3 — a planetary centre distance
+
+**It had none.** The common distance was whatever the shifts left, so the one
+kind whose geometry is *most* constrained by a housing was the one kind that
+could not be told about one.
+
+**And a target makes the layout easier, not harder.** Without one the set has a
+single equation — the two distances must agree — solved by Newton on the planet's
+shift. With one there are **two**, each of them `mesh::shift_sum_for` in closed
+form:
+
+```text
+x_s + x_p = shift_sum_for(z_s + z_p,  a)
+x_p − x_r = shift_sum_for(z_p − z_r,  a)
+```
+
+so one freedom remains, taken as the planet's shift, and the other two are read
+off it. **The iteration disappears.** A shift a designer gave fixes that freedom
+through whichever mesh it is in; where none is given it follows the same rule a
+pair's division does.
+
+| asked | ran at | residual | x_sun / x_planet / x_ring |
+|---|---|---|---|
+| 20.8200 | 20.8200 | 0.0e0 | −0.3851 / 0.1926 / 0.0000 |
+| 21.0200 | 21.0200 | 0.0e0 | 0.0000 / 0.0000 / 0.0000 |
+| 21.2200 | 21.2200 | 0.0e0 | 0.4139 / −0.2070 / 0.0000 |
+
+The ring holds at zero because the shipped set **gives** its shift, so it is the
+freedom and the other two absorb — the rule working, not a coincidence. Outside
+the reachable band the answer is a refusal (`NoContact`, `NoRootSection`), not a
+number.
+
+**`PlanetaryResult` gained a `clearance`** on the way, derived like every other
+kind's. It was the one result type without one, for the good reason that it had
+no distance to derive a gap from; that reason has gone.
+
+#### The declaration had to learn a shape the pair does not have
+
+Writing the freedoms as one flat group of five — `{a, clearance, x_s, x_p, x_r}`
+against two relations, three given — **left the stage over-determined**, and the
+relief test caught it: two groups were fighting, one turning a toggle automatic
+and the next pinning it straight back.
+
+The reason is real geometry. A pair's distance and its two shifts are bound by
+one relation and that is all. A set has a relation **among its shifts alone**, so
+the two constraints nest: with the distance free, two shifts are a design; with
+it given, one. The limit is therefore read from the toggles, which is the same
+value-dependence the model already had for a screw stage's sizing.
+
+> **Gates, run.** Ignoring the target fails the distance law. Hard-wiring the
+> shift limit to 2 regardless of the distance fails the freedom law — **but not
+> the first version of it**, which compared the declaration against itself and
+> passed against the wrong number. That is `docs/corrections.md`'s *a check built
+> from the thing under test measures nothing*, met while writing a check for a
+> declaration. It is asserted against what the set **does** now: give it a
+> distance and two shifts, and one of the three cannot survive.
+
+**And the relief test was strengthened by the same finding.** It checked the
+group it had just relieved; it checks *every* group now, which is what makes
+"these declarations do not fight" a property rather than a hope.
+
+`gear-cli planetstage` prints the given-distance table, so the path is in the
+change detector — the seventh time this audit has had to add a case for *an
+opt-in the harness never switches on*.
 
 ### The toggle model, built
 

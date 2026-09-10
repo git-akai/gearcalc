@@ -80,8 +80,20 @@ optimisation: Optimisation,
 load_sharing: LoadSharing, 
 /**
  * Added to the common centre distance, mm — the running clearance.
+ * **The distance the sun runs from a planet, or automatic.**
+ *
+ * The same shape and the same decision every other stage's centre distance
+ * has. Automatic, the common distance is whatever the shifts leave — which
+ * is what this stage has always done. Given, each mesh has a shift sum it
+ * must reach to run at it, and both of those are closed form
+ * ([`crate::mesh::shift_sum_for`]), so a target makes the layout *easier*:
+ * it removes the iteration rather than adding to it.
+ *
+ * Two equations instead of one means **two** of the three shifts are
+ * absorbed rather than one, which is the same accounting a pair does — see
+ * [`crate::train::FreedomGroup`].
  */
-clearance: Auto<number>, tolerance_plus: number, tolerance_minus: number, 
+centre_distance: Auto<number>, clearance: Auto<number>, tolerance_plus: number, tolerance_minus: number, 
 /**
  * Smallest acceptable gap between adjacent planets' tip circles, mm.
  */

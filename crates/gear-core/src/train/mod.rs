@@ -1452,6 +1452,7 @@ impl Stage {
             (Self::Spur(s), Freedom::Shift(i)) => s.gears.get_mut(i).map(|g| &mut g.profile_shift),
             (Self::Worm(w), Freedom::CentreDistance) => Some(&mut w.centre_distance),
             (Self::Worm(w), Freedom::Clearance) => Some(&mut w.clearance),
+            (Self::Planetary(p), Freedom::CentreDistance) => Some(&mut p.centre_distance),
             (Self::Planetary(p), Freedom::Clearance) => Some(&mut p.clearance),
             (Self::Planetary(p), Freedom::Shift(i)) => match i {
                 0 => Some(&mut p.sun.profile_shift),
@@ -1603,12 +1604,30 @@ impl Stage {
             // centre distances have to agree, which is one relation among the
             // three shifts. It has no distance input of its own — the common
             // distance falls out — which is F39's third item.
-            // **No centre-distance input yet** (F39's third item), so its
-            // clearance has nothing to be derived from and must be given. The
-            // count says so; when the input arrives it says something else.
-            Self::Planetary(_) => vec![
-                one_relation((0..3).map(Freedom::Shift).collect()),
-                distance_and_clearance(None),
+            // **A set has a relation among its shifts alone**, which no other
+            // kind does: its two centre distances have to agree, whatever they
+            // agree at. So two of the three shifts are a design and the third is
+            // what they leave.
+            //
+            // Give it a *distance* as well and there is a **second** relation —
+            // each mesh must now reach that distance rather than merely agree
+            // with the other — so only **one** shift is free. The limit is read
+            // from the toggles because the constraint genuinely changes: this is
+            // a fact about the geometry, not a convenience.
+            //
+            // The pair has no analogue. Its distance and two shifts are bound by
+            // one relation and that is all, which is why its group is flat.
+            Self::Planetary(p) => vec![
+                FreedomGroup {
+                    given_at_most: if p.centre_distance.auto || p.clearance.auto {
+                        2
+                    } else {
+                        1
+                    },
+                    automatic_at_most: 3,
+                    order: (0..3).map(Freedom::Shift).collect(),
+                },
+                distance_and_clearance(Some(Freedom::CentreDistance)),
             ],
             // **One relation per mesh.** The crank offset fixes the difference
             // of a pair's two shifts, so pinning both over-specifies that mesh
@@ -4142,15 +4161,28 @@ mod tests {
                 for just in &group.order {
                     let mut relieved = over.relieved(*just);
 
-                    let given = group
-                        .order
-                        .iter()
-                        .filter(|f| relieved.auto_mut(**f).is_some_and(|a| !a.auto))
-                        .count();
-                    assert!(
-                        given <= group.given_at_most,
-                        "{group:?} left {given} given after relief"
-                    );
+                    // **Every group**, not just this one. Relief walks them in
+                    // turn, so a declaration where satisfying one breaks another
+                    // would leave the stage over-determined however many passes
+                    // it took — which is exactly what a planetary did when its
+                    // shift relation and its distance relation were written as
+                    // one flat group.
+                    for g in &relieved.freedoms() {
+                        let given = g
+                            .order
+                            .iter()
+                            .filter(|f| relieved.auto_mut(**f).is_some_and(|a| !a.auto))
+                            .count();
+                        let automatic = g.order.len() - given;
+                        assert!(
+                            given <= g.given_at_most,
+                            "{g:?} left {given} given after relieving {group:?}"
+                        );
+                        assert!(
+                            automatic <= g.automatic_at_most,
+                            "{g:?} left {automatic} automatic after relieving {group:?}"
+                        );
+                    }
                     assert!(
                         relieved.auto_mut(*just).is_some_and(|a| !a.auto),
                         "{just:?} was just pinned and must not be the one relieved"

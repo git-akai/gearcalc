@@ -352,6 +352,10 @@
       "min_contact_ratio": "1.2000000000000000"
      },
      "load_sharing": "none",
+     "centre_distance": {
+      "auto": true,
+      "manual": 0
+     },
      "clearance": {
       "auto": false,
       "manual": "0.020000000000000000"
@@ -5188,6 +5192,10 @@
        "min_contact_ratio": "1.2000000000000000"
       },
       "load_sharing": "none",
+      "centre_distance": {
+       "auto": false,
+       "manual": "0.10000000000000001"
+      },
       "clearance": {
        "auto": false,
        "manual": "0.020000000000000000"
@@ -5203,7 +5211,7 @@
       "sun": {
        "teeth": 24,
        "profile_shift": {
-        "auto": false,
+        "auto": true,
         "manual": "0.10000000000000001"
        },
        "no_undercut": true,

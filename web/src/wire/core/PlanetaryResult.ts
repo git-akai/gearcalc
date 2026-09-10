@@ -23,8 +23,15 @@ ratio: number,
 /**
  * The common centre distance, zero-backlash, mm — sun-to-planet and
  * planet-to-ring, which the planet's shift has made the same number.
+ * **What portion of the running distance is clearance**, mm — derived, as
+ * every other kind's is.
+ *
+ * `centre_distance − centre_distance_nominal`, so it cannot disagree with
+ * the two numbers it sits between. A set had no distance *input* until F39's
+ * third item, so this was the one kind with no gap to report; with one, the
+ * same three modes apply here as anywhere else.
  */
-centre_distance_nominal: number, 
+clearance: number, centre_distance_nominal: number, 
 /**
  * ...and the one actually used, including clearance.
  */

@@ -139,6 +139,19 @@ pub struct Set {
     /// three shifts — so two are a design and the third is whatever they leave.
     /// Which one that is belongs to the caller, not here.
     pub absorber: Member,
+    /// **The nominal centre distance to hit**, where a designer gave one.
+    ///
+    /// Without it the set has one equation — the two distances must agree — and
+    /// whatever common value they agree at is the answer. With it there are
+    /// **two**: each mesh must reach this distance, and each of those is
+    /// [`crate::mesh::shift_sum_for`] in closed form. So a target does not make
+    /// the solve harder; it makes it easier, and the iteration disappears.
+    ///
+    /// The count of absorbed shifts follows the count of equations: one without
+    /// a target, two with. [`Self::absorber`] names the freedom that is *kept*
+    /// in that case rather than the one that gives way — the planet, being the
+    /// member in both meshes, is the coordinate the other two are read off.
+    pub distance: Option<f64>,
     /// The planet's tip diameter, mm — needed only for planet-to-planet
     /// clearance, which is the one check that cares how big a planet is rather
     /// than how many teeth it has.
@@ -255,7 +268,7 @@ fn pull_in(g: &impl Fn(f64) -> f64, from: f64, toward: f64) -> Option<f64> {
 /// most `z_ring` values fail here.
 #[must_use]
 pub fn solve(set: &Set) -> Option<Layout> {
-    let (rack, teeth, planets) = (&set.rack, set.teeth, set.planets);
+    let (rack, teeth) = (&set.rack, set.teeth);
     let (sum_ext, sum_int) = teeth.sums();
     if teeth.ring <= teeth.planet || teeth.planet == 0 || teeth.sun == 0 {
         return None;
@@ -304,6 +317,24 @@ pub fn solve(set: &Set) -> Option<Layout> {
     let sum_x_for = |sum_z: f64, a_w: f64| {
         crate::mesh::shift_sum_for(rack.mt, rack.alpha_t, rack.alpha_n, sum_z, a_w)
     };
+    // **A given distance is two equations, and both are closed form.** Each
+    // mesh has a shift sum it must reach to run at that distance, so the two
+    // sums are known outright:
+    //
+    //     x_s + x_p = shift_sum_for(sum_ext, a)
+    //     x_p − x_r = shift_sum_for(sum_int, a)
+    //
+    // which leaves **one** freedom. It is taken as the planet's shift, the
+    // member in both meshes, and the other two are read off it — so a target
+    // removes the Newton iteration below rather than adding to it.
+    if let Some(target) = set.distance {
+        let s_ext = sum_x_for(sum_ext, target)?;
+        let s_int = sum_x_for(sum_int, target)?;
+        let x_p = set.shift[Member::Planet.index()];
+        let shift = [s_ext - x_p, x_p, x_p - s_int];
+        return finish(set, shift);
+    }
+
     let shift: [f64; 3] = match set.absorber {
         Member::Planet => {
             let (lo, hi) = shift_bracket(set)?;
@@ -334,10 +365,19 @@ pub fn solve(set: &Set) -> Option<Layout> {
         }
     };
 
-    // **Read back from the three shifts, whichever one was solved.** The two
-    // distances are computed again rather than carried out of the branch above,
-    // so `residual` measures the answer that is being returned rather than an
-    // intermediate the branch happened to hold.
+    finish(set, shift)
+}
+
+/// **Read back from the three shifts, however they were arrived at.**
+///
+/// The two distances are computed again rather than carried out of whichever
+/// branch produced the shifts, so `residual` measures the answer being returned
+/// rather than an intermediate that branch happened to hold. It is also what
+/// makes a given distance and a solved agreement the same kind of answer: both
+/// arrive here with three numbers and are judged the same way.
+fn finish(set: &Set, shift: [f64; 3]) -> Option<Layout> {
+    let (rack, teeth, planets) = (&set.rack, set.teeth, set.planets);
+    let (sum_ext, sum_int) = teeth.sums();
     let (x_s, x_p, x_r) = (shift[0], shift[1], shift[2]);
     let (alpha_w_sun, _, a_e) =
         operating_geometry(rack.mt, rack.alpha_t, rack.alpha_n, sum_ext, x_s + x_p)?;
@@ -1197,6 +1237,7 @@ mod tests {
             planets: 3,
             shift: [0.0; 3],
             absorber: Member::Planet,
+            distance: None,
             planet_tip_diameter: 0.0,
         }
     }

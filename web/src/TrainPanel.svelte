@@ -1888,10 +1888,24 @@
                   )
                 } />
               </label>
-{@render autoNumber(
+              <!-- **A set has a centre distance like every other kind now.**
+                   Automatic, the common distance is whatever the shifts leave,
+                   which is what this stage always did. Given, each mesh has a
+                   shift sum it must reach to run at it — both closed form — so
+                   only one of the three shifts stays free. -->
+              {@render autoNumber(
+                "ui.train_c2c_distance",
+                stage.centre_distance,
+                pres?.centre_distance,
+                0.1,
+                () => relieveStage(stage, "centre_distance"),
+                undefined,
+                "ui.train_mm",
+              )}
+              {@render autoNumber(
                 "ui.train_c2c_clearance",
                 stage.clearance,
-                pres ? pres.centre_distance - pres.centre_distance_nominal : undefined,
+                pres?.clearance,
                 0.01,
                 () => relieveStage(stage, "clearance"),
                 undefined,

@@ -15,3 +15,11 @@ sigma_F  sun 14.8 MPa   planet 15.9 MPa   ring 10.1 MPa
      ring   carrier       sun      -0.4000     97.117 %
 
 note: 3 planets assumed to share load equally; real sets do not without a floating member, and the remedy is a mesh-load factor this tool declines to apply
+
+centre distance given, shifts chosen to reach it
+a mm             x_sun  x_planet    x_ring    residual     eta_0
+20.8200        -0.3851    0.1926    0.0000       0.0e0    0.9706
+20.9200        -0.1963    0.0982    0.0000       0.0e0    0.9712
+21.0200         0.0000    0.0000    0.0000       0.0e0    0.9712
+21.1200         0.2035   -0.1018    0.0000       0.0e0    0.9703
+21.2200         0.4139   -0.2070    0.0000       0.0e0    0.9687

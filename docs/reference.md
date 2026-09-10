@@ -345,6 +345,15 @@ be is **derived at the same time as the distance**: a distance is nominal +
 clearance and a derived clearance is distance − nominal, so with both automatic
 neither has anything to derive from.
 
+**A planetary set counts one relation more, and it is real geometry.** Its two
+centre distances must agree — one relation among its three shifts, whatever they
+agree at — so two shifts are a design and the third is what they leave. Give it a
+distance as well and there is a **second** relation, since each mesh must now
+reach *that* distance rather than merely match the other, and only **one** shift
+stays free. Both of those per-mesh conditions are `shift_sum_for`, so a target
+makes the layout easier: the Newton iteration on the planet's shift disappears
+and the sun's and the ring's shifts are read off the planet's in closed form.
+
 That is one of the two bounds `train::FreedomGroup` carries. The other counts how
 many may be *given*, and the pair of them is what makes an over- or
 under-determined stage resolve itself: too many given turns one automatic, too
