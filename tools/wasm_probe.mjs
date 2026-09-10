@@ -83,6 +83,23 @@ const out = {
   solve_ring: call("solve_ring", () => JSON.parse(w.solve_ring(ringJson))),
   ring_profile: call("ring_profile", () => Array.from(w.ring_profile(ringJson, 24))),
   export_ring_dxf: call("export_ring_dxf", () => w.export_ring_dxf(ringJson)),
+  // **Over-determined on purpose, on every kind**, so the answer is the relief
+  // rather than a stage that needed none. Every input the kind has is pinned
+  // and the first one is declared as the freedom just touched, which is the one
+  // that must survive.
+  relieve_stage: call("relieve_stage", () =>
+    ["spur_stage", "worm_stage", "planetary_stage", "hula_stage"].map((k) => {
+      const stage = structuredClone(defaults[k]);
+      const pin = (a) => (a ? { auto: false, manual: 0.1 } : a);
+      if (stage.centre_distance) stage.centre_distance = pin(stage.centre_distance);
+      for (const g of stage.gears ?? []) g.profile_shift = pin(g.profile_shift);
+      for (const m of ["sun", "planet", "ring"]) {
+        if (stage[m]) stage[m].profile_shift = pin(stage[m].profile_shift);
+      }
+      const just = stage.centre_distance ? "centre_distance" : { shift: 0 };
+      return [k, JSON.parse(w.relieve_stage(JSON.stringify({ stage, just })))];
+    }),
+  ),
   solve_train: call("solve_train", () =>
     JSON.parse(w.solve_train(JSON.stringify({ train: defaults.train, library }))),
   ),

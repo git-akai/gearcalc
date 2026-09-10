@@ -26,6 +26,8 @@ export type { FaceSources } from "./core/FaceSources";
 export type { Family } from "./core/Family";
 export type { Fillet } from "./core/Fillet";
 export type { FirstMemberSizing } from "./core/FirstMemberSizing";
+export type { Freedom } from "./core/Freedom";
+export type { FreedomGroup } from "./core/FreedomGroup";
 export type { GearParams } from "./core/GearParams";
 export type { GearResult } from "./core/GearResult";
 export type { HulaGear } from "./core/HulaGear";

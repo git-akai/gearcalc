@@ -12,6 +12,8 @@ import {
   type Note,
 } from "./strings.svelte";
 import type {
+  Freedom,
+  FreedomGroup,
   Actuation,
   Arrangement,
   Auto,
@@ -71,6 +73,8 @@ import type {
 export type {
   Actuation,
   Arrangement,
+  Freedom,
+  FreedomGroup,
   Auto,
   Backlash,
   Basis,
@@ -144,6 +148,7 @@ import init, {
   export_materials,
   import_train,
   export_train,
+  relieve_stage,
 } from "./wasm/gear_wasm.js";
 
 /** Narrow a `Maybe` to its "there is no value" arm.
@@ -640,6 +645,56 @@ export function relieve(
       given -= 1;
     }
   }
+}
+
+/** **Resolve an over-determined stage**, whatever kind it is.
+ *
+ *  `just` is the input the designer has this moment pinned, and is never the one
+ *  relieved. Which inputs argue with each other, how many may stand and which
+ *  gives way first are facts about the geometry, so Rust decides all of it —
+ *  this used to be three functions here, one per stage kind, each restating a
+ *  relation the core already enforces, and none of them tested.
+ *
+ *  Written **in place**, field by field, rather than by replacing the stage: the
+ *  caller holds a reactive proxy and a wholesale swap would detach every input
+ *  bound to it. Only the toggles are copied back, because only the toggles can
+ *  have moved — `relieved` decides no values.
+ *
+ *  A stage that will not cross the boundary is left alone. Relief runs on a
+ *  click, and a click is not the place to discover a broken boundary.
+ */
+export function relieveStage(stage: Stage, just: Freedom): void {
+  let corrected: Stage;
+  try {
+    corrected = JSON.parse(
+      relieve_stage(JSON.stringify({ stage, just })),
+    ) as Stage;
+  } catch {
+    return;
+  }
+  for (const [live, fixed] of [
+    ...autosOf(stage).map((a, i) => [a, autosOf(corrected)[i]] as const),
+  ]) {
+    if (fixed) live.auto = fixed.auto;
+  }
+}
+
+/** Every `Auto` on a stage that relief can touch, in one fixed order.
+ *
+ *  The order is only used to line a stage up against its own corrected copy, so
+ *  it has to be *stable* rather than meaningful — `Freedom`'s member order is
+ *  the core's business and is never reconstructed here.
+ */
+function autosOf(stage: Stage): Auto<number>[] {
+  const shifts =
+    stage.kind === "planetary"
+      ? [stage.sun, stage.planet, stage.ring].map((g) => g.profile_shift)
+      : "gears" in stage
+        ? stage.gears.map((g) => g.profile_shift)
+        : [];
+  return "centre_distance" in stage
+    ? [stage.centre_distance as Auto<number>, ...shifts]
+    : shifts;
 }
 
 /** A fresh geartrain, one spur stage in it. */

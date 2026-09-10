@@ -24,52 +24,23 @@
     t,
   } from "./core";
   import { developer, trains, library, type TrainTab } from "./state.svelte";
-  import { exportTrain, relieve } from "./core";
+  import { exportTrain, relieveStage } from "./core";
   import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
   import { notes, type Notes } from "./notes";
 
-  /** A mesh chooses one shift per gear, and its centre distance is one relation
-   *  among them — so at most `gears.length` of {distance, shift…} can be given,
-   *  and the count comes from the stage rather than from a number written here.
+  /** **Resolving an over-determined stage is the core's rule, not this file's.**
    *
-   *  **Whether or not the stage is optimising.** This used to return early with
-   *  the optimiser off, on the reading that the shifts were then not being
-   *  solved for anything, so pinning all three was the fully specified design it
-   *  always was. That stopped being true when mode 3 started working without the
-   *  optimiser: a given distance and a given clearance decide the shifts now, so
-   *  giving both shifts as well is the contradiction this exists to relieve.
-   *  The relation is the geometry's and never was the optimiser's.
+   *  Which of a stage's inputs argue with each other, how many may stand and
+   *  which gives way first are facts about the geometry, and they lived here as
+   *  three functions — one per stage kind — each restating a relation Rust
+   *  already enforces. That is an engineering rule outside Rust and the same
+   *  idea written once per kind: a fifth kind would have arrived with no relief
+   *  at all, and one of the three carried a justification that went stale the
+   *  moment the core stopped needing it.
    *
-   *  The distance comes first because relief order is least precious first, and
-   *  it is the number that goes back to automatic when a designer pins both
-   *  shifts — which is the behaviour they describe. */
-  function relieveSpur(stage: SpurStage, just: Auto<number>) {
-    relieve(
-      [stage.centre_distance, ...stage.gears.map((g) => g.profile_shift)],
-      stage.gears.length,
-      just,
-    );
-  }
-
-  /** **An epicyclic set has two shifts to give, not three.** Its two centre
-   *  distances have to agree, which is one relation among the three — so two
-   *  are a design and the third is whatever they leave. Pinning all three
-   *  over-specifies it, and the one furthest from what was just touched returns
-   *  to automatic to absorb the relation again. */
-  function relievePlanetary(stage: PlanetaryStage, just: Auto<number>) {
-    relieve([stage.sun, stage.planet, stage.ring].map((g) => g.profile_shift), 2, just);
-  }
-
-  /** **A hula mesh has one shift to give, not two.** The crank offset fixes the
-   *  difference of a pair's two shifts, so pinning both over-specifies the mesh
-   *  — the same triangle the spur stage's distance and two shifts make, one
-   *  freedom smaller. Pinning one returns the other to automatic, which is what
-   *  the select this replaced used to say in words. */
-  function relieveHula(stage: Extract<Stage, { kind: "hula" }>, mesh: number, just: Auto<number>) {
-    const pair = [stage.gears[mesh * 2], stage.gears[mesh * 2 + 1]].map((g) => g.profile_shift);
-    relieve(pair, 1, just);
-  }
+   *  `Stage::freedoms` declares them now and `relieveStage` walks them, so this
+   *  file passes on which toggle was just pinned and nothing else. */
 
   let { tab }: { tab: TrainTab } = $props();
 
@@ -1471,7 +1442,7 @@
                 stage.centre_distance,
                 (sres ?? xres)?.centre_distance,
                 0.1,
-                () => relieveSpur(stage, stage.centre_distance),
+                () => relieveStage(stage, "centre_distance"),
                 undefined,
                 "ui.train_mm",
               )}
@@ -1554,7 +1525,7 @@
                 {@const g = sres?.gears[j]}
                 {@render gearCard(gearName(i, j), gear, g, {
                   cut: "rack",
-                  onShiftAuto: () => relieveSpur(stage, gear.profile_shift),
+                  onShiftAuto: () => relieveStage(stage, { shift: j }),
                   faceWidth: stage.shaft_angle === 0 ? "rating" : "continuity",
                   faceFromContinuity: xres?.crossed?.face_width_for_continuity?.[j],
                   extra: xres ? crossedMember : undefined,
@@ -1975,11 +1946,11 @@
             <div class="gears">
               {@render gearCard(t("ui.train_sun"), stage.sun, pres?.sun, {
                 cut: "rack",
-                onShiftAuto: () => relievePlanetary(stage, stage.sun.profile_shift),
+                onShiftAuto: () => relieveStage(stage, { shift: 0 }),
               })}
               {@render gearCard(t("ui.train_planet"), stage.planet, pres?.planet.gear, {
                 cut: "rack",
-                onShiftAuto: () => relievePlanetary(stage, stage.planet.profile_shift),
+                onShiftAuto: () => relieveStage(stage, { shift: 1 }),
                 // The one thing only a planet's speed has: its teeth turn in
                 // the carrier's frame, and that is the speed they wear at.
                 speedNote: pres
@@ -1995,7 +1966,7 @@
               {@render gearCard(t("ui.train_ring"), stage.ring, pres?.ring, {
                 cut: "shaper",
                 cutter: stage.cutter,
-                onShiftAuto: () => relievePlanetary(stage, stage.ring.profile_shift),
+                onShiftAuto: () => relieveStage(stage, { shift: 2 }),
               })}
             </div>
 
@@ -2244,7 +2215,7 @@
                     {
                       cut: j === ring ? "shaper" : "rack",
                       cutter: j === ring ? stage.cutter[m] : undefined,
-                      onShiftAuto: () => relieveHula(stage, m, stage.gears[j].profile_shift),
+                      onShiftAuto: () => relieveStage(stage, { shift: j }),
                       // **What a member's teeth see is its speed against the
                       // crank**, which is the carrier of both meshes — so the
                       // fixed-frame figure needs the same annotation a planet's

@@ -1212,6 +1212,45 @@ pub fn export_train(document_json: &str) -> Result<String, JsError> {
     export_train_impl(document_json).map_err(|e| JsError::new(&e))
 }
 
+/// **A stage with its over-determined inputs relieved.**
+///
+/// `{ stage, just }` JSON in — the stage as it now stands and the [`Freedom`]
+/// the designer has this moment pinned — and the corrected stage out.
+///
+/// A designer who pins a pair's distance *and* both its shifts has asked for a
+/// contradiction: the three are bound by one relation, so one would have to be
+/// ignored. Rather than accept an input and quietly disregard it, the first one
+/// in relief order that they are not this moment pinning goes back to
+/// automatic.
+///
+/// Which inputs argue, how many may stand and which gives way first are facts
+/// about the geometry, and they used to live in the panel as three functions,
+/// one per stage kind, restating a relation the core already enforces. **It is
+/// the same relation the solve reads from the other end**, so the two have to
+/// agree or a designer is offered an input the solve will disregard.
+///
+/// Nothing here decides a value: it only says which inputs are still being read.
+///
+/// # Errors
+///
+/// A malformed stage or freedom, which would be a defect on this side of the
+/// boundary.
+#[wasm_bindgen]
+pub fn relieve_stage(input: &str) -> Result<String, JsError> {
+    relieve_stage_impl(input).map_err(|e| JsError::new(&e))
+}
+
+#[derive(Deserialize)]
+struct RelieveRequest {
+    stage: gear_core::train::Stage,
+    just: gear_core::train::Freedom,
+}
+
+fn relieve_stage_impl(input: &str) -> Result<String, String> {
+    let req: RelieveRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    serde_json::to_string(&req.stage.relieved(req.just)).map_err(|e| e.to_string())
+}
+
 /// Version of the core, so the UI can show what it is actually running.
 #[wasm_bindgen]
 #[must_use]

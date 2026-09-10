@@ -1361,6 +1361,186 @@ impl Default for Stage {
     }
 }
 
+/// One of a stage's constrainable inputs, named so a caller can find it.
+///
+/// `Shift(i)` indexes the stage's members in the order
+/// [`StageResult::members`] reports them — a pair's two gears, a set's sun,
+/// planet and ring, a hula stage's four — so a caller that can walk members can
+/// resolve one of these without knowing the kind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum Freedom {
+    /// The distance the stage's members run at.
+    CentreDistance,
+    /// One member's profile shift.
+    Shift(usize),
+}
+
+/// **A set of inputs bound by one relation, and how many of them may be given.**
+///
+/// A geometric relation among `n` inputs leaves `n − 1` of them free, so giving
+/// `n` is not a tighter specification — it is a contradiction, and one of the
+/// numbers would have to be ignored. This says which inputs are in that
+/// argument and how many may stand.
+///
+/// # Why the *stage* declares this rather than the front end
+///
+/// It was three functions in TypeScript, one per stage kind, each restating a
+/// relation the core already enforces. That is two faults at once: an
+/// engineering rule written outside Rust, and the same idea written once per
+/// kind — so a fifth kind arrives with no relief at all, and a rule that changes
+/// changes in one of four places. It is also untestable there, and was untested.
+///
+/// The stage kinds genuinely differ in *what* is related, which is why this is a
+/// declaration and not a constant: a pair relates its distance to its two
+/// shifts, an epicyclic set relates its three shifts to each other through the
+/// two distances that must agree, and a hula stage relates each mesh's pair
+/// separately because its crank fixes their difference one mesh at a time.
+///
+/// What does **not** differ is the resolution: too many given means the first
+/// one in `order` that the designer is not this moment touching goes back to
+/// automatic. Least precious first, and stated by the stage.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct FreedomGroup {
+    /// How many of `order` may be given before the set is over-determined.
+    pub given_at_most: usize,
+    /// The inputs in the argument, **relief order, least precious first**.
+    pub order: Vec<Freedom>,
+}
+
+impl Stage {
+    /// The input a [`Freedom`] names, to be read or written.
+    ///
+    /// The one place the core's member order — [`StageResult::members`]' —
+    /// meets each kind's own fields. `None` where a kind has no such input,
+    /// which is the same thing its [`Self::freedoms`] says by not mentioning it.
+    fn auto_mut(&mut self, f: Freedom) -> Option<&mut Auto<f64>> {
+        match (self, f) {
+            (Self::Spur(s), Freedom::CentreDistance) => Some(&mut s.centre_distance),
+            (Self::Spur(s), Freedom::Shift(i)) => s.gears.get_mut(i).map(|g| &mut g.profile_shift),
+            (Self::Planetary(p), Freedom::Shift(i)) => match i {
+                0 => Some(&mut p.sun.profile_shift),
+                1 => Some(&mut p.planet.profile_shift),
+                2 => Some(&mut p.ring.profile_shift),
+                _ => None,
+            },
+            (Self::Hula(h), Freedom::Shift(i)) => h.gears.get_mut(i).map(|g| &mut g.profile_shift),
+            _ => None,
+        }
+    }
+
+    /// **This stage with its over-determined inputs relieved.**
+    ///
+    /// A designer who pins a pair's distance *and* both its shifts has asked for
+    /// a contradiction: the three are bound by one relation, so one of them
+    /// would have to be ignored. Rather than accept an input and quietly
+    /// disregard it, the first one in relief order that the designer is **not**
+    /// this moment pinning goes back to automatic, visibly.
+    ///
+    /// `just` is the input they have this moment given, and is never the one
+    /// relieved. Every group is resolved, because a stage can have more than one
+    /// argument going on at once.
+    ///
+    /// # Why this is here and not in the panel
+    ///
+    /// It was three functions in TypeScript, one per stage kind. Rule 1 puts an
+    /// engineering rule in Rust, rule 4 says one idea belongs in one place, and
+    /// neither was being followed — nor was any of it tested. What decided it is
+    /// that the rule is not the panel's to know: **it is the same relation the
+    /// solve enforces**, read from the other end, and the two must agree or a
+    /// designer is offered an input the solve will disregard.
+    ///
+    /// Nothing here decides a *value*. It only says which inputs are still being
+    /// read, which is why it can be a pure function of the inputs.
+    #[must_use]
+    pub fn relieved(&self, just: Freedom) -> Self {
+        let mut out = self.clone();
+        for group in self.freedoms() {
+            // Counted with the same accessor that does the relieving, so a
+            // freedom this kind does not have is absent from both.
+            let mut given = 0usize;
+            for f in &group.order {
+                if out.auto_mut(*f).is_some_and(|a| !a.auto) {
+                    given += 1;
+                }
+            }
+            for f in &group.order {
+                if given <= group.given_at_most {
+                    break;
+                }
+                if *f == just {
+                    continue;
+                }
+                if let Some(a) = out.auto_mut(*f) {
+                    if !a.auto {
+                        a.auto = true;
+                        given -= 1;
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// **Every argument this stage's inputs can get into with each other.**
+    ///
+    /// Empty where a kind has no such relation — a screw stage has no profile
+    /// shift, so nothing inside it is free to absorb a distance and there is
+    /// nothing to relieve. That is a fact about a worm and is why its mode 3 is
+    /// an open question rather than an oversight.
+    ///
+    /// A stage may have **more than one** group: a hula stage's crank fixes the
+    /// difference of each mesh's two shifts, which is one relation per mesh
+    /// rather than one for the stage.
+    #[must_use]
+    pub fn freedoms(&self) -> Vec<FreedomGroup> {
+        // **Every group here is a single relation**, so exactly one of its
+        // inputs is the one the others decide. Written once rather than as a
+        // count per kind, because a count per kind is a count to get wrong —
+        // and the first draft did, by one, on the kind with the most tests.
+        let one_relation = |order: Vec<Freedom>| FreedomGroup {
+            given_at_most: order.len() - 1,
+            order,
+        };
+        match self {
+            // A pair's distance and its two shifts: `a = f(x₁ + x₂) + clearance`
+            // is one relation, so two of the three may be given. The distance
+            // comes first because it is the one a designer expects to give way
+            // when they pin both shifts.
+            Self::Spur(s) => vec![one_relation(
+                std::iter::once(Freedom::CentreDistance)
+                    .chain((0..s.gears.len()).map(Freedom::Shift))
+                    .collect(),
+            )],
+            // **An epicyclic set has two shifts to give, not three.** Its two
+            // centre distances have to agree, which is one relation among the
+            // three shifts. It has no distance input of its own — the common
+            // distance falls out — which is F39's third item.
+            Self::Planetary(_) => vec![one_relation((0..3).map(Freedom::Shift).collect())],
+            // **One relation per mesh.** The crank offset fixes the difference
+            // of a pair's two shifts, so pinning both over-specifies that mesh
+            // — the same triangle a pair's distance and two shifts make, one
+            // freedom smaller — and the other mesh is a separate argument.
+            Self::Hula(h) => (0..h.gears.len() / 2)
+                .map(|m| one_relation(vec![Freedom::Shift(2 * m), Freedom::Shift(2 * m + 1)]))
+                .collect(),
+            Self::Worm(_) => Vec::new(),
+        }
+    }
+}
+
 /// What a stage produced, of whichever kind.
 ///
 /// **Each kind keeps its own shape.** A worm stage has no bending stress, no
@@ -3771,6 +3951,211 @@ mod tests {
             checked >= 2,
             "only {checked} parallel stages carried the load"
         );
+    }
+
+    /// **The declared freedoms describe members that exist, and each group has
+    /// something to relieve.**
+    ///
+    /// The structural half. A declaration nothing checks is data, and this is
+    /// the cheap part of checking it: a `Shift(i)` that named a member the stage
+    /// does not have would resolve to nothing in the front end and relieve
+    /// silently, and a group whose limit equals its size can never fire at all.
+    #[test]
+    fn every_declared_freedom_names_a_member_the_stage_has() {
+        let hula = HulaStage::default();
+        let members = |s: &Stage| match s {
+            Stage::Spur(s) => s.gears.len(),
+            Stage::Planetary(_) => 3,
+            Stage::Hula(h) => h.gears.len(),
+            Stage::Worm(_) => 2,
+        };
+        for stage in [
+            Stage::Spur(SpurStage::default()),
+            Stage::Worm(WormStage::default()),
+            Stage::Planetary(Box::default()),
+            Stage::Hula(Box::new(hula)),
+        ] {
+            let n = members(&stage);
+            let groups = stage.freedoms();
+            let mut seen = Vec::new();
+            for g in &groups {
+                assert!(
+                    g.given_at_most < g.order.len(),
+                    "a group that cannot be over-determined is not a group: {g:?}"
+                );
+                assert!(
+                    !g.order.is_empty(),
+                    "a group with no inputs relieves nothing: {g:?}"
+                );
+                for f in &g.order {
+                    if let Freedom::Shift(i) = f {
+                        assert!(*i < n, "Shift({i}) but this stage has {n} members");
+                    }
+                    assert!(
+                        !seen.contains(f),
+                        "{f:?} is in two groups, so relieving one could break the other"
+                    );
+                    seen.push(*f);
+                }
+            }
+        }
+    }
+
+    /// **Relieving an over-determined stage**, on every kind that has a relation
+    /// — behaviour that had no test at all while it lived in the panel.
+    ///
+    /// Three claims, and the third is the one that makes it a rule rather than a
+    /// habit: pinning everything relieves down to the limit; the input the
+    /// designer has *this moment* pinned is never the one taken away; and a
+    /// stage already within its limit is returned untouched, so relief cannot
+    /// undo a design that was never over-determined.
+    #[test]
+    fn an_over_determined_stage_relieves_to_its_limit_and_keeps_what_was_just_pinned() {
+        let pin_everything = |stage: &Stage| {
+            let mut s = stage.clone();
+            for g in s.freedoms() {
+                for f in g.order {
+                    if let Some(a) = s.auto_mut(f) {
+                        *a = Auto::fixed(0.1);
+                    }
+                }
+            }
+            s
+        };
+
+        let mut hula = HulaStage::default();
+        hula.gears[0].profile_shift = Auto::automatic(0.0);
+        for stage in [
+            Stage::Spur(SpurStage::default()),
+            Stage::Worm(WormStage::default()),
+            Stage::Planetary(Box::default()),
+            Stage::Hula(Box::new(hula)),
+        ] {
+            let groups = stage.freedoms();
+            if groups.is_empty() {
+                // A kind with no relation cannot be over-determined, and relief
+                // must leave it exactly as it was.
+                let just = Freedom::Shift(0);
+                assert_eq!(
+                    stage.relieved(just).freedoms(),
+                    groups,
+                    "a stage with no freedoms should come back unchanged"
+                );
+                continue;
+            }
+
+            let over = pin_everything(&stage);
+            for group in &groups {
+                // Each input in turn is the one just pinned.
+                for just in &group.order {
+                    let mut relieved = over.relieved(*just);
+
+                    let given = group
+                        .order
+                        .iter()
+                        .filter(|f| relieved.auto_mut(**f).is_some_and(|a| !a.auto))
+                        .count();
+                    assert!(
+                        given <= group.given_at_most,
+                        "{group:?} left {given} given after relief"
+                    );
+                    assert!(
+                        relieved.auto_mut(*just).is_some_and(|a| !a.auto),
+                        "{just:?} was just pinned and must not be the one relieved"
+                    );
+                }
+            }
+
+            // Already inside the limit: nothing moves. Asserted against every
+            // freedom as `just`, so it cannot pass by picking a lucky one.
+            let mut settled = stage.clone();
+            if let Some(f) = groups[0].order.first() {
+                if let Some(a) = settled.auto_mut(*f) {
+                    *a = Auto::fixed(0.1);
+                }
+            }
+            for group in &groups {
+                for just in &group.order {
+                    let mut before = settled.clone();
+                    let mut after = settled.relieved(*just);
+                    for f in &group.order {
+                        assert_eq!(
+                            before.auto_mut(*f).map(|a| a.auto),
+                            after.auto_mut(*f).map(|a| a.auto),
+                            "{f:?} moved on a stage that was already within its limit"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// **The declared limit is the stage's actual freedom** — asserted by giving
+    /// exactly that many and requiring every one of them to be honoured, then
+    /// giving one more and requiring that it cannot be.
+    ///
+    /// This is what stops the declaration being a number somebody wrote down. A
+    /// pair's group says two of `{a, x₁, x₂}` may be given: with the distance
+    /// and the clearance given the shifts move to reach it, and with **both
+    /// shifts** given as well the distance can no longer be what was asked at
+    /// the clearance that was asked, because nothing is left to absorb the
+    /// difference.
+    ///
+    /// Stated as *the clearance the pair actually runs at*, which is the
+    /// quantity the relation is about, rather than as a shift value — so it says
+    /// the same thing whatever the division rule decides.
+    #[test]
+    fn the_declared_limit_is_the_freedom_the_stage_actually_has() {
+        let lib = library();
+        let clearance = 0.02_f64;
+        let asked = 24.4199_f64 + clearance;
+
+        let solve = |pin_shifts: bool| {
+            let mut sp = SpurStage {
+                clearance,
+                centre_distance: Auto::fixed(asked),
+                ..SpurStage::default()
+            };
+            sp.gears[0].teeth = 9;
+            sp.gears[1].teeth = 37;
+            if pin_shifts {
+                // Two shifts a designer might well type, and nowhere near the
+                // pair the given distance wants.
+                sp.gears[0].profile_shift = Auto::fixed(0.20);
+                sp.gears[1].profile_shift = Auto::fixed(0.20);
+            }
+            let mut t = two_stage();
+            t.stages = vec![Stage::Spur(sp)];
+            let r = solve_train(&t, &lib).expect("the stage solves either way");
+            let s = r.stages[0].as_spur().expect("a spur stage");
+            (s.clearance, s.centre_distance)
+        };
+
+        // At the limit — two given, the shifts free — every given number stands.
+        let (got, distance) = solve(false);
+        assert!(
+            (got - clearance).abs() < 1e-6 && (distance - asked).abs() < 1e-9,
+            "two given should all be honoured: clearance {got} at {distance}"
+        );
+
+        // One more, and the relation cannot hold. The distance is still what was
+        // typed — it is the *clearance* that gives, which is the arm of the
+        // contradiction the panel resolves by relieving the distance.
+        let (over, distance) = solve(true);
+        assert!(
+            (distance - asked).abs() < 1e-9,
+            "the given distance is still the distance"
+        );
+        assert!(
+            (over - clearance).abs() > 1e-3,
+            "with both shifts pinned as well, the clearance cannot also be {clearance}: got {over}"
+        );
+
+        // ...and the group says exactly that many.
+        let groups = Stage::Spur(SpurStage::default()).freedoms();
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].given_at_most, 2);
+        assert_eq!(groups[0].order[0], Freedom::CentreDistance);
     }
 
     /// **A given distance and a given clearance decide the shifts — with the

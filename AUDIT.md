@@ -102,7 +102,14 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
-**Phase 6 — the front end and the payload.** In progress. **F39's item 2 done**
+**Phase 6 — the front end and the payload.** In progress. **The toggle model is
+built** (F76): which of a stage's inputs argue with each other, how many may
+stand and which gives way first are `Stage::freedoms` and `Stage::relieved` in
+`gear-core`, where they can be tested — they were three untested functions in the
+panel, one per stage kind, restating a relation the core already enforces. A worm
+declares no freedoms, which is the model working rather than a hole.
+
+**F39's item 2 done**
 — mode 3 of the clearance paradigm now holds with the optimiser *off*, which is
 the plainest thing a designer does and was returning the undercut floor
 regardless of the distance typed. The division rule is the even split projected
@@ -349,6 +356,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F38 | The reported clearance was the input echoed, not the gap run at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | **part closed** — mode 3 works with the optimiser off (item 2, the largest); items 1, 3 and 4 open, and item 4 now has its answer |
 | F75 | The optimiser's fallback discarded the *centre distance* along with the optimisation whenever its own constraints admitted nothing | **gap** | 6 | **closed** — the fallback is what the constraints imply, not what the stage would build unasked |
+| F76 | The over-constraint rule lived in the panel as three per-kind functions, untested in either language | gap | 6 | **closed** — `Stage::freedoms` and `Stage::relieved`, gates proven |
 | F40 | The tolerance band was built four times and its direction asserted nowhere | gap | 3 | **closed** |
 | F33 | A crossed pair's members said nothing about their own teeth | gap | 3 | **closed** — and logged in `corrections.md` |
 | F42 | A locked mesh reported a torque on the shaft it delivers nothing to | gap | 3b | **closed** — and logged in `corrections.md` |
@@ -1972,10 +1980,10 @@ projection above. The `no undercut` toggle is what puts a floor under a member,
 and with it off the member keeps absorbing until a geometric limit — a severed
 tooth — stops it.
 
-**This is currently three functions in TypeScript**, one per stage kind
-(`relieveSpur`, `relievePlanetary`, `relieveHula` in `TrainPanel.svelte`), which
-is both a rule-1 violation and the per-kind duplication rule 4 exists to catch.
-Unifying it in Rust is the natural home for F16's remaining half.
+**This was three functions in TypeScript**, one per stage kind (`relieveSpur`,
+`relievePlanetary`, `relieveHula` in `TrainPanel.svelte`) — both a rule-1
+violation and the per-kind duplication rule 4 exists to catch. **Done**, see
+below.
 
 For the **worm**, the specification is: the worm's pitch diameter gains an
 automatic toggle that participates in the same relief; and ideally the wheel
@@ -1984,6 +1992,55 @@ profile shift) with an automatic shift that absorbs the distance *in preference
 to* the diameter. That wants an interference check — worm tip to flank, flank to
 undercut junction — which if closed form is worth having for every mesh kind and
 not only this one.
+
+### The toggle model, built
+
+The specification above, implemented. `Stage::freedoms` declares which of a
+stage's inputs argue with each other and `Stage::relieved` resolves it, both in
+`gear-core`; `relieve_stage` carries it across the boundary; the panel says which
+toggle was pinned and nothing else.
+
+**What it replaced.** Three functions in `TrainPanel.svelte` — `relieveSpur`,
+`relievePlanetary`, `relieveHula` — each restating a relation the core already
+enforces. Two faults at once: an engineering rule written outside Rust (rule 1)
+and one idea written once per kind (rule 4). It was also **untested**, in either
+language, and one of the three carried a justification that had gone stale.
+
+**What the kinds actually declare**, which is the part that had to be right:
+
+| kind | groups | given at most |
+|---|---|---|
+| spur | `[centre_distance, shift 0, shift 1]` | 2 |
+| planetary | `[shift sun, shift planet, shift ring]` | 2 |
+| hula | `[shift 0, shift 1]` and `[shift 2, shift 3]` | 1 each |
+| worm | none | — |
+
+A worm declaring **nothing** is the model working rather than a hole: it has no
+profile shift, so nothing inside it is free to absorb a distance, and that is
+exactly why its mode 3 is an open question.
+
+**The limit is `order.len() − 1`, stated once.** Every group here is a single
+relation, so exactly one of its inputs is the one the others decide. The first
+draft wrote the count per kind and got it wrong by one on the kind with the most
+tests — which is the argument for writing it once, made by writing it twice.
+
+> **Gates, run.** Removing the "never relieve what was just pinned" skip fails
+> the relief test; relaxing the limit by one so relief fires on a stage already
+> inside it fails the same test. Both were written before either fault existed
+> and run against them afterwards.
+
+**And the boundary check caught its own first case, unprompted.** Adding the
+entry point made `tools/check_wasm.sh` fail with *"entry points the probe never
+calls: stage_freedoms"* — written an hour earlier, against exactly this. The
+probe over-determines every kind on purpose, so what is recorded is the relief
+rather than a stage that needed none.
+
+**Why it went the whole way into Rust.** The first version had the core declare
+the groups and the panel do the flipping, which would have left the mechanics
+untested. `Freedom` turned out to be the missing piece: it names *which toggle
+the designer just pinned*, so the whole rule crosses as data and the panel is
+reduced to saying `{ shift: j }`. The call sites read better for it — they now
+say which freedom they are about instead of passing a reference to it.
 
 ### F72 — nothing had ever executed the payload
 
