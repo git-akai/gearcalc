@@ -15,7 +15,7 @@ stage 1  spur  z 17/43  beta 0 deg  ratio 2.5294  a_w 30.0257 mm  coprime
 
 stage 2  worm  z 1/40  ratio 40.0000  a 23.7273 mm  lead angle 8.2132 deg
   efficiency  forward 61.805 %  backward 0.000 %  (self-locking)
-  contact  peak 6796.1 MPa  cyclic 4587.0 MPa   patch 3.2052 x 1.8880 mm   sliding 439.2 mm/s
+  contact  peak 6743.6 MPa  cyclic 4574.4 MPa   patch 3.1805 x 1.8734 mm   sliding 439.2 mm/s
   member     b mm   T fwd Nm   T bwd Nm       rpm   cycles bend/contact   material
   worm     13.539     4.9751     0.0000    1186.0   5.693e7 /  5.693e7   4340 Hardened Steel
   wheel     4.690   122.9936   400.0000      29.7   1.423e6 /  1.423e6   Brass C360

@@ -517,6 +517,21 @@ pub enum MeshSide {
     Second,
 }
 
+impl MeshSide {
+    /// 0 or 1, for indexing a per-member pair.
+    ///
+    /// Every place that holds two of something holds them in the order the mesh
+    /// was built, so the conversion is one function rather than a `match` at
+    /// each site.
+    #[must_use]
+    pub fn index(self) -> usize {
+        match self {
+            Self::First => 0,
+            Self::Second => 1,
+        }
+    }
+}
+
 /// The thickness shift of a gear: `x + x_s`.
 ///
 /// Thickness quantities take this; radial quantities take plain `x`. Keeping the

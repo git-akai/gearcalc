@@ -717,18 +717,30 @@ impl Contact {
         Some(sub(v1, v2))
     }
 
-    /// The force pressing the flanks together, N, for a torque quoted on member
-    /// 2 — **at this point of the path**, not at the pitch point.
+    /// The force pressing the flanks together, N, for a torque quoted on one
+    /// member — **at this point of the path**, not at the pitch point.
     ///
     /// The same balance the efficiency comes from, so the friction that carries
     /// part of the load is already in it. The moment arm is the one at *this*
     /// contact, which is why a rating taken along the path should take its force
     /// from here too: the alternative is a stress evaluated at one place with a
     /// load computed at another.
+    ///
+    /// `on` says which member the torque belongs to, and
+    /// [`moment_per_force`](Self::moment_per_force) has already returned both
+    /// arms — the two readings are one balance, and they agree wherever the pair
+    /// transmits. Reading it on the **driving** member is what lets a locked
+    /// pair be rated at all: its output torque is zero and its flanks are not.
     #[must_use]
-    pub fn normal_force(&self, torque_on_2: f64, friction: f64, drive: Drive) -> Option<f64> {
-        let arm = self.moment_per_force(friction, drive)?[1];
-        (arm.abs() > f64::EPSILON).then(|| 1000.0 * torque_on_2 / arm.abs())
+    pub fn normal_force(
+        &self,
+        torque: f64,
+        on: crate::mesh::MeshSide,
+        friction: f64,
+        drive: Drive,
+    ) -> Option<f64> {
+        let arm = self.moment_per_force(friction, drive)?[on.index()];
+        (arm.abs() > f64::EPSILON).then(|| 1000.0 * torque / arm.abs())
     }
 
     /// The **torques** about each axis per unit normal force, mm.

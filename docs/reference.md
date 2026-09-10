@@ -689,6 +689,19 @@ against a **static** coefficient; how well it turns once moving is decided
 against the **sliding** one. `Directional::once_moving` is the whole rule, and
 the static figure is never itself reported.
 
+**The flank load comes from the torque the stage was given**, on the member it
+was given on, in the direction that gives it. `T₁` and `T₂` above are one
+balance, so the input torque read on the worm and the output torque read on the
+wheel are the same normal force everywhere the pair transmits. They part company
+at the one place that matters: a pair whose forward efficiency is **clamped to
+zero** has an output torque of zero and flanks that are pressed just as hard by
+whatever is holding it. Reading it on the driving member is also the only
+self-consistent way to rate *along the path*, since the input torque is what the
+shaft delivers at every instant while the output torque is a consequence that
+varies with the local moment arm. Driving backward loads the other flank, which
+flips the normal term and leaves the friction term alone — half a percent on the
+shipped worm, and it is the same swap `η_backward` above is written from.
+
 ### Face width from continuity
 
 A crossed pair has no stress that depends on its face width, so nothing about

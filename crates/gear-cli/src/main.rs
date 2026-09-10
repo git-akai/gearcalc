@@ -2450,7 +2450,7 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
         }
     };
     println!("  relative curvature   along {flat:.6} /mm   across {sharp:.6} /mm");
-    if let Some(c) = s.contact(torque_out, MeshSide::Second, mu, e_star) {
+    if let Some(c) = s.contact(torque_out, MeshSide::Second, mu, Drive::Forward, e_star) {
         println!(
             "  patch  {:.4} x {:.4} mm   (rated on the wheel's torque)",
             c.semi_major() * 2.0,

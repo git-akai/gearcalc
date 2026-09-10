@@ -3481,21 +3481,27 @@ mod tests {
         );
     }
 
-    /// **The same torque on the wheel is the same rating, whichever end it came
-    /// from.**
+    /// **A back-driving load reaches the wheel undiminished**, and the only
+    /// thing the direction changes about the rating is which flank carries it.
     ///
-    /// A screw pair is the other kind whose distribution depends on direction:
-    /// driving forward the wheel carries the worm's torque stepped up *and cut by
-    /// the mesh's own loss*, while a back-driving load arrives at the wheel
-    /// already. So a stage rated at `max(T_in, T_back)` and then stepped up and
-    /// cut once is rating a back-driven pair at `η_forward` of its load — 62 % of
-    /// it on the shipped worm.
+    /// A screw pair is the kind whose distribution depends on direction: driving
+    /// forward the wheel carries the worm's torque stepped up *and cut by the
+    /// mesh's own loss*, while a back-driving load arrives at the wheel already.
+    /// So a stage rated at `max(T_in, T_back)` and then stepped up and cut once
+    /// is rating a back-driven pair at `η_forward` of its load — 62 % of it on
+    /// the shipped worm, and 85 % of the pressure once a cube root has been
+    /// through it.
     ///
-    /// Asserted by building the same wheel torque twice, from either end, and
-    /// demanding one answer. The forward train is the definition; the back-driven
-    /// one is the claim.
+    /// Asserted by putting the same torque on the wheel twice, from either end.
+    /// The two answers are **not** identical and should not be: back-driving
+    /// loads the other flank, which flips the normal term in the balance and
+    /// leaves the friction term alone, and this pair's two flanks differ by half
+    /// a percent. What makes this a test rather than a tolerance is the second
+    /// bound — the gap between the two readings has to stay far smaller than the
+    /// gap the old fault opened, or "the same load, the other flank" and "the
+    /// wrong load" are not being told apart.
     #[test]
-    fn a_worm_is_rated_at_the_torque_on_its_wheel_from_either_end() {
+    fn a_back_driving_load_reaches_the_wheel_undiminished() {
         let lib = library();
         let load = 400.0;
 
@@ -3517,10 +3523,77 @@ mod tests {
         // ...and driven forward hard enough to put the same torque on the wheel.
         let (from_input, _, _) = driven(load / (ratio * eta), 0.0);
 
+        let apart = (from_output / from_input - 1.0).abs();
         assert!(
-            (from_output - from_input).abs() < 1e-6 * from_input,
-            "the same {load} N·m on the wheel rates at {from_output} MPa reached \
-             from the output and {from_input} MPa reached from the input"
+            apart < 0.02,
+            "the same {load} N·m on the wheel rates at {from_output} MPa reached              from the output and {from_input} MPa reached from the input"
+        );
+        // The fault this is really about: `η` of the load, under a cube root.
+        let old_fault = 1.0 - eta.cbrt();
+        assert!(
+            apart < old_fault / 5.0,
+            "a flank swap moves the rating by {apart}, and rating the load at              η_forward would move it by {old_fault} — too close to tell apart"
+        );
+
+        // And it is the load itself that arrives, so the rating follows Hertz's
+        // cube root of it exactly rather than approximately.
+        let (doubled, _, _) = driven(0.0, 2.0 * load);
+        assert!(
+            (doubled / from_output - 2.0_f64.cbrt()).abs() < 1e-12,
+            "twice the back-driving load should be 2^(1/3) of the pressure: {}",
+            doubled / from_output
+        );
+    }
+
+    /// **A pair that transmits nothing still has its flanks pressed.**
+    ///
+    /// A screw mesh's rating used to be taken from the torque on its **wheel**,
+    /// `T_in · i · η_forward` — and `Directional::once_moving` clamps a locked
+    /// pair's efficiency to zero, so that product is zero and the pair reported
+    /// no flank load at all. It is not zero: something is holding the wheel, and
+    /// whatever holds it is pressing the teeth.
+    ///
+    /// Reached at a helix split of 9° / 81° on a crossed 17/23 pair, which
+    /// `gear-cli crossed 17 23 90` prints — the sliding is over six times the
+    /// pitch-line speed there and the mesh cannot drive forward at µ = 0.06.
+    /// Rated from the torque the stage was **given**, on the member it was given
+    /// on, the answer is in line with its neighbours in that sweep rather than
+    /// absent from it.
+    #[test]
+    fn a_pair_that_transmits_nothing_still_has_its_flanks_pressed() {
+        let lib = library();
+        let locked = WormStage {
+            shaft_angle: 90.0,
+            starts: 17,
+            wheel_teeth: 23,
+            sizing: FirstMemberSizing::HelixAngle(9.0),
+            ..WormStage::default()
+        };
+        let r = solve_worm_stage(&locked, StageTorques::just(2.0), &lib)
+            .expect("a locked pair is still a pair");
+        assert_eq!(
+            r.efficiency.forward, 0.0,
+            "this split is meant to be the forward-locked one"
+        );
+        assert!(
+            r.contact.peak.max_pressure > 100.0,
+            "a locked pair's flanks are pressed by whatever holds them: {} MPa",
+            r.contact.peak.max_pressure
+        );
+        // Not merely non-zero: the same 2 N·m through a split that *does* drive
+        // presses about as hard, because the flank load comes from the input
+        // torque either way and the geometry has not changed much.
+        let driving = WormStage {
+            sizing: FirstMemberSizing::HelixAngle(18.0),
+            ..locked
+        };
+        let d = solve_worm_stage(&driving, StageTorques::just(2.0), &lib).expect("and this one");
+        let ratio = r.contact.peak.max_pressure / d.contact.peak.max_pressure;
+        assert!(
+            (0.5..2.0).contains(&ratio),
+            "the locked split rates at {} MPa against the driving split's {}",
+            r.contact.peak.max_pressure,
+            d.contact.peak.max_pressure
         );
     }
 
@@ -3534,6 +3607,46 @@ mod tests {
     /// limit is a closed form — the patch closes to a point and the pressure with
     /// it (`crate::hertz::elliptical_contact`).
     ///
+    /// Asserted on every kind rather than on the one that failed, since what is
+    /// being claimed is a property of the tool and not a patch to a stage.
+    #[test]
+    fn a_stage_carrying_nothing_is_a_stage() {
+        let lib = library();
+        for stage in [
+            Stage::Spur(SpurStage::default()),
+            Stage::Worm(WormStage::default()),
+            Stage::Planetary(Box::default()),
+            Stage::Hula(Box::default()),
+        ] {
+            let mut train = two_stage();
+            train.stages = vec![stage];
+            train.operating_torque = 0.0;
+            let r = solve_train(&train, &lib)
+                .unwrap_or_else(|e| panic!("a stage at no operating load: {e:?}"));
+            // A worm's members are not gears, so the walk below is empty there
+            // and the claim is the stage's own — which is the one that failed.
+            if let Some(w) = r.stages[0].as_worm() {
+                assert_eq!(w.contact.cyclic.max_pressure, 0.0);
+                assert!(w.contact.peak.max_pressure > 0.0);
+            }
+            for (i, g) in r.stages[0].members().iter().enumerate() {
+                assert_eq!(
+                    g.contact_stress.cyclic, 0.0,
+                    "member {i} carries nothing and reports a stress"
+                );
+                assert!(
+                    g.bending_stress.cyclic.is_none_or(|s| s == 0.0),
+                    "member {i} carries nothing and reports {:?}",
+                    g.bending_stress.cyclic
+                );
+                assert!(
+                    g.contact_stress.peak > 0.0,
+                    "member {i} still has a peak to survive"
+                );
+            }
+        }
+    }
+
     /// **An internal mesh is asked what an internal mesh is asked, whatever is
     /// turning around it — and an external one is not asked it at all.**
     ///
@@ -3617,46 +3730,6 @@ mod tests {
             short.clear(),
             "shortening the ring's tooth should clear it: {short:?}"
         );
-    }
-
-    /// Asserted on every kind rather than on the one that failed, since what is
-    /// being claimed is a property of the tool and not a patch to a stage.
-    #[test]
-    fn a_stage_carrying_nothing_is_a_stage() {
-        let lib = library();
-        for stage in [
-            Stage::Spur(SpurStage::default()),
-            Stage::Worm(WormStage::default()),
-            Stage::Planetary(Box::default()),
-            Stage::Hula(Box::default()),
-        ] {
-            let mut train = two_stage();
-            train.stages = vec![stage];
-            train.operating_torque = 0.0;
-            let r = solve_train(&train, &lib)
-                .unwrap_or_else(|e| panic!("a stage at no operating load: {e:?}"));
-            // A worm's members are not gears, so the walk below is empty there
-            // and the claim is the stage's own — which is the one that failed.
-            if let Some(w) = r.stages[0].as_worm() {
-                assert_eq!(w.contact.cyclic.max_pressure, 0.0);
-                assert!(w.contact.peak.max_pressure > 0.0);
-            }
-            for (i, g) in r.stages[0].members().iter().enumerate() {
-                assert_eq!(
-                    g.contact_stress.cyclic, 0.0,
-                    "member {i} carries nothing and reports a stress"
-                );
-                assert!(
-                    g.bending_stress.cyclic.is_none_or(|s| s == 0.0),
-                    "member {i} carries nothing and reports {:?}",
-                    g.bending_stress.cyclic
-                );
-                assert!(
-                    g.contact_stress.peak > 0.0,
-                    "member {i} still has a peak to survive"
-                );
-            }
-        }
     }
 
     /// **A parallel-axis pair's two members share one tangential force**, so the

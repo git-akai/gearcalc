@@ -852,9 +852,15 @@ pub fn solve_worm_stage(
         .unwrap_or_else(|| s.self_locking_friction());
     let output_torque = input_torque * s.ratio * efficiency.forward;
 
-    // Contact is rated on the wheel's torque: which torque is held fixed decides
-    // which way friction moves the flank load, and only this direction is the
-    // conservative one. See `Screw::normal_force`.
+    // **Contact is rated on the torque the stage was given, on the member it was
+    // given on**, and in the direction that gives it. See `Screw::normal_force`:
+    // the efficiency *is* this balance, so reading the input torque on the worm
+    // and the output torque on the wheel are the same number wherever the pair
+    // transmits. Where it does not — a **forward-locked** pair, whose efficiency
+    // is clamped to zero and whose output torque goes with it — only the first
+    // reading survives, and the flanks are pressed by whatever is holding them
+    // either way. It used to be the second, so a locked pair reported no flank
+    // load at all.
     let e_star = contact_modulus(&materials[0], &materials[1]);
     let (curvature_along, curvature_across) =
         s.contact_curvatures().ok_or(TrainError::NoContact)?;
@@ -884,24 +890,19 @@ pub fn solve_worm_stage(
     .into_iter()
     .fold(f64::MAX, f64::min);
 
-    // One rating, and the load case is the only thing that changes about it: a
-    // case is a torque and nothing else, so this closure takes the torque on the
-    // wheel and knows nothing about which case asked.
-    let rate = |output_torque: f64| -> Result<WormContact, TrainError> {
+    // One rating, and what changes about it is the load: a torque, the member it
+    // is quoted on, and the direction that presses that flank. The closure knows
+    // nothing about which case or which direction asked.
+    let rate = |torque: f64, on: MeshSide, drive: Drive| -> Result<WormContact, TrainError> {
         let at_pitch = s
-            .contact(
-                output_torque,
-                MeshSide::Second,
-                stage.sliding_friction,
-                e_star,
-            )
+            .contact(torque, on, stage.sliding_friction, drive, e_star)
             .ok_or(TrainError::NoContact)?;
         // The same force the patch above was pressed with, bounded by the line
         // the teeth have — `Screw::contact` is the ellipse alone.
         let pitch_pressure = crate::hertz::peak_pressure(
             curvature_along,
             curvature_across,
-            s.normal_force(output_torque, MeshSide::Second, stage.sliding_friction),
+            s.normal_force(torque, on, stage.sliding_friction, drive),
             line_length,
             e_star,
         )
@@ -926,8 +927,7 @@ pub fn solve_worm_stage(
                 // The force at *this* contact, not at the pitch point: a stress
                 // evaluated in one place with a load computed in another is two
                 // answers wearing one number.
-                let Some(force) =
-                    contact.normal_force(output_torque, stage.sliding_friction, Drive::Forward)
+                let Some(force) = contact.normal_force(torque, on, stage.sliding_friction, drive)
                 else {
                     continue;
                 };
@@ -963,23 +963,33 @@ pub fn solve_worm_stage(
         })
     };
 
-    // **Both cases on the wheel, and the peak is the worse of two directions.**
+    // **The peak is the worse of two directions, and each is rated in its own.**
     //
-    // Driving forward the wheel carries the worm's torque stepped up and cut by
-    // the mesh's own loss; being driven it carries the applied load itself,
-    // which `back_driving_torques` has referred to this stage's input shaft and
-    // which this brings back by the ratio alone. Those are two constructions,
-    // not one magnitude, and taking the larger *shaft* torque before choosing
-    // between them rated a back-driven pair at `η_forward` of its load — 62 % of
-    // it on the shipped worm, so 79 % of the contact stress. See
-    // `StageTorques::on_mesh` and `docs/corrections.md`.
-    let wheel_torque = torques.on_mesh(
-        input_torque * s.ratio * efficiency.forward,
-        torques.peak_backward.map(|t| t * s.ratio),
-    );
+    // Driving forward the stage is handed a torque on its worm; being driven it
+    // carries the applied load, which `back_driving_torques` has referred to
+    // this stage's input shaft and which this brings back to the wheel by the
+    // ratio alone. Two constructions, on two members, pressing two different
+    // flanks — so the comparison is between the two **ratings** rather than
+    // between two shaft torques, which is one number's worth of the same rule
+    // that already governs a stage's load cases: *the peak is taken after each
+    // direction's own distribution, never before it.*
+    //
+    // Taking the larger shaft torque first rated a back-driven pair at
+    // `η_forward` of its load — 62 % of it on the shipped worm, so 79 % of the
+    // contact stress (`docs/corrections.md`). Taking it on the wheel alone left
+    // a forward-locked pair reporting no load at all.
+    let on_worm = torques.on_mesh(input_torque, None);
+    let forward_peak = rate(on_worm.peak, MeshSide::First, Drive::Forward)?;
+    let backward_peak = torques
+        .peak_backward
+        .map(|t| rate(t * s.ratio, MeshSide::Second, Drive::Backward))
+        .transpose()?;
     let contact = LoadCase {
-        peak: rate(wheel_torque.peak)?,
-        cyclic: rate(wheel_torque.cyclic)?,
+        peak: match backward_peak {
+            Some(back) if back.max_pressure > forward_peak.max_pressure => back,
+            _ => forward_peak,
+        },
+        cyclic: rate(on_worm.cyclic, MeshSide::First, Drive::Forward)?,
     };
 
     let backlash = Directional::of(|d| {
@@ -1339,8 +1349,14 @@ mod tests {
                 .map(|m| lib.get(&m.material).unwrap().clone())
                 .collect();
             let e_star = contact_modulus(&materials[0], &materials[1]);
-            let out_torque = 2.0 * s.ratio * r.efficiency.forward;
-            let force = s.normal_force(out_torque, MeshSide::Second, stage.sliding_friction);
+            // **The load as the stage was given it**, on the member it was given
+            // on. Reading it back off the wheel means multiplying by an
+            // efficiency taken along the *path* and then using it in a balance
+            // written at the *pitch point*, which is two models in one number:
+            // it differs by 1 % on the near-parallel pair here, where the sweep
+            // is longest.
+            let force =
+                s.normal_force(2.0, MeshSide::First, stage.sliding_friction, Drive::Forward);
             let (along, across) = s.contact_curvatures().unwrap();
             let betas = [s.worm_helix_angle, s.shaft_angle - s.worm_helix_angle];
             let line_length = (0..2)

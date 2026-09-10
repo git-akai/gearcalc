@@ -360,14 +360,31 @@ impl Screw {
     /// been eaten into and the flank must be pressed harder to make it up.
     ///
     /// Both are correct answers to different questions, and it is an easy one to
-    /// get backwards. A rating wants the second: size the contact on the
-    /// **wheel** torque, which is the conservative direction and the one worm
-    /// gearing is conventionally rated on.
+    /// get backwards. **A rating wants the torque it was actually given**, on
+    /// the member it was given on, which is the driving member in whichever
+    /// direction is being rated. Everywhere the pair transmits, the two routes
+    /// are the same number: the efficiency *is* this balance, so the input
+    /// torque read on the worm and the output torque read on the wheel agree to
+    /// the bit. They part company at one place only, and it is the place that
+    /// matters — a **locked** pair, where the efficiency is clamped to zero, the
+    /// output torque with it, and the flanks are pressed just as hard by
+    /// whatever is holding them (`docs/corrections.md`).
+    ///
+    /// # `drive` picks the flank, exactly as [`Self::efficiency`] does
+    ///
+    /// Back-driving loads the *other* flank, which flips the normal term and
+    /// leaves the friction term alone. Reading the back-driving load off the
+    /// driving flank's balance is the same fault as rating a held load at the
+    /// forward efficiency, one layer down.
     #[must_use]
-    pub fn normal_force(&self, torque: f64, on: MeshSide, friction: f64) -> f64 {
-        let (per_normal_1, per_normal_2) = self.tangential_per_normal(friction, Flank::Driving);
+    pub fn normal_force(&self, torque: f64, on: MeshSide, friction: f64, drive: Drive) -> f64 {
+        let flank = match drive {
+            Drive::Forward => Flank::Driving,
+            Drive::Backward => Flank::BackDriving,
+        };
+        let (per_normal_1, per_normal_2) = self.tangential_per_normal(friction, flank);
         match on {
-            MeshSide::First => 2000.0 * torque / self.worm_pitch_diameter / per_normal_1,
+            MeshSide::First => 2000.0 * torque / self.worm_pitch_diameter / per_normal_1.abs(),
             MeshSide::Second => 2000.0 * torque / self.wheel_pitch_diameter / per_normal_2.abs(),
         }
     }
@@ -398,13 +415,14 @@ impl Screw {
         torque: f64,
         on: MeshSide,
         friction: f64,
+        drive: Drive,
         e_star: f64,
     ) -> Option<crate::hertz::EllipticalContact> {
         let (flat, sharp) = self.contact_curvatures()?;
         crate::hertz::elliptical_contact(
             flat,
             sharp,
-            self.normal_force(torque, on, friction),
+            self.normal_force(torque, on, friction, drive),
             e_star,
         )
     }
@@ -1380,7 +1398,10 @@ mod tests {
         // Frictionless, the balance is F_t/(cos α_n sin γ) exactly.
         let tangential = 2000.0 * torque / s.worm_pitch_diameter;
         let ideal = tangential / (s.normal_pressure_angle.cos() * s.lead_angle.sin());
-        assert!((s.normal_force(torque, MeshSide::First, 0.0) - ideal).abs() < 1e-12 * ideal);
+        assert!(
+            (s.normal_force(torque, MeshSide::First, 0.0, Drive::Forward) - ideal).abs()
+                < 1e-12 * ideal
+        );
 
         // Which torque is held fixed decides which way friction moves the flank
         // load, and it is an easy one to get backwards. Holding the *input*
@@ -1388,18 +1409,18 @@ mod tests {
         // need pressing less hard; holding the *output* fixed, friction has
         // eaten into the useful part and they must be pressed harder.
         assert!(
-            s.normal_force(torque, MeshSide::First, 0.06)
-                < s.normal_force(torque, MeshSide::First, 0.0),
+            s.normal_force(torque, MeshSide::First, 0.06, Drive::Forward)
+                < s.normal_force(torque, MeshSide::First, 0.0, Drive::Forward),
             "at fixed input torque, friction lowers the flank load"
         );
         assert!(
-            s.normal_force(torque, MeshSide::Second, 0.06)
-                > s.normal_force(torque, MeshSide::Second, 0.0),
+            s.normal_force(torque, MeshSide::Second, 0.06, Drive::Forward)
+                > s.normal_force(torque, MeshSide::Second, 0.0, Drive::Forward),
             "at fixed output torque, friction raises it — the rating direction"
         );
 
         let c = s
-            .contact(torque, MeshSide::Second, 0.06, 113_000.0)
+            .contact(torque, MeshSide::Second, 0.06, Drive::Forward, 113_000.0)
             .unwrap();
         assert!(c.semi_major().is_finite() && c.semi_minor() > 0.0);
         assert!(
@@ -1415,7 +1436,7 @@ mod tests {
         );
         // A point contact concentrates load far harder than a line would: the
         // same normal force spread along a 10 mm face at this curvature.
-        let line = (s.normal_force(torque, MeshSide::Second, 0.06) / 10.0
+        let line = (s.normal_force(torque, MeshSide::Second, 0.06, Drive::Forward) / 10.0
             * s.contact_curvatures().unwrap().1
             * 113_000.0
             / PI)
@@ -2021,9 +2042,10 @@ mod tests {
             for mu in [0.0, 0.06, 0.15] {
                 for torque in [1.0, 54.7] {
                     let balance = pitch
-                        .normal_force(torque, mu, Drive::Forward)
+                        .normal_force(torque, crate::mesh::MeshSide::Second, mu, Drive::Forward)
                         .expect("a force");
-                    let classical = s.normal_force(torque, crate::mesh::MeshSide::Second, mu);
+                    let classical =
+                        s.normal_force(torque, crate::mesh::MeshSide::Second, mu, Drive::Forward);
                     assert!(
                         (balance - classical).abs() < 1e-9 * classical,
                         "Σ={sigma_deg}° μ={mu} T={torque}: {balance} N against {classical} N"
