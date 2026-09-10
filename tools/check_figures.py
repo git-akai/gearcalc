@@ -278,20 +278,68 @@ def run(command, cache):
 
 
 def untagged(path, tagged_spans):
-    """Tables and code blocks carrying strong figures that nothing generates."""
+    """Blocks carrying strong figures that nothing generates, tables and prose.
+
+    **Prose counts.** This scanned runs of table rows only, so a figure quoted in
+    a sentence was invisible to it and the coverage line under-reported itself --
+    one such block was found by hand, which is what said there would be others.
+    There are: about fifty paragraphs across the four documents.
+
+    They are *reported* rather than failed, and separately from the tables,
+    because the two are not the same claim. A table of figures is output, and
+    something should regenerate it. A figure in a sentence is as often history
+    ("the ring came out 6 % low"), or an illustration, or a bound quoted from a
+    standard -- and tagging fifty paragraphs to find the few that are live output
+    is the shape of sweep this project refuses. What the number is for is that
+    nobody reads "5 ungated" as "5 figures in this repository are ungated".
+
+    A generated document is skipped: `docs/bending-check.html` *is* a command's
+    output, checked verbatim, so its prose is not a claim anybody wrote.
+    """
     lines = path.read_text().splitlines()
     loose = []
+    prose_ok = path.suffix != ".html"
+
+    def close(kind, start, end):
+        text = "\n".join(lines[start - 1 : end - 1])
+        strong = [x for x in numbers(text) if x[1] >= STRONG_DECIMALS]
+        if strong and not any(a <= start <= b for a, b in tagged_spans):
+            loose.append((start, len(strong), kind))
+
     run_start = None
+    prose_start = None
+    fenced = False
     for n, line in enumerate(lines, 1):
-        is_row = line.lstrip().startswith("|")
+        stripped = line.lstrip()
+        if stripped.startswith("```"):
+            fenced = not fenced
+        is_row = not fenced and stripped.startswith("|")
+        # A paragraph: text that is neither a table, a heading, nor inside a
+        # fence. Blank lines end it, which is what makes it a paragraph.
+        is_prose = (
+            prose_ok
+            and not fenced
+            and bool(stripped)
+            and not is_row
+            and not stripped.startswith("#")
+            and not stripped.startswith("<!--")
+        )
+
         if is_row and run_start is None:
             run_start = n
         elif not is_row and run_start is not None:
-            text = "\n".join(lines[run_start - 1 : n - 1])
-            strong = [x for x in numbers(text) if x[1] >= STRONG_DECIMALS]
-            if strong and not any(a <= run_start <= b for a, b in tagged_spans):
-                loose.append((run_start, len(strong)))
+            close("table", run_start, n)
             run_start = None
+
+        if is_prose and prose_start is None:
+            prose_start = n
+        elif not is_prose and prose_start is not None:
+            close("prose", prose_start, n)
+            prose_start = None
+    if run_start is not None:
+        close("table", run_start, len(lines) + 1)
+    if prose_start is not None:
+        close("prose", prose_start, len(lines) + 1)
     return loose
 
 
@@ -375,17 +423,20 @@ def main():
                 )
 
         if listing:
-            for line, strong in untagged(path, spans):
-                coverage.append(f"  {rel}:{line}  {strong} strong figures  <- NOTHING")
+            for line, strong, kind in untagged(path, spans):
+                coverage.append(
+                    f"  {rel}:{line}  {strong} strong figures  <- NOTHING ({kind})"
+                )
 
     if listing:
-        print("Tagged blocks, and tables carrying figures that nothing generates:\n")
+        print("Tagged blocks, and blocks carrying figures that nothing generates:\n")
         print("\n".join(coverage))
-        loose = sum(1 for c in coverage if c.endswith("NOTHING"))
+        tables = sum(1 for c in coverage if c.endswith("(table)"))
+        prose = sum(1 for c in coverage if c.endswith("(prose)"))
         print(
             f"\n{tagged_blocks} gated by a command, {by_test} by a test, "
-            f"{exempt} exempt, {loose} still ungated "
-            f"(tables with figures at {STRONG_DECIMALS}+ decimals)."
+            f"{exempt} exempt, {tables} tables and {prose} paragraphs still "
+            f"ungated (figures at {STRONG_DECIMALS}+ decimals)."
         )
         return 0
 

@@ -1034,13 +1034,24 @@ mod tests {
             }
         }
 
-        // A planetary set whose ring runs out of addendum at its base circle.
-        for (sun, planet, addendum) in [
-            (11_u32, 9_u32, 2.6_f64),
-            (13, 13, 2.2),
-            (17, 17, 1.9),
-            (24, 18, 1.7),
-            (40, 25, 2.4),
+        // A planetary set whose ring's tip clamps at its base circle.
+        //
+        // **These used to raise the addendum and none of them solved.** Five
+        // sets were built with a ring addendum of 1.7 to 2.6 modules, every one
+        // of them failed with *the teeth never come into contact*, and the
+        // `if let Ok` below swallowed it — so the note was declared unfirable
+        // "because it was looked for and not found" when the looking had never
+        // happened. `docs/corrections.md`'s own heading: *a test that never
+        // meets the case it is about passes against the fault.*
+        //
+        // A ring's tip is `r − m(h_a − x)` and its clamp is that tip reaching
+        // the base circle, so what drives it there is a **short** addendum
+        // against a **negative** shift, not a tall one. Swept: it fires on 441
+        // of 1,482 sets that solve.
+        for (sun, planet, addendum, shift) in [
+            (11_u32, 13_u32, 0.5_f64, -1.0_f64),
+            (11, 13, 0.7, -1.4),
+            (17, 18, 0.5, -1.6),
         ] {
             let stage = gear_core::train::PlanetaryStage {
                 sun: gear_core::train::StageGear {
@@ -1052,7 +1063,12 @@ mod tests {
                     ..Default::default()
                 },
                 ring: gear_core::train::StageGear {
+                    // **And its tooth count**, which the version before this
+                    // left at `StageGear`'s own 17 while setting the sun and the
+                    // planet — a ring that does not close the set it is in.
+                    teeth: sun + 2 * planet,
                     addendum,
+                    profile_shift: gear_core::params::Auto::fixed(shift),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -1379,18 +1395,37 @@ mod tests {
     /// found**, and each is a question rather than a settled fact.
     ///
     /// - `clamp.ring_fully_filleted` — the ring's two corner rounds meeting
-    ///   before mid-space. Searched over ~11 000 combinations of ring teeth,
-    ///   cutter teeth, tip round, dedendum and thickness modification, and never
-    ///   fired. The likely reason is that `ShaperCut` already refuses a tool
+    ///   before mid-space. Re-searched over **71,750** combinations of ring
+    ///   teeth, cutter teeth, tip round, cutter addendum, thickness modification,
+    ///   profile shift and module, and it never fires. (The first search was
+    ///   ~11,000 and this is the one the entry now rests on — evidence has a
+    ///   date, and a crate that has changed underneath it deserves a fresh
+    ///   look.) The likely reason is that `ShaperCut` already refuses a tool
     ///   whose own rounds overlap, which is close to the same condition — so the
     ///   guard may be shadowing it entirely.
-    /// - `stage.ring_addendum_clamped` — a planetary ring whose tip clamps at
-    ///   its base circle. The set solves its ring's addendum, so it does not
-    ///   normally hand it one that cannot work.
     ///
-    /// Both are live code with live messages, so neither is deleted on
-    /// suspicion. See HANDOFF docs/rationale.md#where-closed-form-is-impossible.
-    const UNFIRED: &[&str] = &["clamp.ring_fully_filleted", "stage.ring_addendum_clamped"];
+    /// It is live code with a live message, so it is not deleted on suspicion.
+    ///
+    /// # One left this list, and how it got on it
+    ///
+    /// `stage.ring_addendum_clamped` was here on the reading that "the set
+    /// solves its ring's addendum, so it does not normally hand it one that
+    /// cannot work". It fires on **441 of the 1,482 sets** a sweep of tooth
+    /// counts, addenda, shifts, cutters and thickness modifications can solve.
+    ///
+    /// What put it here is worth more than the note. The sweep *did* have five
+    /// cases aimed at it — and every one of them failed to solve, with *the
+    /// teeth never come into contact*, inside an `if let Ok(…)` that said
+    /// nothing. So "looked for and not found" was true of the sentence and false
+    /// of the code: the looking never happened. They raised the ring's addendum,
+    /// where a ring's tip is `r − m(h_a − x)` and reaches its base circle on a
+    /// **short** addendum against a negative shift — and they left the ring's
+    /// tooth count at `StageGear`'s own 17 while setting the sun's and the
+    /// planet's, which is a ring that does not close the set it is in.
+    ///
+    /// *A case that cannot solve is not a case*, and an `if let Ok` around one
+    /// is how it stays that way quietly.
+    const UNFIRED: &[&str] = &["clamp.ring_fully_filleted"];
 
     #[test]
     fn a_document_that_is_not_a_catalogue_is_refused() {

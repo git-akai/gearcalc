@@ -220,21 +220,21 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F4 | `StageGear` — a shared input type — lives in `train/spur.rs` | drift | 3 | **closed** — moved, with its `Default`, `AddendumAsked` and serde helpers; `spur.rs` 1017 → 730 lines |
 | F5 | No ledger of the numbers that are not model constants | gap | 2 | **closed** |
 | F6 | The face-width invariance test ran the one model no stage rates with | gap | 5 | **closed** — every model and a rim, six cases |
-| F7 | ~212 documented figures, one gate | gap | 0 | **part closed** — mechanism built; 5 tables still ungated (F19) |
+| F7 | ~212 documented figures, one gate | gap | 0 | **part closed** — mechanism built; 4 tables and 56 paragraphs ungated (F19, F21) |
 | F8 | The CLI list chosen to be exhaustive is not | drift | 1 | **closed** — the table *is* the dispatch |
 | F9 | The Layout table names 7 of 27 modules | drift | 1 | **closed** — the map is `CLAUDE.md`; `state.md` keeps the decisions |
 | F10 | `bending-check.html` regenerates by hand | drift | 0 | **closed** — `figures-verbatim`, checked exactly |
 | F11 | An orphaned sentence fragment in `reference.md` | drift | 1 | **closed** |
 | F12 | The inline tests never had the integration tests' consolidation | gap | 5 | open |
 | F13 | Five production modules carry no inline tests, invisibly | holds | 5 | open |
-| F14 | The two unfired notes need their evidence re-dated | holds | 5 | open |
+| F14 | The two unfired notes need their evidence re-dated | **gap** | 5 | **closed** — one was never fired *at*; the other re-searched at 7× the breadth |
 | F15 | `TrainPanel.svelte` is 2,848 lines, four hand-written stage forms | gap | 6 | open |
 | F16 | One stage input touches eleven files | holds | 6 | open |
 | F17 | 1.49 MB wasm carrying a simulator no browser path reaches | drift | 6 | open |
 | F18 | `CLAUDE.md` is empty | gap | 0 | **closed** |
 | F19 | Five documented tables have no command that reproduces them | gap | 4 | **part closed** — `:360` regenerates from `gear-cli shifts`; four remain |
 | F20 | `state.md` derived a figure by hand from rounded output, and it was wrong | drift | 0 | **closed** |
-| F21 | The figure checker cannot see figures in prose, only in tables | gap | 5 | open |
+| F21 | The figure checker cannot see figures in prose, only in tables | gap | 5 | **closed** — it counts both now, and the count was an undercount by an order |
 | F22 | The tense rule as written forbade 127 sentences it was not aimed at | drift | 1 | **closed** — the rule was narrowed, not the prose |
 | F23 | The gear tab and a stage member bounded the same gear differently | gap | 2 | **closed** — and logged in `corrections.md` |
 | F24 | The golden corpus covers the CLI, not the wasm boundary | gap | 5 | **closed** — measured; the values and shape are covered, the boundary's *own* defaults were not |
@@ -323,8 +323,8 @@ figures are claimed — for a table with a `before` column that is history),
 gates it, and the name is checked to exist), and `figures-exempt:` with a reason,
 which is section-scoped because history comes in sections.
 
-Coverage today: **5 blocks gated by a command, 2 by a test, 2 sections exempt,
-5 tables still ungated** (F19).
+Coverage today: **6 blocks gated by a command, 2 by a test, 2 sections exempt,
+4 tables and 56 paragraphs still ungated** (F19, F21).
 
 > **Gate, run.** Built a worktree at `30679fb` — the commit before
 > `9e18527` "the tables had drifted again" — tagged study 5's table as it stood
@@ -342,10 +342,22 @@ of the eleven checks catches.
   `figures-bold` immediately caught that `state.md`'s spread of **0.262** was
   derived by subtracting two *rounded* printed values; the figure is **0.261**.
   `gear-cli matrix` prints the spread now, so nothing derives it by hand.
-- **F21, open.** The coverage report scans Markdown tables only, so a figure
-  quoted in prose is invisible to it. One such block was found and tagged by
-  hand; there will be others. Phase 5 should widen it or the "5 ungated" number
-  is an undercount.
+- **F21, closed in Phase 5.** The coverage report scanned Markdown tables only,
+  so a figure quoted in prose was invisible to it — and there were others: **56
+  paragraphs** carrying about 150 figures at two decimals or better, against the
+  four tables the line reported. An order of magnitude, and the line read as
+  though it were the whole story.
+
+  It counts both now and reports them **separately**, which is the point rather
+  than a formatting choice: a table of figures is output and something should
+  regenerate it, while a figure in a sentence is as often history ("the ring
+  came out 6 % low"), an illustration, or a bound quoted from a standard.
+  Reading the fifty-six confirms it — `state.md`'s densest two are a change log
+  and the known-bias register, the latter measured with a Python tool that is
+  not a `gear-cli` command and so cannot be tagged at all. **Tagging them is not
+  the work; knowing the number is.** Spot-checked the one case that could have
+  gone stale — the last figure of a change chain is the live one, and 61.805 %
+  is what `train mixed` prints today.
 
 ---
 
@@ -1327,6 +1339,38 @@ offers** rather than the two the rule had reached.
 > **Gate, run.** Each of the four boundary defaults perturbed again: all four now
 > fail `the_defaults_this_boundary_invents_are_the_ones_it_shipped`, and each was
 > silent across the whole suite, the whole corpus and the binding check before.
+
+### Phase 5, fourth pass — the tests that never met their case
+
+**F21, and the number was out by an order.** The figure checker scanned Markdown
+tables only, so its coverage line — "5 tables still ungated" — was true and read
+as though it were the whole story. Widened to prose: **4 tables and 56
+paragraphs**, about 150 figures at two decimals or better. They are reported
+*separately* rather than failed, and that is the finding rather than a formatting
+choice: a table of figures is output and something should regenerate it, while a
+figure in a sentence is as often history, an illustration, or a bound quoted from
+a standard. Reading the fifty-six confirms it — `state.md`'s two densest are a
+change log and the known-bias register, the latter measured with a Python tool
+that is not a `gear-cli` command and so cannot be tagged at all. **Tagging them
+is not the work; knowing the number is.**
+
+**F14, and it was not a re-dating.** Two notes sat in `UNFIRED` as "looked for
+and not found".
+
+- `clamp.ring_fully_filleted` — re-searched over **71,750** combinations against
+  the original 11,000, and it still never fires. Evidence re-dated, which is what
+  the finding asked for.
+- `stage.ring_addendum_clamped` — **fires on 441 of the 1,482 sets** a sweep can
+  solve. It was never fired *at*: the sweep carried five cases aimed at it and
+  every one failed with *the teeth never come into contact*, inside an
+  `if let Ok(…)` that said nothing.
+
+Two faults in those five, and both are the kind that hide: they **raised** the
+ring's addendum, where a ring's tip is `r − m(h_a − x)` and reaches its base
+circle on a *short* one against a negative shift; and they left the ring's tooth
+count at `StageGear`'s own 17 while setting the sun's and the planet's — a ring
+that does not close the set it is in. *A case that cannot solve is not a case*,
+and an `if let Ok` around one is how it stays that way quietly.
 
 **F6, closed on the way.** The face-width invariance ran on `FormFactorOnly`
 alone, the one notch model no stage rates with — it ships through

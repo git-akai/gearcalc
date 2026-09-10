@@ -202,8 +202,10 @@ And elsewhere:
   against a published standard. They go when that command does.
 - **`verify.rs` is in the library rather than in `tests/`** so the CLI can sweep
   it over thousands of cases.
-- **Two notes nothing can fire** are named in `strings.rs`'s `UNFIRED` with their
-  evidence. Live code, live messages, deliberately not deleted on suspicion.
+- **One note nothing can fire** is named in `strings.rs`'s `UNFIRED` with its
+  evidence. Live code, a live message, deliberately not deleted on suspicion —
+  and the evidence carries the breadth of the search that found nothing, because
+  an absence has a date.
 
 ---
 
