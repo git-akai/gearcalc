@@ -323,12 +323,28 @@ longer fits, a contact ratio floor, bottom clearance. A bracketed scalar solve
 needs a monotone residual with a sign change, and a constraint boundary is where
 the admissible set ends rather than where a derivative vanishes.
 
-**Half of it is already closed form**, and that is the reason to think the rest
-might be: at a fixed shift *sum*, the stationary condition for the **division**
-is derived and solved directly
-([reference.md](reference.md#efficiency-parallel-axes)). What the search is left
-doing is the sum, and every row of every table this project prints reports the
-sum landing on a bound rather than at a stationary point.
+**Half of it has a closed form and does not use it.** At a fixed shift *sum*,
+the stationary condition for the **division** is derived and checked
+([reference.md](reference.md#efficiency-parallel-axes)) — and the search chooses
+the division numerically all the same. This section said otherwise for as long as
+it has existed, which a grep for the function's callers settles in a second and
+nobody had run.
+
+Two things stand in the way, and the second is the reason it stays that way. As
+derived, the condition assumes each tip moves at `m` per unit of shift, so the
+factor cancels between the members; `no_sharp_tip` is **on by default** and holds
+a capped tip at the radius where the tooth is `min_tip_width` wide, which moves
+at about *half* that and differently on each member. And the corrected condition
+would still only supply the *interior* candidates: the optimum is as often at an
+end of the admissible interval, so using it means bracketing that interval's two
+ends, the cap's onset, and a stationary point per smooth piece — five solves
+where a bounded one-dimensional search is one, for an answer already right to a
+thousandth of a module. `AUDIT.md` carries the derivation, verified, for whoever
+weighs it again.
+
+Every row of every table this project prints reports the sum landing on a bound
+rather than at a stationary point, which is the other half and the reason the
+whole thing is a search.
 
 **And the search is converged only where its coordinates are the problem's.**
 The six numbers are an input now (`auto::Search`) rather than constants in the

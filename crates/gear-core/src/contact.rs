@@ -447,8 +447,34 @@ pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Tooth, friction: f64, dr
 /// moves the path a long way for a little shift.
 ///
 /// Returns the residual, not the answer. It is monotone across the useful range
-/// and a caller brackets it — see [`crate::hula::Split`], where the division is
-/// exactly the freedom a shared crank offset leaves over.
+/// and a caller brackets it — see [`efficient_split`].
+///
+/// # The assumption in it, and where the shipped default breaks it
+///
+/// `1/sin α_a` is `dξ/dr_a`: how far a path end moves for a millimetre of tip.
+/// Turning that into a rate per unit *shift* needs `dr_a/dx`, which is `m` for
+/// a tooth whose addendum is a **given** number — and the same `m` on both
+/// members, so it cancels and leaves the expression above. **`no_sharp_tip`
+/// makes it false**, and it is on by default: once the cap engages, the tip is
+/// held at the radius where the tooth is `min_tip_width` wide, and
+/// differentiating that condition gives
+///
+/// ```text
+/// dr_a/dx = 2 r_a c / (2 tan α_a − w_min/r_a),      c = 2 tan α_n / z
+/// ```
+///
+/// — about **0.47 m** on a nine-tooth pinion rather than `m`, and different on
+/// each member, so it no longer cancels. The general condition is this one with
+/// each term weighted by its own member's rate. [Verified against finite
+/// differences of the built tooth, exactly, in both regimes and at three tooth
+/// counts; `AUDIT.md` carries the measurement.]
+///
+/// # Nothing in production calls this
+///
+/// It is a derived and checked fact about the model rather than what chooses a
+/// division: `auto::shifts_for_efficiency` searches the division alongside the
+/// sum. `AUDIT.md` says what wiring it in would take and why that was weighed
+/// and not taken.
 #[must_use]
 pub fn split_residual(path: &ContactPath) -> f64 {
     let p_b = path.base_pitch;

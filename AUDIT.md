@@ -61,7 +61,10 @@ Q5 below, which settled the one question pass 8 had raised and not resolved.
 F42, F43, F44, F45, F46 and F49 closed — **all six bugs**, and F47, F48 recorded
 open. The half pass 8 missed is that it swept the *reported* torques and not the
 *ratings* built from them.
-**Phase 4 — the optimiser.** In progress.
+**Phase 4 — the optimiser.** Done. Six findings, **five of them bugs** (F50, F52,
+F53, F62, and the two instruments F57 and F49), plus F63 and F64 on the documents
+and the derivation. Q3 answered: **the closed form is not taken**, and the
+measurement that says so is below.
 
 *Step 1, done.* The six tuned numbers are `auto::Search`, a value a gate can
 raise, and raising it showed the claim beside them **half false**: a pair's
@@ -104,8 +107,8 @@ where it was 3.2e-4. It cost eight times the time on a pair, which is F61.
 | 2 | The number ledger | **done** — gates proven |
 | 3 | Unify what is written twice | **done** |
 | 3b | The direction sweep, second half — the ratings | **done** — gate proven |
-| 4 | The optimiser | **in progress** — steps 1–3 done, gates proven; F50 closed, the closed form next |
-| 5 | Consolidate the tests | not started |
+| 4 | The optimiser | **done** — gates proven; the closed form weighed and declined, with its derivation kept |
+| 5 | Consolidate the tests | **next** |
 | 6 | Front end and payload | not started |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
@@ -129,7 +132,7 @@ Settled at the outset, recorded here so they are not re-litigated.
 |---|---|---|
 | **Q1** | Is there a compatibility contract on the wire types, the geartrain TOML, the DXF or the CLI's output? | **None.** Any such change is permitted. |
 | **Q2** | Bring `WormMemberResult` inside `GearResult`, or record why a crossed member cannot be one? | Answered **bring it inside**; the experiment showed the premise was two propositions with opposite answers, and it was re-answered **B** — `gear: Option<GearResult>`, `Some` for a crossed pair, `None` for a worm. Done. |
-| **Q3** | Assert the optimiser's convergence claim, or attempt the closed form? | **Attempt the closed form.** The learnings are worth the effort on their own; assert convergence first regardless, since that step stands alone. |
+| **Q3** | Assert the optimiser's convergence claim, or attempt the closed form? | **Attempt the closed form.** The learnings are worth the effort on their own; assert convergence first regardless, since that step stands alone. **Both done. The convergence claim was half false and is now a gate; the closed form is derived, verified, and declined** — see Phase 4. The learnings were indeed the return: four bugs came out of attempting it, none of them in the mathematics. |
 | **Q4** | Loosen the guard conventions toward true degeneracy limits, or document them as conventions? | **Loosen — cautiously.** With the caveat below, which is a constraint on the work and not a preference. |
 | **Q5** | Should a member's back-driving torque carry its *own* stage's backward efficiency? | **Yes — and the question was too narrow.** See below. |
 
@@ -263,6 +266,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F50 | The optimiser's convergence claim was half true: a set's search ran one start of six | gap | 4 | **closed** — and logged in `corrections.md` |
 | F61 | A pair pays eight times over for starts that all land on the same point | gap | 5 | open — measured, see Phase 4 |
 | F62 | The walk took no step at all on a narrow box, so the answer was the sweep's grid | gap | 4 | **closed** — and logged in `corrections.md` |
+| F63 | Three documents said the division is solved; it is searched, and the solver has no production caller | drift | 4 | **closed** — and logged in `corrections.md` |
+| F64 | `split_residual` is derived at fixed tip radii, which the default tip cap breaks | gap | 4 | **closed** — stated where it lives; the corrected rate is below |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so
@@ -1015,11 +1020,14 @@ So step 2's work is:
    shift at which the tip reaches its minimum width, and
    `addendum_for_tip_width` is already the closed-form solve for it. Cut the
    division's interval there and each piece is smooth.
-5. **Then the closed form applies, piecewise.** On a smooth piece the division's
+5. ~~Then the closed form applies, piecewise.~~ **Weighed and not taken** — see
+   below. The derivation is finished and verified; what it buys is not worth what
+   it costs.
+6. **Then the closed form applies, piecewise.** On a smooth piece the division's
    stationary condition is `contact::split_residual`, already derived and already
    bracketed by `efficient_split`. Solve each piece and take the best. **The
    division stops being searched at all.**
-6. **Ask the sum the same question.** With the division closed-form at every sum,
+7. **Ask the sum the same question.** With the division closed-form at every sum,
    the sum is one dimension against the active bound — which is what step 2 set
    out to establish, now with the reason the first attempt would have failed.
 
@@ -1031,6 +1039,51 @@ figure in the golden corpus and in `reference.md`'s five tables has to be
 explained as a *better* optimum rather than a different one — and the test for
 that is F52's row above: the answer at a given distance must equal the answer the
 free search finds at that distance.
+
+#### The closed form: finished, verified, and not taken
+
+**The premise was false.** The brief opened with *"half of the problem already
+has one: at a fixed shift sum, the stationary condition for the division is
+derived and solved directly"*, and three documents said so. It is derived and
+checked; **nothing in production calls it** (F63). A grep for the function's
+callers settles that in a second, and it survived because each document was
+checked against the other documents. It surfaced the way a false claim about
+code usually does — by trying to build on it.
+
+**And the derivation was incomplete for the shipped default** (F64). `1/sin α_a`
+is `dξ/dr_a`, how far a path end moves per millimetre of tip; turning it into a
+rate per unit *shift* wants `dr_a/dx`, which is `m` only while the addendum is a
+number somebody gave. `no_sharp_tip` is **on by default** and holds a capped tip
+at the radius where the tooth is `min_tip_width` wide. Differentiating that
+condition:
+
+```text
+dr_a/dx = 2 r_a c / (2 tan α_a − w_min/r_a),      c = 2 tan α_n / z
+```
+
+> **Verified.** Against finite differences of the tooth the stage actually
+> builds, at z = 9, 17 and 37 across the shift range: **exact to six figures in
+> both regimes**, `1.000000` uncapped and `1.000000` capped. On a nine-tooth
+> pinion the capped rate is about **0.47 m**, and it differs between the two
+> members — so the factor that used to cancel does not.
+
+Measured against a brute scan of the same interval, the existing solver behaves
+exactly as that predicts: it lands within 1e-4 of the best division wherever the
+cap is idle, and returns `None` or a third of the interval away wherever it is
+not.
+
+**Why it is not wired in.** The corrected condition supplies the *interior*
+candidates only, and the measurement says the optimum is at an **end of the
+admissible interval** about as often as inside it — 9/37 sits on its undercut
+floor from a shift sum of 0.5 to 1.1, and 17/43 on the same floor above 1.4. So
+using it means bracketing the interval's two ends, the cap's onset, and a
+stationary point per smooth piece: **five bracketed solves where a bounded
+one-dimensional search is one**, each costing a path build, for an answer already
+right to a thousandth of a module — below what the tool prints.
+
+That is Q4's caveat, met in the last place it was expected: *the relative
+complexity could multiply for little gain.* The derivation is kept, stated where
+it lives, and the documents now say what the code does.
 
 ### What the acceptance has to be
 

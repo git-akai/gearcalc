@@ -1172,14 +1172,25 @@ impl Pinned {
 /// 1.48 against 3.04 — which is the trade a designer is being handed, not one
 /// this decides for them.
 ///
-/// # Why the sum is searched and the division solved
+/// # The pair's own two directions, and both of them are searched
 ///
 /// Moving the two shifts *apart* at a fixed sum leaves the operating pressure
-/// angle where it was, so only the path's two ends move and the stationary
-/// condition is one line — [`crate::contact::split_residual`]. Moving them
-/// *together* changes the operating pressure angle, and with it the base pitch,
-/// the operating radii and both ends at once; there is no such line, so that
-/// direction is searched. Both are cheap: a trial pair is two `Tooth`s and a
+/// angle where it was, so only the path's two ends move; moving them *together*
+/// changes the operating pressure angle, and with it the base pitch, the
+/// operating radii and both ends at once. That is why the search is run in the
+/// sum and the division rather than in the two shifts — one of the two is flat,
+/// and in the shifts themselves it lies along a diagonal.
+///
+/// The division has a stationary condition in closed form
+/// ([`crate::contact::split_residual`]) and **this does not use it**, which the
+/// documents said otherwise of until it was checked. Two reasons, both recorded
+/// in `AUDIT.md`: as derived it assumes both tips move at `m` per unit shift,
+/// which `no_sharp_tip` makes false on the shipped default; and wiring the
+/// corrected form in trades a bounded one-dimensional search for five bracketed
+/// solves — the interval's two ends, the cap's onset, and a stationary point per
+/// smooth piece — which is not a saving in anything but a claim.
+///
+/// Both directions are cheap either way: a trial pair is two `Tooth`s and a
 /// path.
 ///
 /// # Errors

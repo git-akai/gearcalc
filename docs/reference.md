@@ -437,6 +437,15 @@ the division the solver returns beats every other tried; and a pair with nothing
 to tell its members apart divides evenly. Both the textbook rule alone and the
 same expression without its tip-angle weighting fail those.
 
+**It is a derived fact and not what the tool does.** The shift optimiser searches
+the division alongside the sum; nothing in production calls the solver. Two
+reasons, and [rationale.md](rationale.md#and-the-one-thing-in-the-crate-that-is-none-of-the-above)
+argues them: the expression above holds where each tip moves at `m` per unit of
+shift, which the **default** tip-width cap makes false — a capped tip moves at
+about half that, and differently on each member, so the factor stops cancelling —
+and the corrected condition supplies only the interior candidates where the
+optimum is as often at an end of the admissible interval.
+
 **What it is worth depends entirely on what the mesh feeds.** On an ordinary
 pair it is three to eight hundredths of a point — 98.32 % to 98.35 % on 17/43,
 98.08 % to 98.16 % on 13/61 — which is real and small. On a stage whose reduction
