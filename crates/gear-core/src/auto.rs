@@ -1343,31 +1343,35 @@ pub struct Search {
     /// — a thousandth of a module is finer than the tolerance any of this is
     /// ground to, and the surface is flat at that scale anyway.
     pub resolution: f64,
-    /// A ceiling on the total work, **shared across every start**.
+    /// A guard on **one walk**, so a walk that cannot converge stops rather than
+    /// running for ever.
     ///
-    /// Sliding along a curved constraint is where an unbudgeted pattern search
-    /// spends its time, and this is a cap on that sliding. It is measured, and
-    /// what the measurement says is that it is a *truncation* rather than a
-    /// guard:
+    /// # It is per walk because a pool is not a guard
     ///
-    /// - a **pair** converges well inside it — its answer is the same at ten and
-    ///   at a hundred times this, to 4e-7 — and pays for the extra in nothing
-    ///   but time, **24×** of it, which is what a keystroke does not have
-    ///   (`every_search_is_quick_enough_to_type_over`);
-    /// - an **epicyclic set** does not. At ten times this its answer stops
-    ///   moving; at this it is short by up to **3.2e-4** of `η₀`, because its
-    ///   walk is still sliding along the curve its planet's absorption draws
-    ///   when the pool runs out.
+    /// This was a pool shared across every start, and the measurement that
+    /// settled it is the plainest in the crate: a walk terminates on its own
+    /// resolution after **80 to 608** evaluations, so the first walk of six spent
+    /// the entire pool of 220 and **the other five never ran at all**. On the
+    /// shipped epicyclic set that cost the answer — the third start is the one
+    /// that finds the better ridge, and it was never reached, leaving **3.2e-4**
+    /// of `η₀` on the table.
     ///
-    /// So one number cannot serve both, and raising it is not the repair: the
-    /// set is not short of budget, it is short of a direction to climb. `AUDIT.md`
-    /// F50 carries what to do instead.
+    /// A pool is also an order dependence: which starts run is decided by how
+    /// expensive the earlier ones happened to be. Per walk, every start runs,
+    /// and the number below is a ceiling nothing reaches rather than a share
+    /// everything divides.
     ///
-    /// **Being shared is itself a defect** — a later start runs on whatever an
-    /// earlier one left, so the answer depends on the order the starts happen to
-    /// come in. It is recorded rather than fixed because dividing the pool makes
-    /// each walk shorter and the truncation worse, and multiplying it is the
-    /// 24× above.
+    /// # Why not simply a bigger pool
+    ///
+    /// Because a pool sized for the kind that needs the most is spent by the
+    /// kinds that do not: at ten times the pool a pair's search cost **24×** what
+    /// it had, which is what a keystroke does not have
+    /// (`every_search_is_quick_enough_to_type_over`). A guard per walk costs each
+    /// kind what its own walks cost and nothing more.
+    ///
+    /// **Gated rather than tuned.** `the_search_is_converged_not_budgeted`
+    /// quadruples this and demands the same answers, which is the claim a guard
+    /// makes and a truncation cannot.
     pub budget: usize,
     /// How many of the sweep's best points are walked from.
     pub starts: usize,
@@ -1385,7 +1389,7 @@ impl Search {
     pub const SHIPPED: Self = Self {
         scan: 12,
         resolution: 1e-3,
-        budget: 220,
+        budget: 2_000,
         starts: 2,
         first_step: 1.0 / 8.0,
     };
@@ -1513,14 +1517,30 @@ impl Search {
                 }
             }
         }
+        // **Dedup needs the neighbours it compares to be neighbours.** These are
+        // grid points gathered from two different rules — the sweep's best few
+        // and its outermost — so the same point arrives twice and not next to
+        // itself, which `Vec::dedup` cannot see. On the shipped epicyclic set
+        // that was one walk in six spent re-walking a point already walked.
+        // Sorted first, on the coordinates themselves, since they are exact grid
+        // values rather than anything a tolerance would have to soften.
+        starts.sort_by(|a, b| {
+            a.iter()
+                .zip(b)
+                .map(|(x, y)| x.total_cmp(y))
+                .find(|o| o.is_ne())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         starts.dedup();
 
         let mut best: Option<(Vec<f64>, f64)> = None;
-        let mut spent = 0usize;
         for from in starts {
             let Some(value) = objective(&from) else {
                 continue;
             };
+            // **Per walk, not a pool.** Shared, the first walk's cost decided how
+            // many walks there were — see [`Search::budget`].
+            let mut spent = 0usize;
             let (mut at, mut here) = (from, value);
             // **The sweep chose the region; the walk only refines inside it.** A
             // first step near the sweep's own spacing lets a walk cross into a

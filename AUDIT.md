@@ -85,10 +85,10 @@ happened to write it. It closed **F59** — three kinds, three different answers
 the same question — and moved no number anywhere, which is what makes it an
 extraction rather than a change.
 
-*F50, diagnosed.* A set's search is one-signed now but still under-searches by up
-to 3.2e-4, and the mechanism is measured rather than guessed — see below. It
-lands **once** now rather than three times, which is the reason to have done the
-extraction first.
+*F50, closed.* A set's search was running **one start of six** — the budget was a
+pool and the first walk spent it. Per walk, quadrupling the budget now moves no
+answer by a bit, and the set's spread at fourteen times the effort is **1.5e-6**
+where it was 3.2e-4. It cost eight times the time on a pair, which is F61.
 
 | Phase | What it does | State |
 |---|---|---|
@@ -97,7 +97,7 @@ extraction first.
 | 2 | The number ledger | **done** — gates proven |
 | 3 | Unify what is written twice | **done** |
 | 3b | The direction sweep, second half — the ratings | **done** — gate proven |
-| 4 | The optimiser | **in progress** — step 1 and two of step 2's items done, gates proven; F50 next |
+| 4 | The optimiser | **in progress** — steps 1–3 done, gates proven; F50 closed, the closed form next |
 | 5 | Consolidate the tests | not started |
 | 6 | Front end and payload | not started |
 
@@ -253,7 +253,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F47 | `Directional::self_locking` asks a directional question one way only | gap | 6 | open — see Phase 3b |
 | F48 | A screw mesh that transmits nothing reports no flank load | gap | 5 | open — see Phase 3b |
 | F49 | `check_golden.sh` recorded the corpus from whatever binary was on disk | drift | 3b | **closed** — and logged in `corrections.md` |
-| F50 | The optimiser's convergence claim is half true: a set's search is not converged and no budget makes it so | gap | 4 | open — measured, gated as a canary, see Phase 4 |
+| F50 | The optimiser's convergence claim was half true: a set's search ran one start of six | gap | 4 | **closed** — and logged in `corrections.md` |
+| F61 | A pair pays eight times over for starts that all land on the same point | gap | 5 | open — measured, see Phase 4 |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so
@@ -841,9 +842,55 @@ quarter-module a standard tooth leaves externally and against the two circles'
 own separation internally. **No number moved**, on any kind, which is what says
 it is an extraction.
 
-#### F50, measured: what closes the gap and what it costs
+#### F50, closed — and both diagnoses before it were wrong
 
-Four knobs, on the four sets that move most:
+Worth recording as a sequence, because the first two answers were reasoned and
+the third was measured.
+
+1. *"The set's coordinates are wrong; its walk slides along a curve."* Plausible,
+   and it is even true — but it was not what cost the answer.
+2. *"It is the budget, and raising it is not the repair because a pair pays 24×."*
+   Half right: it was the budget. The reason was not.
+3. **Logged what each walk actually spent**, and the answer was flat: *a walk
+   terminates on its own after 80 to 608 evaluations, so the first walk of six
+   spent the whole pool of 220 and the other five never ran.* The third start is
+   the one that finds the better ridge.
+
+So it was never coordinates, and never a walk that needed more room. It was a
+**multi-start search running one start** — which is also why "starts ×6" changed
+nothing, the measurement that should have said so two rounds earlier.
+
+The budget is a guard on **one walk** now. Quadrupled, it moves no answer by a
+bit — the claim a guard can make and a truncation cannot — and
+`the_search_is_converged_not_budgeted` asserts exactly that, alongside the
+weaker "everything ×3 moves less than 2e-6" for the grid and the stopping
+distance, which move both ways.
+
+| | before | after |
+|---|---|---|
+| a set's spread at ×14 effort | **3.2e-4** | **1.5e-6**, and both-signed |
+| four times the budget | recovered 3.2e-4 | moves **nothing** |
+| `shifts epicyclic` 11/18 | 97.0464 % | **97.0775 %** |
+| a pair's answer | — | unchanged, at a fifth of the guard too |
+
+**And it costs.** Every start now runs, so an optimised spur stage goes from
+0.7 ms to **8 ms** and an epicyclic set from 10 ms to **39 ms**; a three-stage
+optimised train is **46 ms**. The optimiser is off by default, so nothing pays
+this unless it was asked for, and the timing gate's ceilings were re-measured
+with the reason written beside them — 40 / 200 / 20 ms, the multiplier coming
+*down* from ten to five so the gate did not go slack while the measurement grew.
+
+**F61 is what is left of the cost.** For a pair, five of its six walks land on
+the same point; for the set, the sixth is the one that matters, and no cheap rule
+separates the two — the set's winning walk starts from a point whose sweep value
+is *below* a result another walk had already reached, so nothing can be pruned by
+value. Recorded rather than guessed at.
+
+#### The measurements, kept because two of them mislead
+
+Four knobs, on the four sets that move most — and read at the time as *the
+budget is the answer and cannot be paid for*, which was wrong in its second
+half:
 
 | | 11/18 | 13/18 | 13/17 | 24/14 |
 |---|---|---|---|---|
@@ -852,28 +899,21 @@ Four knobs, on the four sets that move most:
 | **budget ×10** | 0.970775 | 0.972382 | 0.971587 | 0.972345 |
 | everything ×3 | 0.970776 | 0.972382 | 0.971587 | 0.972345 |
 
-**More starting points buy nothing**, so it is not a basin the search is failing
-to reach — that theory is dead. **It is the budget**, and at ten times it the
-answer stops moving: the walk terminates on its own resolution and a hundredfold
-budget costs the same as tenfold. So `BUDGET` is not a guard on this kind, it is
-a **truncation** — the walk is cut off mid-climb.
+**"More starting points buy nothing"** was read as *it is not a basin*. It was
+in fact the loudest possible statement of the real fault — there were no more
+starting points, because the first walk had spent the pool — and it took a third
+round to hear it that way.
 
-**And raising it is still not the repair.** A pair converges well inside the
-current budget and pays for a bigger one in nothing but time — **24×** of it,
-which took the pair's search from 0.7 ms to 17 ms and failed
-`every_search_is_quick_enough_to_type_over`, a gate that is right to fail. One
-number cannot serve a search that converges and one that slides.
+**"It is the budget"** was right. **"And raising it is not the repair"** was
+wrong: raising the *pool* is not, because a pool sized for the kind that needs
+most is spent by the kinds that do not — 24× on a pair, failing
+`every_search_is_quick_enough_to_type_over`. Making it a guard *per walk* is,
+and it costs each kind only what its own walks cost.
 
-So the set is **not short of budget; it is short of a direction to climb.** Its
-walk zig-zags along the curve its planet's absorption draws, taking many small
-diagonal steps where one along the curve would do. That is the coordinate
-problem, now with the mechanism nailed rather than inferred.
-
-**A second defect fell out of the same measurement**, recorded on the constant:
-the budget is a pool *shared across starts*, so a later walk runs on whatever an
-earlier one left and the answer depends on the order the starts come in.
-Dividing the pool makes each walk shorter and the truncation worse; multiplying
-it is the 24×. Neither is a fix, and it stays until the sliding does.
+The lesson is the one this project already writes down and I did not follow for
+two rounds: **the cheapest instrument is the one that prints what actually
+happened.** Logging each walk's spend took one edit and settled in a single run
+what two rounds of reasoning had got backwards.
 
 ### The repair these three findings agree on
 
@@ -961,12 +1001,8 @@ So step 2's work is:
 2. ~~Give a ring an admissible shift range.~~ **Done, and the premise was
    wrong** — the range already existed; what was missing was the cutter's
    question. See F54 above.
-3. **Stop the walk sliding (F50).** It is a pattern search taking diagonal steps
-   along a curve; what it wants is a step *along the active bound*. The bound is
-   known in closed form wherever it is one of the guards, so this is a direction
-   to add to `directions` rather than a new kind of search — and it is what makes
-   the budget a guard again instead of a truncation. **Do not raise `BUDGET`:**
-   measured, that costs a pair 24× and buys it nothing.
+3. ~~Stop the walk sliding.~~ **Done, and it was not the sliding** — it was a
+   budget shared across the starts, so five of six never ran. See F50 above.
 4. **Split the box at the regime boundaries.** The addendum cap's onset is the
    shift at which the tip reaches its minimum width, and
    `addendum_for_tip_width` is already the closed-form solve for it. Cut the

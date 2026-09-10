@@ -3094,16 +3094,21 @@ mod tests {
              fixture never made the search work"
         );
 
-        // --- sets. Two free shifts tied by one centre distance, searched in the
-        // shifts themselves, so the walk slides along a curved bound instead of
-        // climbing an axis. **This is a known fault** (F50): the bound is the
-        // measured spread over the sweep below, not a claim of convergence.
+        // --- sets. Two free shifts tied by one centre distance, and the harder
+        // of the two searches: its admissible region is bounded by a curve its
+        // planet's absorption draws, so a walk slides along that curve instead
+        // of climbing an axis, and a walk that slides is a walk that costs.
         //
-        // What *is* a law is the sign. More effort searching the same set cannot
-        // lose an answer it already had, so a set may only improve — and it
-        // could not always say that: while the box was a guess the refined
-        // search came back **worse** on three of these thirty, by up to 1.1e-5,
-        // which is a search whose answer depends on where its own sweep fell.
+        // **Its budget is asked for separately**, and that is the claim worth
+        // making: quadrupled, it moves nothing *at all*. A guard says that; a
+        // truncation cannot, and this was a truncation — a pool shared across
+        // the starts, spent entire by the first of six, leaving 3.2e-4 of `η₀`
+        // unfound on the shipped set (F50, `docs/corrections.md`).
+        //
+        // What is left over is a little wider than a pair's, and it is the last
+        // step of a different grid rather than under-search: it moves **both
+        // ways** as the sweep is refined, by 5e-7 either side.
+        let settled = 2e-6;
         let mut worst_set = 0.0_f64;
         for sun in [11_u32, 13, 17, 19, 24, 31] {
             for planet in [14_u32, 17, 18, 21, 25] {
@@ -3152,23 +3157,29 @@ mod tests {
                 };
                 worst_set = worst_set.max((refined - shipped).abs());
                 assert!(
-                    refined > shipped - converged,
-                    "{sun}/{planet}: fourteen times the work came back {} worse, \
-                     so the answer is the sweep's rather than the surface's",
-                    shipped - refined
-                );
-                assert!(
-                    refined - shipped < 4e-4,
-                    "{sun}/{planet}: the set's search leaves {} on the table, \
-                     past the spread F50 records — it has got worse, not better",
+                    (refined - shipped).abs() < settled,
+                    "{sun}/{planet}: fourteen times the work moves `η₀` by {}",
                     refined - shipped
+                );
+                // ...and the budget alone, which must not move it by a bit. It
+                // is the one number here that is a guard rather than a
+                // resolution, so it is the one that can be asked for exactly.
+                let generous = eta0(set.shifts_at(&Search {
+                    budget: Search::SHIPPED.budget * 4,
+                    ..Search::SHIPPED
+                }));
+                assert_eq!(
+                    generous,
+                    Some(shipped),
+                    "{sun}/{planet}: four times the budget moves the answer, so it \
+                     is a ceiling the walk is running into rather than a guard"
                 );
             }
         }
         assert!(
-            worst_set > converged,
-            "the set's search now converges to {worst_set}, which is F50 fixed \
-             — replace this canary with the law the pairs are held to"
+            worst_set > 0.0,
+            "every set gave bit-identical answers at both efforts, so this \
+             fixture never made the search work"
         );
     }
 
@@ -4489,11 +4500,28 @@ mod tests {
     /// that runs its tests in parallel measures the machine as much as the
     /// code, so a bound near the measurement would fail on a loaded one and
     /// teach a reader to ignore it — while a bound far above it stops catching
-    /// anything. These sit roughly ten times what each search costs (0.7 ms,
-    /// 10 ms and 1.8 ms), which is loose enough for a busy machine and tight
+    /// anything. They sit at roughly five times what each search costs (8 ms,
+    /// 39 ms and 2.6 ms), which is loose enough for a busy machine and tight
     /// enough to catch the kind of regression that has actually happened here:
     /// 800 ms, 100 ms and 68 ms at various points, every time because something
     /// was built per candidate that nothing then read.
+    ///
+    /// # These went up, and why
+    ///
+    /// They were 10 / 60 / 20 ms against 0.7 / 10 / 1.8, and the first of those
+    /// measurements was of a search doing **a sixth of its own work**:
+    /// `auto::Search::budget` was a pool shared across the starts, so the first
+    /// walk spent it and the other five never ran. Per walk they all run, which
+    /// costs a pair eight times what it was paying and buys it nothing — its
+    /// answer is the same at a fifth of the guard — while it is the whole of an
+    /// epicyclic set's missing 3.2e-4.
+    ///
+    /// **A ceiling raised to fit a change needs its reason written down**, so:
+    /// the number went up because the work went up, the work went up because it
+    /// was being silently skipped, and the multiplier came *down* from ten to
+    /// five so the gate did not go slack while the measurement grew. The
+    /// optimiser is off by default, so nothing pays this unless it was asked
+    /// for.
     #[test]
     fn every_search_is_quick_enough_to_type_over() {
         let lib = library();
@@ -4517,7 +4545,7 @@ mod tests {
             optimisation: tuned,
             ..SpurStage::default()
         };
-        each("pair's", 10, &|| {
+        each("pair's", 40, &|| {
             solve_spur_stage(&pair, StageTorques::just(2.0), &lib).unwrap();
         });
 
@@ -4527,7 +4555,7 @@ mod tests {
         };
         set.sun.profile_shift = Auto::automatic(0.0);
         set.ring.profile_shift = Auto::automatic(0.0);
-        each("epicyclic set's", 60, &|| {
+        each("epicyclic set's", 200, &|| {
             solve_planetary_stage(&set, 3000.0, StageTorques::just(2.0), &lib).unwrap();
         });
 
