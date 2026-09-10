@@ -526,6 +526,14 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   but a longer moment arm: a planetary ring comes out **2.4 % higher** with
   sharing on than off. Measured, not assumed, and it is why the sharing sweep
   asserts reach rather than relief.
+- **An internal mesh's tip room is read at the pair's own zero-backlash centre
+  distance**, and the stage then assembles at that distance opened by its running
+  clearance. Opening a mesh moves the tips apart, so the reported answer is the
+  **tighter** one: a pair reported clear is clear where it runs, and a pair
+  reported fouling may have a little more room than the flag suggests. The size
+  is the clearance, 0.02 mm on the shipped proportions against tip margins of
+  degrees; the sign is stated because a search refuses on this flag and a
+  conservative refusal is still a refusal.
 - **Hardened 4340's fatigue allowable is the weakest number in the library.**
 - **A face width typed as zero describes a gear with no face**, and every
   rating taken at one is infinite. Those cross the boundary as `null` and the

@@ -3,6 +3,7 @@ import type { Backlash } from "./Backlash";
 import type { ContactRatios } from "./ContactRatios";
 import type { Directional } from "./Directional";
 import type { LoadCase } from "./LoadCase";
+import type { TipRoom } from "./TipRoom";
 
 /**
  * **What one parallel-axis mesh reports**, for any stage kind that has more
@@ -57,4 +58,9 @@ relative_radius: number,
  * Angular backlash at each member, degrees, in the order the mesh was
  * built: the pinion-side member first, then the other.
  */
-backlash: [Backlash, Backlash], };
+backlash: [Backlash, Backlash], 
+/**
+ * **Where an internal mesh's tips are**, and `None` for an external one,
+ * which has no such question.
+ */
+tips: TipRoom | null, };

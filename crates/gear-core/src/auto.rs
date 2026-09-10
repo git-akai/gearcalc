@@ -1017,9 +1017,10 @@ impl MeshTrial<'_> {
     /// What this mesh keeps, driving forward — or `None` where it is not a mesh
     /// a search may choose at all.
     ///
-    /// The three refusals are the three ways a mesh can fail to be one: a member
+    /// The four refusals are the four ways a mesh can fail to be one: a member
     /// the tool would not leave as asked, a tooth that reaches past the root
-    /// circle it runs into, and contact that does not stay continuous.
+    /// circle it runs into, a tip that fouls something it is not meshing with,
+    /// and contact that does not stay continuous.
     #[must_use]
     pub fn efficiency(&self) -> Option<f64> {
         if !self.members.iter().all(Cut::is_as_asked) {
@@ -1030,6 +1031,9 @@ impl MeshTrial<'_> {
             self.members.map(|m| m.root_radius()),
         );
         if gap.iter().any(|g| *g < 0.0) {
+            return None;
+        }
+        if !self.tips_are_clear() {
             return None;
         }
         if self.path.contact_ratio < self.min_contact_ratio {
@@ -1047,6 +1051,59 @@ impl MeshTrial<'_> {
             self.friction,
             crate::contact::Drive::Forward,
         ))
+    }
+
+    /// **Whether either tip reaches something it is not meshing with.**
+    ///
+    /// The bottoming check above asks whether a tip reaches the *root circle*
+    /// across the line of centres, which is a question about the two members'
+    /// radii and nothing else. An internal pair has three more, and they are
+    /// three because an internal mesh's two members curve the same way:
+    ///
+    /// - the pinion's tip reaching past where the ring's flank ends, into the
+    ///   fillet its shaper left (**trochoid interference**);
+    /// - the ring's tip reaching below where the pinion's flank ends, or not
+    ///   reaching its involute at all (**involute interference**);
+    /// - and the tips fouling **away from the line of action** entirely, which
+    ///   the first two cannot see: they ask what happens where the teeth mesh,
+    ///   and this asks whether two teeth try to occupy the same place somewhere
+    ///   else. It is the condition that decides small tooth differences, where
+    ///   the tip circles cross far from the line of centres and the mesh itself
+    ///   is perfectly conjugate.
+    ///
+    /// An external pair has none of them — its tip circles cross on the line of
+    /// centres or not at all — so this is not a branch on the stage kind but on
+    /// **what cut the members**, which is the same parameter [`Cut`] already
+    /// carries. `None` for an internal pair that cannot be meshed at all is a
+    /// refusal too: a search may not choose a pair whose geometry has no answer.
+    ///
+    /// # Where each kind used to ask it
+    ///
+    /// The hula stage asked the third, itself, immediately before building this
+    /// — and neither of the other two. The epicyclic set asked none of the
+    /// three, so its planet-ring mesh could be chosen fouling. That is the same
+    /// shape as the gap `MeshTrial` was extracted to close, one layer in:
+    /// *a constraint belongs to the mesh*, and a ring's tip is the mesh's
+    /// business wherever the ring is.
+    ///
+    /// The four numbers themselves are [`crate::train::TipRoom`], which is what
+    /// the mesh **reports**; this is the one bit of it a search needs, so the
+    /// reader and the constraint cannot come to different conclusions.
+    ///
+    /// # It is asked at the zero-backlash distance, which is the tighter one
+    ///
+    /// [`crate::ring::mesh_with`] solves the pair's own centre distance from its
+    /// shifts, and a stage then assembles at that distance *opened* by its
+    /// running clearance. Opening it can only move the tips apart, so a pair
+    /// that clears here clears where it runs. The bias is stated in
+    /// `docs/state.md` with the rest.
+    fn tips_are_clear(&self) -> bool {
+        let ([Cut::ByRack { tooth, .. }, Cut::ByShaper { ring }]
+        | [Cut::ByShaper { ring }, Cut::ByRack { tooth, .. }]) = self.members
+        else {
+            return true;
+        };
+        crate::train::TipRoom::of(ring, tooth).is_some_and(|t| t.clear())
     }
 }
 
@@ -1606,6 +1663,75 @@ impl Search {
 mod tests {
     use super::*;
     use crate::note::key;
+
+    /// **A search may not choose a mesh whose tips foul**, and the same pair
+    /// with a shorter ring tooth is admissible again.
+    ///
+    /// The constraint and the four numbers a reader is given come from one place
+    /// ([`crate::train::TipRoom`]), so this pins the half a search uses. Stated
+    /// as a *difference* between two rings rather than as "the shipped one is
+    /// refused": what is being claimed is that the tip room decides the answer,
+    /// and a test that only watched the full-depth pair be refused would pass if
+    /// everything were refused.
+    #[test]
+    fn a_mesh_whose_tips_foul_is_not_one_a_search_may_choose() {
+        use crate::ring::{Cutter, Ring};
+        let pinion = Tooth::new(GearParams {
+            teeth: 20,
+            ..Default::default()
+        });
+        let trial = |addendum: f64| -> (bool, Option<f64>) {
+            let ring = Ring::cut_by(
+                &GearParams {
+                    teeth: 60,
+                    addendum,
+                    ..Default::default()
+                },
+                &Cutter::default(),
+            );
+            let as_gear = Tooth::new(GearParams {
+                teeth: 60,
+                addendum,
+                ..Default::default()
+            });
+            let mesh = crate::mesh::Mesh::new(&pinion, &as_gear, crate::mesh::MeshKind::Internal)
+                .expect("a 60/20 internal pair meshes");
+            let path = crate::contact::ContactPath::new(&pinion, ring.ra, &mesh)
+                .expect("and it reaches contact");
+            let tips = crate::train::TipRoom::of(&ring, &pinion).expect("an internal mesh");
+            (
+                tips.clear(),
+                MeshTrial {
+                    members: [
+                        Cut::ByRack {
+                            tooth: &pinion,
+                            floor: None,
+                        },
+                        Cut::ByShaper { ring: &ring },
+                    ],
+                    mesh: &mesh,
+                    path: &path,
+                    min_contact_ratio: 1.0,
+                    friction: 0.08,
+                }
+                .efficiency(),
+            )
+        };
+        // Full depth: the ring's tip would have to touch the pinion inside its
+        // own base circle, and `ring.rs` records that this is what internal
+        // pairs do at full depth rather than an unlucky choice of counts.
+        let (clear, eta) = trial(1.0);
+        assert!(!clear, "a full-depth 60/20 internal pair should foul");
+        assert!(eta.is_none(), "and a search may not choose it: {eta:?}");
+        // Shortened: the same pair, admissible, and losing something sensible.
+        let (clear, eta) = trial(0.8);
+        assert!(clear, "a shorter ring tooth should clear it");
+        let eta = eta.expect("and then the mesh is one a search may choose");
+        assert!(
+            (0.9..1.0).contains(&eta),
+            "an internal pair should keep most of what it is given: {eta}"
+        );
+    }
 
     /// The tooth-count thresholds in the design document, reproduced from the
     /// formula rather than quoted. These are the numbers the control exists to

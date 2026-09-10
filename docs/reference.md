@@ -509,14 +509,21 @@ the shift is at or above the least that clears undercut, the flank is not
 undercut anyway, the tooth does not come to a point before its tip, and the root
 round asked for still fits the space — which shrinks as the shift rises, since
 the cutter bites less deep and the space narrows. A ring is not asked: its root
-and fillet are its shaper's rather than inputs of its own, and an internal
-mesh's bounds are the tip margin and the interference it reports, which belong
-to the pair rather than to one member.
+and fillet are its shaper's rather than inputs of its own, and it answers of its
+**cutter** instead — did the tool leave the shape the shift asked for.
+
+**And an internal mesh is asked three more**, which belong to the pair rather
+than to either member: the two interference conditions below and the tip margin
+beside them. They are the same three whatever is turning around the mesh, so a
+hula pair, an epicyclic set's planet-ring mesh and an ordinary internal pair are
+held to them alike — a search may not choose a mesh that fouls, and every mesh
+that has a ring in it reports what it found (`train::TipRoom`).
 
 They were once asked stage by stage, which meant a bound reached the search it
 was written in and no other: the root round bounded a pair and not an epicyclic
-set, and the hula stage was choosing a pinion nobody could cut and taking
-1.9 points of efficiency less for it.
+set, the hula stage was choosing a pinion nobody could cut and taking 1.9 points
+of efficiency less for it, and the tip room was a hula stage's row alone while
+the set with the same ring mesh in it reported nothing at all.
 
 **The first two of the four are a choice, and the other two are not.** Undercut
 is a design decision — a designer entitled to an undercut tooth is entitled to
@@ -1198,6 +1205,14 @@ Two mesh interference conditions come off the same conjugate relation, forwards
 and backwards: the ring's tip cannot touch the pinion where that would fall
 inside its base circle, and the pinion's tip cannot reach past where the ring's
 flank ends.
+
+The first of the two is the reason internal gears are not built full depth. The
+ring's tip can only touch the pinion's involute while
+`√(r_a2² − r_b2²) ≥ a sin α_w`, and a standard ring misses it — a 60-tooth ring
+on a 20-tooth pinion by 0.009 mm, and every pinion from 20 to 40 teeth by more.
+The remedy is the ring's addendum or a shift, both of which are inputs; the
+shipped epicyclic set is full depth at zero ring shift and **says so** on its
+planet-ring mesh.
 
 **A third asks a different question, and neither of those can see it.** Both of
 the above are about a tip reaching past a flank *where the teeth mesh*. The tips

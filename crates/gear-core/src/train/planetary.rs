@@ -1266,6 +1266,8 @@ pub fn solve_planetary_stage_with(
                 backlash_of(&sp_mesh, MeshSide::First),
                 backlash_of(&sp_mesh, MeshSide::Second),
             ],
+            // Sun to planet is an external mesh.
+            tips: None,
         },
         planet_ring: MeshReport {
             operating_pressure_angle: pr_mesh.alpha_w.to_degrees(),
@@ -1285,6 +1287,10 @@ pub fn solve_planetary_stage_with(
                 backlash_of(&pr_mesh, MeshSide::First),
                 backlash_of(&pr_mesh, MeshSide::Second),
             ],
+            // **And planet to ring is not**, which is the whole of what this
+            // field is for: the set has an internal mesh in it and had never
+            // been asked the three questions one answers.
+            tips: super::TipRoom::of(&ring, &planet),
         },
         equal_spacing: layout.equal_spacing,
         simultaneous_meshing: layout.simultaneous_meshing,

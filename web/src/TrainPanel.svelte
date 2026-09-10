@@ -372,6 +372,27 @@
     <small>{t("ui.train_peak_cyclic")}</small>
     <small>{m ? `ρ ${num(m.relative_radius, 3)} mm` : BLANK}</small>
   </dd>
+  <!-- **Which conditions bite, and nothing when none do.** Drawn for any mesh
+       that has an internal member and for no other — an external pair's tips
+       meet on the line of centres or not at all. It was a hula stage's row,
+       written into that stage's own form, and an epicyclic set with the very
+       same ring mesh in it said nothing; the tip margin was a second number
+       beside it saying the same thing in degrees of pinion rotation, and the
+       row that reports the finding is the one worth drawing attention to. -->
+  {#if m?.tips}
+    <dt>{t("ui.train_interference")}</dt>
+    <dd>
+      {#each [[
+        m.tips.trochoid_interference ? t("ui.train_interference_trochoid") : null,
+        m.tips.involute_interference ? t("ui.train_interference_involute") : null,
+        m.tips.tip_interference ? t("ui.train_interference_tip") : null,
+      ].filter((x) => x !== null)] as fouling (0)}
+        <span class:warn={fouling.length > 0}>
+          {fouling.join(" · ") || t("ui.train_interference_none")}
+        </span>
+      {/each}
+    </dd>
+  {/if}
 {/snippet}
 
 <!-- What a crossed-axis mesh reports, whether it was entered as a worm stage or
@@ -2198,28 +2219,6 @@
                       value: num(hres?.meshes[m].clearance_as_cut, 4),
                     })}
                   </small>
-                </dd>
-                <!-- **Which conditions bite, and nothing when none do.** The
-                     tip margin was a number beside this saying the same thing
-                     in degrees of pinion rotation — the row that reports the
-                     finding is the one worth drawing attention to. -->
-                <dt>{t("ui.train_hula_interference")}</dt>
-                <dd>
-                  {#each [[
-                    hres?.meshes[m].trochoid_interference
-                      ? t("ui.train_hula_interference_trochoid")
-                      : null,
-                    hres?.meshes[m].involute_interference
-                      ? t("ui.train_hula_interference_involute")
-                      : null,
-                    hres?.meshes[m].tip_interference
-                      ? t("ui.train_hula_interference_tip")
-                      : null,
-                  ].filter((x) => x !== null)] as fouling (0)}
-                    <span class:warn={fouling.length > 0}>
-                      {fouling.join(" · ") || t("ui.train_hula_interference_none")}
-                    </span>
-                  {/each}
                 </dd>
               </dl>
               <!-- A clamp that is about the part rather than about a box is

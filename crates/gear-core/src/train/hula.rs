@@ -255,10 +255,11 @@ pub struct HulaGear {
 
 /// One mesh of a solved stage.
 ///
-/// [`MeshReport`] is what any parallel-axis mesh reports and is the same six
-/// fields a planetary set's two meshes carry; what a hula pair adds is the room
-/// it has — the far-side gap the shift was spent on, and the three ways its
-/// teeth can foul.
+/// [`MeshReport`] is what any parallel-axis mesh reports and is the same fields
+/// a planetary set's two meshes carry — including the three ways an internal
+/// mesh's teeth can foul, which used to be declared here. What a hula pair adds
+/// is the room it has: the far-side gap the shift was spent on, which is the
+/// crank's and belongs to the arrangement.
 ///
 /// **The efficiency on the report is this pair's own, with the crank held** —
 /// what the teeth lose, and nothing about the arrangement they sit in. It is
@@ -292,17 +293,6 @@ pub struct HulaMesh {
     /// above only where a tip was clamped, and then the difference is what the
     /// clamp cost.
     pub clearance_as_cut: f64,
-    /// The pinion's tip reaches past where the ring's flank ends.
-    pub trochoid_interference: bool,
-    /// The ring's tip reaches below where the pinion's flank ends.
-    pub involute_interference: bool,
-    /// **The tips foul away from the line of action** — the condition that
-    /// decides a small tooth difference, where the tip circles cross far from
-    /// the line of centres and the mesh itself is perfectly conjugate.
-    pub tip_interference: bool,
-    /// How much room the tips have where their circles cross, as an angle of
-    /// pinion rotation, degrees. Negative is the overlap.
-    pub tip_margin: f64,
 }
 
 /// What a hula stage came to.
@@ -591,24 +581,19 @@ pub fn solve_hula_stage_with(
                 crate::auto::automatic_profile_shift(&pinion_params, pinion_params.dedendum)
             });
 
-            // A split that fouls the tips at this offset is not admissible at
-            // it — read off the pair already in hand rather than through
-            // `tip_room`, which would cut the ring a second time, and cutting a
-            // ring is the dearest thing here. The round that follows may open
-            // the crank far enough to take it, and then it is offered again on
-            // its merits.
-            if mesh_with(&ring, &pinion).is_none_or(|m| m.tip_margin < 0.0) {
-                return None;
-            }
             let mesh =
                 Mesh::new(&pinion, &Tooth::new(params(pair.ring)), MeshKind::Internal).ok()?;
             let path = ContactPath::new(&pinion, ring.ra, &mesh)?;
             // **What this arrangement contributes is the crank that assembled
-            // the mesh**, and the tip margin above, which is the pair's own
-            // bound at a held offset. What is asked of the mesh once it exists
-            // belongs to the mesh (`auto::MeshTrial`), so the pinion's four
-            // questions, the ring's one and the bottom of both spaces are the
-            // same three a pair and a set are held to.
+            // the mesh.** What is asked of the mesh once it exists belongs to
+            // the mesh (`auto::MeshTrial`): the pinion's four questions, the
+            // ring's one, the bottom of both spaces, and — since this pair is
+            // internal — the three ways its tips can foul. A split that fouls
+            // them at this offset is not admissible at it, and the round that
+            // follows may open the crank far enough to take it, at which point
+            // it is offered again on its merits. That test stood written out
+            // here, in one of its three parts, until every kind with an
+            // internal mesh in it needed the same answer.
             crate::auto::MeshTrial {
                 members: [
                     crate::auto::Cut::ByRack {
@@ -707,7 +692,10 @@ pub fn solve_hula_stage_with(
         pinion: Tooth,
         mesh: Mesh,
         path: ContactPath,
-        report: Option<crate::ring::RingMesh>,
+        /// The three ways this internal pair's teeth can foul, and the room the
+        /// third leaves — read once here off the parts already cut, because a
+        /// ring is the dearest thing in this function to build twice.
+        tips: Option<super::TipRoom>,
         /// This pair's own efficiency with the crank held: sliding, then static.
         efficiency: Directional<(f64, f64)>,
     }
@@ -738,7 +726,7 @@ pub fn solve_hula_stage_with(
             )
         });
         built_pairs.push(Pair {
-            report: mesh_with(&ring, &pinion),
+            tips: super::TipRoom::of(&ring, &pinion),
             ring,
             ring_as_gear,
             pinion,
@@ -1185,13 +1173,15 @@ pub fn solve_hula_stage_with(
                 }),
                 relative_radius: cs.relative_radius,
                 backlash: [backlash_of(MeshSide::First), backlash_of(MeshSide::Second)],
+                // Every mesh of a hula stage is internal, and the three
+                // questions that go with that are the mesh's rather than this
+                // kind's — they were four fields of `HulaMesh`'s own until an
+                // epicyclic set turned out to have the same mesh in it and to
+                // be reporting nothing.
+                tips: p.tips,
             },
             clearance: layout.clearance[index],
             clearance_as_cut: p.ring.ra - p.pinion.ra + offset,
-            trochoid_interference: p.report.as_ref().is_some_and(|m| m.trochoid_interference),
-            involute_interference: p.report.as_ref().is_some_and(|m| m.involute_interference),
-            tip_interference: p.report.as_ref().is_some_and(|m| m.tip_interference),
-            tip_margin: p.report.as_ref().map_or(0.0, |m| m.tip_margin.to_degrees()),
         });
     }
 
@@ -1551,11 +1541,12 @@ mod tests {
         let s = stage();
         let shipped = solve(&s, 100.0).unwrap();
         for mesh in &shipped.meshes {
-            assert!(!mesh.tip_interference, "margin {}", mesh.tip_margin);
+            let tips = mesh.report.tips.expect("every hula mesh is internal");
+            assert!(!tips.tip_interference, "margin {}", tips.tip_margin);
             assert!(
-                mesh.tip_margin > 0.1,
+                tips.tip_margin > 0.1,
                 "the far side should be what binds here, not the tips: {}",
-                mesh.tip_margin
+                tips.tip_margin
             );
         }
         let held = shipped.binding_mesh.expect("the gap held it open");
@@ -1572,14 +1563,18 @@ mod tests {
         let opened = solve(&tight, 100.0).unwrap();
         assert!(
             opened.offset_nominal > shipped.offset_nominal - 1e-9
-                || opened.meshes.iter().all(|m| !m.tip_interference),
+                || opened
+                    .meshes
+                    .iter()
+                    .all(|m| m.report.tips.is_some_and(|t| !t.tip_interference)),
             "the tips must be clear whatever was asked for"
         );
         for mesh in &opened.meshes {
+            let tips = mesh.report.tips.expect("every hula mesh is internal");
             assert!(
-                !mesh.tip_interference,
+                !tips.tip_interference,
                 "the offset should have opened until the tips cleared: {}",
-                mesh.tip_margin
+                tips.tip_margin
             );
             assert!(
                 mesh.clearance >= tight.clearance - 1e-9,
@@ -1590,9 +1585,12 @@ mod tests {
         }
         let binding = opened.binding_mesh.expect("something held it open");
         assert!(
-            opened.meshes[binding].tip_margin.abs() < 1e-6,
-            "the tips are what held it, so they sit at their limit: {}",
-            opened.meshes[binding].tip_margin
+            opened.meshes[binding]
+                .report
+                .tips
+                .is_some_and(|t| t.tip_margin.abs() < 1e-6),
+            "the tips are what held it, so they sit at their limit: {:?}",
+            opened.meshes[binding].report.tips
         );
     }
 

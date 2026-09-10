@@ -4,10 +4,11 @@ import type { MeshReport } from "./MeshReport";
 /**
  * One mesh of a solved stage.
  *
- * [`MeshReport`] is what any parallel-axis mesh reports and is the same six
- * fields a planetary set's two meshes carry; what a hula pair adds is the room
- * it has — the far-side gap the shift was spent on, and the three ways its
- * teeth can foul.
+ * [`MeshReport`] is what any parallel-axis mesh reports and is the same fields
+ * a planetary set's two meshes carry — including the three ways an internal
+ * mesh's teeth can foul, which used to be declared here. What a hula pair adds
+ * is the room it has: the far-side gap the shift was spent on, which is the
+ * crank's and belongs to the arrangement.
  *
  * **The efficiency on the report is this pair's own, with the crank held** —
  * what the teeth lose, and nothing about the arrangement they sit in. It is
@@ -40,23 +41,4 @@ clearance: number,
  * above only where a tip was clamped, and then the difference is what the
  * clamp cost.
  */
-clearance_as_cut: number, 
-/**
- * The pinion's tip reaches past where the ring's flank ends.
- */
-trochoid_interference: boolean, 
-/**
- * The ring's tip reaches below where the pinion's flank ends.
- */
-involute_interference: boolean, 
-/**
- * **The tips foul away from the line of action** — the condition that
- * decides a small tooth difference, where the tip circles cross far from
- * the line of centres and the mesh itself is perfectly conjugate.
- */
-tip_interference: boolean, 
-/**
- * How much room the tips have where their circles cross, as an angle of
- * pinion rotation, degrees. Negative is the overlap.
- */
-tip_margin: number, };
+clearance_as_cut: number, };

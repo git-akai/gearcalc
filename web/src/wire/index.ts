@@ -59,6 +59,7 @@ export type { SpurStage } from "./core/SpurStage";
 export type { Stage } from "./core/Stage";
 export type { StageGear } from "./core/StageGear";
 export type { StageResult } from "./core/StageResult";
+export type { TipRoom } from "./core/TipRoom";
 export type { Train } from "./core/Train";
 export type { TrainResult } from "./core/TrainResult";
 export type { Value } from "./core/Value";

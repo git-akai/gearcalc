@@ -185,6 +185,82 @@ pub struct MeshReport {
     /// Angular backlash at each member, degrees, in the order the mesh was
     /// built: the pinion-side member first, then the other.
     pub backlash: [Backlash; 2],
+    /// **Where an internal mesh's tips are**, and `None` for an external one,
+    /// which has no such question.
+    pub tips: Option<TipRoom>,
+}
+
+/// **The three ways an internal mesh's teeth can foul**, and the room the third
+/// leaves.
+///
+/// An external pair has none of them: its two members curve opposite ways, so a
+/// tip meets a flank where the teeth mesh and nowhere else, and the one question
+/// left is whether the tips bottom out — which is a radial comparison every
+/// mesh already makes ([`crate::mesh::Mesh::bottom_clearance`]). An internal
+/// pair's members curve the *same* way, and that opens three more:
+///
+/// - the pinion's tip reaching past where the ring's flank ends, into the fillet
+///   its shaper left (**trochoid**);
+/// - the ring's tip reaching below where the pinion's flank ends, or not
+///   reaching its involute at all (**involute**) — the one a **full-depth**
+///   internal pair fails as a matter of course, which is why internal gears are
+///   not built full-depth (`crate::ring::mesh_with`);
+/// - and the tips fouling **away from the line of action** entirely (**tip**),
+///   which the first two cannot see: they ask what happens where the teeth mesh,
+///   and this asks whether two teeth try to occupy the same place somewhere
+///   else. It is what decides a small tooth difference, where the tip circles
+///   cross far from the line of centres and the mesh itself is perfectly
+///   conjugate.
+///
+/// # Why it is on the mesh report
+///
+/// It was a hula stage's, in four fields of its own, and the epicyclic set with
+/// the same internal mesh in it reported nothing — so a designer was told
+/// whether the teeth foul or not according to which stage kind they had picked.
+/// The set's shipped proportions fail the involute question and had never said
+/// so. *A constraint belongs to the mesh*, and so does what it found: a ring's
+/// tip is the mesh's business wherever the ring is.
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct TipRoom {
+    /// The pinion's tip reaches past where the ring's flank ends.
+    pub trochoid_interference: bool,
+    /// The ring's tip reaches below where the pinion's flank ends.
+    pub involute_interference: bool,
+    /// The tips foul away from the line of action.
+    pub tip_interference: bool,
+    /// How much room the tips have where their circles cross, as an angle of
+    /// **pinion** rotation, degrees. Negative is the overlap, and infinite where
+    /// the tip circles do not cross at all — the ordinary case, where there is
+    /// no place for the tips to meet.
+    pub tip_margin: f64,
+}
+
+impl TipRoom {
+    /// Read off the pair, at the centre distance its own shifts give it.
+    ///
+    /// `None` where the two cannot be meshed at all, which the caller already
+    /// knows by other means — every caller here has built the mesh.
+    pub(crate) fn of(ring: &crate::ring::Ring, pinion: &crate::Tooth) -> Option<Self> {
+        crate::ring::mesh_with(ring, pinion).map(|m| Self {
+            trochoid_interference: m.trochoid_interference,
+            involute_interference: m.involute_interference,
+            tip_interference: m.tip_interference,
+            tip_margin: m.tip_margin.to_degrees(),
+        })
+    }
+
+    /// Whether anything fouls — the question a search asks, as against the four
+    /// numbers a reader is given.
+    #[must_use]
+    pub fn clear(&self) -> bool {
+        !self.trochoid_interference && !self.involute_interference && !self.tip_interference
+    }
 }
 
 impl MeshReport {
@@ -1377,6 +1453,24 @@ impl StageResult {
             Self::Planetary(r) => vec![&r.sun, &r.planet.gear, &r.ring],
             Self::Hula(r) => r.gears.iter().map(|g| &g.gear).collect(),
             Self::Worm(r) => r.members.iter().filter_map(|m| m.gear.as_ref()).collect(),
+        }
+    }
+
+    /// **Every parallel-axis mesh this stage has**, in the order it built them.
+    ///
+    /// The companion of [`Self::members`], and for the same reason: a question
+    /// about *a mesh* — is contact continuous, do the tips foul, how much play
+    /// is there — is asked of a stage by asking each of its meshes, and a walk
+    /// that names the kinds is a walk that forgets one. A pair has one, either
+    /// epicyclic kind has two, and a screw stage has **none**: its pair is not a
+    /// parallel-axis mesh and reports [`WormResult::crossed`] instead.
+    #[must_use]
+    pub fn meshes(&self) -> Vec<&MeshReport> {
+        match self {
+            Self::Spur(r) => vec![&r.mesh],
+            Self::Planetary(r) => vec![&r.sun_planet, &r.planet_ring],
+            Self::Hula(r) => r.meshes.iter().map(|m| &m.report).collect(),
+            Self::Worm(_) => Vec::new(),
         }
     }
 
@@ -3440,6 +3534,91 @@ mod tests {
     /// limit is a closed form — the patch closes to a point and the pressure with
     /// it (`crate::hertz::elliptical_contact`).
     ///
+    /// **An internal mesh is asked what an internal mesh is asked, whatever is
+    /// turning around it — and an external one is not asked it at all.**
+    ///
+    /// The three ways an internal pair's teeth can foul were four fields on a
+    /// *hula stage's* mesh row, and the epicyclic set with the same ring mesh in
+    /// it reported nothing: a designer was told whether the teeth foul according
+    /// to which stage kind they had picked. They are on [`MeshReport`] now, and
+    /// this is the walk that says every kind gets them — through
+    /// [`StageResult::meshes`], which is the same shape as `members()` and
+    /// exists so a walk cannot forget a kind by naming them.
+    ///
+    /// `None` on an external mesh is the other half of the claim, and it is not
+    /// three answers of `false`: an external pair's members curve opposite ways,
+    /// its tip circles cross on the line of centres or not at all, and the
+    /// question does not arise. *An absent thing is not a zero-length thing.*
+    #[test]
+    fn an_internal_mesh_is_asked_what_an_internal_mesh_is_asked() {
+        let lib = library();
+        // Which of each kind's meshes have a ring in them, in the order
+        // `meshes()` returns them: a pair none, a set its second, a hula both.
+        for (stage, internal) in [
+            (Stage::Spur(SpurStage::default()), vec![false]),
+            (Stage::Planetary(Box::default()), vec![false, true]),
+            (Stage::Hula(Box::default()), vec![true, true]),
+            (Stage::Worm(WormStage::default()), vec![]),
+        ] {
+            let mut train = two_stage();
+            train.stages = vec![stage];
+            let r = solve_train(&train, &lib).expect("every shipped kind solves");
+            let meshes = r.stages[0].meshes();
+            assert_eq!(
+                meshes.len(),
+                internal.len(),
+                "the walk found a different number of meshes than the kind has"
+            );
+            for (mesh, is_internal) in meshes.iter().zip(&internal) {
+                assert_eq!(
+                    mesh.tips.is_some(),
+                    *is_internal,
+                    "tip room is an internal mesh's question and only an internal mesh's"
+                );
+            }
+        }
+    }
+
+    /// **A full-depth internal pair interferes, and a shipped epicyclic set is
+    /// one.**
+    ///
+    /// `ring::mesh_with` has said so since it existed — the ring's tip can only
+    /// touch the pinion's involute while `√(r_a2² − r_b2²) ≥ a sin α_w`, and a
+    /// standard ring misses it — but nothing ever put the question to a *set*,
+    /// whose default ring is full-depth at zero shift. So the answer here is
+    /// `true`, and it is asserted rather than fixed: it is a statement about
+    /// what the shipped proportions are, and the remedy is the ring's addendum,
+    /// which is an input.
+    ///
+    /// Both halves are pinned, because a canary that only says "it interferes"
+    /// would pass if every set interfered for a new reason. Shortening the ring
+    /// clears it, which is the same remedy `ring.rs` records and is where the
+    /// rule of thumb about internal tooth differences comes from.
+    #[test]
+    fn a_shipped_sets_full_depth_ring_interferes_and_a_shorter_tooth_clears_it() {
+        let lib = library();
+        let solved = |addendum: f64| {
+            let mut set = PlanetaryStage::default();
+            set.ring.addendum = addendum;
+            crate::train::solve_planetary_stage(&set, 3000.0, StageTorques::just(2.0), &lib)
+                .expect("the shipped set solves")
+        };
+        let full = solved(1.0).planet_ring.tips.expect("an internal mesh");
+        assert!(
+            full.involute_interference,
+            "a full-depth ring should interfere: {full:?}"
+        );
+        assert!(
+            !full.trochoid_interference && !full.tip_interference,
+            "and it should be the involute one alone that bites: {full:?}"
+        );
+        let short = solved(0.75).planet_ring.tips.expect("an internal mesh");
+        assert!(
+            short.clear(),
+            "shortening the ring's tooth should clear it: {short:?}"
+        );
+    }
+
     /// Asserted on every kind rather than on the one that failed, since what is
     /// being claimed is a property of the tool and not a patch to a stage.
     #[test]

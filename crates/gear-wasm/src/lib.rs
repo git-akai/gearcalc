@@ -2110,6 +2110,13 @@ mod tests {
         "pointed",
         // A material value with nothing to say beyond its number.
         "note",
+        // An **external** mesh's tips meet on the line of centres or not at
+        // all, so the three ways an internal mesh's teeth can foul are not
+        // three answers of `false` there — they are questions that do not
+        // arise. `docs/corrections.md#an-absent-thing-is-not-a-zero-length-thing`
+        // is the rule; a spur pair and an epicyclic set's sun-planet mesh are
+        // where it is met.
+        "tips",
         // A worm stage's members are not gears: a worm is a thread and its
         // wheel is the envelope of one, so a profile shift and a buildable
         // range are questions that cannot be put to them. A crossed *gear*

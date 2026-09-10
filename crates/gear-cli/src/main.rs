@@ -481,10 +481,10 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
             "    backlash {:.5} / {:.5} deg   interference: trochoid {}  involute {}  tip {} ({:+.4} deg)",
             mesh.report.backlash[0].nominal,
             mesh.report.backlash[1].nominal,
-            mesh.trochoid_interference,
-            mesh.involute_interference,
-            mesh.tip_interference,
-            mesh.tip_margin
+            mesh.report.tips.is_some_and(|t| t.trochoid_interference),
+            mesh.report.tips.is_some_and(|t| t.involute_interference),
+            mesh.report.tips.is_some_and(|t| t.tip_interference),
+            mesh.report.tips.map_or(0.0, |t| t.tip_margin)
         );
         // What the teeth are worth, which a stage of this kind needs as much as
         // the geometry: the reduction multiplies the mesh loss, and it multiplies
@@ -837,9 +837,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                     };
                     let admissible = r.meshes.iter().all(|m| {
                         m.report.contact_ratios.transverse >= 1.0
-                            && !m.tip_interference
-                            && !m.trochoid_interference
-                            && !m.involute_interference
+                            && m.report.tips.is_some_and(|t| t.clear())
                     }) && r.gears.iter().all(|g| g.gear.as_asked());
                     if !admissible {
                         continue;
@@ -958,8 +956,8 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
             result.gears[pinion_i].gear.profile_shift,
             m.clearance,
             m.report.operating_pressure_angle,
-            m.tip_interference,
-            m.tip_margin
+            m.report.tips.is_some_and(|t| t.tip_interference),
+            m.report.tips.map_or(0.0, |t| t.tip_margin)
         ),
     );
 }
@@ -2715,6 +2713,23 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                             r.planet_clearance
                                 .map_or_else(|| "n/a".into(), |g| format!("{g:.3} mm"))
                         );
+                        // **The internal mesh, asked what an internal mesh is
+                        // asked.** A set never put the question until the tip
+                        // room moved onto the mesh report, and a full-depth ring
+                        // fails one of the three as a matter of course — so this
+                        // is the row that puts it in the corpus. Its counterpart
+                        // for the sun-planet mesh is `None` and is not printed:
+                        // an external pair has no such question.
+                        if let Some(tips) = r.planet_ring.tips {
+                            println!(
+                                "planet-ring interference  trochoid {}  involute {}  \
+                                 tip {} ({:+.4} deg of pinion)",
+                                tips.trochoid_interference,
+                                tips.involute_interference,
+                                tips.tip_interference,
+                                tips.tip_margin
+                            );
+                        }
                         println!(
                             "sigma_H at pitch  sun-planet {:.1} MPa   planet-ring {:.1} MPa",
                             r.sun_planet.contact_stress_at_pitch_point.peak,

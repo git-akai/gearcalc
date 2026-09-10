@@ -740,6 +740,9 @@ pub fn solve_spur_stage_with(
             // `MeshReport::backlash_by_drive` is the one place that turns into
             // the per-direction reading a stage reports.
             backlash,
+            // A parallel-axis pair is external: its tips meet on the line of
+            // centres or not at all, which `bottom_clearance` already asks.
+            tips: None,
         },
         gears: [gears[0].clone(), gears[1].clone()],
         notes,
