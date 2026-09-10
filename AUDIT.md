@@ -85,6 +85,13 @@ happened to write it. It closed **F59** — three kinds, three different answers
 the same question — and moved no number anywhere, which is what makes it an
 extraction rather than a change.
 
+*F62, closed.* The walk took **no step at all** whenever the box was narrower
+than about eight thousandths of a module — its first step fell below its own
+stopping distance, so the loop never ran and the answer was the best of thirteen
+grid points. That is the given-centre-distance path, and it cost up to 3.6e-5.
+Gated against a scan of the same interval, which shares no step, no direction
+and no budget with the walk.
+
 *F50, closed.* A set's search was running **one start of six** — the budget was a
 pool and the first walk spent it. Per walk, quadrupling the budget now moves no
 answer by a bit, and the set's spread at fourteen times the effort is **1.5e-6**
@@ -110,7 +117,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 557 tests** (was 531). **Golden corpus: 26 cases** (was 22).
+**Suite: 558 tests** (was 531). **Golden corpus: 26 cases** (was 22).
 
 ---
 
@@ -255,6 +262,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F49 | `check_golden.sh` recorded the corpus from whatever binary was on disk | drift | 3b | **closed** — and logged in `corrections.md` |
 | F50 | The optimiser's convergence claim was half true: a set's search ran one start of six | gap | 4 | **closed** — and logged in `corrections.md` |
 | F61 | A pair pays eight times over for starts that all land on the same point | gap | 5 | open — measured, see Phase 4 |
+| F62 | The walk took no step at all on a narrow box, so the answer was the sweep's grid | gap | 4 | **closed** — and logged in `corrections.md` |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so

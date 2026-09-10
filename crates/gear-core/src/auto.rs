@@ -1547,8 +1547,18 @@ impl Search {
             // neighbouring basin on a marginal improvement and then settle there,
             // which on 9/37 costs the summit — so it starts well below that spacing
             // and climbs the ridge it was put on.
-            let mut step = spacing * first_step;
-            while step > resolution && spent < budget {
+            //
+            // **...but never below the distance it stops at**, or it stops before
+            // it starts: `step > resolution` is false before the body runs and
+            // the walk is a no-op, leaving the sweep's grid point unrefined. That
+            // happens whenever the box is narrow — a fraction of a module wide,
+            // which is exactly what pinning a centre distance leaves — and it is
+            // where this search was quietly a thirteen-point grid. On 9/37 at a
+            // shift sum of 0.56 the optimum sits four ten-thousandths above the
+            // undercut floor, between two of those points, and the grid cannot
+            // see it (`docs/corrections.md`).
+            let mut step = (spacing * first_step).max(resolution);
+            while step >= resolution && spent < budget {
                 // Every direction is tried from the *same* point and the best taken,
                 // rather than the first that happens to improve: otherwise the step
                 // a direction is judged by depends on which came before it, and the

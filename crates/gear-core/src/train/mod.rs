@@ -2703,6 +2703,122 @@ mod tests {
         assert!(checked >= 6, "only {checked} members carried the load");
     }
 
+    /// **The search refines what its sweep found, and a narrow box does not stop
+    /// it.**
+    ///
+    /// Checked against a scan of the same admissible interval at the search's own
+    /// stopping distance — an instrument that shares no step, no direction and no
+    /// budget with the walk, which is the kind of check this repository trusts.
+    ///
+    /// **The fault it is for.** The walk's first step is a fraction of the
+    /// sweep's spacing, and the sweep's spacing is a fraction of the *box*. Pin a
+    /// centre distance and the box is a fraction of a module wide, at which point
+    /// that first step falls **below the distance the walk stops at** — so
+    /// `step > resolution` was false before the body ran, the walk took no step
+    /// at all, and the answer was the best of thirteen grid points. On 9/37 at a
+    /// shift sum of 0.56 the optimum sits four ten-thousandths above the undercut
+    /// floor, between two of them: **3.6e-5** of efficiency, on the path a given
+    /// centre distance takes.
+    ///
+    /// The tolerance is the resolution's own worth. Near the floor the efficiency
+    /// moves by a few parts in a million across one thousandth of a module, and
+    /// no search that stops there can do better — which is a statement about the
+    /// stopping distance rather than about the walk.
+    #[test]
+    fn the_search_beats_a_scan_of_the_same_interval() {
+        use crate::auto::{Bounds, Pinned, Search};
+        let lib = library();
+        let mut worst = 0.0_f64;
+        for teeth in [[9_u32, 37], [12, 29]] {
+            let stage = SpurStage {
+                gears: [0, 1].map(|i| StageGear {
+                    teeth: teeth[i],
+                    ..SpurStage::default().gears[i].clone()
+                }),
+                optimisation: Optimisation {
+                    enabled: true,
+                    ..Optimisation::default()
+                },
+                ..SpurStage::default()
+            };
+            let asked = [0, 1].map(|i| stage.gears[i].shift_asked(&stage.base_params(i)));
+            let bounds = Bounds {
+                floor: asked.map(|a| a.search_floor),
+                min_contact_ratio: stage.optimisation.min_contact_ratio,
+                clearance: stage.clearance_taken(),
+            };
+            let pair = |q: [f64; 2]| [0, 1].map(|i| stage.params_at(i, q[i]));
+            // The stage's own answer at a shift pair, and `None` where the pair
+            // is one no search may choose — asked of the search itself with both
+            // shifts pinned, so the scan and the walk agree about what is
+            // admissible and differ only in how they look.
+            let at = |x: [f64; 2]| {
+                crate::auto::shifts_for_efficiency(
+                    &pair,
+                    crate::mesh::MeshKind::External,
+                    &bounds,
+                    &Pinned {
+                        shift: [Some(x[0]), Some(x[1])],
+                        sum: None,
+                    },
+                    stage.sliding_friction,
+                    &Search::SHIPPED,
+                )?;
+                let fixed = SpurStage {
+                    gears: [0, 1].map(|i| StageGear {
+                        profile_shift: Auto::fixed(x[i]),
+                        ..stage.gears[i].clone()
+                    }),
+                    optimisation: Optimisation::default(),
+                    ..stage.clone()
+                };
+                solve_spur_stage(&fixed, StageTorques::just(2.0), &lib)
+                    .ok()
+                    .map(|r| r.mesh.efficiency.forward)
+            };
+
+            for k in 0..=8 {
+                let sum = 0.5 + f64::from(k) * 0.075;
+                let found = crate::auto::shifts_for_efficiency(
+                    &pair,
+                    crate::mesh::MeshKind::External,
+                    &bounds,
+                    &Pinned {
+                        shift: [None, None],
+                        sum: Some(sum),
+                    },
+                    stage.sliding_friction,
+                    &Search::SHIPPED,
+                )
+                .and_then(at);
+                // The scan, over the whole interval either shift could take, at
+                // the step the walk stops at.
+                let mut best: Option<f64> = None;
+                let mut x0 = -0.5;
+                while x0 < 1.5 {
+                    if let Some(e) = at([x0, sum - x0]) {
+                        best = Some(best.map_or(e, |b: f64| b.max(e)));
+                    }
+                    x0 += Search::SHIPPED.resolution;
+                }
+                let (Some(found), Some(best)) = (found, best) else {
+                    continue;
+                };
+                worst = worst.max(best - found);
+                assert!(
+                    best - found < 1e-5,
+                    "{teeth:?} at a shift sum of {sum}: the search keeps {found} \
+                     where a scan of the same interval finds {best}"
+                );
+            }
+        }
+        assert!(
+            worst > 0.0,
+            "the scan never beat the search anywhere, so it is not measuring what \
+             it is meant to"
+        );
+    }
+
     /// **Every kind that searches asks the same of its meshes.**
     ///
     /// A constraint belongs to the mesh, not to the arrangement around it: a
