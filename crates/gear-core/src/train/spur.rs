@@ -294,9 +294,6 @@ impl SpurStage {
         let asked = [0, 1].map(|i| self.gears[i].shift_asked(&self.base_params(i)));
         let floor = asked.map(|a| a.search_floor);
         let given = asked.map(|a| a.given);
-        if !self.optimisation.enabled {
-            return asked.map(|a| a.settled);
-        }
         let sum = (!self.centre_distance.auto)
             .then(|| {
                 let rack = crate::plane::BasicRack::new(
@@ -314,6 +311,39 @@ impl SpurStage {
                 )
             })
             .flatten();
+
+        // **What the constraints alone imply**, with no objective involved.
+        //
+        // A given centre distance fixes the shift *sum*; what it leaves
+        // undecided is the division, and with nothing to optimise that follows a
+        // stated rule ([`crate::auto::divide_shift_sum`]) rather than a search.
+        // A shift a designer *gave* is never one of the numbers being chosen: it
+        // stands, and the other member absorbs the whole of the rest.
+        //
+        // `None` where no distance was given — there is then nothing to place —
+        // or where no admissible pair of shifts reaches it, which is F55.
+        let constrained = || -> Option<[f64; 2]> {
+            let sum = sum?;
+            match given {
+                [Some(a), Some(b)] => Some([a, b]),
+                [Some(a), None] => Some([a, sum - a]),
+                [None, Some(b)] => Some([sum - b, b]),
+                [None, None] => {
+                    crate::auto::divide_shift_sum(&|i, x| self.params_at(i, x), 1.0, sum, floor)
+                }
+            }
+        };
+
+        // **A given centre distance is a constraint whether or not anything is
+        // being optimised.** It used to be read only on the optimiser's path, so
+        // the plainest thing a designer does — type a housing distance with
+        // nothing asked to move — returned the undercut floor and ran at
+        // whatever distance that happened to make. Mode 3 of the clearance
+        // paradigm (`docs/reference.md#which-of-the-three-numbers-is-given-and-which-follows`) is the
+        // rule: the distance and the clearance are given, so the shifts follow.
+        if !self.optimisation.enabled {
+            return constrained().unwrap_or_else(|| asked.map(|a| a.settled));
+        }
         crate::auto::shifts_for_efficiency(
             &|x| [0, 1].map(|i| self.params_at(i, x[i])),
             crate::mesh::MeshKind::External,
@@ -326,6 +356,19 @@ impl SpurStage {
             self.sliding_friction,
             search,
         )
+        // **Failing to optimise must not abandon a constraint.** The search has
+        // its own conditions — a minimum contact ratio, a tool that leaves the
+        // members alone — and where none of the candidates meets them it returns
+        // nothing. Falling back to `settled` then threw away the *centre
+        // distance* along with the optimisation, so a pair told to run at
+        // 23.6866 mm with 0.2 of clearance ran at 23.6433 instead, and said so
+        // only through a clearance readout nobody was watching.
+        //
+        // The objective is the thing being given up; the constraints are not.
+        // So the fallback is what the constraints alone imply, and only where
+        // *that* has no answer does the stage fall back to what it would have
+        // built unasked.
+        .or_else(constrained)
         .unwrap_or_else(|| asked.map(|a| a.settled))
     }
 

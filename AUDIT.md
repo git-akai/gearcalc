@@ -102,7 +102,16 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
-**Phase 6 — the front end and the payload.** In progress. **F47 closed**, and
+**Phase 6 — the front end and the payload.** In progress. **F39's item 2 done**
+— mode 3 of the clearance paradigm now holds with the optimiser *off*, which is
+the plainest thing a designer does and was returning the undercut floor
+regardless of the distance typed. The division rule is the even split projected
+onto what each member can be cut at, and it found **F75** on the way: the
+optimiser's fallback was discarding the centre distance along with the
+optimisation. The toggle model that answers item 4 is specified below and is
+wider than F39.
+
+**F47 closed**, and
 the half of it that was not in the finding is the *threshold*: a pair's locking
 friction was quoted for one direction only, so a forward-locked pair was told a
 number about the direction it could drive in. Both are now closed form and the
@@ -338,7 +347,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F36 | `SpurResult` re-declared `MeshReport`'s seven fields, and the panel re-drew them | gap | 3 | **closed** |
 | F37 | A given crank offset was not the offset the stage ran at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F38 | The reported clearance was the input echoed, not the gap run at | gap | 3 | **closed** — and logged in `corrections.md` |
-| F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | open — scheduled, see above |
+| F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | **part closed** — mode 3 works with the optimiser off (item 2, the largest); items 1, 3 and 4 open, and item 4 now has its answer |
+| F75 | The optimiser's fallback discarded the *centre distance* along with the optimisation whenever its own constraints admitted nothing | **gap** | 6 | **closed** — the fallback is what the constraints imply, not what the stage would build unasked |
 | F40 | The tolerance band was built four times and its direction asserted nowhere | gap | 3 | **closed** |
 | F33 | A crossed pair's members said nothing about their own teeth | gap | 3 | **closed** — and logged in `corrections.md` |
 | F42 | A locked mesh reported a torque on the shaft it delivers nothing to | gap | 3b | **closed** — and logged in `corrections.md` |
@@ -1826,6 +1836,124 @@ the whole of what this finding was about.
 > directions fails two tests; making `locking_friction` return the backward
 > value for both fails the same two. Each was written against the fault and run
 > against it.
+
+### F39, item 2 — mode 3 without the optimiser
+
+**The paradigm's own words:** a centre distance is the true distance and a
+clearance says what portion of it is clearance, so any two of {distance,
+clearance, shifts} are given and the third follows. Mode 3 is *the distance and
+the clearance are given, so the shifts follow*, and the audit called it "the
+largest of the four and the only one that moves an answer".
+
+**It held only with the optimiser on.** `SpurStage::shifts_at` returned
+`asked.settled` — the undercut floor — before ever looking at the centre
+distance. So the plainest thing a designer does, type a housing distance with
+nothing asked to move, ran the pair at whatever distance the floor happened to
+make and reported the shortfall as clearance.
+
+**The division rule, which is the part the constraint leaves open.** The sum is
+fixed in closed form; the division is not, and with no objective to search
+against it needs a stated rule. The rule, given by the tool's designer and
+implemented as `auto::divide_shift_sum`:
+
+> the even split, projected onto what each member can be cut at.
+
+Written as one projection rather than as three cases — gear 1's admissible
+contribution is `[max(lo₁, sum−hi₂), min(hi₁, sum−lo₂)]` and the answer is
+`sum/2` clamped into it. An **empty** interval is the honest "no admissible pair
+reaches this distance". A ring is the same expression with `sign` doing the work.
+
+What that *does* is the behaviour a designer describes, and it falls out rather
+than being coded:
+
+| 9/37, distance opened from nominal | x₁ | x₂ |
+|---|---|---|
+| at the floor sum | 0.4736 | 0.0000 |
+| opening — **the pinion cannot move**, the wheel absorbs | 0.4736 | 0.0265 |
+| level, and from here they rise together | 0.5298 | 0.5298 |
+| further out | 0.8348 | 0.8348 |
+
+**The two paths agree about the sum and differ only in the division**, which is
+the strongest available check that the constraint is being honoured identically
+by a search and by a rule that share no code:
+
+| a mm | optimiser off | optimiser on |
+|---|---|---|
+| 23.4866 | 97.568 % | 97.568 % |
+| 23.9532 | 97.634 % | 97.645 % |
+| 24.4199 | 97.706 % | 97.706 % |
+
+The optimiser is better or equal everywhere, as it must be, by at most **0.011
+points** — so the even division is a *good* answer and not merely a defined one.
+
+**And the old answer was worse than it looked.** At 24.4199 mm the pair ran at a
+transverse contact ratio of **0.5711** — below one, so not in continuous contact
+at all — because the shifts were the floor's and the distance was 0.43 mm wider
+than they reached. It is 1.2505 now.
+
+#### The fallback was discarding a constraint
+
+Found by the new test failing on the path it was not written for. With a
+clearance of 0.20 the optimiser's own conditions admit nothing — its minimum
+contact ratio bites at the wider operating distance — and it returned `None`,
+whereupon `shifts_at` fell back to `asked.settled` and **threw away the centre
+distance along with the optimisation**. A pair told to run at 23.6866 mm ran at
+23.6433 and said so only through a clearance readout of 0.2433.
+
+The objective and the constraints are not the same kind of thing. Failing to
+optimise gives up the objective; it must not give up a constraint. The fallback
+is `constrained()` — the same mode-3 placement the non-optimising path uses — and
+only where *that* has no answer does the stage fall back to what it would have
+built unasked. One statement of "what the constraints alone imply", used twice.
+
+> **Gates, run — four, each against its own fault.** Reverting the
+> optimiser-off path to `asked.settled` fails the mode-3 law; removing
+> `.or_else(constrained)` fails it too; replacing the clamped even split with the
+> interval's low end fails both division tests; and dropping the clamp so the
+> even split ignores the floors fails both as well.
+>
+> The third of those is why the division has tests at all: the first version of
+> the mode-3 law asserted only the **sum**, which is division-independent by
+> construction, and the "not the even split" mutation passed against it silently.
+> *A law that cannot see the rule it is about is not a gate on that rule.*
+
+The division is checked against a **scan** of the same interval that shares no
+bound, no midpoint and no clamp with the projection, plus the 9/37 narrative
+above stated as three claims that never mention a formula.
+
+**Still open in F39:** the `Auto<f64>` clearance (item 1), a planetary centre
+distance (item 3), and the worm's absorber (item 4) — which now has an answer,
+recorded below.
+
+### The toggle model, as specified
+
+Answering F39's item 4 produced a general rule that is wider than the item, and
+it is recorded here because it governs the remaining work:
+
+> The under/over-constrained state should be considered a **failure** —
+> the toggles automatically resolve it. Toggles should all behave in a similar,
+> consistent priority or order regardless of mesh type, when being automatically
+> flipped, without keeping track of the order they were touched in.
+
+Concretely, for a parallel pair: both shifts given plus a given distance is
+over-constrained, and the *distance* toggle returns to automatic; one shift given
+means that one stands and the other absorbs the whole sum; neither given is the
+projection above. The `no undercut` toggle is what puts a floor under a member,
+and with it off the member keeps absorbing until a geometric limit — a severed
+tooth — stops it.
+
+**This is currently three functions in TypeScript**, one per stage kind
+(`relieveSpur`, `relievePlanetary`, `relieveHula` in `TrainPanel.svelte`), which
+is both a rule-1 violation and the per-kind duplication rule 4 exists to catch.
+Unifying it in Rust is the natural home for F16's remaining half.
+
+For the **worm**, the specification is: the worm's pitch diameter gains an
+automatic toggle that participates in the same relief; and ideally the wheel
+gains the helical member's inputs it is currently denied (addendum, dedendum,
+profile shift) with an automatic shift that absorbs the distance *in preference
+to* the diameter. That wants an interference check — worm tip to flank, flank to
+undercut junction — which if closed form is worth having for every mesh kind and
+not only this one.
 
 ### F72 — nothing had ever executed the payload
 

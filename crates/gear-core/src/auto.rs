@@ -791,6 +791,81 @@ pub fn searchable_shift(at: &dyn Fn(f64) -> GearParams, floor: Option<f64>) -> O
     (lo < ceiling).then_some((lo, ceiling))
 }
 
+/// **The two shifts a given centre distance implies, divided as evenly as the
+/// members allow.**
+///
+/// A centre distance fixes the *sum* and says nothing about the division. With
+/// the optimiser on, the division is what `shifts_for_efficiency` searches over.
+/// With it off there is no objective to search against, and the stage still has
+/// to answer — so the division follows a stated rule instead.
+///
+/// # The rule: the even split, projected onto what the members can be cut at
+///
+/// Each member contributes to the sum — `x₁` and `sign · x₂`, so a ring is the
+/// same expression — and the even split gives each half. Where that lands
+/// outside a member's own interval it is pushed back in, and the other member
+/// absorbs the difference. Written as one projection rather than as a walk:
+/// gear 1's admissible contribution is
+///
+/// ```text
+/// [max(lo₁, sum − hi₂),  min(hi₁, sum − lo₂)]
+/// ```
+///
+/// — its own interval intersected with what leaves the other inside its own —
+/// and the answer is `sum/2` clamped into that. An **empty** interval is the
+/// honest "no admissible pair of shifts reaches this distance", which is a
+/// refusal rather than a clamp because the input describes no shape.
+///
+/// # What it does, read on a 9/37 pair
+///
+/// The nine-tooth pinion needs about 0.47 modules to clear undercut and the
+/// thirty-seven wants none, so at the nominal distance they sit at 0.47 and 0.
+/// Open the distance and the *pinion cannot move* — it is against its floor —
+/// so the wheel takes all of it, until the two are level and from there they
+/// rise together. Close it instead and the wheel gives the shift back alone,
+/// until it reaches its own floor and there is nothing left to give.
+///
+/// That is the behaviour a designer describes, and it falls out of the
+/// projection rather than being coded as three cases.
+///
+/// # The interval is `searchable_shift`'s, not `admissible_profile_shift`'s
+///
+/// These are shifts the tool chooses, not shifts a designer typed, so the
+/// narrower question applies: *could this member be cut as specified?* — see
+/// [`searchable_shift`], which is also where the caller's undercut floor enters.
+#[must_use]
+pub fn divide_shift_sum(
+    at: &dyn Fn(usize, f64) -> GearParams,
+    sign: f64,
+    sum: f64,
+    floor: [Option<f64>; 2],
+) -> Option<[f64; 2]> {
+    // Each member's interval, as a **contribution** to the sum. A negative
+    // `sign` maps gear 2's interval through a reflection, which reverses it.
+    let contribution = |i: usize| -> Option<(f64, f64)> {
+        let (lo, hi) = searchable_shift(&|x| at(i, x), floor[i])?;
+        let k = if i == 0 { 1.0 } else { sign };
+        Some(if k >= 0.0 {
+            (lo * k, hi * k)
+        } else {
+            (hi * k, lo * k)
+        })
+    };
+    let (lo1, hi1) = contribution(0)?;
+    let (lo2, hi2) = contribution(1)?;
+
+    let lo = lo1.max(sum - hi2);
+    let hi = hi1.min(sum - lo2);
+    // A **positive** test, so a NaN anywhere upstream reads as "no interval"
+    // rather than as an empty one that happens to compare false — the same
+    // reason `Screw::new` guards with predicates rather than with negations.
+    if lo <= hi {
+        let c1 = (sum / 2.0).clamp(lo, hi);
+        return Some([c1, (sum - c1) / sign]);
+    }
+    None
+}
+
 /// **Which of a fixed set of numbers a search still has to choose.**
 ///
 /// A stage hands its searcher some numbers already decided and some not, and
@@ -1663,6 +1738,147 @@ impl Search {
 mod tests {
     use super::*;
     use crate::note::key;
+
+    /// **The division is the evenest one the members allow** — checked against
+    /// a scan that shares none of its arithmetic.
+    ///
+    /// [`divide_shift_sum`] answers by projection: it intersects two intervals
+    /// and clamps the midpoint into the result. The property that is *meant* is
+    /// "as even as the members allow", and those are only the same thing if the
+    /// projection is right — so this asks a brute scan of the same interval
+    /// which point minimises the spread, and requires the two to agree.
+    ///
+    /// A scan is the right instrument here rather than a second formula: it
+    /// shares no bound, no midpoint and no clamp with the thing it checks.
+    #[test]
+    fn the_shift_sum_is_divided_as_evenly_as_the_members_allow() {
+        let pair = |z1: u32, z2: u32| {
+            move |i: usize, x: f64| GearParams {
+                teeth: if i == 0 { z1 } else { z2 },
+                profile_shift: x,
+                ..Default::default()
+            }
+        };
+        let mut checked = 0u32;
+        for (z1, z2) in [(9u32, 37u32), (17, 43), (13, 13), (20, 31)] {
+            let at = pair(z1, z2);
+            // The floors a stage would hand it: the undercut shift on each.
+            let floor = [0, 1].map(|i| {
+                let p = at(i, 0.0);
+                Some(automatic_profile_shift(&p, p.dedendum))
+            });
+            for step in 0..24 {
+                let sum = -0.4 + 0.12 * f64::from(step);
+                let Some(got) = divide_shift_sum(&at, 1.0, sum, floor) else {
+                    continue;
+                };
+                checked += 1;
+
+                assert!(
+                    (got[0] + got[1] - sum).abs() < 1e-9,
+                    "{z1}/{z2} sum {sum}: {got:?} does not add up"
+                );
+
+                // The independent answer: scan the interval and keep the point
+                // with the least spread among the ones that are admissible.
+                let (lo0, hi0) = searchable_shift(&|x| at(0, x), floor[0]).unwrap();
+                let (lo1, hi1) = searchable_shift(&|x| at(1, x), floor[1]).unwrap();
+                let mut best: Option<(f64, f64)> = None;
+                const N: u32 = 20_000;
+                for k in 0..=N {
+                    let x0 = lo0 + (hi0 - lo0) * f64::from(k) / f64::from(N);
+                    let x1 = sum - x0;
+                    if x1 < lo1 || x1 > hi1 {
+                        continue;
+                    }
+                    let spread = (x0 - x1).abs();
+                    if best.is_none_or(|(b, _)| spread < b) {
+                        best = Some((spread, x0));
+                    }
+                }
+                let (_, scanned) = best.expect("the projection found a point, so the scan must");
+                // One scan step of the wider interval, which is what a grid can
+                // resolve — the claim is the location, not the resolution.
+                let step0 = (hi0 - lo0) / f64::from(N);
+                assert!(
+                    (got[0] - scanned).abs() <= 2.0 * step0,
+                    "{z1}/{z2} sum {sum}: projected {} but the evenest is {scanned}",
+                    got[0]
+                );
+            }
+        }
+        assert!(checked >= 40, "only {checked} sums had an answer");
+    }
+
+    /// **What that rule does on a pair whose members differ**, stated as the
+    /// behaviour a designer sees rather than as a formula.
+    ///
+    /// A nine-tooth pinion needs about 0.47 modules to clear undercut and a
+    /// thirty-seven-tooth wheel needs none. So as a centre distance is opened
+    /// from nominal the pinion **cannot move** — it is against its floor — and
+    /// the wheel takes all of it, until the two are level and from there they
+    /// rise together. Three claims, none of which mentions the projection.
+    #[test]
+    fn the_member_at_its_floor_stays_there_until_the_other_catches_up() {
+        let at = |i: usize, x: f64| GearParams {
+            teeth: if i == 0 { 9 } else { 37 },
+            profile_shift: x,
+            ..Default::default()
+        };
+        let floor = [0, 1].map(|i| {
+            let p = at(i, 0.0);
+            Some(automatic_profile_shift(&p, p.dedendum))
+        });
+        let pinion_floor = floor[0].unwrap();
+
+        let x = |sum: f64| divide_shift_sum(&at, 1.0, sum, floor).expect("reachable");
+
+        // Just above the floor sum: the pinion is pinned, the wheel absorbs.
+        let low = x(pinion_floor + 0.05);
+        assert!(
+            (low[0] - pinion_floor).abs() < 1e-9 && low[1] > 0.0,
+            "the pinion should hold at its floor while the wheel takes the rest: {low:?}"
+        );
+
+        // Level, and beyond it they move together.
+        let level = x(2.0 * pinion_floor);
+        assert!(
+            (level[0] - level[1]).abs() < 1e-6,
+            "at twice the floor the two should be level: {level:?}"
+        );
+        let high = x(2.0 * pinion_floor + 0.6);
+        assert!(
+            (high[0] - high[1]).abs() < 1e-6,
+            "past level they should rise together: {high:?}"
+        );
+        assert!(
+            high[0] > level[0] && high[1] > level[1],
+            "a wider distance shifts both further out: {level:?} then {high:?}"
+        );
+
+        // Neither member ever moves backwards as the sum grows. Sums past the
+        // point where the members run out have no answer at all, and a skip is
+        // the honest reading of that — the claim is about the ones that do.
+        let mut previous = x(pinion_floor);
+        let mut walked = 0u32;
+        for step in 1..20 {
+            let Some(now) =
+                divide_shift_sum(&at, 1.0, pinion_floor + 0.08 * f64::from(step), floor)
+            else {
+                break;
+            };
+            assert!(
+                now[0] >= previous[0] - 1e-9 && now[1] >= previous[1] - 1e-9,
+                "a wider distance should not pull a member back: {previous:?} then {now:?}"
+            );
+            previous = now;
+            walked += 1;
+        }
+        assert!(
+            walked >= 10,
+            "only {walked} sums were reachable to walk over"
+        );
+    }
 
     /// **A search may not choose a mesh whose tips foul**, and the same pair
     /// with a shorter ring tooth is admissible again.

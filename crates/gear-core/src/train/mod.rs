@@ -3773,6 +3773,76 @@ mod tests {
         );
     }
 
+    /// **A given distance and a given clearance decide the shifts — with the
+    /// optimiser off as much as on.**
+    ///
+    /// This is mode 3 of the clearance paradigm
+    /// (`docs/reference.md#which-of-the-three-numbers-is-given-and-which-follows`): of the three related
+    /// numbers, any two given leave the third derived, so a housing distance and
+    /// a running clearance fix the shift sum and the stage must hit it.
+    ///
+    /// It used to hold **only with the optimiser on**. `shifts_at` returned the
+    /// undercut floor before ever looking at the distance, so the plainest thing
+    /// a designer does — type a distance with nothing asked to move — ran the
+    /// pair at whatever distance the floor happened to make and reported the
+    /// shortfall as clearance. On a 9/37 pair at 24.42 mm that was 0.47 mm of
+    /// "clearance" nobody asked for.
+    ///
+    /// The claim asserted is the identity `clearance == what was asked`, which
+    /// says the sum was reached without naming any shift — the division is a
+    /// separate rule ([`crate::auto::divide_shift_sum`]) and this is true
+    /// whatever it decides. **Both paths are checked against the same distances**,
+    /// so a search and a stated rule cannot come to different sums.
+    #[test]
+    fn a_given_distance_and_clearance_decide_the_shifts_either_way() {
+        let lib = library();
+        let mut checked = 0u32;
+        for (z1, z2, distances) in [
+            (9u32, 37u32, [23.4866_f64, 23.9532, 24.4199]),
+            (17, 43, [30.3922, 30.7645, 31.1367]),
+        ] {
+            for a in distances {
+                for clearance in [0.0_f64, 0.02, 0.20] {
+                    let mut sums = Vec::new();
+                    for optimiser in [false, true] {
+                        let mut sp = SpurStage {
+                            clearance,
+                            centre_distance: Auto::fixed(a + clearance),
+                            ..SpurStage::default()
+                        };
+                        sp.gears[0].teeth = z1;
+                        sp.gears[1].teeth = z2;
+                        sp.optimisation.enabled = optimiser;
+                        let mut t = two_stage();
+                        t.stages = vec![Stage::Spur(sp)];
+                        let Ok(r) = solve_train(&t, &lib) else {
+                            continue;
+                        };
+                        let s = r.stages[0].as_spur().expect("a spur stage");
+
+                        checked += 1;
+                        assert!(
+                            (s.clearance - clearance).abs() < 1e-6,
+                            "{z1}/{z2} at a={a} clearance={clearance} optimiser={optimiser}:                              the shifts leave {} of clearance, so the pair does not run at the                              distance it was given",
+                            s.clearance
+                        );
+                        sums.push(s.gears[0].profile_shift + s.gears[1].profile_shift);
+                    }
+                    // One relation, two ways of satisfying it: the searched
+                    // division and the stated one must reach the *same* sum,
+                    // because the sum is not either one's to choose.
+                    if let [off, on] = sums[..] {
+                        assert!(
+                            (off - on).abs() < 1e-6,
+                            "{z1}/{z2} at a={a}: the optimiser reaches a sum of {on}                              and the stated division {off}"
+                        );
+                    }
+                }
+            }
+        }
+        assert!(checked >= 30, "only {checked} cases reached the distance");
+    }
+
     /// **The reported clearance is the gap the stage runs at.**
     ///
     /// A centre distance is the true distance and a clearance is what portion of

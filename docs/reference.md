@@ -304,6 +304,45 @@ because it measures play against the zero-backlash reference.
 | Parallel | `Mesh::at(a)` re-describes the pair: the line of action turns, `cos α′ = a_ref cos α_t / a′` |
 | Crossed | `Screw::path_of_contact_at(…, a)` takes it: the line of action cannot turn, so it slides |
 
+### Which of the three numbers is given, and which follows
+
+A centre distance is the **true** distance and a clearance says what portion of
+it is clearance, so
+
+```text
+centre distance = zero-backlash distance + clearance
+zero-backlash distance = f(the shifts)
+```
+
+Two relations in three unknowns, so **any two of {distance, clearance, shifts}
+are given and the third follows**. That is three working modes, and they are
+modes of one model rather than three behaviours:
+
+| | Given | Derived |
+|---|---|---|
+| **1** | clearance, shifts | the distance: nominal + clearance |
+| **2** | the distance, shifts | the clearance: distance − nominal |
+| **3** | the distance, clearance | the shifts, solved to reach `distance − clearance` |
+
+**Mode 3 does not need an optimiser.** The distance fixes the shift *sum*
+exactly (`mesh::shift_sum_for`, closed); what it leaves open is the division
+between the two members, and that is a separate question with its own answer.
+Optimising for efficiency is one answer to it. With nothing being optimised the
+division is the **evenest one the members allow** — the even split projected
+onto each member's admissible interval, so a member against its undercut floor
+holds there while the other absorbs, until the two are level and thereafter move
+together (`auto::divide_shift_sum`).
+
+A shift a designer **gave** is never one of the numbers being chosen: it stands,
+and the other member takes the whole of the rest. Where no admissible pair of
+shifts reaches the distance at all, there is no answer to give.
+
+The objective and the constraints are not the same kind of thing, and failing at
+one must not discard the other: where the optimiser's own conditions — a minimum
+contact ratio, a tool that leaves the members alone — admit nothing, the stage
+falls back to what the *constraints* imply, not to what it would have built with
+no distance given at all.
+
 ### Signed relations, both mesh kinds
 
 Gear 2's tooth count, shift and radii carry the kind's sign, and that is the
