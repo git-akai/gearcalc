@@ -41,3 +41,26 @@ strip = true
 [profile.test]
 opt-level = 2
 debug = true
+
+# **The browser payload, and the one place its opt-level is decided.**
+# `flake.nix` and `tools/check_wasm.sh` both build with `--profile wasm`, so
+# there is no second copy of this choice to drift.
+#
+# `opt-level = "z"` here and 3 everywhere else, because the two targets are
+# asked different questions. The CLI and the test suite simulate a generating
+# rack over thousands of cases and want speed; the browser downloads the module
+# once over a network and then runs one solve per keystroke. Measured, end to
+# end, after `wasm-opt -Oz`:
+#
+#            payload    gzipped   solve_train   solve_gear   optimised train
+#   opt 3   1,355,263   480,711      0.170 ms     0.041 ms         18.1 ms
+#   opt "s" 1,305,165         —            —            —               —
+#   opt "z" 1,209,487   427,195      0.273 ms     0.058 ms         20.5 ms
+#
+# So "z" costs 0.1 ms on the path a designer waits on — against a 16.7 ms frame
+# — and buys 53 KB of transfer. The percentages read alarmingly (+61 % on
+# `solve_train`) and the absolute numbers are what decides it: nothing here is
+# near a budget. The optimised train is over a frame in both, and is opt-in.
+[profile.wasm]
+inherits = "release"
+opt-level = "z"

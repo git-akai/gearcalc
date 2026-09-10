@@ -58,7 +58,11 @@
           name = "source";
           filter = path: type:
             (craneLib.filterCargoSources path type)
-            || (builtins.match ".*/data/[^/]*\\.csv$" path != null);
+            || (builtins.match ".*/data/[^/]*\\.csv$" path != null)
+            # The wasm build recipe, shared with the npm script and the payload
+            # check so there is one of it. Without this the derivation cannot
+            # see the file it is told to run.
+            || (builtins.match ".*/tools/build_wasm\\.sh$" path != null);
         };
 
       commonArgsFor = system:
@@ -99,11 +103,24 @@
           CARGO_BUILD_TARGET = "wasm32-unknown-unknown";
           doCheck = false; # wasm cannot run on the build host
 
-          nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ pkgs.wasm-bindgen-cli ];
+          nativeBuildInputs = commonArgs.nativeBuildInputs
+            ++ [ pkgs.wasm-bindgen-cli pkgs.binaryen ];
+
+          # One recipe, `tools/build_wasm.sh`, shared with `web/package.json`
+          # and `tools/check_wasm.sh` — three copies of a build is three answers
+          # to "which module did you measure?", and the check is worthless the
+          # moment it is not the shipped one. The profile, the `wasm-opt` pass
+          # and the two feature flags are all stated there.
+          #
+          # Crane has already compiled by this point (it owns the vendored
+          # registry, which is only reachable from inside the derivation), so
+          # the script is told to skip its own `cargo build`.
+          CARGO_PROFILE = "wasm";
 
           installPhaseCommand = ''
-            wasm-bindgen --target web --out-dir "$out" \
-              target/wasm32-unknown-unknown/release/gear_wasm.wasm
+            BUILD_WASM_SKIP_CARGO=1 \
+            BUILD_WASM_MODULE=target/wasm32-unknown-unknown/wasm/gear_wasm.wasm \
+              bash tools/build_wasm.sh "$out"
           '';
         });
 

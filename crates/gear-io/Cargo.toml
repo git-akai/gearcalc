@@ -12,7 +12,7 @@ gear-core = { path = "../gear-core", features = ["serde"] }
 # as human-readable, hand-editable documents. Parsing it is I/O, not
 # engineering, so the dependency lives here — `gear-core` stays serde-only.
 serde = { version = "1", features = ["derive"] }
-toml = "0.8"
+toml = "1"
 
 [lints]
 workspace = true

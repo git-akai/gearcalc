@@ -120,6 +120,7 @@ string catalogues is what five languages costs.
 | **A material** | `crates/gear-io/data/materials_default.toml` | `cargo nextest run` — every non-datasheet value must carry a note saying what it is |
 | **A CLI subcommand** | one row in `gear-cli/src/main.rs`'s `COMMANDS`, carrying how its output is recorded | `tools/check_golden.sh --write` — the script asks the binary, so there is no second list |
 | **A type that crosses the boundary** | the Rust type | `tools/check_bindings.sh --write`, then `cd web && npm run check` |
+| **A wasm entry point** | `gear-wasm/src/lib.rs` · a call in `tools/wasm_probe.mjs` | `tools/check_wasm.sh --write` — it fails on an entry point with no probe, so the two cannot drift |
 | **A documented figure** | the document | `tools/check_figures.py` — and tag the block with what generates it |
 | **A language** | one new `strings_<code>.toml` · the list in `gear-io/src/strings.rs` | `cargo nextest run` — a translation that falls behind English's key set fails |
 
@@ -127,7 +128,7 @@ string catalogues is what five languages costs.
 
 ## Which check catches what
 
-Eleven checks in six different ways. `nix flake check` is **not** all of them.
+Twelve checks in six different ways. `nix flake check` is **not** all of them.
 
 | Run | Catches | In CI |
 |---|---|---|
@@ -141,6 +142,7 @@ Eleven checks in six different ways. `nix flake check` is **not** all of them.
 | `tools/check_strings.py` | every `ui.` message is used and every use has a message | yes |
 | `tools/check_golden.sh` | **any number the harness prints that moved.** A change detector, not a correctness gate: a diff is a question | yes |
 | `tools/check_figures.py` | every figure the documents print is one the code still prints | yes |
+| `tools/check_wasm.sh` | **the payload, executed** — everything else checks the boundary's shape or `gear-core`'s values, and nothing ran the `.wasm` the browser downloads. Asserts a law (optimising it changes no answer), records what it answers, and fails if an entry point has no probe | yes |
 | `python3 tools/validate_dxf.py` | an export read back by a parser that shares no code with the writer | yes |
 | `tools/worm_flank_curvature.py` · `crossed_path.py` · `hula_kinematics.py` · `iso_6336_3_stack.py` | the crate against derivations that share no code with it | no — by hand |
 

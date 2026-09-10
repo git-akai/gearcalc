@@ -102,6 +102,14 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
+**Phase 6 — the front end and the payload.** In progress. F17 closed and its
+premise found false — the simulator was never in the payload, and gating it out
+moves **ten bytes**. The payload is 1.51 MB → **1.21 MB** (−19.8 %, −14.5 %
+gzipped) with no answer moved, from a TOML dependency that carried a
+format-preserving parser, an `opt-level` measured rather than assumed, and a
+`wasm-opt` pass. Two findings out of it: **nothing had ever executed the
+payload** (F72) and the build was written three times (F73).
+
 **Phase 5 — the tests.** Done. Eight passes of mutation, thirteen findings, and
 **two live wrong numbers** among them: an epicyclic set that never asked its own
 internal mesh whether the teeth foul (F60), and a screw pair that reported no
@@ -118,7 +126,7 @@ them.
 | 3b | The direction sweep, second half — the ratings | **done** — gate proven |
 | 4 | The optimiser | **done** — gates proven; the closed form weighed and declined, with its derivation kept |
 | 5 | Consolidate the tests | **done** — eight passes, gates proven; two live wrong numbers |
-| 6 | Front end and payload | **next** — F15, F16, F17, F39, F47 |
+| 6 | Front end and payload | **in progress** — F17 closed; F15, F16, F39, F47 open |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
 production code · 10,346 lines of comment in that code · 9,348 lines of
@@ -178,7 +186,7 @@ pass 6 and it is worth asking first, not last.
 |---|---|---|
 | F15 | `TrainPanel.svelte` is 2,848 lines, four hand-written stage forms | 6 |
 | F16 | One stage input touches eleven files | 6 |
-| F17 | 1.49 MB wasm carrying a simulator no browser path reaches | 6 |
+| F17 | 1.49 MB wasm carrying a simulator no browser path reaches | 6 — **closed**, and the premise was false |
 | F39 | The clearance paradigm — `Auto` clearance, mode 3 without the optimiser, a planetary distance | 6 |
 | F47 | `Directional::self_locking` asks a directional question one way only | 6 |
 | F51 | The hula stage's shift search cannot be asked for an effort | 4, deferred |
@@ -298,7 +306,9 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F14 | The two unfired notes need their evidence re-dated | **gap** | 5 | **closed** — one was never fired *at*; the other re-searched at 7× the breadth |
 | F15 | `TrainPanel.svelte` is 2,848 lines, four hand-written stage forms | gap | 6 | open |
 | F16 | One stage input touches eleven files | holds | 6 | open |
-| F17 | 1.49 MB wasm carrying a simulator no browser path reaches | drift | 6 | open |
+| F17 | 1.49 MB wasm carrying a simulator no browser path reaches | drift | 6 | **closed — the premise was false**; the payload is 1.21 MB and the simulator was never in it |
+| F72 | Nothing ever executed the payload: the boundary's shape was checked, `gear-core`'s values were checked, and the `.wasm` the browser downloads was run by nothing | **gap** | 6 | **closed** — `tools/check_wasm.sh`, gates proven |
+| F73 | The wasm build was written out three times — flake, npm script, payload check — so a check could measure a module nobody downloads | gap | 6 | **closed** — `tools/build_wasm.sh` is the one recipe |
 | F18 | `CLAUDE.md` is empty | gap | 0 | **closed** |
 | F19 | Five documented tables have no command that reproduces them | gap | 4 | **part closed** — `:360` regenerates from `gear-cli shifts`; four remain |
 | F20 | `state.md` derived a figure by hand from rounded output, and it was wrong | drift | 0 | **closed** |
@@ -1659,6 +1669,148 @@ objective never fires; anything coarser trades a guaranteed answer for a guess
 about which walk was going to matter. Declined on the same footing as Q3's closed
 form — with the measurement written down so it is not re-derived.
 
+
+---
+
+## Phase 6 — the front end and the payload
+
+### F17, closed — and the premise was false
+
+**The finding said the payload carries "a simulator no browser path reaches".**
+`verify.rs` is 735 lines of rack simulation, it is in the library rather than in
+`tests/` so the CLI can sweep it, and no wasm entry point calls it. The
+inference was reasonable and it is wrong.
+
+> **Measured.** Gated `verify` out of the wasm build entirely —
+> `#[cfg(not(target_arch = "wasm32"))]` — and rebuilt: **1,593,391 →
+> 1,593,381 bytes. Ten bytes.** LTO had been stripping it all along. A `pub mod`
+> in a `cdylib` is not a root; only the `#[wasm_bindgen]` exports are.
+
+So the finding named a real property of the source and drew a size conclusion
+that nothing had measured. *A module being unreachable is a claim about the
+linker, and the linker is cheap to ask.*
+
+**Where the payload actually goes.** Attributed by parsing the name section of
+an unstripped build and bucketing every function by crate:
+
+| | share of the code section |
+|---|---|
+| serde derive and traits | **32.2 %** |
+| `gear_core` — the mathematics | 20.2 % |
+| Rust runtime / std | 18.1 % |
+| `toml_edit` — a **format-preserving** TOML parser | **15.7 %** |
+| `serde_json` | 5.7 % |
+| `gear_wasm` — the boundary | 4.0 % |
+| `gear_io` | 3.5 % |
+
+Serialisation is **53.7 %** of the code and the gearing is a fifth of it. The
+two largest functions in the whole binary are two monomorphisations of the
+derived `Deserialize for train::Stage`, 46.8 KB and 35.6 KB — 7 % of the code
+section for one derive instantiated twice, once for JSON and once for TOML.
+
+`toml_edit` is there because `toml` 0.8 is built on it. Nothing in this project
+edits TOML in place; it reads documents and writes them. **`toml` 1.x parses and
+writes without it.**
+
+| step | payload | gzipped |
+|---|---|---|
+| shipped before this phase | 1,510,018 | 508,169 |
+| `toml` 0.8 → 1 | 1,291,580 | — |
+| `opt-level = "z"` for the wasm only | — | — |
+| `wasm-opt -Oz` | **1,209,487** | **434,630** |
+
+**−19.8 % on the wire, −14.5 % gzipped, and no answer moved.** The TOML bump is
+not merely test-clean: the exported document is **byte-identical**, checked by
+diffing `gear-cli trainfile`'s output across both versions, and the corpus pins
+that file's length and byte count independently.
+
+**The `opt-level` trade was measured rather than assumed, and the first
+measurement was wrong.** A `sed` written to retune a probe profile matched
+`^opt-level = 3$` — which `[profile.release]` also carries — so the row recorded
+as "opt-level 3" had been built at `"z"`. The correction inverted the
+conclusion: `"z"` is not worthless, it is **10.8 %** of the payload. What it
+costs is in `Cargo.toml` beside the profile:
+
+| | opt 3 | opt "z" |
+|---|---|---|
+| payload after `wasm-opt` | 1,355,263 | **1,209,487** |
+| `solve_train`, the per-keystroke path | 0.170 ms | 0.273 ms |
+| an optimised train | 18.1 ms | 20.5 ms |
+
+The percentages read alarmingly (+61 %) and the absolute numbers decide it:
+a quarter of a millisecond against a 16.7 ms frame. Taken — and the two builds
+give **bit-identical answers across all 17 entry points**, which is checked
+rather than assumed.
+
+### F72 — nothing had ever executed the payload
+
+Found by asking what would catch it if `wasm-opt` were wrong. The answer was
+nothing, and the shape of the gap is worth stating because every individual
+check was doing its job:
+
+- `tools/check_bindings.sh` checks the boundary's **shape** — the generated
+  TypeScript against the Rust it comes from.
+- `cargo nextest run` and the golden corpus check **`gear-core`'s values**,
+  natively, through the CLI.
+- `nix build .#web` checks that the site **packages**.
+
+The `.wasm` a browser downloads was run by nothing at all. That was tolerable
+while the build was a straight compile; it stops being tolerable the moment a
+step *rewrites* the module, which is exactly what this phase added.
+
+**`tools/check_wasm.sh`** makes two claims of different kinds, plus a coverage
+claim that holds itself up:
+
+1. **A law.** Optimising the payload changes no answer — asserted
+   *differentially*, by running every entry point against the module before and
+   after `wasm-opt` and requiring identical output. It needs no recorded file
+   and cannot go stale.
+2. **A change detector**, in the corpus idiom: what the boundary answers is
+   recorded, and a diff is a question.
+3. **Coverage.** `tools/wasm_probe.mjs` reports which entry points it called,
+   and the check greps the crate for `#[wasm_bindgen] pub fn` and fails on any
+   the probe does not reach — the rule `gear-cli`'s `COMMANDS` table already
+   follows, where the table *is* the dispatch.
+
+Floats are printed to seventeen digits rather than left to `JSON.stringify`,
+whose shortest-round-tripping form can render two doubles that differ in the
+last bit as the same string.
+
+> **Gates, run — all three against the fault.**
+> The law: a module built from perturbed source, stood in as the optimised one,
+> fails it and prints the moved stresses. The detector: `K_f`'s `H` at
+> 0.331 → 0.3315 moves the record and exits 1. The coverage claim: an added
+> `#[wasm_bindgen] pub fn` with no probe call is named and exits 1.
+
+**And no `wasm-opt` flag could break the law.** `--fast-math`,
+`--traps-never-happen`, `--ignore-implicit-traps` and `--closed-world` each
+leave every answer identical, which is why the gate had to be run by
+substituting a genuinely different module. Reassuring about the pass; it says
+nothing about the next toolchain, which is what the check is for.
+
+**The corpus caught the first attempt at storing the record.** It was written to
+`tools/golden/wasm_boundary.txt`, and `check_golden.sh` — which compares that
+directory whole — reported the extra file immediately. Worth more than the
+tidiness: `check_golden.sh --write` opens with `rm -f golden/*.txt`, so a record
+kept there that the CLI does not produce is one a routine `--write` deletes
+silently. It lives at `tools/wasm_boundary.json`.
+
+### F73 — the build was written three times
+
+Adding the `wasm-opt` pass meant adding it to `flake.nix`, to
+`web/package.json`'s `build:wasm`, and to the check. Three copies of a build
+recipe are three answers to *which module did you measure?*, and the check is
+worthless the moment its answer differs from what ships.
+
+`tools/build_wasm.sh` is the one recipe; all three call it. The Nix derivation
+needed one line in `srcFor`'s filter to see it, since `filterCargoSources` keeps
+only what Cargo needs — the same accommodation the JGMA CSV already has.
+
+The two `--enable-` features are not tuning. They are what rustc emits for this
+target and what `wasm-opt` cannot infer, nothing having written a
+`target_features` section; **without them the pass fails**, which is the failure
+mode to want. A toolchain bump that adds a third makes the build say so rather
+than shipping a module optimised under the wrong assumptions.
 
 ---
 

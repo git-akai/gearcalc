@@ -87,6 +87,16 @@ jobs:
             tools/check_figures.py
           '
 
+      # **The payload, executed.** Everything above checks the boundary without
+      # running it: the binding check compares its generated *shape* against the
+      # Rust, the suite exercises `gear-core` natively, and the corpus records
+      # what the CLI prints. The `.wasm` the browser downloads was run by
+      # nothing — so a build step that rewrites the module could ship a payload
+      # that computes differently with every check green. `nix build .#web` now
+      # runs `wasm-opt` over it, which is exactly such a step.
+      - name: The payload runs, and optimising it changes no answer
+        run: nix develop --command tools/check_wasm.sh
+
       # Read an exported DXF back with ezdxf. The Rust tests can only show the
       # writer agrees with itself; this shows an unrelated parser gets the same
       # gear out.
