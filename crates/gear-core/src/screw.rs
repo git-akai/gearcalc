@@ -66,7 +66,7 @@
 //! docs/reference.md#contact-stress — is the sliding vector, the Hertzian contact, and the geometry;
 //! not this pitch-point shortcut.
 
-use crate::contact::{cross, dot, norm, scale, sub, Drive};
+use crate::contact::{cross, dot, norm, scale, sub, Directional, Drive};
 use crate::mesh::MeshSide;
 
 /// What a screw pair is made of.
@@ -303,15 +303,58 @@ impl Screw {
         }
     }
 
-    /// The coefficient of friction at which the pair stops being back-driveable
-    /// — `cos α_n tan γ` for a right-angle worm.
+    /// The coefficient of friction at which the pair stops being driveable **in
+    /// each direction** — `cos α_n tan γ` backward for a right-angle worm, and
+    /// `cos α_n cot γ` forward.
     ///
     /// **Reported rather than compared against silently**, because it is the
     /// number a designer actually wants: a worm sized just past it is relying on
     /// a friction coefficient nobody measured.
+    ///
+    /// # One condition, asked of the member the power leaves by
+    ///
+    /// Both thresholds are the same statement — *the tangential force reaching
+    /// the **output** member has fallen to zero* — and the two differ only in
+    /// which member that is and which flank the drive loads. Driving forward the
+    /// power leaves by member 2, so it is `on_2` that crosses; back-driving it
+    /// leaves by member 1, so it is `on_1`. Setting the relevant component of
+    /// [`Self::tangential_per_normal`] to zero and solving for `µ` gives both in
+    /// closed form, with no bracketing anywhere.
+    ///
+    /// A **negative** figure means no positive friction locks the pair that way:
+    /// the sliding resolved on that member already points the other way, so
+    /// friction helps rather than resists. That is a value, not a refusal — a
+    /// worm that cannot be made to lock forwards is described by a negative
+    /// threshold exactly as one that locks at µ = 0.13 is described by 0.13.
+    ///
+    /// # This used to be one direction only
+    ///
+    /// `self_locking_friction() -> f64` answered the backward question and had
+    /// no name for the forward one, which is `docs/corrections.md`'s recurring
+    /// fault: a quantity that has a direction, written once. The forward case is
+    /// reachable — a crossed pair at a steep helix split — and the tool quoted a
+    /// *backward* threshold beside a forward efficiency of `0.0 %`.
+    ///
+    /// > **Verified** against the friction at which each direction's efficiency
+    /// > actually crosses zero, found by bisection, over worm diameters from 3
+    /// > to 120 mm and shaft angles from 60° to 110°: exact in both directions
+    /// > at every one, and negative in precisely the cases where no crossing
+    /// > exists.
     #[must_use]
-    pub fn self_locking_friction(&self) -> f64 {
-        self.normal_pressure_angle.cos() * self.lead_angle.sin() / self.slide_on(1)
+    pub fn locking_friction(&self) -> Directional<f64> {
+        Directional::of(|drive| {
+            // The member the power leaves by, and the sign the loaded flank puts
+            // on its normal term. `tangential_per_normal` carries the flank sign
+            // on `cos α sin γ` and leaves the friction term alone, so the root is
+            // `cos α sin γ / (∓ slide)` with the sign the *other* way round from
+            // the flank — friction has to overcome the normal term, whichever
+            // side of the balance it started on.
+            let (sin_gamma, slide, sign) = match drive {
+                Drive::Forward => (self.wheel_lead_angle.sin(), self.slide_on(2), -1.0),
+                Drive::Backward => (self.lead_angle.sin(), self.slide_on(1), 1.0),
+            };
+            self.normal_pressure_angle.cos() * sin_gamma / (sign * slide)
+        })
     }
 
     /// The sliding direction resolved on member `which`'s velocity direction.
@@ -998,30 +1041,38 @@ impl CrossedPath {
         Some(1.0 - loss / steps as f64)
     }
 
-    /// The friction at which this pair stops being back-driveable, from the same
-    /// average the efficiency comes from.
+    /// The friction at which this pair stops being driveable **in each
+    /// direction**, from the same average the efficiency comes from.
     ///
-    /// [`Screw::self_locking_friction`] is the closed form for the *pitch
-    /// point*; along the path there is more sliding, so the pair locks at a
-    /// slightly **lower** friction than the pitch point alone would say. The two
-    /// must not be mixed: a threshold quoted beside an efficiency has to be the
-    /// friction at which *that* efficiency reaches zero, or a pair reads as
-    /// self-locking while its stated threshold says otherwise.
+    /// [`Screw::locking_friction`] is the closed form for the *pitch point*;
+    /// along the path there is more sliding, so the pair locks at a slightly
+    /// **lower** friction than the pitch point alone would say. The two must not
+    /// be mixed: a threshold quoted beside an efficiency has to be the friction
+    /// at which *that* efficiency reaches zero, or a pair reads as locked while
+    /// its stated threshold says otherwise.
     ///
-    /// Backward efficiency falls monotonically with friction — more rubbing can
-    /// only make overhauling harder — so this is one bracketed step between zero
-    /// and the pitch-point threshold, which the path average is always inside.
+    /// Efficiency falls monotonically with friction in **either** direction —
+    /// more rubbing can only make driving harder — so each is one bracketed step
+    /// between zero and its own pitch-point threshold, which the path average is
+    /// always inside.
+    ///
+    /// `None` for a direction the pair does not lock in: the pitch-point
+    /// threshold is negative or not finite there, so there is no interval to
+    /// bracket and no friction that would do it.
     #[must_use]
-    pub fn self_locking_friction(&self, screw: &Screw, samples: usize) -> Option<f64> {
-        let ceiling = screw.self_locking_friction();
-        if !(ceiling.is_finite() && ceiling > 0.0) {
-            return None;
-        }
-        let backward = |mu: f64| {
-            self.efficiency(screw, mu, Drive::Backward, samples)
-                .unwrap_or(f64::NAN)
-        };
-        crate::solve::brent(backward, 0.0, ceiling, crate::solve::Tol::default())
+    pub fn locking_friction(&self, screw: &Screw, samples: usize) -> Directional<Option<f64>> {
+        let ceilings = screw.locking_friction();
+        Directional::of(|drive| {
+            let ceiling = *ceilings.get(drive);
+            if !(ceiling.is_finite() && ceiling > 0.0) {
+                return None;
+            }
+            let eta = |mu: f64| {
+                self.efficiency(screw, mu, drive, samples)
+                    .unwrap_or(f64::NAN)
+            };
+            crate::solve::brent(eta, 0.0, ceiling, crate::solve::Tol::default())
+        })
     }
 
     /// The two positions where one tooth pair carries the whole load.
@@ -1271,7 +1322,6 @@ fn project_out(v: [f64; 3], n: [f64; 3]) -> Option<[f64; 3]> {
 mod tests {
     use super::*;
     use crate::contact::sliding_velocity;
-    use crate::contact::Directional;
     use std::f64::consts::PI;
 
     fn worm(starts: u32, teeth: u32, d1: f64) -> Screw {
@@ -1655,37 +1705,119 @@ mod tests {
             let e = Directional::of(|d| s.efficiency(0.0, d));
             assert!((e.forward - 1.0).abs() < 1e-15);
             assert!((e.backward - 1.0).abs() < 1e-15);
-            assert!(!e.self_locking());
+            assert!(!e.locked().backward);
         }
     }
 
-    /// Self-locking is a sign change, and the threshold is `μ ≥ cos α_n tan γ`.
-    /// The interesting part is that it is exact: at the threshold the backward
+    /// Locking is a sign change, and the threshold is exact: at it the
     /// efficiency is zero rather than merely small.
+    ///
+    /// **Asserted in both directions**, which is the whole of the change that
+    /// made [`Screw::locking_friction`] directional. The classical closed forms
+    /// at `Σ = 90°` are `cos α_n tan γ` back-driving and `cos α_n cot γ`
+    /// driving forward — the same expression with the members swapped — and the
+    /// sign behaviour either side of each is the same law asked twice.
+    ///
+    /// This used to be `self_locking_begins_exactly_where_the_closed_form_says`
+    /// and it tested the backward half only. The forward half was not merely
+    /// unasserted: it had no name in the crate, so a pair that could not be
+    /// driven forward reported an efficiency of `0.0 %` and nothing else.
     #[test]
-    fn self_locking_begins_exactly_where_the_closed_form_says() {
+    fn locking_begins_exactly_where_the_closed_form_says_in_both_directions() {
         for (starts, d1) in [(1u32, 7.0), (1, 20.0), (2, 9.0), (4, 12.0)] {
             let s = worm(starts, 41, d1);
-            let threshold = s.normal_pressure_angle.cos() * s.lead_angle.tan();
-            assert!(
-                (s.self_locking_friction() - threshold).abs() < 1e-14,
-                "z₁={starts} d={d1}: threshold {} vs cos α_n tan γ {threshold}",
-                s.self_locking_friction()
-            );
+            let closed = s.locking_friction();
 
-            let at = Directional::of(|d| s.efficiency(threshold, d));
-            assert!(
-                at.backward.abs() < 1e-15,
-                "at the threshold the backward efficiency should vanish: {}",
-                at.backward
-            );
-            assert!(at.self_locking(), "the threshold itself counts as locked");
+            // The classical pair, at the right angle they are written for.
+            let cos_alpha = s.normal_pressure_angle.cos();
+            let classical = Directional {
+                forward: cos_alpha / s.lead_angle.tan(),
+                backward: cos_alpha * s.lead_angle.tan(),
+            };
 
-            let below = Directional::of(|d| s.efficiency(threshold * 0.9, d));
-            assert!(below.backward > 0.0 && !below.self_locking());
-            let above = Directional::of(|d| s.efficiency(threshold * 1.1, d));
-            assert!(above.backward < 0.0 && above.self_locking());
+            for drive in Drive::BOTH {
+                let threshold = *closed.get(drive);
+                let want = *classical.get(drive);
+                assert!(
+                    (threshold - want).abs() < 1e-14 * want.abs().max(1.0),
+                    "z₁={starts} d={d1} {drive:?}: threshold {threshold} vs classical {want}"
+                );
+                assert!(threshold > 0.0, "both directions lock somewhere on a worm");
+
+                // **The efficiency vanishes at the threshold** — that is the
+                // claim, and it is the exact one. What is *not* claimed is the
+                // sign of the last bit there.
+                //
+                // The backward half of this test used to assert that the
+                // threshold itself counts as locked, and it passed: that
+                // expression happens to round to `-0.0` at every fixture. The
+                // forward one lands on `+3e-19` at two of the four, so the old
+                // assertion was a **coincidence of one expression's rounding**
+                // rather than a fact about the mechanism — found by asking it of
+                // the other direction. Locking is asserted just above the
+                // threshold, where it is a statement about gearing rather than
+                // about arithmetic.
+                let eta = |mu: f64| s.efficiency(mu, drive);
+                assert!(
+                    eta(threshold).abs() < 1e-14,
+                    "{drive:?}: at the threshold the efficiency should vanish: {}",
+                    eta(threshold)
+                );
+
+                let below = Directional::of(|d| s.efficiency(threshold * 0.9, d));
+                assert!(*below.get(drive) > 0.0 && !*below.locked().get(drive));
+                let above = Directional::of(|d| s.efficiency(threshold * 1.1, d));
+                assert!(*above.get(drive) < 0.0 && *above.locked().get(drive));
+            }
         }
+    }
+
+    /// **A pair that cannot be driven forward, which is the case the crate had
+    /// no vocabulary for.**
+    ///
+    /// A steep first member — here a large worm diameter, so a lead angle near
+    /// the right angle — locks *forwards* at an ordinary coefficient while
+    /// back-driving perfectly well. It is reachable from the front end and from
+    /// the harness: `gear-cli crossed 17 23 90` shows it at its 9°/81° split.
+    ///
+    /// The assertion is the **asymmetry**, not merely the flag: forward locked
+    /// and backward emphatically not, so a predicate that answered one question
+    /// for both directions could not pass this.
+    #[test]
+    fn a_steep_first_member_cannot_drive_forward_and_back_drives_freely() {
+        // sin γ₁ = z₁ m_n / d₁, so a diameter just over `z₁ m_n` is a thread
+        // that wraps at almost 90°.
+        let s = Screw::new(&ScrewParams {
+            starts: 1,
+            wheel_teeth: 23,
+            worm_pitch_diameter: 1.0 / 87.0_f64.to_radians().sin(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(
+            s.lead_angle.to_degrees() > 86.0,
+            "the thread should be nearly circumferential: γ₁ = {}",
+            s.lead_angle.to_degrees()
+        );
+
+        let threshold = s.locking_friction();
+        assert!(
+            threshold.forward < 0.06 && threshold.backward > 1.0,
+            "forward should lock at an ordinary µ and backward nowhere near: {threshold:?}"
+        );
+
+        let e = Directional::of(|d| s.efficiency(0.06, d));
+        let locked = e.locked();
+        assert!(
+            locked.forward,
+            "forward should be locked: η = {}",
+            e.forward
+        );
+        assert!(
+            !locked.backward && e.backward > 0.4,
+            "backward should be untroubled: η = {}",
+            e.backward
+        );
     }
 
     /// The direction dependence itself: a worm is worse to back-drive than to
@@ -1711,11 +1843,15 @@ mod tests {
             );
         }
         assert!(
-            !Directional::of(|d| steep.efficiency(mu, d)).self_locking(),
+            !Directional::of(|d| steep.efficiency(mu, d))
+                .locked()
+                .backward,
             "a steep thread back-drives"
         );
         assert!(
-            Directional::of(|d| shallow.efficiency(mu, d)).self_locking(),
+            Directional::of(|d| shallow.efficiency(mu, d))
+                .locked()
+                .backward,
             "a 1-start worm on a 25 mm diameter should self-lock at mu={mu}"
         );
     }
@@ -2103,7 +2239,7 @@ mod tests {
             // where the classical backward efficiency reaches zero; the balance
             // must reach zero at the same friction, and be positive just below
             // it and negative just above.
-            let threshold = s.self_locking_friction();
+            let threshold = s.locking_friction().backward;
             let at = |mu: f64| {
                 pitch
                     .efficiency(mu, Drive::Backward)

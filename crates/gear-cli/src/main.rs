@@ -28,6 +28,29 @@ fn words() -> gear_io::strings::Catalogue {
     gear_io::strings::Catalogue::english()
 }
 
+/// A mesh efficiency in both directions, with any direction it refuses to be
+/// driven in **named**.
+///
+/// One helper because there were four sites, each printing `(self-locking)` or
+/// `(cannot be back-driven)` off `Directional::self_locking`, and none of them
+/// able to say the other thing — a pair that cannot be driven *forward* showed
+/// only `0.000 %` in the forward column, which reads as arithmetic rather than
+/// as a statement about the mechanism. See `Directional::locked`.
+fn both_ways(e: gear_core::contact::Directional<f64>) -> String {
+    let locked = e.locked();
+    let said = match (locked.forward, locked.backward) {
+        (true, true) => "  (turns neither way)",
+        (true, false) => "  (cannot be driven forward)",
+        (false, true) => "  (cannot be back-driven)",
+        (false, false) => "",
+    };
+    format!(
+        "{:.3} % forward / {:.3} % backward{said}",
+        100.0 * e.forward,
+        100.0 * e.backward
+    )
+}
+
 /// One subcommand: what it is called, what it takes, what it does, and how to
 /// run it.
 ///
@@ -1411,15 +1434,9 @@ fn train_report(mode: Option<&str>) {
         train.back_driving_torque
     );
     println!(
-        "       total ratio {:.4}:1   total efficiency {:.3} % forward / {:.3} % backward{}",
+        "       total ratio {:.4}:1   total efficiency {}",
         r.total_ratio,
-        100.0 * r.total_efficiency.forward,
-        100.0 * r.total_efficiency.backward,
-        if r.total_efficiency.self_locking() {
-            "  (cannot be back-driven)"
-        } else {
-            ""
-        }
+        both_ways(r.total_efficiency)
     );
     for n in &r.notes {
         println!("       note: {}", words().render(n));
@@ -1522,16 +1539,7 @@ fn print_worm_stage(k: usize, st: &gear_core::train::WormStage, s: &gear_core::t
         s.centre_distance,
         s.lead_angle
     );
-    println!(
-        "  efficiency  forward {:.3} %  backward {:.3} %{}",
-        100.0 * s.efficiency.forward,
-        100.0 * s.efficiency.backward,
-        if s.efficiency.self_locking() {
-            "  (self-locking)"
-        } else {
-            ""
-        }
-    );
+    println!("  efficiency  {}", both_ways(s.efficiency));
     println!(
         "  contact  peak {:.1} MPa  cyclic {:.1} MPa   patch {:.4} x {:.4} mm   sliding {:.1} mm/s",
         s.contact.peak.max_pressure,
@@ -2415,17 +2423,43 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
 
     println!();
     println!("efficiency          worm driving   wheel driving");
+    // **Both columns can lock**, and the column that reads `locked` is the
+    // finding rather than the formatting: this table used to test only the wheel
+    // and print a bare `0.000 %` where the worm could not drive, which is what
+    // `gear-cli crossed 17 23 90` does at a 9°/81° split.
     for mu in [0.0, 0.02, 0.04, 0.06, 0.10] {
         let e = Directional::of(|d| s.efficiency(mu, d));
-        let back = if e.self_locking() {
-            "  self-locking".to_string()
-        } else {
-            format!("{:12.3} %", e.backward * 100.0)
+        let locked = e.locked();
+        let column = |v: f64, locked: bool| {
+            if locked {
+                "      locked".to_string()
+            } else {
+                format!("{:11.3} %", v * 100.0)
+            }
         };
-        println!("  mu {mu:.2}        {:10.3} % {back}", e.forward * 100.0);
+        println!(
+            "  mu {mu:.2}       {} {}",
+            column(e.forward, locked.forward),
+            column(e.backward, locked.backward)
+        );
     }
-    let threshold = s.self_locking_friction();
-    println!("  self-locks at mu >= {threshold:.4}   (cos alpha_n tan gamma)");
+    // Both thresholds, since both directions have one. Forwards it is usually
+    // absurd or negative — a worm you can turn — and saying so is the point:
+    // the figure a designer checks is the one for the direction they care about,
+    // and quoting only the backward one made that choice for them.
+    let threshold = s.locking_friction();
+    let at = |v: f64| {
+        if v > 0.0 {
+            format!("mu >= {v:.4}")
+        } else {
+            "no friction locks it this way".to_string()
+        }
+    };
+    println!("  locks driving forward at {}", at(threshold.forward));
+    println!(
+        "  locks back-driving at    {}   (cos alpha_n tan gamma)",
+        at(threshold.backward)
+    );
 
     // Contact is the strength figure a worm stage reports. There is deliberately
     // no bending stress here; docs/reference.md#crossed-axes says why.
@@ -2510,16 +2544,7 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
         );
     }
     println!();
-    println!(
-        "  efficiency   forward {:.3} %   backward {:.3} %{}",
-        r.efficiency.forward * 100.0,
-        r.efficiency.backward * 100.0,
-        if r.efficiency.self_locking() {
-            "  (self-locking)"
-        } else {
-            ""
-        }
-    );
+    println!("  efficiency   {}", both_ways(r.efficiency));
     println!(
         "  contact      {:.1} MPa   patch {:.4} x {:.4} mm",
         r.contact.peak.max_pressure, r.contact.peak.patch_length, r.contact.peak.patch_width
@@ -2827,20 +2852,42 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
             ),
             Ok(r) => {
                 any = true;
+                // **What a locked row says, in words**, printed under it rather
+                // than left to the reader to infer from a blank efficiency.
+                //
+                // It is also what puts `stage.forward_locking` in the golden
+                // corpus. A note fired only by the string sweep is a note the
+                // change detector cannot see, which is this project's
+                // sixth-recorded *opt-in the harness never switches on* — and
+                // the case is already here, so nothing had to be contrived.
+                // **`locked` rather than `0.000 %`.** The steepest split here
+                // cannot be driven forward at all, and printing its efficiency
+                // as a number reads as arithmetic rather than as the statement
+                // that this end cannot turn that one. This row is the case
+                // `Directional::locked` was made directional for.
+                let eta = if r.efficiency.locked().forward {
+                    format!("{:>10} ", "locked")
+                } else {
+                    format!("{:>10.3} %", r.efficiency.forward * 100.0)
+                };
                 println!(
-                    "{beta1:>7.1} {:>7.1} {:>9.4} {:>9.4} {:>10.4} {:>10.4} {:>10.3} % {:>9.1} {:>13}",
+                    "{beta1:>7.1} {:>7.1} {:>9.4} {:>9.4} {:>10.4} {:>10.4} {eta} {:>9.1} {:>13}",
                     g.wheel_helix_angle.to_degrees(),
                     g.worm_pitch_diameter,
                     g.wheel_pitch_diameter,
                     g.centre_distance,
                     g.sliding_ratio,
-                    r.efficiency.forward * 100.0,
                     r.contact.peak.max_pressure,
-                    r.crossed.as_ref().map_or_else(
-                        || "—".to_string(),
-                        |c| format!("{:.9}", c.contact_ratio)
-                    )
+                    r.crossed
+                        .as_ref()
+                        .map_or_else(|| "—".to_string(), |c| format!("{:.9}", c.contact_ratio))
                 );
+                for n in r.notes.iter().filter(|n| {
+                    n.is(gear_core::note::key::STAGE_FORWARD_LOCKING)
+                        || n.is(gear_core::note::key::STAGE_SELF_LOCKING)
+                }) {
+                    println!("{:>16}{}", "", words().render(n));
+                }
             }
         }
     }

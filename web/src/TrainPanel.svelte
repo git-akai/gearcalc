@@ -219,6 +219,63 @@
           { percent: pct(e.backward) },
         )}`;
 
+  /** **What a screw stage says about being locked, in its own words.**
+   *
+   *  Four keys, drawn beside the efficiency they are about rather than in the
+   *  list at the foot of the stage — the convention `FIELD_NOTES` already
+   *  follows for a shift raised to clear undercut. They come from Rust and
+   *  carry the coefficient and the threshold, which is more than a predicate
+   *  here could say, and they are directional because the core's are.
+   *
+   *  Subtracted from the stage's own list below, or the reader is told twice. */
+  const LOCK_NOTES: readonly string[] = [
+    "stage.self_locking",
+    "stage.near_self_locking",
+    "stage.forward_locking",
+    "stage.near_forward_locking",
+  ];
+  const lockNote = (from: Note[]) => clampNote(from, LOCK_NOTES);
+  /** What the stage's own list is left with once the lock notes are drawn
+   *  beside the efficiency — the same subtraction `UNDER_A_FIELD` does for a
+   *  gear card, written once so the list and the `{#if}` guarding it cannot
+   *  come to different conclusions about whether there is anything to show. */
+  const restOfNotes = (from: Note[] | undefined) =>
+    (from ?? []).filter((n) => !LOCK_NOTES.includes(n.key));
+
+  /** **Which directions a mesh refuses to be driven in**, named.
+   *
+   *  The mirror of `Directional::locked`, and written once here because it was
+   *  written three times: the crossed readout, the hula stage and the train
+   *  total each tested `efficiency.backward <= 0` inline and each could say only
+   *  *self-locking*. A pair that cannot be driven **forward** — a steep helix
+   *  split, which `gear-cli crossed 17 23 90` reaches at 9°/81° — showed a bare
+   *  `0.000 %` and no words at all.
+   *
+   *  A worm stage says more than this, and says it from Rust: `stage.self_locking`
+   *  and `stage.forward_locking` carry the coefficient and the threshold, and
+   *  are drawn beside the efficiency by `lockNote`. This is for the readouts
+   *  that have no note behind them. */
+  const lockedWays = (e: { forward: number; backward: number } | undefined) => {
+    if (e === undefined) return undefined;
+    const [f, b] = [e.forward <= 0, e.backward <= 0];
+    if (f && b) return t("ui.train_turns_neither_way");
+    if (f) return t("ui.train_cannot_be_driven_forward");
+    if (b) return t("ui.train_cannot_be_back_driven");
+    return undefined;
+  };
+
+  /** The friction each direction stops driving at. Negative means no friction
+   *  locks it that way, which is a fact and not a missing value — the ordinary
+   *  case forwards for anything you can turn. */
+  const locksAt = (e: { forward: number; backward: number } | undefined) => {
+    if (e === undefined) return BLANK;
+    const at = (v: number) => (v > 0 ? v.toFixed(4) : t("ui.train_locking_never"));
+    return `${t("ui.train_locking_forward", { mu: at(e.forward) })} · ${t(
+      "ui.train_locking_backward",
+      { mu: at(e.backward) },
+    )}`;
+  };
+
   /** A rating in both load cases, written in the order they are read: what the
    *  part must survive once, then what it must survive for the duty.
    *
@@ -435,8 +492,8 @@
   <dt>{t("ui.train_mesh_efficiency")}</dt>
   <dd>
     {bothWays(r?.efficiency)}
-    {#if r && r.efficiency.backward <= 0}
-      <small class="warn">{t("ui.train_self_locking")}</small>
+    {#if lockNote(r?.notes ?? [])}
+      <small class="warn">{lockNote(r?.notes ?? [])}</small>
     {/if}
     {#if r?.crossed?.parallel_axis_efficiency != null}
       <small>
@@ -460,8 +517,8 @@
       member: members[0],
     })}
   </dd>
-  <dt>{t("ui.train_self_locks_at")}</dt>
-  <dd>{num(r?.self_locking_friction, 4)}</dd>
+  <dt>{t("ui.train_locks_at")}</dt>
+  <dd>{locksAt(r?.locking_friction)}</dd>
   <dt>{t("ui.train_contact_stress")}</dt>
   <dd>
     {cases(r && { peak: r.contact.peak.max_pressure, cyclic: r.contact.cyclic.max_pressure }, 1)} {t("ui.train_mpa")}
@@ -1258,8 +1315,8 @@
       <dt>{t("ui.train_total_efficiency")}</dt>
       <dd>
         {bothWays(solved?.total_efficiency)}
-        {#if solved && solved.total_efficiency.backward <= 0}
-          <small class="warn">{t("ui.train_cannot_be_back_driven")}</small>
+        {#if lockedWays(solved?.total_efficiency)}
+          <small class="warn">{lockedWays(solved?.total_efficiency)}</small>
         {/if}
       </dd>
       <dt>{t("ui.train_backlash_at_output_shaft")}</dt>
@@ -1766,9 +1823,9 @@
             </div>
 
             {@render screwReadout(wres ?? undefined, [t("ui.train_the_worm"), t("ui.train_the_wheel")])}
-            {#if (wres?.notes.length ?? 0) > 0}
+            {#if restOfNotes(wres?.notes).length > 0}
               <ul class="notes">
-                {#each wres?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
+                {#each restOfNotes(wres?.notes) as n, i (i)}<li>{note(n)}</li>{/each}
               </ul>
             {/if}
 
@@ -2247,8 +2304,8 @@
                 <dt>{t("ui.train_efficiency")}</dt>
                 <dd>
                   {bothWays(hres?.efficiency)}
-                  {#if hres && hres.efficiency.backward <= 0}
-                    <small class="warn">{t("ui.train_self_locking")}</small>
+                  {#if lockedWays(hres?.efficiency)}
+                    <small class="warn">{lockedWays(hres?.efficiency)}</small>
                   {/if}
                 </dd>
                 <!-- The two shafts the same two plays are seen from, which

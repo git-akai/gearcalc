@@ -681,8 +681,18 @@ At the pitch point this **is** the classical screw formula to 1e-12:
 ```text
 η_forward  = (cos α_n − μ tan γ₁) / (cos α_n + μ cot γ₁)
 η_backward = (cos α_n − μ cot γ₁) / (cos α_n + μ tan γ₁)
-self-locking ⟺ μ ≥ cos α_n tan γ
+
+locked forwards  ⟺ μ ≥ cos α_n cot γ₁
+locked backwards ⟺ μ ≥ cos α_n tan γ₁      ("self-locking")
 ```
+
+**Both directions lock, and the two thresholds are one construction.** Each is
+the friction at which the tangential force reaching the member the power *leaves
+by* falls to zero — the wheel driving forward, the worm being back-driven — so
+they are the same expression with the members swapped, and `Screw::locking_friction`
+returns both. Only the backward one has a common name. A **negative** threshold
+means no friction locks the pair that way, which is the usual answer forwards;
+it is a value, not a missing one.
 
 **Two friction coefficients.** Whether a stage turns at all is decided at rest
 against a **static** coefficient; how well it turns once moving is decided

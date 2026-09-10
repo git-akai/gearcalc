@@ -5,7 +5,7 @@ worm stage  z 1/40  module 1  ratio 40.0000:1  a 23.7273 mm
   worm          2.0000    13.539    7.0000   4340 Hardened Steel
   wheel        49.4437     4.690   40.4145   Brass C360
 
-  efficiency   forward 61.805 %   backward 0.000 %  (self-locking)
+  efficiency   61.805 % forward / 0.000 % backward  (cannot be back-driven)
   contact      3376.1 MPa   patch 1.5807 x 0.9582 mm
   backlash     at the wheel 0.15512 deg (min 0.11342, max 0.19683)   at the worm 6.20497 deg
   bending      not reported - see docs/reference.md#crossed-axes

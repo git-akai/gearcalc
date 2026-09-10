@@ -1034,6 +1034,38 @@ mod tests {
             }
         }
 
+        // **The other end of the same question: a pair that cannot be driven
+        // forward.** A very steep first member — a 3° helix, so an 87° lead
+        // angle — locks *forwards* at µ ≈ 0.049 while back-driving perfectly
+        // well at 0.45 efficiency. It is the case `Directional::locked` was made
+        // directional for, and it is reachable from the front end: it is what
+        // `gear-cli crossed 17 23 90` shows at its 9°/81° split.
+        //
+        // Frictions either side of that threshold, so the "cannot be driven
+        // forward" note and the "close to it" one both get their turn.
+        for friction in [0.02_f64, 0.045, 0.06, 0.10] {
+            if let Ok(r) = gear_core::train::solve_worm_stage(
+                &gear_core::train::WormStage {
+                    sliding_friction: friction,
+                    static_friction: friction,
+                    sizing: gear_core::train::FirstMemberSizing::HelixAngle(3.0),
+                    worm: gear_core::train::WormMember {
+                        face_width: gear_core::params::Auto::automatic(6.0),
+                        ..Default::default()
+                    },
+                    wheel: gear_core::train::WormMember {
+                        face_width: gear_core::params::Auto::automatic(6.0),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
+                record(&r.notes);
+            }
+        }
+
         // A planetary set whose ring's tip clamps at its base circle.
         //
         // **These used to raise the addendum and none of them solved.** Five

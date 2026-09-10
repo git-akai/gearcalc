@@ -54,16 +54,21 @@ crossed: CrossedMesh | null,
 /**
  * Mesh efficiency in both drive directions.
  *
- * Unlike a parallel-axis stage these genuinely differ, and the backward one
- * can be zero or negative — that is what self-locking is, and
- * [`Directional::self_locking`] reads it rather than a separate flag that
- * could disagree.
+ * Unlike a parallel-axis stage these genuinely differ, and **either** can
+ * be zero or negative — backward is what self-locking is, and forward is a
+ * steep helix split that cannot drive at all.
+ * [`Directional::locked`] reads them rather than a separate flag that could
+ * disagree.
  */
 efficiency: Directional<number>, 
 /**
- * The coefficient of friction at which self-locking begins.
+ * The coefficient of friction at which each direction stops driving.
+ *
+ * Negative where no friction locks the pair that way, which is the ordinary
+ * case forwards: a worm you can turn is one whose forward threshold is
+ * somewhere absurd or nowhere at all.
  */
-self_locking_friction: number, 
+locking_friction: Directional<number>, 
 /**
  * Sliding speed at the pitch point as a multiple of the worm's pitch line
  * speed. The absolute figure needs a shaft speed, so the train fills

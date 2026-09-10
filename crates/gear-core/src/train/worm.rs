@@ -461,13 +461,18 @@ pub struct WormResult {
     pub crossed: Option<CrossedMesh>,
     /// Mesh efficiency in both drive directions.
     ///
-    /// Unlike a parallel-axis stage these genuinely differ, and the backward one
-    /// can be zero or negative — that is what self-locking is, and
-    /// [`Directional::self_locking`] reads it rather than a separate flag that
-    /// could disagree.
+    /// Unlike a parallel-axis stage these genuinely differ, and **either** can
+    /// be zero or negative — backward is what self-locking is, and forward is a
+    /// steep helix split that cannot drive at all.
+    /// [`Directional::locked`] reads them rather than a separate flag that could
+    /// disagree.
     pub efficiency: Directional<f64>,
-    /// The coefficient of friction at which self-locking begins.
-    pub self_locking_friction: f64,
+    /// The coefficient of friction at which each direction stops driving.
+    ///
+    /// Negative where no friction locks the pair that way, which is the ordinary
+    /// case forwards: a worm you can turn is one whose forward threshold is
+    /// somewhere absurd or nowhere at all.
+    pub locking_friction: Directional<f64>,
     /// Sliding speed at the pitch point as a multiple of the worm's pitch line
     /// speed. The absolute figure needs a shaft speed, so the train fills
     /// [`Self::sliding_velocity`] instead.
@@ -846,10 +851,17 @@ pub fn solve_worm_stage(
     let at_rest = with(stage.static_friction);
     let efficiency = with(stage.sliding_friction).once_moving(&at_rest);
     // Quoted beside that efficiency, so it has to be the friction at which *it*
-    // reaches zero rather than the pitch point's.
-    let threshold = path
-        .and_then(|p| p.self_locking_friction(&s, PATH_SAMPLES))
-        .unwrap_or_else(|| s.self_locking_friction());
+    // reaches zero rather than the pitch point's — and in **both** directions,
+    // since a pair that cannot be driven forward has a threshold too and the
+    // reader is owed it. The pitch-point form is the fallback per direction,
+    // which is why this is not one `unwrap_or_else` over the pair.
+    let pitch_point = s.locking_friction();
+    let along_path = path.map(|p| p.locking_friction(&s, PATH_SAMPLES));
+    let threshold = Directional::of(|d| {
+        along_path
+            .and_then(|t| *t.get(d))
+            .unwrap_or_else(|| *pitch_point.get(d))
+    });
     let output_torque = input_torque * s.ratio * efficiency.forward;
 
     // **Contact is rated on the torque the stage was given, on the member it was
@@ -1007,21 +1019,38 @@ pub fn solve_worm_stage(
 
     let mut notes = Vec::new();
     // **Against the static coefficient, because that is what decides it.**
-    // Whether the wheel can turn the worm at all is a question about breaking
+    // Whether one member can turn the other at all is a question about breaking
     // away; the sliding coefficient answers a different one, and quoting it here
     // named the wrong number for the reader to go and change.
-    if efficiency.self_locking() {
-        notes.push(
-            Note::new(key::STAGE_SELF_LOCKING)
+    //
+    // **Asked in both directions.** A worm that cannot be back-driven is the
+    // familiar case and the one the word "self-locking" is for; a crossed pair
+    // at a steep helix split cannot be driven *forward*, and used to be
+    // described only by a mesh efficiency reading `0.0 %`. Same construction,
+    // roles swapped — the keys differ because the sentence differs, which is a
+    // catalogue matter and not a computation.
+    let locked = at_rest.locked();
+    for drive in Drive::BOTH {
+        let threshold = *threshold.get(drive);
+        let (is_locked, is_near) = match drive {
+            Drive::Backward => (key::STAGE_SELF_LOCKING, key::STAGE_NEAR_SELF_LOCKING),
+            Drive::Forward => (key::STAGE_FORWARD_LOCKING, key::STAGE_NEAR_FORWARD_LOCKING),
+        };
+        let said = |k: &'static str| {
+            Note::new(k)
                 .number("friction", stage.static_friction, 3)
-                .number("threshold", threshold, 4),
-        );
-    } else if stage.static_friction > 0.8 * threshold {
-        notes.push(
-            Note::new(key::STAGE_NEAR_SELF_LOCKING)
-                .number("friction", stage.static_friction, 3)
-                .number("threshold", threshold, 4),
-        );
+                .number("threshold", threshold, 4)
+        };
+        if *locked.get(drive) {
+            notes.push(said(is_locked));
+        } else if threshold > 0.0 && stage.static_friction > 0.8 * threshold {
+            // **`threshold > 0.0` is load-bearing, not defensive.** A direction
+            // no friction can lock has a negative threshold, and `µ > 0.8 × a
+            // negative number` is true of every µ — so without this the "close
+            // to locking" note fires on precisely the pairs that are furthest
+            // from it. Forwards that is the ordinary case.
+            notes.push(said(is_near));
+        }
     }
     if efficiency.forward < 0.5 {
         notes.push(Note::new(key::STAGE_LOW_MESH_EFFICIENCY).number(
@@ -1120,7 +1149,7 @@ pub fn solve_worm_stage(
         axial_module: s.axial_module,
         crossed: crossed_mesh(&s, &members, None, None, centre),
         efficiency,
-        self_locking_friction: threshold,
+        locking_friction: threshold,
         sliding_ratio: s.sliding_ratio,
         sliding_velocity: 0.0,
         contact,
@@ -1918,9 +1947,12 @@ mod tests {
             }
             // The threshold is the friction at which the *reported* backward
             // efficiency reaches zero, so it moves down with it.
-            assert!(r.self_locking_friction <= stage.geometry().unwrap().self_locking_friction());
+            assert!(
+                r.locking_friction.backward
+                    <= stage.geometry().unwrap().locking_friction().backward
+            );
             assert_eq!(
-                r.efficiency.self_locking(),
+                r.efficiency.locked().backward,
                 r.efficiency.backward <= 0.0,
                 "self-locking is what the reported figure says, not a second opinion"
             );
@@ -2041,7 +2073,7 @@ mod tests {
             sliding_friction: 0.06,
             ..Default::default()
         });
-        assert!(r.efficiency.self_locking());
+        assert!(r.efficiency.locked().backward);
         assert!(
             r.notes
                 .iter()
@@ -2468,7 +2500,7 @@ mod tests {
             static_friction: statik,
             ..WormStage::default()
         };
-        let threshold = solved(&stage(0.06, 0.06)).self_locking_friction;
+        let threshold = solved(&stage(0.06, 0.06)).locking_friction.backward;
         assert!(threshold > 0.0 && threshold < 0.3, "{threshold}");
 
         // 1. Both coefficients below it: back-drives, and the figure is the
@@ -2710,7 +2742,7 @@ mod tests {
         assert!((r.ratio - 23.0 / 17.0).abs() < 1e-12);
         assert!(r.efficiency.forward > 0.0 && r.efficiency.forward < 1.0);
         assert!(r.contact.peak.max_pressure > 0.0);
-        assert!(!r.efficiency.self_locking());
+        assert!(!r.efficiency.locked().backward);
 
         // **Where a crossed pair sits, stated as comparisons rather than a
         // threshold.** It slides hard at the pitch point — `1/cos γ₁`, which is

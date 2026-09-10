@@ -2618,7 +2618,7 @@ mod tests {
 
                 let r = solve_train(&train, &lib).expect("a train that solves");
                 let w = r.stages[1].as_worm().expect("a worm stage");
-                let locks = w.efficiency.self_locking();
+                let locks = w.efficiency.locked().backward;
                 assert_eq!(
                     locks,
                     friction > 0.1,
@@ -4071,7 +4071,7 @@ mod tests {
     fn a_parallel_axis_train_reports_equal_efficiencies_and_cannot_lock() {
         let r = solve_train(&two_stage(), &library()).unwrap();
         assert_eq!(r.total_efficiency.forward, r.total_efficiency.backward);
-        assert!(!r.total_efficiency.self_locking());
+        assert!(!r.total_efficiency.locked().backward);
     }
 
     /// Efficiency must always *reduce* delivered torque. Getting this sign wrong
@@ -5809,7 +5809,7 @@ mod tests {
         let r = solve_train(&t, &lib).unwrap();
         let worm = r.stages[2].as_worm().expect("the third stage is a worm");
         assert!(
-            worm.efficiency.self_locking(),
+            worm.efficiency.locked().backward,
             "this worm was meant to lock: backward efficiency {}",
             worm.efficiency.backward
         );

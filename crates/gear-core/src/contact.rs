@@ -244,15 +244,34 @@ impl<T> Directional<T> {
 }
 
 impl Directional<f64> {
-    /// Reading this pair as an efficiency: whether the mesh refuses to be
-    /// back-driven at all.
+    /// Reading this pair as an efficiency: **which directions it refuses to be
+    /// driven in at all.**
     ///
-    /// Derived rather than stored, so it cannot disagree with the number it
-    /// describes. Impossible for a parallel-axis mesh, which is a consequence of
-    /// its symmetry rather than a rule applied to it.
+    /// Derived rather than stored, so it cannot disagree with the numbers it
+    /// describes. Impossible in either direction for a parallel-axis mesh, which
+    /// is a consequence of its symmetry rather than a rule applied to it.
+    ///
+    /// # Both directions, because a mechanism has no forward
+    ///
+    /// This used to be `self_locking() -> bool`, reading `backward <= 0.0`, and
+    /// the asymmetry was invisible because the case it could not describe is
+    /// rare and the word for it is a worm's. A crossed pair at a steep helix
+    /// split is the other one: `gear-cli crossed 17 23 90` at 9°/81° cannot be
+    /// driven **forward** at µ = 0.06 and back-drives perfectly well. The tool
+    /// had no way to say so — the pair was described only by a mesh efficiency
+    /// reading `0.0 %`, which reads as an arithmetic accident rather than as the
+    /// statement that this end cannot drive that one.
+    ///
+    /// `docs/rationale.md#direction-is-the-readers-not-the-mechanisms` is the
+    /// rule: the reverse is the same construction with the roles swapped, so a
+    /// predicate that names one direction in its own signature is a predicate
+    /// that will one day be asked the other and answer wrongly. The name for
+    /// **this** direction's answer belongs to the reader, and
+    /// `stage.self_locking` is still what the catalogue calls
+    /// `locked().backward` on a worm.
     #[must_use]
-    pub fn self_locking(&self) -> bool {
-        self.backward <= 0.0
+    pub fn locked(&self) -> Directional<bool> {
+        Directional::of(|d| *self.get(d) <= 0.0)
     }
 
     /// What the drive actually delivers, given what the *same* drive does with
@@ -1790,7 +1809,7 @@ mod tests {
                     both.forward, both.backward,
                     "z={z1}/{z2} beta={beta}: the two directions should agree"
                 );
-                assert!(!both.self_locking(), "a gear mesh cannot self-lock");
+                assert!(!both.locked().backward, "a gear mesh cannot self-lock");
             }
         }
     }

@@ -102,7 +102,15 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
-**Phase 6 — the front end and the payload.** In progress. F17 closed and its
+**Phase 6 — the front end and the payload.** In progress. **F47 closed**, and
+the half of it that was not in the finding is the *threshold*: a pair's locking
+friction was quoted for one direction only, so a forward-locked pair was told a
+number about the direction it could drive in. Both are now closed form and the
+same expression with the members swapped. No engineering number moved — five
+golden files changed and every one is words — and F74 came out of it: an
+assertion that passed because one expression rounded to `-0.0`.
+
+**F17 closed and its
 premise found false — the simulator was never in the payload, and gating it out
 moves **ten bytes**. The payload is 1.51 MB → **1.21 MB** (−19.8 %, −14.5 %
 gzipped) with no answer moved, from a TOML dependency that carried a
@@ -126,7 +134,7 @@ them.
 | 3b | The direction sweep, second half — the ratings | **done** — gate proven |
 | 4 | The optimiser | **done** — gates proven; the closed form weighed and declined, with its derivation kept |
 | 5 | Consolidate the tests | **done** — eight passes, gates proven; two live wrong numbers |
-| 6 | Front end and payload | **in progress** — F17 closed; F15, F16, F39, F47 open |
+| 6 | Front end and payload | **in progress** — F17, F47 closed; F15, F16, F39 open |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
 production code · 10,346 lines of comment in that code · 9,348 lines of
@@ -188,7 +196,7 @@ pass 6 and it is worth asking first, not last.
 | F16 | One stage input touches eleven files | 6 |
 | F17 | 1.49 MB wasm carrying a simulator no browser path reaches | 6 — **closed**, and the premise was false |
 | F39 | The clearance paradigm — `Auto` clearance, mode 3 without the optimiser, a planetary distance | 6 |
-| F47 | `Directional::self_locking` asks a directional question one way only | 6 |
+| F47 | `Directional::self_locking` asks a directional question one way only | 6 — **closed** |
 | F51 | The hula stage's shift search cannot be asked for an effort | 4, deferred |
 | F55 | A centre distance no admissible shifts can reach is answered rather than refused | 4, deferred |
 | F58 | The hula shift optimiser moves no answer over a band of tooth differences | 4, deferred |
@@ -338,7 +346,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F44 | A back-driven set rated its ring 6.0 % low in bending, 3.0 % in contact | gap | 3b | **closed** — " |
 | F45 | ...and the hula stage 41 % and 23 % low, the same fault | gap | 3b | **closed** — " |
 | F46 | A zero force was refused, so a stage at rest could not be solved | gap | 3b | **closed** — " |
-| F47 | `Directional::self_locking` asks a directional question one way only | gap | 6 | open — see Phase 3b |
+| F47 | `Directional::self_locking` asks a directional question one way only | gap | 6 | **closed** — `locked()` and `locking_friction()` are both directional; the forward threshold is closed form and verified |
+| F74 | A test asserted that the efficiency at the locking threshold is *signed* locked — true only because one expression happened to round to `-0.0` | holds | 6 | **closed** — found by asking it of the other direction; the claim is now that it vanishes |
 | F48 | A screw mesh that transmits nothing reports no flank load | **gap** | 5 | **closed** — rated at the load it was given, on the member given; and the back-driving flank with it |
 | F49 | `check_golden.sh` recorded the corpus from whatever binary was on disk | drift | 3b | **closed** — and logged in `corrections.md` |
 | F50 | The optimiser's convergence claim was half true: a set's search ran one start of six | gap | 4 | **closed** — and logged in `corrections.md` |
@@ -1741,6 +1750,82 @@ The percentages read alarmingly (+61 %) and the absolute numbers decide it:
 a quarter of a millisecond against a 16.7 ms frame. Taken — and the two builds
 give **bit-identical answers across all 17 entry points**, which is checked
 rather than assumed.
+
+### F47, closed — the question asked both ways, and the threshold with it
+
+**What it was.** `Directional::self_locking()` read `backward <= 0.0`. A stage
+that cannot be driven **forward** had no flag, no note and no vocabulary: it was
+described only by a mesh efficiency reading `0.0 %`, which reads as an
+arithmetic accident rather than as *this end cannot turn that one*. The case is
+reachable and is already in the corpus — `gear-cli crossed 17 23 90` at its
+9°/81° split, at µ = 0.06.
+
+**The threshold was one-sided too**, and that half was not in the finding.
+`Screw::self_locking_friction()` returned `cos α_n tan γ` — the backward
+threshold — and the panel drew it under a label reading *Self-locks at µ*. So a
+forward-locked pair was quoted a number about the direction it was not locked in.
+
+**Both are one construction.** A pair locks in a direction when the tangential
+force reaching the member the power **leaves by** falls to zero: forwards that
+member is the wheel, backwards it is the worm. Setting the relevant component of
+the flank balance to zero gives each in closed form — no bracketing anywhere —
+and they are the same expression with the members swapped, which is the standing
+rule (`a mechanism has no forward`) showing up as arithmetic.
+
+> **Verified.** Against the friction at which each direction's efficiency
+> actually crosses zero, found by bisection, over worm diameters 3–120 mm and
+> shaft angles 60°–110°: **exact in both directions at every one**, and negative
+> in precisely the cases where no crossing exists. A negative threshold is a
+> value — *no friction locks it this way* — and not an absence.
+
+**What moved, and what did not.** Five golden files changed and **every one is
+words**; the only new number is the forward threshold itself:
+
+| | was | is |
+|---|---|---|
+| `crossed 17 23 90`, the 9°/81° row | `0.000 %` | `locked`, with the note under it |
+| `worm 1 40 7 90` | `self-locks at mu >= 0.1356` | both: forward `6.5104`, backward `0.1356` |
+| `wormstage`, `train mixed`, `train held` | `(self-locking)` | `(cannot be back-driven)` |
+
+**The panel had written the predicate three times in TypeScript** — the crossed
+readout, the hula stage and the train total each testing
+`efficiency.backward <= 0` inline, each able to say only *self-locking*. The
+worm's is gone entirely: `stage.self_locking` and the new
+`stage.forward_locking` are Rust's, carry the coefficient and the threshold, and
+are drawn beside the efficiency by the same `FIELD_NOTES` convention a shift
+raised for undercut already follows. The two that have no note behind them share
+one `lockedWays` helper. `ui.train_self_locking` is gone, being what
+`ui.train_cannot_be_back_driven` already said.
+
+**The note had to be fired at, and the crate's own gate insisted.**
+`the_sweep_fires_most_of_the_catalogue` failed the moment the two keys existed —
+*"the sweep does not fire [...], so the placeholder check is vacuous for them"* —
+which is F14's lesson enforced rather than remembered. A 3° first-member helix
+(an 87° lead angle) locks forwards at µ ≈ 0.049 and back-drives at 45 %
+efficiency; four coefficients either side of that fire both new notes.
+
+**And the corpus needed the same treatment**, for the sixth-recorded time: a note
+fired only by the string sweep is a note the change detector cannot see. The
+`crossed` table prints the locking notes under a locked row, so the case that
+motivated the finding is the case that records it. Nothing was contrived.
+
+#### F74 — an assertion that was a rounding coincidence
+
+`self_locking_begins_exactly_where_the_closed_form_says` claimed *the threshold
+itself counts as locked*, and passed. Asked of the forward direction it fails:
+the backward expression happens to round to `-0.0` at every fixture, while the
+forward one lands on `+3e-19` at two of four.
+
+So the old assertion was about **one expression's rounding** and not about
+gearing. What is true, and is now what is asserted, is that the efficiency
+*vanishes* at the threshold — to within 1e-14 — and that the pair is locked just
+above it. Found only by asking the same question the other way round, which is
+the whole of what this finding was about.
+
+> **Gates, run.** Reverting `locked()` to answer the backward question for both
+> directions fails two tests; making `locking_friction` return the backward
+> value for both fails the same two. Each was written against the fault and run
+> against it.
 
 ### F72 — nothing had ever executed the payload
 

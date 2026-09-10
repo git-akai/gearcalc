@@ -9,12 +9,13 @@ geometry
   sliding at the pitch point   1.0104 x the worm's pitch line speed
 
 efficiency          worm driving   wheel driving
-  mu 0.00           100.000 %      100.000 %
-  mu 0.02            86.882 %       84.993 %
-  mu 0.04            76.751 %       70.078 %
-  mu 0.06            68.691 %       55.254 %
-  mu 0.10            56.677 %       25.874 %
-  self-locks at mu >= 0.1356   (cos alpha_n tan gamma)
+  mu 0.00           100.000 %     100.000 %
+  mu 0.02            86.882 %      84.993 %
+  mu 0.04            76.751 %      70.078 %
+  mu 0.06            68.691 %      55.254 %
+  mu 0.10            56.677 %      25.874 %
+  locks driving forward at mu >= 6.5104
+  locks back-driving at    mu >= 0.1356   (cos alpha_n tan gamma)
 
 contact   4340 Hardened Steel on Brass C360,  E* 70811 MPa
   worm torque 2.000 Nm  ->  wheel torque 54.953 Nm at mu 0.06

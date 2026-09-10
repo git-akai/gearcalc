@@ -1117,12 +1117,26 @@ limit is closed form, and took a worm stage's whole solve with it.
 direction, that is a fact about its geometry — a worm's lead angle against its
 friction — and shows up as an answer, not as an arm of a branch.
 
-**Where this is still one-sided.** `Directional::self_locking` reads
-`backward <= 0.0`, so a stage that cannot be driven *forward* has no flag and no
-note of its own — it is described only by a mesh efficiency reading `0.0 %`. It
-is reachable (`gear-cli crossed 17 23 90`, at a 9°/81° helix split) and it is
-recorded rather than fixed, because the flag crosses the boundary and is read by
-the panel.
+**This used to be one-sided, and the fix is what the rule asks for.**
+`Directional::self_locking` read `backward <= 0.0`, so a stage that could not be
+driven *forward* had no flag and no note — it was described only by a mesh
+efficiency reading `0.0 %`, which reads as arithmetic rather than as a statement
+about the mechanism. The case is reachable: `gear-cli crossed 17 23 90` at a
+9°/81° helix split is exactly it.
+
+It is `Directional::locked() -> Directional<bool>` now, and the *threshold* went
+with it — [`Screw::locking_friction`] returns both, because both are one
+construction with the members swapped: **the tangential force reaching the member
+the power leaves by has fallen to zero**. Forwards that member is the wheel and
+backwards it is the worm, and setting the relevant component of the flank balance
+to zero gives each in closed form, with no bracketing. A *negative* threshold is
+a value and not an absence — it says no friction locks the pair that way, which
+is the ordinary case forwards.
+
+The word "self-locking" survives where it belongs, in the catalogue: it is what
+English calls `locked().backward` on a worm, and `stage.forward_locking` is the
+sentence for the other end. Naming a direction is the reader's business, which is
+this section's whole point.
 
 ### A load exists only where it is reacted
 
