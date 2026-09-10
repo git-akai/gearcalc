@@ -226,7 +226,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F10 | `bending-check.html` regenerates by hand | drift | 0 | **closed** — `figures-verbatim`, checked exactly |
 | F11 | An orphaned sentence fragment in `reference.md` | drift | 1 | **closed** |
 | F12 | The inline tests never had the integration tests' consolidation | gap | 5 | open |
-| F13 | Five production modules carry no inline tests, invisibly | holds | 5 | open |
+| F13 | Five production modules carry no inline tests, invisibly | holds | 5 | **closed** — four are covered elsewhere, measured; the fifth hid a dead branch |
 | F14 | The two unfired notes need their evidence re-dated | **gap** | 5 | **closed** — one was never fired *at*; the other re-searched at 7× the breadth |
 | F15 | `TrainPanel.svelte` is 2,848 lines, four hand-written stage forms | gap | 6 | open |
 | F16 | One stage input touches eleven files | holds | 6 | open |
@@ -274,6 +274,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F68 | `Loading::at_width`'s exponent was hidden by `PROBE` equalling the default face width | gap | 5 | **closed** — and logged in `corrections.md` |
 | F69 | The outline's own promise was untested; its `worst_deviation` measured chord length | gap | 5 | **closed** — " |
 | F70 | The panel seeded a face width automatically for two stage kinds of four | gap | 5 | **closed** — and logged in `corrections.md` |
+| F71 | `SpurStage::clearance_taken` was a conditional whose every caller made its condition true | gap | 5 | **closed** — and logged in `corrections.md` |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so
@@ -1371,6 +1372,43 @@ circle on a *short* one against a negative shift; and they left the ring's tooth
 count at `StageGear`'s own 17 while setting the sun's and the planet's — a ring
 that does not close the set it is in. *A case that cannot solve is not a case*,
 and an `if let Ok` around one is how it stays that way quietly.
+
+### Phase 5, fifth pass — the five modules with no inline tests
+
+**F13 asked whether five `gear-core` modules carrying no `#[cfg(test)]` are
+untested or merely tested elsewhere.** Answered by mutation rather than by
+reading:
+
+| module | perturbed | caught by |
+|---|---|---|
+| `metrology.rs` | the span's nominal | 3 integration tests |
+| `params.rs` | `MAX_CUTTER_DEPTH_FRACTION_OF_R` | 2 tests, and the corpus |
+| `params.rs` | `MIN_TOOTH_THICKNESS_MODULES` | the corpus |
+| `tooth.rs` | `CROSSING_NUDGE_MODULES`, `LENGTH_SAMPLES` | the corpus |
+| `verify.rs` | `MAX_ROTATION_STEP` | 2 integration tests |
+| **`train/spur.rs`** | `clearance_taken`'s `else` arm | **nothing** |
+
+So four of the five are covered, and the finding is a *labelling* one for them —
+which the map now says. The fifth was not covered, and mutating it explains why.
+
+**F71 — a conditional that decided nothing, explaining a rule it did not
+enforce.** `SpurStage::clearance_taken` returned the clearance "wherever
+anything is free to absorb it" and zero otherwise, with four paragraphs on which
+case is which. **Every caller already ran where its condition held**: the centre
+distance reads it only when automatic, and the shift search only when the
+optimiser is on. The zero arm was unreachable in effect, and replacing the whole
+method with the field moved no test and no recorded figure.
+
+The rule it describes is real, and is enforced by *where the clearance is read*.
+It is stated there now, and a method that suggested there were two answers is
+gone — rule 4, met somewhere worse than a `match`: a branch that decides nothing
+still tells a reader that something is decided.
+
+**And the reason nothing could see it is the sixth opt-in path.** A spur stage
+with a centre distance **given** and the optimiser **off** — the plainest thing a
+designer does — was in no recorded case: every one either left the distance
+automatic or turned the optimiser on. `gear-cli shifts` prints that combination
+now, beside the optimised one.
 
 **F6, closed on the way.** The face-width invariance ran on `FormFactorOnly`
 alone, the one notch model no stage rates with — it ships through

@@ -202,6 +202,13 @@ And elsewhere:
   against a published standard. They go when that command does.
 - **`verify.rs` is in the library rather than in `tests/`** so the CLI can sweep
   it over thousands of cases.
+- **Five modules carry no `#[cfg(test)]`** — `metrology.rs`, `params.rs`,
+  `tooth.rs`, `train/spur.rs`, `verify.rs` — and four of them are covered from
+  somewhere else: the integration suite for the first, third and last, and the
+  golden corpus for the guards in `params.rs`. Measured by perturbing each and
+  seeing what fired, not assumed. It is where a law belongs that decides it: a
+  profile law wants the whole grid `tests/common` builds, and a guard's value
+  wants a recorded output.
 - **One note nothing can fire** is named in `strings.rs`'s `UNFIRED` with its
   evidence. Live code, a live message, deliberately not deleted on suspicion —
   and the evidence carries the breadth of the search that found nothing, because

@@ -201,8 +201,11 @@ pub struct SpurStage {
     /// Added to the centre distance, mm — the assembly clearance, and so the
     /// backlash.
     ///
-    /// Read only where something is free to absorb it; see
-    /// [`Self::clearance_taken`], which is the whole of that rule.
+    /// **Read only where something is free to absorb it** — the automatic
+    /// centre distance, which is this opened out, or the shifts when they are
+    /// being chosen. Given a distance with nothing free, it is not read at all
+    /// and the backlash is a consequence; `solve_spur_stage` is where that
+    /// happens and is the whole of the rule.
     pub clearance: f64,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
@@ -272,33 +275,6 @@ impl SpurStage {
         self.shaft_angle != 0.0
     }
 
-    /// **The clearance this stage actually opens by**, which is the one it was
-    /// given wherever anything is free to absorb it.
-    ///
-    /// With the centre distance automatic, the distance itself absorbs it: it is
-    /// the zero-backlash distance opened out, and that opening *is* the
-    /// backlash. With the distance given by hand there is nothing left to move
-    /// — the shifts sit at their undercut minimum, the distance is whatever was
-    /// typed, and the backlash is a consequence rather than a choice — so the
-    /// clearance is not read at all.
-    ///
-    /// Unless the shifts are being chosen, in which case they are what absorbs
-    /// it: the sum is pinned so the pair closes to zero backlash a clearance
-    /// *inside* the given distance, and the designer gets both the housing they
-    /// specified and the play they asked for.
-    ///
-    /// One rule, in one place, and [`SpurResult::clearance`] reports what came
-    /// of it — so the panel greys the input out by reading the answer rather
-    /// than by knowing the rule a second time.
-    #[must_use]
-    pub fn clearance_taken(&self) -> f64 {
-        if self.centre_distance.auto || self.optimisation.enabled {
-            self.clearance
-        } else {
-            0.0
-        }
-    }
-
     /// The two profile shifts, chosen together where that is what the stage
     /// asked for.
     ///
@@ -334,7 +310,7 @@ impl SpurStage {
                     rack.alpha_t,
                     rack.alpha_n,
                     sum_z,
-                    self.centre_distance.manual - self.clearance_taken(),
+                    self.centre_distance.manual - self.clearance,
                 )
             })
             .flatten();
@@ -344,7 +320,7 @@ impl SpurStage {
             &crate::auto::Bounds {
                 floor,
                 min_contact_ratio: self.optimisation.min_contact_ratio,
-                clearance: self.clearance_taken(),
+                clearance: self.clearance,
             },
             &crate::auto::Pinned { shift: given, sum },
             self.sliding_friction,
@@ -449,7 +425,24 @@ pub fn solve_spur_stage_with(
         .collect::<Result<_, _>>()?;
 
     // --- centre distance and the clearance it is opened by.
-    let clearance = stage.clearance_taken();
+    //
+    // **Where the clearance is read is the rule**, and there is nothing else to
+    // it. With the distance automatic it is the zero-backlash distance opened
+    // out, and that opening *is* the backlash. With the distance given by hand
+    // there is nothing left to move — the shifts sit where they sit, the
+    // distance is whatever was typed — so the clearance is not read here, and
+    // the backlash is a consequence rather than a choice. Unless the shifts are
+    // being chosen, in which case *they* absorb it: `shifts_at` pins the sum a
+    // clearance inside the given distance, so the designer gets both the housing
+    // and the play. [`SpurResult::clearance`] reports what came of it, derived.
+    //
+    // This used to be a `clearance_taken()` returning zero in the given-distance
+    // case, which reads as the rule and enforced none of it: **every caller of
+    // it already ran where its condition held**, so the arm returning zero was
+    // dead. Removing it moved no test and no recorded figure — which is what a
+    // conditional that decides nothing does, while suggesting there are two
+    // answers here.
+    let clearance = stage.clearance;
     let centre = if stage.centre_distance.auto {
         mesh.a_w + clearance
     } else {

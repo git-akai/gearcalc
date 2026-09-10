@@ -1168,6 +1168,30 @@ fn shifts_report(z1: u32, z2: u32) {
             Err(e) => println!("{a:.4}: {e}"),
         }
     }
+
+    // **And the same distances with the optimiser off**, which is the plainest
+    // thing a designer does and was the one combination no recorded case
+    // walked: a distance given by hand with nothing asked to move.
+    //
+    // It is a different rule, not a different answer to the same one. With the
+    // shifts free the stage closes the pair a clearance *inside* the distance
+    // given, so the designer gets both the housing and the play; with nothing
+    // free there is nothing to absorb it, the shifts stay at their undercut
+    // floor, and the clearance is not read at all
+    // (`solve_spur_stage`, where the centre distance is settled). It was the
+    // one combination no recorded case walked.
+    println!("\n...and with the shift optimiser off");
+    println!(
+        "{:<34} {:>9} {:>9} {:>9} {:>9} {:>10}",
+        "a mm", "x1", "x2", "sum", "eps", "eta fwd"
+    );
+    for k in 0..=3 {
+        let a = tight + (free_at - tight) * f64::from(k) / 3.0;
+        match solved(false, Some(a)) {
+            Ok(r) => row(&format!("{a:.4}"), &r),
+            Err(e) => println!("{a:.4}: {e}"),
+        }
+    }
 }
 
 /// **What the two epicyclic kinds choose, and whether their tools leave it.**

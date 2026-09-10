@@ -77,8 +77,11 @@ centre_distance: Auto<number>,
  * Added to the centre distance, mm — the assembly clearance, and so the
  * backlash.
  *
- * Read only where something is free to absorb it; see
- * [`Self::clearance_taken`], which is the whole of that rule.
+ * **Read only where something is free to absorb it** — the automatic
+ * centre distance, which is this opened out, or the shifts when they are
+ * being chosen. Given a distance with nothing free, it is not read at all
+ * and the backlash is a consequence; `solve_spur_stage` is where that
+ * happens and is the whole of the rule.
  */
 clearance: number, tolerance_plus: number, tolerance_minus: number, 
 /**

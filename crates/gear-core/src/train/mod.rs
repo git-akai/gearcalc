@@ -2745,7 +2745,7 @@ mod tests {
             let bounds = Bounds {
                 floor: asked.map(|a| a.search_floor),
                 min_contact_ratio: stage.optimisation.min_contact_ratio,
-                clearance: stage.clearance_taken(),
+                clearance: stage.clearance,
             };
             let pair = |q: [f64; 2]| [0, 1].map(|i| stage.params_at(i, q[i]));
             // The stage's own answer at a shift pair, and `None` where the pair
@@ -2858,7 +2858,7 @@ mod tests {
             let zero = crate::mesh::Mesh::new(&g[0], &g[1], crate::mesh::MeshKind::External)
                 .expect("the pair meshes");
             let mesh = zero
-                .at(zero.a_w + stage.clearance_taken())
+                .at(zero.a_w + stage.clearance)
                 .expect("...at its running distance");
             for (i, gap) in mesh
                 .bottom_clearance([g[0].ra, g[1].ra], [g[0].rf, g[1].rf])
