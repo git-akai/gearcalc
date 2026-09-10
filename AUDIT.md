@@ -108,7 +108,7 @@ where it was 3.2e-4. It cost eight times the time on a pair, which is F61.
 | 3 | Unify what is written twice | **done** |
 | 3b | The direction sweep, second half — the ratings | **done** — gate proven |
 | 4 | The optimiser | **done** — gates proven; the closed form weighed and declined, with its derivation kept |
-| 5 | Consolidate the tests | **in progress** — six passes run; F60 and F61 remain |
+| 5 | Consolidate the tests | **in progress** — seven passes run; F61 and F48 remain |
 | 6 | Front end and payload | not started |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
@@ -148,14 +148,10 @@ for each mutation:
 | 4 | the tests that never met their case | F21, F14, F6 |
 | 5 | the five modules with no inline tests | F13, F71 |
 | 6 | F12, by counting rather than by reading | F12 |
+| 7 | F60 — the *reporting* side of "a constraint belongs to the mesh" | F60, and a live wrong answer |
 
 **Open, and Phase 5's remaining work:**
 
-- **F60** — a hula pair's tip margin and an internal mesh's interference flags
-  are each asked by one kind. This is the *consolidation* finding: the
-  continuation of `auto::MeshTrial`, which put "what is asked of a mesh" in one
-  place and closed F59. These two constraints are the next ones that belong
-  there.
 - **F61** — a pair pays eight times over for starts that all land on the same
   point. Measured under F50; the repair is to stop a walk that has arrived
   somewhere already walked, not to cut the budget back.
@@ -257,7 +253,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F55 | A centre distance no admissible shifts can reach is answered rather than refused | gap | 4 | open |
 | F58 | The hula stage's shift optimiser moves no answer over a band of tooth differences, on or off | holds? | 4 | open — observed, not yet diagnosed |
 | F59 | Three kinds each wrote out what to ask of a mesh, and answered it three ways | gap | 4 | **closed** — `auto::MeshTrial`, and logged in `corrections.md` |
-| F60 | A hula pair's tip margin and an internal mesh's interference flags are asked by one kind each | gap | 5 | open — the next candidates for the mesh level |
+| F60 | A hula pair's tip margin and an internal mesh's interference flags are asked by one kind each | **gap** | 5 | **closed** — `train::TipRoom` on `MeshReport`; and it found the shipped set interfering, see below |
 | F56 | No CLI command drove the optimiser, so its answers were outside the corpus | gap | 4 | **closed** — `gear-cli shifts`, which also closes F19's first row |
 | F57 | `check_figures.py` had `check_golden.sh`'s stale-binary fault | drift | 4 | **closed** — and logged in `corrections.md` |
 | F2 | The worm stage is outside the shared member vocabulary | gap | 3 | **closed** — option B; a crossed member is a `GearResult`, a worm's is not and says why |
@@ -1522,6 +1518,60 @@ it" — its most interesting possible finding — for what was a typo. It builds
 first and records `DOES-NOT-COMPILE` separately now. *An instrument whose failure
 mode is indistinguishable from its most interesting finding will hand you that
 finding.*
+
+
+### Phase 5, seventh pass — F60, and the finding under it
+
+**The finding as recorded:** a hula pair's tip margin and an internal mesh's
+interference flags are asked by one kind each, and they are the next candidates
+for the mesh level — the continuation of `auto::MeshTrial`, which closed F59 by
+putting *what is asked of a mesh* in one place.
+
+**The half that was left** is what the asking **found**. `MeshTrial` had taken
+the constraints; the four numbers a reader is given were still four fields on
+`HulaMesh`, computed in the hula stage's file and drawn in the hula stage's form.
+An epicyclic set has the same internal mesh in it and reported none of them. *A
+designer was told whether their teeth foul according to which stage kind they
+had picked.*
+
+One `train::TipRoom` on `MeshReport` now, `None` on an external mesh — which is
+not three answers of `false` but a question that does not arise, since an
+external pair's tip circles cross on the line of centres or not at all. The
+search reads the same value as its fourth refusal, so the reader and the
+constraint cannot come to different conclusions, and the hula's own pre-check —
+one of the three, asked immediately before building the trial — is gone.
+
+**And it found a live wrong answer.** `ring::mesh_with` has known since it
+existed that a full-depth internal pair interferes: the ring's tip can only touch
+the pinion's involute while `√(r_a2² − r_b2²) ≥ a sin α_w`, and `ring.rs` carries
+a test saying a 60-tooth ring misses it against every pinion from 20 to 40 teeth.
+**Nothing ever put the question to a set.** The shipped 24/18/60 — full-depth
+ring at zero shift — has involute interference on its planet-ring mesh and had
+never said so. It says so now, and `gear-cli planetstage` prints it, which is
+what puts it in the change detector.
+
+| measured | before wiring it in |
+|---|---|
+| epicyclic sets swept, ring shift pinned | 30 |
+| answers the new refusal moves | **2**, both under 5e-5 of `η₀` |
+| numbers moved in the whole corpus | **1** — 17/17's shift division, by 0.002 modules, at the same efficiency to four decimals |
+| searches that returned nothing where the ring is full depth | all of them, which is the refusal being right |
+
+The last row is the one to read twice: with a full-depth ring **every** candidate
+fouls, so the optimiser now finds nothing admissible and falls back to the plain
+shifts. That is correct and it is not silent — the mesh row says which condition
+bit, and the remedy is the ring's addendum, which is an input. Shortening it to
+0.75 clears the same set, and that is the second half of the gate: *a canary that
+only watches the shipped set interfere would pass if everything interfered for a
+new reason.*
+
+`StageResult::meshes()` arrives beside `members()` for the reason `members()`
+exists — a walk that names the kinds is a walk that forgets one — and the panel
+draws the row from the shared `meshRows` snippet, whose own comment already
+records this fault happening once before, to the axial-overlap warning.
+
+> **Gate, run.** A set reporting no tip room fails two tests; the refusal
+> relieved fails a third and moves two corpus files.
 
 
 ---
