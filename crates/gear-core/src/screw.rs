@@ -357,6 +357,65 @@ impl Screw {
         })
     }
 
+    /// **The first member's lead angle at which the centre distance is least.**
+    ///
+    /// A screw pair's centre distance is `(d₁ + d₂)/2`, and the two move
+    /// opposite ways as the first member is resized: `d₁ = z₁ m_n / sin γ`
+    /// shrinks as the thread steepens while `d₂ = z₂ m_n / cos β₂` grows. So the
+    /// distance has a **minimum**, and a target above it is reached by *two*
+    /// different worms — a thin one with a fast lead and a fat one with a slow
+    /// one. Anything solving a size from a distance has to choose which.
+    ///
+    /// Differentiating `2a/m_n = z₁/sin γ + z₂/cos β₂` with `β₂ = Σ − 90° + γ`:
+    ///
+    /// ```text
+    /// z₂ sin β₂ / cos²β₂ = z₁ cos γ / sin²γ
+    /// ```
+    ///
+    /// At a right angle `β₂ = γ` and it collapses to a **closed form**,
+    ///
+    /// ```text
+    /// tan γ = (z₁/z₂)^⅓
+    /// ```
+    ///
+    /// which is returned exactly. Off the right angle the same condition is
+    /// bracketed, over the interval where both members still have a real
+    /// diameter. [verified: at `Σ = 90°`, `z₁ = 1`, `z₂ = 40` the closed form
+    /// gives γ = 16.30° and `d₁ = 3.562 mm`, which is where a scan of the
+    /// distance turns.]
+    ///
+    /// `None` where no interior minimum exists.
+    #[must_use]
+    pub fn least_distance_lead_angle(
+        starts: u32,
+        wheel_teeth: u32,
+        shaft_angle: f64,
+    ) -> Option<f64> {
+        let (z1, z2) = (f64::from(starts), f64::from(wheel_teeth));
+        if !(z1 > 0.0 && z2 > 0.0 && shaft_angle.is_finite()) {
+            return None;
+        }
+        let right_angle = std::f64::consts::FRAC_PI_2;
+        if (shaft_angle - right_angle).abs() < 1e-12 {
+            return Some((z1 / z2).cbrt().atan());
+        }
+        // `d(2a)/dγ`, whose root is the turning point. Both terms are finite
+        // only where each member still has a diameter, which is the bracket.
+        let slope = |gamma: f64| {
+            let beta2 = shaft_angle - right_angle + gamma;
+            let (s, c) = (gamma.sin(), gamma.cos());
+            let (sb, cb) = (beta2.sin(), beta2.cos());
+            if s.abs() < 1e-12 || cb.abs() < 1e-12 {
+                return f64::NAN;
+            }
+            z2 * sb / (cb * cb) - z1 * c / (s * s)
+        };
+        // γ ∈ (0, 90°) and |β₂| < 90°, so γ < 180° − Σ.
+        let hi = right_angle.min(std::f64::consts::PI - shaft_angle) - 1e-9;
+        let lo = 1e-9;
+        (lo < hi).then(|| crate::solve::brent(slope, lo, hi, crate::solve::Tol::default()))?
+    }
+
     /// The sliding direction resolved on member `which`'s velocity direction.
     fn slide_on(&self, which: u8) -> f64 {
         let k = self.velocity_ratio();
@@ -1768,6 +1827,85 @@ mod tests {
                 assert!(*below.get(drive) > 0.0 && !*below.locked().get(drive));
                 let above = Directional::of(|d| s.efficiency(threshold * 1.1, d));
                 assert!(*above.get(drive) < 0.0 && *above.locked().get(drive));
+            }
+        }
+    }
+
+    /// **The centre distance really does turn where the closed form says**, and
+    /// it really does turn — checked against a scan that shares none of its
+    /// arithmetic.
+    ///
+    /// `least_distance_lead_angle` differentiates `2a/m_n = z₁/sin γ +
+    /// z₂/cos β₂` and solves for the root; at a right angle that collapses to
+    /// `tan γ = (z₁/z₂)^⅓`. A scan knows nothing of either — it builds pairs and
+    /// reads their distances — so agreeing is evidence rather than restatement.
+    ///
+    /// The second claim is the one the sizing depends on: the distance is
+    /// **higher on both sides**, so a target above the minimum has two answers
+    /// and picking one is a decision.
+    #[test]
+    fn the_centre_distance_turns_where_the_closed_form_says() {
+        for (starts, wheel, sigma_deg) in [
+            (1u32, 40u32, 90.0_f64),
+            (2, 40, 90.0),
+            (1, 17, 90.0),
+            (4, 60, 90.0),
+            (1, 40, 70.0),
+            (2, 31, 110.0),
+        ] {
+            let sigma = sigma_deg.to_radians();
+            let gamma = Screw::least_distance_lead_angle(starts, wheel, sigma)
+                .expect("these pairs all have a minimum");
+            let m_n = 1.0;
+            let d_of = |g: f64| f64::from(starts) * m_n / g.sin();
+            let distance = |g: f64| -> Option<f64> {
+                Screw::new(&ScrewParams {
+                    normal_module: m_n,
+                    shaft_angle: sigma,
+                    starts,
+                    wheel_teeth: wheel,
+                    worm_pitch_diameter: d_of(g),
+                    ..Default::default()
+                })
+                .ok()
+                .map(|s| s.centre_distance)
+            };
+
+            // The scan's own least point, over the whole admissible range of
+            // lead angles rather than near the answer being checked.
+            let (mut best, mut at) = (f64::INFINITY, f64::NAN);
+            const N: u32 = 40_000;
+            for k in 1..N {
+                let g = std::f64::consts::FRAC_PI_2 * f64::from(k) / f64::from(N);
+                if let Some(a) = distance(g) {
+                    if a < best {
+                        best = a;
+                        at = g;
+                    }
+                }
+            }
+            let step = std::f64::consts::FRAC_PI_2 / f64::from(N);
+            assert!(
+                (gamma - at).abs() <= 2.0 * step,
+                "{starts}/{wheel} at {sigma_deg}°: closed form {}° against a scan's {}°",
+                gamma.to_degrees(),
+                at.to_degrees()
+            );
+
+            // ...and it is a minimum, not merely a stationary point: the
+            // distance rises on both sides. Without this the sizing's two
+            // branches would be a claim rather than a fact.
+            let here = distance(gamma).expect("the turning point is buildable");
+            for away in [0.02_f64, 0.1, 0.3] {
+                for side in [-1.0_f64, 1.0] {
+                    if let Some(there) = distance(gamma + side * away) {
+                        assert!(
+                            there > here,
+                            "{starts}/{wheel}: {}° gives {there} against {here} at the turn",
+                            (gamma + side * away).to_degrees()
+                        );
+                    }
+                }
             }
         }
     }

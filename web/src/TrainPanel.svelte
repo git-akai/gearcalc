@@ -1680,20 +1680,22 @@
 
             <div class="gears">
               <div class="gear">
-                <h4>{t("pitch_diameter" in stage.sizing ? "ui.train_worm_member" : "ui.train_first_gear")}</h4>
+                <h4>{t("pitch_diameter" in stage.sizing.manual ? "ui.train_worm_member" : "ui.train_first_gear")}</h4>
                 <label>
-                  <span>{t("pitch_diameter" in stage.sizing ? "ui.train_starts" : "ui.train_tooth_count")}</span>
+                  <span>{t("pitch_diameter" in stage.sizing.manual ? "ui.train_starts" : "ui.train_tooth_count")}</span>
                   <input type="number" step="1" bind:value={stage.starts} />
                 </label>
                 <label>
                   <span>{t("ui.train_sized_by")}</span>
                   <select
-                    value={"pitch_diameter" in stage.sizing ? "diameter" : "helix"}
+                    value={"pitch_diameter" in stage.sizing.manual ? "diameter" : "helix"}
                     onchange={(e) => {
                       // Swap which of the two is the input, seeding the new one
-                      // from the geometry so the pair does not jump.
+                      // from the geometry so the pair does not jump. Which unit
+                      // it is stated in and whether it is stated at all are
+                      // different questions, so the toggle is left alone here.
                       const g = wres;
-                      stage.sizing =
+                      stage.sizing.manual =
                         e.currentTarget.value === "diameter"
                           ? { pitch_diameter: g ? g.members[0].pitch_diameter : 7 }
                           : { helix_angle: g ? 90 - g.lead_angle : 45 };
@@ -1703,19 +1705,39 @@
                     <option value="helix">{t("ui.train_helix_angle_gear")}</option>
                   </select>
                 </label>
-                {#if "pitch_diameter" in stage.sizing}
-                  <label>
-                    <span>{t("ui.train_pitch_diameter")}</span>
-                    <input type="number" step="0.5" bind:value={stage.sizing.pitch_diameter} />
-                    <em>{t("ui.train_mm")}</em>
-                  </label>
+                <!-- **A screw stage has no profile shift**, so its *size* is the
+                     only thing inside it free to absorb a given centre distance.
+                     Automatic here is that mode: the worm is solved to reach the
+                     housing, which changes the teeth rather than where they sit
+                     — the one kind where mode 3 does — and is why the size leads
+                     this stage's relief order rather than the distance.
+                     `Stage::relieved` keeps the three from over-specifying. -->
+                {#if "pitch_diameter" in stage.sizing.manual}
+                  {@render autoNumber(
+                    "ui.train_pitch_diameter",
+                    { get auto() { return stage.sizing.auto; },
+                      set auto(v) { stage.sizing.auto = v; },
+                      get manual() { return (stage.sizing.manual as { pitch_diameter: number }).pitch_diameter; },
+                      set manual(v) { stage.sizing.manual = { pitch_diameter: v }; } },
+                    wres?.members[0].pitch_diameter,
+                    0.5,
+                    () => relieveStage(stage, "first_member_size"),
+                    undefined,
+                    "ui.train_mm",
+                  )}
                 {:else}
-                  <label>
-                    <span>{t("ui.train_helix_angle")}</span>
-                    <input type="number" step="1" bind:value={stage.sizing.helix_angle} />
-                    <em>°</em>
-                    <small>{t("ui.train_mate_takes_rest_shaft_angle")}</small>
-                  </label>
+                  {@render autoNumber(
+                    "ui.train_helix_angle",
+                    { get auto() { return stage.sizing.auto; },
+                      set auto(v) { stage.sizing.auto = v; },
+                      get manual() { return (stage.sizing.manual as { helix_angle: number }).helix_angle; },
+                      set manual(v) { stage.sizing.manual = { helix_angle: v }; } },
+                    wres ? 90 - wres.lead_angle : undefined,
+                    1,
+                    () => relieveStage(stage, "first_member_size"),
+                    t("ui.train_mate_takes_rest_shaft_angle"),
+                    "",
+                  )}
                 {/if}
                 {#if wres && wres.members[0].recommended_face_width == null}
                   <!-- No recommendation exists for a crossed pair, so there is

@@ -1002,7 +1002,9 @@ mod tests {
             let stage = gear_core::train::WormStage {
                 sliding_friction: friction,
                 static_friction: friction,
-                sizing: gear_core::train::FirstMemberSizing::HelixAngle(45.0),
+                sizing: gear_core::params::Auto::fixed(
+                    gear_core::train::FirstMemberSizing::HelixAngle(45.0),
+                ),
                 worm: gear_core::train::WormMember {
                     face_width: gear_core::params::Auto::automatic(6.0),
                     ..Default::default()
@@ -1048,7 +1050,9 @@ mod tests {
                 &gear_core::train::WormStage {
                     sliding_friction: friction,
                     static_friction: friction,
-                    sizing: gear_core::train::FirstMemberSizing::HelixAngle(3.0),
+                    sizing: gear_core::params::Auto::fixed(
+                        gear_core::train::FirstMemberSizing::HelixAngle(3.0),
+                    ),
                     worm: gear_core::train::WormMember {
                         face_width: gear_core::params::Auto::automatic(6.0),
                         ..Default::default()

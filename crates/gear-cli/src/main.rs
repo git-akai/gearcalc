@@ -2461,6 +2461,53 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
         at(threshold.backward)
     );
 
+    // **A worm sized to reach a given centre distance** — F39's fourth item.
+    // A screw stage has no profile shift, so its size is the only thing inside
+    // it free to absorb one, and the distance has a *minimum* in that size, so
+    // a target above it is reached by two different worms. The branch is the one
+    // the designer's own number is on, which is what makes the answers below
+    // move smoothly instead of jumping.
+    {
+        use gear_core::train::{FirstMemberSizing, WormStage};
+        let least =
+            Screw::least_distance_lead_angle(starts, wheel_teeth, shaft_angle_deg.to_radians());
+        println!();
+        if let Some(least) = least {
+            println!(
+                "  centre distance is least at lead angle {:.4} deg  (d1 {:.4} mm) \
+                 — above it two worms reach the same distance",
+                least.to_degrees(),
+                f64::from(starts.max(1)) / least.sin()
+            );
+        }
+        println!("  a mm given, worm sized to reach it");
+        let base = WormStage {
+            shaft_angle: shaft_angle_deg,
+            starts,
+            wheel_teeth,
+            sizing: gear_core::params::Auto::fixed(FirstMemberSizing::PitchDiameter(worm_diameter)),
+            ..WormStage::default()
+        };
+        if let Ok(g0) = base.geometry() {
+            for step in 0..5 {
+                let target = g0.centre_distance + 0.5 * f64::from(step);
+                let mut stage = base.clone();
+                stage.sizing.auto = true;
+                stage.centre_distance =
+                    gear_core::params::Auto::fixed(target + stage.clearance.manual);
+                match stage.geometry() {
+                    Err(e) => println!("  {target:9.4}  {e:?}"),
+                    Ok(s) => println!(
+                        "  {target:9.4}  d1 {:8.4} mm   lead angle {:7.4} deg   ran at {:9.4}",
+                        stage.first_pitch_diameter(),
+                        s.lead_angle.to_degrees(),
+                        s.centre_distance
+                    ),
+                }
+            }
+        }
+    }
+
     // Contact is the strength figure a worm stage reports. There is deliberately
     // no bending stress here; docs/reference.md#crossed-axes says why.
     let lib = gear_io::default_library();
@@ -2511,7 +2558,9 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
     let stage = WormStage {
         starts,
         wheel_teeth,
-        sizing: gear_core::train::FirstMemberSizing::PitchDiameter(worm_diameter),
+        sizing: gear_core::params::Auto::fixed(gear_core::train::FirstMemberSizing::PitchDiameter(
+            worm_diameter,
+        )),
         wheel: WormMember {
             material: "Brass C360".into(),
             ..WormMember::default()
@@ -2885,7 +2934,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
             shaft_angle,
             starts: z1,
             wheel_teeth: z2,
-            sizing: FirstMemberSizing::HelixAngle(beta1),
+            sizing: gear_core::params::Auto::fixed(FirstMemberSizing::HelixAngle(beta1)),
             ..WormStage::default()
         };
         let Ok(g) = stage.geometry() else {

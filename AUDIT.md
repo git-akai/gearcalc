@@ -102,8 +102,17 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
-**Phase 6 — the front end and the payload.** In progress. **A planetary set has
-a centre distance** (F39 item 3) — the one kind whose geometry a housing most
+**Phase 6 — the front end and the payload.** In progress. **F39 is closed on all
+four items.** The last is the worm, which has no profile shift, so its *size*
+absorbs a given distance — and a screw pair's centre distance turns out not to be
+monotone in that size: it has a minimum at `tan γ = (z₁/z₂)^⅓`, closed form at a
+right angle, so a target above it is reached by **two** different worms and the
+branch is chosen by continuity. Verified against a scan sharing none of its
+arithmetic. What is *not* done is the answer's wider half — a worm wheel with the
+helical inputs it is denied — which wants an interference check no mesh kind has
+(F79).
+
+**A planetary set has a centre distance** (F39 item 3) — the one kind whose geometry a housing most
 constrains was the one kind that could not be told about one. A target makes the
 layout *easier*: two closed-form sums instead of one Newton iteration, and one
 shift left free. It also found **F78**: a set's shifts carry a relation of their
@@ -368,7 +377,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F36 | `SpurResult` re-declared `MeshReport`'s seven fields, and the panel re-drew them | gap | 3 | **closed** |
 | F37 | A given crank offset was not the offset the stage ran at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F38 | The reported clearance was the input echoed, not the gap run at | gap | 3 | **closed** — and logged in `corrections.md` |
-| F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | **part closed** — items 1, 2 and 3 done; item 4 (a worm's absorber) answered and open |
+| F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | **closed for all four items** — item 4's *minimum* (the worm's size absorbs a distance) is done; its *ideal*, a wheel with helical inputs and an interference check, is recorded as F79 |
+| F79 | No mesh kind has a tip-to-flank interference check, which a worm wheel's absorbing shift would need — and which would serve every kind | gap | — | **open**, scoped |
 | F78 | A planetary set's freedoms written as one flat group left it over-determined — its shifts carry a relation of their own that a pair's do not | gap | 6 | **closed** — the shift limit is read from the distance's toggle; the relief test checks every group now |
 | F75 | The optimiser's fallback discarded the *centre distance* along with the optimisation whenever its own constraints admitted nothing | **gap** | 6 | **closed** — the fallback is what the constraints imply, not what the stage would build unasked |
 | F76 | The over-constraint rule lived in the panel as three per-kind functions, untested in either language | gap | 6 | **closed** — `Stage::freedoms` and `Stage::relieved`, gates proven |
@@ -2126,6 +2136,75 @@ group it had just relieved; it checks *every* group now, which is what makes
 `gear-cli planetstage` prints the given-distance table, so the path is in the
 change detector — the seventh time this audit has had to add a case for *an
 opt-in the harness never switches on*.
+
+### F39, item 4 — a worm sized by its housing
+
+**The question the audit left open** was what absorbs a given centre distance in
+a stage that has no profile shift. The answer given was the worm's own size, and
+that is what is built: `FirstMemberSizing` is an `Auto` now, so the pitch
+diameter or the helix angle — two readings of one number — can be the thing the
+distance decides.
+
+**It is the one kind whose mode 3 changes the teeth**, not where they sit, which
+is why the size *leads* this stage's relief order where every other kind's
+distance does. A designer stating a housing and a clearance is asking what worm
+fits, so the worm is the answer rather than the input that should give way.
+
+#### The interesting part: there are two answers, or none
+
+A screw pair's centre distance is not monotone in the worm's size. Steepening the
+thread shrinks the worm and grows the wheel, so `2a/m_n = z₁/sin γ + z₂/cos β₂`
+has a **minimum** — and above it two quite different worms reach the same
+centres. Differentiating and solving:
+
+```text
+z₂ sin β₂ / cos²β₂ = z₁ cos γ / sin²γ        β₂ = Σ − 90° + γ
+tan γ = (z₁/z₂)^⅓                            at a right angle, closed form
+```
+
+> **Verified against a scan that shares none of its arithmetic** — one that
+> builds pairs and reads their distances rather than differentiating anything —
+> at six geometries including two off the right angle, to within two steps of a
+> 40,000-point grid. The scan also confirms it is a *minimum* rather than a
+> stationary point, which is what makes the two branches a fact rather than a
+> claim.
+
+On the shipped 1/40 worm the turn is at **γ = 16.2990°, d₁ = 3.5632 mm**, and
+`gear-cli worm` prints it beside the sizing table.
+
+**The branch is chosen by continuity** — the side the designer's own number is
+on. It is the only choice under which nudging the target moves the answer instead
+of jumping between a thin fast worm and a fat slow one, and it makes the control
+behave like every other automatic value: it starts where you left it.
+
+| a mm asked | d₁ solved | lead angle | ran at |
+|---|---|---|---|
+| 23.7073 | 7.0000 | 8.2132° | 23.7073 |
+| 24.7073 | 9.1748 | 6.2573° | 24.7073 |
+| 25.7073 | 11.2557 | 5.0971° | 25.7073 |
+
+> **Gates, run — three.** Ignoring the automatic size fails the distance law;
+> taking the wrong branch fails it; and `(z₁/z₂)^⅓` written as a square root
+> fails the closed-form check against the scan.
+
+**And a units bug was caught by its own test on the first run.**
+`WormStage::shaft_angle` is the designer's number in degrees and `Screw`'s is the
+mathematics' in radians; the new call passed one where the other was wanted, and
+the turning point came back `None` on a right-angle pair. Written down because it
+is the kind of thing that survives when a test asserts a shape rather than a
+value.
+
+#### What of item 4 is *not* done
+
+The answer given went further than this: *ideally the wheel absorbs the missing
+helical inputs — addendum, dedendum, profile shift — and gains an automatic shift
+that absorbs the distance **in preference to** the diameter.* That is a larger
+change: a `WormMember` would have to become something much closer to a
+`StageGear`, and it wants an interference check — worm tip to flank, flank to
+undercut junction — which **no mesh kind has today**. If that check is closed
+form it belongs beside `Mesh::bottom_clearance` and `train::TipRoom`, serving
+every kind, rather than being written for this one. Recorded as the shape of the
+work rather than attempted.
 
 ### The toggle model, built
 

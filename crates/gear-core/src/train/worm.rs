@@ -224,9 +224,15 @@ pub struct WormStage {
     pub thickness_mod: f64,
     /// Starts on the worm.
     pub starts: u32,
-    /// How the first member's size is fixed — the *only* thing that
-    /// distinguishes a worm stage from a crossed gear pair.
-    pub sizing: FirstMemberSizing,
+    /// **How big the first member is**, and whether the designer says so.
+    ///
+    /// Which *unit* it is stated in — a pitch diameter or a helix angle — is the
+    /// only thing that distinguishes a worm stage from a crossed gear pair, and
+    /// they are two readings of one number (`sin γ = z m_n / d`). Automatic, that
+    /// number is solved to reach a given centre distance: a screw stage has no
+    /// profile shift, so its **size** is the only thing inside it free to absorb
+    /// one, which is what F39's fourth item asks.
+    pub sizing: Auto<FirstMemberSizing>,
     /// Teeth on the wheel.
     pub wheel_teeth: u32,
     /// Automatic uses the geometry's own centre distance plus `clearance`.
@@ -253,7 +259,7 @@ impl Default for WormStage {
             static_friction: 0.16,
             thickness_mod: 1.0,
             starts: 1,
-            sizing: FirstMemberSizing::PitchDiameter(7.0),
+            sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(7.0)),
             wheel_teeth: 40,
             centre_distance: Auto::automatic(0.0),
             clearance: Auto::fixed(0.02),
@@ -529,15 +535,106 @@ pub enum FirstMemberSizing {
 
 impl WormStage {
     /// The first member's pitch diameter, mm — given, or derived from its helix
-    /// angle.
+    /// angle, or **solved to reach a given centre distance**.
+    ///
+    /// The two units are one number: `sin γ = z m_n / d` and `γ = 90° − β`, so a
+    /// diameter and a helix angle are the same freedom read two ways. Automatic
+    /// means neither was stated and the distance decides it — see
+    /// [`Self::size_reaching`], which is also where the two-answers problem is
+    /// dealt with.
+    ///
+    /// Falling back to the number in the box where the distance cannot be
+    /// reached is `docs/rationale.md`'s clamp-rather-than-refuse: the stage still
+    /// solves, at a distance the reported clearance then makes visible.
     #[must_use]
     pub fn first_pitch_diameter(&self) -> f64 {
-        match self.sizing {
+        let stated = match self.sizing.manual {
             FirstMemberSizing::PitchDiameter(d) => d,
             FirstMemberSizing::HelixAngle(beta_deg) => {
                 f64::from(self.starts.max(1)) * self.module / beta_deg.to_radians().cos()
             }
+        };
+        if !self.sizing.auto {
+            return stated;
         }
+        self.nominal_distance()
+            .and_then(|target| self.size_reaching(target, stated))
+            .unwrap_or(stated)
+    }
+
+    /// The **nominal** distance the size has to reach, where one was given — the
+    /// distance typed less the clearance it is opened by, as everywhere else.
+    fn nominal_distance(&self) -> Option<f64> {
+        (!self.centre_distance.auto && !self.clearance.auto)
+            .then_some(self.centre_distance.manual - self.clearance.manual)
+    }
+
+    /// **The first member's size that puts this pair at `target`**, mm of pitch
+    /// diameter — where one exists on the branch the stage is already on.
+    ///
+    /// A screw stage has no profile shift, so its size is the only thing inside
+    /// it free to absorb a given centre distance (F39's fourth item). Which
+    /// makes this the one kind whose mode 3 changes the *teeth* rather than
+    /// where they sit, and the reason it is opt-in.
+    ///
+    /// # Two answers, and the branch is chosen by continuity
+    ///
+    /// The distance has a **minimum** in the worm's diameter
+    /// ([`Screw::least_distance_lead_angle`]): steepening the thread shrinks the
+    /// worm and grows the wheel, and past the turning point the second wins. So
+    /// a target above the minimum is reached by two worms, and picking one is a
+    /// decision rather than a calculation.
+    ///
+    /// It is taken **on the side the designer's own number is on**, which is the
+    /// only choice under which nudging the target moves the answer smoothly
+    /// instead of jumping between a thin fast worm and a fat slow one. A target
+    /// *below* the minimum is reached by neither and there is no answer to give.
+    fn size_reaching(&self, target: f64, from: f64) -> Option<f64> {
+        let z1 = f64::from(self.starts.max(1));
+        // **Degrees here, radians there.** `WormStage::shaft_angle` is the
+        // designer's number and `Screw`'s is the mathematics', which is the
+        // conversion `geometry()` does one line into building one.
+        let least = Screw::least_distance_lead_angle(
+            self.starts.max(1),
+            self.wheel_teeth,
+            self.shaft_angle.to_radians(),
+        )?;
+        let turning = z1 * self.module / least.sin();
+
+        let distance = |d1: f64| -> f64 {
+            let mut probe = self.clone();
+            probe.sizing = Auto::fixed(FirstMemberSizing::PitchDiameter(d1));
+            probe.geometry().map_or(f64::NAN, |s| s.centre_distance)
+        };
+
+        // The two branches meet at the turning point. `thin` is bounded below by
+        // the diameter at which the thread would wrap at a right angle, which is
+        // where `Screw::new` refuses (`WormTooThin`).
+        // **`from` rather than `first_pitch_diameter()`** — that is what calls
+        // this, and reading it back here would recurse forever. It is the
+        // designer's own number, which is the whole point: the branch is chosen
+        // by where they already are.
+        let floor = z1 * self.module;
+        let (lo, hi) = if from <= turning {
+            (floor * (1.0 + 1e-9), turning)
+        } else {
+            // No upper bound in the geometry, so one is grown until it brackets
+            // — the distance rises without bound on this branch, so it does.
+            let mut top = turning.max(from) * 2.0;
+            for _ in 0..60 {
+                if distance(top) >= target || !distance(top).is_finite() {
+                    break;
+                }
+                top *= 2.0;
+            }
+            (turning, top)
+        };
+        crate::solve::brent(
+            |d1| distance(d1) - target,
+            lo,
+            hi,
+            crate::solve::Tol::default(),
+        )
     }
 
     /// The screw geometry this stage describes.
@@ -550,7 +647,7 @@ impl WormStage {
         // angle has become a diameter and the information is gone: `cos 90°` is
         // 6e-17, not zero, so the diameter comes out enormous rather than
         // infinite and passes every finiteness check downstream.
-        if let FirstMemberSizing::HelixAngle(beta) = self.sizing {
+        if let FirstMemberSizing::HelixAngle(beta) = self.sizing.manual {
             if beta.abs() >= 90.0 {
                 return Err(TrainError::Screw(
                     crate::screw::ScrewError::FirstMemberIsADisc,
@@ -613,7 +710,9 @@ pub fn solve_crossed_stage(
         static_friction: stage.static_friction,
         thickness_mod: stage.thickness_mod,
         starts: stage.gears[0].teeth,
-        sizing: FirstMemberSizing::HelixAngle(stage.helix_angles()[0]),
+        // A crossed pair's helix is a *gear's* input, so it is given by
+        // construction: the pair has its own shifts to absorb a distance with.
+        sizing: Auto::fixed(FirstMemberSizing::HelixAngle(stage.helix_angles()[0])),
         wheel_teeth: stage.gears[1].teeth,
         centre_distance: stage.centre_distance,
         clearance: stage.clearance,
@@ -803,7 +902,7 @@ pub fn solve_worm_stage(
     // The face widths, decided before anything that reads them — the path is
     // one of those things now, since a face narrow enough to cut the zone
     // changes what the mesh does as well as how long it does it for.
-    let recommended = match stage.sizing {
+    let recommended = match stage.sizing.manual {
         FirstMemberSizing::PitchDiameter(_) => [
             Some(proportions::worm_length(
                 s.axial_module,
@@ -1321,6 +1420,84 @@ mod tests {
         solve_worm_stage(stage, StageTorques::just(2.0), &library()).unwrap()
     }
 
+    /// **A worm stage runs at the centre distance it was given**, by sizing the
+    /// worm — which is the only thing inside it free to absorb one.
+    ///
+    /// F39's fourth item. A screw stage has no profile shift, so where a pair
+    /// moves its teeth sideways this one has to change how big they are; that is
+    /// why it is opt-in and why the size leads its relief order.
+    ///
+    /// Two claims, and the second is the interesting one. The distance asked for
+    /// is the distance run at — and the answer stays on **the branch the
+    /// designer's own number is on**, because a screw pair's centre distance has
+    /// a minimum in the worm's diameter and a target above it is reached by two
+    /// different worms.
+    #[test]
+    fn a_worm_sized_automatically_reaches_the_distance_it_was_given() {
+        let free = WormStage::default();
+        let a0 = free
+            .geometry()
+            .expect("the shipped worm exists")
+            .centre_distance;
+        let turning = Screw::least_distance_lead_angle(
+            free.starts,
+            free.wheel_teeth,
+            free.shaft_angle.to_radians(),
+        )
+        .expect("a right-angle pair has one");
+        let d_turning = f64::from(free.starts) * free.module / turning.sin();
+        assert!(
+            free.first_pitch_diameter() > d_turning,
+            "the shipped worm should sit on the fat branch: {} against {d_turning}",
+            free.first_pitch_diameter()
+        );
+
+        let mut checked = 0u32;
+        for step in 0..6 {
+            let target = a0 + 0.5 * f64::from(step);
+            let mut stage = free.clone();
+            stage.sizing.auto = true;
+            stage.centre_distance = Auto::fixed(target + stage.clearance.manual);
+            let Ok(s) = stage.geometry() else { continue };
+            checked += 1;
+
+            assert!(
+                (s.centre_distance - target).abs() < 1e-6,
+                "asked {target}, sized to {} which runs at {}",
+                stage.first_pitch_diameter(),
+                s.centre_distance
+            );
+            // The fat branch, which is where the shipped worm is. The thin one
+            // reaches the same distances with a wildly different worm, and
+            // jumping between the two on a nudge is what continuity forbids.
+            assert!(
+                stage.first_pitch_diameter() >= d_turning,
+                "the answer left the branch it started on: {} against {d_turning}",
+                stage.first_pitch_diameter()
+            );
+        }
+        assert!(checked >= 5, "only {checked} targets were reachable");
+
+        // ...and from the thin branch, the thin answer.
+        let mut thin = free.clone();
+        thin.sizing = Auto::fixed(FirstMemberSizing::PitchDiameter(d_turning * 0.6));
+        let from_thin = thin.geometry().expect("a thin worm exists").centre_distance;
+        thin.sizing.auto = true;
+        thin.centre_distance = Auto::fixed(from_thin + 0.4 + thin.clearance.manual);
+        if let Ok(s) = thin.geometry() {
+            assert!(
+                (s.centre_distance - (from_thin + 0.4)).abs() < 1e-6,
+                "the thin branch should reach its own target: {}",
+                s.centre_distance
+            );
+            assert!(
+                thin.first_pitch_diameter() <= d_turning,
+                "a thin worm should stay thin: {}",
+                thin.first_pitch_diameter()
+            );
+        }
+    }
+
     /// **A crossed pair is rated on the contact line its teeth actually have.**
     ///
     /// The elliptical solution assumes half-spaces of unlimited extent, so as
@@ -1353,13 +1530,13 @@ mod tests {
             shaft_angle: sigma_deg.to_radians(),
             starts: 17,
             wheel_teeth: 23,
-            sizing: FirstMemberSizing::HelixAngle(sigma_deg.to_radians() / 2.0),
+            sizing: Auto::fixed(FirstMemberSizing::HelixAngle(sigma_deg.to_radians() / 2.0)),
             ..Default::default()
         };
         let worm = WormStage {
             starts: 1,
             wheel_teeth: 40,
-            sizing: FirstMemberSizing::PitchDiameter(7.0),
+            sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(7.0)),
             ..Default::default()
         };
         for (name, stage, line_should_govern) in [
@@ -1432,7 +1609,7 @@ mod tests {
             let stage = WormStage {
                 starts,
                 wheel_teeth: teeth,
-                sizing: FirstMemberSizing::PitchDiameter(d1),
+                sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(d1)),
                 axial_clearance: 0.04,
                 // isolate the axial term: no clearance on the centre distance
                 clearance: Auto::fixed(0.0),
@@ -1647,7 +1824,7 @@ mod tests {
         let crossed = solved(&WormStage {
             starts: 17,
             wheel_teeth: 23,
-            sizing: FirstMemberSizing::HelixAngle(45.0),
+            sizing: Auto::fixed(FirstMemberSizing::HelixAngle(45.0)),
             worm: WormMember {
                 face_width: Auto::automatic(6.0),
                 ..Default::default()
@@ -1927,7 +2104,7 @@ mod tests {
             WormStage {
                 starts: 2,
                 wheel_teeth: 40,
-                sizing: FirstMemberSizing::PitchDiameter(12.0),
+                sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(12.0)),
                 ..WormStage::default()
             },
         ] {
@@ -2069,7 +2246,7 @@ mod tests {
     fn self_locking_is_said_out_loud() {
         let r = solved(&WormStage {
             starts: 1,
-            sizing: FirstMemberSizing::PitchDiameter(25.0),
+            sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(25.0)),
             sliding_friction: 0.06,
             ..Default::default()
         });
@@ -2088,7 +2265,7 @@ mod tests {
         let err = solve_worm_stage(
             &WormStage {
                 starts: 9,
-                sizing: FirstMemberSizing::PitchDiameter(8.0),
+                sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(8.0)),
                 ..Default::default()
             },
             StageTorques::just(2.0),
@@ -2129,7 +2306,7 @@ mod tests {
                         shaft_angle: sigma,
                         starts: z1,
                         wheel_teeth: z2,
-                        sizing: FirstMemberSizing::HelixAngle(beta1),
+                        sizing: Auto::fixed(FirstMemberSizing::HelixAngle(beta1)),
                         ..WormStage::default()
                     };
                     let Ok(a) = by_angle.geometry() else { continue };
@@ -2147,7 +2324,9 @@ mod tests {
                     // ...and handing the derived diameter back as a diameter is
                     // the same pair, which is what "sized the other way" means.
                     let by_diameter = WormStage {
-                        sizing: FirstMemberSizing::PitchDiameter(by_angle.first_pitch_diameter()),
+                        sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(
+                            by_angle.first_pitch_diameter(),
+                        )),
                         ..by_angle.clone()
                     };
                     let b = by_diameter.geometry().unwrap();
@@ -2179,7 +2358,7 @@ mod tests {
                 starts: 17,
                 wheel_teeth: 23,
                 // The helical member takes the whole shaft angle...
-                sizing: FirstMemberSizing::HelixAngle(sigma),
+                sizing: Auto::fixed(FirstMemberSizing::HelixAngle(sigma)),
                 ..WormStage::default()
             };
             let s = stage
@@ -2204,7 +2383,7 @@ mod tests {
             shaft_angle: 30.0,
             starts: 17,
             wheel_teeth: 23,
-            sizing: FirstMemberSizing::HelixAngle(0.0),
+            sizing: Auto::fixed(FirstMemberSizing::HelixAngle(0.0)),
             ..WormStage::default()
         };
         assert!(
@@ -2228,7 +2407,7 @@ mod tests {
                 shaft_angle: 90.0,
                 starts: 17,
                 wheel_teeth: 23,
-                sizing: FirstMemberSizing::HelixAngle(beta),
+                sizing: Auto::fixed(FirstMemberSizing::HelixAngle(beta)),
                 ..WormStage::default()
             };
             assert!(
@@ -2242,7 +2421,7 @@ mod tests {
             shaft_angle: 90.0,
             starts: 17,
             wheel_teeth: 23,
-            sizing: FirstMemberSizing::HelixAngle(89.0),
+            sizing: Auto::fixed(FirstMemberSizing::HelixAngle(89.0)),
             ..WormStage::default()
         };
         let g = stage.geometry().unwrap();
@@ -2277,7 +2456,7 @@ mod tests {
             shaft_angle: 90.0,
             starts: 17,
             wheel_teeth: 23,
-            sizing: FirstMemberSizing::HelixAngle(45.0),
+            sizing: Auto::fixed(FirstMemberSizing::HelixAngle(45.0)),
             axial_clearance: 0.0,
             worm: WormMember {
                 face_width: Auto::fixed(8.0),
@@ -2730,7 +2909,7 @@ mod tests {
             shaft_angle: 90.0,
             starts: 17,
             wheel_teeth: 23,
-            sizing: FirstMemberSizing::HelixAngle(45.0),
+            sizing: Auto::fixed(FirstMemberSizing::HelixAngle(45.0)),
             ..WormStage::default()
         };
         let r = solve_worm_stage(
@@ -2754,7 +2933,7 @@ mod tests {
                 shaft_angle: 90.0,
                 starts: 1,
                 wheel_teeth: 40,
-                sizing: FirstMemberSizing::PitchDiameter(7.0),
+                sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(7.0)),
                 ..WormStage::default()
             },
             StageTorques::just(2.0),
@@ -2781,7 +2960,7 @@ mod tests {
                     shaft_angle: sigma,
                     starts: 17,
                     wheel_teeth: 23,
-                    sizing: FirstMemberSizing::HelixAngle(sigma / 2.0),
+                    sizing: Auto::fixed(FirstMemberSizing::HelixAngle(sigma / 2.0)),
                     ..WormStage::default()
                 },
                 StageTorques::just(2.0),

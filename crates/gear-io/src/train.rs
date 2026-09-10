@@ -170,7 +170,7 @@ mod tests {
                     }),
                     Stage::Worm(WormStage::default()),
                     Stage::Worm(WormStage {
-                        sizing: FirstMemberSizing::HelixAngle(45.0),
+                        sizing: gear_core::params::Auto::fixed(FirstMemberSizing::HelixAngle(45.0)),
                         ..WormStage::default()
                     }),
                     Stage::Planetary(Box::<PlanetaryStage>::default()),

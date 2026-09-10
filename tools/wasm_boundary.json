@@ -289,7 +289,10 @@
      "thickness_mod": 1,
      "starts": 1,
      "sizing": {
-      "pitch_diameter": 7
+      "auto": false,
+      "manual": {
+       "pitch_diameter": 7
+      }
      },
      "wheel_teeth": 40,
      "centre_distance": {
@@ -5126,7 +5129,10 @@
       "thickness_mod": 1,
       "starts": 1,
       "sizing": {
-       "pitch_diameter": 7
+       "auto": true,
+       "manual": {
+        "pitch_diameter": 7
+       }
       },
       "wheel_teeth": 40,
       "centre_distance": {

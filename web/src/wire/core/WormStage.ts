@@ -56,10 +56,16 @@ thickness_mod: number,
  */
 starts: number, 
 /**
- * How the first member's size is fixed — the *only* thing that
- * distinguishes a worm stage from a crossed gear pair.
+ * **How big the first member is**, and whether the designer says so.
+ *
+ * Which *unit* it is stated in — a pitch diameter or a helix angle — is the
+ * only thing that distinguishes a worm stage from a crossed gear pair, and
+ * they are two readings of one number (`sin γ = z m_n / d`). Automatic, that
+ * number is solved to reach a given centre distance: a screw stage has no
+ * profile shift, so its **size** is the only thing inside it free to absorb
+ * one, which is what F39's fourth item asks.
  */
-sizing: FirstMemberSizing, 
+sizing: Auto<FirstMemberSizing>, 
 /**
  * Teeth on the wheel.
  */

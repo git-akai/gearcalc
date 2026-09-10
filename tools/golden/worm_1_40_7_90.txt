@@ -17,6 +17,14 @@ efficiency          worm driving   wheel driving
   locks driving forward at mu >= 6.5104
   locks back-driving at    mu >= 0.1356   (cos alpha_n tan gamma)
 
+  centre distance is least at lead angle 16.2990 deg  (d1 3.5632 mm) — above it two worms reach the same distance
+  a mm given, worm sized to reach it
+    23.7073  d1   7.0000 mm   lead angle  8.2132 deg   ran at   23.7073
+    24.2073  d1   8.1067 mm   lead angle  7.0858 deg   ran at   24.2073
+    24.7073  d1   9.1748 mm   lead angle  6.2573 deg   ran at   24.7073
+    25.2073  d1  10.2217 mm   lead angle  5.6143 deg   ran at   25.2073
+    25.7073  d1  11.2557 mm   lead angle  5.0971 deg   ran at   25.7073
+
 contact   4340 Hardened Steel on Brass C360,  E* 70811 MPa
   worm torque 2.000 Nm  ->  wheel torque 54.953 Nm at mu 0.06
   relative curvature   along 0.081615 /mm   across 0.173242 /mm

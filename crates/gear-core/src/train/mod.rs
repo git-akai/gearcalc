@@ -1382,6 +1382,10 @@ pub enum Freedom {
     Clearance,
     /// One member's profile shift.
     Shift(usize),
+    /// **How big the first member is** — a screw stage's pitch diameter or
+    /// helix angle, which are two readings of one number. The only thing inside
+    /// a screw stage free to absorb a centre distance, since it has no shift.
+    FirstMemberSize,
 }
 
 /// **A set of inputs bound by one relation, and how many of them may be given.**
@@ -1440,33 +1444,45 @@ pub struct FreedomGroup {
 }
 
 impl Stage {
-    /// The input a [`Freedom`] names, to be read or written.
+    /// **The toggle a [`Freedom`] names** — whether that input is being derived.
     ///
     /// The one place the core's member order — [`StageResult::members`]' —
     /// meets each kind's own fields. `None` where a kind has no such input,
     /// which is the same thing its [`Self::freedoms`] says by not mentioning it.
-    fn auto_mut(&mut self, f: Freedom) -> Option<&mut Auto<f64>> {
+    ///
+    /// It hands back the **flag** rather than the `Auto` that carries it, and
+    /// that is what lets a freedom name an input of any type: relief decides who
+    /// supplies a number and never what the number is, so the value's type is
+    /// none of its business. A worm's size is the case that proves it — an
+    /// `Auto<FirstMemberSizing>`, since a diameter and a lead angle are two
+    /// readings of one freedom.
+    fn toggle_mut(&mut self, f: Freedom) -> Option<&mut bool> {
         match (self, f) {
-            (Self::Spur(s), Freedom::CentreDistance) => Some(&mut s.centre_distance),
-            (Self::Spur(s), Freedom::Clearance) => Some(&mut s.clearance),
-            (Self::Spur(s), Freedom::Shift(i)) => s.gears.get_mut(i).map(|g| &mut g.profile_shift),
-            (Self::Worm(w), Freedom::CentreDistance) => Some(&mut w.centre_distance),
-            (Self::Worm(w), Freedom::Clearance) => Some(&mut w.clearance),
-            (Self::Planetary(p), Freedom::CentreDistance) => Some(&mut p.centre_distance),
-            (Self::Planetary(p), Freedom::Clearance) => Some(&mut p.clearance),
+            (Self::Spur(s), Freedom::CentreDistance) => Some(&mut s.centre_distance.auto),
+            (Self::Spur(s), Freedom::Clearance) => Some(&mut s.clearance.auto),
+            (Self::Spur(s), Freedom::Shift(i)) => {
+                s.gears.get_mut(i).map(|g| &mut g.profile_shift.auto)
+            }
+            (Self::Worm(w), Freedom::CentreDistance) => Some(&mut w.centre_distance.auto),
+            (Self::Worm(w), Freedom::Clearance) => Some(&mut w.clearance.auto),
+            (Self::Worm(w), Freedom::FirstMemberSize) => Some(&mut w.sizing.auto),
+            (Self::Planetary(p), Freedom::CentreDistance) => Some(&mut p.centre_distance.auto),
+            (Self::Planetary(p), Freedom::Clearance) => Some(&mut p.clearance.auto),
             (Self::Planetary(p), Freedom::Shift(i)) => match i {
-                0 => Some(&mut p.sun.profile_shift),
-                1 => Some(&mut p.planet.profile_shift),
-                2 => Some(&mut p.ring.profile_shift),
+                0 => Some(&mut p.sun.profile_shift.auto),
+                1 => Some(&mut p.planet.profile_shift.auto),
+                2 => Some(&mut p.ring.profile_shift.auto),
                 _ => None,
             },
             // **The crank offset is this kind's centre distance.** Its own
             // documentation says so — "the same shape every stage's centre
             // distance has, because it is the same decision" — so it answers to
             // the same name here rather than to one of its own.
-            (Self::Hula(h), Freedom::CentreDistance) => Some(&mut h.offset),
-            (Self::Hula(h), Freedom::Clearance) => Some(&mut h.running_clearance),
-            (Self::Hula(h), Freedom::Shift(i)) => h.gears.get_mut(i).map(|g| &mut g.profile_shift),
+            (Self::Hula(h), Freedom::CentreDistance) => Some(&mut h.offset.auto),
+            (Self::Hula(h), Freedom::Clearance) => Some(&mut h.running_clearance.auto),
+            (Self::Hula(h), Freedom::Shift(i)) => {
+                h.gears.get_mut(i).map(|g| &mut g.profile_shift.auto)
+            }
             _ => None,
         }
     }
@@ -1513,7 +1529,7 @@ impl Stage {
                 // freedom this kind does not have is absent from both.
                 let mut over = 0usize;
                 for f in &group.order {
-                    if out.auto_mut(*f).is_some_and(|a| a.auto != wanted) {
+                    if out.toggle_mut(*f).is_some_and(|t| *t != wanted) {
                         over += 1;
                     }
                 }
@@ -1535,9 +1551,9 @@ impl Stage {
                         if spare_just && *f == just {
                             continue;
                         }
-                        if let Some(a) = out.auto_mut(*f) {
-                            if a.auto != wanted {
-                                a.auto = wanted;
+                        if let Some(t) = out.toggle_mut(*f) {
+                            if *t != wanted {
+                                *t = wanted;
                                 over -= 1;
                             }
                         }
@@ -1641,11 +1657,24 @@ impl Stage {
                     Freedom::CentreDistance,
                 ))))
                 .collect(),
-            // A screw stage has no profile shift, so nothing inside it is free
-            // to absorb a distance and there is no shift group at all. Its
-            // distance and its clearance are still two ways of saying one
-            // number, and that much holds for every kind.
-            Self::Worm(_) => vec![distance_and_clearance(Some(Freedom::CentreDistance))],
+            // **A screw stage has no profile shift, so its *size* is what
+            // absorbs a distance** — the pitch diameter, or the helix angle,
+            // which are two readings of one number. That is one relation among
+            // `{a, clearance, size}`, so two of the three may be given.
+            //
+            // The size leads the relief order rather than the distance, which is
+            // the one place this stage differs from the others and it is
+            // deliberate: a designer who states a housing distance and a
+            // clearance is asking what worm fits, and the worm is the answer
+            // rather than the input that should give way.
+            Self::Worm(_) => vec![
+                one_relation(vec![
+                    Freedom::FirstMemberSize,
+                    Freedom::CentreDistance,
+                    Freedom::Clearance,
+                ]),
+                distance_and_clearance(Some(Freedom::CentreDistance)),
+            ],
         }
     }
 }
@@ -3855,7 +3884,7 @@ mod tests {
             shaft_angle: 90.0,
             starts: 17,
             wheel_teeth: 23,
-            sizing: FirstMemberSizing::HelixAngle(9.0),
+            sizing: Auto::fixed(FirstMemberSizing::HelixAngle(9.0)),
             ..WormStage::default()
         };
         let r = solve_worm_stage(&locked, StageTorques::just(2.0), &lib)
@@ -3873,7 +3902,7 @@ mod tests {
         // presses about as hard, because the flank load comes from the input
         // torque either way and the geometry has not changed much.
         let driving = WormStage {
-            sizing: FirstMemberSizing::HelixAngle(18.0),
+            sizing: Auto::fixed(FirstMemberSizing::HelixAngle(18.0)),
             ..locked
         };
         let d = solve_worm_stage(&driving, StageTorques::just(2.0), &lib).expect("and this one");
@@ -4126,8 +4155,8 @@ mod tests {
             let mut s = stage.clone();
             for g in s.freedoms() {
                 for f in g.order {
-                    if let Some(a) = s.auto_mut(f) {
-                        *a = Auto::fixed(0.1);
+                    if let Some(t) = s.toggle_mut(f) {
+                        *t = false;
                     }
                 }
             }
@@ -4171,7 +4200,7 @@ mod tests {
                         let given = g
                             .order
                             .iter()
-                            .filter(|f| relieved.auto_mut(**f).is_some_and(|a| !a.auto))
+                            .filter(|f| relieved.toggle_mut(**f).is_some_and(|t| !*t))
                             .count();
                         let automatic = g.order.len() - given;
                         assert!(
@@ -4184,7 +4213,7 @@ mod tests {
                         );
                     }
                     assert!(
-                        relieved.auto_mut(*just).is_some_and(|a| !a.auto),
+                        relieved.toggle_mut(*just).is_some_and(|t| !*t),
                         "{just:?} was just pinned and must not be the one relieved"
                     );
                 }
@@ -4194,8 +4223,8 @@ mod tests {
             // freedom as `just`, so it cannot pass by picking a lucky one.
             let mut settled = stage.clone();
             if let Some(f) = groups[0].order.first() {
-                if let Some(a) = settled.auto_mut(*f) {
-                    *a = Auto::fixed(0.1);
+                if let Some(t) = settled.toggle_mut(*f) {
+                    *t = false;
                 }
             }
             for group in &groups {
@@ -4204,8 +4233,8 @@ mod tests {
                     let mut after = settled.relieved(*just);
                     for f in &group.order {
                         assert_eq!(
-                            before.auto_mut(*f).map(|a| a.auto),
-                            after.auto_mut(*f).map(|a| a.auto),
+                            before.toggle_mut(*f).copied(),
+                            after.toggle_mut(*f).copied(),
                             "{f:?} moved on a stage that was already within its limit"
                         );
                     }
@@ -4249,8 +4278,8 @@ mod tests {
             // alone — which is the state that has no answer.
             let mut loose = stage.clone();
             for f in &group.order {
-                if let Some(a) = loose.auto_mut(*f) {
-                    a.auto = true;
+                if let Some(t) = loose.toggle_mut(*f) {
+                    *t = true;
                 }
             }
 
@@ -4260,7 +4289,7 @@ mod tests {
                 let automatic = group
                     .order
                     .iter()
-                    .filter(|f| fixed.auto_mut(**f).is_some_and(|a| a.auto))
+                    .filter(|f| fixed.toggle_mut(**f).is_some_and(|t| *t))
                     .count();
                 assert!(
                     automatic <= group.automatic_at_most,
@@ -4275,7 +4304,7 @@ mod tests {
                 let could_spare = group.order.len() > group.automatic_at_most + 1;
                 if could_spare {
                     assert!(
-                        fixed.auto_mut(*just).is_some_and(|a| a.auto),
+                        fixed.toggle_mut(*just).is_some_and(|t| *t),
                         "{just:?} was just set automatic and something else could have given"
                     );
                 }

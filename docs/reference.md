@@ -354,6 +354,29 @@ stays free. Both of those per-mesh conditions are `shift_sum_for`, so a target
 makes the layout easier: the Newton iteration on the planet's shift disappears
 and the sun's and the ring's shifts are read off the planet's in closed form.
 
+**A screw stage has no profile shift, so its *size* is what absorbs a distance.**
+The pitch diameter and the helix angle are two readings of one number
+(`sin γ = z m_n / d`), and automatic means the housing decides it. This is the
+one kind whose mode 3 changes the **teeth** rather than where they sit, which is
+why the size leads its relief order rather than the distance: a designer who
+states a housing and a clearance is asking what worm fits.
+
+It has an answer only sometimes, and a *pair* of answers often. A screw pair's
+centre distance is `(d₁ + d₂)/2` and the two move opposite ways as the worm is
+resized — `d₁ = z₁ m_n / sin γ` shrinks as the thread steepens while
+`d₂ = z₂ m_n / cos β₂` grows — so the distance has a **minimum**:
+
+```text
+z₂ sin β₂ / cos²β₂ = z₁ cos γ / sin²γ         β₂ = Σ − 90° + γ
+tan γ = (z₁/z₂)^⅓                             at Σ = 90°, in closed form
+```
+
+Above that minimum two different worms reach the same centres — a thin one with
+a fast lead and a fat one with a slow one — and the tool takes the branch the
+designer's own number is on, which is the only choice under which nudging the
+target moves the answer smoothly. Below it there is no worm at all, and the
+stage says so.
+
 That is one of the two bounds `train::FreedomGroup` carries. The other counts how
 many may be *given*, and the pair of them is what makes an over- or
 under-determined stage resolve itself: too many given turns one automatic, too
