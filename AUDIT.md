@@ -108,7 +108,7 @@ where it was 3.2e-4. It cost eight times the time on a pair, which is F61.
 | 3 | Unify what is written twice | **done** |
 | 3b | The direction sweep, second half — the ratings | **done** — gate proven |
 | 4 | The optimiser | **done** — gates proven; the closed form weighed and declined, with its derivation kept |
-| 5 | Consolidate the tests | **in progress** |
+| 5 | Consolidate the tests | **in progress** — six passes run; F60 and F61 remain |
 | 6 | Front end and payload | not started |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
@@ -121,6 +121,51 @@ Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
 **Suite: 560 tests** (was 531). **Golden corpus: 27 cases** (was 22).
+
+### Phase 5 so far, and what is left
+
+Six passes, and the instrument for all of them is **mutation**: perturb one
+production quantity, run the whole suite *and* the corpus *and* the figure
+check, record what fires. The scripts are throwaway by design — three lines of
+`sed`, a build, a `nextest` run, restore — and the only part worth carrying
+forward is the shape:
+
+```
+for each mutation:
+    back up the file, apply the edit
+    cargo build --tests   || record DOES-NOT-COMPILE and restore   # not optional
+    cargo nextest run     -> grep 'FAIL ['
+    tools/check_golden.sh -> caught / silent
+    tools/check_figures.py-> caught / silent
+    restore
+```
+
+| pass | what it asked | findings |
+|---|---|---|
+| 1 | the rating **constants** — what fails if each moves? | F65, F66, F67 |
+| 2 | the stated **laws** — the proportionalities a stage scales by | F68 |
+| 3 | the **boundary** — the wasm crate's own numbers | F24, F70 |
+| 4 | the tests that never met their case | F21, F14, F6 |
+| 5 | the five modules with no inline tests | F13, F71 |
+| 6 | F12, by counting rather than by reading | F12 |
+
+**Open, and Phase 5's remaining work:**
+
+- **F60** — a hula pair's tip margin and an internal mesh's interference flags
+  are each asked by one kind. This is the *consolidation* finding: the
+  continuation of `auto::MeshTrial`, which put "what is asked of a mesh" in one
+  place and closed F59. These two constraints are the next ones that belong
+  there.
+- **F61** — a pair pays eight times over for starts that all land on the same
+  point. Measured under F50; the repair is to stop a walk that has arrived
+  somewhere already walked, not to cut the budget back.
+- **F48** — a screw mesh that transmits nothing reports no flank load. Carried
+  from Phase 3b.
+
+**The question that produced most of this phase**, asked six times and answered
+yes six times: *is there an opt-in path the harness never switches on?* F31, F56,
+F67, F24, F71 and the sixth in `docs/corrections.md`'s last row. It is protocol
+pass 6 and it is worth asking first, not last.
 
 ---
 
@@ -225,7 +270,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F9 | The Layout table names 7 of 27 modules | drift | 1 | **closed** — the map is `CLAUDE.md`; `state.md` keeps the decisions |
 | F10 | `bending-check.html` regenerates by hand | drift | 0 | **closed** — `figures-verbatim`, checked exactly |
 | F11 | An orphaned sentence fragment in `reference.md` | drift | 1 | **closed** |
-| F12 | The inline tests never had the integration tests' consolidation | gap | 5 | open |
+| F12 | The inline tests never had the integration tests' consolidation | holds | 5 | **closed** — the premise was measured and does not hold; one law asserted at two standards, levelled |
 | F13 | Five production modules carry no inline tests, invisibly | holds | 5 | **closed** — four are covered elsewhere, measured; the fifth hid a dead branch |
 | F14 | The two unfired notes need their evidence re-dated | **gap** | 5 | **closed** — one was never fired *at*; the other re-searched at 7× the breadth |
 | F15 | `TrainPanel.svelte` is 2,848 lines, four hand-written stage forms | gap | 6 | open |
@@ -1417,6 +1462,67 @@ the answer, since none of the three reads a face width, which is *why* the
 invariant holds; but a property asserted of one arm of a `match` is asserted of
 one arm of a `match`. Six cases now: three models against a rim silent and
 biting.
+
+### Phase 5, sixth pass — F12, and what counting said about it
+
+**The finding as recorded:** `tests/` was pulled onto one shared grid and the
+`#[cfg(test)]` blocks in `src/` were left as the one-off fixtures they grew from,
+so the inline tests want the same consolidation. Plausible, and read rather than
+measured — so it was measured.
+
+| asked | answer |
+|---|---|
+| mutations run | 32 |
+| test firings | 122 |
+| distinct tests that fired | 101 |
+| tests firing on more than one mutation | 19 |
+| pairs where one test's firings are a subset of another's | none that are about the same thing |
+| helper functions duplicated across modules | 2 (`fn pair(z1, z2)`, `fn library()`) |
+
+**So the premise is largely false.** There is no measurable redundancy: the 19
+tests that fire more than once are broad canaries — the regression fixture, the
+string sweep, the boundary walk — and the things they share firing on are
+unrelated. The nested-loop sweeps in `src/` are not the three-grids fault
+either; each turns the axes its own law needs, which is what
+`docs/corrections.md`'s "an axis nobody turns" asks for and not what a shared
+grid would give it.
+
+**What counting did find** came from clustering the tests by **subject** rather
+than by file: *nine* thickness-modification tests across five files, two of which
+state the same law for the two kinds at very different standards.
+`ring.rs::a_thickness_modification_moves_no_radius_on_a_ring` sweeps three tooth
+counts × three shifts × four values of `k`, checks the cutter's plunge as well as
+the radii, and carves out the one case the rule bends — a space that closes on
+itself. `tests/geometry_laws.rs::thickness_modification_leaves_radial_dimensions_alone`
+asserted the same rule on **one default gear**.
+
+**Not merged, and deliberately.** A ring needs a cutter to be cut by and has a
+limit an external gear has not; merging them would put a `match kind` inside a
+law. What they share now is the *standard*: the external half runs the shared
+grid × five values of `k`, 540 gears, and the law splits where the wider sweep
+says it does — `r` and `rb` exact always, `ra` and `rf` exact unless the profile
+truncated them, and `st` obliged to have moved or the test asserts that a control
+does nothing.
+
+The widened sweep found its own carve-out immediately: `z=3, x=−0.5, α=14.5°,
+k=0.6` moves the tip from 0.2082 to 0.1726 mm. The tooth is **severed** — the tip
+is set by what survives rather than by the addendum asked for — which is the
+exact mirror of the ring's space-closed case. One law, two kinds, one place each
+where it bends, and the same reason both times.
+
+> **Gate, run.** Giving `rb` a `k`-and-helix dependence is caught by this test
+> and by `metrology::consecutive_spans_differ_by_one_base_pitch`, and **could not
+> have been caught before**: the factor is one at β = 0 and the old fixture never
+> turned the helix axis.
+
+**And the harness had a blind spot, found on the way.** It edited a constant,
+rebuilt, and grepped for `FAIL [`. A mutation naming a binding out of scope fails
+to *build*, so there is no `FAIL` line and the harness recorded "no test caught
+it" — its most interesting possible finding — for what was a typo. It builds
+first and records `DOES-NOT-COMPILE` separately now. *An instrument whose failure
+mode is indistinguishable from its most interesting finding will hand you that
+finding.*
+
 
 ---
 
