@@ -33,11 +33,18 @@
    *  among them — so at most `gears.length` of {distance, shift…} can be given,
    *  and the count comes from the stage rather than from a number written here.
    *
-   *  Only while the stage is choosing them at all: with the optimiser off the
-   *  shifts are not being solved for anything, so pinning every one of them is
-   *  the fully specified design it always was and nothing is relieved. */
+   *  **Whether or not the stage is optimising.** This used to return early with
+   *  the optimiser off, on the reading that the shifts were then not being
+   *  solved for anything, so pinning all three was the fully specified design it
+   *  always was. That stopped being true when mode 3 started working without the
+   *  optimiser: a given distance and a given clearance decide the shifts now, so
+   *  giving both shifts as well is the contradiction this exists to relieve.
+   *  The relation is the geometry's and never was the optimiser's.
+   *
+   *  The distance comes first because relief order is least precious first, and
+   *  it is the number that goes back to automatic when a designer pins both
+   *  shifts — which is the behaviour they describe. */
   function relieveSpur(stage: SpurStage, just: Auto<number>) {
-    if (!stage.optimisation.enabled) return;
     relieve(
       [stage.centre_distance, ...stage.gears.map((g) => g.profile_shift)],
       stage.gears.length,

@@ -1921,9 +1921,39 @@ The division is checked against a **scan** of the same interval that shares no
 bound, no midpoint and no clamp with the projection, plus the 9/37 narrative
 above stated as three claims that never mention a formula.
 
+#### And it made a comment in the panel false
+
+`relieveSpur` returned early with the optimiser off, on the reading that *"with
+the optimiser off the shifts are not being solved for anything, so pinning every
+one of them is the fully specified design it always was and nothing is
+relieved."* That was true when it was written and is not any more: a given
+distance and a given clearance decide the shifts now, so giving both shifts as
+well is exactly the contradiction the relief exists for. The relation belongs to
+the geometry and never belonged to the optimiser.
+
+Worth recording as a shape rather than as a line: **a guard whose justification
+is another module's behaviour goes stale when that module is fixed, and nothing
+type-checks a justification.** It was found by reading what the change implied,
+not by any check.
+
 **Still open in F39:** the `Auto<f64>` clearance (item 1), a planetary centre
 distance (item 3), and the worm's absorber (item 4) — which now has an answer,
 recorded below.
+
+Item 1 has a shape now that mode 3 is live. The pinnable set is
+`{a, clearance, x₁, x₂}` against one geometric relation, so **three** of the four
+may be given and the fourth follows — which is exactly the three modes, counted
+rather than enumerated:
+
+| given | what follows |
+|---|---|
+| clearance, x₁, x₂ | the distance — mode 1 |
+| a, x₁, x₂ | the clearance — mode 2 |
+| a, clearance, and one shift *or the division rule* | the shifts — mode 3 |
+
+`relieve`'s limit becomes that count. Today `clearance` is a plain `f64` and so
+cannot say "derived", which is why it is absent from the relief list and why the
+limit reads as `gears.length` rather than as the freedom count it is.
 
 ### The toggle model, as specified
 
