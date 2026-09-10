@@ -1,1 +1,1 @@
-5916 cases: 1258 undercut, 47 severed, 2576 clamped
+94656 cases: 23792 undercut, 1008 severed, 18572 clamped

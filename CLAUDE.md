@@ -144,9 +144,15 @@ Eleven checks in six different ways. `nix flake check` is **not** all of them.
 | `python3 tools/validate_dxf.py` | an export read back by a parser that shares no code with the writer | yes |
 | `tools/worm_flank_curvature.py` · `crossed_path.py` · `hula_kinematics.py` · `iso_6336_3_stack.py` | the crate against derivations that share no code with it | no — by hand |
 
-**Before pushing, run four:** `cargo nextest run`, `nix flake check`,
-`nix build .#web`, and `cd web && npm run check`. Reading `flake check` as the
-whole of CI has cost one red build.
+**Before pushing, run five:** `cargo nextest run`, `nix flake check`,
+`nix build .#web`, `cd web && npm run check`, and **`tools/check_golden.sh`**.
+Reading `flake check` as the whole of CI has cost one red build.
+
+The corpus is on that list because of a measurement, not for symmetry.
+Perturbing five of the rating model's cited constants — `K_f`'s `H` and `L`,
+ISO's `Y_S`, the tangent angle, the reversed-bending fraction — leaves the
+**entire test suite silent**, and the corpus catches every one. A `nextest` run
+is not evidence that the strength model is the one that was there yesterday.
 
 ---
 

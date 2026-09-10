@@ -184,10 +184,10 @@ const COMMANDS: &[Command] = &[
     },
     Command {
         name: "train",
-        args: "[mixed|held]",
-        summary: "a two-stage geartrain, end to end; `mixed` puts a worm stage in it, `held` back-drives that worm harder than the drive does",
+        args: "[mixed|held|toggles]",
+        summary: "a two-stage geartrain, end to end; `mixed` puts a worm stage in it, `held` back-drives that worm harder than the drive does, `toggles` turns on every optional control",
         run: |a| train_report(a.get(1).map(String::as_str)),
-        record: Record::Cases(&["train", "train mixed", "train held"]),
+        record: Record::Cases(&["train", "train mixed", "train held", "train toggles"]),
         slow: false
     },
     Command {
@@ -1286,12 +1286,61 @@ fn train_report(mode: Option<&str>) {
             _ => 0.0,
         },
         operating_torque: 2.0,
-        reversed_bending: false,
-        actuation: Actuation::Continuous {
-            operating_speed: 2400.0,
-            runtime_hours: 1000.0,
+        // **`toggles` reverses the drive**, which is the switch that lets a
+        // reversed root reach a member at all.
+        actuation: if mode == Some("toggles") {
+            Actuation::Intermittent {
+                range_degrees: 90.0,
+                actuations: 600_000,
+                reversing: true,
+            }
+        } else {
+            Actuation::Continuous {
+                operating_speed: 2400.0,
+                runtime_hours: 1000.0,
+            }
         },
-        stages: if matches!(mode, Some("mixed" | "held")) {
+        // **Every optional control, engaged.** The corpus turned three of a
+        // gear's eleven and left the rest at their defaults, so the constants
+        // behind them were outside the change detector: perturbing
+        // `REVERSED_BENDING_FRACTION` or the load-sharing ramp moved **no
+        // recorded output and no test**. That is the fault
+        // `docs/corrections.md` records of a back-driving load and of the
+        // optimiser, met a third time — *an opt-in the harness never switches on
+        // is a path the detector cannot see.*
+        //
+        // The helix is 30° so the **virtual** contact ratio passes 2, which is
+        // where the sharing ramp's own constants finally reach an answer: below
+        // it the governing point is the single-pair boundary, where the share is
+        // exactly one and the ramp is decorative.
+        reversed_bending: mode == Some("toggles"),
+        stages: if mode == Some("toggles") {
+            let toggled = |teeth: u32, undercut: bool, sharp: bool| StageGear {
+                teeth,
+                no_undercut: undercut,
+                no_sharp_tip: sharp,
+                rim_thickness: Some(3.0),
+                material_overrides: gear_core::material::Overrides {
+                    fatigue_allowable: Some(420.0),
+                    ..gear_core::material::Overrides::default()
+                },
+                face_width: Auto::automatic(0.0),
+                ..StageGear::default()
+            };
+            vec![
+                Stage::Spur(SpurStage {
+                    additional_helix: 30.0,
+                    load_sharing: gear_core::contact::LoadSharing::LinearRamp,
+                    gears: [toggled(17, false, true), toggled(43, true, false)],
+                    ..SpurStage::default()
+                }),
+                Stage::Spur(SpurStage {
+                    load_sharing: gear_core::contact::LoadSharing::LinearRamp,
+                    gears: [toggled(13, true, false), toggled(31, false, true)],
+                    ..SpurStage::default()
+                }),
+            ]
+        } else if matches!(mode, Some("mixed" | "held")) {
             vec![
                 Stage::Spur(SpurStage {
                     gears: [auto_width(17), auto_width(43)],
@@ -1793,17 +1842,41 @@ fn sweep() {
         for xi in -6..=10i32 {
             for alpha in [14.5_f64, 20.0, 25.0] {
                 for beta in [0.0_f64, 20.0] {
-                    let g = Tooth::new(GearParams {
-                        teeth: z,
-                        profile_shift: f64::from(xi) * 0.1,
-                        pressure_angle: alpha,
-                        helix_angle: beta,
-                        ..Default::default()
-                    });
-                    total += 1;
-                    undercut += u32::from(g.undercut);
-                    severed += u32::from(g.severed);
-                    clamped += u32::from(g.clamps.any());
+                    // **Every axis a gear has**, not the four this turned. It
+                    // swept `z`, `x`, `α` and `β` and left the rest at their
+                    // defaults — so the eccentric feature, the tool's round and
+                    // the thickness modification were outside the change
+                    // detector entirely, on a command whose whole job is to be
+                    // the parameter grid. That is `tests/common/mod.rs`'s own
+                    // finding — *an axis nobody turns is an axis nobody tests* —
+                    // met in the harness rather than in the tests.
+                    //
+                    // Two values an axis rather than a range: this counts
+                    // clamps, and what it is for is that every combination is
+                    // reached, not that any one of them is resolved.
+                    for dx in [0.0_f64, 0.15] {
+                        for offset in [0.0_f64, 0.25] {
+                            for k in [1.0_f64, 0.9] {
+                                for rho in [0.38_f64, 0.0] {
+                                    let g = Tooth::new(GearParams {
+                                        teeth: z,
+                                        profile_shift: f64::from(xi) * 0.1,
+                                        pressure_angle: alpha,
+                                        helix_angle: beta,
+                                        angular_shift: dx,
+                                        index_offset: offset,
+                                        thickness_mod: k,
+                                        root_radius: rho,
+                                        ..Default::default()
+                                    });
+                                    total += 1;
+                                    undercut += u32::from(g.undercut);
+                                    severed += u32::from(g.severed);
+                                    clamped += u32::from(g.clamps.any());
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

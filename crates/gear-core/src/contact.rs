@@ -939,8 +939,39 @@ mod tests {
     /// Asserted **exactly** below `ε = 2`, because it is an identity and not a
     /// tolerance: outside the plateau either `d < ε − 1 ≤ 1 < ε − d` or
     /// `d > 1 ≥ ε − 1 > ε − d`, so `min` picks the very term the branch picked.
+    ///
+    /// # And the two ends, as numbers
+    ///
+    /// Everything above is written *in terms of* `RAMP_MIN` and `RAMP_MAX`, so
+    /// moving either moves both sides of every comparison and the test does not
+    /// notice — `docs/corrections.md`'s "a gate on a ratio cannot see a scale
+    /// error", met again. Nothing else could see them either: below `ε = 2` the
+    /// governing point *is* the single-pair boundary, where the share is exactly
+    /// one, so the ramp reaches no answer the tool reports and no recorded
+    /// output moves with it. Measured: perturbing `RAMP_MIN` by two hundredths
+    /// left all 558 tests, all 26 golden files and every documented figure
+    /// unchanged.
+    ///
+    /// So the two ends are pinned here as the figures they are. A canary on an
+    /// **uncalibrated** number is the right shape for one — it is not a law and
+    /// nothing derives it, and what a canary is for is that it cannot change by
+    /// accident.
     #[test]
     fn the_load_share_is_continuous_and_unchanged_below_two() {
+        // A third at either extreme of the mesh cycle, reached exactly, and two
+        // thirds *approached* at the single-pair zone's edge — where the value
+        // itself is already 1, the ramp having handed over.
+        assert_eq!(load_share(0.0, 1.5, LoadSharing::LinearRamp), 1.0 / 3.0);
+        assert_eq!(load_share(1.5, 1.5, LoadSharing::LinearRamp), 1.0 / 3.0);
+        assert_eq!(load_share(1.0, 1.5, LoadSharing::LinearRamp), 1.0);
+        for edge in [0.5_f64 - 1e-12, 1.0 + 1e-12] {
+            assert!(
+                (load_share(edge, 1.5, LoadSharing::LinearRamp) - 2.0 / 3.0).abs() < 1e-9,
+                "the ramp does not reach two thirds at the plateau's edge: {}",
+                load_share(edge, 1.5, LoadSharing::LinearRamp)
+            );
+        }
+
         // The form this replaced, kept here as the thing being compared against.
         let branched = |d: f64, eps: f64| {
             let double = (eps - 1.0).max(f64::MIN_POSITIVE);

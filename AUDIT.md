@@ -108,7 +108,7 @@ where it was 3.2e-4. It cost eight times the time on a pair, which is F61.
 | 3 | Unify what is written twice | **done** |
 | 3b | The direction sweep, second half — the ratings | **done** — gate proven |
 | 4 | The optimiser | **done** — gates proven; the closed form weighed and declined, with its derivation kept |
-| 5 | Consolidate the tests | **next** |
+| 5 | Consolidate the tests | **in progress** |
 | 6 | Front end and payload | not started |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
@@ -120,7 +120,7 @@ both except where `gear-cli matrix` gained a printed spread, which was the point
 Phases 2 onward are gated on that corpus, which is what makes "this refactor
 moved no number" a diff rather than a claim.
 
-**Suite: 558 tests** (was 531). **Golden corpus: 26 cases** (was 22).
+**Suite: 558 tests** (was 531). **Golden corpus: 27 cases** (was 22).
 
 ---
 
@@ -219,7 +219,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F3 | `GearResult` assembled three times, one field by two formulas | gap | 3 | **closed** — one `GearResult::of`, and the shared rule is `StageTorques::referred_like` |
 | F4 | `StageGear` — a shared input type — lives in `train/spur.rs` | drift | 3 | **closed** — moved, with its `Default`, `AddendumAsked` and serde helpers; `spur.rs` 1017 → 730 lines |
 | F5 | No ledger of the numbers that are not model constants | gap | 2 | **closed** |
-| F6 | The face-width invariance test runs a model the tool does not ship | gap | 5 | open |
+| F6 | The face-width invariance test ran the one model no stage rates with | gap | 5 | **closed** — every model and a rim, six cases |
 | F7 | ~212 documented figures, one gate | gap | 0 | **part closed** — mechanism built; 5 tables still ungated (F19) |
 | F8 | The CLI list chosen to be exhaustive is not | drift | 1 | **closed** — the table *is* the dispatch |
 | F9 | The Layout table names 7 of 27 modules | drift | 1 | **closed** — the map is `CLAUDE.md`; `state.md` keeps the decisions |
@@ -268,6 +268,9 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F62 | The walk took no step at all on a narrow box, so the answer was the sweep's grid | gap | 4 | **closed** — and logged in `corrections.md` |
 | F63 | Three documents said the division is solved; it is searched, and the solver has no production caller | drift | 4 | **closed** — and logged in `corrections.md` |
 | F64 | `split_residual` is derived at fixed tip radii, which the default tip cap breaks | gap | 4 | **closed** — stated where it lives; the corrected rate is below |
+| F65 | Five rating constants could be perturbed with the whole suite silent | gap | 5 | **closed** — measured; four are the corpus's and it is now in the pre-push list |
+| F66 | The load-sharing ramp's constants were guarded by a test written in terms of them | gap | 5 | **closed** — pinned as figures |
+| F67 | The harness turned three of a gear's eleven controls | gap | 5 | **closed** — `sweep` turns every gear axis, `train toggles` every stage one |
 
 **Kinds.** `gap` — the code and its own stated intent disagree. `drift` — a
 document has fallen behind the code. `holds` — checked and sound, recorded so
@@ -1170,6 +1173,74 @@ echoed. It was the input read back where something was free to absorb it and
 Item 4 is a question; 1–3 are work. None of them changes the mathematics — they
 change which of three related numbers a designer states and which the tool
 derives.
+
+---
+
+## Phase 5 — the tests, and what they discriminate
+
+Not "are there enough" but "what would have to break for one to fail". Run as
+**mutation**: perturb one production quantity, run the whole suite, count.
+
+| perturbed | tests failing | golden | figures |
+|---|---|---|---|
+| `inv α`, by 2 parts in 10⁴ | **50** | — | — |
+| the loss integral, by 0.1 % | 6 | — | — |
+| `K_f`'s `H`, 0.331 → 0.3315 | **0** | caught | caught |
+| `K_f`'s `L`, 0.324 → 0.325 | **0** | caught | caught |
+| ISO `Y_S`, 1.2 → 1.21 | **0** | caught | caught |
+| `TANGENT_ANGLE_DEG`, 30 → 30.1 | **0** | caught | caught |
+| `REVERSED_BENDING_FRACTION`, 0.7 → 0.71 | **0** | **silent** | **silent** |
+| `RAMP_MIN`, ⅓ → 0.34 | **0** | **silent** | **silent** |
+
+**The geometry is gated to the bit and the strength model was not gated at all**
+— which is the shape of a suite grown one geometric learning at a time, and is
+exactly what the audit was asked to look for.
+
+Three findings, and they are different from one another.
+
+**F65 — four of them are the corpus's job, and the advice omitted it.** A change
+detector is the right instrument for a *cited* constant: nothing derives `K_f`'s
+coefficients, so there is no law to assert, only a figure that must not move by
+accident. `tools/check_golden.sh` catches all four. What was wrong is that
+`CLAUDE.md`'s "before pushing, run four" did not list it, so a developer
+following this repository's own advice would not see a mutated strength model
+until CI. It runs five now, with the measurement as the reason.
+
+**F66 — the ramp was guarded by a test written in terms of itself.**
+`the_load_share_is_continuous_and_unchanged_below_two` is thorough about *shape*
+and names `RAMP_MIN`/`RAMP_MAX` on both sides of every comparison, so moving
+either moves the comparison with it. That is `docs/corrections.md`'s "a gate on
+a ratio cannot see a scale error", recurring. And nothing else could see them,
+for a reason worth keeping: below `ε = 2` the governing point *is* the
+single-pair boundary, where the share is exactly one — so the ramp reaches no
+answer the tool reports, and a corpus case cannot be contrived to catch it
+without leaving the band the model is for. Pinned as figures instead, which is
+the right instrument for a number disclosed as uncalibrated.
+
+**F67 — the harness turned three of a gear's eleven controls.** `gear-cli sweep`
+*is* the parameter grid and it swept four axes; `reversed_bending`,
+`load_sharing`, `no_undercut`, `no_sharp_tip`, `rim_thickness` and
+`material_overrides` were never switched anywhere in the harness. So their
+constants were outside the detector by construction — the same fault as the
+back-driving load (F31) and the optimiser (F56), for the third and fourth time.
+**The pattern is now named**: *an opt-in the harness never switches on is a path
+the detector cannot see.* `sweep` turns every gear axis (5,916 cases → 94,656,
+in 59 ms) and `gear-cli train toggles` turns every stage one.
+
+> **Gate, run.** Each of the three constants perturbed again afterwards:
+> `RAMP_MIN` and `RAMP_MAX` now fail **two tests each** where they failed none,
+> and `REVERSED_BENDING_FRACTION` is caught by the corpus where it was silent
+> everywhere. Measured against the *recorded* corpus, not against a case list
+> with a missing file — the first run of this check reported a false catch for
+> exactly that reason.
+
+**F6, closed on the way.** The face-width invariance ran on `FormFactorOnly`
+alone, the one notch model no stage rates with — it ships through
+`gear-cli matrix`, and the stages all use Dolan–Broghamer. Nothing was wrong with
+the answer, since none of the three reads a face width, which is *why* the
+invariant holds; but a property asserted of one arm of a `match` is asserted of
+one arm of a `match`. Six cases now: three models against a rim silent and
+biting.
 
 ---
 

@@ -2737,41 +2737,57 @@ mod tests {
 
     /// `b_min` must not depend on the `b` the stress was evaluated at. It is the
     /// invariant that catches a stress which did not actually scale with face
-    /// width — the failure a single spot check would sail past.
+    /// width — the failure a single spot check would sail past — and every stage
+    /// kind leans on it, since each rates once at a probe width and inverts.
+    ///
+    /// **Every model, and a rim, because the property is the width's and not the
+    /// notch's.** It ran on `FormFactorOnly` alone, which is the one variant no
+    /// stage rates with: that model ships through `gear-cli matrix`, and the
+    /// stages all use Dolan–Broghamer. Nothing was wrong with the answer — none
+    /// of the three reads a face width, which is *why* the invariant holds — but
+    /// a property asserted of one arm of a `match` is asserted of one arm of a
+    /// `match`, and the arm the tool runs was not it.
     #[test]
     fn minimum_face_width_is_independent_of_the_face_width_used() {
         let (g1, g2, mesh) = pair(19, 31);
         let path = ContactPath::new(&g1, g2.ra, &mesh).unwrap();
         let sec = root_section(&g1, path.roll_at(path.highest_single_pair())).unwrap();
 
-        let (mut bend, mut cont) = (Vec::new(), Vec::new());
-        for b in [1.0, 5.0, 12.5, 100.0] {
-            let load = Load::new(3.0, b);
-            let sf = bending_stress(
-                &sec,
-                load.tangential(&g1),
-                b,
-                RootStressModel::FormFactorOnly,
-                None,
-            )
-            .unwrap();
-            let sh = contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 100_000.0).unwrap();
-            bend.push(min_face_width_bending(sf, b, 200.0));
-            cont.push(min_face_width_contact(sh.worst, b, 800.0));
+        let mut checked = 0u32;
+        for model in [
+            RootStressModel::FormFactorOnly,
+            RootStressModel::DolanBroghamer,
+            RootStressModel::Iso6336,
+        ] {
+            // ...and with the rim clause silent and biting, since it is the one
+            // factor that could have been written against a width.
+            for rim in [None, Some(RimSupport::external(1.5, 2.25))] {
+                let (mut bend, mut cont) = (Vec::new(), Vec::new());
+                for b in [1.0, 5.0, 12.5, 100.0] {
+                    let load = Load::new(3.0, b);
+                    let sf = bending_stress(&sec, load.tangential(&g1), b, model, rim).unwrap();
+                    let sh =
+                        contact_stress(&path, &mesh, &g1, PARALLEL_AXES, &load, 100_000.0).unwrap();
+                    bend.push(min_face_width_bending(sf, b, 200.0));
+                    cont.push(min_face_width_contact(sh.worst, b, 800.0));
+                }
+                for v in &bend {
+                    assert!(
+                        (v - bend[0]).abs() < 1e-9,
+                        "{model:?} rim {rim:?}: bending b_min drifted: {bend:?}"
+                    );
+                }
+                for v in &cont {
+                    assert!(
+                        (v - cont[0]).abs() < 1e-9,
+                        "{model:?} rim {rim:?}: contact b_min drifted: {cont:?}"
+                    );
+                }
+                assert!(bend[0] > 0.0 && cont[0] > 0.0);
+                checked += 1;
+            }
         }
-        for v in &bend {
-            assert!(
-                (v - bend[0]).abs() < 1e-9,
-                "bending b_min drifted: {bend:?}"
-            );
-        }
-        for v in &cont {
-            assert!(
-                (v - cont[0]).abs() < 1e-9,
-                "contact b_min drifted: {cont:?}"
-            );
-        }
-        assert!(bend[0] > 0.0 && cont[0] > 0.0);
+        assert_eq!(checked, 6, "a model or a rim case went unrun");
     }
 
     /// Hertz, reached a second way: through the contact half-width.
