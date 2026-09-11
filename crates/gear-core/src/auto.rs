@@ -1583,6 +1583,19 @@ impl Search {
         }
     }
 
+    /// **How many times harder than the shipped search this is**, as the `k` a
+    /// caller passed [`Self::refined`].
+    ///
+    /// Recovered from `starts`, which `refined` scales by exactly `k`. It exists
+    /// so a caller whose search has *outer* structure — the hula stage solves a
+    /// crank and chooses the splits, and does that a few times round — can scale
+    /// that structure by the same effort rather than carrying an effort of its
+    /// own that nothing lines up with.
+    #[must_use]
+    pub fn effort(&self) -> usize {
+        (self.starts / Self::SHIPPED.starts).max(1)
+    }
+
     /// As [`maximise`], at this effort.
     #[must_use]
     #[allow(clippy::too_many_lines)]

@@ -425,6 +425,41 @@ pub fn solve_hula_stage_with(
     lib: &MaterialLibrary,
     reversal: super::Reversal,
 ) -> Result<HulaResult, TrainError> {
+    solve_hula_stage_at(
+        stage,
+        input_speed,
+        torques,
+        lib,
+        reversal,
+        &crate::auto::Search::SHIPPED,
+    )
+}
+
+/// The same, **at a stated search effort**.
+///
+/// This stage was the one search in the crate that could not be asked for one,
+/// so "the shifts it chooses are converged" was a claim nothing could raise and
+/// nothing could check — the other two kinds have had `shifts_at` since F50 and
+/// a gate that quadruples it (F51).
+///
+/// The effort reaches both halves of what this stage does. `Search` itself
+/// governs each mesh's own one-dimensional search; `Search::effort` scales the
+/// **outer** loop, which solves the crank, chooses the splits at that crank, and
+/// goes round again. A gate that refined one and not the other would be checking
+/// half a search.
+///
+/// # Errors
+///
+/// As [`solve_hula_stage`].
+#[allow(clippy::too_many_lines)]
+pub fn solve_hula_stage_at(
+    stage: &HulaStage,
+    input_speed: f64,
+    torques: StageTorques,
+    lib: &MaterialLibrary,
+    reversal: super::Reversal,
+    search: &crate::auto::Search,
+) -> Result<HulaResult, TrainError> {
     let input_torque = torques.peak_forward;
     let teeth = Teeth(stage.gears.each_ref().map(|g| g.teeth));
     // The given shift is the named member's own, so the arrangement is handed
@@ -558,10 +593,18 @@ pub fn solve_hula_stage_with(
         //
         // Nested and joint, this cost eight tenths of a second for a panel that
         // re-solves on every keystroke.
-        const ROUNDS: usize = 3;
-        /// The split has moved by less than a tooth is cut to; another round
-        /// would return the same answer.
-        const SETTLED: f64 = 1e-3;
+        // **A guard on the outer loop, and measured as one**: quadrupling it to
+        // twelve moves neither `gear-cli hula 18 0.2` nor `hulaband 18` by a
+        // digit, so the loop settles on its own and this never binds. It scales
+        // with the effort all the same, or a refined search would be refined in
+        // one half and capped in the other.
+        let rounds = 3 * search.effort();
+        // **The split has moved by less than a tooth is cut to**, which is the
+        // search's own stopping distance rather than a second number meaning the
+        // same thing. It was `1e-3` written here, which is what
+        // `Search::SHIPPED.resolution` is — so refining the search now refines
+        // this with it, as it always should have.
+        let settled_within = search.resolution;
 
         // One mesh's efficiency at a held offset, or `None` where that mesh
         // cannot be built there.
@@ -628,7 +671,7 @@ pub fn solve_hula_stage_with(
         };
 
         let mut at = given;
-        for _ in 0..ROUNDS {
+        for _ in 0..rounds {
             let Ok(layout) = hula::solve_with(&set_at(at), &tip_room) else {
                 break;
             };
@@ -643,7 +686,7 @@ pub fn solve_hula_stage_with(
                 let Some(range) = split_box(index) else {
                     continue;
                 };
-                if let Some(free) = crate::auto::maximise(&[range], &|free| {
+                if let Some(free) = search.maximise(&[range], &|free| {
                     let mut trial = next;
                     trial[index] = free[0];
                     eta_one(trial, held, index)
@@ -651,7 +694,10 @@ pub fn solve_hula_stage_with(
                     next[index] = free[0];
                 }
             }
-            let settled = next.iter().zip(&at).all(|(a, b)| (a - b).abs() < SETTLED);
+            let settled = next
+                .iter()
+                .zip(&at)
+                .all(|(a, b)| (a - b).abs() < settled_within);
             at = next;
             if settled {
                 break;
@@ -1222,6 +1268,149 @@ pub fn solve_hula_stage_with(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// **The hula stage's shift search is converged, and can now be asked** —
+    /// F51.
+    ///
+    /// It was the one search in the crate with no effort parameter, so "the
+    /// shifts it chooses are converged" was a claim nothing could raise. The
+    /// other two kinds have had one since F50 and a gate that quadruples it.
+    ///
+    /// The effort reaches **both** halves. `Search` governs each mesh's own
+    /// one-dimensional search; `Search::effort` scales the outer loop that
+    /// solves the crank, chooses the splits at it, and goes round again. A gate
+    /// that refined one and not the other would be checking half a search.
+    ///
+    /// **What this gate proves is the inner half.** Holding the outer loop at
+    /// three rounds and the shipped stopping distance while refining the inner
+    /// search leaves this test failing, so the inner effort is live. Doing the
+    /// reverse changes **no answer at all** — which is not a hole in the gate
+    /// but the thing the number ledger already records about that loop: it
+    /// settles on its own well inside its cap, and quadrupling the cap moves
+    /// neither shipped fixture by a digit. An outer loop that never binds cannot
+    /// be gated by refining it, and saying so is better than implying otherwise.
+    #[test]
+    fn the_hula_shift_search_is_converged_not_budgeted() {
+        use crate::auto::Search;
+        let lib = super::super::test_library();
+        let mut worst = 0.0_f64;
+        let mut checked = 0u32;
+        for (n, clearance) in [
+            (18u32, 0.2_f64),
+            (18, 0.5),
+            (24, 0.3),
+            (30, 0.25),
+            (12, 0.4),
+            (21, 0.35),
+        ] {
+            let mut stage = HulaStage {
+                clearance,
+                ..HulaStage::default()
+            };
+            stage.optimisation.enabled = true;
+            for (g, z) in stage.gears.iter_mut().zip([n, n + 1, n + 1, n + 2]) {
+                g.teeth = z;
+            }
+            let at = |s: &Search| {
+                solve_hula_stage_at(
+                    &stage,
+                    1000.0,
+                    StageTorques::just(2.0),
+                    &lib,
+                    Default::default(),
+                    s,
+                )
+                .ok()
+                .map(|r| r.fixed_carrier_efficiency.forward)
+            };
+            let (Some(shipped), Some(refined)) = (at(&Search::SHIPPED), at(&Search::refined(3)))
+            else {
+                continue;
+            };
+            checked += 1;
+            worst = worst.max((refined - shipped).abs());
+        }
+        assert!(checked >= 5, "only {checked} fixtures solved");
+        // A part in ten million, three orders below what a mesh is measured to.
+        // Measured across the fixtures above, **four are bit-identical** and the
+        // worst is 6.5e-7 — the same order the parallel pair's search reaches.
+        assert!(
+            worst < 1e-6,
+            "nine times the work moves the stage's efficiency by {worst}"
+        );
+        assert!(
+            worst > 0.0,
+            "every fixture gave a bit-identical answer at both efforts, so this \
+             gate never made the search work"
+        );
+    }
+
+    /// **F58 diagnosed: the optimiser moves nothing over a band, and there are
+    /// two reasons, neither of them a broken search.**
+    ///
+    /// Observed in Phase 4 and recorded without a cause. Measured over tooth
+    /// differences 1 to 9 at a fixed 324:1 reduction, turning the optimiser on
+    /// moves the answer for `d = 2..5` and by **nothing at all** at `d = 1` and
+    /// `d ≥ 6`. The two ends are not the same thing:
+    ///
+    /// - **`d ≥ 6`: the optimum *is* the floor.** The searchable interval begins
+    ///   at the pinion's undercut shift and the efficiency falls monotonically
+    ///   across it, so the best split is the least one — which is exactly where
+    ///   the stage sits with nothing asked to move. The search runs, and agrees.
+    /// - **`d = 1`: nothing in the interval is admissible.** Every split is
+    ///   refused by the mesh, so there is no candidate to choose and the stage
+    ///   keeps what it had. At a one-tooth difference the pair has to open to
+    ///   about 45° of operating pressure angle to clear itself and sits at
+    ///   `ε ≈ 1.02`; there is no room in it.
+    ///
+    /// **They are indistinguishable to a reader**, and that is the part worth
+    /// acting on rather than the band — `AUDIT.md` F82.
+    #[test]
+    fn the_optimiser_moves_nothing_over_a_band_and_the_two_ends_differ() {
+        use crate::auto::Search;
+        let lib = super::super::test_library();
+        let answer = |d: u32, optimise: bool| {
+            let module = 1.0 / f64::from(d);
+            let mut stage = HulaStage {
+                module: [module; 2],
+                clearance: 0.30 * module,
+                ..HulaStage::default()
+            };
+            stage.optimisation.enabled = optimise;
+            let n = 18 * d;
+            for (g, z) in stage.gears.iter_mut().zip([n, n + d, n + d, n + 2 * d]) {
+                g.teeth = z;
+            }
+            solve_hula_stage_at(
+                &stage,
+                1000.0,
+                StageTorques::just(2.0),
+                &lib,
+                Default::default(),
+                &Search::SHIPPED,
+            )
+            .ok()
+        };
+        let moved = |d: u32| -> Option<f64> {
+            let (off, on) = (answer(d, false)?, answer(d, true)?);
+            Some((on.fixed_carrier_efficiency.forward - off.fixed_carrier_efficiency.forward).abs())
+        };
+
+        // The band where it works, so "moves nothing" is a fact about the ends
+        // rather than about the optimiser.
+        for d in 2..=4 {
+            let m = moved(d).expect("these solve");
+            assert!(
+                m > 1e-5,
+                "d={d}: the optimiser should move this one, moved {m}"
+            );
+        }
+        // ...and the two ends, which move nothing.
+        for d in [1u32, 6, 7, 8, 9] {
+            let m = moved(d).expect("these solve");
+            assert!(m == 0.0, "d={d}: expected no movement, moved {m}");
+        }
+    }
     use crate::train::test_library;
 
     /// The stage at one torque, against the shared test library — the shape

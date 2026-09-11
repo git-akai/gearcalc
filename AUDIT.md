@@ -102,6 +102,16 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
+**Phase 7 — F51 and F58, the hula stage's search.** Done. It was the one search
+that could not be asked for an effort; it can now, and it **converges** — four of
+six fixtures bit-identical at nine times the work, worst 6.5e-7. The 798-line
+refactor the finding assumed turned out not to be needed. With that instrument
+**F58 is diagnosed and closes as `holds`**: the optimiser moves nothing at
+`d ≥ 6` because the optimum *is* the undercut floor, and nothing at `d = 1`
+because nothing in the interval is admissible. Neither is a broken search — but
+the two are indistinguishable to a reader, which is **F82** and is left open with
+its measurement.
+
 **Phase 7 — F55, what a stage says about a distance.** Done. Two silent faults,
 not one: a distance no admissible shifts reach was answered with the shifts
 unchanged, and — worse — a distance short enough to put the running centres
@@ -362,12 +372,13 @@ existed. `F` numbers are stable; nothing is renumbered.
 | | Finding | Kind | Phase | State |
 |---|---|---|---|---|
 | F1 | The crate has one optimiser and the solve inventory omits it | gap | 1, 4 | **half closed** — inventory names it; the closed form is Phase 4 |
-| F51 | The hula stage's shift search cannot be asked for an effort, so it is the one search with no convergence gate | gap | 4 | open — see Phase 4 |
+| F51 | The hula stage's shift search cannot be asked for an effort, so it is the one search with no convergence gate | gap | 4, 7 | **closed** — `solve_hula_stage_at`; converged, worst 6.5e-7. The refactor the finding assumed was not needed |
 | F52 | A given centre distance drops the optimiser onto the undercut floor — the tool's own recommended distance, typed back, costs 0.42 points | gap | 4 | **closed** — and logged in `corrections.md` |
 | F53 | The division objective is bimodal at the addendum cap and the search takes the lower peak | gap | 4 | **closed** — " |
 | F54 | A ring was asked nothing, so the search chose rings its cutter had to alter — 26 of 30 sets | gap | 4 | **closed** — and logged in `corrections.md`; the premise was wrong, see below |
 | F55 | A centre distance no admissible shifts can reach is answered rather than refused | gap | 4, 7 | **closed** — and it was two faults; a *negative* clearance was answered silently too, which is a pair that cannot be assembled |
-| F58 | The hula stage's shift optimiser moves no answer over a band of tooth differences, on or off | holds? | 4 | open — observed, not yet diagnosed |
+| F58 | The hula stage's shift optimiser moves no answer over a band of tooth differences, on or off | **holds** | 4, 7 | **closed** — two causes, neither a fault: at `d ≥ 6` the optimum is the floor, at `d = 1` nothing is admissible |
+| F82 | An optimiser that finds nothing admissible is indistinguishable from one that agrees with the floor — every kind falls back in silence | **gap** | 7 | **open**, measured |
 | F59 | Three kinds each wrote out what to ask of a mesh, and answered it three ways | gap | 4 | **closed** — `auto::MeshTrial`, and logged in `corrections.md` |
 | F60 | A hula pair's tip margin and an internal mesh's interference flags are asked by one kind each | **gap** | 5 | **closed** — `train::TipRoom` on `MeshReport`; and it found the shipped set interfering, see below |
 | F56 | No CLI command drove the optimiser, so its answers were outside the corpus | gap | 4 | **closed** — `gear-cli shifts`, which also closes F19's first row |
@@ -2632,6 +2643,50 @@ pinion's much smaller floor.
 > negative-clearance one fails; and **firing the not-reached note
 > unconditionally** fails, which is the half that matters — a note that fires on
 > every stage with a distance would pass the first gate and be worthless.
+
+### F51 and F58 — the hula stage's search, asked and diagnosed
+
+**F51.** This was the one search in the crate that could not be asked for an
+effort, so *"the shifts it chooses are converged"* was a claim nothing could
+raise. `solve_hula_stage_at` takes a `Search` now, following the `_with` pattern
+already beside it — **no lifting onto `HulaStage` was needed**, which the finding
+had assumed and which would have been a 798-line refactor for an argument.
+
+The effort reaches both halves of what this stage does. `Search` governs each
+mesh's own one-dimensional search; `Search::effort` — the `k` a caller passed
+`refined`, recovered from `starts` — scales the **outer** loop that solves the
+crank, chooses the splits at it and goes round again. `SETTLED` is gone with it:
+it was `1e-3` written out, which is what `Search::SHIPPED.resolution` is, so
+refining the search now refines the stopping distance as it always should have.
+
+**Measured, it converges.** Four of six fixtures are bit-identical at nine times
+the work and the worst is **6.5e-7** — the same order the parallel pair reaches.
+
+> **Gate, run, and its scope stated.** Holding the outer loop while refining the
+> inner one fails the gate, so the inner effort is live. Doing the reverse
+> changes **no answer at all**, which is not a hole: the number ledger already
+> records that this loop settles well inside its cap. An outer loop that never
+> binds cannot be gated by refining it, and the test says so rather than implying
+> otherwise.
+
+**F58, and it is `holds`.** The observation was that the optimiser moves no
+answer over a band of tooth differences. Reproduced at a fixed 324:1 reduction,
+turning it on moves the answer for `d = 2..5` and by **nothing at all** at
+`d = 1` and `d ≥ 6` — and the two ends are not the same thing:
+
+| | why nothing moves |
+|---|---|
+| `d ≥ 6` | **the optimum *is* the floor.** The searchable interval begins at the pinion's undercut shift and the efficiency falls monotonically across it — 0.99990 at the floor to 0.99979 at the top — so the best split is the least one, which is where the stage sits unasked. The search runs and agrees |
+| `d = 1` | **nothing in the interval is admissible.** Every split is refused by the mesh, so there is no candidate at all. At a one-tooth difference the pair opens to about 45° to clear itself and sits at `ε ≈ 1.02`; there is no room in it |
+
+Neither is a broken search, so F58 closes as `holds` — and the diagnosis took the
+instrument F51 built, which is why they were done together.
+
+**What it leaves is F82**, and that is the part worth acting on. The two ends are
+**indistinguishable to a reader**: the toggle says *optimise for efficiency* and
+the shifts do not move, and nothing says whether that is because the floor is the
+answer or because there was no answer to find. It is not this stage's alone —
+every kind falls back the same way, with the same silence.
 
 ---
 
