@@ -135,6 +135,17 @@ rather than hidden. **F81** came out of it and is the more useful finding:
 narrowing `TipRoom::clear` left the harness's own filter asking a third of the
 question, the corpus caught it, and the diff read like an improvement.
 
+**Phase 7 — F7, F19, F21, the figures.** Done. Every table the documents print
+is gated — the four hula studies by one test, and **two of the four had
+drifted** through Phase 4's repairs. The prose is not tagged and is not a
+backlog: it was read for the one class that is live output, *a sentence
+attributing a figure to a harness command*, and that class turned up a claim
+that has been **false since before the audit began** — `README.md` said the
+harness prints ε = 1.777921670 against the surfaces derivation, and it prints
+1.758113579, because a stage runs at its operating centre and the script builds
+the nominal one. The agreement itself holds, to 4.4e-10, and nothing had ever
+asserted it; a test does now. The other 57 paragraphs are classified below.
+
 **Phase 6 — the front end and the payload.** Done. Every finding it carried is
 closed, and **three of the five premises did not survive being counted** — F17's
 simulator was never in the payload, F15's four forms share sixteen labels of
@@ -224,6 +235,8 @@ them.
 | 6 | Front end and payload | **done** — F15, F16, F17, F39, F47 closed, plus F72–F78 and F80 out of them; F79 opened and scoped |
 | 7 | One interference check for every mesh | **done** — F79 closed, gates proven; **a live wrong answer**, and F81 caught by the corpus |
 | 7 | What a stage says about a distance it could not reach | **done** — F55 closed, gates proven; two silent faults, the worse being a pair that cannot be assembled |
+| 7 | The hula search asked for an effort, and what it found | **done** — F51 closed, F58 diagnosed and closed as `holds`, F82 opened and closed |
+| 7 | The figures | **done** — F7, F19 closed; every table gated, two had drifted; one attribution false since before the audit, now held by a test |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
 production code · 10,346 lines of comment in that code · 9,348 lines of
@@ -288,12 +301,15 @@ plus the one Phase 6 opened.
 | F51 | The hula stage's shift search cannot be asked for an effort | 4, deferred |
 | F55 | A centre distance no admissible shifts can reach is answered rather than refused | 4, deferred |
 | F58 | The hula shift optimiser moves no answer over a band of tooth differences | 4, deferred |
-| F7, F19, F21 | Figures and tables still ungated — the count is known, the tagging is not done | 0, 4 |
 
-**Phase 7 is what is left**, and it is four deferred findings and one new one
+**Phase 7 was what was left**, and it is four deferred findings and one new one
 rather than a sweep of its own. F79 is the largest and the only one that adds
 mathematics; F55 and F58 are both about a search saying *no answer* clearly; F51
-is a refactor the hula stage wants anyway; F7/F19/F21 are tagging.
+is a refactor the hula stage wants anyway; F7/F19/F21 were tagging, and turned
+up one more false sentence on the way. **All of it is closed.** What remains
+open is nothing this audit proposes to act on: the prose figures it classifies
+rather than gates, and the worm wheel's helical inputs, which F39 records as the
+ideal and F79 as the shape it would take.
 
 ---
 
@@ -394,7 +410,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F4 | `StageGear` — a shared input type — lives in `train/spur.rs` | drift | 3 | **closed** — moved, with its `Default`, `AddendumAsked` and serde helpers; `spur.rs` 1017 → 730 lines |
 | F5 | No ledger of the numbers that are not model constants | gap | 2 | **closed** |
 | F6 | The face-width invariance test ran the one model no stage rates with | gap | 5 | **closed** — every model and a rim, six cases |
-| F7 | ~212 documented figures, one gate | gap | 0 | **part closed** — mechanism built; 4 tables and 56 paragraphs ungated (F19, F21) |
+| F7 | ~212 documented figures, one gate | gap | 0 | **closed** — every table gated by a command or a named test; 57 paragraphs read by class rather than tagged, and the one live class is empty |
 | F8 | The CLI list chosen to be exhaustive is not | drift | 1 | **closed** — the table *is* the dispatch |
 | F9 | The Layout table names 7 of 27 modules | drift | 1 | **closed** — the map is `CLAUDE.md`; `state.md` keeps the decisions |
 | F10 | `bending-check.html` regenerates by hand | drift | 0 | **closed** — `figures-verbatim`, checked exactly |
@@ -408,7 +424,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F72 | Nothing ever executed the payload: the boundary's shape was checked, `gear-core`'s values were checked, and the `.wasm` the browser downloads was run by nothing | **gap** | 6 | **closed** — `tools/check_wasm.sh`, gates proven |
 | F73 | The wasm build was written out three times — flake, npm script, payload check — so a check could measure a module nobody downloads | gap | 6 | **closed** — `tools/build_wasm.sh` is the one recipe |
 | F18 | `CLAUDE.md` is empty | gap | 0 | **closed** |
-| F19 | Five documented tables have no command that reproduces them | gap | 4 | **part closed** — `:360` regenerates from `gear-cli shifts`; four remain |
+| F19 | Five documented tables have no command that reproduces them | gap | 4 | **closed** — `:360` from `gear-cli shifts`; the four hula studies by one test, and two had drifted |
 | F20 | `state.md` derived a figure by hand from rounded output, and it was wrong | drift | 0 | **closed** |
 | F21 | The figure checker cannot see figures in prose, only in tables | gap | 5 | **closed** — it counts both now, and the count was an undercount by an order |
 | F22 | The tense rule as written forbade 127 sentences it was not aimed at | drift | 1 | **closed** — the rule was narrowed, not the prose |
@@ -508,8 +524,10 @@ figures are claimed — for a table with a `before` column that is history),
 gates it, and the name is checked to exist), and `figures-exempt:` with a reason,
 which is section-scoped because history comes in sections.
 
-Coverage today: **6 blocks gated by a command, 2 by a test, 2 sections exempt,
-4 tables and 56 paragraphs still ungated** (F19, F21).
+Coverage when this was written: **6 blocks gated by a command, 2 by a test, 2
+sections exempt, 4 tables and 56 paragraphs still ungated** (F19, F21). At the
+close of Phase 7 it is 8, 8, 2, **no tables**, and 57 paragraphs classified
+rather than tagged — see *F7, F19 and F21* under Phase 7.
 
 > **Gate, run.** Built a worktree at `30679fb` — the commit before
 > `9e18527` "the tables had drifted again" — tagged study 5's table as it stood
@@ -2728,6 +2746,81 @@ harness and reading them.
 `gear-cli shifts epicyclic` prints the three hula rows beside the epicyclic sets,
 which is what puts the path in the change detector. It is the **eighth** time
 this audit has had to add a case for *an opt-in the harness never switches on*.
+
+### F7, F19 and F21 — the tables gated, and the prose read by class
+
+The four hula tables in `reference.md` — the sixteen-arrangement study, the
+addendum sweep, and the two `z = 36` studies at `d = 2..5` — had no command
+because no command prints them: each is a study built from several solves. One
+test now prints all four, `train::hula`'s
+`the_four_hula_studies_are_the_ones_this_code_prints`, and the tables carry a
+`figures-by-test` pointer to it. The checker resolves the name, so a renamed
+test is a failed check rather than a dangling comment.
+
+**Two of the four had drifted.** Tables 3 and 4 were written against the search
+as it stood before F50, F52, F53 and F54 fixed it — a search that quoted a module
+ratio the code never looked for. The sixteen-arrangement and addendum tables
+held. Regenerating the two moved every efficiency by a few tenths and the shift
+divisions by more; the reading did not change, and the paragraph under them that
+says the sum is pinned and the division is worth thirteen points at `d = 3`
+still says it, against the new figures rather than the old.
+
+> **Gate, run.** A misspelt test name in the tag fails the checker; a table
+> figure moved by one unit in its last place fails the test.
+
+**The prose, and why it is not tagged.** With the tables gated, 57 paragraphs
+across the four documents still carry a figure at two or more decimals that
+nothing generates. `check_figures.py`'s own docstring declines to tag them, and
+the reason stands: a figure in a sentence is as often a residual, a citation, or
+arithmetic on a gated table as it is live output. Read by class:
+
+| class | count | what holds it |
+|---|---|---|
+| verification residuals — `4e-16`, `3e-16`, `7.5e-14`, `1e-12` | 7 | the test that produced the residual, which would fail before the sentence became false |
+| a measurement recorded once — a sweep, a threshold, a bias with its sign, a canary's history | 27 | nothing; these are history, and each says when it was taken |
+| constants cited from a standard or a paper — ISO 6336-3's factors, Table B.1, Hamrock–Dowson | 5 | the citation |
+| arithmetic on a block gated above — "27 %", "thirteen points", "within 0.03", "+0.47 at 9 teeth" | 7 | the block's gate, read through by hand; every one checked here against the block, all consistent after the two corrections below |
+| illustration — a rule stated with a number in it, or a study's inputs | 11 | nothing, and nothing needs to |
+
+Fifty-seven, counted one by one rather than estimated — this file has already
+recorded what a ratio quoted from a glob is worth.
+
+The one class that *is* live output — **a sentence attributing a figure to a
+harness command** — was swept by grep rather than by reading, and after this
+phase it is empty. It was not empty before:
+
+**`README.md` and `state.md` said the harness prints ε = 1.777921670.** It
+prints 1.758113579, and has since `187dc75`, four commits before this audit
+began. That commit moved the crossed stage's path to the operating centre — the
+zero-backlash distance plus the default clearance of 0.02 mm — which is right,
+and on this pair costs 0.02 of contact ratio. `tools/crossed_path.py` builds the
+nominal pair, so the two figures the sentence set beside each other were no
+longer the same question. The agreement itself is intact: at the nominal centre
+with tips at `r + m_n` the construction gives 1.777921670 against the surfaces'
+1.777921669562, and **nothing had ever asserted it** — the README's "4.4e-10"
+was a figure held in nobody's test. `screw::tests::the_construction_reproduces_the_surfaces_derivation`
+holds it now, both documents point at it, and the harness's figure sits beside
+it under its own `figures:` tag with the reason the two differ.
+
+> **Gate, run.** Asking the path at the operating centre instead of the nominal
+> one fails the test with the harness's figure in the message.
+
+Two smaller corrections on the way, both prose reading a table that had moved:
+`reference.md:608` quoted the shift optimiser's gains on 17/43 and 13/61 from
+before F79's interference wall — six to fourteen hundredths, now tagged to the
+command that prints them; and the paragraph under `hulaband 18` said the rows
+through `d = 5` sit at `ε ≈ 1.01`, where `d = 5` sits at 1.09 and the table it
+reads does not have a `d = 5` row. Both were arithmetic on a gated table, done
+once and not redone when the table was.
+
+**What this says about the count.** Fourteen paragraphs were read closely
+before the class sweep; three were wrong. That rate is not an argument for
+tagging the other 43 — two of the three were arithmetic on a gated block and the
+third was the one live-output sentence, and both classes are now covered by a
+means other than a tag: the seven arithmetic paragraphs are checked above, and
+the live-output class is swept by a grep that finds nothing. It is an argument for the class sweep being run again by whoever
+next changes a table: the checker names the block, and the paragraph under it
+is the next thing to read.
 
 ---
 

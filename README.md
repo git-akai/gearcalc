@@ -200,6 +200,14 @@ ZN or ZA worm flank actually costs — and its answer is in
 normals by numerical differentiation, so the line of action, the contact ratio
 and conjugate action all come out of differential geometry with nothing about
 gears in the derivation. `gear-core` reaches the same line by a construction in
-lines and angles instead, and the two agree: for a 17/23 pair at 45°/45° with
-shafts at 90°, `gear-cli crossed 17 23 90` prints ε = 1.777921670 against the
-script's 1.777921669562.
+lines and angles instead, and the two agree:
+
+<!-- figures-by-test: the_construction_reproduces_the_surfaces_derivation -->
+for a 17/23 pair at 45°/45° with shafts at 90°, tips at `r + m_n`, the
+construction gives ε = 1.777921670 against the script's 1.777921669562.
+
+<!-- figures: gear-cli crossed 17 23 90 -->
+`gear-cli crossed 17 23 90` prints 1.758113579 for the same pair, because a
+stage runs at its operating centre — open by the default clearance, two
+hundredths of a millimetre — and not at the zero-backlash one the script builds. That the two were once quoted as
+one figure is why the test above exists.

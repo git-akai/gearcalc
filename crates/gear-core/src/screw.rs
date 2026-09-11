@@ -2081,6 +2081,44 @@ mod tests {
     /// This is also the check that the construction survives a shaft angle
     /// approaching its own degeneracy: at `Σ = 0` there is no line, but the limit
     /// from above is a number, and it is the right one.
+    /// **The construction against the surfaces.** `tools/crossed_path.py`
+    /// builds both flanks as parametric surfaces and reads the line of action
+    /// off them by numerical differentiation, sharing no code with this file;
+    /// on a 17/23 pair at 45°/45° with shafts at 90°, tips at `r + m_n`, it
+    /// reports `ε = 1.777921669562`. The construction here must land on that,
+    /// and it does to 4.4e-10. `README.md` and `docs/state.md` quote the pair
+    /// of figures and name this test as what holds them.
+    ///
+    /// At the **nominal** centre, which is what the script builds. The harness's
+    /// `gear-cli crossed 17 23 90` prints 1.758113579 for the same pair because
+    /// a stage runs at its operating centre, 0.02 mm open — and that the two
+    /// were once quoted as one figure is why this test exists.
+    #[test]
+    fn the_construction_reproduces_the_surfaces_derivation() {
+        let (mn, alpha_n) = (1.0, 20.0f64.to_radians());
+        let beta_1 = 45.0f64.to_radians();
+        let d1 = 17.0 * mn / (std::f64::consts::FRAC_PI_2 - beta_1).sin();
+        let s = Screw::new(&ScrewParams {
+            normal_module: mn,
+            normal_pressure_angle_rad: alpha_n,
+            shaft_angle_rad: 90.0f64.to_radians(),
+            starts: 17,
+            wheel_teeth: 23,
+            worm_pitch_diameter: d1,
+        })
+        .expect("a buildable pair");
+        let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+        let path = s
+            .path_of_contact_at(r[0] + mn, r[1] + mn, s.centre_distance)
+            .expect("a path of contact");
+        let from_the_surfaces = 1.777_921_669_562;
+        assert!(
+            (path.contact_ratio - from_the_surfaces).abs() < 1e-9,
+            "the construction gives ε = {:.9} against the surfaces' {from_the_surfaces}",
+            path.contact_ratio
+        );
+    }
+
     #[test]
     fn the_contact_ratio_approaches_the_parallel_pairs_normal_plane_value() {
         let (mn, alpha_n) = (1.0, 20.0f64.to_radians());

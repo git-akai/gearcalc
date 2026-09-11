@@ -146,8 +146,13 @@ paste the body back in.
 The last two share no code with the crate — that is their whole purpose.
 `crossed_path.py` builds both flanks as parametric surfaces and reaches the line
 of action through differential geometry; the crate reaches it through a
-construction in lines and angles. On a 17/23 pair at 45°/45° with shafts at 90°,
-they give ε = 1.777921670 and 1.777921669562.
+construction in lines and angles.
+
+<!-- figures-by-test: the_construction_reproduces_the_surfaces_derivation -->
+On a 17/23 pair at 45°/45° with shafts at 90°, tips at `r + m_n`, they give
+ε = 1.777921670 and 1.777921669562 — at the nominal centre, which is what the
+script builds; the harness's `crossed` command runs the pair 0.02 mm open and
+prints 1.758113579.
 
 ---
 

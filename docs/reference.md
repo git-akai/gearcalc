@@ -605,9 +605,11 @@ about half that, and differently on each member, so the factor stops cancelling 
 and the corrected condition supplies only the interior candidates where the
 optimum is as often at an end of the admissible interval.
 
+<!-- figures: gear-cli shifts 17 43 -->
+<!-- figures: gear-cli shifts 13 61 -->
 **What it is worth depends entirely on what the mesh feeds.** On an ordinary
-pair it is three to eight hundredths of a point — 98.32 % to 98.35 % on 17/43,
-98.08 % to 98.16 % on 13/61 — which is real and small. On a stage whose reduction
+pair it is six to fourteen hundredths of a point — 98.345 % to 98.488 % on
+17/43, 98.223 % to 98.287 % on 13/61 — which is real and small. On a stage whose reduction
 comes from two meshes nearly cancelling it is worth thirty to fifty times that at
 the output, because `η = 1/[R(1 − η₀) + η₀]` multiplies the mesh loss by the
 reduction. That is the whole reason a high-ratio design bothers to optimise its
@@ -1677,6 +1679,7 @@ kind cancel, reduce by `z²`, and keep about a quarter; those carrying one of ea
 cancel nothing, reduce by about `z/2`, and keep ninety-odd percent — on the same
 two meshes, losing the same 0.85 % between them.
 
+<!-- figures-by-test: the_four_hula_studies_are_the_ones_this_code_prints -->
 | arrangement | `D` | ratio | meshes | the stage |
 |---|---|---|---|---|
 | `N+1/N/N−1/N` | 1 | 324 | 99.15 % | 26.6 % |
@@ -1697,6 +1700,7 @@ one, so a tooth that cleared the involute interference limit at one tooth of
 difference reaches past it here. Measured across the proportion, on `N ± 4`
 about 61:
 
+<!-- figures-by-test: the_four_hula_studies_are_the_ones_this_code_prints -->
 | `h_a` | involute interference | ε_α | the stage |
 |---|---|---|---|
 | 0.60 | clear | 1.19 | 88.0 % |
@@ -1768,11 +1772,11 @@ shaper) is what the rows above report. The stationary point of the loss is not
 where they land: on these stages the mesh loses least at divisions of `+2.85`,
 `+2.05` and `−2.55` for one, two and four teeth of difference, and none of the
 three is admissible, because contact has gone discontinuous or the tips have
-fouled well before. The rows through `d = 5` sit at `ε ≈ 1.01` with the tip
-margin at zero instead; past that the winning row's contact ratio rises again,
-which is the turn-over the last three rows show. The loss is still falling when
-the geometry runs out, so what a designer wants to know is which bound stops it —
-and that is what these are.
+fouled well before. The rows through `d = 4` sit at `ε` between 1.01 and 1.03
+with the tip margin at zero instead; from `d = 5` the winning row's contact
+ratio rises again — 1.09, then 1.32 — which is the turn-over the last rows
+show. The loss is still falling when the geometry runs out, so what a designer
+wants to know is which bound stops it — and that is what these are.
 
 Three times better at four teeth of difference than at one, on the same
 reduction in the same envelope — and an eighth of the backlash. The mesh
@@ -1792,39 +1796,47 @@ each pair's own shifts**, not tie the two pairs together.
 
 Optimised that way, each pair on its own at `z = 36`, `h_a = 0.6`, `μ = 0.08`:
 
-| d | reduction | α_w | the pair keeps | the stage keeps | m₁/m₂ |
-|---|---|---|---|---|---|
-| 2 | 324 | 34.8° | 99.875 % | 54.7 % | 1.0000 |
-| 3 | 144 | 27.2° | 99.949 % | 86.5 % | 1.0000 |
-| 4 | 81 | 23.3° | 99.965 % | 94.0 % | 1.0000 |
-| 5 | 51.8 | 22.7° | 99.956 % | 95.0 % | 1.0000 |
+<!-- figures-by-test: the_four_hula_studies_are_the_ones_this_code_prints -->
+| d | reduction | α_w | the pair keeps | the stage keeps |
+|---|---|---|---|---|
+| 2 | 324 | 33.7° | 99.891 % | 58.1 % |
+| 3 | 144 | 25.9° | 99.965 % | 90.4 % |
+| 4 | 81 | 21.3° | 99.958 % | 93.1 % |
+| 5 | 52 | 19.2° | 99.948 % | 94.3 % |
 
-**The module ratio comes out exactly one** — not because the meshes are tied but
-because a stage's two pairs are near twins, `(z+d, z)` against `(z, z−d)`, whose
-independent optima land at the same operating pressure angle. Equal modules is a
-coincidence of that near-symmetry, and the table below is what it costs to depart
-from it.
+**The two pairs land at the same operating pressure angle** — to a hundredth of
+a degree, at every difference — not because the meshes are tied but because a
+stage's two pairs are near twins, `(z+d, z)` against `(z, z−d)`, whose
+independent optima coincide. That near-symmetry is why equal modules cost
+nothing, and the table further down is what departing from them costs.
+
+*(An earlier version of this table was written against a search that has since
+been fixed four times over — F50, F52, F53 and F54 in `AUDIT.md` — and quoted a
+module ratio the code never searched for. The figures here are the ones the test
+named above holds.)*
 
 **Against the lowest shifts that clear.** The default rule — take the least shift
 that produces non-interfering geometry — gets the *sum* right and the *division*
 wrong:
 
+<!-- figures-by-test: the_four_hula_studies_are_the_ones_this_code_prints -->
 | d | least loss (Σx, x_ring, x_pinion) | least shift | stage, best | stage, least |
 |---|---|---|---|---|
-| 2 | −0.20, +0.40, +0.20 | −0.20, +0.05, −0.15 | 54.65 % | 49.83 % |
-| 3 | −0.10, +0.55, +0.45 | −0.10, +0.15, +0.05 | 86.48 % | 78.50 % |
-| 4 | −0.05, +0.55, +0.50 | −0.05, −0.10, −0.15 | 94.00 % | 87.49 % |
-| 5 | −0.05, +0.50, +0.45 | 0.00, −0.10, −0.10 | 95.04 % | 93.63 % |
+| 2 | −0.17, +0.45, +0.28 | −0.19, +0.19, +0.00 | 58.08 % | 52.77 % |
+| 3 | −0.08, +0.58, +0.50 | −0.10, +0.10, +0.00 | 90.39 % | 77.26 % |
+| 4 | −0.02, +0.46, +0.44 | −0.04, +0.04, +0.00 | 93.09 % | 90.58 % |
+| 5 | +0.01, +0.07, +0.08 | +0.01, −0.01, +0.00 | 94.25 % | 94.17 % |
 
-The **sum is identical** at `d = 2, 3, 4` — a constraint sets it, and the default
-finds it. The whole difference is that the optimum raises *both* shifts together
-by 0.4 to 0.65 while holding their difference, and the default has no reason to.
-That is worth 1.4 to 8 points of stage efficiency, and it is the freedom
-[`efficient_split`](#efficiency-parallel-axes) exists for: at `d = 4` and `d = 5`
-it lands on the sweep's answer (0.510 against 0.500, 0.436 against 0.425, the
-efficiencies agreeing to 1e−7). At `d = 2` and `d = 3` it reports no root,
-correctly — the loss there is still falling when the contact ratio runs out, so
-the answer is a bound and not a stationary point.
+The **sum is nearly the same either way** — within 0.03 at every difference —
+because the crank offset sets it and the offset is solved from the far-side
+clearance, which the shifts move only through the tip geometry. The whole
+difference is the *division*: the optimum raises both shifts together, by about
+0.3 to 0.5 at `d = 2..4`, while holding their difference, and the default has no
+reason to. That is worth **13 points** of stage efficiency at `d = 3` and next to
+nothing at `d = 5`, where the optimum has come down almost to the floor. The
+stationary condition for a division is derived and verified where it applies
+([Efficiency](#efficiency-parallel-axes)); on these stages the answer is as often
+a bound as a stationary point, which is why it is searched.
 
 **The two modules are separate inputs and want to be equal.** Nothing in the
 arithmetic ties them — a pair's module is its own — so it is worth knowing that
