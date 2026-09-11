@@ -1346,6 +1346,7 @@ pub fn solve_planetary_stage_with(
         speeds: forward.speeds,
         torques: forward.torques,
         sun_planet: MeshReport {
+            flank_interference: sp_mesh.flank_interference([sun.flank_ends(), planet.flank_ends()]),
             operating_pressure_angle: sp_mesh.alpha_w.to_degrees(),
             coprime: super::gcd(teeth.sun, teeth.planet) == 1,
             contact_ratios: ContactRatios::of(
@@ -1367,6 +1368,11 @@ pub fn solve_planetary_stage_with(
             tips: None,
         },
         planet_ring: MeshReport {
+            // **The ring answers as a ring**, not as the `Tooth` the mesh
+            // arithmetic reads it through: its flank runs outwards from its tip
+            // and ends at its shaper's fillet, which only a `Ring` knows.
+            flank_interference: pr_mesh
+                .flank_interference([planet.flank_ends(), ring.flank_ends()]),
             operating_pressure_angle: pr_mesh.alpha_w.to_degrees(),
             coprime: super::gcd(teeth.planet, teeth.ring) == 1,
             contact_ratios: ContactRatios::of(

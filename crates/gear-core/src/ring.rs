@@ -174,6 +174,21 @@ pub struct Ring {
 }
 
 impl Ring {
+    /// Where this ring's usable flank begins and ends — see
+    /// [`crate::mesh::FlankEnds`].
+    ///
+    /// **The tip is the lower radius here**, which is the whole of why this is a
+    /// seam rather than a field read off either kind: a ring's flank runs
+    /// *outwards* from its tip to the junction with its fillet, and a rack-cut
+    /// tooth's runs the other way.
+    #[must_use]
+    pub fn flank_ends(&self) -> crate::mesh::FlankEnds {
+        crate::mesh::FlankEnds {
+            tip: self.ra,
+            junction: self.involute_at(self.u_j).0,
+        }
+    }
+
     /// Build a ring from the same parameters an external gear takes.
     ///
     /// `addendum` is measured **inward** and `dedendum` outward, which is what
@@ -1002,25 +1017,20 @@ pub fn mesh_with(ring: &Ring, pinion: &Tooth) -> Option<RingMesh> {
     }
     let along = centre_distance * alpha_w.sin();
 
-    // The relation, both ways round.
-    let ring_at = |r_pinion: f64| {
-        let t = (r_pinion * r_pinion - pinion.rb * pinion.rb)
-            .max(0.0)
-            .sqrt();
-        f64::hypot(ring.rb, along + t)
-    };
-    // Read backwards this can fail, and the failure is the answer rather than an
-    // error: a negative distance means the ring's tip would have to touch the
-    // pinion *inside its base circle*, where no involute exists. That is
-    // involute interference in its strongest form, and it is reported as a
-    // finding, not as "this pair cannot be described".
-    let pinion_at = |r_ring: f64| {
-        let t = (r_ring * r_ring - ring.rb * ring.rb).max(0.0).sqrt() - along;
-        (t >= 0.0).then(|| f64::hypot(pinion.rb, t))
-    };
-
-    let ring_contact_at_pinion_tip = ring_at(pinion.ra);
-    let reachable = pinion_at(ring.ra);
+    // **The relation, both ways round — and it is the general one.** A ring's
+    // base radius enters signed, which is the only thing that distinguishes this
+    // arrangement from an external pair, and
+    // [`crate::mesh::conjugate_radius`] does the rest. Reading it backwards can
+    // fail, and the failure is the answer rather than an error: it means the
+    // ring's tip would have to touch the pinion *inside its base circle*, where
+    // no involute exists. That is involute interference in its strongest form,
+    // and it is reported as a finding rather than as "this pair cannot be
+    // described".
+    let rb = [pinion.rb, -ring.rb];
+    let ring_contact_at_pinion_tip =
+        crate::mesh::conjugate_radius(rb, alpha_w, crate::mesh::MeshSide::Second, pinion.ra)?;
+    let reachable =
+        crate::mesh::conjugate_radius(rb, alpha_w, crate::mesh::MeshSide::First, ring.ra);
     let pinion_contact_at_ring_tip = reachable.unwrap_or(pinion.rb);
 
     // Contact ratio, from docs/reference.md#path-of-contact-and-contact-ratio's internal form. The path runs from where
@@ -1034,8 +1044,15 @@ pub fn mesh_with(ring: &Ring, pinion: &Tooth) -> Option<RingMesh> {
         .max(0.0);
     let contact_ratio = path / base_pitch;
 
-    // The ring's flank ends where its fillet begins; the pinion's ends where
-    // its own does. A tip reaching past either is the foul.
+    // **The classical pair, read off the general condition.** A ring's flank
+    // ends where its fillet begins and a pinion's ends where its own does, and a
+    // tip reaching past either is the foul — which is
+    // [`crate::mesh::Mesh::flank_interference`] asked of each member in turn.
+    // The names are the literature's: interference *of the ring's flank* is what
+    // it calls trochoid, and *of the pinion's* involute.
+    //
+    // Written through the general form rather than beside it so the two cannot
+    // come apart; a test holds them to the same numbers.
     let ring_form = ring.involute_at(ring.u_j).0;
     let trochoid_interference = ring_contact_at_pinion_tip > ring_form;
     let involute_interference = reachable.is_none() || pinion_contact_at_ring_tip < pinion.r_j;
@@ -1058,6 +1075,89 @@ pub fn mesh_with(ring: &Ring, pinion: &Tooth) -> Option<RingMesh> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// **The general reading and the ring's own reading are the same number.**
+    ///
+    /// `mesh_with` computes where a tip touches from the internal relation
+    /// written out here; `Mesh::contact_radius_at` computes it from the signed
+    /// one that serves both arrangements. They are the same relation, so they
+    /// have to agree to the bit — and if they do, the general form can replace
+    /// the special case rather than sit beside it.
+    ///
+    /// Asserted on **both** readings, because the two directions exercise
+    /// different halves of the sign: the pinion's tip against the ring uses
+    /// gear 2's negative `ρ`, and the ring's tip against the pinion is the one
+    /// that can fail to reach an involute at all.
+    #[test]
+    fn the_general_contact_reading_reproduces_the_internal_one() {
+        let mut checked = 0u32;
+        for z_ring in [40u32, 52, 60, 84] {
+            for z_pinion in [17u32, 20, 24, 31] {
+                for x in [-0.3_f64, 0.0, 0.4] {
+                    let ring = Ring::cut_by(
+                        &GearParams {
+                            teeth: z_ring,
+                            profile_shift: x,
+                            ..Default::default()
+                        },
+                        &Cutter::default(),
+                    );
+                    let pinion = crate::Tooth::new(GearParams {
+                        teeth: z_pinion,
+                        ..Default::default()
+                    });
+                    let Some(special) = mesh_with(&ring, &pinion) else {
+                        continue;
+                    };
+                    // The same pair as a `Mesh`, which is how every stage builds
+                    // its internal mesh.
+                    let ring_as_gear = crate::Tooth::new(GearParams {
+                        teeth: z_ring,
+                        profile_shift: x,
+                        ..Default::default()
+                    });
+                    let Ok(general) =
+                        crate::mesh::Mesh::new(&pinion, &ring_as_gear, MeshKind::Internal)
+                    else {
+                        continue;
+                    };
+                    assert!(
+                        (general.a_w - special.centre_distance).abs() < 1e-9,
+                        "the two do not even describe the same pair"
+                    );
+                    checked += 1;
+
+                    // The ring radius the pinion's tip touches.
+                    let on_ring = general
+                        .contact_radius_at(crate::mesh::MeshSide::Second, pinion.ra)
+                        .expect("a ring's flank always reaches outwards");
+                    assert!(
+                        (on_ring - special.ring_contact_at_pinion_tip).abs() < 1e-9,
+                        "{z_ring}/{z_pinion} x={x}: general {on_ring} vs internal {}",
+                        special.ring_contact_at_pinion_tip
+                    );
+
+                    // ...and the pinion radius the ring's tip touches, which is
+                    // the reading that can have no answer.
+                    let on_pinion =
+                        general.contact_radius_at(crate::mesh::MeshSide::First, ring.ra);
+                    match on_pinion {
+                        Some(r) => assert!(
+                            (r - special.pinion_contact_at_ring_tip).abs() < 1e-9,
+                            "{z_ring}/{z_pinion} x={x}: general {r} vs internal {}",
+                            special.pinion_contact_at_ring_tip
+                        ),
+                        None => assert!(
+                            special.involute_interference,
+                            "{z_ring}/{z_pinion} x={x}: the general form found no involute \
+                             where the internal one did"
+                        ),
+                    }
+                }
+            }
+        }
+        assert!(checked >= 30, "only {checked} pairs were comparable");
+    }
     use crate::tooth::Tooth;
 
     fn ring(teeth: u32) -> Ring {

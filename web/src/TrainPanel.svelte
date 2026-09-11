@@ -407,20 +407,24 @@
     <small>{t("ui.train_peak_cyclic")}</small>
     <small>{m ? `ρ ${num(m.relative_radius, 3)} mm` : BLANK}</small>
   </dd>
-  <!-- **Which conditions bite, and nothing when none do.** Drawn for any mesh
-       that has an internal member and for no other — an external pair's tips
-       meet on the line of centres or not at all. It was a hula stage's row,
-       written into that stage's own form, and an epicyclic set with the very
-       same ring mesh in it said nothing; the tip margin was a second number
-       beside it saying the same thing in degrees of pinion rotation, and the
-       row that reports the finding is the one worth drawing attention to. -->
-  {#if m?.tips}
+  <!-- **Which conditions bite, and nothing when none do.** Drawn for **every**
+       mesh now. A tip reaching past the usable end of the flank it meshes with
+       is the classical interference condition and belongs to any pair; it was
+       asked of internal meshes under two names — trochoid and involute — and of
+       external ones not at all, though a long addendum on a small pinion is
+       exactly where it bites. Only the *tips crossing away from the line of
+       action* is an internal pair's alone, and that row appears with the mesh
+       that can have it.
+
+       Named by member rather than by the classical pair, because the classical
+       names describe which member is a ring and the condition does not. -->
+  {#if m}
     <dt>{t("ui.train_interference")}</dt>
     <dd>
       {#each [[
-        m.tips.trochoid_interference ? t("ui.train_interference_trochoid") : null,
-        m.tips.involute_interference ? t("ui.train_interference_involute") : null,
-        m.tips.tip_interference ? t("ui.train_interference_tip") : null,
+        m.flank_interference[0] ? t("ui.train_interference_flank", { member: members[0] }) : null,
+        m.flank_interference[1] ? t("ui.train_interference_flank", { member: members[1] }) : null,
+        m.tips?.tip_interference ? t("ui.train_interference_tip") : null,
       ].filter((x) => x !== null)] as fouling (0)}
         <span class:warn={fouling.length > 0}>
           {fouling.join(" · ") || t("ui.train_interference_none")}

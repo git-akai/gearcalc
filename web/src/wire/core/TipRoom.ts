@@ -34,15 +34,12 @@
  */
 export type TipRoom = { 
 /**
- * The pinion's tip reaches past where the ring's flank ends.
- */
-trochoid_interference: boolean, 
-/**
- * The ring's tip reaches below where the pinion's flank ends.
- */
-involute_interference: boolean, 
-/**
  * The tips foul away from the line of action.
+ *
+ * **The only one of the three that is an internal pair's alone.** The other
+ * two — a tip reaching past a flank's usable end — are every mesh's, and
+ * are [`MeshReport::flank_interference`]; they used to be reported here as
+ * well, which was the same question answered in two places.
  */
 tip_interference: boolean, 
 /**

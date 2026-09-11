@@ -60,7 +60,20 @@ relative_radius: number,
  */
 backlash: [Backlash, Backlash], 
 /**
+ * **Whether each member's flank is reached past its usable end** by the
+ * other member's tip, in the order the mesh was built.
+ *
+ * The classical interference condition, and it belongs to **every** mesh.
+ * An internal pair had it under two names — *involute* interference when
+ * the ring's tip reaches below where the pinion's flank ends, which is
+ * `[0]`, and *trochoid* when the pinion's tip reaches into the ring's
+ * fillet, which is `[1]` — and an external pair had it under none, though a
+ * long addendum on a small pinion is exactly where it bites.
+ */
+flank_interference: [boolean, boolean], 
+/**
  * **Where an internal mesh's tips are**, and `None` for an external one,
- * which has no such question.
+ * which has no such question: an external pair's tip circles cross on the
+ * line of centres or not at all.
  */
 tips: TipRoom | null, };

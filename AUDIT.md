@@ -102,6 +102,16 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
+**Phase 7 — F79, the interference check.** Done. An internal pair had it twice
+over under two classical names and an **external pair had it not at all** — so
+the shift optimiser walked into it, and was **recommending gears that foul on 2
+of 14 fixture pairs**, both nine-tooth pinions. One signed relation now answers
+it for either arrangement and the ring's own two closures are gone. It costs
+0.028 of a point on 9/37, and it costs the search something too, which is pinned
+rather than hidden. **F81** came out of it and is the more useful finding:
+narrowing `TipRoom::clear` left the harness's own filter asking a third of the
+question, the corpus caught it, and the diff read like an improvement.
+
 **Phase 6 — the front end and the payload.** Done. Every finding it carried is
 closed, and **three of the five premises did not survive being counted** — F17's
 simulator was never in the payload, F15's four forms share sixteen labels of
@@ -189,6 +199,7 @@ them.
 | 4 | The optimiser | **done** — gates proven; the closed form weighed and declined, with its derivation kept |
 | 5 | Consolidate the tests | **done** — eight passes, gates proven; two live wrong numbers |
 | 6 | Front end and payload | **done** — F15, F16, F17, F39, F47 closed, plus F72–F78 and F80 out of them; F79 opened and scoped |
+| 7 | One interference check for every mesh | **done** — F79 closed, gates proven; **a live wrong answer**, and F81 caught by the corpus |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
 production code · 10,346 lines of comment in that code · 9,348 lines of
@@ -393,7 +404,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F37 | A given crank offset was not the offset the stage ran at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F38 | The reported clearance was the input echoed, not the gap run at | gap | 3 | **closed** — and logged in `corrections.md` |
 | F39 | The clearance paradigm: `Auto` clearance, mode 3 without the optimiser, a planetary distance | gap | 6 | **closed for all four items** — item 4's *minimum* (the worm's size absorbs a distance) is done; its *ideal*, a wheel with helical inputs and an interference check, is recorded as F79 |
-| F79 | No mesh kind has a tip-to-flank interference check, which a worm wheel's absorbing shift would need — and which would serve every kind | gap | — | **open**, scoped |
+| F79 | No mesh kind has a tip-to-flank interference check, which a worm wheel's absorbing shift would need — and which would serve every kind | **gap** | 7 | **closed** — one relation for both kinds; the optimiser had been recommending interfering gears on 2 of 14 fixture pairs |
+| F81 | Narrowing `TipRoom::clear` left every caller asking a third of the question, including the harness's own admissibility filter | **gap** | 7 | **closed** — renamed, and `MeshReport::teeth_clear` is the whole question |
 | F80 | Four angular names meant degrees in one module and radians in the next, and eight angles stated no unit at all — one of them cost a live bug | **gap** | 6 | **closed** — `_rad` where a name would mean both, and `tools/check_units.py` keeps it true; a second bug found in a fixture |
 | F78 | A planetary set's freedoms written as one flat group left it over-determined — its shifts carry a relation of their own that a pair's do not | gap | 6 | **closed** — the shift limit is read from the distance's toggle; the relief test checks every group now |
 | F75 | The optimiser's fallback discarded the *centre distance* along with the optimisation whenever its own constraints admitted nothing | **gap** | 6 | **closed** — the fallback is what the constraints imply, not what the stage would build unasked |
@@ -2469,6 +2481,105 @@ target and what `wasm-opt` cannot infer, nothing having written a
 `target_features` section; **without them the pass fails**, which is the failure
 mode to want. A toolchain bump that adds a third makes the build say so rather
 than shipping a module optimised under the wrong assumptions.
+
+---
+
+## Phase 7 — F79, one interference check for every mesh
+
+**The finding as scoped:** no mesh kind has a tip-to-flank interference check,
+and one would serve every kind. The measurement made it sharper than that: an
+**internal** pair had it twice over, under two classical names, and an
+**external** pair had it not at all.
+
+### The two internal checks were always one question
+
+`ring::mesh_with` reported *trochoid interference* — the pinion's tip reaching
+into the ring's fillet — and *involute interference* — the ring's tip reaching
+below where the pinion's flank ends. Both are: **does the mate's tip contact me
+outside my usable flank?**, asked of each member in turn. And `mesh.rs` already
+held the relation that answers it for either arrangement, signed:
+
+```text
+ρ₁ = r_b1 tan α_w + ξ            ρ₂ = r_b2 tan α_w − ξ
+```
+
+> **Checked algebraically first, then asserted.** The signed form reproduces both
+> of `ring::mesh_with`'s readings exactly — `ρ_ring = a_w sin α_w + ρ_pinion` and
+> its inverse — and a test holds them to the bit over ring and pinion counts and
+> shifts. The ring's own two closures are **gone**: it calls the general one.
+
+`mesh::conjugate_radius` is that relation, `Mesh::flank_interference` is the
+condition, and `FlankEnds` is the seam that lets a rack-cut tooth and a
+shaper-cut ring each say where their own flank runs — the `ToothOutline` idiom,
+and necessary because **a ring's tip is the lower end of its flank**. The
+comparison flips with `MeshKind::sign` rather than with a branch.
+
+### What it found: the optimiser was recommending gears that foul
+
+An external mesh had never been asked, and the shift search is exactly what walks
+into it — loss falls with the length of the path, and the longest admissible path
+ends where the flank does.
+
+| | fixture pairs whose chosen shifts interfere |
+|---|---|
+| before | **2 of 14** — 9/37 and 9/20, both nine-tooth pinions |
+| after | 0 of 14 |
+
+On 9/37 the recommendation was `Σx = 1.6697` for **97.706 %**, and at those
+shifts the wheel's tip contacts the pinion at 4.3053 mm where its flank does not
+begin until 4.3554. The honest answer is `Σx = 1.4078` for **97.678 %** —
+**0.028 of a point** is what it costs. The 11/18 epicyclic set moved likewise, by
+0.023.
+
+The condition also reproduces the classical results without being told them: a
+17/43 pair clears by 0.008 mm and a 14/14 pair fouls by 0.0005 mm, so the
+seventeen-tooth limit for 20° full depth falls out rather than being encoded.
+
+### And it costs the search something, which is recorded rather than hidden
+
+A refused region is a **wall**, and a constrained optimum sits on it. A pattern
+walk in the raw shifts resolves a wall to its own step:
+
+| | before | after |
+|---|---|---|
+| pairs, worst of 14 | 4.1e-7 | **13 of 14 at 1e-9 or better**; 9/20 at 3.3e-6 |
+| sets, worst of 30 | 1.5e-6 | 28 at 1e-6 or better; **11/18 at 1.9e-4** |
+
+Thirteen pairs got an order *tighter* — eliminating an infeasible region takes a
+ridge out of several surfaces — and the outliers are exactly the members small
+enough for interference to be the binding constraint. It is F50's diagnosis met
+on a new constraint, the canary is pinned so it can only shrink, and the remedy
+is the one F50 names: search the coordinate the constraint is flat in.
+
+### The fault this nearly shipped, and what caught it
+
+`TipRoom::clear()` meant *all three* conditions. Moving two of them onto
+`MeshReport` left it meaning one — and every caller that had been asking the
+whole question silently began asking a third of it. One of those callers was
+`gear-cli hulaband`'s own admissibility filter.
+
+**The golden corpus caught it, and it read like an improvement.** Four rows moved
+and every one moved *up*: `d = 9` went from 79.49 % to 95.02 % of stage
+efficiency. It was about to be written into `reference.md` as a better answer.
+It was a filter that had stopped filtering.
+
+Two lessons, and the second is the one worth keeping:
+
+1. A predicate that is narrowed must be **renamed**. It is `TipRoom::tips_clear`
+   now, which cannot be read as the whole question, and `MeshReport::teeth_clear`
+   is the whole question.
+2. **A change detector's diff is a question even when the answer looks good.** A
+   number moving the way you hoped is the easiest kind to explain away, and this
+   one had a ready explanation — *the constraint changed which ridge the search
+   lands on* — that was entirely wrong. With the filter restored the table is
+   byte-identical to the original.
+
+> **Gates, run — three, and the third took two attempts.** Dropping the sign from
+> the general relation fails; not flipping the comparison for a ring fails; and
+> removing the search's refusal **failed nothing** until a test was written that
+> asserts the optimiser's *recommendation* does not interfere. The tests that had
+> broken when the refusal was added were the convergence and idempotency ones,
+> and loosening them to accept the wall had left them unable to discriminate it.
 
 ---
 

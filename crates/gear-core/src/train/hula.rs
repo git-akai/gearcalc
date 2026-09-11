@@ -1151,6 +1151,11 @@ pub fn solve_hula_stage_with(
         };
         meshes.push(HulaMesh {
             report: MeshReport {
+                // The pinion is member 1 and the ring member 2, which is the
+                // order every internal mesh here is built in.
+                flank_interference: p
+                    .mesh
+                    .flank_interference([p.pinion.flank_ends(), p.ring.flank_ends()]),
                 operating_pressure_angle: layout.alpha_w[index].to_degrees(),
                 coprime: super::gcd(teeth.0[pair.ring], teeth.0[pair.pinion]) == 1,
                 // **The contact ratio the stage optimises against is the one it

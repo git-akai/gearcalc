@@ -777,6 +777,11 @@ pub fn solve_spur_stage_with(
         // subtraction rather than the input echoed back.
         clearance: centre - mesh.a_w,
         mesh: MeshReport {
+            // **Asked of the mesh as it runs**, opened by the assembly
+            // clearance — which is the mesh every other figure here is read off,
+            // and the less conservative of the two: opening a centre distance
+            // moves a tip away from the flank it might have reached.
+            flank_interference: mesh.flank_interference([g[0].flank_ends(), g[1].flank_ends()]),
             operating_pressure_angle: mesh.alpha_w.to_degrees(),
             coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
             contact_ratios,

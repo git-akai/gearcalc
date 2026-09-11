@@ -1020,6 +1020,15 @@ pub enum Cut<'a> {
 }
 
 impl Cut<'_> {
+    /// Where this member's usable flank begins and ends — whichever tool cut it.
+    #[must_use]
+    pub fn flank_ends(&self) -> crate::mesh::FlankEnds {
+        match self {
+            Self::ByRack { tooth, .. } => tooth.flank_ends(),
+            Self::ByShaper { ring } => ring.flank_ends(),
+        }
+    }
+
     /// Whether this member is the part the shift asked for.
     #[must_use]
     pub fn is_as_asked(&self) -> bool {
@@ -1092,10 +1101,16 @@ impl MeshTrial<'_> {
     /// What this mesh keeps, driving forward — or `None` where it is not a mesh
     /// a search may choose at all.
     ///
-    /// The four refusals are the four ways a mesh can fail to be one: a member
+    /// The five refusals are the five ways a mesh can fail to be one: a member
     /// the tool would not leave as asked, a tooth that reaches past the root
     /// circle it runs into, a tip that fouls something it is not meshing with,
-    /// and contact that does not stay continuous.
+    /// a tip that reaches past the **flank** it is meshing with, and contact
+    /// that does not stay continuous.
+    ///
+    /// The fourth is the newest and was the one hole an external pair had: the
+    /// interference condition was asked of internal meshes under two classical
+    /// names and of external ones not at all, though a long addendum on a small
+    /// pinion is exactly where it bites.
     #[must_use]
     pub fn efficiency(&self) -> Option<f64> {
         if !self.members.iter().all(Cut::is_as_asked) {
@@ -1109,6 +1124,19 @@ impl MeshTrial<'_> {
             return None;
         }
         if !self.tips_are_clear() {
+            return None;
+        }
+        // **The mate's tip must not reach past a flank's usable end**, asked of
+        // both members and of **every** mesh. `tips_are_clear` above is the
+        // internal pair's other question — whether two tips foul away from the
+        // line of action — and is `true` by construction on an external pair;
+        // this one is not, and had never been asked of one at all.
+        if self
+            .mesh
+            .flank_interference(self.members.map(|m| m.flank_ends()))
+            .iter()
+            .any(|&bad| bad)
+        {
             return None;
         }
         if self.path.contact_ratio < self.min_contact_ratio {
@@ -1178,7 +1206,7 @@ impl MeshTrial<'_> {
         else {
             return true;
         };
-        crate::train::TipRoom::of(ring, tooth).is_some_and(|t| t.clear())
+        crate::train::TipRoom::of(ring, tooth).is_some_and(|t| t.tips_clear())
     }
 }
 
@@ -1914,9 +1942,13 @@ mod tests {
                 .expect("a 60/20 internal pair meshes");
             let path = crate::contact::ContactPath::new(&pinion, ring.ra, &mesh)
                 .expect("and it reaches contact");
+            // **The whole question**, which is now two: the tips crossing away
+            // from the line of action is an internal pair's alone, and a tip
+            // reaching past a flank's usable end is every mesh's.
             let tips = crate::train::TipRoom::of(&ring, &pinion).expect("an internal mesh");
+            let flanks = mesh.flank_interference([pinion.flank_ends(), ring.flank_ends()]);
             (
-                tips.clear(),
+                tips.tips_clear() && flanks == [false, false],
                 MeshTrial {
                     members: [
                         Cut::ByRack {

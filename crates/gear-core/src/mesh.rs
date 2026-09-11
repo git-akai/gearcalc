@@ -483,6 +483,78 @@ impl Mesh {
         (rb1 * t + xi, rb2 * t - xi)
     }
 
+    /// **The radius on one member that a given radius on the other touches**,
+    /// along the line of action.
+    ///
+    /// `side` names the member the answer is *about*; `r_mate` is a radius on
+    /// the other one, and is normally its tip — which is what makes this the
+    /// interference question.
+    ///
+    /// # One relation, both kinds
+    ///
+    /// It is [`Self::curvature_radii`] read twice: the mate's radius fixes its
+    /// own `ρ`, that fixes `ξ`, and `ξ` fixes this member's `ρ`. Every sign is
+    /// the kind's, carried on `r_b2` exactly as it is everywhere else, so the
+    /// external and internal readings are one expression:
+    ///
+    /// ```text
+    /// external   ρ_here = a_w sin α_w − ρ_mate
+    /// internal   ρ_ring = a_w sin α_w + ρ_pinion
+    /// ```
+    ///
+    /// [verified: it reproduces `ring::mesh_with`'s two readings to the bit,
+    /// over a sweep of ring and pinion counts and shifts.]
+    ///
+    /// `None` where the mate's radius reaches a place this member has no
+    /// involute for — a `ρ` of the wrong sign, meaning the contact would have to
+    /// happen inside the base circle. That is not a failure to answer: it is
+    /// **interference in its strongest form**, and the caller reads it as one.
+    #[must_use]
+    pub fn contact_radius_at(&self, side: MeshSide, r_mate: f64) -> Option<f64> {
+        let (rb1, rb2) = self.base_radii();
+        conjugate_radius([rb1, rb2], self.alpha_w, side, r_mate)
+    }
+
+    /// **Whether each member's flank is reached past its usable end** by the
+    /// other member's tip.
+    ///
+    /// `tips` and `junctions` are each member's tip radius and the radius where
+    /// its involute hands over to its fillet — the two numbers that say where a
+    /// usable flank begins and ends. Both are read off the member itself, since
+    /// a rack-cut tooth and a shaper-cut ring answer differently and only they
+    /// know which they are.
+    ///
+    /// # This is the classical interference condition, and it had been asked of
+    /// one arrangement only
+    ///
+    /// An internal pair got it twice under two names —
+    /// **trochoid interference** when the pinion's tip reaches into the ring's
+    /// fillet, and **involute interference** when the ring's tip reaches below
+    /// where the pinion's flank ends. They are the same question asked of each
+    /// member in turn, and asking it of an **external** pair is the same
+    /// question again: a mate's tip reaching below the form circle is what a
+    /// long addendum does, and nothing here had ever asked.
+    ///
+    /// The comparison flips for a ring, whose flank runs the other way — its tip
+    /// is the *lower* end — and the flip is `MeshKind::sign` again rather than a
+    /// branch:
+    ///
+    /// ```text
+    /// interference   ⟺   σ_i (r_i − r_j,i) < 0          σ₁ = 1,  σ₂ = the kind's
+    /// ```
+    #[must_use]
+    pub fn flank_interference(&self, ends: [FlankEnds; 2]) -> [bool; 2] {
+        let signs = [1.0, self.kind.sign()];
+        [MeshSide::First, MeshSide::Second].map(|side| {
+            let i = side.index();
+            match self.contact_radius_at(side, ends[1 - i].tip) {
+                // No involute there at all: the strongest form of it.
+                None => true,
+                Some(r) => signs[i] * (r - ends[i].junction) < 0.0,
+            }
+        })
+    }
+
     /// Transverse relative curvature `1/ρ₁ + 1/ρ₂` at `ξ`, per mm.
     ///
     /// One expression for both kinds: gear 2's `ρ` is negative for a ring, so the
@@ -508,6 +580,77 @@ impl Mesh {
     pub fn ratio(&self) -> f64 {
         f64::from(self.z2) / f64::from(self.z1)
     }
+}
+
+/// **The radius on one member that a given radius on the other touches**, from
+/// the signed base radii alone.
+///
+/// The relation behind [`Mesh::contact_radius_at`], as a free function because a
+/// ring mesh reaches it without holding a [`Mesh`]: `ring::mesh_with` is given a
+/// [`crate::ring::Ring`] and a [`crate::Tooth`], which is not two teeth. Both
+/// callers are the same arithmetic, and this is where it is written down.
+///
+/// `rb` is `[gear 1, gear 2]` with **gear 2's signed** — negative for a ring —
+/// which is the only thing that distinguishes the two arrangements. The sign is
+/// read off it rather than passed alongside, so a caller cannot hand in one that
+/// disagrees with the radii.
+///
+/// # What it is
+///
+/// [`Mesh::curvature_radii`] read twice. The mate's radius fixes its own `ρ`,
+/// that fixes `ξ`, and `ξ` fixes this member's:
+///
+/// ```text
+/// ρ₁ = r_b1 tan α_w + ξ            ρ₂ = r_b2 tan α_w − ξ
+/// ```
+///
+/// which is `ρ_here = a_w sin α_w − ρ_mate` externally and
+/// `ρ_ring = a_w sin α_w + ρ_pinion` internally, without either being written
+/// out.
+///
+/// `None` where the answer would lie inside this member's base circle, which is
+/// not a failure to answer: it is **interference in its strongest form**.
+#[must_use]
+pub fn conjugate_radius(rb: [f64; 2], alpha_w: f64, side: MeshSide, r_mate: f64) -> Option<f64> {
+    let [rb1, rb2] = rb;
+    let t = alpha_w.tan();
+    // Gear 1's `ρ` is positive in its own sense and gear 2's carries the kind's
+    // sign, which is the whole of the difference between the two arrangements.
+    let s = if rb2 < 0.0 { -1.0 } else { 1.0 };
+    let (rb_here, sign_here, rb_mate, sign_mate) = match side {
+        MeshSide::First => (rb1, 1.0, rb2, s),
+        MeshSide::Second => (rb2, s, rb1, 1.0),
+    };
+    let rho_mate = sign_mate * (r_mate * r_mate - rb_mate * rb_mate).max(0.0).sqrt();
+    // `ξ` from the mate's own relation, then this member's `ρ` from `ξ`.
+    let xi = match side {
+        MeshSide::First => rb2 * t - rho_mate,
+        MeshSide::Second => rho_mate - rb1 * t,
+    };
+    let rho_here = match side {
+        MeshSide::First => rb1 * t + xi,
+        MeshSide::Second => rb2 * t - xi,
+    };
+    (sign_here * rho_here >= 0.0).then(|| f64::hypot(rb_here, rho_here))
+}
+
+/// **Where one member's usable flank begins and ends**, mm.
+///
+/// The two radii a mesh needs of a member to ask whether the *other* member's
+/// tip reaches past it: the tip itself, and the radius at which the involute
+/// hands over to the fillet.
+///
+/// It is a seam for the same reason [`crate::strength::ToothOutline`] is one. A
+/// rack-cut tooth and a shaper-cut ring answer both questions differently — and
+/// a ring's tip is the **lower** end of its flank rather than the upper — so
+/// only the member itself can say, and the mesh should not have to ask what kind
+/// of thing it is holding.
+#[derive(Clone, Copy, Debug)]
+pub struct FlankEnds {
+    /// The tip radius, mm.
+    pub tip: f64,
+    /// The radius where the involute ends and the fillet begins, mm.
+    pub junction: f64,
 }
 
 /// Which member of a pair a quantity refers to.

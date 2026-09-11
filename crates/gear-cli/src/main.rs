@@ -501,11 +501,12 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
             mesh.clearance, mesh.clearance_as_cut, mesh.report.contact_ratios.transverse
         );
         println!(
-            "    backlash {:.5} / {:.5} deg   interference: trochoid {}  involute {}  tip {} ({:+.4} deg)",
+            "    backlash {:.5} / {:.5} deg   flank interference: pinion {}  ring {}   \
+             tip {} ({:+.4} deg)",
             mesh.report.backlash[0].nominal,
             mesh.report.backlash[1].nominal,
-            mesh.report.tips.is_some_and(|t| t.trochoid_interference),
-            mesh.report.tips.is_some_and(|t| t.involute_interference),
+            mesh.report.flank_interference[0],
+            mesh.report.flank_interference[1],
             mesh.report.tips.is_some_and(|t| t.tip_interference),
             mesh.report.tips.map_or(0.0, |t| t.tip_margin)
         );
@@ -858,9 +859,13 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                     else {
                         continue;
                     };
+                    // **The whole question**, through the one method that asks
+                    // it. This read `tips.is_some_and(|t| t.clear())` and so
+                    // asked only about the tips crossing once the other two
+                    // conditions moved onto the mesh report — which let fouling
+                    // candidates win four of these rows.
                     let admissible = r.meshes.iter().all(|m| {
-                        m.report.contact_ratios.transverse >= 1.0
-                            && m.report.tips.is_some_and(|t| t.clear())
+                        m.report.contact_ratios.transverse >= 1.0 && m.report.teeth_clear()
                     }) && r.gears.iter().all(|g| g.gear.as_asked());
                     if !admissible {
                         continue;
@@ -2797,14 +2802,21 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                         // is the row that puts it in the corpus. Its counterpart
                         // for the sun-planet mesh is `None` and is not printed:
                         // an external pair has no such question.
-                        if let Some(tips) = r.planet_ring.tips {
+                        // **Both meshes now**, because a tip reaching past a
+                        // flank's usable end is every mesh's question and had
+                        // been asked of the internal one alone.
+                        for (name, m) in [
+                            ("sun-planet", &r.sun_planet),
+                            ("planet-ring", &r.planet_ring),
+                        ] {
                             println!(
-                                "planet-ring interference  trochoid {}  involute {}  \
-                                 tip {} ({:+.4} deg of pinion)",
-                                tips.trochoid_interference,
-                                tips.involute_interference,
-                                tips.tip_interference,
-                                tips.tip_margin
+                                "{name} flank interference  member 1 {}  member 2 {}{}",
+                                m.flank_interference[0],
+                                m.flank_interference[1],
+                                m.tips.map_or_else(String::new, |t| format!(
+                                    "   tips {} ({:+.4} deg of pinion)",
+                                    t.tip_interference, t.tip_margin
+                                ))
                             );
                         }
                         println!(

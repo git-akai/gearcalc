@@ -391,6 +391,44 @@ contact ratio, a tool that leaves the members alone — admit nothing, the stage
 falls back to what the *constraints* imply, not to what it would have built with
 no distance given at all.
 
+### Interference: a tip reaching past the flank it meshes with
+
+A flank is involute only between its tip and the radius where it hands over to
+its fillet. If the **other** member's tip contacts outside that span, the contact
+is on a fillet rather than on a conjugate surface — the teeth interfere.
+
+One relation answers it for both arrangements, and it is
+[`mesh::conjugate_radius`]: the mate's radius fixes its own `ρ`, `ρ` fixes `ξ`,
+and `ξ` fixes this member's radius. With `r_b2` signed that is
+
+```text
+external   ρ_here = a_w sin α_w − ρ_mate
+internal   ρ_ring = a_w sin α_w + ρ_pinion
+```
+
+without either being written out. The comparison then flips with the kind for the
+same reason — a ring's flank runs *outwards* from its tip:
+
+```text
+interference   ⟺   σ_i (r_i − r_j,i) < 0        σ₁ = 1,  σ₂ = the kind's
+```
+
+**The literature names the two internal cases and not the external one.** A ring's
+flank reached by the pinion's tip is *trochoid* interference and a pinion's flank
+reached by the ring's tip is *involute* interference; an external pair's is
+simply "interference", and is what a long addendum on a small pinion does. They
+are one condition asked of each member in turn, so `MeshReport` reports it as
+`flank_interference[member]` and the classical names live here.
+
+It is **not** the same question as undercut, though it has the same remedy.
+Undercut is what the *cutter* does to one gear on its own; interference is what a
+particular *mate* does to it. A 9-tooth pinion at its undercut floor is clear of
+both; unshifted it is clear of neither.
+
+The one condition that does not generalise is two tips fouling **away from the
+line of action**, which is `TipRoom`: an external pair's tip circles cross on the
+line of centres or not at all, so the question does not arise.
+
 ### Signed relations, both mesh kinds
 
 Gear 2's tooth count, shift and radii carry the kind's sign, and that is the
@@ -473,15 +511,21 @@ toward unity, and the loss falls with it.
 
 | pair | least loss | least shift that clears undercut |
 |---|---|---|
-| 9/37 | **97.706 %** at `Σx = 1.6697`, ε 1.2525 | 97.561 % at `Σx = 0.4736`, ε 1.3280 |
+| 9/37 | **97.678 %** at `Σx = 1.4078`, ε 1.2929 | 97.561 % at `Σx = 0.4736`, ε 1.3280 |
 | 17/43 | **98.488 %** at `Σx = 1.2566`, ε 1.4626 | 98.345 % at `Σx = 0.0057`, ε 1.5993 |
 
 **Where the optimum sits is the pair's own answer, not a rule.** On 17/43 it is
 *interior* — every neighbouring shift, in either member or both, is worse and
 buildable, so nothing holds it there but the loss turning over. On 9/37 it is
-**against a constraint**: every direction that would improve it describes a tooth
-that cannot be cut, and the search stops where the geometry runs out rather than
-where the derivative vanishes. That difference is why choosing the shifts is a
+**against a constraint**: every direction that would improve it describes a pair
+that cannot run, and the search stops where the geometry runs out rather than
+where the derivative vanishes.
+
+Which constraint, on 9/37, is **interference**: the wheel's tip reaching past the
+end of the pinion's usable flank. That pair used to be answered at `Σx = 1.6697`
+for 97.706 %, and those teeth foul — the condition was asked of internal meshes
+under two classical names and of external ones not at all. Nought point nought
+three of a point is what the honest answer costs. That difference is why choosing the shifts is a
 search and not a solve, and [rationale.md](rationale.md#and-the-one-thing-in-the-crate-that-is-none-of-the-above)
 argues it at length.
 

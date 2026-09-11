@@ -262,6 +262,22 @@ pub(crate) fn allocate_by_arc_length(
 }
 
 impl Tooth {
+    /// Where this tooth's usable flank begins and ends — see
+    /// [`crate::mesh::FlankEnds`].
+    ///
+    /// The junction is [`Self::r_j`], which is where the involute hands over to
+    /// the trochoid the cutter's corner leaves. It sits **below** the base
+    /// circle on an undercut tooth, which is the right answer rather than a
+    /// clamped one: `docs/state.md` records why the flank is carried down to its
+    /// true intersection.
+    #[must_use]
+    pub fn flank_ends(&self) -> crate::mesh::FlankEnds {
+        crate::mesh::FlankEnds {
+            tip: self.ra,
+            junction: self.r_j,
+        }
+    }
+
     #[must_use]
     pub fn new(params: GearParams) -> Self {
         Self::build(params, false)
