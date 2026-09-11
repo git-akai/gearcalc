@@ -1036,6 +1036,28 @@ mod tests {
             }
         }
 
+        // **An optimiser with nothing to choose.** A hula stage at a one-tooth
+        // difference opens to about 45° of operating pressure angle to clear
+        // itself and sits at `ε ≈ 1.02`: every split in the admissible interval
+        // is refused, so the search has no answer and the shifts stay where they
+        // were. Indistinguishable from a search that agreed, until it said so
+        // (`AUDIT.md` F58, F82).
+        {
+            let mut hula = gear_core::train::HulaStage::default();
+            hula.optimisation.enabled = true;
+            for (g, z) in hula.gears.iter_mut().zip([18u32, 19, 19, 20]) {
+                g.teeth = z;
+            }
+            if let Ok(r) = gear_core::train::solve_hula_stage(
+                &hula,
+                1000.0,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
+                record(&r.notes);
+            }
+        }
+
         // **A centre distance no admissible shifts reach**, and the negative
         // clearance that comes of asking for one well inside what the teeth
         // allow. A 9/37 pair told to run at 23.00 mm has its shifts pinned at

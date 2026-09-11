@@ -102,6 +102,12 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
+**Phase 7 — F82, an optimiser with nothing to choose.** Done. Turning the
+optimiser on and seeing no shift move meant one of two **opposite** things — the
+search agreed with the floor, or it found nothing admissible at all — and the
+shifts are identical in both. Every kind fell back in the same silence.
+`Searched` names the three states and all three choosers report it.
+
 **Phase 7 — F51 and F58, the hula stage's search.** Done. It was the one search
 that could not be asked for an effort; it can now, and it **converges** — four of
 six fixtures bit-identical at nine times the work, worst 6.5e-7. The 798-line
@@ -378,7 +384,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F54 | A ring was asked nothing, so the search chose rings its cutter had to alter — 26 of 30 sets | gap | 4 | **closed** — and logged in `corrections.md`; the premise was wrong, see below |
 | F55 | A centre distance no admissible shifts can reach is answered rather than refused | gap | 4, 7 | **closed** — and it was two faults; a *negative* clearance was answered silently too, which is a pair that cannot be assembled |
 | F58 | The hula stage's shift optimiser moves no answer over a band of tooth differences, on or off | **holds** | 4, 7 | **closed** — two causes, neither a fault: at `d ≥ 6` the optimum is the floor, at `d = 1` nothing is admissible |
-| F82 | An optimiser that finds nothing admissible is indistinguishable from one that agrees with the floor — every kind falls back in silence | **gap** | 7 | **open**, measured |
+| F82 | An optimiser that finds nothing admissible is indistinguishable from one that agrees with the floor — every kind falls back in silence | **gap** | 7 | **closed** — `Searched`, reported by all three choosers, gates proven |
 | F59 | Three kinds each wrote out what to ask of a mesh, and answered it three ways | gap | 4 | **closed** — `auto::MeshTrial`, and logged in `corrections.md` |
 | F60 | A hula pair's tip margin and an internal mesh's interference flags are asked by one kind each | **gap** | 5 | **closed** — `train::TipRoom` on `MeshReport`; and it found the shipped set interfering, see below |
 | F56 | No CLI command drove the optimiser, so its answers were outside the corpus | gap | 4 | **closed** — `gear-cli shifts`, which also closes F19's first row |
@@ -2682,11 +2688,46 @@ turning it on moves the answer for `d = 2..5` and by **nothing at all** at
 Neither is a broken search, so F58 closes as `holds` — and the diagnosis took the
 instrument F51 built, which is why they were done together.
 
-**What it leaves is F82**, and that is the part worth acting on. The two ends are
-**indistinguishable to a reader**: the toggle says *optimise for efficiency* and
-the shifts do not move, and nothing says whether that is because the floor is the
-answer or because there was no answer to find. It is not this stage's alone —
-every kind falls back the same way, with the same silence.
+**What it left is F82**, and that was the part worth acting on: the two ends were
+**indistinguishable to a reader**. Closed below.
+
+### F82 — an optimiser that found nothing, and one that agreed
+
+Raised by F58's diagnosis and closed in the same phase. Turning *optimise for
+efficiency* on and seeing no shift move means one of **two opposite things**:
+
+- the search ran and **agreed** — the optimum is on the floor the stage already
+  sits at, which is the ordinary answer wherever loss falls toward the shortest
+  admissible path; or
+- the search ran and found **nothing admissible at all**, so there was no answer
+  to choose and the stage kept what it had.
+
+The first is the tool working. The second is a design with no room in it. **The
+shifts are identical in both**, and every kind fell back in the same silence.
+
+`Searched` names the three states — `NotAsked`, `Chose`, `FoundNothing` — and
+`Searched::note` is the only place the wording lives, so no kind has to remember
+which of the three is worth saying. All three choosers report it:
+
+| kind | how it can find nothing |
+|---|---|
+| spur | `shifts_for_efficiency` returns nothing; the constraints still decide, the objective does not |
+| planetary | no member has an interval, or the search comes back empty |
+| hula | **per mesh**, and the stage says so only when *no* mesh chose — some choosing means the stage optimised, whatever the others did |
+
+The last row is a correction made while writing it: the first version set the
+state on any mesh failing, so `d = 3` — where the optimiser moves the answer by
+7.1e-4 — reported *nothing admissible*. Caught by putting the three rows in the
+harness and reading them.
+
+> **Gates, run — three.** Silencing the note fails; firing it whenever the
+> optimiser *ran* fails, which is the half that matters — a note that called
+> agreement a failure would pass the first gate and be worse than silence; and
+> not recording a refused mesh fails.
+
+`gear-cli shifts epicyclic` prints the three hula rows beside the epicyclic sets,
+which is what puts the path in the change detector. It is the **eighth** time
+this audit has had to add a case for *an opt-in the harness never switches on*.
 
 ---
 

@@ -573,6 +573,16 @@ pub fn solve_hula_stage_at(
     // The objective is the product of the two mesh efficiencies, which is what
     // the stage's own efficiency rises with, so the power flow does not have to
     // be run inside the search.
+    // **Whether the optimiser found anything**, which on this stage is per mesh
+    // and is the case F58 measured: at a one-tooth difference every split is
+    // refused and there is nothing to choose, while at six or more the optimum
+    // *is* the floor and the search agrees. The shifts look the same either way.
+    // `asked` is whether any mesh had a freedom to search at all; `chose` is
+    // whether any search came back with an answer. A stage where some mesh chose
+    // has optimised, whatever the others did — the note is about the *stage*
+    // having nothing to choose, which is the case F58 measured at a one-tooth
+    // difference, where every split of both meshes is refused.
+    let (mut asked_any, mut chose_any) = (false, false);
     let split_at = if stage.optimisation.enabled {
         // **The crank is solved once a round, and each mesh is chosen alone.**
         //
@@ -679,10 +689,14 @@ pub fn solve_hula_stage_at(
             let mut next = at;
             for index in 0..2 {
                 // A split given by hand is a constraint, and that mesh has
-                // nothing left to search.
+                // nothing left to search. Nothing was asked of it, so its not
+                // moving says nothing.
                 if pinned[index].is_some() {
                     continue;
                 }
+                asked_any = true;
+                // No interval to search in counts the same as combing one and
+                // finding nothing in it: either way there was no answer here.
                 let Some(range) = split_box(index) else {
                     continue;
                 };
@@ -692,6 +706,7 @@ pub fn solve_hula_stage_at(
                     eta_one(trial, held, index)
                 }) {
                     next[index] = free[0];
+                    chose_any = true;
                 }
             }
             let settled = next
@@ -1239,6 +1254,14 @@ pub fn solve_hula_stage_at(
     // **The crank offset is this kind's centre distance**, so the same two
     // findings reach it: an offset the shifts cannot make, and a running gap
     // inside the zero-backlash one. `train::distance_notes`, as everywhere else.
+    notes.extend(
+        match (asked_any, chose_any) {
+            (false, _) => super::Searched::NotAsked,
+            (true, true) => super::Searched::Chose,
+            (true, false) => super::Searched::FoundNothing,
+        }
+        .note(),
+    );
     notes.extend(super::distance_notes(
         (!stage.offset.auto && !stage.running_clearance.auto)
             .then_some(stage.offset.manual - stage.running_clearance.manual),
@@ -1409,6 +1432,32 @@ mod tests {
         for d in [1u32, 6, 7, 8, 9] {
             let m = moved(d).expect("these solve");
             assert!(m == 0.0, "d={d}: expected no movement, moved {m}");
+        }
+
+        // **And the two ends say different things**, which is F82 and is the
+        // part that was worth acting on: nothing moving means one of two
+        // opposite things, and the shifts cannot tell them apart.
+        let said = |d: u32| -> Vec<String> {
+            answer(d, true)
+                .expect("these solve")
+                .notes
+                .iter()
+                .map(|n| n.key.clone())
+                .collect()
+        };
+        let nothing = crate::note::key::STAGE_OPTIMISER_FOUND_NOTHING;
+        assert!(
+            said(1).iter().any(|k| k == nothing),
+            "d=1: every split was refused, and the stage should say so: {:?}",
+            said(1)
+        );
+        for d in [6u32, 9] {
+            assert!(
+                !said(d).iter().any(|k| k == nothing),
+                "d={d}: the search agreed with the floor, which is not the same \
+                 thing and must not be reported as it: {:?}",
+                said(d)
+            );
         }
     }
     use crate::train::test_library;

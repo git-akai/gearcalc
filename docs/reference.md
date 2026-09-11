@@ -348,7 +348,20 @@ overlapping at rest: nothing can be assembled there and every figure taken at it
 describes nothing. `stage.clearance_negative` says that, and it is a stage's
 finding rather than a mesh's because it is the *assembly* that fails.
 
-Both belong to every kind that has a centre distance — a crank offset included,
+**And a third thing a stage says about its shifts: whether the optimiser found
+anything to choose.** Turning it on and seeing no shift move means one of two
+opposite things — the search ran and *agreed*, the optimum being on the floor the
+stage already sits at, which is the ordinary answer wherever loss falls toward
+the shortest admissible path; or the search ran and found **nothing admissible at
+all**, so there was no answer and the stage kept what it had. The first is the
+tool working; the second is a design with no room in it.
+
+The shifts cannot tell them apart, so `stage.optimiser_found_nothing` does. A
+hula stage at a one-tooth difference is the case: it opens to about 45° of
+operating pressure angle to clear itself, sits at `ε ≈ 1.02`, and every split of
+both meshes is refused.
+
+Both of the distance findings belong to every kind that has a centre distance — a crank offset included,
 that being what a hula stage calls one — and both are `train::distance_notes`, so
 they are said in the same words wherever they arise.
 

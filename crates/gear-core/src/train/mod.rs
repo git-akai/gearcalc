@@ -1396,6 +1396,48 @@ impl Default for Stage {
     }
 }
 
+/// **Whether a stage's shift chooser actually chose**, and what it means when
+/// the shifts come back where they started.
+///
+/// A designer who turns *optimise for efficiency* on and sees no shift move is
+/// owed the reason, and there are two of them that look identical:
+///
+/// - the search ran and **agreed** — the optimum is on the floor the stage
+///   already sits at, which is the ordinary answer wherever loss falls
+///   monotonically toward the shortest admissible path; or
+/// - the search ran and found **nothing admissible at all**, so there was no
+///   answer to choose and the stage kept what it had.
+///
+/// The first is the tool working. The second is a design with no room in it, and
+/// it was silent on every kind — `AUDIT.md` F58 measured both ends of it on one
+/// stage before this existed to tell them apart.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Searched {
+    /// The optimiser was off, or every freedom was given by hand. Nothing was
+    /// asked, so nothing failing to move says anything.
+    NotAsked,
+    /// It ran and chose. The answer may still equal the floor; that is the
+    /// search agreeing rather than the search failing.
+    Chose,
+    /// It ran and **nothing in the admissible range could be built**. These
+    /// shifts are the ones the stage takes unasked.
+    FoundNothing,
+}
+
+/// A chooser's answer, and how it arrived.
+pub(crate) struct Chosen<const N: usize> {
+    pub shifts: [f64; N],
+    pub how: Searched,
+}
+
+impl Searched {
+    /// The note this deserves, if any — so no kind has to remember the wording
+    /// or which of the three states is worth saying out loud.
+    pub(crate) fn note(self) -> Option<Note> {
+        (self == Self::FoundNothing).then(|| Note::new(key::STAGE_OPTIMISER_FOUND_NOTHING))
+    }
+}
+
 /// **What a stage has to say about the distance it ended up running at**, if
 /// anything.
 ///

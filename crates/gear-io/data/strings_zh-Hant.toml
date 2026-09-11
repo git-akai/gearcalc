@@ -47,6 +47,7 @@ self_locking = "自鎖：靜摩擦係數 μ {friction}，閾值為 {threshold}�
 near_self_locking = "接近自鎖：靜摩擦係數 μ {friction} 接近閾值 {threshold}，反驅能力因而取決於一個估算的係數"
 centre_distance_not_reached = "沒有可用的變位係數能達到 {asked} mm：齒輪對實際按 {reached} mm 建構，所報間隙即由此產生的間距"
 clearance_negative = "工作中心距比無側隙中心距 {nominal} mm 小 {overlap} mm：這對輪齒無法裝配，在此處計算的任何數值都沒有意義"
+optimiser_found_nothing = "可用範圍內沒有可建構的方案，因此變位係數即為本級未經請求時所取的值：最佳化器沒有可選的答案，這與它認同當前取值並不相同"
 forward_locking = "無法正向驅動：靜摩擦係數 μ {friction}，閾值為 {threshold}，因此第一構件根本無法帶動第二構件"
 near_forward_locking = "接近無法正向驅動：靜摩擦係數 μ {friction} 接近閾值 {threshold}，能否驅動因而取決於一個估算的係數"
 low_mesh_efficiency = "嚙合效率 {percent} %：大部分輸入功率變為熱量，蝸桿級通常因此受限，而非因應力受限"

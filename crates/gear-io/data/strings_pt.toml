@@ -52,6 +52,7 @@ self_locking = "autobloqueio: μ estático {friction} contra um limiar de {thres
 near_self_locking = "próximo do autobloqueio: μ estático {friction} perto do limiar {threshold}, portanto o retroacionamento depende de um coeficiente estimado"
 centre_distance_not_reached = "nenhum deslocamento admissível alcança {asked} mm: o par é construído a {reached} mm, e a folga indicada é o vão que isso deixa"
 clearance_negative = "a distância de funcionamento está {overlap} mm dentro da distância sem folga de {nominal} mm: estes dentes não podem ser montados, e qualquer valor calculado aí não descreve nada"
+optimiser_found_nothing = "nada na faixa admissível pôde ser construído, portanto os deslocamentos são os que este estágio assume sem ser pedido: o otimizador não teve resposta a escolher, o que não é o mesmo que concordar"
 forward_locking = "não pode ser acionado no sentido direto: μ estático {friction} contra um limiar de {threshold}, portanto o primeiro membro não consegue girar o segundo"
 near_forward_locking = "próximo de não acionar no sentido direto: μ estático {friction} perto do limiar {threshold}, portanto acionar ou não depende de um coeficiente estimado"
 low_mesh_efficiency = "rendimento do engrenamento {percent} %: a maior parte da entrada torna-se calor, o que normalmente limita um estágio de sem-fim antes da tensão"

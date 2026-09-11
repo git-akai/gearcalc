@@ -1,3 +1,10 @@
+hula stages  z, by tooth difference
+
+d             x mesh 1  x mesh 2    eta0 fwd   what the optimiser found
+1               0.4533    0.4533    99.3076 %   nothing admissible
+3               0.6124    0.6405    99.8840 %   a shift to choose
+6              -0.0194   -0.0194    99.9799 %   a shift to choose
+
 epicyclic sets  z_sun/z_planet, ring = sun + 2 planet
 
 z_s/z_p          x sun  x planet    x ring    eta0 fwd     cut as asked

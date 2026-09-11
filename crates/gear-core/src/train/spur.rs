@@ -283,6 +283,9 @@ impl SpurStage {
     /// pair is chosen at once, because a shift is only good or bad relative to
     /// the one it meshes with — and what a designer has already given is handed
     /// over as pinned rather than overridden.
+    // **The tests\' door.** The solve reads `chosen_at`, because it needs
+    // to know *how* the shifts were arrived at as well as what they are.
+    #[cfg(test)]
     pub(super) fn shifts(&self) -> [f64; 2] {
         self.shifts_at(&crate::auto::Search::SHIPPED)
     }
@@ -303,7 +306,13 @@ impl SpurStage {
     /// As [`Self::shifts`], at a stated search effort — which is what makes
     /// "the shipped effort is converged" a claim something can raise and check
     /// rather than a comment (`auto::Search`).
-    pub(super) fn shifts_at(&self, search: &crate::auto::Search) -> [f64; 2] {
+    /// As [`Self::shifts_at`], **and whether the optimiser actually chose**.
+    ///
+    /// Two outcomes look identical from the shifts alone: a search that agreed
+    /// with the floor, and a search that found nothing admissible and left the
+    /// floor alone. `super::Searched` tells them apart, and the solve says the
+    /// second out loud.
+    pub(super) fn chosen_at(&self, search: &crate::auto::Search) -> super::Chosen<2> {
         let asked = [0, 1].map(|i| self.gears[i].shift_asked(&self.base_params(i)));
         let floor = asked.map(|a| a.search_floor);
         let given = asked.map(|a| a.given);
@@ -352,7 +361,10 @@ impl SpurStage {
         // paradigm (`docs/reference.md#which-of-the-three-numbers-is-given-and-which-follows`) is the
         // rule: the distance and the clearance are given, so the shifts follow.
         if !self.optimisation.enabled {
-            return constrained().unwrap_or_else(|| asked.map(|a| a.settled));
+            return super::Chosen {
+                shifts: constrained().unwrap_or_else(|| asked.map(|a| a.settled)),
+                how: super::Searched::NotAsked,
+            };
         }
         crate::auto::shifts_for_efficiency(
             &|x| [0, 1].map(|i| self.params_at(i, x[i])),
@@ -383,8 +395,27 @@ impl SpurStage {
         // So the fallback is what the constraints alone imply, and only where
         // *that* has no answer does the stage fall back to what it would have
         // built unasked.
-        .or_else(constrained)
-        .unwrap_or_else(|| asked.map(|a| a.settled))
+        .map_or_else(
+            // Nothing admissible. The constraints still stand — see above — but
+            // the *objective* found no answer, and that is worth saying: it is
+            // otherwise indistinguishable from a search that agreed.
+            || super::Chosen {
+                shifts: constrained().unwrap_or_else(|| asked.map(|a| a.settled)),
+                how: super::Searched::FoundNothing,
+            },
+            |shifts| super::Chosen {
+                shifts,
+                how: super::Searched::Chose,
+            },
+        )
+    }
+
+    /// As [`Self::shifts`], at a stated search effort — which is what makes
+    /// "the shipped effort is converged" a claim something can raise and check
+    /// rather than a comment (`auto::Search`).
+    #[cfg(test)]
+    pub(super) fn shifts_at(&self, search: &crate::auto::Search) -> [f64; 2] {
+        self.chosen_at(search).shifts
     }
 
     /// The gear the stage would build at a given shift — the automatic
@@ -465,7 +496,8 @@ pub fn solve_spur_stage_with(
     // The shifts once, not once per gear: with the optimiser on, `shifts` is a
     // search, and asking each gear for its own would run it twice for one
     // answer.
-    let x = stage.shifts();
+    let chosen = stage.chosen_at(&crate::auto::Search::SHIPPED);
+    let x = chosen.shifts;
     let p = [stage.params_at(0, x[0]), stage.params_at(1, x[1])];
     let g = [Tooth::new(p[0]), Tooth::new(p[1])];
     let mesh = Mesh::new(&g[0], &g[1], MeshKind::External).map_err(TrainError::Mesh)?;
@@ -782,6 +814,10 @@ pub fn solve_spur_stage_with(
         centre,
         mesh.a_w,
     ));
+    // ...and whether the optimiser found anything to choose. A search that
+    // agreed with the floor and a search that found nothing look identical from
+    // the shifts alone (`super::Searched`).
+    notes.extend(chosen.how.note());
 
     Ok(SpurResult {
         ratio: f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth),

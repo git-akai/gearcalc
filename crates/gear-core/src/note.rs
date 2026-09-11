@@ -91,6 +91,8 @@ pub mod key {
     pub const STAGE_CENTRE_DISTANCE_NOT_REACHED: &str = "stage.centre_distance_not_reached";
     /// `stage.clearance_negative`
     pub const STAGE_CLEARANCE_NEGATIVE: &str = "stage.clearance_negative";
+    /// `stage.optimiser_found_nothing`
+    pub const STAGE_OPTIMISER_FOUND_NOTHING: &str = "stage.optimiser_found_nothing";
     /// `stage.forward_locking`
     pub const STAGE_FORWARD_LOCKING: &str = "stage.forward_locking";
     /// `stage.near_forward_locking`
@@ -237,6 +239,7 @@ pub mod key {
         STAGE_NEAR_SELF_LOCKING,
         STAGE_CENTRE_DISTANCE_NOT_REACHED,
         STAGE_CLEARANCE_NEGATIVE,
+        STAGE_OPTIMISER_FOUND_NOTHING,
         STAGE_FORWARD_LOCKING,
         STAGE_NEAR_FORWARD_LOCKING,
         STAGE_OVERLAP_BELOW_ONE,

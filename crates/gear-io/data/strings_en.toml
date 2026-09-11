@@ -112,6 +112,7 @@ self_locking = "self-locking: static μ {friction} against a threshold of {thres
 near_self_locking = "close to self-locking: static μ {friction} near threshold of {threshold}, so back-driving changes on an estimated coefficient"
 centre_distance_not_reached = "no admissible shifts reach {asked} mm: the pair is built at {reached} mm instead, and the clearance reported is the gap that leaves"
 clearance_negative = "the running distance is {overlap} mm inside the zero-backlash {nominal} mm: these teeth cannot be assembled, and every figure taken at it describes nothing"
+optimiser_found_nothing = "nothing in the admissible range could be built, so the shifts are the ones this stage takes unasked: the optimiser had no answer to choose, which is not the same as it agreeing"
 forward_locking = "cannot be driven forward: static μ {friction} against a threshold of {threshold}, so the first member cannot turn the second at all"
 near_forward_locking = "close to not driving forward: static μ {friction} near threshold of {threshold}, so whether it drives at all changes on an estimated coefficient"
 low_mesh_efficiency = "mesh efficiency {percent} %: most of the input becomes heat, which usually limits a worm stage before stress does"

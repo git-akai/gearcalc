@@ -577,13 +577,19 @@ impl PlanetaryStage {
         Some([s_ext - x_p, x_p, x_p - s_int])
     }
 
+    // **The tests\' door.** The solve reads `chosen_at`, because it needs
+    // to know *how* the shifts were arrived at as well as what they are.
+    #[cfg(test)]
     pub(super) fn shifts(&self) -> [f64; 3] {
         self.shifts_at(&crate::auto::Search::SHIPPED)
     }
 
     /// As [`Self::shifts`], at a stated search effort — see `auto::Search`, and
     /// `SpurStage::shifts_at` for why the effort is a parameter at all.
-    pub(super) fn shifts_at(&self, search: &crate::auto::Search) -> [f64; 3] {
+    /// As [`Self::shifts_at`], **and whether the optimiser actually chose** —
+    /// see `super::Searched`, and `SpurStage::chosen_at` for why the two
+    /// outcomes that look alike have to be told apart.
+    pub(super) fn chosen_at(&self, search: &crate::auto::Search) -> super::Chosen<3> {
         let asked = self.asked();
         let absorbed = self.absorber().index();
         let plain: [f64; 3] = std::array::from_fn(|i| asked[i].settled);
@@ -601,12 +607,18 @@ impl PlanetaryStage {
         // alone, which is a one-dimensional search this pass does not add.
         if let Some(target) = self.nominal_distance() {
             if let Some(x) = self.shifts_reaching(target, &asked) {
-                return x;
+                return super::Chosen {
+                    shifts: x,
+                    how: super::Searched::NotAsked,
+                };
             }
         }
 
         if !self.optimisation.enabled {
-            return plain;
+            return super::Chosen {
+                shifts: plain,
+                how: super::Searched::NotAsked,
+            };
         }
         // **The absorber is not searched**: its shift is what the other two
         // leave, so it is neither given nor free and the search never places a
@@ -690,7 +702,12 @@ impl PlanetaryStage {
             )
         };
         if freedoms.count() == 0 {
-            return plain;
+            // Every shift given by hand: nothing was asked, so nothing failing
+            // to move says anything.
+            return super::Chosen {
+                shifts: plain,
+                how: super::Searched::NotAsked,
+            };
         }
         // **Where each member's shift can sit, asked of the tool that cuts it.**
         //
@@ -742,13 +759,34 @@ impl PlanetaryStage {
             })
             .collect::<Option<Vec<_>>>()
         else {
-            return plain;
+            // No member has an interval to search in, which is the same finding
+            // as a search that combed one and found nothing.
+            return super::Chosen {
+                shifts: plain,
+                how: super::Searched::FoundNothing,
+            };
         };
         let box_ = freedoms.boxes([per_member[0], per_member[1], per_member[2]]);
         search
             .maximise(&box_, &|free| eta0(freedoms.place(free)))
             .map(|free| freedoms.place(&free))
-            .unwrap_or(plain)
+            .map_or_else(
+                || super::Chosen {
+                    shifts: plain,
+                    how: super::Searched::FoundNothing,
+                },
+                |shifts| super::Chosen {
+                    shifts,
+                    how: super::Searched::Chose,
+                },
+            )
+    }
+
+    /// As [`Self::shifts`], at a stated search effort — see `auto::Search`, and
+    /// `SpurStage::shifts_at` for why the effort is a parameter at all.
+    #[cfg(test)]
+    pub(super) fn shifts_at(&self, search: &crate::auto::Search) -> [f64; 3] {
+        self.chosen_at(search).shifts
     }
 }
 
@@ -792,7 +830,8 @@ pub fn solve_planetary_stage_with(
     let mut notes: Vec<Note> = Vec::new();
 
     // ---- the set as built, at the shifts the stage settled on.
-    let shifts = stage.shifts();
+    let chosen = stage.chosen_at(&crate::auto::Search::SHIPPED);
+    let shifts = chosen.shifts;
     // ...and the other end of the tooth, which needs those shifts to be known.
     let mut member_notes = member_notes;
     member_notes.extend(
@@ -1276,6 +1315,7 @@ pub fn solve_planetary_stage_with(
         centre,
         layout.centre_distance,
     ));
+    notes.extend(chosen.how.note());
     if !layout.equal_spacing {
         notes.push(Note::new(key::STAGE_PLANETS_NOT_EVENLY_SPACED).count("planets", stage.planets));
     }

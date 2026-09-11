@@ -1260,7 +1260,44 @@ fn epicyclic_shifts_report() {
         ..Optimisation::default()
     };
 
-    println!("epicyclic sets  z_sun/z_planet, ring = sun + 2 planet\n");
+    // **The hula stage belongs here too.** It is the third kind that chooses
+    // shifts, and the one whose optimiser can find *nothing* to choose — at a
+    // one-tooth difference every split is refused, which looks exactly like a
+    // search that agreed until the stage says otherwise (`AUDIT.md` F58, F82).
+    // Without a row here that path is one the change detector cannot see, which
+    // this project has now recorded eight times.
+    println!("hula stages  z, by tooth difference\n");
+    println!(
+        "{:<12} {:>9} {:>9} {:>11}   what the optimiser found",
+        "d", "x mesh 1", "x mesh 2", "eta0 fwd"
+    );
+    for d in [1u32, 3, 6] {
+        let n = 18 * d;
+        let mut hula = gear_core::train::HulaStage {
+            module: [1.0 / f64::from(d); 2],
+            clearance: 0.30 / f64::from(d),
+            ..gear_core::train::HulaStage::default()
+        };
+        hula.optimisation = on;
+        for (g, z) in hula.gears.iter_mut().zip([n, n + d, n + d, n + 2 * d]) {
+            g.teeth = z;
+        }
+        match solve_hula_stage(&hula, 1000.0, StageTorques::just(2.0), &lib) {
+            Err(e) => println!("{d:<12} {e}"),
+            Ok(r) => println!(
+                "{d:<12} {:>9.4} {:>9.4} {:>10.4} %   {}",
+                r.gears[1].gear.profile_shift,
+                r.gears[3].gear.profile_shift,
+                r.fixed_carrier_efficiency.forward * 100.0,
+                r.notes
+                    .iter()
+                    .find(|n| n.is(gear_core::note::key::STAGE_OPTIMISER_FOUND_NOTHING))
+                    .map_or("a shift to choose", |_| "nothing admissible"),
+            ),
+        }
+    }
+
+    println!("\nepicyclic sets  z_sun/z_planet, ring = sun + 2 planet\n");
     println!(
         "{:<12} {:>9} {:>9} {:>9} {:>11} {:>16}",
         "z_s/z_p", "x sun", "x planet", "x ring", "eta0 fwd", "cut as asked"

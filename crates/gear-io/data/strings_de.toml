@@ -51,6 +51,7 @@ self_locking = "selbsthemmend: Haftreibung μ {friction} gegenüber einer Grenze
 near_self_locking = "nahe der Selbsthemmung: Haftreibung μ {friction} nahe der Grenze {threshold}, das Rücktreiben hängt damit an einem geschätzten Beiwert"
 centre_distance_not_reached = "keine zulässigen Profilverschiebungen erreichen {asked} mm: das Paar wird stattdessen bei {reached} mm gebaut, und das gemeldete Spiel ist der verbleibende Abstand"
 clearance_negative = "der Betriebsabstand liegt {overlap} mm innerhalb des spielfreien Abstands von {nominal} mm: diese Zähne lassen sich nicht montieren, und jede dort berechnete Größe beschreibt nichts"
+optimiser_found_nothing = "im zulässigen Bereich ließ sich nichts bauen, daher sind die Profilverschiebungen die, die diese Stufe ungefragt annimmt: der Optimierer hatte nichts zu wählen, was nicht dasselbe ist wie Zustimmung"
 forward_locking = "nicht vorwärts antreibbar: Haftreibung μ {friction} gegenüber einer Grenze von {threshold}, das erste Glied kann das zweite also gar nicht drehen"
 near_forward_locking = "nahe daran, nicht mehr vorwärts anzutreiben: Haftreibung μ {friction} nahe der Grenze {threshold}, ob überhaupt angetrieben wird, hängt damit an einem geschätzten Beiwert"
 low_mesh_efficiency = "Verzahnungswirkungsgrad {percent} %: der größte Teil der Eingangsleistung wird Wärme, was eine Schneckenstufe meist vor der Spannung begrenzt"
