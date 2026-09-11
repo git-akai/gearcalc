@@ -89,6 +89,24 @@ pub struct ScrewParams {
     /// the lead angle, and with it the efficiency and whether the pair can be
     /// back-driven at all.
     pub worm_pitch_diameter: f64,
+    /// Profile shift of each member, in normal modules.
+    ///
+    /// **A shift enters a crossed mesh exactly as a rack's does.** The line of
+    /// action's direction is fixed by the base helices and the shaft angle
+    /// ([`Screw::contact_normal`]) and cannot turn, so a flank thickened by a
+    /// shift `x` is a flank displaced along that fixed normal by `x m_n sin α_n`
+    /// — the involute helicoid rotated about its own axis, which moves it
+    /// uniformly along its normal — and separating the axes by `Δa` displaces
+    /// the flanks by `Δa sin α_n` along the same normal. So the zero-backlash
+    /// centre distance is the reference one plus `(x₁ + x₂) m_n`, with no
+    /// involute function and no operating pressure angle: the normal pressure
+    /// angle at the contact **is** `α_n` at any shift, because the normal is.
+    ///
+    /// A parallel pair is the degeneracy of this: there the line of action
+    /// turns with the centres, `inv α_w` carries the difference, and the two
+    /// laws part company at second order in the shift — the same step at
+    /// `Σ = 0` that the backlash projection has, seen from the other side.
+    pub profile_shifts: [f64; 2],
 }
 
 impl Default for ScrewParams {
@@ -100,6 +118,7 @@ impl Default for ScrewParams {
             starts: 1,
             wheel_teeth: 17,
             worm_pitch_diameter: 7.0,
+            profile_shifts: [0.0; 2],
         }
     }
 }
@@ -123,7 +142,17 @@ pub struct Screw {
     pub axial_module: f64,
     pub worm_pitch_diameter: f64,
     pub wheel_pitch_diameter: f64,
+    /// Where the two reference cylinders touch, mm — `(d₁ + d₂)/2`.
+    ///
+    /// The distance the pitch point is defined at, and so the one the mesh's
+    /// branch is settled at ([`Self::mesh_branch`]). Not where the pair runs
+    /// unless the shifts sum to zero.
+    pub reference_distance: f64,
+    /// The **zero-backlash** centre distance, mm — the reference one plus the
+    /// shift sum in normal modules ([`ScrewParams::profile_shifts`]).
     pub centre_distance: f64,
+    /// `x₁ + x₂`, in normal modules — what separates the two distances above.
+    pub shift_sum: f64,
     /// `z₂/z₁`, which is also `ω₁/ω₂`.
     pub ratio: f64,
     /// Sliding speed at the pitch point, as a multiple of the worm's own pitch
@@ -222,7 +251,12 @@ impl Screw {
             return Err(ScrewError::AxesAreParallel);
         }
 
+        if p.profile_shifts.iter().any(|x| !x.is_finite()) {
+            return Err(ScrewError::NotPositive);
+        }
         let axial_module = p.normal_module / lead_angle_rad.cos();
+        let reference_distance = 0.5 * (p.worm_pitch_diameter + wheel_pitch_diameter);
+        let shift_sum = p.profile_shifts[0] + p.profile_shifts[1];
         Ok(Self {
             lead_angle_rad,
             wheel_lead_angle_rad,
@@ -232,7 +266,11 @@ impl Screw {
             axial_module,
             worm_pitch_diameter: p.worm_pitch_diameter,
             wheel_pitch_diameter,
-            centre_distance: 0.5 * (p.worm_pitch_diameter + wheel_pitch_diameter),
+            reference_distance,
+            // The rack law, exact for involute helicoids — see
+            // `ScrewParams::profile_shifts`.
+            centre_distance: reference_distance + shift_sum * p.normal_module,
+            shift_sum,
             ratio: f64::from(p.wheel_teeth) / f64::from(p.starts),
             sliding_ratio,
             normal_pressure_angle_rad: p.normal_pressure_angle_rad,
@@ -686,7 +724,7 @@ impl Screw {
     ///
     /// Which branch is the mesh is a fact about *which flanks face each other*,
     /// not about how far apart the shafts are, so it is settled once at the
-    /// zero-backlash distance and carried. That is also the only reading that
+    /// reference distance and carried. That is also the only reading that
     /// stays continuous: the geometry does not swap flanks because a bearing
     /// bore went 20 µm wide.
     ///
@@ -727,7 +765,7 @@ impl Screw {
         let axis_2 = [0.0, sin_sigma, cos_sigma];
         let pitch = [r1, 0.0, 0.0];
 
-        // 2. The branch, settled at the zero-backlash distance where the pitch
+        // 2. The branch, settled at the reference distance where the pitch
         //    point can arbitrate, and carried to the distance actually asked for.
         let (s1, s2) = self.mesh_branch(n, rb1, rb2)?;
         let centre_2 = [centre_distance, 0.0, 0.0];
@@ -746,16 +784,23 @@ impl Screw {
         // 4. The zone: both members still on flank they have. The reach owes
         //    nothing to the centre distance — it is tip against base — so this
         //    is where a centre distance error shows, through `t1` and `t2`.
-        let reach = |ra: f64, rb: f64, bb: f64| {
-            let t = (ra * ra - rb * rb).max(0.0).sqrt() / bb.cos();
-            (t.is_finite() && t > 0.0).then_some(t)
-        };
+        //
+        //    **Each flank runs one way from its tangency point**: toward the
+        //    other member's, which is the side the involute unwinds on. The
+        //    other side of a tangency point is inside that member's base
+        //    cylinder, where there is no involute to touch — so a mate whose
+        //    reach crosses it is not in a longer zone, it is interfering
+        //    (`flank_interference`). An earlier reading took both sides and
+        //    could count a fouling tip as contact.
         let (h1, h2) = (
             reach(tip_radius_1, rb1, bb1)?,
             reach(tip_radius_2, rb2, bb2)?,
         );
-        let lo = (t1 - h1).max(t2 - h2);
-        let hi = (t1 + h1).min(t2 + h2);
+        let toward = (t2 - t1).signum();
+        let flank_1 = ordered(t1, t1 + toward * h1);
+        let flank_2 = ordered(t2, t2 - toward * h2);
+        let lo = flank_1.0.max(flank_2.0);
+        let hi = flank_1.1.min(flank_2.1);
         let length = hi - lo;
         if length.is_nan() || length <= 0.0 {
             return None;
@@ -774,7 +819,7 @@ impl Screw {
 
     /// Which of the tangent lines is the mesh, as the two signs that pick it.
     ///
-    /// Asked at the zero-backlash centre distance, always: that is the one place
+    /// Asked at the reference centre distance, always: that is the one place
     /// the pitch point lies on the line, and so the one place the question can be
     /// answered rather than assumed. Both flanks satisfy it — they are mirror
     /// images and every length is the same on either — so the first found is
@@ -783,7 +828,12 @@ impl Screw {
         let (sin_sigma, cos_sigma) = self.shaft_angle_rad.sin_cos();
         let axis_1 = [0.0, 0.0, 1.0];
         let axis_2 = [0.0, sin_sigma, cos_sigma];
-        let centre_2 = [self.centre_distance, 0.0, 0.0];
+        // **At the reference distance, whatever the shifts.** The pitch point
+        // is where the reference cylinders touch, and that is the one place the
+        // line passes through it; a shifted pair's zero-backlash distance is
+        // not that place, and asking there would find no line through the
+        // point and refuse a pair that meshes perfectly well.
+        let centre_2 = [self.reference_distance, 0.0, 0.0];
         let pitch = [self.worm_pitch_diameter / 2.0, 0.0, 0.0];
 
         let mut best: Option<(f64, (f64, f64))> = None;
@@ -803,7 +853,7 @@ impl Screw {
         // The pitch point is on the line exactly, so a residual here is not a
         // tolerance to widen — it means no branch was the mesh. Stated the way
         // round that refuses a NaN rather than letting one through a `<`.
-        (!offset.is_nan() && offset < 1e-6 * self.centre_distance.max(1.0)).then_some(signs)
+        (!offset.is_nan() && offset < 1e-6 * self.reference_distance.max(1.0)).then_some(signs)
     }
 
     /// Normal module, recovered from the pitch geometry it was built with.
@@ -817,6 +867,24 @@ impl Screw {
     #[must_use]
     pub fn normal_base_pitch(&self) -> f64 {
         std::f64::consts::PI * self.normal_module() * self.normal_pressure_angle_rad.cos()
+    }
+
+    /// One member's base radius and base helix angle, `(r_b, β_b)`.
+    #[must_use]
+    pub fn member_base(&self, i: usize) -> (f64, f64) {
+        let (r, beta) = if i == 0 {
+            (self.worm_pitch_diameter / 2.0, self.worm_helix_angle_rad)
+        } else {
+            (
+                self.wheel_pitch_diameter / 2.0,
+                self.shaft_angle_rad - self.worm_helix_angle_rad,
+            )
+        };
+        let alpha_n = self.normal_pressure_angle_rad;
+        (
+            r * crate::plane::transverse_pressure_angle(alpha_n, beta).cos(),
+            crate::plane::base_helix_angle(beta, alpha_n),
+        )
     }
 }
 
@@ -861,8 +929,9 @@ impl CrossedPath {
             };
             // The face is centred on its own gear, which is `axial_centre` and
             // not the origin of this parameter. They coincide only at the
-            // zero-backlash centre distance; anywhere else the contact has slid
-            // along the shafts and the face may no longer be under it.
+            // reference centre distance; anywhere else — a shifted pair at its
+            // own zero-backlash distance included — the contact has slid along
+            // the shafts and the face may no longer be under it.
             let centre = self.axial_centre(screw, i).unwrap_or(0.0);
             if centre + half < hi {
                 hi = centre + half;
@@ -929,7 +998,7 @@ impl CrossedPath {
         };
         let mut out = [0.0; 2];
         for (i, o) in out.iter_mut().enumerate() {
-            // Measured from *that member's* mid-plane. At the zero-backlash
+            // Measured from *that member's* mid-plane. At the reference
             // centre distance this is `2 · half · rate` as it always was; once
             // the contact has slid along the shafts the face has to be wider to
             // still be under it, and by different amounts on the two members.
@@ -968,9 +1037,12 @@ impl CrossedPath {
     ///
     /// A face width is centred on its gear, not on the mesh, so this is the point
     /// a face of width `b` reaches `±b/2·rate` either side of. At the
-    /// zero-backlash centre distance both come out zero — the pitch point is on
+    /// reference centre distance both come out zero — the pitch point is on
     /// the line and lies in both mid-planes at once, which is why it could be
-    /// left implicit until now.
+    /// left implicit until now. A shifted pair's contact is off the common
+    /// perpendicular even at its own zero-backlash distance: the normal is
+    /// fixed, so contact on the perpendicular is possible at the reference
+    /// radii and nowhere else.
     ///
     /// Away from that distance they **separate**, and that separation is a
     /// crossed pair's whole answer to a centre-distance error: the contact slides
@@ -996,6 +1068,47 @@ impl CrossedPath {
         };
         let rate = dot(self.normal, axis);
         (rate.abs() > f64::EPSILON).then(|| -dot(sub(self.through, origin), axis) / rate)
+    }
+
+    /// **The radius on one member that the other's tip touches**, or `None`
+    /// where that would be inside this member's base cylinder — interference in
+    /// its strongest form.
+    ///
+    /// [`crate::mesh::conjugate_radius`] for a crossed pair. There the two roll
+    /// lengths are related through `ξ` in the transverse plane; here they lie
+    /// along one line in space, so the mate's reach from its tangency point
+    /// leaves `|t_j − t_i| − h_j` of this member's flank between the two — the
+    /// same subtraction, with the tangency span in place of `a_w sin α_w`.
+    #[must_use]
+    pub fn contact_radius_at(&self, screw: &Screw, side: MeshSide, r_mate: f64) -> Option<f64> {
+        let (i, j) = (side.index(), 1 - side.index());
+        let (rb_i, bb_i) = screw.member_base(i);
+        let (rb_j, bb_j) = screw.member_base(j);
+        let reach_j = reach(r_mate, rb_j, bb_j)?;
+        let rho_i = (self.tangency[j] - self.tangency[i]).abs() - reach_j;
+        (rho_i >= 0.0).then(|| f64::hypot(rb_i, rho_i * bb_i.cos()))
+    }
+
+    /// **Whether each member's flank is reached past its usable end** by the
+    /// other member's tip — [`crate::mesh::Mesh::flank_interference`], asked of
+    /// a crossed pair.
+    ///
+    /// Both members are external, so the comparison never flips: interference
+    /// is the mate's tip touching below where this member's involute hands over
+    /// to its fillet, or not touching involute at all.
+    #[must_use]
+    pub fn flank_interference(
+        &self,
+        screw: &Screw,
+        ends: [crate::mesh::FlankEnds; 2],
+    ) -> [bool; 2] {
+        [MeshSide::First, MeshSide::Second].map(|side| {
+            let i = side.index();
+            match self.contact_radius_at(screw, side, ends[1 - i].tip) {
+                None => true,
+                Some(r) => r < ends[i].junction,
+            }
+        })
     }
 
     /// The radius each member's flank is at, at a parameter along the path.
@@ -1205,6 +1318,19 @@ fn tangent_line(
     solve3([u1, u2, n], [rb1, rb2 + dot(centre_2, u2), 0.0])
 }
 
+/// How far a flank runs from its tangency point to its tip, mm along the line
+/// of action — `√(r_a² − r_b²) / cos β_b`, the normal-plane roll length. `None`
+/// where the tip is inside the base cylinder: no flank at all.
+fn reach(ra: f64, rb: f64, bb: f64) -> Option<f64> {
+    let t = (ra * ra - rb * rb).max(0.0).sqrt() / bb.cos();
+    (t.is_finite() && t > 0.0).then_some(t)
+}
+
+/// An interval from two ends given in either order.
+fn ordered(a: f64, b: f64) -> (f64, f64) {
+    (a.min(b), a.max(b))
+}
+
 /// Where the line `p + s n` comes nearest an axis — the tangency point's `s`.
 fn foot(p: [f64; 3], n: [f64; 3], axis_point: [f64; 3], axis_dir: [f64; 3]) -> Option<f64> {
     let w = sub(p, axis_point);
@@ -1401,6 +1527,7 @@ mod tests {
             starts,
             wheel_teeth: teeth,
             worm_pitch_diameter: d1,
+            profile_shifts: [0.0; 2],
             ..Default::default()
         })
         .unwrap()
@@ -1596,6 +1723,7 @@ mod tests {
                 starts: 2,
                 wheel_teeth: 41,
                 worm_pitch_diameter: 9.0,
+                profile_shifts: [0.0; 2],
                 shaft_angle_rad: f64::to_radians(sigma_deg),
                 ..Default::default()
             })
@@ -1624,6 +1752,7 @@ mod tests {
                 starts,
                 wheel_teeth: teeth,
                 worm_pitch_diameter: d1,
+                profile_shifts: [0.0; 2],
                 shaft_angle_rad: f64::to_radians(sigma),
                 ..Default::default()
             })
@@ -1648,6 +1777,7 @@ mod tests {
             let s = Screw::new(&ScrewParams {
                 shaft_angle_rad: sigma,
                 worm_pitch_diameter: 11.0,
+                profile_shifts: [0.0; 2],
                 ..Default::default()
             })
             .unwrap();
@@ -1670,6 +1800,7 @@ mod tests {
                 starts: 2,
                 wheel_teeth: 41,
                 worm_pitch_diameter: 9.0,
+                profile_shifts: [0.0; 2],
                 shaft_angle_rad: sigma,
                 ..Default::default()
             })
@@ -1741,6 +1872,7 @@ mod tests {
                 starts: 2,
                 wheel_teeth: 37,
                 worm_pitch_diameter: 10.0,
+                profile_shifts: [0.0; 2],
                 shaft_angle_rad: f64::to_radians(sigma_deg),
                 ..Default::default()
             })
@@ -1771,6 +1903,7 @@ mod tests {
             let s = Screw::new(&ScrewParams {
                 shaft_angle_rad: f64::to_radians(sigma_deg),
                 worm_pitch_diameter: 8.0,
+                profile_shifts: [0.0; 2],
                 ..Default::default()
             })
             .unwrap();
@@ -1878,6 +2011,7 @@ mod tests {
                     starts,
                     wheel_teeth: wheel,
                     worm_pitch_diameter: d_of(g),
+                    profile_shifts: [0.0; 2],
                     ..Default::default()
                 })
                 .ok()
@@ -1942,6 +2076,7 @@ mod tests {
             starts: 1,
             wheel_teeth: 23,
             worm_pitch_diameter: 1.0 / 87.0_f64.to_radians().sin(),
+            profile_shifts: [0.0; 2],
             ..Default::default()
         })
         .unwrap();
@@ -2105,6 +2240,7 @@ mod tests {
             starts: 17,
             wheel_teeth: 23,
             worm_pitch_diameter: d1,
+            profile_shifts: [0.0; 2],
         })
         .expect("a buildable pair");
         let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
@@ -2149,6 +2285,7 @@ mod tests {
                 starts: z1,
                 wheel_teeth: z2,
                 worm_pitch_diameter: d1,
+                profile_shifts: [0.0; 2],
             })
             .expect("a buildable pair");
             let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
@@ -2702,6 +2839,7 @@ mod tests {
                             starts: z1,
                             wheel_teeth: z2,
                             worm_pitch_diameter: d1,
+                            profile_shifts: [0.0; 2],
                         }) else {
                             continue;
                         };
@@ -2724,6 +2862,213 @@ mod tests {
             }
         }
         assert!(checked > 100, "only {checked} pairs were buildable");
+    }
+
+    /// **A shift moves a crossed flank along its normal by `x m_n sin α_n`**,
+    /// which is what makes the zero-backlash distance the rack law
+    /// `a_ref + (x₁ + x₂) m_n` ([`ScrewParams::profile_shifts`]).
+    ///
+    /// Two steps, and this checks the one that is not gated elsewhere. That
+    /// separating the axes by `Δa` opens the flanks by `Δa sin α_n` is
+    /// `contact_normal`'s `n̂ₓ = sin α_n`, gated above. That a shift `x`
+    /// displaces the flank by `x m_n sin α_n` along that same normal is what
+    /// this measures — **off the tooth generator**, which knows nothing of a
+    /// screw pair: the transverse half-thickness angle `ψ_p` moves by `Δψ`
+    /// with the shift, an involute helicoid rotated by `Δψ` about its axis moves
+    /// along its normal by `r_b Δψ cos β_b` everywhere, and that product must be
+    /// `x m_n sin α_n`. At a worm's 82° as much as at a gear's 20°.
+    #[test]
+    fn a_shift_moves_a_crossed_flank_along_its_normal_by_the_rack_law() {
+        let (mn, alpha_n) = (1.0, 20.0f64.to_radians());
+        for (z, beta_deg) in [
+            (17u32, 20.0f64),
+            (17, 45.0),
+            (1, 81.787),
+            (40, 8.213),
+            (9, 60.0),
+        ] {
+            let at = |x: f64| {
+                crate::tooth::Tooth::new(crate::params::GearParams {
+                    module: mn,
+                    pressure_angle: alpha_n.to_degrees(),
+                    teeth: z,
+                    profile_shift: x,
+                    helix_angle: beta_deg,
+                    addendum: 1.0,
+                    dedendum: 1.25,
+                    root_radius: 0.38,
+                    thickness_mod: 1.0,
+                    angular_shift: 0.0,
+                    index_offset: 0.0,
+                })
+            };
+            let plain = at(0.0);
+            let bb = crate::plane::base_helix_angle(beta_deg.to_radians(), alpha_n);
+            for x in [-0.5f64, 0.2, 0.7] {
+                let shifted = at(x);
+                let displaced = plain.rb * (shifted.psi_p - plain.psi_p) * bb.cos();
+                let law = x * mn * alpha_n.sin();
+                assert!(
+                    (displaced - law).abs() < 1e-12,
+                    "z={z} β={beta_deg}° x={x}: the flank moved {displaced} along its \
+                     normal against the law's {law}"
+                );
+            }
+        }
+        // ...and the pair's own reading of it is the sum in modules, either side.
+        let s = Screw::new(&ScrewParams {
+            profile_shifts: [0.3, -0.1],
+            ..ScrewParams::default()
+        })
+        .expect("a buildable pair");
+        assert!((s.centre_distance - s.reference_distance - 0.2 * s.normal_module()).abs() < 1e-12);
+    }
+
+    /// **The zone never crosses a tangency point**, whatever the tips and the
+    /// centres: past its tangency point a member has no involute, so what is
+    /// there is not contact. Swept over shifts and separations as well as tips,
+    /// because a separated pair is where the two intervals slide apart.
+    #[test]
+    fn the_zone_stays_between_the_tangency_points() {
+        let mut checked = 0;
+        for (starts, teeth, sigma_deg, beta_deg) in [
+            (17u32, 23u32, 90.0f64, 45.0f64),
+            (11, 37, 45.0, 25.0),
+            (1, 40, 90.0, 81.787),
+            (9, 17, 30.0, 15.0),
+        ] {
+            for shift in [-0.5f64, 0.0, 0.8] {
+                for delta in [0.0f64, 0.3, 2.0] {
+                    for addendum in [0.5f64, 1.0, 1.35, 3.0] {
+                        let mn = 1.0;
+                        let d1 = f64::from(starts) * mn / beta_deg.to_radians().cos();
+                        let s = Screw::new(&ScrewParams {
+                            shaft_angle_rad: sigma_deg.to_radians(),
+                            starts,
+                            wheel_teeth: teeth,
+                            worm_pitch_diameter: d1,
+                            profile_shifts: [shift, 0.0],
+                            ..ScrewParams::default()
+                        })
+                        .expect("a buildable pair");
+                        let r = [s.worm_pitch_diameter / 2.0, s.wheel_pitch_diameter / 2.0];
+                        let Some(path) = s.path_of_contact_at(
+                            r[0] + addendum * mn,
+                            r[1] + addendum * mn,
+                            s.centre_distance + delta,
+                        ) else {
+                            continue;
+                        };
+                        let (lo, hi) = ordered(path.tangency[0], path.tangency[1]);
+                        assert!(
+                            path.zone[0] >= lo - 1e-12 && path.zone[1] <= hi + 1e-12,
+                            "{starts}/{teeth} Σ={sigma_deg}° x={shift} Δa={delta} h_a={addendum}: \
+                             zone {:?} outside the tangency span [{lo}, {hi}]",
+                            path.zone
+                        );
+                        checked += 1;
+                    }
+                }
+            }
+        }
+        assert!(checked > 100, "only {checked} paths were built");
+    }
+
+    /// **The crossed interference verdict is the parallel one in the limit.**
+    ///
+    /// F79 gave every parallel mesh one relation for whether a mate's tip
+    /// reaches past a member's usable flank. A crossed pair asks the same
+    /// question along its line of action, and as the shafts come parallel the
+    /// two readings must agree — on a grid that crosses the boundary in both
+    /// directions, with a tall addendum against a small pinion to make the
+    /// fouling side populated. Disagreement is allowed only where the parallel
+    /// verdict itself is within a hair of flipping.
+    #[test]
+    fn the_crossed_interference_verdict_meets_the_parallel_one_at_the_limit() {
+        let (mn, alpha_n) = (1.0, 20.0f64);
+        let sigma = 0.01f64.to_radians();
+        let mut agreed = 0;
+        let mut fouled = 0;
+        for (z1, z2) in [(9u32, 37u32), (12, 30), (17, 43), (14, 14)] {
+            for beta_deg in [10.0f64, 25.0] {
+                for addendum in [1.0f64, 1.25, 1.5, 2.0] {
+                    for x1 in [0.0f64, 0.3] {
+                        let tooth = |z: u32, x: f64, beta: f64| {
+                            crate::tooth::Tooth::new(crate::params::GearParams {
+                                module: mn,
+                                pressure_angle: alpha_n,
+                                teeth: z,
+                                profile_shift: x,
+                                helix_angle: beta,
+                                addendum,
+                                dedendum: 1.25,
+                                root_radius: 0.38,
+                                thickness_mod: 1.0,
+                                angular_shift: 0.0,
+                                index_offset: 0.0,
+                            })
+                        };
+                        // The parallel reading, at the pair's zero-backlash distance.
+                        // Opposite hands, as an external pair meshes.
+                        let (g1, g2) = (tooth(z1, x1, beta_deg), tooth(z2, 0.0, -beta_deg));
+                        let Ok(mesh) =
+                            crate::mesh::Mesh::new(&g1, &g2, crate::mesh::MeshKind::External)
+                        else {
+                            continue;
+                        };
+                        let ends = [g1.flank_ends(), g2.flank_ends()];
+                        let parallel = mesh.flank_interference(ends);
+                        // The crossed reading, a hundredth of a degree off parallel.
+                        let d1 = f64::from(z1) * mn / (sigma / 2.0 + beta_deg.to_radians()).cos();
+                        let s = Screw::new(&ScrewParams {
+                            normal_pressure_angle_rad: alpha_n.to_radians(),
+                            shaft_angle_rad: sigma,
+                            starts: z1,
+                            wheel_teeth: z2,
+                            worm_pitch_diameter: d1,
+                            profile_shifts: [x1, 0.0],
+                            ..ScrewParams::default()
+                        })
+                        .expect("a buildable pair");
+                        let Some(path) = s.path_of_contact(ends[0].tip, ends[1].tip) else {
+                            continue;
+                        };
+                        let crossed = path.flank_interference(&s, ends);
+                        for i in 0..2 {
+                            if crossed[i] == parallel[i] {
+                                agreed += 1;
+                                fouled += usize::from(crossed[i]);
+                                continue;
+                            }
+                            // Allowed only on a knife edge: the parallel contact
+                            // radius within a micron of the junction.
+                            let r = mesh.contact_radius_at(
+                                if i == 0 {
+                                    MeshSide::First
+                                } else {
+                                    MeshSide::Second
+                                },
+                                ends[1 - i].tip,
+                            );
+                            assert!(
+                                r.is_some_and(|r| (r - ends[i].junction).abs() < 1e-3),
+                                "{z1}/{z2} β={beta_deg}° h_a={addendum} x₁={x1} member {i}: \
+                                 crossed says {} and parallel says {}, r = {r:?} against \
+                                 junction {}",
+                                crossed[i],
+                                parallel[i],
+                                ends[i].junction
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        assert!(agreed > 80, "only {agreed} verdicts compared");
+        assert!(
+            fouled > 5,
+            "only {fouled} fouling cases met — the grid is not probing the fault"
+        );
     }
 
     /// **Moving the centres slides the line of action without turning it.**
@@ -2754,6 +3099,7 @@ mod tests {
                     starts: 17,
                     wheel_teeth: 43,
                     worm_pitch_diameter: d1,
+                    profile_shifts: [0.0; 2],
                 })
                 .expect("a buildable pair")
             };
@@ -2816,6 +3162,7 @@ mod tests {
             Screw::new(&ScrewParams {
                 starts: 9,
                 worm_pitch_diameter: 8.0,
+                profile_shifts: [0.0; 2],
                 ..Default::default()
             })
             .unwrap_err(),
@@ -2824,6 +3171,7 @@ mod tests {
         assert_eq!(
             Screw::new(&ScrewParams {
                 worm_pitch_diameter: 0.0,
+                profile_shifts: [0.0; 2],
                 ..Default::default()
             })
             .unwrap_err(),

@@ -661,6 +661,7 @@ impl WormStage {
             starts: self.starts,
             wheel_teeth: self.wheel_teeth,
             worm_pitch_diameter: self.first_pitch_diameter(),
+            profile_shifts: [0.0; 2],
         })
         .map_err(TrainError::Screw)
     }

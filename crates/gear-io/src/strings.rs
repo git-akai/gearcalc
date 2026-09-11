@@ -1350,6 +1350,7 @@ mod tests {
                     starts,
                     wheel_teeth: 40,
                     worm_pitch_diameter: dia,
+                    profile_shifts: [0.0; 2],
                 };
                 if let Err(e) = Screw::new(&sp) {
                     err(e.note());
