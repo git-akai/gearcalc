@@ -1036,6 +1036,28 @@ mod tests {
             }
         }
 
+        // **A centre distance no admissible shifts reach**, and the negative
+        // clearance that comes of asking for one well inside what the teeth
+        // allow. A 9/37 pair told to run at 23.00 mm has its shifts pinned at
+        // the pinion's undercut floor, which puts the pair at 23.4433 — so it
+        // runs 0.44 mm *inside* its own zero-backlash distance and cannot be
+        // assembled at all. Both used to be silent.
+        for distance in [23.0_f64, 23.46, 25.0] {
+            let mut sp = gear_core::train::SpurStage {
+                centre_distance: gear_core::params::Auto::fixed(distance),
+                ..Default::default()
+            };
+            sp.gears[0].teeth = 9;
+            sp.gears[1].teeth = 37;
+            if let Ok(r) = gear_core::train::solve_spur_stage(
+                &sp,
+                gear_core::train::StageTorques::just(2.0),
+                &lib,
+            ) {
+                record(&r.notes);
+            }
+        }
+
         // **The other end of the same question: a pair that cannot be driven
         // forward.** A very steep first member — a 3° helix, so an 87° lead
         // angle — locks *forwards* at µ ≈ 0.049 while back-driving perfectly

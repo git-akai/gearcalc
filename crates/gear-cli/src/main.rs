@@ -1186,11 +1186,27 @@ fn shifts_report(z1: u32, z2: u32) {
         "a mm", "x1", "x2", "sum", "eps", "eta fwd"
     );
     let free_at = best.centre_distance;
+    // **What the stage has to say about the distance**, printed under the row it
+    // is about. This is how a distance no admissible shifts reach comes to be in
+    // the change detector rather than only in a test (F55) — and most rows say
+    // nothing, which is the point.
+    let said = |r: &gear_core::train::SpurResult| {
+        for n in &r.notes {
+            if n.is(gear_core::note::key::STAGE_CENTRE_DISTANCE_NOT_REACHED)
+                || n.is(gear_core::note::key::STAGE_CLEARANCE_NEGATIVE)
+            {
+                println!("{:>36}{}", "", words().render(n));
+            }
+        }
+    };
     let tight = f64::from(z1 + z2) / 2.0 + floor.clearance;
     for k in 0..=6 {
         let a = tight + (free_at - tight) * f64::from(k) / 6.0;
         match solved(true, Some(a)) {
-            Ok(r) => row(&format!("{a:.4}"), &r),
+            Ok(r) => {
+                row(&format!("{a:.4}"), &r);
+                said(&r);
+            }
             Err(e) => println!("{a:.4}: {e}"),
         }
     }
@@ -1214,7 +1230,10 @@ fn shifts_report(z1: u32, z2: u32) {
     for k in 0..=3 {
         let a = tight + (free_at - tight) * f64::from(k) / 3.0;
         match solved(false, Some(a)) {
-            Ok(r) => row(&format!("{a:.4}"), &r),
+            Ok(r) => {
+                row(&format!("{a:.4}"), &r);
+                said(&r);
+            }
             Err(e) => println!("{a:.4}: {e}"),
         }
     }

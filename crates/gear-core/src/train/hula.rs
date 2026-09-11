@@ -1190,6 +1190,16 @@ pub fn solve_hula_stage_with(
         });
     }
 
+    // **The crank offset is this kind's centre distance**, so the same two
+    // findings reach it: an offset the shifts cannot make, and a running gap
+    // inside the zero-backlash one. `train::distance_notes`, as everywhere else.
+    notes.extend(super::distance_notes(
+        (!stage.offset.auto && !stage.running_clearance.auto)
+            .then_some(stage.offset.manual - stage.running_clearance.manual),
+        offset,
+        layout.offset,
+    ));
+
     Ok(HulaResult {
         fixed_carrier_efficiency,
         efficiency: stage_efficiency,

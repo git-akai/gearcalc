@@ -334,8 +334,23 @@ holds there while the other absorbs, until the two are level and thereafter move
 together (`auto::divide_shift_sum`).
 
 A shift a designer **gave** is never one of the numbers being chosen: it stands,
-and the other member takes the whole of the rest. Where no admissible pair of
-shifts reaches the distance at all, there is no answer to give.
+and the other member takes the whole of the rest.
+
+**Where no admissible pair of shifts reaches the distance, the stage says so.**
+It still answers — at the shifts it would have built anyway, because the gears
+are cuttable and it is the *assembly* that is impossible, which rule 5 calls a
+clamp rather than a refusal — and `stage.centre_distance_not_reached` names both
+distances so the clearance readout is not the only trace.
+
+At the tight end there is a second thing to say. A distance short enough puts the
+running centres **inside** the pair's own zero-backlash distance, which is teeth
+overlapping at rest: nothing can be assembled there and every figure taken at it
+describes nothing. `stage.clearance_negative` says that, and it is a stage's
+finding rather than a mesh's because it is the *assembly* that fails.
+
+Both belong to every kind that has a centre distance — a crank offset included,
+that being what a hula stage calls one — and both are `train::distance_notes`, so
+they are said in the same words wherever they arise.
 
 **The clearance is an `Auto` like the distance, because it is the same kind of
 number.** Either may be the one given and the other the one derived — that is

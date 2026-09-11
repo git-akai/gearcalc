@@ -1159,6 +1159,15 @@ pub fn solve_worm_stage(
             1,
         ));
     }
+    // What the distance has to say. A screw stage reaches a given one by sizing
+    // its worm, so *not reached* here means no worm on the branch it started
+    // from gets there — which is a fact about the housing rather than about the
+    // search (`train::distance_notes`).
+    notes.extend(super::distance_notes(
+        stage.nominal_distance(),
+        centre,
+        s.centre_distance,
+    ));
 
     // The two conventional proportions, in the axial module they are written
     // in. They size the *part*, not the answer: nothing below reads a face

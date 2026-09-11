@@ -1396,6 +1396,64 @@ impl Default for Stage {
     }
 }
 
+/// **What a stage has to say about the distance it ended up running at**, if
+/// anything.
+///
+/// Two findings, and both were silent. They are here rather than in each stage's
+/// own file because every kind that has a centre distance can reach them, and a
+/// rule one kind asks is a rule the others forget — which `docs/corrections.md`
+/// records happening to the tip-room flags and to the axial-overlap warning.
+///
+/// # The distance was given and the shifts could not reach it
+///
+/// Mode 3 says a given distance and a given clearance decide the shifts. Where
+/// no admissible shifts reach that distance the stage still answers — at the
+/// shifts it would have built anyway — and used to say nothing at all, so a
+/// designer read a stage that was **not** running where they put it and had only
+/// the clearance readout to notice by.
+///
+/// # The running distance is inside the zero-backlash one
+///
+/// A negative clearance is a pair whose teeth overlap at rest: it cannot be
+/// assembled, and every figure computed at that distance describes nothing. A
+/// 9/37 pair told to run at 23.00 mm, whose shifts put it at 23.4433, reported
+/// **−0.4433 mm** of clearance and not one word.
+///
+/// Notes rather than refusals, on rule 5's reading: the gears exist and are
+/// cuttable, so what is wrong is the *assembly*, and a designer is owed the
+/// number rather than an error. `asked` is `None` where no distance was given,
+/// which is the case neither finding can arise in.
+pub(crate) fn distance_notes(target: Option<f64>, running: f64, nominal: f64) -> Vec<Note> {
+    // A hundredth of a micron. Reaching the target is a solve, so agreement is
+    // near machine precision and a failure is gross — the 9/37 pair below misses
+    // by 0.44 mm. This separates the two, and is not a tolerance on an answer.
+    const REACHED: f64 = 1e-6;
+
+    let mut out = Vec::new();
+    // `target` is the **nominal** distance mode 3 asked the shifts for — the
+    // distance given less the clearance given — and `None` where the stage was
+    // not in mode 3 at all, which is the case this cannot arise in. Derived
+    // rather than reported by the caller, so it cannot disagree with the two
+    // numbers beside it.
+    if let Some(target) = target {
+        if (nominal - target).abs() > REACHED {
+            out.push(
+                Note::new(key::STAGE_CENTRE_DISTANCE_NOT_REACHED)
+                    .number("asked", target, 4)
+                    .number("reached", nominal, 4),
+            );
+        }
+    }
+    if running < nominal {
+        out.push(
+            Note::new(key::STAGE_CLEARANCE_NEGATIVE)
+                .number("overlap", nominal - running, 4)
+                .number("nominal", nominal, 4),
+        );
+    }
+    out
+}
+
 /// One of a stage's constrainable inputs, named so a caller can find it.
 ///
 /// `Shift(i)` indexes the stage's members in the order
@@ -4382,6 +4440,80 @@ mod tests {
             );
         }
         assert!(checked >= 10, "only {checked} pairs were solvable");
+    }
+
+    /// **A distance the shifts cannot reach is said out loud**, and so is a pair
+    /// that cannot be assembled — F55.
+    ///
+    /// Mode 3 says a given distance and a given clearance decide the shifts.
+    /// Where no admissible shifts reach that distance the stage still answers,
+    /// at the shifts it would have built anyway, and **said nothing at all**:
+    /// the only trace was a clearance readout that no longer meant what it said.
+    ///
+    /// Worse at the tight end. A 9/37 pair told to run at 23.00 mm has its
+    /// shifts pinned at the pinion's undercut floor, which puts the pair at
+    /// 23.4433 — so it runs **0.44 mm inside its own zero-backlash distance**,
+    /// which is teeth overlapping at rest. Every figure taken there describes
+    /// nothing, and nothing said so.
+    ///
+    /// Notes rather than refusals, on rule 5's reading: the gears are cuttable
+    /// and it is the *assembly* that is impossible, so the designer is owed the
+    /// number. What the rule must not do is fire on a distance that **is**
+    /// reached, which is the third case below.
+    #[test]
+    fn a_distance_the_shifts_cannot_reach_is_said_out_loud() {
+        let lib = library();
+        let at = |a: f64| {
+            let mut sp = SpurStage {
+                centre_distance: Auto::fixed(a),
+                ..SpurStage::default()
+            };
+            sp.gears[0].teeth = 9;
+            sp.gears[1].teeth = 37;
+            let mut t = two_stage();
+            t.stages = vec![Stage::Spur(sp)];
+            let r = solve_train(&t, &lib).expect("all three of these solve");
+            let s = r.stages[0].as_spur().expect("a spur stage");
+            let keys: Vec<String> = s.notes.iter().map(|n| n.key.clone()).collect();
+            (s.clearance, keys)
+        };
+
+        // Well inside what the teeth allow: both findings.
+        let (clearance, keys) = at(23.0);
+        assert!(clearance < 0.0, "this one should not be assemblable");
+        assert!(
+            keys.iter()
+                .any(|k| k == key::STAGE_CENTRE_DISTANCE_NOT_REACHED),
+            "a distance no shifts reach should say so: {keys:?}"
+        );
+        assert!(
+            keys.iter().any(|k| k == key::STAGE_CLEARANCE_NEGATIVE),
+            "a pair that cannot be assembled should say so: {keys:?}"
+        );
+
+        // Too far out: reachable by nothing, but assemblable.
+        let (clearance, keys) = at(25.0);
+        assert!(clearance > 0.0);
+        assert!(
+            keys.iter()
+                .any(|k| k == key::STAGE_CENTRE_DISTANCE_NOT_REACHED)
+                && !keys.iter().any(|k| k == key::STAGE_CLEARANCE_NEGATIVE),
+            "the distance is unreachable but the pair goes together: {keys:?}"
+        );
+
+        // **And a distance that is reached says neither**, which is what stops
+        // this being a note that fires on every stage with a distance.
+        let (clearance, keys) = at(24.22);
+        assert!(
+            (clearance - SpurStage::default().clearance.manual).abs() < 1e-6,
+            "the shifts reach this one, so the clearance is the one asked for: {clearance}"
+        );
+        assert!(
+            !keys.iter().any(|k| {
+                k == key::STAGE_CENTRE_DISTANCE_NOT_REACHED || k == key::STAGE_CLEARANCE_NEGATIVE
+            }),
+            "a distance that is reached should say neither: {keys:?}"
+        );
     }
 
     /// **A distance and a clearance cannot both be derived**, and relief pins one

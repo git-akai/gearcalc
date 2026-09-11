@@ -87,6 +87,10 @@ pub mod key {
     pub const STAGE_LOW_MESH_EFFICIENCY: &str = "stage.low_mesh_efficiency";
     /// `stage.near_self_locking`
     pub const STAGE_NEAR_SELF_LOCKING: &str = "stage.near_self_locking";
+    /// `stage.centre_distance_not_reached`
+    pub const STAGE_CENTRE_DISTANCE_NOT_REACHED: &str = "stage.centre_distance_not_reached";
+    /// `stage.clearance_negative`
+    pub const STAGE_CLEARANCE_NEGATIVE: &str = "stage.clearance_negative";
     /// `stage.forward_locking`
     pub const STAGE_FORWARD_LOCKING: &str = "stage.forward_locking";
     /// `stage.near_forward_locking`
@@ -231,6 +235,8 @@ pub mod key {
         STAGE_CROSSED_FACE_WIDTH_AS_ENTERED,
         STAGE_LOW_MESH_EFFICIENCY,
         STAGE_NEAR_SELF_LOCKING,
+        STAGE_CENTRE_DISTANCE_NOT_REACHED,
+        STAGE_CLEARANCE_NEGATIVE,
         STAGE_FORWARD_LOCKING,
         STAGE_NEAR_FORWARD_LOCKING,
         STAGE_OVERLAP_BELOW_ONE,

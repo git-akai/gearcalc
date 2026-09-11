@@ -102,6 +102,13 @@ where it was 3.2e-4. It cost a pair eight times the time, which was recorded as
 F61 and is now measured: a quarter of that is genuinely redundant, and Phase 5
 declines it for want of an exact repair.
 
+**Phase 7 — F55, what a stage says about a distance.** Done. Two silent faults,
+not one: a distance no admissible shifts reach was answered with the shifts
+unchanged, and — worse — a distance short enough to put the running centres
+**inside** the pair's own zero-backlash distance was answered too. That is teeth
+overlapping at rest, and the tool reported an efficiency for it. The harness's
+own `shifts 9 37` table had been printing three such rows.
+
 **Phase 7 — F79, the interference check.** Done. An internal pair had it twice
 over under two classical names and an **external pair had it not at all** — so
 the shift optimiser walked into it, and was **recommending gears that foul on 2
@@ -200,6 +207,7 @@ them.
 | 5 | Consolidate the tests | **done** — eight passes, gates proven; two live wrong numbers |
 | 6 | Front end and payload | **done** — F15, F16, F17, F39, F47 closed, plus F72–F78 and F80 out of them; F79 opened and scoped |
 | 7 | One interference check for every mesh | **done** — F79 closed, gates proven; **a live wrong answer**, and F81 caught by the corpus |
+| 7 | What a stage says about a distance it could not reach | **done** — F55 closed, gates proven; two silent faults, the worse being a pair that cannot be assembled |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
 production code · 10,346 lines of comment in that code · 9,348 lines of
@@ -358,7 +366,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F52 | A given centre distance drops the optimiser onto the undercut floor — the tool's own recommended distance, typed back, costs 0.42 points | gap | 4 | **closed** — and logged in `corrections.md` |
 | F53 | The division objective is bimodal at the addendum cap and the search takes the lower peak | gap | 4 | **closed** — " |
 | F54 | A ring was asked nothing, so the search chose rings its cutter had to alter — 26 of 30 sets | gap | 4 | **closed** — and logged in `corrections.md`; the premise was wrong, see below |
-| F55 | A centre distance no admissible shifts can reach is answered rather than refused | gap | 4 | open |
+| F55 | A centre distance no admissible shifts can reach is answered rather than refused | gap | 4, 7 | **closed** — and it was two faults; a *negative* clearance was answered silently too, which is a pair that cannot be assembled |
 | F58 | The hula stage's shift optimiser moves no answer over a band of tooth differences, on or off | holds? | 4 | open — observed, not yet diagnosed |
 | F59 | Three kinds each wrote out what to ask of a mesh, and answered it three ways | gap | 4 | **closed** — `auto::MeshTrial`, and logged in `corrections.md` |
 | F60 | A hula pair's tip margin and an internal mesh's interference flags are asked by one kind each | **gap** | 5 | **closed** — `train::TipRoom` on `MeshReport`; and it found the shipped set interfering, see below |
@@ -2580,6 +2588,50 @@ Two lessons, and the second is the one worth keeping:
 > asserts the optimiser's *recommendation* does not interfere. The tests that had
 > broken when the refusal was added were the convergence and idempotency ones,
 > and loosening them to accept the wall had left them unable to discriminate it.
+
+### F55 — a distance no shifts reach, and the pair that cannot be assembled
+
+**The finding as recorded:** a centre distance no admissible shifts can reach is
+answered rather than refused. Probed, it is two silent faults rather than one,
+and the second is the worse.
+
+| 9/37 asked to run at | ran at | clearance | said |
+|---|---|---|---|
+| 20.00 mm | — | — | refused, `CentreDistanceTooSmall` |
+| 22.00 mm | — | — | refused, `NoRootSection` |
+| **23.00 mm** | 23.00 | **−0.4433** | **nothing** |
+| 25.00 mm | 25.00 | +1.5567 | only that the contact ratio is below one |
+| 26.00 mm | — | — | refused, `NoContact` |
+
+The middle row is the one to read twice. A **negative clearance** is a pair whose
+teeth overlap at rest: it cannot be assembled, every figure taken at that distance
+describes nothing, and the tool reported an efficiency for it without comment.
+
+**Both are notes, not refusals**, on rule 5's reading: the gears are cuttable and
+it is the *assembly* that is impossible, so the designer is owed the number.
+`train::distance_notes` is the one place, and it is a free function in
+`train/mod.rs` rather than in any kind's file for the reason `TipRoom` is —
+**every kind with a centre distance can reach these**, and a rule one kind asks
+is a rule the others forget. All four raise them, the hula stage through its
+crank offset, which is what that kind calls a centre distance.
+
+Neither is reported by the caller. `distance_notes` takes the *target* the shifts
+were given — the distance less the clearance, `None` where the stage was not in
+mode 3 — and derives whether it was reached, so the finding cannot disagree with
+the numbers beside it.
+
+**And the harness had been printing three of them.** `gear-cli shifts 9 37` sweeps
+given distances from the reference distance upwards, and its first three rows are
+below what the shifted pair can reach — so they were **unassemblable pairs
+reported with efficiencies** of 96.979 %, 97.277 % and 97.518 %. They have said
+so since, in the corpus, which is where a fault like that is caught by something
+other than reading. 17/43 has two such rows as well, missing by 0.0057 mm on the
+pinion's much smaller floor.
+
+> **Gates, run — three.** Silencing the not-reached note fails; silencing the
+> negative-clearance one fails; and **firing the not-reached note
+> unconditionally** fails, which is the half that matters — a note that fires on
+> every stage with a distance would pass the first gate and be worthless.
 
 ---
 

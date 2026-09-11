@@ -287,6 +287,19 @@ impl SpurStage {
         self.shifts_at(&crate::auto::Search::SHIPPED)
     }
 
+    /// The **nominal** distance the shifts have to reach, where one was given —
+    /// the distance typed less the clearance it is opened by.
+    ///
+    /// `None` where the stage is not in mode 3: with the distance automatic
+    /// there is nothing to reach, and with the *clearance* automatic the
+    /// designer is asking what gap their shifts leave rather than for shifts
+    /// that make a gap. The same accessor, under the same name, is on every
+    /// kind that has a centre distance.
+    pub(super) fn nominal_distance(&self) -> Option<f64> {
+        (!self.centre_distance.auto && !self.clearance.auto)
+            .then_some(self.centre_distance.manual - self.clearance.manual)
+    }
+
     /// As [`Self::shifts`], at a stated search effort — which is what makes
     /// "the shipped effort is converged" a claim something can raise and check
     /// rather than a comment (`auto::Search`).
@@ -299,23 +312,15 @@ impl SpurStage {
         // — and solving the shifts from the distance would answer a question
         // they did not ask. So the sum is pinned only when the clearance is a
         // number they stated.
-        let sum = (!self.centre_distance.auto && !self.clearance.auto)
-            .then(|| {
-                let rack = crate::plane::BasicRack::new(
-                    self.module,
-                    self.pressure_angle,
-                    self.helix_angles()[0].abs(),
-                );
-                let sum_z = f64::from(self.gears[0].teeth) + f64::from(self.gears[1].teeth);
-                crate::mesh::shift_sum_for(
-                    rack.mt,
-                    rack.alpha_t,
-                    rack.alpha_n,
-                    sum_z,
-                    self.centre_distance.manual - self.clearance.manual,
-                )
-            })
-            .flatten();
+        let sum = self.nominal_distance().and_then(|target| {
+            let rack = crate::plane::BasicRack::new(
+                self.module,
+                self.pressure_angle,
+                self.helix_angles()[0].abs(),
+            );
+            let sum_z = f64::from(self.gears[0].teeth) + f64::from(self.gears[1].teeth);
+            crate::mesh::shift_sum_for(rack.mt, rack.alpha_t, rack.alpha_n, sum_z, target)
+        });
 
         // **What the constraints alone imply**, with no objective involved.
         //
@@ -768,6 +773,15 @@ pub fn solve_spur_stage_with(
     // where the section and the share are worked out, so no stage kind has to
     // remember to ask (`train::Bending`). One mesh, so one note at most.
     notes.extend(bending[0].note.clone());
+    // ...and what the *distance* has to say: whether the shifts reached the one
+    // that was given, and whether the pair can be assembled at all. Both are
+    // `train::distance_notes`, so every kind with a centre distance says the
+    // same thing in the same words.
+    notes.extend(super::distance_notes(
+        stage.nominal_distance(),
+        centre,
+        mesh.a_w,
+    ));
 
     Ok(SpurResult {
         ratio: f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth),

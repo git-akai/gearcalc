@@ -9,6 +9,7 @@ least loss                            0.4946    0.7620    1.2566    1.4626    98
 centre distance given, shifts chosen to reach it
 a mm                                      x1        x2       sum       eps    eta fwd
 30.0200                               0.0057    0.0000    0.0057    1.6049    98.339 %
+                                    no admissible shifts reach 30.0000 mm: the pair is built at 30.0057 mm instead, and the clearance reported is the gap that leaves
 30.2061                               0.1904   -0.0000    0.1904    1.5384    98.407 %
 30.3922                               0.2412    0.1477    0.3889    1.5088    98.438 %
 30.5783                               0.2974    0.2979    0.5952    1.4873    98.461 %
@@ -19,6 +20,7 @@ a mm                                      x1        x2       sum       eps    et
 ...and with the shift optimiser off
 a mm                                      x1        x2       sum       eps    eta fwd
 30.0200                               0.0057    0.0000    0.0057    1.6049    98.339 %
+                                    no admissible shifts reach 30.0000 mm: the pair is built at 30.0057 mm instead, and the clearance reported is the gap that leaves
 30.3922                               0.1945    0.1945    0.3889    1.5159    98.436 %
 30.7645                               0.4044    0.4044    0.8088    1.4664    98.474 %
 31.1367                               0.6283    0.6283    1.2566    1.4448    98.470 %

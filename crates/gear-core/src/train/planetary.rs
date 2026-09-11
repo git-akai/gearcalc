@@ -1269,6 +1269,13 @@ pub fn solve_planetary_stage_with(
 
     // ---- what the answer does not include.
     notes.push(Note::new(key::STAGE_PLANETS_SHARE_LOAD_EQUALLY).count("planets", stage.planets));
+    // What the distance has to say — the same two findings every kind with a
+    // centre distance can reach, in the same words (`train::distance_notes`).
+    notes.extend(super::distance_notes(
+        stage.nominal_distance(),
+        centre,
+        layout.centre_distance,
+    ));
     if !layout.equal_spacing {
         notes.push(Note::new(key::STAGE_PLANETS_NOT_EVENLY_SPACED).count("planets", stage.planets));
     }
