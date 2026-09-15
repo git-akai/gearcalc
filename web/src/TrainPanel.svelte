@@ -755,7 +755,9 @@
         ? null
         : t("ui.train_note_proportions", {
             width: n(opts.faceRecommended),
-            formula: opts.faceLabel ? "(11 + c z₂) m_x" : "2 m_x √(q + 1) ≤ 0.67 d₁",
+            formula: opts.faceLabel
+              ? "(11 + c z₂) m_x, c = 0.06 below four starts and 0.09 from four — DIN/ČSN"
+              : "2 m_x √(q + 1), at most 0.67 d₁, q = d₁/m_x — BS 721",
           }),
       "ui.train_mm",
     )}

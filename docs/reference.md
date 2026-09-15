@@ -421,9 +421,9 @@ That is one of the two bounds `train::FreedomGroup` carries. The other counts ho
 many may be *given*, and the pair of them is what makes an over- or
 under-determined stage resolve itself: too many given turns one automatic, too
 many automatic pins one, in the order the stage declares. A kind with **no**
-distance input says `automatic_at_most = 0` for its clearance and so can never
-derive it — which is the planetary today, and is the same statement counted
-rather than special-cased.
+distance input would say `automatic_at_most = 0` for its clearance and so
+could never derive it — the same statement counted rather than special-cased,
+and since every kind has a distance input now, none says it.
 
 The objective and the constraints are not the same kind of thing, and failing at
 one must not discard the other: where the optimiser's own conditions — a minimum

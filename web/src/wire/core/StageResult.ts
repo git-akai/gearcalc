@@ -6,11 +6,10 @@ import type { PlanetaryResult } from "./PlanetaryResult";
 /**
  * What a stage produced, of whichever kind.
  *
- * **Each kind keeps its own shape.** A worm stage has no bending stress, no
- * minimum face width from contact and two efficiencies; a spur stage has all
- * three and one. What the train needs from either is small enough to read
- * through the accessors below — ratio, efficiency, the backlash at the output
- * member — so the accumulation never asks what kind it was, without every
- * result having to pretend to be the same shape.
+ * **Each shape keeps its own result** — a pair's, a set's, a hula stage's —
+ * and the two pair kinds share one. What the train needs from any of them is
+ * small enough to read through the accessors below — ratio, efficiency, the
+ * backlash at the output member — so the accumulation never asks what kind it
+ * was, without every result having to pretend to be the same shape.
  */
 export type StageResult = { "kind": "pair" } & PairResult | { "kind": "planetary" } & PlanetaryResult | { "kind": "hula" } & HulaResult;

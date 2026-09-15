@@ -777,12 +777,13 @@ mod tests {
         solve_pair_stage(stage, PairKind::Worm, StageTorques::just(2.0), &library()).unwrap()
     }
 
-    /// **A worm stage runs at the centre distance it was given**, by sizing the
-    /// worm — which is the only thing inside it free to absorb one.
+    /// **A worm stage runs at the centre distance it was given** — by its
+    /// wheel's shift while that is free, and by sizing the worm once both
+    /// shifts are pinned.
     ///
-    /// F39's fourth item. A screw stage has no profile shift, so where a pair
-    /// moves its teeth sideways this one has to change how big they are; that is
-    /// why it is opt-in and why the size leads its relief order.
+    /// The second is the one kind of mode 3 that changes the *teeth* rather
+    /// than where they sit, which is why it is what a pinned pair falls to and
+    /// not the preference.
     ///
     /// Two claims, and the second is the interesting one. The distance asked for
     /// is the distance run at — and the answer stays on **the branch the

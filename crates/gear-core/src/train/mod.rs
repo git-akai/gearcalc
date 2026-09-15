@@ -1827,10 +1827,10 @@ pub struct FreedomGroup {
     /// neither has anything to derive from. One of the two has to be a number
     /// somebody gave.
     ///
-    /// A kind that has **no** distance input yet says `0` here — its clearance
-    /// can never be derived, because there is nothing to derive it from. That is
-    /// the same statement, counted, and it stops being true on its own when the
-    /// input arrives.
+    /// A kind with **no** distance input would say `0` here — its clearance
+    /// could never be derived, because there is nothing to derive it from. That
+    /// is the same statement, counted; every kind has the input now, so none
+    /// says it.
     pub automatic_at_most: usize,
     /// The inputs in the argument, **relief order, least precious first**.
     ///
@@ -1935,11 +1935,12 @@ impl Stage {
                 // moment touching, and the second — reached only when sparing
                 // it leaves the group unsatisfiable — does not.
                 //
-                // It is reached today by exactly one case, and that case is
-                // honest rather than awkward: a planetary set's clearance is the
-                // only input in its group, because the set has no distance to
-                // derive a clearance *from*. Asking for it to be derived has no
-                // answer, and the toggle snapping back is the tool saying so.
+                // No kind reaches the second pass today: it was the planetary
+                // set's, whose clearance was alone in its group while the set
+                // had no distance to derive one from, and the toggle snapping
+                // back was the tool saying so. It stays because it is the law
+                // and not a case — a kind whose group has one input would reach
+                // it again, and the walk is the same walk.
                 for spare_just in [true, false] {
                     for f in &group.order {
                         if over <= limit {
@@ -1989,15 +1990,12 @@ impl Stage {
         // **Two ways of saying one number, so one of them must be said.** A
         // distance is nominal + clearance and an automatic clearance is
         // distance − nominal; with both automatic neither has anything to derive
-        // from. `distance` is `None` for a kind that has no such input yet, and
-        // then the clearance can never be derived at all — which the count says
-        // by itself rather than by a special case.
-        let distance_and_clearance = |distance: Option<Freedom>| FreedomGroup {
-            given_at_most: 1 + usize::from(distance.is_some()),
-            automatic_at_most: usize::from(distance.is_some()),
-            order: std::iter::once(Freedom::Clearance)
-                .chain(distance)
-                .collect(),
+        // from. Every kind has a distance input — the planetary was the last
+        // to get one — so this is one group rather than one with a hole in it.
+        let distance_and_clearance = FreedomGroup {
+            given_at_most: 2,
+            automatic_at_most: 1,
+            order: vec![Freedom::Clearance, Freedom::CentreDistance],
         };
         match self {
             // **A pair's distance, its two shifts and its size**:
@@ -2017,12 +2015,8 @@ impl Stage {
                         .chain(std::iter::once(Freedom::FirstMemberSize))
                         .collect(),
                 ),
-                distance_and_clearance(Some(Freedom::CentreDistance)),
+                distance_and_clearance.clone(),
             ],
-            // **An epicyclic set has two shifts to give, not three.** Its two
-            // centre distances have to agree, which is one relation among the
-            // three shifts. It has no distance input of its own — the common
-            // distance falls out — which is F39's third item.
             // **A set has a relation among its shifts alone**, which no other
             // kind does: its two centre distances have to agree, whatever they
             // agree at. So two of the three shifts are a design and the third is
@@ -2034,8 +2028,9 @@ impl Stage {
             // from the toggles because the constraint genuinely changes: this is
             // a fact about the geometry, not a convenience.
             //
-            // The pair has no analogue. Its distance and two shifts are bound by
-            // one relation and that is all, which is why its group is flat.
+            // The pair has no analogue. Its distance, two shifts and size are
+            // bound by one relation and that is all, which is why its group is
+            // flat.
             Self::Planetary(p) => vec![
                 FreedomGroup {
                     given_at_most: if p.centre_distance.auto || p.clearance.auto {
@@ -2046,7 +2041,7 @@ impl Stage {
                     automatic_at_most: 3,
                     order: (0..3).map(Freedom::Shift).collect(),
                 },
-                distance_and_clearance(Some(Freedom::CentreDistance)),
+                distance_and_clearance.clone(),
             ],
             // **One relation per mesh.** The crank offset fixes the difference
             // of a pair's two shifts, so pinning both over-specifies that mesh
@@ -2056,9 +2051,7 @@ impl Stage {
             // decision under another name, as its own documentation says.
             Self::Hula(h) => (0..h.gears.len() / 2)
                 .map(|m| one_relation(vec![Freedom::Shift(2 * m), Freedom::Shift(2 * m + 1)]))
-                .chain(std::iter::once(distance_and_clearance(Some(
-                    Freedom::CentreDistance,
-                ))))
+                .chain(std::iter::once(distance_and_clearance.clone()))
                 .collect(),
         }
     }
@@ -2066,12 +2059,11 @@ impl Stage {
 
 /// What a stage produced, of whichever kind.
 ///
-/// **Each kind keeps its own shape.** A worm stage has no bending stress, no
-/// minimum face width from contact and two efficiencies; a spur stage has all
-/// three and one. What the train needs from either is small enough to read
-/// through the accessors below — ratio, efficiency, the backlash at the output
-/// member — so the accumulation never asks what kind it was, without every
-/// result having to pretend to be the same shape.
+/// **Each shape keeps its own result** — a pair's, a set's, a hula stage's —
+/// and the two pair kinds share one. What the train needs from any of them is
+/// small enough to read through the accessors below — ratio, efficiency, the
+/// backlash at the output member — so the accumulation never asks what kind it
+/// was, without every result having to pretend to be the same shape.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(

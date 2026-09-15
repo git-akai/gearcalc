@@ -41,10 +41,10 @@ given_at_most: number,
  * neither has anything to derive from. One of the two has to be a number
  * somebody gave.
  *
- * A kind that has **no** distance input yet says `0` here — its clearance
- * can never be derived, because there is nothing to derive it from. That is
- * the same statement, counted, and it stops being true on its own when the
- * input arrives.
+ * A kind with **no** distance input would say `0` here — its clearance
+ * could never be derived, because there is nothing to derive it from. That
+ * is the same statement, counted; every kind has the input now, so none
+ * says it.
  */
 automatic_at_most: number, 
 /**
