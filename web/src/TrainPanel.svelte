@@ -1011,6 +1011,7 @@
   /** As `boundedNumber`'s: a bound that moved the number, in warning colour. */
   warn?: string | null,
 )}
+  {@const shown = computed === undefined ? a.manual : Number(computed.toFixed(4))}
   <label class="auto" class:constrained={constraint !== undefined}>
     <span class="name">{t(key)}</span>
     <!-- **The box comes first so the label is the box's.** A label activates
@@ -1022,13 +1023,7 @@
          the columns were going to have to be named anyway once a row could
          carry two switches. -->
     {#if a.auto}
-      <input
-        type="number"
-        {step}
-        value={computed === undefined ? a.manual : Number(computed.toFixed(4))}
-        disabled
-        class="computed"
-      />
+      <input type="number" {step} value={shown} disabled class="computed" />
     {:else}
       <input type="number" {step} bind:value={a.manual} />
     {/if}
@@ -1043,6 +1038,15 @@
         on={a.auto}
         title={t("ui.train_automatic")}
         set={(v) => {
+          // **Turning automatic off keeps the number the box was showing.**
+          // `manual` is held while `auto` is on so the field has something
+          // to fall back to, and `params::Auto` says seeding it from the
+          // solved value is the front end's job — which it was not doing, so
+          // a centre distance turned manual dropped to the stale zero it was
+          // created with and the stage fell over. Seeded to the digits shown
+          // rather than the full value, so what the reader saw is what they
+          // now hold; the gear tab's throw and amplitude do the same.
+          if (!v && a.auto) a.manual = shown;
           a.auto = v;
           after?.();
         }}

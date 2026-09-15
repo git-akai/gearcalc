@@ -1644,6 +1644,14 @@ distance the stage runs at, the nominal in the annotation. The hula's was the
 one exception, showing the zero-backlash offset and annotating the running one,
 which read as a different kind of number from the box beside it.
 
+**And turning automatic off keeps the number the box was showing.** `Auto`
+holds its `manual` while `auto` is on so the field has something to fall back
+to, and seeding it from the solved value is the front end's job — which the
+geartrain panel was not doing, so a centre distance turned manual dropped to
+the zero it was created with and the stage fell over. It is seeded to the
+digits shown, so what the reader saw is what they now hold, the way the gear
+tab's throw and amplitude already were.
+
 **A control that is always an input says so by snapping back.** A set's
 clearance and a hula stage's running clearance cannot be derived — the one is
 what the two nominal distances differ by, the other is absorbed by shifts that
