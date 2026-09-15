@@ -668,10 +668,23 @@ Each stage differs only in what is free and what it is worth:
 | spur | both shifts | the mesh's own efficiency |
 | planetary | the sun's and the ring's, the planet's following | `η₀`, since `power` rises with it either way |
 | hula | each mesh's division of its shift | the two meshes' product |
-| worm, crossed | — | the search is the parallel-axis mesh's; a crossed pair asked to optimise takes what the constraints imply and says so |
+| worm, crossed | both shifts — the worm's pinned at the preset | the friction balance along the line of action ([Crossed axes](#crossed-axes)), on the zone the teeth leave |
 
 The searches share `auto::maximise`: what differs between stages is how many
-numbers are free and what they are worth, not how to look for them, and
+numbers are free and what they are worth, not how to look for them, and a
+crossed pair differs from a parallel one in nothing but the objective —
+`crossed_shifts_for_efficiency` is `shifts_for_efficiency` with the mesh
+swapped, the same floor, pinning, box and refusals, the interference asked
+along the line. A member whose shift the designer *gave* is a constraint on
+either search and not a candidate of it: it is not judged, since a clamp the
+tool raised on it is a fact about the design — a worm's thread, whose round is
+capped at every shift, is the case, and a search that asked the pinned worm to
+be as asked refused every wheel. On the shipped worm the search agrees with
+the floor: a worm's loss is its lead angle's, and a wheel shift only lengthens
+the path it slides along. On a crossed gear pair at 5° it is worth a third of
+a point (`gear-cli crossed 17 43 5`). At the parallel limit it lands near the
+parallel search and not on it, because the contact-ratio floor is a
+normal-line count on a point contact and a transverse one on a line. And
 `auto::Freedoms` is the one mapping from what a search hands back onto the full
 set. Each rates the geometry the stage would *build* — the addendum held to the
 tip width it has to keep, at the distance the pair runs at rather than its

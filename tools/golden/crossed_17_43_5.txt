@@ -1,0 +1,22 @@
+crossed gear pair  z 17/43  shaft angle 5 deg  module 1  alpha 20 deg  mu 0.06
+
+  beta1   beta2     d1 mm     d2 mm       a mm   slide/v1     eta fwd    sigma_H       epsilon
+    0.0       5 — no such pair
+    0.5     4.5   17.0006   43.1330    30.0724     0.0874     98.139 %     638.2   1.600174374
+    1.0     4.0   17.0026   43.1050    30.0590     0.0874     98.140 %     638.2   1.600156002
+    1.5     3.5   17.0058   43.0804    30.0478     0.0873     98.140 %     638.2   1.600272284
+    2.0     3.0   17.0104   43.0590    30.0386     0.0873     98.141 %     638.1   1.600523207
+    2.5     2.5   17.0162   43.0410    30.0315     0.0872     98.141 %     638.1   1.600908731
+    3.0     2.0   17.0233   43.0262    30.0265     0.0872     98.142 %     638.0   1.601428790
+    3.5     1.5   17.0318   43.0147    30.0235     0.0872     98.142 %     637.8   1.602083290
+    4.0     1.0   17.0415   43.0066    30.0240     0.0872     98.142 %     637.3   1.602362608
+    4.5     0.5   17.0526   43.0016    30.0271     0.0872     98.143 %     636.7   1.602602719
+    5.0     0.0   17.0649   43.0000    30.0325     0.0872     98.144 %     636.0   1.602897047
+
+A worm is the same geometry with the first member's diameter chosen instead of its helix;
+the split above is the freedom two gears have and a worm does not.
+
+shifts chosen for least loss at the even split (2.5/2.5 deg)
+                                          x1        x2      a mm       eps    eta fwd
+least shift that clears undercut      0.0029    0.0000   30.0515    1.6009    98.141 %
+least loss                            0.4345    0.8494   31.3326    1.2003    98.491 %

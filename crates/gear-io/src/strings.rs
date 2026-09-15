@@ -1002,8 +1002,8 @@ mod tests {
             if let Ok(r) = solve_crossed(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
                 record(&r.notes);
             }
-            // ...the optimiser asked of a crossed mesh, which it does not
-            // search and says so.
+            // ...the optimiser asked of a crossed mesh, whose search has its
+            // own way of finding nothing.
             if let Ok(r) = solve_crossed(
                 &gear_core::train::PairStage {
                     optimisation: gear_core::train::Optimisation {

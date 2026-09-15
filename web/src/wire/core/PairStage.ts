@@ -28,9 +28,10 @@ import type { StageGear } from "./StageGear";
  * line and lose power to sliding along the profile, while crossed axes touch
  * at a point and slide lengthwise. Those are different mechanisms with
  * different formulas and different results (docs/reference.md#crossed-axes),
- * so a crossed pair answers with a point-contact mesh — a contact ratio along
- * the line of action, no bending, two efficiencies — and says so
- * ([`super::PairMesh`]).
+ * so a crossed pair's mesh report carries a contact ratio along the line of
+ * action, no bending and two efficiencies — in the same [`super::MeshReport`]
+ * a parallel pair's does, with [`super::PointContact`] where the other has
+ * [`super::LineContact`].
  *
  * # One relation among five inputs
  *

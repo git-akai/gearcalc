@@ -116,7 +116,6 @@ optimiser_found_nothing = "nothing in the admissible range could be built, so th
 forward_locking = "cannot be driven forward: static μ {friction} against a threshold of {threshold}, so the first member cannot turn the second at all"
 near_forward_locking = "close to not driving forward: static μ {friction} near threshold of {threshold}, so whether it drives at all changes on an estimated coefficient"
 low_mesh_efficiency = "mesh efficiency {percent} %: most of the input becomes heat, which usually limits a worm stage before stress does"
-optimiser_not_for_crossed = "the optimiser searches a parallel-axis mesh, and this pair's shafts cross: the shifts are what the constraints imply, and no search was run"
 planets_share_load_equally = "{planets} planets assumed to share load equally; real sets do not without a floating member, and the remedy is a mesh-load factor this tool declines to apply"
 planets_not_evenly_spaced = "{planets} planets cannot be evenly spaced: sun and ring tooth counts do not sum to a multiple of it"
 planet_clearance_below_minimum = "adjacent planets clear by {gap} mm, below the {minimum} mm asked for"

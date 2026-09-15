@@ -491,10 +491,6 @@ pub fn solve_crossed_pair(
         centre,
         s.centre_distance,
     ));
-    // ...and whether the optimiser was asked of a mesh it does not search.
-    if stage.optimisation.enabled {
-        notes.push(Note::new(key::STAGE_OPTIMISER_NOT_FOR_CROSSED));
-    }
 
     // The zone as the widths in use actually leave it — one construction, asked
     // twice for different things, rather than two that can disagree about
@@ -2033,6 +2029,127 @@ mod tests {
         assert!(
             play.abs() < 1e-12,
             "a spur gear's axial float opens nothing: {play}"
+        );
+    }
+
+    /// **The optimiser reaches a crossed pair, by the crossed mesh's own
+    /// objective — and it is the same search.**
+    ///
+    /// Three claims, each on the friction balance along the line of action:
+    ///
+    /// - what it chooses is **admissible under the crossed model** — no flank
+    ///   fouled, the contact ratio along the line at or above the floor — and
+    ///   loses no more than the undercut floor does; on the 17/43 pair at 5°
+    ///   it gains, and on the shipped worm it *agrees* with the floor, since a
+    ///   worm's loss is its lead angle's and a wheel shift only lengthens the
+    ///   path it slides along, which is `Searched::Chose` at the same shifts
+    ///   rather than `FoundNothing`;
+    /// - it is **converged, not budgeted**: fourteen times the work moves the
+    ///   crossed efficiency by less than the parallel search's own ceiling;
+    /// - at the parallel limit it lands **near** the parallel search — within
+    ///   0.15 of shift and half a point of efficiency — and not on it, for the
+    ///   reason `the_two_contacts_report_one_patch_at_the_limit` names: the
+    ///   contact-ratio floor is a normal-line count on a point contact and a
+    ///   transverse one on a line, `cos² β_b` apart, so the crossed search may
+    ///   shorten the path further before the same floor stops it.
+    #[test]
+    fn the_optimiser_reaches_a_crossed_pair_by_its_own_mesh() {
+        use super::super::{Optimisation, Searched};
+        use crate::auto::Search;
+        let lib = library();
+        let optimised = |mut st: PairStage| {
+            st.optimisation = Optimisation {
+                enabled: true,
+                ..Optimisation::default()
+            };
+            st
+        };
+        let shifts = |r: &PairResult| [r.gears[0].profile_shift, r.gears[1].profile_shift];
+
+        // The shipped worm: the floor is the answer, and the search says so
+        // by choosing rather than by finding nothing.
+        let worm =
+            solve_worm(&optimised(PairStage::worm()), StageTorques::just(2.0), &lib).unwrap();
+        assert_eq!(
+            shifts(&worm),
+            [0.0, 0.0],
+            "a wheel shift buys a worm nothing"
+        );
+        assert_eq!(
+            optimised(PairStage::worm()).chosen_at(&Search::SHIPPED).how,
+            Searched::Chose,
+            "the search ran and agreed with the floor"
+        );
+
+        // A crossed gear pair, where there is something to choose.
+        let crossed = |sigma: f64| PairStage {
+            shaft_angle: sigma,
+            sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(20.0)),
+            gears: [17u32, 43].map(|z| StageGear {
+                teeth: z,
+                face_width: Auto::fixed(30.0),
+                ..StageGear::default()
+            }),
+            ..PairStage::default()
+        };
+        let floor = solve_crossed(&crossed(5.0), StageTorques::just(2.0), &lib).unwrap();
+        let best = solve_crossed(&optimised(crossed(5.0)), StageTorques::just(2.0), &lib).unwrap();
+        assert_eq!(best.mesh.flank_interference, [false, false]);
+        assert!(
+            best.mesh.contact_ratio >= Optimisation::default().min_contact_ratio - 1e-9,
+            "the floor is the crossed count: {}",
+            best.mesh.contact_ratio
+        );
+        assert!(
+            best.mesh.efficiency.forward > floor.mesh.efficiency.forward + 1e-3,
+            "at 5° the shifts are worth something: {} against the floor's {}",
+            best.mesh.efficiency.forward,
+            floor.mesh.efficiency.forward
+        );
+
+        // Converged: the same ceiling the parallel search is held to.
+        let at = |x: [f64; 2]| {
+            let mut fixed = crossed(5.0);
+            for (gear, shift) in fixed.gears.iter_mut().zip(x) {
+                gear.profile_shift = Auto::fixed(shift);
+            }
+            solve_crossed(&fixed, StageTorques::just(2.0), &lib)
+                .unwrap()
+                .mesh
+                .efficiency
+                .forward
+        };
+        let stage = optimised(crossed(5.0));
+        let shipped = at(stage.chosen_at(&Search::SHIPPED).shifts);
+        let refined = at(stage.chosen_at(&Search::refined(3)).shifts);
+        assert!(
+            (refined - shipped).abs() < 1e-5,
+            "fourteen times the work moves the crossed efficiency by {}",
+            refined - shipped
+        );
+
+        // The parallel limit: near, and not on, for the reason above.
+        let parallel = solve_pair_stage(
+            &optimised(crossed(0.0)),
+            PairKind::Spur,
+            StageTorques::just(2.0),
+            &lib,
+        )
+        .unwrap();
+        let near = solve_crossed(&optimised(crossed(0.01)), StageTorques::just(2.0), &lib).unwrap();
+        for i in 0..2 {
+            assert!(
+                (shifts(&near)[i] - shifts(&parallel)[i]).abs() < 0.15,
+                "member {i}: the crossed search chose {} where the parallel chose {}",
+                shifts(&near)[i],
+                shifts(&parallel)[i]
+            );
+        }
+        assert!(
+            (near.mesh.efficiency.forward - parallel.mesh.efficiency.forward).abs() < 5e-3,
+            "{} against {}",
+            near.mesh.efficiency.forward,
+            parallel.mesh.efficiency.forward
         );
     }
 

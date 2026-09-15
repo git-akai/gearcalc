@@ -1015,6 +1015,12 @@ pub enum Cut<'a> {
         tooth: &'a Tooth,
         floor: Option<f64>,
     },
+    /// Rack-generated at a shift the designer **gave**, which a search may not
+    /// overrule and so does not judge: a clamp the tool raised on this member
+    /// is a fact about the design, not about the candidate. A worm's thread is
+    /// the case — its round is capped at every shift, and a search that asked
+    /// the pinned worm to be as asked refused every wheel.
+    Pinned { tooth: &'a Tooth },
     /// Shaper-generated — a ring, whose root and fillet are its cutter's.
     ByShaper { ring: &'a crate::ring::Ring },
 }
@@ -1024,7 +1030,7 @@ impl Cut<'_> {
     #[must_use]
     pub fn flank_ends(&self) -> crate::mesh::FlankEnds {
         match self {
-            Self::ByRack { tooth, .. } => tooth.flank_ends(),
+            Self::ByRack { tooth, .. } | Self::Pinned { tooth } => tooth.flank_ends(),
             Self::ByShaper { ring } => ring.flank_ends(),
         }
     }
@@ -1034,6 +1040,8 @@ impl Cut<'_> {
     pub fn is_as_asked(&self) -> bool {
         match self {
             Self::ByRack { tooth, floor } => member_is_buildable(tooth, *floor),
+            // Given, so not judged — see the variant.
+            Self::Pinned { .. } => true,
             Self::ByShaper { ring } => ring_is_cut_as_asked(ring),
         }
     }
@@ -1042,7 +1050,7 @@ impl Cut<'_> {
     #[must_use]
     pub fn tip_radius(&self) -> f64 {
         match self {
-            Self::ByRack { tooth, .. } => tooth.ra,
+            Self::ByRack { tooth, .. } | Self::Pinned { tooth } => tooth.ra,
             Self::ByShaper { ring } => ring.ra,
         }
     }
@@ -1051,7 +1059,7 @@ impl Cut<'_> {
     #[must_use]
     pub fn root_radius(&self) -> f64 {
         match self {
-            Self::ByRack { tooth, .. } => tooth.rf,
+            Self::ByRack { tooth, .. } | Self::Pinned { tooth } => tooth.rf,
             Self::ByShaper { ring } => ring.rf,
         }
     }
@@ -1142,7 +1150,7 @@ impl MeshTrial<'_> {
         if self.path.contact_ratio < self.min_contact_ratio {
             return None;
         }
-        let Cut::ByRack { tooth, .. } = self.members[0] else {
+        let (Cut::ByRack { tooth, .. } | Cut::Pinned { tooth }) = self.members[0] else {
             // The path and the efficiency integral are read through member 1,
             // which every mesh here builds pinion-first — a ring is never it.
             return None;
@@ -1201,8 +1209,9 @@ impl MeshTrial<'_> {
     /// that clears here clears where it runs. The bias is stated in
     /// `docs/state.md` with the rest.
     fn tips_are_clear(&self) -> bool {
-        let ([Cut::ByRack { tooth, .. }, Cut::ByShaper { ring }]
-        | [Cut::ByShaper { ring }, Cut::ByRack { tooth, .. }]) = self.members
+        let ([Cut::ByRack { tooth, .. } | Cut::Pinned { tooth }, Cut::ByShaper { ring }]
+        | [Cut::ByShaper { ring }, Cut::ByRack { tooth, .. } | Cut::Pinned { tooth }]) =
+            self.members
         else {
             return true;
         };
@@ -1401,14 +1410,8 @@ pub fn shifts_for_efficiency(
         let path = crate::contact::ContactPath::new(&a, b.ra, &mesh)?;
         MeshTrial {
             members: [
-                Cut::ByRack {
-                    tooth: &a,
-                    floor: floor[0],
-                },
-                Cut::ByRack {
-                    tooth: &b,
-                    floor: floor[1],
-                },
+                member(&a, floor[0], pinned.shift[0]),
+                member(&b, floor[1], pinned.shift[1]),
             ],
             mesh: &mesh,
             path: &path,
@@ -1434,12 +1437,132 @@ pub fn shifts_for_efficiency(
     // `docs/corrections.md` records: pin the sum and the admissible interval can
     // be narrower than the sweep's own step, at which point the search reports
     // that no admissible pair exists because its grid fell either side of one.
-    let side = |i: usize| searchable_shift(&|x| pair([x, x])[i], floor[i]);
-    let box_ = pinned.box_of(sign, [side(0)?, side(1)?])?;
+    let box_ = pinned.box_of(sign, sides(pair, &floor, pinned)?)?;
     search
         .maximise(&box_, &|free| loss_at(pinned.place(sign, free)))
         .map(|free| pinned.place(sign, &free))
 }
+
+/// **The interval each member's shift may be searched over** — and for a
+/// member whose shift was given, the given number alone, since an interval
+/// the search will never sweep is not one it should have to exist. A pinned
+/// worm's round is capped at every shift, so its interval is empty, and asking
+/// for it refused the whole search before the wheel was looked at.
+fn sides(
+    pair: &dyn Fn([f64; 2]) -> [GearParams; 2],
+    floor: &[Option<f64>; 2],
+    pinned: &Pinned,
+) -> Option<[(f64, f64); 2]> {
+    let side = |i: usize| match pinned.shift[i] {
+        Some(x) => Some((x, x)),
+        None => searchable_shift(&|x| pair([x, x])[i], floor[i]),
+    };
+    Some([side(0)?, side(1)?])
+}
+
+/// A member of a trial pair: judged where a search is choosing its shift,
+/// taken as given where the designer did.
+fn member<'a>(tooth: &'a Tooth, floor: Option<f64>, given: Option<f64>) -> Cut<'a> {
+    if given.is_some() {
+        Cut::Pinned { tooth }
+    } else {
+        Cut::ByRack { tooth, floor }
+    }
+}
+
+/// **The same choice on crossed shafts**: the shifts a crossed pair loses
+/// least at, by the friction balance along its line of action.
+///
+/// [`shifts_for_efficiency`] with the mesh swapped — the same floor, the same
+/// pinning, the same box, the same search, and the same five refusals asked of
+/// a point contact: a member the tool would not leave as asked, a tip that
+/// bottoms in the mate's root, a tip that reaches past the flank it meshes with
+/// ([`crate::screw::CrossedPath::flank_interference`]), and contact that does
+/// not stay continuous; the internal pair's tip question does not arise. The
+/// objective is [`crate::screw::CrossedPath::efficiency`], forward, on the zone
+/// the *teeth* leave — not the faces, which the stage sizes to the answer.
+///
+/// The shift sum enters through the rack law
+/// ([`crate::screw::ScrewParams::profile_shifts`]), so `screw_at` is the pair
+/// at those shifts and the zero-backlash distance is its own; the stage opens
+/// it by the clearance as it does everywhere.
+///
+/// # Errors
+///
+/// `None` when no admissible pair exists.
+#[must_use]
+pub fn crossed_shifts_for_efficiency(
+    pair: &dyn Fn([f64; 2]) -> [GearParams; 2],
+    screw_at: &dyn Fn([f64; 2]) -> Option<crate::screw::Screw>,
+    bounds: &Bounds,
+    pinned: &Pinned,
+    friction: f64,
+    search: &Search,
+) -> Option<[f64; 2]> {
+    let Bounds {
+        floor,
+        min_contact_ratio,
+        clearance,
+    } = *bounds;
+    // Both members external: the sign is the pair's own.
+    let sign = crate::mesh::MeshKind::External.sign();
+    let loss_at = |x: [f64; 2]| -> Option<f64> {
+        if [0, 1]
+            .iter()
+            .any(|&i| floor[i].is_some_and(|f| x[i] < f - 1e-12))
+        {
+            return None;
+        }
+        let [pa, pb] = pair(x);
+        let (a, b) = (Tooth::new(pa), Tooth::new(pb));
+        let members = [
+            member(&a, floor[0], pinned.shift[0]),
+            member(&b, floor[1], pinned.shift[1]),
+        ];
+        if !members.iter().all(Cut::is_as_asked) {
+            return None;
+        }
+        let s = screw_at(x)?;
+        let centre = s.centre_distance + clearance;
+        // A tip reaching the mate's root across the line of centres — the
+        // radial comparison `Mesh::bottom_clearance` makes, on a crossed pair's
+        // own distance.
+        if centre - a.ra - b.rf < 0.0 || centre - b.ra - a.rf < 0.0 {
+            return None;
+        }
+        let path = s.path_of_contact_at(a.ra, b.ra, centre)?;
+        if path
+            .flank_interference(&s, [a.flank_ends(), b.flank_ends()])
+            .iter()
+            .any(|&bad| bad)
+        {
+            return None;
+        }
+        if path.contact_ratio < min_contact_ratio {
+            return None;
+        }
+        path.efficiency(&s, friction, crate::contact::Drive::Forward, SEARCH_SAMPLES)
+    };
+
+    if pinned.freedoms() == 0 {
+        let x = pinned.place(sign, &[]);
+        return loss_at(x).map(|_| x);
+    }
+    let box_ = pinned.box_of(sign, sides(pair, &floor, pinned)?)?;
+    search
+        .maximise(&box_, &|free| loss_at(pinned.place(sign, free)))
+        .map(|free| pinned.place(sign, &free))
+}
+
+/// Quadrature points for the friction balance **inside the search**.
+///
+/// The stage reports the balance at 2048 points, where the trapezium rule's
+/// residual is below 1e-9 (`train::crossed`). A search does not need that: it
+/// resolves shifts to `Search::resolution`, and the objective moves by
+/// hundredths of a point per module of shift, so a residual of 1e-7 is a
+/// hundredth of the step it could ever tell apart. The rule is second order,
+/// so an eighth of the points buys that sixty-four times over.
+const SEARCH_SAMPLES: usize = 256;
 
 /// **Coordinate descent over a few free numbers**, refined about the best.
 ///

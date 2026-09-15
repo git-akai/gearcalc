@@ -17,3 +17,8 @@ crossed gear pair  z 17/23  shaft angle 90 deg  module 1  alpha 20 deg  mu 0.06
 
 A worm is the same geometry with the first member's diameter chosen instead of its helix;
 the split above is the freedom two gears have and a worm does not.
+
+shifts chosen for least loss at the even split (45.0/45.0 deg)
+                                          x1        x2      a mm       eps    eta fwd
+least shift that clears undercut      0.0000    0.0000   28.3043    1.7581    84.216 %
+least loss                            0.0000    0.0000   28.3043    1.7581    84.216 %

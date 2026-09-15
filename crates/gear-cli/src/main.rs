@@ -288,7 +288,7 @@ const COMMANDS: &[Command] = &[
         args: "[z1] [z2] [shaft angle]",
         summary: "a crossed pair, swept over the helix split (17, 23, 90°)",
         run: |a| crossed_report(arg(a, 1, 17), arg(a, 2, 23), arg(a, 3, 90.0)),
-        record: Record::Cases(&["crossed 17 23 90"]),
+        record: Record::Cases(&["crossed 17 23 90", "crossed 17 43 5"]),
         slow: false
     },
     Command {
@@ -3161,6 +3161,48 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
             "\nA worm is the same geometry with the first member's diameter chosen instead \
              of its helix;\nthe split above is the freedom two gears have and a worm does not."
         );
+    }
+
+    // **The shifts chosen for least loss, at the even split** — the one
+    // search, on the crossed mesh's own objective. Here so the optimiser's
+    // crossed answer is in the change detector, which is the ninth time this
+    // audit has had to put an opt-in the harness never switched on into it.
+    let even = gear_core::train::PairStage {
+        sizing: gear_core::params::Auto::fixed(FirstMemberSizing::HelixAngle(shaft_angle / 2.0)),
+        optimisation: gear_core::train::Optimisation {
+            enabled: true,
+            ..gear_core::train::Optimisation::default()
+        },
+        ..base.clone()
+    };
+    let mut free = even.clone();
+    for g in &mut free.gears {
+        g.profile_shift = gear_core::params::Auto::automatic(0.0);
+    }
+    println!(
+        "\nshifts chosen for least loss at the even split ({:.1}/{:.1} deg)",
+        shaft_angle / 2.0,
+        shaft_angle / 2.0
+    );
+    println!(
+        "{:<34} {:>9} {:>9} {:>9} {:>9} {:>10}",
+        "", "x1", "x2", "a mm", "eps", "eta fwd"
+    );
+    for (name, stage) in [
+        ("least shift that clears undercut", &even),
+        ("least loss", &free),
+    ] {
+        match solve_pair_stage(stage, PairKind::Spur, StageTorques::just(2.0), &lib) {
+            Ok(r) => println!(
+                "{name:<34} {:>9.4} {:>9.4} {:>9.4} {:>9.4} {:>9.3} %",
+                r.gears[0].profile_shift,
+                r.gears[1].profile_shift,
+                r.centre_distance,
+                r.mesh.contact_ratio,
+                100.0 * r.mesh.efficiency.forward
+            ),
+            Err(e) => println!("{name:<34} {e}"),
+        }
     }
 }
 

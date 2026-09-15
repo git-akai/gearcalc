@@ -55,7 +55,6 @@ optimiser_found_nothing = "im zulässigen Bereich ließ sich nichts bauen, daher
 forward_locking = "nicht vorwärts antreibbar: Haftreibung μ {friction} gegenüber einer Grenze von {threshold}, das erste Glied kann das zweite also gar nicht drehen"
 near_forward_locking = "nahe daran, nicht mehr vorwärts anzutreiben: Haftreibung μ {friction} nahe der Grenze {threshold}, ob überhaupt angetrieben wird, hängt damit an einem geschätzten Beiwert"
 low_mesh_efficiency = "Verzahnungswirkungsgrad {percent} %: der größte Teil der Eingangsleistung wird Wärme, was eine Schneckenstufe meist vor der Spannung begrenzt"
-optimiser_not_for_crossed = "der Optimierer durchsucht ein Getriebe mit parallelen Achsen, und die Wellen dieses Paares kreuzen sich: die Profilverschiebungen sind, was die Bedingungen ergeben, und es wurde keine Suche ausgeführt"
 planets_share_load_equally = "es wird angenommen, dass {planets} Planeten die Last gleichmäßig tragen; wirkliche Sätze tun das ohne ein schwimmendes Glied nicht, und das Gegenmittel ist ein Lastverteilungsfaktor, den dieses Werkzeug bewusst nicht ansetzt"
 planets_not_evenly_spaced = "{planets} Planeten lassen sich nicht gleichmäßig verteilen: die Zähnezahlen von Sonne und Hohlrad ergeben in Summe kein Vielfaches davon"
 planet_clearance_below_minimum = "benachbarte Planeten haben {gap} mm Abstand, weniger als die geforderten {minimum} mm"

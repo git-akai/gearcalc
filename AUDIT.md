@@ -252,6 +252,7 @@ them.
 | 7 | The figures | **done** — F7, F19 closed; every table gated, two had drifted; one attribution false since before the audit, now held by a test |
 | 8 | The worm is a pair | **done** — F83 closed, gates proven; one primitive under two kinds, one result, one relation; every recorded number unchanged |
 | 8 | One mesh report for a line and a point | **done** — F84 closed; the two contacts measured at the limit, two seams recorded; the mini-audit of the interrupted run below |
+| 8 | The optimiser on a crossed pair | **done** — F85 closed; a pinned member is a constraint in both searches |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
 production code · 10,346 lines of comment in that code · 9,348 lines of
@@ -418,6 +419,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F82 | An optimiser that finds nothing admissible is indistinguishable from one that agrees with the floor — every kind falls back in silence | **gap** | 7 | **closed** — `Searched`, reported by all three choosers, gates proven |
 | F83 | The worm was a stage type rather than a kind: no shift, no addendum, no interference check, no mode 3 but by resizing, a crossed gear pair whose typed shifts reached the tooth report and not the mesh — and the model needed none of it | **gap** | 8 | **closed** — `PairStage` under `Stage::Spur`/`Stage::Worm`, one `PairResult`, the rack law for a crossed shift, the zone read one way from each tangency point; gates proven, corpus unchanged |
 | F84 | A line contact and a point contact reported in two types with an enum choosing, though the physics is one model with the shaft angle as a parameter — and nothing had measured where the two contacts' reported figures meet | **gap** | 8 | **closed** — one `MeshReport` for every mesh; the limit measured field by field, two seams named and sized; a patch a quarter as wide as its own rating found on the way |
+| F85 | The shift optimiser did not reach a crossed pair, and both searches judged a pinned member's clamps as if its shift were a candidate — a worm's thread never passes, so its wheel was never searched | **gap** | 8 | **closed** — one search with the mesh's own objective; a pinned member is a constraint, not a candidate; gates proven, the harness prints the crossed answer |
 | F59 | Three kinds each wrote out what to ask of a mesh, and answered it three ways | gap | 4 | **closed** — `auto::MeshTrial`, and logged in `corrections.md` |
 | F60 | A hula pair's tip margin and an internal mesh's interference flags are asked by one kind each | **gap** | 5 | **closed** — `train::TipRoom` on `MeshReport`; and it found the shipped set interfering, see below |
 | F56 | No CLI command drove the optimiser, so its answers were outside the corpus | gap | 4 | **closed** — `gear-cli shifts`, which also closes F19's first row |
@@ -3097,9 +3099,60 @@ front end is 200 lines shorter with two forms and two readouts become one
 each. That is the honest shape of the change: not less code, the same code
 doing more, once.
 
+### The crossed optimiser — F85
+
+Recorded below as not done and then done, because the reason it was not was
+weak: the search is not the parallel mesh's, it is `auto::maximise` over a
+box the members' own intervals give, with the mesh asked what a candidate is
+worth. `crossed_shifts_for_efficiency` is `shifts_for_efficiency` with the
+objective swapped — the friction balance along the line of action, on the
+zone the teeth leave — and the five refusals asked of a point contact. The
+note that said the optimiser did not reach a crossed pair is gone with its
+five strings, and the toggle is offered on crossed shafts.
+
+**It found a fault in the parallel search on the way.** Both searches asked
+every member to be *as asked* — no clamp raised — before scoring a candidate,
+including a member whose shift the designer had pinned. A pinned member is a
+constraint on the search and not a candidate of it, which the undercut floor
+had already established for the undercut floor (`ShiftAsked::search_floor`, Phase 6)
+and the clamps had not: a worm's thread has its round capped at every shift,
+so the pinned worm was never as asked and the search refused every wheel,
+silently, as `FoundNothing`. `Cut::Pinned` is judged by nothing now, and its
+interval is the number given rather than one it will never sweep. The
+parallel search carried the same latent fault and never met it, because an
+ordinary gear's round always fits.
+
+On the shipped worm the search **agrees with the floor** — `Searched::Chose`
+at the same shifts — since a worm's loss is its lead angle's and a wheel
+shift only lengthens the path it slides along; on 17/43 at 5° it gains a
+third of a point, which `gear-cli crossed 17 43 5` prints and is the ninth
+opt-in this audit has had to switch on in the harness. At the parallel limit
+it lands within 0.15 of shift of the parallel search and not on it, for the
+seam F84 names: the contact-ratio floor is a normal-line count on a point
+contact and a transverse one on a line, so the crossed search may shorten the
+path further before the same floor stops it.
+
+> **Gates, run.** Restoring the as-asked judgement on a pinned member fails
+> the worm's `Chose`; the crossed answer is held admissible under the crossed
+> model, converged to the parallel search's own ceiling, and near the parallel
+> answer at the limit.
+
+**Recorded, not fixed: the transverse round at a steep helix.** The tooth
+generator's rack round is the coefficient times the *transverse* module; at a
+worm's 82° that is seven normal modules, it never fits, and the fillet the
+thread gets is the cap's (0.95 of the depth). No reported number reads it — the
+crossed rating never touches the fillet, and bending is rated on the virtual
+spur with the normal round — but the worm's `clamp.fillet_capped` fires at
+every shift for that reason, and `r_j` sits higher than a real hob's round
+would put it, which makes the crossed interference verdict conservative by
+that much. At an ordinary helix it is a 6 % larger round at 20°. A normal
+round's transverse section is an ellipse, and neither circle is it; this
+belongs with the helical conventions in `docs/state.md`'s ledger.
+
 ### What is recorded as not done
 
-- **A crossed pair's shift optimiser.** The search is the parallel mesh's; a
+- **The transverse round at a steep helix** — above.
+- ~~**A crossed pair's shift optimiser.**~~ Done, F85. The search is the parallel mesh's; a
   crossed objective would be the path-averaged friction balance over the rack
   law's distance, and the interference wall is already there to bound it. Not
   attempted; said, not silent.

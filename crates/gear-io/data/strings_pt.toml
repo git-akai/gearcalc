@@ -56,7 +56,6 @@ optimiser_found_nothing = "nada na faixa admissível pôde ser construído, port
 forward_locking = "não pode ser acionado no sentido direto: μ estático {friction} contra um limiar de {threshold}, portanto o primeiro membro não consegue girar o segundo"
 near_forward_locking = "próximo de não acionar no sentido direto: μ estático {friction} perto do limiar {threshold}, portanto acionar ou não depende de um coeficiente estimado"
 low_mesh_efficiency = "rendimento do engrenamento {percent} %: a maior parte da entrada torna-se calor, o que normalmente limita um estágio de sem-fim antes da tensão"
-optimiser_not_for_crossed = "o otimizador pesquisa um engrenamento de eixos paralelos, e os eixos deste par cruzam-se: os deslocamentos são o que as restrições implicam, e nenhuma pesquisa foi feita"
 planets_share_load_equally = "assume-se que {planets} planetas repartem a carga por igual; conjuntos reais não o fazem sem um elemento flutuante, e o remédio é um fator de repartição de carga que esta ferramenta se recusa a aplicar"
 planets_not_evenly_spaced = "{planets} planetas não podem ficar igualmente espaçados: a soma dos números de dentes da solar e da anular não é múltipla desse valor"
 planet_clearance_below_minimum = "planetas adjacentes afastam-se {gap} mm, abaixo dos {minimum} mm pedidos"

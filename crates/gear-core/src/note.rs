@@ -111,8 +111,6 @@ pub mod key {
     pub const STAGE_PLANETS_NOT_EVENLY_SPACED: &str = "stage.planets_not_evenly_spaced";
     /// `stage.planets_share_load_equally`
     pub const STAGE_PLANETS_SHARE_LOAD_EQUALLY: &str = "stage.planets_share_load_equally";
-    /// `stage.optimiser_not_for_crossed`
-    pub const STAGE_OPTIMISER_NOT_FOR_CROSSED: &str = "stage.optimiser_not_for_crossed";
     /// `stage.ring_addendum_clamped`
     pub const STAGE_RING_ADDENDUM_CLAMPED: &str = "stage.ring_addendum_clamped";
     /// `stage.self_locking`
@@ -249,7 +247,6 @@ pub mod key {
         STAGE_PLANET_CLEARANCE_BELOW_MINIMUM,
         STAGE_PLANETS_NOT_EVENLY_SPACED,
         STAGE_PLANETS_SHARE_LOAD_EQUALLY,
-        STAGE_OPTIMISER_NOT_FOR_CROSSED,
         STAGE_RING_ADDENDUM_CLAMPED,
         STAGE_SELF_LOCKING,
         STAGE_TRANSVERSE_CONTACT_RATIO_BELOW_ONE,

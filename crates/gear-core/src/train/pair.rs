@@ -727,34 +727,48 @@ impl PairStage {
         // whatever distance that happened to make. Mode 3 of the clearance
         // paradigm (`docs/reference.md#which-of-the-three-numbers-is-given-and-which-follows`) is the
         // rule: the distance and the clearance are given, so the shifts follow.
-        // **The optimiser is a parallel-axis search**: its trial mesh, its
-        // objective and its five refusals are the line-contact model's. A
-        // crossed pair asked to optimise gets what the constraints imply and a
-        // note saying the search does not reach it — not a search over the
-        // wrong mesh, and not silence.
-        if !self.optimisation.enabled || self.is_crossed() {
+        if !self.optimisation.enabled {
             return super::Chosen {
                 shifts: constrained().unwrap_or_else(|| asked.map(|a| a.settled)),
                 how: super::Searched::NotAsked,
             };
         }
-        crate::auto::shifts_for_efficiency(
-            &|x| [0, 1].map(|i| self.params_at(i, x[i])),
-            crate::mesh::MeshKind::External,
-            &crate::auto::Bounds {
-                floor,
-                min_contact_ratio: self.optimisation.min_contact_ratio,
-                // **The gap the designer nominated**, which is a number they
-                // stated even where the *reported* clearance is derived from a
-                // given distance. It is a guard on the trial mesh — the teeth
-                // must not bottom out — so what it wants is the intended gap,
-                // not whatever a candidate's shifts happen to leave.
-                clearance: self.clearance.manual,
-            },
-            &crate::auto::Pinned { shift: given, sum },
-            self.sliding_friction,
-            search,
-        )
+        let bounds = crate::auto::Bounds {
+            floor,
+            min_contact_ratio: self.optimisation.min_contact_ratio,
+            // **The gap the designer nominated**, which is a number they
+            // stated even where the *reported* clearance is derived from a
+            // given distance. It is a guard on the trial mesh — the teeth
+            // must not bottom out — so what it wants is the intended gap,
+            // not whatever a candidate's shifts happen to leave.
+            clearance: self.clearance.manual,
+        };
+        let pinned = crate::auto::Pinned { shift: given, sum };
+        let pair = |x: [f64; 2]| [0, 1].map(|i| self.params_at(i, x[i]));
+        // **One search, two meshes.** The floor, the pinning, the box and the
+        // descent are the same; what a candidate is worth is the mesh's own
+        // question — the loss integral along a line contact, the friction
+        // balance along a point's — and the two meet at the parallel limit as
+        // the meshes do.
+        if self.is_crossed() {
+            crate::auto::crossed_shifts_for_efficiency(
+                &pair,
+                &|x| self.screw_at(x).ok(),
+                &bounds,
+                &pinned,
+                self.sliding_friction,
+                search,
+            )
+        } else {
+            crate::auto::shifts_for_efficiency(
+                &pair,
+                crate::mesh::MeshKind::External,
+                &bounds,
+                &pinned,
+                self.sliding_friction,
+                search,
+            )
+        }
         // **Failing to optimise must not abandon a constraint.** The search has
         // its own conditions — a minimum contact ratio, a tool that leaves the
         // members alone — and where none of the candidates meets them it returns

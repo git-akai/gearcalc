@@ -51,7 +51,6 @@ optimiser_found_nothing = "可用範圍內沒有可建構的方案，因此變�
 forward_locking = "無法正向驅動：靜摩擦係數 μ {friction}，閾值為 {threshold}，因此第一構件根本無法帶動第二構件"
 near_forward_locking = "接近無法正向驅動：靜摩擦係數 μ {friction} 接近閾值 {threshold}，能否驅動因而取決於一個估算的係數"
 low_mesh_efficiency = "嚙合效率 {percent} %：大部分輸入功率變為熱量，蝸桿級通常因此受限，而非因應力受限"
-optimiser_not_for_crossed = "最佳化器搜尋的是平行軸嚙合，而這對齒輪的軸是交錯的：變位量為約束條件所決定，未進行搜尋"
 planets_share_load_equally = "假定 {planets} 個行星輪均分負荷；實际輪系若無浮動構件並不均分，其補償手段是本工具刻意不採用的嚙合負荷係數"
 planets_not_evenly_spaced = "{planets} 個行星輪無法均布：太陽輪與內齒輪的齒數之和不是其倍數"
 planet_clearance_below_minimum = "相鄰行星輪的間隙為 {gap} mm，低於所要求的 {minimum} mm"

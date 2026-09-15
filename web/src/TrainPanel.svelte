@@ -1522,11 +1522,10 @@
               {/if}
               {#if stage.shaft_angle === 0}
                 {@render loadSharing(stage)}
-                <!-- The optimiser searches a parallel-axis mesh, and says so
-                     in a note if asked of a crossed one; here it is simply
-                     not offered where it does not reach. -->
-                {@render efficiencyToggle(stage.optimisation)}
               {/if}
+              <!-- One search for either mesh: the loss integral along a line
+                   contact, the friction balance along a point's. -->
+              {@render efficiencyToggle(stage.optimisation)}
             </div>
 
             <div class="gears">
