@@ -3,11 +3,13 @@
 //!
 //! **Not a stage kind.** A worm stage and a crossed gear pair are one
 //! [`super::PairStage`] whose shafts are not parallel, and this is the mesh
-//! they share; the parallel mesh is [`super::pair`]'s. What a crossed pair has
-//! that a parallel one does not — two efficiencies, a sliding velocity, a
-//! contact patch that is an ellipse, backlash from an axial float — is the
-//! [`CrossedMesh`] this file fills in, and what it lacks is a bending rating,
-//! for the reason docs/reference.md#crossed-axes gives. Both members are
+//! they share; the parallel mesh is [`super::pair`]'s. It fills the same
+//! [`super::MeshReport`] a parallel mesh does — two efficiencies where the
+//! other has one number twice, a sliding at the pitch point where the other
+//! has zero, a patch that is an ellipse where the other's is a line, and the
+//! zone as the faces leave it in [`super::PointContact`] — and what it lacks
+//! is a bending rating, for the reason docs/reference.md#crossed-axes gives.
+//! Both members are
 //! ordinary [`super::GearResult`]s: a worm is a helical gear with a few starts
 //! at a steep helix, and everything a gear can be asked it can be asked.
 //!
@@ -65,8 +67,8 @@
 //! at `Σ = 0` is the degeneracy, not a seam in the code.
 
 use super::{
-    Backlash, GearResult, LoadCase, PairKind, PairMesh, PairResult, PairStage, StageTorques,
-    TrainError,
+    Backlash, ContactPatch, GearResult, LoadCase, MeshReport, PairKind, PairResult, PairStage,
+    PointContact, StageTorques, TrainError,
 };
 
 /// Quadrature points for the path-averaged friction balance.
@@ -149,154 +151,6 @@ pub mod proportions {
         let recommended = 2.0 * axial_module * (q + 1.0).sqrt();
         recommended.min(0.67 * worm_pitch_diameter)
     }
-}
-
-/// What a crossed-axis mesh reports — everything a point contact has that a
-/// line contact does not, beside what both have.
-///
-/// docs/reference.md#crossed-axes takes **both flanks as involute helicoids on
-/// cylinders**, and that is where the contact stress, the efficiency, the
-/// backlash and the zone all come from; a real worm's throated wheel makes the
-/// zone a floor rather than a wrong number ([`CrossedZone`]).
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct CrossedMesh {
-    /// Lead angle of each member, degrees — `90° − β`, the same fact as the
-    /// helix angle from the other datum. A worm is described by how far its
-    /// thread advances, a gear by how far its tooth leans; both are reported
-    /// because a crossed pair is entered either way.
-    pub lead_angles: [f64; 2],
-    /// The first member's lead, mm, and axial module, mm.
-    pub lead: f64,
-    pub axial_module: f64,
-    /// The zone of action as the face widths in use leave it — `None` where the
-    /// pair has no zone at all.
-    pub zone: Option<CrossedZone>,
-    /// Mesh efficiency in both drive directions.
-    ///
-    /// Unlike a parallel-axis stage these genuinely differ, and **either** can
-    /// be zero or negative — backward is what self-locking is, and forward is a
-    /// steep helix split that cannot drive at all.
-    /// [`Directional::locked`] reads them rather than a separate flag that could
-    /// disagree.
-    pub efficiency: Directional<f64>,
-    /// The coefficient of friction at which each direction stops driving.
-    ///
-    /// Negative where no friction locks the pair that way, which is the ordinary
-    /// case forwards: a worm you can turn is one whose forward threshold is
-    /// somewhere absurd or nowhere at all.
-    pub locking_friction: Directional<f64>,
-    /// What the same teeth would lose with their shafts brought **parallel**, as
-    /// an efficiency — `None` where the parallel pair cannot be built.
-    ///
-    /// Reported for comparison: crossing shafts adds sliding, so this is the
-    /// best the pair can be, and how far the crossed figure falls below it is
-    /// what the shaft angle costs.
-    ///
-    /// It was once a *check* — the crossed model omitted the profile sliding, so
-    /// beating this figure meant sliding had gone missing (docs/corrections.md). The friction
-    /// balance counts that sliding now, and the check has become worse than
-    /// useless: it is the **parallel** closed form that is approximate, first
-    /// order in `μ` where the balance is exact, so at a very small shaft angle
-    /// the crossed figure legitimately sits a hundredth of a point above and the
-    /// old test would accuse the better number.
-    pub parallel_axis_efficiency: Option<f64>,
-    /// Sliding speed at the pitch point as a multiple of the first member's
-    /// pitch line speed. The absolute figure needs a shaft speed, so the train
-    /// fills [`Self::sliding_velocity`] instead.
-    pub sliding_ratio: f64,
-    /// Sliding speed at the pitch point, mm/s. Filled in by the train.
-    pub sliding_velocity: f64,
-    /// The contact patch, in both load cases.
-    pub contact: LoadCase<PointContact>,
-    /// Angular backlash **per member**, degrees, at the three centre distances
-    /// — the same reading every mesh gives ([`super::MeshReport::backlash`]),
-    /// and here the worm's float is in it as well as the centre line.
-    pub backlash: [Backlash; 2],
-    /// Whether each member's flank is reached past its usable end by the other
-    /// member's tip ([`CrossedPath::flank_interference`]).
-    pub flank_interference: [bool; 2],
-    /// Whether the tooth counts are coprime.
-    pub coprime: bool,
-}
-
-/// The zone of action of a crossed pair.
-#[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct CrossedZone {
-    /// Tooth pairs in contact. **Below 1 the pair loses contact between one
-    /// pair and the next**, which is a failure of kind rather than of margin.
-    ///
-    /// A floor for a real worm drive: throating *wraps* the wheel around the
-    /// worm and engages more of the thread, which can only lengthen the zone, so
-    /// a worm that clears `ε = 1` here clears it as built. That is an argument
-    /// about the direction, not a computation, and it is said next to the
-    /// number.
-    pub contact_ratio: f64,
-    /// What ended the zone: the teeth, or the face they are cut on.
-    pub limited_by: ZoneLimit,
-    /// The face width at which `ε = 1`, per member, mm.
-    ///
-    /// A **geometric** minimum: it keeps contact continuous and says nothing
-    /// about stress. That is the opposite of the parallel stage's automatic
-    /// width, which inverts a stress, and the difference has to travel with the
-    /// number.
-    pub face_width_for_continuity: Option<[f64; 2]>,
-    /// How far the contact point runs along each member's own axis, mm — what a
-    /// face has to cover, and what a parallel pair does not have at all.
-    pub axial_travel: [f64; 2],
-}
-
-/// The contact patch a crossed mesh presses.
-#[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct PointContact {
-    /// Peak Hertzian pressure, MPa — **the** strength figure for this mesh.
-    ///
-    /// The worst of the points a rating is taken at: the pitch point, and the
-    /// two boundaries of single-pair contact where one tooth carries the whole
-    /// load. Rated at the pitch point *alone* this came out 0.7–2.2 % low.
-    ///
-    /// The relative radius peaks where the two roll lengths are equal and falls
-    /// away toward both ends of the zone, and the pitch point sits near that
-    /// peak — so it is close to the *least* severe place the mesh offers, not
-    /// the worst.
-    ///
-    /// The **ends** of the zone are 10–27 % worse than the pitch point, and the
-    /// rating deliberately does not use them: with `ε > 1` a second pair is in
-    /// contact there and the load is shared. Losing that sharing does push the
-    /// rating outward — but a face narrow enough to lose it has also cut the
-    /// zone's ends off, which pulls it back in, so the two effects nearly
-    /// cancel and the net is about a further 0.5 %.
-    pub max_pressure: f64,
-    /// What the pitch point alone would have said, MPa — the figure this
-    /// replaced, kept so the difference is visible rather than asserted.
-    pub at_pitch_point: f64,
-    /// Where the worst point sits on the path, mm from the pitch point.
-    pub worst_position: f64,
-    /// The patch, mm. An ellipse, not a line.
-    pub patch_length: f64,
-    pub patch_width: f64,
-    /// Relative curvature along the contact, 1/mm. Zero would mean line
-    /// contact; that it is not zero is what crossing the shafts did.
-    pub curvature_along: f64,
-    /// ...and across it.
-    pub curvature_across: f64,
 }
 
 /// Solve a pair whose shafts cross — a worm stage, or a crossed gear pair.
@@ -469,20 +323,38 @@ pub fn solve_crossed_pair(
     // One rating, and what changes about it is the load: a torque, the member it
     // is quoted on, and the direction that presses that flank. The closure knows
     // nothing about which case or which direction asked.
-    let rate = |torque: f64, on: MeshSide, drive: Drive| -> Result<PointContact, TrainError> {
-        let at_pitch = s
-            .contact(torque, on, stage.sliding_friction, drive, e_star)
-            .ok_or(TrainError::NoContact)?;
-        // The same force the patch above was pressed with, bounded by the line
-        // the teeth have — `Screw::contact` is the ellipse alone.
-        let pitch_pressure = crate::hertz::peak_pressure(
-            curvature_along,
-            curvature_across,
-            s.normal_force(torque, on, stage.sliding_friction, drive),
-            line_length,
-            e_star,
-        )
-        .ok_or(TrainError::NoContact)?;
+    let rate = |torque: f64, on: MeshSide, drive: Drive| -> Result<ContactPatch, TrainError> {
+        // **The patch is the governing model's.** `hertz::peak_pressure` is
+        // the larger of the ellipse and the line the teeth have, and the
+        // patch reported has to be the one that gave the number: a line of
+        // the face's length and the line's half-width where the line governs,
+        // the ellipse's two axes where it does. Reporting the ellipse's minor
+        // axis under the line's pressure gave a near-parallel pair a patch a
+        // quarter as wide as the line contact it was rated as.
+        let patch_at = |along: f64, across: f64, force: f64| -> Option<(f64, [f64; 2])> {
+            let line = crate::hertz::line_pressure(across, force, line_length, e_star);
+            let ellipse = crate::hertz::elliptical_contact(along, across, force, e_star);
+            let pressure = crate::hertz::peak_pressure(along, across, force, line_length, e_star)?;
+            Some(match ellipse {
+                Some(e) if e.max_pressure > line => (
+                    pressure,
+                    [
+                        (2.0 * e.semi_major()).min(line_length),
+                        2.0 * e.semi_minor(),
+                    ],
+                ),
+                _ => (
+                    pressure,
+                    [
+                        line_length,
+                        2.0 * crate::hertz::line_half_width(across, pressure, e_star),
+                    ],
+                ),
+            })
+        };
+        let force = s.normal_force(torque, on, stage.sliding_friction, drive);
+        let (pitch_pressure, pitch_patch) =
+            patch_at(curvature_along, curvature_across, force).ok_or(TrainError::NoContact)?;
         // **Rated along the path, not at the pitch point.** The relative radius
         // peaks where the two roll lengths are equal and falls toward both ends of
         // the zone; the pitch point sits near that peak, so rating there alone took
@@ -491,9 +363,11 @@ pub fn solve_crossed_pair(
         // where one tooth carries everything; beyond them the next pair has taken
         // up. Where `ε ≤ 1` those boundaries are the ends of the zone, so a face
         // too narrow raises this figure as well as costing continuity.
-        let mut patch = at_pitch;
         let mut max_pressure = pitch_pressure;
+        let mut patch = pitch_patch;
         let mut worst_position = 0.0;
+        // The curvatures travel with the worst point, as a line contact's do.
+        let mut curvatures = (curvature_along, curvature_across);
         if let Some(path) = path {
             for position in path.single_pair_bounds(&s) {
                 let contact = path.contact_at(&s, position);
@@ -507,35 +381,26 @@ pub fn solve_crossed_pair(
                 else {
                     continue;
                 };
-                let Some(here) = crate::hertz::elliptical_contact(along, across, force, e_star)
-                else {
-                    continue;
-                };
-                let Some(pressure) =
-                    crate::hertz::peak_pressure(along, across, force, line_length, e_star)
-                else {
+                let Some((pressure, here)) = patch_at(along, across, force) else {
                     continue;
                 };
                 if pressure > max_pressure {
-                    patch = here;
                     max_pressure = pressure;
+                    patch = here;
                     worst_position = position;
+                    curvatures = (along, across);
                 }
             }
         }
 
-        Ok(PointContact {
+        Ok(ContactPatch {
             max_pressure,
             at_pitch_point: pitch_pressure,
             worst_position,
-            // **The patch cannot be longer than the teeth it sits on.** The
-            // elastic solution is free to lengthen past the face, and reporting
-            // that length beside a face width it exceeds is a number no part
-            // has. Where the line governs, the length is the line's.
-            patch_length: (2.0 * patch.semi_major()).min(line_length),
-            patch_width: 2.0 * patch.semi_minor(),
-            curvature_along,
-            curvature_across,
+            patch_length: patch[0],
+            patch_width: patch[1],
+            curvature_along: curvatures.0,
+            curvature_across: curvatures.1,
         })
     };
 
@@ -634,27 +499,25 @@ pub fn solve_crossed_pair(
     // The zone as the widths in use actually leave it — one construction, asked
     // twice for different things, rather than two that can disagree about
     // where the teeth touch.
-    let zone = full_path.as_ref().map(|path| {
+    // No zone at all — the teeth never meet — is a contact ratio of zero,
+    // which the note below says as plainly as a short one.
+    let (contact_ratio, zone) = full_path.as_ref().map_or((0.0, None), |path| {
         let (zone, limited_by) = path
             .limited_by_face(&s, widths)
             .unwrap_or((*path, ZoneLimit::Face));
-        CrossedZone {
-            contact_ratio: zone.contact_ratio,
-            limited_by,
-            face_width_for_continuity: path.face_widths_for(&s, 1.0),
-            axial_travel: zone.axial_travel(&s),
-        }
+        (
+            zone.contact_ratio,
+            Some((
+                limited_by,
+                path.face_widths_for(&s, 1.0),
+                zone.axial_travel(&s),
+            )),
+        )
     });
-    if let Some(zone) = zone {
-        if zone.contact_ratio < 1.0 {
-            notes.push(
-                Note::new(key::STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE).number(
-                    "ratio",
-                    zone.contact_ratio,
-                    3,
-                ),
-            );
-        }
+    if contact_ratio < 1.0 {
+        notes.push(
+            Note::new(key::STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE).number("ratio", contact_ratio, 3),
+        );
     }
     // Interference is asked of the flanks whether or not there is a zone: a
     // pair with no zone and a tip inside a base cylinder is fouling, not idle.
@@ -673,6 +536,9 @@ pub fn solve_crossed_pair(
             sizing: Auto::fixed(super::FirstMemberSizing::AdditionalHelix(
                 stage.helix_angles()[0],
             )),
+            // A comparison, not a design: the optimiser is not run on the
+            // counterpart, whatever the stage asked of its own mesh.
+            optimisation: super::Optimisation::default(),
             ..stage.clone()
         },
         kind,
@@ -680,7 +546,7 @@ pub fn solve_crossed_pair(
         lib,
     )
     .ok()
-    .map(|r| r.mesh.efficiency().forward);
+    .map(|r| r.mesh.efficiency.forward);
 
     let mut gears = Vec::with_capacity(2);
     let member_torque = [input_torque, output_torque];
@@ -771,24 +637,27 @@ pub fn solve_crossed_pair(
         // As on a parallel stage: the running distance less the geometric
         // one, rather than the input read back.
         clearance: centre - s.centre_distance,
-        mesh: PairMesh::Point(CrossedMesh {
-            lead_angles: [
-                s.lead_angle_rad.to_degrees(),
-                s.wheel_lead_angle_rad.to_degrees(),
-            ],
-            lead: s.lead,
-            axial_module: s.axial_module,
-            zone,
+        mesh: MeshReport {
+            coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
+            contact_ratio,
             efficiency,
             locking_friction: threshold,
-            parallel_axis_efficiency: parallel,
             sliding_ratio: s.sliding_ratio,
             sliding_velocity: 0.0,
             contact,
             backlash,
             flank_interference,
-            coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
-        }),
+            // Both members external: the tips meet on the line of action or
+            // not at all.
+            tips: None,
+            line: None,
+            point: Some(PointContact {
+                limited_by: zone.map_or(ZoneLimit::Face, |z| z.0),
+                face_width_for_continuity: zone.and_then(|z| z.1),
+                axial_travel: zone.map_or([0.0; 2], |z| z.2),
+                parallel_axis_efficiency: parallel,
+            }),
+        },
         gears: [gears[0].clone(), gears[1].clone()],
         notes,
     })
@@ -898,11 +767,14 @@ mod tests {
         stage
     }
 
-    /// The point-contact mesh a solved pair reports.
-    fn point(r: &PairResult) -> &CrossedMesh {
-        r.mesh
-            .as_point()
-            .expect("a crossed pair reports a point contact")
+    /// The mesh a solved pair reports, checked to be the point contact a
+    /// crossed pair has.
+    fn point(r: &PairResult) -> &MeshReport {
+        assert!(
+            r.mesh.point.is_some() && r.mesh.line.is_none(),
+            "a crossed pair reports a point contact"
+        );
+        &r.mesh
     }
 
     fn solved(stage: &PairStage) -> PairResult {
@@ -1190,9 +1062,9 @@ mod tests {
     fn a_worm_stage_reports_contact_and_two_efficiencies_and_no_bending() {
         let r = solved(&PairStage::worm());
         assert!((r.ratio - 40.0).abs() < 1e-12);
-        assert!(r.mesh.efficiency().forward > 0.0 && r.mesh.efficiency().forward < 1.0);
+        assert!(r.mesh.efficiency.forward > 0.0 && r.mesh.efficiency.forward < 1.0);
         assert!(
-            r.mesh.efficiency().backward < r.mesh.efficiency().forward,
+            r.mesh.efficiency.backward < r.mesh.efficiency.forward,
             "back-driving is the worse direction"
         );
         assert!(
@@ -1210,7 +1082,7 @@ mod tests {
             point(&r).contact.peak.patch_width
         );
         // Torque follows the ratio and the operative efficiency.
-        let expected = 2.0 * r.ratio * r.mesh.efficiency().forward;
+        let expected = 2.0 * r.ratio * r.mesh.efficiency.forward;
         assert!((r.gears[1].torque - expected).abs() < 1e-12 * expected);
     }
 
@@ -1349,7 +1221,7 @@ mod tests {
         assert!(as_worm.gears[1].recommended_face_width.is_some());
         // The gear pair's automatic face is continuity's.
         let continuity = point(&as_gears)
-            .zone
+            .point
             .unwrap()
             .face_width_for_continuity
             .unwrap();
@@ -1389,16 +1261,17 @@ mod tests {
         // Automatic: the width for ε = 1, and the ratio comes back as 1.
         let auto =
             solve_crossed(&stage(Auto::automatic(0.0)), StageTorques::just(2.0), &lib).unwrap();
-        let m = point(&auto)
-            .zone
-            .expect("a crossed pair has a path of contact");
+        let m = point(&auto);
         assert!(
             (m.contact_ratio - 1.0).abs() < 1e-9,
             "automatic should buy exactly continuous contact, got {}",
             m.contact_ratio
         );
-        assert_eq!(m.limited_by, ZoneLimit::Face);
-        let sized = m.face_width_for_continuity.expect("a width for continuity");
+        let zone = m.point.expect("a crossed pair has a path of contact");
+        assert_eq!(zone.limited_by, ZoneLimit::Face);
+        let sized = zone
+            .face_width_for_continuity
+            .expect("a width for continuity");
         for (i, (member, want)) in auto.gears.iter().zip(sized).enumerate() {
             assert!(
                 (member.face_width - want).abs() < 1e-9,
@@ -1418,7 +1291,7 @@ mod tests {
             &lib,
         )
         .unwrap();
-        let n = point(&narrow).zone.unwrap();
+        let n = point(&narrow);
         assert!(
             n.contact_ratio < 0.5 && n.contact_ratio > 0.45,
             "half the face should leave a little under half the contact: {}",
@@ -1434,7 +1307,7 @@ mod tests {
         let centred =
             solve_crossed(&tight(Auto::automatic(0.0)), StageTorques::just(2.0), &lib).unwrap();
         let width = point(&centred)
-            .zone
+            .point
             .expect("a path")
             .face_width_for_continuity
             .expect("a width for continuity");
@@ -1445,7 +1318,7 @@ mod tests {
         )
         .unwrap();
         assert!(
-            (point(&halved).zone.unwrap().contact_ratio - 0.5).abs() < 1e-9,
+            (point(&halved).contact_ratio - 0.5).abs() < 1e-9,
             "with the contact centred, half the face is exactly half the contact"
         );
         assert!(
@@ -1459,12 +1332,12 @@ mod tests {
 
         // Generous, and the teeth are what end it — a wider face buys nothing.
         let wide = solve_crossed(&stage(Auto::fixed(60.0)), StageTorques::just(2.0), &lib).unwrap();
-        let w = point(&wide).zone.unwrap();
-        assert_eq!(w.limited_by, ZoneLimit::Tips);
+        let w = point(&wide);
+        assert_eq!(w.point.unwrap().limited_by, ZoneLimit::Tips);
         assert!(w.contact_ratio > m.contact_ratio);
         let wider =
             solve_crossed(&stage(Auto::fixed(120.0)), StageTorques::just(2.0), &lib).unwrap();
-        assert!((point(&wider).zone.unwrap().contact_ratio - w.contact_ratio).abs() < 1e-12);
+        assert!((point(&wider).contact_ratio - w.contact_ratio).abs() < 1e-12);
     }
 
     /// **A worm stage reports the same path, from its own teeth, and keeps its
@@ -1483,19 +1356,19 @@ mod tests {
     #[test]
     fn a_worm_drive_reports_the_path_from_its_own_teeth_and_keeps_its_proportions() {
         let r = solved(&PairStage::worm());
-        let m = point(&r).zone.expect("the same construction serves a worm");
+        let m = point(&r);
         assert!(m.contact_ratio > 0.0);
         // The proportions still size the face; continuity is reported beside
         // them rather than instead of them.
         assert!(r.gears[0].recommended_face_width.is_some());
-        assert!(m.face_width_for_continuity.is_some());
+        assert!(m.point.unwrap().face_width_for_continuity.is_some());
 
         // The tips are the teeth's: a taller worm thread lengthens the zone.
         let taller = solved(&member(PairStage::worm(), 0, |g| g.addendum = 1.2));
         assert!(
-            point(&taller).zone.unwrap().contact_ratio > m.contact_ratio,
+            point(&taller).contact_ratio > m.contact_ratio,
             "a taller addendum must reach further: {} against {}",
-            point(&taller).zone.unwrap().contact_ratio,
+            point(&taller).contact_ratio,
             m.contact_ratio
         );
     }
@@ -1541,12 +1414,12 @@ mod tests {
             point(&wide).contact.peak.max_pressure >= point(&wide).contact.peak.at_pitch_point,
             "the path cannot be kinder than its gentlest point"
         );
-        assert!(point(&wide).zone.unwrap().contact_ratio > 1.0);
+        assert!(point(&wide).contact_ratio > 1.0);
 
         // Squeeze it: ε falls below 1, load sharing goes, and the same mesh at
         // the same torque rates higher.
         let narrow = solve_crossed(&crossed(0.8), StageTorques::just(2.0), &lib).unwrap();
-        assert!(point(&narrow).zone.unwrap().contact_ratio < 1.0);
+        assert!(point(&narrow).contact_ratio < 1.0);
         assert!(
             point(&narrow).contact.peak.max_pressure > point(&wide).contact.peak.max_pressure,
             "losing contact continuity should cost stress, not save it: {} against {}",
@@ -1606,16 +1479,16 @@ mod tests {
             },
         ] {
             let r = solve_worm(&stage, StageTorques::just(2.0), &lib).unwrap();
-            let classical = point(&r).zone.map(|_| ()).map(|()| {
+            let classical = point(&r).point.map(|_| ()).map(|()| {
                 let s = stage.geometry().unwrap();
                 Directional::of(|d| s.efficiency(stage.sliding_friction, d))
             });
             let classical = classical.expect("a screw geometry");
             for drive in Drive::BOTH {
                 assert!(
-                    r.mesh.efficiency().get(drive) <= classical.get(drive),
+                    r.mesh.efficiency.get(drive) <= classical.get(drive),
                     "{drive:?}: the path average {} should not beat the pitch point {}",
-                    r.mesh.efficiency().get(drive),
+                    r.mesh.efficiency.get(drive),
                     classical.get(drive)
                 );
             }
@@ -1626,8 +1499,8 @@ mod tests {
                     <= stage.geometry().unwrap().locking_friction().backward
             );
             assert_eq!(
-                r.mesh.efficiency().locked().backward,
-                r.mesh.efficiency().backward <= 0.0,
+                r.mesh.efficiency.locked().backward,
+                r.mesh.efficiency.backward <= 0.0,
                 "self-locking is what the reported figure says, not a second opinion"
             );
         }
@@ -1651,9 +1524,9 @@ mod tests {
             ..PairStage::default()
         };
         let r = solve_crossed(&crossed, StageTorques::just(2.0), &lib).unwrap();
-        point(&r).zone.expect("a path");
+        point(&r).point.expect("a path");
         assert!(
-            r.mesh.efficiency().forward < point(&r).parallel_axis_efficiency.unwrap(),
+            r.mesh.efficiency.forward < point(&r).point.unwrap().parallel_axis_efficiency.unwrap(),
             "a crossed pair must still lose more than the same teeth parallel"
         );
     }
@@ -1702,7 +1575,7 @@ mod tests {
         let mut previous = 1.0;
         for sigma in [0.5f64, 2.0, 10.0, 45.0, 90.0] {
             let r = solve_crossed(&stage(sigma), StageTorques::just(2.0), &lib).unwrap();
-            let mesh = point(&r).zone.expect("a path");
+            let mesh = point(&r).point.expect("a path");
             assert_eq!(
                 mesh.limited_by,
                 ZoneLimit::Tips,
@@ -1710,21 +1583,23 @@ mod tests {
                  like-for-like comparison"
             );
             let parallel = point(&r)
+                .point
+                .unwrap()
                 .parallel_axis_efficiency
                 .expect("a parallel counterpart");
             assert!(
-                r.mesh.efficiency().forward < previous,
+                r.mesh.efficiency.forward < previous,
                 "Σ={sigma}°: turning the shafts further must cost more"
             );
-            previous = r.mesh.efficiency().forward;
+            previous = r.mesh.efficiency.forward;
 
             // Below the parallel figure everywhere the difference is physical,
             // and above it by no more than that formula's own linearisation
             // where the two are the same mesh.
             assert!(
-                r.mesh.efficiency().forward < parallel + 2e-4,
+                r.mesh.efficiency.forward < parallel + 2e-4,
                 "Σ={sigma}°: {} against the parallel {parallel}",
-                r.mesh.efficiency().forward
+                r.mesh.efficiency.forward
             );
         }
 
@@ -1733,12 +1608,14 @@ mod tests {
         // angle costs a single-start worm most of what it had.
         let worm = solved(&PairStage::worm());
         let parallel = point(&worm)
+            .point
+            .unwrap()
             .parallel_axis_efficiency
             .expect("a one-start helical gear on parallel shafts is buildable");
         assert!(
-            worm.mesh.efficiency().forward < parallel,
+            worm.mesh.efficiency.forward < parallel,
             "the worm keeps {} against {parallel} with its shafts parallel",
-            worm.mesh.efficiency().forward
+            worm.mesh.efficiency.forward
         );
     }
 
@@ -1752,7 +1629,7 @@ mod tests {
             sliding_friction: 0.06,
             ..PairStage::worm()
         });
-        assert!(r.mesh.efficiency().locked().backward);
+        assert!(r.mesh.efficiency.locked().backward);
         assert!(
             r.notes
                 .iter()
@@ -1958,15 +1835,11 @@ mod tests {
         for (name, x, y) in [
             ("ratio", a.ratio, b.ratio),
             ("centre distance", a.centre_distance, b.centre_distance),
-            (
-                "lead angle",
-                point(&a).lead_angles[0],
-                point(&b).lead_angles[0],
-            ),
+            ("lead angle", a.gears[0].lead_angle, b.gears[0].lead_angle),
             (
                 "efficiency",
-                a.mesh.efficiency().forward,
-                b.mesh.efficiency().forward,
+                a.mesh.efficiency.forward,
+                b.mesh.efficiency.forward,
             ),
             (
                 "contact",
@@ -2271,25 +2144,25 @@ mod tests {
         //    sliding one — the static coefficient changes nothing but the sign
         //    it was consulted for.
         let free = solved(&stage(0.06, threshold * 0.5));
-        assert!(free.mesh.efficiency().backward > 0.0);
+        assert!(free.mesh.efficiency.backward > 0.0);
         let alone = solved(&stage(0.06, 0.06));
         assert!(
-            (free.mesh.efficiency().backward - alone.mesh.efficiency().backward).abs() < 1e-12,
+            (free.mesh.efficiency.backward - alone.mesh.efficiency.backward).abs() < 1e-12,
             "the static coefficient must not leak into the number: {} against {}",
-            free.mesh.efficiency().backward,
-            alone.mesh.efficiency().backward
+            free.mesh.efficiency.backward,
+            alone.mesh.efficiency.backward
         );
 
         // 2. Static above it, sliding below: it never starts, so **zero** — not
         //    the sliding figure, which describes a motion that does not happen.
         let stuck = solved(&stage(0.06, threshold * 1.2));
-        assert_eq!(stuck.mesh.efficiency().backward, 0.0);
+        assert_eq!(stuck.mesh.efficiency.backward, 0.0);
         assert!(
-            stuck.mesh.efficiency().forward > 0.0,
+            stuck.mesh.efficiency.forward > 0.0,
             "forward is unaffected: it is not the direction near the threshold"
         );
         assert!(
-            (stuck.mesh.efficiency().forward - alone.mesh.efficiency().forward).abs() < 1e-12,
+            (stuck.mesh.efficiency.forward - alone.mesh.efficiency.forward).abs() < 1e-12,
             "and forward runs on the sliding coefficient like anything else"
         );
 
@@ -2297,7 +2170,7 @@ mod tests {
         assert_eq!(
             solved(&stage(threshold * 1.2, threshold * 1.2))
                 .mesh
-                .efficiency()
+                .efficiency
                 .backward,
             0.0
         );
@@ -2348,24 +2221,23 @@ mod tests {
             )
             .expect("a stage");
             assert_eq!(
-                r.mesh.efficiency().forward.to_bits(),
-                reference.mesh.efficiency().forward.to_bits(),
+                r.mesh.efficiency.forward.to_bits(),
+                reference.mesh.efficiency.forward.to_bits(),
                 "static μ {statik} moved a parallel stage"
             );
             assert_eq!(
-                r.mesh.efficiency().backward.to_bits(),
-                reference.mesh.efficiency().backward.to_bits()
+                r.mesh.efficiency.backward.to_bits(),
+                reference.mesh.efficiency.backward.to_bits()
             );
         }
     }
 
     /// **A worm stage is rated where it runs, too.**
     ///
-    /// The crossed path above reaches the operating centre distance through
-    /// `solve_crossed_stage`, which overrides it; a plain worm stage reaches it
-    /// through `solve_worm_stage` itself, and that is a second call site with a
-    /// second chance to be left on the nominal. Gated separately for exactly
-    /// that reason — reverting either one alone must fail something.
+    /// The crossed path above reached the operating centre distance through
+    /// one call site and a plain worm stage through another, each with its own
+    /// chance to be left on the nominal; they are one solve now, and this stays
+    /// as the gate on the worm preset's own path.
     ///
     /// Asserted as a direction, not a figure: opening the centre distance
     /// separates the base cylinders along the line of action, which can only
@@ -2387,8 +2259,8 @@ mod tests {
         let mut previous: Option<(f64, f64)> = None;
         for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
             let r = solved(&stage(clearance));
-            let eps = point(&r).zone.expect("a path of contact").contact_ratio;
-            let eta = r.mesh.efficiency().forward;
+            let eps = point(&r).contact_ratio;
+            let eta = r.mesh.efficiency.forward;
             if let Some((was_eps, was_eta)) = previous {
                 assert!(
                     eps < was_eps,
@@ -2447,21 +2319,17 @@ mod tests {
             solve_crossed(&stage(sigma, clearance), StageTorques::just(2.0), &lib)
                 .expect("a crossed pair")
                 .mesh
-                .as_point()
-                .expect("a point contact")
-                .zone
-                .expect("a path of contact")
         };
 
         // At a right angle the same clearance costs almost nothing...
         let square = mesh(90.0, 0.02);
-        assert_eq!(square.limited_by, ZoneLimit::Tips);
+        assert_eq!(square.point.unwrap().limited_by, ZoneLimit::Tips);
         assert!(square.contact_ratio > 1.5);
 
         // ...and near the parallel limit it takes the mesh apart.
         let near = mesh(0.5, 0.02);
         assert_eq!(
-            near.limited_by,
+            near.point.unwrap().limited_by,
             ZoneLimit::Face,
             "the contact should have slid past the face"
         );
@@ -2474,7 +2342,7 @@ mod tests {
         // The clearance is the whole of it: take it away and the same teeth on
         // the same face are tip-limited again, with contact to spare.
         let centred = mesh(0.5, 0.0);
-        assert_eq!(centred.limited_by, ZoneLimit::Tips);
+        assert_eq!(centred.point.unwrap().limited_by, ZoneLimit::Tips);
         assert!(
             centred.contact_ratio > 1.5 * near.contact_ratio,
             "{} against {}",
@@ -2513,9 +2381,9 @@ mod tests {
         )
         .unwrap();
         assert!((r.ratio - 23.0 / 17.0).abs() < 1e-12);
-        assert!(r.mesh.efficiency().forward > 0.0 && r.mesh.efficiency().forward < 1.0);
+        assert!(r.mesh.efficiency.forward > 0.0 && r.mesh.efficiency.forward < 1.0);
         assert!(point(&r).contact.peak.max_pressure > 0.0);
-        assert!(!r.mesh.efficiency().locked().backward);
+        assert!(!r.mesh.efficiency.locked().backward);
 
         // **Where a crossed pair sits, stated as comparisons rather than a
         // threshold.** It slides hard at the pitch point — `1/cos γ₁`, which is
@@ -2534,15 +2402,15 @@ mod tests {
         )
         .unwrap();
         assert!(
-            r.mesh.efficiency().forward > worm.mesh.efficiency().forward,
+            r.mesh.efficiency.forward > worm.mesh.efficiency.forward,
             "a crossed gear pair should beat a worm: {} vs {}",
-            r.mesh.efficiency().forward,
-            worm.mesh.efficiency().forward
+            r.mesh.efficiency.forward,
+            worm.mesh.efficiency.forward
         );
         assert!(
-            r.mesh.efficiency().forward < 0.95,
+            r.mesh.efficiency.forward < 0.95,
             "...but it slides too much to approach a parallel-axis mesh: {}",
-            r.mesh.efficiency().forward
+            r.mesh.efficiency.forward
         );
 
         // ...and more shaft angle means more sliding means less efficiency.
@@ -2560,7 +2428,7 @@ mod tests {
             )
             .unwrap()
             .mesh
-            .efficiency()
+            .efficiency
             .forward;
             assert!(
                 e < previous,

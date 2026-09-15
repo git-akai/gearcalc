@@ -316,7 +316,7 @@ pub struct HulaResult {
     /// **The minimum far-side clearance the stage was held to**, zero where the
     /// crank offset was given instead and the input went unread — the same
     /// question every stage answers about its own clearance (see
-    /// [`super::PairStage::clearance_taken`]).
+    /// [`super::PairResult::clearance`]).
     pub clearance: f64,
     /// The offset actually run at, including the running clearance.
     pub offset: f64,
@@ -1212,13 +1212,7 @@ pub fn solve_hula_stage_at(
             })
         };
         meshes.push(HulaMesh {
-            report: MeshReport {
-                // The pinion is member 1 and the ring member 2, which is the
-                // order every internal mesh here is built in.
-                flank_interference: p
-                    .mesh
-                    .flank_interference([p.pinion.flank_ends(), p.ring.flank_ends()]),
-                operating_pressure_angle: layout.alpha_w[index].to_degrees(),
+            report: super::line_mesh_report(super::LineMesh {
                 coprime: super::gcd(teeth.0[pair.ring], teeth.0[pair.pinion]) == 1,
                 // **The contact ratio the stage optimises against is the one it
                 // reports.** The pair's own report gives the same number by a
@@ -1230,23 +1224,28 @@ pub fn solve_hula_stage_at(
                     stage.helix_angle,
                     stage.module[index],
                 ),
+                operating_pressure_angle: layout.alpha_w[index].to_degrees(),
                 // The sliding figure of the pair the fixed-carrier product is
                 // taken from, rather than a second run of the same integral: one
                 // number, read twice, so a mesh row and the stage's own
                 // efficiency cannot disagree about what this pair loses.
                 efficiency: Directional::of(|d| p.efficiency.get(d).0),
-                contact_stress_at_pitch_point: LoadCase::of(|c| {
-                    cs.at_pitch_point * scale.get(c).sqrt()
+                contact: LoadCase::of(|c| {
+                    super::ContactPatch::line(&cs, *scale.get(c), effective, e_star)
                 }),
-                relative_radius: cs.relative_radius,
                 backlash: [backlash_of(MeshSide::First), backlash_of(MeshSide::Second)],
+                // The pinion is member 1 and the ring member 2, which is the
+                // order every internal mesh here is built in.
+                flank_interference: p
+                    .mesh
+                    .flank_interference([p.pinion.flank_ends(), p.ring.flank_ends()]),
                 // Every mesh of a hula stage is internal, and the three
                 // questions that go with that are the mesh's rather than this
                 // kind's — they were four fields of `HulaMesh`'s own until an
                 // epicyclic set turned out to have the same mesh in it and to
                 // be reporting nothing.
                 tips: p.tips,
-            },
+            }),
             clearance: layout.clearance[index],
             clearance_as_cut: p.ring.ra - p.pinion.ra + offset,
         });
@@ -1512,7 +1511,8 @@ mod tests {
     /// `HulaStage::offset` says a given number "is the distance to run at",
     /// which is what a given centre distance is on every other kind — where the
     /// zero-backlash geometry is derived by taking the absorbed clearance back
-    /// out of it (`PairStage`'s `manual - clearance_taken()`).
+    /// out of it (`PairStage::nominal_distance`, the typed distance less the
+    /// clearance it is opened by).
     ///
     /// This one handed the given number straight to the solve, which made it the
     /// *nominal* offset instead, and the running clearance was then added on
@@ -1908,8 +1908,8 @@ mod tests {
             let r = solve(&s, 1000.0)
                 .unwrap_or_else(|e| panic!("m {ratio}: the table's row must solve: {e}"));
             let angles = [
-                r.meshes[0].report.operating_pressure_angle,
-                r.meshes[1].report.operating_pressure_angle,
+                r.meshes[0].report.line.unwrap().operating_pressure_angle,
+                r.meshes[1].report.line.unwrap().operating_pressure_angle,
             ];
             assert!(
                 (r.offset_nominal - offset).abs() < 0.0005
@@ -1985,7 +1985,7 @@ mod tests {
             // The involute interference the table names is the pinion's flank
             // reached past its end by the ring's tip, on either mesh.
             let got_fouls = r.meshes.iter().any(|m| m.report.flank_interference[0]);
-            let got_eps = r.meshes[0].report.contact_ratios.transverse;
+            let got_eps = r.meshes[0].report.line.unwrap().contact_ratios.transverse;
             let got_keeps = r.efficiency.forward * 100.0;
             assert!(
                 got_fouls == fouls,
@@ -2029,7 +2029,7 @@ mod tests {
                 "d {d}: the table says {reduction}, this gives {}",
                 on.ratio
             );
-            let aw = on.meshes[0].report.operating_pressure_angle;
+            let aw = on.meshes[0].report.line.unwrap().operating_pressure_angle;
             let pk = on.meshes[0].report.efficiency.forward * 100.0;
             assert!(
                 (aw - alpha_w).abs() < 0.05 && (pk - pair_keeps).abs() < 0.0005,
@@ -2048,7 +2048,7 @@ mod tests {
             // **The two pairs land at the same operating angle** — the physical
             // claim the prose makes, and the one that makes equal modules cost
             // nothing.
-            let twin = on.meshes[1].report.operating_pressure_angle;
+            let twin = on.meshes[1].report.line.unwrap().operating_pressure_angle;
             assert!(
                 (aw - twin).abs() < 0.005,
                 "d {d}: the two meshes should sit at one angle: {aw:.2}° and {twin:.2}°"
@@ -2472,9 +2472,9 @@ mod tests {
         );
         for mesh in &r.meshes {
             assert!(
-                mesh.report.contact_ratios.transverse > 1.0,
+                mesh.report.line.unwrap().contact_ratios.transverse > 1.0,
                 "and the pair carries its load continuously: {}",
-                mesh.report.contact_ratios.transverse
+                mesh.report.line.unwrap().contact_ratios.transverse
             );
         }
     }
@@ -2708,8 +2708,10 @@ mod tests {
             (
                 r.meshes[0]
                     .report
+                    .line
+                    .unwrap()
                     .operating_pressure_angle
-                    .max(r.meshes[1].report.operating_pressure_angle),
+                    .max(r.meshes[1].report.line.unwrap().operating_pressure_angle),
                 r.offset_nominal,
             )
         };
@@ -2781,20 +2783,20 @@ mod tests {
         };
         let (lo, hi) = (at(0.0), at(0.4));
         assert!(
-            (lo.meshes[0].report.operating_pressure_angle
-                - hi.meshes[0].report.operating_pressure_angle)
+            (lo.meshes[0].report.line.unwrap().operating_pressure_angle
+                - hi.meshes[0].report.line.unwrap().operating_pressure_angle)
                 .abs()
                 < 1e-9,
             "the crank fixes each pair's sum, so mesh 0's angle should not move either"
         );
         for field in [
             (
-                lo.meshes[1].report.operating_pressure_angle,
-                hi.meshes[1].report.operating_pressure_angle,
+                lo.meshes[1].report.line.unwrap().operating_pressure_angle,
+                hi.meshes[1].report.line.unwrap().operating_pressure_angle,
             ),
             (
-                lo.meshes[1].report.contact_ratios.transverse,
-                hi.meshes[1].report.contact_ratios.transverse,
+                lo.meshes[1].report.line.unwrap().contact_ratios.transverse,
+                hi.meshes[1].report.line.unwrap().contact_ratios.transverse,
             ),
             (
                 lo.gears[2].gear.profile_shift,

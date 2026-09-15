@@ -8,7 +8,7 @@ means one thing in one module and the other thing in the next — and this proje
 had four, plus eight angles that stated no unit at all.
 
 It is not a hypothetical. `Screw::least_distance_lead_angle` was written taking a
-shaft angle in radians, `WormStage::shaft_angle` holds degrees, and the call site
+shaft angle in radians, the stage's `shaft_angle` holds degrees, and the call site
 read correctly to its author and was wrong. The field was *documented*; the
 documentation is not what a reader checks. So the name carries it now, and this
 keeps that true.

@@ -6,13 +6,12 @@
 //!
 //! **A kind is a layer, not a model.** The spur, helical, crossed and worm
 //! stages are one [`PairStage`] under two names — [`Stage::Spur`] and
-//! [`Stage::Worm`] — and produce one [`PairResult`]. What differs between a
-//! line contact and a point contact is real and is the *mesh*: a parallel pair
-//! has a bending rating and one efficiency, a crossed pair a contact ratio
-//! along its line of action and two. So the result carries one of two
-//! [`PairMesh`]es rather than four `Option`s and a comment apologising for
-//! each, and everything a mesh has in common — efficiency, backlash, the
-//! flank interference verdict — is read off the mesh without asking which.
+//! [`Stage::Worm`] — and produce one [`PairResult`]. And a line contact and a
+//! point contact are one [`MeshReport`]: the physics is one model with the
+//! shaft angle as a parameter — one Hertz answer, one friction balance, one
+//! backlash projection, one interference relation, each holding at the limit
+//! — so the report is one shape with the numbers moving, and what only one of
+//! the two has is the little in [`LineContact`] and [`PointContact`].
 //!
 //! # What is state and what is not
 //!
@@ -40,7 +39,7 @@ mod hula;
 mod pair;
 mod planetary;
 
-pub use crossed::{solve_crossed_pair, CrossedMesh, CrossedZone, PointContact};
+pub use crossed::solve_crossed_pair;
 pub use hula::{
     solve_hula_stage, solve_hula_stage_with, stage_efficiency, HulaGear, HulaMesh, HulaResult,
     HulaStage,
@@ -137,18 +136,28 @@ impl Backlash {
     }
 }
 
-/// **What one parallel-axis mesh reports**, for any stage kind that has more
-/// than one of them.
+/// **What one mesh reports**, whatever stage it is in and whichever way its
+/// shafts run.
 ///
-/// A stage with a single mesh puts these on its own result, because there is no
-/// ambiguity about whose they are; a stage with two has to say which mesh each
-/// belongs to, and both of them were saying it in the same six fields. The
-/// planetary set's `sun_planet`/`planet_ring` and the hula stage's two pairs are
-/// the same report, so it is one type.
+/// One type, because the physics is one model with the shaft angle as a
+/// parameter and not two models: the Hertz answer is general contact of which a
+/// line is the degenerate value ([`crate::hertz::peak_pressure`]), the
+/// efficiency is one friction balance the parallel loss integral is the limit
+/// of, the backlash is one gap projected onto one normal, and the interference
+/// verdict is one relation asked in the transverse plane or along the line —
+/// each of which a test holds at the limit. So a designer turning a shaft
+/// angle from zero sees the same rows with the numbers moving, not a readout
+/// changing shape. What a line contact has that a point does not, and the other
+/// way, is the little in [`LineContact`] and [`PointContact`]: the transverse
+/// decomposition of the contact ratio and the operating angle on one side; the
+/// face-limited zone and the parallel counterpart on the other. Bending is
+/// the members' and stays on [`GearResult`], `None` on a point contact for the
+/// reason `docs/rationale.md#a-worm-stage-reports-no-bending-stress` gives.
 ///
-/// A crossed pair has none of this — its line of action slides rather than
-/// turning, so there is no operating pressure angle and no contact ratio to
-/// report (docs/reference.md#crossed-axes).
+/// A set's `sun_planet`/`planet_ring` and a hula stage's two pairs are the
+/// same report, which is why it is one type; a pair's one mesh is on its own
+/// result. This used to be the parallel-axis report only, with a crossed pair's
+/// in a type of its own beside it and an enum choosing between them.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -157,30 +166,59 @@ impl Backlash {
     ts(export, export_to = "core/")
 )]
 pub struct MeshReport {
-    /// Transverse operating pressure angle `α_w`, degrees — the zero-backlash
-    /// pair's, which the profile shifts set.
-    pub operating_pressure_angle: f64,
     /// Whether the two members' tooth counts share no factor — a hunting pair,
     /// which spreads wear evenly instead of repeatedly bringing the same two
     /// teeth together.
     ///
     /// A property of a *mesh*, which is why it is here: a pair reports one
-    /// (its one mesh being the stage), and a set with
-    /// two meshes has two answers. An epicyclic set's separate question — each
-    /// central member against the *planet count* — is a different check with a
-    /// different reason, and it stays where it is.
+    /// (its one mesh being the stage), and a set with two meshes has two
+    /// answers. An epicyclic set's separate question — each central member
+    /// against the *planet count* — is a different check with a different
+    /// reason, and it stays where it is.
     pub coprime: bool,
-    pub contact_ratios: ContactRatios,
-    /// Mesh efficiency, both drive senses. Equal for a parallel-axis pair, and
-    /// arrived at rather than copied.
-    pub efficiency: Directional<f64>,
-    /// Hertzian contact stress at the pitch point, MPa, in both load cases.
+    /// **Tooth pairs sharing the load.** A line contact's total, `ε_α + ε_β`;
+    /// a point contact's along its line of action, the zone over the normal
+    /// base pitch, as the face widths in use leave it. Below 1 the mesh loses
+    /// contact between one pair and the next, on either.
     ///
-    /// The one figure both members of the mesh share. Each member's own rating —
-    /// taken where its dedendum is loaded alone — sits on its [`GearResult`].
-    pub contact_stress_at_pitch_point: LoadCase<f64>,
-    /// Relative radius of curvature at the governing point, mm.
-    pub relative_radius: f64,
+    /// The two are the same *count* and not the same measure, which is the
+    /// one place the two contacts do not meet continuously: a line counts
+    /// lines across the face, a point counts points along one line, and the
+    /// point's limit as the shafts straighten is the normal-plane `ε_α / cos²β_b`
+    /// rather than the total. The decomposition each has is in [`Self::line`]
+    /// and [`Self::point`].
+    pub contact_ratio: f64,
+    /// Mesh efficiency, both drive senses. Equal for a parallel-axis mesh — the
+    /// mirror flank is the same integral — and genuinely different on crossed
+    /// shafts, where **either** can be zero or negative: backward is what
+    /// self-locking is, forward a steep helix split that cannot drive at all.
+    /// [`Directional::locked`] reads them rather than a separate flag that
+    /// could disagree.
+    pub efficiency: Directional<f64>,
+    /// The coefficient of friction at which each direction stops driving,
+    /// read along the path; a **negative** value means no friction locks the
+    /// pair that way — a value rather than a missing one.
+    ///
+    /// Negative both ways on every line contact, and deliberately not the
+    /// number its loss model extrapolates to. That model is first order in
+    /// `μ` ([`crate::contact::efficiency`]), so it reaches zero at
+    /// `μ / (1 − η)` — about 5 on the shipped pair — which is nowhere the
+    /// model describes: the friction balance a hundredth of a degree off
+    /// parallel puts the threshold at half that, and asymmetric. What is true
+    /// within the model is that no friction near unity locks a parallel mesh,
+    /// and *never* is the honest reading of that.
+    pub locking_friction: Directional<f64>,
+    /// Sliding speed at the pitch point as a multiple of the first member's
+    /// pitch line speed — the lengthwise sliding crossed shafts have, and
+    /// **exactly zero** on parallel ones, where the pitch point is the one
+    /// place with no sliding at all and every loss is along the profile.
+    pub sliding_ratio: f64,
+    /// Sliding speed at the pitch point, mm/s. Filled in by the train, which
+    /// is what knows a shaft speed; zero where the ratio is.
+    pub sliding_velocity: f64,
+    /// The Hertzian contact, in both load cases — one patch the two members
+    /// share, an ellipse on crossed shafts and a line on parallel ones.
+    pub contact: LoadCase<ContactPatch>,
     /// Angular backlash at each member, degrees, in the order the mesh was
     /// built: the pinion-side member first, then the other.
     pub backlash: [Backlash; 2],
@@ -192,12 +230,183 @@ pub struct MeshReport {
     /// the ring's tip reaches below where the pinion's flank ends, which is
     /// `[0]`, and *trochoid* when the pinion's tip reaches into the ring's
     /// fillet, which is `[1]` — and an external pair had it under none, though a
-    /// long addendum on a small pinion is exactly where it bites.
+    /// long addendum on a small pinion is exactly where it bites. A crossed
+    /// pair asks it along its line of action
+    /// ([`crate::screw::CrossedPath::flank_interference`]).
     pub flank_interference: [bool; 2],
     /// **Where an internal mesh's tips are**, and `None` for an external one,
     /// which has no such question: an external pair's tip circles cross on the
     /// line of centres or not at all.
     pub tips: Option<TipRoom>,
+    /// What a line contact has and a point does not.
+    pub line: Option<LineContact>,
+    /// What a point contact has and a line does not.
+    pub point: Option<PointContact>,
+}
+
+/// What only a line contact reports: the transverse plane's own figures.
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct LineContact {
+    /// Transverse operating pressure angle `α_w`, degrees — the zero-backlash
+    /// pair's, which the profile shifts set. A point contact has no
+    /// operating angle: its normal cannot turn, so its normal pressure angle
+    /// is `α_n` at any shift.
+    pub operating_pressure_angle: f64,
+    /// The contact ratio decomposed: transverse, overlap and their total,
+    /// which is [`MeshReport::contact_ratio`].
+    pub contact_ratios: ContactRatios,
+}
+
+/// What only a point contact reports: the zone as the faces leave it, and the
+/// pair it is compared against.
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct PointContact {
+    /// What ended the zone: the teeth, or the face they are cut on.
+    pub limited_by: crate::screw::ZoneLimit,
+    /// The face width at which `ε = 1`, per member, mm.
+    ///
+    /// A **geometric** minimum: it keeps contact continuous and says nothing
+    /// about stress. That is the opposite of a line contact's automatic width,
+    /// which inverts a stress, and the difference has to travel with the
+    /// number.
+    pub face_width_for_continuity: Option<[f64; 2]>,
+    /// How far the contact point runs along each member's own axis, mm — what a
+    /// face has to cover, and what a line contact does not have at all.
+    pub axial_travel: [f64; 2],
+    /// What the same teeth would lose with their shafts brought **parallel**, as
+    /// an efficiency — `None` where the parallel pair cannot be built.
+    ///
+    /// Reported for comparison: crossing shafts adds sliding, so this is the
+    /// best the pair can be, and how far the crossed figure falls below it is
+    /// what the shaft angle costs. It was once a *check*, and the friction
+    /// balance has since made it worse than useless as one: the parallel
+    /// closed form is first order in `μ` where the balance is exact, so at a
+    /// very small shaft angle the crossed figure legitimately sits a hundredth
+    /// of a point above it (docs/corrections.md).
+    pub parallel_axis_efficiency: Option<f64>,
+}
+
+/// **The Hertzian contact a mesh presses** — one answer for an ellipse and a
+/// line, since a line is the ellipse with one curvature at zero
+/// ([`crate::hertz::peak_pressure`]).
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct ContactPatch {
+    /// Peak Hertzian pressure, MPa — the worst anywhere on the path. On a line
+    /// contact that is the envelope over both members' governing points, each
+    /// member's own sitting on its [`GearResult`]; on a point contact it is
+    /// the worst of the pitch point and the two boundaries of single-pair
+    /// contact, which sit 10–27 % above the pitch point and are not what is
+    /// rated with `ε > 1` because a second pair shares the load there.
+    pub max_pressure: f64,
+    /// What the pitch point alone says, MPa — the one figure both members
+    /// share, and on a point contact close to the *least* severe the mesh
+    /// offers, since the relative radius peaks near it.
+    pub at_pitch_point: f64,
+    /// Where the worst point sits on the path, mm from the pitch point.
+    pub worst_position: f64,
+    /// The patch, mm: its length along the contact and its width across.
+    ///
+    /// On a line contact the length is the face the mesh is rated on and the
+    /// width the Hertz half-width doubled, `4 ρ p_max / E*`; on a point
+    /// contact the ellipse's two axes, the length bounded by the line the teeth
+    /// have. Both are what a stylus would measure.
+    pub patch_length: f64,
+    pub patch_width: f64,
+    /// Relative curvature along the contact, 1/mm. **Zero is line contact** —
+    /// the degenerate value, and every parallel mesh's — and that it is not
+    /// zero is what crossing the shafts did.
+    pub curvature_along: f64,
+    /// ...and across it, `1/ρ` — the reciprocal of the relative radius of
+    /// curvature at the worst point, in the normal plane.
+    pub curvature_across: f64,
+}
+
+impl ContactPatch {
+    /// A line contact's patch, from the stress along the path.
+    ///
+    /// `load_scale` is the load case's fraction of the load the stress was
+    /// evaluated at, which an epicyclic set applies as its square root rather
+    /// than re-running the path; a pair evaluates each case and passes one.
+    /// The half-width is [`crate::hertz::line_half_width`], closed form from
+    /// what the rating already has.
+    pub(crate) fn line(
+        cs: &crate::strength::ContactStress,
+        load_scale: f64,
+        face_width: f64,
+        e_star: f64,
+    ) -> Self {
+        let k = load_scale.sqrt();
+        let max_pressure = cs.worst * k;
+        let curvature_across = 1.0 / cs.relative_radius;
+        Self {
+            max_pressure,
+            at_pitch_point: cs.at_pitch_point * k,
+            worst_position: cs.worst_position,
+            patch_length: face_width,
+            patch_width: 2.0
+                * crate::hertz::line_half_width(curvature_across, max_pressure, e_star),
+            curvature_along: crate::strength::PARALLEL_AXES,
+            curvature_across,
+        }
+    }
+}
+
+/// **What a line contact's builder has in hand**, gathered so the three kinds
+/// that report one fill the report through one function rather than each
+/// restating which of its fields a line contact leaves at their degenerate
+/// values.
+pub(crate) struct LineMesh {
+    pub coprime: bool,
+    pub contact_ratios: ContactRatios,
+    /// Transverse operating pressure angle, degrees — the report's unit.
+    pub operating_pressure_angle: f64,
+    pub efficiency: Directional<f64>,
+    pub contact: LoadCase<ContactPatch>,
+    pub backlash: [Backlash; 2],
+    pub flank_interference: [bool; 2],
+    pub tips: Option<TipRoom>,
+}
+
+/// A line contact's [`MeshReport`]: the shared fields as given, the sliding at
+/// the pitch point and the locking thresholds at their degenerate values, and
+/// the transverse figures in [`LineContact`].
+pub(crate) fn line_mesh_report(m: LineMesh) -> MeshReport {
+    MeshReport {
+        coprime: m.coprime,
+        contact_ratio: m.contact_ratios.total,
+        // No friction locks a line contact — see the field.
+        locking_friction: Directional::of(|_| -1.0),
+        efficiency: m.efficiency,
+        sliding_ratio: 0.0,
+        sliding_velocity: 0.0,
+        contact: m.contact,
+        backlash: m.backlash,
+        flank_interference: m.flank_interference,
+        tips: m.tips,
+        line: Some(LineContact {
+            operating_pressure_angle: m.operating_pressure_angle,
+            contact_ratios: m.contact_ratios,
+        }),
+        point: None,
+    }
 }
 
 /// **The three ways an internal mesh's teeth can foul**, and the room the third
@@ -959,6 +1168,13 @@ pub struct GearResult {
     /// Helix angle, degrees, signed by hand — likewise from the sizing as
     /// solved.
     pub helix_angle: f64,
+    /// Lead angle, degrees — `90° − |β|`, the same fact from the other datum. A
+    /// worm is described by how far its thread advances, a gear by how far its
+    /// tooth leans; both are reported because a pair is entered either way.
+    pub lead_angle: f64,
+    /// Lead, mm — how far a point on the flank advances per revolution,
+    /// `π d tan γ`. `None` on a spur gear, whose flank does not advance.
+    pub lead: Option<f64>,
     /// Torque on this gear, N·m, driving forward at peak.
     pub torque: f64,
     /// Torque on this gear from a back-driving load, N·m.
@@ -1072,14 +1288,20 @@ impl GearResult {
     /// Every stage kind comes through here, so a field cannot be filled two ways
     /// — see [`MemberFacts`] for the one that was.
     pub(crate) fn of(f: MemberFacts) -> Self {
+        let pitch_diameter =
+            f64::from(f.params.teeth) * f.params.module / f.params.helix_angle.to_radians().cos();
         Self {
             profile_shift: f.profile_shift,
             addendum: f.params.addendum,
             face_width: f.face_width,
             recommended_face_width: f.recommended_face_width,
-            pitch_diameter: f64::from(f.params.teeth) * f.params.module
-                / f.params.helix_angle.to_radians().cos(),
+            pitch_diameter,
             helix_angle: f.params.helix_angle,
+            lead_angle: 90.0 - f.params.helix_angle.abs(),
+            lead: (f.params.helix_angle != 0.0).then(|| {
+                std::f64::consts::PI * pitch_diameter
+                    / f.params.helix_angle.abs().to_radians().tan()
+            }),
             torque: f.torque,
             back_driving_torque: f.back_driving_torque,
             speed: f.speed,
@@ -1129,113 +1351,6 @@ impl GearResult {
     }
 }
 
-/// **What a pair's one mesh reports** — the line contact of parallel axes, or
-/// the point contact of crossed ones.
-///
-/// The one place a pair's result branches, and it branches because the physics
-/// does: parallel axes touch along a line, carry a bending rating and lose
-/// power to sliding along the profile; crossed axes touch at a point, have no
-/// honest bending figure, slide lengthwise and differ in the two directions.
-/// What the two have in common is read through the accessors below, so the
-/// train — and a front end's summary row — never asks which it is holding.
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-#[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
-pub enum PairMesh {
-    /// Parallel axes: line contact, in the type every kind reports a
-    /// parallel-axis mesh in.
-    Line(MeshReport),
-    /// Crossed axes: point contact, along a line of action that cannot turn.
-    Point(CrossedMesh),
-}
-
-impl PairMesh {
-    /// Mesh efficiency, both directions — one number twice for a line contact,
-    /// two genuinely different ones for a point.
-    #[must_use]
-    pub fn efficiency(&self) -> Directional<f64> {
-        match self {
-            Self::Line(m) => m.efficiency,
-            Self::Point(m) => m.efficiency,
-        }
-    }
-
-    /// Angular backlash **per member**, degrees, at the three centre distances.
-    #[must_use]
-    pub fn backlash(&self) -> &[Backlash; 2] {
-        match self {
-            Self::Line(m) => &m.backlash,
-            Self::Point(m) => &m.backlash,
-        }
-    }
-
-    /// The one gap read by drive direction — [`MeshReport::backlash_by_drive`],
-    /// for either mesh.
-    #[must_use]
-    pub fn backlash_by_drive(&self) -> Directional<Backlash> {
-        let b = self.backlash();
-        Directional {
-            forward: b[1],
-            backward: b[0],
-        }
-    }
-
-    /// Whether each member's flank is reached past its usable end by the other
-    /// member's tip — one relation for both meshes
-    /// ([`crate::mesh::Mesh::flank_interference`],
-    /// [`crate::screw::CrossedPath::flank_interference`]).
-    #[must_use]
-    pub fn flank_interference(&self) -> [bool; 2] {
-        match self {
-            Self::Line(m) => m.flank_interference,
-            Self::Point(m) => m.flank_interference,
-        }
-    }
-
-    /// Whether the tooth counts are coprime, so every tooth meets every other.
-    #[must_use]
-    pub fn coprime(&self) -> bool {
-        match self {
-            Self::Line(m) => m.coprime,
-            Self::Point(m) => m.coprime,
-        }
-    }
-
-    /// Tooth pairs in contact: the transverse ratio of a line contact, or the
-    /// ratio along the line of action of a point contact — `None` where a
-    /// crossed pair has no zone at all.
-    #[must_use]
-    pub fn contact_ratio(&self) -> Option<f64> {
-        match self {
-            Self::Line(m) => Some(m.contact_ratios.transverse),
-            Self::Point(m) => m.zone.map(|z| z.contact_ratio),
-        }
-    }
-
-    /// The parallel-axis report, if that is what this is.
-    #[must_use]
-    pub fn as_line(&self) -> Option<&MeshReport> {
-        match self {
-            Self::Line(m) => Some(m),
-            Self::Point(_) => None,
-        }
-    }
-
-    /// The crossed-axis report, if that is what this is.
-    #[must_use]
-    pub fn as_point(&self) -> Option<&CrossedMesh> {
-        match self {
-            Self::Point(m) => Some(m),
-            Self::Line(_) => None,
-        }
-    }
-}
-
 /// Everything a pair produces, whichever mesh it has.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -1265,22 +1380,22 @@ pub struct PairResult {
     pub clearance: f64,
     /// The centre distance actually used, including clearance.
     pub centre_distance: f64,
-    /// **What this pair's one mesh reports** — a line contact in the type every
-    /// other kind reports a parallel-axis mesh in, or a point contact.
+    /// **What this pair's one mesh reports**, in the type every mesh of every
+    /// kind reports in — a line contact on parallel shafts, a point contact
+    /// on crossed ones, and [`MeshReport`] says which by what it carries.
     ///
     /// Seven fields used to sit here loose — the operating pressure angle, the
     /// three contact ratios, whether the pair hunts, the shared contact stress
     /// and relative radius, the efficiency and the backlash — which made the
     /// parallel-axis stage the one kind not using the type named for what a
-    /// parallel-axis mesh reports. The front end had the same split: a
-    /// `meshRows` snippet for the kinds carrying a `MeshReport`, and the same
-    /// rows written out again for this one.
+    /// parallel-axis mesh reports; then a crossed pair had a type of its own
+    /// and an enum chose. The front end had the same split each time.
     ///
     /// A pair's efficiency and backlash **are** its mesh's — one mesh, no
     /// carrier — so they are read through here rather than stored a second
     /// time, and `StageResult::efficiency` is where every kind is made to agree
     /// about which level it is being asked for.
-    pub mesh: PairMesh,
+    pub mesh: MeshReport,
     pub gears: [GearResult; 2],
     /// Anything the stage had to say about the design.
     pub notes: Vec<crate::note::Note>,
@@ -1530,18 +1645,6 @@ impl Default for Stage {
 }
 
 impl Stage {
-    /// A stage of the kind named, at that kind's preset — what *add a stage*
-    /// hands a designer.
-    #[must_use]
-    pub fn preset(kind: StageKind) -> Self {
-        match kind {
-            StageKind::Spur => Self::Spur(PairStage::default()),
-            StageKind::Worm => Self::Worm(PairStage::worm()),
-            StageKind::Planetary => Self::Planetary(Box::default()),
-            StageKind::Hula => Self::Hula(Box::default()),
-        }
-    }
-
     /// The pair this stage is, with its kind, where it is one.
     #[must_use]
     pub fn as_pair(&self) -> Option<(&PairStage, PairKind)> {
@@ -1551,31 +1654,6 @@ impl Stage {
             _ => None,
         }
     }
-
-    /// The pair this stage is, mutably, where it is one.
-    #[must_use]
-    pub fn as_pair_mut(&mut self) -> Option<&mut PairStage> {
-        match self {
-            Self::Spur(p) | Self::Worm(p) => Some(p),
-            _ => None,
-        }
-    }
-}
-
-/// The kinds a stage comes in — the tag of [`Stage`], on its own.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
-pub enum StageKind {
-    Spur,
-    Worm,
-    Planetary,
-    Hula,
 }
 
 /// **Whether a stage's shift chooser actually chose**, and what it means when
@@ -2031,7 +2109,7 @@ impl StageResult {
     #[must_use]
     pub fn efficiency(&self) -> Directional<f64> {
         match self {
-            Self::Pair(r) => r.mesh.efficiency(),
+            Self::Pair(r) => r.mesh.efficiency,
             Self::Planetary(r) => r.efficiency,
             Self::Hula(r) => r.efficiency,
         }
@@ -2076,18 +2154,18 @@ impl StageResult {
         }
     }
 
-    /// **Every parallel-axis mesh this stage has**, in the order it built them.
+    /// **Every mesh this stage has**, in the order it built them.
     ///
     /// The companion of [`Self::members`], and for the same reason: a question
     /// about *a mesh* — is contact continuous, do the tips foul, how much play
     /// is there — is asked of a stage by asking each of its meshes, and a walk
     /// that names the kinds is a walk that forgets one. A pair has one, either
-    /// epicyclic kind has two, and a crossed pair has **none**: its mesh is a
-    /// point contact and reports a [`CrossedMesh`] instead ([`PairMesh`]).
+    /// epicyclic kind has two — and a crossed pair has one like any other,
+    /// which reports a point contact in the same type.
     #[must_use]
     pub fn meshes(&self) -> Vec<&MeshReport> {
         match self {
-            Self::Pair(r) => r.mesh.as_line().into_iter().collect(),
+            Self::Pair(r) => vec![&r.mesh],
             Self::Planetary(r) => vec![&r.sun_planet, &r.planet_ring],
             Self::Hula(r) => r.meshes.iter().map(|m| &m.report).collect(),
         }
@@ -2138,12 +2216,11 @@ impl StageResult {
                     g.speed = speeds[i];
                     g.tooth_cycles = loaded_cycles(cycles[i].0, cycles[i].1);
                 }
-                // Sliding needs a shaft speed, so it could only be filled here.
+                // Sliding needs a shaft speed, so it could only be filled here
+                // — and it is zero on parallel shafts because the ratio is.
                 let radius = r.gears[0].pitch_diameter / 2.0;
-                if let PairMesh::Point(m) = &mut r.mesh {
-                    m.sliding_velocity =
-                        m.sliding_ratio * (speeds[0] / 60.0 * std::f64::consts::TAU) * radius;
-                }
+                r.mesh.sliding_velocity =
+                    r.mesh.sliding_ratio * (speeds[0] / 60.0 * std::f64::consts::TAU) * radius;
             }
             // An epicyclic set's speeds are not the train's two-member pattern —
             // it has three shafts and its own kinematics already set them, so
@@ -3171,14 +3248,13 @@ mod tests {
     }
 
     /// ...and a worm stage's result, with its point contact.
-    fn worm(r: &StageResult) -> (&PairResult, &CrossedMesh) {
+    fn worm(r: &StageResult) -> (&PairResult, &MeshReport) {
         let p = r.as_pair().expect("a worm stage is a pair");
-        (
-            p,
-            p.mesh
-                .as_point()
-                .expect("a worm stage's mesh is a point contact"),
-        )
+        assert!(
+            p.mesh.point.is_some(),
+            "a worm stage's mesh is a point contact"
+        );
+        (p, &p.mesh)
     }
 
     /// The old entry points, as the tests were written against them.
@@ -3495,7 +3571,7 @@ mod tests {
                 };
                 solve_spur_stage(&fixed, StageTorques::just(2.0), &lib)
                     .ok()
-                    .map(|r| r.mesh.efficiency().forward)
+                    .map(|r| r.mesh.efficiency.forward)
             };
 
             for k in 0..=8 {
@@ -3816,7 +3892,7 @@ mod tests {
                     - (free.centre_distance - stage.module * 0.5 * f64::from(teeth[0] + teeth[1]))
                         * f64::from(steps - k)
                         / f64::from(steps);
-                let here = at(a).mesh.efficiency().forward;
+                let here = at(a).mesh.efficiency.forward;
                 assert!(
                     here > last - 1e-9,
                     "{teeth:?}: {a:.4} mm gives {here}, below the {last} a tighter \
@@ -3828,9 +3904,9 @@ mod tests {
             // holds a pair to, and for the same reason: both answers sit on the
             // interference wall and each resolves it to its own last step.
             assert!(
-                (last - free.mesh.efficiency().forward).abs() < 1e-5,
+                (last - free.mesh.efficiency.forward).abs() < 1e-5,
                 "{teeth:?}: the last step reaches {last} where the free answer is {}",
-                free.mesh.efficiency().forward
+                free.mesh.efficiency.forward
             );
         }
     }
@@ -3932,7 +4008,7 @@ mod tests {
                     ..stage.clone()
                 };
                 solve_spur_stage(&fixed, StageTorques::just(2.0), &lib)
-                    .map(|r| r.mesh.efficiency().forward)
+                    .map(|r| r.mesh.efficiency.forward)
             };
             let (Ok(shipped), Ok(refined)) = (
                 at(stage.shifts_at(&Search::SHIPPED)),
@@ -4105,7 +4181,7 @@ mod tests {
                 // projection of their own torques and this law is not theirs.
                 // The worm stage in this train is here for the walk, and its
                 // own rating is gated in `crossed::tests`.
-                if stage.as_pair().is_some_and(|p| p.mesh.as_point().is_some()) {
+                if stage.as_pair().is_some_and(|p| p.mesh.point.is_some()) {
                     continue;
                 }
                 for (i, g) in stage.members().iter().enumerate() {
@@ -4254,7 +4330,7 @@ mod tests {
         };
         let r = solve_worm_stage(&locked, StageTorques::just(2.0), &lib)
             .expect("a locked pair is still a pair");
-        let r_point = r.mesh.as_point().unwrap();
+        let r_point = r.mesh;
         assert_eq!(
             r_point.efficiency.forward, 0.0,
             "this split is meant to be the forward-locked one"
@@ -4272,7 +4348,7 @@ mod tests {
             ..locked
         };
         let d = solve_worm_stage(&driving, StageTorques::just(2.0), &lib).expect("and this one");
-        let d_point = d.mesh.as_point().unwrap();
+        let d_point = d.mesh;
         let ratio = r_point.contact.peak.max_pressure / d_point.contact.peak.max_pressure;
         assert!(
             (0.5..2.0).contains(&ratio),
@@ -4310,7 +4386,11 @@ mod tests {
                 .unwrap_or_else(|e| panic!("a stage at no operating load: {e:?}"));
             // A worm's members are not gears, so the walk below is empty there
             // and the claim is the stage's own — which is the one that failed.
-            if let Some(m) = r.stages[0].as_pair().and_then(|p| p.mesh.as_point()) {
+            if let Some(m) = r.stages[0]
+                .as_pair()
+                .filter(|p| p.mesh.point.is_some())
+                .map(|p| &p.mesh)
+            {
                 assert_eq!(m.contact.cyclic.max_pressure, 0.0);
                 assert!(m.contact.peak.max_pressure > 0.0);
             }
@@ -4347,6 +4427,124 @@ mod tests {
     /// three answers of `false`: an external pair's members curve opposite ways,
     /// its tip circles cross on the line of centres or not at all, and the
     /// question does not arise. *An absent thing is not a zero-length thing.*
+    /// **One `ContactPatch` for both contacts is a claim about a limit, and
+    /// this is the limit measured** — with the seams named, since "meet" has a
+    /// size on each field and two of them are not zero.
+    ///
+    /// The same 17/43 pair, a hundredth of a degree off parallel against
+    /// parallel, the contact centred (no clearance, or the near-parallel
+    /// contact slides along the shafts by `Δa / sin Σ`) and the face wide
+    /// enough that the line governs:
+    ///
+    /// - **the pitch point meets exactly** at no friction — a part in 10⁵ —
+    ///   and by 1.5 % at `μ = 0.08`, which is the flank load: the crossed
+    ///   balance presses the flank with `μ F_n` along a sliding direction that
+    ///   stays finite as the sliding speed vanishes, and the line rating
+    ///   presses it with the transverse projection alone, as ISO does. That
+    ///   is a seam between two conventions and is recorded rather than closed;
+    /// - **the worst point does not meet**, by 5 %, because *one pair carries
+    ///   everything* means a different thing for a line and a point: the line
+    ///   rating's single-pair points are a transverse base pitch in from the
+    ///   path's ends, the point's a normal base pitch in along its line, and
+    ///   the two differ by `cos² β_b`. The zones themselves agree to a micron;
+    /// - the curvature across and the patch width travel with the worst point
+    ///   and sit within a tenth; the sliding at the pitch point closes on the
+    ///   line's zero, and the efficiency meets to first order, as its own gate
+    ///   says.
+    ///
+    /// The count is a different measure on each and is not compared
+    /// ([`MeshReport::contact_ratio`]).
+    #[test]
+    fn the_two_contacts_report_one_patch_at_the_limit() {
+        let lib = library();
+        let stage = |sigma: f64, mu: f64| PairStage {
+            shaft_angle: sigma,
+            sliding_friction: mu,
+            static_friction: mu,
+            clearance: Auto::fixed(0.0),
+            sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(20.0)),
+            gears: [17u32, 43].map(|teeth| StageGear {
+                teeth,
+                face_width: Auto::fixed(30.0),
+                ..StageGear::default()
+            }),
+            ..PairStage::default()
+        };
+        let mesh = |sigma: f64, mu: f64| {
+            solve_spur_stage(&stage(sigma, mu), StageTorques::just(2.0), &lib)
+                .expect("a pair either way")
+                .mesh
+        };
+        let close = |name: &str, a: f64, b: f64, tol: f64| {
+            assert!(
+                ((a - b) / a).abs() < tol,
+                "{name}: the line contact reports {a} and the point contact {b}"
+            );
+        };
+
+        // Frictionless, the pitch point is one number.
+        let (line, point) = (mesh(0.0, 0.0), mesh(0.01, 0.0));
+        assert!(line.line.is_some() && line.point.is_none());
+        assert!(point.point.is_some() && point.line.is_none());
+        let (l, p) = (line.contact.peak, point.contact.peak);
+        close(
+            "pressure at the pitch point, μ = 0",
+            l.at_pitch_point,
+            p.at_pitch_point,
+            1e-4,
+        );
+        // The worst point is a different point — see above — and is not one.
+        close("peak pressure", l.max_pressure, p.max_pressure, 6e-2);
+        assert!(
+            (l.max_pressure - p.max_pressure) / l.max_pressure > 3e-2,
+            "the single-pair seam is real, and this test would be asserting agreement it does \
+             not have if it closed: {} against {}",
+            l.max_pressure,
+            p.max_pressure
+        );
+        // ...and the curvature and the width travel with it, 0.3 mm further
+        // from the pinion's base on the line's reading.
+        close(
+            "curvature across",
+            l.curvature_across,
+            p.curvature_across,
+            1e-1,
+        );
+        close("patch width", l.patch_width, p.patch_width, 1e-1);
+        assert_eq!(
+            l.curvature_along, 0.0,
+            "a line contact is the ellipse at no curvature along"
+        );
+        assert!(
+            p.curvature_along < 1e-6 * p.curvature_across,
+            "and a hundredth of a degree off parallel it nearly is: {}",
+            p.curvature_along
+        );
+        assert_eq!(line.sliding_ratio, 0.0);
+        assert!(
+            point.sliding_ratio < 1e-3,
+            "the lengthwise sliding closes on the line's zero: {}",
+            point.sliding_ratio
+        );
+        assert!(line.contact_ratio > 1.0 && point.contact_ratio > 1.0);
+
+        // With friction, the flank load is the seam: 1.5 % at the pitch point.
+        let (line, point) = (mesh(0.0, 0.08), mesh(0.01, 0.08));
+        let gap = (line.contact.peak.at_pitch_point - point.contact.peak.at_pitch_point)
+            / line.contact.peak.at_pitch_point;
+        assert!(
+            (0.005..0.03).contains(&gap),
+            "the friction seam at the pitch point is {gap}, and it is the flank load \
+             convention — not nothing, and not more than that"
+        );
+        close(
+            "efficiency",
+            line.efficiency.forward,
+            point.efficiency.forward,
+            2e-3,
+        );
+    }
+
     #[test]
     fn an_internal_mesh_is_asked_what_an_internal_mesh_is_asked() {
         let lib = library();
@@ -4356,7 +4554,9 @@ mod tests {
             (Stage::Spur(PairStage::default()), vec![false]),
             (Stage::Planetary(Box::default()), vec![false, true]),
             (Stage::Hula(Box::default()), vec![true, true]),
-            (Stage::Worm(PairStage::worm()), vec![]),
+            // A worm's one mesh is external too, and it is in the walk now:
+            // a point contact answers in the same report as a line.
+            (Stage::Worm(PairStage::worm()), vec![false]),
         ] {
             let mut train = two_stage();
             train.stages = vec![stage];
@@ -4445,7 +4645,7 @@ mod tests {
         for (k, stage) in r.stages.iter().enumerate() {
             // Parallel axes only: a worm's members do not share a tangential
             // force, and its own two-member relation is gated in `crossed`.
-            let Some(spur) = stage.as_pair().filter(|p| p.mesh.as_line().is_some()) else {
+            let Some(spur) = stage.as_pair().filter(|p| p.mesh.line.is_some()) else {
                 continue;
             };
             let (Some(a), Some(b)) = (
@@ -5245,14 +5445,13 @@ mod tests {
         // Every stage produced real numbers.
         for s in r.stages.iter().map(spur) {
             assert!(s.centre_distance > 0.0);
-            assert!(s.mesh.as_line().unwrap().contact_ratios.transverse > 1.0);
-            assert!(s.mesh.efficiency().forward > 0.9 && s.mesh.efficiency().forward < 1.0);
+            assert!(s.mesh.line.unwrap().contact_ratios.transverse > 1.0);
+            assert!(s.mesh.efficiency.forward > 0.9 && s.mesh.efficiency.forward < 1.0);
             assert_eq!(
-                s.mesh.efficiency().forward,
-                s.mesh.efficiency().backward,
+                s.mesh.efficiency.forward, s.mesh.efficiency.backward,
                 "a parallel-axis stage is as efficient driven either way"
             );
-            assert!(s.mesh.as_line().unwrap().contact_stress_at_pitch_point.peak > 0.0);
+            assert!(s.mesh.contact.peak.at_pitch_point > 0.0);
             for g in &s.gears {
                 assert!(g.face_width > 0.0);
                 assert!(g.bending_stress.peak.unwrap() > 0.0);
@@ -5425,7 +5624,7 @@ mod tests {
         let mut previous: Option<(f64, f64)> = None;
         for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
             let r = solve_spur_stage(&stage(clearance), StageTorques::just(2.0), &lib).unwrap();
-            let eps = r.mesh.as_line().unwrap().contact_ratios.transverse;
+            let eps = r.mesh.line.unwrap().contact_ratios.transverse;
             let bending = r.gears[0].bending_stress.peak.expect("a rateable tooth");
             if let Some((was_eps, was_bending)) = previous {
                 assert!(
@@ -5448,17 +5647,17 @@ mod tests {
         let lib = library();
         let spur = solve_spur_stage(&PairStage::default(), StageTorques::just(2.0), &lib).unwrap();
         assert_eq!(
-            spur.mesh.as_line().unwrap().contact_ratios.overlap,
+            spur.mesh.line.unwrap().contact_ratios.overlap,
             0.0,
             "must be exactly zero"
         );
         assert_eq!(
-            spur.mesh.as_line().unwrap().contact_ratios.total,
-            spur.mesh.as_line().unwrap().contact_ratios.transverse
+            spur.mesh.line.unwrap().contact_ratios.total,
+            spur.mesh.line.unwrap().contact_ratios.transverse
         );
         assert!(!spur
             .mesh
-            .as_line()
+            .line
             .unwrap()
             .contact_ratios
             .has_full_axial_overlap());
@@ -5472,10 +5671,10 @@ mod tests {
             &lib,
         )
         .unwrap();
-        assert!(helical.mesh.as_line().unwrap().contact_ratios.overlap > 0.0);
+        assert!(helical.mesh.line.unwrap().contact_ratios.overlap > 0.0);
         assert!(
-            helical.mesh.as_line().unwrap().contact_ratios.total
-                > helical.mesh.as_line().unwrap().contact_ratios.transverse
+            helical.mesh.line.unwrap().contact_ratios.total
+                > helical.mesh.line.unwrap().contact_ratios.transverse
         );
     }
 
@@ -6078,9 +6277,9 @@ mod tests {
         // and the paragraph above needs rewriting.
         for m in &off.meshes {
             assert!(
-                m.report.contact_ratios.transverse < 2.0,
+                m.report.line.unwrap().contact_ratios.transverse < 2.0,
                 "a hula mesh above the band would change the claim: {}",
-                m.report.contact_ratios.transverse
+                m.report.line.unwrap().contact_ratios.transverse
             );
         }
     }
@@ -6270,7 +6469,7 @@ mod tests {
             1.0 - solve_spur_stage(&stage(on), StageTorques::just(2.0), &lib)
                 .unwrap()
                 .mesh
-                .efficiency()
+                .efficiency
                 .forward
         };
         assert!(
@@ -6685,10 +6884,9 @@ mod tests {
             solve_spur_stage(&s, StageTorques::just(2.0), &lib)
                 .unwrap()
                 .mesh
-                .as_line()
-                .unwrap()
-                .contact_stress_at_pitch_point
+                .contact
                 .peak
+                .at_pitch_point
         };
         let base = at(None);
         let quarter = at(Some(190_000.0 / 4.0));
@@ -6941,7 +7139,7 @@ mod tests {
         let base = solved(false, [Overrides::default(), Overrides::default()]);
         let soft_first = solved(false, [modulus(70_000.0), Overrides::default()]);
         let soft_second = solved(false, [Overrides::default(), modulus(70_000.0)]);
-        let pitch = |r: &PairResult| r.mesh.as_line().unwrap().contact_stress_at_pitch_point.peak;
+        let pitch = |r: &PairResult| r.mesh.contact.peak.at_pitch_point;
         for (r, which) in [(&soft_first, "gear 1"), (&soft_second, "gear 2")] {
             assert!(
                 pitch(r) < pitch(&base),
@@ -6986,12 +7184,7 @@ mod tests {
         let half = allowable(0.5 * super::allowable(&wide.gears[1].material, Case::Cyclic));
         let derated = solved(false, [Overrides::default(), half]);
         assert_eq!(
-            derated
-                .mesh
-                .as_line()
-                .unwrap()
-                .contact_stress_at_pitch_point,
-            wide.mesh.as_line().unwrap().contact_stress_at_pitch_point,
+            derated.mesh.contact.peak.at_pitch_point, wide.mesh.contact.peak.at_pitch_point,
             "an allowable is not a stress and must not move one"
         );
         let contact_width = |r: &PairResult| {

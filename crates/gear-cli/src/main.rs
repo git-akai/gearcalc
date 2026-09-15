@@ -15,7 +15,6 @@
 mod diagram;
 mod matrix;
 
-use gear_core::train::PairMesh;
 use gear_core::{GearParams, Tooth};
 
 /// The English catalogue, for turning a [`Note`](gear_core::note::Note) into a
@@ -38,19 +37,27 @@ fn worm_stage(starts: u32, wheel_teeth: u32, worm_diameter: f64) -> gear_core::t
     stage
 }
 
-/// The point-contact mesh a pair reports, where that is what it has.
-fn point(r: &gear_core::train::PairResult) -> &gear_core::train::CrossedMesh {
-    r.mesh
-        .as_point()
-        .expect("this command builds crossed pairs, which report a point contact")
+/// The mesh a pair reports, checked to be the point contact these commands
+/// built a crossed pair for.
+fn point(r: &gear_core::train::PairResult) -> &gear_core::train::MeshReport {
+    assert!(
+        r.mesh.point.is_some(),
+        "this command builds crossed pairs, which report a point contact"
+    );
+    &r.mesh
 }
 
-/// The parallel-axis mesh a pair reports, where that is what it has — the
-/// commands that read one are the ones that built a parallel pair.
-fn line(r: &gear_core::train::PairResult) -> &gear_core::train::MeshReport {
-    r.mesh
-        .as_line()
-        .expect("this command builds parallel pairs, which report a line contact")
+/// The transverse figures a line contact reports — the commands that read them
+/// are the ones that built a parallel pair.
+fn line(r: &gear_core::train::PairResult) -> &gear_core::train::LineContact {
+    transverse(&r.mesh)
+}
+
+/// The same, of any mesh a command built on parallel shafts.
+fn transverse(m: &gear_core::train::MeshReport) -> &gear_core::train::LineContact {
+    m.line
+        .as_ref()
+        .expect("this command builds parallel-axis meshes, which report a line contact")
 }
 
 fn words() -> gear_io::strings::Catalogue {
@@ -522,12 +529,14 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
                 ))
                 .collect::<Vec<_>>()
                 .join("  "),
-            mesh.report.operating_pressure_angle,
+            transverse(&mesh.report).operating_pressure_angle,
             stage.cutter[index].teeth
         );
         println!(
             "    far-side gap {:.4} mm (as cut {:.4})   contact ratio {:.4}",
-            mesh.clearance, mesh.clearance_as_cut, mesh.report.contact_ratios.transverse
+            mesh.clearance,
+            mesh.clearance_as_cut,
+            transverse(&mesh.report).contact_ratios.transverse
         );
         println!(
             "    backlash {:.5} / {:.5} deg   flank interference: pinion {}  ring {}   \
@@ -544,7 +553,8 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         // the torque on the way as well — the output pair carries the whole of it.
         println!(
             "    sigma_H {:.1} MPa at the pitch point   rho {:.4} mm",
-            mesh.report.contact_stress_at_pitch_point.peak, mesh.report.relative_radius
+            mesh.report.contact.peak.at_pitch_point,
+            1.0 / mesh.report.contact.peak.curvature_across
         );
         for gear in &members {
             println!(
@@ -894,7 +904,8 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                     // conditions moved onto the mesh report — which let fouling
                     // candidates win four of these rows.
                     let admissible = r.meshes.iter().all(|m| {
-                        m.report.contact_ratios.transverse >= 1.0 && m.report.teeth_clear()
+                        transverse(&m.report).contact_ratios.transverse >= 1.0
+                            && m.report.teeth_clear()
                     }) && r.gears.iter().all(|g| g.gear.as_asked());
                     if !admissible {
                         continue;
@@ -914,8 +925,8 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                 "{d:>3} {n:>6} {module:>7.3} {h:>5.1} {cutter:>6} {x:>+7.2} {:>9.4}% {:>7.2}% {:>8.2} {:>7.4} {:>9.5}",
                 r.fixed_carrier_efficiency.forward * 100.0,
                 r.efficiency.forward * 100.0,
-                r.meshes[0].report.operating_pressure_angle,
-                r.meshes[0].report.contact_ratios.transverse,
+                transverse(&r.meshes[0].report).operating_pressure_angle,
+                transverse(&r.meshes[0].report).contact_ratios.transverse,
                 r.backlash.forward.nominal
             ),
         }
@@ -1012,7 +1023,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
             result.gears[pinion_i].teeth,
             result.gears[pinion_i].gear.profile_shift,
             m.clearance,
-            m.report.operating_pressure_angle,
+            transverse(&m.report).operating_pressure_angle,
             m.report.tips.is_some_and(|t| t.tip_interference),
             m.report.tips.map_or(0.0, |t| t.tip_margin)
         ),
@@ -1200,7 +1211,7 @@ fn shifts_report(z1: u32, z2: u32) {
             r.gears[1].profile_shift,
             r.gears[0].profile_shift + r.gears[1].profile_shift,
             line(r).contact_ratios.transverse,
-            100.0 * r.mesh.efficiency().forward
+            100.0 * r.mesh.efficiency.forward
         );
     };
     let (Ok(floor), Ok(best)) = (solved(false, None), solved(true, None)) else {
@@ -1211,7 +1222,7 @@ fn shifts_report(z1: u32, z2: u32) {
     row("least loss", &best);
     println!(
         "\n  the trade: {:.2} points of efficiency for {:.2} of contact ratio",
-        100.0 * (best.mesh.efficiency().forward - floor.mesh.efficiency().forward),
+        100.0 * (best.mesh.efficiency.forward - floor.mesh.efficiency.forward),
         line(&floor).contact_ratios.transverse - line(&best).contact_ratios.transverse
     );
 
@@ -1545,9 +1556,11 @@ fn train_report(mode: Option<&str>) {
 
     for (k, s) in r.stages.iter().enumerate() {
         match (train.stages[k].as_pair(), s) {
-            (Some((st, kind)), StageResult::Pair(res)) => match &res.mesh {
-                PairMesh::Line(mesh) => print_line_pair(k, st, kind, res, mesh),
-                PairMesh::Point(mesh) => print_point_pair(k, st, kind, res, mesh),
+            // One report, and which contact it is decides the rows — the
+            // same rows for every line contact and for every point.
+            (Some((st, kind)), StageResult::Pair(res)) => match res.mesh.line {
+                Some(line) => print_line_pair(k, st, kind, res, &line),
+                None => print_point_pair(k, st, kind, res, &res.mesh),
             },
             _ => println!("\nstage {}: kind and result disagree", k + 1),
         }
@@ -1560,9 +1573,11 @@ fn print_line_pair(
     st: &gear_core::train::PairStage,
     kind: gear_core::train::PairKind,
     s: &gear_core::train::PairResult,
-    mesh: &gear_core::train::MeshReport,
+    line: &gear_core::train::LineContact,
 ) {
+    let mesh = &s.mesh;
     let helix = s.gears[0].helix_angle;
+    let ratios = &line.contact_ratios;
     println!(
         "\nstage {}  {}  z {}/{}  beta {} deg  ratio {:.4}  a_w {:.4} mm{}",
         k + 1,
@@ -1576,10 +1591,10 @@ fn print_line_pair(
     );
     println!(
         "  contact ratio  transverse {:.4}   overlap {:.4}   total {:.4}{}",
-        mesh.contact_ratios.transverse,
-        mesh.contact_ratios.overlap,
-        mesh.contact_ratios.total,
-        if helix != 0.0 && !mesh.contact_ratios.has_full_axial_overlap() {
+        ratios.transverse,
+        ratios.overlap,
+        ratios.total,
+        if helix != 0.0 && !ratios.has_full_axial_overlap() {
             "   <- no full axial overlap"
         } else {
             ""
@@ -1595,9 +1610,9 @@ fn print_line_pair(
     // its own is the allowable, and therefore `b_min`.
     println!(
         "  contact at the pitch point  sigma_H {:.1} / {:.1} MPa peak/cyclic   rho {:.3} mm",
-        mesh.contact_stress_at_pitch_point.peak,
-        mesh.contact_stress_at_pitch_point.cyclic,
-        mesh.relative_radius
+        mesh.contact.peak.at_pitch_point,
+        mesh.contact.cyclic.at_pitch_point,
+        1.0 / mesh.contact.peak.curvature_across
     );
     println!(
         "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>21} {:>21} {:>9} {:>21}",
@@ -1647,7 +1662,7 @@ fn print_point_pair(
     st: &gear_core::train::PairStage,
     kind: gear_core::train::PairKind,
     s: &gear_core::train::PairResult,
-    m: &gear_core::train::CrossedMesh,
+    m: &gear_core::train::MeshReport,
 ) {
     println!(
         "\nstage {}  {}  z {}/{}  ratio {:.4}  a {:.4} mm  lead angle {:.4} deg",
@@ -1657,7 +1672,7 @@ fn print_point_pair(
         st.gears[1].teeth,
         s.ratio,
         s.centre_distance,
-        m.lead_angles[0]
+        s.gears[0].lead_angle
     );
     println!("  efficiency  {}", both_ways(m.efficiency));
     println!(
@@ -2717,7 +2732,9 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
     let m = point(&r);
     println!(
         "  lead angle {:.4} deg   wheel helix {:.4} deg   lead {:.4} mm",
-        m.lead_angles[0], r.gears[1].helix_angle, m.lead
+        r.gears[0].lead_angle,
+        r.gears[1].helix_angle,
+        r.gears[0].lead.unwrap_or(f64::INFINITY)
     );
     println!();
     println!("  member      torque Nm   face mm   d mm      material");
@@ -2915,8 +2932,8 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                         println!(
                             "eps_a  sun-planet {:.3}   planet-ring {:.3}   \
                              eta_0 {:.4}   even spacing {}   planet gap {}",
-                            r.sun_planet.contact_ratios.transverse,
-                            r.planet_ring.contact_ratios.transverse,
+                            transverse(&r.sun_planet).contact_ratios.transverse,
+                            transverse(&r.planet_ring).contact_ratios.transverse,
                             r.fixed_carrier_efficiency.forward,
                             r.equal_spacing,
                             r.planet_clearance
@@ -2948,8 +2965,8 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                         }
                         println!(
                             "sigma_H at pitch  sun-planet {:.1} MPa   planet-ring {:.1} MPa",
-                            r.sun_planet.contact_stress_at_pitch_point.peak,
-                            r.planet_ring.contact_stress_at_pitch_point.peak
+                            r.sun_planet.contact.peak.at_pitch_point,
+                            r.planet_ring.contact.peak.at_pitch_point
                         );
                         println!(
                             "sigma_F  sun {}   planet {}   ring {}",
@@ -3124,8 +3141,11 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
                     g.centre_distance,
                     g.sliding_ratio,
                     m.contact.peak.max_pressure,
-                    m.zone
-                        .map_or_else(|| "—".to_string(), |c| format!("{:.9}", c.contact_ratio))
+                    if m.point.is_some() && m.contact_ratio > 0.0 {
+                        format!("{:.9}", m.contact_ratio)
+                    } else {
+                        "—".to_string()
+                    }
                 );
                 for n in r.notes.iter().filter(|n| {
                     n.is(gear_core::note::key::STAGE_FORWARD_LOCKING)

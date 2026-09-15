@@ -251,6 +251,7 @@ them.
 | 7 | The hula search asked for an effort, and what it found | **done** — F51 closed, F58 diagnosed and closed as `holds`, F82 opened and closed |
 | 7 | The figures | **done** — F7, F19 closed; every table gated, two had drifted; one attribution false since before the audit, now held by a test |
 | 8 | The worm is a pair | **done** — F83 closed, gates proven; one primitive under two kinds, one result, one relation; every recorded number unchanged |
+| 8 | One mesh report for a line and a point | **done** — F84 closed; the two contacts measured at the limit, two seams recorded; the mini-audit of the interrupted run below |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
 production code · 10,346 lines of comment in that code · 9,348 lines of
@@ -415,7 +416,8 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F55 | A centre distance no admissible shifts can reach is answered rather than refused | gap | 4, 7 | **closed** — and it was two faults; a *negative* clearance was answered silently too, which is a pair that cannot be assembled |
 | F58 | The hula stage's shift optimiser moves no answer over a band of tooth differences, on or off | **holds** | 4, 7 | **closed** — two causes, neither a fault: at `d ≥ 6` the optimum is the floor, at `d = 1` nothing is admissible |
 | F82 | An optimiser that finds nothing admissible is indistinguishable from one that agrees with the floor — every kind falls back in silence | **gap** | 7 | **closed** — `Searched`, reported by all three choosers, gates proven |
-| F83 | The worm was a stage type rather than a kind: no shift, no addendum, no interference check, no mode 3 but by resizing, a crossed gear pair whose typed shifts reached the tooth report and not the mesh — and the model needed none of it | **gap** | 8 | **closed** — `PairStage` under `Stage::Spur`/`Stage::Worm`, `PairResult` with `PairMesh`, the rack law for a crossed shift, the zone read one way from each tangency point; gates proven, corpus unchanged |
+| F83 | The worm was a stage type rather than a kind: no shift, no addendum, no interference check, no mode 3 but by resizing, a crossed gear pair whose typed shifts reached the tooth report and not the mesh — and the model needed none of it | **gap** | 8 | **closed** — `PairStage` under `Stage::Spur`/`Stage::Worm`, one `PairResult`, the rack law for a crossed shift, the zone read one way from each tangency point; gates proven, corpus unchanged |
+| F84 | A line contact and a point contact reported in two types with an enum choosing, though the physics is one model with the shaft angle as a parameter — and nothing had measured where the two contacts' reported figures meet | **gap** | 8 | **closed** — one `MeshReport` for every mesh; the limit measured field by field, two seams named and sized; a patch a quarter as wide as its own rating found on the way |
 | F59 | Three kinds each wrote out what to ask of a mesh, and answered it three ways | gap | 4 | **closed** — `auto::MeshTrial`, and logged in `corrections.md` |
 | F60 | A hula pair's tip margin and an internal mesh's interference flags are asked by one kind each | **gap** | 5 | **closed** — `train::TipRoom` on `MeshReport`; and it found the shipped set interfering, see below |
 | F56 | No CLI command drove the optimiser, so its answers were outside the corpus | gap | 4 | **closed** — `gear-cli shifts`, which also closes F19's first row |
@@ -2990,12 +2992,113 @@ not the clearance or the sizing — so a relief the core decided on either never
 reached the panel. Every toggle relief can turn is in it now, by the flag
 rather than the value's type.
 
+### Mini-audit of the run above, which was interrupted
+
+Read back cold, against the checks and by grep:
+
+- **Stale words, four.** Two doc comments and the units checker's preamble
+  still named `solve_worm_stage`, `solve_crossed_stage` and `WormStage`; a
+  hula doc pointer named `PairStage::clearance_taken`, a method deleted in
+  Phase 5. Fixed.
+- **Dead API, three.** `Stage::preset`, `StageKind` and `as_pair_mut` were
+  written for a front end that builds its presets through `defaults()` and
+  never called. Deleted, with the generated `StageKind.ts`.
+- **The parallel counterpart ran the optimiser.** The crossed solve builds the
+  same teeth at `Σ = 0` for comparison, cloning the stage — optimiser toggle
+  included, so a crossed pair asked to optimise would have run the search on
+  its counterpart. The counterpart is a comparison and takes
+  `Optimisation::default()` now.
+- **Two accessors nobody read** — `PairMesh::coprime` and `::contact_ratio` —
+  which the second half of this phase removed with the enum they were on.
+- Everything the corpus, the boundary record and the suite hold, held.
+
+### One mesh report — F84
+
+The first half kept `MeshReport` for a line contact and `CrossedMesh` for a
+point, with `PairMesh` choosing, on the reading that the physics differs. The
+reading was too strong: the physics is **one model with the shaft angle as a
+parameter** — one Hertz answer of which the line is the degenerate value, one
+friction balance the parallel integral is the limit of, one backlash
+projection, one interference relation — and each of those had already been
+held at the limit by a test. A designer turning a shaft angle from zero should
+see the same rows with the numbers moving, not a readout changing shape.
+
+So every mesh of every kind reports in one `MeshReport` now: the shared fields
+— coprime, the count of pairs in contact, efficiency, the locking thresholds,
+the sliding at the pitch point, one `ContactPatch`, backlash, interference,
+tips — and what only one contact has in `LineContact` (the transverse
+decomposition and the operating angle) or `PointContact` (the zone as the
+faces leave it, the parallel counterpart). The three kinds that build a line
+contact fill it through one `line_mesh_report`, so the degenerate values —
+sliding at zero, locking at *never*, the line's patch — are written once. The
+front end's two readouts are one `meshRows`; the CLI's two printers read one
+type; `StageResult::meshes()` walks a worm's mesh as it walks every other.
+
+**Where the two contacts meet was then measured**, which nothing had done —
+the earlier gates each held one *field* at the limit and none had compared the
+reports. On the 17/43 pair a hundredth of a degree off parallel, the contact
+centred and the face wide enough that the line governs, the pitch-point
+pressure meets to a part in 10⁵ at no friction; the seams are two:
+
+- **1.5 % at the pitch point with friction**, and it is the flank load
+  convention: the crossed balance presses with `μ F_n` along a sliding
+  direction that stays finite as the sliding speed vanishes, the line rating
+  presses with the transverse projection alone, as ISO does. Two conventions,
+  each standard where it lives; recorded, not closed.
+- **5 % at the worst point**, because *one pair carries everything* is a
+  different point on each: a transverse base pitch in from the path's ends on
+  a line, a normal base pitch in along the line of action on a point — the
+  zones agree to a micron and the pitches differ by `cos² β_b`. A different
+  measure, like the contact ratio, and not compared as if it were one.
+
+The measurement found a fault on the way. `hertz::peak_pressure` is the larger
+of the ellipse and the line the teeth have, and the crossed patch reported the
+*ellipse's* minor axis under whichever pressure won — so a near-parallel pair
+rated as a line contact reported a patch a quarter as wide as the line it was
+rated on. The patch is the governing model's now, with the line's half-width
+`2 ρ p / E*` closed form from what the rating has in hand, and the same closed
+form gives every line contact its width. The corpus did not move: the worm
+canary's ellipse governs, and no recorded case printed a near-parallel patch.
+
+**And one number was declined.** A line contact's loss is exactly linear in
+`μ`, so its locking threshold has a closed form, `μ / (1 − η)` — about 5 on
+the shipped pair — and the first draft reported it. The friction balance a
+hundredth of a degree off parallel puts the threshold at half that and
+asymmetric; a first-order model extrapolated to `μ ≈ 5` describes nothing.
+`locking_friction` is *never* on every line contact, and the field says why.
+
+> **Gates, run.** The limit test asserts the seams are *there* as well as
+> bounded — a version that closed the single-pair gap would be asserting an
+> agreement the models do not have — and the corpus was what caught a
+> curvature printed where a radius belonged, on the first run.
+
+### The line count, before and after
+
+Counted from the tree at each commit — Rust production code and its comments
+with the test modules split off, the front end without the generated wire,
+and the documents:
+
+| | `4daa05a` before | `1d49a9d` one primitive | now, one report |
+|---|---|---|---|
+| Rust, production code | 15,993 | 16,048 | 16,020 |
+| Rust, comment in that code | 12,832 | 12,850 | 12,869 |
+| Rust, tests (code and comment) | 25,936 | 26,146 | 26,283 |
+| front end, code | 4,745 | 4,588 | 4,545 |
+| documents | 7,124 | 7,343 | 7,374 |
+
+**The core did not shrink, and it should be said plainly.** Deleting the worm
+type removed 1,105 lines of stage code and the pair and crossed solves are
+966; but `mod.rs` grew by the report types and their builder, and the CLI by
+the table it could not print before. Rust production is 27 lines longer than
+before the phase, for a worm that has a shift, an addendum, an interference
+check and a mode 3, a crossed pair whose shifts reach its mesh, a helical pair
+that can be sized to a housing, and one report where there were two. The
+front end is 200 lines shorter with two forms and two readouts become one
+each. That is the honest shape of the change: not less code, the same code
+doing more, once.
+
 ### What is recorded as not done
 
-- **The result shapes stayed where the physics differs.** `MeshReport` and
-  `CrossedMesh` are two types because a line contact and a point contact
-  report different things; what they share is read through `PairMesh`. A
-  further merge would be `Option`s and apologies.
 - **A crossed pair's shift optimiser.** The search is the parallel mesh's; a
   crossed objective would be the path-averaged friction balance over the rack
   law's distance, and the interference wall is already there to bound it. Not

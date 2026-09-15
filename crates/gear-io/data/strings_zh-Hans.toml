@@ -301,7 +301,6 @@ train_common_to_both_meshes = "两处啮合共用——行星轮的变位使二�
 train_contact_peak_cyclic = "接触，峰值 / 循环"
 train_contact_ratio = "重合度"
 train_contact_stress = "接触应力"
-train_contact_stress_at_pitch_point = "接触应力，节点处"
 train_contact_travel = "接触行程"
 train_continuous = "连续"
 train_coprime = "齿数互质"

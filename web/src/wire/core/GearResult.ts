@@ -43,6 +43,17 @@ pitch_diameter: number,
  */
 helix_angle: number, 
 /**
+ * Lead angle, degrees — `90° − |β|`, the same fact from the other datum. A
+ * worm is described by how far its thread advances, a gear by how far its
+ * tooth leans; both are reported because a pair is entered either way.
+ */
+lead_angle: number, 
+/**
+ * Lead, mm — how far a point on the flank advances per revolution,
+ * `π d tan γ`. `None` on a spur gear, whose flank does not advance.
+ */
+lead: number | null, 
+/**
  * Torque on this gear, N·m, driving forward at peak.
  */
 torque: number, 

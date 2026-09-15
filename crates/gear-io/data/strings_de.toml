@@ -305,7 +305,6 @@ train_common_to_both_meshes = "beiden Eingriffen gemeinsam — die Profilverschi
 train_contact_peak_cyclic = "Flanke, Spitze / zyklisch"
 train_contact_ratio = "Überdeckung"
 train_contact_stress = "Flankenpressung"
-train_contact_stress_at_pitch_point = "Flankenpressung, im Wälzpunkt"
 train_contact_travel = "Berührweg"
 train_continuous = "Dauerbetrieb"
 train_coprime = "Teilerfremd"

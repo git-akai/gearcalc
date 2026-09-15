@@ -1393,9 +1393,7 @@ pub fn solve_planetary_stage_with(
         backlash: set_backlash,
         speeds: forward.speeds,
         torques: forward.torques,
-        sun_planet: MeshReport {
-            flank_interference: sp_mesh.flank_interference([sun.flank_ends(), planet.flank_ends()]),
-            operating_pressure_angle: sp_mesh.alpha_w.to_degrees(),
+        sun_planet: super::line_mesh_report(super::LineMesh {
             coprime: super::gcd(teeth.sun, teeth.planet) == 1,
             contact_ratios: ContactRatios::of(
                 sp_path.contact_ratio,
@@ -1403,25 +1401,20 @@ pub fn solve_planetary_stage_with(
                 stage.helix_angle,
                 stage.module,
             ),
+            operating_pressure_angle: sp_mesh.alpha_w.to_degrees(),
             efficiency: sp_eff,
-            contact_stress_at_pitch_point: LoadCase::of(|c| {
-                sp_cs.at_pitch_point * sp_scale.get(c).sqrt()
+            contact: LoadCase::of(|c| {
+                super::ContactPatch::line(&sp_cs, *sp_scale.get(c), sp_width, sp_e)
             }),
-            relative_radius: sp_cs.relative_radius,
             backlash: [
                 backlash_of(&sp_mesh, MeshSide::First),
                 backlash_of(&sp_mesh, MeshSide::Second),
             ],
+            flank_interference: sp_mesh.flank_interference([sun.flank_ends(), planet.flank_ends()]),
             // Sun to planet is an external mesh.
             tips: None,
-        },
-        planet_ring: MeshReport {
-            // **The ring answers as a ring**, not as the `Tooth` the mesh
-            // arithmetic reads it through: its flank runs outwards from its tip
-            // and ends at its shaper's fillet, which only a `Ring` knows.
-            flank_interference: pr_mesh
-                .flank_interference([planet.flank_ends(), ring.flank_ends()]),
-            operating_pressure_angle: pr_mesh.alpha_w.to_degrees(),
+        }),
+        planet_ring: super::line_mesh_report(super::LineMesh {
             coprime: super::gcd(teeth.planet, teeth.ring) == 1,
             contact_ratios: ContactRatios::of(
                 pr_path.contact_ratio,
@@ -1429,20 +1422,25 @@ pub fn solve_planetary_stage_with(
                 stage.helix_angle,
                 stage.module,
             ),
+            operating_pressure_angle: pr_mesh.alpha_w.to_degrees(),
             efficiency: pr_eff,
-            contact_stress_at_pitch_point: LoadCase::of(|c| {
-                pr_cs.at_pitch_point * pr_scale.get(c).sqrt()
+            contact: LoadCase::of(|c| {
+                super::ContactPatch::line(&pr_cs, *pr_scale.get(c), pr_width, pr_e)
             }),
-            relative_radius: pr_cs.relative_radius,
             backlash: [
                 backlash_of(&pr_mesh, MeshSide::First),
                 backlash_of(&pr_mesh, MeshSide::Second),
             ],
+            // **The ring answers as a ring**, not as the `Tooth` the mesh
+            // arithmetic reads it through: its flank runs outwards from its tip
+            // and ends at its shaper's fillet, which only a `Ring` knows.
+            flank_interference: pr_mesh
+                .flank_interference([planet.flank_ends(), ring.flank_ends()]),
             // **And planet to ring is not**, which is the whole of what this
             // field is for: the set has an internal mesh in it and had never
             // been asked the three questions one answers.
             tips: super::TipRoom::of(&ring, &planet),
-        },
+        }),
         equal_spacing: layout.equal_spacing,
         simultaneous_meshing: layout.simultaneous_meshing,
         planet_clearance: clearance,
@@ -2057,14 +2055,15 @@ mod tests {
         for (s, p, r) in [(24u32, 18u32, 60u32), (17, 17, 52), (30, 15, 62)] {
             let res = solved(s, p, r);
             assert!(
-                res.planet_ring.contact_ratios.transverse
-                    > res.sun_planet.contact_ratios.transverse,
+                res.planet_ring.line.unwrap().contact_ratios.transverse
+                    > res.sun_planet.line.unwrap().contact_ratios.transverse,
                 "z={s}/{p}/{r}: internal contact ratio {} not above external {}",
-                res.planet_ring.contact_ratios.transverse,
-                res.sun_planet.contact_ratios.transverse
+                res.planet_ring.line.unwrap().contact_ratios.transverse,
+                res.sun_planet.line.unwrap().contact_ratios.transverse
             );
             assert!(
-                res.planet_ring.relative_radius > res.sun_planet.relative_radius,
+                res.planet_ring.contact.peak.curvature_across
+                    < res.sun_planet.contact.peak.curvature_across,
                 "z={s}/{p}/{r}: internal relative radius should be the larger"
             );
             // ...and a ring's tooth is the stronger, so it carries the less
@@ -2305,7 +2304,10 @@ mod tests {
                 "helix={helix}: planet"
             );
             assert!(r.ring.bending_stress.peak.is_some(), "helix={helix}: ring");
-            assert!(r.sun_planet.contact_ratios.overlap > 0.0, "helix={helix}");
+            assert!(
+                r.sun_planet.line.unwrap().contact_ratios.overlap > 0.0,
+                "helix={helix}"
+            );
             assert!(r.planet.shift_residual < 1e-12);
         }
     }
@@ -2414,8 +2416,8 @@ mod tests {
         );
         // Both meshes stay continuous by at least the margin asked for.
         for eps in [
-            tuned.sun_planet.contact_ratios.transverse,
-            tuned.planet_ring.contact_ratios.transverse,
+            tuned.sun_planet.line.unwrap().contact_ratios.transverse,
+            tuned.planet_ring.line.unwrap().contact_ratios.transverse,
         ] {
             let asked = free().optimisation.min_contact_ratio;
             assert!(eps >= asked - 1e-3, "contact ratio {eps} under {asked}");

@@ -386,7 +386,6 @@ train_common_to_both_meshes = "common to both meshes — the planet's shift is w
 train_contact_peak_cyclic = "contact, peak / cyclic"
 train_contact_ratio = "Contact ratio"
 train_contact_stress = "Contact stress"
-train_contact_stress_at_pitch_point = "Contact stress, at pitch point"
 train_contact_travel = "Contact travel"
 train_continuous = "Continuous"
 train_coprime = "Coprime"

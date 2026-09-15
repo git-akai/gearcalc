@@ -1397,9 +1397,11 @@ flanks are involute helicoids on cylinders, a worm is a helical gear with a
 few starts at a steep helix, and its wheel is a helical gear at the
 complementary one; everything a gear can be asked, both can be asked. So
 `Stage::Spur` and `Stage::Worm` carry one `PairStage` now and produce one
-`PairResult`, and what genuinely differs — the mesh — is the one place the
-result branches: `PairMesh::Line` for parallel axes, `PairMesh::Point` for
-crossed. A kind is a *layer* over that primitive: a preset, the words a
+`PairResult` with one `MeshReport` — the mesh being one model with the shaft
+angle as a parameter, so the same rows with the numbers moving rather than a
+readout changing shape, and what only a line or only a point contact has in a
+`LineContact` or a `PointContact` beside them. A kind is a *layer* over that
+primitive: a preset, the words a
 designer uses, which inputs a panel shows, and the conventional proportions a
 worm's faces take ([`PairKind`]). It costs the core one enum read in one
 place, and it bought the worm a shift, an addendum, an interference check and

@@ -306,7 +306,6 @@ train_common_to_both_meshes = "comum aos dois engrenamentos — a correção do 
 train_contact_peak_cyclic = "contato, pico / cíclico"
 train_contact_ratio = "Razão de contato"
 train_contact_stress = "Tensão de contato"
-train_contact_stress_at_pitch_point = "Tensão de contato, no ponto primitivo"
 train_contact_travel = "Percurso de contato"
 train_continuous = "Contínuo"
 train_coprime = "Primos entre si"

@@ -16,7 +16,6 @@
     type Note,
     type Cutter,
     type PairResult,
-    type CrossedMesh,
     type MeshReport,
     type LoadSharing,
     note,
@@ -349,40 +348,75 @@
      happened to the planetary section. What genuinely differs is passed in: a
      ring's root belongs to its cutter, a planet's shift is solved rather than
      chosen, and a member may have something of its own to report. -->
-<!-- **What one parallel-axis mesh reports**, drawn once for every stage that has
-     more than one of them.
+<!-- **What one mesh reports**, drawn once for every mesh of every stage.
 
-     A `MeshReport` is the same six figures whether it is an epicyclic set's
-     sun–planet pair or a hula stage's, and both were drawing them out
-     separately — which is how the axial-overlap warning came to appear on a
-     spur pair alone and the contact-ratio one on a hula alone, though either
-     mesh can be the one that loses contact. Rows rather than a whole list, so a
-     stage with something of its own to say puts it in the same `<dl>` before or
-     after these; `members` names the two ends the one gap is seen from, in the
-     order the mesh was built. -->
-{#snippet meshRows(m: MeshReport | undefined, members: [string, string], helical: boolean)}
+     A `MeshReport` is the same shape whether it is a spur pair's, a worm's, an
+     epicyclic set's sun–planet pair or a hula stage's: the shared rows first,
+     then the little only a line contact has (the transverse decomposition and
+     the operating angle) or only a point contact has (the zone as the faces
+     leave it, the parallel counterpart). A crossed pair used to have a readout
+     of its own beside this one, and before that the spur stage did — each a
+     second place the same row could be drawn differently. `members` names the
+     two ends the one gap is seen from, in the order the mesh was built;
+     `notes` is the stage's, for the lock notes drawn beside the efficiency. -->
+{#snippet meshRows(
+  m: MeshReport | undefined,
+  members: [string, string],
+  helical: boolean,
+  notes: Note[] = [],
+)}
   <dt>{t("ui.train_coprime")}</dt>
   <dd>{m === undefined ? BLANK : m.coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
-  <dt>{t("ui.train_operating_pressure_angle")}</dt>
-  <dd>{num(m?.operating_pressure_angle, 3)}{m ? "°" : BLANK}</dd>
+  {#if m?.line}
+    <dt>{t("ui.train_operating_pressure_angle")}</dt>
+    <dd>{num(m.line.operating_pressure_angle, 3)}°</dd>
+  {/if}
   <dt>{t("ui.train_contact_ratio")}</dt>
   <dd>
-    {#if m}
-      <span class:warn={m.contact_ratios.transverse < 1}>
-        ε<sub>α</sub> {num(m.contact_ratios.transverse, 4)}
+    {#if m?.line}
+      {@const r = m.line.contact_ratios}
+      <span class:warn={r.transverse < 1}>
+        ε<sub>α</sub> {num(r.transverse, 4)}
       </span>
       · ε<sub>β</sub>
-      {num(m.contact_ratios.overlap, 4)} · ε<sub>γ</sub>
-      {num(m.contact_ratios.total, 4)}
-      {#if m.contact_ratios.transverse < 1}
+      {num(r.overlap, 4)} · ε<sub>γ</sub>
+      {num(r.total, 4)}
+      {#if r.transverse < 1}
         <small class="warn">{t("ui.train_note_contact_ratio_below_one")}</small>
-      {:else if helical && m.contact_ratios.overlap < 1}
+      {:else if helical && r.overlap < 1}
         <small class="warn">{t("ui.train_no_full_axial_overlap")}</small>
       {/if}
+    {:else if m?.point}
+      <span class:warn={m.contact_ratio < 1}>
+        ε {num(m.contact_ratio, 4)}
+      </span>
+      <small class:warn={m.contact_ratio < 1}>
+        {m.contact_ratio < 1
+          ? t("ui.train_note_contact_ratio_below_one")
+          : t("ui.train_crossed_pairs_in_contact", {
+              limit: t(
+                m.point.limited_by === "face"
+                  ? "ui.train_limited_by_face_width"
+                  : "ui.train_limited_by_teeth",
+              ),
+            })}
+      </small>
     {/if}
   </dd>
   <dt>{t("ui.train_mesh_efficiency")}</dt>
-  <dd>{bothWays(m?.efficiency)}</dd>
+  <dd>
+    {bothWays(m?.efficiency)}
+    {#if lockNote(notes)}
+      <small class="warn">{lockNote(notes)}</small>
+    {/if}
+    {#if m?.point?.parallel_axis_efficiency != null}
+      <small>
+        {t("ui.train_parallel_shafts_would_give", {
+          percent: pct(m.point.parallel_axis_efficiency),
+        })}
+      </small>
+    {/if}
+  </dd>
   <!-- One gap, seen from each of its two ends, with the tolerance band on the
        first — the way every other mesh here writes its play. -->
   <dt>{t("ui.train_mesh_backlash")}</dt>
@@ -397,17 +431,43 @@
       member: members[1],
     })}
   </dd>
-  <!-- The one figure both members share: same patch, same normal force, same
-       E*, one instant. Each member's own rating is on its card and is this or
-       worse. -->
-  <dt>{t("ui.train_contact_stress_at_pitch_point")}</dt>
+  <!-- Every mesh has a locking threshold and a sliding at the pitch point;
+       a line contact's are *never* and *zero*, and are shown where the
+       shafts cross, which is where they are the numbers a designer reads. -->
+  {#if m?.point}
+    <dt>{t("ui.train_locks_at")}</dt>
+    <dd>{locksAt(m.locking_friction)}</dd>
+    <dt>{t("ui.train_sliding_speed")}</dt>
+    <dd>{num(m.sliding_velocity, 1)} mm/s</dd>
+  {/if}
+  <!-- The one patch both members share: same normal force, same E*, one
+       instant — an ellipse on crossed shafts, a line on parallel ones, and
+       the same rows either way. Each member's own rating is on its card and
+       is this or worse. -->
+  <dt>{t("ui.train_contact_stress")}</dt>
   <dd>
-    {cases(m?.contact_stress_at_pitch_point, 1)} {m && t("ui.train_mpa")}
+    {cases(m && { peak: m.contact.peak.max_pressure, cyclic: m.contact.cyclic.max_pressure }, 1)} {m && t("ui.train_mpa")}
     <small>{t("ui.train_peak_cyclic")}</small>
-    <small>{m ? `ρ ${num(m.relative_radius, 3)} mm` : BLANK}</small>
+    <small>
+      {#if m}
+        {t("ui.train_patch", {
+          length: num(m.contact.peak.patch_length, 4),
+          width: num(m.contact.peak.patch_width, 4),
+        })} ·
+        {Math.abs(m.contact.peak.worst_position) < 1e-9
+          ? t("ui.train_worst_at_pitch_point")
+          : t("ui.train_worst_along_the_path", {
+              position: num(m.contact.peak.worst_position, 3),
+            })}
+        · {t("ui.train_pitch_point_alone_gives", {
+          stress: num(m.contact.peak.at_pitch_point, 1),
+        })}
+        · ρ {num(1 / m.contact.peak.curvature_across, 3)} mm
+      {/if}
+    </small>
   </dd>
   <!-- **Which conditions bite, and nothing when none do.** Drawn for **every**
-       mesh now. A tip reaching past the usable end of the flank it meshes with
+       mesh. A tip reaching past the usable end of the flank it meshes with
        is the classical interference condition and belongs to any pair; it was
        asked of internal meshes under two names — trochoid and involute — and of
        external ones not at all, though a long addendum on a small pinion is
@@ -431,128 +491,22 @@
       {/each}
     </dd>
   {/if}
-{/snippet}
-
-<!-- What a crossed-axis mesh reports, whether it was entered as a worm stage or
-     as a gear pair with its shafts turned: the same mathematics answers both
-     (docs/reference.md#crossed-axes), so it is one readout rather than two that drift. -->
-{#snippet screwReadout(r: PairResult | undefined, m: CrossedMesh, members: [string, string])}
-<!-- Ordered to match the spur stage's shared readout — centre distance,
-     contact ratio, efficiency, backlash — with what only a screw pair has
-     following on. The backlash lives here rather than on the two member cards
-     for the same reason it does there: it is one gap seen from two ends, not a
-     property either member owns. -->
-<dl class="out">
-  <dt>{t("ui.train_centre_distance")}</dt>
-  <dd>
-    {num(r?.centre_distance, 4)} mm
-    <small>{t("ui.train_nominal_value", { value: num(r?.centre_distance_nominal, 4) })}</small>
-  </dd>
-  <dt>{t("ui.train_lead_angle")}</dt>
-  <dd>
-    {num(m.lead_angles[0], 4)}° · {num(m.lead_angles[1], 4)}°
-    <small>{t("ui.train_lead")} {num(m.lead, 4)} mm</small>
-  </dd>
-  {#if m.zone}
-    <dt>{t("ui.train_contact_ratio")}</dt>
-    <dd>
-      <span class:warn={m.zone.contact_ratio < 1}>
-        ε {num(m.zone.contact_ratio, 4)}
-      </span>
-      <small>
-        {m.zone.contact_ratio < 1
-          ? t("ui.train_note_contact_ratio_below_one")
-          : t("ui.train_crossed_pairs_in_contact", {
-              limit: t(
-                m.zone.limited_by === "face"
-                  ? "ui.train_limited_by_face_width"
-                  : "ui.train_limited_by_teeth",
-              ),
-            })}
-      </small>
-    </dd>
-  {/if}
-  <!-- The same verdict every mesh gives, in the same words as `meshRows`:
-       whether either member's tip reaches past the other's usable flank. -->
-  <dt>{t("ui.train_interference")}</dt>
-  <dd>
-    {#each [[
-      m.flank_interference[0] ? t("ui.train_interference_flank", { member: members[0] }) : null,
-      m.flank_interference[1] ? t("ui.train_interference_flank", { member: members[1] }) : null,
-    ].filter((x) => x !== null)] as fouling (0)}
-      <span class:warn={fouling.length > 0}>
-        {fouling.join(" · ") || t("ui.train_interference_none")}
-      </span>
-    {/each}
-  </dd>
-  <dt>{t("ui.train_mesh_efficiency")}</dt>
-  <dd>
-    {bothWays(m.efficiency)}
-    {#if lockNote(r?.notes ?? [])}
-      <small class="warn">{lockNote(r?.notes ?? [])}</small>
-    {/if}
-    {#if m.parallel_axis_efficiency != null}
-      <small>
-        {t("ui.train_parallel_shafts_would_give", {
-          percent: pct(m.parallel_axis_efficiency),
-        })}
-      </small>
-    {/if}
-  </dd>
-  <dt>{t("ui.train_backlash")}</dt>
-  <dd>
-    {t("ui.train_backlash_at", {
-      angle: num(m.backlash[1].nominal, 5),
-      member: members[1],
-    })}
-    <small
-      >{range(num(m.backlash[1].minimum, 5), num(m.backlash[1].maximum, 5))}</small
-    >
-    · {t("ui.train_backlash_at", {
-      angle: num(m.backlash[0].nominal, 5),
-      member: members[0],
-    })}
-  </dd>
-  <dt>{t("ui.train_locks_at")}</dt>
-  <dd>{locksAt(m.locking_friction)}</dd>
-  <dt>{t("ui.train_contact_stress")}</dt>
-  <dd>
-    {cases({ peak: m.contact.peak.max_pressure, cyclic: m.contact.cyclic.max_pressure }, 1)} {t("ui.train_mpa")}
-    <small>{t("ui.train_peak_cyclic")}</small>
-    <small>
-      {t("ui.train_patch", {
-        length: num(m.contact.peak.patch_length, 4),
-        width: num(m.contact.peak.patch_width, 4),
-      })} ·
-      {Math.abs(m.contact.peak.worst_position) < 1e-9
-        ? t("ui.train_worst_at_pitch_point")
-        : t("ui.train_worst_along_the_path", {
-            position: num(m.contact.peak.worst_position, 3),
-          })}
-      · {t("ui.train_pitch_point_alone_gives", {
-        stress: num(m.contact.peak.at_pitch_point, 1),
-      })}
-    </small>
-  </dd>
-  <dt>{t("ui.train_sliding_speed")}</dt>
-  <dd>{num(m.sliding_velocity, 1)} mm/s</dd>
-  <dt>{t("ui.train_bending_stress")}</dt>
-  <dd>
-    <small>{t("ui.train_not_reported_for_crossed_axes_no")}</small>
-  </dd>
-  <dt>{t("ui.train_flank_type")}</dt>
-  <dd>
-    {t("ui.train_flank_type_zi")}
-    <small>{t("ui.train_zn_worm_s_contact_stress_1")}</small>
-  </dd>
-  {#if m.zone}
+  {#if m?.point}
     <dt>{t("ui.train_contact_travel")}</dt>
     <dd>
-      {num(m.zone.axial_travel[0], 3)} · {num(m.zone.axial_travel[1], 3)} mm
+      {num(m.point.axial_travel[0], 3)} · {num(m.point.axial_travel[1], 3)} mm
       <small>{t("ui.train_along_each_member_s_own_axis")}</small>
     </dd>
+    <dt>{t("ui.train_bending_stress")}</dt>
+    <dd>
+      <small>{t("ui.train_not_reported_for_crossed_axes_no")}</small>
+    </dd>
+    <dt>{t("ui.train_flank_type")}</dt>
+    <dd>
+      {t("ui.train_flank_type_zi")}
+      <small>{t("ui.train_zn_worm_s_contact_stress_1")}</small>
+    </dd>
   {/if}
-</dl>
 {/snippet}
 
 {#snippet gearCard(
@@ -1381,8 +1335,6 @@
              they are not (docs/reference.md#crossed-axes). -->
         {@const worm = stage.kind === "worm"}
         {@const pres = res && res.kind === "pair" ? res : null}
-        {@const line = pres && pres.mesh.kind === "line" ? pres.mesh : null}
-        {@const point = pres && pres.mesh.kind === "point" ? pres.mesh : null}
         {@const names: [string, string] = worm
           ? [t("ui.train_the_worm"), t("ui.train_the_wheel")]
           : [gearName(i, 0), gearName(i, 1)]}
@@ -1589,7 +1541,7 @@
                     teethLabel: worm && j === 0 ? "ui.train_starts" : undefined,
                     onShiftAuto: () => relieveStage(stage, { shift: j }),
                     faceWidth: worm ? "proportion" : stage.shaft_angle === 0 ? "rating" : "continuity",
-                    faceFromContinuity: point?.zone?.face_width_for_continuity?.[j],
+                    faceFromContinuity: pres?.mesh.point?.face_width_for_continuity?.[j],
                     faceRecommended: g?.recommended_face_width ?? undefined,
                     faceLabel: worm && j === 0 ? "ui.train_length" : undefined,
                   },
@@ -1597,24 +1549,28 @@
               {/each}
             </div>
 
-            {#if point}
-              {@render screwReadout(pres ?? undefined, point, names)}
-            {:else if line || !pres}
-              <dl class="out">
-                <dt>{t("ui.train_centre_distance")}</dt>
+            <dl class="out">
+              <dt>{t("ui.train_centre_distance")}</dt>
+              <dd>
+                {num(pres?.centre_distance, 4)} {pres && "mm"}
+                <small>{pres && t("ui.train_nominal_value", { value: num(pres.centre_distance_nominal, 4) })}</small>
+              </dd>
+              {#if worm && pres}
+                <dt>{t("ui.train_lead_angle")}</dt>
                 <dd>
-                  {num(pres?.centre_distance, 4)} {pres && "mm"}
-                  <small>{pres && t("ui.train_nominal_value", { value: num(pres.centre_distance_nominal, 4) })}</small>
+                  {num(pres.gears[0].lead_angle, 4)}° · {num(pres.gears[1].lead_angle, 4)}°
+                  <small>{t("ui.train_lead")} {num(pres.gears[0].lead, 4)} mm</small>
                 </dd>
-                <!-- What every parallel-axis mesh reports, drawn by the one
-                     snippet that draws it. -->
-                {@render meshRows(
-                  line ?? undefined,
-                  names,
-                  (pres?.gears[0].helix_angle ?? 0) !== 0,
-                )}
-              </dl>
-            {/if}
+              {/if}
+              <!-- What every mesh reports, drawn by the one snippet that draws
+                   it — the same rows whether the shafts are parallel or not. -->
+              {@render meshRows(
+                pres?.mesh,
+                names,
+                (pres?.gears[0].helix_angle ?? 0) !== 0,
+                pres?.notes ?? [],
+              )}
+            </dl>
             {#if restOfNotes(pres?.notes).length > 0}
               <ul class="notes">
                 {#each restOfNotes(pres?.notes) as n, i (i)}<li>{note(n)}</li>{/each}

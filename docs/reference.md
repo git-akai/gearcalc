@@ -1013,6 +1013,39 @@ it.
 exactly zero; a zero contact line presses with an unbounded pressure, which is
 what a face width of zero means. Only a zero load on a zero line has no answer.
 
+**And the patch reported is the governing model's**: the line's length and its
+half-width `b = 2 ρ p / E*` where the line governs, the ellipse's two axes
+where it does. Reporting the ellipse's minor axis under the line's pressure
+gave a near-parallel pair a patch a quarter as wide as the line it was rated
+as.
+
+**One mesh report, and where the two contacts meet — measured.** Every mesh,
+on parallel shafts or crossed, reports through one `MeshReport`: the physics
+is one model with the shaft angle as a parameter, so a designer turning a
+shaft angle from zero sees the same rows with the numbers moving. Each field
+that claims to meet at the limit is held to a size, on the shipped 17/43 pair
+a hundredth of a degree off parallel, the contact centred and the face wide
+enough that the line governs:
+
+<!-- figures-by-test: the_two_contacts_report_one_patch_at_the_limit -->
+| field | meets by | why not exactly |
+|---|---|---|
+| pressure at the pitch point, `μ = 0` | a part in 10⁵ | — |
+| pressure at the pitch point, `μ = 0.08` | 1.5 % | the flank load: the crossed balance presses with `μ F_n` along a sliding direction that stays finite as the speed vanishes; the line rating uses the transverse projection alone, as ISO does |
+| peak pressure | 5 % | *one pair carries everything* is a different point: a transverse base pitch in from the path's ends on a line, a normal base pitch in along the line of action on a point, `cos² β_b` apart |
+| curvature across, patch width | a tenth | they travel with that point |
+| sliding at the pitch point | to zero | — |
+| efficiency | first order in `μ` | its own gate |
+| backlash | second order in the error | its own gate |
+| contact ratio | not compared | a different measure: lines across the face against points along one line |
+
+The two that are not zero are seams between two conventions, each standard
+within its own model, and are recorded rather than closed. A line contact's
+locking threshold is reported as *never* rather than as the `μ / (1 − η)` its
+first-order loss extrapolates to — about 5 on the shipped pair — because that
+is outside anything the model describes: the friction balance a hundredth of
+a degree off parallel puts the threshold at half that, and asymmetric.
+
 **Which points are checked.** Since `ρ₁ + ρ₂` is constant along the path, the
 relative radius peaks where the two are equal and falls away toward **both**
 ends. That balance point swaps sides with the labelling, so **both** single-pair

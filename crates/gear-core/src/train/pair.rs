@@ -13,15 +13,17 @@
 //! What genuinely differs is the **mesh**, and it must: parallel axes touch
 //! along a line and lose power to sliding along the profile, crossed axes touch
 //! at a point and slide lengthwise. So this file solves the parallel mesh and
-//! [`super::crossed`] the crossed one, both into one [`super::PairResult`] whose
-//! [`super::PairMesh`] says which it was. A worm stage used to be a separate
+//! [`super::crossed`] the crossed one, both into one [`super::PairResult`]
+//! whose [`super::MeshReport`] is one shape for either — the physics being one
+//! model with the shaft angle as a parameter, and every field that meets at
+//! the limit measured to. A worm stage used to be a separate
 //! type with a separate result — no profile shift, no addendum, members that
 //! were not gears — and its centre distance could only be reached by resizing
 //! the worm. It is `AUDIT.md`'s F83 that made it this.
 
 use super::{
-    Backlash, Case, ContactRatios, GearResult, LoadCase, Loading, MemberRating, MeshReport,
-    PairMesh, PairResult, StageGear, StageTorques, TrainError, PROBE,
+    Backlash, Case, ContactPatch, ContactRatios, GearResult, LoadCase, Loading, MemberRating,
+    PairResult, StageGear, StageTorques, TrainError, PROBE,
 };
 use crate::auto::automatic_profile_shift;
 use crate::contact::{efficiency, ContactPath, Directional, LoadSharing};
@@ -252,9 +254,10 @@ pub enum FirstMemberSizing {
 /// line and lose power to sliding along the profile, while crossed axes touch
 /// at a point and slide lengthwise. Those are different mechanisms with
 /// different formulas and different results (docs/reference.md#crossed-axes),
-/// so a crossed pair answers with a point-contact mesh — a contact ratio along
-/// the line of action, no bending, two efficiencies — and says so
-/// ([`super::PairMesh`]).
+/// so a crossed pair's mesh report carries a contact ratio along the line of
+/// action, no bending and two efficiencies — in the same [`super::MeshReport`]
+/// a parallel pair's does, with [`super::PointContact`] where the other has
+/// [`super::LineContact`].
 ///
 /// # One relation among five inputs
 ///
@@ -310,7 +313,7 @@ pub struct PairStage {
     /// **Read only where something is free to absorb it** — the automatic
     /// centre distance, which is this opened out, or the shifts when they are
     /// being chosen. Given a distance with nothing free, it is not read at all
-    /// and the backlash is a consequence; `solve_spur_stage` is where that
+    /// and the backlash is a consequence; `solve_parallel` is where that
     /// happens and is the whole of the rule.
     pub clearance: Auto<f64>,
     pub tolerance_plus: f64,
@@ -1234,38 +1237,36 @@ fn solve_parallel(
         // The gap the pair runs at, which is the two distances above it and a
         // subtraction rather than the input echoed back.
         clearance: centre - mesh.a_w,
-        mesh: PairMesh::Line(MeshReport {
-            // **Asked of the mesh as it runs**, opened by the assembly
-            // clearance — which is the mesh every other figure here is read off,
-            // and the less conservative of the two: opening a centre distance
-            // moves a tip away from the flank it might have reached.
-            flank_interference: mesh.flank_interference([g[0].flank_ends(), g[1].flank_ends()]),
-            operating_pressure_angle: mesh.alpha_w.to_degrees(),
-            coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
-            contact_ratios,
+        mesh: {
             // Breaking away is decided at rest, running is decided sliding —
             // one rule, applied to every stage kind (`Directional::once_moving`).
             // A parallel-axis mesh is never near the threshold, so this passes
             // the sliding figure through and always will; it is here so there is
             // no stage kind the rule has to be remembered for.
-            efficiency: {
-                let with =
-                    |mu: f64| Directional::of(|d| efficiency(&path, &operating, &g[0], mu, d));
-                with(stage.sliding_friction).once_moving(&with(stage.static_friction))
-            },
-            contact_stress_at_pitch_point: LoadCase {
-                peak: rated.peak.0.at_pitch_point,
-                cyclic: rated.cyclic.0.at_pitch_point,
-            },
-            relative_radius: rated.peak.0.relative_radius,
-            // Per member, in the order the mesh was built — which
-            // `MeshReport::backlash_by_drive` is the one place that turns into
-            // the per-direction reading a stage reports.
-            backlash,
-            // A parallel-axis pair is external: its tips meet on the line of
-            // centres or not at all, which `bottom_clearance` already asks.
-            tips: None,
-        }),
+            let with = |mu: f64| Directional::of(|d| efficiency(&path, &operating, &g[0], mu, d));
+            super::line_mesh_report(super::LineMesh {
+                coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
+                contact_ratios,
+                operating_pressure_angle: mesh.alpha_w.to_degrees(),
+                efficiency: with(stage.sliding_friction).once_moving(&with(stage.static_friction)),
+                // Each case evaluated at its own load, so nothing scales.
+                contact: LoadCase::of(|c| {
+                    ContactPatch::line(&rated.get(c).0, 1.0, effective, e_star)
+                }),
+                // Per member, in the order the mesh was built — which
+                // `MeshReport::backlash_by_drive` is the one place that turns into
+                // the per-direction reading a stage reports.
+                backlash,
+                // **Asked of the mesh as it runs**, opened by the assembly
+                // clearance — which is the mesh every other figure here is read off,
+                // and the less conservative of the two: opening a centre distance
+                // moves a tip away from the flank it might have reached.
+                flank_interference: mesh.flank_interference([g[0].flank_ends(), g[1].flank_ends()]),
+                // A parallel-axis pair is external: its tips meet on the line of
+                // centres or not at all, which `bottom_clearance` already asks.
+                tips: None,
+            })
+        },
         gears: [gears[0].clone(), gears[1].clone()],
         notes,
     })

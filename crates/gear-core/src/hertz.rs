@@ -292,13 +292,34 @@ pub fn peak_pressure(
     if line_length == 0.0 && load == 0.0 {
         return None;
     }
-    let line = (load / line_length * curvature_across * e_star / PI).sqrt();
+    let line = line_pressure(curvature_across, load, line_length, e_star);
     // A patch that cannot exist — no load, say — carries no pressure, which the
     // line term still can. So a failed ellipse contributes zero rather than
     // refusing the whole answer.
     let elliptical = elliptical_contact(curvature_along, curvature_across, load, e_star)
         .map_or(0.0, |c| c.max_pressure);
     Some(line.max(elliptical))
+}
+
+/// The line term of [`peak_pressure`] on its own: a load `F` spread along a
+/// line of length `L` against a relative curvature `1/ρ`,
+/// `p = √(F/L · E*/(π ρ))`. Infinite on a line of no length, which is the
+/// value a face of no width has.
+///
+/// Its half-width follows from the same two relations, `p = 2F/(π b L)` and
+/// the above, as [`line_half_width`] — so a caller that has the pressure need
+/// not carry the load to get the width.
+#[must_use]
+pub fn line_pressure(curvature_across: f64, load: f64, line_length: f64, e_star: f64) -> f64 {
+    (load / line_length * curvature_across * e_star / PI).sqrt()
+}
+
+/// The half-width of a line contact pressing at `max_pressure` against a
+/// relative curvature `1/ρ`: `b = 2 ρ p / E*`, closed form from what a rating
+/// already has in hand.
+#[must_use]
+pub fn line_half_width(curvature_across: f64, max_pressure: f64, e_star: f64) -> f64 {
+    2.0 * max_pressure / (curvature_across * e_star)
 }
 
 /// The two **relative** principal curvatures of a contacting pair, from each

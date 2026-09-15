@@ -1895,14 +1895,14 @@ mod tests {
         // Two meshes with their own answers, and every member rated.
         for mesh in ["sun_planet", "planet_ring"] {
             assert!(
-                stage[mesh]["contact_ratios"]["transverse"]
+                stage[mesh]["line"]["contact_ratios"]["transverse"]
                     .as_f64()
                     .unwrap()
                     > 1.0
             );
             for case in ["peak", "cyclic"] {
                 assert!(
-                    stage[mesh]["contact_stress_at_pitch_point"][case]
+                    stage[mesh]["contact"][case]["at_pitch_point"]
                         .as_f64()
                         .unwrap()
                         > 0.0
@@ -1990,14 +1990,19 @@ mod tests {
         for m in 0..2 {
             let mesh = &stage["meshes"][m];
             assert!(
-                mesh["report"]["contact_ratios"]["transverse"]
+                mesh["report"]["line"]["contact_ratios"]["transverse"]
                     .as_f64()
                     .unwrap()
                     > 0.0
             );
-            assert!(mesh["report"]["operating_pressure_angle"].as_f64().unwrap() > 0.0);
             assert!(
-                mesh["report"]["contact_stress_at_pitch_point"]["peak"]
+                mesh["report"]["line"]["operating_pressure_angle"]
+                    .as_f64()
+                    .unwrap()
+                    > 0.0
+            );
+            assert!(
+                mesh["report"]["contact"]["peak"]["at_pitch_point"]
                     .as_f64()
                     .unwrap()
                     > 0.0
@@ -2072,8 +2077,18 @@ mod tests {
         // Both stages are pairs, and each says which mesh it has.
         assert_eq!(v["stages"][0]["kind"], "pair");
         assert_eq!(v["stages"][1]["kind"], "pair");
-        assert_eq!(v["stages"][0]["mesh"]["kind"], "line");
-        assert_eq!(v["stages"][1]["mesh"]["kind"], "point");
+        // ...and one mesh report, saying which contact it is by what it
+        // carries: the transverse figures on parallel shafts, the zone on
+        // crossed ones.
+        assert!(
+            v["stages"][0]["mesh"]["line"].is_object() && v["stages"][0]["mesh"]["point"].is_null()
+        );
+        assert!(
+            v["stages"][1]["mesh"]["point"].is_object() && v["stages"][1]["mesh"]["line"].is_null()
+        );
+        // The sliding a line contact has at its pitch point is exactly none.
+        assert_eq!(v["stages"][0]["mesh"]["sliding_ratio"], 0.0);
+        assert!(v["stages"][1]["mesh"]["sliding_ratio"].as_f64().unwrap() > 1.0);
         assert!(
             v["stages"][0]["gears"][0]["bending_stress"]["peak"]
                 .as_f64()
@@ -2157,11 +2172,14 @@ mod tests {
         // A crossed gear pair is not a worm and has no published proportions,
         // and no parallel-axis member has any either.
         "recommended_face_width",
-        // A crossed pair whose teeth never meet has no zone of action, and
-        // one whose parallel counterpart cannot be built has nothing to be
-        // compared with.
-        "zone",
+        // A line contact has no zone as the faces leave it and a point contact
+        // no transverse decomposition; a point contact whose parallel
+        // counterpart cannot be built has nothing to be compared with; and a
+        // spur gear's flank does not advance, so it has no lead.
+        "line",
+        "point",
         "parallel_axis_efficiency",
+        "lead",
         // The train solved, so there is no failure to report.
         "failure",
         // A bound that does not exist on this geometry — see `auto::Ranges`.
@@ -2428,7 +2446,7 @@ mod tests {
         assert!((g0["speed"].as_f64().unwrap() - 3000.0).abs() < 1e-9);
         // Spur stage: the overlap ratio is exactly zero, not merely small.
         assert_eq!(
-            v["stages"][0]["mesh"]["contact_ratios"]["overlap"]
+            v["stages"][0]["mesh"]["line"]["contact_ratios"]["overlap"]
                 .as_f64()
                 .unwrap(),
             0.0
