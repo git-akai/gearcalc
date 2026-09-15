@@ -32,9 +32,16 @@ offset_nominal: number,
  */
 clearance: number, 
 /**
- * The offset actually run at, including the running clearance.
+ * The offset actually run at — the running clearance *inside* the
+ * zero-backlash one, both meshes being internal.
  */
 offset: number, 
+/**
+ * The running clearance, mm: the input, which both meshes have. Always
+ * given, for the reason a set's is ([`super::Stage::freedoms`]) — the
+ * shifts absorb the offset, so no given offset could hand it back.
+ */
+running_clearance: number, 
 /**
  * Which mesh sits at the clearance minimum, when the offset came from it.
  */

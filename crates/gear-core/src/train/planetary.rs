@@ -167,16 +167,19 @@ impl Default for PlanetaryStage {
             tolerance_minus: 0.02,
             min_planet_clearance: 0.3,
             cutter: Cutter::default(),
+            // `z_r = z_s + 2 z_p`, the ideal ring, on a sun small enough to
+            // need shift — so a fresh set shows what the automatic shift does
+            // rather than three zeros.
             sun: StageGear {
-                teeth: 24,
+                teeth: 12,
                 ..StageGear::default()
             },
             planet: StageGear {
-                teeth: 18,
+                teeth: 30,
                 ..StageGear::default()
             },
             ring: StageGear {
-                teeth: 60,
+                teeth: 72,
                 profile_shift: Auto::fixed(0.0),
                 ..StageGear::default()
             },
@@ -1638,7 +1641,7 @@ mod tests {
                     face_width: Auto::fixed(ring_face),
                     ..StageGear::default()
                 },
-                ..PlanetaryStage::default()
+                ..stage_of(24, 18, 60, 0.0)
             };
             let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &lib)
                 .unwrap_or_else(|e| panic!("ring face {ring_face}: {e}"));

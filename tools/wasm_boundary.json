@@ -441,7 +441,7 @@
       "tip_round": "0.20000000000000001"
      },
      "sun": {
-      "teeth": 24,
+      "teeth": 12,
       "profile_shift": {
        "auto": true,
        "manual": 0
@@ -481,7 +481,7 @@
       }
      },
      "planet": {
-      "teeth": 18,
+      "teeth": 30,
       "profile_shift": {
        "auto": true,
        "manual": 0
@@ -521,7 +521,7 @@
       }
      },
      "ring": {
-      "teeth": 60,
+      "teeth": 72,
       "profile_shift": {
        "auto": false,
        "manual": 0
@@ -817,23 +817,23 @@
    "ok": [
     [
      "en",
-     462
+     459
     ],
     [
      "de",
-     462
+     459
     ],
     [
      "pt",
-     462
+     459
     ],
     [
      "zh-Hans",
-     462
+     459
     ],
     [
      "zh-Hant",
-     462
+     459
     ]
    ]
   },
@@ -5347,7 +5347,7 @@
        "tip_round": "0.20000000000000001"
       },
       "sun": {
-       "teeth": 24,
+       "teeth": 12,
        "profile_shift": {
         "auto": true,
         "manual": "0.10000000000000001"
@@ -5387,7 +5387,7 @@
        }
       },
       "planet": {
-       "teeth": 18,
+       "teeth": 30,
        "profile_shift": {
         "auto": true,
         "manual": "0.10000000000000001"
@@ -5427,7 +5427,7 @@
        }
       },
       "ring": {
-       "teeth": 60,
+       "teeth": 72,
        "profile_shift": {
         "auto": false,
         "manual": "0.10000000000000001"

@@ -121,7 +121,7 @@ cargo run --bin gear-cli -- worm 1 40 7 90         # a worm pair, both direction
 cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
 cargo run --bin gear-cli -- crossed 17 23 90       # a crossed pair, swept over the split
 cargo run --bin gear-cli -- planetary 17 17 3      # every ring count that can work
-cargo run --bin gear-cli -- planetstage 24 18 60 3 # a planetary stage, six modes
+cargo run --bin gear-cli -- planetstage 12 30 72 3 # a planetary stage, six modes
 cargo run --bin gear-cli -- hula 18 0.2            # a hula stage, offset to teeth to ratings
 cargo run --release --bin gear-cli -- meshsweep 60 20 0.8   # roll an internal pair, the control
 cargo run --release --bin gear-cli -- hulasweep 18 0.25     # ...and a hula pair, where the tips cross
@@ -293,8 +293,11 @@ with the running clearance in both — their zero-backlash distances differing b
 twice it, the internal mesh opening as its centres close — the planet's by
 default, and the sun's or the ring's where the planet is pinned, which is one
 relation among three shifts and so two of them a design; the sun and ring cases
-are closed form where the planet's needs a solve. On the ideal ring that is the
-planet thinned by the clearance, and the shipped 24/18/60 carries −0.02. The
+are closed form where the planet's needs a solve. On an ideal ring with nothing
+else asked that is the planet thinned by the clearance; the shipped 12/30/72
+has a sun small enough to need shift, so it opens with +0.298 on the sun and
+−0.170 on the planet, and its planet–ring mesh fouls at a full-depth ring as
+the reference records. The
 ring search, layout checks, Willis kinematics, Pennestrì–Freudenstein
 efficiency in all six arrangements, and backlash referred to the output shaft —
 which on the ideal ring a centre tolerance cannot move, the sun mesh gaining

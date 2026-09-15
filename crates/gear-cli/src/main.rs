@@ -310,17 +310,17 @@ const COMMANDS: &[Command] = &[
     Command {
         name: "planetstage",
         args: "[z_sun] [z_planet] [z_ring] [N] [helix]",
-        summary: "a planetary stage in all six arrangements (24, 18, 60, 3)",
+        summary: "a planetary stage in all six arrangements (12, 30, 72, 3)",
         run: |a| {
             planetary_stage_report(
-                arg(a, 1, 24),
-                arg(a, 2, 18),
-                arg(a, 3, 60),
+                arg(a, 1, 12),
+                arg(a, 2, 30),
+                arg(a, 3, 72),
                 arg(a, 4, 3),
                 arg(a, 5, 0.0),
             );
         },
-        record: Record::Cases(&["planetstage 24 18 60 3"]),
+        record: Record::Cases(&["planetstage 12 30 72 3", "planetstage 24 18 60 3"]),
         slow: false
     },
     Command {

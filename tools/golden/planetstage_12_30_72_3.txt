@@ -1,0 +1,26 @@
+planetary stage  z 12/30/72  N=3  helix 0 deg  module 1  alpha 20 deg
+
+running centre distance 21.145279 mm (zero-backlash 21.125279 sun-planet, 21.165279 planet-ring; residual 0.0e0)  shifts +0.2981 / -0.1701 / +0.0000
+eps_a  sun-planet 1.437   planet-ring 1.973   eta_0 0.9730   even spacing true   planet gap 4.965 mm
+sun-planet flank interference  member 1 false  member 2 false
+planet-ring flank interference  member 1 true  member 2 false   tips false (+2.0231 deg of pinion)
+sigma_H at pitch  sun-planet 501.8 MPa   planet-ring 202.1 MPa
+sigma_F  sun 29.1 MPa   planet 33.8 MPa   ring 18.9 MPa
+
+    input      held    output        ratio  efficiency
+      sun   carrier      ring      -6.0000     97.295 %
+      sun      ring   carrier       7.0000     97.682 %
+  carrier       sun      ring       0.8571     99.604 %
+  carrier      ring       sun       0.1429     97.673 %
+     ring       sun   carrier       1.1667     99.614 %
+     ring   carrier       sun      -0.1667     97.295 %
+
+note: 3 planets assumed to share load equally; real sets do not without a floating member, and the remedy is a mesh-load factor this tool declines to apply
+
+centre distance given, shifts chosen to reach it
+a mm             x_sun  x_planet    x_ring    residual     eta_0
+20.9453        -0.1082    0.0345    0.0000     3.6e-15    0.9721
+21.0453         0.0914   -0.0660    0.0000     3.6e-15    0.9731
+21.1453         0.2981   -0.1701    0.0000     3.6e-15    0.9730
+21.2453         0.5115   -0.2774    0.0000       0.0e0    0.9714
+21.3453         0.7313   -0.3879    0.0000       0.0e0    0.9684

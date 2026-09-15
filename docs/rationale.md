@@ -1627,6 +1627,38 @@ follows. Two values, `--note-gap` and `--field-gap`, are the whole of the fix,
 and they live in the shared stylesheet because the pairing has to mean the same
 thing wherever a note appears.
 
+### A readout does not repeat an input
+
+An automatic input shows the value it resolved to, so a readout printing the
+same number is the same figure twice on one page — and it was three times on
+a pair, whose centre-distance row carried the running distance with the
+nominal folded into an annotation, both of which the two inputs above it
+already said between them. A set's row hung a "residual" off it that a solve
+that closes always reports as nought and a solve that does not reports as a
+failure. Both rows are gone.
+
+**What is not a repeat** is a figure the input does not show: a worm's lead
+angle, a hula mesh's far-side gap *as built* against the minimum it was asked
+to keep. And **which figure the box shows is the same on every kind**: the
+distance the stage runs at, the nominal in the annotation. The hula's was the
+one exception, showing the zero-backlash offset and annotating the running one,
+which read as a different kind of number from the box beside it.
+
+**A control that is always an input says so by snapping back.** A set's
+clearance and a hula stage's running clearance cannot be derived — the one is
+what the two nominal distances differ by, the other is absorbed by shifts that
+are all either given or the crank's — so their `auto` toggles are relieved
+back to given at once, by the same relation the solve enforces, rather than
+offered and silently disregarded.
+
+### Deleting the last of anything leaves a fresh one
+
+A gear tab, a geartrain, and a stage of one: removing the last replaces it
+with a default rather than refusing. The stage's button used to grey out at
+one, which is a rule the reader has to infer from a control that stopped
+working; a train with no stages is one the core refuses, and the honest thing
+to do with that is not to arrive there.
+
 ### A control that exposes an assumption must not default to it
 
 A stage's `working_depth` — the depth the undercut question is asked at — follows

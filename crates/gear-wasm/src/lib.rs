@@ -1870,7 +1870,7 @@ mod tests {
             .sum();
         assert!(sum.abs() < 1e-9, "torques must balance, got {sum}");
 
-        // The planet's shift is *solved*, not sent: 24 + 2x18 = 60 is the ideal
+        // The planet's shift is *solved*, not sent: 12 + 2x30 = 72 is the ideal
         // ring, so what moves it is the running clearance alone — the planet
         // thinned by that much opens both meshes — and it comes back negative,
         // small, with a closed residual.

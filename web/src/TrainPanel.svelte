@@ -112,6 +112,10 @@
 
 
 
+  /** Deleting the last stage leaves a fresh one, as deleting the last gear
+   *  tab or the last geartrain does — a train with no stages is one the core
+   *  refuses, and a button that greys out to prevent that is a rule the
+   *  reader has to infer. */
   function removeStage(i: number) {
     tab.train.stages.splice(i, 1);
     // The expansions are keyed by index, so the ones after the hole move down
@@ -124,6 +128,7 @@
       if (at < i) tab.open[at] = v;
       else if (at > i) tab.open[at - 1] = v;
     }
+    if (tab.train.stages.length === 0) addStageOfKind(STAGE_KINDS[0]);
   }
 
   /** Gear numbering runs across the whole train: stage 1 is gears 1 and 2,
@@ -1550,12 +1555,12 @@
               {/each}
             </div>
 
+            <!-- No centre-distance row: the distance the pair runs at and the
+                 clearance it runs with are the two inputs above, each showing
+                 its solved value, and the nominal is their difference. A row
+                 repeating the first with the second folded into a "nominal"
+                 annotation was one number three times on one page. -->
             <dl class="out">
-              <dt>{t("ui.train_centre_distance")}</dt>
-              <dd>
-                {num(pres?.centre_distance, 4)} {pres && "mm"}
-                <small>{pres && t("ui.train_nominal_value", { value: num(pres.centre_distance_nominal, 4) })}</small>
-              </dd>
               {#if worm && pres}
                 <dt>{t("ui.train_lead_angle")}</dt>
                 <dd>
@@ -1580,8 +1585,7 @@
 
             <button
               class="danger small"
-              onclick={() => removeStage(i)}
-              disabled={tab.train.stages.length === 1}>{t("ui.train_remove_stage")}</button
+              onclick={() => removeStage(i)}>{t("ui.train_remove_stage")}</button
             >
           </div>
         {/if}
@@ -1717,16 +1721,10 @@
                       })}
                   </small>
                 </dd>
-                <dt>{t("ui.train_centre_distance")}</dt>
-                <dd>
-                  {num(pres?.centre_distance, 4)} {pres && "mm"}
-                  <small>
-                    {pres &&
-                      t("ui.train_common_to_both_meshes", {
-                        residual: pres.planet.shift_residual.toExponential(1),
-                      })}
-                  </small>
-                </dd>
+                <!-- No centre-distance row: the distance and the clearance are
+                     the two inputs above, and the residual that used to hang
+                     off it says the solve closed, which a solve that did not
+                     close reports as a failure rather than a small number. -->
                 <!-- **The shaft that is not a gear.** A set has three, and two
                      of them carry a member whose card already prints its speed
                      and its torque — so the carrier is the one a reader can see
@@ -1818,8 +1816,7 @@
 
             <button
               class="danger small"
-              onclick={() => removeStage(i)}
-              disabled={tab.train.stages.length === 1}>{t("ui.train_remove_stage")}</button
+              onclick={() => removeStage(i)}>{t("ui.train_remove_stage")}</button
             >
           </div>
         {/if}
@@ -1862,11 +1859,11 @@
               {@render autoNumber(
                 "ui.train_hula_crank_offset",
                 stage.offset,
-                hres?.offset_nominal,
+                hres?.offset,
                 0.01,
                 undefined,
                 hres
-                  ? `${t("ui.train_hula_running", { value: hres.offset.toFixed(4) })}${
+                  ? `${t("ui.train_nominal_value", { value: hres.offset_nominal.toFixed(4) })}${
                       hres.binding_mesh !== null
                         ? ` · ${t("ui.train_hula_held_open_by", { mesh: String(hres.binding_mesh + 1) })}`
                         : ""
@@ -1876,11 +1873,15 @@
               )}
               <!-- The crank offset above is this kind's centre distance, and
                    this is what portion of it is play — the same pair of numbers
-                   every other kind has, so the same pair of controls. -->
+                   every other kind has, so the same pair of controls. The box
+                   shows the running offset, as every other kind's distance box
+                   does, with the zero-backlash one as its annotation; it used
+                   to show the nominal and annotate the running one, the one
+                   kind the other way round. -->
               {@render autoNumber(
                 "ui.train_c2c_clearance",
                 stage.running_clearance,
-                hres ? hres.offset - hres.offset_nominal : undefined,
+                hres?.running_clearance,
                 0.01,
                 () => relieveStage(stage, "clearance"),
                 undefined,
@@ -2039,8 +2040,7 @@
 
             <button
               class="danger small"
-              onclick={() => removeStage(i)}
-              disabled={tab.train.stages.length === 1}>{t("ui.train_remove_stage")}</button
+              onclick={() => removeStage(i)}>{t("ui.train_remove_stage")}</button
             >
           </div>
         {/if}

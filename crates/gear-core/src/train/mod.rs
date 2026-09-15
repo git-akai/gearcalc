@@ -2014,8 +2014,8 @@ impl Stage {
         // **Two ways of saying one number, so one of them must be said.** A
         // distance is nominal + clearance and an automatic clearance is
         // distance − nominal; with both automatic neither has anything to derive
-        // from. Every kind has a distance input — the planetary was the last
-        // to get one — so this is one group rather than one with a hole in it.
+        // from. A pair's group; the two epicyclic kinds cannot derive a
+        // clearance at all and say so below.
         let distance_and_clearance = FreedomGroup {
             given_at_most: 2,
             automatic_at_most: 1,
@@ -2039,7 +2039,7 @@ impl Stage {
                         .chain(std::iter::once(Freedom::FirstMemberSize))
                         .collect(),
                 ),
-                distance_and_clearance.clone(),
+                distance_and_clearance,
             ],
             // **A set has a relation among its shifts alone**, which no other
             // kind does: its two centre distances have to agree, whatever they
@@ -2083,9 +2083,18 @@ impl Stage {
             // freedom smaller — and the other mesh is a separate argument.
             // The crank offset is this kind's centre distance — the same
             // decision under another name, as its own documentation says.
+            //
+            // **And its running clearance is always given, as a set's is.**
+            // Every shift here is either given or absorbs the crank, so no
+            // given offset leaves a nominal one to subtract from — the input
+            // was being read whatever its toggle said.
             Self::Hula(h) => (0..h.gears.len() / 2)
                 .map(|m| one_relation(vec![Freedom::Shift(2 * m), Freedom::Shift(2 * m + 1)]))
-                .chain(std::iter::once(distance_and_clearance.clone()))
+                .chain(std::iter::once(FreedomGroup {
+                    given_at_most: 1,
+                    automatic_at_most: 0,
+                    order: vec![Freedom::Clearance],
+                }))
                 .collect(),
         }
     }
@@ -4746,35 +4755,46 @@ mod tests {
         }
     }
 
-    /// **A set's clearance cannot be automatic, even when it is the input the
-    /// designer just touched.** It is the amount the two zero-backlash distances
-    /// differ by, which the shifts are solved from; a given distance and given
-    /// shifts leave a gap on each mesh and no one number to hand back. So the
-    /// second pass of `relieved` — the one that does not spare `just` — pins
-    /// it, and the toggle snapping back is the tool saying so.
+    /// **An epicyclic kind's clearance cannot be automatic, even when it is the
+    /// input the designer just touched.** A set's is the amount its two
+    /// zero-backlash distances differ by, which the shifts are solved from; a
+    /// hula stage's shifts absorb the crank, so no given offset leaves a
+    /// nominal one to subtract from. So the second pass of `relieved` — the
+    /// one that does not spare `just` — pins it, and the toggle snapping back
+    /// is the tool saying so.
     #[test]
-    fn a_planetary_sets_clearance_is_pinned_back_whatever_was_touched() {
+    fn an_epicyclic_kinds_clearance_is_pinned_back_whatever_was_touched() {
         let set = PlanetaryStage {
             clearance: Auto::automatic(0.02),
             ..PlanetaryStage::default()
+        };
+        let hula = HulaStage {
+            running_clearance: Auto::automatic(0.02),
+            ..HulaStage::default()
         };
         for just in [
             Freedom::Clearance,
             Freedom::CentreDistance,
             Freedom::Shift(1),
         ] {
-            let relieved = Stage::Planetary(Box::new(set.clone())).relieved(just);
-            let Stage::Planetary(p) = relieved else {
-                unreachable!()
+            let (auto, manual) = match Stage::Planetary(Box::new(set.clone())).relieved(just) {
+                Stage::Planetary(p) => (p.clearance.auto, p.clearance.manual),
+                _ => unreachable!(),
             };
             assert!(
-                !p.clearance.auto,
-                "relieving after {just:?} should pin the clearance"
+                !auto,
+                "a set: relieving after {just:?} should pin the clearance"
             );
-            assert_eq!(
-                p.clearance.manual, 0.02,
-                "and leave the number where it was"
+            assert_eq!(manual, 0.02, "and leave the number where it was");
+            let (auto, manual) = match Stage::Hula(Box::new(hula.clone())).relieved(just) {
+                Stage::Hula(h) => (h.running_clearance.auto, h.running_clearance.manual),
+                _ => unreachable!(),
+            };
+            assert!(
+                !auto,
+                "a hula stage: relieving after {just:?} should pin the clearance"
             );
+            assert_eq!(manual, 0.02, "and leave the number where it was");
         }
     }
 
@@ -5080,7 +5100,9 @@ mod tests {
                 checked += 1;
             }
         }
-        assert!(checked >= 7, "only {checked} cases");
+        // Two inputs on each of the two pair kinds, and the one input the two
+        // epicyclic kinds each bound on its own.
+        assert!(checked >= 6, "only {checked} cases");
     }
 
     /// **The declared limit is the stage's actual freedom** — asserted by giving
@@ -6256,9 +6278,15 @@ mod tests {
                 load_sharing: sharing,
                 ..PlanetaryStage::default()
             };
+            // Named rather than the shipped counts: a set with a small sun
+            // cannot reach the band on its sun mesh at any addendum a tooth
+            // can carry, and what this test asks is of a set that does.
             set.sun = tall(&set.sun);
             set.planet = tall(&set.planet);
             set.ring = tall(&set.ring);
+            set.sun.teeth = 24;
+            set.planet.teeth = 18;
+            set.ring.teeth = 60;
             // **A hula stage needs a taller tooth than it can be built with**,
             // and that is the point of the row below rather than a defect in
             // the fixture: at 1.1 modules its meshes reach `ε_n ≈ 2.02` and its

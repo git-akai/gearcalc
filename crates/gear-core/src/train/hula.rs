@@ -318,8 +318,13 @@ pub struct HulaResult {
     /// question every stage answers about its own clearance (see
     /// [`super::PairResult::clearance`]).
     pub clearance: f64,
-    /// The offset actually run at, including the running clearance.
+    /// The offset actually run at — the running clearance *inside* the
+    /// zero-backlash one, both meshes being internal.
     pub offset: f64,
+    /// The running clearance, mm: the input, which both meshes have. Always
+    /// given, for the reason a set's is ([`super::Stage::freedoms`]) — the
+    /// shifts absorb the offset, so no given offset could hand it back.
+    pub running_clearance: f64,
     /// Which mesh sits at the clearance minimum, when the offset came from it.
     pub binding_mesh: Option<usize>,
     /// Speed of the crank, rpm — the input, and the carrier of both meshes.
@@ -1307,6 +1312,7 @@ pub fn solve_hula_stage_at(
         offset_nominal: layout.offset,
         clearance: stage.clearance_taken(),
         offset,
+        running_clearance: stage.running_clearance.manual,
         binding_mesh: layout.binding,
         crank_speed: input_speed,
         backlash,
