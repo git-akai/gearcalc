@@ -375,8 +375,8 @@ would still only supply the *interior* candidates: the optimum is as often at an
 end of the admissible interval, so using it means bracketing that interval's two
 ends, the cap's onset, and a stationary point per smooth piece — five solves
 where a bounded one-dimensional search is one, for an answer already right to a
-thousandth of a module. `AUDIT.md` carries the derivation, verified, for whoever
-weighs it again.
+thousandth of a module. The audit's record (`docs/history/audit.md`, Phase 4)
+carries the derivation, verified, for whoever weighs it again.
 
 Every row of every table this project prints reports the sum landing on a bound
 rather than at a stationary point, which is the other half and the reason the
@@ -696,10 +696,12 @@ A crossed-axis helical pair and a worm stage are both crossed-axis screw
 gearing. A worm is a screw gear with very few starts and a high lead angle.
 
 **A crossed gear pair is the spur stage with its shafts turned**, which is the
-specification's own arrangement: `β₁ = Σ/2 + β_add`, `β₂ = Σ/2 − β_add`. Three
-stage kinds, not four. What still differs between a worm stage and a gear pair is
-**one input**: whether the first member's diameter is given or derived from a
-helix angle.
+specification's own arrangement: `β₁ = Σ/2 + β_add`, `β₂ = Σ/2 − β_add`. And a
+worm is that stage with its first member's size stated as a pitch diameter
+rather than a helix angle — the same freedom read another way, `d = z m_n /
+cos β`. One stage type under the spur and worm kinds; what a kind adds is a
+preset, the words *starts* and *wheel*, and the worm's conventional proportions
+([each stage kind keeps its own result type](#each-stage-kind-keeps-its-own-result-type)).
 
 **Verified:** `sin γ = z m_n/d` holds on both members, so writing the wheel's
 diameter as `z₂ m_n / sin γ₂` removes the axial module from the chain entirely
@@ -1407,7 +1409,7 @@ worm's faces take ([`PairKind`]). It costs the core one enum read in one
 place, and it bought the worm a shift, an addendum, an interference check and
 a mode 3 that moves the wheel's shift as DIN 3975 has it — none of which the
 separate type could carry, and which the audit had recorded as its ideal
-(`AUDIT.md` F39, F79, F83).
+(`corrections.md`, and the audit's record in `docs/history/audit.md`).
 
 **The vocabulary is the larger half, and it has grown.** A member of any kind
 that is a *gear* is a `GearResult`; a parallel-axis mesh of any kind is a

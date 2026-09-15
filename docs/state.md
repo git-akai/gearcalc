@@ -234,7 +234,7 @@ location: where a boundary is drawn, and what a directory is not for.
 | `web/src/wire/` | **Generated.** The Rust types that cross the boundary, written down by `ts-rs`. |
 | `crates/gear-io/data/strings_en.toml` | **Every word the application shows**, one file per language. |
 | `handoff_inbound/` | Prior Python work. **Reference only** — do not build on it. |
-| `docs/history/` | The superseded design record, kept for provenance. Nothing points at it. |
+| `docs/history/` | The superseded design record, kept for provenance and pointed at by nothing — and the closed audit's record, `audit.md`, which code cites by finding number for its measurements and which governs nothing |
 
 ---
 
@@ -265,11 +265,20 @@ already flags. `tools/iso_6336_3_stack.py` multiplies the set out
 **Crossed axes.** One model rather than a family: the lead angle exact, the path
 of contact from two properties of an involute helicoid, elliptical contact,
 sliding as a vector, and one friction balance containing both older efficiency
-formulas. A crossed gear pair is a spur stage with an axis angle — one stage
-kind fewer than a family of them would need. A crossed pair's face width is automatic from `ε ≥ 1`, a
-*geometric* minimum; a worm keeps its published proportions. Both are labelled
-with which kind of minimum they are, because they differ by 2.4× and answer
-different questions.
+formulas. A crossed gear pair is a spur stage with an axis angle, and a worm is
+the same stage with its first member sized by pitch diameter — one `PairStage`
+under the spur and worm kinds, where the kind is a preset, a vocabulary and a
+choice of which inputs to show ([rationale](rationale.md#each-stage-kind-keeps-its-own-result-type)).
+A profile shift enters the crossed mesh as a rack's does, exactly, so a worm's
+wheel absorbs a housing distance by its shift and the worm's diameter absorbs it
+when both shifts are pinned; the interference verdict is the parallel relation
+asked along the line of action; the optimiser reaches it with the friction
+balance as its objective. A crossed pair's face width is automatic from
+`ε ≥ 1`, a *geometric* minimum; a worm keeps its published proportions. Both are
+labelled with which kind of minimum they are, because they differ by 2.4× and
+answer different questions. Every mesh, on parallel shafts or crossed, reports
+in one `MeshReport`, and where the two contacts' figures meet is measured and
+recorded with its seams ([reference](reference.md#contact-stress)).
 
 **Internal gears.** The ring's flank, its profile shift, a shaper-cut fillet at
 the centre distance the shift puts the tool at, the flank/fillet tangency, the
@@ -461,10 +470,9 @@ been. They are not a backlog.
 | Item | Note |
 |---|---|
 | An **eccentric ring** as a tab kind | The core supports it — `centre_profile` takes which member the eccentric gear is — and the tab does not. A UI decision rather than a limit |
-| The **enveloping** (throated) wheel's zone of action | The cylindrical one is derived and a worm reports it as a floor, with its assumed tooth height named |
+| The **enveloping** (throated) wheel's zone of action | The cylindrical one is derived from the members' own teeth, and a worm reports it as a floor |
 | Tooth thickness tolerance (JGMA 1103-01) | Unavailable. Min/max on span and over-pins only; the result types carry the space |
 | Span over teeth for a ring | Takeable in principle, rare in practice, not derived. Between-pins is done and the tab says which is which |
-| A crossed pair's tooth form reaching its mesh figures | Would need the crossed mesh derived at a shifted centre distance. The form is still specified, and the panel says what it does and does not reach |
 | Worm profile drawing and DXF | A crossed pair draws as its two helical gears already |
 | A planetary **set's** drawing | The viewport draws single gears; a set needs the carrier and N planets placed. **Not planned** — nothing depends on it, and the set's numbers are all reported without it |
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
@@ -505,6 +513,35 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   0.95, 11.4 % at 0.8, 29.4 % at 0.5. The shipped hula stage's meshes sit at
   0.998 and 0.996, so its figures move −0.12 % and −0.25 %.
 - **A ZN worm's contact stress is 1–15 % below the reported ZI figure.**
+- **The rack round is the coefficient times the *transverse* module**, so a
+  helical tooth's transverse fillet is `1/cos β` larger than the normal round
+  a hob has — 6 % at 20°, and seven normal modules at a worm's 82°, where it
+  never fits and the thread's fillet is the cap's (0.95 of the depth). No
+  rating reads it: bending is taken on the virtual spur with the normal round,
+  and a crossed rating never touches the fillet. What it does move is the
+  junction radius the interference verdict reads, upward, which makes that
+  verdict **conservative** by the difference, and it is why a worm's
+  `clamp.fillet_capped` fires at every shift. A normal round's transverse
+  section is an ellipse and neither circle is it; sign stated, size stated,
+  unrepaired.
+- **The two contacts do not quite meet where the shafts straighten**, and
+  the reported figures carry the seams
+  ([reference](reference.md#contact-stress)): the pitch-point pressure of a
+  crossed pair sits **1.5 % below** a parallel one's at `μ = 0.08` because its
+  balance loads the flank with `μ F_n` along a sliding direction that stays
+  finite as the speed vanishes, where the line rating uses the transverse
+  projection alone; and its peak pressure sits **5 % below** because *one pair
+  carries everything* is a normal base pitch in along the line rather than a
+  transverse one. Each is the standard convention of its own model; the
+  parallel figure is the higher on both. At `μ = 0` the pitch point meets to a
+  part in 10⁵.
+- **A crossed pair's centre-distance error slides its contact along the shafts
+  by `Δa / sin Σ`**, which is the model's own degeneracy toward parallel: at a
+  hundredth of a degree the default 0.02 mm of clearance moves the contact
+  95 mm, off any face. The reported zone then says *face* and a contact ratio
+  under one; the rating falls back to the tip-limited zone rather than to an
+  empty one. Neither is a number a designer should read at that angle, and the
+  parallel solve is one shaft-angle keystroke away.
 - **A ring's flank below its generation limit is not a generated involute** —
   about 0.08 mm on ordinary designs. Flagged per part.
 - **The cut simulation cannot see below the generation limit**: its simulated
@@ -896,4 +933,13 @@ Not a queue with a head; this is what a next session would pick from.
   `MeshReport` are per member and per mesh rather than per named role, and
   `planetary::power` takes a basic ratio rather than a set of tooth counts — so
   a fourth kind should be new *kinematics* and no new rating machinery. That
-  claim is untested until something tests it.
+  claim was tested once, the other way: the worm kind was deleted as a type
+  and became a preset over the pair, and no answer moved.
+- **The transverse rack round at a steep helix**, in the ledger above. The
+  honest transverse tool is a normal round's elliptical section, which neither
+  circle is; until then a worm's fillet is the cap's and its interference
+  verdict is conservative by the difference.
+- **The two contacts' seams**, also above — the flank-load convention and the
+  single-pair point — are each standard in their own model. Closing either
+  would mean choosing one convention for both, which is a decision to make on
+  purpose rather than on the way to something else.

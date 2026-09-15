@@ -34,8 +34,9 @@ Four, split by what you came for. Nothing appears in two of them.
 [`docs/bending-check.html`](docs/bending-check.html) is the bending construction
 drawn tooth by tooth, with the prose that reads it — a document with generated
 figures in it, because that construction is far easier to judge by looking than
-by reading an assertion. `docs/history/` holds the superseded design record;
-nothing points there.
+by reading an assertion. `docs/history/` holds the superseded design record,
+which nothing points at, and the closed audit's record, which code cites for
+its measurements and nothing else.
 
 The original brief and the inbound handoff note were removed once every line of
 them was built and the four documents above had outgrown them: a description
@@ -53,7 +54,7 @@ than once.
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
 | `web/` | Svelte 5 + TypeScript + Vite front end. |
 | `web/src/wire/` | **Generated** from the Rust types by `ts-rs`. Never edited by hand. |
-| `docs/` | The four documents, and the bending construction drawn. `docs/history/` holds the superseded design record. |
+| `docs/` | The four documents, and the bending construction drawn. `docs/history/` holds the superseded design record and the closed audit's record. |
 | `crates/gear-io/data/strings_en.toml` | **Every word the application shows.** Notes and labels alike, one file per language. |
 | `handoff_inbound/` | Prior Python work. **Reference only** — do not build on it. |
 

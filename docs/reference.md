@@ -1911,7 +1911,7 @@ independent optima coincide. That near-symmetry is why equal modules cost
 nothing, and the table further down is what departing from them costs.
 
 *(An earlier version of this table was written against a search that has since
-been fixed four times over — F50, F52, F53 and F54 in `AUDIT.md` — and quoted a
+been fixed four times over — F50, F52, F53 and F54 in the audit's record — and quoted a
 module ratio the code never searched for. The figures here are the ones the test
 named above holds.)*
 

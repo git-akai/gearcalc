@@ -486,13 +486,14 @@ pub fn efficiency(path: &ContactPath, mesh: &Mesh, g1: &Tooth, friction: f64, dr
 /// each member, so it no longer cancels. The general condition is this one with
 /// each term weighted by its own member's rate. [Verified against finite
 /// differences of the built tooth, exactly, in both regimes and at three tooth
-/// counts; `AUDIT.md` carries the measurement.]
+/// counts; the audit's record (`docs/history/audit.md`, Phase 4) carries the
+/// measurement.]
 ///
 /// # Nothing in production calls this
 ///
 /// It is a derived and checked fact about the model rather than what chooses a
 /// division: `auto::shifts_for_efficiency` searches the division alongside the
-/// sum. `AUDIT.md` says what wiring it in would take and why that was weighed
+/// sum. The audit's record says what wiring it in would take and why that was weighed
 /// and not taken.
 #[must_use]
 pub fn split_residual(path: &ContactPath) -> f64 {

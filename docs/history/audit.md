@@ -1,16 +1,18 @@
+> **Closed.** The audit this file carried ran from Phase 0 to Phase 8 and every
+> finding on its ledger is closed, holds, or is declined with its reason. Its
+> faults are logged in [`corrections.md`](../corrections.md), its decisions
+> argued in [`rationale.md`](../rationale.md), and its residual biases and
+> measurements stated in [`state.md`](../state.md). What survives here, and
+> nowhere else, is the **evidence**: the sweeps, the gate runs against broken
+> trees, the line counts, the tables that were regenerated and the ones that
+> held. Code cites it for that — `docs/history/audit.md`, a finding number —
+> and for nothing that governs the tool. It is not maintained; where it
+> disagrees with the four documents, they are right.
+
 # Audit
 
-A working document, and the only one in this repository that is expected to be
-**deleted** rather than maintained. It exists so that an audit spanning several
-sessions can be put down and picked up by someone who was not there for the
-earlier ones.
-
-It is not one of the four documents. [`README.md`](README.md) describes the
-tool; `docs/` describes what it computes, why, what was once wrong, and what is
-built. This describes a piece of *work in progress* on all five, and when that
-work is finished this file goes and its findings live wherever they belonged:
-a correction in `corrections.md`, a decision in `rationale.md`, a state in
-`state.md`.
+A working document that spanned several sessions, kept so the audit could be
+put down and picked up by someone who was not there for the earlier ones.
 
 **Scope.** Audit, ablate and refactor the tool in its entirety: the mathematics
 for robustness and closed form, the code for duplication and stray branches, the
@@ -18,17 +20,7 @@ tests for what they actually discriminate, and the documents for whether they ar
 true of the code. Plus a second objective, kept separate throughout: make the
 project cheaper to work on without spending the prose that makes it auditable.
 
----
-
-## How to resume
-
-1. Read **Status** below. It names the phase in progress and the next action.
-2. Read the **Findings ledger**. Anything marked `open` still stands; anything
-   `closed` names what closed it.
-3. Run the checks in [`CLAUDE.md`](CLAUDE.md) to confirm the tree is where this
-   file says it is. If they disagree, this file is wrong — fix it first.
-
-**Two rules arrived after the plan was written**, and both are now in
+**Two rules arrived after the plan was written**, and both are in
 `docs/rationale.md` rather than only here, because they govern the tool and not
 just this audit:
 
@@ -37,14 +29,12 @@ just this audit:
   found two bugs in four sites.
 - **A centre distance is the true distance and a clearance is what portion of it
   is clearance** — two relations in three unknowns, so any two of {distance,
-  clearance, shifts} are given and the third follows. Fully stated below; one
-  part done, the rest scheduled as F39.
+  clearance, shifts} are given and the third follows.
 
 Every phase carries a **gate**, and a phase is not done until its gate has been
 run *against the fault it is meant to catch*. That is this project's own rule
 (`docs/corrections.md`, "A check built from the thing under test measures
-nothing") applied to the audit itself. A gate that has been written but not run
-against a broken tree is recorded here as `written, not proven`.
+nothing") applied to the audit itself.
 
 ---
 
@@ -2342,7 +2332,7 @@ item, touched thirteen files. Sorted by what they cost:
 | | files | what they are |
 |---|---|---|
 | substance | 4 | the stage's file, the layout, `train/mod.rs`'s freedom and toggle, the panel's control |
-| harness and documents | 3 | a `gear-cli` case so the corpus sees it, `reference.md`, `AUDIT.md` |
+| harness and documents | 3 | a `gear-cli` case so the corpus sees it, `reference.md`, this record |
 | **regenerated or recorded** | 5 | two wire types, two golden files, the boundary record — all a `--write` |
 | one line | 1 | a JSON fixture |
 

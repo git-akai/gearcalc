@@ -1353,7 +1353,7 @@ impl Pinned {
 /// The division has a stationary condition in closed form
 /// ([`crate::contact::split_residual`]) and **this does not use it**, which the
 /// documents said otherwise of until it was checked. Two reasons, both recorded
-/// in `AUDIT.md`: as derived it assumes both tips move at `m` per unit shift,
+/// in the audit's record (`docs/history/audit.md`, Phase 4): as derived it assumes both tips move at `m` per unit shift,
 /// which `no_sharp_tip` makes false on the shipped default; and wiring the
 /// corrected form in trades a bounded one-dimensional search for five bracketed
 /// solves — the interval's two ends, the cap's onset, and a stationary point per
@@ -1620,7 +1620,7 @@ pub fn maximise(
 /// pair's own two directions, the shift sum and the division, so its flat
 /// direction is an axis; a set is searched in two of its three raw shifts,
 /// which are nobody's natural coordinate, and its walk slides along a curved
-/// bound instead of climbing. `AUDIT.md` F50 carries the sweep and what is to
+/// bound instead of climbing. The audit's record (`docs/history/audit.md`, F50) carries the sweep and what is to
 /// be done about it.
 #[derive(Clone, Copy, Debug)]
 pub struct Search {

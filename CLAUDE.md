@@ -4,8 +4,8 @@ A **map**, not a summary. The four documents in `docs/` say what the tool
 computes, why, what was once wrong and what is built; this says where things are
 and what it costs to change them.
 
-It exists because the project is about 14,000 lines of code carrying 10,700
-lines of comment, alongside 5,100 lines of standalone document — **prose
+It exists because the project is about 16,100 lines of production code carrying
+12,900 lines of comment, alongside 5,000 lines of standalone document — **prose
 outweighs code a little over 1 to 1**. That ratio is the reason the model
 decisions here are auditable and it is not a target to reduce. What it does mean
 is that finding the right file matters more here than in most codebases, and
@@ -13,11 +13,14 @@ until this file existed there was no way to do it but read the crate.
 
 *(The first version of this paragraph said 1.5 to 1, having counted
 `docs/history/`, which is the **superseded** design record that nothing points
-at. A ratio quoted from a `wc` over a glob is a figure like any other.)*
+at. A ratio quoted from a `wc` over a glob is a figure like any other; this one
+counts `crates/**/*.rs` with the test modules split off, at the tree the audit
+closed on.)*
 
-> An audit is in progress. [`AUDIT.md`](AUDIT.md) carries its state, its
-> findings and what has been decided. Read it before starting work, and delete
-> it when the audit is done.
+> The audit that built this file is closed. Its record is
+> `docs/history/audit.md` — kept for its evidence, cited from code by finding
+> number, and governing nothing: its faults are in `docs/corrections.md`, its
+> decisions in `docs/rationale.md`, its residuals in `docs/state.md`.
 
 ---
 
@@ -96,7 +99,7 @@ of a gear is worth more than knowing what it does.
 | Path | Role |
 |---|---|
 | `crates/gear-io` | DXF export · the TOML material library and geartrain documents · the string catalogues |
-| `crates/gear-wasm` | The boundary. 17 entry points, JSON in and JSON out, all pure |
+| `crates/gear-wasm` | The boundary. 18 entry points, JSON in and JSON out, all pure — `tools/wasm_boundary.json` lists them, and `check_wasm.sh` fails on one it does not |
 | `crates/gear-cli` | The development harness. `gear-cli help` prints its subcommands, from the `COMMANDS` table that *is* its dispatch |
 | `web/src` | Svelte 5 + TypeScript. Layout and event handling **only** |
 | `web/src/wire` | **Generated** by `ts-rs`. Never edited by hand |

@@ -1387,7 +1387,8 @@ mod tests {
     ///   `ε ≈ 1.02`; there is no room in it.
     ///
     /// **They are indistinguishable to a reader**, and that is the part worth
-    /// acting on rather than the band — `AUDIT.md` F82.
+    /// acting on rather than the band — `docs/corrections.md`, and the audit's
+    /// record F82.
     #[test]
     fn the_optimiser_moves_nothing_over_a_band_and_the_two_ends_differ() {
         use crate::auto::Search;

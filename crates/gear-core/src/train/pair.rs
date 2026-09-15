@@ -19,7 +19,8 @@
 //! the limit measured to. A worm stage used to be a separate
 //! type with a separate result — no profile shift, no addendum, members that
 //! were not gears — and its centre distance could only be reached by resizing
-//! the worm. It is `AUDIT.md`'s F83 that made it this.
+//! the worm. `docs/corrections.md` records what that cost, and the audit's
+//! record (`docs/history/audit.md`, F83) what deleting it moved: nothing.
 
 use super::{
     Backlash, Case, ContactPatch, ContactRatios, GearResult, LoadCase, Loading, MemberRating,

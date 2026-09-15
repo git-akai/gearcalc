@@ -1669,7 +1669,8 @@ impl Stage {
 ///   answer to choose and the stage kept what it had.
 ///
 /// The first is the tool working. The second is a design with no room in it, and
-/// it was silent on every kind — `AUDIT.md` F58 measured both ends of it on one
+/// it was silent on every kind — the audit's record (`docs/history/audit.md`,
+/// F58) measured both ends of it on one
 /// stage before this existed to tell them apart.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Searched {
@@ -3937,7 +3938,7 @@ mod tests {
     /// axis and a walk climbs rather than zig-zags. A set is searched in two of
     /// its three raw shifts, which is nobody's natural coordinate: its
     /// admissible region is bounded by a curve and the optimum lies against it,
-    /// so the walk slides. `AUDIT.md` F50 carries the size, the sweep and what
+    /// so the walk slides. The audit's record (F50) carries the size, the sweep and what
     /// is to be done; the bound below is a **canary on a known fault**, pinned
     /// so it can only get smaller.
     #[test]

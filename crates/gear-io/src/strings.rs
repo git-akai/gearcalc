@@ -1036,7 +1036,7 @@ mod tests {
         // itself and sits at `ε ≈ 1.02`: every split in the admissible interval
         // is refused, so the search has no answer and the shifts stay where they
         // were. Indistinguishable from a search that agreed, until it said so
-        // (`AUDIT.md` F58, F82).
+        // (`docs/corrections.md`; the audit's record F58, F82).
         {
             let mut hula = gear_core::train::HulaStage::default();
             hula.optimisation.enabled = true;

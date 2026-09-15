@@ -1169,7 +1169,7 @@ fn train_file_report(path: Option<&str>) {
 ///
 /// The distance sweep is the second half and is the law rather than the table: a
 /// pair told to run at the distance the free search chose must come back with
-/// the gears the free search chose. It did not, and `AUDIT.md` F52 says what
+/// the gears the free search chose. It did not, and the audit's record (F52) says what
 /// that cost.
 fn shifts_report(z1: u32, z2: u32) {
     use gear_core::params::Auto;
@@ -1312,7 +1312,8 @@ fn epicyclic_shifts_report() {
     // **The hula stage belongs here too.** It is the third kind that chooses
     // shifts, and the one whose optimiser can find *nothing* to choose — at a
     // one-tooth difference every split is refused, which looks exactly like a
-    // search that agreed until the stage says otherwise (`AUDIT.md` F58, F82).
+    // search that agreed until the stage says otherwise (`docs/corrections.md`, and
+    // the audit's record F58, F82).
     // Without a row here that path is one the change detector cannot see, which
     // this project has now recorded eight times.
     println!("hula stages  z, by tooth difference\n");
