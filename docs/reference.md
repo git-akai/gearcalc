@@ -230,9 +230,21 @@ x_min = h_w − [ ρ + sin α_t ( r sin α_t − ρ ) ] / m
 ```
 
 Closed form and exactly invertible, because the undercut indicator is linear in
-`x`. With `ρ = 0` it reduces to `x_min = h_w − z sin²α_t / 2`, so `x = 0` needs
+`x` — for a given tool, and **`ρ` is the round the tool actually has**, capped
+to fit the space and the depth (`Rack::wanted_by`), not the coefficient asked
+for. Where the depth cap binds it moves with `x`, and the minimum is the fixed
+point of *shift → tool → shift*, solved
+([rationale](rationale.md#where-closed-form-is-impossible), #10). With `ρ = 0`
+it reduces to `x_min = h_w − z sin²α_t / 2`, so `x = 0` needs
 `z ≥ 2 h_w / sin²α_t` — 18 teeth at one module of depth, 22 at a full standard
 dedendum. The automatic value is `max(x_min, 0)`.
+
+The tooth reads the same relation off its own tool to say whether it is
+undercut — `l = m (x − x_min) / sin α_t`, and `undercut ⟺ x < x_min − ε` with
+`ε` a degeneracy tolerance of a thousand-millionth of a module
+(`params::compat::SAME_SHIFT`). A gear at its automatic shift sits *on* the
+edge, where the indicator is zero to rounding and its sign is not a fact about
+the gear.
 
 **Altered addendum**, from a minimum tip width. `s(r′) = 2r′(ψ_b − inv α_{r′})`
 is monotone decreasing with `ds/dr′ = 2(ψ_b − inv α_{r′} − tan α_{r′})`, so it is
@@ -2278,9 +2290,15 @@ a train with no stages is refused.
 
 ## The boundary
 
-Seventeen `#[wasm_bindgen]` entry points, JSON in and JSON out, all pure
-functions. Five are not calculations: `defaults`, `strings`, `languages`,
-`resolve_language`, and the geartrain document's two directions.
+`#[wasm_bindgen]` entry points, JSON in and JSON out, all pure functions.
+`tools/wasm_boundary.json` is the list, and `tools/check_wasm.sh` fails on an
+entry point missing from it — so no count is quoted here, a number that dates
+belonging in `state.md` if anywhere. Seven of them compute nothing: `defaults`,
+`strings`, `languages`, `resolve_language`, `version`, and the two documents'
+round trips (`import_train`/`export_train`, `import_materials`/
+`export_materials`, with `default_materials` beside them). `relieve_stage` is
+the one rule that is neither — which input gives way when a stage is
+over-specified, asked of the core so the front end does not hold a copy.
 
 **A `null` that crosses is not always a `None`.** `serde_json` writes an
 infinity and a NaN as `null`, which is indistinguishable from a field that

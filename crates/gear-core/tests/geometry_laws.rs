@@ -11,6 +11,7 @@
 
 #![allow(clippy::unwrap_used)]
 
+use gear_core::auto::minimum_profile_shift;
 use gear_core::gear::Gear;
 use gear_core::note::key;
 use gear_core::{inv, inv_from_roll, GearParams, Tooth};
@@ -18,6 +19,7 @@ use gear_core::{inv, inv_from_roll, GearParams, Tooth};
 mod common;
 use common::{
     Grid, AWKWARD_SHIFTS, AWKWARD_TEETH, HELIX_ANGLES, MODULES, PRESSURE_ANGLES, ROOT_RADII,
+    THICKNESS_MODS,
 };
 
 /// The awkward regions: tiny tooth counts, both signs of shift, sharp and
@@ -786,6 +788,84 @@ fn a_tooth_called_unsevered_is_not_severed_at_a_finer_scan() {
     // above gives at length: the margin is a fraction of the space, so it
     // narrows with the tooth and a threshold would record this sweep instead.
     println!("{undercut} undercut, unsevered teeth; closest approach {worst:.3e} rad at {at}");
+}
+
+/// **A gear at its minimum shift is on the edge of undercut, and not over it.**
+///
+/// The automatic shift is the least that clears undercut, so the tooth built
+/// at it sits exactly on the edge — and there the undercut indicator is zero
+/// to rounding, its sign a coin toss between the route that chose the shift and
+/// the route that measures the flank. Decided by that sign, the default
+/// 17-tooth gear was reported undercut at the shift chosen to prevent it, on
+/// whichever gears the ulps fell the wrong way. And derived for the round the
+/// parameters *asked* for rather than the one the tool was capped to, the
+/// shift was genuinely undercut by up to 0.03 mm wherever the cap reached —
+/// which the gate this replaces could not see, at ±1e-4 and with the
+/// root-radius axis never turned.
+///
+/// So this turns every axis that reaches the tool, and asks three things of
+/// the tooth built at `x_min`: that it is not called undercut; that its
+/// indicator is zero to well under the tolerance the flag reads, so the
+/// tolerance is generous by orders and not by luck; and that a hundredth of a
+/// millionth of a module below it the flank *is* undercut, so the edge is
+/// where it says. The one exemption is a tooth whose cutter depth is clamped —
+/// there the shift no longer moves the tool, no shift clears the flank, and
+/// the tooth is expected to say so.
+#[test]
+fn a_gear_at_its_minimum_shift_is_on_the_edge_of_undercut_and_not_over_it() {
+    let mut worst = 0.0_f64;
+    let mut on_edge = 0u32;
+    for p in Grid::new()
+        .teeth(AWKWARD_TEETH)
+        .pressure_angle(PRESSURE_ANGLES)
+        .helix_angle(HELIX_ANGLES)
+        .root_radius(ROOT_RADII)
+        .module(MODULES)
+        .thickness_mod(THICKNESS_MODS)
+        .dedendum(&[1.0, 1.25, 1.4])
+        .build()
+    {
+        let x_min = minimum_profile_shift(&p, p.dedendum).with_cutter_radius;
+        let at = |x: f64| {
+            Tooth::new(GearParams {
+                profile_shift: x,
+                ..p
+            })
+        };
+        let g = at(x_min);
+        let case = format!(
+            "z={} a={} b={} rho={} m={} k={} hf={} x_min={x_min}",
+            p.teeth,
+            p.pressure_angle,
+            p.helix_angle,
+            p.root_radius,
+            p.module,
+            p.thickness_mod,
+            p.dedendum
+        );
+        if g.clamps.fired(key::CLAMP_DEDENDUM_RAISED) || g.clamps.fired(key::CLAMP_DEDENDUM_CAPPED)
+        {
+            continue; // the tool no longer follows the shift; nothing clears it
+        }
+        assert!(
+            !g.undercut,
+            "{case}: reported undercut at its own minimum shift"
+        );
+        // The indicator in the units the flag compares, modules of shift.
+        let residual = g.l * g.alpha_t.sin() / p.module;
+        assert!(
+            residual.abs() < 1e-12,
+            "{case}: residual {residual:e} modules at the edge"
+        );
+        worst = worst.max(residual.abs());
+        assert!(
+            at(x_min - 1e-8).undercut,
+            "{case}: not undercut just below the edge"
+        );
+        on_edge += 1;
+    }
+    assert!(on_edge > 1000, "only {on_edge} cases reached the edge");
+    println!("{on_edge} gears on the edge of undercut; worst residual {worst:.3e} modules");
 }
 
 #[test]

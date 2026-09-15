@@ -882,18 +882,22 @@ pub enum RootStressModel {
     /// L   = s_Fn / h_Fe          q_s = s_Fn / (2 ρ_F)
     /// ```
     ///
-    /// Chosen over Dolan–Broghamer, the 1942 photoelastic fit that AGMA carries,
-    /// for a reason specific to this project: **it is written in terms of the
-    /// geometry we already measure.** `s_Fn`, `h_Fe` and `ρ_F` all come off the
-    /// generated profile, so undercut, profile shift and thickness modification
-    /// flow into the correction the same way they flow into the form factor.
-    /// Dolan–Broghamer is presented as charts indexed by tooth count and shift,
-    /// which is exactly the dependence this project set out to avoid.
+    /// **Not the default**, and it was for a long time. It was chosen first
+    /// because it is written in terms of the geometry this crate already
+    /// measures — `s_Fn`, `h_Fe` and `ρ_F` all come off the generated profile —
+    /// where Dolan and Broghamer's work is *presented* as charts indexed by
+    /// tooth count and shift. That reading mistook the presentation for the
+    /// fit: AGMA's curve fit of the same data is written in the same three
+    /// lengths, at any pressure angle, and it is the notch factor that belongs
+    /// to the parabola section this crate computes. `Y_S` is fitted to ISO's
+    /// tangent section and to `ρ_F` *at* that section, so it is offered here
+    /// as the other half of the coherent ISO set —
+    /// [`CriticalSection::TangentAngle`] with `Y_S`, and no axial term — for a
+    /// number comparable with a published rating, which `gear-cli matrix`
+    /// prints beside the default on both kinds of member.
     ///
-    /// It remains an empirical fit. Published comparisons put Dolan–Broghamer
-    /// within about 8% of finite-element results; a genuinely geometry-exact
-    /// notch stress needs FEA or a critical-distance method, and the latter is
-    /// material-dependent, so neither belongs in a high-level design tool.
+    /// It remains an empirical fit, stated over [`NOTCH_PARAMETER_RANGE`] and
+    /// for external spur gears at 20°; both limits are recorded there.
     Iso6336,
     /// **Dolan and Broghamer**, as curve-fitted by AGMA, and the default.
     ///

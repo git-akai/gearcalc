@@ -12,18 +12,18 @@ parabola · Y_F·K_f                  5.6172%         10               0.00424%
   30° · Y_F only         vs 30° · Y_F·Y_S          rho = 0.794170  (n=1508)
   30° · Y_F only         vs parabola · Y_F only    rho = 0.993410  (n=1508)
   30° · Y_F only         vs parabola · Y_F·K_f     rho = 0.894366  (n=1508)
-  30° · Y_F·Y_S          vs parabola · Y_F only    rho = 0.782571  (n=1508)
+  30° · Y_F·Y_S          vs parabola · Y_F only    rho = 0.782598  (n=1508)
   30° · Y_F·Y_S          vs parabola · Y_F·K_f     rho = 0.897656  (n=1508)
-  parabola · Y_F only    vs parabola · Y_F·K_f     rho = 0.900642  (n=1521)
+  parabola · Y_F only    vs parabola · Y_F·K_f     rho = 0.900653  (n=1521)
 
 == 3. gradient sign agreement, ignoring effects below 0.0% ==
                                                      shift  fillet  dedend
   30° · Y_F only         vs 30° · Y_F·Y_S            68.6%   94.6%   63.4%
-  30° · Y_F only         vs parabola · Y_F only      95.0%   95.4%   92.8%
+  30° · Y_F only         vs parabola · Y_F only      95.0%   94.9%   93.3%
   30° · Y_F only         vs parabola · Y_F·K_f       92.6%   94.6%   89.4%
-  30° · Y_F·Y_S          vs parabola · Y_F only      70.3%   95.8%   59.0%
+  30° · Y_F·Y_S          vs parabola · Y_F only      70.3%   95.6%   59.0%
   30° · Y_F·Y_S          vs parabola · Y_F·K_f       70.9%   98.1%   74.0%
-  parabola · Y_F only    vs parabola · Y_F·K_f       97.6%   96.4%   85.2%
+  parabola · Y_F only    vs parabola · Y_F·K_f       97.6%   96.3%   85.1%
 
 == 3. gradient sign agreement, ignoring effects below 1.0% ==
                                                      shift  fillet  dedend

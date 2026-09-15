@@ -285,7 +285,7 @@ number. Deleted, not reworded.
 
 ### Where closed form is impossible
 
-Nine scalar solves, each monotone, each bracketed, none an optimiser, none with
+Ten scalar solves, each monotone, each bracketed, none an optimiser, none with
 a tuning parameter. Everything else in the crate is algebraic — **except one
 search**, which is named below rather than left out of the count.
 
@@ -301,9 +301,22 @@ search**, which is named below rather than left out of the count.
 | 7 | Cutter travel at a ring's flank/fillet junction | Brent on the trochoid's radius |
 | 8 | Cutter travel where a ring's fillet reaches mid-space | Brent on the trochoid's angle |
 | 9b | Where a severed tooth's trochoid is least | Brent on `dθ/ds`, analytic |
+| 10 | The undercut minimum, where the tool's round is capped by the depth it reaches | Brent on the shift, the tool settled at each trial |
 
 The involute function is not algebraically invertible, and that single fact
 causes #1, #2 and #4.
+
+**#10 is reached only where the closed form stops being exact.** The undercut
+indicator is linear in the shift *for a given tool*, and ordinarily the tool is
+the same at every shift, so one closed-form step lands on the minimum. But the
+tool's round is capped at a fraction of the depth it reaches, and that depth
+moves with the shift — so on a three-tooth gear cut with a full ISO round the
+minimum is a fixed point of *shift → tool → shift*, not a line. The residual is
+continuous and non-decreasing, every regime of the cap being so, and it is
+bracketed and solved. Derived for the round *asked for* instead, the minimum
+sat 0.03 mm into undercut wherever the cap reached, and the gate that should
+have seen it stood ±1e-4 from the edge with the root-radius axis untouched
+([corrections](corrections.md)).
 
 **#9b replaced a scan, and the reason is the general one.** Severing is the
 trochoid reaching the tooth's centreline, and it used to be found by sampling
@@ -334,13 +347,13 @@ guarded and unguarded `inv⁻¹` there is the difference between "this ring toot
 count is impossible" and a NaN silently reaching a stress figure.
 
 **What would change this:** nothing in prospect. A published closed form that is
-a *solution* rather than a fit would retire one of the nine; none is known.
+a *solution* rather than a fit would retire one of the ten; none is known.
 
 ### ...and the one thing in the crate that is none of the above
 
 **`auto::maximise` is a search, and it has tuning parameters.** The paragraph
 above says "each monotone, each bracketed, none an optimiser, none with a tuning
-parameter", and that is true of the nine solves and was read for a while as
+parameter", and that is true of the ten solves and was read for a while as
 though it were true of the crate. It is not. Every stage that chooses profile
 shifts for efficiency calls a bounded box sweep followed by a multi-start pattern
 walk, carrying a search span, a scan step, a stopping resolution, a work budget,
@@ -404,8 +417,8 @@ to whichever constraint binds first. If it is, the sum becomes a one-dimensional
 bracketed search against the active bound and the crate has no optimiser left —
 and the same question asked of a set is the same repair, since *finding the
 coordinate the constraint is flat in* is what both need. That is being attempted
-rather than assumed, and until it lands, this section describes ten things and
-not nine.
+rather than assumed, and until it lands, this section describes eleven things
+and not ten.
 
 ### The Lewis parabola over the 30° tangent
 
@@ -580,9 +593,15 @@ at 4 mm and 40 mm of face width. A convention that cannot move an answer informs
 a choice; one that multiplies a stress silently moves a number a part is sized
 against.
 
-**The axial compression term is omitted** from bending, internal and external
-alike, following ISO rather than AGMA. It relieves stress by order 10 %, so
-leaving it out is the conservative direction.
+**The axial compression term is applied**, internal and external alike. It is
+the second term of the `J` whose first term is `Y_F` — Savage, Rubadeux & Coe's
+`6h/t_c² − tan φ_C/t_c` — so it belongs to the model in use, and it relieved the
+canary by 10.1 % and 12.2 %. ISO omits it, and the ISO comparison set omits it
+too, so a number from that set is not an AGMA `J`. This paragraph said the
+opposite for as long as the term was outstanding: its omission had been
+defended as "the conservative direction", which is exactly the defence
+[a conservative answer is not a free one](#a-conservative-answer-is-not-a-free-one)
+refuses, and it was the debt `state.md` was carrying under that name.
 
 **What would change this:** having ISO's `σ_Flim` values, so the complete set
 would have something consistent to be measured against. They are paywalled, and

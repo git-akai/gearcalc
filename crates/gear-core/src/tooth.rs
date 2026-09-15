@@ -36,7 +36,7 @@
 
 use crate::involute::{inv, inv_from_roll};
 use crate::note::{key, Note};
-use crate::params::{guard, Clamps, GearParams};
+use crate::params::{compat, guard, Clamps, GearParams};
 use crate::solve::{brent, newton_bracketed, Tol};
 
 /// Bracket-expansion settings for the undercut junction search.
@@ -167,8 +167,20 @@ pub struct Tooth {
     pub theta_a: f64,
 
     /// Signed distance from the base tangent point to where the rack's straight
-    /// flank runs out. **`l < 0` is exactly the undercut condition.**
+    /// flank runs out, mm: `m (x − x_min) / sin α_t` for the tool this tooth
+    /// was cut by ([`Rack::undercut_shift`]). **`l < 0` is the undercut
+    /// condition**, and [`Self::undercut`] is it read with a tolerance.
     pub l: f64,
+    /// Whether the cutter has eaten into the flank below the base tangent point.
+    ///
+    /// `x < x_min − ε`, with `x_min` the tool's own [`Rack::undercut_shift`]
+    /// and `ε` [`compat::SAME_SHIFT`]. A tooth at its automatic shift sits
+    /// **on** the edge by construction, where `l` is zero to rounding and its
+    /// sign is a coin toss — one route computes `x_min` and another `l`, and
+    /// deciding a flag on the ulp between them reported the default 17-tooth
+    /// gear undercut at the very shift chosen to clear it. The tolerance is the
+    /// degeneracy kind, not a design one: nothing a designer can type sits a
+    /// thousand-millionth of a module from the edge.
     pub undercut: bool,
     /// Roll parameter at the flank/fillet junction. NaN if severed.
     pub u_j: f64,
@@ -337,17 +349,6 @@ impl Tooth {
         Self::build_with_z(params, clamp_flank_at_base, z, None)
     }
 
-    /// This tooth's form, cut by a tool that has **already been settled**.
-    ///
-    /// The difference from [`Tooth::new`] is what is *absent*: no depth clamp and
-    /// no tip-round cap, because neither is this tooth's to make. Whoever owns
-    /// the whole gear settles the tool once — [`crate::gear::Gear`]
-    /// does, by taking what the most demanding tooth needs — and every tooth is
-    /// then cut by the same one, which is what a hob does and what the type now
-    /// says.
-    ///
-    /// The tooth's own clamps still fire: a tooth can be pointed, undercut,
-    /// severed or too thin whatever tool cut it.
     /// What tool one tooth of these parameters asks for, and the clamps that
     /// asking raises.
     ///
@@ -365,9 +366,20 @@ impl Tooth {
         let alpha_t = crate::plane::transverse_pressure_angle(an, beta);
         let r = m / beta.cos() * z / 2.0;
         let (st, _) = transverse_thickness(params, z, m, an, beta, r);
-        Rack::wanted_by(params, z, st, m, an, alpha_t, beta, r)
+        Rack::wanted_by(params, st, m, alpha_t, beta, r)
     }
 
+    /// This tooth's form, cut by a tool that has **already been settled**.
+    ///
+    /// The difference from [`Tooth::new`] is what is *absent*: no depth clamp and
+    /// no tip-round cap, because neither is this tooth's to make. Whoever owns
+    /// the whole gear settles the tool once — [`crate::gear::Gear`]
+    /// does, by taking what the most demanding tooth needs — and every tooth is
+    /// then cut by the same one, which is what a hob does and what the type now
+    /// says.
+    ///
+    /// The tooth's own clamps still fire: a tooth can be pointed, undercut,
+    /// severed or too thin whatever tool cut it.
     #[must_use]
     pub fn cut_by(params: GearParams, tool: Rack) -> Self {
         let z = f64::from(params.teeth);
@@ -425,7 +437,7 @@ impl Tooth {
         let tool = match tool {
             Some(rack) => rack,
             None => {
-                let (rack, tool_clamps) = Rack::wanted_by(&params, z, st, m, an, alpha_t, beta, r);
+                let (rack, tool_clamps) = Rack::wanted_by(&params, st, m, alpha_t, beta, r);
                 for n in tool_clamps {
                     clamps.push(n);
                 }
@@ -460,8 +472,13 @@ impl Tooth {
         let u_tip = (((ra / rb).powi(2) - 1.0).max(0.0)).sqrt();
 
         // ---- flank / fillet junction ------------------------------------
-        let l = r * sa - bc / sa - rho;
-        let undercut = l < 0.0;
+        //
+        // Both from the tool's own undercut shift, so that the flag and the
+        // automatic shift are one comparison rather than two arithmetics
+        // agreeing to an ulp — see [`Rack::undercut_shift`].
+        let x_min = tool.undercut_shift(m, r, alpha_t);
+        let l = m * (x - x_min) / sa;
+        let undercut = x < x_min - compat::SAME_SHIFT;
 
         let mut g = Self {
             params,
@@ -828,6 +845,33 @@ fn transverse_thickness(
 }
 
 impl Rack {
+    /// **The least profile shift at which this tool leaves the flank whole**,
+    /// in modules, on a gear of pitch radius `r` at transverse pressure angle
+    /// `alpha_t`.
+    ///
+    /// The rack's straight flank runs out where its tip round begins, a depth
+    /// `b_c = b_d − ρ` below the rolling line; undercut is that point falling
+    /// below the base tangent point, `b_c / sin α_t > r sin α_t − ρ`. With
+    /// `b_d = depth − m x` that is linear in `x`, and its root is
+    ///
+    /// ```text
+    /// x_min = ( depth − [ ρ + sin α_t ( r sin α_t − ρ ) ] ) / m
+    /// ```
+    ///
+    /// **One relation, two readers.** [`Tooth`] reads it to say whether it is
+    /// undercut, and [`crate::auto::minimum_profile_shift`] reads it to choose
+    /// the shift that is not — so the two cannot disagree about which tool the
+    /// question was asked of. They did: the automatic shift was derived for the
+    /// round *asked for*, and a tool whose round had been capped to fit the
+    /// space (`Rack::wanted_by`) undercut the tooth built at that shift by up
+    /// to 0.03 mm, on every gear the cap reached.
+    #[must_use]
+    pub fn undercut_shift(&self, module: f64, r: f64, alpha_t: f64) -> f64 {
+        let sa = alpha_t.sin();
+        let rho = self.tip_round;
+        (self.depth - (rho + sa * (r * sa - rho))) / module
+    }
+
     /// The tool a single tooth asks for, and the clamps that asking raised.
     ///
     /// This is the settling [`Tooth::new`] used to do inline. It is a free
@@ -836,13 +880,10 @@ impl Rack {
     /// which is what removes the build-settle-rebuild dance that twice failed to
     /// converge (`docs/corrections.md`).
     #[must_use]
-    #[allow(clippy::too_many_arguments)]
     fn wanted_by(
         params: &GearParams,
-        _z: f64,
         st: f64,
         m: f64,
-        _an: f64,
         alpha_t: f64,
         beta: f64,
         r: f64,

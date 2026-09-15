@@ -294,4 +294,16 @@ pub mod compat {
     /// 1 mm and pressure angles of order 20°, so an absolute tolerance is the
     /// same claim at both.
     pub const SAME_RACK: f64 = 1e-9;
+
+    /// How far below its own undercut minimum a profile shift must sit before
+    /// the flank is called undercut, in modules.
+    ///
+    /// A tooth at its automatic shift is *on* the edge — that is what the
+    /// automatic shift is — and there the undercut indicator is zero to
+    /// rounding, its sign decided by the ulps between the route that chose the
+    /// shift and the route that measures the flank. The same claim as
+    /// [`SAME_RACK`], on the same order-one quantity: generous against a
+    /// handful of ulps by six orders, and a millionth of anything a designer
+    /// could mean.
+    pub const SAME_SHIFT: f64 = SAME_RACK;
 }

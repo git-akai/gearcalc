@@ -9,9 +9,9 @@
 //! into the profile generator.
 
 use crate::involute::{inv, inv_from_roll};
-use crate::params::GearParams;
+use crate::params::{guard, GearParams};
 use crate::solve::{brent, Tol};
-use crate::tooth::{Tooth, POINTED_TOOTH_MAX_ROLL};
+use crate::tooth::{Rack, Tooth, POINTED_TOOTH_MAX_ROLL};
 
 /// The smallest profile shift that avoids undercut at a stated depth.
 ///
@@ -78,28 +78,91 @@ pub struct MinimumShift {
 /// 12.82 — **13 teeth**. Two assumptions buried in one piece of conventional
 /// wisdom, pulling in opposite directions.
 ///
-/// Note this depends only on quantities that are themselves independent of `x`
-/// — `r`, `α_t` and the cutter — so there is no circularity in using it to
-/// choose `x`.
+/// # The tool it is asked of is the tool the tooth gets
+///
+/// The relation is [`Rack::undercut_shift`], and it is read here for the tool
+/// [`Tooth::tool_wanted_by`] would settle — not for the round the parameters
+/// *ask* for. The two differ wherever the round is capped to fit the space the
+/// tooth leaves, and a smaller round undercuts sooner: derived for the asked
+/// round, this returned a shift at which the tooth actually built was undercut
+/// by up to 0.03 mm, on every gear the cap reached.
+///
+/// The tool depends on the shift only through its clamps, so it is settled
+/// **at the answer**: the shift returned is the one at which the tooth built
+/// there is cut by a tool whose own undercut shift is that same number.
+/// Ordinarily the tool is the same at every shift and one closed-form step
+/// lands on it exactly. Where the round is capped by the depth the tool
+/// reaches — a three-tooth gear cut with a full ISO round — the cap moves with
+/// the shift and the relation is a fixed point rather than a line; the
+/// residual `x − x_min(tool at x)` is continuous and non-decreasing in `x`,
+/// every regime of the cap being so, and it is bracketed and solved. That is
+/// the tenth solve in docs/rationale.md#where-closed-form-is-impossible's
+/// inventory, and it is reached only where the closed form is not exact.
+///
+/// Where no bracket exists the tool is clamped to a depth the shift no longer
+/// moves, and the flank is undercut — or not — at every shift alike; the
+/// closed-form value is returned, and the tooth reports what it is.
 #[must_use]
 pub fn minimum_profile_shift(p: &GearParams, working_depth: f64) -> MinimumShift {
+    let asked = GearParams {
+        dedendum: working_depth,
+        ..*p
+    };
     let beta = p.helix_angle.to_radians();
-    let alpha_t = crate::plane::transverse_pressure_angle(p.pressure_angle.to_radians(), beta);
-    let mt = p.module / beta.cos();
-    let r = mt * f64::from(p.teeth) / 2.0;
-    let sa = alpha_t.sin();
+    let alpha_n = p
+        .pressure_angle
+        .to_radians()
+        .max(guard::MIN_PRESSURE_ANGLE_DEG.to_radians());
+    let alpha_t = crate::plane::transverse_pressure_angle(alpha_n, beta);
+    let r = p.module / beta.cos() * f64::from(p.teeth.max(1)) / 2.0;
 
-    // The cutter tip radius is a transverse length: the coefficient is in normal
-    // modules, so it scales by m_t, matching `profile`.
-    let rho = p.root_radius * mt;
+    let tool_at = |x: f64| {
+        Tooth::tool_wanted_by(&GearParams {
+            profile_shift: x,
+            ..asked
+        })
+        .0
+    };
+    let x_min_of = |tool: Rack| tool.undercut_shift(p.module, r, alpha_t);
+    // Zero exactly where the tooth built at `x` is on the edge of undercut.
+    let residual = |x: f64| x - x_min_of(tool_at(x));
 
-    let at = |rho: f64| working_depth - (rho + sa * (r * sa - rho)) / p.module;
+    let x0 = x_min_of(tool_at(p.profile_shift));
+    let f0 = residual(x0);
+    let x_min = if f0 == 0.0 {
+        x0
+    } else {
+        // Non-decreasing, so the root lies on the side the sign says; walk
+        // that way in doubling steps of a module until it is bracketed.
+        let dir = if f0 < 0.0 { 1.0 } else { -1.0 };
+        let mut step = 1.0;
+        let mut far = x0;
+        let bracketed = (0..MINIMUM_SHIFT_BRACKET_STEPS).any(|_| {
+            far = x0 + dir * step;
+            step *= 2.0;
+            (residual(far) < 0.0) != (f0 < 0.0)
+        });
+        bracketed
+            .then(|| brent(residual, x0.min(far), x0.max(far), Tol::default()))
+            .flatten()
+            .unwrap_or(x0)
+    };
 
+    let tool = tool_at(x_min);
     MinimumShift {
-        with_cutter_radius: at(rho),
-        sharp_rack: at(0.0),
+        with_cutter_radius: x_min,
+        sharp_rack: x_min_of(Rack {
+            tip_round: 0.0,
+            ..tool
+        }),
     }
 }
+
+/// Doubling steps of a module the undercut fixed point is walked out for a
+/// bracket before it is declared to have none. A search heuristic, not
+/// geometry: the whole admissible shift range is a few modules wide, and any
+/// bracket gives the same root.
+const MINIMUM_SHIFT_BRACKET_STEPS: u32 = 16;
 
 /// The shift the automatic toggle should apply: enough to avoid undercut, and no
 /// more.
@@ -232,7 +295,6 @@ fn shift_offsets(p: &GearParams) -> (f64, f64) {
 /// reported by [`crate::Mesh::new`] instead.
 #[must_use]
 pub fn admissible_profile_shift(p: &GearParams, working_depth: f64) -> ShiftRange {
-    use crate::params::guard;
     use std::f64::consts::PI;
 
     let beta = p.helix_angle.to_radians();
@@ -506,9 +568,7 @@ pub fn admissible_ranges(p: &GearParams, working_depth: f64) -> Ranges {
     // `admissible_profile_shift`, which `ranges_at_shift` calls.
     let x_lo = p.profile_shift + off_lo;
     let x_hi = p.profile_shift + off_hi;
-    let d_shared = p
-        .dedendum
-        .max(crate::params::guard::MIN_CUTTER_DEPTH_MODULES + x_hi);
+    let d_shared = p.dedendum.max(guard::MIN_CUTTER_DEPTH_MODULES + x_hi);
     let at = |x: f64| {
         ranges_at_shift(
             &GearParams {
@@ -559,8 +619,6 @@ pub fn admissible_ranges(p: &GearParams, working_depth: f64) -> Ranges {
 /// sign chooses which side of the gear is the thick one and nothing else.
 #[must_use]
 pub fn admissible_angular_shift(p: &GearParams) -> Bound {
-    use crate::params::guard;
-
     let beta = p.helix_angle.to_radians();
     let r = p.module / beta.cos() * f64::from(p.teeth) / 2.0;
     let headroom = guard::MAX_CUTTER_DEPTH_FRACTION_OF_R * r / p.module;
@@ -595,7 +653,6 @@ pub fn admissible_angular_shift(p: &GearParams) -> Bound {
 /// The ranges for a gear cut at one shift — every tooth of a concentric gear,
 /// and each extreme of an eccentric one (called twice, [`admissible_ranges`]).
 fn ranges_at_shift(p: &GearParams, working_depth: f64) -> Ranges {
-    use crate::params::guard;
     use std::f64::consts::PI;
 
     let beta = p.helix_angle.to_radians();
@@ -2173,39 +2230,6 @@ mod tests {
 
         // A real cutter tip round always needs LESS shift than a sharp rack.
         assert!(m.with_cutter_radius < m.sharp_rack);
-    }
-
-    #[test]
-    fn a_gear_at_the_minimum_shift_is_on_the_edge_of_undercut() {
-        // The independent check: build the gear at x_min and ask the profile
-        // generator — which knows nothing about this module — whether it is
-        // undercut. `working_depth` equal to the dedendum makes the two ask the
-        // same question.
-        for teeth in [9_u32, 12, 17, 25, 40] {
-            let p = GearParams {
-                teeth,
-                dedendum: 1.25,
-                ..Default::default()
-            };
-            let x = minimum_profile_shift(&p, p.dedendum).with_cutter_radius;
-
-            let just_under = Tooth::new(GearParams {
-                profile_shift: x - 1e-4,
-                ..p
-            });
-            let just_over = Tooth::new(GearParams {
-                profile_shift: x + 1e-4,
-                ..p
-            });
-            assert!(
-                just_under.undercut,
-                "z={teeth}: should undercut below x_min"
-            );
-            assert!(
-                !just_over.undercut,
-                "z={teeth}: should not undercut above x_min"
-            );
-        }
     }
 
     /// The strongest check available: set the addendum to what this returns,
