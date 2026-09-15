@@ -21,9 +21,8 @@ import type { TipRoom } from "./TipRoom";
  */
 export type MeshReport = { 
 /**
- * Operating pressure angle `α_w`, degrees — see
- * [`SpurResult::operating_pressure_angle`], which defines it for every
- * parallel-axis mesh here.
+ * Transverse operating pressure angle `α_w`, degrees — the zero-backlash
+ * pair's, which the profile shifts set.
  */
 operating_pressure_angle: number, 
 /**
@@ -32,7 +31,7 @@ operating_pressure_angle: number,
  * teeth together.
  *
  * A property of a *mesh*, which is why it is here: a pair reports one
- * ([`SpurResult::coprime`], its one mesh being the stage), and a set with
+ * (its one mesh being the stage), and a set with
  * two meshes has two answers. An epicyclic set's separate question — each
  * central member against the *planet count* — is a different check with a
  * different reason, and it stays where it is.

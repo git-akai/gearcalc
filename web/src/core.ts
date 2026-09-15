@@ -25,6 +25,12 @@ import type {
   ClassRef,
   ContactRatios,
   CrossedMesh,
+  CrossedZone,
+  PairKind,
+  PairMesh,
+  PairResult,
+  PairStage,
+  PointContact,
   Cutter,
   CutterRef,
   Defaults,
@@ -53,8 +59,6 @@ import type {
   RingSummary,
   ShiftRange,
   SpanOut,
-  SpurResult,
-  SpurStage,
   Stage,
   StageGear,
   StageResult,
@@ -64,11 +68,6 @@ import type {
   TrainOutcome,
   TrainFailure,
   Variation,
-  WormContact,
-  WormMember,
-  WormMemberResult,
-  WormResult,
-  WormStage,
 } from "./wire";
 export type {
   Actuation,
@@ -83,6 +82,12 @@ export type {
   ClassRef,
   ContactRatios,
   CrossedMesh,
+  CrossedZone,
+  PairKind,
+  PairMesh,
+  PairResult,
+  PairStage,
+  PointContact,
   Cutter,
   CutterRef,
   Defaults,
@@ -112,8 +117,6 @@ export type {
   RingSummary,
   ShiftRange,
   SpanOut,
-  SpurResult,
-  SpurStage,
   Stage,
   StageGear,
   StageResult,
@@ -123,11 +126,6 @@ export type {
   TrainOutcome,
   TrainFailure,
   Variation,
-  WormContact,
-  WormMember,
-  WormMemberResult,
-  WormResult,
-  WormStage,
 } from "./wire";
 
 import init, {
@@ -685,16 +683,27 @@ export function relieveStage(stage: Stage, just: Freedom): void {
  *  it has to be *stable* rather than meaningful — `Freedom`'s member order is
  *  the core's business and is never reconstructed here.
  */
-function autosOf(stage: Stage): Auto<number>[] {
+function autosOf(stage: Stage): { auto: boolean }[] {
   const shifts =
     stage.kind === "planetary"
       ? [stage.sun, stage.planet, stage.ring].map((g) => g.profile_shift)
       : "gears" in stage
         ? stage.gears.map((g) => g.profile_shift)
         : [];
-  return "centre_distance" in stage
-    ? [stage.centre_distance as Auto<number>, ...shifts]
-    : shifts;
+  // Every toggle relief can turn, whatever the value behind it: a pair's
+  // sizing carries a reading rather than a number, and only its flag is
+  // copied. The clearance and the sizing were missing from this list, so a
+  // relief the core decided on either never reached the panel.
+  const toggles: { auto: boolean }[] = [];
+  const push = (a: unknown) => {
+    if (typeof a === "object" && a !== null && "auto" in a) toggles.push(a as { auto: boolean });
+  };
+  push((stage as { centre_distance?: unknown }).centre_distance);
+  push((stage as { clearance?: unknown }).clearance);
+  push((stage as { running_clearance?: unknown }).running_clearance);
+  push((stage as { offset?: unknown }).offset);
+  push((stage as { sizing?: unknown }).sizing);
+  return [...toggles, ...shifts];
 }
 
 /** A fresh geartrain, one spur stage in it. */

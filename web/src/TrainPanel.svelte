@@ -1,5 +1,4 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
   import {
     defaults,
     solveTrain,
@@ -9,7 +8,6 @@
     type Auto,
     type Overrides,
     type StageGear,
-    type SpurStage,
     type Stage,
     type PlanetaryStage,
     type Optimisation,
@@ -17,7 +15,8 @@
     type GearResult,
     type Note,
     type Cutter,
-    type WormResult,
+    type PairResult,
+    type CrossedMesh,
     type MeshReport,
     type LoadSharing,
     note,
@@ -437,7 +436,7 @@
 <!-- What a crossed-axis mesh reports, whether it was entered as a worm stage or
      as a gear pair with its shafts turned: the same mathematics answers both
      (docs/reference.md#crossed-axes), so it is one readout rather than two that drift. -->
-{#snippet screwReadout(r: WormResult | undefined, members: [string, string])}
+{#snippet screwReadout(r: PairResult | undefined, m: CrossedMesh, members: [string, string])}
 <!-- Ordered to match the spur stage's shared readout — centre distance,
      contact ratio, efficiency, backlash — with what only a screw pair has
      following on. The backlash lives here rather than on the two member cards
@@ -449,38 +448,53 @@
     {num(r?.centre_distance, 4)} mm
     <small>{t("ui.train_nominal_value", { value: num(r?.centre_distance_nominal, 4) })}</small>
   </dd>
-  {#if r?.crossed}
+  <dt>{t("ui.train_lead_angle")}</dt>
+  <dd>
+    {num(m.lead_angles[0], 4)}° · {num(m.lead_angles[1], 4)}°
+    <small>{t("ui.train_lead")} {num(m.lead, 4)} mm</small>
+  </dd>
+  {#if m.zone}
     <dt>{t("ui.train_contact_ratio")}</dt>
     <dd>
-      <span class:warn={r.crossed.contact_ratio < 1}>
-        ε {num(r?.crossed.contact_ratio, 4)}
+      <span class:warn={m.zone.contact_ratio < 1}>
+        ε {num(m.zone.contact_ratio, 4)}
       </span>
       <small>
-        {r.crossed.contact_ratio < 1
+        {m.zone.contact_ratio < 1
           ? t("ui.train_note_contact_ratio_below_one")
           : t("ui.train_crossed_pairs_in_contact", {
               limit: t(
-                r.crossed.limited_by === "face"
+                m.zone.limited_by === "face"
                   ? "ui.train_limited_by_face_width"
                   : "ui.train_limited_by_teeth",
               ),
             })}
-        {#if r.crossed.tooth_height_assumed}
-          {t("ui.train_crossed_height_assumed")}
-        {/if}
       </small>
     </dd>
   {/if}
+  <!-- The same verdict every mesh gives, in the same words as `meshRows`:
+       whether either member's tip reaches past the other's usable flank. -->
+  <dt>{t("ui.train_interference")}</dt>
+  <dd>
+    {#each [[
+      m.flank_interference[0] ? t("ui.train_interference_flank", { member: members[0] }) : null,
+      m.flank_interference[1] ? t("ui.train_interference_flank", { member: members[1] }) : null,
+    ].filter((x) => x !== null)] as fouling (0)}
+      <span class:warn={fouling.length > 0}>
+        {fouling.join(" · ") || t("ui.train_interference_none")}
+      </span>
+    {/each}
+  </dd>
   <dt>{t("ui.train_mesh_efficiency")}</dt>
   <dd>
-    {bothWays(r?.efficiency)}
+    {bothWays(m.efficiency)}
     {#if lockNote(r?.notes ?? [])}
       <small class="warn">{lockNote(r?.notes ?? [])}</small>
     {/if}
-    {#if r?.crossed?.parallel_axis_efficiency != null}
+    {#if m.parallel_axis_efficiency != null}
       <small>
         {t("ui.train_parallel_shafts_would_give", {
-          percent: pct(r.crossed.parallel_axis_efficiency),
+          percent: pct(m.parallel_axis_efficiency),
         })}
       </small>
     {/if}
@@ -488,42 +502,40 @@
   <dt>{t("ui.train_backlash")}</dt>
   <dd>
     {t("ui.train_backlash_at", {
-      angle: num(r?.backlash.forward.nominal, 5),
+      angle: num(m.backlash[1].nominal, 5),
       member: members[1],
     })}
     <small
-      >{range(num(r?.backlash.forward.minimum, 5), num(r?.backlash.forward.maximum, 5))}</small
+      >{range(num(m.backlash[1].minimum, 5), num(m.backlash[1].maximum, 5))}</small
     >
     · {t("ui.train_backlash_at", {
-      angle: num(r?.backlash.backward.nominal, 5),
+      angle: num(m.backlash[0].nominal, 5),
       member: members[0],
     })}
   </dd>
   <dt>{t("ui.train_locks_at")}</dt>
-  <dd>{locksAt(r?.locking_friction)}</dd>
+  <dd>{locksAt(m.locking_friction)}</dd>
   <dt>{t("ui.train_contact_stress")}</dt>
   <dd>
-    {cases(r && { peak: r.contact.peak.max_pressure, cyclic: r.contact.cyclic.max_pressure }, 1)} {t("ui.train_mpa")}
+    {cases({ peak: m.contact.peak.max_pressure, cyclic: m.contact.cyclic.max_pressure }, 1)} {t("ui.train_mpa")}
     <small>{t("ui.train_peak_cyclic")}</small>
     <small>
-      {#if r}
       {t("ui.train_patch", {
-        length: num(r.contact.peak.patch_length, 4),
-        width: num(r.contact.peak.patch_width, 4),
+        length: num(m.contact.peak.patch_length, 4),
+        width: num(m.contact.peak.patch_width, 4),
       })} ·
-      {Math.abs(r.contact.peak.worst_position) < 1e-9
+      {Math.abs(m.contact.peak.worst_position) < 1e-9
         ? t("ui.train_worst_at_pitch_point")
         : t("ui.train_worst_along_the_path", {
-            position: num(r.contact.peak.worst_position, 3),
+            position: num(m.contact.peak.worst_position, 3),
           })}
       · {t("ui.train_pitch_point_alone_gives", {
-        stress: num(r.contact.peak.at_pitch_point, 1),
+        stress: num(m.contact.peak.at_pitch_point, 1),
       })}
-      {/if}
     </small>
   </dd>
   <dt>{t("ui.train_sliding_speed")}</dt>
-  <dd>{num(r?.sliding_velocity, 1)} mm/s</dd>
+  <dd>{num(m.sliding_velocity, 1)} mm/s</dd>
   <dt>{t("ui.train_bending_stress")}</dt>
   <dd>
     <small>{t("ui.train_not_reported_for_crossed_axes_no")}</small>
@@ -533,17 +545,15 @@
     {t("ui.train_flank_type_zi")}
     <small>{t("ui.train_zn_worm_s_contact_stress_1")}</small>
   </dd>
-  {#if r?.crossed}
+  {#if m.zone}
     <dt>{t("ui.train_contact_travel")}</dt>
     <dd>
-      {num(r?.crossed.axial_travel[0], 3)} · {num(r?.crossed.axial_travel[1], 3)} mm
+      {num(m.zone.axial_travel[0], 3)} · {num(m.zone.axial_travel[1], 3)} mm
       <small>{t("ui.train_along_each_member_s_own_axis")}</small>
     </dd>
   {/if}
 </dl>
 {/snippet}
-
-{#snippet noExtra(_j: number)}{/snippet}
 
 {#snippet gearCard(
   title: string,
@@ -560,7 +570,13 @@
      *  are offered as toggles. `"continuity"` — a crossed pair, whose contact is
      *  a point no stress depends on, so the width comes from ε = 1 instead and
      *  says which kind of minimum it is. */
-    faceWidth?: "rating" | "continuity";
+    faceWidth?: "rating" | "continuity" | "proportion";
+    /** The width a worm drive's convention recommends, for `"proportion"`. */
+    faceRecommended?: number;
+    /** Catalogue key for the face width's label — a worm's is a *length*. */
+    faceLabel?: string;
+    /** Catalogue key for the tooth count's label — a worm's teeth are *starts*. */
+    teethLabel?: string;
     /** Called when this gear's shift is switched between given and automatic,
      *  so a stage whose inputs constrain one another can relieve whichever of
      *  them that has over-specified. */
@@ -581,16 +597,10 @@
      *  already prints says it *on* that row. The planet said it on a second one
      *  instead: an `extra` block repeating the speed with the annotation
      *  attached, so the card carried the same figure twice and only the copy
-     *  was explained. `extra` is for a readout the shared one does not have —
-     *  which is a crossed pair's, where there is no `GearResult` and no shared
-     *  readout at all. */
+     *  was explained. That block is gone: every member of every kind has a
+     *  `GearResult` now, a worm's included, so there is no card without the
+     *  shared readout. */
     speedNote?: string;
-    /** A readout only this member has; given the member's position.
-     *
-     *  Rendered whether or not the shared readout above it did, so anything it
-     *  prints that the shared one also prints appears twice. */
-    extra?: Snippet<[number]>;
-    extraIndex?: number;
   },
 )}
 {@const own = g?.notes ?? []}
@@ -618,7 +628,7 @@
   {/if}
   <h4 class:later={opts.cutter !== undefined}>{title}</h4>
   <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
-    <span>{t("ui.train_tooth_count")}</span>
+    <span>{t(opts.teethLabel ?? "ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={gear.teeth} />
   </label>
   <!-- **The other end of the tooth, and the same shape as the shift's.** The
@@ -763,7 +773,7 @@
          at which one tooth pair hands over to the next (ε = 1). The spur
          stage's inverts a stress instead, and the two must not read alike. -->
     {@render autoNumber(
-      "ui.train_face_width",
+      opts.faceLabel ?? "ui.train_face_width",
       gear.face_width,
       opts.faceFromContinuity,
       0.5,
@@ -776,9 +786,28 @@
         : t("ui.train_note_face_width_continuity", { width: n(opts.faceFromContinuity) }),
       "ui.train_mm",
     )}
+  {:else if opts.faceWidth === "proportion"}
+    <!-- A worm drive's width is a **convention with a named source**, not a
+         derivation, and it sizes no stress here (`crossed::proportions`); it
+         is offered as the automatic value with its formula beside it, and
+         the box stays editable. -->
+    {@render autoNumber(
+      opts.faceLabel ?? "ui.train_face_width",
+      gear.face_width,
+      opts.faceRecommended,
+      1,
+      undefined,
+      opts.faceRecommended === undefined
+        ? null
+        : t("ui.train_note_proportions", {
+            width: n(opts.faceRecommended),
+            formula: opts.faceLabel ? "(11 + c z₂) m_x" : "2 m_x √(q + 1) ≤ 0.67 d₁",
+          }),
+      "ui.train_mm",
+    )}
   {:else}
     {@render autoNumber(
-      "ui.train_face_width",
+      opts.faceLabel ?? "ui.train_face_width",
       gear.face_width,
       g?.face_width,
       0.5,
@@ -838,6 +867,13 @@
     {@render property(t("ui.train_fatigue_allowable"), gear, "fatigue_allowable", g?.material.fatigue_allowable ?? mat?.fatigue_allowable, 10, t("ui.train_mpa"))}
   </div>
   <dl class="out small">
+    <!-- Outputs on every gear, and solved ones where the sizing is automatic:
+         a worm's diameter and a helical pair's angle are what a given centre
+         distance decides once the shifts are pinned. -->
+    <dt>{t("ui.train_pitch_diameter")}</dt>
+    <dd>{num(g?.pitch_diameter, 4)} {g && "mm"}</dd>
+    <dt>{t("ui.train_helix_angle")}</dt>
+    <dd>{num(g?.helix_angle, 4)}{g ? "°" : BLANK}</dd>
     <dt>{t("ui.train_torque")}</dt>
     <dd>{num(g?.torque, 4)} {g && "Nm"}</dd>
     <!-- Only where there is one. A back-driving load that nothing reacts
@@ -900,17 +936,6 @@
       {#each spare as n, i (i)}<li>{note(n)}</li>{/each}
     </ul>
   {/if}
-{#if !g}
-  <!-- **Only where there is no shared readout**, which is the whole of what
-       this is for: a crossed pair produces no per-gear rating, so `g` is
-       absent exactly when this is the only readout there is. Rendered
-       unconditionally it was free to restate a row the shared one had already
-       printed — the planet did, repeating its speed to hang an annotation on
-       the copy — and nothing could have caught that but reading both. A
-       member that *has* a rating adds to the row it belongs to instead
-       (`speedNote`). -->
-  {@render (opts.extra ?? noExtra)(opts.extraIndex ?? 0)}
-{/if}
 </div>
 {/snippet}
 
@@ -1346,27 +1371,38 @@
   {#each tab.train.stages as stage, i (i)}
     {@const res = solved?.stages[i] ?? null}
     <section class="stage">
-      {#if stage.kind === "spur"}
-        <!-- One stage, two meshes. Crossing the shafts turns a line contact
-             into a point one and changes what sliding costs, so the answer has
-             a different shape: `sres` when the shafts are parallel, the screw
-             result when they are not (docs/reference.md#crossed-axes). The *inputs* below are
-             the same either way, which is what the specification asks for. -->
-        {@const sres = res && res.kind === "spur" ? res : null}
-        {@const xres = res && res.kind === "worm" ? res : null}
+      {#if stage.kind === "spur" || stage.kind === "worm"}
+        <!-- **One pair, two kinds, two meshes.** A spur stage and a worm stage
+             are the same `PairStage`; what the kind decides is the vocabulary
+             — *starts*, *worm*, *wheel* — and which inputs are put in front of
+             the designer. Crossing the shafts turns a line contact into a
+             point one and changes what sliding costs, so the *answer* has a
+             different shape: `line` when the shafts are parallel, `point` when
+             they are not (docs/reference.md#crossed-axes). -->
+        {@const worm = stage.kind === "worm"}
+        {@const pres = res && res.kind === "pair" ? res : null}
+        {@const line = pres && pres.mesh.kind === "line" ? pres.mesh : null}
+        {@const point = pres && pres.mesh.kind === "point" ? pres.mesh : null}
+        {@const names: [string, string] = worm
+          ? [t("ui.train_the_worm"), t("ui.train_the_wheel")]
+          : [gearName(i, 0), gearName(i, 1)]}
+        {@const reading = "pitch_diameter" in stage.sizing.manual
+          ? "diameter"
+          : "helix_angle" in stage.sizing.manual
+            ? "helix"
+            : "additional"}
         <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
           <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
-          {#if stage.shaft_angle !== 0}
+          {#if worm}
+            <span class="kind">{t("ui.train_worm")}</span>
+          {:else if stage.shaft_angle !== 0}
             <span class="kind">{t("ui.train_crossed")}</span>
           {/if}
           <span class="teeth">z {stage.gears[0].teeth} / {stage.gears[1].teeth}</span>
-          {#if sres ?? xres}
-            <span class="ratio">{(sres ?? xres)?.ratio.toFixed(4)} : 1</span>
-            <!-- A spur pair's stage efficiency is its mesh's — one mesh, no
-                 carrier — so it is read through `mesh` rather than stored
-                 twice. A crossed pair's is the screw result's own. -->
-            <span class="eff">{pct((sres ? sres.mesh.efficiency : xres?.efficiency)?.forward ?? 0)} %</span>
+          {#if pres}
+            <span class="ratio">{pres.ratio.toFixed(4)} : 1</span>
+            <span class="eff">{pct(pres.mesh.efficiency.forward)} %</span>
           {/if}
         </button>
 
@@ -1388,20 +1424,80 @@
                   )
                 } />
               </label>
+              <!-- **Three readings of one number**, and a select to say which
+                   (`FirstMemberSizing`): what each gear carries beyond half the
+                   shaft angle, the first member's own helix, or the first
+                   member's pitch diameter — a worm's reading, since a worm's
+                   diameter is a free choice and a gear's follows from its
+                   teeth. Switching seeds the new reading from the geometry so
+                   the pair does not jump. Automatic is mode 3 by size: the
+                   distance decides it, once both shifts are pinned
+                   (`PairStage::first_pitch_diameter`). -->
               <label>
-                <span>{t("ui.train_additional_helix_angle")}</span>
-                <input type="number" step="1" bind:value={stage.additional_helix} />
-                <em>°</em>
-                <FieldNote notes={
-                  notes(
-                    t("ui.train_note_helix_split", {
-                      first: n(stage.shaft_angle / 2 + stage.additional_helix),
-                      second: n(stage.shaft_angle / 2 - stage.additional_helix),
-                    }),
-                    null,
-                  )
-                } />
+                <span>{t("ui.train_sized_by")}</span>
+                <select
+                  value={reading}
+                  onchange={(e) => {
+                    const g = pres?.gears[0];
+                    const first = g ? g.helix_angle : stage.shaft_angle / 2;
+                    stage.sizing.manual =
+                      e.currentTarget.value === "diameter"
+                        ? { pitch_diameter: g ? g.pitch_diameter : 7 }
+                        : e.currentTarget.value === "helix"
+                          ? { helix_angle: first }
+                          : { additional_helix: first - stage.shaft_angle / 2 };
+                  }}
+                >
+                  <option value="additional">{t("ui.train_additional_helix_angle")}</option>
+                  <option value="helix">{t("ui.train_helix_angle_gear")}</option>
+                  <option value="diameter">{t("ui.train_pitch_diameter_worm")}</option>
+                </select>
               </label>
+              {#if reading === "diameter"}
+                {@render autoNumber(
+                  "ui.train_pitch_diameter",
+                  { get auto() { return stage.sizing.auto; },
+                    set auto(v) { stage.sizing.auto = v; },
+                    get manual() { return (stage.sizing.manual as { pitch_diameter: number }).pitch_diameter; },
+                    set manual(v) { stage.sizing.manual = { pitch_diameter: v }; } },
+                  pres?.gears[0].pitch_diameter,
+                  0.5,
+                  () => relieveStage(stage, "first_member_size"),
+                  t("ui.train_mate_takes_rest_shaft_angle"),
+                  "ui.train_mm",
+                )}
+              {:else if reading === "helix"}
+                {@render autoNumber(
+                  "ui.train_helix_angle",
+                  { get auto() { return stage.sizing.auto; },
+                    set auto(v) { stage.sizing.auto = v; },
+                    get manual() { return (stage.sizing.manual as { helix_angle: number }).helix_angle; },
+                    set manual(v) { stage.sizing.manual = { helix_angle: v }; } },
+                  pres?.gears[0].helix_angle,
+                  1,
+                  () => relieveStage(stage, "first_member_size"),
+                  t("ui.train_mate_takes_rest_shaft_angle"),
+                  "°",
+                )}
+              {:else}
+                {@render autoNumber(
+                  "ui.train_additional_helix_angle",
+                  { get auto() { return stage.sizing.auto; },
+                    set auto(v) { stage.sizing.auto = v; },
+                    get manual() { return (stage.sizing.manual as { additional_helix: number }).additional_helix; },
+                    set manual(v) { stage.sizing.manual = { additional_helix: v }; } },
+                  pres ? pres.gears[0].helix_angle - stage.shaft_angle / 2 : undefined,
+                  1,
+                  () => relieveStage(stage, "first_member_size"),
+                  pres
+                    ? t("ui.train_note_helix_split", {
+                        first: n(pres.gears[0].helix_angle),
+                        second: n(pres.gears[1].helix_angle),
+                      })
+                    : null,
+                  "°",
+                )}
+              {/if}
               {@render numberField("ui.train_sliding_friction", () => stage.sliding_friction, (v) => (stage.sliding_friction = v), 0.01, "")}
               {@render numberField("ui.train_static_friction", () => stage.static_friction, (v) => (stage.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
               <label>
@@ -1412,15 +1508,18 @@
                      two are not independent: `k₁ + k₂ = 2` is what keeps the
                      mesh at zero backlash (docs/rationale.md#inputs-are-the-only-state), so storing both would
                      be storing a constraint that can be broken. Which gear it
-                     applies to therefore has to be said. -->
+                     applies to therefore has to be said — and on a crossed
+                     mesh what it reaches differs, which the note says. -->
                 <FieldNote notes={
                   notes(
-                    t(
-                      stage.shaft_angle === 0
-                        ? "ui.train_note_thickness_mod_spur"
-                        : "ui.train_note_thickness_mod_crossed",
-                      { first: String(gearNumber(i, 0)), second: String(gearNumber(i, 1)) },
-                    ),
+                    worm
+                      ? t("ui.train_note_thickness_mod_worm")
+                      : t(
+                          stage.shaft_angle === 0
+                            ? "ui.train_note_thickness_mod_spur"
+                            : "ui.train_note_thickness_mod_crossed",
+                          { first: String(gearNumber(i, 0)), second: String(gearNumber(i, 1)) },
+                        ),
                     null,
                   )
                 } />
@@ -1428,7 +1527,7 @@
               {@render autoNumber(
                 "ui.train_c2c_distance",
                 stage.centre_distance,
-                (sres ?? xres)?.centre_distance,
+                pres?.centre_distance,
                 0.1,
                 () => relieveStage(stage, "centre_distance"),
                 undefined,
@@ -1445,7 +1544,7 @@
               {@render autoNumber(
                 "ui.train_c2c_clearance",
                 stage.clearance,
-                (sres ?? xres)?.clearance,
+                pres?.clearance,
                 0.01,
                 () => relieveStage(stage, "clearance"),
                 undefined,
@@ -1461,322 +1560,64 @@
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
+              <!-- **Exposed where it is relevant, present everywhere.** Every
+                   pair has an axial float on the model's side — a helical gear
+                   sliding along its axis opens the flanks by `j sin β_b` — and
+                   a worm's thrust bearing is where it is the dominant source
+                   of backlash. A spur kind leaves it at zero unseen. -->
+              {#if worm}
+                {@render numberField("ui.train_worm_axial_clearance", () => stage.axial_clearance, (v) => (stage.axial_clearance = v), 0.01, "ui.train_mm")}
+              {/if}
               {#if stage.shaft_angle === 0}
                 {@render loadSharing(stage)}
+                <!-- The optimiser searches a parallel-axis mesh, and says so
+                     in a note if asked of a crossed one; here it is simply
+                     not offered where it does not reach. -->
+                {@render efficiencyToggle(stage.optimisation)}
               {/if}
-              {@render efficiencyToggle(stage.optimisation)}
             </div>
-            <!-- Clearance is meaningless once the centre distance is set by hand:
-                 the specification locks it to zero, and so does the solver. -->
-
-            <!-- A crossed pair rates as one mesh, not two teeth: there is no
-                 bending model and the point contact's pressure belongs to the
-                 pair. What is left that is per-member is what each shaft sees. -->
-            {#snippet crossedMember(j: number)}
-              {#if xres}
-                <dl class="out small">
-                  <dt>{t("ui.train_pitch_diameter")}</dt>
-                  <dd>{xres.members[j].pitch_diameter.toFixed(4)} mm</dd>
-                  <dt>{t("ui.train_helix_angle")}</dt>
-                  <dd>{n(j === 0 ? xres.helix_angle : xres.wheel_helix_angle)}°</dd>
-                  <dt>{t("ui.train_torque")}</dt>
-                  <dd>{xres.members[j].torque.toFixed(4)} N·m</dd>
-                  {#if xres.members[j].back_driving_torque !== null}
-                    <dt>{t("ui.train_back_driving_torque")}</dt>
-                    <dd>{xres.members[j].back_driving_torque.toFixed(4)} N·m</dd>
-                  {/if}
-                  <dt>{t("ui.train_speed")}</dt>
-                  <dd>{xres.members[j].speed.toFixed(1)} {t("ui.train_rpm")}</dd>
-                  <dt>{t("ui.train_tooth_cycles")}</dt>
-                  <dd>
-                    {xres.members[j].tooth_cycles.bending.toLocaleString()} / {xres.members[
-                      j
-                    ].tooth_cycles.contact.toLocaleString()}
-                    <small>{t("ui.train_bending_contact")}</small>
-                  </dd>
-                </dl>
-              {/if}
-            {/snippet}
-
-            <!-- A crossed pair's members are ordinary helical gears, so their
-                 tooth form is specified here as it is anywhere else — it is what
-                 will be cut. What it does *not* do is move this stage's figures,
-                 and saying which is which is the honesty required: the mesh is
-                 solved at its pitch point, so a shift reaches the answer only
-                 through the centre distance, which is an input of its own.
-                 docs/reference.md#crossed-axes. -->
-            {#if stage.shaft_angle !== 0}
-              <p class="aside wide">{t("ui.train_tooth_form_below_shift_addendum_dedendum")}</p>
-            {/if}
 
             <div class="gears">
               {#each stage.gears as gear, j (j)}
-                {@const g = sres?.gears[j]}
-                {@render gearCard(gearName(i, j), gear, g, {
-                  cut: "rack",
-                  onShiftAuto: () => relieveStage(stage, { shift: j }),
-                  faceWidth: stage.shaft_angle === 0 ? "rating" : "continuity",
-                  faceFromContinuity: xres?.crossed?.face_width_for_continuity?.[j],
-                  extra: xres ? crossedMember : undefined,
-                  extraIndex: j,
-                })}
+                {@const g = pres?.gears[j]}
+                {@render gearCard(
+                  worm ? t(j === 0 ? "ui.train_worm_member" : "ui.train_wormwheel") : gearName(i, j),
+                  gear,
+                  g,
+                  {
+                    cut: "rack",
+                    teethLabel: worm && j === 0 ? "ui.train_starts" : undefined,
+                    onShiftAuto: () => relieveStage(stage, { shift: j }),
+                    faceWidth: worm ? "proportion" : stage.shaft_angle === 0 ? "rating" : "continuity",
+                    faceFromContinuity: point?.zone?.face_width_for_continuity?.[j],
+                    faceRecommended: g?.recommended_face_width ?? undefined,
+                    faceLabel: worm && j === 0 ? "ui.train_length" : undefined,
+                  },
+                )}
               {/each}
             </div>
 
-            {#if stage.shaft_angle !== 0}
-              {@render screwReadout(xres ?? undefined, [gearName(i, 0), gearName(i, 1)])}
-              {#if (xres?.notes.length ?? 0) > 0}
-                <ul class="notes">
-                  {#each xres?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
-                </ul>
-              {/if}
-            {/if}
-
-            {#if stage.shaft_angle === 0}
+            {#if point}
+              {@render screwReadout(pres ?? undefined, point, names)}
+            {:else if line || !pres}
               <dl class="out">
                 <dt>{t("ui.train_centre_distance")}</dt>
                 <dd>
-                  {num(sres?.centre_distance, 4)} {sres && "mm"}
-                  <small>{sres && t("ui.train_nominal_value", { value: num(sres.centre_distance_nominal, 4) })}</small>
+                  {num(pres?.centre_distance, 4)} {pres && "mm"}
+                  <small>{pres && t("ui.train_nominal_value", { value: num(pres.centre_distance_nominal, 4) })}</small>
                 </dd>
                 <!-- What every parallel-axis mesh reports, drawn by the one
-                     snippet that draws it. These rows were written out again
-                     here, which made the parallel-axis stage the only kind not
-                     using `meshRows` — the same split the Rust side had, where
-                     `SpurResult` re-declared `MeshReport`'s seven fields rather
-                     than holding one. The snippet is also the better readout: it
-                     warns on a transverse contact ratio below one, which this
-                     copy did not. -->
+                     snippet that draws it. -->
                 {@render meshRows(
-                  sres?.mesh,
-                  [gearName(i, 0), gearName(i, 1)],
-                  stage.additional_helix !== 0,
+                  line ?? undefined,
+                  names,
+                  (pres?.gears[0].helix_angle ?? 0) !== 0,
                 )}
               </dl>
-              {#if (sres?.notes.length ?? 0) > 0}
-                <ul class="notes">
-                  {#each sres?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
-                </ul>
-              {/if}
             {/if}
-
-            <button
-              class="danger small"
-              onclick={() => removeStage(i)}
-              disabled={tab.train.stages.length === 1}>{t("ui.train_remove_stage")}</button
-            >
-          </div>
-        {/if}
-      {:else if stage.kind === "worm"}
-        {@const wres = res && res.kind === "worm" ? res : null}
-        <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
-          <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
-          <strong>{stageName(i)}</strong>
-          <span class="kind">{t("ui.train_worm")}</span>
-          <span class="teeth">z {stage.starts} / {stage.wheel_teeth}</span>
-          {#if wres}
-            <span class="ratio">{wres.ratio.toFixed(4)} : 1</span>
-            <span class="eff">{pct(wres.efficiency.forward)} %</span>
-          {/if}
-        </button>
-
-        {#if tab.open[i]}
-          <div class="body">
-            <div class="grid shared">
-              {@render numberField("ui.train_normal_module", () => stage.module, (v) => (stage.module = v), 0.1, "ui.train_mm")}
-              {@render numberField("ui.train_pressure_angle", () => stage.pressure_angle, (v) => (stage.pressure_angle = v), 0.5, "°")}
-              {@render numberField("ui.train_axis_angle", () => stage.shaft_angle, (v) => (stage.shaft_angle = v), 1, "°")}
-              {@render numberField("ui.train_sliding_friction", () => stage.sliding_friction, (v) => (stage.sliding_friction = v), 0.01, "")}
-              {@render numberField("ui.train_static_friction", () => stage.static_friction, (v) => (stage.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
-              <label>
-                <span>{t("ui.train_tooth_thickness_mod")}</span>
-                <input type="number" step="0.05" bind:value={stage.thickness_mod} />
-                <em>{t("ui.train_k")}</em>
-                <!-- The same single input the spur stage has, and for the same
-                     reason: `k₁ + k₂ = 2` is what keeps the mesh at zero
-                     backlash, so storing both would be storing a breakable
-                     constraint. What it reaches differs, and the note says so —
-                     the pair's play is unchanged *because* of that invariant,
-                     which is an answer rather than a gap. -->
-                <FieldNote notes={
-                  notes(
-                    t("ui.train_note_thickness_mod_worm"),
-                    null,
-                  )
-                } />
-              </label>
-              {@render autoNumber(
-                "ui.train_c2c_distance",
-                stage.centre_distance,
-                wres?.centre_distance,
-                0.1,
-                undefined,
-                undefined,
-                "ui.train_mm",
-              )}
-{@render autoNumber(
-                "ui.train_c2c_clearance",
-                stage.clearance,
-                wres?.clearance,
-                0.01,
-                () => relieveStage(stage, "clearance"),
-                undefined,
-                "ui.train_mm",
-              )}
-              <label>
-                <span>{t("ui.train_c2c_tolerance_plus")}</span>
-                <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              <label>
-                <span>{t("ui.train_c2c_tolerance_minus")}</span>
-                <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              {@render numberField("ui.train_worm_axial_clearance", () => stage.axial_clearance, (v) => (stage.axial_clearance = v), 0.01, "ui.train_mm")}
-            </div>
-
-            <div class="gears">
-              <div class="gear">
-                <h4>{t("pitch_diameter" in stage.sizing.manual ? "ui.train_worm_member" : "ui.train_first_gear")}</h4>
-                <label>
-                  <span>{t("pitch_diameter" in stage.sizing.manual ? "ui.train_starts" : "ui.train_tooth_count")}</span>
-                  <input type="number" step="1" bind:value={stage.starts} />
-                </label>
-                <label>
-                  <span>{t("ui.train_sized_by")}</span>
-                  <select
-                    value={"pitch_diameter" in stage.sizing.manual ? "diameter" : "helix"}
-                    onchange={(e) => {
-                      // Swap which of the two is the input, seeding the new one
-                      // from the geometry so the pair does not jump. Which unit
-                      // it is stated in and whether it is stated at all are
-                      // different questions, so the toggle is left alone here.
-                      const g = wres;
-                      stage.sizing.manual =
-                        e.currentTarget.value === "diameter"
-                          ? { pitch_diameter: g ? g.members[0].pitch_diameter : 7 }
-                          : { helix_angle: g ? 90 - g.lead_angle : 45 };
-                    }}
-                  >
-                    <option value="diameter">{t("ui.train_pitch_diameter_worm")}</option>
-                    <option value="helix">{t("ui.train_helix_angle_gear")}</option>
-                  </select>
-                </label>
-                <!-- **A screw stage has no profile shift**, so its *size* is the
-                     only thing inside it free to absorb a given centre distance.
-                     Automatic here is that mode: the worm is solved to reach the
-                     housing, which changes the teeth rather than where they sit
-                     — the one kind where mode 3 does — and is why the size leads
-                     this stage's relief order rather than the distance.
-                     `Stage::relieved` keeps the three from over-specifying. -->
-                {#if "pitch_diameter" in stage.sizing.manual}
-                  {@render autoNumber(
-                    "ui.train_pitch_diameter",
-                    { get auto() { return stage.sizing.auto; },
-                      set auto(v) { stage.sizing.auto = v; },
-                      get manual() { return (stage.sizing.manual as { pitch_diameter: number }).pitch_diameter; },
-                      set manual(v) { stage.sizing.manual = { pitch_diameter: v }; } },
-                    wres?.members[0].pitch_diameter,
-                    0.5,
-                    () => relieveStage(stage, "first_member_size"),
-                    undefined,
-                    "ui.train_mm",
-                  )}
-                {:else}
-                  {@render autoNumber(
-                    "ui.train_helix_angle",
-                    { get auto() { return stage.sizing.auto; },
-                      set auto(v) { stage.sizing.auto = v; },
-                      get manual() { return (stage.sizing.manual as { helix_angle: number }).helix_angle; },
-                      set manual(v) { stage.sizing.manual = { helix_angle: v }; } },
-                    wres ? 90 - wres.lead_angle : undefined,
-                    1,
-                    () => relieveStage(stage, "first_member_size"),
-                    t("ui.train_mate_takes_rest_shaft_angle"),
-                    "",
-                  )}
-                {/if}
-                {#if wres && wres.members[0].recommended_face_width == null}
-                  <!-- No recommendation exists for a crossed pair, so there is
-                       nothing for an automatic toggle to take: showing one
-                       would lock the field to a value nothing computed. -->
-                  {@render numberField("ui.train_length", () => stage.worm.face_width.manual, (v) => (stage.worm.face_width.manual = v), 1, "ui.train_mm")}
-                {:else}
-                  {@render autoNumber(
-                    "ui.train_length",
-                    stage.worm.face_width,
-                    wres?.members[0].recommended_face_width ?? undefined,
-                    1,
-                  )}
-                {/if}
-                {#if wres?.members[0].recommended_face_width != null}
-                  <p class="convention">
-                    {t("ui.train_note_proportions", {
-                      width: wres.members[0].recommended_face_width?.toFixed(2) ?? "",
-                      formula: "(11 + 0.06 z₂) m_x",
-                    })}
-                  </p>
-                {/if}
-                <label>
-                  <span>{t("ui.train_material")}</span>
-                  <select bind:value={stage.worm.material}>
-                    {#each library.materials.material as m (m.name)}
-                      <option value={m.name}>{m.name}</option>
-                    {/each}
-                  </select>
-                </label>
-                <dl class="out">
-                  <dt>{t("ui.train_lead_angle")}</dt>
-                  <dd>{num(wres?.lead_angle, 4)}{wres ? "°" : BLANK}</dd>
-                  <dt>{t("ui.train_lead")}</dt>
-                  <dd>{num(wres?.lead, 4)} {wres && "mm"}</dd>
-                  <dt>{t("ui.train_torque")}</dt>
-                  <dd>{num(wres?.members[0].torque, 4)} {wres && "N·m"}</dd>
-                  <dt>{t("ui.train_speed")}</dt>
-                  <dd>{num(wres?.members[0].speed, 1)} {wres && t("ui.train_rpm")}</dd>
-                </dl>
-              </div>
-
-              <div class="gear">
-                <h4>{t("ui.train_wormwheel")}</h4>
-                <label>
-                  <span>{t("ui.train_tooth_count")}</span>
-                  <input type="number" step="1" bind:value={stage.wheel_teeth} />
-                </label>
-                {#if wres && wres.members[1].recommended_face_width == null}
-                  {@render numberField("ui.train_face_width", () => stage.wheel.face_width.manual, (v) => (stage.wheel.face_width.manual = v), 1, "ui.train_mm")}
-                {:else}
-                  {@render autoNumber(
-                    "ui.train_face_width",
-                    stage.wheel.face_width,
-                    wres?.members[1].recommended_face_width ?? undefined,
-                    1,
-                  )}
-                {/if}
-                <label>
-                  <span>{t("ui.train_material")}</span>
-                  <select bind:value={stage.wheel.material}>
-                    {#each library.materials.material as m (m.name)}
-                      <option value={m.name}>{m.name}</option>
-                    {/each}
-                  </select>
-                </label>
-                <dl class="out">
-                  <dt>{t("ui.train_pitch_diameter")}</dt>
-                  <dd>{num(wres?.members[1].pitch_diameter, 4)} {wres && "mm"}</dd>
-                  <dt>{t("ui.train_torque")}</dt>
-                  <dd>{num(wres?.members[1].torque, 4)} {wres && "N·m"}</dd>
-                  <dt>{t("ui.train_speed")}</dt>
-                  <dd>{num(wres?.members[1].speed, 1)} {wres && t("ui.train_rpm")}</dd>
-                </dl>
-              </div>
-            </div>
-
-            {@render screwReadout(wres ?? undefined, [t("ui.train_the_worm"), t("ui.train_the_wheel")])}
-            {#if restOfNotes(wres?.notes).length > 0}
+            {#if restOfNotes(pres?.notes).length > 0}
               <ul class="notes">
-                {#each restOfNotes(wres?.notes) as n, i (i)}<li>{note(n)}</li>{/each}
+                {#each restOfNotes(pres?.notes) as n, i (i)}<li>{note(n)}</li>{/each}
               </ul>
             {/if}
 
@@ -2519,15 +2360,6 @@
   .segmented button.on {
     background: var(--selected);
   }
-  /* The source of a shipped convention, next to the number it produced —
-     the project's rule is to say what a figure is where it is shown. */
-  .convention {
-    grid-column: 1 / -1;
-    margin: -0.1rem 0 0.4rem;
-    font-size: 0.72rem;
-    line-height: 1.4;
-    color: var(--muted);
-  }
   .out {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -2728,18 +2560,6 @@
     font-size: 0.72rem;
     color: var(--muted);
     text-align: right;
-  }
-  /* See the note slot's own comment: candidates stack, the tallest sets the
-     height, and nothing moves when the visible one changes. */
-  .aside {
-    grid-column: 1 / -1;
-    margin: 0 0 var(--field-gap);
-    font-size: 0.72rem;
-    color: var(--muted);
-  }
-  .aside.wide {
-    margin: 0.2rem 0 0.5rem;
-    max-width: 60rem;
   }
   label.invalid input {
     border-color: var(--warn);

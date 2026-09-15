@@ -1023,7 +1023,7 @@ pub struct GearTabDefaults {
 }
 
 fn defaults_impl() -> Result<String, String> {
-    use gear_core::train::{Actuation, PlanetaryStage, SpurStage, Stage, Train, WormStage};
+    use gear_core::train::{Actuation, PairStage, PlanetaryStage, Stage, Train};
 
     // The tab starts with an automatic face width, where the core's own
     // default is a plain 10 mm. Both are right for their caller: the CLI and
@@ -1043,15 +1043,9 @@ fn defaults_impl() -> Result<String, String> {
         face_width: gear_core::params::Auto::automatic(UI_SEED),
         ..g.clone()
     };
-    // A worm's members are threads rather than rack-cut gears, so they are their
-    // own type — and the same question put to them wants the same answer.
-    let ui_member = |m: &gear_core::train::WormMember| gear_core::train::WormMember {
-        face_width: gear_core::params::Auto::automatic(UI_SEED),
-        ..m.clone()
-    };
     let spur = {
-        let d = SpurStage::default();
-        SpurStage {
+        let d = PairStage::default();
+        PairStage {
             gears: [ui_gear(&d.gears[0]), ui_gear(&d.gears[1])],
             ..d
         }
@@ -1065,11 +1059,12 @@ fn defaults_impl() -> Result<String, String> {
             ..d
         }
     };
+    // A worm and its wheel are the same members as a spur pair's now, so the
+    // same question put to them gets the same answer by the same closure.
     let worm = {
-        let d = WormStage::default();
-        WormStage {
-            worm: ui_member(&d.worm),
-            wheel: ui_member(&d.wheel),
+        let d = PairStage::worm();
+        PairStage {
+            gears: [ui_gear(&d.gears[0]), ui_gear(&d.gears[1])],
             ..d
         }
     };
@@ -2029,7 +2024,7 @@ mod tests {
             "actuation": { "continuous": { "operating_speed": 2400.0, "runtime_hours": 1000.0 } },
             "stages": [
               {"kind":"spur",
-               "module":1.0,"pressure_angle":20.0,"additional_helix":0.0,"sliding_friction":0.06,"static_friction":0.16,
+               "module":1.0,"pressure_angle":20.0,"sizing":{"auto":false,"manual":{"additional_helix":0.0}},"sliding_friction":0.06,"static_friction":0.16,
                "thickness_mod":1.0,
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":{"auto":false,"manual":0.02},"tolerance_plus":0.02,"tolerance_minus":0.02,
@@ -2050,21 +2045,35 @@ mod tests {
               {"kind":"worm",
                "module":1.0,"pressure_angle":20.0,"shaft_angle":90.0,"sliding_friction":0.06,"static_friction":0.16,
                "thickness_mod":1.0,
-               "starts":1,"sizing":{"auto":false,"manual":{"pitch_diameter":7.0}},"wheel_teeth":40,
+               "sizing":{"auto":false,"manual":{"pitch_diameter":7.0}},
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":{"auto":false,"manual":0.02},"tolerance_plus":0.02,"tolerance_minus":0.02,
                "axial_clearance":0.04,
-               "worm":{"face_width":{"auto":false,"manual":10.0},"material":"4340 Hardened Steel"},
-               "wheel":{"face_width":{"auto":true,"manual":10.0},"material":"Brass C360"}}
+               "gears":[
+                 {"teeth":1,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},
+                  "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
+                  "dedendum":1.25,"root_radius":0.38,
+                  "face_width":{"auto":false,"manual":10.0},
+                  "face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},
+                  "material":"4340 Hardened Steel"},
+                 {"teeth":40,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},
+                  "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
+                  "dedendum":1.25,"root_radius":0.38,
+                  "face_width":{"auto":true,"manual":10.0},
+                  "face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},
+                  "material":"Brass C360"}
+               ]}
             ]}}"#;
 
         let v = solved(req);
         let want = (43.0 / 17.0) * 40.0;
         assert!((v["total_ratio"].as_f64().unwrap() - want).abs() < 1e-9);
 
-        // Each stage says what it is, and carries its own shape.
-        assert_eq!(v["stages"][0]["kind"], "spur");
-        assert_eq!(v["stages"][1]["kind"], "worm");
+        // Both stages are pairs, and each says which mesh it has.
+        assert_eq!(v["stages"][0]["kind"], "pair");
+        assert_eq!(v["stages"][1]["kind"], "pair");
+        assert_eq!(v["stages"][0]["mesh"]["kind"], "line");
+        assert_eq!(v["stages"][1]["mesh"]["kind"], "point");
         assert!(
             v["stages"][0]["gears"][0]["bending_stress"]["peak"]
                 .as_f64()
@@ -2074,16 +2083,17 @@ mod tests {
 
         let worm = &v["stages"][1];
         assert!(
-            worm["gears"].is_null(),
-            "a worm stage has members, not gears"
+            worm["gears"][0]["pitch_diameter"].as_f64().unwrap() > 0.0,
+            "a worm stage's members are gears like any other"
         );
-        assert!(worm["contact"]["peak"]["max_pressure"].as_f64().unwrap() > 0.0);
-        let eff = &worm["efficiency"];
+        let mesh = &worm["mesh"];
+        assert!(mesh["contact"]["peak"]["max_pressure"].as_f64().unwrap() > 0.0);
+        let eff = &mesh["efficiency"];
         assert!(eff["backward"].as_f64().unwrap() < eff["forward"].as_f64().unwrap());
         // ...while the spur stage puts the same number in both, which is the
         // point of reporting it directionally everywhere rather than only where
         // it differs.
-        let spur_eff = &v["stages"][0]["efficiency"];
+        let spur_eff = &v["stages"][0]["mesh"]["efficiency"];
         assert_eq!(spur_eff["forward"], spur_eff["backward"]);
         // And the train reports both totals, plus backlash at each end.
         //
@@ -2098,8 +2108,8 @@ mod tests {
         assert!(v["backlash"]["forward"]["nominal"].as_f64().unwrap() > 0.0);
         assert!(v["backlash"]["backward"]["nominal"].as_f64().unwrap() > 0.0);
         // The sliding speed could only be filled once the shaft line was known.
-        assert!(worm["sliding_velocity"].as_f64().unwrap() > 0.0);
-        assert!(worm["members"][1]["speed"].as_f64().unwrap() > 0.0);
+        assert!(mesh["sliding_velocity"].as_f64().unwrap() > 0.0);
+        assert!(worm["gears"][1]["speed"].as_f64().unwrap() > 0.0);
     }
 
     /// **Every number that crosses is a number**, or a `null` at a field that is
@@ -2129,6 +2139,12 @@ mod tests {
         // left no fillet is the ordinary way to get here.
         "bending",
         "bending_stress",
+        // ...and a crossed pair's members have none by decision: a point
+        // contact tracking across the flank is not the load a cantilever
+        // formula measures (docs/rationale.md#a-worm-stage-reports-no-bending-stress).
+        // As a path, because `peak` and `cyclic` name every rated figure.
+        "bending_stress.peak",
+        "bending_stress.cyclic",
         // No back-driving load reaches this gear, because something upstream
         // reacted it or nothing did.
         "back_driving_torque",
@@ -2138,11 +2154,13 @@ mod tests {
         "planet_clearance",
         // No peak torque, so no fraction of it.
         "operating_torque_percent",
-        // A crossed pair is not a worm and has no published proportions.
+        // A crossed gear pair is not a worm and has no published proportions,
+        // and no parallel-axis member has any either.
         "recommended_face_width",
-        // ...and a worm is not a crossed pair, so it has no zone of action
-        // taken from one.
-        "crossed",
+        // A crossed pair whose teeth never meet has no zone of action, and
+        // one whose parallel counterpart cannot be built has nothing to be
+        // compared with.
+        "zone",
         "parallel_axis_efficiency",
         // The train solved, so there is no failure to report.
         "failure",
@@ -2161,13 +2179,7 @@ mod tests {
         // is the rule; a spur pair and an epicyclic set's sun-planet mesh are
         // where it is met.
         "tips",
-        // A worm stage's members are not gears: a worm is a thread and its
-        // wheel is the envelope of one, so a profile shift and a buildable
-        // range are questions that cannot be put to them. A crossed *gear*
-        // pair's members are gears and this is `Some` there — the same field
-        // separating the two arrangements that share the result type.
-        "gear",
-        // ...and where no rating sizes a face, no width is asked for. A point
+        // Where no rating sizes a face, no width is asked for. A point
         // contact's peak pressure does not depend on the face width at all, so
         // there is nothing to invert; a crossed pair's width comes from
         // continuity instead, and says so under its own name.
@@ -2384,7 +2396,7 @@ mod tests {
             "actuation": { "continuous": { "operating_speed": 2400.0, "runtime_hours": 1000.0 } },
             "stages": [
               {"kind":"spur",
-               "module":1.0,"pressure_angle":20.0,"additional_helix":0.0,"sliding_friction":0.06,"static_friction":0.16,
+               "module":1.0,"pressure_angle":20.0,"sizing":{"auto":false,"manual":{"additional_helix":0.0}},"sliding_friction":0.06,"static_friction":0.16,
                "thickness_mod":1.0,
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":{"auto":false,"manual":0.02},"tolerance_plus":0.02,"tolerance_minus":0.02,

@@ -382,17 +382,27 @@ stays free. Both of those per-mesh conditions are `shift_sum_for`, so a target
 makes the layout easier: the Newton iteration on the planet's shift disappears
 and the sun's and the ring's shifts are read off the planet's in closed form.
 
-**A screw stage has no profile shift, so its *size* is what absorbs a distance.**
-The pitch diameter and the helix angle are two readings of one number
-(`sin γ = z m_n / d`), and automatic means the housing decides it. This is the
-one kind whose mode 3 changes the **teeth** rather than where they sit, which is
-why the size leads its relief order rather than the distance: a designer who
-states a housing and a clearance is asking what worm fits.
+**A pair has a fifth input in the relation, its *size*.** The additional helix,
+the first member's helix angle and the first member's pitch diameter are three
+readings of one number (`d = z m_n / cos β`, `FirstMemberSizing`), and every
+pair — spur, helical, crossed or worm — relates `{a, clearance, x₁, x₂, size}`
+by one equation, so four may be given. Which absorbs a given distance is a
+preference rather than a law, and it is the same on every kind: **the shifts
+do wherever one of them is free, and the size only when both are pinned**,
+because a shift moves the teeth where a size changes them. On a crossed mesh
+the shift enters as a rack's does, `a₀ = a_ref + (x₁ + x₂) m_n` exactly
+([Crossed axes](#crossed-axes)), so the sum is one subtraction; on a parallel
+one it is `shift_sum_for` as before.
 
-It has an answer only sometimes, and a *pair* of answers often. A screw pair's
-centre distance is `(d₁ + d₂)/2` and the two move opposite ways as the worm is
-resized — `d₁ = z₁ m_n / sin γ` shrinks as the thread steepens while
-`d₂ = z₂ m_n / cos β₂` grows — so the distance has a **minimum**:
+The worm kind sets the convention of worm practice as inputs: its worm's shift
+is pinned at zero — the worm is the tool its wheel is cut by — so a given
+distance moves the **wheel's** shift, as DIN 3975 has it, and pinning the
+wheel's too is what makes the worm's diameter absorb it. That last case is
+where the size is the answer to a housing, and it has an answer only
+sometimes, and a *pair* of answers often. A screw pair's reference distance is
+`(d₁ + d₂)/2` and the two move opposite ways as the worm is resized —
+`d₁ = z₁ m_n / sin γ` shrinks as the thread steepens while `d₂ = z₂ m_n / cos β₂`
+grows — so the distance has a **minimum**:
 
 ```text
 z₂ sin β₂ / cos²β₂ = z₁ cos γ / sin²γ         β₂ = Σ − 90° + γ
@@ -403,7 +413,9 @@ Above that minimum two different worms reach the same centres — a thin one wit
 a fast lead and a fat one with a slow one — and the tool takes the branch the
 designer's own number is on, which is the only choice under which nudging the
 target moves the answer smoothly. Below it there is no worm at all, and the
-stage says so.
+stage says so. On parallel shafts there is no turning point: the distance only
+grows with the helix, and a helical pair cut to fit a standard centre distance
+is the same request with one branch.
 
 That is one of the two bounds `train::FreedomGroup` carries. The other counts how
 many may be *given*, and the pair of them is what makes an over- or
@@ -656,7 +668,7 @@ Each stage differs only in what is free and what it is worth:
 | spur | both shifts | the mesh's own efficiency |
 | planetary | the sun's and the ring's, the planet's following | `η₀`, since `power` rises with it either way |
 | hula | each mesh's division of its shift | the two meshes' product |
-| worm | — | no profile shift exists to choose |
+| worm, crossed | — | the search is the parallel-axis mesh's; a crossed pair asked to optimise takes what the constraints imply and says so |
 
 The searches share `auto::maximise`: what differs between stages is how many
 numbers are free and what they are worth, not how to look for them, and
@@ -783,15 +795,41 @@ leaves it unread.
 
 ## Crossed axes
 
-One model covers a worm stage and a crossed helical pair; they differ in **one
-input**, whether the first member's diameter is given or derived from a helix
-angle.
+One model covers a worm stage and a crossed helical pair, and one stage type
+too: a worm is a `PairStage` whose first member is sized by pitch diameter
+rather than by helix angle, with the shift, addendum, dedendum and root round
+every other member has. The *kind* — spur or worm — is a layer over that: a
+preset, the words *starts* and *wheel*, which inputs a panel shows, and the
+conventional proportions a worm's faces take. Nothing in the mathematics reads
+it.
 
 ```text
 sin γ = z m_n / d            exact, no iteration
 γ = 90° − β    ⟹    sin γ = cos β
 β₁ = Σ/2 + β_add      β₂ = Σ/2 − β_add      so β₁ + β₂ = Σ
 ```
+
+**A profile shift enters a crossed mesh as a rack's does.** The line of action's
+direction is fixed by the base helices and the shaft angle and cannot turn
+(below), so a flank thickened by a shift `x` is the same involute helicoid
+rotated about its axis, which moves it along that fixed normal by
+`x m_n sin α_n` everywhere; separating the axes by `Δa` moves the flanks by
+`Δa sin α_n` along the same normal. So
+
+```text
+a₀ = (d₁ + d₂)/2 + (x₁ + x₂) m_n         exact for involute helicoids
+```
+
+with no involute function and no operating pressure angle: the normal pressure
+angle at the contact is `α_n` at any shift, because the normal is. The parallel
+pair is the degeneracy — its line turns with the centres and `inv α_w` carries
+the difference — and the two laws part company at second order in the shift,
+the same step at `Σ = 0` the backlash projection has. Measured off the tooth
+generator, which knows nothing of a screw pair, at five helix angles including a
+worm's 82°. A consequence worth knowing: a shifted pair's contact is off the
+common perpendicular even at its own zero-backlash distance, since contact on
+the perpendicular is possible at the reference radii and nowhere else, and the
+face widths are sized for where the contact actually is.
 
 Both ends of the range are refused and they are not symmetric: `sin γ ≥ 1` is a
 member with no lead at all, and `β₁ = 90°` is a disc rather than a gear — caught
@@ -810,17 +848,29 @@ two flanks, mirror images.
 
 ```text
 r(s)   = √(r_b² + (ρ_n cos β_b)²)          ρ_n = |s − s_tangency|
-zone   = both members with ρ_n ≤ √(r_a² − r_b²)/cos β_b
+zone   = both members with ρ_n ≤ √(r_a² − r_b²)/cos β_b, each running one way
+         from its tangency point toward the other's
 ε      = zone length / (π m_n cos α_n)     the NORMAL base pitch
 travel = zone length · sin β_b             along each member's own axis
 ```
+
+**Interference is the same question the parallel mesh asks**, along the line:
+a member's flank runs one way from its tangency point, and past that point
+there is no involute to touch, so a mate whose reach crosses it is fouling
+rather than in a longer zone. `CrossedPath::contact_radius_at` is
+`mesh::conjugate_radius` with the tangency span in place of `a_w sin α_w`, and
+the verdict — reached below where the involute hands over to the fillet, or
+not touching involute at all — meets the parallel one a hundredth of a degree
+off parallel on a grid with fouling cases in it. An earlier reading took both
+sides of each tangency point and could count a fouling tip as contact.
 
 The parallel case is a **degeneracy**, not a value: at `Σ = 0` the two conditions
 on `n̂` collapse into one, the line becomes a plane, and contact spreads from a
 point to a line. `path_of_contact` returns `None` there.
 
-Which of the eight lines is the mesh is settled once at the zero-backlash
-distance and carried, since which flanks face each other is not a function of
+Which of the eight lines is the mesh is settled once at the **reference**
+distance — where the reference cylinders touch and the pitch point lies on the
+line — and carried, since which flanks face each other is not a function of
 centre distance.
 
 ### The friction balance
@@ -898,7 +948,11 @@ b₁ = (11 + c z₂) m_x,   c = 0.06 (z₁ < 4), 0.09 (z₁ ≥ 4)      DIN/ČSN
 b₂ = 2 m_x √(q + 1),    capped at 0.67 d₁,   q = d₁/m_x       BS 721
 ```
 
-Not offered for a crossed gear pair, which has nothing wrapped round anything.
+Not offered for a crossed gear pair, which has nothing wrapped round anything —
+and it is the **kind** that says which, since the same 17/23 pair at 45° is a
+worm drive if a designer calls it one and a gear pair otherwise. A gear pair's
+automatic face is continuity's; a worm's is these, reported beside whatever
+width is in use.
 
 The worm's flank is taken as an **involute helicoid (ZI)**, which makes it
 developable: one principal curvature is exactly zero along the ruling, so each

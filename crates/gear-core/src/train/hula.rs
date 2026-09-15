@@ -118,7 +118,7 @@ pub struct HulaStage {
     /// How the load is divided while two tooth pairs are engaged.
     ///
     /// **Off by default, and it reaches bending only** — see
-    /// [`super::SpurStage::load_sharing`], which is the same input for the same
+    /// [`super::PairStage::load_sharing`], which is the same input for the same
     /// reason. One switch for the stage rather than one per mesh: it selects a
     /// *model*, and a stage running two meshes under two different models of
     /// the same thing would be reporting a comparison rather than a design.
@@ -316,7 +316,7 @@ pub struct HulaResult {
     /// **The minimum far-side clearance the stage was held to**, zero where the
     /// crank offset was given instead and the input went unread — the same
     /// question every stage answers about its own clearance (see
-    /// [`super::SpurStage::clearance_taken`]).
+    /// [`super::PairStage::clearance_taken`]).
     pub clearance: f64,
     /// The offset actually run at, including the running clearance.
     pub offset: f64,
@@ -1155,6 +1155,7 @@ pub fn solve_hula_stage_at(
             }
 
             let gear = GearResult::of(super::MemberFacts {
+                recommended_face_width: None,
                 profile_shift: layout.shift[i],
                 params: &params,
                 input,
@@ -1511,7 +1512,7 @@ mod tests {
     /// `HulaStage::offset` says a given number "is the distance to run at",
     /// which is what a given centre distance is on every other kind — where the
     /// zero-backlash geometry is derived by taking the absorbed clearance back
-    /// out of it (`SpurStage`'s `manual - clearance_taken()`).
+    /// out of it (`PairStage`'s `manual - clearance_taken()`).
     ///
     /// This one handed the given number straight to the solve, which made it the
     /// *nominal* offset instead, and the running clearance was then added on

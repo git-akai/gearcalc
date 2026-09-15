@@ -86,7 +86,7 @@ optimisation: Optimisation,
  * How the load is divided while two tooth pairs are engaged.
  *
  * **Off by default, and it reaches bending only** — see
- * [`super::SpurStage::load_sharing`], which is the same input for the same
+ * [`super::PairStage::load_sharing`], which is the same input for the same
  * reason. One switch for the stage rather than one per mesh: it selects a
  * *model*, and a stage running two meshes under two different models of
  * the same thing would be reporting a comparison rather than a design.

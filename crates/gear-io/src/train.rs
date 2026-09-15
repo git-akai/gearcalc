@@ -45,6 +45,18 @@
 //!   `static_friction = 0.16` — or the sliding value, to keep a pre-existing
 //!   file's answers, since one coefficient throughout is what it used to mean.
 //!
+//! - **A worm stage became a pair.** `kind = "worm"` now carries exactly the
+//!   fields a `kind = "spur"` stage does — `gears` with the full member inputs
+//!   in place of `worm`/`wheel`, `gears[0].teeth` for `starts` and
+//!   `gears[1].teeth` for `wheel_teeth` — plus `axial_clearance`, which every
+//!   pair now has (`0.0` on a spur stage means what its absence meant). A
+//!   spur stage's `additional_helix = 15.0` became one reading of the sizing,
+//!   `sizing = { auto = false, manual = { additional_helix = 15.0 } }`, beside
+//!   the worm's `helix_angle` and `pitch_diameter` readings. A worm file
+//!   written before this had no shifts or addenda to carry; `profile_shift =
+//!   { auto = false, manual = 0.0 }` on the worm and automatic on the wheel is
+//!   the convention it meant.
+//!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
 //! wrong — a file loading with a field defaulted rather than read — is exactly
@@ -144,9 +156,7 @@ pub fn to_toml(doc: &TrainDocument) -> Result<String, TrainError> {
 mod tests {
     use super::*;
     use gear_core::params::Auto;
-    use gear_core::train::{
-        Actuation, FirstMemberSizing, PlanetaryStage, SpurStage, Stage, WormStage,
-    };
+    use gear_core::train::{Actuation, FirstMemberSizing, PairStage, PlanetaryStage, Stage};
 
     /// One of every stage kind, so the `kind` tag is exercised in both
     /// directions and no variant can quietly stop round-tripping.
@@ -164,14 +174,14 @@ mod tests {
                     runtime_hours: 1000.0,
                 },
                 stages: vec![
-                    Stage::Spur(SpurStage {
-                        additional_helix: 15.0,
-                        ..SpurStage::default()
+                    Stage::Spur(PairStage {
+                        sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(15.0)),
+                        ..PairStage::default()
                     }),
-                    Stage::Worm(WormStage::default()),
-                    Stage::Worm(WormStage {
-                        sizing: gear_core::params::Auto::fixed(FirstMemberSizing::HelixAngle(45.0)),
-                        ..WormStage::default()
+                    Stage::Worm(PairStage::worm()),
+                    Stage::Worm(PairStage {
+                        sizing: Auto::fixed(FirstMemberSizing::HelixAngle(45.0)),
+                        ..PairStage::worm()
                     }),
                     Stage::Planetary(Box::<PlanetaryStage>::default()),
                     Stage::Hula(Box::default()),

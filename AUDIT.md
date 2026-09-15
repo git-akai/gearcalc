@@ -135,6 +135,19 @@ rather than hidden. **F81** came out of it and is the more useful finding:
 narrowing `TipRoom::clear` left the harness's own filter asking a third of the
 question, the corpus caught it, and the diff read like an improvement.
 
+**Phase 8 — F83, the worm is a pair.** Done. The worm stage was a stage
+*type* of its own — members that were not gears, no shift, no addendum, a
+result unlike a spur pair's — and the model underneath never needed it to be:
+both flanks are involute helicoids, a worm is a helical gear with a few starts
+at a steep helix. One `PairStage` under two kinds now, one `PairResult` with
+the mesh as the one place it branches, one five-input relation for every pair.
+The mathematics it took is one line — a shift enters a crossed mesh as a
+rack's does, `a₀ = a_ref + (x₁ + x₂) m_n`, exact — and one correction: the
+crossed zone was read on both sides of each tangency point, where a member has
+no involute, so a fouling tip could count as contact. **Every recorded number
+is unchanged**; what the corpus gained is the wheel's shift absorbing a
+distance, which is DIN 3975's convention and was not available at all.
+
 **Phase 7 — F7, F19, F21, the figures.** Done. Every table the documents print
 is gated — the four hula studies by one test, and **two of the four had
 drifted** through Phase 4's repairs. The prose is not tagged and is not a
@@ -237,6 +250,7 @@ them.
 | 7 | What a stage says about a distance it could not reach | **done** — F55 closed, gates proven; two silent faults, the worse being a pair that cannot be assembled |
 | 7 | The hula search asked for an effort, and what it found | **done** — F51 closed, F58 diagnosed and closed as `holds`, F82 opened and closed |
 | 7 | The figures | **done** — F7, F19 closed; every table gated, two had drifted; one attribution false since before the audit, now held by a test |
+| 8 | The worm is a pair | **done** — F83 closed, gates proven; one primitive under two kinds, one result, one relation; every recorded number unchanged |
 
 **Baseline, measured at `e5e4939`:** 531 tests green in 26.1 s · 13,690 lines of
 production code · 10,346 lines of comment in that code · 9,348 lines of
@@ -401,6 +415,7 @@ existed. `F` numbers are stable; nothing is renumbered.
 | F55 | A centre distance no admissible shifts can reach is answered rather than refused | gap | 4, 7 | **closed** — and it was two faults; a *negative* clearance was answered silently too, which is a pair that cannot be assembled |
 | F58 | The hula stage's shift optimiser moves no answer over a band of tooth differences, on or off | **holds** | 4, 7 | **closed** — two causes, neither a fault: at `d ≥ 6` the optimum is the floor, at `d = 1` nothing is admissible |
 | F82 | An optimiser that finds nothing admissible is indistinguishable from one that agrees with the floor — every kind falls back in silence | **gap** | 7 | **closed** — `Searched`, reported by all three choosers, gates proven |
+| F83 | The worm was a stage type rather than a kind: no shift, no addendum, no interference check, no mode 3 but by resizing, a crossed gear pair whose typed shifts reached the tooth report and not the mesh — and the model needed none of it | **gap** | 8 | **closed** — `PairStage` under `Stage::Spur`/`Stage::Worm`, `PairResult` with `PairMesh`, the rack law for a crossed shift, the zone read one way from each tangency point; gates proven, corpus unchanged |
 | F59 | Three kinds each wrote out what to ask of a mesh, and answered it three ways | gap | 4 | **closed** — `auto::MeshTrial`, and logged in `corrections.md` |
 | F60 | A hula pair's tip margin and an internal mesh's interference flags are asked by one kind each | **gap** | 5 | **closed** — `train::TipRoom` on `MeshReport`; and it found the shipped set interfering, see below |
 | F56 | No CLI command drove the optimiser, so its answers were outside the corpus | gap | 4 | **closed** — `gear-cli shifts`, which also closes F19's first row |
@@ -2821,6 +2836,173 @@ means other than a tag: the seven arithmetic paragraphs are checked above, and
 the live-output class is swept by a grep that finds nothing. It is an argument for the class sweep being run again by whoever
 next changes a table: the checker names the block, and the paragraph under it
 is the next thing to read.
+
+---
+
+## Phase 8 — F83, the worm is a pair
+
+The direction was given in one sentence — *always aiming for the ideal where
+all stages are fundamentally the same* — and the answer to the one question it
+raised was that a **kind is a layer, not a model**: the minimum construct to
+pre-assemble and constrain the primitives, carrying the words a designer uses
+and the choice of which inputs to put in front of them, over one primitive
+underneath. The other answer was that anything nearly the same thing should
+become the same thing, results included.
+
+### What was actually two things, and what was not
+
+`WormStage` differed from a crossed `SpurStage` in one input — the first
+member sized by pitch diameter rather than helix angle — and an axial float.
+Every other field was the same field under a second name. What it *lacked* was
+everything `StageGear` has: profile shift, addendum, dedendum, root round, the
+undercut bound. And the screw model had no profile shift at all, so a crossed
+gear pair's typed shifts reached its tooth-form report and never its mesh —
+its centre distance, its zone, its efficiency were those of the unshifted pair.
+Its mode 3 did not exist either.
+
+The model never asked for the division. Both flanks are involute helicoids on
+cylinders, which is what a helical gear is; a worm is one with a few starts at
+a steep helix. `Tooth::new` at one start and 82° of helix builds a sensible
+thread — no undercut, a fillet cap clamped and said — which was the first
+thing checked and the reason the rest could proceed.
+
+### The mathematics it took
+
+**A shift enters a crossed mesh as a rack's does.** The line of action's
+direction is fixed by the base helices and the shaft angle and cannot turn —
+the fact the backlash projection already rested on — so a flank thickened by
+`x` is the same helicoid rotated about its axis, displaced along that fixed
+normal by `x m_n sin α_n` uniformly, and separating the axes by `Δa` displaces
+the flanks by `Δa sin α_n` along the same normal. Hence
+`a₀ = a_ref + (x₁ + x₂) m_n`, exact, with no involute function and no
+operating pressure angle. The parallel pair is the degeneracy and the two laws
+part company at second order, the same step at `Σ = 0` the backlash has.
+
+> **Verified off the tooth generator**, which shares nothing with `screw.rs`:
+> the transverse half-thickness angle `ψ_p` moves with the shift, `r_b Δψ cos β_b`
+> is the helicoid's displacement along its normal, and the product is
+> `x m_n sin α_n` to 1e-12 at five helix angles including a worm's 82°.
+
+A consequence worth writing down: a shifted pair's contact is **off the common
+perpendicular** even at its own zero-backlash distance. With `n̂` fixed, contact
+on the perpendicular at operating radii `r_wi` would need `cos β_bi sin α_wt,i`
+equal for both members, which forces `α_wt,i = α_t,i` and `r_wi = r_i` — the
+reference radii and nowhere else. So the branch of the line of action is
+settled at the *reference* distance (where the pitch point is on it), and the
+face widths are sized for where the contact actually is, which the code already
+did for a centre-distance error and now does for a shift by the same road.
+
+**The zone was read on both sides of each tangency point.** Past its tangency
+point a member has no involute — that is inside its base cylinder — so a mate
+whose reach crosses it is fouling, not in a longer zone. The zone runs one way
+from each tangency point now, and `CrossedPath::flank_interference` is F79's
+relation asked along the line: `mesh::conjugate_radius` with the tangency span
+in place of `a_w sin α_w`.
+
+> **Gates, run — three.** The old symmetric reading fails the law that the
+> zone stays between the tangency points; ignoring the junction radius fails
+> the parallel-limit check; and that check meets `Mesh::flank_interference` a
+> hundredth of a degree off parallel on a grid with a tall addendum against a
+> small pinion, which has fouling cases in it — asserted, since a grid that
+> never fouls would be a gate that cannot fail.
+
+### The primitive, and the kind over it
+
+`PairStage` is `SpurStage`'s fields plus `sizing: Auto<FirstMemberSizing>` —
+three readings of one number now, `AdditionalHelix`, `HelixAngle`,
+`PitchDiameter` — and `axial_clearance`, which every helical gear has and a
+spur kind leaves at zero unseen. `Stage::Spur` and `Stage::Worm` both carry it;
+the tag is the kind. In the core the kind decides exactly one thing, the face
+width a worm and its wheel take where no rating sizes one (the DIN and BS
+proportions, which describe a worm carrying an enveloping wheel and are offered
+nowhere else). Everything else a kind is — *starts*, *worm*, *wheel*, which
+fields a panel shows — is the front end's to read off the tag.
+
+`PairResult` replaces both result types. Its `mesh` is `PairMesh::Line`
+(`MeshReport`, as every parallel mesh) or `PairMesh::Point` (`CrossedMesh`:
+two efficiencies, the locking thresholds, the sliding, the patch, the zone, the
+lead angles), and the accessors every mesh has — efficiency, backlash, flank
+interference, coprime — are read off it without asking which. Both members are
+`GearResult`s; the two fields a worm's readout wanted and no gear had —
+pitch diameter and helix angle, solved outputs where the sizing is automatic —
+are on every gear now, with the proportion's recommendation beside the face
+width where one applies.
+
+**One relation for every pair**: `{a, clearance, x₁, x₂, size}`, four may be
+given. The order is the spur's with the size last, because a shift moves the
+teeth where a size changes them — which is also the solve's preference when
+both are free to absorb: the shifts do wherever one is automatic, and the size
+only when both are pinned. The worm preset sets DIN's convention as *inputs*
+rather than building it in: the worm's shift pinned at zero (it is the tool),
+the wheel's free, so a given distance moves the wheel's shift; pin the wheel's
+too and the worm's diameter absorbs it, on the branch the designer's number is
+on as before. A helical pair cut to fit a standard centre distance is the same
+request on parallel shafts, one branch, and it works there now too.
+
+> **Gate, run.** `the_declared_limit_is_the_freedom_the_stage_actually_has`
+> gives four and requires every one honoured — with both shifts pinned the
+> helix reaches the distance — then gives five and requires that it cannot be.
+
+**The optimiser stays a parallel-axis search.** Its trial mesh, its objective
+and its five refusals are the line-contact model's; a crossed pair asked to
+optimise takes what the constraints imply and says so
+(`stage.optimiser_not_for_crossed`, fired by the string sweep and offered by no
+panel where it does not reach). It is not offered on a crossed pair rather than
+silently ignored there — the choice the front end makes by kind.
+
+### What the corpus said
+
+Every recorded number is byte-identical: the wormstage canary, the crossed
+table, both trains, the mixed train. Two files changed, both additions — the
+train file is larger because a worm stage now carries the full member inputs,
+and `gear-cli worm` gained the table it could not print before, the wheel's
+shift absorbing a distance:
+
+```text
+  a mm given, the wheel's shift absorbs it
+    23.7073  x2  +0.0000   d1   7.0000 mm   ran at   23.7073
+    24.2073  x2  +0.5000   d1   7.0000 mm   ran at   24.2073
+    24.7073  x2  +1.0000   d1   7.0000 mm   ran at   24.7073
+  a mm given, both shifts pinned, worm sized to reach it
+    23.7073  d1   7.0000 mm   lead angle  8.2132 deg   ran at   23.7073
+```
+
+The wasm boundary's answers are likewise identical in every number and differ
+only in shape, checked field by field against the old record before it was
+rewritten. That the model moved nothing is the point of the change: a stage
+type was deleted and no answer noticed.
+
+### The front end, and one bug it was carrying
+
+One form for both kinds, the kind deciding the words and the exposure: a worm
+shows *starts*, a *length* for its worm, the axial float, and the proportions
+beside its faces; a spur shows load sharing and the optimiser only with its
+shafts parallel. The sizing is a select over the three readings, seeded from
+the geometry on a switch so the pair does not jump. Every member card carries
+every member input now — a worm wheel's shift and addendum included, which is
+what the change was for — and every card has the shared readout, so the
+`extra` block that existed because a crossed member had no `GearResult` is
+gone.
+
+**The relief list was short.** `autosOf`, which lines a stage up against its
+relieved copy to copy the toggles back, listed the distance and the shifts and
+not the clearance or the sizing — so a relief the core decided on either never
+reached the panel. Every toggle relief can turn is in it now, by the flag
+rather than the value's type.
+
+### What is recorded as not done
+
+- **The result shapes stayed where the physics differs.** `MeshReport` and
+  `CrossedMesh` are two types because a line contact and a point contact
+  report different things; what they share is read through `PairMesh`. A
+  further merge would be `Option`s and apologies.
+- **A crossed pair's shift optimiser.** The search is the parallel mesh's; a
+  crossed objective would be the path-averaged friction balance over the rack
+  law's distance, and the interference wall is already there to bound it. Not
+  attempted; said, not silent.
+- **The document format changed shape**, as its own rule allows: a worm file
+  written before this is refused loudly, and `gear-io/src/train.rs` records the
+  edit that carries it across.
 
 ---
 

@@ -10,7 +10,7 @@
 //! that owns the sentence owns the check on it.
 
 use gear_core::contact::LoadSharing;
-use gear_core::train::{solve_spur_stage, SpurStage, StageGear, StageTorques};
+use gear_core::train::{solve_pair_stage, PairKind, PairStage, StageGear, StageTorques};
 
 /// **The sharing note's number, and its lack of a sign.**
 ///
@@ -29,12 +29,12 @@ fn the_sharing_note_quotes_a_number_the_sweep_still_produces() {
             profile_shift: gear_core::params::Auto::fixed(0.0),
             ..Default::default()
         };
-        let stage = SpurStage {
+        let stage = PairStage {
             load_sharing: model,
             gears: [g.clone(), g],
             ..Default::default()
         };
-        solve_spur_stage(&stage, StageTorques::just(2.0), &lib)
+        solve_pair_stage(&stage, PairKind::Spur, StageTorques::just(2.0), &lib)
             .ok()
             .and_then(|r| r.gears[0].bending_stress.peak)
     };

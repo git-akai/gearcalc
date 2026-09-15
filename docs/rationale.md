@@ -184,7 +184,7 @@ trigonometric expression wants 0.349. So a *stage input*, a *gear input* and
 anything crossing the boundary are in **degrees**, and everything from
 `plane.rs` inwards is in **radians**, converted once at the edge —
 `BasicRack::new(module, pressure_angle_deg, helix_angle_deg)` is where that
-happens for a rack, and `WormStage::geometry` for a screw pair.
+happens for a rack, and `PairStage::geometry` for a screw pair.
 
 **What is not right is a name that means both.** This crate had four —
 `shaft_angle`, `lead_angle`, `wheel_helix_angle` and `pressure_angle` each
@@ -193,7 +193,7 @@ that stated no unit at all.
 
 It cost a real bug, and the shape of it is the argument.
 `Screw::least_distance_lead_angle` was written to take a shaft angle in radians;
-`WormStage::shaft_angle` holds degrees; the call site read perfectly well to its
+`PairStage::shaft_angle` holds degrees; the call site read perfectly well to its
 author and was wrong. The field was **documented**. Documentation is not what a
 reader checks — the *name* is.
 
@@ -1383,31 +1383,45 @@ be choosing a machine on the user's behalf.
 
 ### Each stage kind keeps its own result type
 
-A worm stage has no bending stress; a planetary has three shafts, two meshes and
-a planet that is neither. Forcing those into one shape would mean a row of
+A crossed mesh has no bending stress; a planetary has three shafts, two meshes
+and a planet that is neither. Forcing those into one shape would mean a row of
 `Option`s and a comment apologising for each. What the kinds share is the
 vocabulary — `Backlash`, `TrainError`, the duty cycle — not the shape of their
 answers.
+
+**But a kind is not the same thing as a shape, and this rule was once read as
+if it were.** The worm stage was a stage *type* of its own — members that were
+not gears, no shift, no addendum, a result unlike a spur pair's — on the
+reading that a worm is a thread. In the model this crate actually runs both
+flanks are involute helicoids on cylinders, a worm is a helical gear with a
+few starts at a steep helix, and its wheel is a helical gear at the
+complementary one; everything a gear can be asked, both can be asked. So
+`Stage::Spur` and `Stage::Worm` carry one `PairStage` now and produce one
+`PairResult`, and what genuinely differs — the mesh — is the one place the
+result branches: `PairMesh::Line` for parallel axes, `PairMesh::Point` for
+crossed. A kind is a *layer* over that primitive: a preset, the words a
+designer uses, which inputs a panel shows, and the conventional proportions a
+worm's faces take ([`PairKind`]). It costs the core one enum read in one
+place, and it bought the worm a shift, an addendum, an interference check and
+a mode 3 that moves the wheel's shift as DIN 3975 has it — none of which the
+separate type could carry, and which the audit had recorded as its ideal
+(`AUDIT.md` F39, F79, F83).
 
 **The vocabulary is the larger half, and it has grown.** A member of any kind
 that is a *gear* is a `GearResult`; a parallel-axis mesh of any kind is a
 `MeshReport`; the rating every member gets is `MemberRating` over the meshes it
 is in.
 
-**"That is a gear" is a real qualification and not a hedge**, and it is a field
-rather than a comment: `WormMemberResult::gear` is `Some` for a crossed pair and
-`None` for a worm stage. Those two arrangements share a result type and that is
-the whole of what separates them.
-
-A worm is a thread and its wheel is the envelope of one: neither is cut by a
-rack, so a profile shift, a dedendum, an admissible range and an undercut flank
-are not values those members are *missing* — they are questions that cannot be
-put to them, and inventing answers is what a ring's "no dedendum input; it has a
-cutter" already refuses. A **crossed gear pair**'s members are two ordinary
-helical gears, and they had inherited the thread's poverty rather than the
-gear's vocabulary: a crossed pinion could not say its flank had been eaten into
-where the same pinion with parallel shafts could
-([corrections.md](corrections.md)).
+**"That is a gear" was once a qualification here**, and a field rather than a
+comment: a worm stage's members carried no `GearResult`, on the reading that a
+worm is a thread and its wheel the envelope of one, so a profile shift, a
+dedendum, an admissible range and an undercut flank were questions that could
+not be put to them. A **crossed gear pair**'s members had inherited the
+thread's poverty rather than the gear's vocabulary — a crossed pinion could not
+say its flank had been eaten into where the same pinion with parallel shafts
+could ([corrections.md](corrections.md)) — and that was the first sign the
+qualification was the type's rather than the model's. It is gone: every member
+of every kind is a gear, a worm's included (above).
 
 **What the qualification then buys is the walk.** `StageResult::members()` is
 every member of a stage that is a gear, whatever kind the stage is, and it is
@@ -1418,7 +1432,7 @@ torque came to be unbounded and stay so.
 
 **And it found that no quantitative law crosses the kinds.** A parallel-axis
 member's forward torque is a geometric projection with no efficiency in it, so
-its backward share is the same fraction for both members of a pair. A screw
+its backward share is the same fraction for both members of a pair. A crossed
 pair's output torque carries a forward efficiency the backward load does not
 share, so its two members differ by exactly `1/η_forward` — by construction, and
 correctly. The invariant that does hold everywhere is the weaker one, and it is

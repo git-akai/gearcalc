@@ -1,12 +1,15 @@
-//! The worm stage.
+//! The crossed-axis mesh: point contact, along a line of action that cannot
+//! turn.
 //!
-//! A stage of a different shape from [`super::spur`], and deliberately not
-//! forced into the same result type. A worm stage has no bending stress
-//! (docs/reference.md#crossed-axes), no meaningful minimum face width from contact — a point
-//! contact does not care how wide the tooth is — and two efficiencies rather
-//! than one. Bending those facts into [`super::StageResult`] would have meant
-//! four `Option`s and a comment apologising for each; a separate result says the
-//! same thing by being shaped like the answer.
+//! **Not a stage kind.** A worm stage and a crossed gear pair are one
+//! [`super::PairStage`] whose shafts are not parallel, and this is the mesh
+//! they share; the parallel mesh is [`super::pair`]'s. What a crossed pair has
+//! that a parallel one does not — two efficiencies, a sliding velocity, a
+//! contact patch that is an ellipse, backlash from an axial float — is the
+//! [`CrossedMesh`] this file fills in, and what it lacks is a bending rating,
+//! for the reason docs/reference.md#crossed-axes gives. Both members are
+//! ordinary [`super::GearResult`]s: a worm is a helical gear with a few starts
+//! at a steep helix, and everything a gear can be asked it can be asked.
 //!
 //! The mesh mathematics is all in [`crate::screw`]. What this module adds is the
 //! *stage*: materials, face widths, torque, backlash and the notes a designer
@@ -14,11 +17,11 @@
 //!
 //! # Backlash comes out of one projection — and two kinds of displacement
 //!
-//! Two things open a gap between the flanks: axial slack in the worm, and a
-//! centre distance larger than nominal. Both are displacements, and both matter
-//! only through their component along the common flank normal `n̂` — the very
-//! same `n̂` the path of contact is built on ([`crate::screw::Screw::contact_normal`]),
-//! projected rather than re-derived:
+//! Two things open a gap between the flanks: axial slack in the first member,
+//! and a centre distance larger than nominal. Both are displacements, and both
+//! matter only through their component along the common flank normal `n̂` —
+//! the very same `n̂` the path of contact is built on
+//! ([`crate::screw::Screw::contact_normal`]), projected rather than re-derived:
 //!
 //! ```text
 //! j_n = j_axial · (â₁·n̂)   +   2 Δa · (x̂·n̂)
@@ -61,7 +64,10 @@
 //! tests below — and part company by 0.21 % at the default clearance. That step
 //! at `Σ = 0` is the degeneracy, not a seam in the code.
 
-use super::{solve_spur_stage, Backlash, Cycles, LoadCase, StageTorques, TrainError};
+use super::{
+    Backlash, GearResult, LoadCase, PairKind, PairMesh, PairResult, PairStage, StageTorques,
+    TrainError,
+};
 
 /// Quadrature points for the path-averaged friction balance.
 ///
@@ -71,11 +77,12 @@ use super::{solve_spur_stage, Backlash, Cycles, LoadCase, StageTorques, TrainErr
 /// four orders under the last digit anything reports.
 const PATH_SAMPLES: usize = 2048;
 use crate::contact::{Directional, Drive};
-use crate::material::{contact_modulus, Material, MaterialLibrary, Overrides};
+use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::MeshSide;
 use crate::note::{key, Note};
-use crate::params::Auto;
-use crate::screw::{CrossedPath, Screw, ScrewParams, ZoneLimit};
+use crate::params::{Auto, GearParams};
+use crate::screw::{Screw, ZoneLimit};
+use crate::tooth::Tooth;
 
 /// The proportions a worm stage is conventionally given.
 ///
@@ -144,207 +151,14 @@ pub mod proportions {
     }
 }
 
-/// One member of a worm stage.
+/// What a crossed-axis mesh reports — everything a point contact has that a
+/// line contact does not, beside what both have.
 ///
-/// Note what is *absent* against [`super::StageGear`]: no profile shift and no
-/// addendum. Both belong to a generated involute profile that a worm stage does
-/// not yet build.
+/// docs/reference.md#crossed-axes takes **both flanks as involute helicoids on
+/// cylinders**, and that is where the contact stress, the efficiency, the
+/// backlash and the zone all come from; a real worm's throated wheel makes the
+/// zone a floor rather than a wrong number ([`CrossedZone`]).
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct WormMember {
-    /// Face width of the wheel, or length of the worm, mm.
-    ///
-    /// Automatic takes the recommended proportion for this member — see
-    /// [`proportions`], and note what those are and are not. Unlike the spur
-    /// stage's automatic face width, this one is **not** a minimum derived from
-    /// a rating: nothing here is sized against a stress, because a point
-    /// contact's peak pressure does not depend on the face width at all.
-    pub face_width: Auto<f64>,
-    /// Name of a material in the library.
-    pub material: String,
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub material_overrides: Overrides,
-}
-
-impl Default for WormMember {
-    fn default() -> Self {
-        Self {
-            face_width: Auto::automatic(10.0),
-            material: "4340 Hardened Steel".to_string(),
-            material_overrides: Overrides::default(),
-        }
-    }
-}
-
-/// A crossed-axis worm stage.
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct WormStage {
-    /// Normal module, mm. Shared.
-    pub module: f64,
-    /// Normal pressure angle, degrees. Shared.
-    pub pressure_angle: f64,
-    /// Shaft angle, degrees. 90 is the ordinary drive.
-    pub shaft_angle: f64,
-    /// Coefficient of friction for the mesh. **Not** optional in the way it is
-    /// for a spur stage: a worm's whole character comes from it.
-    pub sliding_friction: f64,
-    /// Coefficient of **static** friction, for breaking away.
-    ///
-    /// Whether a stage turns at all is decided at rest and against this; how
-    /// well it does once turning is decided against the sliding coefficient,
-    /// which is lower. See [`Directional::once_moving`] — the static figure's
-    /// only job is the sign, and it is never itself reported as an efficiency.
-    pub static_friction: f64,
-    /// `k₁`. The wheel takes `2 − k₁` by construction, as in a spur stage.
-    ///
-    /// # What it reaches, and why that is not a gap
-    ///
-    /// The teeth that get **cut**, and nothing this stage reports. That is not a
-    /// missing model: `k₁ + k₂ = 2` means a thickness modification *moves*
-    /// thickness between the two members without opening the pair, so the
-    /// backlash it contributes is **exactly zero** — structurally, not
-    /// approximately. docs/reference.md#crossed-axes used to record this as something a crossed stage
-    /// could not yet answer for want of the normal-plane play; that play is
-    /// derived now (docs/reference.md#centre-distance-and-backlash), and the answer it gives is zero.
-    ///
-    /// It is offered because a designer specifying this pair is specifying those
-    /// parts, and a stage document that could not record them would be
-    /// describing a stage nobody could make.
-    pub thickness_mod: f64,
-    /// Starts on the worm.
-    pub starts: u32,
-    /// **How big the first member is**, and whether the designer says so.
-    ///
-    /// Which *unit* it is stated in — a pitch diameter or a helix angle — is the
-    /// only thing that distinguishes a worm stage from a crossed gear pair, and
-    /// they are two readings of one number (`sin γ = z m_n / d`). Automatic, that
-    /// number is solved to reach a given centre distance: a screw stage has no
-    /// profile shift, so its **size** is the only thing inside it free to absorb
-    /// one, which is what F39's fourth item asks.
-    pub sizing: Auto<FirstMemberSizing>,
-    /// Teeth on the wheel.
-    pub wheel_teeth: u32,
-    /// Automatic uses the geometry's own centre distance plus `clearance`.
-    pub centre_distance: Auto<f64>,
-    /// Added to the centre distance, mm. Forced to zero when the centre
-    /// distance is set by hand, as in a spur stage.
-    pub clearance: Auto<f64>,
-    pub tolerance_plus: f64,
-    pub tolerance_minus: f64,
-    /// Axial play of the worm, mm. The dominant source of backlash in a worm
-    /// drive, and one a spur stage has no equivalent of.
-    pub axial_clearance: f64,
-    pub worm: WormMember,
-    pub wheel: WormMember,
-}
-
-impl Default for WormStage {
-    fn default() -> Self {
-        Self {
-            module: 1.0,
-            pressure_angle: 20.0,
-            shaft_angle: 90.0,
-            sliding_friction: 0.08,
-            static_friction: 0.16,
-            thickness_mod: 1.0,
-            starts: 1,
-            sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(7.0)),
-            wheel_teeth: 40,
-            centre_distance: Auto::automatic(0.0),
-            clearance: Auto::fixed(0.02),
-            tolerance_plus: 0.02,
-            tolerance_minus: 0.02,
-            axial_clearance: 0.04,
-            worm: WormMember::default(),
-            wheel: WormMember {
-                material: "Brass C360".to_string(),
-                ..WormMember::default()
-            },
-        }
-    }
-}
-
-/// What a worm stage does to one of its members.
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct WormMemberResult {
-    /// Torque on this member, N·m — the peak, driven forward.
-    pub torque: f64,
-    /// Torque on this member when the load drives the train backward, N·m.
-    ///
-    /// `None` when there is no such load to react: either none was entered, or
-    /// the train is back-drivable and so nothing upstream holds it — see
-    /// [`super::back_driving_torques`].
-    pub back_driving_torque: Option<f64>,
-    /// Rotational speed, rpm. Filled in by the train.
-    pub speed: f64,
-    /// Tooth load cycles over the duty, bending and contact. Filled in by the
-    /// train.
-    pub tooth_cycles: Cycles,
-    /// The width in use, mm — the recommendation when automatic, the input
-    /// otherwise. For the worm this is a *length* along its axis.
-    pub face_width: f64,
-    /// What the conventional proportion asks for, mm, whether or not it is what
-    /// is in use. Reported always, so a hand-set width can be read against it.
-    ///
-    /// A **convention with a named source**, not a derivation, and it sizes no
-    /// stress in this crate — see [`proportions`].
-    ///
-    /// `None` for a crossed gear pair: the proportions describe a worm carrying
-    /// an enveloping wheel, and there is neither.
-    pub recommended_face_width: Option<f64>,
-    pub pitch_diameter: f64,
-    /// This member as a gear, where it **is** one.
-    ///
-    /// `Some` for a **crossed gear pair**, whose two members are ordinary
-    /// helical gears: rack-cut, with a profile shift, a dedendum and a root
-    /// round the designer typed, a buildable range those sit inside, and clamps
-    /// when a cutter has eaten into a flank. Everything a spur stage's member
-    /// reports, reported the same way and by the same type.
-    ///
-    /// `None` for a **worm stage**. A worm is a thread and its wheel is the
-    /// envelope of one, so neither is cut by a rack. A profile shift and an
-    /// admissible range are not values those members are missing — they are
-    /// questions that cannot be put to them, and inventing answers is what a
-    /// ring's "no dedendum input; it has a cutter" already refuses.
-    ///
-    /// **The two arrangements share this result type and do not share this
-    /// field**, which is the whole of what separates them. It was found by
-    /// discarding the crossed half: `solve_crossed_stage` translates a
-    /// `SpurStage` into an equivalent `WormStage` and the translation threw the
-    /// tooth form away, so a crossed pinion could not say its flank was
-    /// undercut where the same pinion with parallel shafts could
-    /// (`docs/corrections.md`).
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub gear: Option<super::GearResult>,
-    /// The material as used, after any overrides.
-    pub material: Material,
-}
-
-/// What the path of contact says about a crossed-axis mesh.
-///
-/// Reported for a worm stage as well as for a crossed gear pair, because both
-/// are the same construction here: docs/reference.md#crossed-axes takes **both flanks as involute
-/// helicoids on cylinders**, and that is where the stage's contact stress,
-/// efficiency and backlash already come from. See [`crossed_mesh`] for why a
-/// real worm's throated wheel makes this a floor rather than a wrong number.
-#[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
     feature = "typescript",
@@ -352,26 +166,33 @@ pub struct WormMemberResult {
     ts(export, export_to = "core/")
 )]
 pub struct CrossedMesh {
-    /// Tooth pairs in contact. **Below 1 the pair loses contact between one
-    /// pair and the next**, which is a failure of kind rather than of margin.
-    pub contact_ratio: f64,
-    /// What ended the zone: the teeth, or the face they are cut on.
-    pub limited_by: ZoneLimit,
-    /// The face width at which `ε = 1`, per member, mm.
+    /// Lead angle of each member, degrees — `90° − β`, the same fact as the
+    /// helix angle from the other datum. A worm is described by how far its
+    /// thread advances, a gear by how far its tooth leans; both are reported
+    /// because a crossed pair is entered either way.
+    pub lead_angles: [f64; 2],
+    /// The first member's lead, mm, and axial module, mm.
+    pub lead: f64,
+    pub axial_module: f64,
+    /// The zone of action as the face widths in use leave it — `None` where the
+    /// pair has no zone at all.
+    pub zone: Option<CrossedZone>,
+    /// Mesh efficiency in both drive directions.
     ///
-    /// A **geometric** minimum: it keeps contact continuous and says nothing
-    /// about stress. That is the opposite of the spur stage's automatic width,
-    /// which inverts a stress, and the difference has to travel with the number.
-    pub face_width_for_continuity: Option<[f64; 2]>,
-    /// How far the contact point runs along each member's own axis, mm — what a
-    /// face has to cover, and what a parallel pair does not have at all.
-    pub axial_travel: [f64; 2],
-    /// True when the tooth height was **assumed** rather than given — a worm
-    /// stage has no addendum input. The figures above are then a lower bound.
-    pub tooth_height_assumed: bool,
+    /// Unlike a parallel-axis stage these genuinely differ, and **either** can
+    /// be zero or negative — backward is what self-locking is, and forward is a
+    /// steep helix split that cannot drive at all.
+    /// [`Directional::locked`] reads them rather than a separate flag that could
+    /// disagree.
+    pub efficiency: Directional<f64>,
+    /// The coefficient of friction at which each direction stops driving.
+    ///
+    /// Negative where no friction locks the pair that way, which is the ordinary
+    /// case forwards: a worm you can turn is one whose forward threshold is
+    /// somewhere absurd or nowhere at all.
+    pub locking_friction: Directional<f64>,
     /// What the same teeth would lose with their shafts brought **parallel**, as
-    /// an efficiency — `None` for a worm stage, whose single-start thread is not
-    /// a parallel-axis gear.
+    /// an efficiency — `None` where the parallel pair cannot be built.
     ///
     /// Reported for comparison: crossing shafts adds sliding, so this is the
     /// best the pair can be, and how far the crossed figure falls below it is
@@ -385,9 +206,26 @@ pub struct CrossedMesh {
     /// the crossed figure legitimately sits a hundredth of a point above and the
     /// old test would accuse the better number.
     pub parallel_axis_efficiency: Option<f64>,
+    /// Sliding speed at the pitch point as a multiple of the first member's
+    /// pitch line speed. The absolute figure needs a shaft speed, so the train
+    /// fills [`Self::sliding_velocity`] instead.
+    pub sliding_ratio: f64,
+    /// Sliding speed at the pitch point, mm/s. Filled in by the train.
+    pub sliding_velocity: f64,
+    /// The contact patch, in both load cases.
+    pub contact: LoadCase<PointContact>,
+    /// Angular backlash **per member**, degrees, at the three centre distances
+    /// — the same reading every mesh gives ([`super::MeshReport::backlash`]),
+    /// and here the worm's float is in it as well as the centre line.
+    pub backlash: [Backlash; 2],
+    /// Whether each member's flank is reached past its usable end by the other
+    /// member's tip ([`CrossedPath::flank_interference`]).
+    pub flank_interference: [bool; 2],
+    /// Whether the tooth counts are coprime.
+    pub coprime: bool,
 }
 
-/// The contact patch a worm mesh presses.
+/// The zone of action of a crossed pair.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -395,8 +233,40 @@ pub struct CrossedMesh {
     derive(ts_rs::TS),
     ts(export, export_to = "core/")
 )]
-pub struct WormContact {
-    /// Peak Hertzian pressure, MPa — **the** strength figure for this stage.
+pub struct CrossedZone {
+    /// Tooth pairs in contact. **Below 1 the pair loses contact between one
+    /// pair and the next**, which is a failure of kind rather than of margin.
+    ///
+    /// A floor for a real worm drive: throating *wraps* the wheel around the
+    /// worm and engages more of the thread, which can only lengthen the zone, so
+    /// a worm that clears `ε = 1` here clears it as built. That is an argument
+    /// about the direction, not a computation, and it is said next to the
+    /// number.
+    pub contact_ratio: f64,
+    /// What ended the zone: the teeth, or the face they are cut on.
+    pub limited_by: ZoneLimit,
+    /// The face width at which `ε = 1`, per member, mm.
+    ///
+    /// A **geometric** minimum: it keeps contact continuous and says nothing
+    /// about stress. That is the opposite of the parallel stage's automatic
+    /// width, which inverts a stress, and the difference has to travel with the
+    /// number.
+    pub face_width_for_continuity: Option<[f64; 2]>,
+    /// How far the contact point runs along each member's own axis, mm — what a
+    /// face has to cover, and what a parallel pair does not have at all.
+    pub axial_travel: [f64; 2],
+}
+
+/// The contact patch a crossed mesh presses.
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct PointContact {
+    /// Peak Hertzian pressure, MPa — **the** strength figure for this mesh.
     ///
     /// The worst of the points a rating is taken at: the pitch point, and the
     /// two boundaries of single-pair contact where one tooth carries the whole
@@ -429,467 +299,43 @@ pub struct WormContact {
     pub curvature_across: f64,
 }
 
-/// Everything a worm stage produces.
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct WormResult {
-    /// `z₂ / z₁` — for a worm, usually large.
-    pub ratio: f64,
-    pub centre_distance_nominal: f64,
-    pub centre_distance: f64,
-    /// **The clearance the stage opened by**, zero where nothing was free to
-    /// absorb it — see [`WormStage::clearance_taken`].
-    pub clearance: f64,
-    /// Lead angle of the worm, degrees.
-    pub lead_angle: f64,
-    /// Lead angle of the wheel, degrees.
-    pub wheel_lead_angle: f64,
-    /// Helix angle of the first member, degrees — `90° − γ₁`.
-    ///
-    /// The same fact as the lead angle, from the other datum: a worm is
-    /// described by how far its thread advances, a gear by how far its tooth
-    /// leans. Both are reported because a crossed *gear* pair is entered by
-    /// helix angle and read that way, and converting between them on the far
-    /// side of the boundary is arithmetic.
-    pub helix_angle: f64,
-    /// Helix angle of the wheel, degrees — an output, per the specification.
-    pub wheel_helix_angle: f64,
-    /// Lead, mm, and axial module, mm.
-    pub lead: f64,
-    pub axial_module: f64,
-    /// The path of contact, for a crossed **gear** pair. `None` for a worm
-    /// drive: see [`CrossedMesh`].
-    pub crossed: Option<CrossedMesh>,
-    /// Mesh efficiency in both drive directions.
-    ///
-    /// Unlike a parallel-axis stage these genuinely differ, and **either** can
-    /// be zero or negative — backward is what self-locking is, and forward is a
-    /// steep helix split that cannot drive at all.
-    /// [`Directional::locked`] reads them rather than a separate flag that could
-    /// disagree.
-    pub efficiency: Directional<f64>,
-    /// The coefficient of friction at which each direction stops driving.
-    ///
-    /// Negative where no friction locks the pair that way, which is the ordinary
-    /// case forwards: a worm you can turn is one whose forward threshold is
-    /// somewhere absurd or nowhere at all.
-    pub locking_friction: Directional<f64>,
-    /// Sliding speed at the pitch point as a multiple of the worm's pitch line
-    /// speed. The absolute figure needs a shaft speed, so the train fills
-    /// [`Self::sliding_velocity`] instead.
-    pub sliding_ratio: f64,
-    /// Sliding speed at the pitch point, mm/s. Filled in by the train.
-    pub sliding_velocity: f64,
-    /// The contact patch, in both load cases.
-    pub contact: LoadCase<WormContact>,
-    /// Angular backlash at whichever member is the output in each direction,
-    /// degrees: the wheel driving forward, the worm driving backward. A worm
-    /// stage shows the gap the two ways round more starkly than any other,
-    /// because the ratio between the lever arms *is* the gear ratio.
-    pub backlash: Directional<Backlash>,
-    pub members: [WormMemberResult; 2],
-    pub notes: Vec<Note>,
-}
-
-/// How the first member's size is fixed.
+/// Solve a pair whose shafts cross — a worm stage, or a crossed gear pair.
 ///
-/// **This is the whole of the difference between a worm stage and a crossed gear
-/// pair**, and it is worth being explicit about because the mathematics is
-/// otherwise identical — docs/reference.md#crossed-axes argued they are one thing, and this is where that
-/// argument is cashed.
+/// One solve for both, because they are one thing: crossed-axis screw gearing
+/// between two involute helicoids. The kind decides one thing here, the
+/// automatic face width where no rating sizes one ([`PairKind`]):
 ///
-/// A worm's pitch diameter is a *free choice*: nothing in its thread count fixes
-/// it, and it is what sets the lead angle, the efficiency, and whether the drive
-/// can be back-driven at all. An ordinary gear's is not free — it follows from
-/// its tooth count and helix angle, `d = z m_n / cos β`. So the two differ in
-/// which of `d` and `β` is the input, and in nothing else:
-///
-/// ```text
-/// sin γ = z m_n / d        and      γ = 90° − β        so      sin γ = cos β
-/// ```
-///
-/// [verified: a `Screw` built with `d₁ = z₁ m_n / cos β₁` reports
-/// `γ₁ = 90° − β₁` exactly, and `β₂ = Σ − β₁`, over three tooth pairs × four
-/// shaft angles × three helix angles.]
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
-pub enum FirstMemberSizing {
-    /// A **worm**: the pitch diameter is given, and the lead angle follows.
-    PitchDiameter(f64),
-    /// A **gear**: the helix angle is given in degrees, and the pitch diameter
-    /// follows. `β = 0` makes the first member an ordinary spur gear crossed with
-    /// a helical one, which is what "crossed-axis spur" means.
-    HelixAngle(f64),
-}
-
-impl WormStage {
-    /// The first member's pitch diameter, mm — given, or derived from its helix
-    /// angle, or **solved to reach a given centre distance**.
-    ///
-    /// The two units are one number: `sin γ = z m_n / d` and `γ = 90° − β`, so a
-    /// diameter and a helix angle are the same freedom read two ways. Automatic
-    /// means neither was stated and the distance decides it — see
-    /// [`Self::size_reaching`], which is also where the two-answers problem is
-    /// dealt with.
-    ///
-    /// Falling back to the number in the box where the distance cannot be
-    /// reached is `docs/rationale.md`'s clamp-rather-than-refuse: the stage still
-    /// solves, at a distance the reported clearance then makes visible.
-    #[must_use]
-    pub fn first_pitch_diameter(&self) -> f64 {
-        let stated = match self.sizing.manual {
-            FirstMemberSizing::PitchDiameter(d) => d,
-            FirstMemberSizing::HelixAngle(beta_deg) => {
-                f64::from(self.starts.max(1)) * self.module / beta_deg.to_radians().cos()
-            }
-        };
-        if !self.sizing.auto {
-            return stated;
-        }
-        self.nominal_distance()
-            .and_then(|target| self.size_reaching(target, stated))
-            .unwrap_or(stated)
-    }
-
-    /// The **nominal** distance the size has to reach, where one was given — the
-    /// distance typed less the clearance it is opened by, as everywhere else.
-    fn nominal_distance(&self) -> Option<f64> {
-        (!self.centre_distance.auto && !self.clearance.auto)
-            .then_some(self.centre_distance.manual - self.clearance.manual)
-    }
-
-    /// **The first member's size that puts this pair at `target`**, mm of pitch
-    /// diameter — where one exists on the branch the stage is already on.
-    ///
-    /// A screw stage has no profile shift, so its size is the only thing inside
-    /// it free to absorb a given centre distance (F39's fourth item). Which
-    /// makes this the one kind whose mode 3 changes the *teeth* rather than
-    /// where they sit, and the reason it is opt-in.
-    ///
-    /// # Two answers, and the branch is chosen by continuity
-    ///
-    /// The distance has a **minimum** in the worm's diameter
-    /// ([`Screw::least_distance_lead_angle`]): steepening the thread shrinks the
-    /// worm and grows the wheel, and past the turning point the second wins. So
-    /// a target above the minimum is reached by two worms, and picking one is a
-    /// decision rather than a calculation.
-    ///
-    /// It is taken **on the side the designer's own number is on**, which is the
-    /// only choice under which nudging the target moves the answer smoothly
-    /// instead of jumping between a thin fast worm and a fat slow one. A target
-    /// *below* the minimum is reached by neither and there is no answer to give.
-    fn size_reaching(&self, target: f64, from: f64) -> Option<f64> {
-        let z1 = f64::from(self.starts.max(1));
-        // **Degrees here, radians there.** `WormStage::shaft_angle` is the
-        // designer's number and `Screw`'s is the mathematics', which is the
-        // conversion `geometry()` does one line into building one.
-        let least = Screw::least_distance_lead_angle(
-            self.starts.max(1),
-            self.wheel_teeth,
-            self.shaft_angle.to_radians(),
-        )?;
-        let turning = z1 * self.module / least.sin();
-
-        let distance = |d1: f64| -> f64 {
-            let mut probe = self.clone();
-            probe.sizing = Auto::fixed(FirstMemberSizing::PitchDiameter(d1));
-            probe.geometry().map_or(f64::NAN, |s| s.centre_distance)
-        };
-
-        // The two branches meet at the turning point. `thin` is bounded below by
-        // the diameter at which the thread would wrap at a right angle, which is
-        // where `Screw::new` refuses (`WormTooThin`).
-        // **`from` rather than `first_pitch_diameter()`** — that is what calls
-        // this, and reading it back here would recurse forever. It is the
-        // designer's own number, which is the whole point: the branch is chosen
-        // by where they already are.
-        let floor = z1 * self.module;
-        let (lo, hi) = if from <= turning {
-            (floor * (1.0 + 1e-9), turning)
-        } else {
-            // No upper bound in the geometry, so one is grown until it brackets
-            // — the distance rises without bound on this branch, so it does.
-            let mut top = turning.max(from) * 2.0;
-            for _ in 0..60 {
-                if distance(top) >= target || !distance(top).is_finite() {
-                    break;
-                }
-                top *= 2.0;
-            }
-            (turning, top)
-        };
-        crate::solve::brent(
-            |d1| distance(d1) - target,
-            lo,
-            hi,
-            crate::solve::Tol::default(),
-        )
-    }
-
-    /// The screw geometry this stage describes.
-    ///
-    /// # Errors
-    ///
-    /// [`TrainError::Screw`] if the pair cannot exist.
-    pub fn geometry(&self) -> Result<Screw, TrainError> {
-        // Caught here rather than in `Screw::new`, because by then the helix
-        // angle has become a diameter and the information is gone: `cos 90°` is
-        // 6e-17, not zero, so the diameter comes out enormous rather than
-        // infinite and passes every finiteness check downstream.
-        if let FirstMemberSizing::HelixAngle(beta) = self.sizing.manual {
-            if beta.abs() >= 90.0 {
-                return Err(TrainError::Screw(
-                    crate::screw::ScrewError::FirstMemberIsADisc,
-                ));
-            }
-        }
-        Screw::new(&ScrewParams {
-            normal_module: self.module,
-            normal_pressure_angle_rad: self.pressure_angle.to_radians(),
-            shaft_angle_rad: self.shaft_angle.to_radians(),
-            starts: self.starts,
-            wheel_teeth: self.wheel_teeth,
-            worm_pitch_diameter: self.first_pitch_diameter(),
-            profile_shifts: [0.0; 2],
-        })
-        .map_err(TrainError::Screw)
-    }
-}
-
-/// Solve a **crossed gear pair** — a [`super::SpurStage`] whose shafts are not
-/// parallel.
-///
-/// It is the same mesh as a worm stage and is solved by the same code, because
-/// it *is* the same thing: crossed-axis screw gearing. The only difference is
-/// which of the first member's diameter and helix angle is the input (docs/reference.md#crossed-axes),
-/// and a gear's diameter follows from its teeth, so the helix angle is what is
-/// given. That is the whole translation below.
-///
-/// Two things a crossed pair does not inherit from its parallel form, both
-/// because the contact is a point:
-///
-/// - **No automatic face width.** A point contact's peak pressure does not
-///   depend on the face width, and there is no bending model for a crossed
-///   pair, so nothing can size it. A width left automatic is used as entered
-///   and the result says so.
-/// - **No axial clearance.** That is a worm's float along its own axis; a gear
-///   pair has none, so the backlash comes from the centre distance alone.
+/// - a **worm** and its wheel take the conventional proportions of a worm
+///   drive ([`proportions`]), which describe a worm carrying an enveloping
+///   wheel and are offered nowhere else;
+/// - a crossed **gear** pair takes the width at which one tooth pair hands
+///   over to the next exactly — `ε = 1` — a geometric minimum that says
+///   nothing about stress, because a point contact's peak pressure does not
+///   depend on the face width and there is no bending model to invert.
 ///
 /// # Errors
 ///
 /// [`TrainError`] if the pair cannot exist or names a material the library does
 /// not have.
-pub fn solve_crossed_stage(
-    stage: &super::SpurStage,
+pub fn solve_crossed_pair(
+    stage: &PairStage,
+    kind: PairKind,
     torques: StageTorques,
     lib: &MaterialLibrary,
-) -> Result<WormResult, TrainError> {
-    let member = |g: &super::StageGear| WormMember {
-        // Fixed, not automatic: see above. `manual` is what the field holds
-        // whichever way its toggle is set, so this is the number on screen.
-        face_width: Auto::fixed(g.face_width.manual),
-        material: g.material.clone(),
-        material_overrides: g.material_overrides,
-    };
-
-    let mut equivalent = WormStage {
-        module: stage.module,
-        pressure_angle: stage.pressure_angle,
-        shaft_angle: stage.shaft_angle,
-        sliding_friction: stage.sliding_friction,
-        static_friction: stage.static_friction,
-        thickness_mod: stage.thickness_mod,
-        starts: stage.gears[0].teeth,
-        // A crossed pair's helix is a *gear's* input, so it is given by
-        // construction: the pair has its own shifts to absorb a distance with.
-        sizing: Auto::fixed(FirstMemberSizing::HelixAngle(stage.helix_angles()[0])),
-        wheel_teeth: stage.gears[1].teeth,
-        centre_distance: stage.centre_distance,
-        clearance: stage.clearance,
-        tolerance_plus: stage.tolerance_plus,
-        tolerance_minus: stage.tolerance_minus,
-        axial_clearance: 0.0,
-        worm: member(&stage.gears[0]),
-        wheel: member(&stage.gears[1]),
-    };
-
-    // --- the path of contact, which is what a crossed pair can now say.
-    //
-    // Its tips come from the tooth form the stage carries: this is the one place
-    // that form reaches an answer, which is why it is specified at all (docs/reference.md#crossed-axes).
-    let screw = equivalent.geometry()?;
-    let tips = {
-        let r = [
-            screw.worm_pitch_diameter / 2.0,
-            screw.wheel_pitch_diameter / 2.0,
-        ];
-        [
-            r[0] + stage.gears[0].addendum * stage.module,
-            r[1] + stage.gears[1].addendum * stage.module,
-        ]
-    };
-    // At the centre distance the pair will run at, not the zero-backlash one:
-    // an automatic face is sized for the machine that gets built. On a crossed
-    // pair that is not a refinement — the contact slides bodily along the shafts
-    // with a centre-distance error, so a face centred on the nominal contact can
-    // miss it entirely (docs/reference.md#centre-distance-and-backlash).
-    let path = screw.path_of_contact_at(tips[0], tips[1], operating_centre(&screw, &equivalent));
-
-    // **Automatic face width means continuity here, not strength.** The spur
-    // stage inverts a stress to size a face; a crossed pair has no stress that
-    // depends on its width at all, and what it does have is a contact point that
-    // runs off the end of a face too narrow. So automatic takes the width at
-    // which one tooth pair hands over to the next exactly — `ε = 1` — and the
-    // result says which kind of minimum it is wherever it shows the number.
-    let continuity = path.as_ref().and_then(|p| p.face_widths_for(&screw, 1.0));
-    let mut notes = Vec::new();
-    for (i, gear) in stage.gears.iter().enumerate() {
-        if !gear.face_width.auto {
-            continue;
-        }
-        match continuity {
-            Some(widths) => {
-                let m = if i == 0 {
-                    &mut equivalent.worm
-                } else {
-                    &mut equivalent.wheel
-                };
-                m.face_width = Auto::fixed(widths[i]);
-            }
-            None => notes.push(
-                Note::new(key::STAGE_CROSSED_FACE_WIDTH_AS_ENTERED)
-                    .text("member", (i + 1).to_string()),
-            ),
-        }
-    }
-
-    let mut result = solve_worm_stage(&equivalent, torques, lib)?;
-
-    // **A crossed pair's members are rack-cut gears, and say so.**
-    //
-    // The equivalent worm stage above carries no tooth form — a worm is a thread
-    // — so nothing in `solve_worm_stage` can report a clamp or an undercut
-    // flank. For a worm that is right. For a crossed pair it is a loss: these
-    // are two helical gears, the designer typed their shift, dedendum and root
-    // round, and every other stage kind says when a cutter has eaten into a
-    // flank. This one did not, and the same pair reported `clamp.tooth_undercut`
-    // with its shafts parallel and nothing at all with them crossed
-    // (`docs/corrections.md`).
-    //
-    // Built here rather than in the worm solver because this is the only side
-    // that has the `StageGear`s to build them from — which is the whole of why
-    // the translation lost them.
-    for i in 0..2 {
-        let params = stage.base_params(i);
-        let tooth = crate::tooth::Tooth::new(params);
-        let m = &result.members[i];
-        result.members[i].gear = Some(super::GearResult::of(super::MemberFacts {
-            profile_shift: params.profile_shift,
-            params: &params,
-            input: &stage.gears[i],
-            rated: super::Rated {
-                // **No bending, and that is a decision rather than a gap.** The
-                // tooth a beam formula would measure is not the tooth this mesh
-                // loads: a crossed pair's contact is a *point* tracking
-                // diagonally across the flank, and a cantilever loaded across
-                // its whole face has no honest reading of it
-                // (docs/rationale.md#a-worm-stage-reports-no-bending-stress).
-                bending_stress: super::LoadCase::of(|_| None),
-                // The mesh's figure, which is the members' figure: two flanks
-                // share one patch, one normal force and one `E*`
-                // (docs/rationale.md#one-pressure-two-ratings--and-the-curvature-is-not-what-separates-them).
-                // Both members are rated at the same point here because a point
-                // contact has only the one.
-                contact_stress: super::LoadCase::of(|c| result.contact.get(c).max_pressure),
-                // **Neither rating sizes this face.** Bending is not taken, and
-                // inverting a contact stress for a width assumes the stress
-                // depends on the width — a point contact's does not. What sizes
-                // a crossed pair's face is continuity, `ε = 1`, and that is a
-                // geometric minimum reported as its own figure rather than
-                // smuggled into this one.
-                min_face_width: super::LoadCase::of(|_| super::Widths {
-                    bending: None,
-                    contact: None,
-                }),
-            },
-            face_width: m.face_width,
-            torque: m.torque,
-            back_driving_torque: m.back_driving_torque,
-            speed: m.speed,
-            material: m.material.clone(),
-            clamps: tooth.clamps.notes.clone(),
-            notes: super::undercut_note(&tooth).into_iter().collect(),
-        }));
-    }
-
-    result.notes.extend(notes);
-
-    // ...and the zone as the widths in use actually leave it.
-    // The same teeth with their shafts brought parallel — which the stage can
-    // describe exactly, since a crossed pair *is* this stage at `Σ = 0`. It is
-    // here to be compared against, not to correct with: see
-    // `CrossedMesh::omits_profile_sliding`.
-    let parallel = solve_spur_stage(
-        &super::SpurStage {
-            shaft_angle: 0.0,
-            ..stage.clone()
-        },
-        torques,
-        lib,
-    )
-    .ok()
-    .map(|r| r.mesh.efficiency.forward);
-
-    // ...and the zone as the widths in use actually leave it. The tips are known
-    // here — a crossed pair carries its tooth form — so nothing is assumed.
-    result.crossed = crossed_mesh(
-        &screw,
-        &result.members,
-        Some(tips),
-        parallel,
-        result.centre_distance,
-    );
-
-    if let Some(zone) = result.crossed {
-        if zone.contact_ratio < 1.0 {
-            result.notes.push(
-                Note::new(key::STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE).number(
-                    "ratio",
-                    zone.contact_ratio,
-                    3,
-                ),
-            );
-        }
-    }
-    Ok(result)
-}
-
-/// Solve one worm stage, given the torque on the worm.
-///
-/// # Errors
-///
-/// [`TrainError`] if the pair cannot exist or names a material the library does
-/// not have.
-pub fn solve_worm_stage(
-    stage: &WormStage,
-    torques: StageTorques,
-    lib: &MaterialLibrary,
-) -> Result<WormResult, TrainError> {
+) -> Result<PairResult, TrainError> {
     let input_torque = torques.peak_forward;
-    let s = stage.geometry()?;
 
-    let materials: Vec<Material> = [&stage.worm, &stage.wheel]
+    // The shifts, decided once — a given distance is reached through them by
+    // the rack law, or through the size where both are pinned
+    // (`PairStage::first_pitch_diameter`).
+    let chosen = stage.chosen_at(&crate::auto::Search::SHIPPED);
+    let x = chosen.shifts;
+    let p: [GearParams; 2] = [stage.params_at(0, x[0]), stage.params_at(1, x[1])];
+    let g = [Tooth::new(p[0]), Tooth::new(p[1])];
+    let s = stage.screw_at(x)?;
+
+    let materials: Vec<Material> = stage
+        .gears
         .iter()
         .map(|m| {
             lib.get(&m.material)
@@ -899,32 +345,56 @@ pub fn solve_worm_stage(
         .collect::<Result<_, _>>()?;
 
     let centre = operating_centre(&s, stage);
+    // The tips are the teeth's own: this is the one place a crossed pair's
+    // tooth form reaches an answer, which is why it is specified at all
+    // (docs/reference.md#crossed-axes).
+    let tips = [g[0].ra, g[1].ra];
+    let ends = [g[0].flank_ends(), g[1].flank_ends()];
 
-    // The face widths, decided before anything that reads them — the path is
-    // one of those things now, since a face narrow enough to cut the zone
+    // --- the face widths, decided before anything that reads them — the path
+    // is one of those things, since a face narrow enough to cut the zone
     // changes what the mesh does as well as how long it does it for.
-    let recommended = match stage.sizing.manual {
-        FirstMemberSizing::PitchDiameter(_) => [
+    //
+    // At the centre distance the pair will run at, not the zero-backlash one:
+    // an automatic face is sized for the machine that gets built. On a crossed
+    // pair that is not a refinement — the contact slides bodily along the
+    // shafts with a centre-distance error, so a face centred on the nominal
+    // contact can miss it entirely (docs/reference.md#centre-distance-and-backlash).
+    let full_path = s.path_of_contact_at(tips[0], tips[1], centre);
+    let recommended: [Option<f64>; 2] = match kind {
+        PairKind::Worm => [
             Some(proportions::worm_length(
                 s.axial_module,
-                stage.wheel_teeth,
-                stage.starts,
+                stage.gears[1].teeth,
+                stage.gears[0].teeth,
             )),
             Some(proportions::wheel_face_width(
                 s.axial_module,
                 s.worm_pitch_diameter,
             )),
         ],
-        FirstMemberSizing::HelixAngle(_) => [None, None],
+        PairKind::Spur => [None, None],
     };
-    let widths = [
-        recommended[0].map_or(stage.worm.face_width.manual, |r| {
-            stage.worm.face_width.resolve(r)
-        }),
-        recommended[1].map_or(stage.wheel.face_width.manual, |r| {
-            stage.wheel.face_width.resolve(r)
-        }),
-    ];
+    let continuity = full_path
+        .as_ref()
+        .and_then(|path| path.face_widths_for(&s, 1.0));
+    let mut notes = Vec::new();
+    let widths: [f64; 2] = [0, 1].map(|i| {
+        let width = &stage.gears[i].face_width;
+        match (recommended[i], continuity) {
+            (Some(r), _) => width.resolve(r),
+            (None, Some(c)) => width.resolve(c[i]),
+            (None, None) => {
+                if width.auto {
+                    notes.push(
+                        Note::new(key::STAGE_CROSSED_FACE_WIDTH_AS_ENTERED)
+                            .text("member", (i + 1).to_string()),
+                    );
+                }
+                width.manual
+            }
+        }
+    });
 
     // **Efficiency from the friction balance along the path, not at the pitch
     // point.** The pitch point is the one place with no sliding up the profile,
@@ -936,7 +406,9 @@ pub fn solve_worm_stage(
     //
     // Every figure this moves, it moves **down**: more sliding is counted, and
     // sliding cannot repay. See the canary note in docs/reference.md#crossed-axes.
-    let path = rating_path(&s, widths, None, centre);
+    let path = full_path
+        .as_ref()
+        .map(|path| path.limited_by_face(&s, widths).map_or(*path, |(z, _)| z));
     // **Two coefficients, and only one of them is an efficiency.** The static
     // one decides whether the drive breaks away at all; the sliding one decides
     // how well it runs once it has. This is the stage kind the rule is *for* —
@@ -989,24 +461,15 @@ pub fn solve_worm_stage(
     // come parallel the ellipse lengthens without bound and the pressure it
     // reports falls toward zero, while the real pair is carrying its load on a
     // line that has not grown at all (`docs/corrections.md`).
-    let line_length = [
-        widths[0]
-            / crate::plane::base_helix_angle(s.worm_helix_angle_rad, s.normal_pressure_angle_rad)
-                .cos(),
-        widths[1]
-            / crate::plane::base_helix_angle(
-                s.shaft_angle_rad - s.worm_helix_angle_rad,
-                s.normal_pressure_angle_rad,
-            )
-            .cos(),
-    ]
-    .into_iter()
-    .fold(f64::MAX, f64::min);
+    let line_length = [0, 1]
+        .map(|i| widths[i] / s.member_base(i).1.cos())
+        .into_iter()
+        .fold(f64::MAX, f64::min);
 
     // One rating, and what changes about it is the load: a torque, the member it
     // is quoted on, and the direction that presses that flank. The closure knows
     // nothing about which case or which direction asked.
-    let rate = |torque: f64, on: MeshSide, drive: Drive| -> Result<WormContact, TrainError> {
+    let rate = |torque: f64, on: MeshSide, drive: Drive| -> Result<PointContact, TrainError> {
         let at_pitch = s
             .contact(torque, on, stage.sliding_friction, drive, e_star)
             .ok_or(TrainError::NoContact)?;
@@ -1061,7 +524,7 @@ pub fn solve_worm_stage(
             }
         }
 
-        Ok(WormContact {
+        Ok(PointContact {
             max_pressure,
             at_pitch_point: pitch_pressure,
             worst_position,
@@ -1105,20 +568,15 @@ pub fn solve_worm_stage(
         cyclic: rate(on_worm.cyclic, MeshSide::First, Drive::Forward)?,
     };
 
-    let backlash = Directional::of(|d| {
-        let at = match d {
-            Drive::Forward => MeshSide::Second,
-            Drive::Backward => MeshSide::First,
-        };
-        // The screw law takes the *separation* from the geometric distance
-        // rather than the distance itself, which is the only thing that differs
-        // from a parallel stage's band.
+    // The screw law takes the *separation* from the geometric distance rather
+    // than the distance itself, which is the only thing that differs from a
+    // parallel stage's band. Per member, as every mesh reports it.
+    let backlash = [MeshSide::First, MeshSide::Second].map(|at| {
         Backlash::banded(centre, stage.tolerance_minus, stage.tolerance_plus, |d| {
             angular_backlash(&s, stage, d - s.centre_distance, at).to_degrees()
         })
     });
 
-    let mut notes = Vec::new();
     // **Against the static coefficient, because that is what decides it.**
     // Whether one member can turn the other at all is a question about breaking
     // away; the sliding coefficient answers a different one, and quoting it here
@@ -1160,146 +618,182 @@ pub fn solve_worm_stage(
             1,
         ));
     }
-    // What the distance has to say. A screw stage reaches a given one by sizing
-    // its worm, so *not reached* here means no worm on the branch it started
-    // from gets there — which is a fact about the housing rather than about the
-    // search (`train::distance_notes`).
+    // What the distance has to say: whether the shifts — or the size, where
+    // both shifts are pinned — reached the one that was given, and whether the
+    // pair can be assembled at all (`train::distance_notes`).
     notes.extend(super::distance_notes(
         stage.nominal_distance(),
         centre,
         s.centre_distance,
     ));
-
-    // The two conventional proportions, in the axial module they are written
-    // in. They size the *part*, not the answer: nothing below reads a face
-    // width, which is what makes shipping a convention here honest (see
-    // `proportions`).
-    //
-    // **Only for a worm stage.** These describe a worm carrying an enveloping
-    // wheel, and a crossed gear pair has neither — its members are two helical
-    // gears touching at a point, with nothing wrapped round anything. docs/reference.md#crossed-axes
-    // makes the first member's sizing the definition of which machine this is,
-    // so that is what decides here. Offering the numbers anyway would be
-    // shipping a convention outside the case it was written for, which is the
-    // thing docs/reference.md#contact-stress's policy exists to refuse.
-    if recommended[0].is_none() && (stage.worm.face_width.auto || stage.wheel.face_width.auto) {
-        notes.push(Note::new(key::STAGE_PROPORTIONS_NOT_APPLICABLE));
+    // ...and whether the optimiser was asked of a mesh it does not search.
+    if stage.optimisation.enabled {
+        notes.push(Note::new(key::STAGE_OPTIMISER_NOT_FOR_CROSSED));
     }
 
-    let members = [
-        WormMemberResult {
-            torque: input_torque,
-            // **The reverse is the same construction with the roles swapped.**
-            // Driving forward this member is the input and the wheel carries its
-            // torque stepped up and cut by the mesh's loss; being driven the
-            // wheel is the input and this member carries the applied load
-            // stepped *down* and cut by the mesh's loss the other way. So the
-            // figure here is the load referred to this shaft and then attenuated
-            // by this stage's own backward efficiency — which is what the walk
-            // multiplies by on its way to the stage before this one, so the
-            // number a worm reports is the number it hands on.
-            //
-            // A self-locking worm's backward efficiency is zero and this reads
-            // **zero**, which is the answer: nothing reaches the worm's shaft.
-            // What the mesh holds is on the wheel, and the wheel reports it.
-            // `StageTorques::referred_like` is deliberately not used on either
-            // member: it scales a member's *forward* torque, and a worm's
-            // carries a forward efficiency a backward load does not share.
-            back_driving_torque: torques
-                .peak_backward
-                .map(|t| t * efficiency.backward.max(0.0)),
-            speed: 0.0,
-            tooth_cycles: Cycles::default(),
-            face_width: widths[0],
-            recommended_face_width: recommended[0],
-            pitch_diameter: s.worm_pitch_diameter,
-            material: materials[0].clone(),
-            // A worm is a thread; see [`WormMemberResult::gear`].
-            gear: None,
-        },
-        WormMemberResult {
-            torque: output_torque,
-            // **The load is on the wheel**, and `back_driving_torques` has
-            // already referred it to this stage's input shaft — so bringing it
-            // back to the output member is that referral inverted, which is the
-            // ratio and nothing else.
-            //
-            // It used to *divide* by the backward efficiency here, on the
-            // reading that the mesh loses something carrying the load. It does,
-            // and the loss belongs on the member the load leaves by rather than
-            // the one it arrives at — a worm's backward efficiency is **zero**
-            // whenever the stage self-locks, which is the case a worm is chosen
-            // for, and the wheel of the shipped worm stage reported
-            // **2.2e307 N·m**: finite, so it crossed the boundary as a number
-            // rather than as the `null` an infinity would have become, and drew
-            // on screen as a figure.
-            back_driving_torque: torques.peak_backward.map(|t| t * s.ratio),
-            speed: 0.0,
-            tooth_cycles: Cycles::default(),
-            face_width: widths[1],
-            recommended_face_width: recommended[1],
-            pitch_diameter: s.wheel_pitch_diameter,
-            material: materials[1].clone(),
-            gear: None,
-        },
-    ];
+    // The zone as the widths in use actually leave it — one construction, asked
+    // twice for different things, rather than two that can disagree about
+    // where the teeth touch.
+    let zone = full_path.as_ref().map(|path| {
+        let (zone, limited_by) = path
+            .limited_by_face(&s, widths)
+            .unwrap_or((*path, ZoneLimit::Face));
+        CrossedZone {
+            contact_ratio: zone.contact_ratio,
+            limited_by,
+            face_width_for_continuity: path.face_widths_for(&s, 1.0),
+            axial_travel: zone.axial_travel(&s),
+        }
+    });
+    if let Some(zone) = zone {
+        if zone.contact_ratio < 1.0 {
+            notes.push(
+                Note::new(key::STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE).number(
+                    "ratio",
+                    zone.contact_ratio,
+                    3,
+                ),
+            );
+        }
+    }
+    // Interference is asked of the flanks whether or not there is a zone: a
+    // pair with no zone and a tip inside a base cylinder is fouling, not idle.
+    let flank_interference = full_path
+        .as_ref()
+        .map_or([true, true], |path| path.flank_interference(&s, ends));
 
-    Ok(WormResult {
+    // The same teeth with their shafts brought parallel — which the stage can
+    // describe exactly, since a crossed pair *is* this stage at `Σ = 0`. Here
+    // to be compared against, not to correct with (`CrossedMesh::parallel_axis_efficiency`).
+    let parallel = super::pair::solve_pair_stage(
+        &PairStage {
+            shaft_angle: 0.0,
+            // The same helix on the first member, read as the split: at Σ = 0
+            // the additional helix *is* the first member's angle.
+            sizing: Auto::fixed(super::FirstMemberSizing::AdditionalHelix(
+                stage.helix_angles()[0],
+            )),
+            ..stage.clone()
+        },
+        kind,
+        torques,
+        lib,
+    )
+    .ok()
+    .map(|r| r.mesh.efficiency().forward);
+
+    let mut gears = Vec::with_capacity(2);
+    let member_torque = [input_torque, output_torque];
+    // **The reverse is the same construction with the roles swapped.** Driving
+    // forward the first member is the input and the wheel carries its torque
+    // stepped up and cut by the mesh's loss; being driven the wheel is the
+    // input and the first member carries the applied load stepped *down* and
+    // cut by the mesh's loss the other way. So the first member's figure is
+    // the load referred to its shaft and then attenuated by this stage's own
+    // backward efficiency — which is what the walk multiplies by on its way to
+    // the stage before this one, so the number a worm reports is the number
+    // it hands on. A self-locking worm's backward efficiency is zero and this
+    // reads **zero**, which is the answer: nothing reaches the worm's shaft.
+    //
+    // The wheel's is the ratio and nothing else: `back_driving_torques` has
+    // already referred the load to this stage's input shaft, so bringing it
+    // back to the output member is that referral inverted. It used to *divide*
+    // by the backward efficiency, and the wheel of the shipped worm stage
+    // reported **2.2e307 N·m** (`docs/corrections.md`).
+    // `StageTorques::referred_like` is deliberately not used on either member:
+    // it scales a member's *forward* torque, and a worm's carries a forward
+    // efficiency a backward load does not share.
+    let back_driving = [
+        torques
+            .peak_backward
+            .map(|t| t * efficiency.backward.max(0.0)),
+        torques.peak_backward.map(|t| t * s.ratio),
+    ];
+    for i in 0..2 {
+        let input = &stage.gears[i];
+        gears.push(GearResult::of(super::MemberFacts {
+            profile_shift: p[i].profile_shift,
+            params: &p[i],
+            input,
+            rated: super::Rated {
+                // **No bending, and that is a decision rather than a gap.** The
+                // tooth a beam formula would measure is not the tooth this mesh
+                // loads: a crossed pair's contact is a *point* tracking
+                // diagonally across the flank, and a cantilever loaded across
+                // its whole face has no honest reading of it
+                // (docs/rationale.md#a-worm-stage-reports-no-bending-stress).
+                bending_stress: LoadCase::of(|_| None),
+                // The mesh's figure, which is the members' figure: two flanks
+                // share one patch, one normal force and one `E*`
+                // (docs/rationale.md#one-pressure-two-ratings--and-the-curvature-is-not-what-separates-them).
+                // Both members are rated at the same point here because a point
+                // contact has only the one.
+                contact_stress: LoadCase::of(|c| contact.get(c).max_pressure),
+                // **Neither rating sizes this face.** Bending is not taken, and
+                // inverting a contact stress for a width assumes the stress
+                // depends on the width — a point contact's does not. What sizes
+                // a crossed pair's face is continuity, or a worm's proportions,
+                // and both are reported as their own figure rather than
+                // smuggled into this one.
+                min_face_width: LoadCase::of(|_| super::Widths {
+                    bending: None,
+                    contact: None,
+                }),
+            },
+            face_width: widths[i],
+            recommended_face_width: recommended[i],
+            torque: member_torque[i],
+            back_driving_torque: back_driving[i],
+            speed: 0.0,
+            material: materials[i].clone(),
+            clamps: g[i].clamps.notes.clone(),
+            notes: {
+                let mut out: Vec<Note> = super::undercut_note(&g[i]).into_iter().collect();
+                out.extend(input.shift_asked(&stage.base_params(i)).note(input.teeth));
+                out.extend(
+                    input
+                        .addendum_asked(&GearParams {
+                            profile_shift: x[i],
+                            ..stage.base_params(i)
+                        })
+                        .note(input.teeth),
+                );
+                out
+            },
+        }));
+    }
+    notes.extend(chosen.how.note());
+
+    Ok(PairResult {
         ratio: s.ratio,
         centre_distance_nominal: s.centre_distance,
         centre_distance: centre,
         // As on a parallel stage: the running distance less the geometric
         // one, rather than the input read back.
         clearance: centre - s.centre_distance,
-        lead_angle: s.lead_angle_rad.to_degrees(),
-        wheel_lead_angle: s.wheel_lead_angle_rad.to_degrees(),
-        helix_angle: s.worm_helix_angle_rad.to_degrees(),
-        wheel_helix_angle: s.wheel_helix_angle_rad.to_degrees(),
-        lead: s.lead,
-        axial_module: s.axial_module,
-        crossed: crossed_mesh(&s, &members, None, None, centre),
-        efficiency,
-        locking_friction: threshold,
-        sliding_ratio: s.sliding_ratio,
-        sliding_velocity: 0.0,
-        contact,
-        backlash,
-        members,
+        mesh: PairMesh::Point(CrossedMesh {
+            lead_angles: [
+                s.lead_angle_rad.to_degrees(),
+                s.wheel_lead_angle_rad.to_degrees(),
+            ],
+            lead: s.lead,
+            axial_module: s.axial_module,
+            zone,
+            efficiency,
+            locking_friction: threshold,
+            parallel_axis_efficiency: parallel,
+            sliding_ratio: s.sliding_ratio,
+            sliding_velocity: 0.0,
+            contact,
+            backlash,
+            flank_interference,
+            coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
+        }),
+        gears: [gears[0].clone(), gears[1].clone()],
         notes,
     })
 }
 
-/// Angular backlash at one member, radians, for a centre distance `delta` above
-/// nominal.
-///
-/// The module documentation derives this; the short of it is that the axial
-/// slack and the centre-distance change are two displacements, and only their
-/// components along the common flank normal open a gap.
-/// The path of contact, as far as the geometry in hand allows it to be known.
-///
-/// `tips` are the two tip radii when the stage carries a tooth height — a
-/// crossed gear pair does. A **worm stage does not**: it has no addendum input,
-/// so a standard one-normal-module tooth is assumed, and that assumption is what
-/// makes the result a *floor* rather than a figure.
-///
-/// # Why a worm gets this at all
-///
-/// Every other number a worm stage reports — its contact stress, its efficiency,
-/// its backlash — comes from a model in which **both flanks are involute
-/// helicoids on cylinders** (docs/reference.md#crossed-axes). Withholding the one number that comes from
-/// the same construction, on the grounds that a real worm's wheel is throated,
-/// would be applying a standard to it that nothing else here is held to.
-///
-/// What throating does is *wrap* the wheel around the worm, engaging more of the
-/// thread. That can only lengthen the zone of action, so the cylindrical figure
-/// is a lower bound on an enveloping one: a worm that clears `ε = 1` here clears
-/// it as built. That is an argument about the direction, not a computation, and
-/// it is said next to the number.
-/// The path of contact as the face widths in use leave it — what a rating walks.
-///
-/// Shares its assumptions with [`crossed_mesh`], which reports the same zone:
-/// one construction, asked twice for different things, rather than two that can
-/// disagree about where the teeth touch.
 /// The centre distance the pair actually runs at.
 ///
 /// Nominal plus the assembly clearance when the centre distance is automatic,
@@ -1308,81 +802,21 @@ pub fn solve_worm_stage(
 /// because a stage asks twice: once inside the solve, and once before it, to
 /// size an automatic face for the pair **as built** rather than for the
 /// zero-backlash one nobody assembles.
-fn operating_centre(s: &Screw, stage: &WormStage) -> f64 {
+fn operating_centre(s: &Screw, stage: &PairStage) -> f64 {
     if stage.centre_distance.auto {
-        s.centre_distance + stage.clearance_taken()
+        s.centre_distance + stage.clearance.manual
     } else {
         stage.centre_distance.manual
     }
 }
 
-impl WormStage {
-    /// **The clearance this stage actually opens by** — the same question every
-    /// stage answers, in the same words (see [`super::SpurStage::clearance_taken`]).
-    ///
-    /// A crossed pair has no shifts to choose, so the distance is the only thing
-    /// that can absorb a clearance and a given distance leaves nothing at all.
-    #[must_use]
-    pub fn clearance_taken(&self) -> f64 {
-        if self.centre_distance.auto {
-            self.clearance.manual
-        } else {
-            0.0
-        }
-    }
-}
-
-fn rating_path(
-    s: &Screw,
-    face: [f64; 2],
-    tips: Option<[f64; 2]>,
-    centre: f64,
-) -> Option<CrossedPath> {
-    let assumed = s.normal_module();
-    let tips = tips.unwrap_or([
-        s.worm_pitch_diameter / 2.0 + assumed,
-        s.wheel_pitch_diameter / 2.0 + assumed,
-    ]);
-    let path = s.path_of_contact_at(tips[0], tips[1], centre)?;
-    Some(path.limited_by_face(s, face).map_or(path, |(z, _)| z))
-}
-
-fn crossed_mesh(
-    s: &Screw,
-    members: &[WormMemberResult; 2],
-    tips: Option<[f64; 2]>,
-    parallel_axis_efficiency: Option<f64>,
-    centre: f64,
-) -> Option<CrossedMesh> {
-    let radii = [
-        members[0].pitch_diameter / 2.0,
-        members[1].pitch_diameter / 2.0,
-    ];
-    // A standard tooth where the stage does not say: one **normal** module, the
-    // shorter of the two conventions a worm is cut to, so the assumption errs
-    // the same way the throating argument does.
-    let assumed = s.normal_module();
-    // Carried, not deduced: a crossed pair whose addendum happens to be one
-    // module produces the same tips as the assumption does, and asking the
-    // numbers which they were would answer wrongly exactly there.
-    let tooth_height_assumed = tips.is_none();
-    let tips = tips.unwrap_or([radii[0] + assumed, radii[1] + assumed]);
-    let path = s.path_of_contact_at(tips[0], tips[1], centre)?;
-    let face = [members[0].face_width, members[1].face_width];
-    let (zone, limited_by) = path
-        .limited_by_face(s, face)
-        .unwrap_or((path, ZoneLimit::Face));
-    Some(CrossedMesh {
-        contact_ratio: zone.contact_ratio,
-        limited_by,
-        face_width_for_continuity: path.face_widths_for(s, 1.0),
-        axial_travel: zone.axial_travel(s),
-        tooth_height_assumed,
-        parallel_axis_efficiency,
-    })
-}
-
-fn angular_backlash(s: &Screw, stage: &WormStage, delta: f64, at: MeshSide) -> f64 {
+/// Angular backlash at one member, radians, for a centre distance `delta` above
+/// nominal.
+///
+/// The module documentation derives this; the short of it is that the axial
+/// slack and the centre-distance change are two displacements, and only their
+/// components along the common flank normal open a gap.
+fn angular_backlash(s: &Screw, stage: &PairStage, delta: f64, at: MeshSide) -> f64 {
     // One normal, and both displacements projected onto it — the same vector the
     // path of contact is built on, rather than its components written out again.
     let Some(n) = s.contact_normal() else {
@@ -1407,10 +841,7 @@ fn angular_backlash(s: &Screw, stage: &WormStage, delta: f64, at: MeshSide) -> f
     let separation = 2.0 * delta.max(0.0) * n[0].abs();
     let slide = stage.axial_clearance * n[2].abs();
 
-    let teeth = match at {
-        MeshSide::First => stage.starts,
-        MeshSide::Second => stage.wheel_teeth,
-    };
+    let teeth = stage.gears[at.index()].teeth;
     // The gap becomes an angle by the law every mesh here shares. `r cos α_n
     // sin γ` is the same number — `r sin γ = z m_n / 2` exactly — but writing it
     // that way made this the second home of a law the parallel mesh already had,
@@ -1421,14 +852,61 @@ fn angular_backlash(s: &Screw, stage: &WormStage, delta: f64, at: MeshSide) -> f
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use super::super::{solve_pair_stage, FirstMemberSizing, StageGear};
     use super::*;
 
     fn library() -> MaterialLibrary {
         super::super::test_library()
     }
 
-    fn solved(stage: &WormStage) -> WormResult {
-        solve_worm_stage(stage, StageTorques::just(2.0), &library()).unwrap()
+    /// The old worm entry point, as the tests were written against it.
+    fn solve_worm(
+        stage: &PairStage,
+        torques: StageTorques,
+        lib: &MaterialLibrary,
+    ) -> Result<PairResult, TrainError> {
+        solve_pair_stage(stage, PairKind::Worm, torques, lib)
+    }
+
+    /// The old crossed-gear entry point, likewise.
+    fn solve_crossed(
+        stage: &PairStage,
+        torques: StageTorques,
+        lib: &MaterialLibrary,
+    ) -> Result<PairResult, TrainError> {
+        solve_pair_stage(stage, PairKind::Spur, torques, lib)
+    }
+
+    /// Two members of a worm stage with these counts, otherwise at the preset.
+    fn teeth(starts: u32, wheel: u32) -> [StageGear; 2] {
+        let [worm, wheel_gear] = PairStage::worm().gears;
+        [
+            StageGear {
+                teeth: starts,
+                ..worm
+            },
+            StageGear {
+                teeth: wheel,
+                ..wheel_gear
+            },
+        ]
+    }
+
+    /// A stage with one member's inputs edited.
+    fn member(mut stage: PairStage, i: usize, edit: impl FnOnce(&mut StageGear)) -> PairStage {
+        edit(&mut stage.gears[i]);
+        stage
+    }
+
+    /// The point-contact mesh a solved pair reports.
+    fn point(r: &PairResult) -> &CrossedMesh {
+        r.mesh
+            .as_point()
+            .expect("a crossed pair reports a point contact")
+    }
+
+    fn solved(stage: &PairStage) -> PairResult {
+        solve_pair_stage(stage, PairKind::Worm, StageTorques::just(2.0), &library()).unwrap()
     }
 
     /// **A worm stage runs at the centre distance it was given**, by sizing the
@@ -1445,23 +923,44 @@ mod tests {
     /// different worms.
     #[test]
     fn a_worm_sized_automatically_reaches_the_distance_it_was_given() {
-        let free = WormStage::default();
+        let free = PairStage::worm();
         let a0 = free
             .geometry()
             .expect("the shipped worm exists")
             .centre_distance;
         let turning = Screw::least_distance_lead_angle(
-            free.starts,
-            free.wheel_teeth,
+            free.gears[0].teeth,
+            free.gears[1].teeth,
             free.shaft_angle.to_radians(),
         )
         .expect("a right-angle pair has one");
-        let d_turning = f64::from(free.starts) * free.module / turning.sin();
+        let d_turning = f64::from(free.gears[0].teeth) * free.module / turning.sin();
         assert!(
             free.first_pitch_diameter() > d_turning,
             "the shipped worm should sit on the fat branch: {} against {d_turning}",
             free.first_pitch_diameter()
         );
+
+        // **The wheel's shift absorbs a distance before the size does.** With
+        // the wheel free — the preset — a given distance moves the wheel's
+        // shift by the rack law and leaves the worm the size it was.
+        {
+            let mut stage = free.clone();
+            stage.sizing.auto = true;
+            stage.centre_distance = Auto::fixed(a0 + 0.5 + stage.clearance.manual);
+            let x = stage.chosen_at(&crate::auto::Search::SHIPPED).shifts;
+            assert!(
+                (x[1] - 0.5 / stage.module).abs() < 1e-9 && x[0] == 0.0,
+                "the wheel should take the half module: {x:?}"
+            );
+            assert!(
+                (stage.first_pitch_diameter() - 7.0).abs() < 1e-12,
+                "and the worm stays 7 mm while a shift is free: {}",
+                stage.first_pitch_diameter()
+            );
+        }
+        // Pin the wheel's shift as well, and the size is what is left.
+        let free = member(free, 1, |g| g.profile_shift = Auto::fixed(0.0));
 
         let mut checked = 0u32;
         for step in 0..6 {
@@ -1542,18 +1041,16 @@ mod tests {
         // Σ = 0.0087° and "crossed 1°" one at 0.0175° — the same point twice,
         // against a comment saying the two cases exist because the answer
         // differs at the two ends.
-        let crossed = |sigma_deg: f64| WormStage {
+        let crossed = |sigma_deg: f64| PairStage {
+            gears: teeth(17, 23),
             shaft_angle: sigma_deg,
-            starts: 17,
-            wheel_teeth: 23,
             sizing: Auto::fixed(FirstMemberSizing::HelixAngle(sigma_deg / 2.0)),
-            ..Default::default()
+            ..PairStage::worm()
         };
-        let worm = WormStage {
-            starts: 1,
-            wheel_teeth: 40,
+        let worm = PairStage {
+            gears: teeth(1, 40),
             sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(7.0)),
-            ..Default::default()
+            ..PairStage::worm()
         };
         for (name, stage, line_should_govern) in [
             ("crossed 0.5°", crossed(0.5), true),
@@ -1561,12 +1058,12 @@ mod tests {
             ("the worm canary", worm, false),
         ] {
             let s = stage.geometry().unwrap();
-            let r = solve_worm_stage(&stage, StageTorques::just(2.0), &lib).unwrap();
+            let r = solve_worm(&stage, StageTorques::just(2.0), &lib).unwrap();
 
             // The same questions the stage asked, from the widths it actually
             // resolved: the load on the wheel, the line the teeth provide, and
             // the two models evaluated separately at the pitch point.
-            let materials: Vec<Material> = [&stage.worm, &stage.wheel]
+            let materials: Vec<Material> = [&stage.gears[0], &stage.gears[1]]
                 .iter()
                 .map(|m| lib.get(&m.material).unwrap().clone())
                 .collect();
@@ -1586,7 +1083,7 @@ mod tests {
             ];
             let line_length = (0..2)
                 .map(|i| {
-                    r.members[i].face_width
+                    r.gears[i].face_width
                         / crate::plane::base_helix_angle(betas[i], s.normal_pressure_angle_rad)
                             .cos()
                 })
@@ -1606,15 +1103,15 @@ mod tests {
             // ...and the rating is the larger of the two, whichever that is.
             let want = line.max(ellipse);
             assert!(
-                (r.contact.peak.at_pitch_point - want).abs() < 1e-9 * want,
+                (point(&r).contact.peak.at_pitch_point - want).abs() < 1e-9 * want,
                 "{name}: rated at {} where the governing model gives {want}",
-                r.contact.peak.at_pitch_point
+                point(&r).contact.peak.at_pitch_point
             );
             // A patch cannot be longer than the teeth it sits on.
             assert!(
-                r.contact.peak.patch_length <= line_length * (1.0 + 1e-12),
+                point(&r).contact.peak.patch_length <= line_length * (1.0 + 1e-12),
                 "{name}: a {} mm patch on a {line_length} mm line",
-                r.contact.peak.patch_length
+                point(&r).contact.peak.patch_length
             );
         }
     }
@@ -1625,34 +1122,35 @@ mod tests {
     /// projection onto the flank normal, which is the claim worth testing.
     #[test]
     fn axial_slack_reproduces_the_two_handbook_relations() {
-        for (starts, teeth, d1) in [(1u32, 40u32, 7.0), (2, 31, 9.0), (4, 60, 14.0)] {
-            let stage = WormStage {
-                starts,
-                wheel_teeth: teeth,
+        for (starts, wheel, d1) in [(1u32, 40u32, 7.0), (2, 31, 9.0), (4, 60, 14.0)] {
+            let stage = PairStage {
+                gears: teeth(starts, wheel),
                 sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(d1)),
                 axial_clearance: 0.04,
                 // isolate the axial term: no clearance on the centre distance
                 clearance: Auto::fixed(0.0),
                 tolerance_plus: 0.0,
                 tolerance_minus: 0.0,
-                ..Default::default()
+                ..PairStage::worm()
             };
             let r = solved(&stage);
             let s = stage.geometry().unwrap();
 
             let wheel = 0.04 / (s.wheel_pitch_diameter / 2.0);
             assert!(
-                (r.backlash.forward.nominal.to_radians() - wheel).abs() < 1e-12 * wheel,
+                (r.mesh.backlash_by_drive().forward.nominal.to_radians() - wheel).abs()
+                    < 1e-12 * wheel,
                 "z₁={starts}: wheel backlash {} vs j/r₂ {}",
-                r.backlash.forward.nominal.to_radians(),
+                r.mesh.backlash_by_drive().forward.nominal.to_radians(),
                 wheel
             );
 
             let worm = std::f64::consts::TAU * 0.04 / s.lead;
             assert!(
-                (r.backlash.backward.nominal.to_radians() - worm).abs() < 1e-12 * worm,
+                (r.mesh.backlash_by_drive().backward.nominal.to_radians() - worm).abs()
+                    < 1e-12 * worm,
                 "z₁={starts}: worm backlash {} vs 2π j/lead {}",
-                r.backlash.backward.nominal.to_radians(),
+                r.mesh.backlash_by_drive().backward.nominal.to_radians(),
                 worm
             );
         }
@@ -1663,24 +1161,26 @@ mod tests {
     /// negative, because the flanks would simply touch.
     #[test]
     fn the_centre_distance_tolerance_moves_the_backlash_the_right_way() {
-        let stage = WormStage {
+        let stage = PairStage {
             clearance: Auto::fixed(0.0),
             axial_clearance: 0.0,
             tolerance_plus: 0.05,
             tolerance_minus: 0.05,
-            ..Default::default()
+            ..PairStage::worm()
         };
         let r = solved(&stage);
         assert_eq!(
-            r.backlash.forward.nominal, 0.0,
+            r.mesh.backlash_by_drive().forward.nominal,
+            0.0,
             "nominal, with no slack at all"
         );
         assert!(
-            r.backlash.forward.maximum > 0.0,
+            r.mesh.backlash_by_drive().forward.maximum > 0.0,
             "opening the centres opens the mesh"
         );
         assert_eq!(
-            r.backlash.forward.minimum, 0.0,
+            r.mesh.backlash_by_drive().forward.minimum,
+            0.0,
             "tighter than nominal is contact"
         );
     }
@@ -1688,27 +1188,30 @@ mod tests {
     /// The stage's headline numbers, and the one it deliberately does not have.
     #[test]
     fn a_worm_stage_reports_contact_and_two_efficiencies_and_no_bending() {
-        let r = solved(&WormStage::default());
+        let r = solved(&PairStage::worm());
         assert!((r.ratio - 40.0).abs() < 1e-12);
-        assert!(r.efficiency.forward > 0.0 && r.efficiency.forward < 1.0);
+        assert!(r.mesh.efficiency().forward > 0.0 && r.mesh.efficiency().forward < 1.0);
         assert!(
-            r.efficiency.backward < r.efficiency.forward,
+            r.mesh.efficiency().backward < r.mesh.efficiency().forward,
             "back-driving is the worse direction"
         );
-        assert!(r.contact.peak.max_pressure > 0.0 && r.contact.peak.max_pressure.is_finite());
         assert!(
-            r.contact.peak.curvature_along > 0.0,
+            point(&r).contact.peak.max_pressure > 0.0
+                && point(&r).contact.peak.max_pressure.is_finite()
+        );
+        assert!(
+            point(&r).contact.peak.curvature_along > 0.0,
             "crossed shafts make a point contact, not a line"
         );
         assert!(
-            r.contact.peak.patch_length > r.contact.peak.patch_width,
+            point(&r).contact.peak.patch_length > point(&r).contact.peak.patch_width,
             "an ellipse: {} by {}",
-            r.contact.peak.patch_length,
-            r.contact.peak.patch_width
+            point(&r).contact.peak.patch_length,
+            point(&r).contact.peak.patch_width
         );
         // Torque follows the ratio and the operative efficiency.
-        let expected = 2.0 * r.ratio * r.efficiency.forward;
-        assert!((r.members[1].torque - expected).abs() < 1e-12 * expected);
+        let expected = 2.0 * r.ratio * r.mesh.efficiency().forward;
+        assert!((r.gears[1].torque - expected).abs() < 1e-12 * expected);
     }
 
     /// **Why the automatic face width here is a proportion and not a rating.**
@@ -1725,24 +1228,15 @@ mod tests {
     /// *narrower* gear. The next test is that one.
     #[test]
     fn contact_pressure_does_not_depend_on_the_face_width() {
-        let narrow = solved(&WormStage {
-            wheel: WormMember {
-                face_width: Auto::fixed(4.0),
-                material: "Brass C360".into(),
-                ..Default::default()
-            },
-            ..Default::default()
-        });
-        let wide = solved(&WormStage {
-            wheel: WormMember {
-                face_width: Auto::fixed(40.0),
-                material: "Brass C360".into(),
-                ..Default::default()
-            },
-            ..Default::default()
-        });
+        let narrow = solved(&member(PairStage::worm(), 1, |g| {
+            g.face_width = Auto::fixed(4.0);
+        }));
+        let wide = solved(&member(PairStage::worm(), 1, |g| {
+            g.face_width = Auto::fixed(40.0);
+        }));
         assert_eq!(
-            narrow.contact.peak.max_pressure, wide.contact.peak.max_pressure,
+            point(&narrow).contact.peak.max_pressure,
+            point(&wide).contact.peak.max_pressure,
             "a ten-fold face width must change nothing about a point contact"
         );
     }
@@ -1807,63 +1301,65 @@ mod tests {
     /// two can be read against each other.
     #[test]
     fn automatic_takes_the_recommendation_and_manual_is_left_alone() {
-        let auto = solved(&WormStage::default());
+        let auto = solved(&PairStage::worm());
         assert_eq!(
-            Some(auto.members[0].face_width),
-            auto.members[0].recommended_face_width,
+            Some(auto.gears[0].face_width),
+            auto.gears[0].recommended_face_width,
             "an automatic worm length is the recommendation"
         );
         assert_eq!(
-            Some(auto.members[1].face_width),
-            auto.members[1].recommended_face_width,
+            Some(auto.gears[1].face_width),
+            auto.gears[1].recommended_face_width,
             "an automatic wheel face width is the recommendation"
         );
 
-        let manual = solved(&WormStage {
-            worm: WormMember {
-                face_width: Auto::fixed(3.5),
-                ..Default::default()
-            },
-            ..Default::default()
-        });
-        assert!((manual.members[0].face_width - 3.5).abs() < 1e-12);
+        let manual = solved(&member(PairStage::worm(), 0, |g| {
+            g.face_width = Auto::fixed(3.5);
+        }));
+        assert!((manual.gears[0].face_width - 3.5).abs() < 1e-12);
         assert_eq!(
-            manual.members[0].recommended_face_width, auto.members[0].recommended_face_width,
+            manual.gears[0].recommended_face_width, auto.gears[0].recommended_face_width,
             "the recommendation is reported whether or not it is in use"
         );
     }
 
-    /// **A crossed gear pair gets no recommendation, and is told so.**
+    /// **The kind decides the proportions, not the reading.**
     ///
     /// The proportions describe a worm carrying an enveloping wheel. A crossed
-    /// pair is two helical gears touching at a point, so quoting them there
-    /// would be shipping a convention outside the case it was written for —
-    /// and quietly, since the number would look like any other.
+    /// gear pair is two helical gears touching at a point, so quoting them
+    /// there would be shipping a convention outside the case it was written
+    /// for — and quietly, since the number would look like any other. The same
+    /// 17/23 pair at 45° is a worm drive if a designer says it is and a gear
+    /// pair otherwise, and only the kind says which: as a gear pair its
+    /// automatic face is the width that keeps contact continuous, with no
+    /// recommendation beside it.
     #[test]
-    fn a_crossed_pair_is_not_given_a_worms_proportions() {
-        let crossed = solved(&WormStage {
-            starts: 17,
-            wheel_teeth: 23,
+    fn a_crossed_gear_pair_is_not_given_a_worms_proportions() {
+        let stage = PairStage {
+            gears: teeth(17, 23),
             sizing: Auto::fixed(FirstMemberSizing::HelixAngle(45.0)),
-            worm: WormMember {
-                face_width: Auto::automatic(6.0),
-                ..Default::default()
-            },
-            ..Default::default()
-        });
-        assert!(crossed.members[0].recommended_face_width.is_none());
-        assert!(crossed.members[1].recommended_face_width.is_none());
-        // Automatic has nothing to take, so the entered width stands...
-        assert!((crossed.members[0].face_width - 6.0).abs() < 1e-12);
-        // ...and the result says why rather than leaving it to be noticed.
-        assert!(
-            crossed
-                .notes
-                .iter()
-                .any(|n| n.is(key::STAGE_PROPORTIONS_NOT_APPLICABLE)),
-            "no note explaining the absent recommendation: {:?}",
-            crossed.notes
-        );
+            ..PairStage::worm()
+        };
+        let lib = library();
+        let as_gears = solve_crossed(&stage, StageTorques::just(2.0), &lib).unwrap();
+        let as_worm = solve_worm(&stage, StageTorques::just(2.0), &lib).unwrap();
+        assert!(as_gears.gears[0].recommended_face_width.is_none());
+        assert!(as_gears.gears[1].recommended_face_width.is_none());
+        assert!(as_worm.gears[0].recommended_face_width.is_some());
+        assert!(as_worm.gears[1].recommended_face_width.is_some());
+        // The gear pair's automatic face is continuity's.
+        let continuity = point(&as_gears)
+            .zone
+            .unwrap()
+            .face_width_for_continuity
+            .unwrap();
+        for (i, (gear, want)) in as_gears.gears.iter().zip(continuity).enumerate() {
+            assert!(
+                (gear.face_width - want).abs() < 1e-9,
+                "member {i}: face {} against continuity's {want}",
+                gear.face_width
+            );
+        }
     }
 
     /// **A crossed stage reports its contact ratio, and an automatic face width
@@ -1876,7 +1372,7 @@ mod tests {
     #[test]
     fn an_automatic_face_width_on_a_crossed_pair_buys_exactly_continuous_contact() {
         use crate::params::Auto;
-        use crate::train::{SpurStage, StageGear};
+        use crate::train::{PairStage, StageGear};
 
         let lib = super::super::test_library();
         let gear = |teeth: u32, face: Auto<f64>| StageGear {
@@ -1884,16 +1380,18 @@ mod tests {
             face_width: face,
             ..StageGear::default()
         };
-        let stage = |face: Auto<f64>| SpurStage {
+        let stage = |face: Auto<f64>| PairStage {
             shaft_angle: 90.0,
             gears: [gear(17, face), gear(23, face)],
-            ..SpurStage::default()
+            ..PairStage::default()
         };
 
         // Automatic: the width for ε = 1, and the ratio comes back as 1.
-        let auto = solve_crossed_stage(&stage(Auto::automatic(0.0)), StageTorques::just(2.0), &lib)
-            .unwrap();
-        let m = auto.crossed.expect("a crossed pair has a path of contact");
+        let auto =
+            solve_crossed(&stage(Auto::automatic(0.0)), StageTorques::just(2.0), &lib).unwrap();
+        let m = point(&auto)
+            .zone
+            .expect("a crossed pair has a path of contact");
         assert!(
             (m.contact_ratio - 1.0).abs() < 1e-9,
             "automatic should buy exactly continuous contact, got {}",
@@ -1901,7 +1399,7 @@ mod tests {
         );
         assert_eq!(m.limited_by, ZoneLimit::Face);
         let sized = m.face_width_for_continuity.expect("a width for continuity");
-        for (i, (member, want)) in auto.members.iter().zip(sized).enumerate() {
+        for (i, (member, want)) in auto.gears.iter().zip(sized).enumerate() {
             assert!(
                 (member.face_width - want).abs() < 1e-9,
                 "member {i} should be sized to {want}"
@@ -1914,13 +1412,13 @@ mod tests {
         // nominal centre distance *plus the clearance* and that slides the
         // contact along the shafts (docs/reference.md#centre-distance-and-backlash). Trimming a face symmetrically about
         // an asymmetric contact loses a little more than half.
-        let narrow = solve_crossed_stage(
+        let narrow = solve_crossed(
             &stage(Auto::fixed(sized[0] / 2.0)),
             StageTorques::just(2.0),
             &lib,
         )
         .unwrap();
-        let n = narrow.crossed.unwrap();
+        let n = point(&narrow).zone.unwrap();
         assert!(
             n.contact_ratio < 0.5 && n.contact_ratio > 0.45,
             "half the face should leave a little under half the contact: {}",
@@ -1929,26 +1427,25 @@ mod tests {
 
         // ...and it is *exactly* half once the clearance is taken away, which
         // pins the shortfall on the slide rather than on the arithmetic.
-        let tight = |face: Auto<f64>| SpurStage {
+        let tight = |face: Auto<f64>| PairStage {
             clearance: Auto::fixed(0.0),
             ..stage(face)
         };
         let centred =
-            solve_crossed_stage(&tight(Auto::automatic(0.0)), StageTorques::just(2.0), &lib)
-                .unwrap();
-        let width = centred
-            .crossed
+            solve_crossed(&tight(Auto::automatic(0.0)), StageTorques::just(2.0), &lib).unwrap();
+        let width = point(&centred)
+            .zone
             .expect("a path")
             .face_width_for_continuity
             .expect("a width for continuity");
-        let halved = solve_crossed_stage(
+        let halved = solve_crossed(
             &tight(Auto::fixed(width[0] / 2.0)),
             StageTorques::just(2.0),
             &lib,
         )
         .unwrap();
         assert!(
-            (halved.crossed.unwrap().contact_ratio - 0.5).abs() < 1e-9,
+            (point(&halved).zone.unwrap().contact_ratio - 0.5).abs() < 1e-9,
             "with the contact centred, half the face is exactly half the contact"
         );
         assert!(
@@ -1961,67 +1458,46 @@ mod tests {
         );
 
         // Generous, and the teeth are what end it — a wider face buys nothing.
-        let wide =
-            solve_crossed_stage(&stage(Auto::fixed(60.0)), StageTorques::just(2.0), &lib).unwrap();
-        let w = wide.crossed.unwrap();
+        let wide = solve_crossed(&stage(Auto::fixed(60.0)), StageTorques::just(2.0), &lib).unwrap();
+        let w = point(&wide).zone.unwrap();
         assert_eq!(w.limited_by, ZoneLimit::Tips);
         assert!(w.contact_ratio > m.contact_ratio);
         let wider =
-            solve_crossed_stage(&stage(Auto::fixed(120.0)), StageTorques::just(2.0), &lib).unwrap();
-        assert!((wider.crossed.unwrap().contact_ratio - w.contact_ratio).abs() < 1e-12);
+            solve_crossed(&stage(Auto::fixed(120.0)), StageTorques::just(2.0), &lib).unwrap();
+        assert!((point(&wider).zone.unwrap().contact_ratio - w.contact_ratio).abs() < 1e-12);
     }
 
-    /// **A worm stage reports the same path, and says what it assumed to.**
+    /// **A worm stage reports the same path, from its own teeth, and keeps its
+    /// proportions.**
     ///
     /// Every other figure a worm stage gives comes from a model in which both
     /// flanks are involute helicoids on cylinders, so withholding the one that
     /// comes from the same construction would be holding it to a standard
-    /// nothing else here meets. What it *does* lack is a tooth height — there is
-    /// no addendum input — so the tips are assumed and the result says so.
+    /// nothing else here meets. The tips are the members' own now — a worm has
+    /// an addendum like any gear — where a separate worm type once had to
+    /// assume one and flag it.
     ///
     /// Its face width stays proportion-sized: BS 721 and DIN are worm-drive
     /// conventions and answer a different question from continuity of contact.
     /// Both numbers are reported, each labelled with what it is.
     #[test]
-    fn a_worm_drive_reports_the_path_as_a_floor_and_keeps_its_proportions() {
-        let r = solved(&WormStage::default());
-        let m = r.crossed.expect("the same construction serves a worm");
-        assert!(
-            m.tooth_height_assumed,
-            "a worm stage has no addendum, so the tips must be flagged as assumed"
-        );
+    fn a_worm_drive_reports_the_path_from_its_own_teeth_and_keeps_its_proportions() {
+        let r = solved(&PairStage::worm());
+        let m = point(&r).zone.expect("the same construction serves a worm");
         assert!(m.contact_ratio > 0.0);
         // The proportions still size the face; continuity is reported beside
         // them rather than instead of them.
-        assert!(r.members[0].recommended_face_width.is_some());
+        assert!(r.gears[0].recommended_face_width.is_some());
         assert!(m.face_width_for_continuity.is_some());
 
-        // A crossed gear pair carries its own tooth height, so nothing is
-        // assumed there — the flag is what separates the two cases.
-        use crate::params::Auto;
-        use crate::train::{SpurStage, StageGear};
-        let crossed = solve_crossed_stage(
-            &SpurStage {
-                shaft_angle: 90.0,
-                gears: [
-                    StageGear {
-                        teeth: 17,
-                        face_width: Auto::fixed(6.0),
-                        ..StageGear::default()
-                    },
-                    StageGear {
-                        teeth: 23,
-                        face_width: Auto::fixed(6.0),
-                        ..StageGear::default()
-                    },
-                ],
-                ..SpurStage::default()
-            },
-            StageTorques::just(2.0),
-            &library(),
-        )
-        .unwrap();
-        assert!(!crossed.crossed.unwrap().tooth_height_assumed);
+        // The tips are the teeth's: a taller worm thread lengthens the zone.
+        let taller = solved(&member(PairStage::worm(), 0, |g| g.addendum = 1.2));
+        assert!(
+            point(&taller).zone.unwrap().contact_ratio > m.contact_ratio,
+            "a taller addendum must reach further: {} against {}",
+            point(&taller).zone.unwrap().contact_ratio,
+            m.contact_ratio
+        );
     }
 
     /// **The rating walks the path, and the pitch point is near its gentlest
@@ -2038,10 +1514,10 @@ mod tests {
     #[test]
     fn rating_along_the_path_is_never_kinder_than_the_pitch_point() {
         use crate::params::Auto;
-        use crate::train::{SpurStage, StageGear};
+        use crate::train::{PairStage, StageGear};
 
         let lib = super::super::test_library();
-        let crossed = |face: f64| SpurStage {
+        let crossed = |face: f64| PairStage {
             shaft_angle: 90.0,
             gears: [
                 StageGear {
@@ -2055,34 +1531,36 @@ mod tests {
                     ..StageGear::default()
                 },
             ],
-            ..SpurStage::default()
+            ..PairStage::default()
         };
 
         // Generous face: the teeth end the zone, the pair shares load, and the
         // rating sits just above the pitch-point figure.
-        let wide = solve_crossed_stage(&crossed(20.0), StageTorques::just(2.0), &lib).unwrap();
+        let wide = solve_crossed(&crossed(20.0), StageTorques::just(2.0), &lib).unwrap();
         assert!(
-            wide.contact.peak.max_pressure >= wide.contact.peak.at_pitch_point,
+            point(&wide).contact.peak.max_pressure >= point(&wide).contact.peak.at_pitch_point,
             "the path cannot be kinder than its gentlest point"
         );
-        assert!(wide.crossed.unwrap().contact_ratio > 1.0);
+        assert!(point(&wide).zone.unwrap().contact_ratio > 1.0);
 
         // Squeeze it: ε falls below 1, load sharing goes, and the same mesh at
         // the same torque rates higher.
-        let narrow = solve_crossed_stage(&crossed(0.8), StageTorques::just(2.0), &lib).unwrap();
-        assert!(narrow.crossed.unwrap().contact_ratio < 1.0);
+        let narrow = solve_crossed(&crossed(0.8), StageTorques::just(2.0), &lib).unwrap();
+        assert!(point(&narrow).zone.unwrap().contact_ratio < 1.0);
         assert!(
-            narrow.contact.peak.max_pressure > wide.contact.peak.max_pressure,
+            point(&narrow).contact.peak.max_pressure > point(&wide).contact.peak.max_pressure,
             "losing contact continuity should cost stress, not save it: {} against {}",
-            narrow.contact.peak.max_pressure,
-            wide.contact.peak.max_pressure
+            point(&narrow).contact.peak.max_pressure,
+            point(&wide).contact.peak.max_pressure
         );
         // ...and it is the *place* being rated that did it, not the load. The
         // load moved too — a narrower face engages only the middle of the zone,
         // which slides less, which delivers more torque — so the two figures
         // are compared as a ratio, which divides the load out: the same mesh
         // rated at its worst against rated at its pitch point.
-        let severity = |r: &WormResult| r.contact.peak.max_pressure / r.contact.peak.at_pitch_point;
+        let severity = |r: &PairResult| {
+            point(r).contact.peak.max_pressure / point(r).contact.peak.at_pitch_point
+        };
         // The margin is small, and the reason is worth knowing: a narrow face
         // cuts the zone's *ends* off, and those ends are what made the path
         // severe. So losing the sharing pushes the rating outward while the
@@ -2115,49 +1593,48 @@ mod tests {
     #[test]
     fn the_stage_counts_all_the_sliding_and_can_only_lose_by_it() {
         use crate::params::Auto;
-        use crate::train::{SpurStage, StageGear};
+        use crate::train::{PairStage, StageGear};
 
         let lib = super::super::test_library();
 
         for stage in [
-            WormStage::default(),
-            WormStage {
-                starts: 2,
-                wheel_teeth: 40,
+            PairStage::worm(),
+            PairStage {
+                gears: teeth(2, 40),
                 sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(12.0)),
-                ..WormStage::default()
+                ..PairStage::worm()
             },
         ] {
-            let r = solve_worm_stage(&stage, StageTorques::just(2.0), &lib).unwrap();
-            let classical = r.crossed.map(|_| ()).map(|()| {
+            let r = solve_worm(&stage, StageTorques::just(2.0), &lib).unwrap();
+            let classical = point(&r).zone.map(|_| ()).map(|()| {
                 let s = stage.geometry().unwrap();
                 Directional::of(|d| s.efficiency(stage.sliding_friction, d))
             });
             let classical = classical.expect("a screw geometry");
             for drive in Drive::BOTH {
                 assert!(
-                    r.efficiency.get(drive) <= classical.get(drive),
+                    r.mesh.efficiency().get(drive) <= classical.get(drive),
                     "{drive:?}: the path average {} should not beat the pitch point {}",
-                    r.efficiency.get(drive),
+                    r.mesh.efficiency().get(drive),
                     classical.get(drive)
                 );
             }
             // The threshold is the friction at which the *reported* backward
             // efficiency reaches zero, so it moves down with it.
             assert!(
-                r.locking_friction.backward
+                point(&r).locking_friction.backward
                     <= stage.geometry().unwrap().locking_friction().backward
             );
             assert_eq!(
-                r.efficiency.locked().backward,
-                r.efficiency.backward <= 0.0,
+                r.mesh.efficiency().locked().backward,
+                r.mesh.efficiency().backward <= 0.0,
                 "self-locking is what the reported figure says, not a second opinion"
             );
         }
 
         // ...and the same for a crossed gear pair, where the term being added is
         // the whole of a parallel mesh's loss.
-        let crossed = SpurStage {
+        let crossed = PairStage {
             shaft_angle: 60.0,
             gears: [
                 StageGear {
@@ -2171,12 +1648,12 @@ mod tests {
                     ..StageGear::default()
                 },
             ],
-            ..SpurStage::default()
+            ..PairStage::default()
         };
-        let r = solve_crossed_stage(&crossed, StageTorques::just(2.0), &lib).unwrap();
-        let m = r.crossed.expect("a path");
+        let r = solve_crossed(&crossed, StageTorques::just(2.0), &lib).unwrap();
+        point(&r).zone.expect("a path");
         assert!(
-            r.efficiency.forward < m.parallel_axis_efficiency.unwrap(),
+            r.mesh.efficiency().forward < point(&r).parallel_axis_efficiency.unwrap(),
             "a crossed pair must still lose more than the same teeth parallel"
         );
     }
@@ -2193,12 +1670,12 @@ mod tests {
     #[test]
     fn a_crossed_pair_loses_more_the_further_its_shafts_are_turned() {
         use crate::params::Auto;
-        use crate::train::{SpurStage, StageGear};
+        use crate::train::{PairStage, StageGear};
 
         let lib = super::super::test_library();
-        let stage = |sigma: f64| SpurStage {
+        let stage = |sigma: f64| PairStage {
             shaft_angle: sigma,
-            additional_helix: 20.0,
+            sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(20.0)),
             gears: [
                 StageGear {
                     teeth: 17,
@@ -2219,58 +1696,63 @@ mod tests {
                     ..StageGear::default()
                 },
             ],
-            ..SpurStage::default()
+            ..PairStage::default()
         };
 
         let mut previous = 1.0;
         for sigma in [0.5f64, 2.0, 10.0, 45.0, 90.0] {
-            let r = solve_crossed_stage(&stage(sigma), StageTorques::just(2.0), &lib).unwrap();
-            let mesh = r.crossed.expect("a path");
+            let r = solve_crossed(&stage(sigma), StageTorques::just(2.0), &lib).unwrap();
+            let mesh = point(&r).zone.expect("a path");
             assert_eq!(
                 mesh.limited_by,
                 ZoneLimit::Tips,
                 "Σ={sigma}°: the face is cutting the zone, so this is not a \
                  like-for-like comparison"
             );
-            let parallel = mesh
+            let parallel = point(&r)
                 .parallel_axis_efficiency
                 .expect("a parallel counterpart");
             assert!(
-                r.efficiency.forward < previous,
+                r.mesh.efficiency().forward < previous,
                 "Σ={sigma}°: turning the shafts further must cost more"
             );
-            previous = r.efficiency.forward;
+            previous = r.mesh.efficiency().forward;
 
             // Below the parallel figure everywhere the difference is physical,
             // and above it by no more than that formula's own linearisation
             // where the two are the same mesh.
             assert!(
-                r.efficiency.forward < parallel + 2e-4,
+                r.mesh.efficiency().forward < parallel + 2e-4,
                 "Σ={sigma}°: {} against the parallel {parallel}",
-                r.efficiency.forward
+                r.mesh.efficiency().forward
             );
         }
 
-        // A worm has no parallel-axis counterpart — a one-start thread is not a
-        // gear — so the comparison is absent rather than invented.
-        assert!(solved(&WormStage::default())
-            .crossed
-            .unwrap()
+        // A worm has one too now — it is a helical gear with one start — and
+        // the same ordering holds against it: crossing the shafts to a right
+        // angle costs a single-start worm most of what it had.
+        let worm = solved(&PairStage::worm());
+        let parallel = point(&worm)
             .parallel_axis_efficiency
-            .is_none());
+            .expect("a one-start helical gear on parallel shafts is buildable");
+        assert!(
+            worm.mesh.efficiency().forward < parallel,
+            "the worm keeps {} against {parallel} with its shafts parallel",
+            worm.mesh.efficiency().forward
+        );
     }
 
     /// A self-locking pair says so, rather than reporting a negative efficiency
     /// and leaving the reader to notice.
     #[test]
     fn self_locking_is_said_out_loud() {
-        let r = solved(&WormStage {
-            starts: 1,
+        let r = solved(&PairStage {
+            gears: teeth(1, 40),
             sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(25.0)),
             sliding_friction: 0.06,
-            ..Default::default()
+            ..PairStage::worm()
         });
-        assert!(r.efficiency.locked().backward);
+        assert!(r.mesh.efficiency().locked().backward);
         assert!(
             r.notes
                 .iter()
@@ -2282,11 +1764,11 @@ mod tests {
 
     #[test]
     fn a_pair_that_cannot_exist_says_which_way_it_failed() {
-        let err = solve_worm_stage(
-            &WormStage {
-                starts: 9,
+        let err = solve_worm(
+            &PairStage {
+                gears: teeth(9, 40),
                 sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(8.0)),
-                ..Default::default()
+                ..PairStage::worm()
             },
             StageTorques::just(2.0),
             &library(),
@@ -2294,14 +1776,8 @@ mod tests {
         .unwrap_err();
         assert!(format!("{err}").contains("too thin"), "{err}");
 
-        let err = solve_worm_stage(
-            &WormStage {
-                wheel: WormMember {
-                    material: "Unobtainium".into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
+        let err = solve_worm(
+            &member(PairStage::worm(), 1, |g| g.material = "Unobtainium".into()),
             StageTorques::just(2.0),
             &library(),
         )
@@ -2322,12 +1798,11 @@ mod tests {
                     if sigma - beta1 < 0.0 || sigma - beta1 > 89.0 {
                         continue;
                     }
-                    let by_angle = WormStage {
+                    let by_angle = PairStage {
+                        gears: teeth(z1, z2),
                         shaft_angle: sigma,
-                        starts: z1,
-                        wheel_teeth: z2,
                         sizing: Auto::fixed(FirstMemberSizing::HelixAngle(beta1)),
-                        ..WormStage::default()
+                        ..PairStage::worm()
                     };
                     let Ok(a) = by_angle.geometry() else { continue };
                     assert!(
@@ -2343,7 +1818,7 @@ mod tests {
 
                     // ...and handing the derived diameter back as a diameter is
                     // the same pair, which is what "sized the other way" means.
-                    let by_diameter = WormStage {
+                    let by_diameter = PairStage {
                         sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(
                             by_angle.first_pitch_diameter(),
                         )),
@@ -2373,13 +1848,12 @@ mod tests {
     #[test]
     fn a_crossed_axis_spur_pair_puts_the_spur_member_second() {
         for sigma in [20.0f64, 30.0, 45.0, 60.0] {
-            let stage = WormStage {
+            let stage = PairStage {
+                gears: teeth(17, 23),
                 shaft_angle: sigma,
-                starts: 17,
-                wheel_teeth: 23,
                 // The helical member takes the whole shaft angle...
                 sizing: Auto::fixed(FirstMemberSizing::HelixAngle(sigma)),
-                ..WormStage::default()
+                ..PairStage::worm()
             };
             let s = stage
                 .geometry()
@@ -2399,12 +1873,11 @@ mod tests {
         }
 
         // The other way round is refused, not fudged.
-        let backwards = WormStage {
+        let backwards = PairStage {
+            gears: teeth(17, 23),
             shaft_angle: 30.0,
-            starts: 17,
-            wheel_teeth: 23,
             sizing: Auto::fixed(FirstMemberSizing::HelixAngle(0.0)),
-            ..WormStage::default()
+            ..PairStage::worm()
         };
         assert!(
             backwards.geometry().is_err(),
@@ -2423,12 +1896,11 @@ mod tests {
     #[test]
     fn a_ninety_degree_helix_is_refused_where_it_is_still_visible() {
         for beta in [90.0f64, 91.0, 120.0, -90.0] {
-            let stage = WormStage {
+            let stage = PairStage {
+                gears: teeth(17, 23),
                 shaft_angle: 90.0,
-                starts: 17,
-                wheel_teeth: 23,
                 sizing: Auto::fixed(FirstMemberSizing::HelixAngle(beta)),
-                ..WormStage::default()
+                ..PairStage::worm()
             };
             assert!(
                 stage.geometry().is_err(),
@@ -2437,12 +1909,11 @@ mod tests {
         }
         // Just inside is silly but representable — the project's standing rule is
         // that a limit answers "could this exist", not "would anyone want it".
-        let stage = WormStage {
+        let stage = PairStage {
+            gears: teeth(17, 23),
             shaft_angle: 90.0,
-            starts: 17,
-            wheel_teeth: 23,
             sizing: Auto::fixed(FirstMemberSizing::HelixAngle(89.0)),
-            ..WormStage::default()
+            ..PairStage::worm()
         };
         let g = stage.geometry().unwrap();
         assert!(g.worm_pitch_diameter.is_finite() && g.worm_pitch_diameter > 0.0);
@@ -2458,7 +1929,7 @@ mod tests {
     #[test]
     fn a_crossed_spur_stage_is_the_screw_stage_it_used_to_be_entered_as() {
         use crate::params::Auto;
-        use crate::train::{SpurStage, StageGear};
+        use crate::train::{PairStage, StageGear};
 
         let lib = super::super::test_library();
         let gear = |teeth: u32| StageGear {
@@ -2466,46 +1937,46 @@ mod tests {
             face_width: Auto::fixed(8.0),
             ..StageGear::default()
         };
-        let spur = SpurStage {
+        let spur = PairStage {
             shaft_angle: 90.0,
-            additional_helix: 0.0,
+            sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(0.0)),
             gears: [gear(17), gear(23)],
-            ..SpurStage::default()
+            ..PairStage::default()
         };
-        let as_screw = WormStage {
+        // The same pair entered the worm way: by the first member's helix,
+        // as a worm kind, with the worm preset's float taken off.
+        let as_screw = PairStage {
             shaft_angle: 90.0,
-            starts: 17,
-            wheel_teeth: 23,
             sizing: Auto::fixed(FirstMemberSizing::HelixAngle(45.0)),
             axial_clearance: 0.0,
-            worm: WormMember {
-                face_width: Auto::fixed(8.0),
-                ..WormMember::default()
-            },
-            wheel: WormMember {
-                face_width: Auto::fixed(8.0),
-                material: "4340 Hardened Steel".into(),
-                ..WormMember::default()
-            },
-            ..WormStage::default()
+            gears: [gear(17), gear(23)],
+            ..PairStage::worm()
         };
 
-        let a = solve_crossed_stage(&spur, StageTorques::just(2.0), &lib).unwrap();
-        let b = solve_worm_stage(&as_screw, StageTorques::just(2.0), &lib).unwrap();
+        let a = solve_crossed(&spur, StageTorques::just(2.0), &lib).unwrap();
+        let b = solve_worm(&as_screw, StageTorques::just(2.0), &lib).unwrap();
         for (name, x, y) in [
             ("ratio", a.ratio, b.ratio),
             ("centre distance", a.centre_distance, b.centre_distance),
-            ("lead angle", a.lead_angle, b.lead_angle),
-            ("efficiency", a.efficiency.forward, b.efficiency.forward),
+            (
+                "lead angle",
+                point(&a).lead_angles[0],
+                point(&b).lead_angles[0],
+            ),
+            (
+                "efficiency",
+                a.mesh.efficiency().forward,
+                b.mesh.efficiency().forward,
+            ),
             (
                 "contact",
-                a.contact.peak.max_pressure,
-                b.contact.peak.max_pressure,
+                point(&a).contact.peak.max_pressure,
+                point(&b).contact.peak.max_pressure,
             ),
             (
                 "backlash",
-                a.backlash.forward.nominal,
-                b.backlash.forward.nominal,
+                a.mesh.backlash_by_drive().forward.nominal,
+                b.mesh.backlash_by_drive().forward.nominal,
             ),
         ] {
             assert_eq!(x.to_bits(), y.to_bits(), "{name}: {x} against {y}");
@@ -2526,12 +1997,12 @@ mod tests {
     /// so it holds whatever the solve does with it.
     #[test]
     fn a_parallel_stage_is_the_shaft_angles_zero() {
-        use crate::train::SpurStage;
+        use crate::train::PairStage;
 
         for additional in [0.0_f64, 12.5, -30.0] {
-            let stage = SpurStage {
-                additional_helix: additional,
-                ..SpurStage::default()
+            let stage = PairStage {
+                sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(additional)),
+                ..PairStage::default()
             };
             let [b1, b2] = stage.helix_angles();
             assert!((b1 - additional).abs() < 1e-12);
@@ -2560,13 +2031,13 @@ mod tests {
     #[test]
     fn the_crossed_backlash_meets_the_parallel_law_at_its_limit() {
         use crate::params::Auto;
-        use crate::train::spur::solve_spur_stage;
-        use crate::train::{SpurStage, StageGear};
+        use crate::train::pair::solve_pair_stage;
+        use crate::train::{PairStage, StageGear};
 
         let lib = super::super::test_library();
-        let stage = |sigma: f64, clearance: f64| SpurStage {
+        let stage = |sigma: f64, clearance: f64| PairStage {
             shaft_angle: sigma,
-            additional_helix: 20.0,
+            sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(20.0)),
             clearance: Auto::fixed(clearance),
             gears: [
                 StageGear {
@@ -2580,25 +2051,30 @@ mod tests {
                     ..StageGear::default()
                 },
             ],
-            ..SpurStage::default()
+            ..PairStage::default()
         };
 
         let mut last = f64::INFINITY;
         for clearance in [0.08_f64, 0.04, 0.02, 0.01, 0.005] {
-            let parallel = solve_spur_stage(&stage(0.0, clearance), StageTorques::just(2.0), &lib)
-                .expect("a parallel pair")
+            let parallel = solve_pair_stage(
+                &stage(0.0, clearance),
+                PairKind::Spur,
+                StageTorques::just(2.0),
+                &lib,
+            )
+            .expect("a parallel pair")
+            .mesh
+            .backlash_by_drive()
+            .forward
+            .nominal;
+            // As close to parallel as the screw model will go. The pair is still
+            // crossed, so it is still the crossed law answering.
+            let crossed = solve_crossed(&stage(0.001, clearance), StageTorques::just(2.0), &lib)
+                .expect("a crossed pair")
                 .mesh
                 .backlash_by_drive()
                 .forward
                 .nominal;
-            // As close to parallel as the screw model will go. The pair is still
-            // crossed, so it is still the crossed law answering.
-            let crossed =
-                solve_crossed_stage(&stage(0.001, clearance), StageTorques::just(2.0), &lib)
-                    .expect("a crossed pair")
-                    .backlash
-                    .forward
-                    .nominal;
 
             assert!(
                 parallel > 0.0 && crossed > 0.0,
@@ -2627,6 +2103,90 @@ mod tests {
             last < 1e-3,
             "the closest the two laws came was {last} apart, relative"
         );
+
+        // **And the axial float is one term on both sides.** A helical gear's
+        // slide along its axis opens the flanks by `j_axial sin β_b` whether
+        // its shafts cross or not; with the centre-distance term taken away
+        // the two laws must agree on it exactly, not merely to first order —
+        // the projection has no second-order term to differ by.
+        let float = |sigma: f64| PairStage {
+            axial_clearance: 0.05,
+            tolerance_plus: 0.0,
+            tolerance_minus: 0.0,
+            ..stage(sigma, 0.0)
+        };
+        let parallel = solve_pair_stage(&float(0.0), PairKind::Spur, StageTorques::just(2.0), &lib)
+            .expect("a parallel pair")
+            .mesh
+            .backlash_by_drive();
+        let crossed = solve_crossed(&float(0.001), StageTorques::just(2.0), &lib)
+            .expect("a crossed pair")
+            .mesh
+            .backlash_by_drive();
+        for (name, p, c) in [
+            ("forward", parallel.forward.nominal, crossed.forward.nominal),
+            (
+                "backward",
+                parallel.backward.nominal,
+                crossed.backward.nominal,
+            ),
+        ] {
+            assert!(
+                p > 0.0,
+                "{name}: an axial float on a helical pair opens the flanks"
+            );
+            // The crossed pair sits a thousandth of a degree off parallel, so
+            // its first member's helix — and `sin β_b` with it — is off by
+            // that much: the 2e-5 the two differ by is the shaft angle, not
+            // a term.
+            assert!(
+                ((p - c) / p).abs() < 1e-4,
+                "{name}: the float reads {p} parallel and {c} crossed"
+            );
+        }
+        // ...and on a spur gear the term is nothing, since `β_b = 0`.
+        let spur = PairStage {
+            sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(0.0)),
+            ..float(0.0)
+        };
+        let play = solve_pair_stage(&spur, PairKind::Spur, StageTorques::just(2.0), &lib)
+            .expect("a spur pair")
+            .mesh
+            .backlash_by_drive()
+            .forward
+            .nominal;
+        // Zero to rounding: the centre-distance term at zero clearance is a
+        // difference of two involute functions and leaves 1e-14 behind.
+        assert!(
+            play.abs() < 1e-12,
+            "a spur gear's axial float opens nothing: {play}"
+        );
+    }
+
+    /// **A crossed pair reports its interference, from its own teeth.** The
+    /// worm preset clears; a wheel with a tall enough addendum reaches below
+    /// where the worm's flank ends, and the result says so on the worm.
+    #[test]
+    fn a_crossed_pair_reports_the_member_whose_flank_is_fouled() {
+        let clear = solved(&PairStage::worm());
+        assert_eq!(
+            point(&clear).flank_interference,
+            [false, false],
+            "the shipped worm clears"
+        );
+        let tall = solved(&member(PairStage::worm(), 1, |g| {
+            g.addendum = 3.0;
+            g.no_sharp_tip = false;
+        }));
+        assert!(
+            point(&tall).flank_interference[0],
+            "a wheel three modules tall reaches past the worm's flank: {:?}",
+            point(&tall).flank_interference
+        );
+        assert!(
+            !point(&tall).flank_interference[1],
+            "and nothing about the worm's tip changed"
+        );
     }
 
     /// The other half of the same story: the shortfall above is **second order**,
@@ -2635,13 +2195,13 @@ mod tests {
     #[test]
     fn the_shortfall_at_the_limit_is_second_order_in_the_error() {
         use crate::params::Auto;
-        use crate::train::spur::solve_spur_stage;
-        use crate::train::{SpurStage, StageGear};
+        use crate::train::pair::solve_pair_stage;
+        use crate::train::{PairStage, StageGear};
 
         let lib = super::super::test_library();
-        let stage = |sigma: f64, clearance: f64| SpurStage {
+        let stage = |sigma: f64, clearance: f64| PairStage {
             shaft_angle: sigma,
-            additional_helix: 20.0,
+            sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(20.0)),
             clearance: Auto::fixed(clearance),
             gears: [
                 StageGear {
@@ -2655,21 +2215,26 @@ mod tests {
                     ..StageGear::default()
                 },
             ],
-            ..SpurStage::default()
+            ..PairStage::default()
         };
         let shortfall = |clearance: f64| {
-            let parallel = solve_spur_stage(&stage(0.0, clearance), StageTorques::just(2.0), &lib)
-                .expect("a parallel pair")
+            let parallel = solve_pair_stage(
+                &stage(0.0, clearance),
+                PairKind::Spur,
+                StageTorques::just(2.0),
+                &lib,
+            )
+            .expect("a parallel pair")
+            .mesh
+            .backlash_by_drive()
+            .forward
+            .nominal;
+            let crossed = solve_crossed(&stage(0.001, clearance), StageTorques::just(2.0), &lib)
+                .expect("a crossed pair")
                 .mesh
                 .backlash_by_drive()
                 .forward
                 .nominal;
-            let crossed =
-                solve_crossed_stage(&stage(0.001, clearance), StageTorques::just(2.0), &lib)
-                    .expect("a crossed pair")
-                    .backlash
-                    .forward
-                    .nominal;
             (parallel - crossed) / parallel
         };
         let (coarse, fine) = (shortfall(0.04), shortfall(0.02));
@@ -2694,44 +2259,45 @@ mod tests {
     /// something if the default worm changes.
     #[test]
     fn a_drive_that_cannot_break_away_delivers_nothing() {
-        let stage = |sliding: f64, statik: f64| WormStage {
+        let stage = |sliding: f64, statik: f64| PairStage {
             sliding_friction: sliding,
             static_friction: statik,
-            ..WormStage::default()
+            ..PairStage::worm()
         };
-        let threshold = solved(&stage(0.06, 0.06)).locking_friction.backward;
+        let threshold = point(&solved(&stage(0.06, 0.06))).locking_friction.backward;
         assert!(threshold > 0.0 && threshold < 0.3, "{threshold}");
 
         // 1. Both coefficients below it: back-drives, and the figure is the
         //    sliding one — the static coefficient changes nothing but the sign
         //    it was consulted for.
         let free = solved(&stage(0.06, threshold * 0.5));
-        assert!(free.efficiency.backward > 0.0);
+        assert!(free.mesh.efficiency().backward > 0.0);
         let alone = solved(&stage(0.06, 0.06));
         assert!(
-            (free.efficiency.backward - alone.efficiency.backward).abs() < 1e-12,
+            (free.mesh.efficiency().backward - alone.mesh.efficiency().backward).abs() < 1e-12,
             "the static coefficient must not leak into the number: {} against {}",
-            free.efficiency.backward,
-            alone.efficiency.backward
+            free.mesh.efficiency().backward,
+            alone.mesh.efficiency().backward
         );
 
         // 2. Static above it, sliding below: it never starts, so **zero** — not
         //    the sliding figure, which describes a motion that does not happen.
         let stuck = solved(&stage(0.06, threshold * 1.2));
-        assert_eq!(stuck.efficiency.backward, 0.0);
+        assert_eq!(stuck.mesh.efficiency().backward, 0.0);
         assert!(
-            stuck.efficiency.forward > 0.0,
+            stuck.mesh.efficiency().forward > 0.0,
             "forward is unaffected: it is not the direction near the threshold"
         );
         assert!(
-            (stuck.efficiency.forward - alone.efficiency.forward).abs() < 1e-12,
+            (stuck.mesh.efficiency().forward - alone.mesh.efficiency().forward).abs() < 1e-12,
             "and forward runs on the sliding coefficient like anything else"
         );
 
         // 3. Both above: still zero, and by the same route.
         assert_eq!(
             solved(&stage(threshold * 1.2, threshold * 1.2))
-                .efficiency
+                .mesh
+                .efficiency()
                 .backward,
             0.0
         );
@@ -2759,30 +2325,36 @@ mod tests {
     /// dry steel on steel.
     #[test]
     fn a_parallel_stage_passes_the_breakaway_rule_untouched() {
-        use crate::train::spur::solve_spur_stage;
-        use crate::train::SpurStage;
+        use crate::train::pair::solve_pair_stage;
+        use crate::train::PairStage;
 
         let lib = super::super::test_library();
-        let reference = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib)
-            .expect("a stage");
+        let reference = solve_pair_stage(
+            &PairStage::default(),
+            PairKind::Spur,
+            StageTorques::just(2.0),
+            &lib,
+        )
+        .expect("a stage");
         for statik in [0.0_f64, 0.06, 0.16, 0.5, 0.9] {
-            let r = solve_spur_stage(
-                &SpurStage {
+            let r = solve_pair_stage(
+                &PairStage {
                     static_friction: statik,
-                    ..SpurStage::default()
+                    ..PairStage::default()
                 },
+                PairKind::Spur,
                 StageTorques::just(2.0),
                 &lib,
             )
             .expect("a stage");
             assert_eq!(
-                r.mesh.efficiency.forward.to_bits(),
-                reference.mesh.efficiency.forward.to_bits(),
+                r.mesh.efficiency().forward.to_bits(),
+                reference.mesh.efficiency().forward.to_bits(),
                 "static μ {statik} moved a parallel stage"
             );
             assert_eq!(
-                r.mesh.efficiency.backward.to_bits(),
-                reference.mesh.efficiency.backward.to_bits()
+                r.mesh.efficiency().backward.to_bits(),
+                reference.mesh.efficiency().backward.to_bits()
             );
         }
     }
@@ -2808,15 +2380,15 @@ mod tests {
     /// direction here would be asserting one of those two cases.
     #[test]
     fn a_worm_stage_is_rated_at_the_centre_distance_it_runs_at() {
-        let stage = |clearance: f64| WormStage {
+        let stage = |clearance: f64| PairStage {
             clearance: Auto::fixed(clearance),
-            ..WormStage::default()
+            ..PairStage::worm()
         };
         let mut previous: Option<(f64, f64)> = None;
         for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
             let r = solved(&stage(clearance));
-            let eps = r.crossed.expect("a path of contact").contact_ratio;
-            let eta = r.efficiency.forward;
+            let eps = point(&r).zone.expect("a path of contact").contact_ratio;
+            let eta = r.mesh.efficiency().forward;
             if let Some((was_eps, was_eta)) = previous {
                 assert!(
                     eps < was_eps,
@@ -2850,12 +2422,12 @@ mod tests {
     #[test]
     fn a_centre_distance_error_slides_a_crossed_pairs_contact_off_its_face() {
         use crate::params::Auto;
-        use crate::train::{SpurStage, StageGear};
+        use crate::train::{PairStage, StageGear};
 
         let lib = super::super::test_library();
-        let stage = |sigma: f64, clearance: f64| SpurStage {
+        let stage = |sigma: f64, clearance: f64| PairStage {
             shaft_angle: sigma,
-            additional_helix: 20.0,
+            sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(20.0)),
             clearance: Auto::fixed(clearance),
             gears: [
                 StageGear {
@@ -2869,12 +2441,15 @@ mod tests {
                     ..StageGear::default()
                 },
             ],
-            ..SpurStage::default()
+            ..PairStage::default()
         };
         let mesh = |sigma: f64, clearance: f64| {
-            solve_crossed_stage(&stage(sigma, clearance), StageTorques::just(2.0), &lib)
+            solve_crossed(&stage(sigma, clearance), StageTorques::just(2.0), &lib)
                 .expect("a crossed pair")
-                .crossed
+                .mesh
+                .as_point()
+                .expect("a point contact")
+                .zone
                 .expect("a path of contact")
         };
 
@@ -2925,69 +2500,67 @@ mod tests {
     /// reports — the result shape is shared because the mathematics is.
     #[test]
     fn a_crossed_gear_pair_solves_end_to_end() {
-        let stage = WormStage {
+        let stage = PairStage {
+            gears: teeth(17, 23),
             shaft_angle: 90.0,
-            starts: 17,
-            wheel_teeth: 23,
             sizing: Auto::fixed(FirstMemberSizing::HelixAngle(45.0)),
-            ..WormStage::default()
+            ..PairStage::worm()
         };
-        let r = solve_worm_stage(
+        let r = solve_worm(
             &stage,
             StageTorques::just(2.0),
             &super::super::test_library(),
         )
         .unwrap();
         assert!((r.ratio - 23.0 / 17.0).abs() < 1e-12);
-        assert!(r.efficiency.forward > 0.0 && r.efficiency.forward < 1.0);
-        assert!(r.contact.peak.max_pressure > 0.0);
-        assert!(!r.efficiency.locked().backward);
+        assert!(r.mesh.efficiency().forward > 0.0 && r.mesh.efficiency().forward < 1.0);
+        assert!(point(&r).contact.peak.max_pressure > 0.0);
+        assert!(!r.mesh.efficiency().locked().backward);
 
         // **Where a crossed pair sits, stated as comparisons rather than a
         // threshold.** It slides hard at the pitch point — `1/cos γ₁`, which is
         // 1.41 × the pitch line speed at 45° — so it is far worse than a
         // parallel-axis mesh and far better than a worm of the same shaft angle.
         // Both bounds are computed here rather than remembered.
-        let worm = solve_worm_stage(
-            &WormStage {
+        let worm = solve_worm(
+            &PairStage {
+                gears: teeth(1, 40),
                 shaft_angle: 90.0,
-                starts: 1,
-                wheel_teeth: 40,
                 sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(7.0)),
-                ..WormStage::default()
+                ..PairStage::worm()
             },
             StageTorques::just(2.0),
             &super::super::test_library(),
         )
         .unwrap();
         assert!(
-            r.efficiency.forward > worm.efficiency.forward,
+            r.mesh.efficiency().forward > worm.mesh.efficiency().forward,
             "a crossed gear pair should beat a worm: {} vs {}",
-            r.efficiency.forward,
-            worm.efficiency.forward
+            r.mesh.efficiency().forward,
+            worm.mesh.efficiency().forward
         );
         assert!(
-            r.efficiency.forward < 0.95,
+            r.mesh.efficiency().forward < 0.95,
             "...but it slides too much to approach a parallel-axis mesh: {}",
-            r.efficiency.forward
+            r.mesh.efficiency().forward
         );
 
         // ...and more shaft angle means more sliding means less efficiency.
         let mut previous = f64::INFINITY;
         for sigma in [20.0f64, 40.0, 60.0, 90.0] {
-            let e = solve_worm_stage(
-                &WormStage {
+            let e = solve_worm(
+                &PairStage {
+                    gears: teeth(17, 23),
                     shaft_angle: sigma,
-                    starts: 17,
-                    wheel_teeth: 23,
                     sizing: Auto::fixed(FirstMemberSizing::HelixAngle(sigma / 2.0)),
-                    ..WormStage::default()
+                    ..PairStage::worm()
                 },
                 StageTorques::just(2.0),
                 &super::super::test_library(),
             )
             .unwrap()
-            .efficiency
+            .mesh
+            .efficiency()
             .forward;
             assert!(
                 e < previous,

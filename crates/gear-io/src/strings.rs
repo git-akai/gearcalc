@@ -672,12 +672,36 @@ mod tests {
         }
 
         // Stages: spur, worm, crossed and planetary, over inputs that fire the
-        // notes each of them can raise.
+        // notes each of them can raise. The three pair kinds are one solve
+        // with a kind on it; the names here say which the case is about.
         let lib = crate::default_library();
+        let solve_spur = |stage: &gear_core::train::PairStage,
+                          torques: gear_core::train::StageTorques,
+                          lib: &gear_core::material::MaterialLibrary| {
+            gear_core::train::solve_pair_stage(
+                stage,
+                gear_core::train::PairKind::Spur,
+                torques,
+                lib,
+            )
+        };
+        let solve_crossed = solve_spur;
+        let solve_worm = |stage: &gear_core::train::PairStage,
+                          torques: gear_core::train::StageTorques,
+                          lib: &gear_core::material::MaterialLibrary| {
+            gear_core::train::solve_pair_stage(
+                stage,
+                gear_core::train::PairKind::Worm,
+                torques,
+                lib,
+            )
+        };
         for helix in [0.0_f64, 3.0, 20.0] {
             for teeth in [(17_u32, 43_u32), (9, 11)] {
-                let stage = gear_core::train::SpurStage {
-                    additional_helix: helix,
+                let stage = gear_core::train::PairStage {
+                    sizing: gear_core::params::Auto::fixed(
+                        gear_core::train::FirstMemberSizing::AdditionalHelix(helix),
+                    ),
                     gears: [
                         gear_core::train::StageGear {
                             teeth: teeth.0,
@@ -690,11 +714,7 @@ mod tests {
                     ],
                     ..Default::default()
                 };
-                if let Ok(r) = gear_core::train::solve_spur_stage(
-                    &stage,
-                    gear_core::train::StageTorques::just(2.0),
-                    &lib,
-                ) {
+                if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
                     record(&r.notes);
                 }
                 for sigma in [0.5_f64, 90.0] {
@@ -702,18 +722,16 @@ mod tests {
                         gear_core::params::Auto::automatic(0.0),
                         gear_core::params::Auto::fixed(0.4),
                     ] {
-                        let mut crossed = gear_core::train::SpurStage {
+                        let mut crossed = gear_core::train::PairStage {
                             shaft_angle: sigma,
                             ..stage.clone()
                         };
                         for g in &mut crossed.gears {
                             g.face_width = face;
                         }
-                        if let Ok(r) = gear_core::train::solve_crossed_stage(
-                            &crossed,
-                            gear_core::train::StageTorques::just(2.0),
-                            &lib,
-                        ) {
+                        if let Ok(r) =
+                            solve_crossed(&crossed, gear_core::train::StageTorques::just(2.0), &lib)
+                        {
                             record(&r.notes);
                         }
                     }
@@ -734,16 +752,12 @@ mod tests {
                 profile_shift: gear_core::params::Auto::fixed(0.0),
                 ..Default::default()
             };
-            let stage = gear_core::train::SpurStage {
+            let stage = gear_core::train::PairStage {
                 load_sharing: gear_core::contact::LoadSharing::LinearRamp,
                 gears: [gear.clone(), gear],
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_spur_stage(
-                &stage,
-                gear_core::train::StageTorques::just(2.0),
-                &lib,
-            ) {
+            if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
                 record(&r.notes);
                 for g in &r.gears {
                     record(&g.notes);
@@ -761,15 +775,11 @@ mod tests {
                 rim_thickness: rim,
                 ..Default::default()
             };
-            let stage = gear_core::train::SpurStage {
+            let stage = gear_core::train::PairStage {
                 gears: [gear.clone(), gear],
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_spur_stage(
-                &stage,
-                gear_core::train::StageTorques::just(2.0),
-                &lib,
-            ) {
+            if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
                 record(&r.notes);
                 for g in &r.gears {
                     record(&g.notes);
@@ -786,15 +796,11 @@ mod tests {
                 root_radius,
                 ..Default::default()
             };
-            let stage = gear_core::train::SpurStage {
+            let stage = gear_core::train::PairStage {
                 gears: [gear.clone(), gear],
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_spur_stage(
-                &stage,
-                gear_core::train::StageTorques::just(2.0),
-                &lib,
-            ) {
+            if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
                 record(&r.notes);
                 for g in &r.gears {
                     record(&g.notes);
@@ -813,15 +819,11 @@ mod tests {
                 min_tip_width: 0.4,
                 ..Default::default()
             };
-            let stage = gear_core::train::SpurStage {
+            let stage = gear_core::train::PairStage {
                 gears: [gear(17), gear(43)],
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_spur_stage(
-                &stage,
-                gear_core::train::StageTorques::just(2.0),
-                &lib,
-            ) {
+            if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
                 record(&r.notes);
                 // A bound that moved a gear's own number rides that gear.
                 for g in &r.gears {
@@ -862,16 +864,12 @@ mod tests {
             (2, 0.10),
             (2, 0.12),
         ] {
-            let stage = gear_core::train::WormStage {
-                starts,
+            let mut stage = gear_core::train::PairStage {
                 sliding_friction: friction,
-                ..Default::default()
+                ..gear_core::train::PairStage::worm()
             };
-            if let Ok(r) = gear_core::train::solve_worm_stage(
-                &stage,
-                gear_core::train::StageTorques::just(2.0),
-                &lib,
-            ) {
+            stage.gears[0].teeth = starts;
+            if let Ok(r) = solve_worm(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
                 record(&r.notes);
             }
         }
@@ -941,7 +939,7 @@ mod tests {
 
         // A parallel pair that loses contact between teeth: short addenda.
         for addendum in [0.35_f64, 0.5] {
-            let stage = gear_core::train::SpurStage {
+            let stage = gear_core::train::PairStage {
                 gears: [
                     gear_core::train::StageGear {
                         teeth: 17,
@@ -956,11 +954,7 @@ mod tests {
                 ],
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_spur_stage(
-                &stage,
-                gear_core::train::StageTorques::just(2.0),
-                &lib,
-            ) {
+            if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
                 record(&r.notes);
                 for g in &r.gears {
                     record(&g.notes);
@@ -969,7 +963,7 @@ mod tests {
             // ...and a crossed pair of the same, whose teeth then reach a full
             // contact ratio at no width at all.
             for sigma in [45.0_f64, 90.0] {
-                let crossed = gear_core::train::SpurStage {
+                let crossed = gear_core::train::PairStage {
                     shaft_angle: sigma,
                     gears: [
                         gear_core::train::StageGear {
@@ -983,11 +977,9 @@ mod tests {
                     ],
                     ..stage.clone()
                 };
-                if let Ok(r) = gear_core::train::solve_crossed_stage(
-                    &crossed,
-                    gear_core::train::StageTorques::just(2.0),
-                    &lib,
-                ) {
+                if let Ok(r) =
+                    solve_crossed(&crossed, gear_core::train::StageTorques::just(2.0), &lib)
+                {
                     record(&r.notes);
                 }
             }
@@ -999,35 +991,38 @@ mod tests {
         // threshold, so both the self-locking note and the "close to it" one
         // get their turn.
         for friction in [0.06_f64, 0.115, 0.12, 0.125] {
-            let stage = gear_core::train::WormStage {
+            let stage = gear_core::train::PairStage {
                 sliding_friction: friction,
                 static_friction: friction,
                 sizing: gear_core::params::Auto::fixed(
                     gear_core::train::FirstMemberSizing::HelixAngle(45.0),
                 ),
-                worm: gear_core::train::WormMember {
-                    face_width: gear_core::params::Auto::automatic(6.0),
-                    ..Default::default()
-                },
-                wheel: gear_core::train::WormMember {
-                    face_width: gear_core::params::Auto::automatic(6.0),
-                    ..Default::default()
-                },
-                ..Default::default()
+                ..gear_core::train::PairStage::worm()
             };
-            if let Ok(r) = gear_core::train::solve_worm_stage(
-                &stage,
+            if let Ok(r) = solve_crossed(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+                record(&r.notes);
+            }
+            // ...the optimiser asked of a crossed mesh, which it does not
+            // search and says so.
+            if let Ok(r) = solve_crossed(
+                &gear_core::train::PairStage {
+                    optimisation: gear_core::train::Optimisation {
+                        enabled: true,
+                        ..gear_core::train::Optimisation::default()
+                    },
+                    ..stage.clone()
+                },
                 gear_core::train::StageTorques::just(2.0),
                 &lib,
             ) {
                 record(&r.notes);
             }
             // ...and a worm sitting just under its self-locking threshold.
-            if let Ok(r) = gear_core::train::solve_worm_stage(
-                &gear_core::train::WormStage {
+            if let Ok(r) = solve_worm(
+                &gear_core::train::PairStage {
                     sliding_friction: friction,
                     static_friction: friction,
-                    ..Default::default()
+                    ..gear_core::train::PairStage::worm()
                 },
                 gear_core::train::StageTorques::just(2.0),
                 &lib,
@@ -1065,17 +1060,13 @@ mod tests {
         // runs 0.44 mm *inside* its own zero-backlash distance and cannot be
         // assembled at all. Both used to be silent.
         for distance in [23.0_f64, 23.46, 25.0] {
-            let mut sp = gear_core::train::SpurStage {
+            let mut sp = gear_core::train::PairStage {
                 centre_distance: gear_core::params::Auto::fixed(distance),
                 ..Default::default()
             };
             sp.gears[0].teeth = 9;
             sp.gears[1].teeth = 37;
-            if let Ok(r) = gear_core::train::solve_spur_stage(
-                &sp,
-                gear_core::train::StageTorques::just(2.0),
-                &lib,
-            ) {
+            if let Ok(r) = solve_spur(&sp, gear_core::train::StageTorques::just(2.0), &lib) {
                 record(&r.notes);
             }
         }
@@ -1090,22 +1081,14 @@ mod tests {
         // Frictions either side of that threshold, so the "cannot be driven
         // forward" note and the "close to it" one both get their turn.
         for friction in [0.02_f64, 0.045, 0.06, 0.10] {
-            if let Ok(r) = gear_core::train::solve_worm_stage(
-                &gear_core::train::WormStage {
+            if let Ok(r) = solve_crossed(
+                &gear_core::train::PairStage {
                     sliding_friction: friction,
                     static_friction: friction,
                     sizing: gear_core::params::Auto::fixed(
                         gear_core::train::FirstMemberSizing::HelixAngle(3.0),
                     ),
-                    worm: gear_core::train::WormMember {
-                        face_width: gear_core::params::Auto::automatic(6.0),
-                        ..Default::default()
-                    },
-                    wheel: gear_core::train::WormMember {
-                        face_width: gear_core::params::Auto::automatic(6.0),
-                        ..Default::default()
-                    },
-                    ..Default::default()
+                    ..gear_core::train::PairStage::worm()
                 },
                 gear_core::train::StageTorques::just(2.0),
                 &lib,
@@ -1175,7 +1158,7 @@ mod tests {
         // are fired through the geometry — the case has to be live, not merely
         // constructible.
         {
-            use gear_core::train::{Actuation, SpurStage, Stage, Train, WormStage};
+            use gear_core::train::{Actuation, PairStage, Stage, Train};
             let train = |back_driving_torque, operating_torque, actuation, stages| Train {
                 input_speed: 3000.0,
                 input_torque: 2.0,
@@ -1185,7 +1168,7 @@ mod tests {
                 actuation,
                 stages,
             };
-            let spur = || vec![Stage::Spur(SpurStage::default())];
+            let spur = || vec![Stage::Spur(PairStage::default())];
             let intermittent = Actuation::Intermittent {
                 range_degrees: 25.0,
                 actuations: 1000,
@@ -1212,10 +1195,10 @@ mod tests {
                     5.0,
                     2.0,
                     intermittent,
-                    vec![Stage::Worm(WormStage {
+                    vec![Stage::Worm(PairStage {
                         sliding_friction: 0.3,
                         static_friction: 0.3,
-                        ..WormStage::default()
+                        ..PairStage::worm()
                     })],
                 ),
                 &lib,
@@ -1237,10 +1220,10 @@ mod tests {
                 },
                 ..Default::default()
             };
-            if let Ok(r) = gear_core::train::solve_spur_stage(
-                &SpurStage {
+            if let Ok(r) = solve_spur(
+                &PairStage {
                     gears: [no_source.clone(), no_source],
-                    ..SpurStage::default()
+                    ..PairStage::default()
                 },
                 gear_core::train::StageTorques::just(2.0),
                 &lib,

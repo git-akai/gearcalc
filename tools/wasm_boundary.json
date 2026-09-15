@@ -68,7 +68,12 @@
        "module": 1,
        "pressure_angle": 20,
        "shaft_angle": 0,
-       "additional_helix": 0,
+       "sizing": {
+        "auto": false,
+        "manual": {
+         "additional_helix": 0
+        }
+       },
        "sliding_friction": "0.080000000000000002",
        "static_friction": "0.16000000000000000",
        "thickness_mod": 1,
@@ -87,6 +92,7 @@
         "min_contact_ratio": "1.2000000000000000"
        },
        "load_sharing": "none",
+       "axial_clearance": 0,
        "gears": [
         {
          "teeth": 17,
@@ -177,7 +183,12 @@
      "module": 1,
      "pressure_angle": 20,
      "shaft_angle": 0,
-     "additional_helix": 0,
+     "sizing": {
+      "auto": false,
+      "manual": {
+       "additional_helix": 0
+      }
+     },
      "sliding_friction": "0.080000000000000002",
      "static_friction": "0.16000000000000000",
      "thickness_mod": 1,
@@ -196,6 +207,7 @@
       "min_contact_ratio": "1.2000000000000000"
      },
      "load_sharing": "none",
+     "axial_clearance": 0,
      "gears": [
       {
        "teeth": 17,
@@ -284,17 +296,15 @@
      "module": 1,
      "pressure_angle": 20,
      "shaft_angle": 90,
-     "sliding_friction": "0.080000000000000002",
-     "static_friction": "0.16000000000000000",
-     "thickness_mod": 1,
-     "starts": 1,
      "sizing": {
       "auto": false,
       "manual": {
        "pitch_diameter": 7
       }
      },
-     "wheel_teeth": 40,
+     "sliding_friction": "0.080000000000000002",
+     "static_friction": "0.16000000000000000",
+     "thickness_mod": 1,
      "centre_distance": {
       "auto": true,
       "manual": 0
@@ -305,35 +315,94 @@
      },
      "tolerance_plus": "0.020000000000000000",
      "tolerance_minus": "0.020000000000000000",
-     "axial_clearance": "0.040000000000000001",
-     "worm": {
-      "face_width": {
-       "auto": true,
-       "manual": 5
-      },
-      "material": "4340 Hardened Steel",
-      "material_overrides": {
-       "density": null,
-       "elastic_modulus": null,
-       "poissons_ratio": null,
-       "ultimate_allowable": null,
-       "fatigue_allowable": null
-      }
+     "optimisation": {
+      "enabled": false,
+      "min_contact_ratio": "1.2000000000000000"
      },
-     "wheel": {
-      "face_width": {
-       "auto": true,
-       "manual": 5
+     "load_sharing": "none",
+     "axial_clearance": "0.040000000000000001",
+     "gears": [
+      {
+       "teeth": 1,
+       "profile_shift": {
+        "auto": false,
+        "manual": 0
+       },
+       "no_undercut": true,
+       "working_depth": {
+        "auto": true,
+        "manual": 1
+       },
+       "addendum": 1,
+       "no_sharp_tip": true,
+       "min_tip_width": "0.10000000000000001",
+       "dedendum": "1.2500000000000000",
+       "root_radius": "0.38000000000000000",
+       "face_width": {
+        "auto": true,
+        "manual": 5
+       },
+       "face_sources": {
+        "bending": {
+         "peak": true,
+         "cyclic": true
+        },
+        "contact": {
+         "peak": false,
+         "cyclic": false
+        }
+       },
+       "rim_thickness": null,
+       "material": "4340 Hardened Steel",
+       "material_overrides": {
+        "density": null,
+        "elastic_modulus": null,
+        "poissons_ratio": null,
+        "ultimate_allowable": null,
+        "fatigue_allowable": null
+       }
       },
-      "material": "Brass C360",
-      "material_overrides": {
-       "density": null,
-       "elastic_modulus": null,
-       "poissons_ratio": null,
-       "ultimate_allowable": null,
-       "fatigue_allowable": null
+      {
+       "teeth": 40,
+       "profile_shift": {
+        "auto": true,
+        "manual": 0
+       },
+       "no_undercut": true,
+       "working_depth": {
+        "auto": true,
+        "manual": 1
+       },
+       "addendum": 1,
+       "no_sharp_tip": true,
+       "min_tip_width": "0.10000000000000001",
+       "dedendum": "1.2500000000000000",
+       "root_radius": "0.38000000000000000",
+       "face_width": {
+        "auto": true,
+        "manual": 5
+       },
+       "face_sources": {
+        "bending": {
+         "peak": true,
+         "cyclic": true
+        },
+        "contact": {
+         "peak": false,
+         "cyclic": false
+        }
+       },
+       "rim_thickness": null,
+       "material": "Brass C360",
+       "material_overrides": {
+        "density": null,
+        "elastic_modulus": null,
+        "poissons_ratio": null,
+        "ultimate_allowable": null,
+        "fatigue_allowable": null
+       }
       }
-     }
+     ]
     },
     "planetary_stage": {
      "kind": "planetary",
@@ -748,23 +817,23 @@
    "ok": [
     [
      "en",
-     467
+     464
     ],
     [
      "de",
-     467
+     464
     ],
     [
      "pt",
-     467
+     464
     ],
     [
      "zh-Hans",
-     467
+     464
     ],
     [
      "zh-Hant",
-     467
+     464
     ]
    ]
   },
@@ -5014,7 +5083,12 @@
       "module": 1,
       "pressure_angle": 20,
       "shaft_angle": 0,
-      "additional_helix": 0,
+      "sizing": {
+       "auto": false,
+       "manual": {
+        "additional_helix": 0
+       }
+      },
       "sliding_friction": "0.080000000000000002",
       "static_friction": "0.16000000000000000",
       "thickness_mod": 1,
@@ -5033,6 +5107,7 @@
        "min_contact_ratio": "1.2000000000000000"
       },
       "load_sharing": "none",
+      "axial_clearance": 0,
       "gears": [
        {
         "teeth": 17,
@@ -5124,56 +5199,113 @@
       "module": 1,
       "pressure_angle": 20,
       "shaft_angle": 90,
-      "sliding_friction": "0.080000000000000002",
-      "static_friction": "0.16000000000000000",
-      "thickness_mod": 1,
-      "starts": 1,
       "sizing": {
-       "auto": true,
+       "auto": false,
        "manual": {
         "pitch_diameter": 7
        }
       },
-      "wheel_teeth": 40,
+      "sliding_friction": "0.080000000000000002",
+      "static_friction": "0.16000000000000000",
+      "thickness_mod": 1,
       "centre_distance": {
        "auto": false,
        "manual": "0.10000000000000001"
       },
       "clearance": {
-       "auto": false,
+       "auto": true,
        "manual": "0.020000000000000000"
       },
       "tolerance_plus": "0.020000000000000000",
       "tolerance_minus": "0.020000000000000000",
-      "axial_clearance": "0.040000000000000001",
-      "worm": {
-       "face_width": {
-        "auto": true,
-        "manual": 5
-       },
-       "material": "4340 Hardened Steel",
-       "material_overrides": {
-        "density": null,
-        "elastic_modulus": null,
-        "poissons_ratio": null,
-        "ultimate_allowable": null,
-        "fatigue_allowable": null
-       }
+      "optimisation": {
+       "enabled": false,
+       "min_contact_ratio": "1.2000000000000000"
       },
-      "wheel": {
-       "face_width": {
-        "auto": true,
-        "manual": 5
+      "load_sharing": "none",
+      "axial_clearance": "0.040000000000000001",
+      "gears": [
+       {
+        "teeth": 1,
+        "profile_shift": {
+         "auto": false,
+         "manual": "0.10000000000000001"
+        },
+        "no_undercut": true,
+        "working_depth": {
+         "auto": true,
+         "manual": 1
+        },
+        "addendum": 1,
+        "no_sharp_tip": true,
+        "min_tip_width": "0.10000000000000001",
+        "dedendum": "1.2500000000000000",
+        "root_radius": "0.38000000000000000",
+        "face_width": {
+         "auto": true,
+         "manual": 5
+        },
+        "face_sources": {
+         "bending": {
+          "peak": true,
+          "cyclic": true
+         },
+         "contact": {
+          "peak": false,
+          "cyclic": false
+         }
+        },
+        "rim_thickness": null,
+        "material": "4340 Hardened Steel",
+        "material_overrides": {
+         "density": null,
+         "elastic_modulus": null,
+         "poissons_ratio": null,
+         "ultimate_allowable": null,
+         "fatigue_allowable": null
+        }
        },
-       "material": "Brass C360",
-       "material_overrides": {
-        "density": null,
-        "elastic_modulus": null,
-        "poissons_ratio": null,
-        "ultimate_allowable": null,
-        "fatigue_allowable": null
+       {
+        "teeth": 40,
+        "profile_shift": {
+         "auto": false,
+         "manual": "0.10000000000000001"
+        },
+        "no_undercut": true,
+        "working_depth": {
+         "auto": true,
+         "manual": 1
+        },
+        "addendum": 1,
+        "no_sharp_tip": true,
+        "min_tip_width": "0.10000000000000001",
+        "dedendum": "1.2500000000000000",
+        "root_radius": "0.38000000000000000",
+        "face_width": {
+         "auto": true,
+         "manual": 5
+        },
+        "face_sources": {
+         "bending": {
+          "peak": true,
+          "cyclic": true
+         },
+         "contact": {
+          "peak": false,
+          "cyclic": false
+         }
+        },
+        "rim_thickness": null,
+        "material": "Brass C360",
+        "material_overrides": {
+         "density": null,
+         "elastic_modulus": null,
+         "poissons_ratio": null,
+         "ultimate_allowable": null,
+         "fatigue_allowable": null
+        }
        }
-      }
+      ]
      }
     ],
     [
@@ -5578,12 +5710,13 @@
      "notes": [],
      "stages": [
       {
-       "kind": "spur",
+       "kind": "pair",
        "ratio": "2.5294117647058822",
        "centre_distance_nominal": "30.005652520608507",
        "clearance": "0.019999999999999574",
        "centre_distance": "30.025652520608507",
        "mesh": {
+        "kind": "line",
         "operating_pressure_angle": "20.029633803874255",
         "coprime": true,
         "contact_ratios": {
@@ -5623,6 +5756,9 @@
          "profile_shift": "0.0056565377194108812",
          "addendum": 1,
          "face_width": "0.044765208228806905",
+         "recommended_face_width": null,
+         "pitch_diameter": 17,
+         "helix_angle": 0,
          "torque": "0.10000000000000001",
          "back_driving_torque": null,
          "speed": 30000,
@@ -5758,6 +5894,9 @@
          "profile_shift": 0,
          "addendum": 1,
          "face_width": "0.044765208228806905",
+         "recommended_face_width": null,
+         "pitch_diameter": 43,
+         "helix_angle": 0,
          "torque": "0.25294117647058822",
          "back_driving_torque": null,
          "speed": "11860.465116279071",
@@ -5893,7 +6032,7 @@
    }
   },
   "export_train": {
-   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\ninput_speed = 30000.0\ninput_torque = 0.1\nback_driving_torque = 0.0\noperating_torque = 0.1\nreversed_bending = false\n\n[train.actuation.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[[train.stages]]\nkind = \"spur\"\nmodule = 1.0\npressure_angle = 20.0\nshaft_angle = 0.0\nadditional_helix = 0.0\nsliding_friction = 0.08\nstatic_friction = 0.16\nthickness_mod = 1.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\nload_sharing = \"none\"\n\n[train.stages.centre_distance]\nauto = true\nmanual = 0.0\n\n[train.stages.clearance]\nauto = false\nmanual = 0.02\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.gears]]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.gears.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.gears.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.gears.face_sources.bending]\npeak = true\ncyclic = true\n\n[train.stages.gears.face_sources.contact]\npeak = false\ncyclic = false\n\n[train.stages.gears.material_overrides]\n\n[[train.stages.gears]]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.gears.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.gears.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.gears.face_sources.bending]\npeak = true\ncyclic = true\n\n[train.stages.gears.face_sources.contact]\npeak = false\ncyclic = false\n\n[train.stages.gears.material_overrides]\n"
+   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\ninput_speed = 30000.0\ninput_torque = 0.1\nback_driving_torque = 0.0\noperating_torque = 0.1\nreversed_bending = false\n\n[train.actuation.intermittent]\nrange_degrees = 25.0\nactuations = 1000\nreversing = false\n\n[[train.stages]]\nkind = \"spur\"\nmodule = 1.0\npressure_angle = 20.0\nshaft_angle = 0.0\nsliding_friction = 0.08\nstatic_friction = 0.16\nthickness_mod = 1.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\nload_sharing = \"none\"\naxial_clearance = 0.0\n\n[train.stages.sizing]\nauto = false\n\n[train.stages.sizing.manual]\nadditional_helix = 0.0\n\n[train.stages.centre_distance]\nauto = true\nmanual = 0.0\n\n[train.stages.clearance]\nauto = false\nmanual = 0.02\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.gears]]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.gears.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.gears.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.gears.face_sources.bending]\npeak = true\ncyclic = true\n\n[train.stages.gears.face_sources.contact]\npeak = false\ncyclic = false\n\n[train.stages.gears.material_overrides]\n\n[[train.stages.gears]]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.gears.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.gears.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.gears.face_sources.bending]\npeak = true\ncyclic = true\n\n[train.stages.gears.face_sources.contact]\npeak = false\ncyclic = false\n\n[train.stages.gears.material_overrides]\n"
   },
   "import_train": {
    "ok": {
@@ -5917,7 +6056,12 @@
        "module": 1,
        "pressure_angle": 20,
        "shaft_angle": 0,
-       "additional_helix": 0,
+       "sizing": {
+        "auto": false,
+        "manual": {
+         "additional_helix": 0
+        }
+       },
        "sliding_friction": "0.080000000000000002",
        "static_friction": "0.16000000000000000",
        "thickness_mod": 1,
@@ -5936,6 +6080,7 @@
         "min_contact_ratio": "1.2000000000000000"
        },
        "load_sharing": "none",
+       "axial_clearance": 0,
        "gears": [
         {
          "teeth": 17,

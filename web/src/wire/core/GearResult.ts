@@ -23,6 +23,26 @@ addendum: number,
  */
 face_width: number, 
 /**
+ * What a convention recommends for the face width, mm, where one applies
+ * and whether or not it is in use — a worm's length and its wheel's width
+ * ([`crossed::proportions`]). `None` where a rating sizes the face
+ * instead, which is every other member.
+ */
+recommended_face_width: number | null, 
+/**
+ * Reference pitch diameter, mm — `z m_n / cos β`.
+ *
+ * An output rather than an echo: a worm's is solved where its size is
+ * automatic, and every other member's follows from a helix that may have
+ * been.
+ */
+pitch_diameter: number, 
+/**
+ * Helix angle, degrees, signed by hand — likewise from the sizing as
+ * solved.
+ */
+helix_angle: number, 
+/**
  * Torque on this gear, N·m, driving forward at peak.
  */
 torque: number, 

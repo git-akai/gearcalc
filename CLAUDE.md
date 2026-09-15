@@ -86,9 +86,9 @@ of a gear is worth more than knowing what it does.
 | File | Answers |
 |---|---|
 | `mod.rs` | **What every kind shares**: load cases, `MemberRating`, `Bending`, `MeshReport`, `GearResult`, the engagement rule, and the train that strings stages together |
-| `spur.rs` | The parallel-axis stage — spur at β = 0, helical otherwise. Also **declares `StageGear`**, which every kind uses |
+| `pair.rs` | **The pair**: two gears on shafts at any angle — the one primitive the spur, helical, crossed and worm kinds are built from. Its inputs, its five-input relation, the sizing solve, and the parallel-axis solve |
 | `planetary.rs` | One carrier, one sun, one ring, N planets |
-| `worm.rs` | The worm stage and the crossed-helical pair — one model, differing in one input |
+| `crossed.rs` | The crossed-axis solve for a pair whose shafts are not parallel — worm or crossed gear pair, one model; the kind decides only the worm's conventional proportions |
 | `hula.rs` | The hula stage: the arrangement built, cut and rated |
 
 ### The other crates
@@ -206,7 +206,7 @@ And elsewhere:
 - **`verify.rs` is in the library rather than in `tests/`** so the CLI can sweep
   it over thousands of cases.
 - **Five modules carry no `#[cfg(test)]`** — `metrology.rs`, `params.rs`,
-  `tooth.rs`, `train/spur.rs`, `verify.rs` — and four of them are covered from
+  `tooth.rs`, `train/pair.rs`, `verify.rs` — and four of them are covered from
   somewhere else: the integration suite for the first, third and last, and the
   golden corpus for the guards in `params.rs`. Measured by perturbing each and
   seeing what fired, not assumed. It is where a law belongs that decides it: a

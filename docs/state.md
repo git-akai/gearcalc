@@ -351,7 +351,8 @@ constrains the search instead of being overruled by it: a shift is that gear's, 
 centre distance fixes the two shifts' sum, and pinning all three is relieved
 visibly rather than silently ignored. The spur pair, the planetary set and the
 hula stage each have their own free variables and their own objective over
-one shared search; the worm stage has no profile shift to choose. Two bounds that
+one shared search; a crossed pair's shifts are placed by the constraints alone,
+since the search is the parallel-axis mesh's. Two bounds that
 never bit near zero shift do here — a contact-ratio floor, which is a stage input
 because the answer sits against it, and bottom clearance, which reads the
 dedendum the designer already specified ([reference](reference.md#efficiency-parallel-axes)).

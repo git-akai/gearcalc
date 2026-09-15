@@ -1,15 +1,18 @@
 //! Geartrains: a stage at a time, and the accumulation along the shaft line.
 //!
-//! Each stage kind has its own module — `spur` and `worm` — and what stays here
-//! is the vocabulary they share ([`Backlash`], [`TrainError`], the duty cycle)
-//! and the train that strings them together.
+//! Each stage shape has its own module — `pair`, `planetary`, `hula` — and what
+//! stays here is the vocabulary they share ([`Backlash`], [`TrainError`], the
+//! duty cycle) and the train that strings them together.
 //!
-//! **Each kind keeps its own result type**, and that was a decision rather than
-//! an oversight. A worm stage has no bending stress, no minimum face width from
-//! contact — a point contact does not care how wide the tooth is — and two
-//! efficiencies rather than one. Forcing that into [`StageResult`] would have
-//! meant four `Option`s and a comment apologising for each. A result shaped like
-//! the answer says the same thing without the apology.
+//! **A kind is a layer, not a model.** The spur, helical, crossed and worm
+//! stages are one [`PairStage`] under two names — [`Stage::Spur`] and
+//! [`Stage::Worm`] — and produce one [`PairResult`]. What differs between a
+//! line contact and a point contact is real and is the *mesh*: a parallel pair
+//! has a bending rating and one efficiency, a crossed pair a contact ratio
+//! along its line of action and two. So the result carries one of two
+//! [`PairMesh`]es rather than four `Option`s and a comment apologising for
+//! each, and everything a mesh has in common — efficiency, backlash, the
+//! flank interference verdict — is read off the mesh without asking which.
 //!
 //! # What is state and what is not
 //!
@@ -32,24 +35,21 @@ use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
 use crate::tooth::Tooth;
 
+pub mod crossed;
 mod hula;
+mod pair;
 mod planetary;
-mod spur;
-mod worm;
 
+pub use crossed::{solve_crossed_pair, CrossedMesh, CrossedZone, PointContact};
 pub use hula::{
     solve_hula_stage, solve_hula_stage_with, stage_efficiency, HulaGear, HulaMesh, HulaResult,
     HulaStage,
 };
+pub use pair::{solve_pair_stage, solve_pair_stage_with, FirstMemberSizing, PairKind, PairStage};
+pub(crate) use pair::{undercut_bound, Decided, ShiftAsked};
 pub use planetary::{
     solve_planetary_stage, solve_planetary_stage_with, PlanetResult, PlanetaryResult,
     PlanetaryStage,
-};
-pub use spur::{solve_spur_stage, solve_spur_stage_with, SpurStage};
-pub(crate) use spur::{undercut_bound, Decided, ShiftAsked};
-pub use worm::{
-    solve_crossed_stage, solve_worm_stage, FirstMemberSizing, WormContact, WormMember,
-    WormMemberResult, WormResult, WormStage,
 };
 
 /// The three contact ratios.
@@ -157,16 +157,15 @@ impl Backlash {
     ts(export, export_to = "core/")
 )]
 pub struct MeshReport {
-    /// Operating pressure angle `α_w`, degrees — see
-    /// [`SpurResult::operating_pressure_angle`], which defines it for every
-    /// parallel-axis mesh here.
+    /// Transverse operating pressure angle `α_w`, degrees — the zero-backlash
+    /// pair's, which the profile shifts set.
     pub operating_pressure_angle: f64,
     /// Whether the two members' tooth counts share no factor — a hunting pair,
     /// which spreads wear evenly instead of repeatedly bringing the same two
     /// teeth together.
     ///
     /// A property of a *mesh*, which is why it is here: a pair reports one
-    /// ([`SpurResult::coprime`], its one mesh being the stage), and a set with
+    /// (its one mesh being the stage), and a set with
     /// two meshes has two answers. An epicyclic set's separate question — each
     /// central member against the *planet count* — is a different check with a
     /// different reason, and it stays where it is.
@@ -946,6 +945,20 @@ pub struct GearResult {
     pub addendum: f64,
     /// Likewise the face width.
     pub face_width: f64,
+    /// What a convention recommends for the face width, mm, where one applies
+    /// and whether or not it is in use — a worm's length and its wheel's width
+    /// ([`crossed::proportions`]). `None` where a rating sizes the face
+    /// instead, which is every other member.
+    pub recommended_face_width: Option<f64>,
+    /// Reference pitch diameter, mm — `z m_n / cos β`.
+    ///
+    /// An output rather than an echo: a worm's is solved where its size is
+    /// automatic, and every other member's follows from a helix that may have
+    /// been.
+    pub pitch_diameter: f64,
+    /// Helix angle, degrees, signed by hand — likewise from the sizing as
+    /// solved.
+    pub helix_angle: f64,
     /// Torque on this gear, N·m, driving forward at peak.
     pub torque: f64,
     /// Torque on this gear from a back-driving load, N·m.
@@ -1029,6 +1042,8 @@ pub(crate) struct MemberFacts<'a> {
     /// The width this member is *rated at*, which is its mesh's rather than its
     /// own ([`Widths`]).
     pub face_width: f64,
+    /// A convention's recommendation for the width, where one applies.
+    pub recommended_face_width: Option<f64>,
     /// Driving forward, at peak.
     pub torque: f64,
     /// Filled here where the stage knows it, and by [`TrainResult`] where the
@@ -1061,6 +1076,10 @@ impl GearResult {
             profile_shift: f.profile_shift,
             addendum: f.params.addendum,
             face_width: f.face_width,
+            recommended_face_width: f.recommended_face_width,
+            pitch_diameter: f64::from(f.params.teeth) * f.params.module
+                / f.params.helix_angle.to_radians().cos(),
+            helix_angle: f.params.helix_angle,
             torque: f.torque,
             back_driving_torque: f.back_driving_torque,
             speed: f.speed,
@@ -1110,7 +1129,15 @@ impl GearResult {
     }
 }
 
-/// Everything a parallel-axis stage produces.
+/// **What a pair's one mesh reports** — the line contact of parallel axes, or
+/// the point contact of crossed ones.
+///
+/// The one place a pair's result branches, and it branches because the physics
+/// does: parallel axes touch along a line, carry a bending rating and lose
+/// power to sliding along the profile; crossed axes touch at a point, have no
+/// honest bending figure, slide lengthwise and differ in the two directions.
+/// What the two have in common is read through the accessors below, so the
+/// train — and a front end's summary row — never asks which it is holding.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -1118,7 +1145,106 @@ impl GearResult {
     derive(ts_rs::TS),
     ts(export, export_to = "core/")
 )]
-pub struct SpurResult {
+#[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
+pub enum PairMesh {
+    /// Parallel axes: line contact, in the type every kind reports a
+    /// parallel-axis mesh in.
+    Line(MeshReport),
+    /// Crossed axes: point contact, along a line of action that cannot turn.
+    Point(CrossedMesh),
+}
+
+impl PairMesh {
+    /// Mesh efficiency, both directions — one number twice for a line contact,
+    /// two genuinely different ones for a point.
+    #[must_use]
+    pub fn efficiency(&self) -> Directional<f64> {
+        match self {
+            Self::Line(m) => m.efficiency,
+            Self::Point(m) => m.efficiency,
+        }
+    }
+
+    /// Angular backlash **per member**, degrees, at the three centre distances.
+    #[must_use]
+    pub fn backlash(&self) -> &[Backlash; 2] {
+        match self {
+            Self::Line(m) => &m.backlash,
+            Self::Point(m) => &m.backlash,
+        }
+    }
+
+    /// The one gap read by drive direction — [`MeshReport::backlash_by_drive`],
+    /// for either mesh.
+    #[must_use]
+    pub fn backlash_by_drive(&self) -> Directional<Backlash> {
+        let b = self.backlash();
+        Directional {
+            forward: b[1],
+            backward: b[0],
+        }
+    }
+
+    /// Whether each member's flank is reached past its usable end by the other
+    /// member's tip — one relation for both meshes
+    /// ([`crate::mesh::Mesh::flank_interference`],
+    /// [`crate::screw::CrossedPath::flank_interference`]).
+    #[must_use]
+    pub fn flank_interference(&self) -> [bool; 2] {
+        match self {
+            Self::Line(m) => m.flank_interference,
+            Self::Point(m) => m.flank_interference,
+        }
+    }
+
+    /// Whether the tooth counts are coprime, so every tooth meets every other.
+    #[must_use]
+    pub fn coprime(&self) -> bool {
+        match self {
+            Self::Line(m) => m.coprime,
+            Self::Point(m) => m.coprime,
+        }
+    }
+
+    /// Tooth pairs in contact: the transverse ratio of a line contact, or the
+    /// ratio along the line of action of a point contact — `None` where a
+    /// crossed pair has no zone at all.
+    #[must_use]
+    pub fn contact_ratio(&self) -> Option<f64> {
+        match self {
+            Self::Line(m) => Some(m.contact_ratios.transverse),
+            Self::Point(m) => m.zone.map(|z| z.contact_ratio),
+        }
+    }
+
+    /// The parallel-axis report, if that is what this is.
+    #[must_use]
+    pub fn as_line(&self) -> Option<&MeshReport> {
+        match self {
+            Self::Line(m) => Some(m),
+            Self::Point(_) => None,
+        }
+    }
+
+    /// The crossed-axis report, if that is what this is.
+    #[must_use]
+    pub fn as_point(&self) -> Option<&CrossedMesh> {
+        match self {
+            Self::Point(m) => Some(m),
+            Self::Line(_) => None,
+        }
+    }
+}
+
+/// Everything a pair produces, whichever mesh it has.
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct PairResult {
     /// `z₂ / z₁`.
     pub ratio: f64,
     /// Zero-backlash centre distance, mm.
@@ -1139,8 +1265,8 @@ pub struct SpurResult {
     pub clearance: f64,
     /// The centre distance actually used, including clearance.
     pub centre_distance: f64,
-    /// **What this pair's one mesh reports**, in the type every other kind
-    /// reports a parallel-axis mesh in.
+    /// **What this pair's one mesh reports** — a line contact in the type every
+    /// other kind reports a parallel-axis mesh in, or a point contact.
     ///
     /// Seven fields used to sit here loose — the operating pressure angle, the
     /// three contact ratios, whether the pair hunts, the shared contact stress
@@ -1150,11 +1276,11 @@ pub struct SpurResult {
     /// `meshRows` snippet for the kinds carrying a `MeshReport`, and the same
     /// rows written out again for this one.
     ///
-    /// A spur pair's efficiency and backlash **are** its mesh's — one mesh, no
+    /// A pair's efficiency and backlash **are** its mesh's — one mesh, no
     /// carrier — so they are read through here rather than stored a second
     /// time, and `StageResult::efficiency` is where every kind is made to agree
     /// about which level it is being asked for.
-    pub mesh: MeshReport,
+    pub mesh: PairMesh,
     pub gears: [GearResult; 2],
     /// Anything the stage had to say about the design.
     pub notes: Vec<crate::note::Note>,
@@ -1371,6 +1497,13 @@ impl Default for Optimisation {
 ///
 /// Serialised with a `kind` tag alongside the stage's own fields, so a train
 /// file says what each stage is rather than relying on position.
+///
+/// **Two of the kinds are one shape.** `Spur` and `Worm` both carry a
+/// [`PairStage`]; the kind is the layer a designer sees — a preset, a
+/// vocabulary, and which inputs are put in front of them — over one model
+/// ([`PairKind`]). It is the tag and nothing else that says which, which is
+/// what lets a worm stage's file say `kind = "worm"` and a front end say
+/// *starts* and *wheel* without the core holding a second stage type.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
@@ -1380,8 +1513,8 @@ impl Default for Optimisation {
 )]
 #[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
 pub enum Stage {
-    Spur(SpurStage),
-    Worm(WormStage),
+    Spur(PairStage),
+    Worm(PairStage),
     // Boxed for the same reason `StageResult`'s variants are: a planetary stage
     // carries three gears, a cutter and an arrangement where a spur stage carries
     // two gears, so a `Vec<Stage>` would otherwise pay the largest of them for
@@ -1392,8 +1525,57 @@ pub enum Stage {
 
 impl Default for Stage {
     fn default() -> Self {
-        Self::Spur(SpurStage::default())
+        Self::Spur(PairStage::default())
     }
+}
+
+impl Stage {
+    /// A stage of the kind named, at that kind's preset — what *add a stage*
+    /// hands a designer.
+    #[must_use]
+    pub fn preset(kind: StageKind) -> Self {
+        match kind {
+            StageKind::Spur => Self::Spur(PairStage::default()),
+            StageKind::Worm => Self::Worm(PairStage::worm()),
+            StageKind::Planetary => Self::Planetary(Box::default()),
+            StageKind::Hula => Self::Hula(Box::default()),
+        }
+    }
+
+    /// The pair this stage is, with its kind, where it is one.
+    #[must_use]
+    pub fn as_pair(&self) -> Option<(&PairStage, PairKind)> {
+        match self {
+            Self::Spur(p) => Some((p, PairKind::Spur)),
+            Self::Worm(p) => Some((p, PairKind::Worm)),
+            _ => None,
+        }
+    }
+
+    /// The pair this stage is, mutably, where it is one.
+    #[must_use]
+    pub fn as_pair_mut(&mut self) -> Option<&mut PairStage> {
+        match self {
+            Self::Spur(p) | Self::Worm(p) => Some(p),
+            _ => None,
+        }
+    }
+}
+
+/// The kinds a stage comes in — the tag of [`Stage`], on its own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum StageKind {
+    Spur,
+    Worm,
+    Planetary,
+    Hula,
 }
 
 /// **Whether a stage's shift chooser actually chose**, and what it means when
@@ -1517,9 +1699,10 @@ pub enum Freedom {
     Clearance,
     /// One member's profile shift.
     Shift(usize),
-    /// **How big the first member is** — a screw stage's pitch diameter or
-    /// helix angle, which are two readings of one number. The only thing inside
-    /// a screw stage free to absorb a centre distance, since it has no shift.
+    /// **How big the first member is** — a pair's additional helix, first
+    /// helix angle or first pitch diameter, which are three readings of one
+    /// number ([`FirstMemberSizing`]). What absorbs a centre distance once
+    /// both shifts are pinned.
     FirstMemberSize,
 }
 
@@ -1593,14 +1776,14 @@ impl Stage {
     /// readings of one freedom.
     fn toggle_mut(&mut self, f: Freedom) -> Option<&mut bool> {
         match (self, f) {
-            (Self::Spur(s), Freedom::CentreDistance) => Some(&mut s.centre_distance.auto),
-            (Self::Spur(s), Freedom::Clearance) => Some(&mut s.clearance.auto),
-            (Self::Spur(s), Freedom::Shift(i)) => {
+            (Self::Spur(s) | Self::Worm(s), Freedom::CentreDistance) => {
+                Some(&mut s.centre_distance.auto)
+            }
+            (Self::Spur(s) | Self::Worm(s), Freedom::Clearance) => Some(&mut s.clearance.auto),
+            (Self::Spur(s) | Self::Worm(s), Freedom::Shift(i)) => {
                 s.gears.get_mut(i).map(|g| &mut g.profile_shift.auto)
             }
-            (Self::Worm(w), Freedom::CentreDistance) => Some(&mut w.centre_distance.auto),
-            (Self::Worm(w), Freedom::Clearance) => Some(&mut w.clearance.auto),
-            (Self::Worm(w), Freedom::FirstMemberSize) => Some(&mut w.sizing.auto),
+            (Self::Spur(s) | Self::Worm(s), Freedom::FirstMemberSize) => Some(&mut s.sizing.auto),
             (Self::Planetary(p), Freedom::CentreDistance) => Some(&mut p.centre_distance.auto),
             (Self::Planetary(p), Freedom::Clearance) => Some(&mut p.clearance.auto),
             (Self::Planetary(p), Freedom::Shift(i)) => match i {
@@ -1738,15 +1921,21 @@ impl Stage {
                 .collect(),
         };
         match self {
-            // A pair's distance and its two shifts: `a = f(x₁ + x₂) + clearance`
-            // is one relation, so two of the three may be given. The distance
-            // comes first because it is the one a designer expects to give way
-            // when they pin both shifts.
-            Self::Spur(s) => vec![
+            // **A pair's distance, its two shifts and its size**:
+            // `a = a₀(size, x₁ + x₂) + clearance` is one relation, so four of
+            // the five may be given — for every kind of pair alike, since a
+            // worm's size and a helical pair's helix are the same freedom
+            // (`FirstMemberSizing`). The distance comes first because it is the
+            // one a designer expects to give way when they pin everything
+            // else; the shifts come before the size because a shift moves the
+            // teeth where a size changes them, which is also the preference the
+            // solve has when both are free to absorb (`PairStage::first_pitch_diameter`).
+            Self::Spur(s) | Self::Worm(s) => vec![
                 one_relation(
                     std::iter::once(Freedom::CentreDistance)
                         .chain(std::iter::once(Freedom::Clearance))
                         .chain((0..s.gears.len()).map(Freedom::Shift))
+                        .chain(std::iter::once(Freedom::FirstMemberSize))
                         .collect(),
                 ),
                 distance_and_clearance(Some(Freedom::CentreDistance)),
@@ -1792,24 +1981,6 @@ impl Stage {
                     Freedom::CentreDistance,
                 ))))
                 .collect(),
-            // **A screw stage has no profile shift, so its *size* is what
-            // absorbs a distance** — the pitch diameter, or the helix angle,
-            // which are two readings of one number. That is one relation among
-            // `{a, clearance, size}`, so two of the three may be given.
-            //
-            // The size leads the relief order rather than the distance, which is
-            // the one place this stage differs from the others and it is
-            // deliberate: a designer who states a housing distance and a
-            // clearance is asking what worm fits, and the worm is the answer
-            // rather than the input that should give way.
-            Self::Worm(_) => vec![
-                one_relation(vec![
-                    Freedom::FirstMemberSize,
-                    Freedom::CentreDistance,
-                    Freedom::Clearance,
-                ]),
-                distance_and_clearance(Some(Freedom::CentreDistance)),
-            ],
         }
     }
 }
@@ -1836,8 +2007,7 @@ pub enum StageResult {
     // will keep doing so as more arrive; a `Vec<StageResult>` would otherwise
     // pay the largest of them for every stage whatever its kind. The boxes are
     // invisible to readers and to serde.
-    Spur(Box<SpurResult>),
-    Worm(Box<WormResult>),
+    Pair(Box<PairResult>),
     Planetary(Box<PlanetaryResult>),
     Hula(Box<HulaResult>),
 }
@@ -1847,8 +2017,7 @@ impl StageResult {
     #[must_use]
     pub fn ratio(&self) -> f64 {
         match self {
-            Self::Spur(r) => r.ratio,
-            Self::Worm(r) => r.ratio,
+            Self::Pair(r) => r.ratio,
             Self::Planetary(r) => r.ratio,
             Self::Hula(r) => r.ratio,
         }
@@ -1862,8 +2031,7 @@ impl StageResult {
     #[must_use]
     pub fn efficiency(&self) -> Directional<f64> {
         match self {
-            Self::Spur(r) => r.mesh.efficiency,
-            Self::Worm(r) => r.efficiency,
+            Self::Pair(r) => r.mesh.efficiency(),
             Self::Planetary(r) => r.efficiency,
             Self::Hula(r) => r.efficiency,
         }
@@ -1877,8 +2045,7 @@ impl StageResult {
     #[must_use]
     pub fn backlash(&self) -> Directional<Backlash> {
         match self {
-            Self::Spur(r) => r.mesh.backlash_by_drive(),
-            Self::Worm(r) => r.backlash,
+            Self::Pair(r) => r.mesh.backlash_by_drive(),
             Self::Planetary(r) => r.backlash,
             Self::Hula(r) => r.backlash,
         }
@@ -1894,18 +2061,18 @@ impl StageResult {
     /// and one of them to be wrong (`docs/corrections.md`, and F30 of the audit
     /// that added this).
     ///
-    /// A worm stage contributes **nothing** here, and that is the qualification
-    /// rather than an omission: a worm is a thread and its wheel is the envelope
-    /// of one, so neither is a gear in the sense the rest of this vocabulary
-    /// means. A crossed *gear* pair contributes both of its members
-    /// ([`WormMemberResult::gear`]).
+    /// A worm and its wheel are here too: in this model both are involute
+    /// helicoids on cylinders — a worm is a helical gear with a few starts at a
+    /// steep helix — so both carry a tooth form, a shift, and every question a
+    /// gear can be asked. A worm stage used to contribute nothing, on the
+    /// reading that a thread is not a gear; that was a separate stage type
+    /// speaking, not the model.
     #[must_use]
     pub fn members(&self) -> Vec<&GearResult> {
         match self {
-            Self::Spur(r) => r.gears.iter().collect(),
+            Self::Pair(r) => r.gears.iter().collect(),
             Self::Planetary(r) => vec![&r.sun, &r.planet.gear, &r.ring],
             Self::Hula(r) => r.gears.iter().map(|g| &g.gear).collect(),
-            Self::Worm(r) => r.members.iter().filter_map(|m| m.gear.as_ref()).collect(),
         }
     }
 
@@ -1915,15 +2082,14 @@ impl StageResult {
     /// about *a mesh* — is contact continuous, do the tips foul, how much play
     /// is there — is asked of a stage by asking each of its meshes, and a walk
     /// that names the kinds is a walk that forgets one. A pair has one, either
-    /// epicyclic kind has two, and a screw stage has **none**: its pair is not a
-    /// parallel-axis mesh and reports [`WormResult::crossed`] instead.
+    /// epicyclic kind has two, and a crossed pair has **none**: its mesh is a
+    /// point contact and reports a [`CrossedMesh`] instead ([`PairMesh`]).
     #[must_use]
     pub fn meshes(&self) -> Vec<&MeshReport> {
         match self {
-            Self::Spur(r) => vec![&r.mesh],
+            Self::Pair(r) => r.mesh.as_line().into_iter().collect(),
             Self::Planetary(r) => vec![&r.sun_planet, &r.planet_ring],
             Self::Hula(r) => r.meshes.iter().map(|m| &m.report).collect(),
-            Self::Worm(_) => Vec::new(),
         }
     }
 
@@ -1936,11 +2102,11 @@ impl StageResult {
         }
     }
 
-    /// The parallel-axis result, if that is what this is.
+    /// The pair's result, if that is what this is.
     #[must_use]
-    pub fn as_spur(&self) -> Option<&SpurResult> {
+    pub fn as_pair(&self) -> Option<&PairResult> {
         match self {
-            Self::Spur(r) => Some(r),
+            Self::Pair(r) => Some(r),
             _ => None,
         }
     }
@@ -1950,15 +2116,6 @@ impl StageResult {
     pub fn as_planetary(&self) -> Option<&PlanetaryResult> {
         match self {
             Self::Planetary(r) => Some(r),
-            _ => None,
-        }
-    }
-
-    /// The worm result, if that is what this is.
-    #[must_use]
-    pub fn as_worm(&self) -> Option<&WormResult> {
-        match self {
-            Self::Worm(r) => Some(r),
             _ => None,
         }
     }
@@ -1976,21 +2133,17 @@ impl StageResult {
     /// fatigue life this crate can rate.
     fn set_kinematics(&mut self, speeds: [f64; 2], cycles: [(f64, Option<(f64, f64)>); 2]) {
         match self {
-            Self::Spur(r) => {
+            Self::Pair(r) => {
                 for (i, g) in r.gears.iter_mut().enumerate() {
                     g.speed = speeds[i];
                     g.tooth_cycles = loaded_cycles(cycles[i].0, cycles[i].1);
                 }
-            }
-            Self::Worm(r) => {
-                for (i, m) in r.members.iter_mut().enumerate() {
-                    m.speed = speeds[i];
-                    m.tooth_cycles = loaded_cycles(cycles[i].0, cycles[i].1);
-                }
                 // Sliding needs a shaft speed, so it could only be filled here.
-                r.sliding_velocity = r.sliding_ratio
-                    * (speeds[0] / 60.0 * std::f64::consts::TAU)
-                    * (r.members[0].pitch_diameter / 2.0);
+                let radius = r.gears[0].pitch_diameter / 2.0;
+                if let PairMesh::Point(m) = &mut r.mesh {
+                    m.sliding_velocity =
+                        m.sliding_ratio * (speeds[0] / 60.0 * std::f64::consts::TAU) * radius;
+                }
             }
             // An epicyclic set's speeds are not the train's two-member pattern —
             // it has three shafts and its own kinematics already set them, so
@@ -2562,13 +2715,10 @@ pub fn solve_any_with(
         // teeth do to each other — a line contact becomes a point, and the
         // sliding changes direction — so a crossed pair answers with the screw
         // result. The *inputs* stay one set, as the specification has them.
-        Stage::Spur(s) if s.is_crossed() => {
-            solve_crossed_stage(s, torques, lib).map(|r| StageResult::Worm(Box::new(r)))
-        }
-        Stage::Spur(s) => {
-            solve_spur_stage_with(s, torques, lib, reversal).map(|r| StageResult::Spur(Box::new(r)))
-        }
-        Stage::Worm(s) => solve_worm_stage(s, torques, lib).map(|r| StageResult::Worm(Box::new(r))),
+        Stage::Spur(s) => solve_pair_stage_with(s, PairKind::Spur, torques, lib, reversal)
+            .map(|r| StageResult::Pair(Box::new(r))),
+        Stage::Worm(s) => solve_pair_stage_with(s, PairKind::Worm, torques, lib, reversal)
+            .map(|r| StageResult::Pair(Box::new(r))),
         // A planetary needs a speed as well as a torque: its efficiency depends
         // on which shaft is held, and that is a kinematic question. The train
         // supplies the speed it has reached by this point.
@@ -3016,12 +3166,39 @@ mod tests {
     }
 
     /// These tests build spur trains, so they know the kind and say so once.
-    fn spur(r: &StageResult) -> &SpurResult {
-        r.as_spur().expect("this train's stages are all spur")
+    fn spur(r: &StageResult) -> &PairResult {
+        r.as_pair().expect("this train's stages are all spur")
+    }
+
+    /// ...and a worm stage's result, with its point contact.
+    fn worm(r: &StageResult) -> (&PairResult, &CrossedMesh) {
+        let p = r.as_pair().expect("a worm stage is a pair");
+        (
+            p,
+            p.mesh
+                .as_point()
+                .expect("a worm stage's mesh is a point contact"),
+        )
+    }
+
+    /// The old entry points, as the tests were written against them.
+    fn solve_spur_stage(
+        stage: &PairStage,
+        torques: StageTorques,
+        lib: &MaterialLibrary,
+    ) -> Result<PairResult, TrainError> {
+        solve_pair_stage(stage, PairKind::Spur, torques, lib)
+    }
+    fn solve_worm_stage(
+        stage: &PairStage,
+        torques: StageTorques,
+        lib: &MaterialLibrary,
+    ) -> Result<PairResult, TrainError> {
+        solve_pair_stage(stage, PairKind::Worm, torques, lib)
     }
 
     /// ...and the same for reaching into a stage's inputs.
-    fn spur_input(s: &mut Stage) -> &mut SpurStage {
+    fn spur_input(s: &mut Stage) -> &mut PairStage {
         match s {
             Stage::Spur(st) => st,
             _ => panic!("this train's stages are all spur"),
@@ -3060,25 +3237,25 @@ mod tests {
             for applied in [0.5_f64, 3.0, 12.5] {
                 let mut train = two_stage();
                 train.stages = vec![
-                    Stage::Worm(WormStage::default()),
-                    Stage::Worm(WormStage {
+                    Stage::Worm(PairStage::worm()),
+                    Stage::Worm(PairStage {
                         sliding_friction: friction,
                         static_friction: friction,
-                        ..WormStage::default()
+                        ..PairStage::worm()
                     }),
                 ];
                 train.back_driving_torque = applied;
 
                 let r = solve_train(&train, &lib).expect("a train that solves");
-                let w = r.stages[1].as_worm().expect("a worm stage");
-                let locks = w.efficiency.locked().backward;
+                let (w, m) = worm(&r.stages[1]);
+                let locks = m.efficiency.locked().backward;
                 assert_eq!(
                     locks,
                     friction > 0.1,
                     "the fixture must span both sides of the threshold"
                 );
 
-                let wheel = w.members[1]
+                let wheel = w.gears[1]
                     .back_driving_torque
                     .expect("the stage reacts the load, so its output member carries it");
                 assert!(
@@ -3089,16 +3266,16 @@ mod tests {
 
                 // ...and the worm carries it referred by the ratio and attenuated
                 // by the loss the mesh takes carrying it that way.
-                let worm = w.members[0]
+                let worm = w.gears[0]
                     .back_driving_torque
                     .expect("likewise the input member");
-                let want = wheel / w.ratio * w.efficiency.backward.max(0.0);
+                let want = wheel / w.ratio * m.efficiency.backward.max(0.0);
                 assert!(
                     (worm - want).abs() < 1e-9 * applied,
                     "the worm reports {worm} where {wheel} at the wheel over a \
                      ratio of {} at {:.4} backward efficiency is {want}",
                     w.ratio,
-                    w.efficiency.backward
+                    m.efficiency.backward
                 );
                 assert_eq!(
                     locks,
@@ -3135,9 +3312,9 @@ mod tests {
     fn a_crossed_pair_says_what_a_parallel_one_says_about_its_teeth() {
         let lib = library();
         let pair = |shaft_angle: f64| {
-            let mut sp = SpurStage {
+            let mut sp = PairStage {
                 shaft_angle,
-                ..SpurStage::default()
+                ..PairStage::default()
             };
             // Small enough at zero shift to be eaten into by a standard rack.
             sp.gears[0].teeth = 9;
@@ -3151,7 +3328,7 @@ mod tests {
 
         let flat = solve_train(&pair(0.0), &lib).expect("the parallel pair solves");
         let spur = flat.stages[0]
-            .as_spur()
+            .as_pair()
             .expect("parallel answers as a spur result");
         let said: Vec<&str> = spur.gears[0]
             .clamps
@@ -3168,12 +3345,9 @@ mod tests {
         // parallel one that the same pinion is still undercut.
         let angled = solve_train(&pair(20.0), &lib).expect("the crossed pair solves");
         let screw = angled.stages[0]
-            .as_worm()
-            .expect("a crossed pair answers as a screw result");
-        let gear = screw.members[0]
-            .gear
-            .as_ref()
-            .expect("a crossed pair's members are gears");
+            .as_pair()
+            .expect("a crossed pair answers as a pair");
+        let gear = &screw.gears[0];
         let crossed: Vec<&str> = gear
             .clamps
             .iter()
@@ -3213,11 +3387,11 @@ mod tests {
         // walking an empty list and passing for the wrong reason. The load
         // enters at the output and walks up; a worm stops it, and every stage
         // between it and the output carries it.
-        train.stages.insert(0, Stage::Worm(WormStage::default()));
+        train.stages.insert(0, Stage::Worm(PairStage::worm()));
         train.stages.push(Stage::Planetary(Box::default()));
-        train.stages.push(Stage::Spur(SpurStage {
+        train.stages.push(Stage::Spur(PairStage {
             shaft_angle: 90.0,
-            ..SpurStage::default()
+            ..PairStage::default()
         }));
 
         let r = solve_train(&train, &lib).expect("a train that solves");
@@ -3277,16 +3451,16 @@ mod tests {
         let lib = library();
         let mut worst = 0.0_f64;
         for teeth in [[9_u32, 37], [12, 29]] {
-            let stage = SpurStage {
+            let stage = PairStage {
                 gears: [0, 1].map(|i| StageGear {
                     teeth: teeth[i],
-                    ..SpurStage::default().gears[i].clone()
+                    ..PairStage::default().gears[i].clone()
                 }),
                 optimisation: Optimisation {
                     enabled: true,
                     ..Optimisation::default()
                 },
-                ..SpurStage::default()
+                ..PairStage::default()
             };
             let asked = [0, 1].map(|i| stage.gears[i].shift_asked(&stage.base_params(i)));
             let bounds = Bounds {
@@ -3311,7 +3485,7 @@ mod tests {
                     stage.sliding_friction,
                     &Search::SHIPPED,
                 )?;
-                let fixed = SpurStage {
+                let fixed = PairStage {
                     gears: [0, 1].map(|i| StageGear {
                         profile_shift: Auto::fixed(x[i]),
                         ..stage.gears[i].clone()
@@ -3321,7 +3495,7 @@ mod tests {
                 };
                 solve_spur_stage(&fixed, StageTorques::just(2.0), &lib)
                     .ok()
-                    .map(|r| r.mesh.efficiency.forward)
+                    .map(|r| r.mesh.efficiency().forward)
             };
 
             for k in 0..=8 {
@@ -3389,16 +3563,16 @@ mod tests {
 
         // --- a pair, rebuilt through the stage's own constructors.
         for teeth in [[9_u32, 37], [17, 43], [12, 29]] {
-            let stage = SpurStage {
+            let stage = PairStage {
                 gears: [0, 1].map(|i| StageGear {
                     teeth: teeth[i],
-                    ..SpurStage::default().gears[i].clone()
+                    ..PairStage::default().gears[i].clone()
                 }),
                 optimisation: Optimisation {
                     enabled: true,
                     ..Optimisation::default()
                 },
-                ..SpurStage::default()
+                ..PairStage::default()
             };
             let x = stage.shifts_at(&Search::SHIPPED);
             let g = [0, 1].map(|i| Tooth::new(stage.params_at(i, x[i])));
@@ -3585,23 +3759,23 @@ mod tests {
     fn a_given_distance_gets_the_gears_the_free_search_would_choose() {
         let lib = library();
         for teeth in [[9_u32, 37], [17, 43], [12, 29], [23, 61]] {
-            let stage = SpurStage {
+            let stage = PairStage {
                 gears: [0, 1].map(|i| StageGear {
                     teeth: teeth[i],
-                    ..SpurStage::default().gears[i].clone()
+                    ..PairStage::default().gears[i].clone()
                 }),
                 optimisation: Optimisation {
                     enabled: true,
                     ..Optimisation::default()
                 },
-                ..SpurStage::default()
+                ..PairStage::default()
             };
             let free = solve_spur_stage(&stage, StageTorques::just(2.0), &lib)
                 .expect("the pair solves with the distance free");
 
             let at = |a: f64| {
                 solve_spur_stage(
-                    &SpurStage {
+                    &PairStage {
                         centre_distance: Auto::fixed(a),
                         ..stage.clone()
                     },
@@ -3642,7 +3816,7 @@ mod tests {
                     - (free.centre_distance - stage.module * 0.5 * f64::from(teeth[0] + teeth[1]))
                         * f64::from(steps - k)
                         / f64::from(steps);
-                let here = at(a).mesh.efficiency.forward;
+                let here = at(a).mesh.efficiency().forward;
                 assert!(
                     here > last - 1e-9,
                     "{teeth:?}: {a:.4} mm gives {here}, below the {last} a tighter \
@@ -3654,9 +3828,9 @@ mod tests {
             // holds a pair to, and for the same reason: both answers sit on the
             // interference wall and each resolves it to its own last step.
             assert!(
-                (last - free.mesh.efficiency.forward).abs() < 1e-5,
+                (last - free.mesh.efficiency().forward).abs() < 1e-5,
                 "{teeth:?}: the last step reaches {last} where the free answer is {}",
-                free.mesh.efficiency.forward
+                free.mesh.efficiency().forward
             );
         }
     }
@@ -3734,22 +3908,22 @@ mod tests {
             [14, 22],
             [16, 33],
         ] {
-            let stage = SpurStage {
+            let stage = PairStage {
                 gears: [0, 1].map(|i| StageGear {
                     teeth: teeth[i],
-                    ..SpurStage::default().gears[i].clone()
+                    ..PairStage::default().gears[i].clone()
                 }),
                 optimisation: Optimisation {
                     enabled: true,
                     ..Optimisation::default()
                 },
-                ..SpurStage::default()
+                ..PairStage::default()
             };
             // Scored by solving the stage at the shifts each search chose, so
             // the objective is the one the tool reports rather than a second
             // spelling of it.
             let at = |x: [f64; 2]| {
-                let fixed = SpurStage {
+                let fixed = PairStage {
                     gears: [0, 1].map(|i| StageGear {
                         profile_shift: Auto::fixed(x[i]),
                         ..stage.gears[i].clone()
@@ -3758,7 +3932,7 @@ mod tests {
                     ..stage.clone()
                 };
                 solve_spur_stage(&fixed, StageTorques::just(2.0), &lib)
-                    .map(|r| r.mesh.efficiency.forward)
+                    .map(|r| r.mesh.efficiency().forward)
             };
             let (Ok(shipped), Ok(refined)) = (
                 at(stage.shifts_at(&Search::SHIPPED)),
@@ -3919,12 +4093,21 @@ mod tests {
             let mut train = two_stage();
             train.back_driving_torque = applied;
             train.operating_torque = train.input_torque;
-            train.stages.insert(0, Stage::Worm(WormStage::default()));
+            train.stages.insert(0, Stage::Worm(PairStage::worm()));
             train.stages.push(Stage::Planetary(Box::default()));
             train.stages.push(Stage::Hula(Box::default()));
 
             let r = solve_train(&train, &lib).expect("a train that solves");
             for (k, stage) in r.stages.iter().enumerate() {
+                // A point contact is rated on the worse of two *constructions*
+                // — the input torque on the worm forward, the applied load on
+                // the wheel backward — so its members' stresses are not a
+                // projection of their own torques and this law is not theirs.
+                // The worm stage in this train is here for the walk, and its
+                // own rating is gated in `crossed::tests`.
+                if stage.as_pair().is_some_and(|p| p.mesh.as_point().is_some()) {
+                    continue;
+                }
                 for (i, g) in stage.members().iter().enumerate() {
                     let Some(back) = g.back_driving_torque else {
                         continue;
@@ -4002,10 +4185,10 @@ mod tests {
             train.input_torque = input_torque;
             train.operating_torque = input_torque;
             train.back_driving_torque = back;
-            train.stages = vec![Stage::Worm(WormStage::default())];
+            train.stages = vec![Stage::Worm(PairStage::worm())];
             let r = solve_train(&train, &lib).expect("a train that solves");
-            let w = r.stages[0].as_worm().expect("a worm stage");
-            (w.contact.peak.max_pressure, w.ratio, w.efficiency.forward)
+            let (w, m) = worm(&r.stages[0]);
+            (m.contact.peak.max_pressure, w.ratio, m.efficiency.forward)
         };
 
         // Driven backward at `load` on the wheel, with nothing at all coming the
@@ -4054,38 +4237,48 @@ mod tests {
     #[test]
     fn a_pair_that_transmits_nothing_still_has_its_flanks_pressed() {
         let lib = library();
-        let locked = WormStage {
+        let locked = PairStage {
             shaft_angle: 90.0,
-            starts: 17,
-            wheel_teeth: 23,
             sizing: Auto::fixed(FirstMemberSizing::HelixAngle(9.0)),
-            ..WormStage::default()
+            gears: [
+                StageGear {
+                    teeth: 17,
+                    ..PairStage::worm().gears[0].clone()
+                },
+                StageGear {
+                    teeth: 23,
+                    ..PairStage::worm().gears[1].clone()
+                },
+            ],
+            ..PairStage::worm()
         };
         let r = solve_worm_stage(&locked, StageTorques::just(2.0), &lib)
             .expect("a locked pair is still a pair");
+        let r_point = r.mesh.as_point().unwrap();
         assert_eq!(
-            r.efficiency.forward, 0.0,
+            r_point.efficiency.forward, 0.0,
             "this split is meant to be the forward-locked one"
         );
         assert!(
-            r.contact.peak.max_pressure > 100.0,
+            r_point.contact.peak.max_pressure > 100.0,
             "a locked pair's flanks are pressed by whatever holds them: {} MPa",
-            r.contact.peak.max_pressure
+            r_point.contact.peak.max_pressure
         );
         // Not merely non-zero: the same 2 N·m through a split that *does* drive
         // presses about as hard, because the flank load comes from the input
         // torque either way and the geometry has not changed much.
-        let driving = WormStage {
+        let driving = PairStage {
             sizing: Auto::fixed(FirstMemberSizing::HelixAngle(18.0)),
             ..locked
         };
         let d = solve_worm_stage(&driving, StageTorques::just(2.0), &lib).expect("and this one");
-        let ratio = r.contact.peak.max_pressure / d.contact.peak.max_pressure;
+        let d_point = d.mesh.as_point().unwrap();
+        let ratio = r_point.contact.peak.max_pressure / d_point.contact.peak.max_pressure;
         assert!(
             (0.5..2.0).contains(&ratio),
             "the locked split rates at {} MPa against the driving split's {}",
-            r.contact.peak.max_pressure,
-            d.contact.peak.max_pressure
+            r_point.contact.peak.max_pressure,
+            d_point.contact.peak.max_pressure
         );
     }
 
@@ -4105,8 +4298,8 @@ mod tests {
     fn a_stage_carrying_nothing_is_a_stage() {
         let lib = library();
         for stage in [
-            Stage::Spur(SpurStage::default()),
-            Stage::Worm(WormStage::default()),
+            Stage::Spur(PairStage::default()),
+            Stage::Worm(PairStage::worm()),
             Stage::Planetary(Box::default()),
             Stage::Hula(Box::default()),
         ] {
@@ -4117,9 +4310,9 @@ mod tests {
                 .unwrap_or_else(|e| panic!("a stage at no operating load: {e:?}"));
             // A worm's members are not gears, so the walk below is empty there
             // and the claim is the stage's own — which is the one that failed.
-            if let Some(w) = r.stages[0].as_worm() {
-                assert_eq!(w.contact.cyclic.max_pressure, 0.0);
-                assert!(w.contact.peak.max_pressure > 0.0);
+            if let Some(m) = r.stages[0].as_pair().and_then(|p| p.mesh.as_point()) {
+                assert_eq!(m.contact.cyclic.max_pressure, 0.0);
+                assert!(m.contact.peak.max_pressure > 0.0);
             }
             for (i, g) in r.stages[0].members().iter().enumerate() {
                 assert_eq!(
@@ -4160,10 +4353,10 @@ mod tests {
         // Which of each kind's meshes have a ring in them, in the order
         // `meshes()` returns them: a pair none, a set its second, a hula both.
         for (stage, internal) in [
-            (Stage::Spur(SpurStage::default()), vec![false]),
+            (Stage::Spur(PairStage::default()), vec![false]),
             (Stage::Planetary(Box::default()), vec![false, true]),
             (Stage::Hula(Box::default()), vec![true, true]),
-            (Stage::Worm(WormStage::default()), vec![]),
+            (Stage::Worm(PairStage::worm()), vec![]),
         ] {
             let mut train = two_stage();
             train.stages = vec![stage];
@@ -4245,12 +4438,14 @@ mod tests {
         let lib = library();
         let mut train = two_stage();
         train.back_driving_torque = 0.5;
-        train.stages.insert(0, Stage::Worm(WormStage::default()));
+        train.stages.insert(0, Stage::Worm(PairStage::worm()));
 
         let r = solve_train(&train, &lib).expect("a train that solves");
         let mut checked = 0u32;
         for (k, stage) in r.stages.iter().enumerate() {
-            let Some(spur) = stage.as_spur() else {
+            // Parallel axes only: a worm's members do not share a tangential
+            // force, and its own two-member relation is gated in `crossed`.
+            let Some(spur) = stage.as_pair().filter(|p| p.mesh.as_line().is_some()) else {
                 continue;
             };
             let (Some(a), Some(b)) = (
@@ -4291,8 +4486,8 @@ mod tests {
             Stage::Worm(_) => 2,
         };
         for stage in [
-            Stage::Spur(SpurStage::default()),
-            Stage::Worm(WormStage::default()),
+            Stage::Spur(PairStage::default()),
+            Stage::Worm(PairStage::worm()),
             Stage::Planetary(Box::default()),
             Stage::Hula(Box::new(hula)),
         ] {
@@ -4349,8 +4544,8 @@ mod tests {
         let mut hula = HulaStage::default();
         hula.gears[0].profile_shift = Auto::automatic(0.0);
         for stage in [
-            Stage::Spur(SpurStage::default()),
-            Stage::Worm(WormStage::default()),
+            Stage::Spur(PairStage::default()),
+            Stage::Worm(PairStage::worm()),
             Stage::Planetary(Box::default()),
             Stage::Hula(Box::new(hula)),
         ] {
@@ -4458,11 +4653,11 @@ mod tests {
             [14, 22],
             [16, 33],
         ] {
-            let mut stage = SpurStage::default();
+            let mut stage = PairStage::default();
             stage.optimisation.enabled = true;
             stage.gears = [0, 1].map(|i| StageGear {
                 teeth: teeth[i],
-                ..SpurStage::default().gears[i].clone()
+                ..PairStage::default().gears[i].clone()
             });
             let x = stage.shifts();
             let g = [0, 1].map(|i| Tooth::new(stage.params_at(i, x[i])));
@@ -4506,16 +4701,16 @@ mod tests {
     fn a_distance_the_shifts_cannot_reach_is_said_out_loud() {
         let lib = library();
         let at = |a: f64| {
-            let mut sp = SpurStage {
+            let mut sp = PairStage {
                 centre_distance: Auto::fixed(a),
-                ..SpurStage::default()
+                ..PairStage::default()
             };
             sp.gears[0].teeth = 9;
             sp.gears[1].teeth = 37;
             let mut t = two_stage();
             t.stages = vec![Stage::Spur(sp)];
             let r = solve_train(&t, &lib).expect("all three of these solve");
-            let s = r.stages[0].as_spur().expect("a spur stage");
+            let s = r.stages[0].as_pair().expect("a spur stage");
             let keys: Vec<String> = s.notes.iter().map(|n| n.key.clone()).collect();
             (s.clearance, keys)
         };
@@ -4547,7 +4742,7 @@ mod tests {
         // this being a note that fires on every stage with a distance.
         let (clearance, keys) = at(24.22);
         assert!(
-            (clearance - SpurStage::default().clearance.manual).abs() < 1e-6,
+            (clearance - PairStage::default().clearance.manual).abs() < 1e-6,
             "the shifts reach this one, so the clearance is the one asked for: {clearance}"
         );
         assert!(
@@ -4576,8 +4771,8 @@ mod tests {
     fn a_distance_and_a_clearance_are_never_both_left_automatic() {
         let mut checked = 0u32;
         for stage in [
-            Stage::Spur(SpurStage::default()),
-            Stage::Worm(WormStage::default()),
+            Stage::Spur(PairStage::default()),
+            Stage::Worm(PairStage::worm()),
             Stage::Planetary(Box::default()),
             Stage::Hula(Box::default()),
         ] {
@@ -4634,11 +4829,12 @@ mod tests {
     /// giving one more and requiring that it cannot be.
     ///
     /// This is what stops the declaration being a number somebody wrote down. A
-    /// pair's group says two of `{a, x₁, x₂}` may be given: with the distance
-    /// and the clearance given the shifts move to reach it, and with **both
-    /// shifts** given as well the distance can no longer be what was asked at
-    /// the clearance that was asked, because nothing is left to absorb the
-    /// difference.
+    /// pair's group says four of `{a, clearance, x₁, x₂, size}` may be given:
+    /// with the distance and the clearance given the shifts move to reach it;
+    /// with **both shifts** given as well the *size* — here the helix — moves
+    /// instead; and with the size given too the distance can no longer be what
+    /// was asked at the clearance that was asked, because nothing is left to
+    /// absorb the difference.
     ///
     /// Stated as *the clearance the pair actually runs at*, which is the
     /// quantity the relation is about, rather than as a shift value — so it says
@@ -4649,11 +4845,11 @@ mod tests {
         let clearance = 0.02_f64;
         let asked = 24.4199_f64 + clearance;
 
-        let solve = |pin_shifts: bool| {
-            let mut sp = SpurStage {
+        let solve = |pin_shifts: bool, size_free: bool| {
+            let mut sp = PairStage {
                 clearance: Auto::fixed(clearance),
                 centre_distance: Auto::fixed(asked),
-                ..SpurStage::default()
+                ..PairStage::default()
             };
             sp.gears[0].teeth = 9;
             sp.gears[1].teeth = 37;
@@ -4663,41 +4859,59 @@ mod tests {
                 sp.gears[0].profile_shift = Auto::fixed(0.20);
                 sp.gears[1].profile_shift = Auto::fixed(0.20);
             }
+            sp.sizing.auto = size_free;
             let mut t = two_stage();
             t.stages = vec![Stage::Spur(sp)];
             let r = solve_train(&t, &lib).expect("the stage solves either way");
-            let s = r.stages[0].as_spur().expect("a spur stage");
-            (s.clearance, s.centre_distance)
+            let s = r.stages[0].as_pair().expect("a spur stage");
+            (s.clearance, s.centre_distance, s.gears[0].helix_angle)
         };
 
-        // At the limit — two given, the shifts free — every given number stands.
-        let (got, distance) = solve(false);
+        // Two given, the shifts free — every given number stands.
+        let (got, distance, helix) = solve(false, false);
         assert!(
             (got - clearance).abs() < 1e-6 && (distance - asked).abs() < 1e-9,
             "two given should all be honoured: clearance {got} at {distance}"
+        );
+        assert_eq!(helix, 0.0, "nothing asked the helix to move");
+
+        // Four given with the size free: the helix reaches it instead.
+        let (got, distance, helix) = solve(true, true);
+        assert!(
+            (got - clearance).abs() < 1e-6 && (distance - asked).abs() < 1e-9,
+            "with the shifts pinned the size should absorb: clearance {got} at {distance}"
+        );
+        assert!(
+            helix > 1.0,
+            "a helix angle is what reached the distance: {helix}°"
         );
 
         // One more, and the relation cannot hold. The distance is still what was
         // typed — it is the *clearance* that gives, which is the arm of the
         // contradiction the panel resolves by relieving the distance.
-        let (over, distance) = solve(true);
+        let (over, distance, _) = solve(true, false);
         assert!(
             (distance - asked).abs() < 1e-9,
             "the given distance is still the distance"
         );
         assert!(
             (over - clearance).abs() > 1e-3,
-            "with both shifts pinned as well, the clearance cannot also be {clearance}: got {over}"
+            "with everything pinned, the clearance cannot also be {clearance}: got {over}"
         );
 
-        // ...and the group says exactly that many: four inputs bound by one
-        // relation, so three may stand and the distance is the first to give.
-        let groups = Stage::Spur(SpurStage::default()).freedoms();
+        // ...and the group says exactly that many: five inputs bound by one
+        // relation, so four may stand and the distance is the first to give.
+        let groups = Stage::Spur(PairStage::default()).freedoms();
         let relation = &groups[0];
-        assert_eq!(relation.order.len(), 4);
-        assert_eq!(relation.given_at_most, 3);
+        assert_eq!(relation.order.len(), 5);
+        assert_eq!(relation.given_at_most, 4);
         assert_eq!(relation.order[0], Freedom::CentreDistance);
         assert!(relation.order.contains(&Freedom::Clearance));
+        assert_eq!(
+            relation.order.last(),
+            Some(&Freedom::FirstMemberSize),
+            "the size is the last to give: a shift moves the teeth, a size changes them"
+        );
 
         // And the second group is the one that stops *both* ways of saying the
         // distance being left automatic at once.
@@ -4741,10 +4955,10 @@ mod tests {
                 for clearance in [0.0_f64, 0.02, 0.20] {
                     let mut sums = Vec::new();
                     for optimiser in [false, true] {
-                        let mut sp = SpurStage {
+                        let mut sp = PairStage {
                             clearance: Auto::fixed(clearance),
                             centre_distance: Auto::fixed(a + clearance),
-                            ..SpurStage::default()
+                            ..PairStage::default()
                         };
                         sp.gears[0].teeth = z1;
                         sp.gears[1].teeth = z2;
@@ -4754,7 +4968,7 @@ mod tests {
                         let Ok(r) = solve_train(&t, &lib) else {
                             continue;
                         };
-                        let s = r.stages[0].as_spur().expect("a spur stage");
+                        let s = r.stages[0].as_pair().expect("a spur stage");
 
                         checked += 1;
                         assert!(
@@ -4800,21 +5014,21 @@ mod tests {
         for distance in [None, Some(30.3_f64), Some(30.5)] {
             for clearance in [0.0_f64, 0.02, 0.20] {
                 for optimiser in [false, true] {
-                    let mut sp = SpurStage {
+                    let mut sp = PairStage {
                         clearance: Auto::fixed(clearance),
-                        ..SpurStage::default()
+                        ..PairStage::default()
                     };
                     sp.optimisation.enabled = optimiser;
                     if let Some(a) = distance {
                         sp.centre_distance = Auto::fixed(a);
                     }
                     let mut t = two_stage();
-                    t.stages = vec![Stage::Spur(sp), Stage::Worm(WormStage::default())];
+                    t.stages = vec![Stage::Spur(sp), Stage::Worm(PairStage::worm())];
                     let Ok(r) = solve_train(&t, &lib) else {
                         continue;
                     };
 
-                    let s = r.stages[0].as_spur().expect("a spur stage");
+                    let s = r.stages[0].as_pair().expect("a spur stage");
                     checked += 1;
                     assert!(
                         (s.clearance - (s.centre_distance - s.centre_distance_nominal)).abs()
@@ -4828,7 +5042,7 @@ mod tests {
                     // ...and the same identity on the kind that has no shift to
                     // absorb anything, which is where an echoed input and a
                     // derived gap part company hardest.
-                    let w = r.stages[1].as_worm().expect("a worm stage");
+                    let (w, _) = worm(&r.stages[1]);
                     assert!(
                         (w.clearance - (w.centre_distance - w.centre_distance_nominal)).abs()
                             < 1e-12,
@@ -4860,13 +5074,13 @@ mod tests {
         let lib = library();
         let mut train = two_stage();
         train.stages = vec![
-            Stage::Spur(SpurStage::default()),
-            Stage::Worm(WormStage::default()),
+            Stage::Spur(PairStage::default()),
+            Stage::Worm(PairStage::worm()),
             Stage::Planetary(Box::default()),
             Stage::Hula(Box::default()),
-            Stage::Spur(SpurStage {
+            Stage::Spur(PairStage {
                 shaft_angle: 90.0,
-                ..SpurStage::default()
+                ..PairStage::default()
             }),
         ];
         let r = solve_train(&train, &lib).expect("a train of every kind");
@@ -4925,7 +5139,7 @@ mod tests {
             };
             let mut t = two_stage();
             t.back_driving_torque = 0.5;
-            t.stages = vec![Stage::Worm(WormStage::default()), Stage::Hula(Box::new(h))];
+            t.stages = vec![Stage::Worm(PairStage::worm()), Stage::Hula(Box::new(h))];
             let r = solve_train(&t, &lib).expect("a train that solves");
             let s = r.stages[1].as_hula().expect("a hula stage");
             let back = |g: &HulaGear| g.gear.back_driving_torque.expect("the stage reacts it");
@@ -4963,7 +5177,7 @@ mod tests {
             t.back_driving_torque = 0.5;
             // A self-locking stage at the input end, so the set reacts the load.
             t.stages = vec![
-                Stage::Worm(WormStage::default()),
+                Stage::Worm(PairStage::worm()),
                 Stage::Planetary(Box::new(set)),
             ];
             let r = solve_train(&t, &lib).expect("a train that solves");
@@ -5000,8 +5214,8 @@ mod tests {
             reversed_bending: false,
             actuation: Actuation::default(),
             stages: vec![
-                Stage::Spur(SpurStage::default()),
-                Stage::Spur(SpurStage {
+                Stage::Spur(PairStage::default()),
+                Stage::Spur(PairStage {
                     gears: [
                         StageGear {
                             teeth: 13,
@@ -5012,7 +5226,7 @@ mod tests {
                             ..StageGear::default()
                         },
                     ],
-                    ..SpurStage::default()
+                    ..PairStage::default()
                 }),
             ],
         }
@@ -5031,13 +5245,14 @@ mod tests {
         // Every stage produced real numbers.
         for s in r.stages.iter().map(spur) {
             assert!(s.centre_distance > 0.0);
-            assert!(s.mesh.contact_ratios.transverse > 1.0);
-            assert!(s.mesh.efficiency.forward > 0.9 && s.mesh.efficiency.forward < 1.0);
+            assert!(s.mesh.as_line().unwrap().contact_ratios.transverse > 1.0);
+            assert!(s.mesh.efficiency().forward > 0.9 && s.mesh.efficiency().forward < 1.0);
             assert_eq!(
-                s.mesh.efficiency.forward, s.mesh.efficiency.backward,
+                s.mesh.efficiency().forward,
+                s.mesh.efficiency().backward,
                 "a parallel-axis stage is as efficient driven either way"
             );
-            assert!(s.mesh.contact_stress_at_pitch_point.peak > 0.0);
+            assert!(s.mesh.as_line().unwrap().contact_stress_at_pitch_point.peak > 0.0);
             for g in &s.gears {
                 assert!(g.face_width > 0.0);
                 assert!(g.bending_stress.peak.unwrap() > 0.0);
@@ -5123,7 +5338,7 @@ mod tests {
     fn an_automatic_profile_shift_follows_the_dedendum() {
         let lib = library();
         let shift_of = |dedendum: f64, working: Auto<f64>| {
-            let stage = SpurStage {
+            let stage = PairStage {
                 gears: [
                     StageGear {
                         teeth: 15,
@@ -5203,14 +5418,14 @@ mod tests {
     #[test]
     fn a_parallel_stage_is_rated_at_the_centre_distance_it_runs_at() {
         let lib = library();
-        let stage = |clearance: f64| SpurStage {
+        let stage = |clearance: f64| PairStage {
             clearance: Auto::fixed(clearance),
-            ..SpurStage::default()
+            ..PairStage::default()
         };
         let mut previous: Option<(f64, f64)> = None;
         for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
             let r = solve_spur_stage(&stage(clearance), StageTorques::just(2.0), &lib).unwrap();
-            let eps = r.mesh.contact_ratios.transverse;
+            let eps = r.mesh.as_line().unwrap().contact_ratios.transverse;
             let bending = r.gears[0].bending_stress.peak.expect("a rateable tooth");
             if let Some((was_eps, was_bending)) = previous {
                 assert!(
@@ -5231,28 +5446,37 @@ mod tests {
     #[test]
     fn a_spur_stage_has_exactly_zero_overlap_and_a_helical_one_does_not() {
         let lib = library();
-        let spur = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib).unwrap();
+        let spur = solve_spur_stage(&PairStage::default(), StageTorques::just(2.0), &lib).unwrap();
         assert_eq!(
-            spur.mesh.contact_ratios.overlap, 0.0,
+            spur.mesh.as_line().unwrap().contact_ratios.overlap,
+            0.0,
             "must be exactly zero"
         );
         assert_eq!(
-            spur.mesh.contact_ratios.total,
-            spur.mesh.contact_ratios.transverse
+            spur.mesh.as_line().unwrap().contact_ratios.total,
+            spur.mesh.as_line().unwrap().contact_ratios.transverse
         );
-        assert!(!spur.mesh.contact_ratios.has_full_axial_overlap());
+        assert!(!spur
+            .mesh
+            .as_line()
+            .unwrap()
+            .contact_ratios
+            .has_full_axial_overlap());
 
         let helical = solve_spur_stage(
-            &SpurStage {
-                additional_helix: 20.0,
-                ..SpurStage::default()
+            &PairStage {
+                sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(20.0)),
+                ..PairStage::default()
             },
             StageTorques::just(2.0),
             &lib,
         )
         .unwrap();
-        assert!(helical.mesh.contact_ratios.overlap > 0.0);
-        assert!(helical.mesh.contact_ratios.total > helical.mesh.contact_ratios.transverse);
+        assert!(helical.mesh.as_line().unwrap().contact_ratios.overlap > 0.0);
+        assert!(
+            helical.mesh.as_line().unwrap().contact_ratios.total
+                > helical.mesh.as_line().unwrap().contact_ratios.transverse
+        );
     }
 
     /// The last stage dominates output backlash, which is the design consequence
@@ -5280,9 +5504,9 @@ mod tests {
 
     #[test]
     fn thickness_modification_cannot_break_its_own_invariant() {
-        let stage = SpurStage {
+        let stage = PairStage {
             thickness_mod: 1.3,
-            ..SpurStage::default()
+            ..PairStage::default()
         };
         let k: Vec<f64> = (0..2)
             .map(|i| stage.params_at(i, stage.shifts()[i]).thickness_mod)
@@ -5298,7 +5522,7 @@ mod tests {
             cyclic: false,
         };
         let width = |sources: FaceSources| {
-            let mut s = SpurStage::default();
+            let mut s = PairStage::default();
             for g in &mut s.gears {
                 g.face_width = Auto::automatic(0.0);
                 g.face_sources = sources;
@@ -5590,7 +5814,7 @@ mod tests {
     fn the_tip_width_bounds_the_addendum_and_bites_exactly() {
         for want in [0.05, 0.15, 0.3] {
             for asked in [0.8, 1.0, 1.6] {
-                let mut stage = SpurStage::default();
+                let mut stage = PairStage::default();
                 for g in &mut stage.gears {
                     g.addendum = asked;
                     g.min_tip_width = want;
@@ -5653,7 +5877,7 @@ mod tests {
             ..StageGear::default()
         };
 
-        let mut spur = SpurStage::default();
+        let mut spur = PairStage::default();
         for g in &mut spur.gears {
             *g = StageGear {
                 teeth: g.teeth,
@@ -5740,9 +5964,9 @@ mod tests {
             ..g.clone()
         };
         let bending_of = |sharing: LoadSharing| {
-            let mut spur = SpurStage {
+            let mut spur = PairStage {
                 load_sharing: sharing,
-                ..SpurStage::default()
+                ..PairStage::default()
             };
             for g in &mut spur.gears {
                 *g = tall(g);
@@ -5915,9 +6139,9 @@ mod tests {
             );
         };
 
-        let pair = SpurStage {
+        let pair = PairStage {
             optimisation: tuned,
-            ..SpurStage::default()
+            ..PairStage::default()
         };
         each("pair's", 40, &|| {
             solve_spur_stage(&pair, StageTorques::just(2.0), &lib).unwrap();
@@ -5961,15 +6185,15 @@ mod tests {
             let gear = |teeth: u32| StageGear {
                 teeth,
                 root_radius: rho,
-                ..SpurStage::default().gears[0].clone()
+                ..PairStage::default().gears[0].clone()
             };
-            SpurStage {
+            PairStage {
                 optimisation: Optimisation {
                     enabled: true,
                     ..Optimisation::default()
                 },
                 gears: [gear(9), gear(37)],
-                ..SpurStage::default()
+                ..PairStage::default()
             }
         };
         let mut last = f64::INFINITY;
@@ -5988,7 +6212,7 @@ mod tests {
                 // The round is unreachable at every shift; nothing was chosen.
                 assert_eq!(
                     x,
-                    SpurStage {
+                    PairStage {
                         optimisation: Optimisation::default(),
                         ..s
                     }
@@ -6017,22 +6241,22 @@ mod tests {
     /// does is moved somewhere else.
     #[test]
     fn a_stage_that_did_not_ask_keeps_the_shifts_it_had() {
-        let stage = |on: bool| SpurStage {
+        let stage = |on: bool| PairStage {
             gears: [
                 StageGear {
                     teeth: 17,
-                    ..SpurStage::default().gears[0].clone()
+                    ..PairStage::default().gears[0].clone()
                 },
                 StageGear {
                     teeth: 43,
-                    ..SpurStage::default().gears[1].clone()
+                    ..PairStage::default().gears[1].clone()
                 },
             ],
             optimisation: Optimisation {
                 enabled: on,
                 ..Optimisation::default()
             },
-            ..SpurStage::default()
+            ..PairStage::default()
         };
         let plain = stage(false).shifts();
         let tuned = stage(true).shifts();
@@ -6046,7 +6270,7 @@ mod tests {
             1.0 - solve_spur_stage(&stage(on), StageTorques::just(2.0), &lib)
                 .unwrap()
                 .mesh
-                .efficiency
+                .efficiency()
                 .forward
         };
         assert!(
@@ -6085,12 +6309,12 @@ mod tests {
             );
         };
 
-        let spur = SpurStage {
+        let spur = PairStage {
             optimisation: Optimisation {
                 enabled: true,
                 ..Optimisation::default()
             },
-            ..SpurStage::default()
+            ..PairStage::default()
         };
         for (i, x) in spur.shifts().iter().enumerate() {
             cuttable(&spur.params_at(i, *x), "the pair's gear");
@@ -6155,18 +6379,18 @@ mod tests {
     #[test]
     fn the_clearance_is_taken_by_whatever_is_free_to_absorb_it() {
         let lib = library();
-        let free = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib).unwrap();
+        let free = solve_spur_stage(&PairStage::default(), StageTorques::just(2.0), &lib).unwrap();
         // A housing the pair can actually meet: a clearance inside it is the
         // distance the automatic solve already closes to.
         let asked = free.centre_distance_nominal + 0.05;
-        let at = |on: bool| SpurStage {
+        let at = |on: bool| PairStage {
             optimisation: Optimisation {
                 enabled: on,
                 ..Optimisation::default()
             },
             centre_distance: Auto::fixed(asked),
             clearance: Auto::fixed(0.05),
-            ..SpurStage::default()
+            ..PairStage::default()
         };
 
         // **Nothing free to absorb it, so the shifts do not move — and the gap
@@ -6210,13 +6434,13 @@ mod tests {
         // And with the distance automatic it is read either way, as it always was.
         for on in [false, true] {
             let r = solve_spur_stage(
-                &SpurStage {
+                &PairStage {
                     optimisation: Optimisation {
                         enabled: on,
                         ..Optimisation::default()
                     },
                     clearance: Auto::fixed(0.05),
-                    ..SpurStage::default()
+                    ..PairStage::default()
                 },
                 StageTorques::just(2.0),
                 &lib,
@@ -6232,15 +6456,15 @@ mod tests {
     #[test]
     fn a_given_centre_distance_still_sets_the_distance() {
         let lib = library();
-        let free = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib).unwrap();
+        let free = solve_spur_stage(&PairStage::default(), StageTorques::just(2.0), &lib).unwrap();
         let asked = free.centre_distance_nominal + 0.4;
-        let stage = SpurStage {
+        let stage = PairStage {
             optimisation: Optimisation {
                 enabled: true,
                 ..Optimisation::default()
             },
             centre_distance: Auto::fixed(asked),
-            ..SpurStage::default()
+            ..PairStage::default()
         };
         let r = solve_spur_stage(&stage, StageTorques::just(2.0), &lib).unwrap();
         assert!(
@@ -6262,7 +6486,7 @@ mod tests {
     #[test]
     fn a_train_that_fails_names_the_stage_that_failed() {
         let mut train = two_stage();
-        train.stages.push(Stage::Spur(SpurStage::default()));
+        train.stages.push(Stage::Spur(PairStage::default()));
         assert!(
             solve_train(&train, &library()).is_ok(),
             "three good stages solve"
@@ -6305,15 +6529,15 @@ mod tests {
         let given = |teeth: u32, x: f64| StageGear {
             teeth,
             profile_shift: Auto::fixed(x),
-            ..SpurStage::default().gears[0].clone()
+            ..PairStage::default().gears[0].clone()
         };
-        let tuned = |gears: [StageGear; 2]| SpurStage {
+        let tuned = |gears: [StageGear; 2]| PairStage {
             optimisation: Optimisation {
                 enabled: true,
                 ..Optimisation::default()
             },
             gears,
-            ..SpurStage::default()
+            ..PairStage::default()
         };
         assert_eq!(
             tuned([given(17, 0.3), given(43, -0.1)]).shifts(),
@@ -6347,14 +6571,14 @@ mod tests {
     #[test]
     fn a_manual_centre_distance_ignores_the_clearance() {
         let lib = library();
-        let auto = solve_spur_stage(&SpurStage::default(), StageTorques::just(2.0), &lib).unwrap();
+        let auto = solve_spur_stage(&PairStage::default(), StageTorques::just(2.0), &lib).unwrap();
 
         // The same distance, set by hand, with a clearance that must be ignored.
         let manual = solve_spur_stage(
-            &SpurStage {
+            &PairStage {
                 centre_distance: Auto::fixed(auto.centre_distance_nominal),
                 clearance: Auto::fixed(0.5),
-                ..SpurStage::default()
+                ..PairStage::default()
             },
             StageTorques::just(2.0),
             &lib,
@@ -6384,7 +6608,7 @@ mod tests {
             cyclic: false,
         };
         let auto_width = |sources: FaceSources, o: Overrides| {
-            let mut s = SpurStage::default();
+            let mut s = PairStage::default();
             for g in &mut s.gears {
                 g.face_width = Auto::automatic(0.0);
                 g.face_sources = sources;
@@ -6451,7 +6675,7 @@ mod tests {
     fn overriding_the_modulus_moves_contact_stress_as_the_square_root() {
         let lib = library();
         let at = |e: Option<f64>| {
-            let mut s = SpurStage::default();
+            let mut s = PairStage::default();
             for g in &mut s.gears {
                 g.material_overrides = Overrides {
                     elastic_modulus: e,
@@ -6461,6 +6685,8 @@ mod tests {
             solve_spur_stage(&s, StageTorques::just(2.0), &lib)
                 .unwrap()
                 .mesh
+                .as_line()
+                .unwrap()
                 .contact_stress_at_pitch_point
                 .peak
         };
@@ -6474,7 +6700,7 @@ mod tests {
 
     #[test]
     fn an_unknown_material_is_named_rather_than_swallowed() {
-        let mut s = SpurStage::default();
+        let mut s = PairStage::default();
         s.gears[0].material = "unobtainium".into();
         let e = solve_spur_stage(&s, StageTorques::just(2.0), &library()).unwrap_err();
         assert!(matches!(e, TrainError::UnknownMaterial(ref n) if n == "unobtainium"));
@@ -6599,7 +6825,7 @@ mod tests {
                     }
                 });
 
-                let Some(sp) = s.as_spur() else { continue };
+                let Some(sp) = s.as_pair() else { continue };
                 for (i, (g, want)) in sp.gears.iter().zip(expected).enumerate() {
                     let got = g.tooth_cycles;
                     assert_eq!(got, want, "{what}, stage {k} gear {i}");
@@ -6640,7 +6866,7 @@ mod tests {
             [weak(250.0), Overrides::default()],
             [Overrides::default(), weak(250.0)],
         ] {
-            let mut stage = SpurStage::default();
+            let mut stage = PairStage::default();
             for (g, o) in stage.gears.iter_mut().zip(over) {
                 g.face_width = Auto::automatic(0.0);
                 g.material_overrides = o;
@@ -6693,7 +6919,7 @@ mod tests {
         // At a **fixed** width: an automatic one is inverted from the stress, so
         // it lands the stress on the allowable and hides the material.
         let solved = |auto: bool, over: [Overrides; 2]| {
-            let mut s = SpurStage::default();
+            let mut s = PairStage::default();
             for (g, o) in s.gears.iter_mut().zip(over) {
                 g.face_width = if auto {
                     Auto::automatic(0.0)
@@ -6715,7 +6941,7 @@ mod tests {
         let base = solved(false, [Overrides::default(), Overrides::default()]);
         let soft_first = solved(false, [modulus(70_000.0), Overrides::default()]);
         let soft_second = solved(false, [Overrides::default(), modulus(70_000.0)]);
-        let pitch = |r: &SpurResult| r.mesh.contact_stress_at_pitch_point.peak;
+        let pitch = |r: &PairResult| r.mesh.as_line().unwrap().contact_stress_at_pitch_point.peak;
         for (r, which) in [(&soft_first, "gear 1"), (&soft_second, "gear 2")] {
             assert!(
                 pitch(r) < pitch(&base),
@@ -6760,10 +6986,15 @@ mod tests {
         let half = allowable(0.5 * super::allowable(&wide.gears[1].material, Case::Cyclic));
         let derated = solved(false, [Overrides::default(), half]);
         assert_eq!(
-            derated.mesh.contact_stress_at_pitch_point, wide.mesh.contact_stress_at_pitch_point,
+            derated
+                .mesh
+                .as_line()
+                .unwrap()
+                .contact_stress_at_pitch_point,
+            wide.mesh.as_line().unwrap().contact_stress_at_pitch_point,
             "an allowable is not a stress and must not move one"
         );
-        let contact_width = |r: &SpurResult| {
+        let contact_width = |r: &PairResult| {
             r.gears[1]
                 .min_face_width
                 .cyclic
@@ -6807,24 +7038,24 @@ mod tests {
         // The same load against a stage that cannot be driven backward. A worm
         // with enough friction locks, and then the load stops there: the worm
         // stage carries it, and the spur stage ahead of it carries none.
-        t.stages.push(Stage::Worm(WormStage {
+        t.stages.push(Stage::Worm(PairStage {
             sliding_friction: 0.3,
             static_friction: 0.3,
-            ..WormStage::default()
+            ..PairStage::worm()
         }));
         let r = solve_train(&t, &lib).unwrap();
-        let worm = r.stages[2].as_worm().expect("the third stage is a worm");
+        let (worm, screw) = worm(&r.stages[2]);
         assert!(
-            worm.efficiency.locked().backward,
+            screw.efficiency.locked().backward,
             "this worm was meant to lock: backward efficiency {}",
-            worm.efficiency.backward
+            screw.efficiency.backward
         );
         // The wheel is on the shaft the load enters by and carries all of it;
         // the worm is at the far end of a mesh that cannot pass it, so its shaft
         // carries **none** — which is what a locked stage means and is not the
         // same as the case being absent (`a_self_locking_worm_reports_the_load_it_reacts`).
         assert_eq!(
-            worm.members
+            worm.gears
                 .iter()
                 .map(|m| m.back_driving_torque)
                 .collect::<Vec<_>>(),
@@ -6857,10 +7088,10 @@ mod tests {
         t.back_driving_torque = 500.0;
         t.stages.insert(
             0,
-            Stage::Worm(WormStage {
+            Stage::Worm(PairStage {
                 sliding_friction: 0.3,
                 static_friction: 0.3,
-                ..WormStage::default()
+                ..PairStage::worm()
             }),
         );
         let r = solve_train(&t, &lib).unwrap();

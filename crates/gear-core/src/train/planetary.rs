@@ -95,7 +95,7 @@ pub struct PlanetaryStage {
     /// How the load is divided while two tooth pairs are engaged.
     ///
     /// **Off by default, and it reaches bending only** — see
-    /// [`super::SpurStage::load_sharing`], which is the same input for the same
+    /// [`super::PairStage::load_sharing`], which is the same input for the same
     /// reason. Both meshes take it: a set switching the model on and getting it
     /// on one mesh would be one stage answering two ways.
     #[cfg_attr(feature = "serde", serde(default))]
@@ -585,9 +585,9 @@ impl PlanetaryStage {
     }
 
     /// As [`Self::shifts`], at a stated search effort — see `auto::Search`, and
-    /// `SpurStage::shifts_at` for why the effort is a parameter at all.
+    /// `PairStage::shifts_at` for why the effort is a parameter at all.
     /// As [`Self::shifts_at`], **and whether the optimiser actually chose** —
-    /// see `super::Searched`, and `SpurStage::chosen_at` for why the two
+    /// see `super::Searched`, and `PairStage::chosen_at` for why the two
     /// outcomes that look alike have to be told apart.
     pub(super) fn chosen_at(&self, search: &crate::auto::Search) -> super::Chosen<3> {
         let asked = self.asked();
@@ -783,7 +783,7 @@ impl PlanetaryStage {
     }
 
     /// As [`Self::shifts`], at a stated search effort — see `auto::Search`, and
-    /// `SpurStage::shifts_at` for why the effort is a parameter at all.
+    /// `PairStage::shifts_at` for why the effort is a parameter at all.
     #[cfg(test)]
     pub(super) fn shifts_at(&self, search: &crate::auto::Search) -> [f64; 3] {
         self.chosen_at(search).shifts
@@ -1360,6 +1360,7 @@ pub fn solve_planetary_stage_with(
         // expression evaluated at the two scales rather than a second solve.
         // Which is what `MemberRating` is, for every stage kind at once.
         GearResult::of(super::MemberFacts {
+            recommended_face_width: None,
             profile_shift: params.profile_shift,
             params,
             input,

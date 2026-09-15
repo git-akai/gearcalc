@@ -1,14 +1,27 @@
-//! The parallel-axis stage: spur when the helix angle is zero, helical
-//! otherwise.
+//! **The pair**: two gears on shafts at any angle, and the one primitive the
+//! spur, helical, crossed and worm kinds are all built from.
 //!
-//! Split out of `train.rs` when the worm stage arrived and gave the division
-//! something to divide. What stays in the parent module is everything a stage
-//! of *any* kind produces — [`StageResult`], [`GearResult`], [`Backlash`] — and
-//! the train that strings them together.
+//! A stage kind is a *layer* over this — a preset, a vocabulary, and a choice
+//! of which inputs to put in front of a designer — and not a second model.
+//! [`super::Stage::Spur`] and [`super::Stage::Worm`] carry the same
+//! [`PairStage`]; what a worm stage adds is that its first member is sized by
+//! pitch diameter rather than helix angle, an axial float, and the conventional
+//! proportions a worm and its wheel are given ([`PairKind`]). Everything else
+//! — module, angle, shifts, addenda, frictions, distance, clearance,
+//! materials, face widths — is the same field meaning the same thing.
+//!
+//! What genuinely differs is the **mesh**, and it must: parallel axes touch
+//! along a line and lose power to sliding along the profile, crossed axes touch
+//! at a point and slide lengthwise. So this file solves the parallel mesh and
+//! [`super::crossed`] the crossed one, both into one [`super::PairResult`] whose
+//! [`super::PairMesh`] says which it was. A worm stage used to be a separate
+//! type with a separate result — no profile shift, no addendum, members that
+//! were not gears — and its centre distance could only be reached by resizing
+//! the worm. It is `AUDIT.md`'s F83 that made it this.
 
 use super::{
     Backlash, Case, ContactRatios, GearResult, LoadCase, Loading, MemberRating, MeshReport,
-    SpurResult, StageGear, StageTorques, TrainError, PROBE,
+    PairMesh, PairResult, StageGear, StageTorques, TrainError, PROBE,
 };
 use crate::auto::automatic_profile_shift;
 use crate::contact::{efficiency, ContactPath, Directional, LoadSharing};
@@ -16,6 +29,7 @@ use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
+use crate::screw::{Screw, ScrewParams};
 use crate::strength::{bending_stress, contact_stress, Load, RootStressModel, PARALLEL_AXES};
 use crate::tooth::Tooth;
 
@@ -139,32 +153,118 @@ impl ShiftAsked {
     }
 }
 
+/// **Which pair this is, to a designer** — the layer over [`PairStage`] that a
+/// stage kind is.
+///
+/// The model underneath is one model: a worm is a helical gear with a few
+/// starts at a steep helix, its wheel a helical gear at the complementary one,
+/// and their mesh the crossed-axis mesh any two such gears have. What the kind
+/// decides is the little that is not geometry:
+///
+/// - **the preset** — `Spur` starts as 17/43 on parallel shafts, `Worm` as a
+///   single start of 7 mm at a right angle to a 40-tooth brass wheel;
+/// - **the automatic face width** where no rating sizes one — a worm and its
+///   wheel take the conventional proportions of a worm drive
+///   ([`super::crossed::proportions`]), a crossed gear pair the width at which
+///   contact is just continuous;
+/// - **the words** — *starts*, *worm*, *wheel* — and which inputs a panel puts
+///   in front of the designer, which is the front end's to read off the kind
+///   and nothing the core has to know.
+///
+/// Nothing in it is a constraint the model needs: a `Worm` at a shaft angle of
+/// zero is a legal, if strange, helical pair and solves as one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum PairKind {
+    /// A spur or helical pair, or a crossed gear pair.
+    Spur,
+    /// A worm and its wheel.
+    Worm,
+}
+
+/// How the first member's size is stated — **three readings of one number**.
+///
+/// A pair's two helix angles are bound by `β₁ + β₂ = Σ`, so one number fixes
+/// both, and it can be stated as what each gear carries beyond half the shaft
+/// angle, as the first member's own helix angle, or as the first member's
+/// pitch diameter — since `d = z m_n / cos β`, a diameter and a helix angle are
+/// the same freedom read two ways. Which reading a designer uses is the whole
+/// of the difference between a worm and a crossed gear: a worm's pitch diameter
+/// is a *free choice* that sets its lead angle, its efficiency and whether it
+/// can be back-driven, while a gear's follows from its teeth.
+///
+/// ```text
+/// AdditionalHelix(β_add):   β₁ = Σ/2 + β_add,   β₂ = Σ/2 − β_add
+/// HelixAngle(β₁):           β₂ = Σ − β₁
+/// PitchDiameter(d₁):        cos β₁ = z₁ m_n / d₁,   β₂ = Σ − β₁
+/// ```
+///
+/// At `Σ = 0` the first reading is the familiar shared helix angle with the
+/// hands opposed, which is the specification's own "Total Helix Angle = 0.5 ×
+/// Axis Angle + Additional Helix Angle".
+///
+/// [verified: a `Screw` built with `d₁ = z₁ m_n / cos β₁` reports
+/// `γ₁ = 90° − β₁` exactly, and `β₂ = Σ − β₁`, over three tooth pairs × four
+/// shaft angles × three helix angles.]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum FirstMemberSizing {
+    /// What each gear carries beyond half the shaft angle, degrees.
+    AdditionalHelix(f64),
+    /// The first member's helix angle, degrees. `β = 0` on crossed shafts makes
+    /// it an ordinary spur gear crossed with a helical one.
+    HelixAngle(f64),
+    /// The first member's pitch diameter, mm — a **worm's** reading.
+    PitchDiameter(f64),
+}
+
 /// A stage of two gears on shafts at any angle.
 ///
-/// Spur when nothing is angled, helical when the teeth are, and a **crossed
-/// gear pair** when the shafts are — one stage, as the specification has it,
-/// with the shaft angle as the input that distinguishes them. It is not three
-/// kinds of stage: the tooth counts, the module, the materials and the
-/// tolerances mean the same thing throughout, and only the *mesh* differs.
+/// Spur when nothing is angled, helical when the teeth are, a **crossed gear
+/// pair** when the shafts are, and a **worm stage** when the first member's
+/// size is a diameter someone chose — one stage, as the specification has it,
+/// with the shaft angle and the sizing as the inputs that distinguish them. It
+/// is not four kinds of stage: the tooth counts, the module, the shifts, the
+/// materials and the tolerances mean the same thing throughout, and only the
+/// *mesh* differs.
 ///
 /// # The two helix angles come from the shaft angle
 ///
-/// ```text
-/// β₁ = Σ/2 + β_add,     β₂ = Σ/2 − β_add
-/// ```
-///
-/// so `β₁ + β₂ = Σ` — the relation crossed-axis screw gearing runs on (docs/reference.md#crossed-axes)
-/// — and at `Σ = 0` it collapses to `β₁ = −β₂ = β_add`, a parallel helical pair
-/// with its two hands opposed. The parallel case is the shaft angle's zero
-/// rather than a separate construction, which is the specification's own
-/// reading: "Total Helix Angle = 0.5 × Axis Angle + Additional Helix Angle".
+/// `β₁ + β₂ = Σ` — the relation crossed-axis screw gearing runs on
+/// (docs/reference.md#crossed-axes) — and [`FirstMemberSizing`] is the one
+/// number that places them. At `Σ = 0` it is a parallel helical pair with its
+/// two hands opposed; the parallel case is the shaft angle's zero rather than a
+/// separate construction.
 ///
 /// What *does* branch is the mesh, and it must: parallel axes touch along a
 /// line and lose power to sliding along the profile, while crossed axes touch
 /// at a point and slide lengthwise. Those are different mechanisms with
-/// different formulas and different results (docs/reference.md#crossed-axes), so a crossed stage
-/// answers with the screw result — no contact ratio, no bending, two
-/// efficiencies — and says so.
+/// different formulas and different results (docs/reference.md#crossed-axes),
+/// so a crossed pair answers with a point-contact mesh — a contact ratio along
+/// the line of action, no bending, two efficiencies — and says so
+/// ([`super::PairMesh`]).
+///
+/// # One relation among five inputs
+///
+/// The centre distance, the clearance, the two shifts and the size are bound
+/// by `a = a₀(size, x₁ + x₂) + clearance`, so four of the five may be given and
+/// the fifth follows — [`super::Stage::freedoms`] says so for every kind of
+/// pair alike. Which one absorbs a given distance is a preference, not a law:
+/// the shifts do wherever one of them is automatic, and the size only when
+/// both shifts are pinned, because a shift moves the teeth and a size changes
+/// them.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
@@ -172,7 +272,7 @@ impl ShiftAsked {
     derive(ts_rs::TS),
     ts(export, export_to = "core/")
 )]
-pub struct SpurStage {
+pub struct PairStage {
     /// Normal module, mm. Shared by both gears.
     pub module: f64,
     /// Normal pressure angle, degrees. Shared.
@@ -181,10 +281,16 @@ pub struct SpurStage {
     /// crosses the shafts.
     #[cfg_attr(feature = "serde", serde(default))]
     pub shaft_angle: f64,
-    /// Additional helix angle, degrees — what each gear carries *beyond* half
-    /// the shaft angle. Gear 2 takes it with the opposite sign, so at `Σ = 0`
-    /// this is the familiar shared helix angle with opposed hands.
-    pub additional_helix: f64,
+    /// **How big the first member is**, in whichever reading the designer uses
+    /// — and whether they state it at all.
+    ///
+    /// Automatic, the size is solved to reach a given centre distance, but
+    /// only where both shifts are pinned: a shift is the thing that absorbs a
+    /// distance by preference ([`Self::first_pitch_diameter`]). A worm stage
+    /// is the kind this was built for — it has no profile shift by convention,
+    /// so its size is what a housing decides — and a helical pair cut to fit a
+    /// standard centre distance is the same request on parallel shafts.
+    pub sizing: Auto<FirstMemberSizing>,
     /// Coefficient of friction for the mesh.
     pub sliding_friction: f64,
     /// Coefficient of **static** friction, for breaking away.
@@ -227,16 +333,26 @@ pub struct SpurStage {
     /// every other estimate in this crate gets.
     #[cfg_attr(feature = "serde", serde(default))]
     pub load_sharing: LoadSharing,
+    /// Axial float of the first member along its own axis, mm.
+    ///
+    /// The dominant source of backlash in a worm drive, and **a displacement
+    /// every helical gear has**: a rigid slide along the axis opens one flank
+    /// exactly as far as it closes the other, by its component along the
+    /// common normal, `j_axial sin β_b1`. On a spur gear that component is zero
+    /// and the input is idle rather than wrong, which is why a spur kind need
+    /// not show it and a worm kind must.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub axial_clearance: f64,
     pub gears: [StageGear; 2],
 }
 
-impl Default for SpurStage {
+impl Default for PairStage {
     fn default() -> Self {
         Self {
             module: 1.0,
             pressure_angle: 20.0,
             shaft_angle: 0.0,
-            additional_helix: 0.0,
+            sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(0.0)),
             sliding_friction: 0.08,
             static_friction: 0.16,
             thickness_mod: 1.0,
@@ -246,6 +362,7 @@ impl Default for SpurStage {
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
             load_sharing: LoadSharing::None,
+            axial_clearance: 0.0,
             gears: [
                 StageGear::default(),
                 StageGear {
@@ -257,15 +374,68 @@ impl Default for SpurStage {
     }
 }
 
-impl SpurStage {
-    /// The two gears' helix angles, degrees: `Σ/2 ± β_add`.
+impl PairStage {
+    /// **The worm kind's preset**: a single start of 7 mm pitch diameter at a
+    /// right angle to a 40-tooth brass wheel, with the float a worm's thrust
+    /// bearing leaves it.
+    ///
+    /// Two conventions of worm practice are set here as inputs rather than
+    /// built in, so a designer can undo either:
+    ///
+    /// - **the worm carries no profile shift** — it is the tool its wheel is
+    ///   cut by, so its shift is pinned at zero and a given centre distance is
+    ///   absorbed by the *wheel's* shift, as DIN 3975 has it; pin the wheel's
+    ///   too and the worm's size absorbs it instead;
+    /// - **the face widths are automatic**, and the worm kind resolves them to
+    ///   a worm drive's conventional proportions rather than to a rating
+    ///   ([`PairKind`]).
+    #[must_use]
+    pub fn worm() -> Self {
+        Self {
+            shaft_angle: 90.0,
+            sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(7.0)),
+            axial_clearance: 0.04,
+            gears: [
+                StageGear {
+                    teeth: 1,
+                    profile_shift: Auto::fixed(0.0),
+                    face_width: Auto::automatic(10.0),
+                    ..StageGear::default()
+                },
+                StageGear {
+                    teeth: 40,
+                    face_width: Auto::automatic(10.0),
+                    material: "Brass C360".to_string(),
+                    ..StageGear::default()
+                },
+            ],
+            ..Self::default()
+        }
+    }
+
+    /// The two gears' helix angles, degrees, from the sizing as it stands or
+    /// as it was solved ([`FirstMemberSizing`]).
     ///
     /// One place to ask, so the pair cannot disagree about a shaft angle they
     /// share — and so `β₁ + β₂ = Σ` holds by construction rather than by a test.
     #[must_use]
     pub fn helix_angles(&self) -> [f64; 2] {
-        let half = self.shaft_angle / 2.0;
-        [half + self.additional_helix, half - self.additional_helix]
+        let first = match self.sizing.manual {
+            FirstMemberSizing::AdditionalHelix(add) if !self.sizing.auto => {
+                self.shaft_angle / 2.0 + add
+            }
+            FirstMemberSizing::HelixAngle(beta) if !self.sizing.auto => beta,
+            // A diameter, given or solved. `cos β = z m_n / d`, clamped so a
+            // diameter below the tooth's own — which `geometry` refuses — reads
+            // as a helix of zero rather than a NaN.
+            _ => {
+                let cos = (f64::from(self.gears[0].teeth.max(1)) * self.module
+                    / self.first_pitch_diameter())
+                .clamp(-1.0, 1.0);
+                cos.acos().to_degrees()
+            }
+        };
+        [first, self.shaft_angle - first]
     }
 
     /// Whether the shafts cross. The parallel case is the zero of the shaft
@@ -273,6 +443,206 @@ impl SpurStage {
     #[must_use]
     pub fn is_crossed(&self) -> bool {
         self.shaft_angle != 0.0
+    }
+
+    /// **The first member's pitch diameter, mm** — from the reading the
+    /// designer gave, or **solved to reach a given centre distance**.
+    ///
+    /// The three readings are one number ([`FirstMemberSizing`]), so this is
+    /// the one accessor the geometry is built from whichever was stated.
+    /// Automatic means the distance decides it — see [`Self::size_reaching`],
+    /// which is also where the two-answers problem is dealt with — and only
+    /// where **both shifts are pinned**: a shift absorbs a distance by
+    /// preference, since it moves the teeth where a size changes them, and
+    /// while one is free the size has nothing to absorb.
+    ///
+    /// Falling back to the number in the box where the distance cannot be
+    /// reached is `docs/rationale.md`'s clamp-rather-than-refuse: the stage still
+    /// solves, at a distance the reported clearance then makes visible.
+    #[must_use]
+    pub fn first_pitch_diameter(&self) -> f64 {
+        let z1 = f64::from(self.gears[0].teeth.max(1)) * self.module;
+        let stated = match self.sizing.manual {
+            FirstMemberSizing::PitchDiameter(d) => d,
+            FirstMemberSizing::HelixAngle(beta_deg) => z1 / beta_deg.to_radians().cos(),
+            FirstMemberSizing::AdditionalHelix(add) => {
+                z1 / (self.shaft_angle / 2.0 + add).to_radians().cos()
+            }
+        };
+        let shifts_pinned = self.gears.iter().all(|g| !g.profile_shift.auto);
+        if !self.sizing.auto || !shifts_pinned {
+            return stated;
+        }
+        self.nominal_distance()
+            .and_then(|target| self.size_reaching(target, stated))
+            .unwrap_or(stated)
+    }
+
+    /// **The first member's size that puts this pair at `target`**, mm of pitch
+    /// diameter — where one exists on the branch the stage is already on.
+    ///
+    /// # Two answers, and the branch is chosen by continuity
+    ///
+    /// On crossed shafts the distance has a **minimum** in the first member's
+    /// diameter ([`Screw::least_distance_lead_angle`]): steepening the thread
+    /// shrinks the worm and grows the wheel, and past the turning point the
+    /// second wins. So a target above the minimum is reached by two worms, and
+    /// picking one is a decision rather than a calculation.
+    ///
+    /// It is taken **on the side the designer's own number is on**, which is the
+    /// only choice under which nudging the target moves the answer smoothly
+    /// instead of jumping between a thin fast worm and a fat slow one. A target
+    /// *below* the minimum is reached by neither and there is no answer to give.
+    ///
+    /// On parallel shafts there is no turning point — the distance only grows
+    /// with the helix — and the one branch runs from the tooth's own diameter
+    /// upward.
+    fn size_reaching(&self, target: f64, from: f64) -> Option<f64> {
+        let z1 = f64::from(self.gears[0].teeth.max(1));
+        let floor = z1 * self.module;
+        // **Degrees here, radians there.** `shaft_angle` is the designer's
+        // number and `Screw`'s is the mathematics'.
+        let turning = Screw::least_distance_lead_angle(
+            self.gears[0].teeth.max(1),
+            self.gears[1].teeth,
+            self.shaft_angle.to_radians(),
+        )
+        .map(|least| z1 * self.module / least.sin());
+
+        // The zero-backlash distance the whole stage would sit at with this
+        // size — the mesh's own, whichever mesh it is — with the shifts as the
+        // stage decides them. Both are pinned wherever this runs.
+        let distance = |d1: f64| -> f64 {
+            let mut probe = self.clone();
+            probe.sizing = Auto::fixed(FirstMemberSizing::PitchDiameter(d1));
+            probe.zero_backlash_distance().unwrap_or(f64::NAN)
+        };
+
+        // **`from` rather than `first_pitch_diameter()`** — that is what calls
+        // this, and reading it back here would recurse forever. It is the
+        // designer's own number, which is the whole point: the branch is chosen
+        // by where they already are. `floor` is the diameter at which the
+        // thread would wrap at a right angle, where `Screw::new` refuses.
+        let grown = |from: f64| {
+            // No upper bound in the geometry, so one is grown until it brackets
+            // — the distance rises without bound on this branch, so it does.
+            let mut top = from * 2.0;
+            for _ in 0..60 {
+                if distance(top) >= target || !distance(top).is_finite() {
+                    break;
+                }
+                top *= 2.0;
+            }
+            top
+        };
+        let (lo, hi) = match turning {
+            Some(turning) if from <= turning => (floor * (1.0 + 1e-9), turning),
+            Some(turning) => (turning, grown(turning.max(from))),
+            None => (floor * (1.0 + 1e-9), grown(from.max(floor * 2.0))),
+        };
+        crate::solve::brent(
+            |d1| distance(d1) - target,
+            lo,
+            hi,
+            crate::solve::Tol::default(),
+        )
+    }
+
+    /// **The zero-backlash centre distance this stage sits at**, mm, with the
+    /// shifts as it decides them — the parallel mesh's `a_w` or the crossed
+    /// mesh's rack-law distance, whichever mesh it has.
+    ///
+    /// `None` where the pair cannot mesh at all.
+    #[must_use]
+    pub fn zero_backlash_distance(&self) -> Option<f64> {
+        let x = self.chosen_at(&crate::auto::Search::SHIPPED).shifts;
+        if self.is_crossed() {
+            return self.screw_at(x).ok().map(|s| s.centre_distance);
+        }
+        let g = [0, 1].map(|i| Tooth::new(self.params_at(i, x[i])));
+        Mesh::new(&g[0], &g[1], MeshKind::External)
+            .ok()
+            .map(|m| m.a_w)
+    }
+
+    /// The crossed-axis geometry this stage describes, at given shifts.
+    ///
+    /// # Errors
+    ///
+    /// [`TrainError::Screw`] if the pair cannot exist.
+    pub fn screw_at(&self, shifts: [f64; 2]) -> Result<Screw, TrainError> {
+        // Caught here rather than in `Screw::new`, because by then the helix
+        // angle has become a diameter and the information is gone: `cos 90°` is
+        // 6e-17, not zero, so the diameter comes out enormous rather than
+        // infinite and passes every finiteness check downstream.
+        if self.helix_angles()[0].abs() >= 90.0 {
+            return Err(TrainError::Screw(
+                crate::screw::ScrewError::FirstMemberIsADisc,
+            ));
+        }
+        Screw::new(&ScrewParams {
+            normal_module: self.module,
+            normal_pressure_angle_rad: self.pressure_angle.to_radians(),
+            shaft_angle_rad: self.shaft_angle.to_radians(),
+            starts: self.gears[0].teeth,
+            wheel_teeth: self.gears[1].teeth,
+            worm_pitch_diameter: self.first_pitch_diameter(),
+            profile_shifts: shifts,
+        })
+        .map_err(TrainError::Screw)
+    }
+
+    /// **This stage with its automatic size resolved to a number**, so the
+    /// geometry below it is built once rather than solved again at every read
+    /// of a helix angle.
+    ///
+    /// The reading is replaced only where it *was* automatic: a stated reading
+    /// is kept in its own words, so a stated additional helix stays `Σ/2 + β`
+    /// to the bit rather than becoming a diameter and coming back through an
+    /// arccosine.
+    #[must_use]
+    pub fn sized(&self) -> Self {
+        if !self.sizing.auto {
+            return self.clone();
+        }
+        Self {
+            sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(
+                self.first_pitch_diameter(),
+            )),
+            ..self.clone()
+        }
+    }
+
+    /// The crossed-axis geometry this stage describes, at the shifts it
+    /// decides — its zero-backlash distance is the stage's.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::screw_at`].
+    pub fn geometry(&self) -> Result<Screw, TrainError> {
+        self.screw_at(self.chosen_at(&crate::auto::Search::SHIPPED).shifts)
+    }
+
+    /// **The shift sum that puts this pair at `target`**, in normal modules —
+    /// the parallel mesh's involute relation, or the crossed mesh's rack law
+    /// ([`crate::screw::ScrewParams::profile_shifts`]). `None` where no sum
+    /// reaches it.
+    fn shift_sum_reaching(&self, target: f64) -> Option<f64> {
+        if self.is_crossed() {
+            // At zero shift, which is the only thing the reference depends on
+            // — and asking `geometry()` here would ask the shifts, which is
+            // what this is deciding.
+            let reference = self.screw_at([0.0; 2]).ok()?.reference_distance;
+            let sum = (target - reference) / self.module;
+            return sum.is_finite().then_some(sum);
+        }
+        let rack = crate::plane::BasicRack::new(
+            self.module,
+            self.pressure_angle,
+            self.helix_angles()[0].abs(),
+        );
+        let sum_z = f64::from(self.gears[0].teeth) + f64::from(self.gears[1].teeth);
+        crate::mesh::shift_sum_for(rack.mt, rack.alpha_t, rack.alpha_n, sum_z, target)
     }
 
     /// The two profile shifts, chosen together where that is what the stage
@@ -321,15 +691,9 @@ impl SpurStage {
         // — and solving the shifts from the distance would answer a question
         // they did not ask. So the sum is pinned only when the clearance is a
         // number they stated.
-        let sum = self.nominal_distance().and_then(|target| {
-            let rack = crate::plane::BasicRack::new(
-                self.module,
-                self.pressure_angle,
-                self.helix_angles()[0].abs(),
-            );
-            let sum_z = f64::from(self.gears[0].teeth) + f64::from(self.gears[1].teeth);
-            crate::mesh::shift_sum_for(rack.mt, rack.alpha_t, rack.alpha_n, sum_z, target)
-        });
+        let sum = self
+            .nominal_distance()
+            .and_then(|target| self.shift_sum_reaching(target));
 
         // **What the constraints alone imply**, with no objective involved.
         //
@@ -360,7 +724,12 @@ impl SpurStage {
         // whatever distance that happened to make. Mode 3 of the clearance
         // paradigm (`docs/reference.md#which-of-the-three-numbers-is-given-and-which-follows`) is the
         // rule: the distance and the clearance are given, so the shifts follow.
-        if !self.optimisation.enabled {
+        // **The optimiser is a parallel-axis search**: its trial mesh, its
+        // objective and its five refusals are the line-contact model's. A
+        // crossed pair asked to optimise gets what the constraints imply and a
+        // note saying the search does not reach it — not a search over the
+        // wrong mesh, and not silence.
+        if !self.optimisation.enabled || self.is_crossed() {
             return super::Chosen {
                 shifts: constrained().unwrap_or_else(|| asked.map(|a| a.settled)),
                 how: super::Searched::NotAsked,
@@ -465,18 +834,24 @@ impl SpurStage {
     }
 }
 
-/// Solve one stage, given the torque on its first gear.
+/// Solve one pair, given the torque on its first gear.
+///
+/// One entry for every kind of pair: the shaft angle decides whether the mesh
+/// is the parallel one solved here or the crossed one
+/// ([`super::crossed::solve_crossed_pair`]), and the kind decides the little a
+/// kind decides ([`PairKind`]).
 ///
 /// # Errors
 ///
 /// [`TrainError`] when the pair cannot mesh, never reaches contact, names a
 /// material the library does not have, or is too undercut to rate.
-pub fn solve_spur_stage(
-    stage: &SpurStage,
+pub fn solve_pair_stage(
+    stage: &PairStage,
+    kind: PairKind,
     torques: StageTorques,
     lib: &MaterialLibrary,
-) -> Result<SpurResult, TrainError> {
-    solve_spur_stage_with(stage, torques, lib, super::Reversal::default())
+) -> Result<PairResult, TrainError> {
+    solve_pair_stage_with(stage, kind, torques, lib, super::Reversal::default())
 }
 
 /// The same, told how the train treats a root loaded on both flanks.
@@ -486,13 +861,29 @@ pub fn solve_spur_stage(
 ///
 /// # Errors
 ///
-/// As [`solve_spur_stage`].
-pub fn solve_spur_stage_with(
-    stage: &SpurStage,
+/// As [`solve_pair_stage`].
+pub fn solve_pair_stage_with(
+    stage: &PairStage,
+    kind: PairKind,
     torques: StageTorques,
     lib: &MaterialLibrary,
     reversal: super::Reversal,
-) -> Result<SpurResult, TrainError> {
+) -> Result<PairResult, TrainError> {
+    // The size once, before anything reads a helix angle off it.
+    let sized = stage.sized();
+    if sized.is_crossed() {
+        return super::crossed::solve_crossed_pair(&sized, kind, torques, lib);
+    }
+    solve_parallel(&sized, torques, lib, reversal)
+}
+
+/// The parallel-axis mesh: line contact, a bending rating, one efficiency.
+fn solve_parallel(
+    stage: &PairStage,
+    torques: StageTorques,
+    lib: &MaterialLibrary,
+    reversal: super::Reversal,
+) -> Result<PairResult, TrainError> {
     // The shifts once, not once per gear: with the optimiser on, `shifts` is a
     // search, and asking each gear for its own would run it twice for one
     // answer.
@@ -524,7 +915,7 @@ pub fn solve_spur_stage_with(
     // the backlash is a consequence rather than a choice. Unless the shifts are
     // being chosen, in which case *they* absorb it: `shifts_at` pins the sum a
     // clearance inside the given distance, so the designer gets both the housing
-    // and the play. [`SpurResult::clearance`] reports what came of it, derived.
+    // and the play. [`PairResult::clearance`] reports what came of it, derived.
     //
     // This used to be a `clearance_taken()` returning zero in the given-distance
     // case, which reads as the rule and enforced none of it: **every caller of
@@ -747,6 +1138,9 @@ pub fn solve_spur_stage_with(
             input: &stage.gears[i],
             rated: this,
             face_width: widths[i],
+            // A parallel pair's face is sized by a rating, and the rating is
+            // the recommendation.
+            recommended_face_width: None,
             torque: load_i.torque,
             back_driving_torque: torques.referred_like(load_i.torque),
             // Filled in by `solve_train`, which is the only level that knows
@@ -760,16 +1154,30 @@ pub fn solve_spur_stage_with(
 
     // --- contact ratios. eps_beta needs the face width, which is why it could
     // not exist before this milestone.
-    let contact_ratios = ContactRatios::of(
-        path.contact_ratio,
-        effective,
-        stage.additional_helix,
-        stage.module,
-    );
+    let helix = stage.helix_angles()[0];
+    let contact_ratios = ContactRatios::of(path.contact_ratio, effective, helix, stage.module);
 
     // --- backlash at the three centre distances.
-    let angular =
-        |a: f64, at: MeshSide| -> f64 { mesh.angular_backlash(a, at).unwrap_or(0.0).to_degrees() };
+    //
+    // Two displacements open the flanks, and both are projections onto the
+    // common normal: the centre-distance error, which the mesh already turns
+    // into transverse play, and the first member's axial float, a rigid slide
+    // that opens one flank as far as it closes the other — `j_axial sin β_b1`
+    // along the normal, lost once. The crossed mesh projects the same two onto
+    // the same normal (`crossed::angular_backlash`); a spur gear's `β_b` is
+    // zero and the term with it.
+    let slide = {
+        let bb =
+            crate::plane::base_helix_angle(helix.to_radians(), stage.pressure_angle.to_radians());
+        stage.axial_clearance * bb.sin().abs()
+    };
+    let p_bn = std::f64::consts::PI * stage.module * stage.pressure_angle.to_radians().cos();
+    let angular = |a: f64, at: MeshSide| -> f64 {
+        let teeth = stage.gears[at.index()].teeth;
+        (mesh.angular_backlash(a, at).unwrap_or(0.0)
+            + crate::mesh::angular_play(slide, teeth, p_bn))
+        .to_degrees()
+    };
     // Reported by direction rather than by member: the output of a forward
     // drive is gear 2, of a backward drive gear 1, and the same gap subtends a
     // different angle at each.
@@ -785,7 +1193,7 @@ pub fn solve_spur_stage_with(
     };
     let backlash = [at_member(MeshSide::First), at_member(MeshSide::Second)];
 
-    if stage.additional_helix != 0.0 && !contact_ratios.has_full_axial_overlap() {
+    if helix != 0.0 && !contact_ratios.has_full_axial_overlap() {
         notes.push(Note::new(key::STAGE_OVERLAP_BELOW_ONE).number(
             "ratio",
             contact_ratios.overlap,
@@ -819,14 +1227,14 @@ pub fn solve_spur_stage_with(
     // the shifts alone (`super::Searched`).
     notes.extend(chosen.how.note());
 
-    Ok(SpurResult {
+    Ok(PairResult {
         ratio: f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth),
         centre_distance_nominal: mesh.a_w,
         centre_distance: centre,
         // The gap the pair runs at, which is the two distances above it and a
         // subtraction rather than the input echoed back.
         clearance: centre - mesh.a_w,
-        mesh: MeshReport {
+        mesh: PairMesh::Line(MeshReport {
             // **Asked of the mesh as it runs**, opened by the assembly
             // clearance — which is the mesh every other figure here is read off,
             // and the less conservative of the two: opening a centre distance
@@ -857,7 +1265,7 @@ pub fn solve_spur_stage_with(
             // A parallel-axis pair is external: its tips meet on the line of
             // centres or not at all, which `bottom_clearance` already asks.
             tips: None,
-        },
+        }),
         gears: [gears[0].clone(), gears[1].clone()],
         notes,
     })
