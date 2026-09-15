@@ -5,8 +5,8 @@ stages 3 -> 3
   quantity                 exported            re-imported   same
   total ratio               354.117647059    354.117647059   yes
   output speed rpm            8.471760797      8.471760797   yes
-  output torque Nm          421.713276560    421.713276560   yes
-  efficiency forward          0.595442334      0.595442334   yes
-  backlash out deg            0.084463074      0.084463074   yes
+  output torque Nm          421.767813339    421.767813339   yes
+  efficiency forward          0.595519338      0.595519338   yes
+  backlash out deg            0.084319261      0.084319261   yes
 
   the file is the train: every figure identical to the last bit

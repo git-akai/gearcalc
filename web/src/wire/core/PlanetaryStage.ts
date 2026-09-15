@@ -79,7 +79,6 @@ optimisation: Optimisation,
  */
 load_sharing: LoadSharing, 
 /**
- * Added to the common centre distance, mm — the running clearance.
  * **The distance the sun runs from a planet, or automatic.**
  *
  * The same shape and the same decision every other stage's centre distance
@@ -93,7 +92,21 @@ load_sharing: LoadSharing,
  * absorbed rather than one, which is the same accounting a pair does — see
  * [`crate::train::FreedomGroup`].
  */
-centre_distance: Auto<number>, clearance: Auto<number>, tolerance_plus: number, tolerance_minus: number, 
+centre_distance: Auto<number>, 
+/**
+ * The running clearance, mm — in **both** meshes, and always an input.
+ *
+ * One physical distance carries a sun–planet mesh that opens as the planet
+ * moves out and a planet–ring mesh that opens as it moves in, so a
+ * clearance in both is the two zero-backlash distances differing by `2c`
+ * ([`crate::mesh::MeshKind::run_at`]) — which is what the absorbing shift
+ * is solved to leave. That is why it cannot be derived: a given distance
+ * and given shifts leave one gap on each mesh, and there is no one number
+ * for this field to be. It carries the same `Auto` every kind's does so
+ * the front end can offer it the same way; [`super::Stage::freedoms`]
+ * says it may not be automatic, and relief pins it.
+ */
+clearance: Auto<number>, tolerance_plus: number, tolerance_minus: number, 
 /**
  * Smallest acceptable gap between adjacent planets' tip circles, mm.
  */

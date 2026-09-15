@@ -288,12 +288,18 @@ their circles cross, which is what decides a small tooth difference — and a
 bending rating.
 Verified by simulating the cut — 2.5–2.7 µm across shifts −0.4 … +0.5.
 
-**Planetary sets.** The shift that makes the two centre distances agree — the
-planet's by default, and the sun's or the ring's where the planet is pinned,
-which is one relation among three shifts and so two of them a design; the sun
-and ring cases are closed form where the planet's needs a solve,
-the ring search, layout checks, Willis kinematics, Pennestrì–Freudenstein
-efficiency in all six arrangements, and backlash referred to the output shaft.
+**Planetary sets.** The shift that puts the two meshes at one physical distance
+with the running clearance in both — their zero-backlash distances differing by
+twice it, the internal mesh opening as its centres close — the planet's by
+default, and the sun's or the ring's where the planet is pinned, which is one
+relation among three shifts and so two of them a design; the sun and ring cases
+are closed form where the planet's needs a solve. On the ideal ring that is the
+planet thinned by the clearance, and the shipped 24/18/60 carries −0.02. The
+ring search, layout checks, Willis kinematics, Pennestrì–Freudenstein
+efficiency in all six arrangements, and backlash referred to the output shaft —
+which on the ideal ring a centre tolerance cannot move, the sun mesh gaining
+what the ring mesh loses. The set's clearance is always given: it is what the
+two nominal distances differ by, and no one distance could hand it back.
 
 **A tooth costs what it measures.** Building one ran a two-thousand-point scan of
 its trochoid to ask whether undercut had removed the flank entirely — on every
@@ -569,14 +575,6 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   but a longer moment arm: a planetary ring comes out **2.4 % higher** with
   sharing on than off. Measured, not assumed, and it is why the sharing sweep
   asserts reach rather than relief.
-- **An internal mesh's tip room is read at the pair's own zero-backlash centre
-  distance**, and the stage then assembles at that distance opened by its running
-  clearance. Opening a mesh moves the tips apart, so the reported answer is the
-  **tighter** one: a pair reported clear is clear where it runs, and a pair
-  reported fouling may have a little more room than the flag suggests. The size
-  is the clearance, 0.02 mm on the shipped proportions against tip margins of
-  degrees; the sign is stated because a search refuses on this flag and a
-  conservative refusal is still a refusal.
 - **Hardened 4340's fatigue allowable is the weakest number in the library.**
 - **A face width typed as zero describes a gear with no face**, and every
   rating taken at one is infinite. Those cross the boundary as `null` and the

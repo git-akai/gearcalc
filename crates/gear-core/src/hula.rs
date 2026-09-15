@@ -200,6 +200,18 @@ pub struct Set {
     /// refused, because it describes an arrangement that could be built and would
     /// foul, which is a thing a designer is owed the number for.
     pub clearance: f64,
+    /// How far inside the solved offset the crank **runs**, mm.
+    ///
+    /// The offset this arrangement solves is the zero-backlash one; both its
+    /// meshes are internal, and an internal pair's flanks part as its centres
+    /// come together, so the crank is set that much shorter than the offset
+    /// solved ([`crate::mesh::MeshKind::run_at`]). It is geometry rather than a
+    /// load, which is why the arrangement has to know it: the far-side gap
+    /// closes by the same amount the flanks open, so the gap a designer asks
+    /// for is held *as built* by solving for that much more at zero backlash;
+    /// the base-circle floor sits that much higher; and a bound supplied from
+    /// the parts is asked where they run.
+    pub running_clearance: f64,
     pub offset: Offset,
     pub split: [Split; 2],
 }
@@ -213,7 +225,8 @@ pub struct Layout {
     pub alpha_w: [f64; 2],
     /// Profile shift of each gear, in [`Teeth`]'s order.
     pub shift: [f64; 4],
-    /// Far-side tip gap of each mesh, mm.
+    /// Far-side tip gap of each mesh **as it runs**, mm — the gap at the
+    /// solved offset less the running clearance the crank takes back.
     pub clearance: [f64; 2],
     /// Which mesh sits at the clearance minimum, when the offset came from it.
     /// `None` when the offset was given, or when neither mesh is what held it
@@ -457,15 +470,19 @@ pub fn solve_with(set: &Set, bound: Bound) -> Result<Layout, Error> {
             // pair at all, so every requirement is asked at or above the higher
             // of the two floors — otherwise a bound would be asked about a mesh
             // that does not exist yet, and answer with a NaN.
+            // ...and the crank runs a clearance inside the offset solved, so
+            // the floor is that much higher, and the gap solved for is the gap
+            // wanted plus what the crank will take back.
             let floor = geometry
                 .iter()
                 .map(|g| g.a_ref * g.rack.alpha_t.cos())
                 .fold(0.0_f64, f64::max)
-                * (1.0 + 1e-9);
+                * (1.0 + 1e-9)
+                + set.running_clearance;
             let mut wants = [0.0_f64; 2];
             for (mesh, geo) in geometry.iter().enumerate() {
                 let gap = geo
-                    .offset_for_clearance(set.clearance)
+                    .offset_for_clearance(set.clearance + set.running_clearance)
                     .ok_or(Error::ClearanceUnreachable(mesh))?
                     .max(floor);
                 let shifts_at = |e: f64| shifts_at_offset(set, &geometry, &pairs, e);
@@ -479,7 +496,12 @@ pub fn solve_with(set: &Set, bound: Bound) -> Result<Layout, Error> {
                     // walking out rather than guessed at.
                     let mut hi = gap;
                     let mut steps = 0;
-                    while supplied(hi) < 0.0 {
+                    // `NaN` is a bound with nothing to measure yet — below the
+                    // running floor of a mesh — and is walked past, not
+                    // mistaken for met.
+                    while supplied(hi).partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater)
+                        && supplied(hi) != 0.0
+                    {
                         hi *= 1.1;
                         steps += 1;
                         if steps > 200 || !hi.is_finite() {
@@ -515,7 +537,7 @@ pub fn solve_with(set: &Set, bound: Bound) -> Result<Layout, Error> {
     for (mesh, geo) in geometry.iter().enumerate() {
         let a_w = geo.alpha_w_at(offset).ok_or(Error::OffsetTooSmall(mesh))?;
         alpha_w[mesh] = a_w;
-        clearance[mesh] = geo.clearance_at(a_w);
+        clearance[mesh] = geo.clearance_at(a_w) - set.running_clearance;
     }
     // The difference is the offset's; the sum is whatever the split says.
     let shift = shifts_at_offset(set, &geometry, &pairs, offset).ok_or(Error::OffsetTooSmall(0))?;
@@ -545,6 +567,7 @@ mod tests {
             helix_angle: 0.0,
             addendum: [0.8; 4],
             clearance: 0.5,
+            running_clearance: 0.0,
             offset: Offset::Clearance,
             split: [Split::Pinion(0.0); 2],
         }

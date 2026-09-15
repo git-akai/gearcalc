@@ -11,9 +11,17 @@ export type Layout = {
 shift: [number, number, number], 
 /**
  * The common centre distance, mm — sun-to-planet and planet-to-ring, which
- * are now the same number.
+ * are now the same number: the one the set **runs** at, with
+ * [`Set::clearance`] in both meshes.
  */
 centre_distance: number, 
+/**
+ * The two meshes' zero-backlash distances, mm, sun–planet then
+ * planet–ring. They differ by twice the clearance — the external mesh runs
+ * a clearance *above* its own and the internal one a clearance *below*
+ * ([`MeshKind::run_at`]) — and are equal only at none.
+ */
+nominal: [number, number], 
 /**
  * Operating pressure angle of the sun–planet mesh, radians.
  */
@@ -23,7 +31,7 @@ alpha_w_sun: number,
  */
 alpha_w_ring: number, 
 /**
- * Residual `|a_ext − a_int|` at the returned shift, mm.
+ * Residual between the two running distances at the returned shift, mm.
  *
  * Reported rather than asserted. It is the one number that says the solve
  * actually closed, and a caller that wants to trust the layout can look at

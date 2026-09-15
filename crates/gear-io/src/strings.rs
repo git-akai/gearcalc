@@ -1379,6 +1379,7 @@ mod tests {
                     helix_angle: 0.0,
                     addendum: [0.8; 4],
                     clearance,
+                    running_clearance: 0.0,
                     offset,
                     split: [Split::Pinion(0.0); 2],
                 };

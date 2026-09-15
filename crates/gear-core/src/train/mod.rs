@@ -116,11 +116,19 @@ pub struct Backlash {
 impl Backlash {
     /// The band a centre-distance tolerance opens around a nominal distance.
     ///
-    /// **One construction, because the sign convention is one claim.** A
-    /// *smaller* centre distance leaves less room and so less play, and a larger
-    /// one more — so `minus` gives the minimum and `plus` the maximum, and
-    /// getting that backwards produces a band that reads perfectly well and is
-    /// inside out.
+    /// **One construction, and which end is which is read off the numbers.**
+    /// A larger centre distance is more play on an external pair and less on an
+    /// internal one, whose flanks part as the centres come together — so the
+    /// tolerance's `minus` end is the minimum on one kind and the maximum on
+    /// the other. This used to assign `minus` to the minimum outright, which
+    /// reads perfectly well and is inside out on every internal mesh.
+    ///
+    /// A set that carries one of each, referred to one shaft, is neither: what
+    /// the sun mesh gains from a planet moved outward the ring mesh loses, so
+    /// on the ideal ring the referred play is stationary at the running
+    /// distance and both ends of the band sit *below* the nominal. The nominal
+    /// is therefore a candidate for either end, and the band is the extremes
+    /// of the three rather than of the two.
     ///
     /// It was written out four times, once per stage kind, each closing over its
     /// own way of turning a distance into an angle. That is the part that
@@ -128,10 +136,15 @@ impl Backlash {
     /// it differently — so it is the argument, and the three lines around it are
     /// not.
     pub fn banded(nominal: f64, minus: f64, plus: f64, angular: impl Fn(f64) -> f64) -> Self {
+        let (lo, mid, hi) = (
+            angular(nominal - minus),
+            angular(nominal),
+            angular(nominal + plus),
+        );
         Self {
-            nominal: angular(nominal),
-            minimum: angular(nominal - minus),
-            maximum: angular(nominal + plus),
+            nominal: mid,
+            minimum: lo.min(mid).min(hi),
+            maximum: lo.max(mid).max(hi),
         }
     }
 }
@@ -462,12 +475,19 @@ pub struct TipRoom {
 }
 
 impl TipRoom {
-    /// Read off the pair, at the centre distance its own shifts give it.
+    /// Read off the pair, at the centre distance it **runs** at — a clearance
+    /// inside its zero-backlash one, for an internal pair. Read at the latter
+    /// the margin is looser than the teeth have, and the shipped hula stage's
+    /// binding mesh sat at exactly nought there and a hair under it as built.
     ///
     /// `None` where the two cannot be meshed at all, which the caller already
     /// knows by other means — every caller here has built the mesh.
-    pub(crate) fn of(ring: &crate::ring::Ring, pinion: &crate::Tooth) -> Option<Self> {
-        crate::ring::mesh_with(ring, pinion).map(|m| Self {
+    pub(crate) fn at(
+        ring: &crate::ring::Ring,
+        pinion: &crate::Tooth,
+        running: f64,
+    ) -> Option<Self> {
+        crate::ring::mesh_at(ring, pinion, running).map(|m| Self {
             tip_interference: m.tip_interference,
             tip_margin: m.tip_margin.to_degrees(),
         })
@@ -1720,13 +1740,16 @@ impl Searched {
 /// A negative clearance is a pair whose teeth overlap at rest: it cannot be
 /// assembled, and every figure computed at that distance describes nothing. A
 /// 9/37 pair told to run at 23.00 mm, whose shifts put it at 23.4433, reported
-/// **−0.4433 mm** of clearance and not one word.
+/// **−0.4433 mm** of clearance and not one word. "Inside" is the mesh's own
+/// reading — an internal pair overlaps when its centres are too far *apart* —
+/// so the finding is asked of the clearance rather than of which distance is
+/// the larger.
 ///
 /// Notes rather than refusals, on rule 5's reading: the gears exist and are
 /// cuttable, so what is wrong is the *assembly*, and a designer is owed the
 /// number rather than an error. `asked` is `None` where no distance was given,
 /// which is the case neither finding can arise in.
-pub(crate) fn distance_notes(target: Option<f64>, running: f64, nominal: f64) -> Vec<Note> {
+pub(crate) fn distance_notes(target: Option<f64>, nominal: f64, clearance: f64) -> Vec<Note> {
     // A hundredth of a micron. Reaching the target is a solve, so agreement is
     // near machine precision and a failure is gross — the 9/37 pair below misses
     // by 0.44 mm. This separates the two, and is not a tolerance on an answer.
@@ -1734,10 +1757,12 @@ pub(crate) fn distance_notes(target: Option<f64>, running: f64, nominal: f64) ->
 
     let mut out = Vec::new();
     // `target` is the **nominal** distance mode 3 asked the shifts for — the
-    // distance given less the clearance given — and `None` where the stage was
-    // not in mode 3 at all, which is the case this cannot arise in. Derived
-    // rather than reported by the caller, so it cannot disagree with the two
-    // numbers beside it.
+    // distance given with the clearance given taken out of it, in the mesh's
+    // own direction — and `None` where the stage was not in mode 3 at all,
+    // which is the case this cannot arise in. `clearance` is the gap the stage
+    // actually left, signed the way the mesh reads it: positive is play on
+    // either kind, so a negative one is teeth overlapping at rest whichever way
+    // the centres moved to get there.
     if let Some(target) = target {
         if (nominal - target).abs() > REACHED {
             out.push(
@@ -1747,10 +1772,10 @@ pub(crate) fn distance_notes(target: Option<f64>, running: f64, nominal: f64) ->
             );
         }
     }
-    if running < nominal {
+    if clearance < 0.0 {
         out.push(
             Note::new(key::STAGE_CLEARANCE_NEGATIVE)
-                .number("overlap", nominal - running, 4)
+                .number("overlap", -clearance, 4)
                 .number("nominal", nominal, 4),
         );
     }
@@ -1935,12 +1960,11 @@ impl Stage {
                 // moment touching, and the second — reached only when sparing
                 // it leaves the group unsatisfiable — does not.
                 //
-                // No kind reaches the second pass today: it was the planetary
-                // set's, whose clearance was alone in its group while the set
-                // had no distance to derive one from, and the toggle snapping
-                // back was the tool saying so. It stays because it is the law
-                // and not a case — a kind whose group has one input would reach
-                // it again, and the walk is the same walk.
+                // The planetary set reaches the second pass: its clearance is
+                // alone in its group with none allowed automatic, because it
+                // is the amount its two zero-backlash distances differ by and
+                // nothing else can hand it back, and the toggle snapping back
+                // is the tool saying so.
                 for spare_just in [true, false] {
                     for f in &group.order {
                         if over <= limit {
@@ -2031,17 +2055,27 @@ impl Stage {
             // The pair has no analogue. Its distance, two shifts and size are
             // bound by one relation and that is all, which is why its group is
             // flat.
+            //
+            // **And its clearance is always given.** One physical distance
+            // carries an external mesh and an internal one, and a clearance
+            // opens them in opposite directions — so it is the amount by which
+            // the two zero-backlash distances *differ*, which is a fact the
+            // shifts are solved from and not one a distance could hand back:
+            // a given distance and given shifts leave a gap on each mesh, and
+            // there is no one number for the field to derive. Alone in its
+            // group with none allowed automatic, so relief pins it — the
+            // second pass of `relieved`, which this kind is the reason for.
             Self::Planetary(p) => vec![
                 FreedomGroup {
-                    given_at_most: if p.centre_distance.auto || p.clearance.auto {
-                        2
-                    } else {
-                        1
-                    },
+                    given_at_most: if p.centre_distance.auto { 2 } else { 1 },
                     automatic_at_most: 3,
                     order: (0..3).map(Freedom::Shift).collect(),
                 },
-                distance_and_clearance.clone(),
+                FreedomGroup {
+                    given_at_most: 1,
+                    automatic_at_most: 0,
+                    order: vec![Freedom::Clearance],
+                },
             ],
             // **One relation per mesh.** The crank offset fixes the difference
             // of a pair's two shifts, so pinning both over-specifies that mesh
@@ -4712,6 +4746,38 @@ mod tests {
         }
     }
 
+    /// **A set's clearance cannot be automatic, even when it is the input the
+    /// designer just touched.** It is the amount the two zero-backlash distances
+    /// differ by, which the shifts are solved from; a given distance and given
+    /// shifts leave a gap on each mesh and no one number to hand back. So the
+    /// second pass of `relieved` — the one that does not spare `just` — pins
+    /// it, and the toggle snapping back is the tool saying so.
+    #[test]
+    fn a_planetary_sets_clearance_is_pinned_back_whatever_was_touched() {
+        let set = PlanetaryStage {
+            clearance: Auto::automatic(0.02),
+            ..PlanetaryStage::default()
+        };
+        for just in [
+            Freedom::Clearance,
+            Freedom::CentreDistance,
+            Freedom::Shift(1),
+        ] {
+            let relieved = Stage::Planetary(Box::new(set.clone())).relieved(just);
+            let Stage::Planetary(p) = relieved else {
+                unreachable!()
+            };
+            assert!(
+                !p.clearance.auto,
+                "relieving after {just:?} should pin the clearance"
+            );
+            assert_eq!(
+                p.clearance.manual, 0.02,
+                "and leave the number where it was"
+            );
+        }
+    }
+
     /// **Relieving an over-determined stage**, on every kind that has a relation
     /// — behaviour that had no test at all while it lived in the panel.
     ///
@@ -5279,7 +5345,7 @@ mod tests {
         let r = solve_train(&train, &lib).expect("a train of every kind");
 
         let mut checked = 0u32;
-        let mut check = |what: &str, b: &Backlash| {
+        let mut check = |what: &str, b: &Backlash, opens: bool| {
             checked += 1;
             assert!(
                 b.minimum <= b.nominal && b.nominal <= b.maximum,
@@ -5288,17 +5354,35 @@ mod tests {
                 b.nominal,
                 b.maximum
             );
-            assert!(
-                b.maximum > b.minimum,
-                "{what}: a tolerance that opens nothing — {} either way",
-                b.minimum
-            );
+            if opens {
+                assert!(
+                    b.maximum > b.minimum,
+                    "{what}: a tolerance that opens nothing — {} either way",
+                    b.minimum
+                );
+            } else {
+                // **The one band a tolerance cannot open.** On the ideal ring,
+                // `z_r = z_s + 2 z_p`, both meshes have the same reference
+                // distance, so their operating angles are the same function of
+                // the running distance and the referred play
+                // `2 (z_s + z_p)(inv α_w,ring − inv α_w,sun)` is invariant in
+                // it — to all orders, not merely to first. What the sun mesh
+                // gains from a planet moved out, the ring mesh loses. The
+                // shipped set is that set.
+                assert!(
+                    b.maximum - b.minimum < 1e-12,
+                    "{what}: the ideal set's play should not move with its centre tolerance, \
+                     but the band is {} wide",
+                    b.maximum - b.minimum
+                );
+            }
         };
 
         for (k, stage) in r.stages.iter().enumerate() {
             let d = stage.backlash();
-            check(&format!("stage {k} forward"), &d.forward);
-            check(&format!("stage {k} backward"), &d.backward);
+            let opens = !matches!(stage, StageResult::Planetary(_));
+            check(&format!("stage {k} forward"), &d.forward, opens);
+            check(&format!("stage {k} backward"), &d.backward, opens);
         }
         assert!(checked >= 10, "only {checked} bands checked");
     }
@@ -6151,8 +6235,13 @@ mod tests {
     fn the_sharing_model_reaches_every_member_that_bends() {
         use crate::contact::LoadSharing;
         let lib = library();
+        // Tall enough that every mesh is above `ε_n = 2` **where it runs**:
+        // the set's sun–planet mesh sits at 1.997 at 1.35 modules once rated a
+        // clearance off its zero-backlash distance, which is just the wrong
+        // side of the band and exactly what this test would misread as a
+        // member the model does not reach.
         let tall = |g: &StageGear| StageGear {
-            addendum: 1.35,
+            addendum: 1.4,
             ..g.clone()
         };
         let bending_of = |sharing: LoadSharing| {

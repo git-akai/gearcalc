@@ -1,3 +1,3 @@
-hula mesh 1  ring z19 x+0.4375  pinion z18 x+0.0000   gap asked 0.25 got 0.2772 mm   alpha_w 50.57 deg   tip false (+0.0000 deg)   centre distance 0.7397 mm
+hula mesh 1  ring z19 x+0.4519  pinion z18 x+0.0000   gap asked 0.25 got 0.2779 mm   alpha_w 50.96 deg   tip false (+0.0000 deg)   centre distance 0.7460 mm
   best assembly phase 9.4737 deg of a 18.947 deg ring pitch, clear by -0.00000 mm there
-  rolled through one tooth: least clearance -0.00001 mm at -20.6 deg from the line of centres   (touching, as a mesh does)
+  rolled through one tooth: least clearance -0.00001 mm at 20.2 deg from the line of centres   (touching, as a mesh does)

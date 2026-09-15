@@ -41,7 +41,7 @@
 //! `docs/reference.md#internal-gears` records what happened to the attempt that treated it as
 //! one. Efficiency is docs/reference.md#planetary-sets and belongs with the stage.
 
-use crate::mesh::operating_geometry;
+use crate::mesh::{operating_geometry, MeshKind};
 use crate::plane::BasicRack;
 use crate::solve::{newton_bracketed, Tol};
 
@@ -90,13 +90,19 @@ pub struct Layout {
     /// [`Set::shift`] with the absorber's entry filled in by the solve.
     pub shift: [f64; 3],
     /// The common centre distance, mm — sun-to-planet and planet-to-ring, which
-    /// are now the same number.
+    /// are now the same number: the one the set **runs** at, with
+    /// [`Set::clearance`] in both meshes.
     pub centre_distance: f64,
+    /// The two meshes' zero-backlash distances, mm, sun–planet then
+    /// planet–ring. They differ by twice the clearance — the external mesh runs
+    /// a clearance *above* its own and the internal one a clearance *below*
+    /// ([`MeshKind::run_at`]) — and are equal only at none.
+    pub nominal: [f64; 2],
     /// Operating pressure angle of the sun–planet mesh, radians.
     pub alpha_w_sun: f64,
     /// ...and of the planet–ring mesh, radians.
     pub alpha_w_ring: f64,
-    /// Residual `|a_ext − a_int|` at the returned shift, mm.
+    /// Residual between the two running distances at the returned shift, mm.
     ///
     /// Reported rather than asserted. It is the one number that says the solve
     /// actually closed, and a caller that wants to trust the layout can look at
@@ -156,6 +162,29 @@ pub struct Set {
     /// clearance, which is the one check that cares how big a planet is rather
     /// than how many teeth it has.
     pub planet_tip_diameter: f64,
+    /// **The running clearance, in both meshes**, mm.
+    ///
+    /// One physical distance carries two meshes, and a clearance opens them in
+    /// opposite directions: the sun–planet pair parts as the planet moves out,
+    /// the planet–ring pair as it moves in. So the two zero-backlash distances
+    /// cannot be the same number — they must differ by `2c`, and that is what
+    /// the shifts are solved to leave. Written as a distance the two agreed at
+    /// with the clearance added afterwards, the internal mesh ran a clearance
+    /// *tighter* than zero backlash, and the shifts never heard of it
+    /// (`docs/corrections.md`).
+    pub clearance: f64,
+}
+
+impl Set {
+    /// The zero-backlash distance each mesh must have to run at `running` with
+    /// this set's clearance — sun–planet, then planet–ring.
+    #[must_use]
+    pub fn nominal_at(&self, running: f64) -> [f64; 2] {
+        [
+            MeshKind::External.nominal_of(running, self.clearance),
+            MeshKind::Internal.nominal_of(running, self.clearance),
+        ]
+    }
 }
 
 /// One of the three members, and so one of [`Set::shift`]'s entries.
@@ -298,8 +327,20 @@ pub fn solve(set: &Set) -> Option<Layout> {
         )
     };
 
+    // Each mesh where it runs — the external one a clearance above its own
+    // zero-backlash distance, the internal one a clearance below — and the set
+    // closes where those two are one number.
+    let runs = |a_e: f64, a_i: f64| {
+        (
+            MeshKind::External.run_at(a_e, set.clearance),
+            MeshKind::Internal.run_at(a_i, set.clearance),
+        )
+    };
     let g = |x_p: f64| match (ext(x_p), int(x_p)) {
-        (Some((_, _, a_e)), Some((_, _, a_i))) => a_e - a_i,
+        (Some((_, _, a_e)), Some((_, _, a_i))) => {
+            let (e, i) = runs(a_e, a_i);
+            e - i
+        }
         // Outside the involute domain the residual has no value, and returning a
         // number here would let the solver walk into it. `newton_bracketed`
         // rejects a non-finite endpoint, which is the right answer.
@@ -318,18 +359,19 @@ pub fn solve(set: &Set) -> Option<Layout> {
         crate::mesh::shift_sum_for(rack.mt, rack.alpha_t, rack.alpha_n, sum_z, a_w)
     };
     // **A given distance is two equations, and both are closed form.** Each
-    // mesh has a shift sum it must reach to run at that distance, so the two
-    // sums are known outright:
+    // mesh has a shift sum it must reach to run at that distance with the
+    // clearance, so the two sums are known outright:
     //
-    //     x_s + x_p = shift_sum_for(sum_ext, a)
-    //     x_p − x_r = shift_sum_for(sum_int, a)
+    //     x_s + x_p = shift_sum_for(sum_ext, a − c)
+    //     x_p − x_r = shift_sum_for(sum_int, a + c)
     //
     // which leaves **one** freedom. It is taken as the planet's shift, the
     // member in both meshes, and the other two are read off it — so a target
     // removes the Newton iteration below rather than adding to it.
     if let Some(target) = set.distance {
-        let s_ext = sum_x_for(sum_ext, target)?;
-        let s_int = sum_x_for(sum_int, target)?;
+        let [n_ext, n_int] = set.nominal_at(target);
+        let s_ext = sum_x_for(sum_ext, n_ext)?;
+        let s_int = sum_x_for(sum_int, n_int)?;
         let x_p = set.shift[Member::Planet.index()];
         let shift = [s_ext - x_p, x_p, x_p - s_int];
         return finish(set, shift);
@@ -352,16 +394,18 @@ pub fn solve(set: &Set) -> Option<Layout> {
             [sun_shift, x_p, ring_shift]
         }
         // The planet's shift is given, so the mesh the absorber is not in fixes
-        // the distance and its own mesh has a shift sum to reach at it.
+        // the running distance and its own mesh has a shift sum to reach at it.
         Member::Sun => {
             let x_p = set.shift[Member::Planet.index()];
             let (_, _, a_i) = int(x_p)?;
-            [sum_x_for(sum_ext, a_i)? - x_p, x_p, ring_shift]
+            let [n_ext, _] = set.nominal_at(MeshKind::Internal.run_at(a_i, set.clearance));
+            [sum_x_for(sum_ext, n_ext)? - x_p, x_p, ring_shift]
         }
         Member::Ring => {
             let x_p = set.shift[Member::Planet.index()];
             let (_, _, a_e) = ext(x_p)?;
-            [sun_shift, x_p, x_p - sum_x_for(sum_int, a_e)?]
+            let [_, n_int] = set.nominal_at(MeshKind::External.run_at(a_e, set.clearance));
+            [sun_shift, x_p, x_p - sum_x_for(sum_int, n_int)?]
         }
     };
 
@@ -384,18 +428,23 @@ fn finish(set: &Set, shift: [f64; 3]) -> Option<Layout> {
     let (alpha_w_ring, _, a_i) =
         operating_geometry(rack.mt, rack.alpha_t, rack.alpha_n, sum_int, x_p - x_r)?;
 
+    let running = MeshKind::External.run_at(a_e, set.clearance);
+    let residual = (running - MeshKind::Internal.run_at(a_i, set.clearance)).abs();
+
     let equal_spacing = planets > 0 && (teeth.sun + teeth.ring) % planets == 0;
     let simultaneous_meshing = planets > 0 && teeth.sun % planets == 0 && teeth.ring % planets == 0;
+    // Where the planets actually sit, which is the running distance.
     let planet_clearance = (planets > 1).then(|| {
-        2.0 * a_e * (std::f64::consts::PI / f64::from(planets)).sin() - set.planet_tip_diameter
+        2.0 * running * (std::f64::consts::PI / f64::from(planets)).sin() - set.planet_tip_diameter
     });
 
     Some(Layout {
         shift,
-        centre_distance: a_e,
+        centre_distance: running,
+        nominal: [a_e, a_i],
         alpha_w_sun,
         alpha_w_ring,
-        residual: (a_e - a_i).abs(),
+        residual,
         equal_spacing,
         simultaneous_meshing,
         planet_clearance,
@@ -1239,6 +1288,7 @@ mod tests {
             absorber: Member::Planet,
             distance: None,
             planet_tip_diameter: 0.0,
+            clearance: 0.0,
         }
     }
 

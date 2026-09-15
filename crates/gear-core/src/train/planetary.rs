@@ -100,7 +100,6 @@ pub struct PlanetaryStage {
     /// on one mesh would be one stage answering two ways.
     #[cfg_attr(feature = "serde", serde(default))]
     pub load_sharing: crate::contact::LoadSharing,
-    /// Added to the common centre distance, mm — the running clearance.
     /// **The distance the sun runs from a planet, or automatic.**
     ///
     /// The same shape and the same decision every other stage's centre distance
@@ -114,6 +113,17 @@ pub struct PlanetaryStage {
     /// absorbed rather than one, which is the same accounting a pair does — see
     /// [`crate::train::FreedomGroup`].
     pub centre_distance: Auto<f64>,
+    /// The running clearance, mm — in **both** meshes, and always an input.
+    ///
+    /// One physical distance carries a sun–planet mesh that opens as the planet
+    /// moves out and a planet–ring mesh that opens as it moves in, so a
+    /// clearance in both is the two zero-backlash distances differing by `2c`
+    /// ([`crate::mesh::MeshKind::run_at`]) — which is what the absorbing shift
+    /// is solved to leave. That is why it cannot be derived: a given distance
+    /// and given shifts leave one gap on each mesh, and there is no one number
+    /// for this field to be. It carries the same `Auto` every kind's does so
+    /// the front end can offer it the same way; [`super::Stage::freedoms`]
+    /// says it may not be automatic, and relief pins it.
     pub clearance: Auto<f64>,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
@@ -213,18 +223,14 @@ pub struct PlanetaryResult {
     pub output: PlanetaryShaft,
     /// Speed reduction, input over output. Negative when the output reverses.
     pub ratio: f64,
-    /// The common centre distance, zero-backlash, mm — sun-to-planet and
-    /// planet-to-ring, which the planet's shift has made the same number.
-    /// **What portion of the running distance is clearance**, mm — derived, as
-    /// every other kind's is.
-    ///
-    /// `centre_distance − centre_distance_nominal`, so it cannot disagree with
-    /// the two numbers it sits between. A set had no distance *input* until F39's
-    /// third item, so this was the one kind with no gap to report; with one, the
-    /// same three modes apply here as anywhere else.
+    /// The running clearance, mm — the input, which both meshes have.
     pub clearance: f64,
-    pub centre_distance_nominal: f64,
-    /// ...and the one actually used, including clearance.
+    /// The two meshes' zero-backlash distances, mm, sun–planet then
+    /// planet–ring. The first is a clearance *under* the running distance and
+    /// the second a clearance *over* it, an internal mesh opening as its
+    /// centres close; they are one number only at no clearance.
+    pub centre_distance_nominal: [f64; 2],
+    /// The common centre distance the set runs at, mm.
     pub centre_distance: f64,
     /// Fixed-carrier efficiency `η₀`, the product of the two mesh efficiencies.
     /// The quantity docs/reference.md#planetary-sets requires, because the meshes slide at their speeds
@@ -359,6 +365,10 @@ pub(super) struct Built {
     pub(super) ring: Ring,
     pub(super) ring_as_gear: Tooth,
     pub(super) layout: crate::planetary::Layout,
+    /// The two meshes at zero backlash — what play is measured against.
+    pub(super) sp_design: Mesh,
+    pub(super) pr_design: Mesh,
+    /// ...and where they run, which every other figure is taken at.
     pub(super) sp_mesh: Mesh,
     pub(super) sp_path: ContactPath,
     pub(super) pr_mesh: Mesh,
@@ -385,12 +395,12 @@ impl PlanetaryStage {
             planets: stage.planets,
             shift: std::array::from_fn(|i| shifts[i] + modification(i)),
             absorber: stage.absorber(),
-            // **The nominal distance**, which is what the shifts have to reach;
-            // the clearance is added to it afterwards, exactly as a pair's is.
-            distance: (!stage.centre_distance.auto)
-                .then_some(stage.centre_distance.manual - stage.clearance.manual),
+            // **The running distance**, where one was given; the layout takes
+            // the clearance out of it for each mesh in that mesh's direction.
+            distance: stage.given_distance(),
             // Filled once the planet exists; clearance only reads it.
             planet_tip_diameter: 0.0,
+            clearance: stage.clearance.manual,
         };
         let layout = crate::planetary::solve(&set).ok_or(TrainError::NoContact)?;
         // The solve works in thickness shifts, so take the modification back out
@@ -435,10 +445,24 @@ impl PlanetaryStage {
         // its space exactly as an external gear's enters its tooth (docs/reference.md#internal-gears).
         let ring_as_gear = Tooth::new(ring_params);
 
-        let sp_mesh = Mesh::new(&sun, &planet, MeshKind::External).map_err(TrainError::Mesh)?;
-        let sp_path = ContactPath::new(&sun, planet.ra, &sp_mesh).ok_or(TrainError::NoContact)?;
-        let pr_mesh =
+        // **Both meshes where they run**, which is one distance — the
+        // layout's — a clearance above the external mesh's zero-backlash
+        // distance and a clearance below the internal one's. The design
+        // meshes are kept beside them for the one quantity that measures play
+        // *against* zero backlash. A pair has rated where it runs since
+        // `docs/rationale.md#a-stage-is-rated-where-it-runs`; the set rated at
+        // zero backlash, and with the internal mesh's clearance the wrong way
+        // round the two were 0.04 mm apart on the mesh that fouls.
+        let sp_design = Mesh::new(&sun, &planet, MeshKind::External).map_err(TrainError::Mesh)?;
+        let pr_design =
             Mesh::new(&planet, &ring_as_gear, MeshKind::Internal).map_err(TrainError::Mesh)?;
+        let sp_mesh = sp_design
+            .at(layout.centre_distance)
+            .map_err(TrainError::Mesh)?;
+        let pr_mesh = pr_design
+            .at(layout.centre_distance)
+            .map_err(TrainError::Mesh)?;
+        let sp_path = ContactPath::new(&sun, planet.ra, &sp_mesh).ok_or(TrainError::NoContact)?;
         let pr_path = ContactPath::new(&planet, ring.ra, &pr_mesh).ok_or(TrainError::NoContact)?;
 
         Ok(Built {
@@ -447,6 +471,8 @@ impl PlanetaryStage {
             ring,
             ring_as_gear,
             layout,
+            sp_design,
+            pr_design,
             sp_mesh,
             sp_path,
             pr_mesh,
@@ -525,15 +551,15 @@ impl PlanetaryStage {
         ]
     }
 
-    /// The **nominal** distance the shifts have to reach, where one was given —
-    /// the distance typed less the clearance it is opened by, exactly as a
-    /// parallel pair reads its own.
-    fn nominal_distance(&self) -> Option<f64> {
-        (!self.centre_distance.auto && !self.clearance.auto)
-            .then_some(self.centre_distance.manual - self.clearance.manual)
+    /// The **running** distance a designer gave, where one was. The clearance
+    /// is always given on this kind ([`super::Stage::freedoms`]), so a given
+    /// distance is mode 3 by itself.
+    fn given_distance(&self) -> Option<f64> {
+        (!self.centre_distance.auto).then_some(self.centre_distance.manual)
     }
 
-    /// **The three shifts that put both meshes at `target`.**
+    /// **The three shifts that put both meshes at the running distance
+    /// `target`**, each a clearance from its own zero-backlash distance.
     ///
     /// Two closed-form sums and one freedom, taken as the planet's shift. A
     /// shift a designer *gave* fixes that freedom — through whichever mesh it is
@@ -548,12 +574,16 @@ impl PlanetaryStage {
     fn shifts_reaching(&self, target: f64, asked: &[super::ShiftAsked; 3]) -> Option<[f64; 3]> {
         let rack = self.rack();
         let teeth = self.teeth();
-        let sum_x = |sum_z: f64| {
-            crate::mesh::shift_sum_for(rack.mt, rack.alpha_t, rack.alpha_n, sum_z, target)
+        let sum_x = |sum_z: f64, nominal: f64| {
+            crate::mesh::shift_sum_for(rack.mt, rack.alpha_t, rack.alpha_n, sum_z, nominal)
         };
         let sum_ext = f64::from(teeth.sun) + f64::from(teeth.planet);
         let sum_int = f64::from(teeth.ring) - f64::from(teeth.planet);
-        let (s_ext, s_int) = (sum_x(sum_ext)?, sum_x(-sum_int)?);
+        let c = self.clearance.manual;
+        let (s_ext, s_int) = (
+            sum_x(sum_ext, MeshKind::External.nominal_of(target, c))?,
+            sum_x(-sum_int, MeshKind::Internal.nominal_of(target, c))?,
+        );
 
         let given = [0, 1, 2].map(|i| asked[i].given);
         let x_p = match given {
@@ -605,7 +635,7 @@ impl PlanetaryStage {
         // the optimiser. **What is not yet done is searching that one freedom**
         // — with a target the objective is a function of the planet's shift
         // alone, which is a one-dimensional search this pass does not add.
-        if let Some(target) = self.nominal_distance() {
+        if let Some(target) = self.given_distance() {
             if let Some(x) = self.shifts_reaching(target, &asked) {
                 return super::Chosen {
                     shifts: x,
@@ -865,6 +895,8 @@ pub fn solve_planetary_stage_with(
         ring,
         ring_as_gear,
         layout,
+        sp_design,
+        pr_design,
         sp_mesh,
         sp_path,
         pr_mesh,
@@ -1242,7 +1274,10 @@ pub fn solve_planetary_stage_with(
         .ok_or(TrainError::NoContact)?;
 
     // ---- centre distance and backlash.
-    let centre = layout.centre_distance + stage.clearance.manual;
+    //
+    // The layout's distance is the running one — both meshes a clearance from
+    // their own zero-backlash distance, in opposite directions.
+    let centre = layout.centre_distance;
     let angular = |mesh: &Mesh, a: f64, at: MeshSide| -> f64 {
         mesh.angular_backlash(a, at).unwrap_or(0.0).to_degrees()
     };
@@ -1288,16 +1323,20 @@ pub fn solve_planetary_stage_with(
         PlanetaryShaft::Carrier => zs + zr,
         PlanetaryShaft::Ring => zr,
     };
+    // Signed, on both: a mesh's play is positive when it has some and negative
+    // when its teeth overlap, whichever way its centres moved to get there.
+    // Taking magnitudes here is how an internal mesh assembled a clearance
+    // *tighter* than zero backlash came to report that overlap as play.
     let referred = |at: PlanetaryShaft, a: f64| -> f64 {
-        let j1 = sp_mesh.backlash(a).unwrap_or(0.0);
-        let j2 = pr_mesh.backlash(a).unwrap_or(0.0);
-        let delta = ((zs + zp) * j1.abs() + (zr - zp) * j2.abs()) / a;
+        let j1 = sp_design.backlash(a).unwrap_or(0.0);
+        let j2 = pr_design.backlash(a).unwrap_or(0.0);
+        let delta = ((zs + zp) * j1 + (zr - zp) * j2) / a;
         (delta / coefficient(at)).to_degrees()
     };
-    let backlash_at = |at: PlanetaryShaft| Backlash {
-        nominal: referred(at, centre),
-        minimum: referred(at, centre - stage.tolerance_minus),
-        maximum: referred(at, centre + stage.tolerance_plus),
+    let backlash_at = |at: PlanetaryShaft| {
+        Backlash::banded(centre, stage.tolerance_minus, stage.tolerance_plus, |a| {
+            referred(at, a)
+        })
     };
     let set_backlash = Directional {
         // Forward the output shaft is where the play shows; backward the shaft
@@ -1310,10 +1349,16 @@ pub fn solve_planetary_stage_with(
     notes.push(Note::new(key::STAGE_PLANETS_SHARE_LOAD_EQUALLY).count("planets", stage.planets));
     // What the distance has to say — the same two findings every kind with a
     // centre distance can reach, in the same words (`train::distance_notes`).
+    // A given distance is re-solved into the layout at every path through
+    // `built`, so the first finding cannot arise here — a target no shifts
+    // reach is a set with no geometry, refused above rather than built
+    // elsewhere. The second can: the clearance is the input, and a negative
+    // one is both meshes overlapping at rest. The sun–planet mesh's nominal is
+    // the one quoted, the two differing by twice that clearance.
     notes.extend(super::distance_notes(
-        stage.nominal_distance(),
-        centre,
-        layout.centre_distance,
+        None,
+        layout.nominal[0],
+        stage.clearance.manual,
     ));
     notes.extend(chosen.how.note());
     if !layout.equal_spacing {
@@ -1385,8 +1430,8 @@ pub fn solve_planetary_stage_with(
         arrangement: stage.arrangement,
         output: forward.output,
         ratio: forward.ratio,
-        clearance: centre - layout.centre_distance,
-        centre_distance_nominal: layout.centre_distance,
+        clearance: stage.clearance.manual,
+        centre_distance_nominal: layout.nominal,
         centre_distance: centre,
         fixed_carrier_efficiency: eta0,
         efficiency: set_efficiency,
@@ -1407,8 +1452,8 @@ pub fn solve_planetary_stage_with(
                 super::ContactPatch::line(&sp_cs, *sp_scale.get(c), sp_width, sp_e)
             }),
             backlash: [
-                backlash_of(&sp_mesh, MeshSide::First),
-                backlash_of(&sp_mesh, MeshSide::Second),
+                backlash_of(&sp_design, MeshSide::First),
+                backlash_of(&sp_design, MeshSide::Second),
             ],
             flank_interference: sp_mesh.flank_interference([sun.flank_ends(), planet.flank_ends()]),
             // Sun to planet is an external mesh.
@@ -1428,8 +1473,8 @@ pub fn solve_planetary_stage_with(
                 super::ContactPatch::line(&pr_cs, *pr_scale.get(c), pr_width, pr_e)
             }),
             backlash: [
-                backlash_of(&pr_mesh, MeshSide::First),
-                backlash_of(&pr_mesh, MeshSide::Second),
+                backlash_of(&pr_design, MeshSide::First),
+                backlash_of(&pr_design, MeshSide::Second),
             ],
             // **The ring answers as a ring**, not as the `Tooth` the mesh
             // arithmetic reads it through: its flank runs outwards from its tip
@@ -1439,7 +1484,7 @@ pub fn solve_planetary_stage_with(
             // **And planet to ring is not**, which is the whole of what this
             // field is for: the set has an internal mesh in it and had never
             // been asked the three questions one answers.
-            tips: super::TipRoom::of(&ring, &planet),
+            tips: super::TipRoom::at(&ring, &planet, centre),
         }),
         equal_spacing: layout.equal_spacing,
         simultaneous_meshing: layout.simultaneous_meshing,
@@ -1884,10 +1929,34 @@ mod tests {
             );
             assert!(res.centre_distance > 0.0);
         }
-        // The ideal ring needs no shift at all, and gets exactly none.
+        // The ideal ring needs no shift at all to *agree* — and gets exactly
+        // none at no clearance. The shipped 0.02 mm is then all that moves the
+        // planet: thinned by that much it opens both meshes with the planets
+        // where they always were, which is why the running distance stays at
+        // the ideal 21 to well under a micron while the two zero-backlash
+        // distances part by twice the clearance.
+        let lib = test_library();
+        let mut exact = stage_of(24, 18, 60, 0.0);
+        exact.clearance = Auto::fixed(0.0);
+        let exact = solve_planetary_stage(&exact, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+        assert!(exact.planet.gear.profile_shift.abs() < 1e-12);
+        assert!(exact
+            .centre_distance_nominal
+            .iter()
+            .all(|a| (a - 21.0).abs() < 1e-12));
+
         let ideal = solved(24, 18, 60);
-        assert!(ideal.planet.gear.profile_shift.abs() < 1e-12);
-        assert!((ideal.centre_distance_nominal - 21.0).abs() < 1e-12);
+        let c = ideal.clearance;
+        assert!(c > 0.0, "the shipped set has a running clearance");
+        assert!(
+            ideal.planet.gear.profile_shift < 0.0,
+            "{}",
+            ideal.planet.gear.profile_shift
+        );
+        let [ext, int] = ideal.centre_distance_nominal;
+        assert!((ideal.centre_distance - ext - c).abs() < 1e-12);
+        assert!((int - ideal.centre_distance - c).abs() < 1e-12);
+        assert!((ideal.centre_distance - 21.0).abs() < 1e-3);
     }
 
     /// The classical ratios, through the whole stage rather than the bare
@@ -2156,9 +2225,25 @@ mod tests {
             tight.backlash.forward.nominal
         );
 
-        // And the tolerance band brackets the nominal, as it does everywhere else.
+        // And the tolerance band holds the nominal. On the ideal ring it is a
+        // point — the referred play is invariant in the running distance, the
+        // sun mesh gaining exactly what the ring mesh loses (the law is in
+        // `train::tests::a_tolerance_band_widens_with_the_centre_distance`) —
+        // so a set one tooth off the ideal is what shows the band opening, and
+        // it opens on both sides of the nominal since the two meshes' operating
+        // angles no longer move together.
         let b = &tight.backlash.forward;
-        assert!(b.minimum < b.nominal && b.nominal < b.maximum);
+        assert!(b.minimum <= b.nominal && b.nominal <= b.maximum);
+        let off = stage_of(24, 18, 61, 0.0);
+        let off = solve_planetary_stage(&off, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+        let b = &off.backlash.forward;
+        assert!(
+            b.minimum < b.nominal && b.nominal < b.maximum,
+            "off the ideal ring the band opens: {} … {} … {}",
+            b.minimum,
+            b.nominal,
+            b.maximum
+        );
 
         // At the zero-backlash centre distance there is no play at all.
         let exact = PlanetaryStage {

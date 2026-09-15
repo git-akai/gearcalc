@@ -488,8 +488,8 @@ pub fn solve_crossed_pair(
     // pair can be assembled at all (`train::distance_notes`).
     notes.extend(super::distance_notes(
         stage.nominal_distance(),
-        centre,
         s.centre_distance,
+        centre - s.centre_distance,
     ));
 
     // The zone as the widths in use actually leave it — one construction, asked

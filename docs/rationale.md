@@ -1008,12 +1008,42 @@ reported because the mechanism is not yet chosen.
 ### A stage is rated where it runs
 
 The zero-backlash centre distance is where the profile shifts put the pair; a
-real one runs at that plus its assembly clearance. Every contact quantity belongs
-to the second, and only **backlash** keeps the design mesh, because it measures
-play *against* the zero-backlash reference.
+real one runs at that opened by its assembly clearance. Every contact quantity
+belongs to the second, and only **backlash** keeps the design mesh, because it
+measures play *against* the zero-backlash reference.
 
 Rating at `a_w` was rating a pair nobody assembles, and the clearance is not a
 detail to round away: it is the reason there is any backlash to report at all.
+
+**"Opened" has a direction, and it is the mesh kind's.** An external pair's
+flanks part as its centres separate; an internal pair's part as they come
+together, the pinion moving out of the ring's teeth toward its centre. So a
+clearance is `+c` on one kind's centres and `−c` on the other's —
+`MeshKind::run_at`, [a ring is a gear with a negative tooth
+count](#a-ring-is-a-gear-with-a-negative-tooth-count) read on the assembly —
+and the backlash law carries the same sign, so play is positive on either kind
+where the flanks have parted. **Measured, and it was live on every internal
+mesh:** the law reported the interference a separation caused as play of the
+same size, the two epicyclic kinds assembled their internal meshes a clearance
+*tighter* than zero backlash and took the magnitude of that overlap as the play
+they had, and the planetary set — whose two meshes share one physical distance
+and so need their zero-backlash distances to differ by `2c` — solved them to be
+equal, which is why its clearance never reached a shift. It was found from the
+outside: a designer turning the clearance and watching no shift move, where the
+arrangement says one must.
+
+**And the rule was swept to the end this time.** A pair rated where it runs
+from the day this entry was written; the epicyclic set and the hula stage went
+on rating their meshes — path, stresses, efficiency, the interference verdicts
+and the tip room — at zero backlash, which the shipped hula stage turned into a
+crank held open until its tip margin was exactly nought and then run a clearance
+inside it. Both rate where they run now, and the hula arrangement solves for the
+far-side gap *as built*, its running clearance being geometry the arrangement
+has to know (`hula::Set::running_clearance`).
+
+**What would change this:** nothing about the direction. If a fourth mesh kind
+arrives whose flanks part some other way, it is a third value of the sign and
+not a branch.
 
 **Measured, all in the same direction because separating the centres can only
 shorten the path:** spur `ε` 1.6211 → 1.6013, its `σ_F` 81.1 → 82.1 MPa, worm `η`

@@ -268,13 +268,24 @@ kinds. `None` when `inv α_w < 0`: the base circles would have to overlap.
 **Backlash is exact**, not the textbook first-order `j_t ≈ 2Δa tan α_w`:
 
 ```text
-cos α′ = a_ref cos α_t / a′        j_t = 2 a′ ( inv α′ − inv α_w )
+cos α′ = a_ref cos α_t / a′        j_t = σ · 2 a′ ( inv α′ − inv α_w )
 ```
 
-verified to 3e-16 mm against a direct computation of tooth thicknesses at the
-operating pitch circles. It is zero at `a′ = a_w` by construction, and every
-source of backlash — shift, thickness modification, clearance, tolerance —
-enters through `α_w` and `α′` alone.
+verified against a direct computation of tooth and space widths at the
+operating pitch circles, on both kinds of mesh. It is zero at `a′ = a_w` by
+construction, and every source of backlash — shift, thickness modification,
+clearance, tolerance — enters through `α_w` and `α′` alone. `σ` is the kind's
+sign: **separating the centres of an internal pair closes it**, the pinion
+moving into the ring's teeth, so play is positive on either kind where the
+flanks have parted and negative where they overlap.
+
+**A clearance opens a mesh in its own direction.** A mesh assembled with a
+clearance `c` runs at `a_w + σ c` — `MeshKind::run_at`, the one place that
+direction is written — which is `+c` on the centres of an external pair and
+`−c` on an internal one. The law carried no `σ` and the two epicyclic kinds
+added the clearance on every mesh alike, so their internal meshes assembled a
+clearance *tighter* than zero backlash and reported that overlap as play
+([corrections](corrections.md)).
 
 **One conversion, two numerators.** Angular play at a member is one sentence for
 every mesh in the crate: a flank advances along the common normal by one normal
@@ -305,11 +316,15 @@ it opens both flanks equally.
 
 ### The centre distance a pair runs at
 
-`Mesh::a_w` is the **zero-backlash** distance. A real pair runs at that plus its
-assembly clearance, and every contact quantity belongs to the second: the path,
-the operating pressure angle, the operating radii, the relative curvature, the
-stresses, the efficiency integral. Only **backlash** keeps the design mesh,
-because it measures play against the zero-backlash reference.
+`Mesh::a_w` is the **zero-backlash** distance. A real pair runs at that opened
+by its assembly clearance — `MeshKind::run_at`, outward on an external pair
+and inward on an internal one — and every contact quantity belongs to the
+second: the path, the operating pressure angle, the operating radii, the
+relative curvature, the stresses, the efficiency integral, and an internal
+pair's interference verdicts and tip room (`ring::mesh_at`). Only **backlash**
+keeps the design mesh, because it measures play against the zero-backlash
+reference. Every kind rates where it runs — the two epicyclic kinds rated at
+zero backlash for as long as a pair had not.
 
 | | how the distance enters |
 |---|---|
@@ -370,7 +385,7 @@ tool working; the second is a design with no room in it.
 
 The shifts cannot tell them apart, so `stage.optimiser_found_nothing` does. A
 hula stage at a one-tooth difference is the case: it opens to about 45° of
-operating pressure angle to clear itself, sits at `ε ≈ 1.02`, and every split of
+operating pressure angle to clear itself, sits just under continuous contact, and every split of
 both meshes is refused.
 
 Both of the distance findings belong to every kind that has a centre distance — a crank offset included,
@@ -386,13 +401,25 @@ clearance and a derived clearance is distance − nominal, so with both automati
 neither has anything to derive from.
 
 **A planetary set counts one relation more, and it is real geometry.** Its two
-centre distances must agree — one relation among its three shifts, whatever they
-agree at — so two shifts are a design and the third is what they leave. Give it a
-distance as well and there is a **second** relation, since each mesh must now
-reach *that* distance rather than merely match the other, and only **one** shift
-stays free. Both of those per-mesh conditions are `shift_sum_for`, so a target
-makes the layout easier: the Newton iteration on the planet's shift disappears
-and the sun's and the ring's shifts are read off the planet's in closed form.
+meshes share one physical distance, and a clearance opens them in opposite
+directions — so their zero-backlash distances must **differ by `2c`**, the
+sun–planet's a clearance under the running distance and the planet–ring's a
+clearance over it. That is one relation among its three shifts, so two shifts
+are a design and the third is what they leave: on the ideal ring it is the
+planet thinned by exactly the clearance, which opens both meshes with the
+planets where they always were. Give it a distance as well and there is a
+**second** relation, since each mesh must now reach *its* nominal distance
+rather than merely stand `2c` from the other, and only **one** shift stays
+free. Both of those per-mesh conditions are `shift_sum_for`, so a target makes
+the layout easier: the Newton iteration on the planet's shift disappears and
+the sun's and the ring's shifts are read off the planet's in closed form.
+
+**And its clearance is always given.** It is the amount the two nominal
+distances differ by, which the shifts are solved from; a given distance and
+given shifts leave one gap on *each* mesh, and there is no one number for the
+field to derive. So the set has modes 1 and 3 and not mode 2, and its clearance
+toggle, alone in its own freedom group with none allowed automatic, is pinned
+back by relief.
 
 **A pair has a fifth input in the relation, its *size*.** The additional helix,
 the first member's helix angle and the first member's pitch diameter are three
@@ -1613,12 +1640,14 @@ inversion since the throw rises monotonically in `Δx` from zero.
 ## Planetary sets
 
 ```text
-common centre distance   g(x_p) = a_w,ext(x_s + x_p) − a_w,int(x_r − x_p) = 0
+common centre distance   g(x_p) = [a_w,ext(x_s + x_p) + c] − [a_w,int(x_r − x_p) − c] = 0
 da_w/dΣx = [ a cos α_t sin α_w / cos²α_w ] · [ 2 tan α_n / (Σz tan²α_w) ]
 ```
 
-`g` is strictly increasing, so the root is unique and Newton is safe from
-`x_p = 0`. The bracket is closed form, from `inv α_w ≥ 0` on both meshes:
+with `c` the running clearance, which each mesh takes in its own direction
+([centre distance](#centre-distance-and-backlash)). `g` is strictly
+increasing, so the root is unique and Newton is safe from `x_p = 0`. The
+bracket is closed form, from `inv α_w ≥ 0` on both meshes:
 
 ```text
 x_p ≥ −inv(α_t)(z_s + z_p)/(2 tan α_n) − x_s          external
@@ -1626,7 +1655,17 @@ x_p ≤  x_r + inv(α_t)(z_r − z_p)/(2 tan α_n)          internal
 ```
 
 Required planet shift is **strictly increasing in `z_ring`**, which is what makes
-the ring search provably complete, and `z_r = z_s + 2z_p` gives exactly zero.
+the ring search provably complete, and `z_r = z_s + 2z_p` gives exactly zero at
+no clearance — and `−c` at a clearance `c`, near enough: the planet thinned by
+the clearance opens both meshes, and the running distance stays at the ideal
+to well under a micron.
+
+On that ideal ring both meshes have the same reference distance, so their
+operating angles are one function of the running distance and the output
+backlash, `2(z_s + z_p)(inv α_w,ring − inv α_w,sun)` referred, is **invariant
+in it** — a centre tolerance opens nothing, what the sun mesh gains from a
+planet moved out the ring mesh losing. A set one tooth off the ideal shows the
+band opening again.
 
 **Which of the three shifts closes the set is a choice, and only one of the
 three is hard.** The equality above is one relation among `x_s`, `x_p` and
@@ -1767,17 +1806,17 @@ a millimetre of gap. Two teeth of difference is far kinder — 26° for the same
 
 **Two efficiencies, because one is not the other.** Each pair's own comes from
 [`contact::efficiency`](#efficiency-parallel-axes) with the crank held, and the
-two multiply — 99.15 % together on the shipped counts. The *stage's* comes from
+two multiply — 99.18 % together on the shipped counts. The *stage's* comes from
 the three-shaft power flow ([Planetary sets](#planetary-sets)) at
 `i₀ = z₂z₄/(z₁z₃)`, and it is nowhere near the first, because power circulates:
 
 <!-- figures-by-test: the_documented_tables_are_the_ones_this_code_prints -->
 | reduction | meshes, crank held | the stage |
 |---|---|---|
-| 144 | 98.80 % | 36.8 % |
-| 324 | 99.15 % | 26.6 % |
-| 900 | 99.48 % | 17.5 % |
-| 2500 | 99.68 % | 11.1 % |
+| 144 | 98.85 % | 37.9 % |
+| 324 | 99.18 % | 27.4 % |
+| 900 | 99.50 % | 18.1 % |
+| 2500 | 99.69 % | 11.5 % |
 
 The nearer the two meshes come to cancelling — which is what buys the reduction —
 the more power goes round between them before any reaches the output, so a
@@ -1794,13 +1833,13 @@ two meshes, losing the same 0.85 % between them.
 <!-- figures-by-test: the_four_hula_studies_are_the_ones_this_code_prints -->
 | arrangement | `D` | ratio | meshes | the stage |
 |---|---|---|---|---|
-| `N+1/N/N−1/N` | 1 | 324 | 99.15 % | 26.6 % |
-| `N/N+1/N/N−1` | −1 | −323 | 99.15 % | 26.4 % |
-| `N+1/N/N/N−1` | −36 | −8.5 | 99.15 % | 92.4 % |
-| `N/N+1/N/N+1` | 37 | 9.8 | 99.17 % | 93.2 % |
+| `N+1/N/N−1/N` | 1 | 324 | 99.18 % | 27.4 % |
+| `N/N+1/N/N−1` | −1 | −323 | 99.18 % | 27.2 % |
+| `N+1/N/N/N−1` | −36 | −8.5 | 99.18 % | 92.7 % |
+| `N/N+1/N/N+1` | 37 | 9.8 | 99.20 % | 93.5 % |
 
 **What the tool ships with is `N ± 4` about 61**, reducing 232.6:1 and keeping
-79.6 % forward and 74.3 % back. Four teeth of difference cancels less than one does,
+81.9 % forward and 77.9 % back. Four teeth of difference cancels less than one does,
 and that is the whole of the difference: the same code, the same two meshes, and
 a stage that keeps two and a half times what the `N ± 1` arrangement does at a
 comparable size.
@@ -1815,11 +1854,11 @@ about 61:
 <!-- figures-by-test: the_four_hula_studies_are_the_ones_this_code_prints -->
 | `h_a` | involute interference | ε_α | the stage |
 |---|---|---|---|
-| 0.60 | clear | 1.19 | 88.0 % |
-| 0.65 | clear | 1.28 | 83.5 % |
-| 0.70 | clear | 1.37 | 79.6 % |
-| 0.75 | **fouls** | 1.46 | 76.2 % |
-| 0.80 | **fouls** | 1.54 | 73.1 % |
+| 0.60 | clear | 1.17 | 90.4 % |
+| 0.65 | clear | 1.26 | 86.2 % |
+| 0.70 | clear | 1.35 | 81.9 % |
+| 0.75 | **fouls** | 1.44 | 78.2 % |
+| 0.80 | **fouls** | 1.52 | 75.0 % |
 
 The threshold sits between 0.70 and 0.75, so 0.7 is the last proportion that
 ships clean — and the taller tooth costs efficiency on the way as well, since a
@@ -1870,12 +1909,12 @@ addendum, the shaper and each mesh's shift division free (`gear-cli hulaband`):
 <!-- figures: gear-cli hulaband 18 -->
 | d | z | module | meshes | the stage | α_w | backlash out |
 |---|---|---|---|---|---|---|
-| 1 | 18 | 1.000 | 99.350 % | **32.3 %** | 45.1° | 0.378° |
-| 2 | 36 | 0.500 | 99.767 % | **57.1 %** | 33.8° | 0.149° |
-| 3 | 54 | 0.333 | 99.942 % | **84.2 %** | 26.2° | 0.079° |
-| 4 | 72 | 0.250 | 99.980 % | **93.9 %** | 20.0° | 0.047° |
-| 6 | 108 | 0.167 | 99.983 % | **94.7 %** | 17.8° | 0.028° |
-| 9 | 162 | 0.111 | 99.920 % | **79.5 %** | 12.8° | 0.014° |
+| 1 | 18 | 1.000 | 99.383 % | **33.4 %** | 45.7° | 0.371° |
+| 2 | 36 | 0.500 | 99.784 % | **58.9 %** | 36.6° | 0.154° |
+| 3 | 54 | 0.333 | 99.956 % | **87.6 %** | 26.8° | 0.077° |
+| 4 | 72 | 0.250 | 99.980 % | **94.0 %** | 21.0° | 0.046° |
+| 6 | 108 | 0.167 | 99.982 % | **94.6 %** | 18.4° | 0.027° |
+| 9 | 162 | 0.111 | 99.915 % | **78.5 %** | 14.7° | 0.014° |
 
 **These are optimised divisions, and they sit on a bound rather than at an
 optimum.** The *sum* of a mesh's two shifts is never free — the crank offset is
@@ -1884,9 +1923,9 @@ shaper) is what the rows above report. The stationary point of the loss is not
 where they land: on these stages the mesh loses least at divisions of `+2.85`,
 `+2.05` and `−2.55` for one, two and four teeth of difference, and none of the
 three is admissible, because contact has gone discontinuous or the tips have
-fouled well before. The rows through `d = 4` sit at `ε` between 1.01 and 1.03
+fouled well before. The rows through `d = 4` sit at `ε` between 1.00 and 1.04
 with the tip margin at zero instead; from `d = 5` the winning row's contact
-ratio rises again — 1.09, then 1.32 — which is the turn-over the last rows
+ratio rises again — 1.11, then 1.32 — which is the turn-over the last rows
 show. The loss is still falling when the geometry runs out, so what a designer
 wants to know is which bound stops it — and that is what these are.
 
@@ -1911,10 +1950,10 @@ Optimised that way, each pair on its own at `z = 36`, `h_a = 0.6`, `μ = 0.08`:
 <!-- figures-by-test: the_four_hula_studies_are_the_ones_this_code_prints -->
 | d | reduction | α_w | the pair keeps | the stage keeps |
 |---|---|---|---|---|
-| 2 | 324 | 33.7° | 99.891 % | 58.1 % |
-| 3 | 144 | 25.9° | 99.965 % | 90.4 % |
-| 4 | 81 | 21.3° | 99.958 % | 93.1 % |
-| 5 | 52 | 19.2° | 99.948 % | 94.3 % |
+| 2 | 324 | 34.5° | 99.893 % | 58.4 % |
+| 3 | 144 | 26.8° | 99.966 % | 90.3 % |
+| 4 | 81 | 22.3° | 99.959 % | 93.3 % |
+| 5 | 52 | 20.1° | 99.948 % | 94.3 % |
 
 **The two pairs land at the same operating pressure angle** — to a hundredth of
 a degree, at every difference — not because the meshes are tied but because a
@@ -1934,18 +1973,18 @@ wrong:
 <!-- figures-by-test: the_four_hula_studies_are_the_ones_this_code_prints -->
 | d | least loss (Σx, x_ring, x_pinion) | least shift | stage, best | stage, least |
 |---|---|---|---|---|
-| 2 | −0.17, +0.45, +0.28 | −0.19, +0.19, +0.00 | 58.08 % | 52.77 % |
-| 3 | −0.08, +0.58, +0.50 | −0.10, +0.10, +0.00 | 90.39 % | 77.26 % |
-| 4 | −0.02, +0.46, +0.44 | −0.04, +0.04, +0.00 | 93.09 % | 90.58 % |
-| 5 | +0.01, +0.07, +0.08 | +0.01, −0.01, +0.00 | 94.25 % | 94.17 % |
+| 2 | −0.19, +0.37, +0.18 | −0.20, +0.20, +0.00 | 58.39 % | 54.81 % |
+| 3 | −0.09, +0.52, +0.42 | −0.11, +0.11, +0.00 | 90.29 % | 79.52 % |
+| 4 | −0.03, +0.37, +0.34 | −0.05, +0.05, +0.00 | 93.25 % | 91.72 % |
+| 5 | +0.00, +0.00, +0.00 | +0.00, +0.00, +0.00 | 94.25 % | 94.25 % |
 
 The **sum is nearly the same either way** — within 0.03 at every difference —
 because the crank offset sets it and the offset is solved from the far-side
 clearance, which the shifts move only through the tip geometry. The whole
 difference is the *division*: the optimum raises both shifts together, by about
-0.3 to 0.5 at `d = 2..4`, while holding their difference, and the default has no
-reason to. That is worth **13 points** of stage efficiency at `d = 3` and next to
-nothing at `d = 5`, where the optimum has come down almost to the floor. The
+0.3 to 0.4 at `d = 2..4`, while holding their difference, and the default has no
+reason to. That is worth **11 points** of stage efficiency at `d = 3` and nothing
+at `d = 5`, where the optimum *is* the floor. The
 stationary condition for a division is derived and verified where it applies
 ([Efficiency](#efficiency-parallel-axes)); on these stages the answer is as often
 a bound as a stationary point, which is why it is searched.
@@ -1962,13 +2001,13 @@ the *other* mesh's angle out by rather more than the first one gained. At
 <!-- figures-by-test: the_documented_tables_are_the_ones_this_code_prints -->
 | m₁/m₂ | 0.80 | 0.90 | **1.00** | 1.10 | 1.30 |
 |---|---|---|---|---|---|
-| offset, mm | 0.807 | 0.807 | **0.807** | 0.879 | 1.022 |
-| α_w, mesh 1 | 62.2° | 58.4° | **54.4°** | 54.0° | 53.3° |
-| α_w, mesh 2 | 54.4° | 54.4° | **54.4°** | 57.7° | 62.6° |
+| offset, mm | 0.813 | 0.813 | **0.813** | 0.884 | 1.028 |
+| α_w, mesh 1 | 62.5° | 58.6° | **54.7°** | 54.2° | 53.5° |
+| α_w, mesh 2 | 54.7° | 54.7° | **54.7°** | 57.9° | 62.8° |
 
 Equal modules is a corner where both bounds are active at once, and the stage
-efficiency falls away either side of it — 26.9 % at equality against 23.1 % at
-0.8 and 25.5 % at 1.1 on the same search. So the design space is
+efficiency falls away either side of it — 27.4 % at equality against 23.7 % at
+0.8 and 26.0 % at 1.1 on the same search. So the design space is
 `(z, d, addendum, shaper, two divisions)` and nothing more: the tooth
 differences are equal because the ratio demands it, the two base counts are equal
 for the same reason, and the modules are equal because the offset is shared.

@@ -7,18 +7,31 @@
 //! Backlash is computed exactly, not linearised:
 //!
 //! ```text
-//! j_t = 2 a' ( inv α' − inv α_w )
+//! j_t = σ · 2 a' ( inv α' − inv α_w )        σ = +1 external, −1 internal
 //! ```
 //!
 //! where `α_w` is the zero-backlash operating pressure angle and `α'` the actual
 //! one at centre distance `a'`. This is worth dwelling on, because the textbook
 //! `j_t ≈ 2 Δa tan α_w` is only its first-order expansion:
 //!
-//! - it is **exact**, verified to 3e-16 mm against a direct computation of tooth
-//!   thicknesses at the operating pitch circles;
+//! - it is **exact**, verified against a direct computation of tooth and space
+//!   widths at the operating pitch circles, on both kinds of mesh;
 //! - it is zero at `a' = a_w` by construction;
 //! - every source of backlash — profile shift, thickness modification, clearance,
 //!   tolerance — enters through just `α_w` and `α'`. One formula, not four cases.
+//!
+//! # Which way a clearance opens a mesh
+//!
+//! **Separating the centres of an internal pair closes it.** The pinion sits
+//! inside the ring, so moving it away from the ring's centre moves it *into*
+//! the ring's teeth; the flanks part when the centres come together. So `σ`
+//! above is the sign of the kind, and a clearance `c` puts a mesh at
+//! `a_w + σ c` — [`MeshKind::run_at`], the one place that direction is written.
+//! The law carried no `σ` for as long as it existed, and every test of it was
+//! on an external pair: an internal mesh reported the interference a separation
+//! caused as play of the same size, and the two epicyclic kinds assembled their
+//! internal meshes a clearance *tighter* than zero backlash while reporting
+//! that number as the play they had (`docs/corrections.md`).
 //!
 //! # Thickness modification enters through the shift, not separately
 //!
@@ -68,6 +81,27 @@ impl MeshKind {
             Self::External => 1.0,
             Self::Internal => -1.0,
         }
+    }
+
+    /// Where a mesh of this kind runs when its zero-backlash distance is opened
+    /// by `clearance`: `a_w + σ c`.
+    ///
+    /// The one place the direction is written. An external pair's flanks part
+    /// as its centres separate; an internal pair's part as they come together,
+    /// because the pinion moves *out* of the ring's teeth toward its centre.
+    /// So a positive clearance is a larger distance on one kind and a smaller
+    /// one on the other, and every stage that opens a mesh asks this rather
+    /// than adding.
+    #[must_use]
+    pub fn run_at(self, zero_backlash: f64, clearance: f64) -> f64 {
+        zero_backlash + self.sign() * clearance
+    }
+
+    /// The zero-backlash distance a mesh of this kind must have to run at
+    /// `running` with `clearance` — [`Self::run_at`] read backwards.
+    #[must_use]
+    pub fn nominal_of(self, running: f64, clearance: f64) -> f64 {
+        running - self.sign() * clearance
     }
 }
 
@@ -287,15 +321,27 @@ impl Mesh {
 
     /// Transverse circumferential backlash at an actual centre distance, mm.
     ///
-    /// Positive is play; negative means the teeth interfere. Exact — see the
-    /// module documentation.
+    /// Positive is play; negative means the teeth interfere — on **both** kinds
+    /// of mesh, which is what the kind's sign in front is for: an internal pair
+    /// opens as its centres come together. Exact — see the module
+    /// documentation.
     ///
     /// # Errors
     ///
     /// [`MeshError::CentreDistanceTooSmall`] if the base circles cannot reach.
     pub fn backlash(&self, a_actual: f64) -> Result<f64, MeshError> {
         let ap = self.pressure_angle_at(a_actual)?;
-        Ok(2.0 * a_actual * (inv(ap) - inv(self.alpha_w)))
+        // `+ 0.0` turns the `−0.0` an internal mesh's sign makes of an exact
+        // zero back into `+0.0`, so a band whose end sits exactly on the
+        // zero-backlash distance prints as nought rather than as "−0.0000".
+        Ok(self.kind.sign() * 2.0 * a_actual * (inv(ap) - inv(self.alpha_w)) + 0.0)
+    }
+
+    /// Where this mesh runs when opened by `clearance` — [`MeshKind::run_at`]
+    /// on its own zero-backlash distance.
+    #[must_use]
+    pub fn running_distance(&self, clearance: f64) -> f64 {
+        self.kind.run_at(self.a_w, clearance)
     }
 
     /// How far a member turns when the centres move to `a_actual` with **one
@@ -1292,6 +1338,61 @@ mod tests {
             let m = Mesh::new(&a, &b, MeshKind::External).unwrap();
             assert!(m.backlash(m.a_w).unwrap().abs() < 1e-12);
         }
+    }
+
+    /// **The law against the geometry, on both kinds of mesh.** At an actual
+    /// centre distance the two members roll on their operating pitch circles,
+    /// and the play is the space one leaves minus the tooth the other puts in
+    /// it, as arcs on those circles — read off the generated tooth and, for a
+    /// ring, its generated space. That shares nothing with `inv α' − inv α_w`.
+    ///
+    /// The internal case is the one that matters: separating the centres of an
+    /// internal pair *closes* it, and the law reported that interference as
+    /// play of the same magnitude for as long as it carried no sign. Every
+    /// test of it had been on an external pair.
+    #[test]
+    fn the_backlash_law_is_the_geometry_on_both_kinds_and_a_clearance_opens_both() {
+        use crate::ring::{Cutter, Ring};
+        let arc = |g: &Tooth, r: f64| {
+            let u = (((r / g.rb).powi(2) - 1.0).max(0.0)).sqrt();
+            2.0 * r * (g.psi_b - crate::involute::inv_from_roll(u))
+        };
+        let mut worst = 0.0_f64;
+        for (z1, z2, x1, x2) in [(17, 43, 0.0, 0.0), (18, 60, 0.3, -0.2), (9, 37, 0.47, 0.2)] {
+            let (a, b) = pair(z1, z2, x1, x2);
+            for kind in [MeshKind::External, MeshKind::Internal] {
+                let m = Mesh::new(&a, &b, kind).unwrap();
+                let ring = (kind == MeshKind::Internal).then(|| {
+                    Ring::cut_by(
+                        &GearParams {
+                            teeth: z2,
+                            profile_shift: x2,
+                            ..Default::default()
+                        },
+                        &Cutter::default(),
+                    )
+                });
+                for c in [-0.05_f64, -0.02, 0.0, 0.02, 0.05] {
+                    let at = m.running_distance(c);
+                    let alpha = m.pressure_angle_at(at).unwrap();
+                    let (r1, r2) = (a.rb / alpha.cos(), b.rb / alpha.cos());
+                    let space = match &ring {
+                        Some(ring) => ring.space_width_at(r2),
+                        None => 2.0 * std::f64::consts::PI * r1 / f64::from(z1) - arc(&b, r2),
+                    };
+                    let play = space - arc(&a, r1);
+                    let law = m.backlash(at).unwrap();
+                    worst = worst.max((law - play).abs());
+                    assert!(
+                        (law - play).abs() < 1e-12,
+                        "{kind:?} {z1}/{z2} c={c}: law {law:.9} against geometry {play:.9}"
+                    );
+                    // The whole point: the same clearance is play on either kind.
+                    assert_eq!(law > 0.0, c > 0.0, "{kind:?} c={c}: {law}");
+                }
+            }
+        }
+        println!("law against geometry, both kinds: worst {worst:.3e} mm");
     }
 
     /// The textbook `j ≈ 2 Δa tan α_w` must appear as the small-Δa limit of the

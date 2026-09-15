@@ -2795,6 +2795,9 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
         // A planet's tip diameter at a standard addendum, which is what the
         // clearance column is measured against.
         planet_tip_diameter: module * (f64::from(planet) + 2.0),
+        // The counts a set can reach are asked at zero backlash; a running
+        // clearance moves every row's shift by the same small amount.
+        clearance: 0.0,
     };
 
     println!(
@@ -2924,11 +2927,15 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                 Ok(r) => {
                     if !shown {
                         println!(
-                            "\ncommon centre distance {:.6} mm (residual {:.1e})  \
-                             planet shift {:+.4}",
-                            r.centre_distance_nominal,
+                            "\nrunning centre distance {:.6} mm (zero-backlash {:.6} sun-planet, \
+                             {:.6} planet-ring; residual {:.1e})  shifts {:+.4} / {:+.4} / {:+.4}",
+                            r.centre_distance,
+                            r.centre_distance_nominal[0],
+                            r.centre_distance_nominal[1],
                             r.planet.shift_residual,
-                            r.planet.gear.profile_shift
+                            r.sun.profile_shift,
+                            r.planet.gear.profile_shift,
+                            r.ring.profile_shift,
                         );
                         println!(
                             "eps_a  sun-planet {:.3}   planet-ring {:.3}   \

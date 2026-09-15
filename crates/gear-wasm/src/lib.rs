@@ -1871,13 +1871,14 @@ mod tests {
         assert!(sum.abs() < 1e-9, "torques must balance, got {sum}");
 
         // The planet's shift is *solved*, not sent: 24 + 2x18 = 60 is the ideal
-        // ring, so it comes back as exactly zero with a closed residual.
+        // ring, so what moves it is the running clearance alone — the planet
+        // thinned by that much opens both meshes — and it comes back negative,
+        // small, with a closed residual.
+        let x_p = stage["planet"]["gear"]["profile_shift"].as_f64().unwrap();
+        let c = stage["clearance"].as_f64().unwrap();
         assert!(
-            stage["planet"]["gear"]["profile_shift"]
-                .as_f64()
-                .unwrap()
-                .abs()
-                < 1e-12
+            c > 0.0 && x_p < 0.0 && x_p.abs() < 2.0 * c,
+            "x_p {x_p} at clearance {c}"
         );
         assert!(stage["planet"]["shift_residual"].as_f64().unwrap() < 1e-12);
         // A planet's root is loaded on both flanks, and with no correction asked

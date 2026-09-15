@@ -881,10 +881,12 @@ impl Ring {
 /// two readings, asked at a tip.
 #[derive(Clone, Copy, Debug)]
 pub struct RingMesh {
-    /// Zero-backlash centre distance, mm — `r_ring − r_pinion` for a standard
-    /// pair, larger when the ring is shifted further than its pinion.
+    /// The centre distance the pair was asked at, mm: its zero-backlash one —
+    /// `r_ring − r_pinion` for a standard pair, larger when the ring is
+    /// shifted further than its pinion — or, through [`mesh_at`], the one it
+    /// runs at, a clearance *inside* that.
     pub centre_distance: f64,
-    /// Operating pressure angle, radians.
+    /// Operating pressure angle there, radians.
     pub alpha_w: f64,
     /// Transverse contact ratio.
     pub contact_ratio: f64,
@@ -998,6 +1000,29 @@ fn tip_clearance(ring: &Ring, pinion: &Tooth, a: f64) -> f64 {
 /// shifts that drive the operating pressure angle out of the involute domain.
 #[must_use]
 pub fn mesh_with(ring: &Ring, pinion: &Tooth) -> Option<RingMesh> {
+    let (a_ref, zero_backlash) = reference_geometry(ring, pinion)?;
+    described_at(ring, pinion, a_ref, zero_backlash)
+}
+
+/// [`mesh_with`], asked at the centre distance the pair **runs** at.
+///
+/// Every verdict here moves with the distance — the operating angle, the two
+/// contact radii, both interference conditions and the room the tips have —
+/// and a stage that assembles with a clearance is owed them where it
+/// assembled, which for an internal pair is a clearance *inside* its
+/// zero-backlash distance ([`crate::mesh::MeshKind::run_at`]). Read at zero
+/// backlash instead, the tip room came out looser than the pair has: the
+/// shipped hula stage opened its crank until that margin was exactly nought,
+/// and then ran a clearance inside it.
+#[must_use]
+pub fn mesh_at(ring: &Ring, pinion: &Tooth, running: f64) -> Option<RingMesh> {
+    let (a_ref, _) = reference_geometry(ring, pinion)?;
+    described_at(ring, pinion, a_ref, running)
+}
+
+/// Whether the two can mesh at all, and if so their reference and
+/// zero-backlash distances, mm.
+fn reference_geometry(ring: &Ring, pinion: &Tooth) -> Option<(f64, f64)> {
     // The *transverse* rack, since a ring carries its own `mt` and `alpha_t`
     // rather than a `GearParams`. Same tolerance as `GearParams::same_rack_as`,
     // from the same place, so the two cannot drift apart again.
@@ -1010,11 +1035,20 @@ pub fn mesh_with(ring: &Ring, pinion: &Tooth) -> Option<RingMesh> {
     }
     let sum_z = f64::from(pinion.params.teeth) - f64::from(ring.teeth);
     let sum_x = (pinion.params.profile_shift + pinion.params.thickness_shift()) - ring.x_thick;
-    let (alpha_w, _, centre_distance) =
+    let (_, a_ref, zero_backlash) =
         crate::mesh::operating_geometry(ring.mt, ring.alpha_t, ring.alpha_n, sum_z, sum_x)?;
-    if centre_distance.is_nan() || centre_distance <= 0.0 {
+    (zero_backlash.is_finite() && zero_backlash > 0.0).then_some((a_ref, zero_backlash))
+}
+
+/// The pair at a centre distance: the base cylinders are the gears, so the
+/// line of action turns to keep touching them — `cos α' = a_ref cos α_t / a'`,
+/// the relation [`crate::mesh::Mesh::at`] reads — and every verdict follows.
+fn described_at(ring: &Ring, pinion: &Tooth, a_ref: f64, centre_distance: f64) -> Option<RingMesh> {
+    let cos_alpha_w = a_ref * ring.alpha_t.cos() / centre_distance;
+    if !(-1.0..=1.0).contains(&cos_alpha_w) {
         return None;
     }
+    let alpha_w = cos_alpha_w.acos();
     let along = centre_distance * alpha_w.sin();
 
     // **The relation, both ways round — and it is the general one.** A ring's

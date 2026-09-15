@@ -673,8 +673,15 @@ impl PairStage {
     /// that make a gap. The same accessor, under the same name, is on every
     /// kind that has a centre distance.
     pub(super) fn nominal_distance(&self) -> Option<f64> {
-        (!self.centre_distance.auto && !self.clearance.auto)
-            .then_some(self.centre_distance.manual - self.clearance.manual)
+        self.given_distance()
+            .map(|running| MeshKind::External.nominal_of(running, self.clearance.manual))
+    }
+
+    /// The **running** distance a designer gave, where mode 3 is on — the
+    /// number typed, which the pair is then judged against
+    /// (`train::distance_notes`).
+    pub(super) fn given_distance(&self) -> Option<f64> {
+        (!self.centre_distance.auto && !self.clearance.auto).then_some(self.centre_distance.manual)
     }
 
     /// As [`Self::shifts`], at a stated search effort — which is what makes
@@ -949,7 +956,7 @@ fn solve_parallel(
     // value it wrote rather than a refusal.
     let clearance = stage.clearance.manual;
     let centre = if stage.centre_distance.auto {
-        mesh.a_w + clearance
+        mesh.running_distance(clearance)
     } else {
         stage.centre_distance.manual
     };
@@ -1237,8 +1244,8 @@ fn solve_parallel(
     // same thing in the same words.
     notes.extend(super::distance_notes(
         stage.nominal_distance(),
-        centre,
         mesh.a_w,
+        centre - mesh.a_w,
     ));
     // ...and whether the optimiser found anything to choose. A search that
     // agreed with the floor and a search that found nothing look identical from

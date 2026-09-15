@@ -1272,7 +1272,8 @@ impl MeshTrial<'_> {
         else {
             return true;
         };
-        crate::train::TipRoom::of(ring, tooth).is_some_and(|t| t.tips_clear())
+        // Where the mesh runs, which is where the trial mesh already is.
+        crate::train::TipRoom::at(ring, tooth, self.mesh.a_w).is_some_and(|t| t.tips_clear())
     }
 }
 
@@ -1463,7 +1464,9 @@ pub fn shifts_for_efficiency(
         // is assembled. What is then asked of the mesh belongs to the mesh
         // ([`MeshTrial`]) and is the same question every kind asks.
         let zero_backlash = crate::mesh::Mesh::new(&a, &b, kind).ok()?;
-        let mesh = zero_backlash.at(zero_backlash.a_w + clearance).ok()?;
+        let mesh = zero_backlash
+            .at(zero_backlash.running_distance(clearance))
+            .ok()?;
         let path = crate::contact::ContactPath::new(&a, b.ra, &mesh)?;
         MeshTrial {
             members: [
@@ -2138,7 +2141,8 @@ mod tests {
             // **The whole question**, which is now two: the tips crossing away
             // from the line of action is an internal pair's alone, and a tip
             // reaching past a flank's usable end is every mesh's.
-            let tips = crate::train::TipRoom::of(&ring, &pinion).expect("an internal mesh");
+            let tips =
+                crate::train::TipRoom::at(&ring, &pinion, mesh.a_w).expect("an internal mesh");
             let flanks = mesh.flank_interference([pinion.flank_ends(), ring.flank_ends()]);
             (
                 tips.tips_clear() && flanks == [false, false],
