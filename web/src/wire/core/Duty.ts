@@ -15,7 +15,7 @@ range_degrees: number,
  */
 at: Port, actuations: number, 
 /**
- * Whether the drive reverses between actuations.
+ * Whether the duty reverses between actuations.
  *
  * It changes nothing but the **cycle count** and which roots are
  * loaded both ways ([`loaded_cycles`], [`Reversal`]): each
