@@ -817,23 +817,23 @@
    "ok": [
     [
      "en",
-     459
+     453
     ],
     [
      "de",
-     459
+     453
     ],
     [
      "pt",
-     459
+     453
     ],
     [
      "zh-Hans",
-     459
+     453
     ],
     [
      "zh-Hant",
-     459
+     453
     ]
    ]
   },
@@ -1254,6 +1254,10 @@
       "11.113303879331880"
      ]
     },
+    "pin_diameter_range": [
+     "1.4222487943448829",
+     "5.8895581421860062"
+    ],
     "available_classes": [
      {
       "scale": "fine",
@@ -1814,6 +1818,10 @@
       "57.401290170634368"
      ]
     },
+    "pin_diameter_range": [
+     "0.87489589889193509",
+     "2.1630601772687017"
+    ],
     "clamps": [
      {
       "key": "clamp.ring_flank_ungenerated",
@@ -5765,6 +5773,7 @@
          false
         ],
         "tips": null,
+        "notes": [],
         "line": {
          "operating_pressure_angle": "20.029633803874255",
          "contact_ratios": {

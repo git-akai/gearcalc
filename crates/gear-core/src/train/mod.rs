@@ -251,6 +251,12 @@ pub struct MeshReport {
     /// which has no such question: an external pair's tip circles cross on the
     /// line of centres or not at all.
     pub tips: Option<TipRoom>,
+    /// **What this mesh has to say**, on every kind alike: contact that does not
+    /// stay continuous, a helical pair without full axial overlap, a sharing
+    /// model that is extrapolating, a screw pair that locks or nearly does,
+    /// or one that loses more than it keeps. A set has two meshes and says
+    /// which, which a note on the stage could not.
+    pub notes: Vec<Note>,
     /// What a line contact has and a point does not.
     pub line: Option<LineContact>,
     /// What a point contact has and a line does not.
@@ -396,13 +402,28 @@ pub(crate) struct LineMesh {
     pub backlash: [Backlash; 2],
     pub flank_interference: [bool; 2],
     pub tips: Option<TipRoom>,
+    /// What the builder has to say that this function cannot read off the
+    /// ratios — the sharing model's finding, raised where the section is.
+    pub notes: Vec<Note>,
 }
 
 /// A line contact's [`MeshReport`]: the shared fields as given, the sliding at
 /// the pitch point and the locking thresholds at their degenerate values, and
 /// the transverse figures in [`LineContact`].
 pub(crate) fn line_mesh_report(m: LineMesh) -> MeshReport {
+    // The two findings every line contact's ratios can raise, asked here so
+    // that no kind has to remember to — the pair asked both and neither
+    // epicyclic kind asked either.
+    let mut notes = m.notes;
+    let r = &m.contact_ratios;
+    if r.transverse < 1.0 {
+        notes.push(Note::new(key::MESH_CONTACT_RATIO_BELOW_ONE).number("ratio", r.transverse, 3));
+    }
+    if r.overlap > 0.0 && !r.has_full_axial_overlap() {
+        notes.push(Note::new(key::MESH_OVERLAP_BELOW_ONE).number("ratio", r.overlap, 3));
+    }
     MeshReport {
+        notes,
         coprime: m.coprime,
         contact_ratio: m.contact_ratios.total,
         // No friction locks a line contact — see the field.
@@ -675,7 +696,7 @@ impl Bending {
             share,
             rim,
             note: out_of_band
-                .then(|| Note::new(key::STAGE_LOAD_SHARING_OUT_OF_BAND).number("ratio", eps_n, 3)),
+                .then(|| Note::new(key::MESH_LOAD_SHARING_OUT_OF_BAND).number("ratio", eps_n, 3)),
         }
     }
 }
@@ -695,7 +716,7 @@ impl Bending {
 /// model between them.
 pub(crate) fn rim_below_minimum(rim: Option<crate::strength::RimSupport>) -> Option<Note> {
     rim.filter(|r| !r.in_range())
-        .map(|r| Note::new(key::STAGE_RIM_BELOW_MINIMUM).number("ratio", r.ratio(), 2))
+        .map(|r| Note::new(key::GEAR_RIM_BELOW_MINIMUM).number("ratio", r.ratio(), 2))
 }
 
 /// **What one mesh does to one member**: the two stresses it produces there,
@@ -903,10 +924,9 @@ pub(crate) struct AddendumAsked {
 }
 impl AddendumAsked {
     /// The note a clamped addendum owes its reader, if it was clamped.
-    pub(crate) fn note(&self, teeth: u32) -> Option<crate::note::Note> {
+    pub(crate) fn note(&self) -> Option<crate::note::Note> {
         self.clamped.then(|| {
-            crate::note::Note::new(crate::note::key::STAGE_ADDENDUM_HELD_TO_TIP_WIDTH)
-                .count("teeth", teeth)
+            crate::note::Note::new(crate::note::key::GEAR_ADDENDUM_HELD_TO_TIP_WIDTH)
                 .number("addendum", self.used, 4)
         })
     }
@@ -920,10 +940,9 @@ impl AddendumAsked {
     /// solve inside that root-find and take the derivative away with it. Not
     /// every bound an input creates needs a solver behind it: this one says
     /// what the tooth would have to be and leaves the number alone.
-    pub(crate) fn warning(&self, teeth: u32) -> Option<crate::note::Note> {
+    pub(crate) fn warning(&self) -> Option<crate::note::Note> {
         self.clamped.then(|| {
-            crate::note::Note::new(crate::note::key::STAGE_ADDENDUM_ABOVE_TIP_WIDTH)
-                .count("teeth", teeth)
+            crate::note::Note::new(crate::note::key::GEAR_ADDENDUM_ABOVE_TIP_WIDTH)
                 .number("addendum", self.used, 4)
         })
     }
@@ -1065,6 +1084,18 @@ pub struct StageGear {
 }
 
 impl StageGear {
+    /// **An automatic width with nothing to size it**, said on the gear.
+    ///
+    /// Every source switched off leaves nothing to invert, so the width stands
+    /// at the number in its box ([`FaceSources::width_for`]) — said rather than
+    /// divided by, which is what a zero width was. Every kind used to raise it
+    /// on the stage, naming the gear; it is the gear's, drawn under its own
+    /// face-width field.
+    pub(crate) fn face_width_note(&self) -> Option<Note> {
+        (self.face_width.auto && !self.face_sources.any())
+            .then(|| Note::new(key::GEAR_FACE_WIDTH_NO_SOURCE))
+    }
+
     /// **The addendum this gear builds at**, at a given shift.
     ///
     /// The bound is an upper one — a taller tooth is a sharper tooth — so the
@@ -1364,9 +1395,9 @@ impl GearResult {
     pub fn as_asked(&self) -> bool {
         self.clamps.is_empty()
             && !self.notes.iter().any(|n| {
-                n.is(key::STAGE_SHIFT_RAISED_FOR_UNDERCUT)
-                    || n.is(key::STAGE_ADDENDUM_ABOVE_TIP_WIDTH)
-                    || n.is(key::STAGE_ADDENDUM_HELD_TO_TIP_WIDTH)
+                n.is(key::GEAR_SHIFT_RAISED_FOR_UNDERCUT)
+                    || n.is(key::GEAR_ADDENDUM_ABOVE_TIP_WIDTH)
+                    || n.is(key::GEAR_ADDENDUM_HELD_TO_TIP_WIDTH)
             })
     }
 }
@@ -2438,13 +2469,13 @@ impl Reversal {
             return None;
         }
         Some(if self.correct {
-            Note::new(key::STAGE_REVERSED_BENDING_APPLIED).number(
+            Note::new(key::GEAR_REVERSED_BENDING_APPLIED).number(
                 "fraction",
                 crate::material::REVERSED_BENDING_FRACTION,
                 2,
             )
         } else {
-            Note::new(key::STAGE_REVERSED_BENDING_UNCORRECTED)
+            Note::new(key::GEAR_REVERSED_BENDING_UNCORRECTED)
         })
     }
 
@@ -6230,11 +6261,19 @@ mod tests {
             }
         }
         // The note still fires — the point is that it is now the *only* thing
-        // that happens, not that it stopped happening.
-        for (what, notes) in [("spur", &spur_r.notes), ("epicyclic", &set_r.notes)] {
+        // that happens, not that it stopped happening — and it fires on the
+        // gear whose width it is about, on every kind, not in a stage's list.
+        let members: Vec<&GearResult> = spur_r
+            .gears
+            .iter()
+            .chain([&set_r.sun, &set_r.planet.gear, &set_r.ring])
+            .chain(hula_r.gears.iter().map(|g| &g.gear))
+            .collect();
+        for (i, g) in members.iter().enumerate() {
             assert!(
-                notes.iter().any(|n| n.is(key::STAGE_FACE_WIDTH_NO_SOURCE)),
-                "{what} should still say no rating sizes the width"
+                g.notes.iter().any(|n| n.is(key::GEAR_FACE_WIDTH_NO_SOURCE)),
+                "member {i} should say no rating sizes its width: {:?}",
+                g.notes
             );
         }
     }

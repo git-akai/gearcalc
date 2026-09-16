@@ -1350,7 +1350,14 @@ too.
 | **2 pins** | `2 r_M + d_p` | `2 r_M cos(π/2z) + d_p` |
 | **3 pins** | `2 r_M cos(π/z) + d_p` | `r_M (1 + cos(π/z)) + d_p` |
 
-Validity, all closed form: `r_form < r_b/cos φ < r_a` and `r_M − d_p/2 > r_f`.
+Validity: the contact between the form circle and the tip, and the pin clear
+of the root, `r_M − σ d_p/2` on the flank side of `r_f`. **Where a pin sits is
+monotone in its diameter** — a larger pin rides higher in an external space and
+deeper in a ring's — so every failure is off one end of that map: sinking
+toward the root is a pin too *small*, riding past the tip one too *large*, and
+the diameters that seat are one interval. That interval is read off the same
+verdict by bisection (`metrology::pin_diameter_range`, the intersection over
+every space of an eccentric gear) and is the bound the pin box shows.
 Three pins are external only — inside a bore neither the odd-count problem nor
 the datum problem arises.
 
@@ -2354,6 +2361,12 @@ Every type that crosses is declared to TypeScript by `ts-rs` into
 
 A value that does not exist crosses as `Maybe::Unavailable`, carrying a `Note` —
 a stable key and the values its sentence needs — exactly as a clamp does.
+
+**Where a note is carried says what it is about.** `[clamp]` and `[gear]`
+notes are on the gear's result, `[mesh]` notes on the `MeshReport`, `[stage]`
+notes on the stage's and `[train]` notes on the train's
+([rationale](rationale.md#a-note-lives-with-the-thing-it-is-about)); none names
+the thing it is about, and a panel draws each where it belongs.
 
 ### Languages
 

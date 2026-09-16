@@ -5,6 +5,7 @@
     defaults,
     dxf,
     isUnavailable,
+    outside,
     profile,
     solve,
     validate,
@@ -192,6 +193,20 @@
 
   const eccentric = $derived(tab.kind === "eccentric");
   const ring = $derived(internal ? solveRing(ringRequest) : null);
+  /** The pins that seat on the flanks at every position, whichever kind the
+   *  tab is, as the bound the pin box is held to. */
+  const pins = $derived<[number, number] | null>(
+    internal
+      ? ring && "ok" in ring
+        ? ring.ok.pin_diameter_range
+        : null
+      : "ok" in result
+        ? result.ok.pin_diameter_range
+        : null,
+  );
+  const pinBound = $derived(
+    pins ? { min: pins[0], max: pins[1], exclusive_min: false, exclusive_max: false } : null,
+  );
 
   /** The kinds this tab may be switched to, and the note under the one it holds.
    *
@@ -451,10 +466,20 @@
 
     <h2>{t("ui.gear_measurement")}</h2>
     <div class="grid">
-      <label>
+      <!-- The bound every other input has: the pins that seat on the flanks
+           at every position, read off the same map the measurement is, so a
+           pin the box refuses is refused with its range rather than a
+           verdict. One box serves both kinds and so does the hint. -->
+      <label class:invalid={pinBound !== null && outside(tab.pinDiameter, pinBound) !== null}>
         <span>{t("ui.gear_pin_ball_diameter")}</span>
         <input type="number" step="0.05" bind:value={tab.pinDiameter} />
         <em>{t("ui.gear_mm")}</em>
+        <FieldNote notes={
+          notes(
+            pins ? t("ui.bound_pin_diameter", { min: n(pins[0]), max: n(pins[1]) }) : null,
+            pinBound ? outside(tab.pinDiameter, pinBound) : null,
+          )
+        } />
       </label>
       {#if "ok" in result}
         <label>

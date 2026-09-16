@@ -27,24 +27,194 @@ pub fn base_helix_angle(g: &Tooth) -> f64 {
 }
 
 /// Why a measurement cannot be taken.
+///
+/// **A pin fails at one of two ends, and which is the whole diagnosis.** Where
+/// a pin sits in a space is a monotone function of its diameter — a larger pin
+/// rides higher in an external gear's space and deeper in a ring's, since one
+/// narrows inward and the other outward — so every way a pin can fail to
+/// measure is a way of being off one end of that map: sinking to the root, or
+/// contacting past the root end of the flank, is a pin too *small*; contacting
+/// past the tip, or its centre past the base circle of a ring, is a pin too
+/// *large*. Four names for those used to stand here, two of them saying where
+/// the pin ended up rather than which way to change it, and one of them
+/// diagnosing the ring's root end backwards. [`pin_diameter_range`] is the same
+/// map read for both ends at once.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MeasurementError {
     /// No span over any number of teeth contacts the usable flank.
     NoValidSpan,
-    /// The pin contacts outside the usable flank — below the form circle or
-    /// beyond the tip.
-    PinContactOffFlank,
-    /// The pin sits on the root diameter instead of the flanks.
-    PinBottomsOut,
-    /// The pin is small enough to fall between the flanks entirely: its centre
-    /// would sit inside the base circle, where there is no involute to touch.
-    ///
-    /// External gears only — a ring's space narrows *outward*, so there is no
-    /// pin too small to seat in one.
+    /// The pin is too small to seat on the flanks: it sinks toward the root —
+    /// contacting below the usable flank, bottoming on the root circle, or, in
+    /// an external gear, falling between the flanks with its centre inside the
+    /// base circle.
     PinTooSmall,
-    /// The pin is too large to seat: contact would run past the base circle, or —
-    /// in a ring, whose space narrows outward — the centre itself would.
+    /// The pin is too large to seat on the flanks: it rides toward the tip —
+    /// contacting past it, or, in a ring, with its centre past the base circle.
     PinTooLarge,
+}
+
+/// A tooth space as a pin sees it, for **either** kind of gear.
+///
+/// What [`pin_seat`] needs to place the pin, and the three radii that decide
+/// whether the seat is a measurement: the ends of the usable flank, by role
+/// rather than by size — a ring's tip is its *smallest* radius — and the root
+/// the pin must not reach. One description for an external gear, a ring, and
+/// one space of an eccentric gear whose two bounding teeth differ.
+#[derive(Clone, Copy, Debug)]
+pub struct Space {
+    /// Half the angular width of the space at the base circle, radians.
+    pub half_space: f64,
+    /// Base radius, mm.
+    pub rb: f64,
+    /// Base helix angle, radians.
+    pub beta_b: f64,
+    /// `+1` external, `−1` a ring — [`crate::mesh::MeshKind::sign`].
+    pub sigma: f64,
+    /// Where the usable flank ends at the tip, mm.
+    pub tip: f64,
+    /// Where it ends at the root, handing over to the fillet, mm.
+    pub form: f64,
+    /// The root circle, mm.
+    pub root: f64,
+}
+
+impl Space {
+    /// An evenly cut external gear's space.
+    #[must_use]
+    pub fn of(g: &Tooth) -> Self {
+        Self {
+            half_space: std::f64::consts::PI / f64::from(g.params.teeth) - g.psi_b,
+            rb: g.rb,
+            beta_b: base_helix_angle(g),
+            sigma: 1.0,
+            tip: g.ra,
+            form: g.r_j,
+            root: g.rf,
+        }
+    }
+
+    /// A ring's space. The usable flank runs from the tip — the ring's
+    /// smallest radius — out to where the cutter handed over to the fillet,
+    /// and the root circle is *outside* the teeth.
+    #[must_use]
+    pub fn of_ring(ring: &crate::ring::Ring) -> Self {
+        Self {
+            half_space: std::f64::consts::PI / f64::from(ring.teeth) - ring.psi_b,
+            rb: ring.rb,
+            beta_b: ring.base_helix_angle(),
+            sigma: -1.0,
+            tip: ring.ra,
+            form: ring.involute_at(ring.u_j).0,
+            root: ring.rf,
+        }
+    }
+
+    /// Where a pin of this diameter sits, `(pin centre radius, contact
+    /// radius)`, or which way it is off the flanks.
+    ///
+    /// Every check is one direction of the same map. `σ` reads the kind: an
+    /// external gear's root is inward and a ring's outward, so "past the form
+    /// toward the root" is `σ (r_c − form) < 0` on either, and bottoming is the
+    /// pin's near surface reaching the root circle in that same direction.
+    ///
+    /// # Errors
+    ///
+    /// [`MeasurementError::PinTooSmall`] or [`MeasurementError::PinTooLarge`].
+    pub fn seat(&self, pin_diameter: f64) -> Result<(f64, f64), MeasurementError> {
+        let (r_m, contact) = pin_seat(
+            self.half_space,
+            self.rb,
+            self.beta_b,
+            pin_diameter,
+            self.sigma,
+        )?;
+        let bottoms = self.sigma * (r_m - self.sigma * pin_diameter / 2.0 - self.root) <= 0.0;
+        if bottoms || self.sigma * (contact - self.form) < 0.0 {
+            return Err(MeasurementError::PinTooSmall);
+        }
+        if self.sigma * (contact - self.tip) > 0.0 {
+            return Err(MeasurementError::PinTooLarge);
+        }
+        Ok((r_m, contact))
+    }
+}
+
+/// The space after tooth `i` of an assembled gear: bounded by two teeth that
+/// need not agree, so its half-angle is the gear's rather than one tooth's,
+/// and its flank and root are those of the tooth the pin's contact is read
+/// against.
+fn space_at(gear: &crate::gear::Gear, i: usize) -> Space {
+    let mean = gear.mean();
+    let t = gear.tooth(i).0;
+    Space {
+        half_space: gear.space_half_angle(i),
+        rb: mean.rb,
+        beta_b: base_helix_angle(mean),
+        sigma: 1.0,
+        tip: t.ra,
+        form: t.r_j,
+        root: t.rf,
+    }
+}
+
+/// [`pin_diameter_range`] over every space of an assembled gear — the pins
+/// that measure at **every** position, as one caliper carried round.
+#[must_use]
+pub fn pin_diameter_range_around(gear: &crate::gear::Gear) -> Option<(f64, f64)> {
+    (0..gear.teeth())
+        .map(|i| pin_diameter_range(&space_at(gear, i)))
+        .try_fold((0.0_f64, f64::INFINITY), |(lo, hi), r| {
+            let (a, b) = r?;
+            let (lo, hi) = (lo.max(a), hi.min(b));
+            (lo < hi).then_some((lo, hi))
+        })
+}
+
+/// **The pin diameters that measure this space**, `(smallest, largest)`, or
+/// `None` where none does.
+///
+/// Where a pin sits is monotone in its diameter and every failure is off one
+/// end of that map ([`MeasurementError`]), so the diameters that seat are one
+/// interval, and each of its ends is where the verdict changes — found by
+/// bisection on the verdict itself rather than by a residual per condition,
+/// since which condition binds at each end is exactly what differs between an
+/// external gear, a ring and a helical one. Sixty halvings of a bracket a few
+/// modules wide is the full mantissa, so the ends are as sharp as the map.
+#[must_use]
+pub fn pin_diameter_range(space: &Space) -> Option<(f64, f64)> {
+    use MeasurementError::{PinTooLarge, PinTooSmall};
+    let verdict = |d: f64| space.seat(d).err();
+    // Small at nothing, and large somewhere: a pin much wider than the space
+    // is off the tip end whatever the kind. Walked out from the base radius
+    // rather than guessed, and a space no pin reaches at all is `None`.
+    let mut hi = space.rb;
+    let mut steps = 0;
+    while verdict(hi) != Some(PinTooLarge) {
+        hi *= 2.0;
+        steps += 1;
+        if steps > 64 {
+            return None;
+        }
+    }
+    let bisect = |mut lo: f64, mut hi: f64, below: fn(Option<MeasurementError>) -> bool| {
+        for _ in 0..64 {
+            let mid = 0.5 * (lo + hi);
+            if below(verdict(mid)) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        0.5 * (lo + hi)
+    };
+    let smallest = if verdict(0.0) == Some(PinTooSmall) {
+        bisect(0.0, hi, |v| v == Some(PinTooSmall))
+    } else {
+        0.0
+    };
+    let largest = bisect(0.0, hi, |v| v != Some(PinTooLarge));
+    (smallest < largest && space.seat(0.5 * (smallest + largest)).is_ok())
+        .then_some((smallest, largest))
 }
 
 /// Span over `k` teeth ("base tangent length"), mm.
@@ -325,9 +495,19 @@ fn pin_seat(
 
     // The contact point lies on the involute normal through the pin centre, at
     // the pin's radius from it: unwrapped length r_b·tan φ, less the pin.
+    // The contact point inside the base circle is the same failure as the
+    // centre there, and reads the same way: a pin too small for an external
+    // gear's space, which it has sunk into, and — were it reachable — too large
+    // for a ring's. It was reported as too large on both, which sent an
+    // external gear's designer the wrong way over the first few microns above
+    // the smallest pin that reaches the base circle.
     let u_contact = phi.tan() - sigma * pin_diameter / (2.0 * rb);
     if u_contact <= 0.0 {
-        return Err(MeasurementError::PinTooLarge);
+        return Err(if sigma > 0.0 {
+            MeasurementError::PinTooSmall
+        } else {
+            MeasurementError::PinTooLarge
+        });
     }
     Ok((r_m, rb * f64::hypot(1.0, u_contact)))
 }
@@ -349,14 +529,7 @@ pub fn over_pins(
     pin_diameter: f64,
     pin_count: PinCount,
 ) -> Result<OverPins, MeasurementError> {
-    let (r_m, contact_radius) = pin_geometry(g, pin_diameter)?;
-
-    if r_m - pin_diameter / 2.0 <= g.rf {
-        return Err(MeasurementError::PinBottomsOut);
-    }
-    if contact_radius < g.r_j || contact_radius > g.ra {
-        return Err(MeasurementError::PinContactOffFlank);
-    }
+    let (r_m, contact_radius) = Space::of(g).seat(pin_diameter)?;
 
     let z = f64::from(g.params.teeth);
     let pi = std::f64::consts::PI;
@@ -496,8 +669,6 @@ pub fn over_pins_at(
     start: usize,
 ) -> Result<OverPins, MeasurementError> {
     let z = gear.teeth();
-    let mean = gear.mean();
-    let bb = base_helix_angle(mean);
 
     // Where the pin in the space after tooth `i` sits: its own centre radius,
     // and the angle its centre sits at.
@@ -506,14 +677,7 @@ pub fn over_pins_at(
     // into one of `z − 1` — the same angle, and not the same `cos`. That last
     // ulp reaches the screen as a range on a gear that has none.
     let seat = |i: usize| -> Result<([f64; 2], f64), MeasurementError> {
-        let (r_m, contact) = pin_seat(gear.space_half_angle(i), mean.rb, bb, pin_diameter, 1.0)?;
-        let t = gear.tooth(i).0;
-        if r_m - pin_diameter / 2.0 <= t.rf {
-            return Err(MeasurementError::PinBottomsOut);
-        }
-        if contact < t.r_j || contact > t.ra {
-            return Err(MeasurementError::PinContactOffFlank);
-        }
+        let (r_m, contact) = space_at(gear, i).seat(pin_diameter)?;
         // Relative to the first pin's space, so every angle in the measurement
         // is a *difference* and the pitch terms cancel exactly.
         let c = gear.space_centre_delta(start, i);
@@ -573,8 +737,6 @@ impl crate::note::Explain for MeasurementError {
         use crate::note::key;
         crate::note::Note::new(match self {
             Self::NoValidSpan => key::ERROR_MEASURE_NO_VALID_SPAN,
-            Self::PinContactOffFlank => key::ERROR_MEASURE_PIN_OFF_FLANK,
-            Self::PinBottomsOut => key::ERROR_MEASURE_PIN_BOTTOMS_OUT,
             Self::PinTooSmall => key::ERROR_MEASURE_PIN_TOO_SMALL,
             Self::PinTooLarge => key::ERROR_MEASURE_PIN_TOO_LARGE,
         })
@@ -587,10 +749,8 @@ impl std::fmt::Display for MeasurementError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             Self::NoValidSpan => "no span contacts the usable flank on this gear",
-            Self::PinContactOffFlank => "the pin touches outside the usable flank",
-            Self::PinBottomsOut => "the pin sits on the root diameter, not the flanks",
-            Self::PinTooSmall => "the pin is too small: it falls between the flanks into the root",
-            Self::PinTooLarge => "the pin is too large: contact would fall below the base circle",
+            Self::PinTooSmall => "the pin or ball is too small to seat on the flanks",
+            Self::PinTooLarge => "the pin or ball is too large to seat on the flanks",
         };
         f.write_str(s)
     }
@@ -646,25 +806,7 @@ pub fn between_pins(
     ring: &crate::ring::Ring,
     pin_diameter: f64,
 ) -> Result<BetweenPins, MeasurementError> {
-    let (r_m, contact_radius) = pin_seat(
-        std::f64::consts::PI / f64::from(ring.teeth) - ring.psi_b,
-        ring.rb,
-        ring.base_helix_angle(),
-        pin_diameter,
-        -1.0,
-    )?;
-
-    // A ring's root circle is *outside* its teeth, so "bottoming out" is the pin
-    // reaching outward into the root rather than inward.
-    if r_m + pin_diameter / 2.0 >= ring.rf {
-        return Err(MeasurementError::PinBottomsOut);
-    }
-    // The usable flank runs from the tip — the ring's *smallest* radius — out to
-    // where the cutter handed over to the fillet.
-    let form_radius = ring.involute_at(ring.u_j).0;
-    if contact_radius < ring.ra || contact_radius > form_radius {
-        return Err(MeasurementError::PinContactOffFlank);
-    }
+    let (r_m, contact_radius) = Space::of_ring(ring).seat(pin_diameter)?;
 
     let z = f64::from(ring.teeth);
     let pi = std::f64::consts::PI;

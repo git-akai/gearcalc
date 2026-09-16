@@ -185,8 +185,9 @@
    *  stage that lists what is left over can subtract exactly what was drawn
    *  rather than repeating the keys. */
   const FIELD_NOTES = {
-    profile_shift: ["stage.shift_raised_for_undercut"],
-    addendum: ["stage.addendum_held_to_tip_width", "stage.addendum_above_tip_width"],
+    profile_shift: ["gear.shift_raised_for_undercut"],
+    addendum: ["gear.addendum_held_to_tip_width", "gear.addendum_above_tip_width"],
+    face_width: ["gear.face_width_no_source", "gear.face_width_as_entered"],
   } as const;
   const UNDER_A_FIELD: readonly string[] = Object.values(FIELD_NOTES).flat();
 
@@ -200,28 +201,23 @@
           { percent: pct(e.backward) },
         )}`;
 
-  /** **What a screw stage says about being locked, in its own words.**
-   *
-   *  Four keys, drawn beside the efficiency they are about rather than in the
-   *  list at the foot of the stage — the convention `FIELD_NOTES` already
-   *  follows for a shift raised to clear undercut. They come from Rust and
-   *  carry the coefficient and the threshold, which is more than a predicate
-   *  here could say, and they are directional because the core's are.
-   *
-   *  Subtracted from the stage's own list below, or the reader is told twice. */
-  const LOCK_NOTES: readonly string[] = [
-    "stage.self_locking",
-    "stage.near_self_locking",
-    "stage.forward_locking",
-    "stage.near_forward_locking",
+  /** **A mesh's notes are drawn beside the figure each is about.** Those
+   *  about its contact — a ratio below one, a helical pair short of full
+   *  overlap, a sharing model extrapolating past the single-pair zone — go
+   *  under the contact ratio; everything else a mesh can say is about its
+   *  efficiency — locking, nearly locking, losing more than it keeps — and
+   *  goes under that. Two groups and a remainder rather than a key per note,
+   *  so a note the core adds is drawn somewhere rather than nowhere. The core
+   *  raises them on the mesh, so a set says which of its two meshes. */
+  const CONTACT_NOTES: readonly string[] = [
+    "mesh.contact_ratio_below_one",
+    "mesh.overlap_below_one",
+    "mesh.load_sharing_out_of_band",
   ];
-  const lockNote = (from: Note[]) => clampNote(from, LOCK_NOTES);
-  /** What the stage's own list is left with once the lock notes are drawn
-   *  beside the efficiency — the same subtraction `UNDER_A_FIELD` does for a
-   *  gear card, written once so the list and the `{#if}` guarding it cannot
-   *  come to different conclusions about whether there is anything to show. */
-  const restOfNotes = (from: Note[] | undefined) =>
-    (from ?? []).filter((n) => !LOCK_NOTES.includes(n.key));
+  const contactNotes = (m: MeshReport | undefined) =>
+    (m?.notes ?? []).filter((n) => CONTACT_NOTES.includes(n.key));
+  const efficiencyNotes = (m: MeshReport | undefined) =>
+    (m?.notes ?? []).filter((n) => !CONTACT_NOTES.includes(n.key));
 
   /** **Which directions a mesh refuses to be driven in**, named.
    *
@@ -232,10 +228,10 @@
    *  split, which `gear-cli crossed 17 23 90` reaches at 9°/81° — showed a bare
    *  `0.000 %` and no words at all.
    *
-   *  A worm stage says more than this, and says it from Rust: `stage.self_locking`
-   *  and `stage.forward_locking` carry the coefficient and the threshold, and
-   *  are drawn beside the efficiency by `lockNote`. This is for the readouts
-   *  that have no note behind them. */
+   *  A screw mesh says more than this, and says it from Rust: `mesh.self_locking`
+   *  and `mesh.forward_locking` carry the coefficient and the threshold, and
+   *  are drawn beside the mesh's efficiency. This is for the readouts that have
+   *  no note behind them. */
   const lockedWays = (e: { forward: number; backward: number } | undefined) => {
     if (e === undefined) return undefined;
     const [f, b] = [e.forward <= 0, e.backward <= 0];
@@ -364,12 +360,7 @@
      second place the same row could be drawn differently. `members` names the
      two ends the one gap is seen from, in the order the mesh was built;
      `notes` is the stage's, for the lock notes drawn beside the efficiency. -->
-{#snippet meshRows(
-  m: MeshReport | undefined,
-  members: [string, string],
-  helical: boolean,
-  notes: Note[] = [],
-)}
+{#snippet meshRows(m: MeshReport | undefined, members: [string, string])}
   <dt>{t("ui.train_coprime")}</dt>
   <dd>{m === undefined ? BLANK : m.coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
   {#if m?.line}
@@ -386,34 +377,32 @@
       · ε<sub>β</sub>
       {num(r.overlap, 4)} · ε<sub>γ</sub>
       {num(r.total, 4)}
-      {#if r.transverse < 1}
-        <small class="warn">{t("ui.train_note_contact_ratio_below_one")}</small>
-      {:else if helical && r.overlap < 1}
-        <small class="warn">{t("ui.train_no_full_axial_overlap")}</small>
-      {/if}
     {:else if m?.point}
       <span class:warn={m.contact_ratio < 1}>
         ε {num(m.contact_ratio, 4)}
       </span>
-      <small class:warn={m.contact_ratio < 1}>
-        {m.contact_ratio < 1
-          ? t("ui.train_note_contact_ratio_below_one")
-          : t("ui.train_crossed_pairs_in_contact", {
-              limit: t(
-                m.point.limited_by === "face"
-                  ? "ui.train_limited_by_face_width"
-                  : "ui.train_limited_by_teeth",
-              ),
-            })}
-      </small>
+      {#if m.contact_ratio >= 1}
+        <small>
+          {t("ui.train_crossed_pairs_in_contact", {
+            limit: t(
+              m.point.limited_by === "face"
+                ? "ui.train_limited_by_face_width"
+                : "ui.train_limited_by_teeth",
+            ),
+          })}
+        </small>
+      {/if}
     {/if}
+    {#each contactNotes(m) as n, i (i)}
+      <small class="warn">{note(n)}</small>
+    {/each}
   </dd>
   <dt>{t("ui.train_mesh_efficiency")}</dt>
   <dd>
     {bothWays(m?.efficiency)}
-    {#if lockNote(notes)}
-      <small class="warn">{lockNote(notes)}</small>
-    {/if}
+    {#each efficiencyNotes(m) as n, i (i)}
+      <small class="warn">{note(n)}</small>
+    {/each}
     {#if m?.point?.parallel_axis_efficiency != null}
       <small>
         {t("ui.train_parallel_shafts_would_give", {
@@ -580,7 +569,7 @@
       <span>{t("ui.train_cutter_teeth")}</span>
       <input type="number" step="1" min="1" bind:value={cut.teeth} />
       <em></em>
-      <FieldNote notes={notes(t("ui.train_note_cutter_teeth"), null)} />
+      <FieldNote notes={notes(t("ui.gear_note_cutter_teeth"), null)} />
     </label>
     {@render numberField("ui.train_cutter_addendum", () => cut.addendum, (v) => (cut.addendum = v), 0.05, "ui.train_m")}
     {@render numberField("ui.train_cutter_tip_round", () => cut.tip_round, (v) => (cut.tip_round = v), 0.02, "ui.train_m")}
@@ -744,6 +733,8 @@
         ? t("ui.train_note_no_continuous_width")
         : t("ui.train_note_face_width_continuity", { width: n(opts.faceFromContinuity) }),
       "ui.train_mm",
+      undefined,
+      clampNote(own, FIELD_NOTES.face_width),
     )}
   {:else if opts.faceWidth === "proportion"}
     <!-- A worm drive's width is a **convention with a named source**, not a
@@ -765,6 +756,8 @@
               : "2 m_x √(q + 1), at most 0.67 d₁, q = d₁/m_x — BS 721",
           }),
       "ui.train_mm",
+      undefined,
+      clampNote(own, FIELD_NOTES.face_width),
     )}
   {:else}
     {@render autoNumber(
@@ -775,6 +768,9 @@
       undefined,
       undefined,
       "ui.train_mm",
+      undefined,
+      // A width nothing sizes, said under the box it stands at.
+      clampNote(own, FIELD_NOTES.face_width),
     )}
   {/if}
   {#if gear.face_width.auto && (opts.faceWidth ?? "rating") === "rating"}
@@ -1477,12 +1473,10 @@
                   notes(
                     worm
                       ? t("ui.train_note_thickness_mod_worm")
-                      : t(
-                          stage.shaft_angle === 0
-                            ? "ui.train_note_thickness_mod_spur"
-                            : "ui.train_note_thickness_mod_crossed",
-                          { first: String(gearNumber(i, 0)), second: String(gearNumber(i, 1)) },
-                        ),
+                      : t("ui.train_note_thickness_mod_pair", {
+                          first: String(gearNumber(i, 0)),
+                          second: String(gearNumber(i, 1)),
+                        }),
                     null,
                   )
                 } />
@@ -1574,16 +1568,11 @@
               {/if}
               <!-- What every mesh reports, drawn by the one snippet that draws
                    it — the same rows whether the shafts are parallel or not. -->
-              {@render meshRows(
-                pres?.mesh,
-                names,
-                (pres?.gears[0].helix_angle ?? 0) !== 0,
-                pres?.notes ?? [],
-              )}
+              {@render meshRows(pres?.mesh, names)}
             </dl>
-            {#if restOfNotes(pres?.notes).length > 0}
+            {#if (pres?.notes.length ?? 0) > 0}
               <ul class="notes">
-                {#each restOfNotes(pres?.notes) as n, i (i)}<li>{note(n)}</li>{/each}
+                {#each pres?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
               </ul>
             {/if}
 
@@ -1808,7 +1797,7 @@
                        which is the one `meshRows` draws below. -->
                   <dt>{t("ui.train_coprime_with_planets")}</dt>
                   <dd>{coprime === undefined ? BLANK : coprime ? t("ui.train_yes") : t("ui.train_no")}</dd>
-                  {@render meshRows(m, [t(first), t(second)], stage.helix_angle !== 0)}
+                  {@render meshRows(m, [t(first), t(second)])}
                 </dl>
               {/each}
 
@@ -1961,11 +1950,10 @@
                      arrangement has — the same order the spur and screw
                      readouts take. The mesh was built pinion first, so the
                      pinion leads the pair of backlash figures. -->
-                {@render meshRows(
-                  hres?.meshes[m].report,
-                  [t("ui.train_the_pinion"), t("ui.train_the_ring")],
-                  stage.helix_angle !== 0,
-                )}
+                {@render meshRows(hres?.meshes[m].report, [
+                  t("ui.train_the_pinion"),
+                  t("ui.train_the_ring"),
+                ])}
                 <dt>{t("ui.train_hula_clearance_result")}</dt>
                 <dd>
                   {num(hres?.meshes[m].clearance, 4)} {t("ui.train_mm")}

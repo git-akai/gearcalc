@@ -42,6 +42,10 @@ use std::collections::BTreeMap;
 /// `gear-io` holds both halves of that check: every key here has a message, and
 /// every message here has a key.
 pub mod key {
+    // ---- clamps ---------------------------------------------------- //
+    //
+    // A guard fired on a part, and the geometry is not quite what was asked
+    // for. Reported on the gear or member it happened to.
     /// `clamp.cutter_no_tip_corner`
     pub const CLAMP_CUTTER_NO_TIP_CORNER: &str = "clamp.cutter_no_tip_corner";
     /// `clamp.cutter_teeth_reduced`
@@ -70,7 +74,6 @@ pub mod key {
     pub const CLAMP_RING_TIP_RAISED: &str = "clamp.ring_tip_raised";
     /// `clamp.tip_capped_pointed`
     pub const CLAMP_TIP_CAPPED_POINTED: &str = "clamp.tip_capped_pointed";
-
     /// `clamp.tooth_severed`
     pub const CLAMP_TOOTH_SEVERED: &str = "clamp.tooth_severed";
     /// `clamp.tooth_undercut`
@@ -79,55 +82,70 @@ pub mod key {
     pub const CLAMP_TOOTH_THICKNESS_CAPPED: &str = "clamp.tooth_thickness_capped";
     /// `clamp.tooth_thickness_raised`
     pub const CLAMP_TOOTH_THICKNESS_RAISED: &str = "clamp.tooth_thickness_raised";
-    /// `stage.crossed_contact_ratio_below_one`
-    pub const STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE: &str = "stage.crossed_contact_ratio_below_one";
-    /// `stage.crossed_face_width_as_entered`
-    pub const STAGE_CROSSED_FACE_WIDTH_AS_ENTERED: &str = "stage.crossed_face_width_as_entered";
-    /// `stage.low_mesh_efficiency`
-    pub const STAGE_LOW_MESH_EFFICIENCY: &str = "stage.low_mesh_efficiency";
-    /// `stage.near_self_locking`
-    pub const STAGE_NEAR_SELF_LOCKING: &str = "stage.near_self_locking";
+
+    // ---- a member --------------------------------------------------- //
+    //
+    // A finding about one gear of a stage — a bound that moved its number, a
+    // root loaded both ways, a rim too thin to rate, a face nothing sizes —
+    // carried on that gear's own result and drawn on its card, never in the
+    // stage's list where a reader would have to match it back up.
+    /// `gear.face_width_as_entered`
+    pub const GEAR_FACE_WIDTH_AS_ENTERED: &str = "gear.face_width_as_entered";
+    /// `gear.addendum_above_tip_width`
+    pub const GEAR_ADDENDUM_ABOVE_TIP_WIDTH: &str = "gear.addendum_above_tip_width";
+    /// `gear.addendum_held_to_tip_width`
+    pub const GEAR_ADDENDUM_HELD_TO_TIP_WIDTH: &str = "gear.addendum_held_to_tip_width";
+    /// `gear.shift_raised_for_undercut`
+    pub const GEAR_SHIFT_RAISED_FOR_UNDERCUT: &str = "gear.shift_raised_for_undercut";
+    /// `gear.ring_addendum_clamped`
+    pub const GEAR_RING_ADDENDUM_CLAMPED: &str = "gear.ring_addendum_clamped";
+    /// `gear.face_width_no_source`
+    pub const GEAR_FACE_WIDTH_NO_SOURCE: &str = "gear.face_width_no_source";
+    /// `gear.reversed_bending_uncorrected`
+    pub const GEAR_REVERSED_BENDING_UNCORRECTED: &str = "gear.reversed_bending_uncorrected";
+    /// `gear.reversed_bending_applied`
+    pub const GEAR_REVERSED_BENDING_APPLIED: &str = "gear.reversed_bending_applied";
+    /// `gear.rim_below_minimum`
+    pub const GEAR_RIM_BELOW_MINIMUM: &str = "gear.rim_below_minimum";
+
+    // ---- a mesh ----------------------------------------------------- //
+    //
+    // A finding about one mesh, on every kind's [`MeshReport`] alike: its
+    // contact, its overlap, its sharing model, whether it locks. A set has
+    // two meshes and says which.
+    /// `mesh.contact_ratio_below_one`
+    pub const MESH_CONTACT_RATIO_BELOW_ONE: &str = "mesh.contact_ratio_below_one";
+    /// `mesh.low_efficiency`
+    pub const MESH_LOW_EFFICIENCY: &str = "mesh.low_efficiency";
+    /// `mesh.near_self_locking`
+    pub const MESH_NEAR_SELF_LOCKING: &str = "mesh.near_self_locking";
+    /// `mesh.forward_locking`
+    pub const MESH_FORWARD_LOCKING: &str = "mesh.forward_locking";
+    /// `mesh.near_forward_locking`
+    pub const MESH_NEAR_FORWARD_LOCKING: &str = "mesh.near_forward_locking";
+    /// `mesh.overlap_below_one`
+    pub const MESH_OVERLAP_BELOW_ONE: &str = "mesh.overlap_below_one";
+    /// `mesh.self_locking`
+    pub const MESH_SELF_LOCKING: &str = "mesh.self_locking";
+    /// `mesh.load_sharing_out_of_band`
+    pub const MESH_LOAD_SHARING_OUT_OF_BAND: &str = "mesh.load_sharing_out_of_band";
+
+    // ---- the stage -------------------------------------------------- //
+    //
+    // What only the arrangement can say: its distance, its search, its
+    // planets.
     /// `stage.centre_distance_not_reached`
     pub const STAGE_CENTRE_DISTANCE_NOT_REACHED: &str = "stage.centre_distance_not_reached";
     /// `stage.clearance_negative`
     pub const STAGE_CLEARANCE_NEGATIVE: &str = "stage.clearance_negative";
     /// `stage.optimiser_found_nothing`
     pub const STAGE_OPTIMISER_FOUND_NOTHING: &str = "stage.optimiser_found_nothing";
-    /// `stage.forward_locking`
-    pub const STAGE_FORWARD_LOCKING: &str = "stage.forward_locking";
-    /// `stage.near_forward_locking`
-    pub const STAGE_NEAR_FORWARD_LOCKING: &str = "stage.near_forward_locking";
-    /// `stage.overlap_below_one`
-    pub const STAGE_OVERLAP_BELOW_ONE: &str = "stage.overlap_below_one";
-    /// `stage.addendum_above_tip_width`
-    pub const STAGE_ADDENDUM_ABOVE_TIP_WIDTH: &str = "stage.addendum_above_tip_width";
-    /// `stage.addendum_held_to_tip_width`
-    pub const STAGE_ADDENDUM_HELD_TO_TIP_WIDTH: &str = "stage.addendum_held_to_tip_width";
-    /// `stage.shift_raised_for_undercut`
-    pub const STAGE_SHIFT_RAISED_FOR_UNDERCUT: &str = "stage.shift_raised_for_undercut";
     /// `stage.planet_clearance_below_minimum`
     pub const STAGE_PLANET_CLEARANCE_BELOW_MINIMUM: &str = "stage.planet_clearance_below_minimum";
     /// `stage.planets_not_evenly_spaced`
     pub const STAGE_PLANETS_NOT_EVENLY_SPACED: &str = "stage.planets_not_evenly_spaced";
     /// `stage.planets_share_load_equally`
     pub const STAGE_PLANETS_SHARE_LOAD_EQUALLY: &str = "stage.planets_share_load_equally";
-    /// `stage.ring_addendum_clamped`
-    pub const STAGE_RING_ADDENDUM_CLAMPED: &str = "stage.ring_addendum_clamped";
-    /// `stage.self_locking`
-    pub const STAGE_SELF_LOCKING: &str = "stage.self_locking";
-    /// `stage.transverse_contact_ratio_below_one`
-    pub const STAGE_TRANSVERSE_CONTACT_RATIO_BELOW_ONE: &str =
-        "stage.transverse_contact_ratio_below_one";
-    /// `stage.face_width_no_source`
-    pub const STAGE_FACE_WIDTH_NO_SOURCE: &str = "stage.face_width_no_source";
-    /// `stage.reversed_bending_uncorrected`
-    pub const STAGE_REVERSED_BENDING_UNCORRECTED: &str = "stage.reversed_bending_uncorrected";
-    /// `stage.reversed_bending_applied`
-    pub const STAGE_REVERSED_BENDING_APPLIED: &str = "stage.reversed_bending_applied";
-    /// `stage.load_sharing_out_of_band`
-    pub const STAGE_LOAD_SHARING_OUT_OF_BAND: &str = "stage.load_sharing_out_of_band";
-    /// `stage.rim_below_minimum`
-    pub const STAGE_RIM_BELOW_MINIMUM: &str = "stage.rim_below_minimum";
 
     // ---- the train, as a whole ------------------------------------ //
     //
@@ -143,7 +161,6 @@ pub mod key {
     /// `train.back_driving_not_reacted`
     pub const TRAIN_BACK_DRIVING_NOT_REACTED: &str = "train.back_driving_not_reacted";
 
-    /// Every key above, for the catalogue coverage tests.
     // ---- errors --------------------------------------------------- //
     //
     // The reason a result does not exist, said the same way a clamp says what
@@ -161,10 +178,6 @@ pub mod key {
     pub const ERROR_MESH_CENTRE_DISTANCE_TOO_SMALL: &str = "error.mesh_centre_distance_too_small";
     /// `error.measure_no_valid_span`
     pub const ERROR_MEASURE_NO_VALID_SPAN: &str = "error.measure_no_valid_span";
-    /// `error.measure_pin_off_flank`
-    pub const ERROR_MEASURE_PIN_OFF_FLANK: &str = "error.measure_pin_off_flank";
-    /// `error.measure_pin_bottoms_out`
-    pub const ERROR_MEASURE_PIN_BOTTOMS_OUT: &str = "error.measure_pin_bottoms_out";
     /// `error.measure_pin_too_small`
     pub const ERROR_MEASURE_PIN_TOO_SMALL: &str = "error.measure_pin_too_small";
     /// `error.measure_pin_too_large`
@@ -204,6 +217,7 @@ pub mod key {
     /// `error.gear_no_pin_diameter`
     pub const ERROR_GEAR_NO_PIN_DIAMETER: &str = "error.gear_no_pin_diameter";
 
+    /// Every key above, for the catalogue coverage tests.
     pub const ALL: &[&str] = &[
         CLAMP_CUTTER_NO_TIP_CORNER,
         CLAMP_CUTTER_TEETH_REDUCED,
@@ -223,41 +237,38 @@ pub mod key {
         CLAMP_TOOTH_UNDERCUT,
         CLAMP_TOOTH_THICKNESS_CAPPED,
         CLAMP_TOOTH_THICKNESS_RAISED,
-        STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE,
-        STAGE_FACE_WIDTH_NO_SOURCE,
-        STAGE_RIM_BELOW_MINIMUM,
-        STAGE_REVERSED_BENDING_UNCORRECTED,
-        STAGE_REVERSED_BENDING_APPLIED,
+        GEAR_FACE_WIDTH_AS_ENTERED,
+        GEAR_ADDENDUM_ABOVE_TIP_WIDTH,
+        GEAR_ADDENDUM_HELD_TO_TIP_WIDTH,
+        GEAR_SHIFT_RAISED_FOR_UNDERCUT,
+        GEAR_RING_ADDENDUM_CLAMPED,
+        GEAR_FACE_WIDTH_NO_SOURCE,
+        GEAR_REVERSED_BENDING_UNCORRECTED,
+        GEAR_REVERSED_BENDING_APPLIED,
+        GEAR_RIM_BELOW_MINIMUM,
+        MESH_CONTACT_RATIO_BELOW_ONE,
+        MESH_LOW_EFFICIENCY,
+        MESH_NEAR_SELF_LOCKING,
+        MESH_FORWARD_LOCKING,
+        MESH_NEAR_FORWARD_LOCKING,
+        MESH_OVERLAP_BELOW_ONE,
+        MESH_SELF_LOCKING,
+        MESH_LOAD_SHARING_OUT_OF_BAND,
+        STAGE_CENTRE_DISTANCE_NOT_REACHED,
+        STAGE_CLEARANCE_NEGATIVE,
+        STAGE_OPTIMISER_FOUND_NOTHING,
+        STAGE_PLANET_CLEARANCE_BELOW_MINIMUM,
+        STAGE_PLANETS_NOT_EVENLY_SPACED,
+        STAGE_PLANETS_SHARE_LOAD_EQUALLY,
         TRAIN_OPERATING_TORQUE_CLAMPED,
         TRAIN_OPERATING_SPEED_CLAMPED,
         TRAIN_BACK_DRIVING_REACTED_AT,
         TRAIN_BACK_DRIVING_NOT_REACTED,
-        STAGE_CROSSED_FACE_WIDTH_AS_ENTERED,
-        STAGE_LOW_MESH_EFFICIENCY,
-        STAGE_NEAR_SELF_LOCKING,
-        STAGE_CENTRE_DISTANCE_NOT_REACHED,
-        STAGE_CLEARANCE_NEGATIVE,
-        STAGE_OPTIMISER_FOUND_NOTHING,
-        STAGE_FORWARD_LOCKING,
-        STAGE_NEAR_FORWARD_LOCKING,
-        STAGE_OVERLAP_BELOW_ONE,
-        STAGE_ADDENDUM_ABOVE_TIP_WIDTH,
-        STAGE_ADDENDUM_HELD_TO_TIP_WIDTH,
-        STAGE_SHIFT_RAISED_FOR_UNDERCUT,
-        STAGE_PLANET_CLEARANCE_BELOW_MINIMUM,
-        STAGE_PLANETS_NOT_EVENLY_SPACED,
-        STAGE_PLANETS_SHARE_LOAD_EQUALLY,
-        STAGE_RING_ADDENDUM_CLAMPED,
-        STAGE_SELF_LOCKING,
-        STAGE_TRANSVERSE_CONTACT_RATIO_BELOW_ONE,
-        STAGE_LOAD_SHARING_OUT_OF_BAND,
         ERROR_MESH_INCOMPATIBLE,
         ERROR_MESH_RING_TOO_SMALL,
         ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,
         ERROR_MESH_CENTRE_DISTANCE_TOO_SMALL,
         ERROR_MEASURE_NO_VALID_SPAN,
-        ERROR_MEASURE_PIN_OFF_FLANK,
-        ERROR_MEASURE_PIN_BOTTOMS_OUT,
         ERROR_MEASURE_PIN_TOO_SMALL,
         ERROR_MEASURE_PIN_TOO_LARGE,
         ERROR_SCREW_NOT_POSITIVE,

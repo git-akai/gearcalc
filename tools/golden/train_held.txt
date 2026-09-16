@@ -20,4 +20,4 @@ stage 2  worm  z 1/40  ratio 40.0000  a 23.7273 mm  lead angle 8.2132 deg
   worm     13.539     4.9751     0.0000    1186.0   5.693e7 /  5.693e7   4340 Hardened Steel
   wheel     4.690   122.9936   400.0000      29.7   1.423e6 /  1.423e6   Brass C360
   bending not reported, flank type ZI - see docs/reference.md#crossed-axes
-  note: self-locking: static μ 0.160 against a threshold of 0.1327, so the wheel cannot back-drive the worm
+  note: self-locking: static μ 0.160 against a threshold of 0.1327, so the second member cannot drive the first

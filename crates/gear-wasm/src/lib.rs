@@ -295,6 +295,10 @@ pub struct GearSummary {
     pub span: Maybe<SpanOut>,
     pub over_two_pins: Maybe<PinsOut>,
     pub over_three_pins: Maybe<PinsOut>,
+    /// The pin or ball diameters that seat on the flanks at every position
+    /// round the gear — the bound the pin box is held to, as every other input
+    /// has one. `None` where no pin measures this gear at all.
+    pub pin_diameter_range: Option<(f64, f64)>,
 
     /// Classes the standard actually covers for this gear.
     pub available_classes: Vec<ClassRef>,
@@ -411,6 +415,7 @@ fn summarise(ecc: &gear_core::gear::Gear, req: &GearRequest, params: GearParams)
         })),
         over_two_pins: pins(PinCount::Two),
         over_three_pins: pins(PinCount::Three),
+        pin_diameter_range: metrology::pin_diameter_range_around(ecc),
         available_classes: available.into_iter().map(ClassRef::from_class).collect(),
         tolerance,
     }
@@ -535,6 +540,9 @@ pub struct RingSummary {
     /// the gear tab's over-pins. Two pins only, and
     /// [`gear_core::metrology::between_pins`] says why.
     pub between_pins: Maybe<PinsOut>,
+    /// The pin or ball diameters that seat in this ring's spaces, as on
+    /// [`GearSummary::pin_diameter_range`].
+    pub pin_diameter_range: Option<(f64, f64)>,
     pub clamps: Vec<gear_core::note::Note>,
 }
 
@@ -587,6 +595,7 @@ fn solve_ring_impl(input: &str) -> Result<String, String> {
                 unavailable: Note::new("ui.gear_no_pin_diameter"),
             },
         },
+        pin_diameter_range: metrology::pin_diameter_range(&metrology::Space::of_ring(&g)),
         clamps: g.clamps.clone(),
     };
     serde_json::to_string(&summary).map_err(|e| format!("could not encode result: {e}"))
@@ -1889,7 +1898,7 @@ mod tests {
         assert!(
             notes
                 .iter()
-                .any(|n| n["key"] == "stage.reversed_bending_uncorrected"),
+                .any(|n| n["key"] == "gear.reversed_bending_uncorrected"),
             "the planet's reversal should be disclosed on the planet: {notes:?}"
         );
 

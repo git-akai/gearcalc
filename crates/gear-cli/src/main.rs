@@ -548,6 +548,9 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
             mesh.report.tips.is_some_and(|t| t.tip_interference),
             mesh.report.tips.map_or(0.0, |t| t.tip_margin)
         );
+        for note in &mesh.report.notes {
+            println!("    ! {}", words().render(note));
+        }
         // What the teeth are worth, which a stage of this kind needs as much as
         // the geometry: the reduction multiplies the mesh loss, and it multiplies
         // the torque on the way as well — the output pair carries the whole of it.
@@ -1644,7 +1647,7 @@ fn print_line_pair(
             g.tooth_cycles.contact
         );
     }
-    for n in &s.notes {
+    for n in s.mesh.notes.iter().chain(&s.notes) {
         println!("  note: {}", words().render(n));
     }
 }
@@ -1706,7 +1709,7 @@ fn print_point_pair(
         );
     }
     println!("  bending not reported, flank type ZI - see docs/reference.md#crossed-axes");
-    for n in &s.notes {
+    for n in s.mesh.notes.iter().chain(&s.notes) {
         println!("  note: {}", words().render(n));
     }
 }
@@ -2761,7 +2764,7 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
          {:15}1-15 % lower, rising with lead angle - see docs/reference.md#crossed-axes",
         ""
     );
-    for note in &r.notes {
+    for note in m.notes.iter().chain(&r.notes) {
         println!("  ! {}", words().render(note));
     }
 }
@@ -3021,6 +3024,14 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
         &lib,
     ) {
         println!();
+        for (which, mesh) in [
+            ("sun-planet", &r.sun_planet),
+            ("planet-ring", &r.planet_ring),
+        ] {
+            for note in &mesh.notes {
+                println!("note: {which}: {}", words().render(note));
+            }
+        }
         for note in &r.notes {
             println!("note: {}", words().render(note));
         }
@@ -3125,7 +3136,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
                 // **What a locked row says, in words**, printed under it rather
                 // than left to the reader to infer from a blank efficiency.
                 //
-                // It is also what puts `stage.forward_locking` in the golden
+                // It is also what puts `mesh.forward_locking` in the golden
                 // corpus. A note fired only by the string sweep is a note the
                 // change detector cannot see, which is this project's
                 // sixth-recorded *opt-in the harness never switches on* — and
@@ -3155,9 +3166,9 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
                         "—".to_string()
                     }
                 );
-                for n in r.notes.iter().filter(|n| {
-                    n.is(gear_core::note::key::STAGE_FORWARD_LOCKING)
-                        || n.is(gear_core::note::key::STAGE_SELF_LOCKING)
+                for n in m.notes.iter().filter(|n| {
+                    n.is(gear_core::note::key::MESH_FORWARD_LOCKING)
+                        || n.is(gear_core::note::key::MESH_SELF_LOCKING)
                 }) {
                     println!("{:>16}{}", "", words().render(n));
                 }

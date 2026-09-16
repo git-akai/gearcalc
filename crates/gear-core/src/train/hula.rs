@@ -42,7 +42,7 @@ use crate::contact::{efficiency, ContactPath, Directional};
 use crate::hula::{self, Offset, Split, Teeth};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
-use crate::note::{key, Note};
+use crate::note::Note;
 use crate::planetary::{self, Arrangement, PlanetaryShaft};
 use crate::ring::{mesh_with, Cutter, Ring};
 use crate::strength::{bending_stress, contact_stress, Load, RootStressModel, PARALLEL_AXES};
@@ -529,8 +529,7 @@ pub fn solve_hula_stage_at(
     let pinned: [Option<f64>; 2] = std::array::from_fn(|mesh| asked(mesh).given);
     // A carrier whose given shift had to be raised says so, on the gear whose
     // shift it is — the channel this stage already reports a clamped part on.
-    let raised: [Option<crate::note::Note>; 2] =
-        std::array::from_fn(|mesh| asked(mesh).note(teeth.0[carrier(mesh)]));
+    let raised: [Option<crate::note::Note>; 2] = std::array::from_fn(|mesh| asked(mesh).note());
     let asked_offset = if stage.offset.auto {
         Offset::Clearance
     } else {
@@ -1071,9 +1070,6 @@ pub fn solve_hula_stage_at(
             stage.load_sharing,
             stage.gears[pair.ring].rim_thickness,
         );
-        // What the sharing model has to say about this mesh, if anything. Both
-        // members of a pair are in the same one, so it is said once.
-        notes.extend(pinion_bending.note.clone());
 
         // The probe pass, at whatever width — a minimum face width does not
         // depend on the width it was measured at.
@@ -1126,11 +1122,6 @@ pub fn solve_hula_stage_at(
         let mut wanted = 0.0_f64;
         for (slot, &i) in members.iter().enumerate() {
             let g = &stage.gears[i];
-            if g.face_width.auto && !g.face_sources.any() {
-                notes.push(
-                    Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", (i + 1).to_string()),
-                );
-            }
             wanted = wanted.max(
                 g.face_sources
                     .width_for(&rating(slot, PROBE).asks(), g.face_width.manual),
@@ -1169,6 +1160,7 @@ pub fn solve_hula_stage_at(
                 member_notes.extend(super::undercut_note(&p.pinion));
             }
             member_notes.extend(reversal.note_for(reverses));
+            member_notes.extend(input.face_width_note());
             if i == carrier(index) {
                 member_notes.extend(raised[index].clone());
             }
@@ -1184,7 +1176,7 @@ pub fn solve_hula_stage_at(
             // so it was answering a different question and reporting the answer
             // as this member's. The planetary set never asked it; this did.
             if !is_ring {
-                member_notes.extend(input.addendum_asked(&params).warning(teeth.0[i]));
+                member_notes.extend(input.addendum_asked(&params).warning());
             }
 
             let gear = GearResult::of(super::MemberFacts {
@@ -1278,6 +1270,9 @@ pub fn solve_hula_stage_at(
                 // epicyclic set turned out to have the same mesh in it and to
                 // be reporting nothing.
                 tips: p.tips,
+                // What the sharing model has to say about this mesh. Both
+                // members of a pair are in the same one, so it is said once.
+                notes: pinion_bending.note.clone().into_iter().collect(),
             }),
             clearance: layout.clearance[index],
             clearance_as_cut: p.ring.ra - p.pinion.ra + offset,
@@ -2165,7 +2160,7 @@ mod tests {
         let told = |g: &HulaGear, k: &str| g.gear.notes.iter().any(|n| n.is(k));
         for g in &r.gears {
             assert_eq!(
-                told(g, key::STAGE_ADDENDUM_ABOVE_TIP_WIDTH),
+                told(g, key::GEAR_ADDENDUM_ABOVE_TIP_WIDTH),
                 !g.ring,
                 "z{}: a tip-width bound is a rack's question, and this member \
                  {} rack-cut",
@@ -2183,7 +2178,7 @@ mod tests {
         assert!(
             r.gears
                 .iter()
-                .any(|g| told(g, key::STAGE_ADDENDUM_ABOVE_TIP_WIDTH)),
+                .any(|g| told(g, key::GEAR_ADDENDUM_ABOVE_TIP_WIDTH)),
             "the pinions should have said their teeth cannot keep a 2 mm tip"
         );
     }

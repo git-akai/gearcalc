@@ -57,4 +57,9 @@ smallest_tooth_count: number,
  * the gear tab's over-pins. Two pins only, and
  * [`gear_core::metrology::between_pins`] says why.
  */
-between_pins: Maybe<PinsOut>, clamps: Array<Note>, };
+between_pins: Maybe<PinsOut>, 
+/**
+ * The pin or ball diameters that seat in this ring's spaces, as on
+ * [`GearSummary::pin_diameter_range`].
+ */
+pin_diameter_range: [number, number] | null, clamps: Array<Note>, };

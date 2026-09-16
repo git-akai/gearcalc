@@ -258,7 +258,7 @@ edition revised it and `Y_F` *together*, `f_ε` lives inside that revised `Y_F`,
 and their product is **below 1** for any gear with full axial overlap. Measured
 against a published ISO 2019 rating this tool sits 1.26–1.36× at full overlap
 and 0.78–0.94× at low overlap and high helix — conservative where gears are
-designed, below the standard only in the regime `stage.overlap_below_one`
+designed, below the standard only in the regime `mesh.overlap_below_one`
 already flags. `tools/iso_6336_3_stack.py` multiplies the set out
 ([rationale](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither)).
 
@@ -500,7 +500,7 @@ whose size is unmeasured is a debt still owed, and is marked as one.
 - **Helical bending is conservative against ISO 6336-3:2019 by 26–36 %** at
   full axial overlap, and **below it by up to 22 %** at an overlap ratio under
   0.3 with a helix over 20° — the one regime where this model runs under the
-  standard, and one `stage.overlap_below_one` already flags. Measured with
+  standard, and one `mesh.overlap_below_one` already flags. Measured with
   `tools/iso_6336_3_stack.py`, not asserted; the figure the documentation used
   to quote was right by accident.
 - **`K_f`'s calibration contained no undercut teeth.** Dolan and Broghamer's
@@ -590,16 +590,20 @@ whose size is unmeasured is a debt still owed, and is marked as one.
 
 ---
 
-## Two notes nothing can fire
+## One note nothing can fire
 
-Both are live code with live messages, so neither is deleted on suspicion. They
-are named in `strings.rs`'s `UNFIRED` with their evidence.
+Live code with a live message, so it is not deleted on suspicion. It is named
+in `strings.rs`'s `UNFIRED` with its evidence.
 
-- `clamp.ring_fully_filleted` — searched for over ~11 000 ring/cutter
+- `clamp.ring_fully_filleted` — searched for over 71 750 ring/cutter
   combinations and never fired. `ShaperCut` already refuses a tool whose rounds
   overlap, which may shadow it entirely.
-- `stage.ring_addendum_clamped` — needs a planetary ring whose tip clamps, and
-  the set solves its own ring addendum.
+
+A second used to be listed here — `ring_addendum_clamped`, on the reading that
+a set solves its own ring addendum — and it fires on 441 of the 1 482 sets a
+sweep can solve ([corrections](corrections.md)). The sweep that was cited had
+five cases aimed at it, every one of which failed to solve inside an `if let
+Ok` that said nothing.
 
 ---
 

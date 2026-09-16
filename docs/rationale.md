@@ -574,7 +574,7 @@ name of getting closer to it. Three mixings, not one:
 - **`ε_β ≤ 0,3` with `β ≥ 20°`**: 0,78–0,94×. **Below** ISO — the one regime
   where the derived model is unconservative against the standard. It is already
   flagged: a helical stage without full axial overlap raises
-  `stage.overlap_below_one`, for a reason arrived at independently (a gear
+  `mesh.overlap_below_one`, for a reason arrived at independently (a gear
   helical in form that still transfers load like a spur gear). That note is now
   also the marker for this.
 
@@ -658,7 +658,7 @@ two answers, which is the fault this whole document is mostly about.
 ratio of 2 or more** there is no single-pair zone at all: two pairs are always
 engaged, the ramp never reaches a full share, and it relieves the tooth by about
 a third. That is a large number from an uncalibrated model in the
-unconservative direction, so the stage reports `stage.load_sharing_out_of_band`
+unconservative direction, so the stage reports `mesh.load_sharing_out_of_band`
 beside the figure. It is not a hypothetical regime — a standard tooth cannot
 reach it at any helix angle, but an ordinary **high-contact-ratio** design
 (addendum 1.35) reaches it immediately, and that is exactly the design a user
@@ -1221,7 +1221,7 @@ a value and not an absence — it says no friction locks the pair that way, whic
 is the ordinary case forwards.
 
 The word "self-locking" survives where it belongs, in the catalogue: it is what
-English calls `locked().backward` on a worm, and `stage.forward_locking` is the
+English calls `locked().backward` on a worm, and `mesh.forward_locking` is the
 sentence for the other end. Naming a direction is the reader's business, which is
 this section's whole point.
 
@@ -1626,6 +1626,37 @@ a note sits as near the next field as its own and reads as a heading for what
 follows. Two values, `--note-gap` and `--field-gap`, are the whole of the fix,
 and they live in the shared stylesheet because the pairing has to mean the same
 thing wherever a note appears.
+
+### A note lives with the thing it is about
+
+Three things a solve can remark on, and the catalogue's sections are those
+three: a **gear** (`[gear]` — a bound that moved its number, a root loaded
+both ways, a rim too thin to rate, a face nothing sizes), a **mesh** (`[mesh]`
+— contact that does not stay continuous, a helical pair short of full overlap,
+a sharing model extrapolating, a screw pair that locks), and the **stage**
+(`[stage]` — its distance, its search, its planets). Each is carried on the
+result of the thing it names and drawn there: a gear's under the field it is
+about or on its card, a mesh's beside the figure it is about, the stage's in
+the stage's list. Nothing names what it is about, because where it is drawn
+says so.
+
+**Why it was worth a rename.** Nine of these were filed under `[stage]` and
+carried a tooth count or a member name to be matched back up by — on a card
+that already had the gear's name at the top. The contact-ratio finding was
+three sentences: one stage note for a line contact, another for a point, and a
+third, hand-written in the front end, drawn beside the row — so a reader was
+told twice, in words that did not agree. The mesh notes are on `MeshReport`
+now, which is what lets a set say *which* of its two meshes extrapolates, and
+what made the two epicyclic kinds raise the contact-ratio findings at all: the
+pair had asked both questions and neither of them had asked either.
+
+**The self-locking sentence is kind-neutral**, because the note is raised on
+any crossed-axis mesh — a spur kind at a shaft angle as much as a worm — and
+"the wheel cannot back-drive the worm" named parts that stage has none of.
+"The second member cannot drive the first" is what `Directional::locked` says.
+
+**What would change this:** a fourth thing to remark on — a shaft, say — which
+would be a fourth section rather than a note on the nearest of these three.
 
 ### A readout does not repeat an input
 

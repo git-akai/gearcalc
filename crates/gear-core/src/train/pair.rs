@@ -30,7 +30,6 @@ use crate::auto::automatic_profile_shift;
 use crate::contact::{efficiency, ContactPath, Directional, LoadSharing};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
-use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
 use crate::screw::{Screw, ScrewParams};
 use crate::strength::{bending_stress, contact_stress, Load, RootStressModel, PARALLEL_AXES};
@@ -145,13 +144,16 @@ impl ShiftAsked {
     /// `no undercut` bounds a shift a designer typed as well as one the stage
     /// chose, which is what lets it mean one thing everywhere — but a number
     /// that was not taken as given has to say so, or the field and the gear
-    /// disagree in silence. The gear is named by its tooth count, which every
-    /// stage kind has and none has to invent a scheme for.
-    pub(crate) fn note(&self, teeth: u32) -> Option<crate::note::Note> {
+    /// disagree in silence. It is the gear's own note, drawn under its own
+    /// field, so it names no gear: it used to carry a tooth count for a list
+    /// at the foot of the stage it no longer sits in.
+    pub(crate) fn note(&self) -> Option<crate::note::Note> {
         self.raised.then(|| {
-            crate::note::Note::new(crate::note::key::STAGE_SHIFT_RAISED_FOR_UNDERCUT)
-                .count("teeth", teeth)
-                .number("shift", self.settled, 4)
+            crate::note::Note::new(crate::note::key::GEAR_SHIFT_RAISED_FOR_UNDERCUT).number(
+                "shift",
+                self.settled,
+                4,
+            )
         })
     }
 }
@@ -1078,14 +1080,16 @@ fn solve_parallel(
         // in a list at the foot of the stage where they have to match it back
         // up by tooth count.
         let g = &stage.gears[i];
-        out.extend(g.shift_asked(&stage.base_params(i)).note(g.teeth));
+        out.extend(g.shift_asked(&stage.base_params(i)).note());
         out.extend(
             g.addendum_asked(&GearParams {
                 profile_shift: x[i],
                 ..stage.base_params(i)
             })
-            .note(g.teeth),
+            .note(),
         );
+        // ...and an automatic width nothing sizes, which stands at its box.
+        out.extend(g.face_width_note());
         out
     };
     // **What the mesh needs, not what one gear needs.** The narrower face
@@ -1101,10 +1105,6 @@ fn solve_parallel(
         // invert, so it stands at the number in its box and the stage says so
         // (`FaceSources::width_for`). Said rather than divided by, which is
         // what it was: a zero width made every stress infinite.
-        if g.face_width.auto && !g.face_sources.any() {
-            notes
-                .push(Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", (i + 1).to_string()));
-        }
         g.face_sources.width_for(
             &rating(i, &probed, PROBE, PROBE).asks(),
             g.face_width.manual,
@@ -1218,27 +1218,7 @@ fn solve_parallel(
     };
     let backlash = [at_member(MeshSide::First), at_member(MeshSide::Second)];
 
-    if helix != 0.0 && !contact_ratios.has_full_axial_overlap() {
-        notes.push(Note::new(key::STAGE_OVERLAP_BELOW_ONE).number(
-            "ratio",
-            contact_ratios.overlap,
-            3,
-        ));
-    }
-    if path.contact_ratio < 1.0 {
-        notes.push(
-            Note::new(key::STAGE_TRANSVERSE_CONTACT_RATIO_BELOW_ONE).number(
-                "ratio",
-                path.contact_ratio,
-                3,
-            ),
-        );
-    }
-    // What the sharing model has to say about this mesh, if anything — raised
-    // where the section and the share are worked out, so no stage kind has to
-    // remember to ask (`train::Bending`). One mesh, so one note at most.
-    notes.extend(bending[0].note.clone());
-    // ...and what the *distance* has to say: whether the shifts reached the one
+    // What the *distance* has to say: whether the shifts reached the one
     // that was given, and whether the pair can be assembled at all. Both are
     // `train::distance_notes`, so every kind with a centre distance says the
     // same thing in the same words.
@@ -1287,6 +1267,10 @@ fn solve_parallel(
                 // A parallel-axis pair is external: its tips meet on the line of
                 // centres or not at all, which `bottom_clearance` already asks.
                 tips: None,
+                // What the sharing model has to say about this mesh, raised
+                // where the section and the share are worked out
+                // (`train::Bending`). One mesh, so one note at most.
+                notes: bending[0].note.clone().into_iter().collect(),
             })
         },
         gears: [gears[0].clone(), gears[1].clone()],

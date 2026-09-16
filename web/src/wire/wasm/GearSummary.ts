@@ -80,6 +80,12 @@ per_tooth_clamps: PerToothClamps,
  */
 centre_profile: Maybe<CentreProfile>, span: Maybe<SpanOut>, over_two_pins: Maybe<PinsOut>, over_three_pins: Maybe<PinsOut>, 
 /**
+ * The pin or ball diameters that seat on the flanks at every position
+ * round the gear — the bound the pin box is held to, as every other input
+ * has one. `None` where no pin measures this gear at all.
+ */
+pin_diameter_range: [number, number] | null, 
+/**
  * Classes the standard actually covers for this gear.
  */
 available_classes: Array<ClassRef>, tolerance: Maybe<ToleranceOut>, };

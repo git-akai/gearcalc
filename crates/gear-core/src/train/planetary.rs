@@ -858,7 +858,7 @@ pub fn solve_planetary_stage_with(
     ]
     .into_iter()
     .enumerate()
-    .filter_map(|(i, (g, p))| g.shift_asked(&p).note(g.teeth).map(|n| (i, n)))
+    .filter_map(|(i, (g, p))| g.shift_asked(&p).note().map(|n| (i, n)))
     .collect();
     let mut notes: Vec<Note> = Vec::new();
 
@@ -881,7 +881,7 @@ pub fn solve_planetary_stage_with(
         .enumerate()
         .filter_map(|(i, (g, member, teeth, x))| {
             g.addendum_asked(&stage.params(member, teeth, x, g.addendum))
-                .note(teeth)
+                .note()
                 .map(|n| (i, n))
         }),
     );
@@ -1160,17 +1160,20 @@ pub fn solve_planetary_stage_with(
         out.extend(reversal.note_for(reverses[i]));
         // **A bound that moved this member's own number belongs to it**, not to
         // a list at the foot of the stage that a reader has to match back up by
-        // tooth count. The ring has none: it is asked neither question.
+        // tooth count. The ring has none: it is asked neither question — and a
+        // ring tooth held to its own base circle is its finding too.
         out.extend(notes_for(i));
+        out.extend([&stage.sun, &stage.planet, &stage.ring][i].face_width_note());
+        if i == 2 && ring.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_RAISED)) {
+            // Asked by key. This used to search the clamp's *text* for "tip
+            // radius raised", which is a sentence doing a symbol's job — one
+            // rewording, or one translation, from silently doing nothing.
+            out.push(Note::new(key::GEAR_RING_ADDENDUM_CLAMPED));
+        }
         out
     };
 
-    let mut no_source = Vec::new();
-    let mut ask_of = |name: &str, g: &StageGear, asks: &LoadCase<Widths>| -> f64 {
-        if g.face_width.auto && !g.face_sources.any() {
-            no_source
-                .push(Note::new(key::STAGE_FACE_WIDTH_NO_SOURCE).text("gear", name.to_string()));
-        }
+    let ask_of = |g: &StageGear, asks: &LoadCase<Widths>| -> f64 {
         g.face_sources.width_for(asks, g.face_width.manual)
     };
 
@@ -1237,18 +1240,10 @@ pub fn solve_planetary_stage_with(
     };
     let ratings: [MemberRating; 3] = std::array::from_fn(|i| rating(i, PROBE, PROBE));
     let asks = [
-        ask_of("sun", &stage.sun, &ratings[0].asks()),
-        ask_of("planet", &stage.planet, &ratings[1].asks()),
-        ask_of("ring", &stage.ring, &ratings[2].asks()),
+        ask_of(&stage.sun, &ratings[0].asks()),
+        ask_of(&stage.planet, &ratings[1].asks()),
+        ask_of(&stage.ring, &ratings[2].asks()),
     ];
-    notes.extend(no_source);
-    // What the sharing model has to say, mesh by mesh: two meshes can be in
-    // different bands, and a set with one extrapolating and one not should say
-    // which. The note carries its own contact ratio, so two entries are two
-    // findings rather than a repeat.
-    for b in [Some(&sun_bending), planet_ring_bending.as_ref()] {
-        notes.extend(b.and_then(|b| b.note.clone()));
-    }
     // **A member's automatic width is the largest requirement of any mesh it is
     // in**, because the narrower face carries the pair — see the spur stage for
     // the fault this avoids. The planet is in both meshes, so it answers to
@@ -1376,12 +1371,6 @@ pub fn solve_planetary_stage_with(
             );
         }
     }
-    // Asked by key. This used to search the clamp's *text* for "tip radius
-    // raised", which is a sentence doing a symbol's job — one rewording, or one
-    // translation, from silently doing nothing.
-    if ring.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_RAISED)) {
-        notes.push(Note::new(key::STAGE_RING_ADDENDUM_CLAMPED));
-    }
 
     // **The width a member is rated at is its mesh's, not its own.** The
     // narrower face carries the pair, so that is the width the load is spread
@@ -1461,6 +1450,10 @@ pub fn solve_planetary_stage_with(
             flank_interference: sp_mesh.flank_interference([sun.flank_ends(), planet.flank_ends()]),
             // Sun to planet is an external mesh.
             tips: None,
+            // What the sharing model has to say about *this* mesh: two meshes
+            // can be in different bands, and a set with one extrapolating and
+            // one not says which.
+            notes: sun_bending.note.clone().into_iter().collect(),
         }),
         planet_ring: super::line_mesh_report(super::LineMesh {
             coprime: super::gcd(teeth.planet, teeth.ring) == 1,
@@ -1488,6 +1481,11 @@ pub fn solve_planetary_stage_with(
             // field is for: the set has an internal mesh in it and had never
             // been asked the three questions one answers.
             tips: super::TipRoom::at(&ring, &planet, centre),
+            notes: planet_ring_bending
+                .as_ref()
+                .and_then(|b| b.note.clone())
+                .into_iter()
+                .collect(),
         }),
         equal_spacing: layout.equal_spacing,
         simultaneous_meshing: layout.simultaneous_meshing,
@@ -2300,19 +2298,16 @@ mod tests {
 
         // Off: nothing is derated, and the planet's reversal is disclosed.
         let plain = solve(crate::train::Reversal::default());
-        assert_eq!(fired(&plain, key::STAGE_REVERSED_BENDING_UNCORRECTED), 1);
-        assert_eq!(fired(&plain, key::STAGE_REVERSED_BENDING_APPLIED), 0);
+        assert_eq!(fired(&plain, key::GEAR_REVERSED_BENDING_UNCORRECTED), 1);
+        assert_eq!(fired(&plain, key::GEAR_REVERSED_BENDING_APPLIED), 0);
 
         // On: the same member is derated, and the note says so instead.
         let corrected = solve(crate::train::Reversal {
             drive_reverses: false,
             correct: true,
         });
-        assert_eq!(fired(&corrected, key::STAGE_REVERSED_BENDING_APPLIED), 1);
-        assert_eq!(
-            fired(&corrected, key::STAGE_REVERSED_BENDING_UNCORRECTED),
-            0
-        );
+        assert_eq!(fired(&corrected, key::GEAR_REVERSED_BENDING_APPLIED), 1);
+        assert_eq!(fired(&corrected, key::GEAR_REVERSED_BENDING_UNCORRECTED), 0);
 
         // A smaller allowable asks for more face, and only for the planet.
         let width = |r: &PlanetaryResult, g: &GearResult| {
@@ -2340,7 +2335,7 @@ mod tests {
             drive_reverses: true,
             correct: true,
         });
-        assert_eq!(fired(&driven, key::STAGE_REVERSED_BENDING_APPLIED), 3);
+        assert_eq!(fired(&driven, key::GEAR_REVERSED_BENDING_APPLIED), 3);
         // ...and no member's own list carries one note twice, which is the shape
         // that broke the panel: a keyed list cannot draw two of one key.
         for g in [&driven.sun, &driven.planet.gear, &driven.ring] {

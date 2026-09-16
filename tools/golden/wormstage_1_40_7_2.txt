@@ -11,4 +11,4 @@ worm stage  z 1/40  module 1  ratio 40.0000:1  a 23.7273 mm
   bending      not reported - see docs/reference.md#crossed-axes
   flank type   ZI (involute helicoid); a ZN worm's contact stress is
                1-15 % lower, rising with lead angle - see docs/reference.md#crossed-axes
-  ! self-locking: static μ 0.160 against a threshold of 0.1327, so the wheel cannot back-drive the worm
+  ! self-locking: static μ 0.160 against a threshold of 0.1327, so the second member cannot drive the first

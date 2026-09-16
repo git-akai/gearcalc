@@ -4,6 +4,7 @@ import type { ContactPatch } from "./ContactPatch";
 import type { Directional } from "./Directional";
 import type { LineContact } from "./LineContact";
 import type { LoadCase } from "./LoadCase";
+import type { Note } from "./Note";
 import type { PointContact } from "./PointContact";
 import type { TipRoom } from "./TipRoom";
 
@@ -124,6 +125,14 @@ flank_interference: [boolean, boolean],
  * line of centres or not at all.
  */
 tips: TipRoom | null, 
+/**
+ * **What this mesh has to say**, on every kind alike: contact that does not
+ * stay continuous, a helical pair without full axial overlap, a sharing
+ * model that is extrapolating, a screw pair that locks or nearly does,
+ * or one that loses more than it keeps. A set has two meshes and says
+ * which, which a note on the stage could not.
+ */
+notes: Array<Note>, 
 /**
  * What a line contact has and a point does not.
  */

@@ -12,7 +12,7 @@ crossed gear pair  z 17/23  shaft angle 90 deg  module 1  alpha 20 deg  mu 0.06
    63.0    27.0   37.4457   25.8135    31.6296     1.1223     81.884 %    1127.8   1.771412896
    72.0    18.0   55.0132   24.1836    39.5984     1.0515     76.976 %    1063.4   1.772907510
    81.0     9.0  108.6717   23.2867    65.9792     1.0125     64.116 %     898.3   1.769479672
-                self-locking: static μ 0.160 against a threshold of 0.1485, so the wheel cannot back-drive the worm
+                self-locking: static μ 0.160 against a threshold of 0.1485, so the second member cannot drive the first
    90.0       0 — no such pair
 
 A worm is the same geometry with the first member's diameter chosen instead of its helix;

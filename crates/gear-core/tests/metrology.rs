@@ -238,9 +238,114 @@ fn unusable_pins_are_rejected_rather_than_measured() {
         Err(MeasurementError::PinTooSmall)
     ));
     // Far too large: contact runs past the tip.
-    assert!(over_pins(&g, 5.0, PinCount::Two).is_err());
+    assert!(matches!(
+        over_pins(&g, 5.0, PinCount::Two),
+        Err(MeasurementError::PinTooLarge)
+    ));
     // A sane pin works.
     assert!(over_pins(&g, 1.75, PinCount::Two).is_ok());
+}
+
+/// **The reported pin range is exactly the pins that measure**, on both kinds.
+///
+/// Every failure is off one end of a monotone map — a pin too small sinks
+/// toward the root, one too large rides past the tip — so the diameters that
+/// seat are one interval, and the range is read off the same verdict the
+/// measurement gives. The law: a hair inside either end measures, a hair
+/// outside fails, and fails on the side its end names. Over the shared grid for
+/// external gears, with the pressure angle, helix, module and thickness turned
+/// since each moves where a pin sits, and over a set of rings.
+#[test]
+fn the_pin_range_is_where_the_pin_seats_and_the_verdict_names_the_end() {
+    use gear_core::metrology::{between_pins, pin_diameter_range, Space};
+    use gear_core::ring::{Cutter, Ring};
+    let hair = 1e-9;
+    let mut checked = 0u32;
+    let mut none = 0u32;
+
+    let check =
+        |lo: f64, hi: f64, measure: &dyn Fn(f64) -> Result<(), MeasurementError>, what: &str| {
+            assert!(
+                lo < hi,
+                "{what}: an empty range should be None, not ({lo}, {hi})"
+            );
+            assert!(
+                measure(lo + hair).is_ok(),
+                "{what}: just inside the smallest pin {lo}"
+            );
+            assert!(
+                measure(hi - hair).is_ok(),
+                "{what}: just inside the largest pin {hi}"
+            );
+            assert!(
+                measure(0.5 * (lo + hi)).is_ok(),
+                "{what}: the middle of the range"
+            );
+            if lo > 0.0 {
+                assert_eq!(
+                    measure(lo - hair),
+                    Err(MeasurementError::PinTooSmall),
+                    "{what}: below the smallest pin {lo}"
+                );
+            }
+            assert_eq!(
+                measure(hi + hair),
+                Err(MeasurementError::PinTooLarge),
+                "{what}: above the largest pin {hi}"
+            );
+        };
+
+    for p in grid() {
+        let g = Tooth::new(p);
+        if g.severed {
+            continue;
+        }
+        let what = format!(
+            "z={} x={} a={} b={} m={} k={}",
+            p.teeth, p.profile_shift, p.pressure_angle, p.helix_angle, p.module, p.thickness_mod
+        );
+        match pin_diameter_range(&Space::of(&g)) {
+            Some((lo, hi)) => {
+                check(
+                    lo,
+                    hi,
+                    &|d| over_pins(&g, d, PinCount::Two).map(|_| ()),
+                    &what,
+                );
+                checked += 1;
+            }
+            None => none += 1,
+        }
+    }
+    for (teeth, shift, addendum) in [
+        (19u32, 0.3, 0.8),
+        (40, 0.0, 1.0),
+        (60, -0.2, 0.9),
+        (72, 0.0, 1.0),
+    ] {
+        let ring = Ring::cut_by(
+            &GearParams {
+                teeth,
+                profile_shift: shift,
+                addendum,
+                ..Default::default()
+            },
+            &Cutter::default(),
+        );
+        let what = format!("ring z={teeth} x={shift} h_a={addendum}");
+        match pin_diameter_range(&Space::of_ring(&ring)) {
+            Some((lo, hi)) => {
+                check(lo, hi, &|d| between_pins(&ring, d).map(|_| ()), &what);
+                checked += 1;
+            }
+            None => none += 1,
+        }
+    }
+    assert!(
+        checked > 100 && none < checked / 10,
+        "{checked} ranges checked, {none} gears with none"
+    );
+    println!("{checked} pin ranges hold at both ends; {none} gears no pin measures");
 }
 
 // --------------------------------------------------------------------- //

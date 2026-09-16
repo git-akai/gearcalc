@@ -97,7 +97,7 @@ def main() -> None:
     band("low overlap (ε_β ≤ 0.3)", lambda e: e <= 0.3)
     print("\n  Full overlap is the designed-for case and the tool is conservative there.")
     print("  Low overlap is the one regime it runs BELOW the standard — and a helical")
-    print("  stage without full axial overlap already raises `stage.overlap_below_one`.")
+    print("  stage without full axial overlap already raises `mesh.overlap_below_one`.")
 
     print("\nThe third mixing: this crate's virtual gear follows the 2006 z_n.")
     for beta in (10.0, 20.0, 30.0):

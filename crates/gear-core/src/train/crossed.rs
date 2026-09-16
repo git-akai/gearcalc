@@ -233,18 +233,19 @@ pub fn solve_crossed_pair(
         .as_ref()
         .and_then(|path| path.face_widths_for(&s, 1.0));
     let mut notes = Vec::new();
+    // What the mesh has to say, kept apart from the stage's list: it goes on
+    // the mesh report, where a set with two meshes could say which.
+    let mut mesh_notes = Vec::new();
+    // An automatic width with no width to give it a full contact ratio stands
+    // at its box — a finding about that gear, drawn on its card.
+    let mut as_entered = [false; 2];
     let widths: [f64; 2] = [0, 1].map(|i| {
         let width = &stage.gears[i].face_width;
         match (recommended[i], continuity) {
             (Some(r), _) => width.resolve(r),
             (None, Some(c)) => width.resolve(c[i]),
             (None, None) => {
-                if width.auto {
-                    notes.push(
-                        Note::new(key::STAGE_CROSSED_FACE_WIDTH_AS_ENTERED)
-                            .text("member", (i + 1).to_string()),
-                    );
-                }
+                as_entered[i] = width.auto;
                 width.manual
             }
         }
@@ -457,8 +458,8 @@ pub fn solve_crossed_pair(
     for drive in Drive::BOTH {
         let threshold = *threshold.get(drive);
         let (is_locked, is_near) = match drive {
-            Drive::Backward => (key::STAGE_SELF_LOCKING, key::STAGE_NEAR_SELF_LOCKING),
-            Drive::Forward => (key::STAGE_FORWARD_LOCKING, key::STAGE_NEAR_FORWARD_LOCKING),
+            Drive::Backward => (key::MESH_SELF_LOCKING, key::MESH_NEAR_SELF_LOCKING),
+            Drive::Forward => (key::MESH_FORWARD_LOCKING, key::MESH_NEAR_FORWARD_LOCKING),
         };
         let said = |k: &'static str| {
             Note::new(k)
@@ -466,18 +467,18 @@ pub fn solve_crossed_pair(
                 .number("threshold", threshold, 4)
         };
         if *locked.get(drive) {
-            notes.push(said(is_locked));
+            mesh_notes.push(said(is_locked));
         } else if threshold > 0.0 && stage.static_friction > 0.8 * threshold {
             // **`threshold > 0.0` is load-bearing, not defensive.** A direction
             // no friction can lock has a negative threshold, and `µ > 0.8 × a
             // negative number` is true of every µ — so without this the "close
             // to locking" note fires on precisely the pairs that are furthest
             // from it. Forwards that is the ordinary case.
-            notes.push(said(is_near));
+            mesh_notes.push(said(is_near));
         }
     }
     if efficiency.forward < 0.5 {
-        notes.push(Note::new(key::STAGE_LOW_MESH_EFFICIENCY).number(
+        mesh_notes.push(Note::new(key::MESH_LOW_EFFICIENCY).number(
             "percent",
             efficiency.forward * 100.0,
             1,
@@ -511,9 +512,11 @@ pub fn solve_crossed_pair(
         )
     });
     if contact_ratio < 1.0 {
-        notes.push(
-            Note::new(key::STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE).number("ratio", contact_ratio, 3),
-        );
+        mesh_notes.push(Note::new(key::MESH_CONTACT_RATIO_BELOW_ONE).number(
+            "ratio",
+            contact_ratio,
+            3,
+        ));
     }
     // Interference is asked of the flanks whether or not there is a zone: a
     // pair with no zone and a tip inside a base cylinder is fouling, not idle.
@@ -611,15 +614,16 @@ pub fn solve_crossed_pair(
             clamps: g[i].clamps.notes.clone(),
             notes: {
                 let mut out: Vec<Note> = super::undercut_note(&g[i]).into_iter().collect();
-                out.extend(input.shift_asked(&stage.base_params(i)).note(input.teeth));
+                out.extend(input.shift_asked(&stage.base_params(i)).note());
                 out.extend(
                     input
                         .addendum_asked(&GearParams {
                             profile_shift: x[i],
                             ..stage.base_params(i)
                         })
-                        .note(input.teeth),
+                        .note(),
                 );
+                out.extend(as_entered[i].then(|| Note::new(key::GEAR_FACE_WIDTH_AS_ENTERED)));
                 out
             },
         }));
@@ -646,6 +650,7 @@ pub fn solve_crossed_pair(
             // Both members external: the tips meet on the line of action or
             // not at all.
             tips: None,
+            notes: mesh_notes,
             line: None,
             point: Some(PointContact {
                 limited_by: zone.map_or(ZoneLimit::Face, |z| z.0),
@@ -1320,11 +1325,12 @@ mod tests {
         );
         assert!(
             narrow
+                .mesh
                 .notes
                 .iter()
-                .any(|s| s.is(key::STAGE_CROSSED_CONTACT_RATIO_BELOW_ONE)),
-            "a contact ratio below 1 must be said: {:?}",
-            narrow.notes
+                .any(|s| s.is(key::MESH_CONTACT_RATIO_BELOW_ONE)),
+            "a contact ratio below 1 must be said, on the mesh: {:?}",
+            narrow.mesh.notes
         );
 
         // Generous, and the teeth are what end it — a wider face buys nothing.
@@ -1628,11 +1634,12 @@ mod tests {
         });
         assert!(r.mesh.efficiency.locked().backward);
         assert!(
-            r.notes
+            r.mesh
+                .notes
                 .iter()
-                .any(|n| n.is(key::STAGE_SELF_LOCKING) || n.is(key::STAGE_NEAR_SELF_LOCKING)),
+                .any(|n| n.is(key::MESH_SELF_LOCKING) || n.is(key::MESH_NEAR_SELF_LOCKING)),
             "notes: {:?}",
-            r.notes
+            r.mesh.notes
         );
     }
 
@@ -2295,10 +2302,10 @@ mod tests {
 
         // The note names the coefficient that decided it, so a reader knows
         // which input to go and change.
-        let notes = &stuck.notes;
+        let notes = &stuck.mesh.notes;
         let locked = notes
             .iter()
-            .find(|n| n.is(key::STAGE_SELF_LOCKING))
+            .find(|n| n.is(key::MESH_SELF_LOCKING))
             .expect("self-locking must be said out loud");
         assert_eq!(
             locked.values["friction"],

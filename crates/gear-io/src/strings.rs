@@ -310,7 +310,7 @@ mod tests {
             "only {} messages",
             c.messages().len()
         );
-        assert!(c.get("stage.self_locking").is_some());
+        assert!(c.get("mesh.self_locking").is_some());
     }
 
     /// **Every shipped language says everything English says, and nothing more.**
@@ -440,7 +440,7 @@ mod tests {
     #[test]
     fn a_note_renders_with_its_values() {
         let c = Catalogue::english();
-        let note = Note::new(key::STAGE_SELF_LOCKING)
+        let note = Note::new(key::MESH_SELF_LOCKING)
             .number("friction", 0.06, 3)
             .number("threshold", 0.098_765, 4);
         let text = c.render(&note);
@@ -563,6 +563,46 @@ mod tests {
         use gear_core::tooth::Tooth;
 
         let mut seen: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        /// Every note a stage result carries, wherever it carries it: the
+        /// stage's own, each member's and each mesh's. A sweep that walked the
+        /// fields it thought of missed the meshes the moment they got a list.
+        trait EveryNote {
+            fn every_note(&self) -> Vec<Note>;
+        }
+        fn every_note_of(r: &gear_core::train::StageResult) -> Vec<Note> {
+            let mut out: Vec<Note> = match r {
+                gear_core::train::StageResult::Pair(p) => p.notes.clone(),
+                gear_core::train::StageResult::Planetary(p) => p.notes.clone(),
+                gear_core::train::StageResult::Hula(h) => h.notes.clone(),
+            };
+            out.extend(r.members().iter().flat_map(|g| g.notes.iter().cloned()));
+            out.extend(r.meshes().iter().flat_map(|m| m.notes.iter().cloned()));
+            out
+        }
+        impl EveryNote for gear_core::train::PairResult {
+            fn every_note(&self) -> Vec<Note> {
+                every_note_of(&gear_core::train::StageResult::Pair(Box::new(self.clone())))
+            }
+        }
+        impl EveryNote for gear_core::train::PlanetaryResult {
+            fn every_note(&self) -> Vec<Note> {
+                every_note_of(&gear_core::train::StageResult::Planetary(Box::new(
+                    self.clone(),
+                )))
+            }
+        }
+        impl EveryNote for gear_core::train::TrainResult {
+            fn every_note(&self) -> Vec<Note> {
+                let mut out = self.notes.clone();
+                out.extend(self.stages.iter().flat_map(every_note_of));
+                out
+            }
+        }
+        impl EveryNote for gear_core::train::HulaResult {
+            fn every_note(&self) -> Vec<Note> {
+                every_note_of(&gear_core::train::StageResult::Hula(Box::new(self.clone())))
+            }
+        }
         let mut record = |notes: &[Note]| {
             for n in notes {
                 seen.entry(n.key.clone())
@@ -715,7 +755,7 @@ mod tests {
                     ..Default::default()
                 };
                 if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
-                    record(&r.notes);
+                    record(&r.every_note());
                 }
                 for sigma in [0.5_f64, 90.0] {
                     for face in [
@@ -732,7 +772,7 @@ mod tests {
                         if let Ok(r) =
                             solve_crossed(&crossed, gear_core::train::StageTorques::just(2.0), &lib)
                         {
-                            record(&r.notes);
+                            record(&r.every_note());
                         }
                     }
                 }
@@ -758,7 +798,7 @@ mod tests {
                 ..Default::default()
             };
             if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
-                record(&r.notes);
+                record(&r.every_note());
                 for g in &r.gears {
                     record(&g.notes);
                 }
@@ -780,7 +820,7 @@ mod tests {
                 ..Default::default()
             };
             if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
-                record(&r.notes);
+                record(&r.every_note());
                 for g in &r.gears {
                     record(&g.notes);
                 }
@@ -801,7 +841,7 @@ mod tests {
                 ..Default::default()
             };
             if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
-                record(&r.notes);
+                record(&r.every_note());
                 for g in &r.gears {
                     record(&g.notes);
                 }
@@ -824,7 +864,7 @@ mod tests {
                 ..Default::default()
             };
             if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
-                record(&r.notes);
+                record(&r.every_note());
                 // A bound that moved a gear's own number rides that gear.
                 for g in &r.gears {
                     record(&g.notes);
@@ -849,7 +889,7 @@ mod tests {
                 gear_core::train::StageTorques::just(2.0),
                 &lib,
             ) {
-                record(&r.notes);
+                record(&r.every_note());
                 for g in &r.gears {
                     record(&g.gear.clamps);
                     record(&g.gear.notes);
@@ -870,7 +910,7 @@ mod tests {
             };
             stage.gears[0].teeth = starts;
             if let Ok(r) = solve_worm(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
-                record(&r.notes);
+                record(&r.every_note());
             }
         }
         // A planet's root is loaded both ways whatever the drive does, so the
@@ -886,7 +926,7 @@ mod tests {
                 correct: true,
             },
         ) {
-            record(&r.notes);
+            record(&r.every_note());
             // ...and what the members themselves say, which is where a note
             // about one gear belongs.
             for g in [&r.sun, &r.planet.gear, &r.ring] {
@@ -905,7 +945,7 @@ mod tests {
                 gear_core::train::StageTorques::just(2.0),
                 &lib,
             ) {
-                record(&r.notes);
+                record(&r.every_note());
                 for g in [&r.sun, &r.planet.gear, &r.ring] {
                     record(&g.notes);
                 }
@@ -955,7 +995,7 @@ mod tests {
                 ..Default::default()
             };
             if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
-                record(&r.notes);
+                record(&r.every_note());
                 for g in &r.gears {
                     record(&g.notes);
                 }
@@ -980,7 +1020,7 @@ mod tests {
                 if let Ok(r) =
                     solve_crossed(&crossed, gear_core::train::StageTorques::just(2.0), &lib)
                 {
-                    record(&r.notes);
+                    record(&r.every_note());
                 }
             }
         }
@@ -1000,7 +1040,7 @@ mod tests {
                 ..gear_core::train::PairStage::worm()
             };
             if let Ok(r) = solve_crossed(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
-                record(&r.notes);
+                record(&r.every_note());
             }
             // ...the optimiser asked of a crossed mesh, whose search has its
             // own way of finding nothing.
@@ -1015,7 +1055,7 @@ mod tests {
                 gear_core::train::StageTorques::just(2.0),
                 &lib,
             ) {
-                record(&r.notes);
+                record(&r.every_note());
             }
             // ...and a worm sitting just under its self-locking threshold.
             if let Ok(r) = solve_worm(
@@ -1027,7 +1067,7 @@ mod tests {
                 gear_core::train::StageTorques::just(2.0),
                 &lib,
             ) {
-                record(&r.notes);
+                record(&r.every_note());
             }
         }
 
@@ -1049,7 +1089,7 @@ mod tests {
                 gear_core::train::StageTorques::just(2.0),
                 &lib,
             ) {
-                record(&r.notes);
+                record(&r.every_note());
             }
         }
 
@@ -1067,7 +1107,7 @@ mod tests {
             sp.gears[0].teeth = 9;
             sp.gears[1].teeth = 37;
             if let Ok(r) = solve_spur(&sp, gear_core::train::StageTorques::just(2.0), &lib) {
-                record(&r.notes);
+                record(&r.every_note());
             }
         }
 
@@ -1093,7 +1133,7 @@ mod tests {
                 gear_core::train::StageTorques::just(2.0),
                 &lib,
             ) {
-                record(&r.notes);
+                record(&r.every_note());
             }
         }
 
@@ -1142,7 +1182,7 @@ mod tests {
                 gear_core::train::StageTorques::just(2.0),
                 &lib,
             ) {
-                record(&r.notes);
+                record(&r.every_note());
                 for g in [&r.sun, &r.planet.gear, &r.ring] {
                     record(&g.notes);
                 }
@@ -1187,7 +1227,7 @@ mod tests {
                 ),
                 &lib,
             ) {
-                record(&r.notes);
+                record(&r.every_note());
             }
             // ...and the same load against a worm that cannot be back-driven.
             if let Ok(r) = gear_core::train::solve_train(
@@ -1203,7 +1243,7 @@ mod tests {
                 ),
                 &lib,
             ) {
-                record(&r.notes);
+                record(&r.every_note());
             }
             // An automatic face width with every rating switched off.
             let no_source = gear_core::train::StageGear {
@@ -1228,7 +1268,7 @@ mod tests {
                 gear_core::train::StageTorques::just(2.0),
                 &lib,
             ) {
-                record(&r.notes);
+                record(&r.every_note());
                 for g in &r.gears {
                     record(&g.notes);
                 }
@@ -1473,7 +1513,7 @@ mod tests {
     ///
     /// # One left this list, and how it got on it
     ///
-    /// `stage.ring_addendum_clamped` was here on the reading that "the set
+    /// `ring_addendum_clamped` was here on the reading that "the set
     /// solves its ring's addendum, so it does not normally hand it one that
     /// cannot work". It fires on **441 of the 1,482 sets** a sweep of tooth
     /// counts, addenda, shifts, cutters and thickness modifications can solve.
