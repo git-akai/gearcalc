@@ -33,4 +33,4 @@ stage 2  spur  z 13/31  beta 15 deg  ratio 2.3846  a_w 22.9511 mm  coprime
       case 1  T    11.8637 Nm      497.4 rpm  sigma_F    719.0  sigma_H   2297.6 MPa  cycles -
       case 2  T     0.0000 Nm        0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -
       case 3  T    11.8637 Nm      397.9 rpm  sigma_F    719.0  sigma_H   2297.6 MPa  cycles 2.387e7 / 2.387e7
-  note: overlap ratio 0.223: below 1, helical in form but loaded like a spur gear
+  note: axial contact ratio below 1; helical in form but loaded like a spur gear

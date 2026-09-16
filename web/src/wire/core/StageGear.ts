@@ -78,7 +78,24 @@ no_sharp_tip: boolean,
  */
 min_tip_width: number, dedendum: number, root_radius: number, 
 /**
- * Automatic takes the larger of the enabled minimums below.
+ * Helix angle, degrees, signed by hand — and who decides it.
+ *
+ * **Automatic means the stage does**, through whatever relates this
+ * member's helix to the rest of it: a pair's two are bound by
+ * `β₁ + β₂ = Σ` and the first member's by its pitch diameter, a set's
+ * three by the hands its two meshes require, a hula stage's four by its
+ * two internal meshes. So at most one member of a stage states a helix
+ * and the others follow — or none does, and the stage's own relation
+ * decides: a given centre distance with both shifts pinned sizes a pair's
+ * first member, and a given axial contact ratio with every face width
+ * given sizes the helix any kind needs to reach it
+ * ([`Stage::freedoms`] says which may stand). Where nothing decides it,
+ * the first member's stands at its box.
+ */
+helix_angle: Auto<number>, 
+/**
+ * Automatic takes the larger of the enabled minimums below, and the
+ * width a given axial contact ratio needs where the stage has one.
  */
 face_width: Auto<number>, 
 /**

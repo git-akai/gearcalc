@@ -421,17 +421,29 @@ field to derive. So the set has modes 1 and 3 and not mode 2, and its clearance
 toggle, alone in its own freedom group with none allowed automatic, is pinned
 back by relief.
 
-**A pair has a fifth input in the relation, its *size*.** The additional helix,
-the first member's helix angle and the first member's pitch diameter are three
-readings of one number (`d = z m_n / cos β`, `FirstMemberSizing`), and every
-pair — spur, helical, crossed or worm — relates `{a, clearance, x₁, x₂, size}`
-by one equation, so four may be given. Which absorbs a given distance is a
-preference rather than a law, and it is the same on every kind: **the shifts
-do wherever one of them is free, and the size only when both are pinned**,
-because a shift moves the teeth where a size changes them. On a crossed mesh
-the shift enters as a rack's does, `a₀ = a_ref + (x₁ + x₂) m_n` exactly
-([Crossed axes](#crossed-axes)), so the sum is one subtraction; on a parallel
-one it is `shift_sum_for` as before.
+**A pair has a fifth input in the relation, its *size*.** Each member's helix
+angle and the first member's pitch diameter are three readings of one number
+(`d₁ = z₁ m_n / cos β₁`, `β₂ = Σ − β₁`), so **one** of the three may be given
+and the toggles relieve one another; with all three automatic the shaft angle
+is shared evenly, `β₁ = β₂ = Σ/2`, which is the spur gear at `Σ = 0` and no
+special case for it. Every pair — spur, helical, crossed or worm — relates
+`{a, clearance, x₁, x₂, size}` by one equation, so four may be given. Which
+absorbs a given distance is a preference rather than a law, and it is the same
+on every kind: **the shifts do wherever one of them is free, and the size only
+when both are pinned**, because a shift moves the teeth where a size changes
+them. On a crossed mesh the shift enters as a rack's does,
+`a₀ = a_ref + (x₁ + x₂) m_n` exactly ([Crossed axes](#crossed-axes)), so the
+sum is one subtraction; on a parallel one it is `shift_sum_for` as before.
+
+**The axial contact ratio is a sixth, on parallel shafts only.** `ε_β = b sin β
+/ (π m_n)` ties the helix to the narrower face, so a given ratio is one more
+reading of the size when both faces are given, and a floor under an automatic
+face otherwise ([Load cases](#load-cases) has the automatic width). It is the reading
+the relief takes **last**, since the ratio is asked for less often than an
+angle, and it has no answer at all when `ε_β π m_n / b > 1`: the note
+`stage.overlap_unreachable` says so and the pair is built at the even split.
+Crossed shafts have no overlap in this sense, and the input is not offered
+there.
 
 The worm kind sets the convention of worm practice as inputs: its worm's shift
 is pinned at zero — the worm is the tool its wheel is cut by — so a given
@@ -848,9 +860,10 @@ leaves it unread.
 ## Crossed axes
 
 One model covers a worm stage and a crossed helical pair, and one stage type
-too: a worm is a `PairStage` whose first member is sized by pitch diameter
-rather than by helix angle, with the shift, addendum, dedendum and root round
-every other member has. The *kind* — spur or worm — is a layer over that: a
+too: a worm is a `PairStage` whose first member states its pitch diameter
+rather than its helix angle — the same reading of the same size — with the
+shift, addendum, dedendum and root round every other member has, and a root
+round of zero by preset because a worm's thread is ground to its root. The *kind* — spur or worm — is a layer over that: a
 preset, the words *starts* and *wheel*, which inputs a panel shows, and the
 conventional proportions a worm's faces take. Nothing in the mathematics reads
 it.
@@ -989,7 +1002,11 @@ closed form in three cases, because the zone grows with the half-span at slope 2
 while both ends are the face's, at slope 1 once one end has reached the teeth,
 and at slope 0 once both have. The face is centred on its **gear**, not on the
 mesh: `CrossedPath::axial_centre` is where each member's mid-plane meets the
-path.
+path. The width is **reported**, as the geometric minimum beside the strength
+minimum a parallel mesh would have, and it sizes nothing: an automatic face on
+a crossed gear pair stands at its box and says so
+(`gear.face_width_as_entered`), because the alternative — a face that grows
+with every helix the designer tries — was a width nobody had asked for.
 
 ### Worm proportions
 
@@ -1002,9 +1019,9 @@ b₂ = 2 m_x √(q + 1),    capped at 0.67 d₁,   q = d₁/m_x       BS 721
 
 Not offered for a crossed gear pair, which has nothing wrapped round anything —
 and it is the **kind** that says which, since the same 17/23 pair at 45° is a
-worm drive if a designer calls it one and a gear pair otherwise. A gear pair's
-automatic face is continuity's; a worm's is these, reported beside whatever
-width is in use.
+worm drive if a designer calls it one and a gear pair otherwise. A worm's
+automatic faces are these, and they size the part only: no stress the crossed
+model reports depends on either width, which the note beside them says.
 
 The worm's flank is taken as an **involute helicoid (ZI)**, which makes it
 developable: one principal curvature is exactly zero along the ruling, so each
@@ -2243,6 +2260,12 @@ the planet's root to 45.6 MPa where the sun mesh gives 16.6.
 **An automatic face width is sized to the mesh, not to one gear.** The narrower
 face carries the pair, so each automatic width resolves to the largest ask any
 member of that mesh has. A member in two meshes — a planet — answers to both.
+A given axial contact ratio is one ask more, `b = ε_β π m_n / sin |β|`, taken
+by every parallel mesh in the stage at the stage's helix: it raises a width the
+strength asks leave narrower and touches one they leave wider not at all, and
+with every face given it has nothing to raise and sizes the helix instead
+([which is given](#which-of-the-three-numbers-is-given-and-which-follows)). At zero
+helix it asks nothing, since no width buys overlap on a spur gear.
 
 **And a member is *rated* at its mesh's width too**, not at its own. The load is
 spread over the width the pair actually shares, so that is the width the stress

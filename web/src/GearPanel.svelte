@@ -358,7 +358,7 @@
           <!-- **The amplitude and the centre-distance offset are one number.**
                A shift amplitude produces a throw and a throw is delivered by an
                amplitude, so either can be the input and the other follows —
-               like a worm stage sized by helix angle or by pitch diameter.
+               like a worm given its helix angle or its pitch diameter.
                Two fields with `auto` toggles that flip each other, because that
                is what every other pair of this kind in the application looks
                like; it used to be a mode select and a field that appeared, which

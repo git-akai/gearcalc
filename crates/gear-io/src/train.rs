@@ -69,6 +69,20 @@
 //!   actuation as its `duty` — an intermittent one gaining `at = "end"`, the
 //!   port its range was always measured at, and a continuous one losing its
 //!   `operating_speed` to the case's own `speed`.
+//! - **The helix moved onto the members.** A pair's `sizing` — one of three
+//!   readings of its size — is gone; every member of every kind carries
+//!   `helix_angle = { auto, manual }`, a pair carries `pitch_diameter =
+//!   { auto, manual }` for its first member, and a planetary set's and a hula
+//!   stage's stage-level `helix_angle` went with it. At most one reading is
+//!   given: `sizing = { auto = false, manual = { helix_angle = 45.0 } }` is
+//!   `helix_angle = { auto = false, manual = 45.0 }` on the first member, an
+//!   `additional_helix = a` is `Σ/2 + a` there, and a `pitch_diameter = d` is
+//!   the stage's `pitch_diameter`; a set's `helix_angle = β` is
+//!   `helix_angle = { auto = false, manual = β }` on its sun. Every reading
+//!   automatic shares the shaft angle evenly, which at zero is a spur pair.
+//!   Every stage with a line contact also gained `overlap = { auto, manual }`,
+//!   the axial contact ratio; `{ auto = true, manual = 1.0 }` is what an
+//!   older file meant.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
@@ -169,9 +183,7 @@ pub fn to_toml(doc: &TrainDocument) -> Result<String, TrainError> {
 mod tests {
     use super::*;
     use gear_core::params::Auto;
-    use gear_core::train::{
-        Duty, FirstMemberSizing, LoadCase, PairStage, PlanetaryStage, Port, Stage,
-    };
+    use gear_core::train::{Duty, LoadCase, PairStage, PlanetaryStage, Port, Stage};
 
     /// One of every stage kind, so the `kind` tag is exercised in both
     /// directions and no variant can quietly stop round-tripping.
@@ -203,15 +215,19 @@ mod tests {
                 ],
                 reversed_bending: false,
                 stages: vec![
-                    Stage::Spur(PairStage {
-                        sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(15.0)),
-                        ..PairStage::default()
-                    }),
+                    Stage::Spur(
+                        PairStage {
+                            ..PairStage::default()
+                        }
+                        .with_additional_helix(15.0),
+                    ),
                     Stage::Worm(PairStage::worm()),
-                    Stage::Worm(PairStage {
-                        sizing: Auto::fixed(FirstMemberSizing::HelixAngle(45.0)),
-                        ..PairStage::worm()
-                    }),
+                    Stage::Worm(
+                        PairStage {
+                            ..PairStage::worm()
+                        }
+                        .with_first_helix(45.0),
+                    ),
                     Stage::Planetary(Box::<PlanetaryStage>::default()),
                     Stage::Hula(Box::default()),
                 ],

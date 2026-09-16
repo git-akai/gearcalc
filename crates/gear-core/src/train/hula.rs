@@ -64,8 +64,12 @@ pub struct HulaStage {
     pub module: [f64; 2],
     /// Normal pressure angle, degrees. Shared by both meshes.
     pub pressure_angle: f64,
-    /// Helix angle, degrees. Shared.
-    pub helix_angle: f64,
+    /// **The axial contact ratio** `ε_β` the stage is asked for, where it is
+    /// asked for one — the same input a pair has ([`super::PairStage::overlap`]),
+    /// asked of both meshes: a floor under every automatic face width, or,
+    /// with all four widths given, the thing that decides the helix, so that
+    /// the narrower of the two meshes reaches it.
+    pub overlap: Auto<f64>,
     /// `k` for each mesh's **pinion**. Its ring takes the same figure, because
     /// on a ring `k` describes the space, and a pinion and a ring that mesh
     /// want the same one rather than complementary ones.
@@ -137,6 +141,43 @@ pub struct HulaStage {
 }
 
 impl HulaStage {
+    /// **Whether the axial contact ratio decides the helix**: it is given and
+    /// every face width is given, so the widths the meshes carry are known.
+    #[must_use]
+    pub fn size_taken_by_overlap(&self) -> bool {
+        !self.overlap.auto && self.gears.iter().all(|g| !g.face_width.auto)
+    }
+
+    /// The narrower width either mesh carries, as given.
+    fn given_width(&self) -> f64 {
+        self.gears
+            .iter()
+            .map(|g| g.face_width.manual)
+            .fold(f64::INFINITY, f64::min)
+    }
+
+    /// **The stage's helix angle, degrees** — from whichever gear states one.
+    /// Both meshes are internal and an internal mesh keeps its hand, and the
+    /// wobble body carries one gear of each, so all four share one angle.
+    /// Where none states it, the ratio decides it if it is given to; where
+    /// nothing decides it, the teeth are straight.
+    #[must_use]
+    pub fn helix_angle(&self) -> f64 {
+        if let Some(g) = self.gears.iter().find(|g| !g.helix_angle.auto) {
+            return g.helix_angle.manual;
+        }
+        if self.size_taken_by_overlap() {
+            if let Some(h) = super::helix_for_overlap(
+                self.overlap.manual,
+                self.module[0].min(self.module[1]),
+                self.given_width(),
+            ) {
+                return h;
+            }
+        }
+        0.0
+    }
+
     /// **The minimum clearance this stage is actually held to.**
     ///
     /// It is what *sets* the crank offset, so it is read only while the offset
@@ -173,7 +214,7 @@ impl Default for HulaStage {
         Self {
             module: [1.0, 1.0],
             pressure_angle: 20.0,
-            helix_angle: 0.0,
+            overlap: Auto::automatic(1.0),
             thickness_mod: [1.0, 1.0],
             sliding_friction: [0.08, 0.08],
             static_friction: [0.16, 0.16],
@@ -367,6 +408,10 @@ pub struct HulaResult {
     pub backlash: Directional<super::Backlash>,
     pub meshes: [HulaMesh; 2],
     pub gears: [HulaGear; 4],
+    /// **The axial contact ratio the stage comes to** — the smaller of its two
+    /// meshes', which is the one a given ratio is held to. What the stage's
+    /// `overlap` input shows while automatic.
+    pub overlap: f64,
     /// Anything the stage had to say about the design, as every other stage kind
     /// reports it. A note that names one gear rides on that gear instead — see
     /// [`GearResult::notes`].
@@ -469,7 +514,7 @@ pub fn solve_hula_stage_at(
     let built = |mesh: usize, shift: [f64; 4], i: usize| GearParams {
         module: stage.module[mesh],
         pressure_angle: stage.pressure_angle,
-        helix_angle: stage.helix_angle,
+        helix_angle: stage.helix_angle(),
         teeth: teeth.0[i],
         profile_shift: shift[i],
         addendum: stage.gears[i].addendum,
@@ -542,7 +587,7 @@ pub fn solve_hula_stage_at(
         teeth,
         module: stage.module,
         pressure_angle: stage.pressure_angle,
-        helix_angle: stage.helix_angle,
+        helix_angle: stage.helix_angle(),
         addendum: stage.gears.each_ref().map(|g| g.addendum),
         clearance: stage.clearance,
         running_clearance: stage.running_clearance.manual,
@@ -1107,7 +1152,11 @@ pub fn solve_hula_stage_at(
         // **A member's automatic width is the largest ask in its mesh**, because
         // the narrower face carries the pair — see the spur stage for the fault
         // that avoids.
-        let mut wanted = 0.0_f64;
+        // ...and the width a given axial contact ratio needs, a floor under
+        // an automatic one.
+        let mut wanted =
+            super::width_for_overlap(&stage.overlap, stage.helix_angle(), stage.module[index])
+                .unwrap_or(0.0);
         for (slot, &i) in members.iter().enumerate() {
             let g = &stage.gears[i];
             wanted = wanted.max(
@@ -1240,7 +1289,7 @@ pub fn solve_hula_stage_at(
                     contact_ratios: super::ContactRatios::of(
                         p.path.contact_ratio,
                         effective,
-                        stage.helix_angle,
+                        stage.helix_angle(),
                         stage.module[index],
                     ),
                     operating_pressure_angle: layout.alpha_w[index].to_degrees(),
@@ -1293,6 +1342,12 @@ pub fn solve_hula_stage_at(
         layout.offset,
         stage.running_clearance.manual,
     ));
+    notes.extend(super::overlap_note(
+        stage.size_taken_by_overlap(),
+        &stage.overlap,
+        stage.module[0].min(stage.module[1]),
+        stage.given_width(),
+    ));
 
     Ok(HulaResult {
         fixed_carrier_efficiency,
@@ -1314,6 +1369,10 @@ pub fn solve_hula_stage_at(
         running_clearance: stage.running_clearance.manual,
         binding_mesh: layout.binding,
         backlash,
+        overlap: meshes
+            .iter()
+            .filter_map(|m| m.report.line.as_ref().map(|l| l.contact_ratios.overlap))
+            .fold(f64::INFINITY, f64::min),
         meshes: [meshes[0].clone(), meshes[1].clone()],
         gears: gears.map(|g| g.expect("every gear belongs to a mesh")),
         notes,

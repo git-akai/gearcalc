@@ -59,6 +59,12 @@ backlash: Directional<Backlash>,
  */
 cases: Array<ShaftsCase>, sun_planet: MeshReport, planet_ring: MeshReport, 
 /**
+ * **The axial contact ratio the set comes to** — the smaller of its two
+ * meshes', which is the one a given ratio is held to. What the stage's
+ * `overlap` input shows while automatic.
+ */
+overlap: number, 
+/**
  * Planets can be spaced evenly: `(z_s + z_r) mod N = 0`.
  */
 equal_spacing: boolean, 

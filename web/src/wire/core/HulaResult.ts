@@ -94,6 +94,12 @@ cases: Array<ShaftsCase>,
  */
 backlash: Directional<Backlash>, meshes: [HulaMesh, HulaMesh], gears: [HulaGear, HulaGear, HulaGear, HulaGear], 
 /**
+ * **The axial contact ratio the stage comes to** — the smaller of its two
+ * meshes', which is the one a given ratio is held to. What the stage's
+ * `overlap` input shows while automatic.
+ */
+overlap: number, 
+/**
  * Anything the stage had to say about the design, as every other stage kind
  * reports it. A note that names one gear rides on that gear instead — see
  * [`GearResult::notes`].

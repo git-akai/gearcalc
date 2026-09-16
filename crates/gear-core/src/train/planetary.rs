@@ -58,9 +58,12 @@ pub struct PlanetaryStage {
     pub module: f64,
     /// Normal pressure angle, degrees. Shared.
     pub pressure_angle: f64,
-    /// Helix angle, degrees. Shared; the internal pair takes the same hand and
-    /// the external pair the opposite, which is what the meshes require.
-    pub helix_angle: f64,
+    /// **The axial contact ratio** `ε_β` the set is asked for, where it is
+    /// asked for one — the same input a pair has ([`super::PairStage::overlap`]),
+    /// asked of both meshes: a floor under every automatic face width, or,
+    /// with all three widths given, the thing that decides the helix, so that
+    /// the narrower of the two meshes reaches it.
+    pub overlap: Auto<f64>,
     /// Coefficient of friction, sun-to-planet.
     pub sliding_friction_sun_planet: f64,
     /// Coefficient of **static** friction, for breaking away.
@@ -148,7 +151,7 @@ impl Default for PlanetaryStage {
         Self {
             module: 1.0,
             pressure_angle: 20.0,
-            helix_angle: 0.0,
+            overlap: Auto::automatic(1.0),
             sliding_friction_sun_planet: 0.08,
             static_friction_sun_planet: 0.16,
             sliding_friction_planet_ring: 0.08,
@@ -250,6 +253,10 @@ pub struct PlanetaryResult {
     pub cases: Vec<ShaftsCase>,
     pub sun_planet: MeshReport,
     pub planet_ring: MeshReport,
+    /// **The axial contact ratio the set comes to** — the smaller of its two
+    /// meshes', which is the one a given ratio is held to. What the stage's
+    /// `overlap` input shows while automatic.
+    pub overlap: f64,
     /// Planets can be spaced evenly: `(z_s + z_r) mod N = 0`.
     pub equal_spacing: bool,
     /// Every planet meshes at the same phase — rarely true, and not a fault.
@@ -273,18 +280,75 @@ pub struct PlanetaryResult {
 }
 
 impl PlanetaryStage {
+    /// The three members in the order [`super::StageResult::members`] reports
+    /// them: sun, planet, ring.
+    #[must_use]
+    pub fn members(&self) -> [&StageGear; 3] {
+        [&self.sun, &self.planet, &self.ring]
+    }
+
+    /// ...and one of them mutably, for the one caller that turns their toggles.
+    pub(crate) fn member_mut(&mut self, i: usize) -> Option<&mut StageGear> {
+        match i {
+            0 => Some(&mut self.sun),
+            1 => Some(&mut self.planet),
+            2 => Some(&mut self.ring),
+            _ => None,
+        }
+    }
+
+    /// **Whether the axial contact ratio decides the helix**: it is given and
+    /// every face width is given, so the widths the meshes carry are known.
+    #[must_use]
+    pub fn size_taken_by_overlap(&self) -> bool {
+        !self.overlap.auto && self.members().iter().all(|g| !g.face_width.auto)
+    }
+
+    /// The narrower width either mesh carries, as given.
+    fn given_width(&self) -> f64 {
+        let [s, p, r] = self.members().map(|g| g.face_width.manual);
+        s.min(p).min(r)
+    }
+
+    /// **The set's helix angle, degrees, as the sun carries it** — from
+    /// whichever member states one, the planet and the ring being the sun's
+    /// opposed (an external mesh opposes hands, an internal one keeps them, so
+    /// the planet and the ring share a hand and the sun has the other). Where
+    /// none does, the ratio decides it if it is given to; where nothing
+    /// decides it, the teeth are straight.
+    #[must_use]
+    pub fn helix_angle(&self) -> f64 {
+        if !self.sun.helix_angle.auto {
+            return self.sun.helix_angle.manual;
+        }
+        for other in [&self.planet, &self.ring] {
+            if !other.helix_angle.auto {
+                return -other.helix_angle.manual;
+            }
+        }
+        if self.size_taken_by_overlap() {
+            if let Some(h) =
+                super::helix_for_overlap(self.overlap.manual, self.module, self.given_width())
+            {
+                return h;
+            }
+        }
+        0.0
+    }
+
     /// `GearParams` for one member, with the thickness invariants applied.
     ///
     /// The sun's `k` is the input; the planet takes `2 − k` because they mesh
     /// externally, and the ring takes the planet's because they mesh internally.
     /// One number, three consistent values, no assertion needed.
     fn params(&self, member: PlanetaryShaft, teeth: u32, shift: f64, addendum: f64) -> GearParams {
+        let helix_angle = self.helix_angle();
         let (k, helix) = match member {
-            PlanetaryShaft::Sun => (self.thickness_mod, self.helix_angle),
+            PlanetaryShaft::Sun => (self.thickness_mod, helix_angle),
             // The planet opposes the sun's hand, as an external pair must.
-            PlanetaryShaft::Carrier => (2.0 - self.thickness_mod, -self.helix_angle),
+            PlanetaryShaft::Carrier => (2.0 - self.thickness_mod, -helix_angle),
             // ...and the ring shares the planet's, as an internal pair must.
-            PlanetaryShaft::Ring => (2.0 - self.thickness_mod, -self.helix_angle),
+            PlanetaryShaft::Ring => (2.0 - self.thickness_mod, -helix_angle),
         };
         GearParams {
             // A stage member is concentric: the eccentric feature is the gear
@@ -313,7 +377,7 @@ impl PlanetaryStage {
     }
 
     fn rack(&self) -> BasicRack {
-        BasicRack::new(self.module, self.pressure_angle, self.helix_angle)
+        BasicRack::new(self.module, self.pressure_angle, self.helix_angle())
     }
 
     fn teeth(&self) -> Teeth {
@@ -1242,10 +1306,14 @@ pub fn solve_planetary_stage_with(
         ),
     };
     let ratings: [MemberRating; 3] = std::array::from_fn(|i| rating(i, PROBE, PROBE));
+    // ...and the width a given axial contact ratio needs, a floor under every
+    // automatic width: one helix, so one floor for both meshes.
+    let for_overlap =
+        super::width_for_overlap(&stage.overlap, stage.helix_angle(), stage.module).unwrap_or(0.0);
     let asks = [
-        ask_of(&stage.sun, &ratings[0].asks()),
-        ask_of(&stage.planet, &ratings[1].asks()),
-        ask_of(&stage.ring, &ratings[2].asks()),
+        ask_of(&stage.sun, &ratings[0].asks()).max(for_overlap),
+        ask_of(&stage.planet, &ratings[1].asks()).max(for_overlap),
+        ask_of(&stage.ring, &ratings[2].asks()).max(for_overlap),
     ];
     // **A member's automatic width is the largest requirement of any mesh it is
     // in**, because the narrower face carries the pair — see the spur stage for
@@ -1361,6 +1429,12 @@ pub fn solve_planetary_stage_with(
         stage.clearance.manual,
     ));
     notes.extend(chosen.how.note());
+    notes.extend(super::overlap_note(
+        stage.size_taken_by_overlap(),
+        &stage.overlap,
+        stage.module,
+        stage.given_width(),
+    ));
     if !layout.equal_spacing {
         notes.push(Note::new(key::STAGE_PLANETS_NOT_EVENLY_SPACED).count("planets", stage.planets));
     }
@@ -1485,7 +1559,7 @@ pub fn solve_planetary_stage_with(
                 contact_ratios: ContactRatios::of(
                     sp_path.contact_ratio,
                     sp_width,
-                    stage.helix_angle,
+                    stage.helix_angle(),
                     stage.module,
                 ),
                 operating_pressure_angle: sp_mesh.alpha_w.to_degrees(),
@@ -1515,7 +1589,7 @@ pub fn solve_planetary_stage_with(
                 contact_ratios: ContactRatios::of(
                     pr_path.contact_ratio,
                     pr_width,
-                    stage.helix_angle,
+                    stage.helix_angle(),
                     stage.module,
                 ),
                 operating_pressure_angle: pr_mesh.alpha_w.to_degrees(),
@@ -1543,6 +1617,22 @@ pub fn solve_planetary_stage_with(
                     .into_iter()
                     .collect(),
             },
+        ),
+        overlap: ContactRatios::of(
+            sp_path.contact_ratio,
+            sp_width,
+            stage.helix_angle(),
+            stage.module,
+        )
+        .overlap
+        .min(
+            ContactRatios::of(
+                pr_path.contact_ratio,
+                pr_width,
+                stage.helix_angle(),
+                stage.module,
+            )
+            .overlap,
         ),
         equal_spacing: layout.equal_spacing,
         simultaneous_meshing: layout.simultaneous_meshing,
@@ -1789,9 +1879,9 @@ mod tests {
 
     fn stage_of(sun: u32, planet: u32, ring: u32, helix: f64) -> PlanetaryStage {
         PlanetaryStage {
-            helix_angle: helix,
             sun: StageGear {
                 teeth: sun,
+                helix_angle: Auto::fixed(helix),
                 ..StageGear::default()
             },
             planet: StageGear {

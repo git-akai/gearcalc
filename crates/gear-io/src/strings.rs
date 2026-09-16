@@ -729,9 +729,6 @@ mod tests {
         for helix in [0.0_f64, 3.0, 20.0] {
             for teeth in [(17_u32, 43_u32), (9, 11)] {
                 let stage = gear_core::train::PairStage {
-                    sizing: gear_core::params::Auto::fixed(
-                        gear_core::train::FirstMemberSizing::AdditionalHelix(helix),
-                    ),
                     gears: [
                         gear_core::train::StageGear {
                             teeth: teeth.0,
@@ -743,7 +740,8 @@ mod tests {
                         },
                     ],
                     ..Default::default()
-                };
+                }
+                .with_additional_helix(helix);
                 if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                     record(&r.every_note());
                 }
@@ -1018,11 +1016,9 @@ mod tests {
             let stage = gear_core::train::PairStage {
                 sliding_friction: friction,
                 static_friction: friction,
-                sizing: gear_core::params::Auto::fixed(
-                    gear_core::train::FirstMemberSizing::HelixAngle(45.0),
-                ),
                 ..gear_core::train::PairStage::worm()
-            };
+            }
+            .with_first_helix(45.0);
             if let Ok(r) = solve_crossed(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
             }
@@ -1108,11 +1104,9 @@ mod tests {
                 &gear_core::train::PairStage {
                     sliding_friction: friction,
                     static_friction: friction,
-                    sizing: gear_core::params::Auto::fixed(
-                        gear_core::train::FirstMemberSizing::HelixAngle(3.0),
-                    ),
                     ..gear_core::train::PairStage::worm()
-                },
+                }
+                .with_first_helix(3.0),
                 &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
@@ -1209,6 +1203,20 @@ mod tests {
                 &lib,
             ) {
                 record(&r.every_note());
+            }
+            // A ratio asked to decide the helix that no helix reaches: three
+            // base pitches of overlap on a two-millimetre face.
+            {
+                let mut narrow = PairStage {
+                    overlap: gear_core::params::Auto::fixed(3.0),
+                    ..PairStage::default()
+                };
+                for g in &mut narrow.gears {
+                    g.face_width = gear_core::params::Auto::fixed(2.0);
+                }
+                if let Ok(r) = solve_spur(&narrow, &gear_core::train::StageLoads::just(2.0), &lib) {
+                    record(&r.every_note());
+                }
             }
             // An automatic face width with every rating switched off.
             let no_source = gear_core::train::StageGear {

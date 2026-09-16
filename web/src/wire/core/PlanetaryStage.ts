@@ -19,10 +19,13 @@ module: number,
  */
 pressure_angle: number, 
 /**
- * Helix angle, degrees. Shared; the internal pair takes the same hand and
- * the external pair the opposite, which is what the meshes require.
+ * **The axial contact ratio** `ε_β` the set is asked for, where it is
+ * asked for one — the same input a pair has ([`super::PairStage::overlap`]),
+ * asked of both meshes: a floor under every automatic face width, or,
+ * with all three widths given, the thing that decides the helix, so that
+ * the narrower of the two meshes reaches it.
  */
-helix_angle: number, 
+overlap: Auto<number>, 
 /**
  * Coefficient of friction, sun-to-planet.
  */

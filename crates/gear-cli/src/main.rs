@@ -27,11 +27,8 @@ use gear_core::{GearParams, Tooth};
 /// A worm stage at the preset with these counts and this worm diameter — what
 /// every worm command here builds from.
 fn worm_stage(starts: u32, wheel_teeth: u32, worm_diameter: f64) -> gear_core::train::PairStage {
-    use gear_core::train::{FirstMemberSizing, PairStage};
-    let mut stage = PairStage {
-        sizing: gear_core::params::Auto::fixed(FirstMemberSizing::PitchDiameter(worm_diameter)),
-        ..PairStage::worm()
-    };
+    use gear_core::train::PairStage;
+    let mut stage = PairStage::worm().with_first_diameter(worm_diameter);
     stage.gears[0].teeth = starts;
     stage.gears[1].teeth = wheel_teeth;
     stage
@@ -1044,8 +1041,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
 fn train_file_report(path: Option<&str>) {
     use gear_core::params::Auto;
     use gear_core::train::{
-        solve_train, Duty, FirstMemberSizing, LoadCase, PairStage, PlanetaryStage, Port, Stage,
-        StageGear, Train,
+        solve_train, Duty, LoadCase, PairStage, PlanetaryStage, Port, Stage, StageGear, Train,
     };
     use gear_io::TrainDocument;
 
@@ -1077,21 +1073,23 @@ fn train_file_report(path: Option<&str>) {
             ],
             reversed_bending: false,
             stages: vec![
-                Stage::Spur(PairStage {
-                    sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(15.0)),
-                    gears: [
-                        StageGear {
-                            teeth: 17,
-                            face_width: Auto::automatic(0.0),
-                            ..StageGear::default()
-                        },
-                        StageGear {
-                            teeth: 43,
-                            ..StageGear::default()
-                        },
-                    ],
-                    ..PairStage::default()
-                }),
+                Stage::Spur(
+                    PairStage {
+                        gears: [
+                            StageGear {
+                                teeth: 17,
+                                face_width: Auto::automatic(0.0),
+                                ..StageGear::default()
+                            },
+                            StageGear {
+                                teeth: 43,
+                                ..StageGear::default()
+                            },
+                        ],
+                        ..PairStage::default()
+                    }
+                    .with_additional_helix(15.0),
+                ),
                 Stage::Worm(PairStage::worm()),
                 Stage::Planetary(Box::<PlanetaryStage>::default()),
             ],
@@ -1430,8 +1428,7 @@ fn epicyclic_shifts_report() {
 fn train_report(mode: Option<&str>) {
     use gear_core::params::Auto;
     use gear_core::train::{
-        solve_train, Duty, FirstMemberSizing, LoadCase, PairStage, Port, Stage, StageGear,
-        StageResult, Train,
+        solve_train, Duty, LoadCase, PairStage, Port, Stage, StageGear, StageResult, Train,
     };
 
     let lib = gear_io::default_library();
@@ -1525,12 +1522,14 @@ fn train_report(mode: Option<&str>) {
                 ..StageGear::default()
             };
             vec![
-                Stage::Spur(PairStage {
-                    sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(30.0)),
-                    load_sharing: gear_core::contact::LoadSharing::LinearRamp,
-                    gears: [toggled(17, false, true), toggled(43, true, false)],
-                    ..PairStage::default()
-                }),
+                Stage::Spur(
+                    PairStage {
+                        load_sharing: gear_core::contact::LoadSharing::LinearRamp,
+                        gears: [toggled(17, false, true), toggled(43, true, false)],
+                        ..PairStage::default()
+                    }
+                    .with_additional_helix(30.0),
+                ),
                 Stage::Spur(PairStage {
                     load_sharing: gear_core::contact::LoadSharing::LinearRamp,
                     gears: [toggled(13, true, false), toggled(31, false, true)],
@@ -1551,11 +1550,13 @@ fn train_report(mode: Option<&str>) {
                     gears: [auto_width(17), auto_width(43)],
                     ..PairStage::default()
                 }),
-                Stage::Spur(PairStage {
-                    sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(15.0)),
-                    gears: [auto_width(13), auto_width(31)],
-                    ..PairStage::default()
-                }),
+                Stage::Spur(
+                    PairStage {
+                        gears: [auto_width(13), auto_width(31)],
+                        ..PairStage::default()
+                    }
+                    .with_additional_helix(15.0),
+                ),
             ]
         },
     };
@@ -2733,8 +2734,7 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
             };
             for step in 0..5 {
                 let target = g0.centre_distance + 0.5 * f64::from(step);
-                let mut stage = base.clone();
-                stage.sizing.auto = true;
+                let mut stage = base.clone().size_free();
                 stage.centre_distance =
                     gear_core::params::Auto::fixed(target + stage.clearance.manual);
                 match stage.geometry() {
@@ -2956,10 +2956,10 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
 
     let lib = gear_io::default_library();
     let base = PlanetaryStage {
-        helix_angle: helix,
         planets,
         sun: StageGear {
             teeth: sun,
+            helix_angle: gear_core::params::Auto::fixed(helix),
             ..StageGear::default()
         },
         planet: StageGear {
@@ -3156,7 +3156,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
 /// by tooth count and helix, so `β₁` is what there is to choose. Nothing else
 /// about the pair changes — it is the same screw geometry either way.
 fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
-    use gear_core::train::{solve_pair_stage, FirstMemberSizing, PairKind, StageLoads};
+    use gear_core::train::{solve_pair_stage, PairKind, StageLoads};
 
     let lib = gear_io::default_library();
     println!(
@@ -3164,15 +3164,17 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
          mu 0.06"
     );
     // The worm preset's members and frictions, entered as a gear pair: the
-    // faces fixed, since a crossed gear pair's automatic face is sized for
-    // continuity and this table is about the split, and both shifts pinned at
-    // zero so the geometry is the pure one the split describes.
+    // faces fixed, since nothing sizes a crossed gear pair's automatic face
+    // and this table is about the split; both shifts pinned at zero so the
+    // geometry is the pure one the split describes; and a gear's root round
+    // on the first member, since a worm's thread has none and these are gears.
     let base = {
         let mut stage = worm_stage(z1, z2, 7.0);
         stage.shaft_angle = shaft_angle;
         for g in &mut stage.gears {
             g.face_width = gear_core::params::Auto::fixed(10.0);
             g.profile_shift = gear_core::params::Auto::fixed(0.0);
+            g.root_radius = gear_core::train::StageGear::default().root_radius;
         }
         stage
     };
@@ -3184,10 +3186,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
     for i in 0..=10 {
         #[allow(clippy::cast_precision_loss)]
         let beta1 = shaft_angle * (i as f64 / 10.0);
-        let stage = gear_core::train::PairStage {
-            sizing: gear_core::params::Auto::fixed(FirstMemberSizing::HelixAngle(beta1)),
-            ..base.clone()
-        };
+        let stage = base.clone().with_first_helix(beta1);
         let Ok(g) = stage.geometry() else {
             println!("{beta1:>7.1} {:>7} — no such pair", shaft_angle - beta1);
             continue;
@@ -3253,13 +3252,13 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
     // crossed answer is in the change detector, which is the ninth time this
     // audit has had to put an opt-in the harness never switched on into it.
     let even = gear_core::train::PairStage {
-        sizing: gear_core::params::Auto::fixed(FirstMemberSizing::HelixAngle(shaft_angle / 2.0)),
         optimisation: gear_core::train::Optimisation {
             enabled: true,
             ..gear_core::train::Optimisation::default()
         },
         ..base.clone()
-    };
+    }
+    .with_first_helix(shaft_angle / 2.0);
     let mut free = even.clone();
     for g in &mut free.gears {
         g.profile_shift = gear_core::params::Auto::automatic(0.0);

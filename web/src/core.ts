@@ -36,7 +36,6 @@ import type {
   CutterRef,
   Defaults,
   Directional,
-  FirstMemberSizing,
   GearParams,
   GearRequest,
   GearResult,
@@ -96,7 +95,6 @@ export type {
   CutterRef,
   Defaults,
   Directional,
-  FirstMemberSizing,
   GearParams,
   GearRequest,
   GearResult,
@@ -657,36 +655,6 @@ export function exportLibrary(
 //  Geartrains
 // --------------------------------------------------------------------- //
 
-/** Which shaft of a planetary set. Mirrors Rust's `planetary::PlanetaryShaft`. */
-/**
- * Turn constraints automatic until no more than `limit` of them are given.
- *
- * A pair of gears has two profile shifts to choose and three things a designer
- * can pin down: each shift, and the distance the pair runs at. Any two of those
- * fix the third, so pinning all three is not a tighter specification — it is a
- * contradiction, and the third would simply be ignored. Rather than accept an
- * input and quietly disregard it, the one furthest from what the designer just
- * touched goes back to automatic, visibly.
- *
- * `constraints` is in relief order, least precious first, and `just` is the one
- * the designer has this moment turned on, which is never the one relieved.
- * Nothing here decides a value: it only says which inputs are still being read.
- */
-export function relieve(
-  constraints: Auto<number>[],
-  limit: number,
-  just: Auto<number>,
-): void {
-  let given = constraints.filter((c) => !c.auto).length;
-  for (const c of constraints) {
-    if (given <= limit) return;
-    if (!c.auto && c !== just) {
-      c.auto = true;
-      given -= 1;
-    }
-  }
-}
-
 /** **Resolve an over-determined stage**, whatever kind it is.
  *
  *  `just` is the input the designer has this moment pinned, and is never the one
@@ -700,10 +668,18 @@ export function relieve(
  *  bound to it. Only the toggles are copied back, because only the toggles can
  *  have moved — `relieved` decides no values.
  *
+ *  **A toggle relief turns keeps the number the box was showing.** An input
+ *  turned manual by the designer is seeded from what it displayed; one turned
+ *  manual by relief used to keep whatever its box last held, which for a helix
+ *  pinned when its neighbour was freed was a stale zero. So the solved value
+ *  is written into any box relief moves, from the stage's last result, exactly
+ *  as the designer's own toggle does — a number Rust computed, copied where the
+ *  designer would have copied it.
+ *
  *  A stage that will not cross the boundary is left alone. Relief runs on a
  *  click, and a click is not the place to discover a broken boundary.
  */
-export function relieveStage(stage: Stage, just: Freedom): void {
+export function relieveStage(stage: Stage, just: Freedom, solved?: StageResult): void {
   let corrected: Stage;
   try {
     corrected = JSON.parse(
@@ -712,40 +688,70 @@ export function relieveStage(stage: Stage, just: Freedom): void {
   } catch {
     return;
   }
-  for (const [live, fixed] of [
-    ...autosOf(stage).map((a, i) => [a, autosOf(corrected)[i]] as const),
-  ]) {
-    if (fixed) live.auto = fixed.auto;
+  const live = autosOf(stage);
+  const fixed = autosOf(corrected);
+  for (const [i, a] of live.entries()) {
+    const f = fixed[i];
+    if (!f || f.toggle.auto === a.toggle.auto) continue;
+    const shown = solved ? valueOf(solved, a.freedom) : undefined;
+    if (shown !== undefined) a.toggle.manual = Number(shown.toFixed(4));
+    a.toggle.auto = f.toggle.auto;
   }
 }
 
-/** Every `Auto` on a stage that relief can touch, in one fixed order.
- *
- *  The order is only used to line a stage up against its own corrected copy, so
- *  it has to be *stable* rather than meaningful — `Freedom`'s member order is
- *  the core's business and is never reconstructed here.
- */
-function autosOf(stage: Stage): { auto: boolean }[] {
-  const shifts =
-    stage.kind === "planetary"
-      ? [stage.sun, stage.planet, stage.ring].map((g) => g.profile_shift)
-      : "gears" in stage
-        ? stage.gears.map((g) => g.profile_shift)
-        : [];
-  // Every toggle relief can turn, whatever the value behind it: a pair's
-  // sizing carries a reading rather than a number, and only its flag is
-  // copied. The clearance and the sizing were missing from this list, so a
-  // relief the core decided on either never reached the panel.
-  const toggles: { auto: boolean }[] = [];
-  const push = (a: unknown) => {
-    if (typeof a === "object" && a !== null && "auto" in a) toggles.push(a as { auto: boolean });
+/** **Every `Auto` on a stage that relief can touch**, each with the freedom
+ *  that names it — the one place this side lines a stage's toggles up against
+ *  the core's names, and the only order that has to be *stable* rather than
+ *  meaningful. `Freedom`'s member order is the core's business: a member here
+ *  is a member there, in the order `StageResult::members` reports them. */
+function autosOf(stage: Stage): { freedom: Freedom; toggle: Auto<number> }[] {
+  const out: { freedom: Freedom; toggle: Auto<number> }[] = [];
+  const push = (freedom: Freedom, toggle: unknown) => {
+    if (typeof toggle === "object" && toggle !== null && "auto" in toggle) {
+      out.push({ freedom, toggle: toggle as Auto<number> });
+    }
   };
-  push((stage as { centre_distance?: unknown }).centre_distance);
-  push((stage as { clearance?: unknown }).clearance);
-  push((stage as { running_clearance?: unknown }).running_clearance);
-  push((stage as { offset?: unknown }).offset);
-  push((stage as { sizing?: unknown }).sizing);
-  return [...toggles, ...shifts];
+  const members: StageGear[] =
+    stage.kind === "planetary" ? [stage.sun, stage.planet, stage.ring] : stage.gears;
+  push("centre_distance", (stage as { centre_distance?: unknown }).centre_distance);
+  push("centre_distance", (stage as { offset?: unknown }).offset);
+  push("clearance", (stage as { clearance?: unknown }).clearance);
+  push("clearance", (stage as { running_clearance?: unknown }).running_clearance);
+  push("first_pitch_diameter", (stage as { pitch_diameter?: unknown }).pitch_diameter);
+  push("overlap", (stage as { overlap?: unknown }).overlap);
+  members.forEach((g, i) => {
+    push({ shift: i }, g.profile_shift);
+    push({ helix: i }, g.helix_angle);
+    push({ face_width: i }, g.face_width);
+  });
+  return out;
+}
+
+/** **What a freedom's input came to in a result** — the number a box turned
+ *  manual by relief is seeded with. A lookup, not a calculation: every figure
+ *  is one the result already carries. `undefined` where the result has no
+ *  such figure, and the box keeps what it had. */
+function valueOf(solved: StageResult, freedom: Freedom): number | undefined {
+  const members: GearResult[] =
+    solved.kind === "planetary"
+      ? [solved.sun, solved.planet.gear, solved.ring]
+      : solved.kind === "hula"
+        ? solved.gears.map((g) => g.gear)
+        : solved.gears;
+  if (freedom === "centre_distance") {
+    return solved.kind === "hula" ? solved.offset : solved.centre_distance;
+  }
+  if (freedom === "clearance") {
+    return solved.kind === "hula" ? solved.running_clearance : solved.clearance;
+  }
+  if (freedom === "first_pitch_diameter") return members[0]?.pitch_diameter;
+  if (freedom === "overlap") {
+    return solved.kind === "pair" ? (solved.mesh.line?.contact_ratios.overlap ?? undefined) : solved.overlap;
+  }
+  if ("shift" in freedom) return members[freedom.shift]?.profile_shift;
+  if ("helix" in freedom) return members[freedom.helix]?.helix_angle;
+  if ("face_width" in freedom) return members[freedom.face_width]?.face_width;
+  return undefined;
 }
 
 /** A fresh geartrain, one spur stage in it. */

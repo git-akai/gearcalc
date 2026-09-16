@@ -271,17 +271,19 @@ already flags. `tools/iso_6336_3_stack.py` multiplies the set out
 of contact from two properties of an involute helicoid, elliptical contact,
 sliding as a vector, and one friction balance containing both older efficiency
 formulas. A crossed gear pair is a spur stage with an axis angle, and a worm is
-the same stage with its first member sized by pitch diameter — one `PairStage`
+the same stage with its first member stating a pitch diameter where a gear
+states a helix angle — one `PairStage`
 under the spur and worm kinds, where the kind is a preset, a vocabulary and a
 choice of which inputs to show ([rationale](rationale.md#each-stage-kind-keeps-its-own-result-type)).
 A profile shift enters the crossed mesh as a rack's does, exactly, so a worm's
 wheel absorbs a housing distance by its shift and the worm's diameter absorbs it
 when both shifts are pinned; the interference verdict is the parallel relation
 asked along the line of action; the optimiser reaches it with the friction
-balance as its objective. A crossed pair's face width is automatic from
-`ε ≥ 1`, a *geometric* minimum; a worm keeps its published proportions. Both are
-labelled with which kind of minimum they are, because they differ by 2.4× and
-answer different questions. Every mesh, on parallel shafts or crossed, reports
+balance as its objective. A crossed pair reports the face width continuity
+takes, `ε ≥ 1`, a *geometric* minimum, and sizes nothing by it; a worm's
+automatic faces are its published proportions, which size the part and change
+no stress. Both figures are labelled with what they are, because they differ by
+2.4× and answer different questions. Every mesh, on parallel shafts or crossed, reports
 in one `MeshReport`, and where the two contacts' figures meet is measured and
 recorded with its seams ([reference](reference.md#contact-stress)).
 

@@ -4,6 +4,7 @@
     solveTrain,
     STAGE_KINDS,
     type StageKindSpec,
+    type StageResult,
     CASE_KINDS,
     type CaseKindSpec,
     PORTS,
@@ -587,9 +588,10 @@
      *  three answers rather than a flag with two.
      *
      *  `"rating"` — the default: a stress inverted, so the sources that size it
-     *  are offered as toggles. `"continuity"` — a crossed pair, whose contact is
-     *  a point no stress depends on, so the width comes from ε = 1 instead and
-     *  says which kind of minimum it is. */
+     *  are offered as toggles. `"continuity"` — a crossed gear pair, whose
+     *  contact is a point no stress depends on, so nothing sizes it and the
+     *  width at which contact stays continuous is reported beside the box.
+     *  `"proportion"` — a worm's convention. */
     faceWidth?: "rating" | "continuity" | "proportion";
     /** The width a worm drive's convention recommends, for `"proportion"`. */
     faceRecommended?: number;
@@ -597,10 +599,17 @@
     faceLabel?: string;
     /** Catalogue key for the tooth count's label — a worm's teeth are *starts*. */
     teethLabel?: string;
-    /** Called when this gear's shift is switched between given and automatic,
-     *  so a stage whose inputs constrain one another can relieve whichever of
-     *  them that has over-specified. */
-    onShiftAuto?: () => void;
+    /** **Which of the stage's inputs this card's toggles argue with**, so a
+     *  toggle switched here can relieve whichever of them has over-specified:
+     *  the stage, and this member's index in the core's own order. Every
+     *  toggle on the card — the shift, the helix, the face width, a worm's
+     *  diameter — asks the same relief, since the core declares the relations
+     *  and this side only says which input was just touched. */
+    relief?: { stage: Stage; member: number; solved: StageResult | undefined };
+    /** **A worm's pitch diameter**, drawn on its card right under its starts:
+     *  the same size freedom as the helix angles read as a size, which is a
+     *  worm's reading and a gear's only by derivation. */
+    pitchDiameter?: Auto<number>;
     /** The width at which ε = 1, for a crossed pair. */
     faceFromContinuity?: number;
     /** **The tool this ring is shaped with.**
@@ -649,6 +658,32 @@
     <span>{t(opts.teethLabel ?? "ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={gear.teeth} />
   </label>
+  {#if opts.pitchDiameter}
+    {@render autoNumber(
+      "ui.train_pitch_diameter",
+      opts.pitchDiameter,
+      g?.pitch_diameter,
+      0.5,
+      () => opts.relief && relieveStage(opts.relief.stage, "first_pitch_diameter", opts.relief.solved),
+      undefined,
+      "ui.train_mm",
+    )}
+  {/if}
+  <!-- **The helix, with who decides it.** Every member's is bound to the
+       others' — a pair's two by the shaft angle, a set's three by the hands
+       its meshes require — so at most one member states it and the rest
+       follow; none stated is the shaft angle shared evenly, or what a given
+       distance or a given axial contact ratio decides. Automatic shows the
+       angle the stage arrived at. -->
+  {@render autoNumber(
+    "ui.train_helix_angle",
+    gear.helix_angle,
+    g?.helix_angle,
+    1,
+    () => opts.relief && relieveStage(opts.relief.stage, { helix: opts.relief.member }, opts.relief.solved),
+    undefined,
+    "°",
+  )}
   <!-- **The other end of the tooth, and the same shape as the shift's.** The
        addendum had an `auto` toggle whose only answer was the tallest tooth the
        tip width allows — a bound wearing a source's clothes, and one that went
@@ -728,7 +763,7 @@
     gear.profile_shift,
     g?.profile_shift,
     0.05,
-    opts.onShiftAuto,
+    () => opts.relief && relieveStage(opts.relief.stage, { shift: opts.relief.member }, opts.relief.solved),
     undefined,
     "ui.train_m",
     opts.cut === "shaper"
@@ -786,57 +821,42 @@
       } />
     </p>
   {/if}
-  {#if opts.faceWidth === "continuity"}
-    <!-- A crossed pair's automatic width is a **geometric** minimum: the width
-         at which one tooth pair hands over to the next (ε = 1). The spur
-         stage's inverts a stress instead, and the two must not read alike. -->
-    {@render autoNumber(
-      opts.faceLabel ?? "ui.train_face_width",
-      gear.face_width,
-      opts.faceFromContinuity,
-      0.5,
-      undefined,
-      // Inside the field, not beside it. A note outside its label is not the
-      // label's row and does not get the gap that pairs the two — it sits a
-      // whole field-gap below, reading as a heading for whatever follows.
-      opts.faceFromContinuity === undefined
-        ? t("ui.train_note_no_continuous_width")
-        : t("ui.train_note_face_width_continuity", { width: n(opts.faceFromContinuity) }),
-      "ui.train_mm",
-      undefined,
-      clampNote(own, FIELD_NOTES.face_width),
-    )}
-  {:else if opts.faceWidth === "proportion"}
+  {#if opts.faceWidth === "proportion"}
     <!-- A worm drive's width is a **convention with a named source**, not a
          derivation, and it sizes no stress here (`crossed::proportions`); it
-         is offered as the automatic value with its formula beside it, and
-         the box stays editable. -->
+         is offered as the automatic value with its source beside it, and the
+         box stays editable. -->
     {@render autoNumber(
       opts.faceLabel ?? "ui.train_face_width",
       gear.face_width,
       opts.faceRecommended,
       1,
-      undefined,
+      () => opts.relief && relieveStage(opts.relief.stage, { face_width: opts.relief.member }, opts.relief.solved),
       opts.faceRecommended === undefined
         ? null
-        : t("ui.train_note_proportions", {
+        : t(opts.faceLabel ? "ui.train_note_worm_length" : "ui.train_note_wheel_width", {
             width: n(opts.faceRecommended),
-            formula: opts.faceLabel
-              ? "(11 + c z₂) m_x, c = 0.06 below four starts and 0.09 from four — DIN/ČSN"
-              : "2 m_x √(q + 1), at most 0.67 d₁, q = d₁/m_x — BS 721",
           }),
       "ui.train_mm",
       undefined,
       clampNote(own, FIELD_NOTES.face_width),
     )}
   {:else}
+    <!-- Sized by its ratings and by a given axial contact ratio on a line
+         contact; by nothing on a crossed gear pair, whose contact is a point
+         and whose card says so — with the width at which its contact stays
+         continuous reported beside it as a figure. -->
     {@render autoNumber(
       opts.faceLabel ?? "ui.train_face_width",
       gear.face_width,
       g?.face_width,
       0.5,
-      undefined,
-      undefined,
+      () => opts.relief && relieveStage(opts.relief.stage, { face_width: opts.relief.member }, opts.relief.solved),
+      opts.faceWidth === "continuity"
+        ? opts.faceFromContinuity === undefined
+          ? t("ui.train_note_no_continuous_width")
+          : t("ui.train_note_face_width_continuity", { width: n(opts.faceFromContinuity) })
+        : undefined,
       "ui.train_mm",
       undefined,
       // A width nothing sizes, said under the box it stands at.
@@ -893,15 +913,6 @@
     {@render property(t("ui.train_ultimate_allowable"), gear, "ultimate_allowable", g?.material.ultimate_allowable ?? mat?.ultimate_allowable, 10, t("ui.train_mpa"))}
     {@render property(t("ui.train_fatigue_allowable"), gear, "fatigue_allowable", g?.material.fatigue_allowable ?? mat?.fatigue_allowable, 10, t("ui.train_mpa"))}
   </div>
-  <dl class="out small">
-    <!-- Outputs on every gear, and solved ones where the sizing is automatic:
-         a worm's diameter and a helical pair's angle are what a given centre
-         distance decides once the shifts are pinned. -->
-    <dt>{t("ui.train_pitch_diameter")}</dt>
-    <dd>{num(g?.pitch_diameter, 4)} {g && "mm"}</dd>
-    <dt>{t("ui.train_helix_angle")}</dt>
-    <dd>{num(g?.helix_angle, 4)}{g ? "°" : BLANK}</dd>
-  </dl>
   <!-- **What every load case does to this gear**, one row per enabled case:
        the torque it puts on it and the speed it turns at, how often it is
        loaded, the two stresses, and the width each would need. The rows are
@@ -1136,6 +1147,35 @@
     <em></em>
     <FieldNote notes={notes(t("ui.train_note_load_sharing"), null)} />
   </label>
+{/snippet}
+
+<!-- **The axial contact ratio, as an input**, on every stage with a line
+     contact. Automatic it shows what the helix and the width the mesh carries
+     come to; given, it is a floor under an automatic face width, or — with
+     every width given — the thing that decides the helix, and the core's
+     relief keeps those readings from arguing. The mesh's finding that the
+     ratio is below one is drawn here, beside the box it is about, rather than
+     under a contact-ratio row that already prints the figure. -->
+{#snippet overlapField(
+  stage: { overlap: Auto<number> } & Stage,
+  computed: number | undefined,
+  meshes: (MeshReport | undefined)[],
+)}
+  {@render autoNumber(
+    "ui.train_overlap",
+    stage.overlap,
+    computed,
+    0.1,
+    () => relieveStage(stage, "overlap", solved?.stages[tab.train.stages.indexOf(stage)]),
+    meshes
+      .flatMap((m) => m?.notes ?? [])
+      .filter((n) => n.key === "mesh.overlap_below_one")
+      .slice(0, 1)
+      .map(note)[0] ?? t("ui.train_note_overlap"),
+    "",
+    undefined,
+    undefined,
+  )}
 {/snippet}
 
 {#snippet efficiencyToggle(o: Optimisation, after?: () => void)}
@@ -1431,11 +1471,6 @@
         {@const names: [string, string] = worm
           ? [t("ui.train_the_worm"), t("ui.train_the_wheel")]
           : [gearName(i, 0), gearName(i, 1)]}
-        {@const reading = "pitch_diameter" in stage.sizing.manual
-          ? "diameter"
-          : "helix_angle" in stage.sizing.manual
-            ? "helix"
-            : "additional"}
         <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
           <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
@@ -1458,7 +1493,18 @@
               {@render numberField("ui.train_pressure_angle", () => stage.pressure_angle, (v) => (stage.pressure_angle = v), 0.5, "°")}
               <label>
                 <span>{t("ui.train_axis_angle")}</span>
-                <input type="number" step="5" bind:value={stage.shaft_angle} />
+                <!-- Crossing the shafts takes the axial contact ratio's box away
+                     — a point contact has no overlap — so a ratio that was
+                     given goes back to automatic rather than acting unseen
+                     (`docs/rationale.md#a-hidden-input-is-still-an-input`). -->
+                <input
+                  type="number"
+                  step="5"
+                  bind:value={stage.shaft_angle}
+                  onchange={() => {
+                    if (stage.shaft_angle !== 0) stage.overlap.auto = true;
+                  }}
+                />
                 <em>°</em>
                 <FieldNote notes={
                   notes(
@@ -1469,80 +1515,6 @@
                   )
                 } />
               </label>
-              <!-- **Three readings of one number**, and a select to say which
-                   (`FirstMemberSizing`): what each gear carries beyond half the
-                   shaft angle, the first member's own helix, or the first
-                   member's pitch diameter — a worm's reading, since a worm's
-                   diameter is a free choice and a gear's follows from its
-                   teeth. Switching seeds the new reading from the geometry so
-                   the pair does not jump. Automatic is mode 3 by size: the
-                   distance decides it, once both shifts are pinned
-                   (`PairStage::first_pitch_diameter`). -->
-              <label>
-                <span>{t("ui.train_sized_by")}</span>
-                <select
-                  value={reading}
-                  onchange={(e) => {
-                    const g = pres?.gears[0];
-                    const first = g ? g.helix_angle : stage.shaft_angle / 2;
-                    stage.sizing.manual =
-                      e.currentTarget.value === "diameter"
-                        ? { pitch_diameter: g ? g.pitch_diameter : 7 }
-                        : e.currentTarget.value === "helix"
-                          ? { helix_angle: first }
-                          : { additional_helix: first - stage.shaft_angle / 2 };
-                  }}
-                >
-                  <option value="additional">{t("ui.train_additional_helix_angle")}</option>
-                  <option value="helix">{t("ui.train_helix_angle_gear")}</option>
-                  <option value="diameter">{t("ui.train_pitch_diameter_worm")}</option>
-                </select>
-              </label>
-              {#if reading === "diameter"}
-                {@render autoNumber(
-                  "ui.train_pitch_diameter",
-                  { get auto() { return stage.sizing.auto; },
-                    set auto(v) { stage.sizing.auto = v; },
-                    get manual() { return (stage.sizing.manual as { pitch_diameter: number }).pitch_diameter; },
-                    set manual(v) { stage.sizing.manual = { pitch_diameter: v }; } },
-                  pres?.gears[0].pitch_diameter,
-                  0.5,
-                  () => relieveStage(stage, "first_member_size"),
-                  t("ui.train_mate_takes_rest_shaft_angle"),
-                  "ui.train_mm",
-                )}
-              {:else if reading === "helix"}
-                {@render autoNumber(
-                  "ui.train_helix_angle",
-                  { get auto() { return stage.sizing.auto; },
-                    set auto(v) { stage.sizing.auto = v; },
-                    get manual() { return (stage.sizing.manual as { helix_angle: number }).helix_angle; },
-                    set manual(v) { stage.sizing.manual = { helix_angle: v }; } },
-                  pres?.gears[0].helix_angle,
-                  1,
-                  () => relieveStage(stage, "first_member_size"),
-                  t("ui.train_mate_takes_rest_shaft_angle"),
-                  "°",
-                )}
-              {:else}
-                {@render autoNumber(
-                  "ui.train_additional_helix_angle",
-                  { get auto() { return stage.sizing.auto; },
-                    set auto(v) { stage.sizing.auto = v; },
-                    get manual() { return (stage.sizing.manual as { additional_helix: number }).additional_helix; },
-                    set manual(v) { stage.sizing.manual = { additional_helix: v }; } },
-                  pres ? pres.gears[0].helix_angle - stage.shaft_angle / 2 : undefined,
-                  1,
-                  () => relieveStage(stage, "first_member_size"),
-                  pres
-                    ? t("ui.train_note_helix_split", {
-                        first: n(pres.gears[0].helix_angle),
-                        second: n(pres.gears[1].helix_angle),
-                      })
-                    : null,
-                  "°",
-                )}
-              {/if}
               {@render numberField("ui.train_sliding_friction", () => stage.sliding_friction, (v) => (stage.sliding_friction = v), 0.01, "")}
               {@render numberField("ui.train_static_friction", () => stage.static_friction, (v) => (stage.static_friction = v), 0.01, "", t("ui.train_note_static_friction"))}
               <label>
@@ -1572,7 +1544,7 @@
                 stage.centre_distance,
                 pres?.centre_distance,
                 0.1,
-                () => relieveStage(stage, "centre_distance"),
+                () => relieveStage(stage, "centre_distance", res ?? undefined),
                 undefined,
                 "ui.train_mm",
               )}
@@ -1589,7 +1561,7 @@
                 stage.clearance,
                 pres?.clearance,
                 0.01,
-                () => relieveStage(stage, "clearance"),
+                () => relieveStage(stage, "clearance", res ?? undefined),
                 undefined,
                 "ui.train_mm",
               )}
@@ -1613,6 +1585,7 @@
               {/if}
               {#if stage.shaft_angle === 0}
                 {@render loadSharing(stage)}
+                {@render overlapField(stage, pres?.mesh.line?.contact_ratios.overlap, [pres?.mesh])}
               {/if}
               <!-- One search for either mesh: the loss integral along a line
                    contact, the friction balance along a point's. -->
@@ -1629,7 +1602,8 @@
                   {
                     cut: "rack",
                     teethLabel: worm && j === 0 ? "ui.train_starts" : undefined,
-                    onShiftAuto: () => relieveStage(stage, { shift: j }),
+                    relief: { stage, member: j, solved: res ?? undefined },
+                    pitchDiameter: worm && j === 0 ? stage.pitch_diameter : undefined,
                     faceWidth: worm ? "proportion" : stage.shaft_angle === 0 ? "rating" : "continuity",
                     faceFromContinuity: pres?.mesh.point?.face_width_for_continuity?.[j],
                     faceRecommended: g?.recommended_face_width ?? undefined,
@@ -1685,7 +1659,6 @@
             <div class="grid shared">
               {@render numberField("ui.train_normal_module", () => stage.module, (v) => (stage.module = v), 0.1, "ui.train_mm")}
               {@render numberField("ui.train_pressure_angle", () => stage.pressure_angle, (v) => (stage.pressure_angle = v), 0.5, "°")}
-              {@render numberField("ui.train_helix_angle", () => stage.helix_angle, (v) => (stage.helix_angle = v), 1, "°")}
               {@render numberField("ui.train_sliding_friction_sun_planet", () => stage.sliding_friction_sun_planet, (v) => (stage.sliding_friction_sun_planet = v), 0.01, "")}
               {@render numberField("ui.train_static_friction_sun_planet", () => stage.static_friction_sun_planet, (v) => (stage.static_friction_sun_planet = v), 0.01, "", t("ui.train_note_static_friction"))}
               {@render numberField("ui.train_sliding_friction_planet_ring", () => stage.sliding_friction_planet_ring, (v) => (stage.sliding_friction_planet_ring = v), 0.01, "")}
@@ -1701,7 +1674,7 @@
                 stage.centre_distance,
                 pres?.centre_distance,
                 0.1,
-                () => relieveStage(stage, "centre_distance"),
+                () => relieveStage(stage, "centre_distance", res ?? undefined),
                 undefined,
                 "ui.train_mm",
               )}
@@ -1710,7 +1683,7 @@
                 stage.clearance,
                 pres?.clearance,
                 0.01,
-                () => relieveStage(stage, "clearance"),
+                () => relieveStage(stage, "clearance", res ?? undefined),
                 undefined,
                 "ui.train_mm",
               )}
@@ -1749,6 +1722,7 @@
                 <em></em>
               </label>
               {@render loadSharing(stage)}
+              {@render overlapField(stage, pres?.overlap, [pres?.sun_planet, pres?.planet_ring])}
               {@render efficiencyToggle(stage.optimisation)}
             </div>
 
@@ -1763,11 +1737,11 @@
             <div class="gears">
               {@render gearCard(t("ui.train_sun"), stage.sun, pres?.sun, {
                 cut: "rack",
-                onShiftAuto: () => relieveStage(stage, { shift: 0 }),
+                relief: { stage, member: 0, solved: res ?? undefined },
               })}
               {@render gearCard(t("ui.train_planet"), stage.planet, pres?.planet.gear, {
                 cut: "rack",
-                onShiftAuto: () => relieveStage(stage, { shift: 1 }),
+                relief: { stage, member: 1, solved: res ?? undefined },
                 // The one thing only a planet's speed has: its teeth turn in
                 // the carrier's frame, and that is the speed they wear at.
                 carrier: t("ui.train_the_carrier"),
@@ -1778,7 +1752,7 @@
               {@render gearCard(t("ui.train_ring"), stage.ring, pres?.ring, {
                 cut: "shaper",
                 cutter: stage.cutter,
-                onShiftAuto: () => relieveStage(stage, { shift: 2 }),
+                relief: { stage, member: 2, solved: res ?? undefined },
               })}
             </div>
 
@@ -1914,7 +1888,6 @@
           <div class="body">
             <div class="grid shared">
               {@render numberField("ui.train_pressure_angle", () => stage.pressure_angle, (v) => (stage.pressure_angle = v), 0.5, "°")}
-              {@render numberField("ui.train_helix_angle", () => stage.helix_angle, (v) => (stage.helix_angle = v), 1, "°")}
               <label>
                 <span>{t("ui.train_hula_gap")}</span>
                 {#if hres && hres.clearance === 0}
@@ -1960,7 +1933,7 @@
                 stage.running_clearance,
                 hres?.running_clearance,
                 0.01,
-                () => relieveStage(stage, "clearance"),
+                () => relieveStage(stage, "clearance", res ?? undefined),
                 undefined,
                 "ui.train_mm",
               )}
@@ -1975,6 +1948,7 @@
                 <em>{t("ui.train_mm")}</em>
               </label>
               {@render loadSharing(stage)}
+              {@render overlapField(stage, hres?.overlap, hres?.meshes.map((m) => m.report) ?? [])}
               {@render efficiencyToggle(stage.optimisation)}
             </div>
 
@@ -2008,7 +1982,7 @@
                     {
                       cut: j === ring ? "shaper" : "rack",
                       cutter: j === ring ? stage.cutter[m] : undefined,
-                      onShiftAuto: () => relieveStage(stage, { shift: j }),
+                      relief: { stage, member: j, solved: res ?? undefined },
                       // **What a member's teeth see is its speed against the
                       // crank**, which is the carrier of both meshes — so the
                       // fixed-frame figure needs the same annotation a planet's
@@ -2397,10 +2371,6 @@
     gap: 0.15rem 0.75rem;
     margin: 0.75rem 0 0;
     font-size: 0.85rem;
-  }
-  .out.small {
-    font-size: 0.8rem;
-    margin-top: 0.5rem;
   }
   /* One mesh's readout, sitting under its heading. */
   h4.mesh {

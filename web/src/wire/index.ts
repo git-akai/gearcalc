@@ -27,7 +27,6 @@ export type { Duty } from "./core/Duty";
 export type { FaceSources } from "./core/FaceSources";
 export type { Family } from "./core/Family";
 export type { Fillet } from "./core/Fillet";
-export type { FirstMemberSizing } from "./core/FirstMemberSizing";
 export type { Freedom } from "./core/Freedom";
 export type { FreedomGroup } from "./core/FreedomGroup";
 export type { GearCase } from "./core/GearCase";

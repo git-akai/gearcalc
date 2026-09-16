@@ -36,8 +36,8 @@ recommended_face_width: number | null,
  */
 pitch_diameter: number, 
 /**
- * Helix angle, degrees, signed by hand — likewise from the sizing as
- * solved.
+ * Helix angle, degrees, signed by hand — likewise from the size as
+ * solved, whichever reading of it was given.
  */
 helix_angle: number, 
 /**

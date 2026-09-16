@@ -44,7 +44,7 @@ pub use hula::{
     solve_hula_stage, solve_hula_stage_with, stage_efficiency, HulaGear, HulaMesh, HulaResult,
     HulaStage,
 };
-pub use pair::{solve_pair_stage, solve_pair_stage_with, FirstMemberSizing, PairKind, PairStage};
+pub use pair::{solve_pair_stage, solve_pair_stage_with, PairKind, PairStage};
 pub(crate) use pair::{undercut_bound, Decided, ShiftAsked};
 pub use planetary::{
     solve_planetary_stage, solve_planetary_stage_with, PlanetResult, PlanetaryResult,
@@ -444,8 +444,9 @@ pub(crate) fn line_mesh_report(loads: &StageLoads, m: LineMesh) -> MeshReport {
     if r.transverse < 1.0 {
         notes.push(Note::new(key::MESH_CONTACT_RATIO_BELOW_ONE).number("ratio", r.transverse, 3));
     }
+    // Without the figure: it is drawn beside the ratio's own box.
     if r.overlap > 0.0 && !r.has_full_axial_overlap() {
-        notes.push(Note::new(key::MESH_OVERLAP_BELOW_ONE).number("ratio", r.overlap, 3));
+        notes.push(Note::new(key::MESH_OVERLAP_BELOW_ONE));
     }
     MeshReport {
         notes,
@@ -1131,7 +1132,22 @@ pub struct StageGear {
     pub min_tip_width: f64,
     pub dedendum: f64,
     pub root_radius: f64,
-    /// Automatic takes the larger of the enabled minimums below.
+    /// Helix angle, degrees, signed by hand — and who decides it.
+    ///
+    /// **Automatic means the stage does**, through whatever relates this
+    /// member's helix to the rest of it: a pair's two are bound by
+    /// `β₁ + β₂ = Σ` and the first member's by its pitch diameter, a set's
+    /// three by the hands its two meshes require, a hula stage's four by its
+    /// two internal meshes. So at most one member of a stage states a helix
+    /// and the others follow — or none does, and the stage's own relation
+    /// decides: a given centre distance with both shifts pinned sizes a pair's
+    /// first member, and a given axial contact ratio with every face width
+    /// given sizes the helix any kind needs to reach it
+    /// ([`Stage::freedoms`] says which may stand). Where nothing decides it,
+    /// the first member's stands at its box.
+    pub helix_angle: Auto<f64>,
+    /// Automatic takes the larger of the enabled minimums below, and the
+    /// width a given axial contact ratio needs where the stage has one.
     pub face_width: Auto<f64>,
     /// Which of the four ratings an automatic face width is sized from.
     pub face_sources: FaceSources,
@@ -1256,6 +1272,7 @@ impl Default for StageGear {
             min_tip_width: 0.1,
             dedendum: 1.25,
             root_radius: 0.38,
+            helix_angle: Auto::automatic(0.0),
             face_width: Auto::fixed(10.0),
             face_sources: FaceSources::default(),
             // A rim nobody described: `Y_B` is 1, and the gear cannot be told
@@ -1338,8 +1355,8 @@ pub struct GearResult {
     /// automatic, and every other member's follows from a helix that may have
     /// been.
     pub pitch_diameter: f64,
-    /// Helix angle, degrees, signed by hand — likewise from the sizing as
-    /// solved.
+    /// Helix angle, degrees, signed by hand — likewise from the size as
+    /// solved, whichever reading of it was given.
     pub helix_angle: f64,
     /// Lead angle, degrees — `90° − |β|`, the same fact from the other datum. A
     /// worm is described by how far its thread advances, a gear by how far its
@@ -1623,9 +1640,9 @@ impl std::fmt::Display for TrainError {
                 }
                 crate::screw::ScrewError::WormTooThin => write!(
                     f,
-                    "the first member has no lead angle: sized by diameter, the worm \
+                    "the first member has no lead angle: given a diameter, the worm \
                      is too thin for that many starts at that module and its thread \
-                     would have to wrap at ninety degrees or more; sized by helix \
+                     would have to wrap at ninety degrees or more; given a helix \
                      angle, a zero helix makes it a spur gear, which has no lead at \
                      all — put the helical member first and the spur one second"
                 ),
@@ -1921,11 +1938,54 @@ pub enum Freedom {
     Clearance,
     /// One member's profile shift.
     Shift(usize),
-    /// **How big the first member is** — a pair's additional helix, first
-    /// helix angle or first pitch diameter, which are three readings of one
-    /// number ([`FirstMemberSizing`]). What absorbs a centre distance once
-    /// both shifts are pinned.
-    FirstMemberSize,
+    /// One member's helix angle — and, since every member's is bound to the
+    /// others', **the size of the stage's teeth along the axis**: a pair's
+    /// first member is as big as its helix makes it, which is what absorbs a
+    /// centre distance once both shifts are pinned.
+    Helix(usize),
+    /// A pair's first member's pitch diameter — the same freedom as its helix
+    /// read as a size, which is a worm's reading.
+    FirstPitchDiameter,
+    /// One member's face width.
+    FaceWidth(usize),
+    /// The stage's axial contact ratio, which relates the helix to the face
+    /// width the mesh carries: given with every width given, it decides the
+    /// helix; given with a width automatic, it is a floor under that width.
+    Overlap,
+}
+
+/// **The face width an axial contact ratio needs**, mm — `ε_β π m_n / sin |β|`
+/// — where the ratio is given and the helix can carry one. `None` where the
+/// ratio is automatic or the teeth are straight, which no width makes helical.
+///
+/// One home for the relation every kind with a line contact asks, read as a
+/// width: the ask an automatic face width adds to its ratings'.
+pub(crate) fn width_for_overlap(overlap: &Auto<f64>, helix_deg: f64, module: f64) -> Option<f64> {
+    let sin = helix_deg.to_radians().sin().abs();
+    (!overlap.auto && sin > 0.0).then(|| overlap.manual * std::f64::consts::PI * module / sin)
+}
+
+/// **The note a ratio that could not decide the helix owes its reader**: it
+/// was given to decide it (`taken`), and no helix reaches it at the width the
+/// mesh carries, so the helix stood at its box. One home, for every kind
+/// that lets a ratio decide.
+pub(crate) fn overlap_note(
+    taken: bool,
+    overlap: &Auto<f64>,
+    module: f64,
+    width: f64,
+) -> Option<Note> {
+    (taken && helix_for_overlap(overlap.manual, module, width).is_none())
+        .then(|| Note::new(key::STAGE_OVERLAP_UNREACHABLE).number("ratio", overlap.manual, 3))
+}
+
+/// **The helix an axial contact ratio needs**, degrees, at a face width the
+/// mesh carries — the same relation read the other way, for a stage whose
+/// widths are all given and whose ratio is. `None` where no helix reaches it:
+/// `ε_β π m_n / b` above 1 asks for a tooth wrapped past a right angle.
+pub(crate) fn helix_for_overlap(overlap: f64, module: f64, width: f64) -> Option<f64> {
+    let sin = overlap * std::f64::consts::PI * module / width;
+    (width > 0.0 && (0.0..=1.0).contains(&sin)).then(|| sin.asin().to_degrees())
 }
 
 /// **A set of inputs bound by one relation, and how many of them may be given.**
@@ -1983,6 +2043,35 @@ pub struct FreedomGroup {
     pub order: Vec<Freedom>,
 }
 
+/// **The two arguments a kind's helices can get into**, where the helix is one
+/// number the members share: at most one member states it — none is straight
+/// teeth, or the helix a given axial contact ratio with every face width given
+/// decides — and the ratio may stand beside a stated helix only while a width
+/// is automatic, when it is a floor under that width rather than the size.
+///
+/// A pair's is written out in [`Stage::freedoms`] because its size is also
+/// a pitch diameter and is also what a centre distance decides; these two are
+/// the same groups without those.
+fn helix_groups(members: usize, widths_given: bool) -> Vec<FreedomGroup> {
+    let helices: Vec<Freedom> = (0..members).map(Freedom::Helix).collect();
+    vec![
+        FreedomGroup {
+            given_at_most: if widths_given { 1 } else { 2 },
+            automatic_at_most: members + 1,
+            order: helices
+                .iter()
+                .copied()
+                .chain(std::iter::once(Freedom::Overlap))
+                .collect(),
+        },
+        FreedomGroup {
+            given_at_most: 1,
+            automatic_at_most: members,
+            order: helices,
+        },
+    ]
+}
+
 impl Stage {
     /// **The toggle a [`Freedom`] names** — whether that input is being derived.
     ///
@@ -1993,9 +2082,9 @@ impl Stage {
     /// It hands back the **flag** rather than the `Auto` that carries it, and
     /// that is what lets a freedom name an input of any type: relief decides who
     /// supplies a number and never what the number is, so the value's type is
-    /// none of its business. A worm's size is the case that proves it — an
-    /// `Auto<FirstMemberSizing>`, since a diameter and a lead angle are two
-    /// readings of one freedom.
+    /// none of its business. A pair's size is the case that proves it — two
+    /// helix angles and a pitch diameter are three toggles on one freedom, and
+    /// the overlap ratio a fourth reading of it when every face is given.
     fn toggle_mut(&mut self, f: Freedom) -> Option<&mut bool> {
         match (self, f) {
             (Self::Spur(s) | Self::Worm(s), Freedom::CentreDistance) => {
@@ -2005,15 +2094,28 @@ impl Stage {
             (Self::Spur(s) | Self::Worm(s), Freedom::Shift(i)) => {
                 s.gears.get_mut(i).map(|g| &mut g.profile_shift.auto)
             }
-            (Self::Spur(s) | Self::Worm(s), Freedom::FirstMemberSize) => Some(&mut s.sizing.auto),
+            (Self::Spur(s) | Self::Worm(s), Freedom::Helix(i)) => {
+                s.gears.get_mut(i).map(|g| &mut g.helix_angle.auto)
+            }
+            (Self::Spur(s) | Self::Worm(s), Freedom::FirstPitchDiameter) => {
+                Some(&mut s.pitch_diameter.auto)
+            }
+            (Self::Spur(s) | Self::Worm(s), Freedom::FaceWidth(i)) => {
+                s.gears.get_mut(i).map(|g| &mut g.face_width.auto)
+            }
+            (Self::Spur(s) | Self::Worm(s), Freedom::Overlap) => Some(&mut s.overlap.auto),
             (Self::Planetary(p), Freedom::CentreDistance) => Some(&mut p.centre_distance.auto),
             (Self::Planetary(p), Freedom::Clearance) => Some(&mut p.clearance.auto),
-            (Self::Planetary(p), Freedom::Shift(i)) => match i {
-                0 => Some(&mut p.sun.profile_shift.auto),
-                1 => Some(&mut p.planet.profile_shift.auto),
-                2 => Some(&mut p.ring.profile_shift.auto),
-                _ => None,
-            },
+            (Self::Planetary(p), Freedom::Shift(i)) => {
+                p.member_mut(i).map(|g| &mut g.profile_shift.auto)
+            }
+            (Self::Planetary(p), Freedom::Helix(i)) => {
+                p.member_mut(i).map(|g| &mut g.helix_angle.auto)
+            }
+            (Self::Planetary(p), Freedom::FaceWidth(i)) => {
+                p.member_mut(i).map(|g| &mut g.face_width.auto)
+            }
+            (Self::Planetary(p), Freedom::Overlap) => Some(&mut p.overlap.auto),
             // **The crank offset is this kind's centre distance.** Its own
             // documentation says so — "the same shape every stage's centre
             // distance has, because it is the same decision" — so it answers to
@@ -2023,6 +2125,13 @@ impl Stage {
             (Self::Hula(h), Freedom::Shift(i)) => {
                 h.gears.get_mut(i).map(|g| &mut g.profile_shift.auto)
             }
+            (Self::Hula(h), Freedom::Helix(i)) => {
+                h.gears.get_mut(i).map(|g| &mut g.helix_angle.auto)
+            }
+            (Self::Hula(h), Freedom::FaceWidth(i)) => {
+                h.gears.get_mut(i).map(|g| &mut g.face_width.auto)
+            }
+            (Self::Hula(h), Freedom::Overlap) => Some(&mut h.overlap.auto),
             _ => None,
         }
     }
@@ -2053,7 +2162,15 @@ impl Stage {
     #[must_use]
     pub fn relieved(&self, just: Freedom) -> Self {
         let mut out = self.clone();
-        for group in self.freedoms() {
+        // **Each group is read off the stage as it stands after the groups
+        // before it**, because a limit can depend on a toggle another group
+        // moves: a given axial contact ratio takes the size freedom only while
+        // both widths are given, so once the ratio has given way to a helix
+        // the distance relation has its full count back. The groups come in
+        // the order that makes this settle in one pass, and their number is a
+        // fact about the kind rather than about its toggles.
+        for i in 0..self.freedoms().len() {
+            let group = out.freedoms().swap_remove(i);
             // **One walk, both directions.** Too many given turns one automatic;
             // too many automatic pins one. Each time it is the first in relief
             // order that the designer is not this moment touching, so the answer
@@ -2143,22 +2260,66 @@ impl Stage {
             // **A pair's distance, its two shifts and its size**:
             // `a = a₀(size, x₁ + x₂) + clearance` is one relation, so four of
             // the five may be given — for every kind of pair alike, since a
-            // worm's size and a helical pair's helix are the same freedom
-            // (`FirstMemberSizing`). The distance comes first because it is the
+            // worm's diameter and a helical pair's helix are the same freedom
+            // (`Freedom::Helix`, `Freedom::FirstPitchDiameter`). The distance comes first because it is the
             // one a designer expects to give way when they pin everything
             // else; the shifts come before the size because a shift moves the
             // teeth where a size changes them, which is also the preference the
             // solve has when both are free to absorb (`PairStage::first_pitch_diameter`).
-            Self::Spur(s) | Self::Worm(s) => vec![
-                one_relation(
-                    std::iter::once(Freedom::CentreDistance)
-                        .chain(std::iter::once(Freedom::Clearance))
-                        .chain((0..s.gears.len()).map(Freedom::Shift))
-                        .chain(std::iter::once(Freedom::FirstMemberSize))
-                        .collect(),
-                ),
-                distance_and_clearance,
-            ],
+            //
+            // **The size is three toggles and one freedom.** Either member's
+            // helix and the first member's pitch diameter are readings of one
+            // number, so at most one of them stands; the distance relation
+            // counts them as one by allowing four given of its seven, which a
+            // second group holds them to. Every reading automatic is a state
+            // with an answer — the shaft angle shared evenly, unless a given
+            // distance with both shifts pinned decides the size — so none of
+            // them has to stand. And where the axial contact ratio is given
+            // with both face widths given, *it* decides the helix and takes
+            // that freedom: the size toggles must all be automatic, and the
+            // distance relation has one fewer to give.
+            Self::Spur(s) | Self::Worm(s) => {
+                let sizes = (0..s.gears.len())
+                    .map(Freedom::Helix)
+                    .chain(std::iter::once(Freedom::FirstPitchDiameter))
+                    .collect::<Vec<_>>();
+                let taken = s.size_taken_by_overlap();
+                vec![
+                    // The ratio may be given beside a size while a width is
+                    // automatic — it is then a floor under that width — but not
+                    // once both widths are given, when it is the size. First,
+                    // so the distance relation below sees whether the ratio
+                    // still holds the size once this has settled.
+                    FreedomGroup {
+                        given_at_most: if s.gears.iter().all(|g| !g.face_width.auto) {
+                            1
+                        } else {
+                            2
+                        },
+                        automatic_at_most: sizes.len() + 1,
+                        order: sizes
+                            .iter()
+                            .copied()
+                            .chain(std::iter::once(Freedom::Overlap))
+                            .collect(),
+                    },
+                    FreedomGroup {
+                        given_at_most: 1,
+                        automatic_at_most: sizes.len(),
+                        order: sizes.clone(),
+                    },
+                    FreedomGroup {
+                        given_at_most: if taken { 3 } else { 4 },
+                        automatic_at_most: 4 + sizes.len(),
+                        order: std::iter::once(Freedom::CentreDistance)
+                            .chain(std::iter::once(Freedom::Clearance))
+                            .chain((0..s.gears.len()).map(Freedom::Shift))
+                            .chain(sizes.iter().copied())
+                            .collect(),
+                    },
+                    distance_and_clearance,
+                ]
+            }
             // **A set has a relation among its shifts alone**, which no other
             // kind does: its two centre distances have to agree, whatever they
             // agree at. So two of the three shifts are a design and the third is
@@ -2183,18 +2344,25 @@ impl Stage {
             // there is no one number for the field to derive. Alone in its
             // group with none allowed automatic, so relief pins it — the
             // second pass of `relieved`, which this kind is the reason for.
-            Self::Planetary(p) => vec![
-                FreedomGroup {
-                    given_at_most: if p.centre_distance.auto { 2 } else { 1 },
-                    automatic_at_most: 3,
-                    order: (0..3).map(Freedom::Shift).collect(),
-                },
-                FreedomGroup {
-                    given_at_most: 1,
-                    automatic_at_most: 0,
-                    order: vec![Freedom::Clearance],
-                },
-            ],
+            Self::Planetary(p) => {
+                let mut groups = vec![
+                    FreedomGroup {
+                        given_at_most: if p.centre_distance.auto { 2 } else { 1 },
+                        automatic_at_most: 3,
+                        order: (0..3).map(Freedom::Shift).collect(),
+                    },
+                    FreedomGroup {
+                        given_at_most: 1,
+                        automatic_at_most: 0,
+                        order: vec![Freedom::Clearance],
+                    },
+                ];
+                groups.extend(helix_groups(
+                    3,
+                    p.members().iter().all(|g| !g.face_width.auto),
+                ));
+                groups
+            }
             // **One relation per mesh.** The crank offset fixes the difference
             // of a pair's two shifts, so pinning both over-specifies that mesh
             // — the same triangle a pair's distance and two shifts make, one
@@ -2213,6 +2381,10 @@ impl Stage {
                     automatic_at_most: 0,
                     order: vec![Freedom::Clearance],
                 }))
+                .chain(helix_groups(
+                    h.gears.len(),
+                    h.gears.iter().all(|g| !g.face_width.auto),
+                ))
                 .collect(),
         }
     }
@@ -4499,7 +4671,6 @@ mod tests {
         let lib = library();
         let locked = PairStage {
             shaft_angle: 90.0,
-            sizing: Auto::fixed(FirstMemberSizing::HelixAngle(9.0)),
             gears: [
                 StageGear {
                     teeth: 17,
@@ -4511,7 +4682,8 @@ mod tests {
                 },
             ],
             ..PairStage::worm()
-        };
+        }
+        .with_first_helix(9.0);
         let r = solve_worm_stage(&locked, &StageLoads::just(2.0), &lib)
             .expect("a locked pair is still a pair");
         let r_point = r.mesh;
@@ -4527,10 +4699,7 @@ mod tests {
         // Not merely non-zero: the same 2 N·m through a split that *does* drive
         // presses about as hard, because the flank load comes from the input
         // torque either way and the geometry has not changed much.
-        let driving = PairStage {
-            sizing: Auto::fixed(FirstMemberSizing::HelixAngle(18.0)),
-            ..locked
-        };
+        let driving = PairStage { ..locked }.with_first_helix(18.0);
         let d = solve_worm_stage(&driving, &StageLoads::just(2.0), &lib).expect("and this one");
         let d_point = d.mesh;
         let ratio = r_point.cases[0].contact.max_pressure / d_point.cases[0].contact.max_pressure;
@@ -4641,18 +4810,20 @@ mod tests {
     #[test]
     fn the_two_contacts_report_one_patch_at_the_limit() {
         let lib = library();
-        let stage = |sigma: f64, mu: f64| PairStage {
-            shaft_angle: sigma,
-            sliding_friction: mu,
-            static_friction: mu,
-            clearance: Auto::fixed(0.0),
-            sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(20.0)),
-            gears: [17u32, 43].map(|teeth| StageGear {
-                teeth,
-                face_width: Auto::fixed(30.0),
-                ..StageGear::default()
-            }),
-            ..PairStage::default()
+        let stage = |sigma: f64, mu: f64| {
+            PairStage {
+                shaft_angle: sigma,
+                sliding_friction: mu,
+                static_friction: mu,
+                clearance: Auto::fixed(0.0),
+                gears: [17u32, 43].map(|teeth| StageGear {
+                    teeth,
+                    face_width: Auto::fixed(30.0),
+                    ..StageGear::default()
+                }),
+                ..PairStage::default()
+            }
+            .with_additional_helix(20.0)
         };
         let mesh = |sigma: f64, mu: f64| {
             solve_spur_stage(&stage(sigma, mu), &StageLoads::just(2.0), &lib)
@@ -5025,14 +5196,11 @@ mod tests {
                 }
             }
 
-            // Already inside the limit: nothing moves. Asserted against every
-            // freedom as `just`, so it cannot pass by picking a lucky one.
-            let mut settled = stage.clone();
-            if let Some(f) = groups[0].order.first() {
-                if let Some(t) = settled.toggle_mut(*f) {
-                    *t = false;
-                }
-            }
+            // Already inside the limit — every kind's preset is, with a
+            // clearance and a worm's diameter given — nothing moves. Asserted
+            // against every freedom as `just`, so it cannot pass by picking a
+            // lucky one.
+            let settled = stage.clone();
             for group in &groups {
                 for just in &group.order {
                     let mut before = settled.clone();
@@ -5289,7 +5457,12 @@ mod tests {
                 sp.gears[0].profile_shift = Auto::fixed(0.20);
                 sp.gears[1].profile_shift = Auto::fixed(0.20);
             }
-            sp.sizing.auto = size_free;
+            // A stated size, or every reading of it left to the distance.
+            sp = if size_free {
+                sp.size_free()
+            } else {
+                sp.with_first_helix(0.0)
+            };
             let mut t = two_stage();
             t.stages = vec![Stage::Spur(sp)];
             let r = solve_train(&t, &lib).expect("the stage solves either way");
@@ -5330,18 +5503,39 @@ mod tests {
         );
 
         // ...and the group says exactly that many: five inputs bound by one
-        // relation, so four may stand and the distance is the first to give.
+        // relation, so four may stand and the distance is the first to give —
+        // the size being three readings of one number, which come last.
         let groups = Stage::Spur(PairStage::default()).freedoms();
-        let relation = &groups[0];
-        assert_eq!(relation.order.len(), 5);
+        let relation = &groups[2];
+        assert_eq!(relation.order.len(), 7);
         assert_eq!(relation.given_at_most, 4);
         assert_eq!(relation.order[0], Freedom::CentreDistance);
         assert!(relation.order.contains(&Freedom::Clearance));
         assert_eq!(
-            relation.order.last(),
-            Some(&Freedom::FirstMemberSize),
+            &relation.order[4..],
+            &[
+                Freedom::Helix(0),
+                Freedom::Helix(1),
+                Freedom::FirstPitchDiameter
+            ],
             "the size is the last to give: a shift moves the teeth, a size changes them"
         );
+        // ...and the three readings are held to one, none being an answer
+        // (the shaft angle shared evenly) rather than a contradiction.
+        let readings = &groups[1];
+        assert_eq!(readings.given_at_most, 1);
+        assert_eq!(readings.automatic_at_most, 3);
+        // ...and the ratio stands beside one of them only while a width is
+        // automatic; with both given it is the size, and the two argue.
+        let with_ratio = &groups[0];
+        assert_eq!(with_ratio.order.last(), Some(&Freedom::Overlap));
+        assert_eq!(
+            with_ratio.given_at_most, 1,
+            "the preset's widths are given, so the ratio would be the size"
+        );
+        let mut width_free = PairStage::default();
+        width_free.gears[0].face_width = Auto::automatic(8.0);
+        assert_eq!(Stage::Spur(width_free).freedoms()[0].given_at_most, 2);
 
         // And the second group is the one that stops *both* ways of saying the
         // distance being left automatic at once.
@@ -5944,9 +6138,9 @@ mod tests {
 
         let helical = solve_spur_stage(
             &PairStage {
-                sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(20.0)),
                 ..PairStage::default()
-            },
+            }
+            .with_additional_helix(20.0),
             &StageLoads::just(2.0),
             &lib,
         )
@@ -6874,7 +7068,7 @@ mod tests {
                 &GearParams {
                     module: drive.module[i / 2],
                     pressure_angle: drive.pressure_angle,
-                    helix_angle: drive.helix_angle,
+                    helix_angle: drive.helix_angle(),
                     teeth: g.teeth,
                     profile_shift: g.gear.profile_shift,
                     addendum: drive.gears[i].addendum,
@@ -7748,21 +7942,23 @@ mod tests {
         let mut train = two_stage();
         train.stages.insert(
             0,
-            Stage::Worm(PairStage {
-                shaft_angle: 90.0,
-                sizing: Auto::fixed(FirstMemberSizing::HelixAngle(9.0)),
-                gears: [
-                    StageGear {
-                        teeth: 17,
-                        ..PairStage::worm().gears[0].clone()
-                    },
-                    StageGear {
-                        teeth: 23,
-                        ..PairStage::worm().gears[1].clone()
-                    },
-                ],
-                ..PairStage::worm()
-            }),
+            Stage::Worm(
+                PairStage {
+                    shaft_angle: 90.0,
+                    gears: [
+                        StageGear {
+                            teeth: 17,
+                            ..PairStage::worm().gears[0].clone()
+                        },
+                        StageGear {
+                            teeth: 23,
+                            ..PairStage::worm().gears[1].clone()
+                        },
+                    ],
+                    ..PairStage::worm()
+                }
+                .with_first_helix(9.0),
+            ),
         );
         let r = solve_train(&train, &lib).expect("solves");
         assert!(

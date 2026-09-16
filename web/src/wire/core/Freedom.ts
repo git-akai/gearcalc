@@ -8,4 +8,4 @@
  * planet and ring, a hula stage's four — so a caller that can walk members can
  * resolve one of these without knowing the kind.
  */
-export type Freedom = "centre_distance" | "clearance" | { "shift": number } | "first_member_size";
+export type Freedom = "centre_distance" | "clearance" | { "shift": number } | { "helix": number } | "first_pitch_diameter" | { "face_width": number } | "overlap";

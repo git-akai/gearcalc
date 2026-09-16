@@ -19,9 +19,13 @@ module: [number, number],
  */
 pressure_angle: number, 
 /**
- * Helix angle, degrees. Shared.
+ * **The axial contact ratio** `ε_β` the stage is asked for, where it is
+ * asked for one — the same input a pair has ([`super::PairStage::overlap`]),
+ * asked of both meshes: a floor under every automatic face width, or,
+ * with all four widths given, the thing that decides the helix, so that
+ * the narrower of the two meshes reaches it.
  */
-helix_angle: number, 
+overlap: Auto<number>, 
 /**
  * `k` for each mesh's **pinion**. Its ring takes the same figure, because
  * on a ring `k` describes the space, and a pinion and a ring that mesh

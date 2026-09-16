@@ -107,11 +107,13 @@
        "module": 1,
        "pressure_angle": 20,
        "shaft_angle": 0,
-       "sizing": {
-        "auto": false,
-        "manual": {
-         "additional_helix": 0
-        }
+       "pitch_diameter": {
+        "auto": true,
+        "manual": 17
+       },
+       "overlap": {
+        "auto": true,
+        "manual": 1
        },
        "sliding_friction": "0.080000000000000002",
        "static_friction": "0.16000000000000000",
@@ -149,6 +151,10 @@
          "min_tip_width": "0.10000000000000001",
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
+         "helix_angle": {
+          "auto": true,
+          "manual": 0
+         },
          "face_width": {
           "auto": true,
           "manual": 5
@@ -189,6 +195,10 @@
          "min_tip_width": "0.10000000000000001",
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
+         "helix_angle": {
+          "auto": true,
+          "manual": 0
+         },
          "face_width": {
           "auto": true,
           "manual": 5
@@ -222,11 +232,13 @@
      "module": 1,
      "pressure_angle": 20,
      "shaft_angle": 0,
-     "sizing": {
-      "auto": false,
-      "manual": {
-       "additional_helix": 0
-      }
+     "pitch_diameter": {
+      "auto": true,
+      "manual": 17
+     },
+     "overlap": {
+      "auto": true,
+      "manual": 1
      },
      "sliding_friction": "0.080000000000000002",
      "static_friction": "0.16000000000000000",
@@ -264,6 +276,10 @@
        "min_tip_width": "0.10000000000000001",
        "dedendum": "1.2500000000000000",
        "root_radius": "0.38000000000000000",
+       "helix_angle": {
+        "auto": true,
+        "manual": 0
+       },
        "face_width": {
         "auto": true,
         "manual": 5
@@ -304,6 +320,10 @@
        "min_tip_width": "0.10000000000000001",
        "dedendum": "1.2500000000000000",
        "root_radius": "0.38000000000000000",
+       "helix_angle": {
+        "auto": true,
+        "manual": 0
+       },
        "face_width": {
         "auto": true,
         "manual": 5
@@ -335,11 +355,13 @@
      "module": 1,
      "pressure_angle": 20,
      "shaft_angle": 90,
-     "sizing": {
+     "pitch_diameter": {
       "auto": false,
-      "manual": {
-       "pitch_diameter": 7
-      }
+      "manual": 7
+     },
+     "overlap": {
+      "auto": true,
+      "manual": 1
      },
      "sliding_friction": "0.080000000000000002",
      "static_friction": "0.16000000000000000",
@@ -376,7 +398,11 @@
        "no_sharp_tip": true,
        "min_tip_width": "0.10000000000000001",
        "dedendum": "1.2500000000000000",
-       "root_radius": "0.38000000000000000",
+       "root_radius": 0,
+       "helix_angle": {
+        "auto": true,
+        "manual": "81.786789298261809"
+       },
        "face_width": {
         "auto": true,
         "manual": 5
@@ -417,6 +443,10 @@
        "min_tip_width": "0.10000000000000001",
        "dedendum": "1.2500000000000000",
        "root_radius": "0.38000000000000000",
+       "helix_angle": {
+        "auto": true,
+        "manual": "8.2132107017381912"
+       },
        "face_width": {
         "auto": true,
         "manual": 5
@@ -447,7 +477,10 @@
      "kind": "planetary",
      "module": 1,
      "pressure_angle": 20,
-     "helix_angle": 0,
+     "overlap": {
+      "auto": true,
+      "manual": 1
+     },
      "sliding_friction_sun_planet": "0.080000000000000002",
      "static_friction_sun_planet": "0.16000000000000000",
      "sliding_friction_planet_ring": "0.080000000000000002",
@@ -495,6 +528,10 @@
       "min_tip_width": "0.10000000000000001",
       "dedendum": "1.2500000000000000",
       "root_radius": "0.38000000000000000",
+      "helix_angle": {
+       "auto": true,
+       "manual": 0
+      },
       "face_width": {
        "auto": true,
        "manual": 5
@@ -535,6 +572,10 @@
       "min_tip_width": "0.10000000000000001",
       "dedendum": "1.2500000000000000",
       "root_radius": "0.38000000000000000",
+      "helix_angle": {
+       "auto": true,
+       "manual": 0
+      },
       "face_width": {
        "auto": true,
        "manual": 5
@@ -575,6 +616,10 @@
       "min_tip_width": "0.10000000000000001",
       "dedendum": "1.2500000000000000",
       "root_radius": "0.38000000000000000",
+      "helix_angle": {
+       "auto": true,
+       "manual": 0
+      },
       "face_width": {
        "auto": true,
        "manual": 5
@@ -607,7 +652,10 @@
       1
      ],
      "pressure_angle": 20,
-     "helix_angle": 0,
+     "overlap": {
+      "auto": true,
+      "manual": 1
+     },
      "thickness_mod": [
       1,
       1
@@ -665,6 +713,10 @@
        "min_tip_width": "0.10000000000000001",
        "dedendum": 1,
        "root_radius": "0.38000000000000000",
+       "helix_angle": {
+        "auto": true,
+        "manual": 0
+       },
        "face_width": {
         "auto": true,
         "manual": 5
@@ -705,6 +757,10 @@
        "min_tip_width": "0.10000000000000001",
        "dedendum": 1,
        "root_radius": "0.38000000000000000",
+       "helix_angle": {
+        "auto": true,
+        "manual": 0
+       },
        "face_width": {
         "auto": true,
         "manual": 5
@@ -745,6 +801,10 @@
        "min_tip_width": "0.10000000000000001",
        "dedendum": 1,
        "root_radius": "0.38000000000000000",
+       "helix_angle": {
+        "auto": true,
+        "manual": 0
+       },
        "face_width": {
         "auto": true,
         "manual": 5
@@ -785,6 +845,10 @@
        "min_tip_width": "0.10000000000000001",
        "dedendum": 1,
        "root_radius": "0.38000000000000000",
+       "helix_angle": {
+        "auto": true,
+        "manual": 0
+       },
        "face_width": {
         "auto": true,
         "manual": 5
@@ -893,23 +957,23 @@
    "ok": [
     [
      "en",
-     450
+     448
     ],
     [
      "de",
-     450
+     448
     ],
     [
      "pt",
-     450
+     448
     ],
     [
      "zh-Hans",
-     450
+     448
     ],
     [
      "zh-Hant",
-     450
+     448
     ]
    ]
   },
@@ -5167,11 +5231,13 @@
       "module": 1,
       "pressure_angle": 20,
       "shaft_angle": 0,
-      "sizing": {
-       "auto": false,
-       "manual": {
-        "additional_helix": 0
-       }
+      "pitch_diameter": {
+       "auto": true,
+       "manual": 17
+      },
+      "overlap": {
+       "auto": true,
+       "manual": 1
       },
       "sliding_friction": "0.080000000000000002",
       "static_friction": "0.16000000000000000",
@@ -5181,7 +5247,7 @@
        "manual": "0.10000000000000001"
       },
       "clearance": {
-       "auto": true,
+       "auto": false,
        "manual": "0.020000000000000000"
       },
       "tolerance_plus": "0.020000000000000000",
@@ -5209,6 +5275,10 @@
         "min_tip_width": "0.10000000000000001",
         "dedendum": "1.2500000000000000",
         "root_radius": "0.38000000000000000",
+        "helix_angle": {
+         "auto": true,
+         "manual": 0
+        },
         "face_width": {
          "auto": true,
          "manual": 5
@@ -5249,6 +5319,10 @@
         "min_tip_width": "0.10000000000000001",
         "dedendum": "1.2500000000000000",
         "root_radius": "0.38000000000000000",
+        "helix_angle": {
+         "auto": true,
+         "manual": 0
+        },
         "face_width": {
          "auto": true,
          "manual": 5
@@ -5283,11 +5357,13 @@
       "module": 1,
       "pressure_angle": 20,
       "shaft_angle": 90,
-      "sizing": {
+      "pitch_diameter": {
        "auto": false,
-       "manual": {
-        "pitch_diameter": 7
-       }
+       "manual": 7
+      },
+      "overlap": {
+       "auto": true,
+       "manual": 1
       },
       "sliding_friction": "0.080000000000000002",
       "static_friction": "0.16000000000000000",
@@ -5324,7 +5400,11 @@
         "no_sharp_tip": true,
         "min_tip_width": "0.10000000000000001",
         "dedendum": "1.2500000000000000",
-        "root_radius": "0.38000000000000000",
+        "root_radius": 0,
+        "helix_angle": {
+         "auto": true,
+         "manual": "81.786789298261809"
+        },
         "face_width": {
          "auto": true,
          "manual": 5
@@ -5365,6 +5445,10 @@
         "min_tip_width": "0.10000000000000001",
         "dedendum": "1.2500000000000000",
         "root_radius": "0.38000000000000000",
+        "helix_angle": {
+         "auto": true,
+         "manual": "8.2132107017381912"
+        },
         "face_width": {
          "auto": true,
          "manual": 5
@@ -5398,7 +5482,10 @@
       "kind": "planetary",
       "module": 1,
       "pressure_angle": 20,
-      "helix_angle": 0,
+      "overlap": {
+       "auto": true,
+       "manual": 1
+      },
       "sliding_friction_sun_planet": "0.080000000000000002",
       "static_friction_sun_planet": "0.16000000000000000",
       "sliding_friction_planet_ring": "0.080000000000000002",
@@ -5446,6 +5533,10 @@
        "min_tip_width": "0.10000000000000001",
        "dedendum": "1.2500000000000000",
        "root_radius": "0.38000000000000000",
+       "helix_angle": {
+        "auto": true,
+        "manual": 0
+       },
        "face_width": {
         "auto": true,
         "manual": 5
@@ -5486,6 +5577,10 @@
        "min_tip_width": "0.10000000000000001",
        "dedendum": "1.2500000000000000",
        "root_radius": "0.38000000000000000",
+       "helix_angle": {
+        "auto": true,
+        "manual": 0
+       },
        "face_width": {
         "auto": true,
         "manual": 5
@@ -5526,6 +5621,10 @@
        "min_tip_width": "0.10000000000000001",
        "dedendum": "1.2500000000000000",
        "root_radius": "0.38000000000000000",
+       "helix_angle": {
+        "auto": true,
+        "manual": 0
+       },
        "face_width": {
         "auto": true,
         "manual": 5
@@ -5561,7 +5660,10 @@
        1
       ],
       "pressure_angle": 20,
-      "helix_angle": 0,
+      "overlap": {
+       "auto": true,
+       "manual": 1
+      },
       "thickness_mod": [
        1,
        1
@@ -5619,6 +5721,10 @@
         "min_tip_width": "0.10000000000000001",
         "dedendum": 1,
         "root_radius": "0.38000000000000000",
+        "helix_angle": {
+         "auto": true,
+         "manual": 0
+        },
         "face_width": {
          "auto": true,
          "manual": 5
@@ -5659,6 +5765,10 @@
         "min_tip_width": "0.10000000000000001",
         "dedendum": 1,
         "root_radius": "0.38000000000000000",
+        "helix_angle": {
+         "auto": true,
+         "manual": 0
+        },
         "face_width": {
          "auto": true,
          "manual": 5
@@ -5699,6 +5809,10 @@
         "min_tip_width": "0.10000000000000001",
         "dedendum": 1,
         "root_radius": "0.38000000000000000",
+        "helix_angle": {
+         "auto": true,
+         "manual": 0
+        },
         "face_width": {
          "auto": true,
          "manual": 5
@@ -5739,6 +5853,10 @@
         "min_tip_width": "0.10000000000000001",
         "dedendum": 1,
         "root_radius": "0.38000000000000000",
+        "helix_angle": {
+         "auto": true,
+         "manual": 0
+        },
         "face_width": {
          "auto": true,
          "manual": 5
@@ -6225,7 +6343,7 @@
    }
   },
   "export_train": {
-   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\nport = \"start\"\nreacted = true\ntorque = 0.1\nspeed = 30000.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = \"end\"\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\nport = \"end\"\nreacted = false\ntorque = 3.0\nspeed = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = \"end\"\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\nport = \"start\"\nreacted = true\ntorque = 0.1\nspeed = 30000.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = \"end\"\nactuations = 1000\nreversing = false\n\n[[train.stages]]\nkind = \"spur\"\nmodule = 1.0\npressure_angle = 20.0\nshaft_angle = 0.0\nsliding_friction = 0.08\nstatic_friction = 0.16\nthickness_mod = 1.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\nload_sharing = \"none\"\naxial_clearance = 0.0\n\n[train.stages.sizing]\nauto = false\n\n[train.stages.sizing.manual]\nadditional_helix = 0.0\n\n[train.stages.centre_distance]\nauto = true\nmanual = 0.0\n\n[train.stages.clearance]\nauto = false\nmanual = 0.02\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.gears]]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.gears.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.gears.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.gears.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.gears.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.gears.material_overrides]\n\n[[train.stages.gears]]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.gears.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.gears.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.gears.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.gears.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.gears.material_overrides]\n"
+   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\nport = \"start\"\nreacted = true\ntorque = 0.1\nspeed = 30000.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = \"end\"\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\nport = \"end\"\nreacted = false\ntorque = 3.0\nspeed = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = \"end\"\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\nport = \"start\"\nreacted = true\ntorque = 0.1\nspeed = 30000.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = \"end\"\nactuations = 1000\nreversing = false\n\n[[train.stages]]\nkind = \"spur\"\nmodule = 1.0\npressure_angle = 20.0\nshaft_angle = 0.0\nsliding_friction = 0.08\nstatic_friction = 0.16\nthickness_mod = 1.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\nload_sharing = \"none\"\naxial_clearance = 0.0\n\n[train.stages.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[train.stages.overlap]\nauto = true\nmanual = 1.0\n\n[train.stages.centre_distance]\nauto = true\nmanual = 0.0\n\n[train.stages.clearance]\nauto = false\nmanual = 0.02\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.gears]]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.gears.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.gears.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.gears.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.gears.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.gears.material_overrides]\n\n[[train.stages.gears]]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.gears.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.gears.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.gears.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.gears.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.gears.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.gears.material_overrides]\n"
   },
   "import_train": {
    "ok": {
@@ -6288,11 +6406,13 @@
        "module": 1,
        "pressure_angle": 20,
        "shaft_angle": 0,
-       "sizing": {
-        "auto": false,
-        "manual": {
-         "additional_helix": 0
-        }
+       "pitch_diameter": {
+        "auto": true,
+        "manual": 17
+       },
+       "overlap": {
+        "auto": true,
+        "manual": 1
        },
        "sliding_friction": "0.080000000000000002",
        "static_friction": "0.16000000000000000",
@@ -6330,6 +6450,10 @@
          "min_tip_width": "0.10000000000000001",
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
+         "helix_angle": {
+          "auto": true,
+          "manual": 0
+         },
          "face_width": {
           "auto": true,
           "manual": 5
@@ -6370,6 +6494,10 @@
          "min_tip_width": "0.10000000000000001",
          "dedendum": "1.2500000000000000",
          "root_radius": "0.38000000000000000",
+         "helix_angle": {
+          "auto": true,
+          "manual": 0
+         },
          "face_width": {
           "auto": true,
           "manual": 5

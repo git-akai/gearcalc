@@ -140,6 +140,8 @@ pub mod key {
     pub const STAGE_CLEARANCE_NEGATIVE: &str = "stage.clearance_negative";
     /// `stage.optimiser_found_nothing`
     pub const STAGE_OPTIMISER_FOUND_NOTHING: &str = "stage.optimiser_found_nothing";
+    /// `stage.overlap_unreachable`
+    pub const STAGE_OVERLAP_UNREACHABLE: &str = "stage.overlap_unreachable";
     /// `stage.planet_clearance_below_minimum`
     pub const STAGE_PLANET_CLEARANCE_BELOW_MINIMUM: &str = "stage.planet_clearance_below_minimum";
     /// `stage.planets_not_evenly_spaced`
@@ -246,6 +248,7 @@ pub mod key {
         STAGE_CENTRE_DISTANCE_NOT_REACHED,
         STAGE_CLEARANCE_NEGATIVE,
         STAGE_OPTIMISER_FOUND_NOTHING,
+        STAGE_OVERLAP_UNREACHABLE,
         STAGE_PLANET_CLEARANCE_BELOW_MINIMUM,
         STAGE_PLANETS_NOT_EVENLY_SPACED,
         STAGE_PLANETS_SHARE_LOAD_EQUALLY,

@@ -4,9 +4,9 @@
 //! A stage kind is a *layer* over this — a preset, a vocabulary, and a choice
 //! of which inputs to put in front of a designer — and not a second model.
 //! [`super::Stage::Spur`] and [`super::Stage::Worm`] carry the same
-//! [`PairStage`]; what a worm stage adds is that its first member is sized by
-//! pitch diameter rather than helix angle, an axial float, and the conventional
-//! proportions a worm and its wheel are given ([`PairKind`]). Everything else
+//! [`PairStage`]; what a worm stage adds is that its first member states a
+//! pitch diameter where a gear states a helix angle, an axial float, and the
+//! conventional proportions a worm and its wheel are given ([`PairKind`]). Everything else
 //! — module, angle, shifts, addenda, frictions, distance, clearance,
 //! materials, face widths — is the same field meaning the same thing.
 //!
@@ -193,54 +193,13 @@ pub enum PairKind {
     Worm,
 }
 
-/// How the first member's size is stated — **three readings of one number**.
-///
-/// A pair's two helix angles are bound by `β₁ + β₂ = Σ`, so one number fixes
-/// both, and it can be stated as what each gear carries beyond half the shaft
-/// angle, as the first member's own helix angle, or as the first member's
-/// pitch diameter — since `d = z m_n / cos β`, a diameter and a helix angle are
-/// the same freedom read two ways. Which reading a designer uses is the whole
-/// of the difference between a worm and a crossed gear: a worm's pitch diameter
-/// is a *free choice* that sets its lead angle, its efficiency and whether it
-/// can be back-driven, while a gear's follows from its teeth.
-///
-/// ```text
-/// AdditionalHelix(β_add):   β₁ = Σ/2 + β_add,   β₂ = Σ/2 − β_add
-/// HelixAngle(β₁):           β₂ = Σ − β₁
-/// PitchDiameter(d₁):        cos β₁ = z₁ m_n / d₁,   β₂ = Σ − β₁
-/// ```
-///
-/// At `Σ = 0` the first reading is the familiar shared helix angle with the
-/// hands opposed, which is the specification's own "Total Helix Angle = 0.5 ×
-/// Axis Angle + Additional Helix Angle".
-///
-/// [verified: a `Screw` built with `d₁ = z₁ m_n / cos β₁` reports
-/// `γ₁ = 90° − β₁` exactly, and `β₂ = Σ − β₁`, over three tooth pairs × four
-/// shaft angles × three helix angles.]
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
-pub enum FirstMemberSizing {
-    /// What each gear carries beyond half the shaft angle, degrees.
-    AdditionalHelix(f64),
-    /// The first member's helix angle, degrees. `β = 0` on crossed shafts makes
-    /// it an ordinary spur gear crossed with a helical one.
-    HelixAngle(f64),
-    /// The first member's pitch diameter, mm — a **worm's** reading.
-    PitchDiameter(f64),
-}
-
 /// A stage of two gears on shafts at any angle.
 ///
 /// Spur when nothing is angled, helical when the teeth are, a **crossed gear
 /// pair** when the shafts are, and a **worm stage** when the first member's
 /// size is a diameter someone chose — one stage, as the specification has it,
-/// with the shaft angle and the sizing as the inputs that distinguish them. It
+/// with the shaft angle and which reading of the size is given as the inputs
+/// that distinguish them. It
 /// is not four kinds of stage: the tooth counts, the module, the shifts, the
 /// materials and the tolerances mean the same thing throughout, and only the
 /// *mesh* differs.
@@ -248,10 +207,19 @@ pub enum FirstMemberSizing {
 /// # The two helix angles come from the shaft angle
 ///
 /// `β₁ + β₂ = Σ` — the relation crossed-axis screw gearing runs on
-/// (docs/reference.md#crossed-axes) — and [`FirstMemberSizing`] is the one
-/// number that places them. At `Σ = 0` it is a parallel helical pair with its
-/// two hands opposed; the parallel case is the shaft angle's zero rather than a
-/// separate construction.
+/// (docs/reference.md#crossed-axes) — so one number places them, and it can be
+/// stated three ways: either member's helix angle, or the first member's
+/// pitch diameter, since `d = z m_n / cos β` makes a diameter and a helix the
+/// same freedom read as a size. Which reading a designer uses is the whole of
+/// the difference between a worm and a crossed gear: a worm's pitch diameter
+/// is a *free choice* that sets its lead angle, its efficiency and whether it
+/// can be back-driven, while a gear's follows from its teeth. At `Σ = 0` it is
+/// a parallel helical pair with its two hands opposed; the parallel case is
+/// the shaft angle's zero rather than a separate construction.
+///
+/// [verified: a `Screw` built with `d₁ = z₁ m_n / cos β₁` reports
+/// `γ₁ = 90° − β₁` exactly, and `β₂ = Σ − β₁`, over three tooth pairs × four
+/// shaft angles × three helix angles.]
 ///
 /// What *does* branch is the mesh, and it must: parallel axes touch along a
 /// line and lose power to sliding along the profile, while crossed axes touch
@@ -287,16 +255,32 @@ pub struct PairStage {
     /// crosses the shafts.
     #[cfg_attr(feature = "serde", serde(default))]
     pub shaft_angle: f64,
-    /// **How big the first member is**, in whichever reading the designer uses
-    /// — and whether they state it at all.
+    /// **The first member's pitch diameter, mm** — a worm's reading of how
+    /// big it is, and one of the three readings of the pair's one size freedom
+    /// with the two members' helix angles ([`StageGear::helix_angle`]).
     ///
-    /// Automatic, the size is solved to reach a given centre distance, but
-    /// only where both shifts are pinned: a shift is the thing that absorbs a
-    /// distance by preference ([`Self::first_pitch_diameter`]). A worm stage
-    /// is the kind this was built for — it has no profile shift by convention,
-    /// so its size is what a housing decides — and a helical pair cut to fit a
+    /// Given, it decides both helix angles. Automatic with a helix given, it
+    /// follows from that. Automatic with every size reading automatic, the
+    /// size is solved to reach a given centre distance, but only where both
+    /// shifts are pinned: a shift is the thing that absorbs a distance by
+    /// preference ([`Self::first_pitch_diameter`]). A worm stage is the kind
+    /// that was built for — it has no profile shift by convention, so its
+    /// size is what a housing decides — and a helical pair cut to fit a
     /// standard centre distance is the same request on parallel shafts.
-    pub sizing: Auto<FirstMemberSizing>,
+    pub pitch_diameter: Auto<f64>,
+    /// **The axial contact ratio** `ε_β` the pair is asked for, where it is
+    /// asked for one.
+    ///
+    /// Automatic, it is an output — what the helix and the face width the
+    /// mesh carries come to. Given, it is a constraint on whichever of the two
+    /// is free: a floor under an automatic face width, beside the ratings'
+    /// asks; or, with both widths given, the thing that decides the helix
+    /// ([`super::helix_for_overlap`]). Read on parallel shafts alone — a
+    /// point contact has no overlap — and the floor on a crossed pair's
+    /// automatic width is nothing at all: its contact's pressure does not
+    /// depend on the width, so nothing here can size one, and it stands at
+    /// its box ([`super::key::GEAR_FACE_WIDTH_AS_ENTERED`]).
+    pub overlap: Auto<f64>,
     /// Coefficient of friction for the mesh.
     pub sliding_friction: f64,
     /// Coefficient of **static** friction, for breaking away.
@@ -358,7 +342,8 @@ impl Default for PairStage {
             module: 1.0,
             pressure_angle: 20.0,
             shaft_angle: 0.0,
-            sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(0.0)),
+            pitch_diameter: Auto::automatic(17.0),
+            overlap: Auto::automatic(1.0),
             sliding_friction: 0.08,
             static_friction: 0.16,
             thickness_mod: 1.0,
@@ -369,6 +354,8 @@ impl Default for PairStage {
             tolerance_minus: 0.02,
             load_sharing: LoadSharing::None,
             axial_clearance: 0.0,
+            // Neither member states a helix, so the two share the shaft
+            // angle evenly — straight teeth on parallel shafts.
             gears: [
                 StageGear::default(),
                 StageGear {
@@ -397,19 +384,29 @@ impl PairStage {
     ///   ([`PairKind`]).
     #[must_use]
     pub fn worm() -> Self {
+        // The helix boxes hold what 7 mm on one start gives — `cos β₁ = m/d₁`,
+        // and the wheel's is the rest of the right angle — so a reading pinned
+        // by relief stands where the diameter had it rather than at a zero.
+        let worm_helix = (1.0_f64 / 7.0).acos().to_degrees();
         Self {
             shaft_angle: 90.0,
-            sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(7.0)),
+            pitch_diameter: Auto::fixed(7.0),
             axial_clearance: 0.04,
             gears: [
                 StageGear {
                     teeth: 1,
                     profile_shift: Auto::fixed(0.0),
+                    // A worm's thread has no fillet of the rack's kind: its
+                    // root is cut by the thread mill's own round, which this
+                    // model does not describe, so the coefficient is nought.
+                    root_radius: 0.0,
+                    helix_angle: Auto::automatic(worm_helix),
                     face_width: Auto::automatic(10.0),
                     ..StageGear::default()
                 },
                 StageGear {
                     teeth: 40,
+                    helix_angle: Auto::automatic(90.0 - worm_helix),
                     face_width: Auto::automatic(10.0),
                     material: "Brass C360".to_string(),
                     ..StageGear::default()
@@ -419,27 +416,87 @@ impl PairStage {
         }
     }
 
-    /// The two gears' helix angles, degrees, from the sizing as it stands or
-    /// as it was solved ([`FirstMemberSizing`]).
+    /// **This pair with its first member's helix stated**, degrees — the other
+    /// readings of the size left to follow. `β₂ = Σ − β₁`.
+    #[must_use]
+    pub fn with_first_helix(mut self, beta_deg: f64) -> Self {
+        self.gears[0].helix_angle = Auto::fixed(beta_deg);
+        self.gears[1].helix_angle.auto = true;
+        self.pitch_diameter.auto = true;
+        self
+    }
+
+    /// **This pair with what each member carries beyond half the shaft angle
+    /// stated**, degrees: `β₁ = Σ/2 + β_add`, `β₂ = Σ/2 − β_add`. At `Σ = 0`
+    /// it is the familiar shared helix with the hands opposed — the
+    /// specification's own "Total Helix Angle = 0.5 × Axis Angle + Additional
+    /// Helix Angle" — stated on the first member.
+    #[must_use]
+    pub fn with_additional_helix(self, add_deg: f64) -> Self {
+        let half = self.shaft_angle / 2.0;
+        self.with_first_helix(half + add_deg)
+    }
+
+    /// **This pair with every reading of its size automatic**, so a given
+    /// centre distance with both shifts pinned decides it, or a given axial
+    /// contact ratio with both widths given does.
+    #[must_use]
+    pub fn size_free(mut self) -> Self {
+        self.pitch_diameter.auto = true;
+        for g in &mut self.gears {
+            g.helix_angle.auto = true;
+        }
+        self
+    }
+
+    /// **This pair with its first member's pitch diameter stated**, mm — a
+    /// worm's reading, with both helix angles left to follow.
+    #[must_use]
+    pub fn with_first_diameter(mut self, d1: f64) -> Self {
+        self.pitch_diameter = Auto::fixed(d1);
+        for g in &mut self.gears {
+            g.helix_angle.auto = true;
+        }
+        self
+    }
+
+    /// **Whether the axial contact ratio decides the helix**: it is given, both
+    /// face widths are given so the width the mesh carries is known, and the
+    /// shafts are parallel so there is an overlap to reach.
+    #[must_use]
+    pub fn size_taken_by_overlap(&self) -> bool {
+        !self.overlap.auto && !self.is_crossed() && self.gears.iter().all(|g| !g.face_width.auto)
+    }
+
+    /// The width the mesh carries as given — the narrower of two given faces.
+    fn given_width(&self) -> f64 {
+        self.gears[0]
+            .face_width
+            .manual
+            .min(self.gears[1].face_width.manual)
+    }
+
+    /// The two gears' helix angles, degrees — from whichever reading of the
+    /// size is given, or from what decides it where none is.
     ///
     /// One place to ask, so the pair cannot disagree about a shaft angle they
     /// share — and so `β₁ + β₂ = Σ` holds by construction rather than by a test.
+    /// A stated helix is kept in its own words, to the bit, rather than
+    /// becoming a diameter and coming back through an arccosine.
     #[must_use]
     pub fn helix_angles(&self) -> [f64; 2] {
-        let first = match self.sizing.manual {
-            FirstMemberSizing::AdditionalHelix(add) if !self.sizing.auto => {
-                self.shaft_angle / 2.0 + add
-            }
-            FirstMemberSizing::HelixAngle(beta) if !self.sizing.auto => beta,
+        let first = if !self.gears[0].helix_angle.auto {
+            self.gears[0].helix_angle.manual
+        } else if !self.gears[1].helix_angle.auto {
+            self.shaft_angle - self.gears[1].helix_angle.manual
+        } else {
             // A diameter, given or solved. `cos β = z m_n / d`, clamped so a
             // diameter below the tooth's own — which `geometry` refuses — reads
             // as a helix of zero rather than a NaN.
-            _ => {
-                let cos = (f64::from(self.gears[0].teeth.max(1)) * self.module
-                    / self.first_pitch_diameter())
-                .clamp(-1.0, 1.0);
-                cos.acos().to_degrees()
-            }
+            let cos = (f64::from(self.gears[0].teeth.max(1)) * self.module
+                / self.first_pitch_diameter())
+            .clamp(-1.0, 1.0);
+            cos.acos().to_degrees()
         };
         [first, self.shaft_angle - first]
     }
@@ -451,37 +508,60 @@ impl PairStage {
         self.shaft_angle != 0.0
     }
 
-    /// **The first member's pitch diameter, mm** — from the reading the
-    /// designer gave, or **solved to reach a given centre distance**.
+    /// **The first member's pitch diameter, mm** — from whichever reading of
+    /// the size is given, or from what decides it where none is.
     ///
-    /// The three readings are one number ([`FirstMemberSizing`]), so this is
-    /// the one accessor the geometry is built from whichever was stated.
-    /// Automatic means the distance decides it — see [`Self::size_reaching`],
-    /// which is also where the two-answers problem is dealt with — and only
-    /// where **both shifts are pinned**: a shift absorbs a distance by
-    /// preference, since it moves the teeth where a size changes them, and
-    /// while one is free the size has nothing to absorb.
+    /// The three readings are one number, so this is the one accessor the
+    /// crossed geometry is built from whichever was stated: the diameter
+    /// itself, to the bit, or `z₁ m_n / cos β₁` from either helix. With every
+    /// reading automatic, what decides it is, in order: a given axial contact
+    /// ratio with both widths given ([`Self::size_taken_by_overlap`]); a
+    /// given centre distance with **both shifts pinned** — a shift absorbs a
+    /// distance by preference, since it moves the teeth where a size changes
+    /// them, so while one is free the size has nothing to absorb (see
+    /// [`Self::size_reaching`], which is also where the two-answers problem
+    /// is dealt with); and otherwise **the shaft angle shared evenly**, which
+    /// at `Σ = 0` is a spur pair and at a right angle a 45°/45° crossed one.
     ///
-    /// Falling back to the number in the box where the distance cannot be
-    /// reached is `docs/rationale.md`'s clamp-rather-than-refuse: the stage still
-    /// solves, at a distance the reported clearance then makes visible.
+    /// Falling back to the even split where the distance cannot be reached is
+    /// `docs/rationale.md`'s clamp-rather-than-refuse: the stage still solves,
+    /// at a distance the reported clearance then makes visible.
     #[must_use]
     pub fn first_pitch_diameter(&self) -> f64 {
-        let z1 = f64::from(self.gears[0].teeth.max(1)) * self.module;
-        let stated = match self.sizing.manual {
-            FirstMemberSizing::PitchDiameter(d) => d,
-            FirstMemberSizing::HelixAngle(beta_deg) => z1 / beta_deg.to_radians().cos(),
-            FirstMemberSizing::AdditionalHelix(add) => {
-                z1 / (self.shaft_angle / 2.0 + add).to_radians().cos()
-            }
-        };
-        let shifts_pinned = self.gears.iter().all(|g| !g.profile_shift.auto);
-        if !self.sizing.auto || !shifts_pinned {
-            return stated;
+        if !self.pitch_diameter.auto {
+            return self.pitch_diameter.manual;
         }
-        self.nominal_distance()
-            .and_then(|target| self.size_reaching(target, stated))
-            .unwrap_or(stated)
+        let z1 = f64::from(self.gears[0].teeth.max(1)) * self.module;
+        let of_helix = |beta_deg: f64| z1 / beta_deg.to_radians().cos();
+        let even = self.shaft_angle / 2.0;
+        if !self.gears[0].helix_angle.auto {
+            return of_helix(self.gears[0].helix_angle.manual);
+        }
+        if !self.gears[1].helix_angle.auto {
+            return of_helix(self.shaft_angle - self.gears[1].helix_angle.manual);
+        }
+        if self.size_taken_by_overlap() {
+            // Or, where no helix reaches the ratio, the even split stands and
+            // `solve_parallel` says so.
+            return of_helix(
+                super::helix_for_overlap(self.overlap.manual, self.module, self.given_width())
+                    .unwrap_or(even),
+            );
+        }
+        let shifts_pinned = self.gears.iter().all(|g| !g.profile_shift.auto);
+        if shifts_pinned {
+            // The branch is chosen by the diameter in the box — the designer's
+            // own number, which is what `size_reaching` argues from — held to
+            // the tooth's own diameter below which no pair exists.
+            let from = self.pitch_diameter.manual.max(z1 * 1.000_001);
+            if let Some(d1) = self
+                .nominal_distance()
+                .and_then(|target| self.size_reaching(target, from))
+            {
+                return d1;
+            }
+        }
+        of_helix(even)
     }
 
     /// **The first member's size that puts this pair at `target`**, mm of pitch
@@ -520,7 +600,7 @@ impl PairStage {
         // stage decides them. Both are pinned wherever this runs.
         let distance = |d1: f64| -> f64 {
             let mut probe = self.clone();
-            probe.sizing = Auto::fixed(FirstMemberSizing::PitchDiameter(d1));
+            probe.pitch_diameter = Auto::fixed(d1);
             probe.zero_backlash_distance().unwrap_or(f64::NAN)
         };
 
@@ -602,19 +682,18 @@ impl PairStage {
     /// geometry below it is built once rather than solved again at every read
     /// of a helix angle.
     ///
-    /// The reading is replaced only where it *was* automatic: a stated reading
-    /// is kept in its own words, so a stated additional helix stays `Σ/2 + β`
-    /// to the bit rather than becoming a diameter and coming back through an
-    /// arccosine.
+    /// Only where every reading *was* automatic: a stated reading is kept in
+    /// its own words, so a stated helix stays itself to the bit rather than
+    /// becoming a diameter and coming back through an arccosine.
     #[must_use]
     pub fn sized(&self) -> Self {
-        if !self.sizing.auto {
+        let any_stated =
+            !self.pitch_diameter.auto || self.gears.iter().any(|g| !g.helix_angle.auto);
+        if any_stated {
             return self.clone();
         }
         Self {
-            sizing: Auto::fixed(FirstMemberSizing::PitchDiameter(
-                self.first_pitch_diameter(),
-            )),
+            pitch_diameter: Auto::fixed(self.first_pitch_diameter()),
             ..self.clone()
         }
     }
@@ -1103,16 +1182,23 @@ fn solve_parallel(
     // with it — under what gear 2 required. Each gear's toggles still choose
     // which of *its* ratings count; the width they resolve to is the largest ask
     // in the mesh.
+    // ...and the width a given axial contact ratio needs, which is a floor
+    // under an automatic width beside the ratings' asks — the mesh's one
+    // helix, so one floor for both members.
+    let helix = stage.helix_angles()[0];
+    let for_overlap = super::width_for_overlap(&stage.overlap, helix, stage.module);
     let asks = [0usize, 1].map(|i| {
         let g = &stage.gears[i];
         // An automatic width with every source switched off has nothing to
         // invert, so it stands at the number in its box and the stage says so
         // (`FaceSources::width_for`). Said rather than divided by, which is
         // what it was: a zero width made every stress infinite.
-        g.face_sources.width_for(
-            &rating(i, &probed, PROBE, PROBE).asks(),
-            g.face_width.manual,
-        )
+        g.face_sources
+            .width_for(
+                &rating(i, &probed, PROBE, PROBE).asks(),
+                g.face_width.manual,
+            )
+            .max(for_overlap.unwrap_or(0.0))
     });
     let wanted = asks[0].max(asks[1]);
     let widths = [0usize, 1].map(|i| stage.gears[i].face_width.resolve(wanted));
@@ -1163,7 +1249,6 @@ fn solve_parallel(
 
     // --- contact ratios. eps_beta needs the face width, which is why it could
     // not exist before this milestone.
-    let helix = stage.helix_angles()[0];
     let contact_ratios = ContactRatios::of(path.contact_ratio, effective, helix, stage.module);
 
     // --- backlash at the three centre distances.
@@ -1215,6 +1300,17 @@ fn solve_parallel(
     // agreed with the floor and a search that found nothing look identical from
     // the shifts alone (`super::Searched`).
     notes.extend(chosen.how.note());
+    // ...and whether a ratio asked to decide the helix could: past `ε_β π m_n
+    // / b = 1` no helix reaches it, and the helix stood at its box instead.
+    notes.extend(super::overlap_note(
+        stage.size_taken_by_overlap(),
+        &stage.overlap,
+        stage.module,
+        stage.gears[0]
+            .face_width
+            .manual
+            .min(stage.gears[1].face_width.manual),
+    ));
 
     Ok(PairResult {
         ratio,
