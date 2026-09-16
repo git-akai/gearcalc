@@ -74,21 +74,20 @@
 # carry their unit, because a bare number beside a radius is ambiguous.
 
 [clamp]
-pressure_angle_raised = "pressure angle raised to {degrees}°"
-dedendum_raised = "dedendum raised: cutter had no depth left"
+pressure_angle_raised = "pressure angle increased to {degrees}°"
+dedendum_raised = "dedendum increased: cutter had no depth left"
 dedendum_capped = "dedendum capped: root circle would reach the axis"
-tooth_thickness_raised = "tooth thickness raised: shift or thickness modification too negative"
+tooth_thickness_raised = "tooth thickness increased: shift or thickness modification too negative"
 tooth_thickness_capped = "tooth thickness capped: shift or thickness modification too positive"
 fillet_capped = "fillet capped to {radius} mm: tooth space holds no larger round"
 tip_capped_pointed = "tip capped at {radius} mm: tooth comes to a point there"
-tooth_severed = "tooth severed by undercut: profile truncated at the centreline"
+tooth_severed = "tooth severed by undercut"
 tooth_undercut = "undercut: cutter has removed part of the flank near the root"
 cutter_no_tip_corner = "no fillet: cutter has no usable tip corner"
-
 ring_space_capped = "space width capped: shift or thickness modification too positive"
-ring_space_raised = "space width raised: shift or thickness modification too negative"
-ring_space_closed = "the tooth space closes at radius {radius} mm, where its two flanks meet: the root is truncated there rather than at the cutter's tip"
-ring_tip_raised = "tip radius raised to {radius} mm: below it a ring's tooth has no thickness"
+ring_space_raised = "space width increased: shift or thickness modification too negative"
+ring_space_closed = "tooth space closes at radius {radius} mm where flanks meet: root is truncated"
+ring_tip_raised = "tip radius increased to {radius} mm: below it, the tooth has no thickness"
 cutter_teeth_reduced = "cutter reduced to {teeth} teeth: ring needs more teeth than its shaper"
 ring_flank_ungenerated = "flank below {limit} mm not generated; increase cutter teeth"
 ring_fully_filleted = "fully filleted root: corner rounds meet, leaving no root arc"
@@ -100,9 +99,9 @@ ring_flank_fillet_gap = "flank and fillet do not meet: cutter does not reach thi
 # so a reader scanning the list sees the numbers first.
 
 [stage]
-centre_distance_not_reached = "no admissible shifts reach {asked} mm: the pair is built at {reached} mm instead, and the clearance reported is the gap that leaves"
-clearance_negative = "the running distance is {overlap} mm inside the zero-backlash {nominal} mm: these teeth cannot be assembled, and every figure taken at it describes nothing"
-optimiser_found_nothing = "nothing in the admissible range could be built, so the shifts are the ones this stage takes unasked: the optimiser had no answer to choose, which is not the same as it agreeing"
+centre_distance_not_reached = "no admissible shifts reach {asked} mm: the pair is built at {reached} mm instead, and the clearance reported is the gap"
+clearance_negative = "the running distance is {overlap} mm inside the zero-backlash {nominal} mm: these teeth cannot be assembled"
+optimiser_found_nothing = "no solution within the admissible range; shifts remain unaltered"
 planets_share_load_equally = "{planets} planets assumed to share load equally; real sets do not without a floating member, and the remedy is a mesh-load factor this tool declines to apply"
 planets_not_evenly_spaced = "{planets} planets cannot be evenly spaced: sun and ring tooth counts do not sum to a multiple of planet count"
 planet_clearance_below_minimum = "adjacent planets clear by {gap} mm, below the {minimum} mm asked for"
@@ -114,15 +113,15 @@ planet_clearance_below_minimum = "adjacent planets clear by {gap} mm, below the 
 # gear's own card, so none names a gear.
 
 [gear]
-shift_raised_for_undercut = "profile shift raised to {shift} to prevent undercut"
+shift_raised_for_undercut = "profile shift increased to {shift} to prevent undercut"
 addendum_held_to_tip_width = "addendum limited to {addendum}"
-addendum_above_tip_width = "higher than tip width allows — {addendum} would keep it"
-face_width_as_entered = "face width as entered: no width gives a full contact ratio"
+addendum_above_tip_width = "higher than tip width allows; reduce to {addendum}"
+face_width_as_entered = "face width as entered does not give full contact ratio"
 ring_addendum_clamped = "ring addendum clamped at base circle; add more teeth or shorten the addendum"
-face_width_no_source = "automatic face width has no rating to size it: every source is switched off, so it stands at the width in its box"
+face_width_no_source = "automatic face width has no rating to size it: every source is switched off; width remains unaltered"
 rim_below_minimum = "rim backup ratio {ratio} is at or below the minimum ISO 6336-3 will rate: the clause says such a rim shall be avoided, and Y_B is reported past where the standard goes"
-reversed_bending_uncorrected = "this root is loaded on both flanks, and is rated against the one-directional allowable: switch reversed bending on to rate it against the reduced one"
-reversed_bending_applied = "this root is loaded on both flanks, and is rated against {fraction} of the one-directional allowable"
+reversed_bending_uncorrected = "root is loaded by both flanks and is rated against the one-directional allowable: switch reversed bending on to rate against the reduced allowable"
+reversed_bending_applied = "root is loaded by both flanks and is rated against {fraction} of the one-directional allowable"
 
 # ---------------------------------------------------------------- mesh notes
 #
@@ -136,8 +135,8 @@ contact_ratio_below_one = "contact ratio {ratio}: below 1, the pair loses contac
 load_sharing_out_of_band = "load sharing at a virtual contact ratio of {ratio} is out of band; extrapolated result can vary from -24% to +15%"
 self_locking = "self-locking: static μ {friction} against a threshold of {threshold}, so the second member cannot drive the first"
 near_self_locking = "close to self-locking: static μ {friction} near threshold of {threshold}, so back-driving changes on an estimated coefficient"
-forward_locking = "cannot be driven forward: static μ {friction} against a threshold of {threshold}, so the first member cannot turn the second at all"
-near_forward_locking = "close to not driving forward: static μ {friction} near threshold of {threshold}, so whether it drives at all changes on an estimated coefficient"
+forward_locking = "cannot be driven forward: static μ {friction} against a threshold of {threshold}, so the first member cannot drive the second"
+near_forward_locking = "close to not driving forward: static μ {friction} near threshold of {threshold}, so whether it drives changes on an estimated coefficient"
 low_efficiency = "mesh efficiency {percent} %: most of the input becomes heat, which usually limits a crossed-axis stage before stress does"
 
 # ------------------------------------------------------------------- the train
@@ -169,7 +168,7 @@ back_driving_not_reacted = "the back-driving load reaches no gear: every stage c
 # translating.
 mesh_incompatible = "the gears cannot mesh: module, pressure angle or helix differ"
 mesh_ring_too_small = "an internal mesh needs more teeth on the ring than the pinion"
-mesh_outside_involute_domain = "these profile shifts leave no operating pressure angle"
+mesh_outside_involute_domain = "profile shifts leave no operating pressure angle"
 mesh_centre_distance_too_small = "centre distance is below the base-circle limit"
 measure_no_valid_span = "no span contacts the usable flank on this gear"
 measure_pin_too_small = "the pin or ball is too small"
@@ -188,9 +187,6 @@ hula_coaxial = "mesh {mesh}: both gears have the same tooth count; no space for 
 hula_offset_too_small = "mesh {mesh}: the crank offset is below its base circles"
 hula_clearance_unreachable = "mesh {mesh}: no crank offset gives the specified clearance"
 hula_bound_unreachable = "mesh {mesh}: no crank offset clears the teeth"
-gear_no_mate = "no mate given"
-gear_concentric_has_no_profile = "a concentric gear commands one centre distance, not a profile"
-gear_no_pin_diameter = "no pin diameter given"
 
 [ui]
 app_core_failed = "The calculation core failed to load: {reason}"
@@ -206,7 +202,7 @@ bound_profile_shift_pointed = "pointed above {pointed}"
 bound_root_radius = "up to {max}: fillet must fit the tooth space"
 bound_root_radius_shared_cutter = "up to {max}: shared cutter must fit the tightest tooth"
 bound_pin_diameter = "{min} to {max}: seats on the flanks between the form circle and the tip"
-gear_accumulated_coast = "accumulated {value} · scales |1 + λ| — reversing the drive makes these the driving flanks"
+gear_accumulated_coast = "accumulated {value} · scales |1 + λ| · reversing the drive makes these the driving flanks"
 gear_accumulated_drive = "accumulated {value} · scales |1 − λ|"
 gear_at_the_base_circle = "at the base circle {lo} to {hi} mm"
 gear_auto = "auto"
@@ -239,7 +235,7 @@ gear_delete_question = "Delete “{name}”?"
 gear_departure_from_a_circle = "Departure from a circle"
 gear_departure_from_that_sinusoid = "Departure from that sinusoid"
 gear_eccentricity = "Eccentricity"
-gear_eccentricity_exceeds_mate = "some tooth's shift drives the operating pressure angle below zero — the eccentricity is larger than this mate can absorb. A smaller amplitude, a larger tooth-count difference, or a mean shift nearer zero each relieve it"
+gear_eccentricity_exceeds_mate = "a tooth's shift drives the operating pressure angle below zero because the eccentricity is too large; reduce amplitude, increase tooth-count difference, or adjust mean shift nearer to zero"
 gear_envelope_eccentricity = "Envelope eccentricity"
 gear_envelope_limacon_not_circle_e_2ro = "a limaçon, not a displaced circle — departure is e²/2ρ"
 gear_export = "Export"
@@ -285,7 +281,7 @@ gear_name = "Gear name"
 gear_negative_is_interference_not_slack = "negative is interference; axes closer than teeth allow"
 gear_new = "New"
 gear_no_mate = "no mate given"
-gear_no_pin_diameter = "no pin diameter given"
+gear_no_pin_diameter = "no pin or ball diameter given"
 gear_nominal = "Nominal"
 gear_none_available = "none available"
 gear_none_this_cutter_generated_no_fillet = "none — this cutter generated no fillet"

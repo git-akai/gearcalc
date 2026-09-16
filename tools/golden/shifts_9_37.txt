@@ -9,14 +9,14 @@ least loss                            0.6746    0.7332    1.4078    1.2929    97
 centre distance given, shifts chosen to reach it
 a mm                                      x1        x2       sum       eps    eta fwd
 23.0200                               0.4736    0.0000    0.4736    1.7372    96.979 %
-                                    no admissible shifts reach 23.0000 mm: the pair is built at 23.4433 mm instead, and the clearance reported is the gap that leaves
-                                    the running distance is 0.4233 mm inside the zero-backlash 23.4433 mm: these teeth cannot be assembled, and every figure taken at it describes nothing
+                                    no admissible shifts reach 23.0000 mm: the pair is built at 23.4433 mm instead, and the clearance reported is the gap
+                                    the running distance is 0.4233 mm inside the zero-backlash 23.4433 mm: these teeth cannot be assembled
 23.2207                               0.4736    0.0000    0.4736    1.5457    97.277 %
-                                    no admissible shifts reach 23.2007 mm: the pair is built at 23.4433 mm instead, and the clearance reported is the gap that leaves
-                                    the running distance is 0.2226 mm inside the zero-backlash 23.4433 mm: these teeth cannot be assembled, and every figure taken at it describes nothing
+                                    no admissible shifts reach 23.2007 mm: the pair is built at 23.4433 mm instead, and the clearance reported is the gap
+                                    the running distance is 0.2226 mm inside the zero-backlash 23.4433 mm: these teeth cannot be assembled
 23.4213                               0.4736    0.0000    0.4736    1.3647    97.518 %
-                                    no admissible shifts reach 23.4013 mm: the pair is built at 23.4433 mm instead, and the clearance reported is the gap that leaves
-                                    the running distance is 0.0220 mm inside the zero-backlash 23.4433 mm: these teeth cannot be assembled, and every figure taken at it describes nothing
+                                    no admissible shifts reach 23.4013 mm: the pair is built at 23.4433 mm instead, and the clearance reported is the gap
+                                    the running distance is 0.0220 mm inside the zero-backlash 23.4433 mm: these teeth cannot be assembled
 23.6220                               0.4736    0.1831    0.6567    1.3269    97.603 %
 23.8226                               0.4736    0.4239    0.8975    1.3323    97.636 %
 24.0233                               0.6559    0.4922    1.1481    1.2793    97.652 %
@@ -25,10 +25,10 @@ a mm                                      x1        x2       sum       eps    et
 ...and with the shift optimiser off
 a mm                                      x1        x2       sum       eps    eta fwd
 23.0200                               0.4736    0.0000    0.4736    1.7372    96.979 %
-                                    no admissible shifts reach 23.0000 mm: the pair is built at 23.4433 mm instead, and the clearance reported is the gap that leaves
-                                    the running distance is 0.4233 mm inside the zero-backlash 23.4433 mm: these teeth cannot be assembled, and every figure taken at it describes nothing
+                                    no admissible shifts reach 23.0000 mm: the pair is built at 23.4433 mm instead, and the clearance reported is the gap
+                                    the running distance is 0.4233 mm inside the zero-backlash 23.4433 mm: these teeth cannot be assembled
 23.4213                               0.4736    0.0000    0.4736    1.3647    97.518 %
-                                    no admissible shifts reach 23.4013 mm: the pair is built at 23.4433 mm instead, and the clearance reported is the gap that leaves
-                                    the running distance is 0.0220 mm inside the zero-backlash 23.4433 mm: these teeth cannot be assembled, and every figure taken at it describes nothing
+                                    no admissible shifts reach 23.4013 mm: the pair is built at 23.4433 mm instead, and the clearance reported is the gap
+                                    the running distance is 0.0220 mm inside the zero-backlash 23.4433 mm: these teeth cannot be assembled
 23.8226                               0.4736    0.4239    0.8975    1.3323    97.636 %
 24.2240                               0.7039    0.7039    1.4078    1.2800    97.681 %

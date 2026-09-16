@@ -1446,17 +1446,6 @@ mod tests {
                     err(e.note());
                 }
             }
-
-            // ...and the three the boundary raises rather than the core: they
-            // are `ui.` keys, checked by `tools/check_strings.py`, so they are
-            // recorded here only so this sweep sees the `error.` twins.
-            for k in [
-                key::ERROR_GEAR_NO_MATE,
-                key::ERROR_GEAR_CONCENTRIC_HAS_NO_PROFILE,
-                key::ERROR_GEAR_NO_PIN_DIAMETER,
-            ] {
-                err(gear_core::note::Note::new(k));
-            }
         }
 
         seen

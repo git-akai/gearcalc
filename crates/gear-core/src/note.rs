@@ -210,12 +210,6 @@ pub mod key {
     pub const ERROR_HULA_CLEARANCE_UNREACHABLE: &str = "error.hula_clearance_unreachable";
     /// `error.hula_bound_unreachable`
     pub const ERROR_HULA_BOUND_UNREACHABLE: &str = "error.hula_bound_unreachable";
-    /// `error.gear_no_mate`
-    pub const ERROR_GEAR_NO_MATE: &str = "error.gear_no_mate";
-    /// `error.gear_concentric_has_no_profile`
-    pub const ERROR_GEAR_CONCENTRIC_HAS_NO_PROFILE: &str = "error.gear_concentric_has_no_profile";
-    /// `error.gear_no_pin_diameter`
-    pub const ERROR_GEAR_NO_PIN_DIAMETER: &str = "error.gear_no_pin_diameter";
 
     /// Every key above, for the catalogue coverage tests.
     pub const ALL: &[&str] = &[
@@ -285,9 +279,6 @@ pub mod key {
         ERROR_HULA_OFFSET_TOO_SMALL,
         ERROR_HULA_CLEARANCE_UNREACHABLE,
         ERROR_HULA_BOUND_UNREACHABLE,
-        ERROR_GEAR_NO_MATE,
-        ERROR_GEAR_CONCENTRIC_HAS_NO_PROFILE,
-        ERROR_GEAR_NO_PIN_DIAMETER,
     ];
 }
 

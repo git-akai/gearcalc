@@ -3,7 +3,7 @@ crossed gear pair  z 17/23  shaft angle 90 deg  module 1  alpha 20 deg  mu 0.06
   beta1   beta2     d1 mm     d2 mm       a mm   slide/v1     eta fwd    sigma_H       epsilon
     0.0      90 — no such pair
     9.0    81.0   17.2119  147.0264    82.1192     6.3925     locked     1176.1   1.731976070
-                cannot be driven forward: static μ 0.160 against a threshold of 0.1486, so the first member cannot turn the second at all
+                cannot be driven forward: static μ 0.160 against a threshold of 0.1486, so the first member cannot drive the second
    18.0    72.0   17.8749   74.4296    46.1522     3.2361     71.715 %    1273.0   1.739531377
    27.0    63.0   19.0795   50.6619    34.8707     2.2027     79.730 %    1273.6   1.746370111
    36.0    54.0   21.0132   39.1299    30.0715     1.7013     83.043 %    1233.6   1.751996715
