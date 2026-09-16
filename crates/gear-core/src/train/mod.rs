@@ -7669,4 +7669,121 @@ mod tests {
         }
         assert_eq!(seen, 4, "both spur stages, both gears");
     }
+
+    /// **A case is rated on its own, whatever else the train carries.**
+    ///
+    /// The law the list rests on: a load case's figures depend on that case
+    /// and the shaft line, and on nothing about the other cases — not their
+    /// number, not their order, not whether one is switched off. A scale taken
+    /// against "the worst torque a mesh carries" is exactly the kind of shared
+    /// reference that could make a case move when its neighbour did, and the
+    /// epicyclic kinds rate through one (`StageLoads::scaled`); the scale is
+    /// exact in the mathematics, and this holds it to the digits the corpus
+    /// prints. **Run against a scale read from the wrong case, it fails on
+    /// every member**, which is the fault this is for.
+    #[test]
+    fn a_case_is_rated_on_its_own_whatever_else_the_train_carries() {
+        let lib = library();
+        let mut train = two_stage();
+        train.stages.push(Stage::Planetary(Box::default()));
+        train.stages.push(Stage::Hula(Box::default()));
+        train.load_cases = vec![
+            LoadCase::ultimate(2.0, 3000.0),
+            LoadCase {
+                port: Port::End,
+                reacted: true,
+                ..LoadCase::fatigue(0.7, 40.0)
+            },
+        ];
+        let alone = solve_train(&train, &lib).expect("solves");
+
+        // The same two cases, with a heavier one in front of them and a
+        // switched-off one after: the first two cases' figures are unmoved.
+        let mut crowded = train.clone();
+        crowded.load_cases.insert(0, LoadCase::ultimate(50.0, 100.0));
+        crowded.load_cases.push(LoadCase {
+            enabled: false,
+            ..LoadCase::ultimate(1.0e6, 1.0)
+        });
+        let with = solve_train(&crowded, &lib).expect("solves");
+        assert_eq!(with.cases.len(), 3, "a case switched off reports nothing");
+        let near = |x: f64, y: f64| (x - y).abs() <= 1e-9 * x.abs().max(1e-300);
+        let mut checked = 0;
+        for (a, b) in alone.stages.iter().zip(&with.stages) {
+            for (ga, gb) in a.members().iter().zip(b.members()) {
+                assert_eq!(gb.cases.len(), 3);
+                for (want, got) in ga.cases.iter().zip(&gb.cases[1..]) {
+                    checked += 1;
+                    assert!(
+                        near(want.torque, got.torque)
+                            && near(want.contact_stress, got.contact_stress)
+                            && want.cycles == got.cycles
+                            && match (want.bending_stress, got.bending_stress) {
+                                (Some(x), Some(y)) => near(x, y),
+                                (a, b) => a == b,
+                            },
+                        "a case moved when a heavier one was put in front of it: \
+                         {want:?} against {got:?}"
+                    );
+                }
+            }
+        }
+        assert!(checked >= 20, "only {checked} readings compared");
+        // ...and every case names its index in the train's list, which is how
+        // the front end joins a result to its input.
+        assert_eq!(
+            with.cases.iter().map(|c| c.case).collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+    }
+
+    /// **A stage that cannot be driven forward holds a load from the start**,
+    /// by the same walk that lets a self-locking worm hold one from the end.
+    ///
+    /// A crossed pair at a 9°/81° helix split cannot drive forward at the
+    /// shipped static friction. Put first, it is where a load entering at the
+    /// start stops: the pair carries it, the stages after it carry none, and
+    /// the case says which stage held it. A forward load used to be pushed
+    /// through such a stage at its efficiency — nought or less — and reported
+    /// downstream as a torque of nothing with no word about why.
+    #[test]
+    fn a_forward_locked_stage_holds_a_load_from_the_start() {
+        let lib = library();
+        let mut train = two_stage();
+        train.stages.insert(
+            0,
+            Stage::Worm(PairStage {
+                shaft_angle: 90.0,
+                sizing: Auto::fixed(FirstMemberSizing::HelixAngle(9.0)),
+                gears: [
+                    StageGear {
+                        teeth: 17,
+                        ..PairStage::worm().gears[0].clone()
+                    },
+                    StageGear {
+                        teeth: 23,
+                        ..PairStage::worm().gears[1].clone()
+                    },
+                ],
+                ..PairStage::worm()
+            }),
+        );
+        let r = solve_train(&train, &lib).expect("solves");
+        assert!(
+            r.stages[0].efficiency().locked().forward,
+            "this fixture is meant to be forward-locked"
+        );
+        let start = &r.cases[PEAK];
+        assert_eq!(start.reacted_at, Some(0));
+        assert_eq!(start.delivered_torque, 0.0);
+        assert!(start.notes.iter().any(|n| n.is(key::TRAIN_LOAD_REACTED_AT)));
+        // The locked pair carries it on the member the load is on...
+        assert!(r.stages[0].members()[0].cases[PEAK].torque > 0.0);
+        // ...and nothing beyond it sees any.
+        for s in &r.stages[1..] {
+            for g in s.members() {
+                assert_eq!(g.cases[PEAK].torque, 0.0);
+            }
+        }
+    }
 }
