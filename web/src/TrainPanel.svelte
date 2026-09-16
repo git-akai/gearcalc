@@ -104,12 +104,11 @@
     c.duty = m === "intermittent" ? defaults().fatigue_case.duty : defaults().continuous_duty;
   }
 
-  /** **The load cases are a list, as the stages are**, and are added, removed
-   *  and replaced by the same rules: one of each kind from the core's own
-   *  defaults, and a train whose last case is removed is left with the fresh
-   *  first kind rather than with none — a train with no case rates nothing,
-   *  and a button that greys out to prevent that is a rule the reader has to
-   *  infer. */
+  /** **The load cases are a list, as the stages are**, added one of each kind
+   *  from the core's own defaults. Unlike the stages, the last one may go: a
+   *  train with no load case is a shaft line and nothing else, every rating
+   *  row stands empty, and the two buttons under the list are how one comes
+   *  back — where a train with no stage is one the core refuses. */
   function addCaseOfKind(kind: CaseKindSpec) {
     tab.train.load_cases.push(kind.fresh());
     tab.openCases[tab.train.load_cases.length - 1] = true;
@@ -123,7 +122,6 @@
       if (at < i) tab.openCases[at] = v;
       else if (at > i) tab.openCases[at - 1] = v;
     }
-    if (tab.train.load_cases.length === 0) addCaseOfKind(CASE_KINDS[0]);
   }
   /** A load case by number, as a stage is; and the words for its kind and its
    *  port, from the same tables the selects offer them from. */
@@ -431,13 +429,6 @@
     {#each efficiencyNotes(m) as n, i (i)}
       <small class="warn">{note(n)}</small>
     {/each}
-    {#if m?.point?.parallel_axis_efficiency != null}
-      <small>
-        {t("ui.train_parallel_shafts_would_give", {
-          percent: pct(m.point.parallel_axis_efficiency),
-        })}
-      </small>
-    {/if}
   </dd>
   <!-- One gap, seen from each of its two ends, with the tolerance band on the
        first — the way every other mesh here writes its play. -->
@@ -1318,16 +1309,8 @@
           <div class="grid shared">
             <!-- The kind decides which allowable the core judges against and
                  which inputs are put in front of the designer; nothing else
-                 about a case knows which it is. -->
-            <label>
-              <span>{t("ui.train_case_kind")}</span>
-              <select bind:value={c.kind}>
-                {#each CASE_KINDS as k (k.key)}
-                  <option value={k.key}>{t(k.label)}</option>
-                {/each}
-              </select>
-              <em></em>
-            </label>
+                 about a case knows which it is. It is chosen when the case is
+                 added and shown on the heading, not switched here. -->
             <label>
               <span>{t("ui.train_case_port")}</span>
               <select bind:value={c.port}>
@@ -2484,10 +2467,19 @@
     display: flex;
     align-items: center;
     padding-right: 0.5rem;
+    border-radius: 4px;
+  }
+  /* The whole bar lights, switch included, as a stage's heading does — the
+     row is one heading with two controls on it, not a button beside a gap. */
+  .casehead:hover {
+    background: var(--hover);
   }
   .casehead .head {
     flex: 1;
     min-width: 0;
+  }
+  .casehead .head:hover {
+    background: none;
   }
   /* A case switched off is still a case: its inputs stand, so it is dimmed
      rather than hidden, and its heading still says what it is. */

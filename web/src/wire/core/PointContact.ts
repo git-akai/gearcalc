@@ -23,17 +23,4 @@ face_width_for_continuity: [number, number] | null,
  * How far the contact point runs along each member's own axis, mm — what a
  * face has to cover, and what a line contact does not have at all.
  */
-axial_travel: [number, number], 
-/**
- * What the same teeth would lose with their shafts brought **parallel**, as
- * an efficiency — `None` where the parallel pair cannot be built.
- *
- * Reported for comparison: crossing shafts adds sliding, so this is the
- * best the pair can be, and how far the crossed figure falls below it is
- * what the shaft angle costs. It was once a *check*, and the friction
- * balance has since made it worse than useless as one: the parallel
- * closed form is first order in `μ` where the balance is exact, so at a
- * very small shaft angle the crossed figure legitimately sits a hundredth
- * of a point above it (docs/corrections.md).
- */
-parallel_axis_efficiency: number | null, };
+axial_travel: [number, number], };

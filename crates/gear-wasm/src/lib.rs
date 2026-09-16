@@ -1108,8 +1108,9 @@ fn defaults_impl() -> Result<String, String> {
         },
         train: Train {
             // The three loads a fresh train used to hold as fields: a peak at
-            // the start, held at the end; no load from the end until one is
-            // entered, and held by nothing but a stage that locks; and a
+            // the start, held at the end; a load from the end, held still and
+            // by nothing but a stage that locks — so on a fresh spur stage it
+            // turns the train and rates nothing, which the case says; and a
             // fatigue load equal to the peak until one is entered — a fresh
             // tab assumes no derating rather than a derating nobody asked for.
             load_cases: vec![
@@ -1117,7 +1118,7 @@ fn defaults_impl() -> Result<String, String> {
                 LoadCase {
                     port: Port::End,
                     reacted: false,
-                    ..LoadCase::ultimate(0.0, 0.0)
+                    ..LoadCase::ultimate(3.0, 0.0)
                 },
                 LoadCase::fatigue(0.1, 30_000.0),
             ],
@@ -2221,12 +2222,10 @@ mod tests {
         // and no parallel-axis member has any either.
         "recommended_face_width",
         // A line contact has no zone as the faces leave it and a point contact
-        // no transverse decomposition; a point contact whose parallel
-        // counterpart cannot be built has nothing to be compared with; and a
-        // spur gear's flank does not advance, so it has no lead.
+        // no transverse decomposition; and a spur gear's flank does not
+        // advance, so it has no lead.
         "line",
         "point",
-        "parallel_axis_efficiency",
         "lead",
         // The train solved, so there is no failure to report.
         "failure",
@@ -2339,7 +2338,8 @@ mod tests {
         assert_eq!(cases[1]["kind"], "ultimate");
         assert_eq!(cases[1]["port"], "end");
         assert_eq!(cases[1]["reacted"], false);
-        assert_eq!(cases[1]["torque"], 0.0);
+        assert_eq!(cases[1]["torque"], 3.0);
+        assert_eq!(cases[1]["speed"], 0.0);
         assert_eq!(cases[2]["kind"], "fatigue");
         assert_eq!(cases[2]["torque"], 0.1);
         assert_eq!(cases[2]["duty"]["intermittent"]["at"], "end");

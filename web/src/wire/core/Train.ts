@@ -8,7 +8,8 @@ import type { Stage } from "./Stage";
 export type Train = { 
 /**
  * Every load the train is rated for. Any number, as the stages are any
- * number; a case switched off is kept and takes part in nothing.
+ * number — including none, which is a shaft line with nothing rated on
+ * it; a case switched off is kept and takes part in nothing.
  */
 load_cases: Array<LoadCase>, 
 /**

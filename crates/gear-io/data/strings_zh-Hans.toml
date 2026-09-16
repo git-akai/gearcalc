@@ -69,7 +69,7 @@ low_efficiency = "啮合效率 {percent} %：大部分输入功率变为热量�
 
 [train]
 load_reacted_at = "由第 {stage} 级承受，该级无法沿此方向被驱动；其之后的各级不承担任何该载荷"
-load_not_reacted = "未传到任何齿轮：没有任何构件承受该载荷，因此它只会带动整个轮系，而不会被它承受"
+load_not_reacted = "载荷未传到任何齿轮；没有构件承受它，轮系可自由转动"
 
 [error]
 mesh_incompatible = "这两个齿轮无法啮合：模数、压力角或螺旋角不一致"
@@ -253,7 +253,6 @@ train_case_delivered = "输出"
 train_case_enabled = "启用"
 train_case_fatigue = "疲劳"
 train_case_heading = "载荷工况 {number}"
-train_case_kind = "类型"
 train_case_port = "施加于"
 train_case_reacted = "受支承"
 train_case_ultimate = "极限"
@@ -401,7 +400,6 @@ train_note_thickness_mod_worm = "大于 1 时蜗杆螺纹变厚而蜗轮齿变�
 train_note_working_depth = "判断根切时所取的齿深"
 train_one_planet_no_neighbour = "只有一个行星轮，没有相邻件"
 train_optimise_efficiency = "效率优化"
-train_parallel_shafts_would_give = "同样的轮齿若两轴平行可得 {percent} %——两者之差即为交错轴所付出的代价"
 train_patch = "接触斑 {length} × {width} mm"
 train_pinion = "小齿轮"
 train_pitch_diameter = "分度圆直径"

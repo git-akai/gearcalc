@@ -147,7 +147,7 @@ low_efficiency = "mesh efficiency {percent} %: most of the input becomes heat, w
 
 [train]
 load_reacted_at = "held at stage {stage}, which cannot be driven this way; stages beyond it carry none of it"
-load_not_reacted = "reaches no gear: nothing holds it, so the load turns the train rather than being carried by it"
+load_not_reacted = "load reaches no gear; nothing reacts it and the train is free to turn"
 
 # ---------------------------------------------------------------- the application
 #
@@ -345,7 +345,6 @@ train_case_delivered = "Delivered"
 train_case_enabled = "Enabled"
 train_case_fatigue = "Fatigue"
 train_case_heading = "Load case {number}"
-train_case_kind = "Kind"
 train_case_port = "Applied at"
 train_case_reacted = "Reacted"
 train_case_ultimate = "Ultimate"
@@ -493,7 +492,6 @@ train_note_thickness_mod_worm = "above 1, worm's thread thickens and wheel's tee
 train_note_working_depth = "the depth the undercut question is asked at"
 train_one_planet_no_neighbour = "one planet has no neighbour"
 train_optimise_efficiency = "Efficiency optimization"
-train_parallel_shafts_would_give = "the same teeth with parallel shafts would give {percent} % — crossing them is what the difference costs"
 train_patch = "patch {length} × {width} mm"
 train_pinion = "Pinion"
 train_pitch_diameter = "Pitch diameter"

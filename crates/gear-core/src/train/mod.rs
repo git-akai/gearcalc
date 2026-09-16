@@ -339,17 +339,6 @@ pub struct PointContact {
     /// How far the contact point runs along each member's own axis, mm — what a
     /// face has to cover, and what a line contact does not have at all.
     pub axial_travel: [f64; 2],
-    /// What the same teeth would lose with their shafts brought **parallel**, as
-    /// an efficiency — `None` where the parallel pair cannot be built.
-    ///
-    /// Reported for comparison: crossing shafts adds sliding, so this is the
-    /// best the pair can be, and how far the crossed figure falls below it is
-    /// what the shaft angle costs. It was once a *check*, and the friction
-    /// balance has since made it worse than useless as one: the parallel
-    /// closed form is first order in `μ` where the balance is exact, so at a
-    /// very small shaft angle the crossed figure legitimately sits a hundredth
-    /// of a point above it (docs/corrections.md).
-    pub parallel_axis_efficiency: Option<f64>,
 }
 
 /// **The Hertzian contact a mesh presses** — one answer for an ellipse and a
@@ -2432,10 +2421,12 @@ impl FaceSources {
     ///
     /// `asks` is every load case's ask with the kind that made it: the largest
     /// over every case of a kind that is switched on — the highest case is the
-    /// one that sizes the part, however many overlap.
+    /// one that sizes the part, however many overlap. A train with no case
+    /// asks nothing, and that is the same answer as no source: the width
+    /// stands at its box.
     #[must_use]
     pub fn width_for(&self, asks: &[(CaseKind, Widths)], given: f64) -> f64 {
-        if !self.any() {
+        if !self.any() || asks.is_empty() {
             return given;
         }
         let mut want = 0.0_f64;
@@ -3104,7 +3095,8 @@ pub fn solve_any_with(
 )]
 pub struct Train {
     /// Every load the train is rated for. Any number, as the stages are any
-    /// number; a case switched off is kept and takes part in nothing.
+    /// number — including none, which is a shaft line with nothing rated on
+    /// it; a case switched off is kept and takes part in nothing.
     pub load_cases: Vec<LoadCase>,
     /// Judge a root that is loaded on **both** flanks against the reduced
     /// bending allowable.
@@ -7787,6 +7779,49 @@ mod tests {
         for s in &r.stages[1..] {
             for g in s.members() {
                 assert_eq!(g.cases[PEAK].torque, 0.0);
+            }
+        }
+    }
+
+    /// **A train with no load case is a shaft line**, and every kind solves it.
+    ///
+    /// Ratios, efficiencies and backlash stand; every member reports no case;
+    /// and an automatic face width, with nothing to ask, stands at its box —
+    /// the same answer as no source switched on, since both are a width with
+    /// nothing to choose between. A case switched off is the same train.
+    #[test]
+    fn a_train_with_no_load_case_is_a_shaft_line() {
+        let lib = library();
+        for cases in [
+            vec![],
+            vec![LoadCase {
+                enabled: false,
+                ..LoadCase::ultimate(2.0, 1.0)
+            }],
+        ] {
+            let mut train = two_stage();
+            train.stages.push(Stage::Worm(PairStage::worm()));
+            train.stages.push(Stage::Planetary(Box::default()));
+            train.stages.push(Stage::Hula(Box::default()));
+            if let Stage::Spur(s) = &mut train.stages[0] {
+                for g in &mut s.gears {
+                    g.face_width = Auto::automatic(7.0);
+                }
+            }
+            train.load_cases = cases;
+            let r = solve_train(&train, &lib).expect("a shaft line solves");
+            assert!(r.cases.is_empty());
+            assert!(r.total_ratio > 1.0 && r.total_efficiency.forward > 0.0);
+            for s in &r.stages {
+                for g in s.members() {
+                    assert!(g.cases.is_empty());
+                }
+                for m in s.meshes() {
+                    assert!(m.cases.is_empty());
+                }
+            }
+            for g in &spur(&r.stages[0]).gears {
+                assert_eq!(g.face_width, 7.0);
             }
         }
     }

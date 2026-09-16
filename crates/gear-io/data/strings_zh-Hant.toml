@@ -69,7 +69,7 @@ low_efficiency = "嚙合效率 {percent} %：大部分輸入功率變為熱量�
 
 [train]
 load_reacted_at = "由第 {stage} 級承受，該級無法沿此方向被驅動；其之後的各級不承擔任何該負荷"
-load_not_reacted = "未傳到任何齒輪：沒有任何構件承受該負荷，因此它只會帶動整個輪系，而不會被它承受"
+load_not_reacted = "負荷未傳到任何齒輪；沒有構件承受它，輪系可自由轉動"
 
 [error]
 mesh_incompatible = "這兩個齒輪無法嚙合：模數、壓力角或螺旋角不一致"
@@ -253,7 +253,6 @@ train_case_delivered = "輸出"
 train_case_enabled = "啟用"
 train_case_fatigue = "疲勞"
 train_case_heading = "負荷工況 {number}"
-train_case_kind = "類型"
 train_case_port = "施加於"
 train_case_reacted = "受支承"
 train_case_ultimate = "極限"
@@ -401,7 +400,6 @@ train_note_thickness_mod_worm = "大於 1 時蝸桿螺紋變厚而蝸輪齒變�
 train_note_working_depth = "判斷過切時所取的齒深"
 train_one_planet_no_neighbour = "只有一個行星輪，沒有相鄰件"
 train_optimise_efficiency = "效率最佳化"
-train_parallel_shafts_would_give = "同樣的輪齒若兩軸平行可得 {percent} %——兩者之差即為交錯軸所付出的代價"
 train_patch = "接觸斑 {length} × {width} mm"
 train_pinion = "小齒輪"
 train_pitch_diameter = "節圓直徑"

@@ -3,7 +3,7 @@ train  total ratio 6.0317:1   total efficiency 96.375 % forward / 96.375 % backw
        backlash at the input shaft   0.43912 deg  (min -0.00000, max 0.88059)
        case 1  ultimate 2.000 Nm / 3000 rpm at start, held at the far end   ->   11.626 Nm / 497.4 rpm at end
        case 2  ultimate 0.000 Nm / 0 rpm at end, held by nothing   ->   0.000 Nm / 0.0 rpm at start
-              note: reaches no gear: nothing holds it, so the load turns the train rather than being carried by it
+              note: load reaches no gear; nothing reacts it and the train is free to turn
        case 3  fatigue  2.000 Nm / 2400 rpm at start, held at the far end   ->   11.626 Nm / 397.9 rpm at end   1000 h
 
 stage 1  spur  z 17/43  beta 0 deg  ratio 2.5294  a_w 30.0257 mm  coprime

@@ -73,7 +73,7 @@ low_efficiency = "Verzahnungswirkungsgrad {percent} %: der größte Teil der Ein
 
 [train]
 load_reacted_at = "wird in Stufe {stage} abgestützt, die sich in dieser Richtung nicht antreiben lässt; die Stufen dahinter tragen nichts davon"
-load_not_reacted = "erreicht kein Zahnrad: nichts hält die Last, sie dreht den Strang also, statt von ihm getragen zu werden"
+load_not_reacted = "die Last erreicht kein Zahnrad; nichts stützt sie ab, und der Strang kann frei drehen"
 
 [error]
 mesh_incompatible = "die Räder können nicht kämmen: Modul, Eingriffswinkel oder Schrägungswinkel unterscheiden sich"
@@ -257,7 +257,6 @@ train_case_delivered = "Abgegeben"
 train_case_enabled = "Aktiv"
 train_case_fatigue = "Dauerlast"
 train_case_heading = "Lastfall {number}"
-train_case_kind = "Art"
 train_case_port = "Angreifend am"
 train_case_reacted = "Abgestützt"
 train_case_ultimate = "Höchstlast"
@@ -405,7 +404,6 @@ train_note_thickness_mod_worm = "über 1 wird der Schneckengang dicker und die R
 train_note_working_depth = "die Tiefe, in der die Unterschnittfrage gestellt wird"
 train_one_planet_no_neighbour = "ein einzelner Planet hat keinen Nachbarn"
 train_optimise_efficiency = "Wirkungsgradoptimierung"
-train_parallel_shafts_would_give = "dieselben Zähne mit parallelen Wellen ergäben {percent} % — die Differenz ist, was das Kreuzen kostet"
 train_patch = "Druckfläche {length} × {width} mm"
 train_pinion = "Ritzel"
 train_pitch_diameter = "Teilkreisdurchmesser"

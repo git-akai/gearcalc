@@ -1766,6 +1766,13 @@ one, which is a rule the reader has to infer from a control that stopped
 working; a train with no stages is one the core refuses, and the honest thing
 to do with that is not to arrive there.
 
+**A load case is the one exception, because none is a state the core answers.**
+A train with no load case is a shaft line — ratios, efficiencies and backlash
+stand, every rating row stands empty, and an automatic face width with nothing
+to ask stands at its box as it does with no source switched on. Nothing is
+refused, so nothing has to be replaced, and the two buttons under the list are
+how a case comes back.
+
 ### A control that exposes an assumption must not default to it
 
 A stage's `working_depth` — the depth the undercut question is asked at — follows

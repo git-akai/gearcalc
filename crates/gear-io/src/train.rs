@@ -271,6 +271,18 @@ mod tests {
         assert!((back.train.load_cases[0].speed - 3000.0).abs() < 1e-12);
     }
 
+    /// A train with no load cases is a shaft line and round-trips as one: the
+    /// empty list is written and read back, rather than dropped and defaulted.
+    #[test]
+    fn a_train_without_load_cases_round_trips() {
+        let mut doc = document();
+        doc.train.load_cases.clear();
+        let text = to_toml(&doc).unwrap();
+        assert!(text.contains("load_cases = []"), "{text}");
+        let back = from_toml(&text).unwrap();
+        assert!(back.train.load_cases.is_empty());
+    }
+
     /// A train with no stages parses as TOML and is not a train. Refused here
     /// rather than downstream, where it would arrive as an empty result.
     #[test]

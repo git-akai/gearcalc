@@ -82,7 +82,7 @@ use crate::contact::{Directional, Drive};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::MeshSide;
 use crate::note::{key, Note};
-use crate::params::{Auto, GearParams};
+use crate::params::GearParams;
 use crate::screw::{Screw, ZoneLimit};
 use crate::tooth::Tooth;
 
@@ -512,29 +512,6 @@ pub fn solve_crossed_pair(
         .as_ref()
         .map_or([true, true], |path| path.flank_interference(&s, ends));
 
-    // The same teeth with their shafts brought parallel — which the stage can
-    // describe exactly, since a crossed pair *is* this stage at `Σ = 0`. Here
-    // to be compared against, not to correct with (`CrossedMesh::parallel_axis_efficiency`).
-    let parallel = super::pair::solve_pair_stage(
-        &PairStage {
-            shaft_angle: 0.0,
-            // The same helix on the first member, read as the split: at Σ = 0
-            // the additional helix *is* the first member's angle.
-            sizing: Auto::fixed(super::FirstMemberSizing::AdditionalHelix(
-                stage.helix_angles()[0],
-            )),
-            // A comparison, not a design: the optimiser is not run on the
-            // counterpart, whatever the stage asked of its own mesh.
-            optimisation: super::Optimisation::default(),
-            ..stage.clone()
-        },
-        kind,
-        loads,
-        lib,
-    )
-    .ok()
-    .map(|r| r.mesh.efficiency.forward);
-
     let mut gears = Vec::with_capacity(2);
     // **The reverse is the same construction with the roles swapped.** Driving
     // forward the first member is the input and the wheel carries its torque
@@ -673,7 +650,6 @@ pub fn solve_crossed_pair(
                 limited_by: zone.map_or(ZoneLimit::Face, |z| z.0),
                 face_width_for_continuity: zone.and_then(|z| z.1),
                 axial_travel: zone.map_or([0.0; 2], |z| z.2),
-                parallel_axis_efficiency: parallel,
             }),
         },
         gears: [gears[0].clone(), gears[1].clone()],
@@ -741,6 +717,7 @@ fn angular_backlash(s: &Screw, stage: &PairStage, delta: f64, at: MeshSide) -> f
 mod tests {
     use super::super::{solve_pair_stage, FirstMemberSizing, StageGear};
     use super::*;
+    use crate::params::Auto;
 
     fn library() -> MaterialLibrary {
         super::super::test_library()
@@ -797,6 +774,31 @@ mod tests {
 
     fn solved(stage: &PairStage) -> PairResult {
         solve_pair_stage(stage, PairKind::Worm, &StageLoads::just(2.0), &library()).unwrap()
+    }
+
+    /// **The same teeth with their shafts brought parallel**, as an efficiency
+    /// — the best the pair can be, which a crossed figure is measured against
+    /// here and nowhere else. The stage can describe it exactly, since a
+    /// crossed pair *is* this stage at `Σ = 0`: the same helix on the first
+    /// member, read as the split, and no optimiser on the counterpart. It was
+    /// a field of every point contact once, solved for every crossed stage a
+    /// designer built and read by nothing but this comparison.
+    fn parallel_counterpart(stage: &PairStage, kind: PairKind) -> f64 {
+        solve_pair_stage(
+            &PairStage {
+                shaft_angle: 0.0,
+                sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(stage.helix_angles()[0])),
+                optimisation: super::super::Optimisation::default(),
+                ..stage.clone()
+            },
+            kind,
+            &StageLoads::just(2.0),
+            &library(),
+        )
+        .expect("the parallel counterpart is buildable")
+        .mesh
+        .efficiency
+        .forward
     }
 
     /// **A worm stage runs at the centre distance it was given** — by its
@@ -1548,7 +1550,7 @@ mod tests {
         let r = solve_crossed(&crossed, &StageLoads::just(2.0), &lib).unwrap();
         point(&r).point.expect("a path");
         assert!(
-            r.mesh.efficiency.forward < point(&r).point.unwrap().parallel_axis_efficiency.unwrap(),
+            r.mesh.efficiency.forward < parallel_counterpart(&crossed, PairKind::Spur),
             "a crossed pair must still lose more than the same teeth parallel"
         );
     }
@@ -1604,11 +1606,7 @@ mod tests {
                 "Σ={sigma}°: the face is cutting the zone, so this is not a \
                  like-for-like comparison"
             );
-            let parallel = point(&r)
-                .point
-                .unwrap()
-                .parallel_axis_efficiency
-                .expect("a parallel counterpart");
+            let parallel = parallel_counterpart(&stage(sigma), PairKind::Spur);
             assert!(
                 r.mesh.efficiency.forward < previous,
                 "Σ={sigma}°: turning the shafts further must cost more"
@@ -1629,11 +1627,7 @@ mod tests {
         // the same ordering holds against it: crossing the shafts to a right
         // angle costs a single-start worm most of what it had.
         let worm = solved(&PairStage::worm());
-        let parallel = point(&worm)
-            .point
-            .unwrap()
-            .parallel_axis_efficiency
-            .expect("a one-start helical gear on parallel shafts is buildable");
+        let parallel = parallel_counterpart(&PairStage::worm(), PairKind::Worm);
         assert!(
             worm.mesh.efficiency.forward < parallel,
             "the worm keeps {} against {parallel} with its shafts parallel",

@@ -74,7 +74,7 @@ low_efficiency = "rendimento do engrenamento {percent} %: a maior parte da entra
 
 [train]
 load_reacted_at = "é suportada no estágio {stage}, que não pode ser acionado neste sentido; os estágios seguintes não suportam nada dela"
-load_not_reacted = "não chega a nenhuma engrenagem: nada a suporta, pelo que a carga faz girar o trem em vez de ser suportada por ele"
+load_not_reacted = "a carga não chega a nenhuma engrenagem; nada a suporta e o trem fica livre para girar"
 
 [error]
 mesh_incompatible = "as engrenagens não podem engrenar: módulo, ângulo de pressão ou hélice diferem"
@@ -258,7 +258,6 @@ train_case_delivered = "Entregue"
 train_case_enabled = "Ativo"
 train_case_fatigue = "Fadiga"
 train_case_heading = "Caso de carga {number}"
-train_case_kind = "Tipo"
 train_case_port = "Aplicado em"
 train_case_reacted = "Suportado"
 train_case_ultimate = "Ruptura"
@@ -406,7 +405,6 @@ train_note_thickness_mod_worm = "acima de 1, o filete do sem-fim engrossa e os d
 train_note_working_depth = "a profundidade a que a questão do adelgaçamento é colocada"
 train_one_planet_no_neighbour = "um único planeta não tem vizinho"
 train_optimise_efficiency = "Otimização de rendimento"
-train_parallel_shafts_would_give = "os mesmos dentes com eixos paralelos dariam {percent} % — a diferença é o que cruzar os eixos custa"
 train_patch = "impressão {length} × {width} mm"
 train_pinion = "Pinhão"
 train_pitch_diameter = "Diâmetro primitivo"
