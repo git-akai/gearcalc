@@ -2064,7 +2064,7 @@ grounded member reacts nearly all of it.
 **No member of this stage is structurally reversed.** The wobble body carries
 two gears rather than one and each of them meshes once, so — unlike a planet,
 which the sun drives on one flank and the ring on the other — every root here is
-loaded one way unless the drive itself reverses.
+loaded one way unless a load case's duty reverses.
 
 **A shaper has to be smaller than the ring it cuts**, and these rings are small.
 A tool larger than its workpiece is clamped down to the ring's own tooth count
@@ -2149,11 +2149,12 @@ presses — so a case's direction is carried beside its torque rather than folde
 into a magnitude first. A parallel-axis pair distributes one tangential force
 the same way whichever end drives; a screw pair and an epicyclic set do not,
 and for them a load from each end is a different distribution and not a
-different size. Both epicyclic kinds solve their power flow once at unit
-torque and scale it, a power flow being linear in the torque through it; every
-rating is evaluated once at the largest torque a mesh carries in any case and
-each case is that scaled — bending linear in torque, contact as its square
-root — so a case carrying nothing is a scale of zero rather than a refusal.
+different size. A parallel-axis pair evaluates each case at its own load. The
+epicyclic kinds solve their power flow once at unit torque and scale it, a
+power flow being linear in the torque through it, and evaluate every rating
+once at the largest torque a mesh carries in any case, each case being that
+scaled — bending linear in torque, contact as its square root — so a case
+carrying nothing is a scale of zero rather than a refusal.
 
 A gear reports, per case, the torque it carries at its own radius, its speed,
 its speed **against the carrier of its mesh** (its own speed on a pair; a held

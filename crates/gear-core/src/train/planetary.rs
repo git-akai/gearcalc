@@ -343,7 +343,7 @@ pub fn solve_planetary_stage(
 
 /// The same, told how the train treats a root loaded on both flanks.
 ///
-/// **A planet's root always is**, whatever the drive does: the sun drives one
+/// **A planet's root always is**, whatever the load does: the sun drives one
 /// flank and the ring the other. So a planetary set is the stage kind where this
 /// is never idle — with the correction off, the planet is rated against the
 /// material's plain fatigue figure and the stage says the reversal is there and
@@ -2386,7 +2386,7 @@ mod tests {
         assert_eq!(
             width(&driven, &driven.planet.gear).to_bits(),
             width(&corrected, &corrected.planet.gear).to_bits(),
-            "a reversing drive cannot make a planet more reversed than it is"
+            "a reversing duty cannot make a planet more reversed than it is"
         );
     }
 

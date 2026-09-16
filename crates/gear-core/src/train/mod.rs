@@ -2679,7 +2679,7 @@ pub enum Duty {
         /// The shaft the sweep is measured at.
         at: Port,
         actuations: u32,
-        /// Whether the drive reverses between actuations.
+        /// Whether the duty reverses between actuations.
         ///
         /// It changes nothing but the **cycle count** and which roots are
         /// loaded both ways ([`loaded_cycles`], [`Reversal`]): each
@@ -2904,9 +2904,9 @@ impl StageLoads {
     }
 }
 
-/// How often a tooth is loaded, which is not one number once the drive reverses.
+/// How often a tooth is loaded, which is not one number once the duty reverses.
 ///
-/// Both counts are always reported and are the **same number** when the drive
+/// Both counts are always reported and are the **same number** when the duty
 /// does not reverse — the ordinary case as a value rather than behind a flag, so
 /// a reader can quote a range unconditionally.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -2917,10 +2917,10 @@ impl StageLoads {
     ts(export, export_to = "core/")
 )]
 pub struct Cycles {
-    /// Engagements the tooth root sees. A reversing drive loads **both** flanks
+    /// Engagements the tooth root sees. A reversing duty loads **both** flanks
     /// in bending, so every engagement counts.
     pub bending: f64,
-    /// Engagements one flank sees. A reversing drive shares them between the two
+    /// Engagements one flank sees. A reversing duty shares them between the two
     /// flanks, so each takes half; otherwise it is the same number as `bending`.
     pub contact: f64,
 }
