@@ -7,6 +7,7 @@ import type { MeshReport } from "./MeshReport";
 import type { Note } from "./Note";
 import type { PlanetResult } from "./PlanetResult";
 import type { PlanetaryShaft } from "./PlanetaryShaft";
+import type { ShaftsCase } from "./ShaftsCase";
 
 /**
  * Everything a planetary stage produces.
@@ -53,13 +54,10 @@ efficiency: Directional<number>,
  */
 backlash: Directional<Backlash>, 
 /**
- * Speeds `[sun, carrier, ring]`, rpm. The held shaft is exactly zero.
+ * Speeds and torques of `[sun, carrier, ring]` in every load case, each
+ * distributed in that case's own direction.
  */
-speeds: [number, number, number], 
-/**
- * Torques `[sun, carrier, ring]`, N·m. They sum to zero.
- */
-torques: [number, number, number], sun_planet: MeshReport, planet_ring: MeshReport, 
+cases: Array<ShaftsCase>, sun_planet: MeshReport, planet_ring: MeshReport, 
 /**
  * Planets can be spaced evenly: `(z_s + z_r) mod N = 0`.
  */

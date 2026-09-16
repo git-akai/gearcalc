@@ -1,23 +1,36 @@
-train  in 3000 rpm / 2.000 Nm peak   ->   out 29.7 rpm / 122.994 Nm peak
-       operating 2.000 Nm (100.0 % of peak)   back-driving 0.600 Nm at the output
-       total ratio 101.1765:1   total efficiency 60.782 % forward / 0.000 % backward  (cannot be back-driven)
-       note: the back-driving load is reacted at stage 2, which cannot be driven backward; stages before it carry none of it
+train  total ratio 101.1765:1   total efficiency 60.782 % forward / 0.000 % backward  (cannot be back-driven)
        backlash at the output shaft  0.15610 deg  (min 0.11342, max 0.19878)
        backlash at the input shaft   15.79344 deg  (min 11.47505, max 20.11231)
+       case 1  ultimate 2.000 Nm / 3000 rpm at start, held at the far end   ->   122.994 Nm / 29.7 rpm at end
+       case 2  ultimate 0.600 Nm / 0 rpm at end, held by nothing   ->   0.000 Nm / 0.0 rpm at start
+              note: held at stage 2, which cannot be driven this way; stages beyond it carry none of it
+       case 3  fatigue  2.000 Nm / 2400 rpm at start, held at the far end   ->   122.994 Nm / 23.7 rpm at end   1000 h
 
 stage 1  spur  z 17/43  beta 0 deg  ratio 2.5294  a_w 30.0257 mm  coprime
   contact ratio  transverse 1.5993   overlap 0.0000   total 1.5993
   efficiency 98.345 % forward / 98.345 % backward
-  contact at the pitch point  sigma_H 2097.6 / 2097.6 MPa peak/cyclic   rho 1.733 mm
-  gear          x     b mm   T fwd Nm   T bwd Nm   sigma_F peak/cyclic   sigma_H peak/cyclic       rpm   cycles bend/contact
-  1        0.0057    0.895     2.0000          -     750.0 /    750.0    2308.6 /   2308.6    3000.0   1.440e8 /  1.440e8
-  2        0.0000    0.895     5.0588          -     635.0 /    635.0    2097.6 /   2097.6    1186.0   5.693e7 /  5.693e7
+  contact at the pitch point  sigma_H 2097.6 / 0.0 / 2097.6 MPa by case   rho 1.733 mm
+  gear          x     b mm
+  1        0.0057    0.895
+      case 1  T     2.0000 Nm     3000.0 rpm  sigma_F    750.0  sigma_H   2308.6 MPa  cycles -
+      case 2  T     0.0000 Nm        0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -
+      case 3  T     2.0000 Nm     2400.0 rpm  sigma_F    750.0  sigma_H   2308.6 MPa  cycles 1.440e8 / 1.440e8
+  2        0.0000    0.895
+      case 1  T     5.0588 Nm     1186.0 rpm  sigma_F    635.0  sigma_H   2097.6 MPa  cycles -
+      case 2  T     0.0000 Nm        0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -
+      case 3  T     5.0588 Nm      948.8 rpm  sigma_F    635.0  sigma_H   2097.6 MPa  cycles 5.693e7 / 5.693e7
 
 stage 2  worm  z 1/40  ratio 40.0000  a 23.7273 mm  lead angle 8.2132 deg
   efficiency  61.805 % forward / 0.000 % backward  (cannot be back-driven)
-  contact  peak 4574.4 MPa  cyclic 4574.4 MPa   patch 2.1417 x 1.2984 mm   sliding 439.2 mm/s
-  member     b mm   T fwd Nm   T bwd Nm       rpm   cycles bend/contact   material
-  worm     13.539     4.9751     0.0000    1186.0   5.693e7 /  5.693e7   4340 Hardened Steel
-  wheel     4.690   122.9936     0.6000      29.7   1.423e6 /  1.423e6   Brass C360
+  contact  4574.4 / 772.0 / 4574.4 MPa by case   patch 2.1417 x 1.2984 mm   sliding 439.2 / 0.0 / 351.4 mm/s by case
+  member     b mm   material
+  worm     13.539   4340 Hardened Steel
+      case 1  T     4.9751 Nm     1186.0 rpm  sigma_F        -  sigma_H   4574.4 MPa  cycles -
+      case 2  T     0.0000 Nm        0.0 rpm  sigma_F        -  sigma_H    772.0 MPa  cycles -
+      case 3  T     4.9751 Nm      948.8 rpm  sigma_F        -  sigma_H   4574.4 MPa  cycles 5.693e7 / 5.693e7
+  wheel     4.690   Brass C360
+      case 1  T   122.9936 Nm       29.7 rpm  sigma_F        -  sigma_H   4574.4 MPa  cycles -
+      case 2  T     0.6000 Nm        0.0 rpm  sigma_F        -  sigma_H    772.0 MPa  cycles -
+      case 3  T   122.9936 Nm       23.7 rpm  sigma_F        -  sigma_H   4574.4 MPa  cycles 1.423e6 / 1.423e6
   bending not reported, flank type ZI - see docs/reference.md#crossed-axes
   note: self-locking: static μ 0.160 against a threshold of 0.1327, so the second member cannot drive the first

@@ -996,7 +996,11 @@ pub struct Defaults {
     /// front of a reader rather than about the mathematics — so it crosses the
     /// boundary like the other three and the front end decides who sees it.
     pub hula_stage: gear_core::train::Stage,
-    /// The fraction a reversed root's cyclic bending allowable is taken at.
+    /// One of each load case kind, for the "add load case" menu — and what a
+    /// train whose last case is removed is left with, as a stage is.
+    pub ultimate_case: gear_core::train::LoadCase,
+    pub fatigue_case: gear_core::train::LoadCase,
+    /// The fraction a reversed root's fatigue bending allowable is taken at.
     ///
     /// Crosses so the control's own note can name it. It is
     /// [`REVERSED_BENDING_FRACTION`](gear_core::material::REVERSED_BENDING_FRACTION)
@@ -1032,7 +1036,7 @@ pub struct GearTabDefaults {
 }
 
 fn defaults_impl() -> Result<String, String> {
-    use gear_core::train::{Actuation, PairStage, PlanetaryStage, Stage, Train};
+    use gear_core::train::{LoadCase, PairStage, PlanetaryStage, Port, Stage, Train};
 
     // The tab starts with an automatic face width, where the core's own
     // default is a plain 10 mm. Both are right for their caller: the CLI and
@@ -1099,23 +1103,31 @@ fn defaults_impl() -> Result<String, String> {
             eccentric_throw: 0.1,
         },
         train: Train {
-            input_speed: 30_000.0,
-            input_torque: 0.1,
-            // No back-driving load until one is entered, and a cyclic torque
-            // equal to the peak until one is: a fresh tab assumes no derating
-            // rather than a derating nobody asked for.
-            back_driving_torque: 0.0,
-            operating_torque: 0.1,
+            // The three loads a fresh train used to hold as fields: a peak at
+            // the start, held at the end; no load from the end until one is
+            // entered, and held by nothing but a stage that locks; and a
+            // fatigue load equal to the peak until one is entered — a fresh
+            // tab assumes no derating rather than a derating nobody asked for.
+            load_cases: vec![
+                LoadCase::ultimate(0.1, 30_000.0),
+                LoadCase {
+                    port: Port::End,
+                    reacted: false,
+                    ..LoadCase::ultimate(0.0, 0.0)
+                },
+                LoadCase::fatigue(0.1, 30_000.0),
+            ],
             // Off, like every other correction this crate could apply and does
             // not: a reversed root is disclosed rather than silently derated.
             reversed_bending: false,
-            actuation: Actuation::default(),
             stages: vec![Stage::Spur(spur.clone())],
         },
         spur_stage: Stage::Spur(spur),
         worm_stage: Stage::Worm(worm),
         planetary_stage: Stage::Planetary(Box::new(planetary)),
         hula_stage: Stage::Hula(Box::new(hula)),
+        ultimate_case: LoadCase::ultimate(0.1, 30_000.0),
+        fatigue_case: LoadCase::fatigue(0.1, 30_000.0),
         reverse_loading_coefficient: gear_core::material::REVERSED_BENDING_FRACTION,
     };
     serde_json::to_string(&defaults).map_err(|e| format!("could not encode defaults: {e}"))
@@ -1306,9 +1318,11 @@ mod tests {
 
         let train = serde_json::json!({
             "train": {
-                "input_speed": 1000.0, "input_torque": 1.0,
-                "back_driving_torque": 0.0, "operating_torque": 0.0,
-                "actuation": { "continuous": { "operating_speed": 1000.0, "runtime_hours": 1.0 } },
+                "load_cases": [
+                { "kind": "ultimate", "enabled": true, "port": "start", "reacted": true, "torque": 1.0, "speed": 1000.0, "duty": { "continuous": { "runtime_hours": 1.0 } } },
+                { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.0, "speed": 0.0, "duty": { "continuous": { "runtime_hours": 1.0 } } },
+                { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 0.0, "speed": 1000.0, "duty": { "continuous": { "runtime_hours": 1.0 } } }
+            ],
                 "stages": [stage],
             },
             "materials": null
@@ -1364,9 +1378,11 @@ mod tests {
         let document = serde_json::json!({
             "name": "Elevation drive",
             "train": {
-                "input_speed": 12_000.0,
-                "input_torque": 0.25, "back_driving_torque": 0.1, "operating_torque": 0.2,
-                "actuation": { "continuous": { "operating_speed": 9600.0, "runtime_hours": 1000.0 } },
+                "load_cases": [
+                { "kind": "ultimate", "enabled": true, "port": "start", "reacted": true, "torque": 0.25, "speed": 12_000.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
+                { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.1, "speed": 0.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
+                { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 0.2, "speed": 9600.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } }
+            ],
                 // Every stage kind, and a crossed pair too — which is a spur
                 // stage with its shafts at an angle, not a kind of its own.
                 "stages": [d["spur_stage"], crossed, d["worm_stage"], d["planetary_stage"]],
@@ -1402,8 +1418,11 @@ mod tests {
 
         let empty = serde_json::json!({
             "name": "no stages",
-            "train": { "input_speed": 1.0, "input_torque": 1.0, "back_driving_torque": 0.0, "operating_torque": 1.0,
-                       "actuation": { "intermittent": { "range_degrees": 25.0, "actuations": 10, "reversing": false } },
+            "train": { "load_cases": [
+                { "kind": "ultimate", "enabled": true, "port": "start", "reacted": true, "torque": 1.0, "speed": 1.0, "duty": { "intermittent": { "range_degrees": 25.0, "at": "end", "actuations": 10, "reversing": false } } },
+                { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.0, "speed": 0.0, "duty": { "intermittent": { "range_degrees": 25.0, "at": "end", "actuations": 10, "reversing": false } } },
+                { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 1.0, "speed": 1.0, "duty": { "intermittent": { "range_degrees": 25.0, "at": "end", "actuations": 10, "reversing": false } } }
+            ],
                        "stages": [] }
         });
         let text = export_train_impl(&empty.to_string()).unwrap();
@@ -1837,9 +1856,11 @@ mod tests {
     #[test]
     fn a_planetary_stage_crosses_the_boundary_with_its_own_shape() {
         let req = r#"{"train":{
-            "input_speed": 3000.0,
-            "input_torque": 2.0, "back_driving_torque": 0.0, "operating_torque": 1.6,
-            "actuation": { "continuous": { "operating_speed": 2400.0, "runtime_hours": 1000.0 } },
+            "load_cases": [
+                { "kind": "ultimate", "enabled": true, "port": "start", "reacted": true, "torque": 2.0, "speed": 3000.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
+                { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.0, "speed": 0.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
+                { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 1.6, "speed": 2400.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } }
+            ],
             "stages": [
               {"kind":"planetary",
                "module":1.0,"pressure_angle":20.0,"helix_angle":0.0,
@@ -1851,9 +1872,9 @@ mod tests {
                "clearance":{"auto":false,"manual":0.02},"tolerance_plus":0.02,"tolerance_minus":0.02,
                "min_planet_clearance":0.3,
                "cutter":{"teeth":20,"addendum":1.25,"tip_round":0.2},
-               "sun":{"teeth":24,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},"material":"4340 Hardened Steel"},
-               "planet":{"teeth":18,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},"material":"4340 Hardened Steel"},
-               "ring":{"teeth":60,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},"material":"4340 Hardened Steel"}
+               "sun":{"teeth":24,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},"material":"4340 Hardened Steel"},
+               "planet":{"teeth":18,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},"material":"4340 Hardened Steel"},
+               "ring":{"teeth":60,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},"material":"4340 Hardened Steel"}
               }
             ]}}"#;
 
@@ -1866,12 +1887,14 @@ mod tests {
         assert_eq!(stage["output"], "carrier");
         assert_eq!(stage["arrangement"]["fixed"], "ring");
 
-        // Three shafts, the held one exactly still, and the torques balancing.
-        let speeds = stage["speeds"].as_array().unwrap();
+        // Three shafts, the held one exactly still, and the torques balancing
+        // — in the first load case, at its own speed.
+        let shafts = &stage["cases"][0];
+        let speeds = shafts["speeds"].as_array().unwrap();
         assert_eq!(speeds.len(), 3);
         assert_eq!(speeds[2].as_f64().unwrap(), 0.0, "the ring is held");
         assert!((speeds[0].as_f64().unwrap() - 3000.0).abs() < 1e-9);
-        let sum: f64 = stage["torques"]
+        let sum: f64 = shafts["torques"]
             .as_array()
             .unwrap()
             .iter()
@@ -1910,23 +1933,23 @@ mod tests {
                     .unwrap()
                     > 1.0
             );
-            for case in ["peak", "cyclic"] {
-                assert!(
-                    stage[mesh]["contact"][case]["at_pitch_point"]
-                        .as_f64()
-                        .unwrap()
-                        > 0.0
-                );
+            // The two cases that carry a load press the flanks; the one from
+            // the end carries nothing and presses with exactly nothing.
+            for (case, loaded) in [(0, true), (1, false), (2, true)] {
+                let pressure = stage[mesh]["cases"][case]["contact"]["at_pitch_point"]
+                    .as_f64()
+                    .unwrap();
+                assert_eq!(pressure > 0.0, loaded, "{mesh} case {case}: {pressure}");
             }
         }
         for who in ["sun", "ring"] {
             assert!(
-                stage[who]["bending_stress"]["peak"].as_f64().unwrap() > 0.0,
+                stage[who]["cases"][0]["bending_stress"].as_f64().unwrap() > 0.0,
                 "{who} must be rated"
             );
         }
         assert!(
-            stage["planet"]["gear"]["bending_stress"]["peak"]
+            stage["planet"]["gear"]["cases"][0]["bending_stress"]
                 .as_f64()
                 .unwrap()
                 > 0.0
@@ -1961,11 +1984,11 @@ mod tests {
     fn a_hula_stage_crosses_the_boundary_carrying_its_ratings() {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let train = serde_json::json!({"train": {
-            "input_speed": 3000.0,
-            "input_torque": 2.0,
-            "back_driving_torque": 0.0,
-            "operating_torque": 1.0,
-            "actuation": { "continuous": { "operating_speed": 3000.0, "runtime_hours": 1.0 } },
+            "load_cases": [
+                { "kind": "ultimate", "enabled": true, "port": "start", "reacted": true, "torque": 2.0, "speed": 3000.0, "duty": { "continuous": { "runtime_hours": 1.0 } } },
+                { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.0, "speed": 0.0, "duty": { "continuous": { "runtime_hours": 1.0 } } },
+                { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 1.0, "speed": 3000.0, "duty": { "continuous": { "runtime_hours": 1.0 } } }
+            ],
             "stages": [d["hula_stage"]],
         }});
         let v = solved(&train.to_string());
@@ -1980,8 +2003,11 @@ mod tests {
             assert!(g["tip_radius"].as_f64().unwrap() > 0.0, "gear {i}");
             let rated = &g["gear"];
             assert!(rated["face_width"].as_f64().unwrap() > 0.0, "gear {i}");
-            assert!(rated["torque"].as_f64().unwrap().abs() > 0.0, "gear {i}");
-            assert!(rated["contact_stress"]["peak"].as_f64().unwrap() > 0.0);
+            assert!(
+                rated["cases"][0]["torque"].as_f64().unwrap().abs() > 0.0,
+                "gear {i}"
+            );
+            assert!(rated["cases"][0]["contact_stress"].as_f64().unwrap() > 0.0);
             assert!(
                 rated["material"]["name"].as_str().is_some(),
                 "gear {i} was rated on a material"
@@ -1989,11 +2015,13 @@ mod tests {
             // **A grounded gear is loaded**, which is the case a count taken
             // from a member's own revolutions could not state.
             assert!(
-                rated["tooth_cycles"]["bending"].as_f64().unwrap() > 0.0,
+                rated["cases"][2]["cycles"]["bending"].as_f64().unwrap() > 0.0,
                 "gear {i} is engaged once a crank turn at least"
             );
+            // ...and an ultimate case counts nothing.
+            assert!(rated["cases"][0]["cycles"].is_null(), "gear {i}");
         }
-        assert_eq!(gears[0]["gear"]["speed"].as_f64().unwrap(), 0.0);
+        assert_eq!(gears[0]["gear"]["cases"][0]["speed"].as_f64().unwrap(), 0.0);
 
         // Two meshes, each reporting what any parallel-axis mesh reports, under
         // the one key the panel reads it by.
@@ -2012,7 +2040,7 @@ mod tests {
                     > 0.0
             );
             assert!(
-                mesh["report"]["contact"]["peak"]["at_pitch_point"]
+                mesh["report"]["cases"][0]["contact"]["at_pitch_point"]
                     .as_f64()
                     .unwrap()
                     > 0.0
@@ -2021,7 +2049,7 @@ mod tests {
         }
         // The three shafts are in equilibrium, and the drive says so in the
         // vocabulary a stage says anything in.
-        let sum: f64 = stage["shaft_torques"]
+        let sum: f64 = stage["cases"][0]["torques"]
             .as_array()
             .unwrap()
             .iter()
@@ -2034,9 +2062,11 @@ mod tests {
     #[test]
     fn a_mixed_train_crosses_the_boundary_with_both_shapes_intact() {
         let req = r#"{"train":{
-            "input_speed": 3000.0,
-            "input_torque": 2.0, "back_driving_torque": 0.0, "operating_torque": 1.6,
-            "actuation": { "continuous": { "operating_speed": 2400.0, "runtime_hours": 1000.0 } },
+            "load_cases": [
+                { "kind": "ultimate", "enabled": true, "port": "start", "reacted": true, "torque": 2.0, "speed": 3000.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
+                { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.0, "speed": 0.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
+                { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 1.6, "speed": 2400.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } }
+            ],
             "stages": [
               {"kind":"spur",
                "module":1.0,"pressure_angle":20.0,"sizing":{"auto":false,"manual":{"additional_helix":0.0}},"sliding_friction":0.06,"static_friction":0.16,
@@ -2048,13 +2078,13 @@ mod tests {
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":0.0},
-                  "face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},
+                  "face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},
                   "material":"4340 Hardened Steel"},
                  {"teeth":43,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":0.0},
-                  "face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},
+                  "face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},
                   "material":"4340 Hardened Steel"}
                ]},
               {"kind":"worm",
@@ -2069,13 +2099,13 @@ mod tests {
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":false,"manual":10.0},
-                  "face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},
+                  "face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},
                   "material":"4340 Hardened Steel"},
                  {"teeth":40,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":10.0},
-                  "face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},
+                  "face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},
                   "material":"Brass C360"}
                ]}
             ]}}"#;
@@ -2100,7 +2130,7 @@ mod tests {
         assert_eq!(v["stages"][0]["mesh"]["sliding_ratio"], 0.0);
         assert!(v["stages"][1]["mesh"]["sliding_ratio"].as_f64().unwrap() > 1.0);
         assert!(
-            v["stages"][0]["gears"][0]["bending_stress"]["peak"]
+            v["stages"][0]["gears"][0]["cases"][0]["bending_stress"]
                 .as_f64()
                 .unwrap()
                 > 0.0
@@ -2112,7 +2142,12 @@ mod tests {
             "a worm stage's members are gears like any other"
         );
         let mesh = &worm["mesh"];
-        assert!(mesh["contact"]["peak"]["max_pressure"].as_f64().unwrap() > 0.0);
+        assert!(
+            mesh["cases"][0]["contact"]["max_pressure"]
+                .as_f64()
+                .unwrap()
+                > 0.0
+        );
         let eff = &mesh["efficiency"];
         assert!(eff["backward"].as_f64().unwrap() < eff["forward"].as_f64().unwrap());
         // ...while the spur stage puts the same number in both, which is the
@@ -2132,9 +2167,9 @@ mod tests {
         assert!(v["total_efficiency"]["forward"].as_f64().unwrap() > 0.0);
         assert!(v["backlash"]["forward"]["nominal"].as_f64().unwrap() > 0.0);
         assert!(v["backlash"]["backward"]["nominal"].as_f64().unwrap() > 0.0);
-        // The sliding speed could only be filled once the shaft line was known.
-        assert!(mesh["sliding_velocity"].as_f64().unwrap() > 0.0);
-        assert!(worm["gears"][1]["speed"].as_f64().unwrap() > 0.0);
+        // The sliding speed is each case's own, at that case's speed.
+        assert!(mesh["cases"][0]["sliding_velocity"].as_f64().unwrap() > 0.0);
+        assert!(worm["gears"][1]["cases"][0]["speed"].as_f64().unwrap() > 0.0);
     }
 
     /// **Every number that crosses is a number**, or a `null` at a field that is
@@ -2167,18 +2202,14 @@ mod tests {
         // ...and a crossed pair's members have none by decision: a point
         // contact tracking across the flank is not the load a cantilever
         // formula measures (docs/rationale.md#a-worm-stage-reports-no-bending-stress).
-        // As a path, because `peak` and `cyclic` name every rated figure.
-        "bending_stress.peak",
-        "bending_stress.cyclic",
-        // No back-driving load reaches this gear, because something upstream
-        // reacted it or nothing did.
-        "back_driving_torque",
+        // An ultimate case is survived once and counts no cycles.
+        "cycles",
+        // No stage held the load: the far end did, or nothing did.
+        "reacted_at",
         // Nothing held the crank open at the clearance minimum.
         "binding_mesh",
         // A single planet has no neighbour to clear.
         "planet_clearance",
-        // No peak torque, so no fraction of it.
-        "operating_torque_percent",
         // A crossed gear pair is not a worm and has no published proportions,
         // and no parallel-axis member has any either.
         "recommended_face_width",
@@ -2215,8 +2246,7 @@ mod tests {
         // **Written as a path rather than as a field**, because `contact` is
         // also a tooth-cycle count and a face-width toggle, and allowing the
         // bare name would stop this noticing if either of those went absent.
-        "min_face_width.peak.contact",
-        "min_face_width.cyclic.contact",
+        "min_face_width.contact",
     ];
 
     /// Every `null` in a result, at a field not named above.
@@ -2290,11 +2320,28 @@ mod tests {
         assert_eq!(d["gear"]["eccentric_throw"], 0.1);
         assert_eq!(d["gear"]["reference_circles"], true);
 
-        // A fresh train: a small motor, and no derating nobody asked for.
-        assert_eq!(d["train"]["input_speed"], 30_000.0);
-        assert_eq!(d["train"]["input_torque"], 0.1);
-        assert_eq!(d["train"]["operating_torque"], 0.1);
-        assert_eq!(d["train"]["back_driving_torque"], 0.0);
+        // A fresh train: a small motor, and no derating nobody asked for —
+        // the three cases a train used to hold as fields, in that order.
+        let cases = d["train"]["load_cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 3);
+        assert_eq!(cases[0]["kind"], "ultimate");
+        assert_eq!(cases[0]["port"], "start");
+        assert_eq!(cases[0]["reacted"], true);
+        assert_eq!(cases[0]["speed"], 30_000.0);
+        assert_eq!(cases[0]["torque"], 0.1);
+        assert_eq!(cases[1]["kind"], "ultimate");
+        assert_eq!(cases[1]["port"], "end");
+        assert_eq!(cases[1]["reacted"], false);
+        assert_eq!(cases[1]["torque"], 0.0);
+        assert_eq!(cases[2]["kind"], "fatigue");
+        assert_eq!(cases[2]["torque"], 0.1);
+        assert_eq!(cases[2]["duty"]["intermittent"]["at"], "end");
+        for c in cases {
+            assert_eq!(c["enabled"], true);
+        }
+        // ...and the two a picker adds, which are the first and last of them.
+        assert_eq!(d["ultimate_case"], cases[0]);
+        assert_eq!(d["fatigue_case"], cases[2]);
         assert_eq!(d["train"]["reversed_bending"], false);
 
         // **The face width a panel seeds, on every gear of every stage kind it
@@ -2346,19 +2393,19 @@ mod tests {
         for g in bare["gears"].as_array_mut().unwrap() {
             g["face_width"] = serde_json::json!({ "auto": true, "manual": 6.0 });
             g["face_sources"] = serde_json::json!({
-                "bending": { "peak": false, "cyclic": false },
-                "contact": { "peak": false, "cyclic": false },
+                "bending": { "ultimate": false, "fatigue": false },
+                "contact": { "ultimate": false, "fatigue": false },
             });
         }
         stages.push(bare);
 
         for (i, stage) in stages.iter().enumerate() {
             let train = serde_json::json!({ "train": {
-                "input_speed": 3000.0,
-                "input_torque": 2.0,
-                "back_driving_torque": 0.0,
-                "operating_torque": 1.0,
-                "actuation": { "continuous": { "operating_speed": 3000.0, "runtime_hours": 1.0 } },
+                "load_cases": [
+                { "kind": "ultimate", "enabled": true, "port": "start", "reacted": true, "torque": 2.0, "speed": 3000.0, "duty": { "continuous": { "runtime_hours": 1.0 } } },
+                { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.0, "speed": 0.0, "duty": { "continuous": { "runtime_hours": 1.0 } } },
+                { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 1.0, "speed": 3000.0, "duty": { "continuous": { "runtime_hours": 1.0 } } }
+            ],
                 "stages": [stage],
             }});
             let v = solved(&train.to_string());
@@ -2419,9 +2466,11 @@ mod tests {
         // The shape the UI will send: a train, and no library, meaning "use the
         // one you ship with".
         let req = r#"{"train":{
-            "input_speed": 3000.0,
-            "input_torque": 2.0, "back_driving_torque": 0.0, "operating_torque": 1.6,
-            "actuation": { "continuous": { "operating_speed": 2400.0, "runtime_hours": 1000.0 } },
+            "load_cases": [
+                { "kind": "ultimate", "enabled": true, "port": "start", "reacted": true, "torque": 2.0, "speed": 3000.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
+                { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.0, "speed": 0.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
+                { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 1.6, "speed": 2400.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } }
+            ],
             "stages": [
               {"kind":"spur",
                "module":1.0,"pressure_angle":20.0,"sizing":{"auto":false,"manual":{"additional_helix":0.0}},"sliding_friction":0.06,"static_friction":0.16,
@@ -2433,27 +2482,28 @@ mod tests {
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":0.0},
-                  "face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},
+                  "face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},
                   "material":"4340 Hardened Steel"},
                  {"teeth":43,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},
                   "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
                   "dedendum":1.25,"root_radius":0.38,
                   "face_width":{"auto":true,"manual":0.0},
-                  "face_sources":{"bending":{"peak":true,"cyclic":true},"contact":{"peak":true,"cyclic":true}},
+                  "face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},
                   "material":"4340 Hardened Steel"}
                ]}
             ]}}"#;
 
         let v = solved(req);
         assert!((v["total_ratio"].as_f64().unwrap() - 43.0 / 17.0).abs() < 1e-12);
-        assert!(v["output_torque"].as_f64().unwrap() > 2.0);
+        assert!(v["cases"][0]["delivered_torque"].as_f64().unwrap() > 2.0);
+        assert_eq!(v["cases"][0]["delivered_at"], "end");
 
         let g0 = &v["stages"][0]["gears"][0];
         // The automatic face width came back, and so did the cycle count.
         assert!(g0["face_width"].as_f64().unwrap() > 0.0);
-        assert!(g0["tooth_cycles"]["bending"].as_f64().unwrap() > 0.0);
-        assert!(g0["tooth_cycles"]["contact"].as_f64().unwrap() > 0.0);
-        assert!((g0["speed"].as_f64().unwrap() - 3000.0).abs() < 1e-9);
+        assert!(g0["cases"][2]["cycles"]["bending"].as_f64().unwrap() > 0.0);
+        assert!(g0["cases"][2]["cycles"]["contact"].as_f64().unwrap() > 0.0);
+        assert!((g0["cases"][0]["speed"].as_f64().unwrap() - 3000.0).abs() < 1e-9);
         // Spur stage: the overlap ratio is exactly zero, not merely small.
         assert_eq!(
             v["stages"][0]["mesh"]["line"]["contact_ratios"]["overlap"]
@@ -2489,8 +2539,11 @@ mod tests {
 
     #[test]
     fn a_train_that_cannot_be_solved_says_why() {
-        let bad = r#"{"train":{"input_speed":1.0,"input_torque":1.0,"back_driving_torque":0.0,"operating_torque":1.0,
-            "actuation":{"intermittent":{"range_degrees":25.0,"actuations":1000,"reversing":false}},
+        let bad = r#"{"train":{"load_cases": [
+                { "kind": "ultimate", "enabled": true, "port": "start", "reacted": true, "torque": 1.0, "speed": 1.0, "duty": { "intermittent": { "range_degrees": 25.0, "at": "end", "actuations": 1000, "reversing": false } } },
+                { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.0, "speed": 0.0, "duty": { "intermittent": { "range_degrees": 25.0, "at": "end", "actuations": 1000, "reversing": false } } },
+                { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 1.0, "speed": 1.0, "duty": { "intermittent": { "range_degrees": 25.0, "at": "end", "actuations": 1000, "reversing": false } } }
+            ],
             "stages":[]}}"#;
         let v: serde_json::Value = serde_json::from_str(&solve_train_impl(bad).unwrap()).unwrap();
         assert!(v["result"].is_null(), "an empty train has no answer");

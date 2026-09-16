@@ -56,6 +56,19 @@
 //!   written before this had no shifts or addenda to carry; `profile_shift =
 //!   { auto = false, manual = 0.0 }` on the worm and automatic on the wheel is
 //!   the convention it meant.
+//! - **The train's loads became a list.** `input_speed`, `input_torque`,
+//!   `back_driving_torque`, `operating_torque` and `actuation` are gone, and
+//!   `[[train.load_cases]]` holds any number of loads, each with a `kind`
+//!   (`ultimate` or `fatigue`), `enabled`, a `port` (`start` or `end`), whether
+//!   it is `reacted` at the far end, its `torque` and `speed` at that port, and
+//!   a `duty` a fatigue case is counted over. What a pre-existing file meant is
+//!   three cases: `kind = "ultimate"`, `port = "start"`, `reacted = true` at
+//!   the input torque and speed; `kind = "ultimate"`, `port = "end"`,
+//!   `reacted = false` at the back-driving torque; and `kind = "fatigue"`,
+//!   `port = "start"`, `reacted = true` at the operating torque, with the
+//!   actuation as its `duty` — an intermittent one gaining `at = "end"`, the
+//!   port its range was always measured at, and a continuous one losing its
+//!   `operating_speed` to the case's own `speed`.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
@@ -156,7 +169,9 @@ pub fn to_toml(doc: &TrainDocument) -> Result<String, TrainError> {
 mod tests {
     use super::*;
     use gear_core::params::Auto;
-    use gear_core::train::{Actuation, FirstMemberSizing, PairStage, PlanetaryStage, Stage};
+    use gear_core::train::{
+        Duty, FirstMemberSizing, LoadCase, PairStage, PlanetaryStage, Port, Stage,
+    };
 
     /// One of every stage kind, so the `kind` tag is exercised in both
     /// directions and no variant can quietly stop round-tripping.
@@ -164,15 +179,29 @@ mod tests {
         TrainDocument {
             name: "Test train".into(),
             train: Train {
-                input_speed: 12_000.0,
-                input_torque: 0.25,
-                back_driving_torque: 0.1,
-                operating_torque: 0.2,
+                // One of every kind at every port, and both duties, so the
+                // tags and the nested tables are exercised in both directions.
+                load_cases: vec![
+                    LoadCase::ultimate(0.25, 12_000.0),
+                    LoadCase {
+                        port: Port::End,
+                        reacted: false,
+                        enabled: false,
+                        ..LoadCase::ultimate(0.1, 0.0)
+                    },
+                    LoadCase {
+                        duty: Duty::Continuous {
+                            runtime_hours: 1000.0,
+                        },
+                        ..LoadCase::fatigue(0.2, 9600.0)
+                    },
+                    LoadCase {
+                        port: Port::End,
+                        reacted: true,
+                        ..LoadCase::fatigue(0.05, 100.0)
+                    },
+                ],
                 reversed_bending: false,
-                actuation: Actuation::Continuous {
-                    operating_speed: 9600.0,
-                    runtime_hours: 1000.0,
-                },
                 stages: vec![
                     Stage::Spur(PairStage {
                         sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(15.0)),
@@ -213,7 +242,8 @@ mod tests {
 
     /// The file is meant to be read and edited by a person, so the things a
     /// person needs are checked: the header, the name at the top, and a
-    /// `kind` on every stage rather than meaning carried by position.
+    /// `kind` on every stage and every load case rather than meaning carried
+    /// by position.
     #[test]
     fn the_document_says_what_it_is() {
         let text = to_toml(&document()).unwrap();
@@ -222,10 +252,10 @@ mod tests {
         assert!(text.contains("name = \"Test train\""));
         assert_eq!(
             text.matches("kind = ").count(),
-            5,
-            "one tag a stage:\n{text}"
+            5 + 4,
+            "one tag a stage and one a load case:\n{text}"
         );
-        for kind in ["spur", "worm", "planetary", "hula"] {
+        for kind in ["spur", "worm", "planetary", "hula", "ultimate", "fatigue"] {
             assert!(text.contains(&format!("kind = \"{kind}\"")), "no {kind}");
         }
     }
@@ -234,12 +264,11 @@ mod tests {
     /// answer. Nothing here trusts the writer: the value is changed in the text.
     #[test]
     fn an_edit_to_the_text_survives_the_read() {
-        let text = to_toml(&document()).unwrap().replace(
-            "input_speed = 12000.0",
-            "input_speed = 3000.0 # slowed down by hand",
-        );
+        let text = to_toml(&document())
+            .unwrap()
+            .replace("speed = 12000.0", "speed = 3000.0 # slowed down by hand");
         let back = from_toml(&text).unwrap();
-        assert!((back.train.input_speed - 3000.0).abs() < 1e-12);
+        assert!((back.train.load_cases[0].speed - 3000.0).abs() < 1e-12);
     }
 
     /// A train with no stages parses as TOML and is not a train. Refused here

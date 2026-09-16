@@ -68,10 +68,8 @@ near_forward_locking = "接近无法正向驱动：静摩擦系数 μ {friction}
 low_efficiency = "啮合效率 {percent} %：大部分输入功率变为热量，通常在应力之前就限制了交错轴级"
 
 [train]
-operating_torque_clamped = "工作扭矩已限制为 {torque} Nm：不得超过峰值"
-operating_speed_clamped = "工作转速已限制为 {speed} rpm：不得超过峰值"
-back_driving_reacted_at = "反驱载荷由第 {stage} 级承受，该级无法被反向驱动；其之前的各级不承担任何反驱载荷"
-back_driving_not_reacted = "反驱载荷未传到任何齿轮：每一级都可被反向驱动，因此该载荷只会带动整个轮系，而不会被它承受"
+load_reacted_at = "由第 {stage} 级承受，该级无法沿此方向被驱动；其之后的各级不承担任何该载荷"
+load_not_reacted = "未传到任何齿轮：没有任何构件承受该载荷，因此它只会带动整个轮系，而不会被它承受"
 
 [error]
 mesh_incompatible = "这两个齿轮无法啮合：模数、压力角或螺旋角不一致"

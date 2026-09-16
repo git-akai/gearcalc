@@ -23,8 +23,8 @@
 //! record (`docs/history/audit.md`, F83) what deleting it moved: nothing.
 
 use super::{
-    Backlash, Case, ContactPatch, ContactRatios, GearResult, LoadCase, Loading, MemberRating,
-    PairResult, StageGear, StageTorques, TrainError, PROBE,
+    Backlash, CaseLoadings, ContactPatch, ContactRatios, GearResult, Loading, MemberRating,
+    PairResult, StageGear, StageLoads, TrainError, PROBE,
 };
 use crate::auto::automatic_profile_shift;
 use crate::contact::{efficiency, ContactPath, Directional, LoadSharing};
@@ -875,16 +875,16 @@ impl PairStage {
 pub fn solve_pair_stage(
     stage: &PairStage,
     kind: PairKind,
-    torques: StageTorques,
+    loads: &StageLoads,
     lib: &MaterialLibrary,
 ) -> Result<PairResult, TrainError> {
-    solve_pair_stage_with(stage, kind, torques, lib, super::Reversal::default())
+    solve_pair_stage_with(stage, kind, loads, lib, super::Reversal::default())
 }
 
 /// The same, told how the train treats a root loaded on both flanks.
 ///
-/// A parallel-axis gear reverses only when the **drive** does, so with an
-/// ordinary one-way drive this is the call above and nothing moves.
+/// A parallel-axis gear reverses only when a load case's **duty** does, so
+/// with ordinary one-way loads this is the call above and nothing moves.
 ///
 /// # Errors
 ///
@@ -892,22 +892,22 @@ pub fn solve_pair_stage(
 pub fn solve_pair_stage_with(
     stage: &PairStage,
     kind: PairKind,
-    torques: StageTorques,
+    loads: &StageLoads,
     lib: &MaterialLibrary,
     reversal: super::Reversal,
 ) -> Result<PairResult, TrainError> {
     // The size once, before anything reads a helix angle off it.
     let sized = stage.sized();
     if sized.is_crossed() {
-        return super::crossed::solve_crossed_pair(&sized, kind, torques, lib);
+        return super::crossed::solve_crossed_pair(&sized, kind, loads, lib);
     }
-    solve_parallel(&sized, torques, lib, reversal)
+    solve_parallel(&sized, loads, lib, reversal)
 }
 
 /// The parallel-axis mesh: line contact, a bending rating, one efficiency.
 fn solve_parallel(
     stage: &PairStage,
-    torques: StageTorques,
+    loads: &StageLoads,
     lib: &MaterialLibrary,
     reversal: super::Reversal,
 ) -> Result<PairResult, TrainError> {
@@ -1004,11 +1004,14 @@ fn solve_parallel(
     let load_share = [bending[0].share, bending[1].share];
     let rims = [bending[0].rim, bending[1].rim];
 
-    // Every rating at a probe width, one set per load case. `b_min` does not
-    // depend on the `b` it was measured at, so this is still one evaluation per
-    // case and nothing iterates.
-    let probe = |case| -> Result<(crate::strength::ContactStress, [Option<f64>; 2]), TrainError> {
-        let load = Load::new(torques.at(case), PROBE);
+    // Every rating at one width, one set per load case. `b_min` does not
+    // depend on the `b` it was measured at, so the probe pass is still one
+    // evaluation per case and nothing iterates. **A parallel-axis mesh carries
+    // one tangential force whichever way it turns**, so a case's direction
+    // changes nothing here and only its torque is read.
+    type Evaluated = (crate::strength::ContactStress, [Option<f64>; 2]);
+    let rate = |torque: f64, width: f64| -> Result<Evaluated, TrainError> {
+        let load = Load::new(torque, width);
         let cs = contact_stress(&path, &operating, &g[0], PARALLEL_AXES, &load, e_star)
             .ok_or(TrainError::NoContact)?;
         let sf = [0usize, 1].map(|i| {
@@ -1026,39 +1029,40 @@ fn solve_parallel(
         });
         Ok((cs, sf))
     };
-    let probed = LoadCase {
-        peak: probe(Case::Peak)?,
-        cyclic: probe(Case::Cyclic)?,
+    let rate_all = |width: f64| -> Result<Vec<Evaluated>, TrainError> {
+        loads.cases.iter().map(|c| rate(c.torque, width)).collect()
     };
+    let probed = rate_all(PROBE)?;
 
-    // A parallel-axis gear's root is loaded both ways only when the drive
-    // reverses; nothing about the pair itself reverses it.
-    let reverses = reversal.reverses(false);
     // **A pair is one mesh, so each member is in a list of one** — and it says
     // so through the same type an epicyclic set's planet says it is in two.
     // What is this stage's own is that each load case is *evaluated* rather
     // than scaled: it has its own torque, and nothing here has to claim the
-    // stresses are linear in it (`Loading::both_cases` is that claim, and the
+    // stresses are linear in it (`Loading::for_cases` is that claim, and the
     // stages that make it are the ones whose power split does not depend on the
     // magnitude passing through them).
-    let rating = |i: usize,
-                  at: &LoadCase<(crate::strength::ContactStress, [Option<f64>; 2])>,
-                  measured_at: f64,
-                  carried_at: f64| MemberRating {
+    let rating = |i: usize, at: &[Evaluated], measured_at: f64, carried_at: f64| MemberRating {
         material: &materials[i],
         reversal,
-        reverses,
-        loadings: LoadCase::of(|case| {
-            let (cs, sf) = at.get(case);
-            vec![Loading {
-                bending: sf[i],
-                // **This gear's** governing point, not the pair's envelope: the
-                // width a gear needs follows from the stress it is rated at.
-                contact: cs.governing(i),
-                measured_at,
-                carried_at,
-            }]
-        }),
+        // Nothing about the pair itself reverses a root; a case's duty may.
+        always_reverses: false,
+        cases: loads
+            .cases
+            .iter()
+            .zip(at)
+            .map(|(load, (cs, sf))| CaseLoadings {
+                load: *load,
+                meshes: vec![Loading {
+                    bending: sf[i],
+                    // **This gear's** governing point, not the pair's envelope:
+                    // the width a gear needs follows from the stress it is
+                    // rated at.
+                    contact: cs.governing(i),
+                    measured_at,
+                    carried_at,
+                }],
+            })
+            .collect(),
     };
 
     let mut notes = Vec::new();
@@ -1073,8 +1077,8 @@ fn solve_parallel(
         // can prevent once a shift is given and `no undercut` is off.
         out.extend(super::undercut_note(&g[i]));
         // ...and whether this root is loaded both ways, which for a parallel
-        // pair is the drive's doing alone.
-        out.extend(reversal.note_for(reverses));
+        // pair is a duty's doing alone.
+        out.extend(reversal.note_for(loads.any_reverse()));
         // **A bound that moved this gear's own number belongs to this gear.**
         // A note naming an input is one the reader wants under that input, not
         // in a list at the foot of the stage where they have to match it back
@@ -1117,60 +1121,40 @@ fn solve_parallel(
     // are rated at the smaller width regardless of which one owns it.
     let effective = widths[0].min(widths[1]);
 
-    // Every rating again, at the width actually in force. Two evaluations
-    // rather than one, and the same expression: a load case is a torque, and
-    // nothing else about the stage knows which one it is looking at.
-    let rate =
-        |case: Case| -> Result<(crate::strength::ContactStress, [Option<f64>; 2]), TrainError> {
-            let load = Load::new(torques.at(case), effective);
-            let cs = contact_stress(&path, &operating, &g[0], PARALLEL_AXES, &load, e_star)
-                .ok_or(TrainError::NoContact)?;
-            let sf = [0usize, 1].map(|i| {
-                let li = load.across_mesh(&g[0], &g[i]);
-                // The share this tooth carries where it is rated — exactly 1 unless
-                // a sharing model was asked for, so nothing scales by default.
-                bending_stress(
-                    &sections[i],
-                    li.tangential(&g[i]),
-                    li.face_width,
-                    RootStressModel::DolanBroghamer,
-                    rims[i],
-                )
-                .map(|s| s * load_share[i])
-            });
-            Ok((cs, sf))
-        };
-    let rated = LoadCase {
-        peak: rate(Case::Peak)?,
-        cyclic: rate(Case::Cyclic)?,
-    };
-    // **The rating and the reported torque are different questions.** The peak
-    // *case* is rated at whichever direction loads the teeth harder, which is
-    // what `rated.peak` used; the torque a gear is labelled with is the one it
-    // carries driving **forward**, with the back-driving figure reported beside
-    // it rather than folded into it.
-    let load = Load::new(torques.peak_forward, effective);
+    // Every rating again, at the width actually in force. One evaluation per
+    // case and the same expression: a load case is a torque, and nothing else
+    // about the stage knows which one it is looking at.
+    let rated = rate_all(effective)?;
+    let ratio = f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth);
 
     let mut gears = Vec::with_capacity(2);
     for i in 0..2 {
-        let load_i = load.across_mesh(&g[0], &g[i]);
         // Measured at the width in force and carried at it, so nothing scales
         // and the figures are the ones this stage's own arithmetic produced.
-        let this = rating(i, &rated, effective, effective).rated();
+        // Each case's torque on this gear is the mesh projection of the
+        // stage's, which for a parallel pair has no efficiency in it whichever
+        // way the case travels; its speed and engagements follow the ratio.
+        let by = if i == 0 { 1.0 } else { 1.0 / ratio };
+        let cases = rating(i, &rated, effective, effective)
+            .rated()
+            .into_iter()
+            .map(|r| {
+                let load = r.load;
+                let torque = Load::new(load.torque, effective)
+                    .across_mesh(&g[0], &g[i])
+                    .torque;
+                r.into_case(torque, (load.speed * by, load.speed * by), by)
+            })
+            .collect();
         gears.push(GearResult::of(super::MemberFacts {
             profile_shift: p[i].profile_shift,
             params: &p[i],
             input: &stage.gears[i],
-            rated: this,
+            cases,
             face_width: widths[i],
             // A parallel pair's face is sized by a rating, and the rating is
             // the recommendation.
             recommended_face_width: None,
-            torque: load_i.torque,
-            back_driving_torque: torques.referred_like(load_i.torque),
-            // Filled in by `solve_train`, which is the only level that knows
-            // where this gear sits in the shaft line.
-            speed: 0.0,
             material: materials[i].clone(),
             clamps: g[i].clamps.notes.clone(),
             notes: gear_notes(i),
@@ -1233,7 +1217,7 @@ fn solve_parallel(
     notes.extend(chosen.how.note());
 
     Ok(PairResult {
-        ratio: f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth),
+        ratio,
         centre_distance_nominal: mesh.a_w,
         centre_distance: centre,
         // The gap the pair runs at, which is the two distances above it and a
@@ -1246,32 +1230,38 @@ fn solve_parallel(
             // the sliding figure through and always will; it is here so there is
             // no stage kind the rule has to be remembered for.
             let with = |mu: f64| Directional::of(|d| efficiency(&path, &operating, &g[0], mu, d));
-            super::line_mesh_report(super::LineMesh {
-                coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
-                contact_ratios,
-                operating_pressure_angle: mesh.alpha_w.to_degrees(),
-                efficiency: with(stage.sliding_friction).once_moving(&with(stage.static_friction)),
-                // Each case evaluated at its own load, so nothing scales.
-                contact: LoadCase::of(|c| {
-                    ContactPatch::line(&rated.get(c).0, 1.0, effective, e_star)
-                }),
-                // Per member, in the order the mesh was built — which
-                // `MeshReport::backlash_by_drive` is the one place that turns into
-                // the per-direction reading a stage reports.
-                backlash,
-                // **Asked of the mesh as it runs**, opened by the assembly
-                // clearance — which is the mesh every other figure here is read off,
-                // and the less conservative of the two: opening a centre distance
-                // moves a tip away from the flank it might have reached.
-                flank_interference: mesh.flank_interference([g[0].flank_ends(), g[1].flank_ends()]),
-                // A parallel-axis pair is external: its tips meet on the line of
-                // centres or not at all, which `bottom_clearance` already asks.
-                tips: None,
-                // What the sharing model has to say about this mesh, raised
-                // where the section and the share are worked out
-                // (`train::Bending`). One mesh, so one note at most.
-                notes: bending[0].note.clone().into_iter().collect(),
-            })
+            super::line_mesh_report(
+                loads,
+                super::LineMesh {
+                    coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
+                    contact_ratios,
+                    operating_pressure_angle: mesh.alpha_w.to_degrees(),
+                    efficiency: with(stage.sliding_friction)
+                        .once_moving(&with(stage.static_friction)),
+                    // Each case evaluated at its own load, so nothing scales.
+                    contact: rated
+                        .iter()
+                        .map(|(cs, _)| ContactPatch::line(cs, 1.0, effective, e_star))
+                        .collect(),
+                    // Per member, in the order the mesh was built — which
+                    // `MeshReport::backlash_by_drive` is the one place that turns into
+                    // the per-direction reading a stage reports.
+                    backlash,
+                    // **Asked of the mesh as it runs**, opened by the assembly
+                    // clearance — which is the mesh every other figure here is read off,
+                    // and the less conservative of the two: opening a centre distance
+                    // moves a tip away from the flank it might have reached.
+                    flank_interference: mesh
+                        .flank_interference([g[0].flank_ends(), g[1].flank_ends()]),
+                    // A parallel-axis pair is external: its tips meet on the line of
+                    // centres or not at all, which `bottom_clearance` already asks.
+                    tips: None,
+                    // What the sharing model has to say about this mesh, raised
+                    // where the section and the share are worked out
+                    // (`train::Bending`). One mesh, so one note at most.
+                    notes: bending[0].note.clone().into_iter().collect(),
+                },
+            )
         },
         gears: [gears[0].clone(), gears[1].clone()],
         notes,

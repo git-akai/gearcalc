@@ -15,13 +15,10 @@ gear: GearResult,
 /**
  * `|a_sun-planet − a_planet-ring|` at that shift, mm. Reported rather than
  * asserted: it is the one number that says the solve closed.
- */
-shift_residual: number, 
-/**
- * Speed **relative to the carrier**, rpm — what its teeth actually see.
  *
- * The planet is the one member whose fixed-frame speed is not the whole
- * story, and it is not the sun's relative speed either: the two differ by
- * `z_s/z_p` ([`crate::planetary::Power::planet_speed`]).
+ * Its speed relative to the carrier — the one member whose fixed-frame
+ * speed is not the whole story, and not the sun's relative speed either,
+ * the two differing by `z_s/z_p` — is on every case of every member now
+ * ([`GearCase::speed_against_carrier`]).
  */
-speed_relative: number, };
+shift_residual: number, };

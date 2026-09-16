@@ -73,10 +73,8 @@ near_forward_locking = "próximo de não acionar no sentido direto: μ estático
 low_efficiency = "rendimento do engrenamento {percent} %: a maior parte da entrada torna-se calor, o que normalmente limita um andar de eixos cruzados antes da tensão"
 
 [train]
-operating_torque_clamped = "torque de operação limitado a {torque} Nm: não pode exceder o pico"
-operating_speed_clamped = "rotação de operação limitada a {speed} rpm: não pode exceder o pico"
-back_driving_reacted_at = "a carga de retroacionamento é absorvida no estágio {stage}, que não pode ser acionado no sentido inverso; os estágios anteriores não suportam nada dela"
-back_driving_not_reacted = "a carga de retroacionamento não chega a nenhuma engrenagem: todos os estágios podem ser acionados no sentido inverso, pelo que a carga faz girar o trem em vez de ser suportada por ele"
+load_reacted_at = "é suportada no estágio {stage}, que não pode ser acionado neste sentido; os estágios seguintes não suportam nada dela"
+load_not_reacted = "não chega a nenhuma engrenagem: nada a suporta, pelo que a carga faz girar o trem em vez de ser suportada por ele"
 
 [error]
 mesh_incompatible = "as engrenagens não podem engrenar: módulo, ângulo de pressão ou hélice diferem"

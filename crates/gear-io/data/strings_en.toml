@@ -146,10 +146,8 @@ low_efficiency = "mesh efficiency {percent} %: most of the input becomes heat, w
 # back-driving load is reacted.
 
 [train]
-operating_torque_clamped = "operating torque clamped to {torque} Nm: it cannot exceed the peak"
-operating_speed_clamped = "operating speed clamped to {speed} rpm: it cannot exceed the peak"
-back_driving_reacted_at = "the back-driving load is reacted at stage {stage}, which cannot be driven backward; stages before it carry none of it"
-back_driving_not_reacted = "the back-driving load reaches no gear: every stage can be driven backward, so the load turns the train rather than being held by it"
+load_reacted_at = "held at stage {stage}, which cannot be driven this way; stages beyond it carry none of it"
+load_not_reacted = "reaches no gear: nothing holds it, so the load turns the train rather than being carried by it"
 
 # ---------------------------------------------------------------- the application
 #

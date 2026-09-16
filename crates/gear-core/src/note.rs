@@ -149,17 +149,12 @@ pub mod key {
 
     // ---- the train, as a whole ------------------------------------ //
     //
-    // What a stage cannot say, because it is a fact about the shaft line: an
-    // input clamped against the peak it is measured from, and where — or
-    // whether — a back-driving load is reacted at all.
-    /// `train.operating_torque_clamped`
-    pub const TRAIN_OPERATING_TORQUE_CLAMPED: &str = "train.operating_torque_clamped";
-    /// `train.operating_speed_clamped`
-    pub const TRAIN_OPERATING_SPEED_CLAMPED: &str = "train.operating_speed_clamped";
-    /// `train.back_driving_reacted_at`
-    pub const TRAIN_BACK_DRIVING_REACTED_AT: &str = "train.back_driving_reacted_at";
-    /// `train.back_driving_not_reacted`
-    pub const TRAIN_BACK_DRIVING_NOT_REACTED: &str = "train.back_driving_not_reacted";
+    // What a stage cannot say, because it is a fact about the shaft line:
+    // where — or whether — a load case is held at all.
+    /// `train.load_reacted_at`
+    pub const TRAIN_LOAD_REACTED_AT: &str = "train.load_reacted_at";
+    /// `train.load_not_reacted`
+    pub const TRAIN_LOAD_NOT_REACTED: &str = "train.load_not_reacted";
 
     // ---- errors --------------------------------------------------- //
     //
@@ -254,10 +249,8 @@ pub mod key {
         STAGE_PLANET_CLEARANCE_BELOW_MINIMUM,
         STAGE_PLANETS_NOT_EVENLY_SPACED,
         STAGE_PLANETS_SHARE_LOAD_EQUALLY,
-        TRAIN_OPERATING_TORQUE_CLAMPED,
-        TRAIN_OPERATING_SPEED_CLAMPED,
-        TRAIN_BACK_DRIVING_REACTED_AT,
-        TRAIN_BACK_DRIVING_NOT_REACTED,
+        TRAIN_LOAD_REACTED_AT,
+        TRAIN_LOAD_NOT_REACTED,
         ERROR_MESH_INCOMPATIBLE,
         ERROR_MESH_RING_TOO_SMALL,
         ERROR_MESH_OUTSIDE_INVOLUTE_DOMAIN,

@@ -1,22 +1,35 @@
-train  in 3000 rpm / 2.000 Nm peak   ->   out 497.4 rpm / 11.639 Nm peak
-       operating 2.000 Nm (100.0 % of peak)   back-driving 0.000 Nm at the output
-       total ratio 6.0317:1   total efficiency 96.482 % forward / 96.482 % backward
+train  total ratio 6.0317:1   total efficiency 96.482 % forward / 96.482 % backward
        backlash at the output shaft  0.07432 deg  (min 0.00000, max 0.14903)
        backlash at the input shaft   0.44829 deg  (min 0.00000, max 0.89889)
+       case 1  ultimate 2.000 Nm / 3000 rpm at start, held at the far end   ->   11.639 Nm / 497.4 rpm at end
+       case 2  ultimate 5.000 Nm / 0 rpm at end, held at the far end   ->   0.800 Nm / 0.0 rpm at start
+       case 3  fatigue  2.000 Nm / 3000 rpm at start, held at the far end   ->   11.639 Nm / 497.4 rpm at end   90 deg at end x 600000, reversing
 
 stage 1  spur  z 17/43  beta 30 deg  ratio 2.5294  a_w 34.6610 mm  coprime
   contact ratio  transverse 1.3205   overlap 0.2674   total 1.5879   <- no full axial overlap
   efficiency 98.454 % forward / 98.454 % backward
-  contact at the pitch point  sigma_H 1183.9 / 1183.9 MPa peak/cyclic   rho 2.363 mm
-  gear          x     b mm   T fwd Nm   T bwd Nm   sigma_F peak/cyclic   sigma_H peak/cyclic       rpm   cycles bend/contact
-  1        0.0000    1.680     2.0000          -     294.0 /    294.0    1355.9 /   1355.9    3000.0   1.200e6 /  6.000e5
-  2        0.0000    1.680     5.0588          -     266.3 /    266.3    1183.9 /   1183.9    1186.0   6.000e5 /  3.000e5
+  contact at the pitch point  sigma_H 1183.9 / 754.5 / 1183.9 MPa by case   rho 2.363 mm
+  gear          x     b mm
+  1        0.0000    1.680
+      case 1  T     2.0000 Nm     3000.0 rpm  sigma_F    294.0  sigma_H   1355.9 MPa  cycles -
+      case 2  T     0.8124 Nm        0.0 rpm  sigma_F    119.4  sigma_H    864.1 MPa  cycles -
+      case 3  T     2.0000 Nm     3000.0 rpm  sigma_F    294.0  sigma_H   1355.9 MPa  cycles 1.200e6 / 6.000e5
+  2        0.0000    1.680
+      case 1  T     5.0588 Nm     1186.0 rpm  sigma_F    266.3  sigma_H   1183.9 MPa  cycles -
+      case 2  T     2.0548 Nm        0.0 rpm  sigma_F    108.1  sigma_H    754.5 MPa  cycles -
+      case 3  T     5.0588 Nm     1186.0 rpm  sigma_F    266.3  sigma_H   1183.9 MPa  cycles 6.000e5 / 3.000e5
   note: overlap ratio 0.267: below 1, helical in form but loaded like a spur gear
 
 stage 2  spur  z 13/31  beta 0 deg  ratio 2.3846  a_w 22.2508 mm  coprime
   contact ratio  transverse 1.4488   overlap 0.0000   total 1.4488
   efficiency 97.998 % forward / 97.998 % backward
-  contact at the pitch point  sigma_H 1479.7 / 1479.7 MPa peak/cyclic   rho 1.407 mm
-  gear          x     b mm   T fwd Nm   T bwd Nm   sigma_F peak/cyclic   sigma_H peak/cyclic       rpm   cycles bend/contact
-  1        0.2396    7.178     4.9806          -     288.0 /    288.0    1632.7 /   1632.7    1186.0   6.000e5 /  3.000e5
-  2        0.0000    7.178    11.8768          -     294.0 /    294.0    1479.7 /   1479.7     497.4   6.000e5 /  3.000e5
+  contact at the pitch point  sigma_H 1479.7 / 960.1 / 1479.7 MPa by case   rho 1.407 mm
+  gear          x     b mm
+  1        0.2396    7.178
+      case 1  T     4.9806 Nm     1186.0 rpm  sigma_F    288.0  sigma_H   1632.7 MPa  cycles -
+      case 2  T     2.0968 Nm        0.0 rpm  sigma_F    121.2  sigma_H   1059.4 MPa  cycles -
+      case 3  T     4.9806 Nm     1186.0 rpm  sigma_F    288.0  sigma_H   1632.7 MPa  cycles 6.000e5 / 3.000e5
+  2        0.0000    7.178
+      case 1  T    11.8768 Nm      497.4 rpm  sigma_F    294.0  sigma_H   1479.7 MPa  cycles -
+      case 2  T     5.0000 Nm        0.0 rpm  sigma_F    123.8  sigma_H    960.1 MPa  cycles -
+      case 3  T    11.8768 Nm      497.4 rpm  sigma_F    294.0  sigma_H   1479.7 MPa  cycles 6.000e5 / 3.000e5

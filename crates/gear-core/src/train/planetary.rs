@@ -30,10 +30,10 @@
 //! coefficient, and a designer who needs the derating can apply it knowingly.
 
 use super::{
-    Backlash, ContactRatios, GearResult, LoadCase, Loading, MemberRating, MeshReport, StageTorques,
+    Backlash, ContactRatios, GearResult, Loading, MemberRating, MeshReport, ShaftsCase, StageLoads,
     TrainError, Widths, PROBE,
 };
-use crate::contact::{efficiency, ContactPath, Directional};
+use crate::contact::{efficiency, ContactPath, Directional, Drive};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
 use crate::mesh::{Mesh, MeshKind, MeshSide};
 use crate::note::{key, Note};
@@ -203,13 +203,12 @@ pub struct PlanetResult {
     pub gear: GearResult,
     /// `|a_sun-planet − a_planet-ring|` at that shift, mm. Reported rather than
     /// asserted: it is the one number that says the solve closed.
-    pub shift_residual: f64,
-    /// Speed **relative to the carrier**, rpm — what its teeth actually see.
     ///
-    /// The planet is the one member whose fixed-frame speed is not the whole
-    /// story, and it is not the sun's relative speed either: the two differ by
-    /// `z_s/z_p` ([`crate::planetary::Power::planet_speed`]).
-    pub speed_relative: f64,
+    /// Its speed relative to the carrier — the one member whose fixed-frame
+    /// speed is not the whole story, and not the sun's relative speed either,
+    /// the two differing by `z_s/z_p` — is on every case of every member now
+    /// ([`GearCase::speed_against_carrier`]).
+    pub shift_residual: f64,
 }
 
 /// Everything a planetary stage produces.
@@ -246,10 +245,9 @@ pub struct PlanetaryResult {
     /// output shaft driving forward, the input shaft driving backward — the same
     /// convention every other stage kind uses.
     pub backlash: Directional<Backlash>,
-    /// Speeds `[sun, carrier, ring]`, rpm. The held shaft is exactly zero.
-    pub speeds: [f64; 3],
-    /// Torques `[sun, carrier, ring]`, N·m. They sum to zero.
-    pub torques: [f64; 3],
+    /// Speeds and torques of `[sun, carrier, ring]` in every load case, each
+    /// distributed in that case's own direction.
+    pub cases: Vec<ShaftsCase>,
     pub sun_planet: MeshReport,
     pub planet_ring: MeshReport,
     /// Planets can be spaced evenly: `(z_s + z_r) mod N = 0`.
@@ -337,11 +335,10 @@ impl PlanetaryStage {
 #[allow(clippy::too_many_lines)]
 pub fn solve_planetary_stage(
     stage: &PlanetaryStage,
-    input_speed: f64,
-    torques: StageTorques,
+    loads: &StageLoads,
     lib: &MaterialLibrary,
 ) -> Result<PlanetaryResult, TrainError> {
-    solve_planetary_stage_with(stage, input_speed, torques, lib, super::Reversal::default())
+    solve_planetary_stage_with(stage, loads, lib, super::Reversal::default())
 }
 
 /// The same, told how the train treats a root loaded on both flanks.
@@ -826,12 +823,10 @@ impl PlanetaryStage {
 /// As [`solve_planetary_stage`].
 pub fn solve_planetary_stage_with(
     stage: &PlanetaryStage,
-    input_speed: f64,
-    torques: StageTorques,
+    loads: &StageLoads,
     lib: &MaterialLibrary,
     reversal: super::Reversal,
 ) -> Result<PlanetaryResult, TrainError> {
-    let input_torque = torques.peak_forward;
     let teeth = stage.teeth();
     // The sun and the planet are rack-cut and can be raised to clear undercut;
     // a ring is not asked. Collected here and handed to the member each one is
@@ -940,11 +935,16 @@ pub fn solve_planetary_stage_with(
         &planet_ring(stage.static_friction_planet_ring),
     );
 
+    // **The flow is solved at unit speed and unit torque.** A power flow is
+    // linear in the torque through it and in the speed driving it — the shape
+    // of the split depends on the arrangement and `η₀` alone — so one solve
+    // serves every load case by a multiplication, and a case carrying nothing
+    // is a scale of zero rather than a flow that refuses to exist.
     let forward = planetary::power(
         planetary::basic_ratio(teeth),
         stage.arrangement,
-        input_speed,
-        input_torque,
+        1.0,
+        1.0,
         eta0.forward,
     )
     .ok_or(TrainError::NoContact)?;
@@ -977,8 +977,8 @@ pub fn solve_planetary_stage_with(
         forward: planetary::power(
             planetary::basic_ratio(teeth),
             stage.arrangement,
-            input_speed,
-            input_torque,
+            1.0,
+            1.0,
             eta0_at_rest.forward,
         )
         .map_or(0.0, |p| p.efficiency),
@@ -1001,49 +1001,52 @@ pub fn solve_planetary_stage_with(
     let planets = f64::from(stage.planets.max(1));
 
     // **The reverse is the same construction with the roles swapped**, and the
-    // torques it produces are the ones a back-driving load puts on each member.
+    // torques it produces are the ones a load from the far end puts on each
+    // member.
     //
     // They used to be the *forward* distribution scaled by the ratio of the two
-    // stage torques (`StageTorques::referred_like`), which is exact wherever the
-    // forward torque is a geometric projection or the two directional
-    // efficiencies agree. An epicyclic set is neither: which shaft is driving
-    // decides where `η₀` multiplies, so the distribution itself changes shape.
-    // Measured on the shipped set, driving backward puts **1.922 N·m** on the
-    // sun where scaling the forward answer says 2.000 — 3.9 %, and 1.6 % on the
-    // ring.
+    // stage torques, which is exact wherever the forward torque is a geometric
+    // projection or the two directional efficiencies agree. An epicyclic set is
+    // neither: which shaft is driving decides where `η₀` multiplies, so the
+    // distribution itself changes shape. Measured on the shipped set, driving
+    // backward puts **1.922 N·m** on the sun where scaling the forward answer
+    // says 2.000 — 3.9 %, and 1.6 % on the ring.
     //
     // `backward` was already solved, for its efficiency; this reads the torques
     // it had all along. Normalised so the shaft the load was referred to carries
-    // what `back_driving_torques` referred there, since a power flow is linear
-    // in the torque through it.
+    // what the train referred there, since a power flow is linear in the torque
+    // through it. **Per shaft, not per planet.**
     let in_i = stage.arrangement.input.index_pub();
-    let backward_share = |shaft: usize| -> Option<f64> {
-        let (b, applied) = (backward.as_ref()?, torques.peak_backward?);
-        let at_input = b.torques[in_i];
-        if at_input == 0.0 {
-            return Some(0.0);
+    let shaft_torques = |drive: Drive, applied: f64| -> [f64; 3] {
+        match drive {
+            Drive::Forward => forward.torques.map(|t| t * applied),
+            Drive::Backward => match &backward {
+                Some(b) if b.torques[in_i] != 0.0 => {
+                    b.torques.map(|t| t * (applied / b.torques[in_i]))
+                }
+                _ => [0.0; 3],
+            },
         }
-        Some((b.torques[shaft] / planets) * (applied / at_input))
     };
 
     // **What each mesh carries, in each load case.** Driving forward it is the
     // shaft's torque shared among the planets; being driven it is the reverse
     // solve's, which is a different *shape* and not merely a different size. So
-    // the peak is taken per mesh, after each direction's own distribution —
-    // `StageTorques::on_mesh` argues the order, and this set is one of the two
-    // kinds where the two orders differ.
-    let sun_torque_per_mesh = (forward.torques[0] / planets).abs();
-    let ring_torque_per_mesh = (forward.torques[2] / planets).abs();
-    let sp_torque = torques.on_mesh(
-        sun_torque_per_mesh,
-        backward_share(PlanetaryShaft::Sun.index_pub()),
-    );
+    // each case's torque is distributed in its own direction, and the two
+    // meshes need not agree about which case loads them hardest — which is why
+    // every scale below is the mesh's.
+    let mesh_torque = |shaft: usize, c: &super::StageLoad| -> f64 {
+        (shaft_torques(c.drive, c.torque)[shaft] / planets).abs()
+    };
     // Quoted at the planet, which is the member the ring mesh's loads are read
     // through, so both directions take the same projection.
-    let pr_torque = torques.on_mesh(
-        ring_torque_per_mesh / pr_mesh.ratio(),
-        backward_share(PlanetaryShaft::Ring.index_pub()).map(|t| t / pr_mesh.ratio()),
-    );
+    let sp_torque_of = |c: &super::StageLoad| mesh_torque(PlanetaryShaft::Sun.index_pub(), c);
+    let pr_torque_of =
+        |c: &super::StageLoad| mesh_torque(PlanetaryShaft::Ring.index_pub(), c) / pr_mesh.ratio();
+    // Every rating is evaluated once, at the worst torque the mesh carries, and
+    // every case is that scaled ([`Loading::for_cases`]).
+    let (sp_worst, sp_scale) = loads.scaled(sp_torque_of);
+    let (pr_worst, pr_scale) = loads.scaled(pr_torque_of);
 
     // ---- face widths and stresses. `b_min` does not depend on the width it was
     // measured at (docs/reference.md#contact-stress), so one probe evaluation gives every minimum.
@@ -1055,7 +1058,7 @@ pub fn solve_planetary_stage_with(
         &sp_mesh,
         &sun,
         PARALLEL_AXES,
-        &Load::new(sp_torque.peak, PROBE),
+        &Load::new(sp_worst, PROBE),
         sp_e,
     )
     .ok_or(TrainError::NoContact)?;
@@ -1064,7 +1067,7 @@ pub fn solve_planetary_stage_with(
         &pr_mesh,
         &planet,
         PARALLEL_AXES,
-        &Load::new(pr_torque.peak, PROBE),
+        &Load::new(pr_worst, PROBE),
         pr_e,
     )
     .ok_or(TrainError::NoContact)?;
@@ -1118,27 +1121,15 @@ pub fn solve_planetary_stage_with(
         stage.ring.rim_thickness,
     );
 
-    // Every rating is linear or square-root in the torque, and the set's power
-    // split does not depend on the *magnitude* passing through it, so once each
-    // mesh's peak torque is known the other case is a scale rather than a second
-    // kinematic solve. **The two directions are not** — they are two solves, and
-    // `sp_torque` / `pr_torque` are where that was done.
-    let sp_scale = sp_torque.as_fraction_of_peak();
-    let pr_scale = pr_torque.as_fraction_of_peak();
-
     // An automatic width with every source switched off stands at the number in
     // its box, as in the spur stage (`FaceSources::width_for`).
     //
     // **Which members are loaded on both flanks.** The planet structurally —
-    // sun on one flank, ring on the other, whatever the drive does — and all
-    // three when the drive itself reverses. A reversing drive does not make a
+    // sun on one flank, ring on the other, whatever the load does — and all
+    // three in a case whose duty reverses. A reversing duty does not make a
     // planet *more* reversed, so the two do not stack: `Reversal::reverses`
-    // takes the member's own answer or the drive's, never both.
-    let reverses = [
-        reversal.reverses(false),
-        reversal.reverses(true),
-        reversal.reverses(false),
-    ];
+    // takes the member's own answer or the case's, never both.
+    let always_reverses = [false, true, false];
     // What the rating has to say about each member, kept **on** the member: two
     // of them raising the same note would give one list two entries under one
     // key, which is not something a keyed list can draw.
@@ -1157,7 +1148,7 @@ pub fn solve_planetary_stage_with(
         // rate. One rim per member, so unlike the notch it is asked once.
         out.extend(super::rim_below_minimum(rims[i]));
         out.extend(cut_by_a_rack[i].and_then(super::undercut_note));
-        out.extend(reversal.note_for(reverses[i]));
+        out.extend(reversal.note_for(reversal.reverses(always_reverses[i], loads.any_reverse())));
         // **A bound that moved this member's own number belongs to it**, not to
         // a list at the foot of the stage that a reader has to match back up by
         // tooth count. The ring has none: it is asked neither question — and a
@@ -1173,12 +1164,12 @@ pub fn solve_planetary_stage_with(
         out
     };
 
-    let ask_of = |g: &StageGear, asks: &LoadCase<Widths>| -> f64 {
+    let ask_of = |g: &StageGear, asks: &[(super::CaseKind, Widths)]| -> f64 {
         g.face_sources.width_for(asks, g.face_width.manual)
     };
 
-    let probe_load_sp = Load::new(sp_torque.peak, PROBE);
-    let probe_load_pr = Load::new(pr_torque.peak, PROBE);
+    let probe_load_sp = Load::new(sp_worst, PROBE);
+    let probe_load_pr = Load::new(pr_worst, PROBE);
     // The share this tooth carries where it is rated — exactly 1 unless a
     // sharing model was asked for, so nothing scales by default.
     // **`F_t` is the mesh's**, so a member is named only to say which reference
@@ -1228,15 +1219,27 @@ pub fn solve_planetary_stage_with(
     let rating = |i: usize, sp: f64, pr: f64| MemberRating {
         material: &mats[i],
         reversal,
-        reverses: reverses[i],
-        loadings: Loading::both_cases(&match i {
-            0 => vec![(loading(sun_sf, sp_probe.governing(0), sp), sp_scale)],
-            1 => vec![
-                (loading(planet_sf, sp_probe.governing(1), sp), sp_scale),
-                (loading(planet_ring_sf, pr_probe.governing(0), pr), pr_scale),
-            ],
-            _ => vec![(loading(ring_sf, pr_probe.governing(1), pr), pr_scale)],
-        }),
+        always_reverses: always_reverses[i],
+        cases: Loading::for_cases(
+            loads,
+            &match i {
+                0 => vec![(loading(sun_sf, sp_probe.governing(0), sp), sp_scale.clone())],
+                1 => vec![
+                    (
+                        loading(planet_sf, sp_probe.governing(1), sp),
+                        sp_scale.clone(),
+                    ),
+                    (
+                        loading(planet_ring_sf, pr_probe.governing(0), pr),
+                        pr_scale.clone(),
+                    ),
+                ],
+                _ => vec![(
+                    loading(ring_sf, pr_probe.governing(1), pr),
+                    pr_scale.clone(),
+                )],
+            },
+        ),
     };
     let ratings: [MemberRating; 3] = std::array::from_fn(|i| rating(i, PROBE, PROBE));
     let asks = [
@@ -1259,13 +1262,12 @@ pub fn solve_planetary_stage_with(
     let sp_width = widths[0].min(widths[1]);
     let pr_width = widths[1].min(widths[2]);
 
-    // **At the peak each mesh actually carries**, so the figures the mesh report
-    // scales from are the ones the worse direction produces. The torque a member
-    // is *labelled* with is its forward one, which is a different question and
-    // is taken from `sp_forward` below.
-    let sp_load = Load::new(sp_torque.peak, sp_width);
-    let pr_load = Load::new(pr_torque.peak, pr_width);
-    let sp_forward = Load::new(sun_torque_per_mesh, sp_width);
+    // **At the worst load each mesh actually carries**, so the figures the mesh
+    // report scales from are the ones the worst case produces. The torque a
+    // member is *labelled* with in each case is that case's own, projected
+    // through the mesh in that case's direction.
+    let sp_load = Load::new(sp_worst, sp_width);
+    let pr_load = Load::new(pr_worst, pr_width);
     let sp_cs = contact_stress(&sp_path, &sp_mesh, &sun, PARALLEL_AXES, &sp_load, sp_e)
         .ok_or(TrainError::NoContact)?;
     let pr_cs = contact_stress(&pr_path, &pr_mesh, &planet, PARALLEL_AXES, &pr_load, pr_e)
@@ -1382,41 +1384,80 @@ pub fn solve_planetary_stage_with(
     // **A member's speed is its own.** It used to be read out of the shaft array
     // by role, which gave the planet the *carrier's* — the shaft it rides rather
     // than the one it spins on, and on a set with the ring held not even the
-    // same sign.
-    let gear_result = |speed: f64,
-                       input: &StageGear,
-                       params: &GearParams,
-                       which: usize,
-                       torque: f64,
-                       back_driving_torque: Option<f64>,
-                       clamps: Vec<Note>,
-                       notes: Vec<Note>|
-     -> GearResult {
-        // A load case is a scale on the torque, and every rating is linear or
-        // square-root in it — so the peak and cyclic figures are the same
-        // expression evaluated at the two scales rather than a second solve.
-        // Which is what `MemberRating` is, for every stage kind at once.
-        GearResult::of(super::MemberFacts {
-            recommended_face_width: None,
-            profile_shift: params.profile_shift,
-            params,
-            input,
-            rated: rating(which, sp_width, pr_width).rated(),
-            face_width: widths[which],
-            torque,
-            back_driving_torque,
-            speed,
-            material: mats[which].clone(),
-            clamps,
-            notes,
-        })
-    };
-
+    // same sign. The unit flow gives every shaft's speed per turn of the input,
+    // and a case's speed scales them; its teeth are engaged by its turns against
+    // the carrier, which the same unit speeds give (`train::engagements`).
+    //
     // **The planet's own rotation**, from the kinematics rather than from the
     // shaft beside it: its absolute speed is not the carrier's, and what its
     // teeth see is not the sun's speed relative to the carrier
     // ([`crate::planetary::Power::planet_speed`]).
     let (planet_absolute, planet_relative) = forward.planet_speed(teeth);
+    let carrier = forward.speeds[PlanetaryShaft::Carrier.index_pub()];
+    let unit_speed = [
+        forward.speeds[PlanetaryShaft::Sun.index_pub()],
+        planet_absolute,
+        forward.speeds[PlanetaryShaft::Ring.index_pub()],
+    ];
+    let against_carrier = [
+        unit_speed[0] - carrier,
+        planet_relative,
+        unit_speed[2] - carrier,
+    ];
+    let input_unit = forward.speeds[in_i];
+    // Each member's torque in each case: the central members' are their
+    // shaft's share of one mesh path; **a planet is not one of the three
+    // shafts**, so its is the sun's carried across the mesh they share — the
+    // same projection whichever direction the case travels.
+    let member_torque = |which: usize, c: &super::StageLoad| -> f64 {
+        let t = shaft_torques(c.drive, c.torque);
+        match which {
+            0 => t[PlanetaryShaft::Sun.index_pub()] / planets,
+            1 => {
+                Load::new(t[PlanetaryShaft::Sun.index_pub()] / planets, sp_width)
+                    .across_mesh(&sun, &planet)
+                    .torque
+            }
+            _ => t[PlanetaryShaft::Ring.index_pub()] / planets,
+        }
+    };
+    let gear_result = |input: &StageGear,
+                       params: &GearParams,
+                       which: usize,
+                       clamps: Vec<Note>,
+                       notes: Vec<Note>|
+     -> GearResult {
+        // A load case is a scale on the torque, and every rating is linear or
+        // square-root in it — so every case's figures are the same expression
+        // evaluated at its scale rather than a second solve. Which is what
+        // `MemberRating` is, for every stage kind at once.
+        let cases = rating(which, sp_width, pr_width)
+            .rated()
+            .into_iter()
+            .map(|r| {
+                let c = r.load;
+                r.into_case(
+                    member_torque(which, &c),
+                    (
+                        unit_speed[which] * c.speed,
+                        against_carrier[which] * c.speed,
+                    ),
+                    super::engagements(unit_speed[which], carrier, input_unit, planets),
+                )
+            })
+            .collect();
+        GearResult::of(super::MemberFacts {
+            recommended_face_width: None,
+            profile_shift: params.profile_shift,
+            params,
+            input,
+            cases,
+            face_width: widths[which],
+            material: mats[which].clone(),
+            clamps,
+            notes,
+        })
+    };
 
     Ok(PlanetaryResult {
         arrangement: stage.arrangement,
@@ -1428,65 +1469,81 @@ pub fn solve_planetary_stage_with(
         fixed_carrier_efficiency: eta0,
         efficiency: set_efficiency,
         backlash: set_backlash,
-        speeds: forward.speeds,
-        torques: forward.torques,
-        sun_planet: super::line_mesh_report(super::LineMesh {
-            coprime: super::gcd(teeth.sun, teeth.planet) == 1,
-            contact_ratios: ContactRatios::of(
-                sp_path.contact_ratio,
-                sp_width,
-                stage.helix_angle,
-                stage.module,
-            ),
-            operating_pressure_angle: sp_mesh.alpha_w.to_degrees(),
-            efficiency: sp_eff,
-            contact: LoadCase::of(|c| {
-                super::ContactPatch::line(&sp_cs, *sp_scale.get(c), sp_width, sp_e)
-            }),
-            backlash: [
-                backlash_of(&sp_design, MeshSide::First),
-                backlash_of(&sp_design, MeshSide::Second),
-            ],
-            flank_interference: sp_mesh.flank_interference([sun.flank_ends(), planet.flank_ends()]),
-            // Sun to planet is an external mesh.
-            tips: None,
-            // What the sharing model has to say about *this* mesh: two meshes
-            // can be in different bands, and a set with one extrapolating and
-            // one not says which.
-            notes: sun_bending.note.clone().into_iter().collect(),
-        }),
-        planet_ring: super::line_mesh_report(super::LineMesh {
-            coprime: super::gcd(teeth.planet, teeth.ring) == 1,
-            contact_ratios: ContactRatios::of(
-                pr_path.contact_ratio,
-                pr_width,
-                stage.helix_angle,
-                stage.module,
-            ),
-            operating_pressure_angle: pr_mesh.alpha_w.to_degrees(),
-            efficiency: pr_eff,
-            contact: LoadCase::of(|c| {
-                super::ContactPatch::line(&pr_cs, *pr_scale.get(c), pr_width, pr_e)
-            }),
-            backlash: [
-                backlash_of(&pr_design, MeshSide::First),
-                backlash_of(&pr_design, MeshSide::Second),
-            ],
-            // **The ring answers as a ring**, not as the `Tooth` the mesh
-            // arithmetic reads it through: its flank runs outwards from its tip
-            // and ends at its shaper's fillet, which only a `Ring` knows.
-            flank_interference: pr_mesh
-                .flank_interference([planet.flank_ends(), ring.flank_ends()]),
-            // **And planet to ring is not**, which is the whole of what this
-            // field is for: the set has an internal mesh in it and had never
-            // been asked the three questions one answers.
-            tips: super::TipRoom::at(&ring, &planet, centre),
-            notes: planet_ring_bending
-                .as_ref()
-                .and_then(|b| b.note.clone())
-                .into_iter()
-                .collect(),
-        }),
+        cases: loads
+            .cases
+            .iter()
+            .map(|c| ShaftsCase {
+                case: c.case,
+                speeds: forward.speeds.map(|w| w * c.speed),
+                torques: shaft_torques(c.drive, c.torque),
+            })
+            .collect(),
+        sun_planet: super::line_mesh_report(
+            loads,
+            super::LineMesh {
+                coprime: super::gcd(teeth.sun, teeth.planet) == 1,
+                contact_ratios: ContactRatios::of(
+                    sp_path.contact_ratio,
+                    sp_width,
+                    stage.helix_angle,
+                    stage.module,
+                ),
+                operating_pressure_angle: sp_mesh.alpha_w.to_degrees(),
+                efficiency: sp_eff,
+                contact: sp_scale
+                    .iter()
+                    .map(|&k| super::ContactPatch::line(&sp_cs, k, sp_width, sp_e))
+                    .collect(),
+                backlash: [
+                    backlash_of(&sp_design, MeshSide::First),
+                    backlash_of(&sp_design, MeshSide::Second),
+                ],
+                flank_interference: sp_mesh
+                    .flank_interference([sun.flank_ends(), planet.flank_ends()]),
+                // Sun to planet is an external mesh.
+                tips: None,
+                // What the sharing model has to say about *this* mesh: two meshes
+                // can be in different bands, and a set with one extrapolating and
+                // one not says which.
+                notes: sun_bending.note.clone().into_iter().collect(),
+            },
+        ),
+        planet_ring: super::line_mesh_report(
+            loads,
+            super::LineMesh {
+                coprime: super::gcd(teeth.planet, teeth.ring) == 1,
+                contact_ratios: ContactRatios::of(
+                    pr_path.contact_ratio,
+                    pr_width,
+                    stage.helix_angle,
+                    stage.module,
+                ),
+                operating_pressure_angle: pr_mesh.alpha_w.to_degrees(),
+                efficiency: pr_eff,
+                contact: pr_scale
+                    .iter()
+                    .map(|&k| super::ContactPatch::line(&pr_cs, k, pr_width, pr_e))
+                    .collect(),
+                backlash: [
+                    backlash_of(&pr_design, MeshSide::First),
+                    backlash_of(&pr_design, MeshSide::Second),
+                ],
+                // **The ring answers as a ring**, not as the `Tooth` the mesh
+                // arithmetic reads it through: its flank runs outwards from its tip
+                // and ends at its shaper's fillet, which only a `Ring` knows.
+                flank_interference: pr_mesh
+                    .flank_interference([planet.flank_ends(), ring.flank_ends()]),
+                // **And planet to ring is not**, which is the whole of what this
+                // field is for: the set has an internal mesh in it and had never
+                // been asked the three questions one answers.
+                tips: super::TipRoom::at(&ring, &planet, centre),
+                notes: planet_ring_bending
+                    .as_ref()
+                    .and_then(|b| b.note.clone())
+                    .into_iter()
+                    .collect(),
+            },
+        ),
         equal_spacing: layout.equal_spacing,
         simultaneous_meshing: layout.simultaneous_meshing,
         planet_clearance: clearance,
@@ -1494,41 +1551,27 @@ pub fn solve_planetary_stage_with(
         sun_coprime_with_planets: super::gcd(teeth.sun, stage.planets.max(1)) == 1,
         ring_coprime_with_planets: super::gcd(teeth.ring, stage.planets.max(1)) == 1,
         sun: gear_result(
-            forward.speeds[PlanetaryShaft::Sun.index_pub()],
             &stage.sun,
             &sun_params,
             0,
-            forward.torques[0] / planets,
-            backward_share(PlanetaryShaft::Sun.index_pub()),
             sun.clamps.notes.clone(),
             gear_notes(0),
         ),
         planet: PlanetResult {
             gear: gear_result(
-                planet_absolute,
                 &stage.planet,
                 &planet_params,
                 1,
-                sp_forward.across_mesh(&sun, &planet).torque,
-                // **A planet is not one of the three shafts**, so its share is
-                // the sun's carried across the mesh they share — the same
-                // projection its forward torque takes, on the backward figure.
-                backward_share(PlanetaryShaft::Sun.index_pub())
-                    .map(|t| Load::new(t, sp_width).across_mesh(&sun, &planet).torque),
                 planet.clamps.notes.clone(),
                 gear_notes(1),
             ),
             shift_residual: layout.residual,
-            speed_relative: planet_relative,
         },
         planets: stage.planets,
         ring: gear_result(
-            forward.speeds[PlanetaryShaft::Ring.index_pub()],
             &stage.ring,
             &ring_params,
             2,
-            forward.torques[2] / planets,
-            backward_share(PlanetaryShaft::Ring.index_pub()),
             ring.clamps.clone(),
             gear_notes(2),
         ),
@@ -1578,7 +1621,7 @@ mod tests {
                 },
                 ..PlanetaryStage::default()
             };
-            let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &lib)
+            let r = solve_planetary_stage(&stage, &StageLoads::just(2.0), &lib)
                 .unwrap_or_else(|e| panic!("face {face}: {e}"));
             let b = stage
                 .built([
@@ -1592,7 +1635,7 @@ mod tests {
             // there. Same `contact_stress`; what it does not share is the
             // scaling under test.
             let planets = f64::from(stage.planets.max(1));
-            let load = Load::new((r.torques[0] / planets).abs(), face);
+            let load = Load::new((r.cases[0].torques[0] / planets).abs(), face);
             let e_star = contact_modulus(
                 &lib.get(&stage.sun.material).expect("a material").clone(),
                 &lib.get(&stage.planet.material).expect("a material").clone(),
@@ -1601,7 +1644,7 @@ mod tests {
                 contact_stress(&b.sp_path, &b.sp_mesh, &b.sun, PARALLEL_AXES, &load, e_star)
                     .expect("the sun mesh has contact");
 
-            let got = r.sun.contact_stress.peak;
+            let got = r.sun.cases[0].contact_stress;
             assert!(
                 (got - direct.governing(0)).abs() < 1e-9 * direct.governing(0),
                 "face {face}: the sun reports {got} MPa where a direct evaluation \
@@ -1641,13 +1684,10 @@ mod tests {
                 },
                 ..stage_of(24, 18, 60, 0.0)
             };
-            let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &lib)
+            let r = solve_planetary_stage(&stage, &StageLoads::just(2.0), &lib)
                 .unwrap_or_else(|e| panic!("ring face {ring_face}: {e}"));
-            let got = r
-                .planet
-                .gear
+            let got = r.planet.gear.cases[0]
                 .bending_stress
-                .peak
                 .expect("a planet has a root section");
 
             // The two contributions, rebuilt from what the result reports rather
@@ -1671,14 +1711,14 @@ mod tests {
             };
             let from_sun = each(
                 built.sp_path.contact_ratio,
-                Load::new((r.torques[0] / planets).abs(), sp_width)
+                Load::new((r.cases[0].torques[0] / planets).abs(), sp_width)
                     .across_mesh(&built.sun, &built.planet)
                     .torque,
                 sp_width,
             );
             let from_ring = each(
                 built.pr_path.contact_ratio,
-                (r.torques[2] / planets).abs() / built.pr_mesh.ratio(),
+                (r.cases[0].torques[2] / planets).abs() / built.pr_mesh.ratio(),
                 pr_width,
             );
             assert!(
@@ -1720,22 +1760,22 @@ mod tests {
                 thickness_mod: k,
                 ..Default::default()
             };
-            let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &lib)
+            let r = solve_planetary_stage(&stage, &StageLoads::just(2.0), &lib)
                 .unwrap_or_else(|e| panic!("k={k}: the set should still solve, got {e}"));
 
             assert!(
-                r.ring.bending_stress.peak.is_none(),
+                r.ring.cases[0].bending_stress.is_none(),
                 "k={k}: a ring with no notch cannot have a bending stress"
             );
             // ...and everything that never needed the notch is still there.
             assert!(r.ratio.is_finite() && r.ratio != 0.0, "k={k}: no ratio");
             assert!(
-                r.sun.bending_stress.peak.is_some(),
+                r.sun.cases[0].bending_stress.is_some(),
                 "k={k}: the sun's own bending went with it"
             );
             for (name, gear) in [("sun", &r.sun), ("ring", &r.ring)] {
                 assert!(
-                    gear.contact_stress.peak > 0.0,
+                    gear.cases[0].contact_stress > 0.0,
                     "k={k}: {name} lost its contact stress"
                 );
             }
@@ -1770,8 +1810,7 @@ mod tests {
     fn solved(sun: u32, planet: u32, ring: u32) -> PlanetaryResult {
         solve_planetary_stage(
             &stage_of(sun, planet, ring, 0.0),
-            3000.0,
-            StageTorques::just(2.0),
+            &StageLoads::at(2.0, 3000.0),
             &test_library(),
         )
         .unwrap()
@@ -1795,7 +1834,7 @@ mod tests {
     fn a_given_distance_leaves_a_set_one_free_shift() {
         let lib = super::super::test_library();
         let base = PlanetaryStage::default();
-        let free = solve_planetary_stage(&base, 3000.0, StageTorques::just(2.0), &lib)
+        let free = solve_planetary_stage(&base, &StageLoads::just(2.0), &lib)
             .expect("the shipped set solves");
         let asked = free.centre_distance + 0.1;
 
@@ -1803,7 +1842,7 @@ mod tests {
         // given number stands.
         let mut one = base.clone();
         one.centre_distance = Auto::fixed(asked);
-        let r = solve_planetary_stage(&one, 3000.0, StageTorques::just(2.0), &lib)
+        let r = solve_planetary_stage(&one, &StageLoads::just(2.0), &lib)
             .expect("one free shift is enough");
         assert!((r.centre_distance - asked).abs() < 1e-9);
         assert!((r.ring.profile_shift - one.ring.profile_shift.manual).abs() < 1e-12);
@@ -1812,7 +1851,7 @@ mod tests {
         // worth of demands on two freedoms.
         let mut two = one.clone();
         two.sun.profile_shift = Auto::fixed(r.sun.profile_shift + 0.25);
-        let over = solve_planetary_stage(&two, 3000.0, StageTorques::just(2.0), &lib)
+        let over = solve_planetary_stage(&two, &StageLoads::just(2.0), &lib)
             .expect("it still builds; it just cannot honour everything");
         let honoured = [
             (over.centre_distance - asked).abs() < 1e-9,
@@ -1864,7 +1903,7 @@ mod tests {
     fn a_set_runs_at_the_centre_distance_it_was_given() {
         let lib = super::super::test_library();
         let base = PlanetaryStage::default();
-        let free = solve_planetary_stage(&base, 3000.0, StageTorques::just(2.0), &lib)
+        let free = solve_planetary_stage(&base, &StageLoads::just(2.0), &lib)
             .expect("the shipped set solves");
 
         let mut checked = 0u32;
@@ -1872,7 +1911,7 @@ mod tests {
             let asked = free.centre_distance + 0.2 * f64::from(step);
             let mut stage = base.clone();
             stage.centre_distance = Auto::fixed(asked);
-            let Ok(r) = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &lib) else {
+            let Ok(r) = solve_planetary_stage(&stage, &StageLoads::just(2.0), &lib) else {
                 // A distance no set can reach is refused, not answered — which
                 // is the honest end of the range rather than a gap in it.
                 continue;
@@ -1939,7 +1978,7 @@ mod tests {
         let lib = test_library();
         let mut exact = stage_of(24, 18, 60, 0.0);
         exact.clearance = Auto::fixed(0.0);
-        let exact = solve_planetary_stage(&exact, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+        let exact = solve_planetary_stage(&exact, &StageLoads::just(2.0), &lib).unwrap();
         assert!(exact.planet.gear.profile_shift.abs() < 1e-12);
         assert!(exact
             .centre_distance_nominal
@@ -1997,7 +2036,7 @@ mod tests {
                 absorber,
                 "the member left automatic should be the one that absorbs"
             );
-            let r = solve_planetary_stage(&s, 100.0, StageTorques::just(2.0), &lib)
+            let r = solve_planetary_stage(&s, &StageLoads::just(2.0), &lib)
                 .unwrap_or_else(|e| panic!("{absorber:?} could not close the set: {e:?}"));
 
             // The equality actually closed...
@@ -2082,8 +2121,7 @@ mod tests {
                 arrangement: Arrangement { input, fixed },
                 ..stage_of(24, 18, 60, 0.0)
             };
-            let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library())
-                .unwrap();
+            let r = solve_planetary_stage(&stage, &StageLoads::just(2.0), &test_library()).unwrap();
             assert_eq!(r.output, output);
             assert!(
                 (r.ratio - ratio).abs() < 1e-12,
@@ -2105,8 +2143,7 @@ mod tests {
             },
             ..stage_of(24, 18, 60, 0.0)
         };
-        let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library())
-            .unwrap();
+        let r = solve_planetary_stage(&stage, &StageLoads::just(2.0), &test_library()).unwrap();
         let product = r.sun_planet.efficiency.forward * r.planet_ring.efficiency.forward;
         assert!((r.fixed_carrier_efficiency.forward - product).abs() < 1e-15);
         assert!(
@@ -2132,8 +2169,8 @@ mod tests {
                 res.sun_planet.line.unwrap().contact_ratios.transverse
             );
             assert!(
-                res.planet_ring.contact.peak.curvature_across
-                    < res.sun_planet.contact.peak.curvature_across,
+                res.planet_ring.cases[0].contact.curvature_across
+                    < res.sun_planet.cases[0].contact.curvature_across,
                 "z={s}/{p}/{r}: internal relative radius should be the larger"
             );
             // ...and a ring's tooth is the stronger, so it carries the less
@@ -2142,11 +2179,12 @@ mod tests {
             // withhold the figure entirely — see
             // `the_rating_is_continuous_across_the_flank_fillet_transition`.
             let (sun_s, ring_s) = (
-                res.sun
+                res.sun.cases[0]
                     .bending_stress
-                    .peak
                     .expect("the sun is always rated"),
-                res.ring.bending_stress.peak.expect("and so is the ring"),
+                res.ring.cases[0]
+                    .bending_stress
+                    .expect("and so is the ring"),
             );
             assert!(
                 ring_s < sun_s,
@@ -2184,9 +2222,8 @@ mod tests {
                 },
                 ..stage_of(s, p, r, 0.0)
             };
-            let a = solve_planetary_stage(&sun_in, 3000.0, StageTorques::just(2.0), &lib).unwrap();
-            let b =
-                solve_planetary_stage(&carrier_in, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+            let a = solve_planetary_stage(&sun_in, &StageLoads::just(2.0), &lib).unwrap();
+            let b = solve_planetary_stage(&carrier_in, &StageLoads::just(2.0), &lib).unwrap();
 
             // `a` outputs at the carrier, `b` at the sun.
             let at_carrier = a.backlash.forward.nominal;
@@ -2211,14 +2248,14 @@ mod tests {
     fn both_meshes_contribute_to_the_output_backlash() {
         let lib = test_library();
         let base = stage_of(24, 18, 60, 0.0);
-        let tight = solve_planetary_stage(&base, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+        let tight = solve_planetary_stage(&base, &StageLoads::just(2.0), &lib).unwrap();
 
         // More clearance opens both meshes, so the output must loosen.
         let loose = PlanetaryStage {
             clearance: Auto::fixed(base.clearance.manual + 0.05),
             ..base.clone()
         };
-        let loose = solve_planetary_stage(&loose, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+        let loose = solve_planetary_stage(&loose, &StageLoads::just(2.0), &lib).unwrap();
         assert!(
             loose.backlash.forward.nominal > tight.backlash.forward.nominal,
             "{} should exceed {}",
@@ -2236,7 +2273,7 @@ mod tests {
         let b = &tight.backlash.forward;
         assert!(b.minimum <= b.nominal && b.nominal <= b.maximum);
         let off = stage_of(24, 18, 61, 0.0);
-        let off = solve_planetary_stage(&off, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+        let off = solve_planetary_stage(&off, &StageLoads::just(2.0), &lib).unwrap();
         let b = &off.backlash.forward;
         assert!(
             b.minimum < b.nominal && b.nominal < b.maximum,
@@ -2253,7 +2290,7 @@ mod tests {
             tolerance_minus: 0.0,
             ..base
         };
-        let exact = solve_planetary_stage(&exact, 3000.0, StageTorques::just(2.0), &lib).unwrap();
+        let exact = solve_planetary_stage(&exact, &StageLoads::just(2.0), &lib).unwrap();
         assert!(
             exact.backlash.forward.nominal < 1e-12,
             "zero clearance must give zero play, got {}",
@@ -2266,8 +2303,9 @@ mod tests {
     #[test]
     fn the_planet_is_reported_as_the_special_case_it_is() {
         let r = solved(24, 18, 60);
-        assert!(r.planet.speed_relative.abs() > 0.0);
-        assert!((r.planet.speed_relative - r.planet.gear.speed).abs() > 1e-9);
+        let c = &r.planet.gear.cases[0];
+        assert!(c.speed_against_carrier.abs() > 0.0);
+        assert!((c.speed_against_carrier - c.speed).abs() > 1e-9);
     }
 
     /// **A planet's root is loaded both ways, and what to do about it is asked
@@ -2282,9 +2320,15 @@ mod tests {
     fn a_reversed_root_is_corrected_only_when_the_train_asks() {
         let lib = test_library();
         let stage = PlanetaryStage::default();
-        let solve = |reversal: crate::train::Reversal| {
-            solve_planetary_stage_with(&stage, 3000.0, StageTorques::just(2.0), &lib, reversal)
-                .unwrap()
+        // `StageLoads::just` reverses nothing; the reversing duty is the
+        // fatigue case's own, so the second solve hands the stage one.
+        let solve = |reversal: crate::train::Reversal, reversing: bool| {
+            let mut loads = StageLoads::just(2.0);
+            loads.cases[1].turns = Some(crate::train::Turns {
+                revolutions: 1.0,
+                reversing_actuations: reversing.then_some(1.0),
+            });
+            solve_planetary_stage_with(&stage, &loads, &lib, reversal).unwrap()
         };
         // **On the member, not the stage.** Three members raising one note is
         // exactly what a stage-level list could not carry: one key, three
@@ -2297,22 +2341,19 @@ mod tests {
         };
 
         // Off: nothing is derated, and the planet's reversal is disclosed.
-        let plain = solve(crate::train::Reversal::default());
+        let plain = solve(crate::train::Reversal::default(), false);
         assert_eq!(fired(&plain, key::GEAR_REVERSED_BENDING_UNCORRECTED), 1);
         assert_eq!(fired(&plain, key::GEAR_REVERSED_BENDING_APPLIED), 0);
 
         // On: the same member is derated, and the note says so instead.
-        let corrected = solve(crate::train::Reversal {
-            drive_reverses: false,
-            correct: true,
-        });
+        let corrected = solve(crate::train::Reversal { correct: true }, false);
         assert_eq!(fired(&corrected, key::GEAR_REVERSED_BENDING_APPLIED), 1);
         assert_eq!(fired(&corrected, key::GEAR_REVERSED_BENDING_UNCORRECTED), 0);
 
         // A smaller allowable asks for more face, and only for the planet.
         let width = |r: &PlanetaryResult, g: &GearResult| {
             let _ = r;
-            g.min_face_width.cyclic.bending.unwrap()
+            g.cases[1].min_face_width.bending.unwrap()
         };
         assert!(
             width(&corrected, &corrected.planet.gear) > width(&plain, &plain.planet.gear) * 1.2,
@@ -2331,10 +2372,7 @@ mod tests {
 
         // A reversing **drive** reverses all three, and does not stack with the
         // planet's own — which is the whole point of asking `reverses` once.
-        let driven = solve(crate::train::Reversal {
-            drive_reverses: true,
-            correct: true,
-        });
+        let driven = solve(crate::train::Reversal { correct: true }, true);
         assert_eq!(fired(&driven, key::GEAR_REVERSED_BENDING_APPLIED), 3);
         // ...and no member's own list carries one note twice, which is the shape
         // that broke the panel: a keyed list cannot draw two of one key.
@@ -2366,8 +2404,7 @@ mod tests {
             planets: 1,
             ..stage_of(24, 18, 60, 0.0)
         };
-        let r =
-            solve_planetary_stage(&one, 3000.0, StageTorques::just(2.0), &test_library()).unwrap();
+        let r = solve_planetary_stage(&one, &StageLoads::just(2.0), &test_library()).unwrap();
         assert!(r.planet_clearance.is_none());
         assert!(r.planet_clearance_ok);
     }
@@ -2379,14 +2416,20 @@ mod tests {
     fn a_helical_set_reports_everything_a_spur_one_does() {
         for helix in [10.0, 20.0, 30.0] {
             let stage = stage_of(24, 18, 60, helix);
-            let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library())
+            let r = solve_planetary_stage(&stage, &StageLoads::just(2.0), &test_library())
                 .unwrap_or_else(|e| panic!("helix={helix}: {e}"));
-            assert!(r.sun.bending_stress.peak.is_some(), "helix={helix}: sun");
             assert!(
-                r.planet.gear.bending_stress.peak.is_some(),
+                r.sun.cases[0].bending_stress.is_some(),
+                "helix={helix}: sun"
+            );
+            assert!(
+                r.planet.gear.cases[0].bending_stress.is_some(),
                 "helix={helix}: planet"
             );
-            assert!(r.ring.bending_stress.peak.is_some(), "helix={helix}: ring");
+            assert!(
+                r.ring.cases[0].bending_stress.is_some(),
+                "helix={helix}: ring"
+            );
             assert!(
                 r.sun_planet.line.unwrap().contact_ratios.overlap > 0.0,
                 "helix={helix}"
@@ -2402,8 +2445,7 @@ mod tests {
     fn an_impossible_set_is_refused() {
         assert!(solve_planetary_stage(
             &stage_of(24, 18, 200, 0.0),
-            3000.0,
-            StageTorques::just(2.0),
+            &StageLoads::just(2.0),
             &test_library()
         )
         .is_err());
@@ -2433,13 +2475,7 @@ mod tests {
             );
             assert!((planet - ring).abs() < 1e-15, "internal pair must match");
             // ...and it still solves.
-            assert!(solve_planetary_stage(
-                &stage,
-                3000.0,
-                StageTorques::just(2.0),
-                &test_library()
-            )
-            .is_ok());
+            assert!(solve_planetary_stage(&stage, &StageLoads::just(2.0), &test_library()).is_ok());
         }
     }
     /// **The set's shifts follow the same rule as a pair's**: off, the sun sits
@@ -2469,8 +2505,7 @@ mod tests {
                     },
                     ..free()
                 },
-                3000.0,
-                StageTorques::just(2.0),
+                &StageLoads::just(2.0),
                 &lib,
             )
             .expect("the set solves")
@@ -2519,8 +2554,8 @@ mod tests {
         };
         stage.sun.profile_shift = Auto::automatic(0.0);
         stage.ring.profile_shift = Auto::fixed(0.25);
-        let r = solve_planetary_stage(&stage, 3000.0, StageTorques::just(2.0), &test_library())
-            .expect("solves");
+        let r =
+            solve_planetary_stage(&stage, &StageLoads::just(2.0), &test_library()).expect("solves");
         assert!((r.ring.profile_shift - 0.25).abs() < 1e-9);
     }
 }

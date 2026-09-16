@@ -442,7 +442,7 @@ fn main() {
 /// would be a second answer to the same question — which is how the two start
 /// disagreeing.
 fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth: Option<u32>) {
-    use gear_core::train::{solve_hula_stage, HulaStage, StageTorques};
+    use gear_core::train::{solve_hula_stage, HulaStage, StageLoads};
 
     let lib = gear_io::default_library();
     let teeth = [n + 1, n, n - 1, n];
@@ -466,7 +466,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         cutter.teeth = cutter_teeth.unwrap_or_else(|| stocked.min(ring.saturating_sub(5)).max(4));
     }
 
-    let result = match solve_hula_stage(&stage, 1000.0, StageTorques::just(2.0), &lib) {
+    let result = match solve_hula_stage(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("that stage has no geometry: {e}");
@@ -492,7 +492,9 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
     );
     println!(
         "  speeds  crank {:.1}  wobble {:+.3}  output {:+.4} rpm",
-        result.crank_speed, result.gears[1].gear.speed, result.gears[3].gear.speed
+        result.cases[0].speeds[1],
+        result.gears[1].gear.cases[0].speed,
+        result.gears[3].gear.cases[0].speed
     );
     println!(
         "  efficiency {:.3} % forward, {:.3} % back-driven{}   (the two meshes alone, crank held: {:.4})",
@@ -556,20 +558,19 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         // the torque on the way as well — the output pair carries the whole of it.
         println!(
             "    sigma_H {:.1} MPa at the pitch point   rho {:.4} mm",
-            mesh.report.contact.peak.at_pitch_point,
-            1.0 / mesh.report.contact.peak.curvature_across
+            mesh.report.cases[0].contact.at_pitch_point,
+            1.0 / mesh.report.cases[0].contact.curvature_across
         );
         for gear in &members {
             println!(
                 "    z{:<4} T {:>10.4} Nm  b {:>7.3} mm  sigma_F {:>8}  sigma_H {:>7.1} MPa",
                 gear.teeth,
-                gear.gear.torque,
+                gear.gear.cases[0].torque,
                 gear.gear.face_width,
-                gear.gear
+                gear.gear.cases[0]
                     .bending_stress
-                    .peak
                     .map_or_else(|| "—".to_string(), |s| format!("{s:.1}")),
-                gear.gear.contact_stress.peak,
+                gear.gear.cases[0].contact_stress,
             );
             for note in gear.gear.clamps.iter().chain(&gear.gear.notes) {
                 println!("    ! z{}: {}", gear.teeth, words().render(note));
@@ -857,7 +858,7 @@ fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, tit
 /// out — the useful statement is which bound stops it, and that is what these
 /// rows are.
 fn hula_band(z0: u32, clearance_in_modules: f64) {
-    use gear_core::train::{solve_hula_stage, HulaStage, StageTorques};
+    use gear_core::train::{solve_hula_stage, HulaStage, StageLoads};
 
     let lib = gear_io::default_library();
 
@@ -897,8 +898,7 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                     for c in &mut stage.cutter {
                         c.teeth = cutter;
                     }
-                    let Ok(r) = solve_hula_stage(&stage, 1000.0, StageTorques::just(2.0), &lib)
-                    else {
+                    let Ok(r) = solve_hula_stage(&stage, &StageLoads::at(2.0, 1000.0), &lib) else {
                         continue;
                     };
                     // **The whole question**, through the one method that asks
@@ -982,7 +982,7 @@ fn mesh_sweep(z_ring: u32, z_pinion: u32, ring_addendum: f64, pinion_addendum: f
 /// nobody builds.
 fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     use gear_core::ring::Ring;
-    use gear_core::train::{solve_hula_stage, HulaStage, StageTorques};
+    use gear_core::train::{solve_hula_stage, HulaStage, StageLoads};
 
     let lib = gear_io::default_library();
     let teeth = [n + 1, n, n - 1, n];
@@ -993,7 +993,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     for (gear, count) in stage.gears.iter_mut().zip(teeth) {
         gear.teeth = count;
     }
-    let result = match solve_hula_stage(&stage, 1000.0, StageTorques::just(2.0), &lib) {
+    let result = match solve_hula_stage(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("that stage has no geometry: {e}");
@@ -1044,8 +1044,8 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
 fn train_file_report(path: Option<&str>) {
     use gear_core::params::Auto;
     use gear_core::train::{
-        solve_train, Actuation, FirstMemberSizing, PairStage, PlanetaryStage, Stage, StageGear,
-        Train,
+        solve_train, Duty, FirstMemberSizing, LoadCase, PairStage, PlanetaryStage, Port, Stage,
+        StageGear, Train,
     };
     use gear_io::TrainDocument;
 
@@ -1053,15 +1053,29 @@ fn train_file_report(path: Option<&str>) {
     let doc = TrainDocument {
         name: "Elevation drive".to_string(),
         train: Train {
-            input_speed: 3000.0,
-            input_torque: 2.0,
-            back_driving_torque: 0.0,
-            operating_torque: 2.0,
+            // Both kinds, both ports, both duties: everything the document can
+            // carry for a load, so the round trip is asked of all of it.
+            load_cases: vec![
+                LoadCase::ultimate(2.0, 3000.0),
+                LoadCase {
+                    port: Port::End,
+                    reacted: false,
+                    ..LoadCase::ultimate(0.5, 0.0)
+                },
+                LoadCase {
+                    duty: Duty::Continuous {
+                        runtime_hours: 1000.0,
+                    },
+                    ..LoadCase::fatigue(2.0, 2400.0)
+                },
+                LoadCase {
+                    port: Port::End,
+                    reacted: true,
+                    enabled: false,
+                    ..LoadCase::fatigue(0.2, 30.0)
+                },
+            ],
             reversed_bending: false,
-            actuation: Actuation::Continuous {
-                operating_speed: 2400.0,
-                runtime_hours: 1000.0,
-            },
             stages: vec![
                 Stage::Spur(PairStage {
                     sizing: Auto::fixed(FirstMemberSizing::AdditionalHelix(15.0)),
@@ -1126,8 +1140,16 @@ fn train_file_report(path: Option<&str>) {
             println!("\n  quantity                 exported            re-imported   same");
             let rows: [(&str, f64, f64); 5] = [
                 ("total ratio", a.total_ratio, b.total_ratio),
-                ("output speed rpm", a.output_speed, b.output_speed),
-                ("output torque Nm", a.output_torque, b.output_torque),
+                (
+                    "output speed rpm",
+                    a.cases[0].delivered_speed,
+                    b.cases[0].delivered_speed,
+                ),
+                (
+                    "output torque Nm",
+                    a.cases[0].delivered_torque,
+                    b.cases[0].delivered_torque,
+                ),
                 (
                     "efficiency forward",
                     a.total_efficiency.forward,
@@ -1177,7 +1199,7 @@ fn train_file_report(path: Option<&str>) {
 fn shifts_report(z1: u32, z2: u32) {
     use gear_core::params::Auto;
     use gear_core::train::{
-        solve_pair_stage, Optimisation, PairKind, PairStage, StageGear, StageTorques,
+        solve_pair_stage, Optimisation, PairKind, PairStage, StageGear, StageLoads,
     };
 
     let lib = gear_io::default_library();
@@ -1194,12 +1216,7 @@ fn shifts_report(z1: u32, z2: u32) {
         ..PairStage::default()
     };
     let solved = |on: bool, at: Option<f64>| {
-        solve_pair_stage(
-            &stage(on, at),
-            PairKind::Spur,
-            StageTorques::just(2.0),
-            &lib,
-        )
+        solve_pair_stage(&stage(on, at), PairKind::Spur, &StageLoads::just(2.0), &lib)
     };
 
     println!("pair z {z1}/{z2}  module 1  alpha 20 deg  mu 0.06\n");
@@ -1303,7 +1320,7 @@ fn epicyclic_shifts_report() {
     use gear_core::params::Auto;
     use gear_core::train::{
         solve_hula_stage, solve_planetary_stage, HulaStage, Optimisation, PlanetaryStage,
-        StageTorques,
+        StageLoads,
     };
 
     let lib = gear_io::default_library();
@@ -1335,7 +1352,7 @@ fn epicyclic_shifts_report() {
         for (g, z) in hula.gears.iter_mut().zip([n, n + d, n + d, n + 2 * d]) {
             g.teeth = z;
         }
-        match solve_hula_stage(&hula, 1000.0, StageTorques::just(2.0), &lib) {
+        match solve_hula_stage(&hula, &StageLoads::at(2.0, 1000.0), &lib) {
             Err(e) => println!("{d:<12} {e}"),
             Ok(r) => println!(
                 "{d:<12} {:>9.4} {:>9.4} {:>10.4} %   {}",
@@ -1365,7 +1382,7 @@ fn epicyclic_shifts_report() {
         set.ring.teeth = sun + 2 * planet;
         set.sun.profile_shift = Auto::automatic(0.0);
         set.ring.profile_shift = Auto::automatic(0.0);
-        match solve_planetary_stage(&set, 1000.0, StageTorques::just(2.0), &lib) {
+        match solve_planetary_stage(&set, &StageLoads::just(2.0), &lib) {
             Ok(r) => println!(
                 "{:<12} {:>9.4} {:>9.4} {:>9.4} {:>10.4} % {:>16}",
                 format!("{sun}/{planet}"),
@@ -1396,7 +1413,7 @@ fn epicyclic_shifts_report() {
         for (gear, count) in stage.gears.iter_mut().zip([n + 1, n, n - 1, n]) {
             gear.teeth = count;
         }
-        match solve_hula_stage(&stage, 1000.0, StageTorques::just(2.0), &lib) {
+        match solve_hula_stage(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
             Ok(r) => println!(
                 "{:<12} {:>9.4} {:>9.4} {:>10.4} % {:>16}",
                 n,
@@ -1413,7 +1430,8 @@ fn epicyclic_shifts_report() {
 fn train_report(mode: Option<&str>) {
     use gear_core::params::Auto;
     use gear_core::train::{
-        solve_train, Actuation, FirstMemberSizing, PairStage, Stage, StageGear, StageResult, Train,
+        solve_train, Duty, FirstMemberSizing, LoadCase, PairStage, Port, Stage, StageGear,
+        StageResult, Train,
     };
 
     let lib = gear_io::default_library();
@@ -1423,14 +1441,12 @@ fn train_report(mode: Option<&str>) {
         ..StageGear::default()
     };
     let train = Train {
-        input_speed: 3000.0,
-        input_torque: 2.0,
-        // **Three trains, because a back-driving load has three regimes** and
-        // the corpus has to walk all of them. `train` reacts none of it;
+        // **Three trains, because a load from the far end has three regimes**
+        // and the corpus has to walk all of them. `train` reacts none of it;
         // `train mixed` reacts a load the drive still outweighs; `train held` is
         // the worm holding more than it is driving, which is what a self-locking
-        // worm is chosen to do and is the only regime in which the *peak* load
-        // case is the backward one.
+        // worm is chosen to do and is the only regime in which the case from the
+        // end is the larger one.
         //
         // Every train this harness shipped set this to zero, so
         // `tools/check_golden.sh` recorded a path nothing ever walked: a
@@ -1439,26 +1455,48 @@ fn train_report(mode: Option<&str>) {
         // load it did walk was one the drive outweighed, so the corpus still
         // could not show a stage rated at `η_forward` of what it was holding
         // (`docs/corrections.md`).
-        back_driving_torque: match mode {
-            Some("held") => 400.0,
-            Some("mixed") => 0.6,
-            _ => 0.0,
-        },
-        operating_torque: 2.0,
-        // **`toggles` reverses the drive**, which is the switch that lets a
-        // reversed root reach a member at all.
-        actuation: if mode == Some("toggles") {
-            Actuation::Intermittent {
-                range_degrees: 90.0,
-                actuations: 600_000,
-                reversing: true,
-            }
-        } else {
-            Actuation::Continuous {
-                operating_speed: 2400.0,
-                runtime_hours: 1000.0,
-            }
-        },
+        //
+        // **`toggles` reverses the duty**, which is the switch that lets a
+        // reversed root reach a member at all — and holds a load from the end
+        // at the far port, which is the other thing a case can be asked.
+        load_cases: vec![
+            LoadCase::ultimate(2.0, 3000.0),
+            LoadCase {
+                port: Port::End,
+                reacted: mode == Some("toggles"),
+                ..LoadCase::ultimate(
+                    match mode {
+                        Some("held") => 400.0,
+                        Some("mixed") => 0.6,
+                        Some("toggles") => 5.0,
+                        _ => 0.0,
+                    },
+                    0.0,
+                )
+            },
+            LoadCase {
+                duty: if mode == Some("toggles") {
+                    Duty::Intermittent {
+                        range_degrees: 90.0,
+                        at: Port::End,
+                        actuations: 600_000,
+                        reversing: true,
+                    }
+                } else {
+                    Duty::Continuous {
+                        runtime_hours: 1000.0,
+                    }
+                },
+                ..LoadCase::fatigue(
+                    2.0,
+                    if mode == Some("toggles") {
+                        3000.0
+                    } else {
+                        2400.0
+                    },
+                )
+            },
+        ],
         // **Every optional control, engaged.** The corpus turned three of a
         // gear's eleven and left the rest at their defaults, so the constants
         // behind them were outside the change detector: perturbing
@@ -1531,24 +1569,10 @@ fn train_report(mode: Option<&str>) {
     };
 
     println!(
-        "train  in {:.0} rpm / {:.3} Nm peak   ->   out {:.1} rpm / {:.3} Nm peak",
-        train.input_speed, train.input_torque, r.output_speed, r.output_torque
-    );
-    println!(
-        "       operating {:.3} Nm{}   back-driving {:.3} Nm at the output",
-        train.cyclic_torque(),
-        r.operating_torque_percent
-            .map_or(String::new(), |p| format!(" ({p:.1} % of peak)")),
-        train.back_driving_torque
-    );
-    println!(
-        "       total ratio {:.4}:1   total efficiency {}",
+        "train  total ratio {:.4}:1   total efficiency {}",
         r.total_ratio,
         both_ways(r.total_efficiency)
     );
-    for n in &r.notes {
-        println!("       note: {}", words().render(n));
-    }
     println!(
         "       backlash at the output shaft  {:.5} deg  (min {:.5}, max {:.5})",
         r.backlash.forward.nominal, r.backlash.forward.minimum, r.backlash.forward.maximum
@@ -1557,6 +1581,7 @@ fn train_report(mode: Option<&str>) {
         "       backlash at the input shaft   {:.5} deg  (min {:.5}, max {:.5})",
         r.backlash.backward.nominal, r.backlash.backward.minimum, r.backlash.backward.maximum
     );
+    print_train_cases(&train, &r);
 
     for (k, s) in r.stages.iter().enumerate() {
         match (train.stages[k].as_pair(), s) {
@@ -1568,6 +1593,80 @@ fn train_report(mode: Option<&str>) {
             },
             _ => println!("\nstage {}: kind and result disagree", k + 1),
         }
+    }
+}
+
+/// Every load case of a train: what was applied where, what arrived at the far
+/// end, and what the shaft line had to say about it.
+fn print_train_cases(train: &gear_core::train::Train, r: &gear_core::train::TrainResult) {
+    use gear_core::train::{CaseKind, Duty, Port};
+    let port = |p: Port| match p {
+        Port::Start => "start",
+        Port::End => "end",
+    };
+    for c in &r.cases {
+        let input = &train.load_cases[c.case];
+        let duty = match (input.kind, input.duty) {
+            (CaseKind::Ultimate, _) => String::new(),
+            (
+                CaseKind::Fatigue,
+                Duty::Intermittent {
+                    range_degrees,
+                    at,
+                    actuations,
+                    reversing,
+                },
+            ) => format!(
+                "   {range_degrees} deg at {} x {actuations}{}",
+                port(at),
+                if reversing { ", reversing" } else { "" }
+            ),
+            (CaseKind::Fatigue, Duty::Continuous { runtime_hours }) => {
+                format!("   {runtime_hours} h")
+            }
+        };
+        println!(
+            "       case {}  {:<8} {:.3} Nm / {:.0} rpm at {}, {}   ->   {:.3} Nm / {:.1} rpm at {}{duty}",
+            c.case + 1,
+            match input.kind {
+                CaseKind::Ultimate => "ultimate",
+                CaseKind::Fatigue => "fatigue",
+            },
+            input.torque,
+            input.speed,
+            port(input.port),
+            if input.reacted {
+                "held at the far end"
+            } else {
+                "held by nothing"
+            },
+            c.delivered_torque,
+            c.delivered_speed,
+            port(c.delivered_at),
+        );
+        for n in &c.notes {
+            println!("              note: {}", words().render(n));
+        }
+    }
+}
+
+/// What every load case does to one member, one row per case — the same rows
+/// for a line contact's members and a point's, which report no bending.
+fn print_gear_cases(cases: &[gear_core::train::GearCase]) {
+    for c in cases {
+        println!(
+            "      case {}  T {:>10.4} Nm  {:>9.1} rpm  sigma_F {:>8}  sigma_H {:>8.1} MPa  cycles {}",
+            c.case + 1,
+            c.torque,
+            c.speed,
+            c.bending_stress
+                .map_or_else(|| "-".to_string(), |s| format!("{s:.1}")),
+            c.contact_stress,
+            c.cycles.map_or_else(
+                || "-".to_string(),
+                |n| format!("{:.3e} / {:.3e}", n.bending, n.contact)
+            ),
+        );
     }
 }
 
@@ -1609,43 +1708,27 @@ fn print_line_pair(
         100.0 * mesh.efficiency.forward,
         100.0 * mesh.efficiency.backward
     );
-    // One pressure, printed once. The pair shares a patch, a normal force and an
-    // `E*`, so there is no second number to print per gear — what a gear has of
-    // its own is the allowable, and therefore `b_min`.
+    // One pressure, printed once per case. The pair shares a patch, a normal
+    // force and an `E*`, so there is no second number to print per gear — what
+    // a gear has of its own is the allowable, and therefore `b_min`.
     println!(
-        "  contact at the pitch point  sigma_H {:.1} / {:.1} MPa peak/cyclic   rho {:.3} mm",
-        mesh.contact.peak.at_pitch_point,
-        mesh.contact.cyclic.at_pitch_point,
-        1.0 / mesh.contact.peak.curvature_across
+        "  contact at the pitch point  sigma_H {} MPa by case   rho {:.3} mm",
+        mesh.cases
+            .iter()
+            .map(|c| format!("{:.1}", c.contact.at_pitch_point))
+            .collect::<Vec<_>>()
+            .join(" / "),
+        1.0 / mesh.cases[0].contact.curvature_across
     );
-    println!(
-        "  {:<6} {:>8} {:>8} {:>10} {:>10} {:>21} {:>21} {:>9} {:>21}",
-        "gear",
-        "x",
-        "b mm",
-        "T fwd Nm",
-        "T bwd Nm",
-        "sigma_F peak/cyclic",
-        "sigma_H peak/cyclic",
-        "rpm",
-        "cycles bend/contact"
-    );
+    println!("  {:<6} {:>8} {:>8}", "gear", "x", "b mm");
     for (i, g) in s.gears.iter().enumerate() {
         println!(
-            "  {:<6} {:>8.4} {:>8.3} {:>10.4} {:>10} {:>9.1} /{:>9.1} {:>9.1} /{:>9.1} {:>9.1} {:>9.3e} /{:>9.3e}",
+            "  {:<6} {:>8.4} {:>8.3}",
             i + 1,
             g.profile_shift,
-            g.face_width,
-            g.torque,
-            g.back_driving_torque.map_or("-".into(), |t| format!("{t:.4}")),
-            g.bending_stress.peak.unwrap_or(f64::NAN),
-            g.bending_stress.cyclic.unwrap_or(f64::NAN),
-            g.contact_stress.peak,
-            g.contact_stress.cyclic,
-            g.speed,
-            g.tooth_cycles.bending,
-            g.tooth_cycles.contact
+            g.face_width
         );
+        print_gear_cases(&g.cases);
     }
     for n in s.mesh.notes.iter().chain(&s.notes) {
         println!("  note: {}", words().render(n));
@@ -1680,33 +1763,28 @@ fn print_point_pair(
     );
     println!("  efficiency  {}", both_ways(m.efficiency));
     println!(
-        "  contact  peak {:.1} MPa  cyclic {:.1} MPa   patch {:.4} x {:.4} mm   sliding {:.1} mm/s",
-        m.contact.peak.max_pressure,
-        m.contact.cyclic.max_pressure,
-        m.contact.peak.patch_length,
-        m.contact.peak.patch_width,
-        m.sliding_velocity
+        "  contact  {} MPa by case   patch {:.4} x {:.4} mm   sliding {} mm/s by case",
+        m.cases
+            .iter()
+            .map(|c| format!("{:.1}", c.contact.max_pressure))
+            .collect::<Vec<_>>()
+            .join(" / "),
+        m.cases[0].contact.patch_length,
+        m.cases[0].contact.patch_width,
+        m.cases
+            .iter()
+            .map(|c| format!("{:.1}", c.sliding_velocity))
+            .collect::<Vec<_>>()
+            .join(" / "),
     );
-    println!(
-        "  {:<6} {:>8} {:>10} {:>10} {:>9} {:>21}   material",
-        "member", "b mm", "T fwd Nm", "T bwd Nm", "rpm", "cycles bend/contact"
-    );
+    println!("  {:<6} {:>8}   material", "member", "b mm");
     let names = match kind {
         gear_core::train::PairKind::Worm => ["worm", "wheel"],
         gear_core::train::PairKind::Spur => ["1", "2"],
     };
-    for (name, m) in names.iter().zip(&s.gears) {
-        println!(
-            "  {name:<6} {:>8.3} {:>10.4} {:>10} {:>9.1} {:>9.3e} /{:>9.3e}   {}",
-            m.face_width,
-            m.torque,
-            m.back_driving_torque
-                .map_or("-".into(), |t| format!("{t:.4}")),
-            m.speed,
-            m.tooth_cycles.bending,
-            m.tooth_cycles.contact,
-            m.material.name
-        );
+    for (name, g) in names.iter().zip(&s.gears) {
+        println!("  {name:<6} {:>8.3}   {}", g.face_width, g.material.name);
+        print_gear_cases(&g.cases);
     }
     println!("  bending not reported, flank type ZI - see docs/reference.md#crossed-axes");
     for n in s.mesh.notes.iter().chain(&s.notes) {
@@ -2717,11 +2795,11 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
 
 /// A worm stage end to end: geometry, both directions, contact and backlash.
 fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: f64) {
-    use gear_core::train::{solve_pair_stage, PairKind, StageTorques};
+    use gear_core::train::{solve_pair_stage, PairKind, StageLoads};
 
     let stage = worm_stage(starts, wheel_teeth, worm_diameter);
     let lib = gear_io::default_library();
-    let r = match solve_pair_stage(&stage, PairKind::Worm, StageTorques::just(torque), &lib) {
+    let r = match solve_pair_stage(&stage, PairKind::Worm, &StageLoads::just(torque), &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("cannot solve that stage: {e}");
@@ -2745,14 +2823,16 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
     for (name, m) in ["worm", "wheel"].iter().zip(&r.gears) {
         println!(
             "  {name:<10} {:9.4} {:9.3} {:9.4}   {}",
-            m.torque, m.face_width, m.pitch_diameter, m.material.name
+            m.cases[0].torque, m.face_width, m.pitch_diameter, m.material.name
         );
     }
     println!();
     println!("  efficiency   {}", both_ways(m.efficiency));
     println!(
         "  contact      {:.1} MPa   patch {:.4} x {:.4} mm",
-        m.contact.peak.max_pressure, m.contact.peak.patch_length, m.contact.peak.patch_width
+        m.cases[0].contact.max_pressure,
+        m.cases[0].contact.patch_length,
+        m.cases[0].contact.patch_width
     );
     println!(
         "  backlash     at the wheel {:.5} deg (min {:.5}, max {:.5})   at the worm {:.5} deg",
@@ -2922,8 +3002,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
             };
             match solve_planetary_stage(
                 &stage,
-                3000.0,
-                gear_core::train::StageTorques::just(2.0),
+                &gear_core::train::StageLoads::at(2.0, 3000.0),
                 &lib,
             ) {
                 Err(e) => println!("  {:>7} in, {:>7} held: {e}", name(input), name(fixed)),
@@ -2976,23 +3055,19 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                         }
                         println!(
                             "sigma_H at pitch  sun-planet {:.1} MPa   planet-ring {:.1} MPa",
-                            r.sun_planet.contact.peak.at_pitch_point,
-                            r.planet_ring.contact.peak.at_pitch_point
+                            r.sun_planet.cases[0].contact.at_pitch_point,
+                            r.planet_ring.cases[0].contact.at_pitch_point
                         );
                         println!(
                             "sigma_F  sun {}   planet {}   ring {}",
-                            r.sun
+                            r.sun.cases[0]
                                 .bending_stress
-                                .peak
                                 .map_or_else(|| "-".into(), |v| format!("{v:.1} MPa")),
-                            r.planet
-                                .gear
+                            r.planet.gear.cases[0]
                                 .bending_stress
-                                .peak
                                 .map_or_else(|| "-".into(), |v| format!("{v:.1} MPa")),
-                            r.ring
+                            r.ring.cases[0]
                                 .bending_stress
-                                .peak
                                 .map_or_else(|| "-".into(), |v| format!("{v:.1} MPa")),
                         );
                         println!(
@@ -3017,12 +3092,9 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
         return;
     }
     let stage = base.clone();
-    if let Ok(r) = solve_planetary_stage(
-        &stage,
-        3000.0,
-        gear_core::train::StageTorques::just(2.0),
-        &lib,
-    ) {
+    if let Ok(r) =
+        solve_planetary_stage(&stage, &gear_core::train::StageLoads::at(2.0, 3000.0), &lib)
+    {
         println!();
         for (which, mesh) in [
             ("sun-planet", &r.sun_planet),
@@ -3045,12 +3117,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
     //
     // Here rather than nowhere because a path the harness never walks is a path
     // the change detector cannot see, which this project has recorded six times.
-    let free = solve_planetary_stage(
-        &base,
-        3000.0,
-        gear_core::train::StageTorques::just(2.0),
-        &lib,
-    );
+    let free = solve_planetary_stage(&base, &gear_core::train::StageLoads::at(2.0, 3000.0), &lib);
     if let Ok(free) = free {
         println!("\ncentre distance given, shifts chosen to reach it");
         println!(
@@ -3063,8 +3130,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
             stage.centre_distance = gear_core::Auto::fixed(asked);
             match solve_planetary_stage(
                 &stage,
-                3000.0,
-                gear_core::train::StageTorques::just(2.0),
+                &gear_core::train::StageLoads::at(2.0, 3000.0),
                 &lib,
             ) {
                 Err(e) => println!("{asked:<12.4} {e}"),
@@ -3090,7 +3156,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
 /// by tooth count and helix, so `β₁` is what there is to choose. Nothing else
 /// about the pair changes — it is the same screw geometry either way.
 fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
-    use gear_core::train::{solve_pair_stage, FirstMemberSizing, PairKind, StageTorques};
+    use gear_core::train::{solve_pair_stage, FirstMemberSizing, PairKind, StageLoads};
 
     let lib = gear_io::default_library();
     println!(
@@ -3126,7 +3192,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
             println!("{beta1:>7.1} {:>7} — no such pair", shaft_angle - beta1);
             continue;
         };
-        match solve_pair_stage(&stage, PairKind::Spur, StageTorques::just(2.0), &lib) {
+        match solve_pair_stage(&stage, PairKind::Spur, &StageLoads::just(2.0), &lib) {
             Err(e) => println!(
                 "{beta1:>7.1} {:>7.1}  {e}",
                 g.wheel_helix_angle_rad.to_degrees()
@@ -3159,7 +3225,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
                     g.wheel_pitch_diameter,
                     g.centre_distance,
                     g.sliding_ratio,
-                    m.contact.peak.max_pressure,
+                    m.cases[0].contact.max_pressure,
                     if m.point.is_some() && m.contact_ratio > 0.0 {
                         format!("{:.9}", m.contact_ratio)
                     } else {
@@ -3211,7 +3277,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
         ("least shift that clears undercut", &even),
         ("least loss", &free),
     ] {
-        match solve_pair_stage(stage, PairKind::Spur, StageTorques::just(2.0), &lib) {
+        match solve_pair_stage(stage, PairKind::Spur, &StageLoads::just(2.0), &lib) {
             Ok(r) => println!(
                 "{name:<34} {:>9.4} {:>9.4} {:>9.4} {:>9.4} {:>9.3} %",
                 r.gears[0].profile_shift,

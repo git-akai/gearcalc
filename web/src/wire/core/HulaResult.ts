@@ -4,6 +4,7 @@ import type { Directional } from "./Directional";
 import type { HulaGear } from "./HulaGear";
 import type { HulaMesh } from "./HulaMesh";
 import type { Note } from "./Note";
+import type { ShaftsCase } from "./ShaftsCase";
 
 /**
  * What a hula stage came to.
@@ -47,10 +48,6 @@ running_clearance: number,
  */
 binding_mesh: number | null, 
 /**
- * Speed of the crank, rpm — the input, and the carrier of both meshes.
- */
-crank_speed: number, 
-/**
  * Mesh efficiency with the **crank held**, 0..1, both directions: the two
  * pairs' own, multiplied.
  *
@@ -84,10 +81,12 @@ fixed_carrier_efficiency: Directional<number>,
  */
 efficiency: Directional<number>, 
 /**
- * Torque on each shaft — the grounded gear, the crank, the output — in
- * whatever unit the input torque was given. They sum to zero.
+ * Speed and torque on each shaft — the grounded gear, the crank, the
+ * output — in every load case, each distributed in its own direction.
+ * The crank is the carrier of both meshes, and the shaft the load is
+ * referred to.
  */
-shaft_torques: [number, number, number], 
+cases: Array<ShaftsCase>, 
 /**
  * Angular backlash at whichever shaft is the **output**, degrees: gear 4
  * driving forward, the crank driving backward. The same two plays subtend

@@ -72,10 +72,8 @@ near_forward_locking = "nahe daran, nicht mehr vorwärts anzutreiben: Haftreibun
 low_efficiency = "Verzahnungswirkungsgrad {percent} %: der größte Teil der Eingangsleistung wird Wärme, was eine Stufe mit gekreuzten Achsen meist vor der Spannung begrenzt"
 
 [train]
-operating_torque_clamped = "Betriebsdrehmoment auf {torque} Nm begrenzt: es kann den Spitzenwert nicht überschreiten"
-operating_speed_clamped = "Betriebsdrehzahl auf {speed} min⁻¹ begrenzt: sie kann den Spitzenwert nicht überschreiten"
-back_driving_reacted_at = "die rücktreibende Last wird in Stufe {stage} abgestützt, die sich nicht rückwärts antreiben lässt; die Stufen davor tragen nichts davon"
-back_driving_not_reacted = "die rücktreibende Last erreicht kein Zahnrad: jede Stufe lässt sich rückwärts antreiben, die Last dreht den Strang also, statt von ihm gehalten zu werden"
+load_reacted_at = "wird in Stufe {stage} abgestützt, die sich in dieser Richtung nicht antreiben lässt; die Stufen dahinter tragen nichts davon"
+load_not_reacted = "erreicht kein Zahnrad: nichts hält die Last, sie dreht den Strang also, statt von ihm getragen zu werden"
 
 [error]
 mesh_incompatible = "die Räder können nicht kämmen: Modul, Eingriffswinkel oder Schrägungswinkel unterscheiden sich"

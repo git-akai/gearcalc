@@ -593,7 +593,7 @@ mod tests {
         }
         impl EveryNote for gear_core::train::TrainResult {
             fn every_note(&self) -> Vec<Note> {
-                let mut out = self.notes.clone();
+                let mut out: Vec<Note> = self.cases.iter().flat_map(|c| c.notes.clone()).collect();
                 out.extend(self.stages.iter().flat_map(every_note_of));
                 out
             }
@@ -716,25 +716,15 @@ mod tests {
         // with a kind on it; the names here say which the case is about.
         let lib = crate::default_library();
         let solve_spur = |stage: &gear_core::train::PairStage,
-                          torques: gear_core::train::StageTorques,
+                          loads: &gear_core::train::StageLoads,
                           lib: &gear_core::material::MaterialLibrary| {
-            gear_core::train::solve_pair_stage(
-                stage,
-                gear_core::train::PairKind::Spur,
-                torques,
-                lib,
-            )
+            gear_core::train::solve_pair_stage(stage, gear_core::train::PairKind::Spur, loads, lib)
         };
         let solve_crossed = solve_spur;
         let solve_worm = |stage: &gear_core::train::PairStage,
-                          torques: gear_core::train::StageTorques,
+                          loads: &gear_core::train::StageLoads,
                           lib: &gear_core::material::MaterialLibrary| {
-            gear_core::train::solve_pair_stage(
-                stage,
-                gear_core::train::PairKind::Worm,
-                torques,
-                lib,
-            )
+            gear_core::train::solve_pair_stage(stage, gear_core::train::PairKind::Worm, loads, lib)
         };
         for helix in [0.0_f64, 3.0, 20.0] {
             for teeth in [(17_u32, 43_u32), (9, 11)] {
@@ -754,7 +744,7 @@ mod tests {
                     ],
                     ..Default::default()
                 };
-                if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+                if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                     record(&r.every_note());
                 }
                 for sigma in [0.5_f64, 90.0] {
@@ -770,7 +760,7 @@ mod tests {
                             g.face_width = face;
                         }
                         if let Ok(r) =
-                            solve_crossed(&crossed, gear_core::train::StageTorques::just(2.0), &lib)
+                            solve_crossed(&crossed, &gear_core::train::StageLoads::just(2.0), &lib)
                         {
                             record(&r.every_note());
                         }
@@ -797,7 +787,7 @@ mod tests {
                 gears: [gear.clone(), gear],
                 ..Default::default()
             };
-            if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
                 for g in &r.gears {
                     record(&g.notes);
@@ -819,7 +809,7 @@ mod tests {
                 gears: [gear.clone(), gear],
                 ..Default::default()
             };
-            if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
                 for g in &r.gears {
                     record(&g.notes);
@@ -840,7 +830,7 @@ mod tests {
                 gears: [gear.clone(), gear],
                 ..Default::default()
             };
-            if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
                 for g in &r.gears {
                     record(&g.notes);
@@ -863,7 +853,7 @@ mod tests {
                 gears: [gear(17), gear(43)],
                 ..Default::default()
             };
-            if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
                 // A bound that moved a gear's own number rides that gear.
                 for g in &r.gears {
@@ -885,8 +875,7 @@ mod tests {
             }
             if let Ok(r) = gear_core::train::solve_hula_stage(
                 &drive,
-                1000.0,
-                gear_core::train::StageTorques::just(2.0),
+                &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
                 record(&r.every_note());
@@ -909,7 +898,7 @@ mod tests {
                 ..gear_core::train::PairStage::worm()
             };
             stage.gears[0].teeth = starts;
-            if let Ok(r) = solve_worm(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = solve_worm(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
             }
         }
@@ -918,13 +907,9 @@ mod tests {
         // switched off — every other case here — fires the disclosure.
         if let Ok(r) = gear_core::train::solve_planetary_stage_with(
             &gear_core::train::PlanetaryStage::default(),
-            3000.0,
-            gear_core::train::StageTorques::just(2.0),
+            &gear_core::train::StageLoads::just(2.0),
             &lib,
-            gear_core::train::Reversal {
-                drive_reverses: false,
-                correct: true,
-            },
+            gear_core::train::Reversal { correct: true },
         ) {
             record(&r.every_note());
             // ...and what the members themselves say, which is where a note
@@ -941,8 +926,7 @@ mod tests {
             };
             if let Ok(r) = gear_core::train::solve_planetary_stage(
                 &stage,
-                3000.0,
-                gear_core::train::StageTorques::just(2.0),
+                &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
                 record(&r.every_note());
@@ -994,7 +978,7 @@ mod tests {
                 ],
                 ..Default::default()
             };
-            if let Ok(r) = solve_spur(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = solve_spur(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
                 for g in &r.gears {
                     record(&g.notes);
@@ -1018,7 +1002,7 @@ mod tests {
                     ..stage.clone()
                 };
                 if let Ok(r) =
-                    solve_crossed(&crossed, gear_core::train::StageTorques::just(2.0), &lib)
+                    solve_crossed(&crossed, &gear_core::train::StageLoads::just(2.0), &lib)
                 {
                     record(&r.every_note());
                 }
@@ -1039,7 +1023,7 @@ mod tests {
                 ),
                 ..gear_core::train::PairStage::worm()
             };
-            if let Ok(r) = solve_crossed(&stage, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = solve_crossed(&stage, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
             }
             // ...the optimiser asked of a crossed mesh, whose search has its
@@ -1052,7 +1036,7 @@ mod tests {
                     },
                     ..stage.clone()
                 },
-                gear_core::train::StageTorques::just(2.0),
+                &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
                 record(&r.every_note());
@@ -1064,7 +1048,7 @@ mod tests {
                     static_friction: friction,
                     ..gear_core::train::PairStage::worm()
                 },
-                gear_core::train::StageTorques::just(2.0),
+                &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
                 record(&r.every_note());
@@ -1085,8 +1069,7 @@ mod tests {
             }
             if let Ok(r) = gear_core::train::solve_hula_stage(
                 &hula,
-                1000.0,
-                gear_core::train::StageTorques::just(2.0),
+                &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
                 record(&r.every_note());
@@ -1106,7 +1089,7 @@ mod tests {
             };
             sp.gears[0].teeth = 9;
             sp.gears[1].teeth = 37;
-            if let Ok(r) = solve_spur(&sp, gear_core::train::StageTorques::just(2.0), &lib) {
+            if let Ok(r) = solve_spur(&sp, &gear_core::train::StageLoads::just(2.0), &lib) {
                 record(&r.every_note());
             }
         }
@@ -1130,7 +1113,7 @@ mod tests {
                     ),
                     ..gear_core::train::PairStage::worm()
                 },
-                gear_core::train::StageTorques::just(2.0),
+                &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
                 record(&r.every_note());
@@ -1178,8 +1161,7 @@ mod tests {
             };
             if let Ok(r) = gear_core::train::solve_planetary_stage(
                 &stage,
-                3000.0,
-                gear_core::train::StageTorques::just(2.0),
+                &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
                 record(&r.every_note());
@@ -1192,55 +1174,38 @@ mod tests {
         // ---- the whole train ---------------------------------------- //
         //
         // The notes no stage can fire, because they are facts about the shaft
-        // line: an operating input above the peak it is measured from, and a
-        // back-driving load that is either reacted somewhere or reacted
-        // nowhere. Fired through `solve_train` for the same reason the clamps
-        // are fired through the geometry — the case has to be live, not merely
+        // line: a load case that is either held somewhere or held nowhere.
+        // Fired through `solve_train` for the same reason the clamps are fired
+        // through the geometry — the case has to be live, not merely
         // constructible.
         {
-            use gear_core::train::{Actuation, PairStage, Stage, Train};
-            let train = |back_driving_torque, operating_torque, actuation, stages| Train {
-                input_speed: 3000.0,
-                input_torque: 2.0,
-                back_driving_torque,
-                operating_torque,
+            use gear_core::train::{LoadCase, PairStage, Port, Stage, Train};
+            let train = |stages| Train {
+                load_cases: vec![
+                    LoadCase::ultimate(2.0, 3000.0),
+                    // A load from the end that nothing is asked to hold.
+                    LoadCase {
+                        port: Port::End,
+                        reacted: false,
+                        ..LoadCase::ultimate(5.0, 0.0)
+                    },
+                ],
                 reversed_bending: false,
-                actuation,
                 stages,
             };
-            let spur = || vec![Stage::Spur(PairStage::default())];
-            let intermittent = Actuation::Intermittent {
-                range_degrees: 25.0,
-                actuations: 1000,
-                reversing: true,
-            };
-            // Both inputs above their peaks, and a load nothing reacts.
-            if let Ok(r) = gear_core::train::solve_train(
-                &train(
-                    5.0,
-                    10.0,
-                    Actuation::Continuous {
-                        operating_speed: 9000.0,
-                        runtime_hours: 1000.0,
-                    },
-                    spur(),
-                ),
-                &lib,
-            ) {
+            // A load nothing reacts...
+            if let Ok(r) =
+                gear_core::train::solve_train(&train(vec![Stage::Spur(PairStage::default())]), &lib)
+            {
                 record(&r.every_note());
             }
             // ...and the same load against a worm that cannot be back-driven.
             if let Ok(r) = gear_core::train::solve_train(
-                &train(
-                    5.0,
-                    2.0,
-                    intermittent,
-                    vec![Stage::Worm(PairStage {
-                        sliding_friction: 0.3,
-                        static_friction: 0.3,
-                        ..PairStage::worm()
-                    })],
-                ),
+                &train(vec![Stage::Worm(PairStage {
+                    sliding_friction: 0.3,
+                    static_friction: 0.3,
+                    ..PairStage::worm()
+                })]),
                 &lib,
             ) {
                 record(&r.every_note());
@@ -1249,13 +1214,13 @@ mod tests {
             let no_source = gear_core::train::StageGear {
                 face_width: gear_core::params::Auto::automatic(0.0),
                 face_sources: gear_core::train::FaceSources {
-                    bending: gear_core::train::LoadCase {
-                        peak: false,
-                        cyclic: false,
+                    bending: gear_core::train::ByKind {
+                        ultimate: false,
+                        fatigue: false,
                     },
-                    contact: gear_core::train::LoadCase {
-                        peak: false,
-                        cyclic: false,
+                    contact: gear_core::train::ByKind {
+                        ultimate: false,
+                        fatigue: false,
                     },
                 },
                 ..Default::default()
@@ -1265,7 +1230,7 @@ mod tests {
                     gears: [no_source.clone(), no_source],
                     ..PairStage::default()
                 },
-                gear_core::train::StageTorques::just(2.0),
+                &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
                 record(&r.every_note());
@@ -1389,15 +1354,8 @@ mod tests {
             err(TrainError::NoRootSection.note());
             if let Err(e) = gear_core::train::solve_train(
                 &Train {
-                    input_speed: 3000.0,
-                    input_torque: 2.0,
-                    back_driving_torque: 0.0,
-                    operating_torque: 2.0,
+                    load_cases: vec![gear_core::train::LoadCase::ultimate(2.0, 3000.0)],
                     reversed_bending: false,
-                    actuation: gear_core::train::Actuation::Continuous {
-                        operating_speed: 2400.0,
-                        runtime_hours: 1000.0,
-                    },
                     stages: Vec::new(),
                 },
                 &lib,
