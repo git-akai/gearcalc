@@ -4,6 +4,14 @@
     solveTrain,
     STAGE_KINDS,
     type StageKindSpec,
+    CASE_KINDS,
+    type CaseKindSpec,
+    PORTS,
+    type CaseKind,
+    type Port,
+    type LoadCase,
+    type GearCase,
+    type MeshCase,
     outside,
     type Auto,
     type Overrides,
@@ -85,19 +93,49 @@
   const solved = $derived(result.result ?? undefined);
   const failure = $derived(result.failure);
 
-  const mode = $derived<"intermittent" | "continuous">(
-    "intermittent" in tab.train.actuation ? "intermittent" : "continuous",
-  );
-
-  function setMode(m: "intermittent" | "continuous") {
-    if (m === mode) return;
-    tab.train.actuation =
-      m === "intermittent"
-        ? { intermittent: { range_degrees: 25, actuations: 1000, reversing: false } }
-        : // The operating speed starts at the peak, which is the one value that
-          // is certainly admissible and asserts nothing about the stage.
-          { continuous: { operating_speed: tab.train.input_speed, runtime_hours: 1000 } };
+  /** Which duty a fatigue case is counted over. Switching seeds the other
+   *  shape from the core's own defaults — a fresh case's intermittent duty,
+   *  and the continuous one the boundary carries for exactly this — so no
+   *  number is written on this side. */
+  const dutyMode = (c: LoadCase): "intermittent" | "continuous" =>
+    "intermittent" in c.duty ? "intermittent" : "continuous";
+  function setDuty(c: LoadCase, m: "intermittent" | "continuous") {
+    if (m === dutyMode(c)) return;
+    c.duty = m === "intermittent" ? defaults().fatigue_case.duty : defaults().continuous_duty;
   }
+
+  /** **The load cases are a list, as the stages are**, and are added, removed
+   *  and replaced by the same rules: one of each kind from the core's own
+   *  defaults, and a train whose last case is removed is left with the fresh
+   *  first kind rather than with none — a train with no case rates nothing,
+   *  and a button that greys out to prevent that is a rule the reader has to
+   *  infer. */
+  function addCaseOfKind(kind: CaseKindSpec) {
+    tab.train.load_cases.push(kind.fresh());
+    tab.openCases[tab.train.load_cases.length - 1] = true;
+  }
+  function removeCase(i: number) {
+    tab.train.load_cases.splice(i, 1);
+    const was = { ...tab.openCases };
+    tab.openCases = {};
+    for (const [k, v] of Object.entries(was)) {
+      const at = Number(k);
+      if (at < i) tab.openCases[at] = v;
+      else if (at > i) tab.openCases[at - 1] = v;
+    }
+    if (tab.train.load_cases.length === 0) addCaseOfKind(CASE_KINDS[0]);
+  }
+  /** A load case by number, as a stage is; and the words for its kind and its
+   *  port, from the same tables the selects offer them from. */
+  const caseName = (i: number) => t("ui.train_case_heading", { number: String(i + 1) });
+  const kindLabel = (k: CaseKind) => t(CASE_KINDS.find((x) => x.key === k)?.label ?? k);
+  const portLabel = (p: Port) => t(PORTS.find((x) => x.key === p)?.label ?? p);
+  /** **Every result names its case**, so a readout that stands for a case looks
+   *  its figures up by that index rather than by position: a case switched off
+   *  has no result and its row draws blank, and the rows are the train's cases
+   *  in the train's order either way. */
+  const forCase = <T extends { case: number }>(list: T[] | undefined, i: number) =>
+    list?.find((c) => c.case === i);
 
   /** The kinds on offer. A kind the developer mode hides cannot already be in
    *  a train the reader is looking at — the picker is the only way one arrives
@@ -253,21 +291,11 @@
     )}`;
   };
 
-  /** A rating in both load cases, written in the order they are read: what the
-   *  part must survive once, then what it must survive for the duty.
-   *
-   *  Formatting, not arithmetic — every number here came from Rust. A rating
-   *  that does not exist for a member renders as a dash rather than as a zero,
-   *  because those are different facts. */
-  const cases = (
-    v: { peak: number | null; cyclic: number | null } | undefined,
-    digits: number,
-  ) =>
-    v === undefined
-      ? BLANK
-      : `${v.peak === null ? "—" : v.peak.toFixed(digits)} / ${
-          v.cyclic === null ? "—" : v.cyclic.toFixed(digits)
-        }`;
+  /** A rating that may not exist for a member renders as a dash rather than as
+   *  a zero, because those are different facts — and as a blank where nothing
+   *  has solved, like every other figure. */
+  const rated = (v: number | null | undefined, digits: number) =>
+    v === undefined ? BLANK : v === null ? "—" : v.toFixed(digits);
 
 </script>
 
@@ -431,34 +459,40 @@
   {#if m?.point}
     <dt>{t("ui.train_locks_at")}</dt>
     <dd>{locksAt(m.locking_friction)}</dd>
+    <!-- At each case's own speed, since a case is a speed as well as a torque. -->
     <dt>{t("ui.train_sliding_speed")}</dt>
-    <dd>{num(m.sliding_velocity, 1)} mm/s</dd>
+    <dd>
+      {#each m.cases as c (c.case)}
+        <span class="line">{caseName(c.case)}: {num(c.sliding_velocity, 1)} mm/s</span>
+      {/each}
+    </dd>
   {/if}
   <!-- The one patch both members share: same normal force, same E*, one
        instant — an ellipse on crossed shafts, a line on parallel ones, and
-       the same rows either way. Each member's own rating is on its card and
-       is this or worse. -->
+       the same rows either way, once per load case. Each member's own rating
+       is on its card and is this or worse. -->
   <dt>{t("ui.train_contact_stress")}</dt>
   <dd>
-    {cases(m && { peak: m.contact.peak.max_pressure, cyclic: m.contact.cyclic.max_pressure }, 1)} {m && t("ui.train_mpa")}
-    <small>{t("ui.train_peak_cyclic")}</small>
-    <small>
-      {#if m}
-        {t("ui.train_patch", {
-          length: num(m.contact.peak.patch_length, 4),
-          width: num(m.contact.peak.patch_width, 4),
-        })} ·
-        {Math.abs(m.contact.peak.worst_position) < 1e-9
-          ? t("ui.train_worst_at_pitch_point")
-          : t("ui.train_worst_along_the_path", {
-              position: num(m.contact.peak.worst_position, 3),
-            })}
-        · {t("ui.train_pitch_point_alone_gives", {
-          stress: num(m.contact.peak.at_pitch_point, 1),
-        })}
-        · ρ {num(1 / m.contact.peak.curvature_across, 3)} mm
-      {/if}
-    </small>
+    {#each m?.cases ?? [] as c (c.case)}
+      <span class="line">
+        {caseName(c.case)}: {num(c.contact.max_pressure, 1)} {t("ui.train_mpa")}
+        <small>
+          {t("ui.train_patch", {
+            length: num(c.contact.patch_length, 4),
+            width: num(c.contact.patch_width, 4),
+          })} ·
+          {Math.abs(c.contact.worst_position) < 1e-9
+            ? t("ui.train_worst_at_pitch_point")
+            : t("ui.train_worst_along_the_path", {
+                position: num(c.contact.worst_position, 3),
+              })}
+          · {t("ui.train_pitch_point_alone_gives", {
+            stress: num(c.contact.at_pitch_point, 1),
+          })}
+          · ρ {num(1 / c.contact.curvature_across, 3)} mm
+        </small>
+      </span>
+    {/each}
   </dd>
   <!-- **Which conditions bite, and nothing when none do.** Drawn for **every**
        mesh. A tip reaching past the usable end of the flank it meshes with
@@ -503,6 +537,53 @@
   {/if}
 {/snippet}
 
+{#snippet caseRows(cases: GearCase[] | undefined, carrier: string | undefined)}
+  <div class="caselist">
+    <table class="cases">
+      <!-- Units in the headings, so a cell is a number and a column stays a
+           column: "30000.0 rpm" folded in two where "30000.0" does not. -->
+      <thead>
+        <tr>
+          <th></th>
+          <th>{t("ui.train_torque")}<small>{t("ui.train_nm")}</small></th>
+          <th>{t("ui.train_speed")}<small>{t("ui.train_rpm")}</small></th>
+          <th>{t("ui.train_tooth_cycles")}<small>{t("ui.train_bending_contact")}</small></th>
+          <th>{t("ui.train_bending_stress")}<small>{t("ui.train_mpa")}</small></th>
+          <th>{t("ui.train_contact_stress")}<small>{t("ui.train_mpa")}</small></th>
+          <th>{t("ui.train_min_face_width")}<small>{t("ui.train_bending_contact")} · mm</small></th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each tab.train.load_cases as c, i (i)}
+          {#if c.enabled}
+            {@const r = forCase(cases, i)}
+            <tr>
+              <th>{caseName(i)}</th>
+              <td>{num(r?.torque, 4)}</td>
+              <td>
+                {num(r?.speed, 1)}
+                {#if r && carrier}
+                  <small>{t("ui.train_relative_to", { speed: r.speed_against_carrier.toFixed(1), shaft: carrier })}</small>
+                {/if}
+              </td>
+              <td>
+                {r === undefined
+                  ? BLANK
+                  : r.cycles === null
+                    ? "—"
+                    : `${count(r.cycles.bending)} / ${count(r.cycles.contact)}`}
+              </td>
+              <td>{rated(r?.bending_stress, 1)}</td>
+              <td>{rated(r?.contact_stress, 1)}</td>
+              <td>{rated(r?.min_face_width.bending, 3)} / {rated(r?.min_face_width.contact, 3)}</td>
+            </tr>
+          {/if}
+        {/each}
+      </tbody>
+    </table>
+  </div>
+{/snippet}
+
 {#snippet gearCard(
   title: string,
   gear: StageGear,
@@ -539,16 +620,14 @@
      *  about. Given only for `cut: "shaper"`, which is the only kind of member
      *  that has one. */
     cutter?: Cutter;
-    /** **What this member's speed has to add to the figure.**
+    /** **The carrier this member's teeth see**, where it has one.
      *
-     *  A member with something more to say about a row the shared readout
-     *  already prints says it *on* that row. The planet said it on a second one
-     *  instead: an `extra` block repeating the speed with the annotation
-     *  attached, so the card carried the same figure twice and only the copy
-     *  was explained. That block is gone: every member of every kind has a
-     *  `GearResult` now, a worm's included, so there is no card without the
-     *  shared readout. */
-    speedNote?: string;
+     *  A member of an epicyclic kind turns in its carrier's frame, and that is
+     *  the speed its teeth wear at — so beside its fixed-frame speed each case
+     *  says what it is against the carrier, which the core reports rather than
+     *  leaving this side to subtract. The name says which shaft that is. A
+     *  pair's members have none, and the two figures would be one. */
+    carrier?: string;
   },
 )}
 {@const own = g?.notes ?? []}
@@ -774,32 +853,32 @@
     )}
   {/if}
   {#if gear.face_width.auto && (opts.faceWidth ?? "rating") === "rating"}
-    <!-- Four ratings, so four toggles: a rating exists for every combination
-         of what fails (bending or contact) and what it is rated against (the
-         peak load, against the ultimate, or the cyclic one, against fatigue).
-         The width is the largest any enabled rating asks for. With none of them
-         enabled there is nothing to invert and the width comes out zero, which
-         the stage says in a note rather than hiding. -->
+    <!-- Four toggles: a rating exists for every combination of what fails
+         (bending or contact) and what it is rated against (the ultimate
+         allowable, or fatigue). Per kind rather than per case: however many
+         loads of a kind there are, the width is the largest any enabled one
+         asks for. With none enabled there is nothing to invert and the width
+         stands at its box, which the stage says in a note rather than hiding. -->
     <div class="subtoggles">
       <Switch
-        label={t("ui.train_from_bending_peak")}
-        on={gear.face_sources.bending.peak}
-        set={(v) => (gear.face_sources.bending.peak = v)}
+        label={t("ui.train_from_bending_ultimate")}
+        on={gear.face_sources.bending.ultimate}
+        set={(v) => (gear.face_sources.bending.ultimate = v)}
       />
       <Switch
-        label={t("ui.train_from_bending_cyclic")}
-        on={gear.face_sources.bending.cyclic}
-        set={(v) => (gear.face_sources.bending.cyclic = v)}
+        label={t("ui.train_from_bending_fatigue")}
+        on={gear.face_sources.bending.fatigue}
+        set={(v) => (gear.face_sources.bending.fatigue = v)}
       />
       <Switch
-        label={t("ui.train_from_contact_peak")}
-        on={gear.face_sources.contact.peak}
-        set={(v) => (gear.face_sources.contact.peak = v)}
+        label={t("ui.train_from_contact_ultimate")}
+        on={gear.face_sources.contact.ultimate}
+        set={(v) => (gear.face_sources.contact.ultimate = v)}
       />
       <Switch
-        label={t("ui.train_from_contact_cyclic")}
-        on={gear.face_sources.contact.cyclic}
-        set={(v) => (gear.face_sources.contact.cyclic = v)}
+        label={t("ui.train_from_contact_fatigue")}
+        on={gear.face_sources.contact.fatigue}
+        set={(v) => (gear.face_sources.contact.fatigue = v)}
       />
     </div>
   {/if}
@@ -831,54 +910,20 @@
     <dd>{num(g?.pitch_diameter, 4)} {g && "mm"}</dd>
     <dt>{t("ui.train_helix_angle")}</dt>
     <dd>{num(g?.helix_angle, 4)}{g ? "°" : BLANK}</dd>
-    <dt>{t("ui.train_torque")}</dt>
-    <dd>{num(g?.torque, 4)} {g && "Nm"}</dd>
-    <!-- Only where there is one. A back-driving load that nothing reacts
-         reaches no gear, and an empty row is the honest report of that. -->
-    {#if g?.back_driving_torque != null}
-      <dt>{t("ui.train_back_driving_torque")}</dt>
-      <dd>{num(g.back_driving_torque, 4)} Nm</dd>
-    {/if}
-    <dt>{t("ui.train_speed")}</dt>
-    <dd>
-      {num(g?.speed, 1)} {g && t("ui.train_rpm")}
-      <!-- Where a member's speed has more to say than the number — a planet's
-           teeth see the carrier's frame, not the ground's — it is said here,
-           against the figure it qualifies. -->
-      {#if opts.speedNote}<small>{opts.speedNote}</small>{/if}
-    </dd>
-    <dt>{t("ui.train_tooth_cycles")}</dt>
-    <dd>
-      {g ? `${count(g.tooth_cycles.bending)} / ${count(g.tooth_cycles.contact)}` : BLANK}
-      <small>{t("ui.train_bending_contact")}</small>
-    </dd>
-    <dt>{t("ui.train_bending_stress")}</dt>
-    <dd>
-      {cases(g?.bending_stress, 1)} {g && t("ui.train_mpa")}
-      <small>{t("ui.train_peak_cyclic")}</small>
-    </dd>
-    <!-- Per gear, and genuinely so. The two flanks share one pressure at any
-         instant — the individual curvatures reach Hertz only through their
-         sum — but the two gears are not rated at the same instant: each one's
-         dedendum carries the load alone at its own end of the path, and that
-         is where its pitting is assessed. -->
-    <dt>{t("ui.train_contact_stress")}</dt>
-    <dd>
-      {cases(g?.contact_stress, 1)} {g && t("ui.train_mpa")}
-      <small>{t("ui.train_peak_cyclic")}</small>
-    </dd>
-    <dt>{t("ui.train_min_face_width")}</dt>
-    <dd>
-      <span class="line">
-        {cases(g && { peak: g.min_face_width.peak.bending, cyclic: g.min_face_width.cyclic.bending }, 3)} {g && "mm"}
-        <small>{t("ui.train_bending_peak_cyclic")}</small>
-      </span>
-      <span class="line">
-        {cases(g && { peak: g.min_face_width.peak.contact, cyclic: g.min_face_width.cyclic.contact }, 3)} {g && "mm"}
-        <small>{t("ui.train_contact_peak_cyclic")}</small>
-      </span>
-    </dd>
   </dl>
+  <!-- **What every load case does to this gear**, one row per enabled case:
+       the torque it puts on it and the speed it turns at, how often it is
+       loaded, the two stresses, and the width each would need. The rows are
+       the train's enabled cases in the train's order and stand blank until the
+       train solves, as every readout here does; a result names its case, so a
+       row finds its own figures however the list was edited.
+
+       Contact is per gear, and genuinely so. The two flanks share one pressure
+       at any instant — the individual curvatures reach Hertz only through
+       their sum — but the two gears are not rated at the same instant: each
+       one's dedendum carries the load alone at its own end of the path, and
+       that is where its pitting is assessed. -->
+  {@render caseRows(g?.cases, opts.carrier)}
   <!-- What the fields did not take. A note naming an input is drawn under
        that input, so repeating it here would be the same sentence twice in
        one card. -->
@@ -1164,92 +1209,9 @@
 
 <section class="train">
   <div class="grid shared">
-    {@render numberField("ui.train_input_speed_peak", () => tab.train.input_speed, (v) => (tab.train.input_speed = v), 100, "ui.train_rpm")}
-    {@render numberField("ui.train_input_torque_peak", () => tab.train.input_torque, (v) => (tab.train.input_torque = v), 0.01, "ui.train_nm")}
-    <!-- A load applied at the *output*, trying to turn the train the other way.
-         It is not a sign on the input torque: it enters at the far end and is
-         attenuated by each stage's backward efficiency on the way up, and on a
-         train that can be back-driven it is reacted by nothing and reaches no
-         gear at all. The train says which of those happened. -->
-    {@render numberField("ui.train_back_driving_torque_peak", () => tab.train.back_driving_torque, (v) => (tab.train.back_driving_torque = v), 0.01, "ui.train_nm")}
-
-    <div class="mode">
-      <span>{t("ui.train_actuation")}</span>
-      <div class="segmented">
-        <button class:on={mode === "intermittent"} onclick={() => setMode("intermittent")}>
-          {t("ui.train_intermittent")}
-        </button>
-        <button class:on={mode === "continuous"} onclick={() => setMode("continuous")}>
-          {t("ui.train_continuous")}
-        </button>
-      </div>
-    </div>
-
-    <!-- First under the actuation, and in both modes: the load the train's
-         fatigue life is spent against, as opposed to the peak it must merely
-         survive. Absolute rather than a percentage of peak — this tool declines
-         to assert a relation between torque and speed on the user's behalf — so
-         the percentage is reported beside it instead of driving it. Zero is a
-         legitimate entry: a train that only ever sees its peak has no cyclic
-         case. -->
-    <label>
-      <span>{t("ui.train_operating_torque")}</span>
-      <input
-        type="number"
-        step="0.01"
-        max={tab.train.input_torque}
-        bind:value={tab.train.operating_torque}
-      />
-      <em>{t("ui.train_nm")}</em>
-      <FieldNote notes={notes(
-        solved?.operating_torque_percent != null
-          ? t("ui.train_note_operating_torque_percent", {
-              percent: solved.operating_torque_percent.toFixed(1),
-            })
-          : null,
-        null,
-      )} />
-    </label>
-
-    {#if "intermittent" in tab.train.actuation}
-      {@const act = tab.train.actuation.intermittent}
-      <label>
-        <span>{t("ui.train_actuation_range")}</span>
-        <input
-          type="number"
-          step="1"
-          bind:value={act.range_degrees}
-        />
-        <em>{t("ui.train_at_output")}</em>
-      </label>
-      {@render numberField("ui.train_actuation_count", () => act.actuations, (v) => (act.actuations = v), 100, "")}
-      <!-- Offered only here, because it only means something here: a continuous
-           drive has no actuation to reverse between. It changes nothing but the
-           cycle count, and the note says how — whether or not it is on. -->
-      {@render switchField(
-        "ui.train_reversing",
-        act.reversing,
-        (v) => (act.reversing = v),
-        t("ui.train_note_reversing"),
-      )}
-    {:else if "continuous" in tab.train.actuation}
-      {@const cont = tab.train.actuation.continuous}
-      <label>
-        <span>{t("ui.train_operating_speed")}</span>
-        <input
-          type="number"
-          step="100"
-          max={tab.train.input_speed}
-          bind:value={cont.operating_speed}
-        />
-        <em>{t("ui.train_rpm")}</em>
-      </label>
-      {@render numberField("ui.train_runtime", () => cont.runtime_hours, (v) => (cont.runtime_hours = v), 100, "ui.train_hours")}
-    {/if}
-
-    <!-- Last, and train-wide, because it is one decision about how every gear
-         is judged rather than a property of any stage. A planet's root is
-         loaded on both flanks whatever the drive does, and a reversing drive
+    <!-- Train-wide, because it is one decision about how every gear is judged
+         rather than a property of any stage or any load: a planet's root is
+         loaded on both flanks whatever the load does, and a reversing duty
          loads every root both ways — but the allowance for it is a fraction on
          an allowable a part is sized against, which this tool asks for rather
          than applies. Off, the stages say where reversal is present and
@@ -1272,7 +1234,9 @@
     <!-- **The rows stand whether or not there is an answer in them.** A
          readout that vanishes takes its label with it, so the page a designer
          is editing changes shape at the moment they most need it to hold
-         still; every figure below is blank instead until the train solves. -->
+         still; every figure below is blank instead until the train solves.
+         What is here is the shaft line — what no load moves. What each load
+         comes to is on the load case that carries it. -->
     <dl class="out">
       <dt>{t("ui.train_total_ratio")}</dt>
       <dd>
@@ -1282,10 +1246,6 @@
             ? `${num(solved.total_ratio, 4)} : 1`
             : `1 : ${num(1 / solved.total_ratio, 4)}`}
       </dd>
-      <dt>{t("ui.train_output_speed_peak")}</dt>
-      <dd>{num(solved?.output_speed, 1)} {solved && t("ui.train_rpm")}</dd>
-      <dt>{t("ui.train_output_torque_peak")}</dt>
-      <dd>{num(solved?.output_torque, 4)} {solved && "Nm"}</dd>
       <dt>{t("ui.train_total_efficiency")}</dt>
       <dd>
         {bothWays(solved?.total_efficiency)}
@@ -1308,25 +1268,168 @@
         >
       </dd>
     </dl>
-    <!-- What the shaft line wants read, which no single stage is in a
-         position to say: an input clamped against its peak, and where — or
-         whether — the back-driving load is reacted. And, at the head of it,
-         why there is no answer at all — through the catalogue like every other
+    <!-- Why there is no answer at all — through the catalogue like every other
          message, naming the stage where one is to blame. -->
-    {#if failure || (solved?.notes.length ?? 0) > 0}
+    {#if failure}
       <ul class="notes">
-        {#if failure}
-          <li class="warn">
-            {failure.stage === null
-              ? note(failure.note)
-              : `${stageName(failure.stage - 1)}: ${note(failure.note)}`}
-          </li>
-        {/if}
-        {#each solved?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
+        <li class="warn">
+          {failure.stage === null
+            ? note(failure.note)
+            : `${stageName(failure.stage - 1)}: ${note(failure.note)}`}
+        </li>
       </ul>
     {/if}
   </div>
 </section>
+
+<!-- **The load cases, as the stages are: a list, each one an accordion.** A
+     case is a torque at a port, held or not at the far end, judged against one
+     of the two allowables — and any number of them, since a train is rated for
+     every load it will see and not for two. The switch on the heading takes a
+     case out of every rating without losing it, and works with the case
+     collapsed; the heading itself says what the case is, so a closed one still
+     reads. -->
+<div class="stages">
+  {#each tab.train.load_cases as c, i (i)}
+    {@const cres = forCase(solved?.cases, i)}
+    <section class="stage" class:off={!c.enabled}>
+      <div class="casehead">
+        <button class="head" onclick={() => (tab.openCases[i] = !tab.openCases[i])}>
+          <span class="caret">{tab.openCases[i] ? "▾" : "▸"}</span>
+          <strong>{caseName(i)}</strong>
+          <span class="kind">{kindLabel(c.kind)}</span>
+          <span class="teeth"
+            >{num(c.torque, 3)} {t("ui.train_nm")} · {num(c.speed, 0)} {t("ui.train_rpm")} ·
+            {t("ui.train_at_port", { port: portLabel(c.port) })}</span
+          >
+          {#if cres}
+            <span class="eff"
+              >{num(cres.delivered_torque, 3)} {t("ui.train_nm")}
+              {t("ui.train_at_port", { port: portLabel(cres.delivered_at) })}</span
+            >
+          {/if}
+        </button>
+        <span class="control">
+          <Switch label={t("ui.train_case_enabled")} on={c.enabled} set={(v) => (c.enabled = v)} />
+        </span>
+      </div>
+      {#if tab.openCases[i]}
+        <div class="body">
+          <div class="grid shared">
+            <!-- The kind decides which allowable the core judges against and
+                 which inputs are put in front of the designer; nothing else
+                 about a case knows which it is. -->
+            <label>
+              <span>{t("ui.train_case_kind")}</span>
+              <select bind:value={c.kind}>
+                {#each CASE_KINDS as k (k.key)}
+                  <option value={k.key}>{t(k.label)}</option>
+                {/each}
+              </select>
+              <em></em>
+            </label>
+            <label>
+              <span>{t("ui.train_case_port")}</span>
+              <select bind:value={c.port}>
+                {#each PORTS as p (p.key)}
+                  <option value={p.key}>{t(p.label)}</option>
+                {/each}
+              </select>
+              <em></em>
+            </label>
+            <!-- Whether the far end holds the load. On, it is carried through
+                 every stage to the far port; off, only a stage that cannot be
+                 driven that way holds it, and a train with no such stage turns
+                 under it and carries none of it. Either way a stage that locks
+                 in the load's direction holds it where it stands. -->
+            {@render switchField(
+              "ui.train_case_reacted",
+              c.reacted,
+              (v) => (c.reacted = v),
+              t(c.reacted ? "ui.train_note_reacted" : "ui.train_note_not_reacted"),
+            )}
+            {@render numberField("ui.train_torque", () => c.torque, (v) => (c.torque = v), 0.01, "ui.train_nm")}
+            {@render numberField("ui.train_speed", () => c.speed, (v) => (c.speed = v), 100, "ui.train_rpm")}
+
+            {#if c.kind === "fatigue"}
+              <!-- A fatigue case alone has a duty: an ultimate load is
+                   survived once and counts nothing. The sweep is measured at
+                   a named port, since it is a fact about the mechanism's
+                   motion and not about where its load enters. -->
+              <div class="mode">
+                <span>{t("ui.train_actuation")}</span>
+                <div class="segmented">
+                  <button class:on={dutyMode(c) === "intermittent"} onclick={() => setDuty(c, "intermittent")}>
+                    {t("ui.train_intermittent")}
+                  </button>
+                  <button class:on={dutyMode(c) === "continuous"} onclick={() => setDuty(c, "continuous")}>
+                    {t("ui.train_continuous")}
+                  </button>
+                </div>
+              </div>
+              {#if "intermittent" in c.duty}
+                {@const act = c.duty.intermittent}
+                <label>
+                  <span>{t("ui.train_actuation_range")}</span>
+                  <input type="number" step="1" bind:value={act.range_degrees} />
+                  <em>°</em>
+                </label>
+                <label>
+                  <span>{t("ui.train_actuation_range_at")}</span>
+                  <select bind:value={act.at}>
+                    {#each PORTS as p (p.key)}
+                      <option value={p.key}>{t(p.label)}</option>
+                    {/each}
+                  </select>
+                  <em></em>
+                </label>
+                {@render numberField("ui.train_actuation_count", () => act.actuations, (v) => (act.actuations = v), 100, "")}
+                <!-- It changes nothing but the cycle count and which roots are
+                     loaded both ways, and the note says how — whether or not
+                     it is on. -->
+                {@render switchField(
+                  "ui.train_reversing",
+                  act.reversing,
+                  (v) => (act.reversing = v),
+                  t("ui.train_note_reversing"),
+                )}
+              {:else if "continuous" in c.duty}
+                {@const cont = c.duty.continuous}
+                {@render numberField("ui.train_runtime", () => cont.runtime_hours, (v) => (cont.runtime_hours = v), 100, "ui.train_hours")}
+              {/if}
+            {/if}
+          </div>
+
+          <!-- What this load comes to at the train level: what reaches the
+               far port after every loss — and, in the notes under it, where a
+               stage held it or that nothing did. The row stands while the
+               train has no answer, as every readout here does. -->
+          <dl class="out">
+            <dt>{t("ui.train_case_delivered")}</dt>
+            <dd>
+              {num(cres?.delivered_torque, 4)} {cres && t("ui.train_nm")}
+              {cres ? "·" : ""}
+              {num(cres?.delivered_speed, 1)} {cres && t("ui.train_rpm")}
+              {#if cres}
+                <small>{t("ui.train_at_port", { port: portLabel(cres.delivered_at) })}</small>
+              {/if}
+            </dd>
+          </dl>
+          {#if (cres?.notes.length ?? 0) > 0}
+            <ul class="notes">
+              {#each cres?.notes ?? [] as n, j (j)}<li>{note(n)}</li>{/each}
+            </ul>
+          {/if}
+          <button class="danger small" onclick={() => removeCase(i)}>{t("ui.train_remove_case")}</button>
+        </div>
+      {/if}
+    </section>
+  {/each}
+
+  {#each CASE_KINDS as k (k.key)}
+    <button class="add" onclick={() => addCaseOfKind(k)}>{t(k.add)}</button>
+  {/each}
+</div>
 
 <div class="stages">
   {#each tab.train.stages as stage, i (i)}
@@ -1684,12 +1787,7 @@
                 onShiftAuto: () => relieveStage(stage, { shift: 1 }),
                 // The one thing only a planet's speed has: its teeth turn in
                 // the carrier's frame, and that is the speed they wear at.
-                speedNote: pres
-                  ? t("ui.train_relative_to", {
-                      speed: pres.planet.speed_relative.toFixed(1),
-                      shaft: t("ui.train_the_carrier"),
-                    })
-                  : undefined,
+                carrier: t("ui.train_the_carrier"),
               })}
               <!-- A ring's root and fillet are its cutter's, so it has neither a
                    dedendum nor a root radius of its own (docs/reference.md#internal-gears); the tool
@@ -1725,8 +1823,11 @@
                      Both figures were computed and reached no screen. -->
                 <dt>{t("ui.train_carrier")}</dt>
                 <dd>
-                  {num(pres?.speeds[1], 1)} {pres && t("ui.train_rpm")}
-                  {pres ? `· ${num(pres.torques[1], 4)} Nm` : ""}
+                  {#each pres?.cases ?? [] as sc (sc.case)}
+                    <span class="line"
+                      >{caseName(sc.case)}: {num(sc.speeds[1], 1)} {t("ui.train_rpm")} · {num(sc.torques[1], 4)} {t("ui.train_nm")}</span
+                    >
+                  {/each}
                 </dd>
                 <dt>{t("ui.train_efficiency")}</dt>
                 <dd>
@@ -1931,12 +2032,7 @@
                       // does, and for the same reason. The grounded gear is the
                       // case that makes it worth saying: it stands still and is
                       // engaged once every crank turn.
-                      speedNote: hres
-                        ? t("ui.train_relative_to", {
-                            speed: (hres.gears[j].gear.speed - hres.crank_speed).toFixed(1),
-                            shaft: t("ui.train_the_crank"),
-                          })
-                        : undefined,
+                      carrier: t("ui.train_the_crank"),
                     },
                   )}
                 {/each}
@@ -2017,8 +2113,11 @@
                      row repeating them was the same figure twice on one page. -->
                 <dt>{t("ui.train_hula_crank")}</dt>
                 <dd>
-                  {num(hres?.crank_speed, 1)} {hres && t("ui.train_rpm")}
-                  {hres ? `· ${num(hres.shaft_torques[1], 4)} Nm` : ""}
+                  {#each hres?.cases ?? [] as sc (sc.case)}
+                    <span class="line"
+                      >{caseName(sc.case)}: {num(sc.speeds[1], 1)} {t("ui.train_rpm")} · {num(sc.torques[1], 4)} {t("ui.train_nm")}</span
+                    >
+                  {/each}
                 </dd>
               </dl>
 
@@ -2377,8 +2476,62 @@
     padding: 0.45rem 0.7rem;
     font-size: 0.9rem;
   }
+  /* A load case's heading is a button and a switch side by side: the button
+     opens it, the switch takes it out of every rating — and a switch cannot
+     sit inside a button, so the two share a row rather than one wrapping the
+     other. The button keeps the heading's own look and takes the width. */
+  .casehead {
+    display: flex;
+    align-items: center;
+    padding-right: 0.5rem;
+  }
+  .casehead .head {
+    flex: 1;
+    min-width: 0;
+  }
+  /* A case switched off is still a case: its inputs stand, so it is dimmed
+     rather than hidden, and its heading still says what it is. */
+  .stage.off > .casehead {
+    opacity: 0.55;
+  }
   .caret {
     color: var(--muted);
+  }
+  /* One member's ratings, a row per load case. A table rather than the
+     label/figure list the rest of a card uses, because a case is one row of
+     several figures and a reader compares down a column. */
+  .caselist {
+    overflow-x: auto;
+  }
+  table.cases {
+    width: 100%;
+    margin-top: 0.5rem;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    /* A figure and its unit stay on one line; a card too narrow for every
+       column scrolls the table rather than folding "30000.0 rpm" in two. */
+    white-space: nowrap;
+  }
+  table.cases th {
+    color: var(--muted);
+    font-weight: normal;
+    text-align: left;
+    padding: 0.1rem 0.6rem 0.1rem 0;
+    vertical-align: bottom;
+  }
+  table.cases thead th {
+    border-bottom: 1px solid var(--rule);
+    white-space: normal;
+  }
+  table.cases td {
+    padding: 0.15rem 0.6rem 0.15rem 0;
+    vertical-align: top;
+  }
+  table.cases small {
+    display: block;
+    color: var(--muted);
+    margin-left: 0;
   }
   .teeth,
   .ratio,

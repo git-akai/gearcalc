@@ -14,8 +14,10 @@ import {
 import type {
   Freedom,
   FreedomGroup,
-  Actuation,
   Arrangement,
+  CaseKind,
+  LoadCase,
+  Port,
   Auto,
   Optimisation,
   Backlash,
@@ -68,9 +70,13 @@ import type {
   TrainFailure,
   Variation,
 } from "./wire";
+export type { CaseKind, LoadCase, Port };
 export type {
-  Actuation,
   Arrangement,
+  Duty,
+  GearCase,
+  MeshCase,
+  TrainCase,
   Freedom,
   FreedomGroup,
   Auto,
@@ -297,6 +303,44 @@ export const STAGE_KINDS: StageKindSpec[] = [
     fresh: () => defaults().hula_stage,
     developer: true,
   },
+];
+
+export interface CaseKindSpec {
+  key: CaseKind;
+  /** Catalogue key for the kind's name — the chip on a heading, the option in
+   *  the select. */
+  label: string;
+  /** Catalogue key for the button that adds one. */
+  add: string;
+  /** A fresh case of this kind, from the core. */
+  fresh: () => LoadCase;
+}
+
+/** The load case kinds, as data, for the reason the stage kinds are: the "add
+ *  load case" buttons and the kind select render from this, and a kind decides
+ *  which allowable the core judges against and which inputs are put in front
+ *  of the designer — nothing else. */
+export const CASE_KINDS: CaseKindSpec[] = [
+  {
+    key: "ultimate",
+    label: "ui.train_case_ultimate",
+    add: "ui.train_add_ultimate_case",
+    fresh: () => defaults().ultimate_case,
+  },
+  {
+    key: "fatigue",
+    label: "ui.train_case_fatigue",
+    add: "ui.train_add_fatigue_case",
+    fresh: () => defaults().fatigue_case,
+  },
+];
+
+/** Where a load can enter, in the order a select offers them. The core's
+ *  `Port::ALL` is the list; this is its catalogue keys, so a third port is a
+ *  row here and a value there. */
+export const PORTS: { key: Port; label: string }[] = [
+  { key: "start", label: "ui.train_port_start" },
+  { key: "end", label: "ui.train_port_end" },
 ];
 
 export interface FieldSpec {

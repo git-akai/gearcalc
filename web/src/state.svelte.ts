@@ -87,6 +87,9 @@ export interface TrainTab {
    *  small forgetting that makes two tabs tiring to compare. It dies with the
    *  session, like every other thing here that is not the language. */
   open: Record<number, boolean>;
+  /** Which load cases are expanded, by index — the same thing as `open`, for
+   *  the other list the panel draws as an accordion. */
+  openCases: Record<number, boolean>;
 }
 
 let nextId = 1;
@@ -220,8 +223,9 @@ export function setKind(tab: GearTab, kind: GearKind) {
 export const workspace = new Workspace();
 
 function freshTrain(name = t("ui.train_default_name")): TrainTab {
-  // The first stage open, as a fresh panel has always shown it.
-  return { id: nextTrainId++, name, train: defaultTrain(), open: { 0: true } };
+  // The first stage open, as a fresh panel has always shown it; the load
+  // cases closed, since their headings say what each one is.
+  return { id: nextTrainId++, name, train: defaultTrain(), open: { 0: true }, openCases: {} };
 }
 
 /** The geartrain tabs.
@@ -300,6 +304,7 @@ class Trains {
       name: r.ok.name,
       train: r.ok.train,
       open: { 0: true },
+      openCases: {},
     };
     this.tabs.push(t);
     this.importError = null;

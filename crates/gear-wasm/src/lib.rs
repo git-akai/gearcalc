@@ -1000,6 +1000,10 @@ pub struct Defaults {
     /// train whose last case is removed is left with, as a stage is.
     pub ultimate_case: gear_core::train::LoadCase,
     pub fatigue_case: gear_core::train::LoadCase,
+    /// The duty a fatigue case starts with when switched to continuous —
+    /// the intermittent one is the fresh case's own. A number the panel seeds
+    /// is a number Rust decided, this one included.
+    pub continuous_duty: gear_core::train::Duty,
     /// The fraction a reversed root's fatigue bending allowable is taken at.
     ///
     /// Crosses so the control's own note can name it. It is
@@ -1128,6 +1132,9 @@ fn defaults_impl() -> Result<String, String> {
         hula_stage: Stage::Hula(Box::new(hula)),
         ultimate_case: LoadCase::ultimate(0.1, 30_000.0),
         fatigue_case: LoadCase::fatigue(0.1, 30_000.0),
+        continuous_duty: gear_core::train::Duty::Continuous {
+            runtime_hours: 1000.0,
+        },
         reverse_loading_coefficient: gear_core::material::REVERSED_BENDING_FRACTION,
     };
     serde_json::to_string(&defaults).map_err(|e| format!("could not encode defaults: {e}"))
@@ -2342,6 +2349,7 @@ mod tests {
         // ...and the two a picker adds, which are the first and last of them.
         assert_eq!(d["ultimate_case"], cases[0]);
         assert_eq!(d["fatigue_case"], cases[2]);
+        assert_eq!(d["continuous_duty"]["continuous"]["runtime_hours"], 1000.0);
         assert_eq!(d["train"]["reversed_bending"], false);
 
         // **The face width a panel seeds, on every gear of every stage kind it
