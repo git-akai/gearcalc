@@ -74,7 +74,7 @@
           # crane's eval-time "placeholder value" warning, which is emitted
           # while inspecting the root manifest and is cosmetic.
           pname = "gears";
-          version = "0.2.0";
+          version = "0.3.0";
           buildInputs = [ ];
           nativeBuildInputs = [ ];
         };
@@ -130,9 +130,9 @@
         in
         pkgs.buildNpmPackage {
           pname = "gears-web";
-          version = "0.2.0";
+          version = "0.3.0";
           src = ./web;
-          npmDepsHash = "sha256-dVM25vhkcbLUftcibKGfd8m6ylanDuBgp/2tg/tEBRs=";
+          npmDepsHash = "sha256-vqmkqltn86XZkS8x7XewqvGAurJzCx/pPOJl1SrsCZk=";
 
           # The wasm stage already ran; skip the npm script that would rerun it
           # (cargo cannot reach the network inside the sandbox anyway).

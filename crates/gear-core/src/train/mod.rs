@@ -1400,12 +1400,13 @@ pub struct GearResult {
 /// # Why this exists
 ///
 /// Three kinds built a `GearResult` field by field, listing the same seventeen
-/// names each time. Sixteen agreed. The seventeenth did not: `back_driving_torque`
-/// was the mesh projection of the backward torque in the spur stage and this
-/// gear's forward torque scaled by `|t| / |forward|` in the other two — the same
-/// number wherever the projection is linear, which it is, **except in sign**.
-/// A stage with a negative ratio gave a signed figure from one kind and a
-/// magnitude from another, for the field beside `torque`, which is signed.
+/// names each time. Sixteen agreed. The seventeenth did not: a member's share
+/// of a load from the far end was the mesh projection of the backward torque in
+/// the spur stage and this gear's forward torque scaled by `|t| / |forward|` in
+/// the other two — the same number wherever the projection is linear, which it
+/// is, **except in sign**. A stage with a negative ratio gave a signed figure
+/// from one kind and a magnitude from another, for the field beside the forward
+/// torque, which is signed.
 ///
 /// That is the fault `docs/corrections.md` opens with: a duplicated formula is a
 /// place where two answers can differ, and nothing compared these two.
@@ -2393,13 +2394,13 @@ impl Default for FaceSources {
             // **Neither contact rating sizes a width by default.** Both are
             // offered and both are computed; what they are not is *assumed*.
             //
-            // The peak case is the weaker of the two: a Hertzian pressure is not
+            // The ultimate kind is the weaker of the two: a Hertzian pressure is not
             // a tensile stress, and the library's `ultimate_allowable` is a
             // tensile figure — a flank under a single overload fails by
             // subsurface shear, at a contact pressure well above it. Comparing
             // them is arithmetic with no mechanism behind it.
             //
-            // The cyclic case is sounder — the fatigue allowable is a flank
+            // The fatigue kind is sounder — the fatigue allowable is a flank
             // figure — but it is the one that *dominates*, by an order of
             // magnitude: on the reference train it asks 8.5 mm where bending
             // asks 0.9. A default that decides the answer is a default making
@@ -3639,7 +3640,8 @@ mod tests {
     /// of backward to forward is the same for both members. A screw pair's
     /// output torque carries a forward efficiency that the backward load does
     /// not share, so its two members differ by exactly `1/η_forward` — by
-    /// construction, and correctly. See [`StageTorques::referred_like`].
+    /// construction, and correctly — which is why each kind projects each case's
+    /// torque through its own construction in that case's direction.
     #[test]
     fn every_member_of_a_reacting_stage_reports_its_share() {
         let lib = library();
@@ -4550,7 +4552,7 @@ mod tests {
 
     /// **Zero is a torque.**
     ///
-    /// A train has an operating torque as well as a peak, and nothing stops it
+    /// A train's fatigue case is a load like any other, and nothing stops it
     /// being nought: a mechanism that is held rather than driven runs at no load
     /// and still has to be rated for the peak it sees. Every parallel-axis kind
     /// answered; a worm stage returned `NoContact` and took the whole train down
@@ -7700,7 +7702,9 @@ mod tests {
         // The same two cases, with a heavier one in front of them and a
         // switched-off one after: the first two cases' figures are unmoved.
         let mut crowded = train.clone();
-        crowded.load_cases.insert(0, LoadCase::ultimate(50.0, 100.0));
+        crowded
+            .load_cases
+            .insert(0, LoadCase::ultimate(50.0, 100.0));
         crowded.load_cases.push(LoadCase {
             enabled: false,
             ..LoadCase::ultimate(1.0e6, 1.0)

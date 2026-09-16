@@ -88,7 +88,7 @@ of a gear is worth more than knowing what it does.
 
 | File | Answers |
 |---|---|
-| `mod.rs` | **What every kind shares**: load cases, `MemberRating`, `Bending`, `MeshReport`, `GearResult`, the engagement rule, and the train that strings stages together |
+| `mod.rs` | **What every kind shares**: the load cases and the walk that carries each toward the far port, `StageLoads`, `MemberRating`, `Bending`, `MeshReport`, `GearResult` and its `GearCase` per load, the engagement rule, and the train that strings stages together |
 | `pair.rs` | **The pair**: two gears on shafts at any angle — the one primitive the spur, helical, crossed and worm kinds are built from. Its inputs, its five-input relation, the sizing solve, and the parallel-axis solve |
 | `planetary.rs` | One carrier, one sun, one ring, N planets |
 | `crossed.rs` | The crossed-axis solve for a pair whose shafts are not parallel — worm or crossed gear pair, one model; the kind decides only the worm's conventional proportions |
@@ -117,6 +117,7 @@ string catalogues is what five languages costs.
 |---|---|---|
 | **A model or formula** | the one module in `gear-core` | `cargo nextest run` · `tools/check_golden.sh` · `tools/check_figures.py` |
 | **A stage-level input** | the stage kind's file · `train/mod.rs` if shared · `auto.rs` if a search reads it · 5 × `strings_*.toml` · `web/src/TrainPanel.svelte` | the above, plus `tools/check_bindings.sh --write` and `tools/check_strings.py` |
+| **A load-case input** | `LoadCase` in `train/mod.rs` · `solve_train`'s walk if it changes what a stage is handed (`StageLoad`) · `gear-wasm`'s `defaults` · `gear-io/src/train.rs`'s change log · 5 × `strings_*.toml` · `web/src/TrainPanel.svelte` | as above; `gear-cli train` and `--write` the corpus |
 | **A per-gear input** | `params.rs` · the generator that reads it · `auto.rs` (`admissible_ranges`) · 5 × `strings_*.toml` · `web/src/GearPanel.svelte` | as above |
 | **A note the solve emits** | `note.rs` (the key) · the site that raises it · 5 × `strings_*.toml` | `cargo nextest run` — `gear_io::strings` checks both directions by *firing every note* |
 | **A UI string with no `Note` behind it** | 5 × `strings_*.toml` · the `.svelte` that reads it | `tools/check_strings.py` |

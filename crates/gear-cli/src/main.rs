@@ -235,7 +235,7 @@ const COMMANDS: &[Command] = &[
         // epicyclic case because the corpus had never walked the crate's one
         // optimiser at all: no `gear-cli` command set `Optimisation::enabled`,
         // so every answer it chooses was outside the change detector. That is
-        // the fault `docs/corrections.md` records of `back_driving_torque`, met
+        // the fault `docs/corrections.md` records of a load from the end, met
         // again, and it is worth covering **each kind that searches** rather
         // than the one whose table is documented.
         record: Record::Cases(&["shifts 9 37", "shifts 17 43", "shifts epicyclic"]),

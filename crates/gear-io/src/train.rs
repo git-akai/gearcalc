@@ -288,7 +288,7 @@ mod tests {
         for src in [
             "this is not toml",
             "name = \"no train in here\"",
-            "[train]\ninput_speed = \"fast\"",
+            "[train]\nload_cases = \"heavy\"",
         ] {
             assert!(matches!(from_toml(src), Err(TrainError::Parse(_))), "{src}");
         }

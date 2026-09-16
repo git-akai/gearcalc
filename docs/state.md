@@ -1,10 +1,12 @@
 # State
 
-Where the project stands, what to run, and what is left. **Version 0.2.0** — the
-minor bump is the bending model: the notch factor, the fillet radius it reads
-and the parabola's selection rule all moved to one source, which moved the
-strength canary and changed `bending_stress`, `min_face_width_bending`,
-`RootStressModel` (which was `StressConcentration`) and `RootSection`.
+Where the project stands, what to run, and what is left. **Version 0.3.0** — the
+minor bump is the load cases: a train carries any number of them, each a
+torque at a port judged against one allowable, in place of the five load
+fields it held; every rating crosses the boundary per case, and the geartrain
+document changed shape with no shim. 0.2.0 was the bending model — the notch
+factor, the fillet radius it reads and the parabola's selection rule moved to
+one source, which moved the strength canary.
 
 **This is the only document allowed to talk about the present**, and saying so is
 what lets the others stop hedging. [`reference.md`](reference.md) states what the
@@ -205,9 +207,12 @@ worth keeping because each was a model change rather than a fix:
    figure. **Backlash did not move**, which is again the two staying in their
    lanes: a coefficient of friction is not a geometry.
 
-Load cases moved neither canary. Both are single-load reports, and a stage asked
+Load cases moved neither canary, twice: when the second case arrived, and when
+the pair of them became a list. Both are single-load reports, and a stage asked
 for one torque answers with the figure it always did — which is the check that
-the second case was added rather than substituted for the first.
+a case was added rather than substituted for the first. The corpus's train
+reports moved only in layout when the list arrived: every member's figures in
+the three cases a train used to hold as fields are what they were.
 
 ---
 
@@ -226,7 +231,7 @@ location: where a boundary is drawn, and what a directory is not for.
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. `serde` and `ts-rs`, both optional and both about the shape a type takes when it leaves. |
 | `gear-core/src/gear.rs` | `Gear` — the assembly, and the only place a gear is drawn. An ordinary gear is `Δx = 0`. |
 | `gear-core/src/strength.rs` | The bending model: the critical section both kinds of member share, the notch factors and which fillet radius each reads, and the Hertz contact beside it. |
-| `gear-core/src/train/mod.rs` | What every stage kind shares: the load cases, `MemberRating` — every mesh a member is in, and the worst of them — `Bending`, `MeshReport`, the engagement rule, and the train that strings the stages together. |
+| `gear-core/src/train/mod.rs` | What every stage kind shares: the load cases and the walk that carries each toward the far port, `MemberRating` — every mesh a member is in, in every case, and the worst mesh — `Bending`, `MeshReport`, the engagement rule, and the train that strings the stages together. |
 | `crates/gear-io` | File formats: DXF export, the TOML material library and geartrain documents, and the string catalogue. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
@@ -344,11 +349,11 @@ none of it — its line of action slides rather than turning, so there is no suc
 angle and no contact ratio to report.
 
 **And every member is rated over every mesh it is in**, likewise once rather
-than once per stage: two stresses against two load cases, the face width each of
+than once per stage: two stresses in every load case, the face width each of
 those would need, and the worst mesh answering figure by figure. Most members are
 in one mesh, a planet is in two, and adding a third is adding a list entry rather
 than an arm to an expression. The loadings are held **per load case** rather than
-as one list and a factor, because "the second case is the first times a number"
+as one list and a factor, because "the next case is this one times a number"
 is a claim about a stage's *power flow* and not about gearing — every kind here
 can make it, and one that could not would build each case for itself with nothing
 added.
@@ -407,9 +412,15 @@ on **every kind that reports a bending stress**, off by default, reaching
 bending alone — a ring included, which had no shared section of its own. Below a
 virtual contact ratio of 2 the model finds the point the unshared rating already
 took and reports the same tooth, which is the model rather than a fault; a hula
-stage cannot reach that band at any proportion it can be built at. Two load cases throughout — a peak against the ultimate allowable
-and a cyclic one against fatigue — with the automatic face width sized from any
-of the four ratings a gear chooses. **Neither contact rating is enabled by
+stage cannot reach that band at any proportion it can be built at. **Load cases
+are a list**, as the stages are: any number, each an ultimate or a fatigue load
+— the allowable it is judged against — entering at the start or the end, held
+by the far end or by nothing but a stage that locks, at its own torque and
+speed, a fatigue case with its own duty; every stress, cycle count and width
+is reported per case, and the automatic face width is the largest ask of every
+enabled case of a kind a gear's four toggles switch on. A fresh train carries
+three — the peak, the load from the end and the operating duty it used to hold
+as fields, at the same defaults. **Neither contact rating is enabled by
 default**: both are computed and shown, but a fresh stage is sized from bending
 alone, so its face width will not satisfy contact until a designer says which
 rating should decide it — the figures are on screen, and the minimum face width
@@ -418,14 +429,16 @@ each rating asks for is beside them. The two gears of a mesh are rated at differ
 stresses; the shared pitch-point figure is reported at the mesh. An automatic
 width answers to the mesh, not to one gear, and so does the width a member is
 *rated* at — the narrower face carries the pair, so that is the width the load
-is spread over. A back-driving load applied at the output
-finds the stage that reacts it, or reports that nothing does. A reversing
-intermittent drive rounds its cycles within one actuation and splits contact
-between the flanks. **Reversed bending is a train-wide switch, off by default**:
-a planet's root is loaded both ways whatever the drive does, a reversing drive
-loads every root both ways, and each gear that one reaches says so beside its own
-numbers — corrected against the reduced allowable only where the switch asks for
-it. No member of a hula stage is reversed structurally: its wobble body
+is spread over. A load from either port is carried toward the other by one
+walk, attenuated by each stage's efficiency in the direction it travels, and
+finds the stage that holds it — a self-locking worm from the end, a
+forward-locked crossed pair from the start — or the far end, or reports that
+nothing does. A reversing intermittent duty rounds its cycles within one
+actuation and splits contact between the flanks. **Reversed bending is a
+train-wide switch, off by default**: a planet's root is loaded both ways
+whatever the load does, a reversing duty loads every root both ways in its
+case, and each gear that one reaches says so beside its own numbers —
+corrected against the reduced allowable only where the switch asks for it. No member of a hula stage is reversed structurally: its wobble body
 carries two gears rather than one, and each of them meshes once. A notch
 parameter outside the band the `Y_S` fit is stated for says so on the gear too.
 
@@ -485,7 +498,7 @@ been. They are not a backlog.
 | Worm profile drawing and DXF | A crossed pair draws as its two helical gears already |
 | A planetary **set's** drawing | The viewport draws single gears; a set needs the carrier and N planets placed. **Not planned** — nothing depends on it, and the set's numbers are all reported without it |
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
-| `Driven By` as a train direction on a worm stage | Back-driving is reported, not modelled as a train direction |
+| A third port | A train has a start and an end; a load case names one. A stage kind with a third shaft a load could enter by would add a value to `Port`, and nothing else knows a direction |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
 
 ---

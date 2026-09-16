@@ -86,9 +86,12 @@ reproduces the other.
   sweeps nothing and takes the point the unshared reading always took.
 - A member in one mesh is a member in a list of one, so a planet in two needs no
   arm of its own ([the rating](reference.md#load-cases)).
-- A load case is the peak scaled — wherever the stage's power split does not
-  depend on the magnitude passing through it, which is a property each kind
-  claims for itself rather than one assumed of all of them.
+- A load case is the worst one a mesh carries, scaled — wherever the stage's
+  power split does not depend on the magnitude passing through it, which is a
+  property each kind claims for itself rather than one assumed of all of them.
+- A load from the far end is a load from the near end with the direction
+  reversed: one walk carries either, and a stage that locks in the direction of
+  travel holds either ([the walk](reference.md#load-cases)).
 
 This is not tidiness. **Every surviving `match kind` is a place where two answers
 can silently disagree**, and the corrections log is largely a record of exactly
@@ -167,7 +170,7 @@ nothing else is:
 
 - **which way power flows** — `Drive::Forward`, driven forward, back-driving, a
   drive flank against a coast flank;
-- **how the train is actuated** — a reversing drive, whether the drive reverses.
+- **how a load is applied** — a reversing duty, whether the duty reverses.
 
 Neither names a part of a geartrain, so neither collides with the rule. And
 where the thing being named is not a stage, it is not called one: `hula.rs`
@@ -1057,29 +1060,67 @@ clearance, `ε` falls from 1.664 to **0.860** and the zone is `Face`-limited. A
 designer now gets *"these teeth will not touch as built"* where the model used to
 report a healthy contact ratio for a mesh that was not happening.
 
-### Two load cases, because there are two allowables
+### A load case is a torque, a port and a kind — and a train carries a list of them
 
 A rating is a stress against an allowable, and the crate held two allowables from
 the start — `ultimate_allowable` and `fatigue_allowable` — while rating
 everything against the second. That is the wrong question asked confidently: a
 peak load has to be survived *once*, and judging it against what the part must
-survive forever fails gears that are fine and passes none that are not.
+survive forever fails gears that are fine and passes none that are not. So a
+load case has a **kind**, and the kind is the allowable it is judged against —
+plus the one thing that follows from it: an ultimate load is survived once and
+counts no cycles, a fatigue load is spent over a duty and may reverse the roots.
+Nothing else about a stage knows which kind it is looking at.
 
-So a rating is `LoadCase<T>`. What separates the two cases is exactly two things
-— which torque, and which allowable — and nothing else about a stage knows which
-one it is looking at. Both scale in closed form (bending linear in torque,
-contact as its square root), so the second case costs a multiply rather than a
-second solve, and `LoadCase::of` is the only constructor for the same reason
-`Directional::of` is: there is no path by which a stage reports one case and not
-the other.
+**The cases are a list, as the stages are.** The train used to hold exactly
+two loads, and their ports and directions were written into the field names:
+`input_torque` entered at the input and drove forward, `back_driving_torque`
+entered at the output and drove backward, and the rating folded the two into a
+"peak" that was the worse of them. That is the same idea written down twice
+with a direction baked into each copy, and it is why a third load — a brake at
+the motor holding an output load, a second motor duty — had nowhere to go. A
+case is now a torque, a **port** it enters at, and whether the far end holds
+it; direction is derived from the port and never stored, so a train with a
+third entry point some day is a third value of `Port` and not a branch anywhere.
 
-**Why the operating load is a torque and a speed, not a percentage.** The
-obvious control is one "duty" slider at 80 %. It asserts that torque and speed
-fall together, which an electric motor roughly obeys, efficiencies bend, and
-another power source need not obey at all. This crate has no basis for that
-relation, so it declines to assert it: the user states each absolutely, each is
-clamped to its own peak, and the *ratio between them* is reported as an output.
-Zero is admissible — a train that only ever sees its peak has no cyclic case.
+**What went with the pair.** The rule that "the peak is taken *after* each
+direction's own distribution, never before it" — which
+[direction is the reader's](#direction-is-the-readers-not-the-mechanisms)
+records being got wrong in two stage kinds — is not generalised but **removed**:
+two directions are two cases, each rated at its own torque in its own
+direction, and there is no maximum left to take in the wrong order. The only
+maxima that remain are in sizing, where an automatic face width answers to the
+largest ask of every enabled case of a kind that is switched on — the highest
+case sizes the part, however many overlap. The clamps went with it too: an
+operating torque was held to the peak and a note said so, and there is no peak
+to hold a case to now, cases being absolute and free to exceed one another.
+
+**Every case is evaluated or scaled at its own torque.** A parallel pair
+evaluates each at its own load; the epicyclic kinds solve their power flow once
+at unit torque and scale it — a power flow being linear in the torque through
+it — and every rating once at the largest torque a mesh carries in any case,
+each case being that scaled. The latter is the same "second case costs a
+multiply" the two-case model had, with the reference chosen so the shipped
+trains reproduce the figures they had to the bit; and it is what lets a case
+carrying nothing be a scale of zero where a flow solved at nothing would have
+refused (`planetary::power` wants a driving input). A fresh train carries three
+cases — the two loads and the operating duty it used to hold as fields, with
+the same defaults — so nothing a designer had moves.
+
+**Why a load is a torque and a speed, not a percentage.** The obvious control
+is one "duty" slider at 80 %. It asserts that torque and speed fall together,
+which an electric motor roughly obeys, efficiencies bend, and another power
+source need not obey at all. This crate has no basis for that relation, so it
+declines to assert it: each case states both, absolutely. Zero is admissible —
+a load held still is a torque at no speed, and a train that only ever sees its
+peak has no fatigue case.
+
+**Why the sweep of an intermittent duty is measured at a named port.** The
+alternative — at the load's own port — keeps one field fewer, but makes a 25°
+sweep stated on a case at the start mean 25° of *motor* rotation, which is not
+what anyone designing a 25° output mechanism types. The sweep is a fact about
+the mechanism's motion and not about where its load enters, so it says which
+port it is measured at, and defaults to the end — where it was always measured.
 
 ### A contact pressure is not a tensile stress
 
@@ -1178,20 +1219,24 @@ direction to place. So a model in which they still differ is wrong, and a model
 in which they *never* differ has thrown the direction away.
 
 **A load case is a torque *and a direction*.** It follows, and it is where the
-rule was hardest to see: a stage's peak is the worse of driving and being driven,
-and the maximum has to be taken **after** each direction's own distribution
-rather than before it. Collapsing the two shaft torques to one magnitude first
-and pushing that through the forward construction is the same answer only where
-the distribution is direction-independent — a parallel-axis mesh carries one
-tangential force whichever way it turns — and every kind for which it is *not*
-had this fault in its ratings after the same fault had been corrected in its
-reports. `StageTorques::on_mesh` is the one place it is written; a back-driven
-worm was rated at `η_forward` of the load it was holding, and a back-driven set's
-ring 6 % low in bending, which is the same 6 % the reported torques had been.
+rule was hardest to see. While the train held two loads and rated a "peak"
+that was the worse of driving and being driven, the maximum had to be taken
+**after** each direction's own distribution rather than before it: collapsing
+the two shaft torques to one magnitude first and pushing that through the
+forward construction is the same answer only where the distribution is
+direction-independent — a parallel-axis mesh carries one tangential force
+whichever way it turns — and every kind for which it is *not* had this fault
+in its ratings after the same fault had been corrected in its reports. A
+back-driven worm was rated at `η_forward` of the load it was holding, and a
+back-driven set's ring 6 % low in bending, which is the same 6 % the reported
+torques had been. The rule is now unwritable rather than obeyed: a load from
+each end is its own case, carrying its direction beside its torque
+([a load case is a torque, a port and a kind](#a-load-case-is-a-torque-a-port-and-a-kind--and-a-train-carries-a-list-of-them)),
+and there is no maximum across directions left to take in either order.
 
-**And the peak belongs to the mesh, not the stage.** Two meshes of one stage need
-not agree about which direction loads them hardest, so a set's sun mesh and ring
-mesh carry their own.
+**And what a mesh carries belongs to the mesh, not the stage.** Two meshes of
+one stage need not agree about which case loads them hardest, so a set's sun
+mesh and ring mesh each scale from their own worst.
 
 **Zero is a torque, as it is a speed.** A mechanism that is held rather than
 driven runs at no load and still has to be rated for the peak it sees, and a
@@ -1227,25 +1272,45 @@ this section's whole point.
 
 ### A load exists only where it is reacted
 
-A back-driving torque is not a sign on the input. It enters at the far end, and
-the question it raises is not "how big is it" but "what holds it".
+A load entering at a port is not a sign on the other port's torque. It enters
+at its own end, and the question it raises is not "how big is it" but "what
+holds it".
 
-Walking upstream, each stage passes the load on attenuated by its **backward**
-efficiency until one cannot be driven backward at all. That stage reacts it, and
-everything above it carries none of it — which is the whole reason a designer
-puts a worm in a lifting drive. If the walk reaches the input with the load still
-turning something, then nothing reacted it: the train is back-drivable, the load
-drives it, and the case is zero at every gear.
+Walking toward the far port, each stage passes the load on attenuated by its
+efficiency **in the direction of travel** until one cannot be driven that way
+at all. That stage reacts it, and everything beyond it carries none of it —
+which is the whole reason a designer puts a worm in a lifting drive. The same
+walk, the other way, is what a load from the start meets at a crossed pair
+whose helix split cannot drive forward: it used to be pushed through such a
+stage at an efficiency of nought or less and arrive downstream as a torque of
+nothing with no word about why. If the walk reaches the far port with the load
+still turning something, what happens is the case's own **`reacted`**: on, the
+far end holds it — a motor's load delivered to the output, a brake at the
+motor holding an output load through every mesh — and every stage carries what
+the walk gave it; off, nothing reacted it, the train is free to turn under the
+load, and the case is zero at every gear.
 
 That last outcome is an input reaching no number, which the interface rule below
-says must be **said** rather than silently ignored — so the train reports which
+says must be **said** rather than silently ignored — so each case reports which
 stage held the load, or that none did.
 
-**Why a two-pass solve.** A stage's backward torque depends on every efficiency
-downstream of it, which is not known until those stages are solved. Ratio and
-efficiency do not depend on torque, so the train is solved once for the shaft
-line and again for the ratings. The second pass is not a refinement of the
-first — it is the same arithmetic with the load it was missing.
+**Why `reacted` is the designer's and not the model's.** Whether the far end
+holds a load is a fact about what is connected there — a brake, a motor with
+holding torque, a free shaft — and nothing in the geometry can know it. The
+train used to decide it by direction: a load from the input was always held
+(the output was assumed to be a load) and a load from the output never was
+(the input was assumed free), which is the ordinary case written down as the
+only case. It is a switch per load now, defaulting to what the direction used
+to imply.
+
+**Why a two-pass solve.** A stage's torque depends on the ratio and efficiency
+of every stage between it and the port, which are not known until those stages
+are solved. Ratio and efficiency do not depend on torque, so the train is solved
+once for the shaft line and again for the ratings. The second pass is not a
+refinement of the first — it is the same arithmetic with the loads it was
+missing. The first runs at a unit load rather than at none: an automatic face
+width is sized from a rating, and a stage asked to rate nothing on a face of no
+width has a `0/0` to refuse where the shaft line was all that was wanted.
 
 ### A reversed root is disclosed, and corrected only on request
 
@@ -1258,11 +1323,13 @@ apply on a designer's behalf. So it is a train-wide switch, **off by default**,
 and where it is off the stage says which members the reversal reaches.
 
 **Two things reverse a root, and they do not stack.** A planet always is loaded
-both ways — the sun drives one flank and the ring the other, whatever the drive
-does — and every gear is when the *drive* reverses, which is the same flag that
-already splits the contact cycles between the two flanks. `Reversal::reverses`
-takes the member's own answer or the drive's, never both, so one rule decides
-where a note can appear and where a derate can land.
+both ways — the sun drives one flank and the ring the other, whatever the load
+does — and every gear is in a fatigue case whose *duty* reverses, which is the
+same flag that already splits that case's contact cycles between the two
+flanks. `Reversal::reverses` takes the member's own answer or the case's, never
+both, so one rule decides where a note can appear and where a derate can land;
+the derate lands on that case's fatigue bending alone, and the note is raised
+once on the member if any case reverses it.
 
 **It was applied to the planet alone, silently.** A planetary set derated its
 planet whether or not anyone had asked, while a reversing drive — an explicit
@@ -1282,7 +1349,7 @@ column, and inventing one is the thing
 
 ### Reversing changes the count, and which roots are reversed
 
-A reversing drive changes no stress. What it changes is how many times each
+A reversing duty changes no stress. What it changes is how many times each
 thing is loaded, in two ways that pull opposite directions:
 
 - **Bending rounds within one actuation, not once over all of them.** A tooth
@@ -1291,15 +1358,16 @@ thing is loaded, in two ways that pull opposite directions:
 - **Contact halves.** The two flanks share the engagements; the root takes all
   of them.
 
-It is offered only for an intermittent drive, because only there is there an
+It is offered only for an intermittent duty, because only there is there an
 actuation to reverse between — an input that would mean nothing in the other
-mode is not offered in it.
+mode is not offered in it — and only on a fatigue case, an ultimate load being
+survived once.
 
 **And it marks every root as reversed**, which is the one thing beyond the count
 it decides — see
 [a reversed root is disclosed](#a-reversed-root-is-disclosed-and-corrected-only-on-request).
 It does not stack with a planet's own reversal: a planet's bending is fully
-reversed whatever the drive does, since the sun loads one flank and the ring the
+reversed whatever the duty does, since the sun loads one flank and the ring the
 other, and counting that twice would be counting one fact twice.
 
 ### The tolerance table has two grade scales, not one
@@ -1367,8 +1435,8 @@ uncertainty is order-of-magnitude, and it is flagged as the weakest column.
 **The S-N curve was withdrawn.** Fitting Basquin needs two points on a fatigue
 curve, and those do not exist for six of the eight materials. A curve fitted to
 invented points is worse than an honest scalar, because it looks like it knows
-more than it does. Each material carries a peak and a cyclic allowable instead,
-which pair with the peak and cyclic input torques the geartrain already takes.
+more than it does. Each material carries an ultimate and a fatigue allowable instead,
+which are what an ultimate and a fatigue load case are judged against.
 
 **No glass-filled POM, and that is a finding.** Delrin 570 is glass *filled* —
 fibres added without effective coupling — so it is **25 % weaker** in tension than

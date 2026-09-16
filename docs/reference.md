@@ -2083,12 +2083,9 @@ are asked at [`ring::mesh_with`](#limits) rather than restated here.
 ## Trains
 
 Per stage `i = z_out/z_in`; a worm's is `z_wheel/z_starts` and a planetary's
-comes from its own kinematics. Total ratio is the product. Torque propagates with
-efficiency always *reducing* delivered torque, in either direction:
-
-```text
-forward   T_{k+1} = T_k i_k η_k          backward  T_{k−1} = T_k η_k / i_k
-```
+comes from its own kinematics. Total ratio is the product. A train has two
+**ports** — `start`, the first stage's first member, and `end`, the last
+stage's last member — and every load enters at one of them.
 
 **Backlash accumulates referred to the output shaft**, so the last stage
 dominates:
@@ -2099,32 +2096,70 @@ dominates:
 
 ### Load cases
 
-A train carries two loads and they are judged against different figures. Every
-stress, cycle count and minimum face width is a `LoadCase<T>`:
+A train carries any number of **load cases**, as it carries any number of
+stages, and every stress, cycle count and minimum face width is reported once
+per enabled case. A case is:
 
 ```text
-peak     max(|T_forward|, |T_backward|)   vs  ultimate_allowable
-cyclic   |T_operating|                    vs  fatigue_allowable
+kind       ultimate | fatigue      which allowable it is judged against
+enabled    on | off                off takes part in nothing; the inputs stand
+port       start | end             where the torque enters
+reacted    on | off                whether the far end holds it
+torque     N·m at the port
+speed      rpm at the port         zero is a load held still
+duty       a fatigue case's        how the load is applied over the train's life
 ```
-
-`T_forward` propagates from the input as above. `T_operating` is an input in its
-own right, clamped to the peak, and may be zero. Both scale every rating in
-closed form — bending is linear in torque and contact goes as its square root —
-so a second case is a scale, not a second solve.
-
-**Back-driving.** `T_backward` is applied at the *output* shaft and works
-upstream, referred to each stage's own input shaft and attenuated by that
-stage's backward efficiency:
 
 ```text
-T_k = T_out,k / i_k          the load stage k carries, at its input shaft
-T_out,k−1 = T_k η_b,k        what reaches the stage above it
+ultimate   judged against  ultimate_allowable      survive it once; no cycles
+fatigue    judged against  fatigue_allowable       survive it for the duty
 ```
 
-The walk stops at the first stage with `η_b ≤ 0`: that stage reacts the load and
-everything upstream carries none of it. If the walk reaches the input still
-nonzero, **nothing reacted it** — the train is back-drivable, the load simply
-turns it, and the case is zero at every gear.
+The kind decides the allowable, whether cycles are counted and whether a duty
+can reverse the roots, and nothing else: where a load enters, what holds it and
+how big it is are the same questions for either kind. Cases may overlap or
+exceed one another freely; nothing is clamped against anything.
+
+**Carrying a load.** Direction is derived from the port and never stored: a
+load from `start` drives the stages forward in order, a load from `end` drives
+them backward in reverse order. At each stage the load is referred to that
+stage's first member — a division by the ratio when it arrives from the far
+side, and nothing else — and leaves attenuated by the stage's efficiency **in
+the direction it is travelling**:
+
+```text
+from start   T_k = T arriving          T leaving = T_k · i_k · η_forward,k
+from end     T_k = T arriving / i_k    T leaving = T_k · η_backward,k
+```
+
+The walk stops at the first stage whose efficiency in that direction is `≤ 0`:
+that stage **holds** the load, and every stage beyond it carries none. A
+self-locking worm holds a load from the end; a crossed pair at a steep helix
+split holds one from the start, by the same rule. If the walk reaches the far
+port with load remaining, `reacted` decides: on, the far end holds it and every
+stage carries what the walk gave it; off, **nothing reacted it** — the train
+simply turns under the load and the case is zero at every gear. Each case
+reports the torque delivered at the far port, the stage that held it if one
+did, and a note where it was held by a stage or by nothing.
+
+**Every rating is per case, at that case's torque and in that case's
+direction.** Which way a stage is driven decides how a load distributes through
+it — where `η₀` multiplies in an epicyclic set, which flank a screw pair
+presses — so a case's direction is carried beside its torque rather than folded
+into a magnitude first. A parallel-axis pair distributes one tangential force
+the same way whichever end drives; a screw pair and an epicyclic set do not,
+and for them a load from each end is a different distribution and not a
+different size. Both epicyclic kinds solve their power flow once at unit
+torque and scale it, a power flow being linear in the torque through it; every
+rating is evaluated once at the largest torque a mesh carries in any case and
+each case is that scaled — bending linear in torque, contact as its square
+root — so a case carrying nothing is a scale of zero rather than a refusal.
+
+A gear reports, per case, the torque it carries at its own radius, its speed,
+its speed **against the carrier of its mesh** (its own speed on a pair; a held
+ring's is not zero while its speed is), its cycles on a fatigue case, both
+stresses and the widths each would need. A mesh reports its contact per case,
+and an epicyclic kind its three shafts' speeds and torques per case.
 
 **Load sharing.** A stage input, `LoadSharing`, **off by default**, on every
 kind that reports a bending stress. It reaches bending alone — a contact rating
@@ -2161,8 +2196,10 @@ cannot reach the band at any proportion it can be built at — its meshes run ju
 above continuous contact by construction — so the control is offered there and
 provably cannot bite.
 
-**Automatic face width.** Four ratings, four toggles per gear; the width is the
-largest any *enabled* rating asks for. Peak contact is off by default — see
+**Automatic face width.** Four toggles per gear — bending and contact, each by
+kind — and the width is the largest any *enabled* rating asks for over every
+enabled case of a kind that is switched on: the highest case sizes the part,
+however many overlap. Ultimate contact is off by default — see
 [rationale](rationale.md#a-contact-pressure-is-not-a-tensile-stress). With none
 enabled there is nothing to invert, so the width **stands at the number in its
 box** and the stage says so: an automatic value with nothing to choose between
@@ -2212,26 +2249,30 @@ belongs to and the width the minimum is inverted at. Rating a member at its own
 tells one that is wider than its mate that it needs face in proportion to how
 much wider it is.
 
-A gear's reported `torque` is the one it carries **driving forward**; a
-back-driving load is reported beside it, not folded into it. Each is that
-direction's own construction with the roles swapped — so a member at the far end
-of a mesh carries the load referred by the ratio and cut by the loss the mesh
-takes carrying it *that* way, which for a locked mesh is nought.
+A gear's reported torque in a case is that case's own construction with the
+roles set by its direction — so a member at the far end of a mesh carries the
+load referred by the ratio and cut by the loss the mesh takes carrying it
+*that* way, which for a locked mesh is nought.
 
-The peak *rating* uses whichever direction loads the teeth harder, **member by
-member and mesh by mesh** — the maximum is taken after each direction's
-distribution, never before it. A parallel-axis pair distributes one tangential
-force the same way whichever end drives, so for it the two orders agree; a screw
-pair and an epicyclic set distribute differently, and for them they do not.
-
-The operating case may legitimately be **zero**, and a stage carrying nothing
-rates at nothing rather than refusing to answer.
+A case may legitimately be **zero**, and a stage carrying nothing rates at
+nothing rather than refusing to answer.
 
 ### Tooth cycles
 
-Revolutions first. Intermittent: `(range/360) × Π(ratios between i and output)`
-per actuation. Continuous: `rpm_i × 60 × hours`, where `rpm_i` is that shaft's
-speed scaled from the peak the train was laid out at to the operating speed.
+A fatigue case's duty, and revolutions first:
+
+```text
+intermittent   range_degrees at a named port, × actuations, optionally reversing
+continuous     runtime_hours at the case's own speed
+```
+
+An intermittent sweep is measured at a **named port** — the sweep is a fact
+about the mechanism's motion, not about where its load enters, so a 25° sweep
+of the output is stated at `end` whichever shaft drives it — and every other
+shaft's revolutions follow through the ratios: `(range/360) × actuations ×
+(turns of this shaft per turn of that port)`. Continuous: `rpm × 60 × hours` at
+each shaft's own speed, from the case's speed at its port through the same
+ratios. An ultimate case counts nothing: it is survived once.
 
 Then engagements, and **one rule covers every arrangement here**: a member's
 teeth are engaged once per revolution *relative to the carrier of its mesh*,
@@ -2245,9 +2286,11 @@ A simple pair has no carrier and one path, so this is the member's own
 revolutions and nothing more. An epicyclic set has both: in the carrier's frame
 the arm stands still and everything else turns past it, which is what makes the
 relative speed the one that counts — for a sun, a ring, a planet, a hula stage's
-grounded gear and its wobble body alike. The consequence worth stating is the
-one a per-member reading cannot: **a shaft that does not turn is still loaded.**
-A held ring meets a planet once per *carrier* revolution, which is
+grounded gear and its wobble body alike. The ratio is taken of the kind's
+**unit** kinematics rather than of a case's speeds, so a case held still is
+still engaged by every sweep its duty counts. The consequence worth stating is
+the one a per-member reading cannot: **a shaft that does not turn is still
+loaded.** A held ring meets a planet once per *carrier* revolution, which is
 `z_s/(z_s + z_r)` of the input's rather than none.
 
 A hula stage is the same statement with one wobble body: `N = 1`, and the crank
@@ -2255,7 +2298,7 @@ is both the carrier and the shaft the revolutions were counted on, so each gear
 counts how far it turns against the crank.
 
 Counts are then **whole numbers**, and where the rounding happens depends on
-whether the drive reverses:
+whether the duty reverses:
 
 ```text
 not reversing   bending = contact = ceil(revolutions over the whole duty)
@@ -2263,18 +2306,18 @@ reversing       bending = ceil(revolutions per actuation) × actuations
                 contact = bending / 2
 ```
 
-A partial sweep still loads the teeth it reaches, so a reversing drive rounds
+A partial sweep still loads the teeth it reaches, so a reversing duty rounds
 *within* one actuation rather than once over all of them; and its two flanks
 share the engagements while the root takes every one of them. A planet's bending
-is fully reversed whatever the drive does — the sun loads one flank and the ring
-the other — and a reversing drive loads every root both ways. The two do not
-stack: a member reverses if either says so.
+is fully reversed whatever the duty does — the sun loads one flank and the ring
+the other — and a reversing duty loads every root both ways in that case. The
+two do not stack: a member reverses if either says so.
 
 **Whether that is corrected for is a train-wide input, off by default.**
 
 ```text
 reversed_bending = false   the reversal is reported, member by member
-reversed_bending = true    cyclic bending allowable × 0.7 for those members
+reversed_bending = true    fatigue bending allowable × 0.7 for those members
 ```
 
 Bending only: pitting is compressive on whichever flank carries it, so a contact
@@ -2291,7 +2334,7 @@ anything that is not a plain datasheet reading carries a note saying what it is.
 
 ```text
 E*         1/E* = (1−ν₁²)/E₁ + (1−ν₂²)/E₂
-allowables ultimate_allowable, fatigue_allowable — pairing with peak and cyclic torque
+allowables ultimate_allowable, fatigue_allowable — what an ultimate and a fatigue case are judged against
 ```
 
 Stored SI (density in kg/m³) and displayed in the domain's own units, with the
