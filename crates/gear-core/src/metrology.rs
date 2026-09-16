@@ -69,7 +69,7 @@ pub struct Space {
     /// Base helix angle, radians.
     pub beta_b: f64,
     /// `+1` external, `−1` a ring — [`crate::mesh::MeshKind::sign`].
-    pub sigma: f64,
+    pub sign: f64,
     /// Where the usable flank ends at the tip, mm.
     pub tip: f64,
     /// Where it ends at the root, handing over to the fillet, mm.
@@ -86,7 +86,7 @@ impl Space {
             half_space: std::f64::consts::PI / f64::from(g.params.teeth) - g.psi_b,
             rb: g.rb,
             beta_b: base_helix_angle(g),
-            sigma: 1.0,
+            sign: 1.0,
             tip: g.ra,
             form: g.r_j,
             root: g.rf,
@@ -102,7 +102,7 @@ impl Space {
             half_space: std::f64::consts::PI / f64::from(ring.teeth) - ring.psi_b,
             rb: ring.rb,
             beta_b: ring.base_helix_angle(),
-            sigma: -1.0,
+            sign: -1.0,
             tip: ring.ra,
             form: ring.involute_at(ring.u_j).0,
             root: ring.rf,
@@ -112,7 +112,7 @@ impl Space {
     /// Where a pin of this diameter sits, `(pin centre radius, contact
     /// radius)`, or which way it is off the flanks.
     ///
-    /// Every check is one direction of the same map. `σ` reads the kind: an
+    /// Every check is one direction of the same map. The sign reads the kind: an
     /// external gear's root is inward and a ring's outward, so "past the form
     /// toward the root" is `σ (r_c − form) < 0` on either, and bottoming is the
     /// pin's near surface reaching the root circle in that same direction.
@@ -126,13 +126,13 @@ impl Space {
             self.rb,
             self.beta_b,
             pin_diameter,
-            self.sigma,
+            self.sign,
         )?;
-        let bottoms = self.sigma * (r_m - self.sigma * pin_diameter / 2.0 - self.root) <= 0.0;
-        if bottoms || self.sigma * (contact - self.form) < 0.0 {
+        let bottoms = self.sign * (r_m - self.sign * pin_diameter / 2.0 - self.root) <= 0.0;
+        if bottoms || self.sign * (contact - self.form) < 0.0 {
             return Err(MeasurementError::PinTooSmall);
         }
-        if self.sigma * (contact - self.tip) > 0.0 {
+        if self.sign * (contact - self.tip) > 0.0 {
             return Err(MeasurementError::PinTooLarge);
         }
         Ok((r_m, contact))
@@ -150,7 +150,7 @@ fn space_at(gear: &crate::gear::Gear, i: usize) -> Space {
         half_space: gear.space_half_angle(i),
         rb: mean.rb,
         beta_b: base_helix_angle(mean),
-        sigma: 1.0,
+        sign: 1.0,
         tip: t.ra,
         form: t.r_j,
         root: t.rf,

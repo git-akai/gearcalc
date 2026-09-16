@@ -150,9 +150,12 @@ Thirteen checks in six different ways. `nix flake check` is **not** all of them.
 | `python3 tools/validate_dxf.py` | an export read back by a parser that shares no code with the writer | yes |
 | `tools/worm_flank_curvature.py` · `crossed_path.py` · `hula_kinematics.py` · `iso_6336_3_stack.py` | the crate against derivations that share no code with it | no — by hand |
 
-**Before pushing, run five:** `cargo nextest run`, `nix flake check`,
-`nix build .#web`, `cd web && npm run check`, and **`tools/check_golden.sh`**.
-Reading `flake check` as the whole of CI has cost one red build.
+**Before pushing, run everything the table marks "yes"** — not a chosen
+subset. It was "run five" here, and the five omitted `check_units.py`: a
+field named `sigma` for a mesh kind's sign went out green on every one of the
+five and red on CI, the second red build this paragraph has cost by naming
+fewer checks than CI runs. The one-liner is the table; the cheap ones take
+seconds.
 
 The corpus is on that list because of a measurement, not for symmetry.
 Perturbing five of the rating model's cited constants — `K_f`'s `H` and `L`,
