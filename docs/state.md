@@ -934,27 +934,46 @@ Not a queue with a head; this is what a next session would pick from.
 
 - **Further UI work**, as it is asked for.
 - **The two panels' remaining differences of style**, catalogued when their
-  top bars were made one (`app.css`, *the bar at the top of a tab*), so the
-  next alignment starts from a list rather than a diff. The gear tab's
-  treatment is the one to keep unless the geartrain's has a reason:
-  - section headings — the gear tab's uppercase `h2` at 0.7 rem against the
-    geartrain's accordion `.head` at full size with the stage's figures inline;
-  - field rows — `1fr 7rem 3.5rem` on the gear tab against `1fr 6rem 3.5rem`
-    on a stage card, so the same input box is a rem narrower on one tab;
-  - the field grid — a single column on the gear tab against
-    `auto-fill, minmax(15rem, 1fr)` on a stage, which is a choice about how
-    many inputs a stage has and may stay;
-  - notes under a field — one shape in both, but the geartrain's `.hint` for a
-    note outside its label undoes the field gap by hand;
-  - readouts — the gear tab's label/value rows against the geartrain's `.out`
-    two-column grid at a different gap;
-  - buttons below the bar — panel background on the gear tab, none on the
-    geartrain's; the disabled state is opacity on one and a muted colour on
-    the other;
-  - error and notice paragraphs — the same tokens, but the gear tab has no
-    notice slot;
-  - the viewport — its canvas is sized when it draws and not when the window
-    changes, so a resize stretches the drawing until something redraws it.
+  top bars were made one (`app.css`, *the bar at the top of a tab*) and
+  trimmed when the section headings, the names' contrast, the field-box
+  widths, the lower action buttons and the viewport's resize followed. What
+  is left, with the two values so the next alignment is a decision rather
+  than a diff; the gear tab's treatment is the one to keep unless the
+  geartrain's has a reason:
+  - **number boxes** — the gear tab's are right-aligned (`text-align: right`,
+    padding `0.2rem 0.4rem`, background `--bg`); a stage's are left-aligned
+    at `0.15rem 0.3rem` on no background, so a column of figures lines up on
+    its decimal point on one tab and on its first digit on the other. The
+    gear tab's is the one to keep;
+  - **the field grid** — a single column on the gear tab (`.grid`: flex
+    column, `--field-gap` between rows, and `--field-gap` again between
+    groups); a stage's inputs flow in `repeat(auto-fill, minmax(15rem, 1fr))`
+    at `--field-gap 1rem`, and its shared block is two equal halves at
+    `0.4rem 2rem` with a 9 rem box, chosen so a box in a wide block does not
+    float away from its name. A choice about how many inputs a stage has,
+    and may stay;
+  - **notes outside a label** — both tabs draw a field's note through
+    `FieldNote` at 0.72 rem, but a stage's `.hint` for a note that has no
+    label to sit in pulls itself up by `calc(--note-gap − --field-gap)` and
+    right-aligns; the gear tab has no such note;
+  - **readouts** — the gear tab's `dl` is `max-content 1fr` at `0.15rem 1rem`
+    with values right-aligned, tabular and **600**; a stage's `.out` is
+    `auto 1fr` at `0.15rem 0.75rem` with values left-aligned, tabular and at
+    normal weight, an annotation in a muted `small`, and an `.indent` variant
+    under a mesh heading. The weight and the alignment are the visible half;
+  - **the list of notes** at the foot of a section — `0.75rem 0 0` margin,
+    1.1 rem indent, 0.8 rem on the gear tab; `0.5rem 0 0`, 1 rem, 0.78 rem on
+    a stage;
+  - **buttons that show a state** — the gear tab's `button:disabled` is
+    `opacity: 0.5`, a stage's is `color: --muted`; the `Switch` is one
+    component on both, and the `auto` and `no undercut` toggles keep their
+    small size by design;
+  - **error and notice paragraphs** — the same tokens, but only the geartrain
+    has a `.notice` (an import adjusted); the gear tab's adopt failure uses
+    `.error` and has no quieter slot;
+  - **cards** — a stage's members sit in bordered `.gear` cards at
+    `0.5rem 0.7rem` in a `minmax(20rem, 1fr)` grid; the gear tab's sections
+    are unbordered, which is a difference of content rather than of style.
 - **Where a gear tab and a stage member still differ in what they describe**,
   noted while the tab learned to adopt a member. Back end only — the tab
   needs none of the stage's solvers — and the same `GearParams` throughout:
@@ -968,6 +987,14 @@ Not a queue with a head; this is what a next session would pick from.
   - a stage enforces `k₂ = 2 − k₁` across a mesh; the gear tab's `k` is free;
   - the gear tab alone has the eccentric feature and the metrology; a stage
     alone has a material, a face width and a rim. None of those is a drift.
+
+  Kept as they are, on purpose: the exposed behaviour is right on both
+  sides. What was checked for internal alignment found none owed — the
+  figures behind both surfaces already come from one place (`auto.rs`:
+  `admissible_ranges`, `addendum_for_tip_width`, `minimum_profile_shift`;
+  the working depth's fallback is the dedendum on both by the same rule), so
+  the difference is only whether a guard *acts*, which is the difference
+  intended.
 - **Multiply the set out before adopting anything else from a standard.**
   `tools/iso_6336_3_stack.py` is the pattern: a factor's direction is a property
   of the set it was calibrated in, not of the factor, and this project has been

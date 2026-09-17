@@ -39,6 +39,14 @@
      same tenth. */
   --unit-cell: 3.5rem;
   --row-gap: 0.4rem;
+  /* The width of a number box in a field row, shared for the reason the unit
+     cell is: the two panels had one at 7 rem and the other at 6 rem, so the
+     same input was a rem wider on one tab. The narrower is kept. */
+  --field-box: 6rem;
+  /* ...and the wider box a row holding *words* takes — a kind, a material, a
+     sharing model — out of the label's share, so it still ends where every
+     number does. "Internal (ring)" was arriving as "Internal (rin". */
+  --field-box-wide: 10.5rem;
   /* What stops one cell short of the row's edge, which is where every input box
      ends. */
   --unit-inset: calc(var(--unit-cell) + var(--row-gap));
@@ -135,7 +143,8 @@ header.tab-bar .actions {
 }
 header.tab-bar .actions button,
 header.tab-bar .actions select,
-.tab-confirm button {
+.tab-confirm button,
+.action {
   font: inherit;
   font-size: 0.8rem;
   padding: 0.25rem 0.7rem;
@@ -147,12 +156,28 @@ header.tab-bar .actions select,
 }
 header.tab-bar .actions button:hover:not(:disabled),
 header.tab-bar .actions select:hover,
-.tab-confirm button:hover {
+.tab-confirm button:hover,
+.action:hover:not(:disabled) {
   background: var(--hover);
 }
 header.tab-bar .actions button.danger,
-.tab-confirm button.danger {
+.tab-confirm button.danger,
+.action.danger {
   color: var(--warn);
+}
+/* `.action` is the same button below the bar — a stage or a load case added
+   or removed — so an action on the page and an action on the tab read as one
+   kind of thing. A control that shows a *state* (a switch, an `auto` toggle)
+   is not one of these and keeps its own size and highlight. */
+
+/* **A section heading**, on either tab: the geartrain's size, the gear tab's
+   colour, and no weight — a heading is a place to look, not a thing to read
+   twice, and the two tabs had one at 0.7 rem in capitals and the other at
+   0.9 rem in bold. */
+.section-heading {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--muted);
 }
 /* A select drawn as a button: no value shows, only its label, since choosing
    an entry acts at once and the control returns to the label. */

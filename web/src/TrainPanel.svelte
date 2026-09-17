@@ -1339,7 +1339,7 @@
     {@const cres = forCase(solved?.cases, i)}
     <section class="stage" class:off={!c.enabled}>
       <div class="casehead">
-        <button class="head" onclick={() => (tab.openCases[i] = !tab.openCases[i])}>
+        <button class="head section-heading" onclick={() => (tab.openCases[i] = !tab.openCases[i])}>
           <span class="caret">{tab.openCases[i] ? "▾" : "▸"}</span>
           <strong>{caseName(i)}</strong>
           <span class="kind">{kindLabel(c.kind)}</span>
@@ -1457,14 +1457,14 @@
               {#each cres?.notes ?? [] as n, j (j)}<li>{note(n)}</li>{/each}
             </ul>
           {/if}
-          <button class="danger small" onclick={() => removeCase(i)}>{t("ui.train_remove_case")}</button>
+          <button class="action danger" onclick={() => removeCase(i)}>{t("ui.train_remove_case")}</button>
         </div>
       {/if}
     </section>
   {/each}
 
   {#each CASE_KINDS as k (k.key)}
-    <button class="add" onclick={() => addCaseOfKind(k)}>{t(k.add)}</button>
+    <button class="action add" onclick={() => addCaseOfKind(k)}>{t(k.add)}</button>
   {/each}
 </div>
 
@@ -1486,7 +1486,7 @@
         {@const names: [string, string] = worm
           ? [t("ui.train_the_worm"), t("ui.train_the_wheel")]
           : [gearName(i, 0), gearName(i, 1)]}
-        <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
+        <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
           <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
           {#if worm}
@@ -1654,14 +1654,14 @@
             {/if}
 
             <button
-              class="danger small"
+              class="action danger"
               onclick={() => removeStage(i)}>{t("ui.train_remove_stage")}</button
             >
           </div>
         {/if}
       {:else if stage.kind === "planetary"}
         {@const pres = res && res.kind === "planetary" ? res : null}
-        <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
+        <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
           <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
           <span class="kind">{t("ui.train_planetary")}</span>
@@ -1883,7 +1883,7 @@
               {/if}
 
             <button
-              class="danger small"
+              class="action danger"
               onclick={() => removeStage(i)}>{t("ui.train_remove_stage")}</button
             >
           </div>
@@ -1891,7 +1891,7 @@
 
       {:else if stage.kind === "hula"}
         {@const hres = res && res.kind === "hula" ? res : null}
-        <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
+        <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
           <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
           <span class="kind">{t("ui.train_hula")}</span>
@@ -2104,7 +2104,7 @@
               {/if}
 
             <button
-              class="danger small"
+              class="action danger"
               onclick={() => removeStage(i)}>{t("ui.train_remove_stage")}</button
             >
           </div>
@@ -2119,14 +2119,16 @@
        knocked on, which is the same gate the gear tab's eccentric kind is
        behind and the same table shape. -->
   {#each stageKinds as k (k.key)}
-    <button class="add" onclick={() => addStageOfKind(k)}>{t(k.label)}</button>
+    <button class="action add" onclick={() => addStageOfKind(k)}>{t(k.label)}</button>
   {/each}
 </div>
 
 <style>
-  /* The bar and the delete strip are `app.css`'s, shared with the gear tab;
-     what follows serves the buttons below them. */
-  button {
+  /* The bar, the delete strip and every `.action` — a stage or a case added
+     or removed — are `app.css`'s, shared with the gear tab; this serves the
+     buttons that show a state or open a section, and leaves the actions to
+     the shared rule rather than outranking it by being scoped. */
+  button:not(.action) {
     font: inherit;
     font-size: 0.8rem;
     padding: 0.25rem 0.6rem;
@@ -2136,10 +2138,10 @@
     color: var(--fg);
     cursor: pointer;
   }
-  button:hover:not(:disabled) {
+  button:not(.action):hover:not(:disabled) {
     background: var(--hover);
   }
-  button:disabled {
+  button:not(.action):disabled {
     color: var(--muted);
     cursor: default;
   }
@@ -2211,24 +2213,24 @@
   /* The `auto` toggle takes a column of its own, out of the label's share, so
      the number keeps the edge every other number in the panel shares. */
   label.auto {
-    grid-template-columns: 1fr auto 6rem 3.5rem;
+    grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
   }
   .grid.shared > label.auto {
     grid-template-columns: 1fr auto 9rem 3.5rem;
   }
   .gear label.auto {
-    grid-template-columns: 1fr auto 6.5rem 3.5rem;
+    grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
   }
   /* A second switch takes a second column of its own, out of the label's share
      again, so the box keeps the edge every other box in the card shares. */
   label.auto.constrained {
-    grid-template-columns: 1fr auto auto 6rem 3.5rem;
+    grid-template-columns: 1fr auto auto var(--field-box) var(--unit-cell);
   }
   .grid.shared > label.auto.constrained {
     grid-template-columns: 1fr auto auto 9rem 3.5rem;
   }
   .gear label.auto.constrained {
-    grid-template-columns: 1fr auto auto 6.5rem 3.5rem;
+    grid-template-columns: 1fr auto auto var(--field-box) var(--unit-cell);
   }
   /* **Read in columns, not in source order.** The box is written first so the
      row's label is for the box; these put everything back where it reads. Each
@@ -2282,7 +2284,7 @@
      edge. */
   label {
     display: grid;
-    grid-template-columns: 1fr 6rem 3.5rem;
+    grid-template-columns: 1fr var(--field-box) var(--unit-cell);
     align-items: center;
     /* See GearPanel: the column gap spaces a row, the row gap pairs a note to
        the box above it. */
@@ -2290,9 +2292,9 @@
     row-gap: var(--note-gap);
     font-size: 0.85rem;
   }
-  label span {
-    color: var(--muted);
-  }
+  /* An input's name is at full contrast, as on the gear tab; what is lower
+     contrast is a note, a unit, a readout's name. The names here were muted,
+     which put an input and its readout at the same weight. */
   input[type="number"],
   select {
     font: inherit;
@@ -2366,6 +2368,7 @@
   h4.mesh {
     margin: 0.75rem 0 0;
     font-size: 0.8rem;
+    font-weight: 400;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--muted);
@@ -2408,6 +2411,8 @@
     border: 1px solid var(--rule);
     border-radius: 4px;
   }
+  /* Size, weight and colour are `app.css`'s `.section-heading`, shared with
+     the gear tab's `h2`; the figures beside the name keep their own. */
   .head {
     display: flex;
     align-items: baseline;
@@ -2417,7 +2422,13 @@
     border: none;
     border-radius: 4px;
     padding: 0.45rem 0.7rem;
-    font-size: 0.9rem;
+    /* The panel's own `button` rule above sets the colour every button has,
+       and being scoped it outranks the shared class; the heading's colour is
+       restated here so the shared one shows through. */
+    color: var(--muted);
+  }
+  .head strong {
+    font-weight: inherit;
   }
   /* A load case's heading is a button and a switch side by side: the button
      opens it, the switch takes it out of every rating — and a switch cannot
@@ -2522,6 +2533,7 @@
   .gear h4 {
     margin: 0 0 0.4rem;
     font-size: 0.8rem;
+    font-weight: 400;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--muted);
@@ -2585,7 +2597,7 @@
   .gear .prop {
     /* 2.2 + 0.4 gap + 0.9 = 3.5rem, the same trailing width as a plain row, so
        these boxes share the edge with the ones above them. */
-    grid-template-columns: 1fr 6.5rem 2.2rem 0.9rem;
+    grid-template-columns: 1fr var(--field-box) 2.2rem 0.9rem;
     font-size: 0.78rem;
     margin-bottom: 0.15rem;
   }
@@ -2619,8 +2631,15 @@
     border-color: var(--warn);
   }
   .gear label {
-    grid-template-columns: 1fr 6.5rem 3.5rem;
+    grid-template-columns: 1fr var(--field-box) var(--unit-cell);
     margin-bottom: var(--field-gap);
+  }
+  /* A row holding words — a material, a sharing model — takes the wide box,
+     as the gear tab's kind and class rows do. */
+  label:has(> select),
+  .gear label:has(> select),
+  .grid.shared > label:has(> select) {
+    grid-template-columns: 1fr var(--field-box-wide) var(--unit-cell);
   }
   .notes {
     margin: 0.5rem 0 0;
@@ -2636,11 +2655,9 @@
   }
   .add {
     align-self: flex-start;
-    border-style: dashed;
-    color: var(--muted);
   }
-  .small {
+  /* A stage's or a case's remove sits below its inputs, apart from them. */
+  .action.danger {
     margin-top: 0.6rem;
-    font-size: 0.75rem;
   }
 </style>

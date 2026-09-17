@@ -339,7 +339,7 @@
 
 <div class="columns">
   <section class="inputs">
-    <h2>{t("ui.gear_parameters")}</h2>
+    <h2 class="section-heading">{t("ui.gear_parameters")}</h2>
     <div class="grid">
       <label class="wide">
         <span>{t("ui.gear_kind")}</span>
@@ -498,7 +498,7 @@
       </div>
     {/if}
 
-    <h2>{t("ui.gear_measurement")}</h2>
+    <h2 class="section-heading">{t("ui.gear_measurement")}</h2>
     <div class="grid">
       <!-- The bound every other input has: the pins that seat on the flanks
            at every position, read off the same map the measurement is, so a
@@ -543,7 +543,7 @@
       {/if}
     </div>
 
-    <h2>{t("ui.gear_export")}</h2>
+    <h2 class="section-heading">{t("ui.gear_export")}</h2>
     <div class="grid">
       <label>
         <span>{t("ui.gear_chord_tolerance")}</span>
@@ -585,7 +585,7 @@
           rim={r.rim_radius}
           bind:view={tab.view}
         />
-        <h2>{t("ui.gear_geometry")}</h2>
+        <h2 class="section-heading">{t("ui.gear_geometry")}</h2>
         <dl>
           <dt>{t("ui.gear_transverse_module")}</dt>
           <dd>{mm(r.transverse_module)}</dd>
@@ -631,7 +631,7 @@
              same measurement read at the opposite sign. That a ring has no span
              over teeth is not noted: absence needs saying only where the thing
              was expected, and nothing here offers one. -->
-        <h2>{t("ui.gear_measurement_between_pins")}</h2>
+        <h2 class="section-heading">{t("ui.gear_measurement_between_pins")}</h2>
         <dl>
           <dt>{t("ui.gear_two_pins")}</dt>
           <dd>
@@ -672,7 +672,7 @@
         </ul>
       {/if}
 
-      <h2>{t("ui.gear_geometry")}</h2>
+      <h2 class="section-heading">{t("ui.gear_geometry")}</h2>
       <!-- Tip/root diameter and tooth thickness vary around an eccentric gear;
            they are shown as ranges in the Eccentricity section rather than as a
            mean-tooth scalar here. -->
@@ -693,7 +693,7 @@
            ordinary one, so this is a question of what is worth reading rather
            than of what the core computed. -->
       {#if eccentric}
-        <h2>{t("ui.gear_eccentricity")}</h2>
+        <h2 class="section-heading">{t("ui.gear_eccentricity")}</h2>
         {#if s.per_tooth_clamps.teeth.length}
           <!-- A guard on a tool *setting* is shared, so it trips for the whole
                gear or not at all; these are the ones true of one tooth and not
@@ -755,7 +755,7 @@
           </dd>
         </dl>
 
-        <h2>{t("ui.gear_commanded_centre_distance")}</h2>
+        <h2 class="section-heading">{t("ui.gear_commanded_centre_distance")}</h2>
         {#if isUnavailable(s.centre_profile)}
           <p class="aside">{note(s.centre_profile.unavailable)}</p>
         {:else}
@@ -789,7 +789,7 @@
         {/if}
       {/if}
 
-      <h2>{t("ui.gear_measurement_over_teeth")}</h2>
+      <h2 class="section-heading">{t("ui.gear_measurement_over_teeth")}</h2>
       <dl>
         {#if isUnavailable(s.span)}
           <dt>{t("ui.gear_span")}</dt><dd class="na">{note(s.span.unavailable)}</dd>
@@ -800,7 +800,7 @@
         {/if}
       </dl>
 
-      <h2>{t("ui.gear_measurement_over_pins")}</h2>
+      <h2 class="section-heading">{t("ui.gear_measurement_over_pins")}</h2>
       <dl>
         {#each pinRows as row (row.label)}
           {#if isUnavailable(row.value)}
@@ -811,7 +811,7 @@
         {/each}
       </dl>
 
-      <h2>{t("ui.gear_composite_error_jgma_116_02")}</h2>
+      <h2 class="section-heading">{t("ui.gear_composite_error_jgma_116_02")}</h2>
       <dl>
         {#if isUnavailable(s.tolerance)}
           <dt>{t("ui.gear_tolerance")}</dt><dd class="na">{note(s.tolerance.unavailable)}</dd>
@@ -871,11 +871,9 @@
     }
   }
 
+  /* Size, weight and colour are `app.css`'s `.section-heading`, shared with
+     the geartrain's stage and case headings. */
   h2 {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
     margin: 1.25rem 0 0.5rem;
   }
   h2:first-child {
@@ -896,7 +894,7 @@
   }
   label {
     display: grid;
-    grid-template-columns: 1fr 7rem 3.5rem;
+    grid-template-columns: 1fr var(--field-box) var(--unit-cell);
     align-items: center;
     /* Column gap spaces the label, box and unit; row gap is what holds a note
        to the box it belongs to. They are not the same measurement. */
@@ -909,8 +907,9 @@
      out of the label's share rather than out of the trailing cell, so it still
      ends where every input and every note in the panel ends — a kind has no
      unit to print, but the cell is what holds the column together. */
-  label.wide {
-    grid-template-columns: 1fr 10.5rem 3.5rem;
+  label.wide,
+  label:has(> select) {
+    grid-template-columns: 1fr var(--field-box-wide) var(--unit-cell);
   }
   /* A switch that carries its own name has nothing to put in a label column,
      so the row is the button alone at the right edge — the same edge every
@@ -952,7 +951,7 @@
      the number keeps the edge every other number here shares — and the
      trailing cell stays free for the unit. */
   label.auto {
-    grid-template-columns: 1fr auto 7rem 3.5rem;
+    grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
   }
 
   input[type="number"],
