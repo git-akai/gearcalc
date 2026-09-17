@@ -1438,4 +1438,38 @@ impl Constrained for PairStage {
         }
         groups
     }
+
+    /// **Two shafts on the housing, one mesh framed on it.**
+    ///
+    /// The shaft angle does not appear: crossing the shafts changes what the
+    /// teeth do to each other — a line contact becomes a point, the sliding
+    /// turns lengthwise — and changes nothing whatever about the speeds, which
+    /// are `z₁/z₂` on parallel shafts and on crossed ones alike. So a worm
+    /// stage's wiring is a spur stage's, and that is the model saying a kind is
+    /// a layer rather than a second kinematics.
+    fn wiring(&self) -> super::Wiring {
+        use crate::kinematics::HOUSING;
+        const FIRST: usize = 1;
+        const SECOND: usize = 2;
+        super::Wiring {
+            shafts: vec![
+                super::ShaftSpec { label: "housing" },
+                super::ShaftSpec { label: "first" },
+                super::ShaftSpec { label: "second" },
+            ],
+            mounts: vec![
+                super::Mount::coaxial_with(FIRST, HOUSING),
+                super::Mount::coaxial_with(SECOND, HOUSING),
+            ],
+            meshes: vec![super::MeshSpec {
+                a: 0,
+                b: 1,
+                kind: crate::mesh::MeshKind::External,
+                paths: 1,
+            }],
+            conditions: super::arranged(3, FIRST, &[]),
+            input: FIRST,
+            output: SECOND,
+        }
+    }
 }

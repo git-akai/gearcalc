@@ -38,6 +38,7 @@ pub mod crossed;
 mod hula;
 mod pair;
 mod planetary;
+mod wiring;
 
 pub use crossed::solve_crossed_pair;
 pub use hula::{
@@ -50,6 +51,8 @@ pub use planetary::{
     solve_planetary_stage, solve_planetary_stage_with, PlanetResult, PlanetaryResult,
     PlanetaryStage,
 };
+pub(crate) use wiring::{arranged, teeth_of};
+pub use wiring::{MeshSpec, Mount, Offsets, ShaftSpec, Wiring, WiringError};
 
 /// The three contact ratios.
 #[derive(Clone, Copy, Debug)]
@@ -2253,14 +2256,22 @@ pub(crate) fn readings_group(readings: &[Reading]) -> FreedomGroup {
     }
 }
 
-/// **What a kind declares so the relief and the size resolver shared by every
-/// kind can serve it** — the whole of what a new kind owes them.
+/// **What a kind declares so the machinery shared by every kind can serve it**
+/// — the whole of what a new kind owes.
 ///
-/// Four questions: which members it has, which inputs relief may turn and by
-/// what name, how its helix may be stated, and which of its inputs argue with
-/// each other. Everything that walks those — counting, relieving, seeding a
-/// box, reading the helix the readings state — is written once above the
-/// kinds, so a kind that answers the four has relief without writing any.
+/// Five questions: which members it has, which inputs relief may turn and by
+/// what name, how its helix may be stated, which of its inputs argue with each
+/// other, and **where its shafts and meshes sit**. Everything that walks those
+/// — counting, relieving, seeding a box, reading the helix the readings state,
+/// assembling the kinematic system — is written once above the kinds, so a
+/// kind that answers the five has all of it without writing any.
+///
+/// The fifth is the newest, and it is the one that tests the claim
+/// `docs/rationale.md#each-stage-kind-keeps-its-own-result-type` makes and
+/// calls untested: that a new kind should be new **kinematics** and no new
+/// rating machinery. A kind states its topology here and the one solver in
+/// [`crate::kinematics`] answers every question about motion, torque and play
+/// that used to be answered per kind.
 pub(crate) trait Constrained {
     /// The members in the order [`StageResult::members`] reports them.
     fn members(&self) -> Vec<&StageGear>;
@@ -2271,6 +2282,9 @@ pub(crate) trait Constrained {
     fn readings(&self) -> Vec<Reading>;
     /// Every argument this kind's inputs can get into with each other.
     fn freedoms(&self) -> Vec<FreedomGroup>;
+    /// **Where this kind's shafts and meshes sit** — topology alone, with no
+    /// module, no shift and no distance in it. See [`Wiring`].
+    fn wiring(&self) -> Wiring;
 }
 
 impl Stage {
@@ -2326,6 +2340,26 @@ impl Stage {
     #[must_use]
     pub fn members(&self) -> Vec<&StageGear> {
         self.kind().members()
+    }
+
+    /// **Where this stage's shafts and meshes sit** ([`Wiring`]) — the topology
+    /// the one kinematic solver is assembled from, with no geometry in it.
+    #[must_use]
+    pub fn wiring(&self) -> Wiring {
+        self.kind().wiring()
+    }
+
+    /// **This stage's kinematic system**, from its wiring and its tooth counts.
+    ///
+    /// It needs neither a module nor a shift nor a material, which is the whole
+    /// point: a stage that will not close geometrically still has a ratio, and
+    /// this is what can still be asked of it.
+    ///
+    /// # Errors
+    ///
+    /// [`WiringError`] for a wiring that does not describe meshes.
+    pub fn system(&self) -> Result<crate::kinematics::System, WiringError> {
+        self.wiring().alone(&teeth_of(self.members()))
     }
 
     /// **The pinion cutter a member is cut by, where it is a ring** — which is
@@ -5201,6 +5235,279 @@ mod tests {
             Stage::Planetary(Box::default()),
             Stage::Hula(Box::new(hula)),
         ]
+    }
+
+    /// **Every kind, at a spread of tooth counts and every arrangement** — the
+    /// grid the wiring laws below are asserted over.
+    ///
+    /// `every_kind` is the presets; this turns the axes that change the
+    /// *topology's* answer, which is what a law about topology has to be swept
+    /// over. An axis nobody turns is an axis nobody tests
+    /// (`docs/corrections.md`), and for the graph that axis is the arrangement:
+    /// which shaft is held is the whole of what an epicyclic set's ratio
+    /// depends on, and a sweep that leaves it at the preset checks one sixth of
+    /// the model.
+    fn every_wiring() -> Vec<(String, Stage)> {
+        use crate::planetary::{Arrangement, PlanetaryShaft};
+        let mut out = Vec::new();
+        for (z1, z2) in [(17_u32, 43_u32), (9, 37), (13, 13)] {
+            let mut s = PairStage::default();
+            s.gears[0].teeth = z1;
+            s.gears[1].teeth = z2;
+            out.push((format!("spur {z1}/{z2}"), Stage::Spur(s)));
+        }
+        out.push(("worm".into(), Stage::Worm(PairStage::worm())));
+        for teeth in [[12_u32, 30, 72], [24, 18, 60], [17, 17, 51]] {
+            for input in PlanetaryShaft::ALL {
+                for fixed in PlanetaryShaft::ALL {
+                    if input == fixed {
+                        continue;
+                    }
+                    let mut p = PlanetaryStage {
+                        arrangement: Arrangement { input, fixed },
+                        ..PlanetaryStage::default()
+                    };
+                    for (g, z) in [&mut p.sun, &mut p.planet, &mut p.ring]
+                        .into_iter()
+                        .zip(teeth)
+                    {
+                        g.teeth = z;
+                    }
+                    out.push((
+                        format!("set {teeth:?} {input:?} in, {fixed:?} held"),
+                        Stage::Planetary(Box::new(p)),
+                    ));
+                }
+            }
+        }
+        for teeth in [[65_u32, 61, 57, 61], [19, 18, 17, 16]] {
+            let mut h = HulaStage::default();
+            h.gears[0].profile_shift = Auto::automatic(0.0);
+            for (g, z) in h.gears.iter_mut().zip(teeth) {
+                g.teeth = z;
+            }
+            out.push((format!("hula {teeth:?}"), Stage::Hula(Box::new(h))));
+        }
+        out
+    }
+
+    /// **The graph reproduces every kind's own kinematics**, which is the whole
+    /// of what the wiring has to earn.
+    ///
+    /// Three kinds each solve their speeds a different way —
+    /// `Mesh::ratio` for a pair, `planetary::power` for a set, the two
+    /// products through that same solve for a hula stage — and one system of
+    /// mesh rows has to give all three. Agreeing everywhere is what says the
+    /// declaration is right; **and it is the only thing that can say so**,
+    /// since the lock-up invariant is silent on a wrong sign and on a
+    /// misattributed frame alike (`crate::kinematics`, measured).
+    ///
+    /// What is compared is the **magnitude** of the ratio, with the sign
+    /// checked separately and only where the kind reports one — because it does
+    /// not always: a pair's ratio is `Mesh::ratio`, whose own documentation
+    /// says *"ignoring sign"*, while a set's is signed. That disagreement
+    /// between two kinds' meaning of one accessor is recorded rather than
+    /// papered over here; resolving it is a deliberate change of a reported
+    /// number and belongs with the phase that makes the graph answer.
+    #[test]
+    fn the_graph_gives_every_kind_the_kinematics_it_gives_itself() {
+        let lib = library();
+        let mut checked = 0u32;
+        for (name, stage) in every_wiring() {
+            let w = stage.wiring();
+            let system = stage.system().unwrap_or_else(|e| panic!("{name}: {e:?}"));
+            assert!(system.lock_up_is_free(), "{name}");
+            let m = system
+                .motion(&w.conditions)
+                .unwrap_or_else(|e| panic!("{name}: {e:?}"));
+            assert!(
+                m.is_unique(),
+                "{name}: the arrangement should determine every shaft, not {m:?}"
+            );
+
+            // --- the ratio, against the kind's own.
+            let r = solve_any(&stage, &StageLoads::at(1.0, 1.0), &lib)
+                .unwrap_or_else(|e| panic!("{name}: {e}"));
+            let graph = m
+                .ratio(w.input, w.output)
+                .unwrap_or_else(|| panic!("{name}: the output does not turn"));
+            let want = r.ratio();
+            assert!(
+                (graph.to_f64().abs() - want.abs()).abs() < 1e-9 * want.abs().max(1.0),
+                "{name}: graph {graph} vs stage {want}"
+            );
+            // The two epicyclic kinds report a signed ratio; a pair does not.
+            if stage.as_pair().is_none() {
+                assert_eq!(
+                    f64::from(graph.signum()),
+                    want.signum(),
+                    "{name}: graph {graph} vs stage {want}"
+                );
+            }
+
+            // --- every member's speed, and its speed against its own frame.
+            //
+            // Solved at unit input speed, so the graph's speeds *are* the
+            // stage's — which is the strongest form of this check: not a
+            // ratio each, but every shaft at once.
+            for (i, g) in r.members().iter().enumerate() {
+                let shaft = w.mounts[i].spins_with;
+                let case = &g.cases[0];
+                let speed = m.values[shaft].to_f64();
+                assert!(
+                    (speed.abs() - case.speed.abs()).abs() < 1e-9 * case.speed.abs().max(1.0),
+                    "{name}: member {i} graph {speed} vs stage {}",
+                    case.speed
+                );
+                let frame = m.values[w.mounts[i].axis_fixed_in].to_f64();
+                let against = speed - frame;
+                assert!(
+                    (against.abs() - case.speed_against_carrier.abs()).abs()
+                        < 1e-9 * case.speed_against_carrier.abs().max(1.0),
+                    "{name}: member {i} against its frame, graph {against} vs stage {}",
+                    case.speed_against_carrier
+                );
+                checked += 1;
+            }
+        }
+        assert!(checked > 60, "only {checked} members checked");
+    }
+
+    /// **The transpose solve gives the equilibrium `planetary::power` does**,
+    /// once the loss is taken out of it.
+    ///
+    /// `power` folds `η₀^w` into the torque split, so the two can only be
+    /// compared at `η₀ = 1` — and that is the comparison worth having: it
+    /// isolates the *equilibrium* from the loss model, so a disagreement is
+    /// about the rowspace and not about friction. All six arrangements, on the
+    /// shipped counts and on a set whose basic ratio is close to one, which is
+    /// where `power`'s two branches straddle and where its own documentation
+    /// says the sign of the rolling power stops being obvious.
+    #[test]
+    fn the_ideal_torque_split_is_the_equilibrium_the_set_already_solves() {
+        use crate::kinematics::Condition;
+        use crate::planetary::{self, Arrangement, PlanetaryShaft, Teeth};
+        use crate::ratio::Ratio;
+        let mut checked = 0u32;
+        for teeth in [
+            Teeth {
+                sun: 24,
+                planet: 18,
+                ring: 60,
+            },
+            Teeth {
+                sun: 12,
+                planet: 30,
+                ring: 72,
+            },
+            // i₀ = −60/57, a hair from −1.
+            Teeth {
+                sun: 57,
+                planet: 3,
+                ring: 60,
+            },
+        ] {
+            let mut stage = PlanetaryStage::default();
+            for (g, z) in [&mut stage.sun, &mut stage.planet, &mut stage.ring]
+                .into_iter()
+                .zip([teeth.sun, teeth.planet, teeth.ring])
+            {
+                g.teeth = z;
+            }
+            for input in PlanetaryShaft::ALL {
+                for fixed in PlanetaryShaft::ALL {
+                    if input == fixed {
+                        continue;
+                    }
+                    stage.arrangement = Arrangement { input, fixed };
+                    let w = stage.wiring();
+                    let system = Stage::Planetary(Box::new(stage.clone())).system().unwrap();
+                    let Some(p) = planetary::power(
+                        planetary::basic_ratio(teeth),
+                        stage.arrangement,
+                        1.0,
+                        1.0,
+                        1.0,
+                    ) else {
+                        // A lossless flow that will not solve is `power`'s own
+                        // refusal and not the graph's business.
+                        continue;
+                    };
+                    // The planet carries no external torque and nothing in a
+                    // pure epicyclic meshes against the housing, so both are
+                    // exact zeros rather than unknowns.
+                    let mut applied = vec![None; w.shafts.len()];
+                    applied[crate::kinematics::HOUSING] = Some(Ratio::ZERO);
+                    applied[w.mounts[1].spins_with] = Some(Ratio::ZERO);
+                    applied[w.input] = Some(Ratio::ONE);
+                    let t = system.torques(&applied).unwrap();
+                    assert!(t.is_unique(), "{teeth:?} {input:?}/{fixed:?}");
+                    for role in PlanetaryShaft::ALL {
+                        let shaft = match role {
+                            PlanetaryShaft::Sun => w.mounts[0].spins_with,
+                            PlanetaryShaft::Ring => w.mounts[2].spins_with,
+                            // The carrier is the frame both meshes are seen
+                            // from, and the one shaft that is not a gear.
+                            PlanetaryShaft::Carrier => w.mounts[1].axis_fixed_in,
+                        };
+                        let got = t.values[shaft].to_f64();
+                        let want = p.torques[role.index_pub()];
+                        assert!(
+                            (got - want).abs() < 1e-9 * want.abs().max(1.0),
+                            "{teeth:?} {input:?}/{fixed:?} {role:?}: {got} vs {want}"
+                        );
+                        checked += 1;
+                    }
+                    // ...and the speeds, which the same conditions give.
+                    let motion = system.motion(&w.conditions).unwrap();
+                    assert!(matches!(w.conditions[w.input], Condition::Drive(_)));
+                    for role in PlanetaryShaft::ALL {
+                        let shaft = match role {
+                            PlanetaryShaft::Sun => w.mounts[0].spins_with,
+                            PlanetaryShaft::Ring => w.mounts[2].spins_with,
+                            PlanetaryShaft::Carrier => w.mounts[1].axis_fixed_in,
+                        };
+                        let got = motion.values[shaft].to_f64();
+                        let want = p.speeds[role.index_pub()];
+                        assert!(
+                            (got - want).abs() < 1e-9 * want.abs().max(1.0),
+                            "{teeth:?} {input:?}/{fixed:?} {role:?} speed: {got} vs {want}"
+                        );
+                    }
+                }
+            }
+        }
+        assert!(checked >= 50, "only {checked} torques checked");
+    }
+
+    /// **A stage that will not close geometrically still has a ratio.**
+    ///
+    /// The fault the whole refactor opens on: a set whose two centre distances
+    /// no planet shift can bring together refuses, and takes the shaft line
+    /// with it — though Willis needs the tooth counts and the topology and
+    /// nothing else. The wiring is what makes the second answerable
+    /// independently of the first, and this holds that it is.
+    #[test]
+    fn a_stage_with_no_geometry_still_answers_about_motion() {
+        let lib = library();
+        let mut stage = PlanetaryStage::default();
+        // Only `z_ring ∈ [48, 54]` admits any planet shift at 17/17.
+        stage.sun.teeth = 17;
+        stage.planet.teeth = 17;
+        stage.ring.teeth = 80;
+        let stage = Stage::Planetary(Box::new(stage));
+        assert!(
+            solve_any(&stage, &StageLoads::just(1.0), &lib).is_err(),
+            "this set is the one that cannot be built"
+        );
+        let w = stage.wiring();
+        let m = stage.system().unwrap().motion(&w.conditions).unwrap();
+        // Sun in, ring held: the carrier runs at z_s/(z_s + z_r) of the sun,
+        // whatever the geometry can or cannot be made to do.
+        assert_eq!(
+            m.ratio(w.input, w.output).unwrap(),
+            crate::ratio::Ratio::new(17 + 80, 17).unwrap()
+        );
     }
 
     /// Every freedom a stage's groups mention, flat.

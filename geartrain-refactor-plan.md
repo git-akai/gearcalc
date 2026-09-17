@@ -78,7 +78,7 @@ case of a path, hand-derived.
 
 This refactor is that test. It is also the answer to the third port.
 
-### 1.3 Three flaws found on the way in
+### 1.3 Four flaws found on the way in
 
 All are things to fix, not things to work around.
 
@@ -119,6 +119,27 @@ kinematics/geometry split reorganises — a closure failure and a power-flow
 refusal end up on opposite sides of it — and fixing the wording twice would be
 the churn this project's file-format rule exists to avoid. Recorded here so the
 deferral is a decision rather than an oversight.
+
+**(d) `StageResult::ratio()` means two different things.** A pair's is
+`Mesh::ratio`, whose own doc says *"ignoring sign"*; an epicyclic set's is
+`PlanetaryResult::ratio`, whose own doc says *"negative when the output
+reverses"*. So a spur stage cannot report that its output turns backwards —
+which every external pair's does — while a set can, and `TrainResult::total_ratio`
+is the product of the two meanings. `docs/reference.md#trains` states both halves
+(*"per stage `i = z_out/z_in`… and a planetary's comes from its own
+kinematics"*) without noticing they disagree.
+
+It is already visible in the corpus: `kinematics.txt` shows a pair delivering
+`+4.9751 Nm` and a set `−11.6755 Nm`, and it is not only a readout — `carry()`
+divides by `ratio()`, so the sign reaches every reported torque downstream of an
+epicyclic stage and none downstream of a pair.
+
+The graph gives the signed answer naturally, so **Phase 3 resolves it in that
+direction** and the sign appearing on a pair's ratio is a deliberate golden diff
+with `train_kinematics.py`'s independent answer beside it. Which of the two
+conventions a *readout* should use — signed ratio, or magnitude with the
+direction stated separately — is a UI question for Phase 4, and a different one
+from what the model holds.
 
 ---
 
@@ -375,13 +396,45 @@ choosing the carrier radius, not as a stage kind.
 **It keeps its vocabulary, and the vocabulary is gated by the arrangement.**
 Per §10.2, the far-side clearance, the offset stated as a crank distance and
 the words a designer of one of these uses all survive as inputs of the
-epicyclic stage — *shown where they mean something*, which for most of them is
-a planet count of 1 and a pair of internal meshes at a small tooth difference.
-The gate is asked of the arrangement, never of a kind tag: a stage with one
-planet and a one-tooth internal mesh is offered a far-side clearance because
-that is what such a stage has, not because somebody ticked "hula". This is the
-worm's treatment, where the kind decides a preset, a vocabulary and which
-inputs are put in front of a designer, and the core holds one model.
+epicyclic stage — *shown where they mean something*. The gate is asked of the
+arrangement, never of a kind tag: a stage with one planet and a one-tooth
+internal mesh is offered a far-side clearance because that is what such a stage
+has, not because somebody ticked "hula". This is the worm's treatment, where
+the kind decides a preset, a vocabulary and which inputs are put in front of a
+designer, and the core holds one model.
+
+**And the gate is per feature, not one bundle**, because the features do not
+share a condition:
+
+| feature | the arrangement that earns it |
+|---|---|
+| far-side tip clearance, and the carrier radius solved from it | **any** internal mesh whose tip circles cross — which `TipRoom` already computes and `MeshTrial::tips_are_clear` already asks |
+| eccentric / crank vocabulary for the carrier | one planet, `N = 1` |
+| equal spacing, simultaneous meshing, planet-to-planet clearance | more than one planet |
+| the closure solve absorbing into a shift | every planet shaft with more than one mesh |
+
+**These are not the hula stage's features and never were.** They are the
+small-tooth-difference internal mesh's, and the thing that wants them next is
+the very thing this refactor is for: a **Wolfrom's** second ring commonly runs
+at one or two teeth of difference, which is exactly where two tip circles
+overlap away from the mesh and where the carrier radius has to answer to the
+tip bound rather than to the shifts. A planocentric reducer — sun, one planet,
+ring, at a tooth or two of difference — is the same facility again with a
+different tick pattern, and is not implemented today at all. Reading them as
+one stage kind's quirks is what has kept them out of every other arrangement
+that needs them.
+
+**So unification is worth a change in current behaviour**, per §10.2's own
+terms. Two follow directly and both are improvements:
+
+- an epicyclic set gains the option of taking its carrier radius from the tip
+  bound, which today only a hula stage can do;
+- a hula-shaped stage gains the shift-absorbed closure, which today only a set
+  can do.
+
+Each is a feature reaching an arrangement that could always have used it. Where
+one moves a shipped number, §10.3's rule applies: a reason, and a check that is
+not the diff.
 
 ### 4.5 Ports, conditions and mobility
 

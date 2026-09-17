@@ -1434,6 +1434,64 @@ impl super::Constrained for HulaStage {
             )))
             .collect()
     }
+
+    /// **Four shafts and two meshes framed on the crank** — which is to say a
+    /// compound planet with one planet, and the crank is its carrier.
+    ///
+    /// Gears 1 and 4 sit on the fixed axis, which is the crank's own axis of
+    /// rotation, so they are `coaxial_with` it exactly as a sun and a ring are
+    /// coaxial with a carrier; gears 2 and 3 ride it, and share one shaft
+    /// because they are one wobble body. Set that beside
+    /// [`super::PlanetaryStage`]'s wiring and the two are the same shape with
+    /// different ticks — which is the plan's case for folding this kind into a
+    /// general epicyclic one, made in the one place the kinematics is stated.
+    ///
+    /// **Which member of a pair is its ring is not an input**: two axes one
+    /// crank offset apart can only be an internal pair, so it is whichever has
+    /// more teeth, and [`crate::hula::Teeth::pair`] is asked rather than a
+    /// second rule written here.
+    fn wiring(&self) -> super::Wiring {
+        const GEAR1: usize = 1;
+        const CRANK: usize = 2;
+        const WOBBLE: usize = 3;
+        const GEAR4: usize = 4;
+        let teeth = crate::hula::Teeth(self.gears.each_ref().map(|g| g.teeth));
+        // A mesh whose members cannot be told apart by tooth count has no ring
+        // to name; the pair is built pinion-first and the stage refuses it
+        // elsewhere, so the fallback here is the order it was written in.
+        let mesh = |m: usize| {
+            let (a, b) = teeth
+                .pair(m)
+                .map_or((2 * m, 2 * m + 1), |p| (p.pinion, p.ring));
+            super::MeshSpec {
+                a,
+                b,
+                kind: MeshKind::Internal,
+                paths: 1,
+            }
+        };
+        super::Wiring {
+            shafts: vec![
+                super::ShaftSpec { label: "housing" },
+                super::ShaftSpec { label: "grounded" },
+                super::ShaftSpec { label: "crank" },
+                super::ShaftSpec { label: "wobble" },
+                super::ShaftSpec { label: "output" },
+            ],
+            mounts: vec![
+                super::Mount::coaxial_with(GEAR1, CRANK),
+                super::Mount::riding(WOBBLE, CRANK),
+                super::Mount::riding(WOBBLE, CRANK),
+                super::Mount::coaxial_with(GEAR4, CRANK),
+            ],
+            meshes: vec![mesh(0), mesh(1)],
+            // Gear 1 grounded and the crank driven: the arrangement this kind
+            // has, stated so the graph can be asked what it answers.
+            conditions: super::arranged(5, CRANK, &[GEAR1]),
+            input: CRANK,
+            output: GEAR4,
+        }
+    }
 }
 
 #[cfg(test)]

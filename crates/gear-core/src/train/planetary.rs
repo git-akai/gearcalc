@@ -1725,6 +1725,76 @@ impl super::Constrained for PlanetaryStage {
             super::readings_group(&super::Constrained::readings(self)),
         ]
     }
+
+    /// **Four shafts and two meshes framed on the carrier.**
+    ///
+    /// The sun and the ring are `coaxial_with` the *carrier* rather than the
+    /// housing, and that is the whole of why the frame needs no field of its
+    /// own: a member on the carrier's own axis stands still in the carrier's
+    /// frame, so the frame of each mesh is the one shaft both its members name
+    /// ([`super::Wiring`]).
+    ///
+    /// The planet count is `paths` on each mesh. It changes no speed — every
+    /// planet is the same planet — and it is what a member's engagements are
+    /// counted over.
+    ///
+    /// **Which shaft is held is stated here for now**, from the stage's own
+    /// `arrangement`, so the graph can be asked the question this kind already
+    /// answers. It belongs to the train, and the plan moves it there.
+    fn wiring(&self) -> super::Wiring {
+        // Shaft indices, and the order the three roles map onto them.
+        const SUN: usize = 1;
+        const CARRIER: usize = 2;
+        const RING: usize = 3;
+        const PLANET: usize = 4;
+        let shaft = |m: PlanetaryShaft| match m {
+            PlanetaryShaft::Sun => SUN,
+            PlanetaryShaft::Carrier => CARRIER,
+            PlanetaryShaft::Ring => RING,
+        };
+        let output = PlanetaryShaft::ALL
+            .into_iter()
+            .find(|&m| m != self.arrangement.input && m != self.arrangement.fixed)
+            .unwrap_or(self.arrangement.input);
+        super::Wiring {
+            shafts: vec![
+                super::ShaftSpec { label: "housing" },
+                super::ShaftSpec { label: "sun" },
+                super::ShaftSpec { label: "carrier" },
+                super::ShaftSpec { label: "ring" },
+                super::ShaftSpec { label: "planet" },
+            ],
+            // Members in `StageResult::members()` order: sun, planet, ring.
+            mounts: vec![
+                super::Mount::coaxial_with(SUN, CARRIER),
+                super::Mount::riding(PLANET, CARRIER),
+                super::Mount::coaxial_with(RING, CARRIER),
+            ],
+            meshes: vec![
+                super::MeshSpec {
+                    a: 0,
+                    b: 1,
+                    kind: MeshKind::External,
+                    paths: self.planets.max(1),
+                },
+                // `b` is the ring, which is `MeshKind::Internal`'s convention
+                // and the order this stage builds the mesh in.
+                super::MeshSpec {
+                    a: 1,
+                    b: 2,
+                    kind: MeshKind::Internal,
+                    paths: self.planets.max(1),
+                },
+            ],
+            conditions: super::arranged(
+                5,
+                shaft(self.arrangement.input),
+                &[shaft(self.arrangement.fixed)],
+            ),
+            input: shaft(self.arrangement.input),
+            output: shaft(output),
+        }
+    }
 }
 
 #[cfg(test)]

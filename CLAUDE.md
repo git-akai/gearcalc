@@ -90,11 +90,12 @@ of a gear is worth more than knowing what it does.
 
 | File | Answers |
 |---|---|
-| `mod.rs` | **What every kind shares**: the load cases and the walk that carries each toward the far port, `StageLoads`, `MemberRating`, `Bending`, `MeshReport`, `GearResult` and its `GearCase` per load, the engagement rule, the train that strings stages together — and **relief**: `Freedom`, `Reading`, `FreedomGroup` and the walk over them, which each kind feeds through `Constrained` and never writes |
+| `mod.rs` | **What every kind shares**: the load cases and the walk that carries each toward the far port, `StageLoads`, `MemberRating`, `Bending`, `MeshReport`, `GearResult` and its `GearCase` per load, the engagement rule, the train that strings stages together — and **relief**: `Freedom`, `Reading`, `FreedomGroup` and the walk over them, which each kind feeds through `Constrained` and never writes. `Constrained` is the whole of what a kind owes: five questions, and the fifth is its wiring |
+| `wiring.rs` | **Where a kind's shafts and meshes sit** — topology alone, no geometry, feeding `kinematics.rs`. The frame is *derived* from the two members' common frame rather than stored, and a mesh's sign is its `MeshKind`'s |
 | `pair.rs` | **The pair**: two gears on shafts at any angle — the one primitive the spur, helical, crossed and worm kinds are built from. Its inputs, its five-input relation, the sizing solve, and the parallel-axis solve |
 | `planetary.rs` | One carrier, one sun, one ring, N planets |
 | `crossed.rs` | The crossed-axis solve for a pair whose shafts are not parallel — worm or crossed gear pair, one model; the kind decides only the worm's conventional proportions |
-| `hula.rs` | The hula stage: the arrangement built, cut and rated |
+| `hula.rs` | The hula stage: the arrangement built, cut and rated. Kinematically a compound planet with one planet and both meshes internal, which its `wiring` says in one place |
 
 ### The other crates
 
@@ -121,6 +122,7 @@ string catalogues is what five languages costs.
 | **A stage-level input** | the stage kind's file — its field, and its `Constrained` impl if relief may turn it or it argues with another · `train/mod.rs` if shared · `auto.rs` if a search reads it · 5 × `strings_*.toml` · `web/src/TrainPanel.svelte` | the above, plus `tools/check_bindings.sh --write` and `tools/check_strings.py`. The relief laws in `train/mod.rs`'s tests run over every kind's preset, so a freedom the solve does not read fails there |
 | **A load-case input** | `LoadCase` in `train/mod.rs` · `solve_train`'s walk if it changes what a stage is handed (`StageLoad`) · `gear-wasm`'s `defaults` · `gear-io/src/train.rs`'s change log · 5 × `strings_*.toml` · `web/src/TrainPanel.svelte` | as above; `gear-cli train` and `--write` the corpus |
 | **A per-gear input** | `params.rs` · the generator that reads it · `auto.rs` (`admissible_ranges`) · 5 × `strings_*.toml` · `web/src/GearPanel.svelte` — and, if it is a stage member's toggle, one line in `train/mod.rs`'s `member_inputs` and one in `MemberFreedom`, for every kind at once | as above |
+| **A stage kind** | its own file — the assembly and the result it keeps — plus `Constrained`'s five answers, of which `wiring()` is the whole of its kinematics. **Nothing in `MemberRating`, `MeshReport`, `Bending` or `GearResult` should move**; if it does, the division `docs/rationale.md#each-stage-kind-keeps-its-own-result-type` argues was wrong | `cargo nextest run` — `the_graph_gives_every_kind_the_kinematics_it_gives_itself` sweeps every kind and arrangement · `tools/train_kinematics.py` · the corpus |
 | **A note the solve emits** | `note.rs` (the key) · the site that raises it · 5 × `strings_*.toml` | `cargo nextest run` — `gear_io::strings` checks both directions by *firing every note* |
 | **A UI string with no `Note` behind it** | 5 × `strings_*.toml` · the `.svelte` that reads it | `tools/check_strings.py` |
 | **A material** | `crates/gear-io/data/materials_default.toml` | `cargo nextest run` — every non-datasheet value must carry a note saying what it is |

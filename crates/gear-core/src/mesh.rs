@@ -83,6 +83,23 @@ impl MeshKind {
         }
     }
 
+    /// **Gear 2's tooth count as this kind signs it** — the same `σ` as
+    /// [`Self::sign`], read where the count is an integer.
+    ///
+    /// It is here rather than as a cast at the call site because the sign is
+    /// this type's one fact and both readings of it belong together: a caller
+    /// turning `sign()` into an integer is a second place the convention could
+    /// be written down, and `docs/corrections.md` opens on what that costs.
+    /// [`crate::kinematics`] is the caller — a mesh row over exact integers —
+    /// and it has no business knowing which way round the two kinds are.
+    #[must_use]
+    pub const fn signed(self, z: i64) -> i64 {
+        match self {
+            Self::External => z,
+            Self::Internal => -z,
+        }
+    }
+
     /// Where a mesh of this kind runs when its zero-backlash distance is opened
     /// by `clearance`: `a_w + σ c`.
     ///

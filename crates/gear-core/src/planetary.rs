@@ -513,6 +513,13 @@ pub enum PlanetaryShaft {
 }
 
 impl PlanetaryShaft {
+    /// The three shafts, in the order the arrays below index them.
+    ///
+    /// Named once because it was written out three times — in `other`, in the
+    /// tests' arrangement sweep and in the harness — and a list of three
+    /// written four times is a list that can come to be three.
+    pub const ALL: [Self; 3] = [Self::Sun, Self::Carrier, Self::Ring];
+
     /// Index into the `[sun, carrier, ring]` arrays below.
     const fn index(self) -> usize {
         match self {
@@ -534,7 +541,7 @@ impl PlanetaryShaft {
     /// A planetary set has three shafts and exactly two are chosen — one driven,
     /// one held — so the third is not a choice at all.
     fn other(a: Self, b: Self) -> Option<Self> {
-        [Self::Sun, Self::Carrier, Self::Ring]
+        Self::ALL
             .into_iter()
             .find(|&m| m != a && m != b)
             .filter(|_| a != b)
