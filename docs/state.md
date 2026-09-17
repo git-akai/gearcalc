@@ -948,19 +948,17 @@ Not a queue with a head; this is what a next session would pick from.
   - **the field grid** — a single column on the gear tab (`.grid`: flex
     column, `--field-gap` between rows, and `--field-gap` again between
     groups); a stage's inputs flow in `repeat(auto-fill, minmax(15rem, 1fr))`
-    at `--field-gap 1rem`, and its shared block is two equal halves at
-    `0.4rem 2rem` with a 9 rem box, chosen so a box in a wide block does not
-    float away from its name. A choice about how many inputs a stage has,
-    and may stay;
+    at `--field-gap 1rem`, and its shared block is one column capped at
+    34 rem. A choice about how many inputs a stage has, and may stay;
   - **notes outside a label** — both tabs draw a field's note through
     `FieldNote` at 0.72 rem, but a stage's `.hint` for a note that has no
     label to sit in pulls itself up by `calc(--note-gap − --field-gap)` and
     right-aligns; the gear tab has no such note;
   - **readouts** — the gear tab's `dl` is `max-content 1fr` at `0.15rem 1rem`
-    with values right-aligned, tabular and **600**; a stage's `.out` is
-    `auto 1fr` at `0.15rem 0.75rem` with values left-aligned, tabular and at
-    normal weight, an annotation in a muted `small`, and an `.indent` variant
-    under a mesh heading. The weight and the alignment are the visible half;
+    with values right-aligned; a stage's `.out` is `auto 1fr` at
+    `0.15rem 0.75rem` with values left-aligned, an annotation in a muted
+    `small`, and an `.indent` variant under a mesh heading. Both tabular at
+    normal weight now; the alignment is the visible half;
   - **the list of notes** at the foot of a section — `0.75rem 0 0` margin,
     1.1 rem indent, 0.8 rem on the gear tab; `0.5rem 0 0`, 1 rem, 0.78 rem on
     a stage;
