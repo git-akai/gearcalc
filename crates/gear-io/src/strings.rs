@@ -1218,6 +1218,19 @@ mod tests {
                     record(&r.every_note());
                 }
             }
+            // A ratio given as a floor under an automatic width, on straight
+            // teeth — where no width buys any overlap.
+            {
+                let mut straight = PairStage {
+                    overlap: gear_core::params::Auto::fixed(1.2),
+                    ..PairStage::default()
+                };
+                straight.gears[0].face_width = gear_core::params::Auto::automatic(5.0);
+                if let Ok(r) = solve_spur(&straight, &gear_core::train::StageLoads::just(2.0), &lib)
+                {
+                    record(&r.every_note());
+                }
+            }
             // An automatic face width with every rating switched off.
             let no_source = gear_core::train::StageGear {
                 face_width: gear_core::params::Auto::automatic(0.0),

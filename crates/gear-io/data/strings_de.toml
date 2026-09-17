@@ -43,6 +43,7 @@ centre_distance_not_reached = "keine zulässigen Profilverschiebungen erreichen 
 clearance_negative = "der Betriebsabstand liegt {overlap} mm innerhalb des spielfreien Abstands von {nominal} mm: diese Zähne lassen sich nicht montieren"
 optimiser_found_nothing = "keine Lösung im zulässigen Bereich; die Profilverschiebungen bleiben unverändert"
 overlap_unreachable = "keine Schrägung erreicht bei dieser Zahnbreite eine Sprungüberdeckung von {ratio}; der Schrägungswinkel bleibt"
+overlap_needs_helix = "eine Sprungüberdeckung von {ratio} verlangt geradverzahnt nichts: bei Schrägungswinkel null kauft keine Zahnbreite Überdeckung; einen Schrägungswinkel angeben, oder jede Zahnbreite, damit das Verhältnis ihn bestimmt"
 planets_share_load_equally = "es wird angenommen, dass {planets} Planeten die Last gleichmäßig tragen; wirkliche Sätze tun das ohne ein schwimmendes Glied nicht, und das Gegenmittel ist ein Lastverteilungsfaktor, den dieses Werkzeug bewusst nicht ansetzt"
 planets_not_evenly_spaced = "{planets} Planeten lassen sich nicht gleichmäßig verteilen: die Zähnezahlen von Sonne und Hohlrad ergeben in Summe kein Vielfaches davon"
 planet_clearance_below_minimum = "benachbarte Planeten haben {gap} mm Abstand, weniger als die geforderten {minimum} mm"

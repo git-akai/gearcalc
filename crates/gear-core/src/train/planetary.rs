@@ -30,8 +30,8 @@
 //! coefficient, and a designer who needs the derating can apply it knowingly.
 
 use super::{
-    Backlash, ContactRatios, GearResult, Loading, MemberRating, MeshReport, ShaftsCase, StageLoads,
-    TrainError, Widths, PROBE,
+    Backlash, ContactRatios, Freedom, GearResult, Loading, MemberRating, MeshReport, ShaftsCase,
+    StageLoads, TrainError, Widths, PROBE,
 };
 use crate::contact::{efficiency, ContactPath, Directional, Drive};
 use crate::material::{contact_modulus, Material, MaterialLibrary};
@@ -287,21 +287,19 @@ impl PlanetaryStage {
         [&self.sun, &self.planet, &self.ring]
     }
 
-    /// ...and one of them mutably, for the one caller that turns their toggles.
-    pub(crate) fn member_mut(&mut self, i: usize) -> Option<&mut StageGear> {
-        match i {
-            0 => Some(&mut self.sun),
-            1 => Some(&mut self.planet),
-            2 => Some(&mut self.ring),
-            _ => None,
-        }
+    /// **Whether the axial contact ratio is a reading of the size**: every
+    /// face width is given, so the widths the meshes carry are known and a
+    /// ratio can be turned into a helix at them ([`super::PairStage::overlap_reads_size`]).
+    #[must_use]
+    pub fn overlap_reads_size(&self) -> bool {
+        self.members().iter().all(|g| !g.face_width.auto)
     }
 
-    /// **Whether the axial contact ratio decides the helix**: it is given and
-    /// every face width is given, so the widths the meshes carry are known.
+    /// **Whether the axial contact ratio decides the helix**: it is a reading
+    /// of the size, and it is given.
     #[must_use]
     pub fn size_taken_by_overlap(&self) -> bool {
-        !self.overlap.auto && self.members().iter().all(|g| !g.face_width.auto)
+        !self.overlap.auto && self.overlap_reads_size()
     }
 
     /// The narrower width either mesh carries, as given.
@@ -311,29 +309,14 @@ impl PlanetaryStage {
     }
 
     /// **The set's helix angle, degrees, as the sun carries it** — from
-    /// whichever member states one, the planet and the ring being the sun's
-    /// opposed (an external mesh opposes hands, an internal one keeps them, so
-    /// the planet and the ring share a hand and the sun has the other). Where
-    /// none does, the ratio decides it if it is given to; where nothing
-    /// decides it, the teeth are straight.
+    /// whichever reading states one ([`super::Reading`]): a member's box, the
+    /// planet's and the ring's being the sun's opposed (an external mesh
+    /// opposes hands, an internal one keeps them, so the planet and the ring
+    /// share a hand and the sun has the other), or the ratio where it is
+    /// given the size to decide. Where nothing does, the teeth are straight.
     #[must_use]
     pub fn helix_angle(&self) -> f64 {
-        if !self.sun.helix_angle.auto {
-            return self.sun.helix_angle.manual;
-        }
-        for other in [&self.planet, &self.ring] {
-            if !other.helix_angle.auto {
-                return -other.helix_angle.manual;
-            }
-        }
-        if self.size_taken_by_overlap() {
-            if let Some(h) =
-                super::helix_for_overlap(self.overlap.manual, self.module, self.given_width())
-            {
-                return h;
-            }
-        }
-        0.0
+        super::stated_helix(&super::Constrained::readings(self)).unwrap_or(0.0)
     }
 
     /// `GearParams` for one member, with the thickness invariants applied.
@@ -1429,11 +1412,12 @@ pub fn solve_planetary_stage_with(
         stage.clearance.manual,
     ));
     notes.extend(chosen.how.note());
-    notes.extend(super::overlap_note(
+    notes.extend(super::overlap_notes(
         stage.size_taken_by_overlap(),
         &stage.overlap,
         stage.module,
         stage.given_width(),
+        stage.helix_angle(),
     ));
     if !layout.equal_spacing {
         notes.push(Note::new(key::STAGE_PLANETS_NOT_EVENLY_SPACED).count("planets", stage.planets));
@@ -1667,6 +1651,80 @@ pub fn solve_planetary_stage_with(
         ),
         notes,
     })
+}
+
+/// What the set declares to the relief and size resolver every kind shares.
+impl super::Constrained for PlanetaryStage {
+    fn members(&self) -> Vec<&StageGear> {
+        self.members().to_vec()
+    }
+
+    fn inputs(&mut self) -> Vec<(Freedom, &mut Auto<f64>)> {
+        let mut out = vec![
+            (Freedom::CentreDistance, &mut self.centre_distance),
+            (Freedom::Clearance, &mut self.clearance),
+            (Freedom::Overlap, &mut self.overlap),
+        ];
+        out.extend(super::member_inputs([
+            &mut self.sun,
+            &mut self.planet,
+            &mut self.ring,
+        ]));
+        out
+    }
+
+    fn readings(&self) -> Vec<super::Reading> {
+        let mut out = vec![
+            super::Reading::helix(0, &self.sun, |b| b),
+            super::Reading::helix(1, &self.planet, |b| -b),
+            super::Reading::helix(2, &self.ring, |b| -b),
+        ];
+        if self.overlap_reads_size() {
+            out.push(super::Reading::overlap(
+                &self.overlap,
+                self.module,
+                self.given_width(),
+            ));
+        }
+        out
+    }
+
+    /// **A set has a relation among its shifts alone**, which no other kind
+    /// does: its two centre distances have to agree, whatever they agree at.
+    /// So two of the three shifts are a design and the third is what they
+    /// leave.
+    ///
+    /// Give it a *distance* as well and there is a **second** relation — each
+    /// mesh must now reach that distance rather than merely agree with the
+    /// other — so only **one** shift is free. The limit is read from the
+    /// toggles because the constraint genuinely changes: this is a fact about
+    /// the geometry, not a convenience.
+    ///
+    /// The pair has no analogue. Its distance, two shifts and size are bound
+    /// by one relation and that is all, which is why its group is flat.
+    ///
+    /// **And its clearance is always given.** One physical distance carries
+    /// an external mesh and an internal one, and a clearance opens them in
+    /// opposite directions — so it is the amount by which the two
+    /// zero-backlash distances *differ*, which is a fact the shifts are solved
+    /// from and not one a distance could hand back: a given distance and
+    /// given shifts leave a gap on each mesh, and there is no one number for
+    /// the field to derive. Alone in its group with none allowed automatic,
+    /// so relief pins it — the second pass of `relieved`, which this kind is
+    /// the reason for.
+    fn freedoms(&self) -> Vec<super::FreedomGroup> {
+        vec![
+            super::FreedomGroup {
+                given_at_most: if self.centre_distance.auto { 2 } else { 1 },
+                automatic_at_most: 3,
+                order: (0..3)
+                    .map(|i| vec![Freedom::Member(i, super::MemberFreedom::Shift)])
+                    .collect(),
+            },
+            super::always_given(Freedom::Clearance),
+            super::readings_group(&super::Constrained::readings(self)),
+        ]
+    }
 }
 
 #[cfg(test)]
@@ -1955,12 +2013,14 @@ mod tests {
         );
 
         // ...and the declaration says the same thing, read from the toggles.
-        use super::super::{Freedom, Stage};
+        use super::super::{Freedom, MemberFreedom, Stage};
+        let is_shift =
+            |e: &Vec<Freedom>| matches!(e[..], [Freedom::Member(_, MemberFreedom::Shift)]);
         let flat = Stage::Planetary(Box::new(one.clone()));
         let shifts = flat
             .freedoms()
             .into_iter()
-            .find(|g| g.order.iter().all(|f| matches!(f, Freedom::Shift(_))))
+            .find(|g| g.order.iter().all(is_shift))
             .expect("a set declares a group over its shifts");
         assert_eq!(shifts.given_at_most, 1, "a given distance leaves one shift");
 
@@ -1969,7 +2029,7 @@ mod tests {
         let free_group = Stage::Planetary(Box::new(loose))
             .freedoms()
             .into_iter()
-            .find(|g| g.order.iter().all(|f| matches!(f, Freedom::Shift(_))))
+            .find(|g| g.order.iter().all(is_shift))
             .expect("a set declares a group over its shifts");
         assert_eq!(
             free_group.given_at_most, 2,

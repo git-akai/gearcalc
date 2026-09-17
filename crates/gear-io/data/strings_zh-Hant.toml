@@ -39,6 +39,7 @@ centre_distance_not_reached = "沒有可用的變位係數能達到 {asked} mm�
 clearance_negative = "工作中心距比無側隙中心距 {nominal} mm 小 {overlap} mm：這對輪齒無法裝配"
 optimiser_found_nothing = "可用範圍內沒有解；變位係數保持不變"
 overlap_unreachable = "在此齒寬下沒有任何螺旋角能達到 {ratio} 的縱向接觸比；螺旋角保持不變"
+overlap_needs_helix = "縱向接觸比 {ratio} 對直齒沒有任何要求：螺旋角為零時任何齒寬都換不來接觸比；請給出螺旋角，或給出全部齒寬讓接觸比來決定它"
 planets_share_load_equally = "假定 {planets} 個行星輪均分負荷；實际輪系若無浮動構件並不均分，其補償手段是本工具刻意不採用的嚙合負荷係數"
 planets_not_evenly_spaced = "{planets} 個行星輪無法均布：太陽輪與內齒輪的齒數之和不是其倍數"
 planet_clearance_below_minimum = "相鄰行星輪的間隙為 {gap} mm，低於所要求的 {minimum} mm"

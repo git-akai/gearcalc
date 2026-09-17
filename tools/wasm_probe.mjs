@@ -96,8 +96,11 @@ const out = {
       for (const m of ["sun", "planet", "ring"]) {
         if (stage[m]) stage[m].profile_shift = pin(stage[m].profile_shift);
       }
-      const just = stage.centre_distance ? "centre_distance" : { shift: 0 };
-      return [k, JSON.parse(w.relieve_stage(JSON.stringify({ stage, just })))];
+      const just = stage.centre_distance ? "centre_distance" : { member: [0, "shift"] };
+      // ...and a figure for the shift relief turns back given on a hula
+      // stage, so the seeding is exercised too.
+      const figures = [{ freedom: { member: [1, "shift"] }, value: 0.25 }];
+      return [k, JSON.parse(w.relieve_stage(JSON.stringify({ stage, just, figures })))];
     }),
   ),
   solve_train: call("solve_train", () =>

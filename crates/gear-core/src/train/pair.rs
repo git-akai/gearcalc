@@ -23,8 +23,8 @@
 //! record (`docs/history/audit.md`, F83) what deleting it moved: nothing.
 
 use super::{
-    Backlash, CaseLoadings, ContactPatch, ContactRatios, GearResult, Loading, MemberRating,
-    PairResult, StageGear, StageLoads, TrainError, PROBE,
+    Backlash, CaseLoadings, Constrained, ContactPatch, ContactRatios, Freedom, GearResult, Loading,
+    MemberRating, PairResult, Reading, StageGear, StageLoads, TrainError, PROBE,
 };
 use crate::auto::automatic_profile_shift;
 use crate::contact::{efficiency, ContactPath, Directional, LoadSharing};
@@ -460,12 +460,22 @@ impl PairStage {
         self
     }
 
-    /// **Whether the axial contact ratio decides the helix**: it is given, both
-    /// face widths are given so the width the mesh carries is known, and the
-    /// shafts are parallel so there is an overlap to reach.
+    /// **Whether the axial contact ratio is a reading of the size**: both
+    /// face widths are given, so the width the mesh carries is known and a
+    /// ratio can be turned into a helix at it, and the shafts are parallel so
+    /// there is an overlap to reach. A fact about the widths, not about the
+    /// ratio's own toggle — which is what lets relief count it among the
+    /// readings the moment it is pinned.
+    #[must_use]
+    pub fn overlap_reads_size(&self) -> bool {
+        !self.is_crossed() && self.gears.iter().all(|g| !g.face_width.auto)
+    }
+
+    /// **Whether the axial contact ratio decides the helix**: it is a reading
+    /// of the size, and it is given.
     #[must_use]
     pub fn size_taken_by_overlap(&self) -> bool {
-        !self.overlap.auto && !self.is_crossed() && self.gears.iter().all(|g| !g.face_width.auto)
+        !self.overlap.auto && self.overlap_reads_size()
     }
 
     /// The width the mesh carries as given — the narrower of two given faces.
@@ -477,7 +487,8 @@ impl PairStage {
     }
 
     /// The two gears' helix angles, degrees — from whichever reading of the
-    /// size is given, or from what decides it where none is.
+    /// size is given ([`super::Reading`]), or from what decides it where none
+    /// is ([`Self::first_pitch_diameter`]).
     ///
     /// One place to ask, so the pair cannot disagree about a shaft angle they
     /// share — and so `β₁ + β₂ = Σ` holds by construction rather than by a test.
@@ -485,19 +496,15 @@ impl PairStage {
     /// becoming a diameter and coming back through an arccosine.
     #[must_use]
     pub fn helix_angles(&self) -> [f64; 2] {
-        let first = if !self.gears[0].helix_angle.auto {
-            self.gears[0].helix_angle.manual
-        } else if !self.gears[1].helix_angle.auto {
-            self.shaft_angle - self.gears[1].helix_angle.manual
-        } else {
+        let first = super::stated_helix(&self.readings()).unwrap_or_else(|| {
             // A diameter, given or solved. `cos β = z m_n / d`, clamped so a
-            // diameter below the tooth's own — which `geometry` refuses — reads
-            // as a helix of zero rather than a NaN.
+            // diameter below the tooth's own — which `geometry` refuses —
+            // reads as a helix of zero rather than a NaN.
             let cos = (f64::from(self.gears[0].teeth.max(1)) * self.module
                 / self.first_pitch_diameter())
             .clamp(-1.0, 1.0);
             cos.acos().to_degrees()
-        };
+        });
         [first, self.shaft_angle - first]
     }
 
@@ -511,17 +518,17 @@ impl PairStage {
     /// **The first member's pitch diameter, mm** — from whichever reading of
     /// the size is given, or from what decides it where none is.
     ///
-    /// The three readings are one number, so this is the one accessor the
-    /// crossed geometry is built from whichever was stated: the diameter
-    /// itself, to the bit, or `z₁ m_n / cos β₁` from either helix. With every
-    /// reading automatic, what decides it is, in order: a given axial contact
-    /// ratio with both widths given ([`Self::size_taken_by_overlap`]); a
-    /// given centre distance with **both shifts pinned** — a shift absorbs a
-    /// distance by preference, since it moves the teeth where a size changes
-    /// them, so while one is free the size has nothing to absorb (see
+    /// The readings are one number, so this is the one accessor the crossed
+    /// geometry is built from whichever was stated: the diameter itself, to
+    /// the bit, or `z₁ m_n / cos β₁` from the helix the readings state. With
+    /// every reading automatic, what decides it is a given centre distance
+    /// with **both shifts pinned** — a shift absorbs a distance by
+    /// preference, since it moves the teeth where a size changes them, so
+    /// while one is free the size has nothing to absorb (see
     /// [`Self::size_reaching`], which is also where the two-answers problem
-    /// is dealt with); and otherwise **the shaft angle shared evenly**, which
-    /// at `Σ = 0` is a spur pair and at a right angle a 45°/45° crossed one.
+    /// is dealt with) — and otherwise **the shaft angle shared evenly**,
+    /// which at `Σ = 0` is a spur pair and at a right angle a 45°/45° crossed
+    /// one.
     ///
     /// Falling back to the even split where the distance cannot be reached is
     /// `docs/rationale.md`'s clamp-rather-than-refuse: the stage still solves,
@@ -533,20 +540,8 @@ impl PairStage {
         }
         let z1 = f64::from(self.gears[0].teeth.max(1)) * self.module;
         let of_helix = |beta_deg: f64| z1 / beta_deg.to_radians().cos();
-        let even = self.shaft_angle / 2.0;
-        if !self.gears[0].helix_angle.auto {
-            return of_helix(self.gears[0].helix_angle.manual);
-        }
-        if !self.gears[1].helix_angle.auto {
-            return of_helix(self.shaft_angle - self.gears[1].helix_angle.manual);
-        }
-        if self.size_taken_by_overlap() {
-            // Or, where no helix reaches the ratio, the even split stands and
-            // `solve_parallel` says so.
-            return of_helix(
-                super::helix_for_overlap(self.overlap.manual, self.module, self.given_width())
-                    .unwrap_or(even),
-            );
+        if let Some(beta) = super::stated_helix(&self.readings()) {
+            return of_helix(beta);
         }
         let shifts_pinned = self.gears.iter().all(|g| !g.profile_shift.auto);
         if shifts_pinned {
@@ -561,7 +556,7 @@ impl PairStage {
                 return d1;
             }
         }
-        of_helix(even)
+        of_helix(self.shaft_angle / 2.0)
     }
 
     /// **The first member's size that puts this pair at `target`**, mm of pitch
@@ -1300,16 +1295,15 @@ fn solve_parallel(
     // agreed with the floor and a search that found nothing look identical from
     // the shifts alone (`super::Searched`).
     notes.extend(chosen.how.note());
-    // ...and whether a ratio asked to decide the helix could: past `ε_β π m_n
-    // / b = 1` no helix reaches it, and the helix stood at its box instead.
-    notes.extend(super::overlap_note(
+    // ...and whether a given ratio could be read: past `ε_β π m_n / b = 1` no
+    // helix reaches it and the helix stood at its box; on straight teeth no
+    // width buys any overlap and the floor was nothing.
+    notes.extend(super::overlap_notes(
         stage.size_taken_by_overlap(),
         &stage.overlap,
         stage.module,
-        stage.gears[0]
-            .face_width
-            .manual
-            .min(stage.gears[1].face_width.manual),
+        stage.given_width(),
+        stage.helix_angles()[0],
     ));
 
     Ok(PairResult {
@@ -1362,4 +1356,86 @@ fn solve_parallel(
         gears: [gears[0].clone(), gears[1].clone()],
         notes,
     })
+}
+
+/// What the pair declares to the relief and size resolver every kind shares.
+impl Constrained for PairStage {
+    fn members(&self) -> Vec<&StageGear> {
+        self.gears.iter().collect()
+    }
+
+    fn inputs(&mut self) -> Vec<(Freedom, &mut Auto<f64>)> {
+        let mut out = vec![
+            (Freedom::CentreDistance, &mut self.centre_distance),
+            (Freedom::Clearance, &mut self.clearance),
+            (Freedom::FirstPitchDiameter, &mut self.pitch_diameter),
+            (Freedom::Overlap, &mut self.overlap),
+        ];
+        out.extend(super::member_inputs(self.gears.iter_mut()));
+        out
+    }
+
+    /// Either member's helix, the first member's diameter, and the ratio
+    /// where it is given the size to decide — in that order, the ratio last
+    /// because it is asked for least often and so is the last to give.
+    fn readings(&self) -> Vec<Reading> {
+        let z1 = f64::from(self.gears[0].teeth.max(1)) * self.module;
+        let mut out = vec![
+            Reading::helix(0, &self.gears[0], |b| b),
+            Reading::helix(1, &self.gears[1], |b| self.shaft_angle - b),
+            Reading {
+                freedom: Freedom::FirstPitchDiameter,
+                // `cos β = z m_n / d`, clamped so a diameter below the tooth's
+                // own reads as straight teeth rather than a NaN.
+                helix: (!self.pitch_diameter.auto).then(|| {
+                    (z1 / self.pitch_diameter.manual)
+                        .clamp(-1.0, 1.0)
+                        .acos()
+                        .to_degrees()
+                }),
+            },
+        ];
+        if self.overlap_reads_size() {
+            out.push(Reading::overlap(
+                &self.overlap,
+                self.module,
+                self.given_width(),
+            ));
+        }
+        out
+    }
+
+    /// **A pair's distance, its two shifts and its size**:
+    /// `a = a₀(size, x₁ + x₂) + clearance` is one relation, so four of the
+    /// five may be given — for every kind of pair alike, since a worm's
+    /// diameter and a helical pair's helix are the same freedom. The distance
+    /// comes first because it is the one a designer expects to give way when
+    /// they pin everything else; the shifts come before the size because a
+    /// shift moves the teeth where a size changes them, which is also the
+    /// preference the solve has when both are free to absorb
+    /// ([`PairStage::first_pitch_diameter`]).
+    ///
+    /// **The size is one entry with three or four readings.** Every reading
+    /// automatic is a state with an answer — the shaft angle shared evenly,
+    /// unless a given distance with both shifts pinned decides the size — so
+    /// none of them has to stand. The ratio is among them only while it
+    /// decides the helix; while a width is automatic it is a floor under that
+    /// width, in no argument with anything, and on crossed shafts it is
+    /// nothing at all and is turned back automatic.
+    fn freedoms(&self) -> Vec<super::FreedomGroup> {
+        let mut groups = vec![
+            super::one_relation(vec![
+                vec![Freedom::CentreDistance],
+                vec![Freedom::Clearance],
+                vec![Freedom::Member(0, super::MemberFreedom::Shift)],
+                vec![Freedom::Member(1, super::MemberFreedom::Shift)],
+                super::entry(&self.readings()),
+            ]),
+            super::distance_and_clearance(),
+        ];
+        if self.is_crossed() {
+            groups.push(super::always_automatic(Freedom::Overlap));
+        }
+        groups
+    }
 }

@@ -1756,7 +1756,54 @@ clearance and a hula stage's running clearance cannot be derived — the one is
 what the two nominal distances differ by, the other is absorbed by shifts that
 are all either given or the crank's — so their `auto` toggles are relieved
 back to given at once, by the same relation the solve enforces, rather than
-offered and silently disregarded.
+offered and silently disregarded. And a control that is never read says so
+the same way: a crossed pair has no axial overlap, so its ratio's toggle is
+relieved back to automatic — by the core, on any change to the stage, which
+is why relief can be asked with nothing *just* touched. The panel used to
+reset that toggle itself when the shaft angle moved, and it was the one
+relief rule left written in TypeScript.
+
+### What a kind owes relief
+
+The freedoms machinery was measured by what one change cost it — the helix
+becoming three readings on the members and the axial contact ratio arriving
+as a fourth — and the answer was eight arms in a `match` over kind × freedom,
+three copies of the same precedence chain, a count in one group hand-derived
+from a toggle another group moves, and a walk that settled only because its
+groups were written in a lucky order. None of it wrong, all of it the shape
+that makes the next kind cost the same again.
+
+So a kind now answers four questions, in `train::Constrained`, and nothing
+else: which members it has; every input relief may turn, by name; how its
+helix may be *stated* — the readings, in relief order; and which of its
+inputs argue with each other. Everything that walks those — counting,
+relieving, seeding a box from what it showed, reading the helix the readings
+state, lining a stage's inputs up against its result — is written once above
+the kinds. A member's inputs are resolved once for every kind by
+`Freedom::Member(i, _)`, so a per-member input that arrives is one line, not
+one per kind.
+
+**The readings are one list, read from both ends.** Relief turns them
+automatic least precious first, and the solve honours the *last* one given —
+so the reading relief leaves standing is the reading the solve reads, by
+construction, with no second chain of `if`s to keep in step. Before this the
+two were stated separately, and on a pair they disagreed: relief kept the
+second member's helix over the first's, and the solve read the first's.
+
+**And a group's entry is one input, stated one or more ways.** A pair's size
+is one freedom with three boxes, and the relation among distance, clearance,
+shifts and size counts it once — given while any reading is. That replaces a
+count trick (four of seven, held to one by a second group) and the
+toggle-dependent limit it needed, and it is why the walk no longer depends on
+the order its groups come in: it repeats until a pass moves nothing, and a
+test holds that relief is idempotent from every start.
+
+**The gate is asked of the solve, not of the declaration.** Everything
+pinned, relief decides what may stand, and then each input left given is
+nudged and the solved stage has to move. An input that stands given and
+moves nothing is one the solve disregards — the very thing relief was written
+to prevent — and only a test that runs both ends can see it. It is the test
+that found the crossed pair's ratio standing given and read by nothing.
 
 ### Deleting the last of anything leaves a fresh one
 

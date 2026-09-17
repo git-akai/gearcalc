@@ -773,6 +773,14 @@ pub struct TrainRequest {
 pub struct TrainOutcome {
     pub result: Option<gear_core::train::TrainResult>,
     pub failure: Option<TrainFailure>,
+    /// **What each stage's constrainable inputs came to**, one list per
+    /// stage, by the name relief knows them by — what a box relief turns
+    /// given is seeded from ([`relieve_stage`]). Beside the result rather
+    /// than inside it because it is the *inputs'* names lined up against the
+    /// result's figures, which the core does in one place
+    /// (`StageResult::figure`) and the panel need not know at all: it hands
+    /// this list back with the stage, and never learns which field is which.
+    pub figures: Vec<Vec<gear_core::train::Figure>>,
 }
 
 /// Why a train has no answer, and where.
@@ -798,6 +806,22 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
     let lib = req.materials.unwrap_or_else(gear_io::default_library);
     let outcome = match gear_core::train::solve_train(&req.train, &lib) {
         Ok(result) => TrainOutcome {
+            figures: req
+                .train
+                .stages
+                .iter()
+                .zip(&result.stages)
+                .map(|(stage, solved)| {
+                    stage
+                        .toggles()
+                        .into_iter()
+                        .map(|(freedom, _)| gear_core::train::Figure {
+                            freedom,
+                            value: solved.figure(freedom),
+                        })
+                        .collect()
+                })
+                .collect(),
             result: Some(result),
             failure: None,
         },
@@ -814,6 +838,7 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
                     note: e.note(),
                     stage,
                 }),
+                figures: Vec::new(),
             }
         }
     };
@@ -1242,8 +1267,11 @@ pub fn export_train(document_json: &str) -> Result<String, JsError> {
 
 /// **A stage with its over-determined inputs relieved.**
 ///
-/// `{ stage, just }` JSON in — the stage as it now stands and the [`Freedom`]
-/// the designer has this moment pinned — and the corrected stage out.
+/// `{ stage, just, figures }` JSON in — the stage as it now stands, the
+/// [`Freedom`] the designer has this moment pinned (`null` where what changed
+/// was not a toggle), and what the stage's inputs last came to
+/// ([`TrainOutcome::figures`] for it) — and the corrected stage out, with
+/// every box relief turned given seeded from its figure.
 ///
 /// A designer who pins a pair's distance *and* both its shifts has asked for a
 /// contradiction: the three are bound by one relation, so one would have to be
@@ -1257,7 +1285,9 @@ pub fn export_train(document_json: &str) -> Result<String, JsError> {
 /// the same relation the solve reads from the other end**, so the two have to
 /// agree or a designer is offered an input the solve will disregard.
 ///
-/// Nothing here decides a value: it only says which inputs are still being read.
+/// Nothing here decides a value: relief says which inputs are still being
+/// read, and a box it turns given holds what it was showing — a number the
+/// core computed, copied where the designer would have copied it.
 ///
 /// # Errors
 ///
@@ -1271,12 +1301,16 @@ pub fn relieve_stage(input: &str) -> Result<String, JsError> {
 #[derive(Deserialize)]
 struct RelieveRequest {
     stage: gear_core::train::Stage,
-    just: gear_core::train::Freedom,
+    #[serde(default)]
+    just: Option<gear_core::train::Freedom>,
+    #[serde(default)]
+    figures: Vec<gear_core::train::Figure>,
 }
 
 fn relieve_stage_impl(input: &str) -> Result<String, String> {
     let req: RelieveRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
-    serde_json::to_string(&req.stage.relieved(req.just)).map_err(|e| e.to_string())
+    serde_json::to_string(&req.stage.relieved_from(req.just, &req.figures))
+        .map_err(|e| e.to_string())
 }
 
 /// Version of the core, so the UI can show what it is actually running.

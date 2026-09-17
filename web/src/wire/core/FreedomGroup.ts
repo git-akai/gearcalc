@@ -50,8 +50,17 @@ automatic_at_most: number,
 /**
  * The inputs in the argument, **relief order, least precious first**.
  *
- * One order serves both directions: too many given turns the first one that
- * is not being touched automatic, and too many automatic pins the first one
- * that is not being touched. The same walk, read the other way.
+ * **An entry is one input, stated one or more ways.** A pair's size is
+ * either helix or the first pitch diameter — one freedom, three boxes —
+ * so the entry that names it lists all three, and the relation counts it
+ * once: given while any reading is, automatic while all are. Within an
+ * entry at most one reading stands, relieved in the same order, so the
+ * exclusivity of the readings is not a second group with a count to keep
+ * in step with this one.
+ *
+ * One order serves both directions: too many given turns the first entry
+ * that is not being touched automatic, and too many automatic pins the
+ * first that is not being touched — by its last reading, the one the
+ * solve reads first. The same walk, read the other way.
  */
-order: Array<Freedom>, };
+order: Array<Array<Freedom>>, };

@@ -44,6 +44,7 @@ centre_distance_not_reached = "nenhum deslocamento admissível alcança {asked} 
 clearance_negative = "a distância de funcionamento está {overlap} mm dentro da distância sem folga de {nominal} mm: estes dentes não podem ser montados"
 optimiser_found_nothing = "nenhuma solução na faixa admissível; os deslocamentos permanecem inalterados"
 overlap_unreachable = "nenhuma hélice alcança uma razão de recobrimento de {ratio} com esta largura de face; o ângulo de hélice mantém-se"
+overlap_needs_helix = "uma razão de recobrimento de {ratio} nada pede a dentes rectos: com hélice zero nenhuma largura de face compra recobrimento; indique um ângulo de hélice, ou todas as larguras de face para que a razão o decida"
 planets_share_load_equally = "assume-se que {planets} planetas repartem a carga por igual; conjuntos reais não o fazem sem um elemento flutuante, e o remédio é um fator de repartição de carga que esta ferramenta se recusa a aplicar"
 planets_not_evenly_spaced = "{planets} planetas não podem ficar igualmente espaçados: a soma dos números de dentes da solar e da anular não é múltipla desse valor"
 planet_clearance_below_minimum = "planetas adjacentes afastam-se {gap} mm, abaixo dos {minimum} mm pedidos"

@@ -424,7 +424,8 @@ back by relief.
 **A pair has a fifth input in the relation, its *size*.** Each member's helix
 angle and the first member's pitch diameter are three readings of one number
 (`d₁ = z₁ m_n / cos β₁`, `β₂ = Σ − β₁`), so **one** of the three may be given
-and the toggles relieve one another; with all three automatic the shaft angle
+and the toggles relieve one another — least precious first, the solve reading
+the last one given, from one list (`train::Reading`); with all three automatic the shaft angle
 is shared evenly, `β₁ = β₂ = Σ/2`, which is the spur gear at `Σ = 0` and no
 special case for it. Every pair — spur, helical, crossed or worm — relates
 `{a, clearance, x₁, x₂, size}` by one equation, so four may be given. Which
@@ -442,8 +443,10 @@ face otherwise ([Load cases](#load-cases) has the automatic width). It is the re
 the relief takes **last**, since the ratio is asked for less often than an
 angle, and it has no answer at all when `ε_β π m_n / b > 1`: the note
 `stage.overlap_unreachable` says so and the pair is built at the even split.
-Crossed shafts have no overlap in this sense, and the input is not offered
-there.
+Given as a floor on straight teeth it asks nothing, since no width buys
+overlap at zero helix, and `stage.overlap_needs_helix` says so. Crossed shafts
+have no overlap in this sense: the input is not offered there, and one that
+was given is relieved back to automatic.
 
 The worm kind sets the convention of worm practice as inputs: its worm's shift
 is pinned at zero — the worm is the tool its wheel is cut by — so a given
@@ -471,10 +474,16 @@ is the same request with one branch.
 That is one of the two bounds `train::FreedomGroup` carries. The other counts how
 many may be *given*, and the pair of them is what makes an over- or
 under-determined stage resolve itself: too many given turns one automatic, too
-many automatic pins one, in the order the stage declares. A kind with **no**
-distance input would say `automatic_at_most = 0` for its clearance and so
-could never derive it — the same statement counted rather than special-cased,
-and since every kind has a distance input now, none says it.
+many automatic pins one, in the order the stage declares. An entry of a group
+is one input stated one or more ways — a pair's size is either helix or the
+first pitch diameter, and the ratio where every face is given — counted once,
+given while any of its readings is, and within it at most one reading stands.
+A kind with **no** distance input would say `automatic_at_most = 0` for its
+clearance and so could never derive it — the same statement counted rather
+than special-cased, and since every kind has a distance input now, none says
+it. Each kind declares its groups, its readings and its inputs through
+`train::Constrained`, and the walk over them is written once
+([rationale](rationale.md#what-a-kind-owes-relief)).
 
 The objective and the constraints are not the same kind of thing, and failing at
 one must not discard the other: where the optimiser's own conditions — a minimum

@@ -1919,10 +1919,12 @@ pub(crate) fn distance_notes(target: Option<f64>, nominal: f64, clearance: f64) 
 
 /// One of a stage's constrainable inputs, named so a caller can find it.
 ///
-/// `Shift(i)` indexes the stage's members in the order
-/// [`StageResult::members`] reports them — a pair's two gears, a set's sun,
-/// planet and ring, a hula stage's four — so a caller that can walk members can
-/// resolve one of these without knowing the kind.
+/// Two levels, because a stage has inputs of two kinds: its own — a distance,
+/// a clearance, a ratio, a worm's diameter — and one of each per member.
+/// `Member(i, _)` indexes the members in the order [`StageResult::members`]
+/// reports them — a pair's two gears, a set's sun, planet and ring, a hula
+/// stage's four — and is resolved once for every kind ([`member_inputs`]), so
+/// a member input that arrives costs one line there and none per kind.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
@@ -1936,22 +1938,132 @@ pub enum Freedom {
     CentreDistance,
     /// What portion of that distance is running play.
     Clearance,
-    /// One member's profile shift.
-    Shift(usize),
-    /// One member's helix angle — and, since every member's is bound to the
-    /// others', **the size of the stage's teeth along the axis**: a pair's
-    /// first member is as big as its helix makes it, which is what absorbs a
-    /// centre distance once both shifts are pinned.
-    Helix(usize),
     /// A pair's first member's pitch diameter — the same freedom as its helix
     /// read as a size, which is a worm's reading.
     FirstPitchDiameter,
-    /// One member's face width.
-    FaceWidth(usize),
     /// The stage's axial contact ratio, which relates the helix to the face
     /// width the mesh carries: given with every width given, it decides the
     /// helix; given with a width automatic, it is a floor under that width.
     Overlap,
+    /// One member's own input.
+    Member(usize, MemberFreedom),
+}
+
+/// One of a member's constrainable inputs.
+///
+/// A helix here is one reading of **the size of the stage's teeth along the
+/// axis**: every member's is bound to the others', so a pair's first member
+/// is as big as its helix makes it, which is what absorbs a centre distance
+/// once both shifts are pinned.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum MemberFreedom {
+    /// The profile shift.
+    Shift,
+    /// The helix angle.
+    Helix,
+    /// The face width.
+    FaceWidth,
+}
+
+/// **Every constrainable input a run of members has**, by name — the one
+/// place a [`MemberFreedom`] meets the field it names, for every kind at once.
+pub(crate) fn member_inputs<'a>(
+    gears: impl IntoIterator<Item = &'a mut StageGear>,
+) -> Vec<(Freedom, &'a mut Auto<f64>)> {
+    gears
+        .into_iter()
+        .enumerate()
+        .flat_map(|(i, g)| {
+            let StageGear {
+                profile_shift,
+                helix_angle,
+                face_width,
+                ..
+            } = g;
+            [
+                (Freedom::Member(i, MemberFreedom::Shift), profile_shift),
+                (Freedom::Member(i, MemberFreedom::Helix), helix_angle),
+                (Freedom::Member(i, MemberFreedom::FaceWidth), face_width),
+            ]
+        })
+        .collect()
+}
+
+/// **What one input came to**, by the name relief knows it by — the number a
+/// box turned given by relief is seeded with, so a designer holds what they
+/// were shown rather than a stale zero.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct Figure {
+    pub freedom: Freedom,
+    /// `None` where the result carries no such figure — a crossed pair's
+    /// overlap — and the box keeps what it had.
+    pub value: Option<f64>,
+}
+
+/// **One way of stating a stage's helix**, and what it states.
+///
+/// The helix is one number a stage's members share — `β₂ = Σ − β₁` on a pair,
+/// the hand flipped across an external mesh in a set, one angle on a hula
+/// stage's four — so a kind has several inputs that all say it: each member's
+/// helix, a pair's first pitch diameter (`d = z m_n / cos β`), and the axial
+/// contact ratio where every face is given and the ratio can be turned into a
+/// helix at the width the mesh carries. Those are *readings* of one freedom,
+/// and at most one of them stands.
+///
+/// A kind lists its readings in **relief order, least precious first**, and
+/// the solve honours the **last** one given ([`stated_helix`]). So the reading
+/// relief leaves standing is the reading the solve reads, by construction —
+/// there is no second list stating the precedence again in an `if` chain, and
+/// nothing for the two to disagree about.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Reading {
+    pub freedom: Freedom,
+    /// The first member's helix, degrees, as this reading states it. `None`
+    /// where the input is automatic — or given and reaching nothing, which a
+    /// ratio no helix reaches at the given width is, and the stage says so
+    /// ([`overlap_notes`]).
+    pub helix: Option<f64>,
+}
+
+impl Reading {
+    /// A reading from a member's helix box, `to_first` turning what it states
+    /// into the first member's angle.
+    pub(crate) fn helix(i: usize, gear: &StageGear, to_first: impl FnOnce(f64) -> f64) -> Self {
+        Self {
+            freedom: Freedom::Member(i, MemberFreedom::Helix),
+            helix: (!gear.helix_angle.auto).then(|| to_first(gear.helix_angle.manual)),
+        }
+    }
+
+    /// The ratio's reading, where it is given the size to decide.
+    pub(crate) fn overlap(overlap: &Auto<f64>, module: f64, width: f64) -> Self {
+        Self {
+            freedom: Freedom::Overlap,
+            helix: (!overlap.auto)
+                .then(|| helix_for_overlap(overlap.manual, module, width))
+                .flatten(),
+        }
+    }
+}
+
+/// The helix the readings state, degrees of the first member — the last
+/// reading given, which is the one relief leaves standing — or `None` where
+/// every reading is automatic and something else decides.
+pub(crate) fn stated_helix(readings: &[Reading]) -> Option<f64> {
+    readings.iter().rev().find_map(|r| r.helix)
 }
 
 /// **The face width an axial contact ratio needs**, mm — `ε_β π m_n / sin |β|`
@@ -1965,18 +2077,30 @@ pub(crate) fn width_for_overlap(overlap: &Auto<f64>, helix_deg: f64, module: f64
     (!overlap.auto && sin > 0.0).then(|| overlap.manual * std::f64::consts::PI * module / sin)
 }
 
-/// **The note a ratio that could not decide the helix owes its reader**: it
-/// was given to decide it (`taken`), and no helix reaches it at the width the
-/// mesh carries, so the helix stood at its box. One home, for every kind
-/// that lets a ratio decide.
-pub(crate) fn overlap_note(
+/// **What a given ratio owes its reader when it could not be read.** Given to
+/// decide the helix (`taken`) and reaching none at the width the mesh carries,
+/// the helix stood at its box; given as a floor and the teeth straight, no
+/// width buys any overlap and the floor is nothing. Either is an input the
+/// solve could not honour, said rather than swallowed. One home, for every
+/// kind that reads a ratio.
+pub(crate) fn overlap_notes(
     taken: bool,
     overlap: &Auto<f64>,
     module: f64,
     width: f64,
-) -> Option<Note> {
-    (taken && helix_for_overlap(overlap.manual, module, width).is_none())
-        .then(|| Note::new(key::STAGE_OVERLAP_UNREACHABLE).number("ratio", overlap.manual, 3))
+    helix_deg: f64,
+) -> Vec<Note> {
+    let mut out = Vec::new();
+    if overlap.auto {
+        return out;
+    }
+    if taken && helix_for_overlap(overlap.manual, module, width).is_none() {
+        out.push(Note::new(key::STAGE_OVERLAP_UNREACHABLE).number("ratio", overlap.manual, 3));
+    }
+    if !taken && helix_deg == 0.0 {
+        out.push(Note::new(key::STAGE_OVERLAP_NEEDS_HELIX).number("ratio", overlap.manual, 3));
+    }
+    out
 }
 
 /// **The helix an axial contact ratio needs**, degrees, at a face width the
@@ -2037,103 +2161,174 @@ pub struct FreedomGroup {
     pub automatic_at_most: usize,
     /// The inputs in the argument, **relief order, least precious first**.
     ///
-    /// One order serves both directions: too many given turns the first one that
-    /// is not being touched automatic, and too many automatic pins the first one
-    /// that is not being touched. The same walk, read the other way.
-    pub order: Vec<Freedom>,
+    /// **An entry is one input, stated one or more ways.** A pair's size is
+    /// either helix or the first pitch diameter — one freedom, three boxes —
+    /// so the entry that names it lists all three, and the relation counts it
+    /// once: given while any reading is, automatic while all are. Within an
+    /// entry at most one reading stands, relieved in the same order, so the
+    /// exclusivity of the readings is not a second group with a count to keep
+    /// in step with this one.
+    ///
+    /// One order serves both directions: too many given turns the first entry
+    /// that is not being touched automatic, and too many automatic pins the
+    /// first that is not being touched — by its last reading, the one the
+    /// solve reads first. The same walk, read the other way.
+    pub order: Vec<Vec<Freedom>>,
 }
 
-/// **The two arguments a kind's helices can get into**, where the helix is one
-/// number the members share: at most one member states it — none is straight
-/// teeth, or the helix a given axial contact ratio with every face width given
-/// decides — and the ratio may stand beside a stated helix only while a width
-/// is automatic, when it is a floor under that width rather than the size.
+/// **A single relation** among its inputs, so exactly one of them is the one
+/// the others decide. Written once rather than as a count per kind, because a
+/// count per kind is a count to get wrong — and the first draft did, by one,
+/// on the kind with the most tests.
 ///
-/// A pair's is written out in [`Stage::freedoms`] because its size is also
-/// a pitch diameter and is also what a centre distance decides; these two are
-/// the same groups without those.
-fn helix_groups(members: usize, widths_given: bool) -> Vec<FreedomGroup> {
-    let helices: Vec<Freedom> = (0..members).map(Freedom::Helix).collect();
-    vec![
-        FreedomGroup {
-            given_at_most: if widths_given { 1 } else { 2 },
-            automatic_at_most: members + 1,
-            order: helices
-                .iter()
-                .copied()
-                .chain(std::iter::once(Freedom::Overlap))
-                .collect(),
-        },
-        FreedomGroup {
-            given_at_most: 1,
-            automatic_at_most: members,
-            order: helices,
-        },
-    ]
+/// Says nothing about how many may be *automatic*: every input in one of these
+/// has a rule of its own to fall back on, so leaving them all automatic is a
+/// design with nothing pinned rather than a contradiction.
+pub(crate) fn one_relation(order: Vec<Vec<Freedom>>) -> FreedomGroup {
+    FreedomGroup {
+        given_at_most: order.len() - 1,
+        automatic_at_most: order.len(),
+        order,
+    }
+}
+
+/// **Two ways of saying one number, so one of them must be said.** A distance
+/// is nominal + clearance and an automatic clearance is distance − nominal;
+/// with both automatic neither has anything to derive from. A pair's group;
+/// the two epicyclic kinds cannot derive a clearance at all and say so with
+/// [`always_given`].
+pub(crate) fn distance_and_clearance() -> FreedomGroup {
+    FreedomGroup {
+        given_at_most: 2,
+        automatic_at_most: 1,
+        order: vec![vec![Freedom::Clearance], vec![Freedom::CentreDistance]],
+    }
+}
+
+/// **An input that is always given**, alone in its group with none allowed
+/// automatic, so relief pins it back whatever was touched — the tool saying
+/// that nothing can hand it back, rather than offering a toggle and reading
+/// the box regardless.
+pub(crate) fn always_given(f: Freedom) -> FreedomGroup {
+    FreedomGroup {
+        given_at_most: 1,
+        automatic_at_most: 0,
+        order: vec![vec![f]],
+    }
+}
+
+/// **An input that is never read**, the mirror of [`always_given`]: relief
+/// turns it automatic whatever was touched, so a box the solve would
+/// disregard is not left showing a number as if it were being read.
+pub(crate) fn always_automatic(f: Freedom) -> FreedomGroup {
+    FreedomGroup {
+        given_at_most: 0,
+        automatic_at_most: 1,
+        order: vec![vec![f]],
+    }
+}
+
+/// The readings as one entry, for a group to count as one input.
+pub(crate) fn entry(readings: &[Reading]) -> Vec<Freedom> {
+    readings.iter().map(|r| r.freedom).collect()
+}
+
+/// **The readings of the helix as a group of their own**, for a kind whose
+/// size is in no other relation: nothing counts it against a distance, so all
+/// the group holds is that at most one reading stands.
+pub(crate) fn readings_group(readings: &[Reading]) -> FreedomGroup {
+    FreedomGroup {
+        given_at_most: 1,
+        automatic_at_most: 1,
+        order: vec![entry(readings)],
+    }
+}
+
+/// **What a kind declares so the relief and the size resolver shared by every
+/// kind can serve it** — the whole of what a new kind owes them.
+///
+/// Four questions: which members it has, which inputs relief may turn and by
+/// what name, how its helix may be stated, and which of its inputs argue with
+/// each other. Everything that walks those — counting, relieving, seeding a
+/// box, reading the helix the readings state — is written once above the
+/// kinds, so a kind that answers the four has relief without writing any.
+pub(crate) trait Constrained {
+    /// The members in the order [`StageResult::members`] reports them.
+    fn members(&self) -> Vec<&StageGear>;
+    /// Every input relief may turn, by name — the stage's own and, through
+    /// [`member_inputs`], each member's.
+    fn inputs(&mut self) -> Vec<(Freedom, &mut Auto<f64>)>;
+    /// The readings of the helix, relief order, least precious first.
+    fn readings(&self) -> Vec<Reading>;
+    /// Every argument this kind's inputs can get into with each other.
+    fn freedoms(&self) -> Vec<FreedomGroup>;
 }
 
 impl Stage {
-    /// **The toggle a [`Freedom`] names** — whether that input is being derived.
-    ///
-    /// The one place the core's member order — [`StageResult::members`]' —
-    /// meets each kind's own fields. `None` where a kind has no such input,
-    /// which is the same thing its [`Self::freedoms`] says by not mentioning it.
-    ///
-    /// It hands back the **flag** rather than the `Auto` that carries it, and
-    /// that is what lets a freedom name an input of any type: relief decides who
-    /// supplies a number and never what the number is, so the value's type is
-    /// none of its business. A pair's size is the case that proves it — two
-    /// helix angles and a pitch diameter are three toggles on one freedom, and
-    /// the overlap ratio a fourth reading of it when every face is given.
-    fn toggle_mut(&mut self, f: Freedom) -> Option<&mut bool> {
-        match (self, f) {
-            (Self::Spur(s) | Self::Worm(s), Freedom::CentreDistance) => {
-                Some(&mut s.centre_distance.auto)
-            }
-            (Self::Spur(s) | Self::Worm(s), Freedom::Clearance) => Some(&mut s.clearance.auto),
-            (Self::Spur(s) | Self::Worm(s), Freedom::Shift(i)) => {
-                s.gears.get_mut(i).map(|g| &mut g.profile_shift.auto)
-            }
-            (Self::Spur(s) | Self::Worm(s), Freedom::Helix(i)) => {
-                s.gears.get_mut(i).map(|g| &mut g.helix_angle.auto)
-            }
-            (Self::Spur(s) | Self::Worm(s), Freedom::FirstPitchDiameter) => {
-                Some(&mut s.pitch_diameter.auto)
-            }
-            (Self::Spur(s) | Self::Worm(s), Freedom::FaceWidth(i)) => {
-                s.gears.get_mut(i).map(|g| &mut g.face_width.auto)
-            }
-            (Self::Spur(s) | Self::Worm(s), Freedom::Overlap) => Some(&mut s.overlap.auto),
-            (Self::Planetary(p), Freedom::CentreDistance) => Some(&mut p.centre_distance.auto),
-            (Self::Planetary(p), Freedom::Clearance) => Some(&mut p.clearance.auto),
-            (Self::Planetary(p), Freedom::Shift(i)) => {
-                p.member_mut(i).map(|g| &mut g.profile_shift.auto)
-            }
-            (Self::Planetary(p), Freedom::Helix(i)) => {
-                p.member_mut(i).map(|g| &mut g.helix_angle.auto)
-            }
-            (Self::Planetary(p), Freedom::FaceWidth(i)) => {
-                p.member_mut(i).map(|g| &mut g.face_width.auto)
-            }
-            (Self::Planetary(p), Freedom::Overlap) => Some(&mut p.overlap.auto),
-            // **The crank offset is this kind's centre distance.** Its own
-            // documentation says so — "the same shape every stage's centre
-            // distance has, because it is the same decision" — so it answers to
-            // the same name here rather than to one of its own.
-            (Self::Hula(h), Freedom::CentreDistance) => Some(&mut h.offset.auto),
-            (Self::Hula(h), Freedom::Clearance) => Some(&mut h.running_clearance.auto),
-            (Self::Hula(h), Freedom::Shift(i)) => {
-                h.gears.get_mut(i).map(|g| &mut g.profile_shift.auto)
-            }
-            (Self::Hula(h), Freedom::Helix(i)) => {
-                h.gears.get_mut(i).map(|g| &mut g.helix_angle.auto)
-            }
-            (Self::Hula(h), Freedom::FaceWidth(i)) => {
-                h.gears.get_mut(i).map(|g| &mut g.face_width.auto)
-            }
-            (Self::Hula(h), Freedom::Overlap) => Some(&mut h.overlap.auto),
-            _ => None,
+    fn kind(&self) -> &dyn Constrained {
+        match self {
+            Self::Spur(s) | Self::Worm(s) => s,
+            Self::Planetary(p) => &**p,
+            Self::Hula(h) => &**h,
         }
+    }
+
+    fn kind_mut(&mut self) -> &mut dyn Constrained {
+        match self {
+            Self::Spur(s) | Self::Worm(s) => s,
+            Self::Planetary(p) => &mut **p,
+            Self::Hula(h) => &mut **h,
+        }
+    }
+
+    /// **The input a [`Freedom`] names**, where this kind has it. `None` is the
+    /// same thing [`Self::freedoms`] says by not mentioning it.
+    pub(crate) fn input_mut(&mut self, f: Freedom) -> Option<&mut Auto<f64>> {
+        self.kind_mut()
+            .inputs()
+            .into_iter()
+            .find_map(|(g, a)| (g == f).then_some(a))
+    }
+
+    /// Whether the input a freedom names is given. An input this kind does
+    /// not have is neither given nor automatic.
+    fn is_given(&mut self, f: Freedom) -> bool {
+        self.input_mut(f).is_some_and(|a| !a.auto)
+    }
+
+    /// **Every input relief may turn, and whether it is automatic** — in the
+    /// one order the kind declares, so a caller lining two stages up against
+    /// each other can do it by name rather than by field.
+    #[must_use]
+    pub fn toggles(&self) -> Vec<(Freedom, bool)> {
+        // Read through a copy: the kinds hand their inputs out mutably, once,
+        // and a second accessor for reading would be the same list twice.
+        let mut probe = self.clone();
+        probe
+            .kind_mut()
+            .inputs()
+            .into_iter()
+            .map(|(f, a)| (f, a.auto))
+            .collect()
+    }
+
+    /// **The stage's members**, in the order [`StageResult::members`] reports
+    /// them — the order [`Freedom::Member`] indexes.
+    #[must_use]
+    pub fn members(&self) -> Vec<&StageGear> {
+        self.kind().members()
+    }
+
+    /// **Every argument this stage's inputs can get into with each other.**
+    ///
+    /// A stage may have **more than one** group: a hula stage's crank fixes the
+    /// difference of each mesh's two shifts, which is one relation per mesh
+    /// rather than one for the stage. Each kind declares its own
+    /// ([`Constrained::freedoms`]); what is shared is everything that reads
+    /// them.
+    #[must_use]
+    pub fn freedoms(&self) -> Vec<FreedomGroup> {
+        self.kind().freedoms()
     }
 
     /// **This stage with its over-determined inputs relieved.**
@@ -2145,8 +2340,8 @@ impl Stage {
     /// this moment pinning goes back to automatic, visibly.
     ///
     /// `just` is the input they have this moment given, and is never the one
-    /// relieved. Every group is resolved, because a stage can have more than one
-    /// argument going on at once.
+    /// relieved while sparing it leaves an answer; `None` where what changed
+    /// was not a toggle — a shaft angle, say — and nothing is spared.
     ///
     /// # Why this is here and not in the panel
     ///
@@ -2159,234 +2354,146 @@ impl Stage {
     ///
     /// Nothing here decides a *value*. It only says which inputs are still being
     /// read, which is why it can be a pure function of the inputs.
+    ///
+    /// # Settled, whatever order the groups come in
+    ///
+    /// Groups share inputs — a pair's distance is in its relation and in the
+    /// argument with its clearance — so satisfying one can hand another an
+    /// input, and the walk repeats until a pass moves nothing. It is bounded
+    /// by the number of toggles a pass could turn, and the declaration is
+    /// checked for settling at all by the test that relief is idempotent:
+    /// a declaration where satisfying one group breaks another for ever would
+    /// fail there, rather than depend on the order the groups were written in.
     #[must_use]
-    pub fn relieved(&self, just: Freedom) -> Self {
+    pub fn relieved(&self, just: Option<Freedom>) -> Self {
         let mut out = self.clone();
-        // **Each group is read off the stage as it stands after the groups
-        // before it**, because a limit can depend on a toggle another group
-        // moves: a given axial contact ratio takes the size freedom only while
-        // both widths are given, so once the ratio has given way to a helix
-        // the distance relation has its full count back. The groups come in
-        // the order that makes this settle in one pass, and their number is a
-        // fact about the kind rather than about its toggles.
-        for i in 0..self.freedoms().len() {
-            let group = out.freedoms().swap_remove(i);
-            // **One walk, both directions.** Too many given turns one automatic;
-            // too many automatic pins one. Each time it is the first in relief
-            // order that the designer is not this moment touching, so the answer
-            // depends on the order the *stage* declares and never on the order
-            // the toggles happened to be turned in.
-            for wanted in [false, true] {
-                let limit = if wanted {
-                    group.given_at_most
-                } else {
-                    group.automatic_at_most
-                };
-                // Counted with the same accessor that does the moving, so a
-                // freedom this kind does not have is absent from both.
-                let mut over = 0usize;
-                for f in &group.order {
-                    if out.toggle_mut(*f).is_some_and(|t| *t != wanted) {
-                        over += 1;
-                    }
-                }
-                // **`just` is a preference; the relation is a law.** Two
-                // passes: the first spares the input the designer is this
-                // moment touching, and the second — reached only when sparing
-                // it leaves the group unsatisfiable — does not.
-                //
-                // The planetary set reaches the second pass: its clearance is
-                // alone in its group with none allowed automatic, because it
-                // is the amount its two zero-backlash distances differ by and
-                // nothing else can hand it back, and the toggle snapping back
-                // is the tool saying so.
-                for spare_just in [true, false] {
-                    for f in &group.order {
-                        if over <= limit {
-                            break;
-                        }
-                        if spare_just && *f == just {
-                            continue;
-                        }
-                        if let Some(t) = out.toggle_mut(*f) {
-                            if *t != wanted {
-                                *t = wanted;
-                                over -= 1;
-                            }
-                        }
-                    }
+        let bound = out.toggles().len() + 1;
+        for _ in 0..bound {
+            let mut moved = false;
+            for group in out.freedoms() {
+                moved |= out.settle(&group, just);
+            }
+            if !moved {
+                break;
+            }
+        }
+        out
+    }
+
+    /// **This stage relieved, with every box relief turned given seeded from
+    /// what it last showed** — the number the designer would have copied in,
+    /// to the digits they saw, so a helix pinned when its neighbour was freed
+    /// holds the angle it had rather than a stale zero.
+    #[must_use]
+    pub fn relieved_from(&self, just: Option<Freedom>, figures: &[Figure]) -> Self {
+        let mut out = self.relieved(just);
+        for (f, was_auto) in self.toggles() {
+            let Some(a) = out.input_mut(f) else { continue };
+            if was_auto && !a.auto {
+                if let Some(v) = figures
+                    .iter()
+                    .find(|x| x.freedom == f)
+                    .and_then(|x| x.value)
+                {
+                    a.manual = (v * 1e4).round() / 1e4;
                 }
             }
         }
         out
     }
 
-    /// **Every argument this stage's inputs can get into with each other.**
-    ///
-    /// Empty where a kind has no such relation — a screw stage has no profile
-    /// shift, so nothing inside it is free to absorb a distance and there is
-    /// nothing to relieve. That is a fact about a worm and is why its mode 3 is
-    /// an open question rather than an oversight.
-    ///
-    /// A stage may have **more than one** group: a hula stage's crank fixes the
-    /// difference of each mesh's two shifts, which is one relation per mesh
-    /// rather than one for the stage.
-    #[must_use]
-    pub fn freedoms(&self) -> Vec<FreedomGroup> {
-        // **A single relation** among its inputs, so exactly one of them is the
-        // one the others decide. Written once rather than as a count per kind,
-        // because a count per kind is a count to get wrong — and the first draft
-        // did, by one, on the kind with the most tests.
-        //
-        // Says nothing about how many may be *automatic*: every input in one of
-        // these has a rule of its own to fall back on, so leaving them all
-        // automatic is a design with nothing pinned rather than a contradiction.
-        let one_relation = |order: Vec<Freedom>| FreedomGroup {
-            given_at_most: order.len() - 1,
-            automatic_at_most: order.len(),
-            order,
-        };
-        // **Two ways of saying one number, so one of them must be said.** A
-        // distance is nominal + clearance and an automatic clearance is
-        // distance − nominal; with both automatic neither has anything to derive
-        // from. A pair's group; the two epicyclic kinds cannot derive a
-        // clearance at all and say so below.
-        let distance_and_clearance = FreedomGroup {
-            given_at_most: 2,
-            automatic_at_most: 1,
-            order: vec![Freedom::Clearance, Freedom::CentreDistance],
-        };
-        match self {
-            // **A pair's distance, its two shifts and its size**:
-            // `a = a₀(size, x₁ + x₂) + clearance` is one relation, so four of
-            // the five may be given — for every kind of pair alike, since a
-            // worm's diameter and a helical pair's helix are the same freedom
-            // (`Freedom::Helix`, `Freedom::FirstPitchDiameter`). The distance comes first because it is the
-            // one a designer expects to give way when they pin everything
-            // else; the shifts come before the size because a shift moves the
-            // teeth where a size changes them, which is also the preference the
-            // solve has when both are free to absorb (`PairStage::first_pitch_diameter`).
-            //
-            // **The size is three toggles and one freedom.** Either member's
-            // helix and the first member's pitch diameter are readings of one
-            // number, so at most one of them stands; the distance relation
-            // counts them as one by allowing four given of its seven, which a
-            // second group holds them to. Every reading automatic is a state
-            // with an answer — the shaft angle shared evenly, unless a given
-            // distance with both shifts pinned decides the size — so none of
-            // them has to stand. And where the axial contact ratio is given
-            // with both face widths given, *it* decides the helix and takes
-            // that freedom: the size toggles must all be automatic, and the
-            // distance relation has one fewer to give.
-            Self::Spur(s) | Self::Worm(s) => {
-                let sizes = (0..s.gears.len())
-                    .map(Freedom::Helix)
-                    .chain(std::iter::once(Freedom::FirstPitchDiameter))
-                    .collect::<Vec<_>>();
-                let taken = s.size_taken_by_overlap();
-                vec![
-                    // The ratio may be given beside a size while a width is
-                    // automatic — it is then a floor under that width — but not
-                    // once both widths are given, when it is the size. First,
-                    // so the distance relation below sees whether the ratio
-                    // still holds the size once this has settled.
-                    FreedomGroup {
-                        given_at_most: if s.gears.iter().all(|g| !g.face_width.auto) {
-                            1
-                        } else {
-                            2
-                        },
-                        automatic_at_most: sizes.len() + 1,
-                        order: sizes
-                            .iter()
-                            .copied()
-                            .chain(std::iter::once(Freedom::Overlap))
-                            .collect(),
-                    },
-                    FreedomGroup {
-                        given_at_most: 1,
-                        automatic_at_most: sizes.len(),
-                        order: sizes.clone(),
-                    },
-                    FreedomGroup {
-                        given_at_most: if taken { 3 } else { 4 },
-                        automatic_at_most: 4 + sizes.len(),
-                        order: std::iter::once(Freedom::CentreDistance)
-                            .chain(std::iter::once(Freedom::Clearance))
-                            .chain((0..s.gears.len()).map(Freedom::Shift))
-                            .chain(sizes.iter().copied())
-                            .collect(),
-                    },
-                    distance_and_clearance,
-                ]
+    /// One group brought within its limits, and whether anything moved.
+    fn settle(&mut self, group: &FreedomGroup, just: Option<Freedom>) -> bool {
+        let mut moved = false;
+        // **Within an entry, one reading stands.** Least precious first, the
+        // one just touched last of all — and only then, when sparing it would
+        // leave two.
+        for entry in &group.order {
+            let mut given = entry.iter().filter(|f| self.is_given(**f)).count();
+            for spare_just in [true, false] {
+                for f in entry {
+                    if given <= 1 {
+                        break;
+                    }
+                    if spare_just && Some(*f) == just {
+                        continue;
+                    }
+                    if let Some(a) = self.input_mut(*f) {
+                        if !a.auto {
+                            a.auto = true;
+                            given -= 1;
+                            moved = true;
+                        }
+                    }
+                }
             }
-            // **A set has a relation among its shifts alone**, which no other
-            // kind does: its two centre distances have to agree, whatever they
-            // agree at. So two of the three shifts are a design and the third is
-            // what they leave.
-            //
-            // Give it a *distance* as well and there is a **second** relation —
-            // each mesh must now reach that distance rather than merely agree
-            // with the other — so only **one** shift is free. The limit is read
-            // from the toggles because the constraint genuinely changes: this is
-            // a fact about the geometry, not a convenience.
-            //
-            // The pair has no analogue. Its distance, two shifts and size are
-            // bound by one relation and that is all, which is why its group is
-            // flat.
-            //
-            // **And its clearance is always given.** One physical distance
-            // carries an external mesh and an internal one, and a clearance
-            // opens them in opposite directions — so it is the amount by which
-            // the two zero-backlash distances *differ*, which is a fact the
-            // shifts are solved from and not one a distance could hand back:
-            // a given distance and given shifts leave a gap on each mesh, and
-            // there is no one number for the field to derive. Alone in its
-            // group with none allowed automatic, so relief pins it — the
-            // second pass of `relieved`, which this kind is the reason for.
-            Self::Planetary(p) => {
-                let mut groups = vec![
-                    FreedomGroup {
-                        given_at_most: if p.centre_distance.auto { 2 } else { 1 },
-                        automatic_at_most: 3,
-                        order: (0..3).map(Freedom::Shift).collect(),
-                    },
-                    FreedomGroup {
-                        given_at_most: 1,
-                        automatic_at_most: 0,
-                        order: vec![Freedom::Clearance],
-                    },
-                ];
-                groups.extend(helix_groups(
-                    3,
-                    p.members().iter().all(|g| !g.face_width.auto),
-                ));
-                groups
-            }
-            // **One relation per mesh.** The crank offset fixes the difference
-            // of a pair's two shifts, so pinning both over-specifies that mesh
-            // — the same triangle a pair's distance and two shifts make, one
-            // freedom smaller — and the other mesh is a separate argument.
-            // The crank offset is this kind's centre distance — the same
-            // decision under another name, as its own documentation says.
-            //
-            // **And its running clearance is always given, as a set's is.**
-            // Every shift here is either given or absorbs the crank, so no
-            // given offset leaves a nominal one to subtract from — the input
-            // was being read whatever its toggle said.
-            Self::Hula(h) => (0..h.gears.len() / 2)
-                .map(|m| one_relation(vec![Freedom::Shift(2 * m), Freedom::Shift(2 * m + 1)]))
-                .chain(std::iter::once(FreedomGroup {
-                    given_at_most: 1,
-                    automatic_at_most: 0,
-                    order: vec![Freedom::Clearance],
-                }))
-                .chain(helix_groups(
-                    h.gears.len(),
-                    h.gears.iter().all(|g| !g.face_width.auto),
-                ))
-                .collect(),
         }
+        // **One walk, both directions.** Too many given turns one entry
+        // automatic; too many automatic pins one. Each time it is the first in
+        // relief order that the designer is not this moment touching, so the
+        // answer depends on the order the *stage* declares and never on the
+        // order the toggles happened to be turned in.
+        for wanted_auto in [false, true] {
+            let limit = if wanted_auto {
+                group.given_at_most
+            } else {
+                group.automatic_at_most
+            };
+            // An entry is given while any reading is, automatic while all
+            // are; one the kind has no input for is neither.
+            let state = |s: &mut Self, entry: &[Freedom]| -> Option<bool> {
+                let present: Vec<bool> = entry
+                    .iter()
+                    .filter_map(|f| s.input_mut(*f).map(|a| a.auto))
+                    .collect();
+                (!present.is_empty()).then(|| present.iter().all(|auto| *auto))
+            };
+            let mut over = group
+                .order
+                .iter()
+                .filter(|e| state(self, e) == Some(!wanted_auto))
+                .count();
+            // **`just` is a preference; the relation is a law.** Two passes:
+            // the first spares the input the designer is this moment
+            // touching, and the second — reached only when sparing it leaves
+            // the group unsatisfiable — does not.
+            //
+            // The planetary set reaches the second pass: its clearance is
+            // alone in its group with none allowed automatic, because it is
+            // the amount its two zero-backlash distances differ by and
+            // nothing else can hand it back, and the toggle snapping back is
+            // the tool saying so.
+            for spare_just in [true, false] {
+                for entry in &group.order {
+                    if over <= limit {
+                        break;
+                    }
+                    if spare_just && entry.iter().any(|f| Some(*f) == just) {
+                        continue;
+                    }
+                    if state(self, entry) != Some(!wanted_auto) {
+                        continue;
+                    }
+                    if wanted_auto {
+                        for f in entry {
+                            if let Some(a) = self.input_mut(*f) {
+                                a.auto = true;
+                            }
+                        }
+                    } else {
+                        for f in entry.iter().rev() {
+                            if let Some(a) = self.input_mut(*f) {
+                                a.auto = false;
+                                break;
+                            }
+                        }
+                    }
+                    over -= 1;
+                    moved = true;
+                }
+            }
+        }
+        moved
     }
 }
 
@@ -2477,6 +2584,38 @@ impl StageResult {
             Self::Pair(r) => r.gears.iter().collect(),
             Self::Planetary(r) => vec![&r.sun, &r.planet.gear, &r.ring],
             Self::Hula(r) => r.gears.iter().map(|g| &g.gear).collect(),
+        }
+    }
+
+    /// **What one of the stage's inputs came to**, by the name relief knows
+    /// it by — the one place a [`Freedom`] meets the figure a result carries
+    /// for it, so a box relief turns given can be seeded from what it showed
+    /// without the panel knowing which field that is. `None` where the result
+    /// has no such figure: a crossed pair has no overlap.
+    #[must_use]
+    pub fn figure(&self, f: Freedom) -> Option<f64> {
+        match f {
+            Freedom::CentreDistance => Some(match self {
+                Self::Pair(r) => r.centre_distance,
+                Self::Planetary(r) => r.centre_distance,
+                Self::Hula(r) => r.offset,
+            }),
+            Freedom::Clearance => Some(match self {
+                Self::Pair(r) => r.clearance,
+                Self::Planetary(r) => r.clearance,
+                Self::Hula(r) => r.running_clearance,
+            }),
+            Freedom::FirstPitchDiameter => self.members().first().map(|g| g.pitch_diameter),
+            Freedom::Overlap => match self {
+                Self::Pair(r) => r.mesh.line.as_ref().map(|l| l.contact_ratios.overlap),
+                Self::Planetary(r) => Some(r.overlap),
+                Self::Hula(r) => Some(r.overlap),
+            },
+            Freedom::Member(i, m) => self.members().get(i).map(|g| match m {
+                MemberFreedom::Shift => g.profile_shift,
+                MemberFreedom::Helix => g.helix_angle,
+                MemberFreedom::FaceWidth => g.face_width,
+            }),
         }
     }
 
@@ -5025,39 +5164,52 @@ mod tests {
         );
     }
 
-    /// **The declared freedoms describe members that exist, and each group has
-    /// something to relieve.**
-    ///
-    /// The structural half. A declaration nothing checks is data, and this is
-    /// the cheap part of checking it: a `Shift(i)` that named a member the stage
-    /// does not have would resolve to nothing in the front end and relieve
-    /// silently, and a group whose limit equals its size can never fire at all.
-    #[test]
-    fn every_declared_freedom_names_a_member_the_stage_has() {
-        let hula = HulaStage::default();
-        let members = |s: &Stage| match s {
-            Stage::Spur(s) => s.gears.len(),
-            Stage::Planetary(_) => 3,
-            Stage::Hula(h) => h.gears.len(),
-            Stage::Worm(_) => 2,
-        };
-        for stage in [
+    /// The four presets, one of each kind, for a law about every kind.
+    fn every_kind() -> Vec<Stage> {
+        let mut hula = HulaStage::default();
+        hula.gears[0].profile_shift = Auto::automatic(0.0);
+        vec![
             Stage::Spur(PairStage::default()),
             Stage::Worm(PairStage::worm()),
             Stage::Planetary(Box::default()),
             Stage::Hula(Box::new(hula)),
-        ] {
-            let n = members(&stage);
+        ]
+    }
+
+    /// Every freedom a stage's groups mention, flat.
+    fn mentioned(stage: &Stage) -> Vec<Freedom> {
+        stage
+            .freedoms()
+            .into_iter()
+            .flat_map(|g| g.order.into_iter().flatten())
+            .collect()
+    }
+
+    /// **The declared freedoms describe inputs the stage has, and each group
+    /// has something to relieve.**
+    ///
+    /// The structural half. A declaration nothing checks is data, and this is
+    /// the cheap part of checking it: a freedom that named an input the stage
+    /// does not have would count as neither given nor automatic and relieve
+    /// silently, and a group whose limits equal its size can never fire at all
+    /// — unless an entry of it holds several readings, which is where such a
+    /// group bites.
+    #[test]
+    fn every_declared_freedom_names_an_input_the_stage_has() {
+        for stage in every_kind() {
+            let has: Vec<Freedom> = stage.toggles().into_iter().map(|(f, _)| f).collect();
             for g in &stage.freedoms() {
                 assert!(
                     !g.order.is_empty(),
                     "a group with no inputs relieves nothing: {g:?}"
                 );
                 assert!(
-                    g.given_at_most < g.order.len() || g.automatic_at_most < g.order.len(),
+                    g.given_at_most < g.order.len()
+                        || g.automatic_at_most < g.order.len()
+                        || g.order.iter().any(|e| e.len() > 1),
                     "a group neither bound can bite on is not a group: {g:?}"
                 );
-                // **The two bounds have to be jointly satisfiable.** Every input
+                // **The two bounds have to be jointly satisfiable.** Every entry
                 // is either given or automatic, so the counts always sum to
                 // `order.len()` — and a group demanding fewer than that in total
                 // is one no arrangement of toggles can satisfy, which would leave
@@ -5066,13 +5218,301 @@ mod tests {
                     g.given_at_most + g.automatic_at_most >= g.order.len(),
                     "no arrangement of toggles satisfies {g:?}"
                 );
-                for f in &g.order {
-                    if let Freedom::Shift(i) = f {
-                        assert!(*i < n, "Shift({i}) but this stage has {n} members");
+                for f in g.order.iter().flatten() {
+                    assert!(
+                        has.contains(f),
+                        "{f:?} is declared but {stage:?} has no such input"
+                    );
+                }
+            }
+        }
+    }
+
+    /// **Relief settles, and settles once.** Relieving a relieved stage moves
+    /// nothing, whatever was touched — so a declaration where satisfying one
+    /// group breaks another for ever, which the walk's bound would cut short
+    /// rather than resolve, cannot pass here. And it settles from any start:
+    /// everything pinned, everything freed, and each single toggle turned.
+    #[test]
+    fn relief_is_idempotent_from_any_start() {
+        for stage in every_kind() {
+            let all = stage.toggles();
+            let mut starts = vec![stage.clone()];
+            for auto in [false, true] {
+                let mut s = stage.clone();
+                for (f, _) in &all {
+                    if let Some(a) = s.input_mut(*f) {
+                        a.auto = auto;
+                    }
+                }
+                starts.push(s);
+            }
+            for (f, was) in &all {
+                let mut s = stage.clone();
+                s.input_mut(*f).expect("its own toggle").auto = !was;
+                starts.push(s);
+            }
+            let justs: Vec<Option<Freedom>> = std::iter::once(None)
+                .chain(all.iter().map(|(f, _)| Some(*f)))
+                .collect();
+            for start in &starts {
+                for just in &justs {
+                    let once = start.relieved(*just);
+                    let twice = once.relieved(*just);
+                    assert_eq!(
+                        once.toggles(),
+                        twice.toggles(),
+                        "relief moved on a second pass after {just:?} from {start:?}"
+                    );
+                    // ...and once settled, every group is within its limits —
+                    // counted the way relief counts, entries given while any
+                    // reading is.
+                    let mut probe = once.clone();
+                    for g in once.freedoms() {
+                        let states: Vec<bool> = g
+                            .order
+                            .iter()
+                            .map(|e| e.iter().all(|f| probe.input_mut(*f).is_none_or(|a| a.auto)))
+                            .collect();
+                        let automatic = states.iter().filter(|a| **a).count();
+                        let given = states.len() - automatic;
+                        assert!(
+                            given <= g.given_at_most && automatic <= g.automatic_at_most,
+                            "{g:?} left {given} given and {automatic} automatic after {just:?}"
+                        );
+                        for e in &g.order {
+                            assert!(
+                                e.iter()
+                                    .filter(|f| probe.input_mut(**f).is_some_and(|a| !a.auto))
+                                    .count()
+                                    <= 1,
+                                "two readings of one input stand in {e:?} after {just:?}"
+                            );
+                        }
                     }
                 }
             }
         }
+    }
+
+    /// **After relief, every given input in a relation is read** — the
+    /// property the machinery exists for, asked of the solve rather than of
+    /// the declaration. Everything is pinned, relief decides what may stand,
+    /// and then each input left given is nudged and the solved stage has to
+    /// move: an input that stands given and moves nothing is one the solve
+    /// disregards, which is precisely what relief was written to prevent.
+    ///
+    /// This is the gate that sees a disagreement between the declaration and
+    /// the solve — a freedom the groups let stand that the solve never
+    /// reads — which no test of either side alone can.
+    #[test]
+    fn every_input_relief_leaves_given_is_honoured_by_the_solve() {
+        let lib = library();
+        let signature = |stage: &Stage| -> Vec<f64> {
+            let mut t = two_stage();
+            t.stages = vec![stage.clone()];
+            let r = solve_train(&t, &lib).expect("a pinned preset solves");
+            let solved = &r.stages[0];
+            stage
+                .toggles()
+                .into_iter()
+                .filter_map(|(f, _)| solved.figure(f))
+                .chain(solved.members().iter().map(|g| g.pitch_diameter))
+                .collect()
+        };
+        let nudge = |f: Freedom, a: &mut Auto<f64>| match f {
+            Freedom::CentreDistance => a.manual += 0.2,
+            Freedom::Clearance => a.manual += 0.01,
+            Freedom::FirstPitchDiameter => a.manual *= 1.05,
+            Freedom::Overlap => a.manual += 0.1,
+            Freedom::Member(_, MemberFreedom::Shift) => a.manual += 0.05,
+            Freedom::Member(_, MemberFreedom::Helix) => a.manual += 2.0,
+            Freedom::Member(_, MemberFreedom::FaceWidth) => a.manual += 1.0,
+        };
+        let mut checked = 0u32;
+        for stage in every_kind() {
+            // Every box seeded with what the preset came to, as the panel
+            // seeds a box a designer pins — so pinning everything pins the
+            // design the preset already was, not a distance of nought.
+            let mut t = two_stage();
+            t.stages = vec![stage.clone()];
+            let solved = solve_train(&t, &lib).expect("every preset solves");
+            let mut pinned = stage.clone();
+            for (f, _) in stage.toggles() {
+                if let Some(v) = solved.stages[0].figure(f) {
+                    pinned.input_mut(f).expect("its own input").manual = v;
+                }
+            }
+            for f in mentioned(&stage) {
+                if let Some(a) = pinned.input_mut(f) {
+                    a.auto = false;
+                }
+            }
+            let settled = pinned.relieved(None);
+            let base = signature(&settled);
+            for f in mentioned(&settled) {
+                let mut moved = settled.clone();
+                let a = moved.input_mut(f).expect("declared, so present");
+                if a.auto {
+                    continue;
+                }
+                nudge(f, a);
+                let after = signature(&moved);
+                assert!(
+                    base.iter().zip(&after).any(|(x, y)| (x - y).abs() > 1e-9),
+                    "{f:?} stands given on {settled:?} and the solve does not read it"
+                );
+                checked += 1;
+            }
+        }
+        assert!(checked >= 12, "only {checked} given inputs were checked");
+    }
+
+    /// **The reading relief leaves standing is the reading the solve reads.**
+    /// Two readings of a pair's size given with different stories — a helix
+    /// that says one diameter and a diameter that says another — and after
+    /// relief the pair is the size the surviving reading states, exactly.
+    /// One list serves both, so this cannot fail by the two lists drifting;
+    /// it is here so that stays true when the next reading arrives.
+    #[test]
+    fn the_surviving_reading_is_the_one_the_solve_reads() {
+        let mut both = PairStage::default().with_first_helix(10.0);
+        both.pitch_diameter = Auto::fixed(20.0);
+        let relieved = Stage::Spur(both).relieved(None);
+        let Stage::Spur(pair) = relieved else {
+            unreachable!()
+        };
+        assert!(
+            pair.gears[0].helix_angle.auto,
+            "the helix is the less precious reading"
+        );
+        assert!(!pair.pitch_diameter.auto, "the diameter stands");
+        assert_eq!(pair.first_pitch_diameter(), 20.0);
+        let expect = (17.0_f64 / 20.0).acos().to_degrees();
+        assert!((pair.helix_angles()[0] - expect).abs() < 1e-12);
+
+        // ...and a ratio given the size to decide is the most precious of all.
+        let mut with_ratio = PairStage::default().with_first_helix(10.0);
+        with_ratio.overlap = Auto::fixed(1.2);
+        let Stage::Spur(pair) = Stage::Spur(with_ratio).relieved(None) else {
+            unreachable!()
+        };
+        assert!(pair.gears[0].helix_angle.auto && !pair.overlap.auto);
+        let width = pair.gears[0]
+            .face_width
+            .manual
+            .min(pair.gears[1].face_width.manual);
+        let expect = helix_for_overlap(1.2, 1.0, width).expect("reachable at the preset's width");
+        assert!((pair.helix_angles()[0] - expect).abs() < 1e-12);
+    }
+
+    /// **A crossed pair has no overlap, and its ratio is turned back
+    /// automatic** — by relief, whatever was touched, rather than by a line in
+    /// the panel that used to reset the toggle when the shaft angle moved.
+    /// A point contact has nothing for the ratio to relate, and a box the
+    /// solve disregards must not stand as if it were read.
+    #[test]
+    fn a_crossed_pairs_ratio_cannot_stand_given() {
+        let mut crossed = PairStage::worm();
+        crossed.overlap = Auto::fixed(1.5);
+        for just in [None, Some(Freedom::Overlap), Some(Freedom::CentreDistance)] {
+            let Stage::Worm(p) = Stage::Worm(crossed.clone()).relieved(just) else {
+                unreachable!()
+            };
+            assert!(
+                p.overlap.auto,
+                "the ratio stood given on crossed shafts after {just:?}"
+            );
+            assert_eq!(p.overlap.manual, 1.5, "and the number is kept");
+        }
+        // ...and on parallel shafts the same input stands.
+        let parallel = PairStage {
+            overlap: Auto::fixed(1.5),
+            ..PairStage::default()
+        };
+        let Stage::Spur(p) = Stage::Spur(parallel).relieved(None) else {
+            unreachable!()
+        };
+        assert!(!p.overlap.auto);
+    }
+
+    /// **A ratio given on straight teeth is said to have asked nothing.** As
+    /// a floor under an automatic width it needs a helix to buy overlap with,
+    /// and at zero helix no width does — so the input is read as nothing, and
+    /// the note says so rather than the box standing as if it had bitten.
+    #[test]
+    fn a_ratio_given_on_straight_teeth_says_it_asked_nothing() {
+        let lib = library();
+        let mut sp = PairStage {
+            overlap: Auto::fixed(1.2),
+            ..PairStage::default()
+        };
+        for g in &mut sp.gears {
+            g.face_width = Auto::automatic(5.0);
+        }
+        let mut t = two_stage();
+        t.stages = vec![Stage::Spur(sp.clone())];
+        let r = solve_train(&t, &lib).expect("solves");
+        let notes = &r.stages[0].as_pair().expect("a pair").notes;
+        assert!(
+            notes
+                .iter()
+                .any(|n| n.key == key::STAGE_OVERLAP_NEEDS_HELIX),
+            "no note for a ratio with no helix to work on: {notes:?}"
+        );
+        // Give it a helix and the floor bites, and the note goes.
+        let helical = sp.with_first_helix(20.0);
+        t.stages = vec![Stage::Spur(helical)];
+        let r = solve_train(&t, &lib).expect("solves");
+        let pair = r.stages[0].as_pair().expect("a pair");
+        assert!(!pair
+            .notes
+            .iter()
+            .any(|n| n.key == key::STAGE_OVERLAP_NEEDS_HELIX));
+        let ratio = pair
+            .mesh
+            .line
+            .as_ref()
+            .expect("a line contact")
+            .contact_ratios
+            .overlap;
+        assert!(
+            (ratio - 1.2).abs() < 1e-9,
+            "the floor should buy exactly the ratio: {ratio}"
+        );
+    }
+
+    /// **A box relief turns given holds what it was showing**, to the digits
+    /// shown — seeded from the figure the result carried for it, by name, so
+    /// the panel need not know which field a freedom is. A box relief leaves
+    /// alone, and one it turns automatic, keep their numbers.
+    #[test]
+    fn a_box_relief_pins_is_seeded_from_its_figure() {
+        let set = PlanetaryStage {
+            clearance: Auto::automatic(0.02),
+            ..PlanetaryStage::default()
+        };
+        let figures = [
+            Figure {
+                freedom: Freedom::Clearance,
+                value: Some(0.123_456_789),
+            },
+            Figure {
+                freedom: Freedom::CentreDistance,
+                value: Some(99.0),
+            },
+        ];
+        let Stage::Planetary(p) = Stage::Planetary(Box::new(set)).relieved_from(None, &figures)
+        else {
+            unreachable!()
+        };
+        assert!(!p.clearance.auto, "the set's clearance is pinned back");
+        assert_eq!(p.clearance.manual, 0.1235, "and seeded to the digits shown");
+        assert_eq!(
+            p.centre_distance.manual,
+            PlanetaryStage::default().centre_distance.manual,
+            "a box relief did not turn keeps its number"
+        );
     }
 
     /// **An epicyclic kind's clearance cannot be automatic, even when it is the
@@ -5093,9 +5533,10 @@ mod tests {
             ..HulaStage::default()
         };
         for just in [
-            Freedom::Clearance,
-            Freedom::CentreDistance,
-            Freedom::Shift(1),
+            Some(Freedom::Clearance),
+            Some(Freedom::CentreDistance),
+            Some(Freedom::Member(1, MemberFreedom::Shift)),
+            None,
         ] {
             let (auto, manual) = match Stage::Planetary(Box::new(set.clone())).relieved(just) {
                 Stage::Planetary(p) => (p.clearance.auto, p.clearance.manual),
@@ -5128,91 +5569,38 @@ mod tests {
     /// undo a design that was never over-determined.
     #[test]
     fn an_over_determined_stage_relieves_to_its_limit_and_keeps_what_was_just_pinned() {
-        let pin_everything = |stage: &Stage| {
-            let mut s = stage.clone();
-            for g in s.freedoms() {
-                for f in g.order {
-                    if let Some(t) = s.toggle_mut(f) {
-                        *t = false;
-                    }
+        for stage in every_kind() {
+            let mut over = stage.clone();
+            for f in mentioned(&stage) {
+                if let Some(a) = over.input_mut(f) {
+                    a.auto = false;
                 }
             }
-            s
-        };
-
-        let mut hula = HulaStage::default();
-        hula.gears[0].profile_shift = Auto::automatic(0.0);
-        for stage in [
-            Stage::Spur(PairStage::default()),
-            Stage::Worm(PairStage::worm()),
-            Stage::Planetary(Box::default()),
-            Stage::Hula(Box::new(hula)),
-        ] {
-            let groups = stage.freedoms();
-            if groups.is_empty() {
-                // A kind with no relation cannot be over-determined, and relief
-                // must leave it exactly as it was.
-                let just = Freedom::Shift(0);
-                assert_eq!(
-                    stage.relieved(just).freedoms(),
-                    groups,
-                    "a stage with no freedoms should come back unchanged"
+            for just in mentioned(&stage) {
+                let mut relieved = over.relieved(Some(just));
+                // `just` is spared wherever sparing it leaves an answer, which
+                // for every input in a relation it does — the always-given
+                // and always-automatic groups are the exceptions, and they
+                // are alone in theirs.
+                let alone = stage
+                    .freedoms()
+                    .iter()
+                    .any(|g| g.order == vec![vec![just]] && g.given_at_most == 0);
+                assert!(
+                    alone || relieved.input_mut(just).is_some_and(|a| !a.auto),
+                    "{just:?} was just pinned and must not be the one relieved"
                 );
-                continue;
             }
-
-            let over = pin_everything(&stage);
-            for group in &groups {
-                // Each input in turn is the one just pinned.
-                for just in &group.order {
-                    let mut relieved = over.relieved(*just);
-
-                    // **Every group**, not just this one. Relief walks them in
-                    // turn, so a declaration where satisfying one breaks another
-                    // would leave the stage over-determined however many passes
-                    // it took — which is exactly what a planetary did when its
-                    // shift relation and its distance relation were written as
-                    // one flat group.
-                    for g in &relieved.freedoms() {
-                        let given = g
-                            .order
-                            .iter()
-                            .filter(|f| relieved.toggle_mut(**f).is_some_and(|t| !*t))
-                            .count();
-                        let automatic = g.order.len() - given;
-                        assert!(
-                            given <= g.given_at_most,
-                            "{g:?} left {given} given after relieving {group:?}"
-                        );
-                        assert!(
-                            automatic <= g.automatic_at_most,
-                            "{g:?} left {automatic} automatic after relieving {group:?}"
-                        );
-                    }
-                    assert!(
-                        relieved.toggle_mut(*just).is_some_and(|t| !*t),
-                        "{just:?} was just pinned and must not be the one relieved"
-                    );
-                }
-            }
-
             // Already inside the limit — every kind's preset is, with a
             // clearance and a worm's diameter given — nothing moves. Asserted
             // against every freedom as `just`, so it cannot pass by picking a
             // lucky one.
-            let settled = stage.clone();
-            for group in &groups {
-                for just in &group.order {
-                    let mut before = settled.clone();
-                    let mut after = settled.relieved(*just);
-                    for f in &group.order {
-                        assert_eq!(
-                            before.toggle_mut(*f).copied(),
-                            after.toggle_mut(*f).copied(),
-                            "{f:?} moved on a stage that was already within its limit"
-                        );
-                    }
-                }
+            for just in mentioned(&stage) {
+                assert_eq!(
+                    stage.relieved(Some(just)).toggles(),
+                    stage.toggles(),
+                    "a toggle moved on a stage that was already within its limit, after {just:?}"
+                );
             }
         }
     }
@@ -5383,19 +5771,19 @@ mod tests {
             // Both automatic — or, for a kind with no distance, the clearance
             // alone — which is the state that has no answer.
             let mut loose = stage.clone();
-            for f in &group.order {
-                if let Some(t) = loose.toggle_mut(*f) {
-                    *t = true;
+            let order: Vec<Freedom> = group.order.iter().flatten().copied().collect();
+            for f in &order {
+                if let Some(a) = loose.input_mut(*f) {
+                    a.auto = true;
                 }
             }
 
             // Relief pins one, and never the one being touched.
-            for just in &group.order {
-                let mut fixed = loose.relieved(*just);
-                let automatic = group
-                    .order
+            for just in &order {
+                let mut fixed = loose.relieved(Some(*just));
+                let automatic = order
                     .iter()
-                    .filter(|f| fixed.toggle_mut(**f).is_some_and(|t| *t))
+                    .filter(|f| fixed.input_mut(**f).is_some_and(|a| a.auto))
                     .count();
                 assert!(
                     automatic <= group.automatic_at_most,
@@ -5410,7 +5798,7 @@ mod tests {
                 let could_spare = group.order.len() > group.automatic_at_most + 1;
                 if could_spare {
                     assert!(
-                        fixed.toggle_mut(*just).is_some_and(|t| *t),
+                        fixed.input_mut(*just).is_some_and(|a| a.auto),
                         "{just:?} was just set automatic and something else could have given"
                     );
                 }
@@ -5504,38 +5892,29 @@ mod tests {
 
         // ...and the group says exactly that many: five inputs bound by one
         // relation, so four may stand and the distance is the first to give —
-        // the size being three readings of one number, which come last.
+        // the size being one entry of three readings, which comes last.
         let groups = Stage::Spur(PairStage::default()).freedoms();
-        let relation = &groups[2];
-        assert_eq!(relation.order.len(), 7);
+        let relation = groups
+            .iter()
+            .find(|g| g.order.len() == 5)
+            .expect("the pair's relation");
         assert_eq!(relation.given_at_most, 4);
-        assert_eq!(relation.order[0], Freedom::CentreDistance);
-        assert!(relation.order.contains(&Freedom::Clearance));
+        assert_eq!(relation.order[0], vec![Freedom::CentreDistance]);
+        assert_eq!(relation.order[1], vec![Freedom::Clearance]);
         assert_eq!(
-            &relation.order[4..],
-            &[
-                Freedom::Helix(0),
-                Freedom::Helix(1),
-                Freedom::FirstPitchDiameter
+            relation.order[4],
+            vec![
+                Freedom::Member(0, MemberFreedom::Helix),
+                Freedom::Member(1, MemberFreedom::Helix),
+                Freedom::FirstPitchDiameter,
+                Freedom::Overlap,
             ],
-            "the size is the last to give: a shift moves the teeth, a size changes them"
+            "the size is the last to give: a shift moves the teeth, a size changes them — and the preset's widths are given, so the ratio is a reading of it"
         );
-        // ...and the three readings are held to one, none being an answer
-        // (the shaft angle shared evenly) rather than a contradiction.
-        let readings = &groups[1];
-        assert_eq!(readings.given_at_most, 1);
-        assert_eq!(readings.automatic_at_most, 3);
-        // ...and the ratio stands beside one of them only while a width is
-        // automatic; with both given it is the size, and the two argue.
-        let with_ratio = &groups[0];
-        assert_eq!(with_ratio.order.last(), Some(&Freedom::Overlap));
-        assert_eq!(
-            with_ratio.given_at_most, 1,
-            "the preset's widths are given, so the ratio would be the size"
-        );
+        // ...and with a width automatic the ratio is a floor, in no argument.
         let mut width_free = PairStage::default();
         width_free.gears[0].face_width = Auto::automatic(8.0);
-        assert_eq!(Stage::Spur(width_free).freedoms()[0].given_at_most, 2);
+        assert!(!mentioned(&Stage::Spur(width_free)).contains(&Freedom::Overlap));
 
         // And the second group is the one that stops *both* ways of saying the
         // distance being left automatic at once.
@@ -5544,7 +5923,7 @@ mod tests {
             .find(|g| g.automatic_at_most < g.order.len())
             .expect("a distance and a clearance cannot both be derived");
         assert_eq!(both.automatic_at_most, 1);
-        assert_eq!(both.order[0], Freedom::Clearance);
+        assert_eq!(both.order[0], vec![Freedom::Clearance]);
     }
 
     /// **A given distance and a given clearance decide the shifts — with the

@@ -36,7 +36,8 @@
 //! derive one from.
 
 use super::{
-    GearResult, Loading, MemberRating, MeshReport, ShaftsCase, StageLoads, TrainError, PROBE,
+    Freedom, GearResult, Loading, MemberRating, MeshReport, ShaftsCase, StageLoads, TrainError,
+    PROBE,
 };
 use crate::contact::{efficiency, ContactPath, Directional, Drive};
 use crate::hula::{self, Offset, Split, Teeth};
@@ -141,11 +142,19 @@ pub struct HulaStage {
 }
 
 impl HulaStage {
-    /// **Whether the axial contact ratio decides the helix**: it is given and
-    /// every face width is given, so the widths the meshes carry are known.
+    /// **Whether the axial contact ratio is a reading of the size**: every
+    /// face width is given, so the widths the meshes carry are known and a
+    /// ratio can be turned into a helix at them ([`super::PairStage::overlap_reads_size`]).
+    #[must_use]
+    pub fn overlap_reads_size(&self) -> bool {
+        self.gears.iter().all(|g| !g.face_width.auto)
+    }
+
+    /// **Whether the axial contact ratio decides the helix**: it is a reading
+    /// of the size, and it is given.
     #[must_use]
     pub fn size_taken_by_overlap(&self) -> bool {
-        !self.overlap.auto && self.gears.iter().all(|g| !g.face_width.auto)
+        !self.overlap.auto && self.overlap_reads_size()
     }
 
     /// The narrower width either mesh carries, as given.
@@ -156,26 +165,14 @@ impl HulaStage {
             .fold(f64::INFINITY, f64::min)
     }
 
-    /// **The stage's helix angle, degrees** — from whichever gear states one.
-    /// Both meshes are internal and an internal mesh keeps its hand, and the
-    /// wobble body carries one gear of each, so all four share one angle.
-    /// Where none states it, the ratio decides it if it is given to; where
-    /// nothing decides it, the teeth are straight.
+    /// **The stage's helix angle, degrees** — from whichever reading states
+    /// one ([`super::Reading`]). Both meshes are internal and an internal
+    /// mesh keeps its hand, and the wobble body carries one gear of each, so
+    /// all four share one angle; the ratio decides it where it is given the
+    /// size to; where nothing does, the teeth are straight.
     #[must_use]
     pub fn helix_angle(&self) -> f64 {
-        if let Some(g) = self.gears.iter().find(|g| !g.helix_angle.auto) {
-            return g.helix_angle.manual;
-        }
-        if self.size_taken_by_overlap() {
-            if let Some(h) = super::helix_for_overlap(
-                self.overlap.manual,
-                self.module[0].min(self.module[1]),
-                self.given_width(),
-            ) {
-                return h;
-            }
-        }
-        0.0
+        super::stated_helix(&super::Constrained::readings(self)).unwrap_or(0.0)
     }
 
     /// **The minimum clearance this stage is actually held to.**
@@ -1342,11 +1339,12 @@ pub fn solve_hula_stage_at(
         layout.offset,
         stage.running_clearance.manual,
     ));
-    notes.extend(super::overlap_note(
+    notes.extend(super::overlap_notes(
         stage.size_taken_by_overlap(),
         &stage.overlap,
         stage.module[0].min(stage.module[1]),
         stage.given_width(),
+        stage.helix_angle(),
     ));
 
     Ok(HulaResult {
@@ -1377,6 +1375,65 @@ pub fn solve_hula_stage_at(
         gears: gears.map(|g| g.expect("every gear belongs to a mesh")),
         notes,
     })
+}
+
+/// What the hula stage declares to the relief and size resolver every kind
+/// shares.
+impl super::Constrained for HulaStage {
+    fn members(&self) -> Vec<&StageGear> {
+        self.gears.iter().collect()
+    }
+
+    /// **The crank offset is this kind's centre distance.** Its own
+    /// documentation says so — "the same shape every stage's centre distance
+    /// has, because it is the same decision" — so it answers to the same name
+    /// here rather than to one of its own.
+    fn inputs(&mut self) -> Vec<(Freedom, &mut Auto<f64>)> {
+        let mut out = vec![
+            (Freedom::CentreDistance, &mut self.offset),
+            (Freedom::Clearance, &mut self.running_clearance),
+            (Freedom::Overlap, &mut self.overlap),
+        ];
+        out.extend(super::member_inputs(self.gears.iter_mut()));
+        out
+    }
+
+    fn readings(&self) -> Vec<super::Reading> {
+        let mut out: Vec<super::Reading> = self
+            .gears
+            .iter()
+            .enumerate()
+            .map(|(i, g)| super::Reading::helix(i, g, |b| b))
+            .collect();
+        if self.overlap_reads_size() {
+            out.push(super::Reading::overlap(
+                &self.overlap,
+                self.module[0].min(self.module[1]),
+                self.given_width(),
+            ));
+        }
+        out
+    }
+
+    /// **One relation per mesh.** The crank offset fixes the difference of a
+    /// pair's two shifts, so pinning both over-specifies that mesh — the same
+    /// triangle a pair's distance and two shifts make, one freedom smaller —
+    /// and the other mesh is a separate argument.
+    ///
+    /// **And its running clearance is always given, as a set's is.** Every
+    /// shift here is either given or absorbs the crank, so no given offset
+    /// leaves a nominal one to subtract from — the input was being read
+    /// whatever its toggle said.
+    fn freedoms(&self) -> Vec<super::FreedomGroup> {
+        let shift = |i: usize| vec![Freedom::Member(i, super::MemberFreedom::Shift)];
+        (0..self.gears.len() / 2)
+            .map(|m| super::one_relation(vec![shift(2 * m), shift(2 * m + 1)]))
+            .chain(std::iter::once(super::always_given(Freedom::Clearance)))
+            .chain(std::iter::once(super::readings_group(
+                &super::Constrained::readings(self),
+            )))
+            .collect()
+    }
 }
 
 #[cfg(test)]

@@ -4,7 +4,7 @@
     solveTrain,
     STAGE_KINDS,
     type StageKindSpec,
-    type StageResult,
+    type Figure,
     CASE_KINDS,
     type CaseKindSpec,
     PORTS,
@@ -93,6 +93,11 @@
    *  below as a blank rather than as a row that is not there. */
   const solved = $derived(result.result ?? undefined);
   const failure = $derived(result.failure);
+  /** What a stage's inputs last came to, by name — handed back to relief so a
+   *  box it turns given holds the number it showed. An empty list where the
+   *  train has not solved, and the box keeps what it had. */
+  const figuresOf = (stage: Stage): Figure[] =>
+    result.figures[tab.train.stages.indexOf(stage)] ?? [];
 
   /** Which duty a fatigue case is counted over. Switching seeds the other
    *  shape from the core's own defaults — a fresh case's intermittent duty,
@@ -605,7 +610,7 @@
      *  toggle on the card — the shift, the helix, the face width, a worm's
      *  diameter — asks the same relief, since the core declares the relations
      *  and this side only says which input was just touched. */
-    relief?: { stage: Stage; member: number; solved: StageResult | undefined };
+    relief?: { stage: Stage; member: number; figures: Figure[] };
     /** **A worm's pitch diameter**, drawn on its card right under its starts:
      *  the same size freedom as the helix angles read as a size, which is a
      *  worm's reading and a gear's only by derivation. */
@@ -664,7 +669,7 @@
       opts.pitchDiameter,
       g?.pitch_diameter,
       0.5,
-      () => opts.relief && relieveStage(opts.relief.stage, "first_pitch_diameter", opts.relief.solved),
+      () => opts.relief && relieveStage(opts.relief.stage, "first_pitch_diameter", opts.relief.figures),
       undefined,
       "ui.train_mm",
     )}
@@ -680,7 +685,7 @@
     gear.helix_angle,
     g?.helix_angle,
     1,
-    () => opts.relief && relieveStage(opts.relief.stage, { helix: opts.relief.member }, opts.relief.solved),
+    () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "helix"] }, opts.relief.figures),
     undefined,
     "°",
   )}
@@ -763,7 +768,7 @@
     gear.profile_shift,
     g?.profile_shift,
     0.05,
-    () => opts.relief && relieveStage(opts.relief.stage, { shift: opts.relief.member }, opts.relief.solved),
+    () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "shift"] }, opts.relief.figures),
     undefined,
     "ui.train_m",
     opts.cut === "shaper"
@@ -831,7 +836,7 @@
       gear.face_width,
       opts.faceRecommended,
       1,
-      () => opts.relief && relieveStage(opts.relief.stage, { face_width: opts.relief.member }, opts.relief.solved),
+      () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "face_width"] }, opts.relief.figures),
       opts.faceRecommended === undefined
         ? null
         : t(opts.faceLabel ? "ui.train_note_worm_length" : "ui.train_note_wheel_width", {
@@ -851,7 +856,7 @@
       gear.face_width,
       g?.face_width,
       0.5,
-      () => opts.relief && relieveStage(opts.relief.stage, { face_width: opts.relief.member }, opts.relief.solved),
+      () => opts.relief && relieveStage(opts.relief.stage, { member: [opts.relief.member, "face_width"] }, opts.relief.figures),
       opts.faceWidth === "continuity"
         ? opts.faceFromContinuity === undefined
           ? t("ui.train_note_no_continuous_width")
@@ -1166,7 +1171,7 @@
     stage.overlap,
     computed,
     0.1,
-    () => relieveStage(stage, "overlap", solved?.stages[tab.train.stages.indexOf(stage)]),
+    () => relieveStage(stage, "overlap", figuresOf(stage)),
     meshes
       .flatMap((m) => m?.notes ?? [])
       .filter((n) => n.key === "mesh.overlap_below_one")
@@ -1457,6 +1462,7 @@
 <div class="stages">
   {#each tab.train.stages as stage, i (i)}
     {@const res = solved?.stages[i] ?? null}
+    {@const figures = figuresOf(stage)}
     <section class="stage">
       {#if stage.kind === "spur" || stage.kind === "worm"}
         <!-- **One pair, two kinds, two meshes.** A spur stage and a worm stage
@@ -1494,16 +1500,18 @@
               <label>
                 <span>{t("ui.train_axis_angle")}</span>
                 <!-- Crossing the shafts takes the axial contact ratio's box away
-                     — a point contact has no overlap — so a ratio that was
-                     given goes back to automatic rather than acting unseen
-                     (`docs/rationale.md#a-hidden-input-is-still-an-input`). -->
+                     — a point contact has no overlap — so the stage is
+                     relieved as after any other change, with nothing just
+                     touched: the core turns a ratio that was given back to
+                     automatic rather than leaving it acting unseen
+                     (`docs/rationale.md#a-hidden-input-is-still-an-input`).
+                     This side used to reset the toggle itself, which was the
+                     one relief rule left written here. -->
                 <input
                   type="number"
                   step="5"
                   bind:value={stage.shaft_angle}
-                  onchange={() => {
-                    if (stage.shaft_angle !== 0) stage.overlap.auto = true;
-                  }}
+                  onchange={() => relieveStage(stage, null, figures)}
                 />
                 <em>°</em>
                 <FieldNote notes={
@@ -1544,7 +1552,7 @@
                 stage.centre_distance,
                 pres?.centre_distance,
                 0.1,
-                () => relieveStage(stage, "centre_distance", res ?? undefined),
+                () => relieveStage(stage, "centre_distance", figures),
                 undefined,
                 "ui.train_mm",
               )}
@@ -1561,7 +1569,7 @@
                 stage.clearance,
                 pres?.clearance,
                 0.01,
-                () => relieveStage(stage, "clearance", res ?? undefined),
+                () => relieveStage(stage, "clearance", figures),
                 undefined,
                 "ui.train_mm",
               )}
@@ -1602,7 +1610,7 @@
                   {
                     cut: "rack",
                     teethLabel: worm && j === 0 ? "ui.train_starts" : undefined,
-                    relief: { stage, member: j, solved: res ?? undefined },
+                    relief: { stage, member: j, figures },
                     pitchDiameter: worm && j === 0 ? stage.pitch_diameter : undefined,
                     faceWidth: worm ? "proportion" : stage.shaft_angle === 0 ? "rating" : "continuity",
                     faceFromContinuity: pres?.mesh.point?.face_width_for_continuity?.[j],
@@ -1674,7 +1682,7 @@
                 stage.centre_distance,
                 pres?.centre_distance,
                 0.1,
-                () => relieveStage(stage, "centre_distance", res ?? undefined),
+                () => relieveStage(stage, "centre_distance", figures),
                 undefined,
                 "ui.train_mm",
               )}
@@ -1683,7 +1691,7 @@
                 stage.clearance,
                 pres?.clearance,
                 0.01,
-                () => relieveStage(stage, "clearance", res ?? undefined),
+                () => relieveStage(stage, "clearance", figures),
                 undefined,
                 "ui.train_mm",
               )}
@@ -1737,11 +1745,11 @@
             <div class="gears">
               {@render gearCard(t("ui.train_sun"), stage.sun, pres?.sun, {
                 cut: "rack",
-                relief: { stage, member: 0, solved: res ?? undefined },
+                relief: { stage, member: 0, figures },
               })}
               {@render gearCard(t("ui.train_planet"), stage.planet, pres?.planet.gear, {
                 cut: "rack",
-                relief: { stage, member: 1, solved: res ?? undefined },
+                relief: { stage, member: 1, figures },
                 // The one thing only a planet's speed has: its teeth turn in
                 // the carrier's frame, and that is the speed they wear at.
                 carrier: t("ui.train_the_carrier"),
@@ -1752,7 +1760,7 @@
               {@render gearCard(t("ui.train_ring"), stage.ring, pres?.ring, {
                 cut: "shaper",
                 cutter: stage.cutter,
-                relief: { stage, member: 2, solved: res ?? undefined },
+                relief: { stage, member: 2, figures },
               })}
             </div>
 
@@ -1933,7 +1941,7 @@
                 stage.running_clearance,
                 hres?.running_clearance,
                 0.01,
-                () => relieveStage(stage, "clearance", res ?? undefined),
+                () => relieveStage(stage, "clearance", figures),
                 undefined,
                 "ui.train_mm",
               )}
@@ -1982,7 +1990,7 @@
                     {
                       cut: j === ring ? "shaper" : "rack",
                       cutter: j === ring ? stage.cutter[m] : undefined,
-                      relief: { stage, member: j, solved: res ?? undefined },
+                      relief: { stage, member: j, figures },
                       // **What a member's teeth see is its speed against the
                       // crank**, which is the carrier of both meshes — so the
                       // fixed-frame figure needs the same annotation a planet's

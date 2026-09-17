@@ -12,6 +12,7 @@ import {
   type Note,
 } from "./strings.svelte";
 import type {
+  Figure,
   Freedom,
   FreedomGroup,
   Arrangement,
@@ -76,6 +77,7 @@ export type {
   GearCase,
   MeshCase,
   TrainCase,
+  Figure,
   Freedom,
   FreedomGroup,
   Auto,
@@ -658,100 +660,53 @@ export function exportLibrary(
 /** **Resolve an over-determined stage**, whatever kind it is.
  *
  *  `just` is the input the designer has this moment pinned, and is never the one
- *  relieved. Which inputs argue with each other, how many may stand and which
- *  gives way first are facts about the geometry, so Rust decides all of it —
- *  this used to be three functions here, one per stage kind, each restating a
- *  relation the core already enforces, and none of them tested.
+ *  relieved; `null` where what changed was not a toggle — a shaft angle — and
+ *  nothing is spared. Which inputs argue with each other, how many may stand
+ *  and which gives way first are facts about the geometry, so Rust decides all
+ *  of it — this used to be three functions here, one per stage kind, each
+ *  restating a relation the core already enforces, and none of them tested.
  *
- *  Written **in place**, field by field, rather than by replacing the stage: the
+ *  Written **in place**, leaf by leaf, rather than by replacing the stage: the
  *  caller holds a reactive proxy and a wholesale swap would detach every input
- *  bound to it. Only the toggles are copied back, because only the toggles can
- *  have moved — `relieved` decides no values.
+ *  bound to it. Only leaves that differ are written, and this side does not
+ *  know which they are — it used to list every field relief could touch by
+ *  name, per kind, so a kind with a field named otherwise got no relief and
+ *  nothing said so. Now the core hands back the stage as it should stand and
+ *  the copy is shape-blind.
  *
- *  **A toggle relief turns keeps the number the box was showing.** An input
- *  turned manual by the designer is seeded from what it displayed; one turned
- *  manual by relief used to keep whatever its box last held, which for a helix
- *  pinned when its neighbour was freed was a stale zero. So the solved value
- *  is written into any box relief moves, from the stage's last result, exactly
- *  as the designer's own toggle does — a number Rust computed, copied where the
- *  designer would have copied it.
+ *  **A box relief turns given keeps the number it was showing.** The core seeds
+ *  it from `figures` — what the stage's inputs last came to, by name, which
+ *  `solveTrain` returns beside the result — so a helix pinned when its
+ *  neighbour was freed holds the angle it had rather than a stale zero, exactly
+ *  as the designer's own toggle does. This side forwards the list and never
+ *  learns which figure is which.
  *
  *  A stage that will not cross the boundary is left alone. Relief runs on a
  *  click, and a click is not the place to discover a broken boundary.
  */
-export function relieveStage(stage: Stage, just: Freedom, solved?: StageResult): void {
+export function relieveStage(stage: Stage, just: Freedom | null, figures: Figure[] = []): void {
   let corrected: Stage;
   try {
-    corrected = JSON.parse(
-      relieve_stage(JSON.stringify({ stage, just })),
-    ) as Stage;
+    corrected = JSON.parse(relieve_stage(JSON.stringify({ stage, just, figures }))) as Stage;
   } catch {
     return;
   }
-  const live = autosOf(stage);
-  const fixed = autosOf(corrected);
-  for (const [i, a] of live.entries()) {
-    const f = fixed[i];
-    if (!f || f.toggle.auto === a.toggle.auto) continue;
-    const shown = solved ? valueOf(solved, a.freedom) : undefined;
-    if (shown !== undefined) a.toggle.manual = Number(shown.toFixed(4));
-    a.toggle.auto = f.toggle.auto;
-  }
+  assignLeaves(stage, corrected);
 }
 
-/** **Every `Auto` on a stage that relief can touch**, each with the freedom
- *  that names it — the one place this side lines a stage's toggles up against
- *  the core's names, and the only order that has to be *stable* rather than
- *  meaningful. `Freedom`'s member order is the core's business: a member here
- *  is a member there, in the order `StageResult::members` reports them. */
-function autosOf(stage: Stage): { freedom: Freedom; toggle: Auto<number> }[] {
-  const out: { freedom: Freedom; toggle: Auto<number> }[] = [];
-  const push = (freedom: Freedom, toggle: unknown) => {
-    if (typeof toggle === "object" && toggle !== null && "auto" in toggle) {
-      out.push({ freedom, toggle: toggle as Auto<number> });
+/** Write every leaf of `from` that differs into `into`, in place, shape-blind:
+ *  the two are the same stage before and after relief, so they have the same
+ *  shape, and only toggles and the numbers relief seeded can differ. */
+function assignLeaves(into: Record<string, unknown>, from: Record<string, unknown>): void {
+  for (const key of Object.keys(from)) {
+    const a = into[key];
+    const b = from[key];
+    if (typeof a === "object" && a !== null && typeof b === "object" && b !== null) {
+      assignLeaves(a as Record<string, unknown>, b as Record<string, unknown>);
+    } else if (a !== b) {
+      into[key] = b;
     }
-  };
-  const members: StageGear[] =
-    stage.kind === "planetary" ? [stage.sun, stage.planet, stage.ring] : stage.gears;
-  push("centre_distance", (stage as { centre_distance?: unknown }).centre_distance);
-  push("centre_distance", (stage as { offset?: unknown }).offset);
-  push("clearance", (stage as { clearance?: unknown }).clearance);
-  push("clearance", (stage as { running_clearance?: unknown }).running_clearance);
-  push("first_pitch_diameter", (stage as { pitch_diameter?: unknown }).pitch_diameter);
-  push("overlap", (stage as { overlap?: unknown }).overlap);
-  members.forEach((g, i) => {
-    push({ shift: i }, g.profile_shift);
-    push({ helix: i }, g.helix_angle);
-    push({ face_width: i }, g.face_width);
-  });
-  return out;
-}
-
-/** **What a freedom's input came to in a result** — the number a box turned
- *  manual by relief is seeded with. A lookup, not a calculation: every figure
- *  is one the result already carries. `undefined` where the result has no
- *  such figure, and the box keeps what it had. */
-function valueOf(solved: StageResult, freedom: Freedom): number | undefined {
-  const members: GearResult[] =
-    solved.kind === "planetary"
-      ? [solved.sun, solved.planet.gear, solved.ring]
-      : solved.kind === "hula"
-        ? solved.gears.map((g) => g.gear)
-        : solved.gears;
-  if (freedom === "centre_distance") {
-    return solved.kind === "hula" ? solved.offset : solved.centre_distance;
   }
-  if (freedom === "clearance") {
-    return solved.kind === "hula" ? solved.running_clearance : solved.clearance;
-  }
-  if (freedom === "first_pitch_diameter") return members[0]?.pitch_diameter;
-  if (freedom === "overlap") {
-    return solved.kind === "pair" ? (solved.mesh.line?.contact_ratios.overlap ?? undefined) : solved.overlap;
-  }
-  if ("shift" in freedom) return members[freedom.shift]?.profile_shift;
-  if ("helix" in freedom) return members[freedom.helix]?.helix_angle;
-  if ("face_width" in freedom) return members[freedom.face_width]?.face_width;
-  return undefined;
 }
 
 /** A fresh geartrain, one spur stage in it. */
@@ -785,6 +740,7 @@ export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutc
         },
         stage: null,
       },
+      figures: [],
     };
   }
 }

@@ -103,6 +103,7 @@ centre_distance_not_reached = "no admissible shifts reach {asked} mm: the pair i
 clearance_negative = "the running distance is {overlap} mm inside the zero-backlash {nominal} mm: these teeth cannot be assembled"
 optimiser_found_nothing = "no solution within the admissible range; shifts remain unaltered"
 overlap_unreachable = "no helix reaches an axial contact ratio of {ratio} at this face width; the helix stands"
+overlap_needs_helix = "axial contact ratio {ratio} asks nothing of straight teeth: no face width buys overlap at zero helix; give a helix angle, or every face width for the ratio to decide it"
 planets_share_load_equally = "{planets} planets assumed to share load equally; real sets do not without a floating member, and the remedy is a mesh-load factor this tool declines to apply"
 planets_not_evenly_spaced = "{planets} planets cannot be evenly spaced: sun and ring tooth counts do not sum to a multiple of planet count"
 planet_clearance_below_minimum = "adjacent planets clear by {gap} mm, below the {minimum} mm asked for"

@@ -957,23 +957,23 @@
    "ok": [
     [
      "en",
-     448
+     449
     ],
     [
      "de",
-     448
+     449
     ],
     [
      "pt",
-     448
+     449
     ],
     [
      "zh-Hans",
-     448
+     449
     ],
     [
      "zh-Hant",
-     448
+     449
     ]
    ]
   },
@@ -6339,7 +6339,81 @@
       }
      ]
     },
-    "failure": null
+    "failure": null,
+    "figures": [
+     [
+      {
+       "freedom": "centre_distance",
+       "value": "30.025652520608507"
+      },
+      {
+       "freedom": "clearance",
+       "value": "0.019999999999999574"
+      },
+      {
+       "freedom": "first_pitch_diameter",
+       "value": 17
+      },
+      {
+       "freedom": "overlap",
+       "value": 0
+      },
+      {
+       "freedom": {
+        "member": [
+         0,
+         "shift"
+        ]
+       },
+       "value": "0.0056565377194108812"
+      },
+      {
+       "freedom": {
+        "member": [
+         0,
+         "helix"
+        ]
+       },
+       "value": 0
+      },
+      {
+       "freedom": {
+        "member": [
+         0,
+         "face_width"
+        ]
+       },
+       "value": "0.044765208228806905"
+      },
+      {
+       "freedom": {
+        "member": [
+         1,
+         "shift"
+        ]
+       },
+       "value": 0
+      },
+      {
+       "freedom": {
+        "member": [
+         1,
+         "helix"
+        ]
+       },
+       "value": 0
+      },
+      {
+       "freedom": {
+        "member": [
+         1,
+         "face_width"
+        ]
+       },
+       "value": "0.044765208228806905"
+      }
+     ]
+    ]
    }
   },
   "export_train": {
