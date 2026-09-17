@@ -601,13 +601,21 @@ export interface TrainDocument {
   train: Train;
 }
 
+/** What reading a geartrain came to: the document, and whether Rust adjusted
+ *  it on the way in — a toggle the file had given that no stage can honour,
+ *  turned back automatic with its number kept. */
+export interface Imported {
+  document: TrainDocument;
+  adjusted: boolean;
+}
+
 /** Parse an exported geartrain. The TOML never touches TypeScript: the file is
  *  handed to Rust as text, so exactly one parser exists. */
 export function importTrain(
   tomlText: string,
-): { ok: TrainDocument } | { error: string } {
+): { ok: Imported } | { error: string } {
   try {
-    return { ok: JSON.parse(import_train(tomlText)) as TrainDocument };
+    return { ok: JSON.parse(import_train(tomlText)) as Imported };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }

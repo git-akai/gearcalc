@@ -89,6 +89,21 @@
 //! wrong — a file loading with a field defaulted rather than read — is exactly
 //! what a refusal prevents.
 //!
+//! # What *is* adjusted on import
+//!
+//! A file can say what the panel cannot: a crossed pair with its axial
+//! contact ratio given, a pair with its distance and both shifts and a helix
+//! pinned at once. An input that stands given and is read by nothing is the
+//! thing this tool refuses to have (`docs/rationale.md#what-a-kind-owes-relief`),
+//! so every stage read is **relieved** exactly as a stage in the panel is after
+//! any change — by the core, with nothing just touched — and the reader says
+//! whether that moved anything ([`Imported::adjusted`]). A hand-edited value
+//! is never changed; only which toggles stand, and only where the file asked
+//! for a contradiction or for an input the stage has no use for. The
+//! precedent: a file is *adjusted to what the tool can honour*, once, on the
+//! way in, and the reader is told in one sentence rather than left to find
+//! a box that does nothing.
+//!
 //! # What is *not* checked on import
 //!
 //! A stage names its materials by name, and the library that has them is the
@@ -152,19 +167,40 @@ const HEADER: &str = "\
 # Editing this file by hand is expected.
 ";
 
-/// Parse a geartrain from TOML.
+/// What reading a geartrain came to: the document, and whether reading it
+/// changed it.
+#[derive(Clone, Debug, Serialize)]
+pub struct Imported {
+    pub document: TrainDocument,
+    /// Whether any stage was relieved on the way in — a toggle the file had
+    /// given that the stage cannot honour, turned back automatic (the module
+    /// documentation, *What is adjusted on import*). The values are the
+    /// file's own throughout.
+    pub adjusted: bool,
+}
+
+/// Parse a geartrain from TOML, relieved of anything it asks for that no stage
+/// can honour.
 ///
 /// # Errors
 ///
 /// [`TrainError::Parse`] if the document is not a geartrain, or
 /// [`TrainError::NoStages`] if it describes a train with no stages — which
 /// parses happily and then has nothing to solve.
-pub fn from_toml(src: &str) -> Result<TrainDocument, TrainError> {
-    let doc: TrainDocument = toml::from_str(src).map_err(TrainError::Parse)?;
-    if doc.train.stages.is_empty() {
+pub fn from_toml(src: &str) -> Result<Imported, TrainError> {
+    let mut document: TrainDocument = toml::from_str(src).map_err(TrainError::Parse)?;
+    if document.train.stages.is_empty() {
         return Err(TrainError::NoStages);
     }
-    Ok(doc)
+    let mut adjusted = false;
+    for stage in &mut document.train.stages {
+        let relieved = stage.relieved(None);
+        if relieved.toggles() != stage.toggles() {
+            adjusted = true;
+            *stage = relieved;
+        }
+    }
+    Ok(Imported { document, adjusted })
 }
 
 /// Write a geartrain as TOML, in the same shape the reader accepts.
@@ -247,6 +283,11 @@ mod tests {
         let doc = document();
         let text = to_toml(&doc).unwrap();
         let back = from_toml(&text).unwrap();
+        assert!(
+            !back.adjusted,
+            "a document the tool wrote needs no adjusting"
+        );
+        let back = back.document;
         assert_eq!(
             toml::to_string_pretty(&doc).unwrap(),
             toml::to_string_pretty(&back).unwrap()
@@ -283,7 +324,7 @@ mod tests {
         let text = to_toml(&document())
             .unwrap()
             .replace("speed = 12000.0", "speed = 3000.0 # slowed down by hand");
-        let back = from_toml(&text).unwrap();
+        let back = from_toml(&text).unwrap().document;
         assert!((back.train.load_cases[0].speed - 3000.0).abs() < 1e-12);
     }
 
@@ -295,7 +336,7 @@ mod tests {
         doc.train.load_cases.clear();
         let text = to_toml(&doc).unwrap();
         assert!(text.contains("load_cases = []"), "{text}");
-        let back = from_toml(&text).unwrap();
+        let back = from_toml(&text).unwrap().document;
         assert!(back.train.load_cases.is_empty());
     }
 
@@ -332,11 +373,40 @@ mod tests {
             s.centre_distance = Auto::fixed(31.5);
             s.gears[0].face_width = Auto::automatic(4.0);
         }
-        let back = from_toml(&to_toml(&doc).unwrap()).unwrap();
+        let back = from_toml(&to_toml(&doc).unwrap()).unwrap().document;
         let Stage::Spur(s) = &back.train.stages[0] else {
             panic!("stage 1 came back a different kind");
         };
         assert!(!s.centre_distance.auto && (s.centre_distance.manual - 31.5).abs() < 1e-12);
         assert!(s.gears[0].face_width.auto && (s.gears[0].face_width.manual - 4.0).abs() < 1e-12);
+    }
+
+    /// **A file asking for what no stage can honour is adjusted on the way
+    /// in, and says so.** A crossed pair's axial contact ratio given — which
+    /// the panel cannot produce and the solve reads on parallel shafts only —
+    /// comes back automatic with its number kept, and `adjusted` is the one
+    /// sentence the reader is owed. Every value the file gave is untouched,
+    /// and a file that asks for nothing impossible is not adjusted.
+    #[test]
+    fn a_file_asking_for_what_no_stage_honours_is_adjusted_and_says_so() {
+        let mut doc = document();
+        if let Stage::Worm(w) = &mut doc.train.stages[1] {
+            w.overlap = Auto::fixed(1.5);
+        } else {
+            panic!("stage 2 is the worm");
+        }
+        let back = from_toml(&to_toml(&doc).unwrap()).unwrap();
+        assert!(back.adjusted);
+        let Stage::Worm(w) = &back.document.train.stages[1] else {
+            panic!("stage 2 came back a different kind");
+        };
+        assert!(w.overlap.auto, "a crossed pair's ratio cannot stand given");
+        assert!((w.overlap.manual - 1.5).abs() < 1e-12, "the number is kept");
+        // ...and a second read of the adjusted document adjusts nothing.
+        assert!(
+            !from_toml(&to_toml(&back.document).unwrap())
+                .unwrap()
+                .adjusted
+        );
     }
 }

@@ -931,8 +931,8 @@ fn export_materials_impl(library_json: &str) -> Result<String, String> {
 }
 
 fn import_train_impl(toml_text: &str) -> Result<String, String> {
-    let doc = gear_io::train::from_toml(toml_text).map_err(|e| e.to_string())?;
-    serde_json::to_string(&doc).map_err(|e| e.to_string())
+    let imported = gear_io::train::from_toml(toml_text).map_err(|e| e.to_string())?;
+    serde_json::to_string(&imported).map_err(|e| e.to_string())
 }
 
 fn export_train_impl(document_json: &str) -> Result<String, String> {
@@ -1234,7 +1234,14 @@ pub fn export_materials(library_json: &str) -> Result<String, JsError> {
     export_materials_impl(library_json).map_err(|e| JsError::new(&e))
 }
 
-/// Import a geartrain: TOML text in, `{ name, train }` JSON out.
+/// Import a geartrain: TOML text in, `{ document: { name, train }, adjusted }`
+/// JSON out.
+///
+/// `adjusted` says whether any stage was relieved on the way in — a toggle
+/// the file had given that no stage can honour, such as a crossed pair's
+/// axial contact ratio, turned back automatic with its number kept. The panel
+/// says so in one sentence; the values are the file's own throughout
+/// (`gear_io::train`, *What is adjusted on import*).
 ///
 /// The same arrangement as the material library, and for the same reason: the
 /// TOML never reaches TypeScript, so exactly one parser exists and it is the
@@ -1432,8 +1439,14 @@ mod tests {
         });
 
         let toml_text = export_train_impl(&document.to_string()).unwrap();
-        let back: serde_json::Value =
+        let imported: serde_json::Value =
             serde_json::from_str(&import_train_impl(&toml_text).unwrap()).unwrap();
+        assert_eq!(
+            imported["adjusted"].as_bool(),
+            Some(false),
+            "a document the tool wrote asks for nothing it cannot honour"
+        );
+        let back = imported["document"].clone();
         assert_eq!(back["name"].as_str(), Some("Elevation drive"));
 
         let solve = |doc: &serde_json::Value| {

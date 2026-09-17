@@ -285,6 +285,10 @@ class Trains {
 
   /** Set when the last import failed, so the panel can say why. */
   importError = $state<string | null>(null);
+  /** Set when the last import was adjusted to what the tool can honour — a
+   *  toggle the file gave that no stage reads, turned back automatic by Rust
+   *  on the way in — so the panel says so in one sentence. */
+  importAdjusted = $state(false);
 
   /** Import creates a **new tab**, as the specification requires: reading a
    *  file never overwrites what is open, and nothing is written back to it. The
@@ -297,17 +301,19 @@ class Trains {
     const r = importTrain(text);
     if ("error" in r) {
       this.importError = r.error;
+      this.importAdjusted = false;
       return;
     }
     const t: TrainTab = {
       id: nextTrainId++,
-      name: r.ok.name,
-      train: r.ok.train,
+      name: r.ok.document.name,
+      train: r.ok.document.train,
       open: { 0: true },
       openCases: {},
     };
     this.tabs.push(t);
     this.importError = null;
+    this.importAdjusted = r.ok.adjusted;
     this.select(t.id);
   }
 

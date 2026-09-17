@@ -1104,7 +1104,7 @@ fn train_file_report(path: Option<&str>) {
         }
     };
     let back = match gear_io::train::from_toml(&text) {
-        Ok(d) => d,
+        Ok(d) => d.document,
         Err(e) => {
             eprintln!("could not read it back: {e}");
             return;

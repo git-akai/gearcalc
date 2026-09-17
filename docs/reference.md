@@ -2420,7 +2420,10 @@ belonging in `state.md` if anywhere. Seven of them compute nothing: `defaults`,
 round trips (`import_train`/`export_train`, `import_materials`/
 `export_materials`, with `default_materials` beside them). `relieve_stage` is
 the one rule that is neither — which input gives way when a stage is
-over-specified, asked of the core so the front end does not hold a copy.
+over-specified, asked of the core so the front end does not hold a copy — and
+`import_train` applies the same rule to every stage it reads, reporting
+`adjusted` where a file asked for what no stage can honour
+([rationale](rationale.md#a-file-is-adjusted-to-what-the-tool-can-honour)).
 
 **A `null` that crosses is not always a `None`.** `serde_json` writes an
 infinity and a NaN as `null`, which is indistinguishable from a field that

@@ -1830,6 +1830,28 @@ it undercut at all?*, and it shipped defaulting to the first.
 Following the dedendum also makes the automatic shift agree with the profile
 generator's own `undercut` flag **by construction** rather than by coincidence.
 
+### A file is adjusted to what the tool can honour
+
+A file can say what the panel cannot. The panel relieves a stage on every
+change, so a crossed pair with its axial contact ratio given, or a pair with
+its distance, both shifts and a helix all pinned, cannot be built there — but
+a hand-edited document can say either, and reading it faithfully would put a
+box on screen that stands given and is read by nothing, the exact state
+relief exists to prevent.
+
+So every stage a file describes is relieved on the way in, by the same
+`relieved(None)` the panel asks after a shaft angle moves, and the reader is
+told in one sentence — *the imported file has been adjusted to meet the
+requirements of the tool* — where anything moved. Two things are fixed by
+that sentence being the whole of it. **No value is changed**: a toggle the
+stage cannot honour goes back to automatic and its number stays in the box,
+so nothing the person typed is lost, only the claim that it was being read.
+And **the adjustment is once, on the way in**: the document in the tab is one
+the panel would have produced, and exporting it and reading it again adjusts
+nothing, which the test holds. The precedent is for whatever else a file may
+one day say that a stage has no use for: relieve it into what can be honoured,
+keep the numbers, say so once, and never refuse a whole train over one toggle.
+
 ### An input that moves no number needs saying so
 
 ...and the fix is not always to hide it. A ring's profile shift box was connected

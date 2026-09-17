@@ -1225,6 +1225,9 @@
 {#if trains.importError}
   <p class="error">{t("ui.train_import_failed", { reason: trains.importError })}</p>
 {/if}
+{#if trains.importAdjusted}
+  <p class="notice">{t("ui.train_import_adjusted")}</p>
+{/if}
 {#if exportError}
   <p class="error">{t("ui.train_export_failed", { reason: exportError })}</p>
 {/if}
@@ -2648,6 +2651,9 @@
   }
   .error {
     color: var(--warn);
+  }
+  .notice {
+    color: var(--muted);
   }
   .add {
     align-self: flex-start;
