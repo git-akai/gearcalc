@@ -1136,8 +1136,9 @@ fn defaults_impl() -> Result<String, String> {
             // the start, held at the end; a load from the end, held still and
             // by nothing but a stage that locks — so on a fresh spur stage it
             // turns the train and rates nothing, which the case says; and a
-            // fatigue load equal to the peak until one is entered — a fresh
-            // tab assumes no derating rather than a derating nobody asked for.
+            // fatigue load a fifth of the peak — a running load rather than
+            // the stall the ultimate case is, so a fresh tab shows the two
+            // ratings answering different questions.
             load_cases: vec![
                 LoadCase::ultimate(0.1, 30_000.0),
                 LoadCase {
@@ -1145,7 +1146,7 @@ fn defaults_impl() -> Result<String, String> {
                     reacted: false,
                     ..LoadCase::ultimate(3.0, 0.0)
                 },
-                LoadCase::fatigue(0.1, 30_000.0),
+                LoadCase::fatigue(0.02, 30_000.0),
             ],
             // Off, like every other correction this crate could apply and does
             // not: a reversed root is disclosed rather than silently derated.
@@ -1157,7 +1158,7 @@ fn defaults_impl() -> Result<String, String> {
         planetary_stage: Stage::Planetary(Box::new(planetary)),
         hula_stage: Stage::Hula(Box::new(hula)),
         ultimate_case: LoadCase::ultimate(0.1, 30_000.0),
-        fatigue_case: LoadCase::fatigue(0.1, 30_000.0),
+        fatigue_case: LoadCase::fatigue(0.02, 30_000.0),
         continuous_duty: gear_core::train::Duty::Continuous {
             runtime_hours: 1000.0,
         },
@@ -2388,7 +2389,7 @@ mod tests {
         assert_eq!(cases[1]["torque"], 3.0);
         assert_eq!(cases[1]["speed"], 0.0);
         assert_eq!(cases[2]["kind"], "fatigue");
-        assert_eq!(cases[2]["torque"], 0.1);
+        assert_eq!(cases[2]["torque"], 0.02);
         assert_eq!(cases[2]["duty"]["intermittent"]["at"], "end");
         for c in cases {
             assert_eq!(c["enabled"], true);
