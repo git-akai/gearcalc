@@ -179,15 +179,19 @@ comparing the envelope it leaves.
 
 ## Verification tooling
 
-Four scripts check the Rust against something that shares no code with it, and a
-fifth checks the catalogue against the code. All are run by hand rather than in
-CI:
+These check the Rust against something that shares no code with it, and are run
+by hand rather than in CI. **The exhaustive list of every check is
+[`CLAUDE.md`](CLAUDE.md)'s own table** — this and `docs/state.md` used to carry
+counts of their own, which disagreed with each other about both the number and
+the membership:
 
 ```bash
 python3 tools/validate_dxf.py <file.dxf> ...   # an export's structure, then its geometry
 python3 tools/worm_flank_curvature.py          # worm flank curvature from the surface itself
 python3 tools/crossed_path.py                  # a crossed pair's path of contact, from the surfaces
 python3 tools/hula_kinematics.py               # a hula stage's ratio, from the rolling circles
+python3 tools/train_kinematics.py              # any topology's speeds and torques, from rigid-body velocities
+python3 tools/iso_6336_3_stack.py              # where this tool stands against ISO 6336-3, factor by factor
 
 python3 tools/check_strings.py                 # every UI message is used, and every used one exists
 python3 tools/check_doc_links.py               # every pointer into the documents resolves

@@ -62,6 +62,8 @@ of a gear is worth more than knowing what it does.
 | `solve.rs` | Two bracketed root finders. Every transcendental step routes through them | anything about gears |
 | `involute.rs` | `inv α = tan α − α`, and its safeguarded inverse | " |
 | `elliptic.rs` | Carlson symmetric elliptic integrals | " |
+| `ratio.rs` | An exact rational, `i128`, overflow refused rather than wrapped | " |
+| `kinematics.rs` | **Shafts, meshes and what relates them** — one matrix read four ways: speeds, mobility, torques, play. A gear reaches it as a signed tooth count | " — no geometry, no stage, no loss |
 | `hertz.rs` | General Hertzian contact; line contact is the degenerate value | " — a concave body is a negative radius, which is why there is no internal case |
 | `plane.rs` | The normal and transverse planes, the identities between them, the basic rack | tooth counts |
 | `params.rs` | A gear's inputs, and the record of any guard that altered them | how any of them is used |
@@ -149,7 +151,7 @@ Thirteen checks in six different ways. `nix flake check` is **not** all of them.
 | `tools/check_units.py` | **an angle that does not say its unit, or a name that means both.** The crate is degrees where a designer states a number and radians in the mathematics; a name meaning one in one module and the other in the next is how that becomes a bug, and it did | yes |
 | `tools/check_wasm.sh` | **the payload, executed** — everything else checks the boundary's shape or `gear-core`'s values, and nothing ran the `.wasm` the browser downloads. Asserts a law (optimising it changes no answer), records what it answers, and fails if an entry point has no probe | yes |
 | `python3 tools/validate_dxf.py` | an export read back by a parser that shares no code with the writer | yes |
-| `tools/worm_flank_curvature.py` · `crossed_path.py` · `hula_kinematics.py` · `iso_6336_3_stack.py` | the crate against derivations that share no code with it | no — by hand |
+| `tools/worm_flank_curvature.py` · `crossed_path.py` · `hula_kinematics.py` · `train_kinematics.py` · `iso_6336_3_stack.py` | the crate against derivations that share no code with it | no — by hand |
 
 **Before pushing, run everything the table marks "yes"** — not a chosen
 subset. It was "run five" here, and the five omitted `check_units.py`: a

@@ -135,6 +135,7 @@ cargo run --release --bin gear-cli -- verify 100   # the two-sided cutter check
 python3 tools/worm_flank_curvature.py              # ZI vs ZN vs ZA, from the surface
 python3 tools/crossed_path.py                      # the crossed path, from the surfaces
 python3 tools/hula_kinematics.py                   # the hula ratio, from the rolling circles
+python3 tools/train_kinematics.py                  # every topology's speeds and torques, from rigid-body velocities
 python3 tools/iso_6336_3_stack.py                  # where this tool stands against ISO 6336-3, factor by factor
 ```
 
@@ -146,11 +147,25 @@ line, a `figures-verbatim` marker that `tools/check_figures.py` reads. If the
 construction moves, that check fails and names the file; re-run the command and
 paste the body back in.
 
-**All four Python scripts share no code with the crate** — that is their whole
-purpose, and `README.md` counts them the same way. This paragraph said "the last
-two" from when there were two of them, and then named only one of those; a
-curated count that reads as exhaustive is the failure this section's own opening
-is about, met one paragraph further down.
+**The Python scripts share no code with the crate** — that is their whole
+purpose, and **[`CLAUDE.md`](../CLAUDE.md)'s table is the exhaustive list of
+every check**, here and in `README.md` alike.
+
+This paragraph said "the last two" from when there were two of them, and then
+named only one of those; `README.md` said "four" of a *different* four, having
+counted `validate_dxf.py` and not `iso_6336_3_stack.py`. Two curated counts of
+one set, disagreeing about the number and the membership — which is the failure
+this section's own opening is about, met twice one paragraph further down. The
+fix is the same one: no count outside the table that is the list.
+
+`train_kinematics.py` and `hula_kinematics.py` **are not one script** and
+neither covers the other, which is worth saying because they look alike.
+`hula_kinematics.py` integrates the no-slip condition through a full revolution,
+in 200 000 steps, on one arrangement; `train_kinematics.py` writes rigid-body
+velocities at one instant, on any topology — a pair, an epicyclic set in all six
+arrangements, a compound planet, meshed planets, a hula stage — and adds torque
+from virtual work. Instantaneous over everything, and integrated over the one
+case where standing still is worth doubting.
 
 `crossed_path.py` builds both flanks as parametric surfaces and reaches the line
 of action through differential geometry; the crate reaches it through a

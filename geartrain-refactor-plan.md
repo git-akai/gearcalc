@@ -152,11 +152,26 @@ and that — not tidiness — is the argument for the refactor. Every one of tho
 four is a place two answers can silently disagree, and the corrections log is
 largely a record of exactly that happening.
 
-**One free assertion.** The all-ones vector satisfies every mesh row and every
-coupling row: a train locked solid turns as one body. If it does not, the
-assembler has a sign or a frame wrong. That is a law rather than a threshold,
-it costs nothing, and it localises the class of bug this refactor is most
-likely to introduce. It goes in as an internal invariant and as a test.
+**One free assertion, and it is worth less than the handoff claims.** The
+all-ones vector satisfies every mesh row and every coupling row: a train locked
+solid turns as one body. The handoff offers this as the check that localises a
+sign or frame bug, and this document repeated it.
+
+**It does not catch either.** Measured in Phase 1, by the method `CLAUDE.md`
+prescribes — flip a ring's tooth count to positive, run the suite, see what
+fires. The lock-up test passed; only the cross-check against `planetary::power`
+failed. The reason is that the row constructor derives the frame's coefficient
+from the counts it was handed, so the sum telescopes to zero whatever they are:
+*a check built from the thing under test measures nothing*, which is a pattern
+`docs/corrections.md` already names, met in the first check the new module
+offered.
+
+What it is worth, stated: it catches a row assembled anywhere but the
+constructors, and a frame coefficient written by hand — the classic
+transposition — and nothing else. The gate for a wrong **sign** or a
+misattributed **frame** is Phase 2's cross-check against the model being
+replaced, and the independent Python check beside it. Both are kept; neither is
+described as doing the other's job.
 
 ---
 
@@ -499,14 +514,17 @@ across a tooth-count grid, against the hula mapping, and against a new
 `tools/train_kinematics.py` that builds the same systems from
 `fractions.Fraction` and shares no code with Rust — extending
 `tools/hula_kinematics.py`, which becomes one case of it. The lock-up invariant
-goes in here, and is run against deliberately broken code in a worktree before
-it is trusted.
+goes in here, and **is run against the broken code before it is trusted** —
+which is how it was found to be silent on the two faults it was advertised for
+(§2), and why the sign and the frame answer to the cross-check instead.
 
 **Phase 2 — stages declare their wiring.** `Wired` and its four
 implementations. Both models live: a test asserts that the graph's ratio,
 efficiency-free torque split and backlash agree with each kind's own, on every
-preset and over a swept grid. This is the phase that finds sign and frame bugs,
-and the lock-up assertion is what localises them.
+preset and over a swept grid. **This is the phase that finds sign and frame
+bugs, and the cross-check is the only thing that can** — so a kind's sign
+should be read off its own `MeshKind` rather than written into the wiring by
+hand, which makes the fault unrepresentable instead of merely detectable.
 
 **Phase 3 — the graph answers.** Kind-matched accessors and `carry` are
 replaced by graph readings; `planetary::power` leaves production and stays as a
@@ -648,7 +666,7 @@ Traced against `CLAUDE.md`'s *To change X, touch these*.
 
 | Risk | Handling |
 |---|---|
-| **Sign or frame errors in the assembler** — the most likely defect class | the lock-up invariant, Phase 2's both-models-agree sweep, the independent Python check |
+| **Sign or frame errors in the assembler** — the most likely defect class | Phase 2's both-models-agree sweep and the independent Python check. **Not the lock-up invariant**, which was measured silent on both (§2) |
 | **The lossy generalisation moves shipped numbers** | Expected and allowed (§10.3), never accepted on sight: each moved figure gets a reason traced to the per-mesh direction, and each *unmoved* one gets evidence the new path was reached. The corpus raises the question; `train_kinematics.py`'s power balance answers it |
 | **The hula stage does not reduce** | Phase 6 is allowed to fail. `Stage::Hula` stays and the reason is written down |
 | **`TrainPanel.svelte` is 2675 lines with a branch per kind** | the grid renders from data the core declares; the pair keeps its branch; four become two |
