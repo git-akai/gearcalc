@@ -1273,6 +1273,121 @@ pub fn export_train(document_json: &str) -> Result<String, JsError> {
     export_train_impl(document_json).map_err(|e| JsError::new(&e))
 }
 
+/// **One member of a geartrain, as a gear tab would hold it.**
+///
+/// `{ train, materials, stage, member }` JSON in — a train request with the
+/// stage's index and the member's, in the order the stage's cards show them
+/// — and `{ params, internal, cutter }` out: the tooth the stage cut that
+/// member with, every automatic value resolved and every convention applied
+/// (`GearResult::params`), whether it is a ring, and the pinion cutter that
+/// cut it where it is. The gear tab **adopts** the member — a word chosen so
+/// it cannot be mistaken for the TOML `import_train`, which reads a document
+/// this tool wrote — and shows the tooth the stage rated rather than a
+/// rebuild from the inputs.
+///
+/// The train is solved here, in microseconds, because the tooth as built is
+/// an output: a shift the stage chose, an addendum a tip width held down, a
+/// helix shared out of a shaft angle. Nothing on the other side of the
+/// boundary could know those, and nothing should try.
+///
+/// # Errors
+///
+/// A malformed request; a stage or member index the train does not have; a
+/// train that has no answer, with its reason; and a **worm**, which is not a
+/// gear the tab can hold — a thread's proportions are its own — and which the
+/// panel lists greyed rather than omitted so a reader can see why it is not
+/// offered.
+#[wasm_bindgen]
+pub fn adopt_member(input: &str) -> Result<String, JsError> {
+    adopt_member_impl(input).map_err(|e| JsError::new(&e))
+}
+
+#[derive(Deserialize)]
+struct AdoptRequest {
+    train: gear_core::train::Train,
+    #[serde(default)]
+    materials: Option<gear_core::MaterialLibrary>,
+    stage: usize,
+    member: usize,
+}
+
+/// What [`adopt_member`] answers.
+#[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
+pub struct Adopted {
+    /// The tooth as the stage cut it.
+    pub params: GearParams,
+    /// Whether the member is a ring — cut by a pinion cutter — and so the
+    /// tab's *internal* kind.
+    pub internal: bool,
+    /// The cutter that cut it, where it is a ring.
+    pub cutter: Option<CutterRef>,
+}
+
+/// What adopting a member came to — the member, or why there is none, as a
+/// [`Note`] the catalogue renders, for the reason [`TrainOutcome`] gives: a
+/// train that will not build is an answer a designer is regularly holding,
+/// and the words belong to the catalogue.
+#[derive(Serialize)]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "wasm/")
+)]
+pub struct AdoptOutcome {
+    pub adopted: Option<Adopted>,
+    pub failure: Option<Note>,
+}
+
+fn adopt_member_impl(input: &str) -> Result<String, String> {
+    let req: AdoptRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    // A stage or member the train does not have, or a worm, is a defect on
+    // the other side of the boundary — the panel lists what can be adopted —
+    // so each is a refusal rather than an outcome.
+    let stage = req
+        .train
+        .stages
+        .get(req.stage)
+        .ok_or_else(|| format!("the train has no stage {}", req.stage + 1))?;
+    if req.member >= stage.members().len() {
+        return Err(format!(
+            "stage {} has no member {}",
+            req.stage + 1,
+            req.member + 1
+        ));
+    }
+    if matches!(stage, gear_core::train::Stage::Worm(_)) && req.member == 0 {
+        return Err("a worm is not a gear the tab can hold".to_string());
+    }
+    let lib = req.materials.unwrap_or_else(gear_io::default_library);
+    let outcome = match gear_core::train::solve_train(&req.train, &lib) {
+        Ok(result) => {
+            let cutter = stage.member_cutter(req.member).map(|c| CutterRef {
+                teeth: c.teeth,
+                addendum: c.addendum,
+                tip_round: c.tip_round,
+            });
+            AdoptOutcome {
+                adopted: Some(Adopted {
+                    params: result.stages[req.stage].members()[req.member].params,
+                    internal: cutter.is_some(),
+                    cutter,
+                }),
+                failure: None,
+            }
+        }
+        Err(e) => AdoptOutcome {
+            adopted: None,
+            failure: Some(e.note()),
+        },
+    };
+    serde_json::to_string(&outcome).map_err(|e| e.to_string())
+}
+
 /// **A stage with its over-determined inputs relieved.**
 ///
 /// `{ stage, just, figures }` JSON in — the stage as it now stands, the
@@ -1519,6 +1634,69 @@ mod tests {
                 && junction < v["root_radius"].as_f64().unwrap(),
             "the junction is on the tooth, between tip and root"
         );
+    }
+
+    /// **A member adopted is the tooth the stage cut, with its kind and its
+    /// cutter** — a planetary ring comes over internal with the set's cutter,
+    /// a worm stage's wheel comes over as the helical gear it is, and the
+    /// worm itself is refused. A gear tab solving the adopted parameters is
+    /// then showing the tooth the stage rated, which is the whole point of
+    /// adopting rather than retyping.
+    #[test]
+    fn a_member_adopted_is_the_tooth_the_stage_cut() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let request = |kind: &str, member: usize| {
+            let mut train = d["train"].clone();
+            train["stages"] = serde_json::json!([d[kind]]);
+            serde_json::json!({ "train": train, "stage": 0, "member": member }).to_string()
+        };
+        let adopt = |kind: &str, member: usize| -> serde_json::Value {
+            serde_json::from_str(&adopt_member_impl(&request(kind, member)).unwrap()).unwrap()
+        };
+
+        let ring = adopt("planetary_stage", 2);
+        let a = &ring["adopted"];
+        assert_eq!(a["internal"], true);
+        assert_eq!(a["cutter"], d["planetary_stage"]["cutter"]);
+        assert_eq!(a["params"]["teeth"], d["planetary_stage"]["ring"]["teeth"]);
+        assert!(ring["failure"].is_null());
+
+        let sun = adopt("planetary_stage", 0);
+        assert_eq!(sun["adopted"]["internal"], false);
+        assert!(sun["adopted"]["cutter"].is_null());
+        // The planet opposes the sun's hand and the ring shares the planet's:
+        // the adopted helix carries the member's own sign.
+        let planet = adopt("planetary_stage", 1);
+        let (hs, hp) = (
+            sun["adopted"]["params"]["helix_angle"].as_f64().unwrap(),
+            planet["adopted"]["params"]["helix_angle"].as_f64().unwrap(),
+        );
+        assert_eq!(hs, -hp);
+
+        let wheel = adopt("worm_stage", 1);
+        assert_eq!(wheel["adopted"]["internal"], false);
+        assert!(wheel["adopted"]["params"]["helix_angle"].as_f64().unwrap() > 0.0);
+        let worm = adopt_member_impl(&request("worm_stage", 0)).unwrap_err();
+        assert!(worm.contains("worm"), "{worm}");
+
+        // ...and the gear tab, solving what it adopted, builds it as asked:
+        // the stage's own guards already held every dimension, so the tab
+        // has nothing to clamp and the pitch diameter is the stage's.
+        let spur = adopt("spur_stage", 0);
+        let params = &spur["adopted"]["params"];
+        let solved: serde_json::Value = serde_json::from_str(
+            &solve_gear_impl(&serde_json::json!({ "params": params }).to_string()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            solved["clamps"].as_array().map(Vec::len),
+            Some(0),
+            "{:?}",
+            solved["clamps"]
+        );
+        let z = params["teeth"].as_f64().unwrap();
+        let m = params["module"].as_f64().unwrap();
+        assert!((solved["pitch_diameter"].as_f64().unwrap() - z * m).abs() < 1e-12);
     }
 
     #[test]

@@ -35,6 +35,7 @@
   import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
   import { notes, type Notes } from "./notes";
+  import { gearNumber as trainGearNumber, hulaRing } from "./members";
 
   /** **Resolving an over-determined stage is the core's rule, not this file's.**
    *
@@ -88,7 +89,13 @@
 
   // Every number on screen comes back from Rust. Nothing here computes a
   // result — the project rule — so this is the only place a value is produced.
-  const result = $derived(solveTrain(tab.train));
+  // ...against the library the reader has, where they imported one — the
+  // shipped one otherwise, which Rust supplies for itself. It was never
+  // sent, so an imported library reached the material readouts and not the
+  // ratings.
+  const result = $derived(
+    solveTrain(tab.train, library.origin === null ? undefined : library.materials),
+  );
   /** The answer, where there is one — `undefined` reads through every formatter
    *  below as a blank rather than as a row that is not there. */
   const solved = $derived(result.result ?? undefined);
@@ -173,11 +180,10 @@
     if (tab.train.stages.length === 0) addStageOfKind(STAGE_KINDS[0]);
   }
 
-  /** Gear numbering runs across the whole train: stage 1 is gears 1 and 2,
-   *  stage 2 is gears 3 and 4, as the specification describes. */
-  function gearNumber(stage: number, which: number): number {
-    return stage * 2 + which + 1;
-  }
+  /** Gear numbering runs across the whole train, counting every member of
+   *  the stages before — written once in `members.ts`, where the gear tab's
+   *  adopt list reads the same numbers. */
+  const gearNumber = (stage: number, which: number) => trainGearNumber(tab.train, stage, which);
 
   /** The candidates for one note slot: a blank to reserve the space, the note
    *  itself when the stage has solved, and the out-of-range message when the
@@ -1203,7 +1209,7 @@
   {/if}
 {/snippet}
 
-<header>
+<header class="tab-bar">
   <input class="title" bind:value={tab.name} aria-label={t("ui.train_name")} />
   <div class="actions">
     <button onclick={saveTrain}>{t("ui.train_export")}</button>
@@ -1233,7 +1239,7 @@
 {/if}
 
 {#if confirmingDelete}
-  <div class="confirm" role="alertdialog">
+  <div class="tab-confirm" role="alertdialog">
     <span>{t("ui.train_delete_question", { name: tab.name || t("ui.train_unnamed") })}</span>
     <button
       class="danger"
@@ -1971,7 +1977,7 @@
                    says the same thing in the core. Reading it off the solve
                    instead left the cards, and the tool that shapes the ring,
                    labelled from a stale answer before the first one arrived. -->
-              {@const ring = stage.gears[m * 2].teeth >= stage.gears[m * 2 + 1].teeth ? m * 2 : m * 2 + 1}
+              {@const ring = hulaRing(stage, m)}
               {@const pinion = ring === m * 2 ? m * 2 + 1 : m * 2}
               <h4 class="mesh">{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
               <div class="grid shared">
@@ -2118,26 +2124,8 @@
 </div>
 
 <style>
-  header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-  }
-  .title {
-    font: inherit;
-    font-size: 1.1rem;
-    flex: 1;
-    background: none;
-    border: none;
-    border-bottom: 1px solid var(--rule);
-    color: var(--fg);
-    padding: 0.2rem 0;
-  }
-  .actions {
-    display: flex;
-    gap: 0.35rem;
-  }
+  /* The bar and the delete strip are `app.css`'s, shared with the gear tab;
+     what follows serves the buttons below them. */
   button {
     font: inherit;
     font-size: 0.8rem;
@@ -2158,15 +2146,6 @@
   .danger:hover {
     border-color: var(--warn);
     color: var(--warn);
-  }
-  .confirm {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--warn);
-    border-radius: 3px;
-    margin-bottom: 0.75rem;
   }
   /* Inputs on the left, stacked; what they produce beside them, also stacked.
      The same shape as a gear card and its readout, without the border or the

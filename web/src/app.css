@@ -98,3 +98,77 @@ body {
     sans-serif;
   font-size: 15px;
 }
+
+/* **The bar at the top of a tab** — its name, and what can be done to it —
+   is the one thing the gear tab and the geartrain tab draw identically, so it
+   is written once here rather than once per panel: the two had drifted on the
+   title's weight, the buttons' background and a quarter-rem of spacing, and
+   the eye reads a difference in the same control as a difference in kind.
+   The gear tab's treatment is the one kept. A panel's own `button` rule still
+   serves the buttons below the bar; these are more specific and win here. */
+header.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+header.tab-bar .title {
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  color: var(--fg);
+}
+header.tab-bar .title:hover,
+header.tab-bar .title:focus {
+  border-color: var(--rule);
+  background: var(--bg);
+}
+header.tab-bar .actions {
+  display: flex;
+  gap: 0.4rem;
+}
+header.tab-bar .actions button,
+header.tab-bar .actions select,
+.tab-confirm button {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--fg);
+  cursor: pointer;
+}
+header.tab-bar .actions button:hover:not(:disabled),
+header.tab-bar .actions select:hover,
+.tab-confirm button:hover {
+  background: var(--hover);
+}
+header.tab-bar .actions button.danger,
+.tab-confirm button.danger {
+  color: var(--warn);
+}
+/* A select drawn as a button: no value shows, only its label, since choosing
+   an entry acts at once and the control returns to the label. */
+header.tab-bar .actions select {
+  appearance: none;
+  max-width: 14rem;
+  text-overflow: ellipsis;
+}
+/* The strip a delete asks its question in, under the bar, on both tabs. */
+.tab-confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--warn);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}

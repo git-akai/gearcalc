@@ -103,6 +103,20 @@ const out = {
       return [k, JSON.parse(w.relieve_stage(JSON.stringify({ stage, just, figures })))];
     }),
   ),
+  // **One member of each kind adopted**, including a planetary ring so the
+  // cutter travels, and a worm stage's wheel — its worm is refused, which
+  // the entry point's own test holds.
+  adopt_member: call("adopt_member", () =>
+    [
+      ["spur_stage", 1],
+      ["worm_stage", 1],
+      ["planetary_stage", 2],
+      ["hula_stage", 0],
+    ].map(([k, member]) => {
+      const train = { ...structuredClone(defaults.train), stages: [defaults[k]] };
+      return [k, JSON.parse(w.adopt_member(JSON.stringify({ train, materials: library, stage: 0, member })))];
+    }),
+  ),
   solve_train: call("solve_train", () =>
     JSON.parse(w.solve_train(JSON.stringify({ train: defaults.train, library }))),
   ),

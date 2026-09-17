@@ -933,6 +933,41 @@ future reader knows it was read and set aside rather than missed.
 Not a queue with a head; this is what a next session would pick from.
 
 - **Further UI work**, as it is asked for.
+- **The two panels' remaining differences of style**, catalogued when their
+  top bars were made one (`app.css`, *the bar at the top of a tab*), so the
+  next alignment starts from a list rather than a diff. The gear tab's
+  treatment is the one to keep unless the geartrain's has a reason:
+  - section headings — the gear tab's uppercase `h2` at 0.7 rem against the
+    geartrain's accordion `.head` at full size with the stage's figures inline;
+  - field rows — `1fr 7rem 3.5rem` on the gear tab against `1fr 6rem 3.5rem`
+    on a stage card, so the same input box is a rem narrower on one tab;
+  - the field grid — a single column on the gear tab against
+    `auto-fill, minmax(15rem, 1fr)` on a stage, which is a choice about how
+    many inputs a stage has and may stay;
+  - notes under a field — one shape in both, but the geartrain's `.hint` for a
+    note outside its label undoes the field gap by hand;
+  - readouts — the gear tab's label/value rows against the geartrain's `.out`
+    two-column grid at a different gap;
+  - buttons below the bar — panel background on the gear tab, none on the
+    geartrain's; the disabled state is opacity on one and a muted colour on
+    the other;
+  - error and notice paragraphs — the same tokens, but the gear tab has no
+    notice slot;
+  - the viewport — its canvas is sized when it draws and not when the window
+    changes, so a resize stretches the drawing until something redraws it.
+- **Where a gear tab and a stage member still differ in what they describe**,
+  noted while the tab learned to adopt a member. Back end only — the tab
+  needs none of the stage's solvers — and the same `GearParams` throughout:
+  - a stage caps the addendum at what `min_tip_width` allows and raises the
+    shift to clear undercut, each behind a toggle; the gear tab reports both
+    conditions in its ranges and applies neither, which is right for a tab
+    that is a free drawing but is a difference a reader will meet the moment
+    they adopt a member and lower its shift;
+  - a stage asks the undercut question at a `working_depth` the designer may
+    set; the gear tab asks it at the dedendum and offers no box;
+  - a stage enforces `k₂ = 2 − k₁` across a mesh; the gear tab's `k` is free;
+  - the gear tab alone has the eccentric feature and the metrology; a stage
+    alone has a material, a face width and a rim. None of those is a drift.
 - **Multiply the set out before adopting anything else from a standard.**
   `tools/iso_6336_3_stack.py` is the pattern: a factor's direction is a property
   of the set it was calibrated in, not of the factor, and this project has been

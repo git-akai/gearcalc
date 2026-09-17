@@ -79,6 +79,8 @@ export type { Value } from "./core/Value";
 export type { Variation } from "./core/Variation";
 export type { Widths } from "./core/Widths";
 export type { ZoneLimit } from "./core/ZoneLimit";
+export type { AdoptOutcome } from "./wasm/AdoptOutcome";
+export type { Adopted } from "./wasm/Adopted";
 export type { ClassRef } from "./wasm/ClassRef";
 export type { CutterRef } from "./wasm/CutterRef";
 export type { Defaults } from "./wasm/Defaults";

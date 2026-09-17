@@ -1338,6 +1338,14 @@ pub struct GearCase {
     ts(export, export_to = "core/")
 )]
 pub struct GearResult {
+    /// **The tooth as built** — the parameters the stage cut this member
+    /// with, every automatic value resolved and every convention applied: the
+    /// shift in force, the addendum the tip allows, the helix with the hand
+    /// this member has, a planet's `2 − k`. What the gear tab receives when it
+    /// adopts a member ([`Stage::member_cutter`] says whether it is a ring),
+    /// and what a caller that wants to draw or measure this member starts
+    /// from, rather than rebuilding it from the inputs and hoping to agree.
+    pub params: GearParams,
     /// The shift in force, after any automatic calculation.
     pub profile_shift: f64,
     /// Likewise the addendum.
@@ -1454,6 +1462,7 @@ impl GearResult {
         let pitch_diameter =
             f64::from(f.params.teeth) * f.params.module / f.params.helix_angle.to_radians().cos();
         Self {
+            params: *f.params,
             profile_shift: f.profile_shift,
             addendum: f.params.addendum,
             face_width: f.face_width,
@@ -2317,6 +2326,24 @@ impl Stage {
     #[must_use]
     pub fn members(&self) -> Vec<&StageGear> {
         self.kind().members()
+    }
+
+    /// **The pinion cutter a member is cut by, where it is a ring** — which is
+    /// the one question *is this member internal?* has, asked of the stage
+    /// that knows: a pair has no ring, a set's ring is its third member, and
+    /// a hula stage's are the larger gear of each mesh, cut by that mesh's
+    /// cutter. `None` for every rack-cut member, including a worm.
+    #[must_use]
+    pub fn member_cutter(&self, i: usize) -> Option<&crate::ring::Cutter> {
+        match self {
+            Self::Spur(_) | Self::Worm(_) => None,
+            Self::Planetary(p) => (i == 2).then_some(&p.cutter),
+            Self::Hula(h) => {
+                let teeth = crate::hula::Teeth(h.gears.each_ref().map(|g| g.teeth));
+                let pair = teeth.pair(i / 2).ok()?;
+                (pair.ring == i).then_some(&h.cutter[i / 2])
+            }
+        }
     }
 
     /// **Every argument this stage's inputs can get into with each other.**
@@ -5183,6 +5210,75 @@ mod tests {
             .into_iter()
             .flat_map(|g| g.order.into_iter().flatten())
             .collect()
+    }
+
+    /// **A member's result carries the tooth it was cut with**, agreeing with
+    /// every figure the result quotes beside it — so a gear tab that adopts
+    /// the member shows the tooth the stage rated, and not a rebuild from the
+    /// inputs that could drift from it. On every kind, every member: the
+    /// shift, the addendum and the helix in `params` are the ones in force,
+    /// the count and module are the stage's, and a rack-cut member rebuilt
+    /// from `params` alone is the reported pitch diameter; a ring is the
+    /// member its stage cuts with a pinion cutter, and only that member.
+    #[test]
+    fn a_members_result_carries_the_tooth_it_was_cut_with() {
+        let lib = library();
+        let mut checked = 0u32;
+        for stage in every_kind() {
+            let mut t = two_stage();
+            t.stages = vec![stage.clone()];
+            let r = solve_train(&t, &lib).expect("every preset solves");
+            let inputs = stage.members();
+            for (i, g) in r.stages[0].members().iter().enumerate() {
+                assert_eq!(
+                    g.params.profile_shift, g.profile_shift,
+                    "{stage:?} member {i}"
+                );
+                assert_eq!(g.params.addendum, g.addendum, "{stage:?} member {i}");
+                assert_eq!(g.params.helix_angle, g.helix_angle, "{stage:?} member {i}");
+                assert_eq!(g.params.teeth, inputs[i].teeth, "{stage:?} member {i}");
+                assert_eq!(
+                    g.params.dedendum, inputs[i].dedendum,
+                    "{stage:?} member {i}"
+                );
+                assert_eq!(
+                    g.params.root_radius, inputs[i].root_radius,
+                    "{stage:?} member {i}"
+                );
+                let rebuilt = Tooth::new(g.params);
+                assert!(
+                    (rebuilt.params.teeth as f64 * rebuilt.params.module
+                        / rebuilt.params.helix_angle.to_radians().cos()
+                        - g.pitch_diameter)
+                        .abs()
+                        < 1e-12,
+                    "{stage:?} member {i}: the tooth rebuilt from params is not the one reported"
+                );
+                checked += 1;
+            }
+            let rings: Vec<usize> = (0..inputs.len())
+                .filter(|i| stage.member_cutter(*i).is_some())
+                .collect();
+            let expect: Vec<usize> = match &stage {
+                Stage::Spur(_) | Stage::Worm(_) => vec![],
+                Stage::Planetary(_) => vec![2],
+                Stage::Hula(h) => (0..2)
+                    .map(|m| {
+                        let (a, b) = (2 * m, 2 * m + 1);
+                        if h.gears[a].teeth > h.gears[b].teeth {
+                            a
+                        } else {
+                            b
+                        }
+                    })
+                    .collect(),
+            };
+            assert_eq!(
+                rings, expect,
+                "which members {stage:?} cuts with a pinion cutter"
+            );
+        }
+        assert_eq!(checked, 2 + 2 + 3 + 4);
     }
 
     /// **The declared freedoms describe inputs the stage has, and each group

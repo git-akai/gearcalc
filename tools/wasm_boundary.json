@@ -1,5 +1,6 @@
 {
  "entries": [
+  "adopt_member",
   "default_materials",
   "defaults",
   "export_dxf",
@@ -957,23 +958,23 @@
    "ok": [
     [
      "en",
-     450
+     454
     ],
     [
      "de",
-     450
+     454
     ],
     [
      "pt",
-     450
+     454
     ],
     [
      "zh-Hans",
-     450
+     454
     ],
     [
      "zh-Hant",
-     450
+     454
     ]
    ]
   },
@@ -5886,6 +5887,110 @@
     ]
    ]
   },
+  "adopt_member": {
+   "ok": [
+    [
+     "spur_stage",
+     {
+      "adopted": {
+       "params": {
+        "module": 1,
+        "pressure_angle": 20,
+        "teeth": 43,
+        "profile_shift": 0,
+        "helix_angle": 0,
+        "addendum": 1,
+        "dedendum": "1.2500000000000000",
+        "root_radius": "0.38000000000000000",
+        "thickness_mod": 1,
+        "angular_shift": 0,
+        "index_offset": 0
+       },
+       "internal": false,
+       "cutter": null
+      },
+      "failure": null
+     }
+    ],
+    [
+     "worm_stage",
+     {
+      "adopted": {
+       "params": {
+        "module": 1,
+        "pressure_angle": 20,
+        "teeth": 40,
+        "profile_shift": 0,
+        "helix_angle": "8.2132107017381912",
+        "addendum": 1,
+        "dedendum": "1.2500000000000000",
+        "root_radius": "0.38000000000000000",
+        "thickness_mod": 1,
+        "angular_shift": 0,
+        "index_offset": 0
+       },
+       "internal": false,
+       "cutter": null
+      },
+      "failure": null
+     }
+    ],
+    [
+     "planetary_stage",
+     {
+      "adopted": {
+       "params": {
+        "module": 1,
+        "pressure_angle": 20,
+        "teeth": 72,
+        "profile_shift": 0,
+        "helix_angle": 0,
+        "addendum": 1,
+        "dedendum": "1.2500000000000000",
+        "root_radius": "0.38000000000000000",
+        "thickness_mod": 1,
+        "angular_shift": 0,
+        "index_offset": 0
+       },
+       "internal": true,
+       "cutter": {
+        "teeth": 20,
+        "addendum": "1.2500000000000000",
+        "tip_round": "0.20000000000000001"
+       }
+      },
+      "failure": null
+     }
+    ],
+    [
+     "hula_stage",
+     {
+      "adopted": {
+       "params": {
+        "module": 1,
+        "pressure_angle": 20,
+        "teeth": 65,
+        "profile_shift": "0.095866786133363177",
+        "helix_angle": 0,
+        "addendum": "0.69999999999999996",
+        "dedendum": 1,
+        "root_radius": "0.38000000000000000",
+        "thickness_mod": 1,
+        "angular_shift": 0,
+        "index_offset": 0
+       },
+       "internal": true,
+       "cutter": {
+        "teeth": 20,
+        "addendum": 1,
+        "tip_round": "0.20000000000000001"
+       }
+      },
+      "failure": null
+     }
+    ]
+   ]
+  },
   "solve_train": {
    "ok": {
     "result": {
@@ -6027,6 +6132,19 @@
        },
        "gears": [
         {
+         "params": {
+          "module": 1,
+          "pressure_angle": 20,
+          "teeth": 17,
+          "profile_shift": "0.0056565377194108812",
+          "helix_angle": 0,
+          "addendum": 1,
+          "dedendum": "1.2500000000000000",
+          "root_radius": "0.38000000000000000",
+          "thickness_mod": 1,
+          "angular_shift": 0,
+          "index_offset": 0
+         },
          "profile_shift": "0.0056565377194108812",
          "addendum": 1,
          "face_width": "0.024596268257586214",
@@ -6181,6 +6299,19 @@
          }
         },
         {
+         "params": {
+          "module": 1,
+          "pressure_angle": 20,
+          "teeth": 43,
+          "profile_shift": 0,
+          "helix_angle": 0,
+          "addendum": 1,
+          "dedendum": "1.2500000000000000",
+          "root_radius": "0.38000000000000000",
+          "thickness_mod": 1,
+          "angular_shift": 0,
+          "index_offset": 0
+         },
          "profile_shift": 0,
          "addendum": 1,
          "face_width": "0.024596268257586214",

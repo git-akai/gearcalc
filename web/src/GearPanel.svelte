@@ -23,7 +23,8 @@
     note,
     t,
   } from "./core";
-  import { developer, setKind, workspace, type GearTab as Tab } from "./state.svelte";
+  import { developer, setKind, trains, workspace, type GearTab as Tab } from "./state.svelte";
+  import { memberRefs } from "./members";
   import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
   import { notes } from "./notes";
@@ -280,17 +281,50 @@
   const um = (v: number) => `${v.toFixed(1)} µm`;
 </script>
 
-<header>
+<header class="tab-bar">
   <input class="title" bind:value={tab.name} aria-label={t("ui.gear_name")} />
   <div class="actions">
-    <button onclick={() => workspace.copy(tab.id)}>{t("ui.gear_copy")}</button>
+    <!-- **A member of an open geartrain, adopted as a tab.** One native
+         select, grouped by geartrain in the sidebar's order, a member per
+         option under the numbering its cards carry; a worm is listed greyed,
+         so a reader sees why it is not offered. Choosing one makes the tab
+         and the control snaps back to its label, so it reads as a button
+         with a menu and holds no state of its own. -->
+    <select
+      class="adopt"
+      value=""
+      aria-label={t("ui.gear_from_train")}
+      onchange={(e) => {
+        const [train, stage, member] = e.currentTarget.value.split(":").map(Number);
+        e.currentTarget.value = "";
+        const source = trains.tabs[train];
+        const ref = memberRefs(source.train).find((r) => r.stage === stage && r.member === member);
+        if (ref) workspace.adopt(source, stage, member, ref.label);
+      }}
+    >
+      <option value="" disabled>{t("ui.gear_from_train")}</option>
+      {#each trains.tabs as source, i (source.id)}
+        <optgroup label={source.name || t("ui.train_unnamed")}>
+          {#each memberRefs(source.train) as ref (ref.number)}
+            <option value={`${i}:${ref.stage}:${ref.member}`} disabled={!ref.adoptable}>
+              {t("ui.gear_from_train_member", { stage: String(ref.stage + 1), member: ref.label })}
+            </option>
+          {/each}
+        </optgroup>
+      {/each}
+    </select>
     <button onclick={() => workspace.create()}>{t("ui.gear_new")}</button>
+    <button onclick={() => workspace.copy(tab.id)}>{t("ui.gear_copy")}</button>
     <button class="danger" onclick={() => (confirmingDelete = true)}>{t("ui.gear_delete")}</button>
   </div>
 </header>
 
+{#if workspace.adoptError !== null}
+  <p class="error">{t("ui.gear_from_train_failed", { reason: workspace.adoptError })}</p>
+{/if}
+
 {#if confirmingDelete}
-  <div class="confirm" role="alertdialog">
+  <div class="tab-confirm" role="alertdialog">
     <span>{t("ui.gear_delete_question", { name: tab.name || t("ui.gear_unnamed") })}</span>
     <button
       class="danger"
@@ -796,33 +830,8 @@
 </div>
 
 <style>
-  header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-  .title {
-    font: inherit;
-    font-size: 1.15rem;
-    font-weight: 600;
-    flex: 1;
-    min-width: 0;
-    padding: 0.25rem 0.4rem;
-    border: 1px solid transparent;
-    border-radius: 3px;
-    background: none;
-    color: var(--fg);
-  }
-  .title:hover,
-  .title:focus {
-    border-color: var(--rule);
-    background: var(--bg);
-  }
-  .actions {
-    display: flex;
-    gap: 0.4rem;
-  }
+  /* The bar and the delete strip are `app.css`'s, shared with the geartrain
+     tab; what follows serves the buttons below them. */
   button {
     font: inherit;
     font-size: 0.8rem;
@@ -848,17 +857,6 @@
     border-color: var(--accent);
     color: var(--on-accent);
     margin-top: 0.5rem;
-  }
-
-  .confirm {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 1rem;
-    border: 1px solid var(--warn);
-    border-radius: 4px;
-    font-size: 0.85rem;
   }
 
   .columns {

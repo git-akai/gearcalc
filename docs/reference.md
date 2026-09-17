@@ -2424,6 +2424,11 @@ over-specified, asked of the core so the front end does not hold a copy — and
 `import_train` applies the same rule to every stage it reads, reporting
 `adjusted` where a file asked for what no stage can honour
 ([rationale](rationale.md#a-file-is-adjusted-to-what-the-tool-can-honour)).
+`adopt_member` is the one that hands a train's member to the gear tab: it
+solves the train and returns `GearResult::params`, **the tooth as built** —
+every automatic value resolved, every guard applied — with whether the member
+is a ring and the cutter that cut it
+([rationale](rationale.md#a-member-is-adopted-not-imported)).
 
 **A `null` that crosses is not always a `None`.** `serde_json` writes an
 infinity and a NaN as `null`, which is indistinguishable from a field that

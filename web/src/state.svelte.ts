@@ -5,9 +5,11 @@
 // Rust on each change.
 
 import {
+  adoptMember,
   defaults,
   defaultLibrary,
   defaultTrain,
+  note,
   t,
   type CutterRef,
   FIELDS,
@@ -165,6 +167,40 @@ class Workspace {
     const t = freshTab();
     this.tabs.push(t);
     this.select(t.id);
+  }
+
+  /** Set when the last adopt failed, so the panel can say why. */
+  adoptError = $state<string | null>(null);
+
+  /** **A new tab holding one member of an open geartrain** — the tooth the
+   *  stage cut, as Rust reports it, with the member's kind and, for a ring,
+   *  its cutter. Named *"<train> - <member>"*, and selected, like a tab made
+   *  any other way; the rest of the tab is a fresh one's.
+   *
+   *  A train that will not build has no tooth to adopt, and says why in the
+   *  catalogue's words rather than leaving a tab half-filled. */
+  adopt(train: TrainTab, stage: number, member: number, label: string) {
+    const r = adoptMember(
+      train.train,
+      stage,
+      member,
+      library.origin === null ? undefined : library.materials,
+    );
+    if ("error" in r) {
+      this.adoptError = r.error;
+      return;
+    }
+    if (r.adopted === null) {
+      this.adoptError = r.failure === null ? "" : note(r.failure);
+      return;
+    }
+    const tab = freshTab(`${train.name} - ${label}`);
+    tab.params = r.adopted.params;
+    tab.kind = r.adopted.internal ? "internal" : "external";
+    if (r.adopted.cutter !== null) tab.cutter = r.adopted.cutter;
+    this.tabs.push(tab);
+    this.adoptError = null;
+    this.select(tab.id);
   }
 
   /** Duplicates the tab, name included, as the specification requires. */
