@@ -78,9 +78,9 @@ case of a path, hand-derived.
 
 This refactor is that test. It is also the answer to the third port.
 
-### 1.3 Two flaws found on the way in
+### 1.3 Three flaws found on the way in
 
-Both are things to fix, not things to work around.
+All are things to fix, not things to work around.
 
 **(a) A geometric refusal kills the kinematics.** `solve_train` returns
 `Err(TrainError::InStage { .. })` the moment any stage fails, and the whole
@@ -100,6 +100,25 @@ planetary's ratio is a single number and why two epicyclic stages cannot share
 a shaft. `docs/rationale.md#a-planetary-needs-the-held-shaft-named` argues
 correctly that the shaft must be *named* — it is the level it is named at that
 was wrong.
+
+**(c) `TrainError::NoContact` carries three different meanings**, and says the
+wrong one twice. Found by Phase 0's `unclosed` fixture, which reports *"the
+teeth never come into contact"* for a set whose teeth are fine and whose two
+centre distances simply cannot be brought together. The three sites:
+
+| `train/planetary.rs` | what actually happened | what it says |
+|---|---|---|
+| `planetary::solve(…).ok_or(NoContact)` | no planet shift closes the set | the teeth never touch |
+| `planetary::power(…).ok_or(NoContact)` ×2 | no self-consistent power flow — self-locking, or a shaft named as the input that is not driving | the teeth never touch |
+| `ContactPath::new(…).ok_or(NoContact)` ×2 | the teeth genuinely never touch | correct |
+
+This is a *user-visible* wrong sentence, since the variant renders through
+`error.train_no_contact` in five catalogues. It is **deferred to Phase 3**
+rather than patched now: the error taxonomy is one of the things the
+kinematics/geometry split reorganises — a closure failure and a power-flow
+refusal end up on opposite sides of it — and fixing the wording twice would be
+the churn this project's file-format rule exists to avoid. Recorded here so the
+deferral is a decision rather than an oversight.
 
 ---
 
@@ -492,9 +511,13 @@ and the lock-up assertion is what localises them.
 **Phase 3 — the graph answers.** Kind-matched accessors and `carry` are
 replaced by graph readings; `planetary::power` leaves production and stays as a
 test oracle. The kinematic solve is separated from the geometric one so that a
-stage that will not close still reports its ratio (§1.3a). Every golden diff is
-examined one at a time: a change detector's diff is a question even when the
-answer looks better.
+stage that will not close still reports its ratio (§1.3a) — and the error
+taxonomy is reorganised along that same seam, which is where `NoContact`'s
+three meanings are separated and the two wrong sentences fixed (§1.3c). Every
+golden diff is examined one at a time: a change detector's diff is a question
+even when the answer looks better, and `kinematics.txt`'s `unclosed` and
+`chain-unclosed` rows turning from *no answer* into ratios is the diff this
+phase exists to produce.
 
 **Phase 4 — ports, conditions, mobility.** Ports as named shafts, conditions as
 a list under the existing relief walk, the affine family as a result. Load cases

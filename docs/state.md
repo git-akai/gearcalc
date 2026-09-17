@@ -118,6 +118,7 @@ cargo run --bin gear-cli -- shifts 9 37            # the shifts a pair loses lea
 cargo run --bin gear-cli -- train                  # a two-stage train
 cargo run --bin gear-cli -- train mixed            # ...with a worm stage in it
 cargo run --bin gear-cli -- train held             # ...that worm holding more than it drives
+cargo run --bin gear-cli -- kinematics             # motion, torque, loss and play alone, every kind and every arrangement
 cargo run --bin gear-cli -- trainfile [path]       # a train to TOML and back, answers compared
 cargo run --bin gear-cli -- worm 1 40 7 90         # a worm pair, both directions
 cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
@@ -145,7 +146,12 @@ line, a `figures-verbatim` marker that `tools/check_figures.py` reads. If the
 construction moves, that check fails and names the file; re-run the command and
 paste the body back in.
 
-The last two share no code with the crate — that is their whole purpose.
+**All four Python scripts share no code with the crate** — that is their whole
+purpose, and `README.md` counts them the same way. This paragraph said "the last
+two" from when there were two of them, and then named only one of those; a
+curated count that reads as exhaustive is the failure this section's own opening
+is about, met one paragraph further down.
+
 `crossed_path.py` builds both flanks as parametric surfaces and reaches the line
 of action through differential geometry; the crate reaches it through a
 construction in lines and angles.

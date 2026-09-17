@@ -13,6 +13,7 @@
 //! Proximity is not a mechanism; a table that *is* the dispatch is.
 
 mod diagram;
+mod kinematics;
 mod matrix;
 
 use gear_core::{GearParams, Tooth};
@@ -244,6 +245,14 @@ const COMMANDS: &[Command] = &[
         summary: "a two-stage geartrain, end to end; `mixed` puts a worm stage in it, `held` back-drives that worm harder than the drive does, `toggles` turns on every optional control",
         run: |a| train_report(a.get(1).map(String::as_str)),
         record: Record::Cases(&["train", "train mixed", "train held", "train toggles"]),
+        slow: false
+    },
+    Command {
+        name: "kinematics",
+        args: "[fixture]",
+        summary: "motion, torque, loss and play alone, for every stage kind and every epicyclic arrangement — what a graph over shafts and meshes has to reproduce",
+        run: |a| kinematics::run(a.get(1).map(String::as_str)),
+        record: Record::Cases(&["kinematics"]),
         slow: false
     },
     Command {
