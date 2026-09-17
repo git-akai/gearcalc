@@ -177,7 +177,7 @@ header.tab-bar .actions button.danger,
    and weight (`.section-heading .aside`). */
 .section-heading {
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted);

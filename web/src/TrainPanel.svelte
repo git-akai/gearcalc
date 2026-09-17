@@ -1355,7 +1355,7 @@
           {/if}
         </button>
         <span class="control">
-          <Switch small label={t("ui.train_case_enabled")} on={c.enabled} set={(v) => (c.enabled = v)} />
+          <Switch label={t("ui.train_case_enabled")} on={c.enabled} set={(v) => (c.enabled = v)} />
         </span>
       </div>
       {#if tab.openCases[i]}
@@ -2125,10 +2125,11 @@
 
 <style>
   /* The bar, the delete strip and every `.action` — a stage or a case added
-     or removed — are `app.css`'s, shared with the gear tab; this serves the
-     buttons that show a state or open a section, and leaves the actions to
-     the shared rule rather than outranking it by being scoped. */
-  button:not(.action) {
+     or removed — are `app.css`'s, shared with the gear tab, and a `.head` is
+     a heading that happens to be a button; this serves the buttons that show
+     a state, and leaves those to their own rules rather than outranking them
+     by being scoped (`:not()` counts toward specificity, so this would). */
+  button:not(.action):not(.head) {
     font: inherit;
     font-size: 0.8rem;
     padding: 0.25rem 0.6rem;
@@ -2138,10 +2139,10 @@
     color: var(--fg);
     cursor: pointer;
   }
-  button:not(.action):hover:not(:disabled) {
+  button:not(.action):not(.head):hover:not(:disabled) {
     background: var(--hover);
   }
-  button:not(.action):disabled {
+  button:not(.action):not(.head):disabled {
     color: var(--muted);
     cursor: default;
   }
@@ -2415,11 +2416,21 @@
     text-align: left;
     border: none;
     border-radius: 4px;
-    padding: 0.45rem 0.7rem;
-    /* The panel's own `button` rule above sets the colour every button has,
-       and being scoped it outranks the shared class; the heading's colour is
-       restated here so the shared one shows through. */
+    /* The bar keeps the height it had at 0.9 rem: the heading's face is
+       0.8 rem now, and the difference goes into the padding rather than
+       into a shorter bar and a smaller caret. */
+    padding: 0.5rem 0.7rem;
+    /* A button's own face, undone one property at a time rather than with
+       the `font` shorthand, which would reset the size and weight the shared
+       heading class gives it. */
+    font-family: inherit;
+    line-height: 1.2;
+    background: none;
     color: var(--muted);
+    cursor: pointer;
+  }
+  .head:hover {
+    background: var(--hover);
   }
   .head strong {
     font-weight: inherit;
@@ -2458,6 +2469,7 @@
   }
   .caret {
     color: var(--muted);
+    font-size: 0.9rem;
   }
   /* One member's ratings, a row per load case. A table rather than the
      label/figure list the rest of a card uses, because a case is one row of
@@ -2648,8 +2660,14 @@
   .notice {
     color: var(--muted);
   }
+  /* An add is the same button as every other action in size and face, but
+     drawn as a place where something is not yet: a dashed outline, no fill,
+     the muted colour. */
   .add {
     align-self: flex-start;
+    border-style: dashed;
+    background: none;
+    color: var(--muted);
   }
   /* A stage's or a case's remove sits below its inputs, apart from them. */
   .action.danger {
