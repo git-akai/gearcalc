@@ -2332,14 +2332,13 @@
      column that lined up with nothing. */
   .mode {
     display: grid;
-    grid-template-columns: 1fr auto 3.5rem;
+    grid-template-columns: 1fr auto var(--unit-cell);
     align-items: center;
     gap: var(--row-gap);
     font-size: 0.85rem;
   }
-  .mode > span {
-    color: var(--muted);
-  }
+  /* The row's name is an input's name — at full contrast like every other;
+     it was the one left muted when the labels changed. */
   .segmented {
     display: flex;
   }

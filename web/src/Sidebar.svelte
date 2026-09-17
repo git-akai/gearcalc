@@ -80,10 +80,10 @@
   {/if}
 
   <section class="library">
-    <h2>{t("ui.sidebar_materials")}</h2>
+    <h2 class="section-heading">{t("ui.sidebar_materials")}</h2>
     <div class="row">
-      <button onclick={() => picker.click()}>{t("ui.sidebar_import_library")}</button>
-      <button onclick={saveLibrary} disabled={library.materials.material.length === 0}>{t("ui.sidebar_export")}</button>
+      <button class="action" onclick={() => picker.click()}>{t("ui.sidebar_import_library")}</button>
+      <button class="action" onclick={saveLibrary} disabled={library.materials.material.length === 0}>{t("ui.sidebar_export")}</button>
     </div>
     <input
       bind:this={picker}
@@ -103,7 +103,7 @@
   </section>
 
   <section>
-    <h2>{t("ui.sidebar_gears")}</h2>
+    <h2 class="section-heading">{t("ui.sidebar_gears")}</h2>
     <ul>
       {#each workspace.tabs as tab (tab.id)}
         <li>
@@ -122,7 +122,7 @@
   </section>
 
   <section>
-    <h2>{t("ui.sidebar_geartrains")}</h2>
+    <h2 class="section-heading">{t("ui.sidebar_geartrains")}</h2>
     <ul>
       {#each trains.tabs as tab (tab.id)}
         <li>
@@ -175,11 +175,9 @@
     -webkit-user-select: none;
     user-select: none;
   }
+  /* Its face is `app.css`'s `.section-heading`, the one every heading in the
+     application has; only the margin is its own. */
   h2 {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
     margin: 0 0 0.4rem 0.25rem;
   }
   ul {
@@ -243,23 +241,10 @@
     display: flex;
     gap: 0.35rem;
   }
+  /* The library's import and export are `.action`s — the face every action
+     in the application has, from `app.css` — sharing the row. */
   .row button {
     flex: 1;
-    font: inherit;
-    font-size: 0.8rem;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid var(--rule);
-    border-radius: 3px;
-    background: none;
-    color: var(--fg);
-    cursor: pointer;
-  }
-  .row button:hover:not(:disabled) {
-    background: var(--hover);
-  }
-  .row button:disabled {
-    color: var(--muted);
-    cursor: default;
   }
   .library .detail {
     font-size: 0.7rem;
