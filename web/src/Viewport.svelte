@@ -93,11 +93,28 @@
     dragging = false;
   }
 
+  /** The canvas's size on screen, read by the draw below so it re-runs when
+   *  the window changes shape. The backing store is sized from the element
+   *  at draw time, so a resize between draws left the last drawing stretched
+   *  to the new box — a circle drawn at 660×290 and shown at 660×660 was an
+   *  ellipse until something else asked for a redraw. A `ResizeObserver`
+   *  writes the size here; the draw reads it and so runs again. */
+  let box = $state({ w: 0, h: 0 });
+  $effect(() => {
+    const c = canvas;
+    if (!c) return;
+    const watch = new ResizeObserver(() => {
+      box = { w: c.clientWidth, h: c.clientHeight };
+    });
+    watch.observe(c);
+    return () => watch.disconnect();
+  });
+
   $effect(() => {
     const c = canvas;
     if (!c || !points || points.length < 4) return;
-    // referenced so the effect re-runs on view changes
-    void [view.zoom, view.panX, view.panY, view.circles, pitch, base, tip, root, rim];
+    // referenced so the effect re-runs on view changes, and on the box's
+    void [view.zoom, view.panX, view.panY, view.circles, pitch, base, tip, root, rim, box.w, box.h];
 
     const dpr = window.devicePixelRatio || 1;
     const w = c.clientWidth;

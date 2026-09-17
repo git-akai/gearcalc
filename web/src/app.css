@@ -39,6 +39,14 @@
      same tenth. */
   --unit-cell: 3.5rem;
   --row-gap: 0.4rem;
+  /* The width of a number box in a field row, shared for the reason the unit
+     cell is: the two panels had one at 7 rem and the other at 6 rem, so the
+     same input was a rem wider on one tab. The narrower is kept. */
+  --field-box: 6rem;
+  /* ...and the wider box a row holding *words* takes — a kind, a material, a
+     sharing model — out of the label's share, so it still ends where every
+     number does. "Internal (ring)" was arriving as "Internal (rin". */
+  --field-box-wide: 10.5rem;
   /* What stops one cell short of the row's edge, which is where every input box
      ends. */
   --unit-inset: calc(var(--unit-cell) + var(--row-gap));
@@ -97,4 +105,108 @@ body {
     "Segoe UI",
     sans-serif;
   font-size: 15px;
+}
+
+/* **The bar at the top of a tab** — its name, and what can be done to it —
+   is the one thing the gear tab and the geartrain tab draw identically, so it
+   is written once here rather than once per panel: the two had drifted on the
+   title's weight, the buttons' background and a quarter-rem of spacing, and
+   the eye reads a difference in the same control as a difference in kind.
+   The gear tab's treatment is the one kept. A panel's own `button` rule still
+   serves the buttons below the bar; these are more specific and win here. */
+header.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+header.tab-bar .title {
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  color: var(--fg);
+}
+header.tab-bar .title:hover,
+header.tab-bar .title:focus {
+  border-color: var(--rule);
+  background: var(--bg);
+}
+header.tab-bar .actions {
+  display: flex;
+  gap: 0.4rem;
+}
+header.tab-bar .actions button,
+header.tab-bar .actions select,
+.tab-confirm button,
+.action {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--fg);
+  cursor: pointer;
+}
+header.tab-bar .actions button:hover:not(:disabled),
+header.tab-bar .actions select:hover,
+.tab-confirm button:hover,
+.action:hover:not(:disabled) {
+  background: var(--hover);
+}
+header.tab-bar .actions button.danger,
+.tab-confirm button.danger,
+.action.danger {
+  color: var(--warn);
+}
+header.tab-bar .actions button:disabled,
+.action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* `.action` is the same button below the bar — a stage or a load case added
+   or removed — so an action on the page and an action on the tab read as one
+   kind of thing. A control that shows a *state* (a switch, an `auto` toggle)
+   is not one of these and keeps its own size and highlight. */
+
+/* **A section heading**, on either tab: small capitals, bold, muted — the
+   geartrain's card titles, which the gear tab's sections and the geartrain's
+   stage and case headings now share. What sits beside a heading's name — a
+   stage's tooth counts, a case's load — is a figure, and keeps its own case
+   and weight (`.section-heading .aside`). */
+.section-heading {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.section-heading .aside {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+/* A select drawn as a button: no value shows, only its label, since choosing
+   an entry acts at once and the control returns to the label. */
+header.tab-bar .actions select {
+  appearance: none;
+  max-width: 14rem;
+  text-overflow: ellipsis;
+}
+/* The strip a delete asks its question in, under the bar, on both tabs. */
+.tab-confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--warn);
+  border-radius: 4px;
+  font-size: 0.85rem;
 }

@@ -1830,6 +1830,37 @@ it undercut at all?*, and it shipped defaulting to the first.
 Following the dedendum also makes the automatic shift agree with the profile
 generator's own `undercut` flag **by construction** rather than by coincidence.
 
+### A member is adopted, not imported
+
+The gear tab can take one member of an open geartrain as a new tab. It is the
+same part described twice — a stage member is a `GearParams` with a rating
+around it — so the tab should show the tooth the stage rated, and the way to
+guarantee that is to hand over the parameters the stage *built* rather than
+the ones it was *given*: `GearResult::params`, filled once where every kind
+makes its result, carrying the shift the stage chose, the addendum a tip
+width held down, the helix shared out of a shaft angle with this member's
+hand, a planet's `2 − k`. The tab solves those with no guard left to fire —
+a test holds that nothing clamps — and quotes the stage's own pitch diameter.
+
+Which members are rings is the stage's to say, not the tab's to infer from a
+tooth count: `Stage::member_cutter` names the pinion cutter where there is
+one, and a member with a cutter is internal and takes it. A worm is refused —
+a thread's proportions are its own and the tab has no model of them — and the
+list shows it greyed rather than omitting it, so a reader sees why.
+
+The word is *adopt*. `import_train` reads a document this tool wrote, and the
+two must not be confused in the code or the catalogue: one crosses a file
+boundary and is checked for what a file can say that no stage honours; the
+other reads a train that is open and cannot say anything of the kind.
+
+One native `<select>`, grouped by geartrain in the sidebar's order with a
+member per option, was chosen over a two-step menu because it holds no state
+of its own: choosing acts at once and the control returns to its label. The
+members are numbered as their cards are — and the cards' numbering used to
+be `2 × stage + member`, right only while every earlier stage was a pair;
+it counts the members the earlier stages have now, in one place both panels
+read.
+
 ### A file is adjusted to what the tool can honour
 
 A file can say what the panel cannot. The panel relieves a stage on every

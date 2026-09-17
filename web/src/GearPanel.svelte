@@ -23,7 +23,8 @@
     note,
     t,
   } from "./core";
-  import { developer, setKind, workspace, type GearTab as Tab } from "./state.svelte";
+  import { developer, setKind, trains, workspace, type GearTab as Tab } from "./state.svelte";
+  import { memberRefs } from "./members";
   import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
   import { notes } from "./notes";
@@ -280,17 +281,50 @@
   const um = (v: number) => `${v.toFixed(1)} µm`;
 </script>
 
-<header>
+<header class="tab-bar">
   <input class="title" bind:value={tab.name} aria-label={t("ui.gear_name")} />
   <div class="actions">
-    <button onclick={() => workspace.copy(tab.id)}>{t("ui.gear_copy")}</button>
+    <!-- **A member of an open geartrain, adopted as a tab.** One native
+         select, grouped by geartrain in the sidebar's order, a member per
+         option under the numbering its cards carry; a worm is listed greyed,
+         so a reader sees why it is not offered. Choosing one makes the tab
+         and the control snaps back to its label, so it reads as a button
+         with a menu and holds no state of its own. -->
+    <select
+      class="adopt"
+      value=""
+      aria-label={t("ui.gear_from_train")}
+      onchange={(e) => {
+        const [train, stage, member] = e.currentTarget.value.split(":").map(Number);
+        e.currentTarget.value = "";
+        const source = trains.tabs[train];
+        const ref = memberRefs(source.train).find((r) => r.stage === stage && r.member === member);
+        if (ref) workspace.adopt(source, stage, member, ref.label);
+      }}
+    >
+      <option value="" disabled>{t("ui.gear_from_train")}</option>
+      {#each trains.tabs as source, i (source.id)}
+        <optgroup label={source.name || t("ui.train_unnamed")}>
+          {#each memberRefs(source.train) as ref (ref.number)}
+            <option value={`${i}:${ref.stage}:${ref.member}`} disabled={!ref.adoptable}>
+              {t("ui.gear_from_train_member", { stage: String(ref.stage + 1), member: ref.label })}
+            </option>
+          {/each}
+        </optgroup>
+      {/each}
+    </select>
     <button onclick={() => workspace.create()}>{t("ui.gear_new")}</button>
+    <button onclick={() => workspace.copy(tab.id)}>{t("ui.gear_copy")}</button>
     <button class="danger" onclick={() => (confirmingDelete = true)}>{t("ui.gear_delete")}</button>
   </div>
 </header>
 
+{#if workspace.adoptError !== null}
+  <p class="error">{t("ui.gear_from_train_failed", { reason: workspace.adoptError })}</p>
+{/if}
+
 {#if confirmingDelete}
-  <div class="confirm" role="alertdialog">
+  <div class="tab-confirm" role="alertdialog">
     <span>{t("ui.gear_delete_question", { name: tab.name || t("ui.gear_unnamed") })}</span>
     <button
       class="danger"
@@ -305,7 +339,7 @@
 
 <div class="columns">
   <section class="inputs">
-    <h2>{t("ui.gear_parameters")}</h2>
+    <h2 class="section-heading">{t("ui.gear_parameters")}</h2>
     <div class="grid">
       <label class="wide">
         <span>{t("ui.gear_kind")}</span>
@@ -464,7 +498,7 @@
       </div>
     {/if}
 
-    <h2>{t("ui.gear_measurement")}</h2>
+    <h2 class="section-heading">{t("ui.gear_measurement")}</h2>
     <div class="grid">
       <!-- The bound every other input has: the pins that seat on the flanks
            at every position, read off the same map the measurement is, so a
@@ -509,7 +543,7 @@
       {/if}
     </div>
 
-    <h2>{t("ui.gear_export")}</h2>
+    <h2 class="section-heading">{t("ui.gear_export")}</h2>
     <div class="grid">
       <label>
         <span>{t("ui.gear_chord_tolerance")}</span>
@@ -551,7 +585,7 @@
           rim={r.rim_radius}
           bind:view={tab.view}
         />
-        <h2>{t("ui.gear_geometry")}</h2>
+        <h2 class="section-heading">{t("ui.gear_geometry")}</h2>
         <dl>
           <dt>{t("ui.gear_transverse_module")}</dt>
           <dd>{mm(r.transverse_module)}</dd>
@@ -597,7 +631,7 @@
              same measurement read at the opposite sign. That a ring has no span
              over teeth is not noted: absence needs saying only where the thing
              was expected, and nothing here offers one. -->
-        <h2>{t("ui.gear_measurement_between_pins")}</h2>
+        <h2 class="section-heading">{t("ui.gear_measurement_between_pins")}</h2>
         <dl>
           <dt>{t("ui.gear_two_pins")}</dt>
           <dd>
@@ -638,7 +672,7 @@
         </ul>
       {/if}
 
-      <h2>{t("ui.gear_geometry")}</h2>
+      <h2 class="section-heading">{t("ui.gear_geometry")}</h2>
       <!-- Tip/root diameter and tooth thickness vary around an eccentric gear;
            they are shown as ranges in the Eccentricity section rather than as a
            mean-tooth scalar here. -->
@@ -659,7 +693,7 @@
            ordinary one, so this is a question of what is worth reading rather
            than of what the core computed. -->
       {#if eccentric}
-        <h2>{t("ui.gear_eccentricity")}</h2>
+        <h2 class="section-heading">{t("ui.gear_eccentricity")}</h2>
         {#if s.per_tooth_clamps.teeth.length}
           <!-- A guard on a tool *setting* is shared, so it trips for the whole
                gear or not at all; these are the ones true of one tooth and not
@@ -721,7 +755,7 @@
           </dd>
         </dl>
 
-        <h2>{t("ui.gear_commanded_centre_distance")}</h2>
+        <h2 class="section-heading">{t("ui.gear_commanded_centre_distance")}</h2>
         {#if isUnavailable(s.centre_profile)}
           <p class="aside">{note(s.centre_profile.unavailable)}</p>
         {:else}
@@ -755,7 +789,7 @@
         {/if}
       {/if}
 
-      <h2>{t("ui.gear_measurement_over_teeth")}</h2>
+      <h2 class="section-heading">{t("ui.gear_measurement_over_teeth")}</h2>
       <dl>
         {#if isUnavailable(s.span)}
           <dt>{t("ui.gear_span")}</dt><dd class="na">{note(s.span.unavailable)}</dd>
@@ -766,7 +800,7 @@
         {/if}
       </dl>
 
-      <h2>{t("ui.gear_measurement_over_pins")}</h2>
+      <h2 class="section-heading">{t("ui.gear_measurement_over_pins")}</h2>
       <dl>
         {#each pinRows as row (row.label)}
           {#if isUnavailable(row.value)}
@@ -777,7 +811,7 @@
         {/each}
       </dl>
 
-      <h2>{t("ui.gear_composite_error_jgma_116_02")}</h2>
+      <h2 class="section-heading">{t("ui.gear_composite_error_jgma_116_02")}</h2>
       <dl>
         {#if isUnavailable(s.tolerance)}
           <dt>{t("ui.gear_tolerance")}</dt><dd class="na">{note(s.tolerance.unavailable)}</dd>
@@ -796,33 +830,8 @@
 </div>
 
 <style>
-  header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-  .title {
-    font: inherit;
-    font-size: 1.15rem;
-    font-weight: 600;
-    flex: 1;
-    min-width: 0;
-    padding: 0.25rem 0.4rem;
-    border: 1px solid transparent;
-    border-radius: 3px;
-    background: none;
-    color: var(--fg);
-  }
-  .title:hover,
-  .title:focus {
-    border-color: var(--rule);
-    background: var(--bg);
-  }
-  .actions {
-    display: flex;
-    gap: 0.4rem;
-  }
+  /* The bar and the delete strip are `app.css`'s, shared with the geartrain
+     tab; what follows serves the buttons below them. */
   button {
     font: inherit;
     font-size: 0.8rem;
@@ -850,17 +859,6 @@
     margin-top: 0.5rem;
   }
 
-  .confirm {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 1rem;
-    border: 1px solid var(--warn);
-    border-radius: 4px;
-    font-size: 0.85rem;
-  }
-
   .columns {
     display: grid;
     grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr);
@@ -873,11 +871,9 @@
     }
   }
 
+  /* Size, weight and colour are `app.css`'s `.section-heading`, shared with
+     the geartrain's stage and case headings. */
   h2 {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
     margin: 1.25rem 0 0.5rem;
   }
   h2:first-child {
@@ -898,7 +894,7 @@
   }
   label {
     display: grid;
-    grid-template-columns: 1fr 7rem 3.5rem;
+    grid-template-columns: 1fr var(--field-box) var(--unit-cell);
     align-items: center;
     /* Column gap spaces the label, box and unit; row gap is what holds a note
        to the box it belongs to. They are not the same measurement. */
@@ -911,8 +907,9 @@
      out of the label's share rather than out of the trailing cell, so it still
      ends where every input and every note in the panel ends — a kind has no
      unit to print, but the cell is what holds the column together. */
-  label.wide {
-    grid-template-columns: 1fr 10.5rem 3.5rem;
+  label.wide,
+  label:has(> select) {
+    grid-template-columns: 1fr var(--field-box-wide) var(--unit-cell);
   }
   /* A switch that carries its own name has nothing to put in a label column,
      so the row is the button alone at the right edge — the same edge every
@@ -954,7 +951,7 @@
      the number keeps the edge every other number here shares — and the
      trailing cell stays free for the unit. */
   label.auto {
-    grid-template-columns: 1fr auto 7rem 3.5rem;
+    grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
   }
 
   input[type="number"],
@@ -997,14 +994,13 @@
   dt {
     color: var(--muted);
   }
+  /* At the weight a geartrain card's readout has; these were 600. */
   dd {
     margin: 0;
     text-align: right;
     font-variant-numeric: tabular-nums;
-    font-weight: 600;
   }
   dd.na {
-    font-weight: 400;
     color: var(--muted);
     font-style: italic;
     text-align: right;

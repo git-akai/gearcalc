@@ -67,6 +67,8 @@ import type {
   Train,
   TrainResult,
   TrainOutcome,
+  AdoptOutcome,
+  Adopted,
   TrainFailure,
   Variation,
 } from "./wire";
@@ -128,6 +130,8 @@ export type {
   Train,
   TrainResult,
   TrainOutcome,
+  AdoptOutcome,
+  Adopted,
   TrainFailure,
   Variation,
 } from "./wire";
@@ -151,6 +155,7 @@ import init, {
   import_train,
   export_train,
   relieve_stage,
+  adopt_member,
 } from "./wasm/gear_wasm.js";
 
 /** Narrow a `Maybe` to its "there is no value" arm.
@@ -714,6 +719,26 @@ function assignLeaves(into: Record<string, unknown>, from: Record<string, unknow
     } else if (a !== b) {
       into[key] = b;
     }
+  }
+}
+
+/** **One member of a geartrain, as a gear tab would hold it** — the tooth the
+ *  stage cut, with whether it is a ring and the cutter that cut it. Rust
+ *  solves the train to answer, because the tooth as built is an output: a
+ *  shift the stage chose, an addendum a tip width held down, a helix shared
+ *  out of a shaft angle. *Adopt*, not import: `importTrain` reads a document
+ *  this tool wrote, and this reads a member of a train that is open. */
+export function adoptMember(
+  train: Train,
+  stage: number,
+  member: number,
+  materials?: MaterialLibrary,
+): AdoptOutcome | { error: string } {
+  try {
+    const body = JSON.stringify({ train, materials: materials ?? null, stage, member });
+    return JSON.parse(adopt_member(body)) as AdoptOutcome;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
   }
 }
 

@@ -99,7 +99,7 @@ of a gear is worth more than knowing what it does.
 | Path | Role |
 |---|---|
 | `crates/gear-io` | DXF export · the TOML material library and geartrain documents · the string catalogues |
-| `crates/gear-wasm` | The boundary. 18 entry points, JSON in and JSON out, all pure — `tools/wasm_boundary.json` lists them, and `check_wasm.sh` fails on one it does not |
+| `crates/gear-wasm` | The boundary. 19 entry points, JSON in and JSON out, all pure — `tools/wasm_boundary.json` lists them, and `check_wasm.sh` fails on one it does not |
 | `crates/gear-cli` | The development harness. `gear-cli help` prints its subcommands, from the `COMMANDS` table that *is* its dispatch |
 | `web/src` | Svelte 5 + TypeScript. Layout and event handling **only** |
 | `web/src/wire` | **Generated** by `ts-rs`. Never edited by hand |

@@ -35,6 +35,7 @@
   import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
   import { notes, type Notes } from "./notes";
+  import { gearNumber as trainGearNumber, hulaRing } from "./members";
 
   /** **Resolving an over-determined stage is the core's rule, not this file's.**
    *
@@ -88,7 +89,13 @@
 
   // Every number on screen comes back from Rust. Nothing here computes a
   // result — the project rule — so this is the only place a value is produced.
-  const result = $derived(solveTrain(tab.train));
+  // ...against the library the reader has, where they imported one — the
+  // shipped one otherwise, which Rust supplies for itself. It was never
+  // sent, so an imported library reached the material readouts and not the
+  // ratings.
+  const result = $derived(
+    solveTrain(tab.train, library.origin === null ? undefined : library.materials),
+  );
   /** The answer, where there is one — `undefined` reads through every formatter
    *  below as a blank rather than as a row that is not there. */
   const solved = $derived(result.result ?? undefined);
@@ -173,11 +180,10 @@
     if (tab.train.stages.length === 0) addStageOfKind(STAGE_KINDS[0]);
   }
 
-  /** Gear numbering runs across the whole train: stage 1 is gears 1 and 2,
-   *  stage 2 is gears 3 and 4, as the specification describes. */
-  function gearNumber(stage: number, which: number): number {
-    return stage * 2 + which + 1;
-  }
+  /** Gear numbering runs across the whole train, counting every member of
+   *  the stages before — written once in `members.ts`, where the gear tab's
+   *  adopt list reads the same numbers. */
+  const gearNumber = (stage: number, which: number) => trainGearNumber(tab.train, stage, which);
 
   /** The candidates for one note slot: a blank to reserve the space, the note
    *  itself when the stage has solved, and the out-of-range message when the
@@ -648,7 +654,7 @@
          are the tool's: a ring's dedendum and root radius are not inputs of its
          own, and reading the cutter first is reading them. -->
     {@const cut = opts.cutter}
-    <h4>{t("ui.train_ring_cutter")}</h4>
+    <h4 class="section-heading">{t("ui.train_ring_cutter")}</h4>
     <label>
       <span>{t("ui.train_cutter_teeth")}</span>
       <input type="number" step="1" min="1" bind:value={cut.teeth} />
@@ -658,7 +664,7 @@
     {@render numberField("ui.train_cutter_addendum", () => cut.addendum, (v) => (cut.addendum = v), 0.05, "ui.train_m")}
     {@render numberField("ui.train_cutter_tip_round", () => cut.tip_round, (v) => (cut.tip_round = v), 0.02, "ui.train_m")}
   {/if}
-  <h4 class:later={opts.cutter !== undefined}>{title}</h4>
+  <h4 class="section-heading" class:later={opts.cutter !== undefined}>{title}</h4>
   <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
     <span>{t(opts.teethLabel ?? "ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={gear.teeth} />
@@ -1203,7 +1209,7 @@
   {/if}
 {/snippet}
 
-<header>
+<header class="tab-bar">
   <input class="title" bind:value={tab.name} aria-label={t("ui.train_name")} />
   <div class="actions">
     <button onclick={saveTrain}>{t("ui.train_export")}</button>
@@ -1233,7 +1239,7 @@
 {/if}
 
 {#if confirmingDelete}
-  <div class="confirm" role="alertdialog">
+  <div class="tab-confirm" role="alertdialog">
     <span>{t("ui.train_delete_question", { name: tab.name || t("ui.train_unnamed") })}</span>
     <button
       class="danger"
@@ -1333,16 +1339,16 @@
     {@const cres = forCase(solved?.cases, i)}
     <section class="stage" class:off={!c.enabled}>
       <div class="casehead">
-        <button class="head" onclick={() => (tab.openCases[i] = !tab.openCases[i])}>
-          <span class="caret">{tab.openCases[i] ? "▾" : "▸"}</span>
+        <button class="head section-heading" onclick={() => (tab.openCases[i] = !tab.openCases[i])}>
+          <span class="caret aside">{tab.openCases[i] ? "▾" : "▸"}</span>
           <strong>{caseName(i)}</strong>
-          <span class="kind">{kindLabel(c.kind)}</span>
-          <span class="teeth"
+          <span class="kind aside">{kindLabel(c.kind)}</span>
+          <span class="teeth aside"
             >{num(c.torque, 3)} {t("ui.train_nm")} · {num(c.speed, 0)} {t("ui.train_rpm")} ·
             {t("ui.train_at_port", { port: portLabel(c.port) })}</span
           >
           {#if cres}
-            <span class="eff"
+            <span class="eff aside"
               >{num(cres.delivered_torque, 3)} {t("ui.train_nm")}
               {t("ui.train_at_port", { port: portLabel(cres.delivered_at) })}</span
             >
@@ -1451,14 +1457,14 @@
               {#each cres?.notes ?? [] as n, j (j)}<li>{note(n)}</li>{/each}
             </ul>
           {/if}
-          <button class="danger small" onclick={() => removeCase(i)}>{t("ui.train_remove_case")}</button>
+          <button class="action danger" onclick={() => removeCase(i)}>{t("ui.train_remove_case")}</button>
         </div>
       {/if}
     </section>
   {/each}
 
   {#each CASE_KINDS as k (k.key)}
-    <button class="add" onclick={() => addCaseOfKind(k)}>{t(k.add)}</button>
+    <button class="action add" onclick={() => addCaseOfKind(k)}>{t(k.add)}</button>
   {/each}
 </div>
 
@@ -1480,18 +1486,18 @@
         {@const names: [string, string] = worm
           ? [t("ui.train_the_worm"), t("ui.train_the_wheel")]
           : [gearName(i, 0), gearName(i, 1)]}
-        <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
-          <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
+        <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
+          <span class="caret aside">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
           {#if worm}
-            <span class="kind">{t("ui.train_worm")}</span>
+            <span class="kind aside">{t("ui.train_worm")}</span>
           {:else if stage.shaft_angle !== 0}
-            <span class="kind">{t("ui.train_crossed")}</span>
+            <span class="kind aside">{t("ui.train_crossed")}</span>
           {/if}
-          <span class="teeth">z {stage.gears[0].teeth} / {stage.gears[1].teeth}</span>
+          <span class="teeth aside">z {stage.gears[0].teeth} / {stage.gears[1].teeth}</span>
           {#if pres}
-            <span class="ratio">{pres.ratio.toFixed(4)} : 1</span>
-            <span class="eff">{pct(pres.mesh.efficiency.forward)} %</span>
+            <span class="ratio aside">{pres.ratio.toFixed(4)} : 1</span>
+            <span class="eff aside">{pct(pres.mesh.efficiency.forward)} %</span>
           {/if}
         </button>
 
@@ -1648,21 +1654,21 @@
             {/if}
 
             <button
-              class="danger small"
+              class="action danger"
               onclick={() => removeStage(i)}>{t("ui.train_remove_stage")}</button
             >
           </div>
         {/if}
       {:else if stage.kind === "planetary"}
         {@const pres = res && res.kind === "planetary" ? res : null}
-        <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
-          <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
+        <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
+          <span class="caret aside">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
-          <span class="kind">{t("ui.train_planetary")}</span>
-          <span class="teeth">z {stage.sun.teeth} / {stage.planet.teeth} / {stage.ring.teeth}</span>
+          <span class="kind aside">{t("ui.train_planetary")}</span>
+          <span class="teeth aside">z {stage.sun.teeth} / {stage.planet.teeth} / {stage.ring.teeth}</span>
           {#if pres}
-            <span class="ratio">{pres.ratio.toFixed(4)} : 1</span>
-            <span class="eff">{pct(pres.efficiency.forward)} %</span>
+            <span class="ratio aside">{pres.ratio.toFixed(4)} : 1</span>
+            <span class="eff aside">{pct(pres.efficiency.forward)} %</span>
           {/if}
         </button>
         {#if tab.open[i]}
@@ -1857,7 +1863,7 @@
                 [t("ui.train_mesh_sun_planet"), pres?.sun_planet, pres?.sun_coprime_with_planets, "ui.train_the_sun", "ui.train_the_planet"],
                 [t("ui.train_mesh_planet_ring"), pres?.planet_ring, pres?.ring_coprime_with_planets, "ui.train_the_planet", "ui.train_the_ring"],
               ] as const as [label, m, coprime, first, second] (label)}
-                <h4 class="mesh">{label}</h4>
+                <h4 class="mesh section-heading">{label}</h4>
                 <dl class="out indent">
                   <!-- **Two coprime checks, and they are different questions.**
                        This one is the central member against the *planet count*
@@ -1877,7 +1883,7 @@
               {/if}
 
             <button
-              class="danger small"
+              class="action danger"
               onclick={() => removeStage(i)}>{t("ui.train_remove_stage")}</button
             >
           </div>
@@ -1885,14 +1891,14 @@
 
       {:else if stage.kind === "hula"}
         {@const hres = res && res.kind === "hula" ? res : null}
-        <button class="head" onclick={() => (tab.open[i] = !tab.open[i])}>
-          <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
+        <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
+          <span class="caret aside">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
-          <span class="kind">{t("ui.train_hula")}</span>
-          <span class="teeth">z {stage.gears.map((g) => g.teeth).join(" / ")}</span>
+          <span class="kind aside">{t("ui.train_hula")}</span>
+          <span class="teeth aside">z {stage.gears.map((g) => g.teeth).join(" / ")}</span>
           {#if hres}
-            <span class="ratio">{hres.ratio.toFixed(2)} : 1</span>
-            <span class="eff">{pct(hres.efficiency.forward)} %</span>
+            <span class="ratio aside">{hres.ratio.toFixed(2)} : 1</span>
+            <span class="eff aside">{pct(hres.efficiency.forward)} %</span>
           {/if}
         </button>
         {#if tab.open[i]}
@@ -1971,9 +1977,9 @@
                    says the same thing in the core. Reading it off the solve
                    instead left the cards, and the tool that shapes the ring,
                    labelled from a stale answer before the first one arrived. -->
-              {@const ring = stage.gears[m * 2].teeth >= stage.gears[m * 2 + 1].teeth ? m * 2 : m * 2 + 1}
+              {@const ring = hulaRing(stage, m)}
               {@const pinion = ring === m * 2 ? m * 2 + 1 : m * 2}
-              <h4 class="mesh">{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
+              <h4 class="mesh section-heading">{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
               <div class="grid shared">
                 {@render numberField("ui.train_normal_module", () => stage.module[m], (v) => (stage.module[m] = v), 0.05, "ui.train_mm")}
                 {@render numberField("ui.train_tooth_thickness_mod", () => stage.thickness_mod[m], (v) => (stage.thickness_mod[m] = v), 0.05, "ui.train_k", t("ui.train_hula_note_thickness_mod"))}
@@ -2098,7 +2104,7 @@
               {/if}
 
             <button
-              class="danger small"
+              class="action danger"
               onclick={() => removeStage(i)}>{t("ui.train_remove_stage")}</button
             >
           </div>
@@ -2113,32 +2119,17 @@
        knocked on, which is the same gate the gear tab's eccentric kind is
        behind and the same table shape. -->
   {#each stageKinds as k (k.key)}
-    <button class="add" onclick={() => addStageOfKind(k)}>{t(k.label)}</button>
+    <button class="action add" onclick={() => addStageOfKind(k)}>{t(k.label)}</button>
   {/each}
 </div>
 
 <style>
-  header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-  }
-  .title {
-    font: inherit;
-    font-size: 1.1rem;
-    flex: 1;
-    background: none;
-    border: none;
-    border-bottom: 1px solid var(--rule);
-    color: var(--fg);
-    padding: 0.2rem 0;
-  }
-  .actions {
-    display: flex;
-    gap: 0.35rem;
-  }
-  button {
+  /* The bar, the delete strip and every `.action` — a stage or a case added
+     or removed — are `app.css`'s, shared with the gear tab, and a `.head` is
+     a heading that happens to be a button; this serves the buttons that show
+     a state, and leaves those to their own rules rather than outranking them
+     by being scoped (`:not()` counts toward specificity, so this would). */
+  button:not(.action):not(.head) {
     font: inherit;
     font-size: 0.8rem;
     padding: 0.25rem 0.6rem;
@@ -2148,25 +2139,16 @@
     color: var(--fg);
     cursor: pointer;
   }
-  button:hover:not(:disabled) {
+  button:not(.action):not(.head):hover:not(:disabled) {
     background: var(--hover);
   }
-  button:disabled {
+  button:not(.action):not(.head):disabled {
     color: var(--muted);
     cursor: default;
   }
   .danger:hover {
     border-color: var(--warn);
     color: var(--warn);
-  }
-  .confirm {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--warn);
-    border-radius: 3px;
-    margin-bottom: 0.75rem;
   }
   /* Inputs on the left, stacked; what they produce beside them, also stacked.
      The same shape as a gear card and its readout, without the border or the
@@ -2220,36 +2202,35 @@
     gap: var(--field-gap);
     max-width: 34rem;
   }
-  /* The boxes sit further right than a gear card's, toward the middle of the
-     stage. A stage's field names are the long ones — "Minimum planet
-     clearance", "Static friction, planet–ring" — and with the narrow label
-     column they wrapped while the box floated close enough to read as part of
-     the name. Only the shared block: the gear cards below are half as wide and
-     their own column is right for them. */
+  /* The same box every other row has. These were 9 rem, on an argument
+     about long field names wrapping that a narrower box does not bear on —
+     the label column is what is left of the block after the box, so a
+     narrower box gives a name *more* room — and a stage's row was the one
+     place in the application with a box of its own width. */
   .grid.shared > label {
-    grid-template-columns: 1fr 9rem 3.5rem;
+    grid-template-columns: 1fr var(--field-box) var(--unit-cell);
   }
   /* The `auto` toggle takes a column of its own, out of the label's share, so
      the number keeps the edge every other number in the panel shares. */
   label.auto {
-    grid-template-columns: 1fr auto 6rem 3.5rem;
+    grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
   }
   .grid.shared > label.auto {
-    grid-template-columns: 1fr auto 9rem 3.5rem;
+    grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
   }
   .gear label.auto {
-    grid-template-columns: 1fr auto 6.5rem 3.5rem;
+    grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
   }
   /* A second switch takes a second column of its own, out of the label's share
      again, so the box keeps the edge every other box in the card shares. */
   label.auto.constrained {
-    grid-template-columns: 1fr auto auto 6rem 3.5rem;
+    grid-template-columns: 1fr auto auto var(--field-box) var(--unit-cell);
   }
   .grid.shared > label.auto.constrained {
-    grid-template-columns: 1fr auto auto 9rem 3.5rem;
+    grid-template-columns: 1fr auto auto var(--field-box) var(--unit-cell);
   }
   .gear label.auto.constrained {
-    grid-template-columns: 1fr auto auto 6.5rem 3.5rem;
+    grid-template-columns: 1fr auto auto var(--field-box) var(--unit-cell);
   }
   /* **Read in columns, not in source order.** The box is written first so the
      row's label is for the box; these put everything back where it reads. Each
@@ -2303,7 +2284,7 @@
      edge. */
   label {
     display: grid;
-    grid-template-columns: 1fr 6rem 3.5rem;
+    grid-template-columns: 1fr var(--field-box) var(--unit-cell);
     align-items: center;
     /* See GearPanel: the column gap spaces a row, the row gap pairs a note to
        the box above it. */
@@ -2311,9 +2292,9 @@
     row-gap: var(--note-gap);
     font-size: 0.85rem;
   }
-  label span {
-    color: var(--muted);
-  }
+  /* An input's name is at full contrast, as on the gear tab; what is lower
+     contrast is a note, a unit, a readout's name. The names here were muted,
+     which put an input and its readout at the same weight. */
   input[type="number"],
   select {
     font: inherit;
@@ -2351,14 +2332,13 @@
      column that lined up with nothing. */
   .mode {
     display: grid;
-    grid-template-columns: 1fr auto 3.5rem;
+    grid-template-columns: 1fr auto var(--unit-cell);
     align-items: center;
     gap: var(--row-gap);
     font-size: 0.85rem;
   }
-  .mode > span {
-    color: var(--muted);
-  }
+  /* The row's name is an input's name — at full contrast like every other;
+     it was the one left muted when the labels changed. */
   .segmented {
     display: flex;
   }
@@ -2386,10 +2366,6 @@
   /* One mesh's readout, sitting under its heading. */
   h4.mesh {
     margin: 0.75rem 0 0;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted);
   }
   .out.indent {
     padding-left: 0.9rem;
@@ -2429,6 +2405,8 @@
     border: 1px solid var(--rule);
     border-radius: 4px;
   }
+  /* Size, weight and colour are `app.css`'s `.section-heading`, shared with
+     the gear tab's `h2`; the figures beside the name keep their own. */
   .head {
     display: flex;
     align-items: baseline;
@@ -2437,8 +2415,29 @@
     text-align: left;
     border: none;
     border-radius: 4px;
-    padding: 0.45rem 0.7rem;
-    font-size: 0.9rem;
+    /* The bar keeps the height it had at 0.9 rem: the heading's face is
+       0.8 rem now, and the difference goes into the padding rather than
+       into a shorter bar and a smaller caret. */
+    padding: 0.5rem 0.7rem;
+    /* A button's own face, undone one property at a time rather than with
+       the `font` shorthand, which would reset the size and weight the shared
+       heading class gives it. */
+    font-family: inherit;
+    line-height: 1.2;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .head:hover {
+    background: var(--hover);
+  }
+  .head strong {
+    font-weight: inherit;
+  }
+  /* The band of load cases and the band of stages are two lists, and the
+     second stands off from the first's add buttons. */
+  .stages + .stages {
+    margin-top: 1rem;
   }
   /* A load case's heading is a button and a switch side by side: the button
      opens it, the switch takes it out of every rating — and a switch cannot
@@ -2469,6 +2468,7 @@
   }
   .caret {
     color: var(--muted);
+    font-size: 0.9rem;
   }
   /* One member's ratings, a row per load case. A table rather than the
      label/figure list the rest of a card uses, because a case is one row of
@@ -2540,12 +2540,9 @@
   .gear h4.later {
     margin-top: 0.8rem;
   }
+  /* Its face is `app.css`'s `.section-heading`; only the margin is its own. */
   .gear h4 {
     margin: 0 0 0.4rem;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted);
   }
   .sub {
     font-size: 0.78rem;
@@ -2606,7 +2603,7 @@
   .gear .prop {
     /* 2.2 + 0.4 gap + 0.9 = 3.5rem, the same trailing width as a plain row, so
        these boxes share the edge with the ones above them. */
-    grid-template-columns: 1fr 6.5rem 2.2rem 0.9rem;
+    grid-template-columns: 1fr var(--field-box) 2.2rem 0.9rem;
     font-size: 0.78rem;
     margin-bottom: 0.15rem;
   }
@@ -2640,8 +2637,15 @@
     border-color: var(--warn);
   }
   .gear label {
-    grid-template-columns: 1fr 6.5rem 3.5rem;
+    grid-template-columns: 1fr var(--field-box) var(--unit-cell);
     margin-bottom: var(--field-gap);
+  }
+  /* A row holding words — a material, a sharing model — takes the wide box,
+     as the gear tab's kind and class rows do. */
+  label:has(> select),
+  .gear label:has(> select),
+  .grid.shared > label:has(> select) {
+    grid-template-columns: 1fr var(--field-box-wide) var(--unit-cell);
   }
   .notes {
     margin: 0.5rem 0 0;
@@ -2655,13 +2659,17 @@
   .notice {
     color: var(--muted);
   }
+  /* An add is the same button as every other action in size and face, but
+     drawn as a place where something is not yet: a dashed outline, no fill,
+     the muted colour. */
   .add {
     align-self: flex-start;
     border-style: dashed;
+    background: none;
     color: var(--muted);
   }
-  .small {
+  /* A stage's or a case's remove sits below its inputs, apart from them. */
+  .action.danger {
     margin-top: 0.6rem;
-    font-size: 0.75rem;
   }
 </style>
