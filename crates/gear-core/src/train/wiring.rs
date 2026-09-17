@@ -282,3 +282,206 @@ pub(crate) fn arranged(shafts: usize, input: Shaft, held: &[Shaft]) -> Vec<Condi
     out[input] = Condition::Drive(crate::ratio::Ratio::ONE);
     out
 }
+
+// ------------------------------------------------- the train as one system ---
+
+use super::Train;
+use crate::kinematics::{Mobility, Refusal, Solution};
+use crate::ratio::Ratio;
+
+/// Why a train's motion could not be worked out.
+///
+/// **None of these is a geometric refusal**, and that is the point: a ratio
+/// needs tooth counts and a topology, so a stage whose centre distances cannot
+/// be made to agree still has one. `TrainError` is the other question.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MotionError {
+    /// A train with no stages has no shaft line.
+    Empty,
+    /// A stage's wiring does not describe meshes.
+    Wiring(usize, WiringError),
+    /// The conditions and the structure cannot both hold.
+    Refused(Refusal),
+}
+
+/// One shaft of an assembled train.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ShaftMotion {
+    /// Which stage introduced it, and `None` for the housing, which every
+    /// stage shares.
+    pub stage: Option<usize>,
+    pub label: &'static str,
+    /// Turns per turn of the driven port — exactly.
+    pub speed: Ratio,
+}
+
+/// **What a whole train does, from tooth counts and topology alone.**
+///
+/// No module, no shift, no material and no load. That independence is the
+/// finding this type exists for: `solve_train` refuses a train outright when
+/// any one stage will not close geometrically, and takes every other stage's
+/// ratio down with it — though Willis needs none of what failed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TrainMotion {
+    pub shafts: Vec<ShaftMotion>,
+    /// One per stage: input over output, or `None` where the output does not
+    /// turn — two meshes stepping by the same amount and cancelling, which is a
+    /// refusal rather than a very large number.
+    pub ratios: Vec<Option<Ratio>>,
+    /// The first stage's input to the last stage's output.
+    pub total: Option<Ratio>,
+    /// How many conditions the train needs, and which shafts nothing touches.
+    pub mobility: Mobility,
+    /// Where each stage's shafts begin.
+    pub at: Vec<Offsets>,
+    /// The solution in full, for a caller that wants a shaft this does not
+    /// name — a member's, through its stage's [`Wiring::mounts`].
+    pub solution: Solution,
+}
+
+impl TrainMotion {
+    /// The global index of one of a stage's own shafts.
+    #[must_use]
+    pub fn shaft_of(&self, stage: usize, local: Shaft) -> Shaft {
+        self.at[stage].of(local)
+    }
+
+    /// **One member's speed, and its speed against the frame of its mesh** —
+    /// turns per turn of the driven port.
+    ///
+    /// The second is what its teeth see and what its cycles are counted from,
+    /// and it is the same subtraction for every kind: a pair's frame is the
+    /// housing and the difference is the member's own speed; an epicyclic
+    /// member's frame is its carrier, and a held ring's difference is *not*
+    /// zero while its speed is.
+    #[must_use]
+    pub fn member(&self, wiring: &Wiring, stage: usize, member: usize) -> Option<(Ratio, Ratio)> {
+        let mount = wiring.mounts.get(member)?;
+        let own = self.solution.values[self.shaft_of(stage, mount.spins_with)];
+        let frame = self.solution.values[self.shaft_of(stage, mount.axis_fixed_in)];
+        Some((own, own.checked_sub(frame)?))
+    }
+}
+
+impl Train {
+    /// **The whole train as one system**, and where each stage's shafts sit in
+    /// it.
+    ///
+    /// One housing, shared; each stage's other shafts appended in order; and a
+    /// rigid coupling from each stage's output to the next stage's input, which
+    /// is what a shaft line *is*. The chain is the default and the only
+    /// topology a train can presently describe — a coupling list of its own is
+    /// what the plan adds when ports become named shafts.
+    ///
+    /// # Errors
+    ///
+    /// [`MotionError::Empty`], or the stage whose wiring does not describe
+    /// meshes.
+    pub fn system(&self) -> Result<(System, Vec<Offsets>), MotionError> {
+        if self.stages.is_empty() {
+            return Err(MotionError::Empty);
+        }
+        let wirings: Vec<Wiring> = self.stages.iter().map(super::Stage::wiring).collect();
+        let mut at = Vec::with_capacity(wirings.len());
+        let mut next = 1;
+        for w in &wirings {
+            at.push(Offsets { first: next });
+            next += w.shafts.len() - 1;
+        }
+        let mut system = System::new(next);
+        for (k, w) in wirings.iter().enumerate() {
+            let teeth = teeth_of(self.stages[k].members());
+            w.add_to(&mut system, &teeth, &at[k])
+                .map_err(|e| MotionError::Wiring(k, e))?;
+        }
+        for k in 1..wirings.len() {
+            let from = at[k - 1].of(wirings[k - 1].output);
+            let to = at[k].of(wirings[k].input);
+            system
+                .couple(from, to)
+                .ok_or(MotionError::Wiring(k, WiringError::NotAMesh(k)))?;
+        }
+        Ok((system, at))
+    }
+
+    /// **What the train is asked**, one condition per shaft of the assembled
+    /// system.
+    ///
+    /// The housing is held; every shaft a stage's own arrangement holds is
+    /// held; and the **first** stage's input is driven at unit speed. The
+    /// intermediate stages' drives are dropped, since a stage in a chain is
+    /// turned by the one before it rather than by a motor of its own — which is
+    /// the one thing a chain says that a stage cannot say for itself.
+    #[must_use]
+    pub fn conditions(&self, at: &[Offsets], shafts: usize) -> Vec<Condition> {
+        let mut out = vec![Condition::Free; shafts];
+        out[HOUSING] = Condition::Ground;
+        let wirings: Vec<Wiring> = self.stages.iter().map(super::Stage::wiring).collect();
+        for (k, w) in wirings.iter().enumerate() {
+            for (local, c) in w.conditions.iter().enumerate() {
+                if local != HOUSING && *c == Condition::Ground {
+                    out[at[k].of(local)] = Condition::Ground;
+                }
+            }
+        }
+        if let (Some(w), Some(a)) = (wirings.first(), at.first()) {
+            out[a.of(w.input)] = Condition::Drive(Ratio::ONE);
+        }
+        out
+    }
+
+    /// **The train's motion**, at one turn of the driven port.
+    ///
+    /// # Errors
+    ///
+    /// [`MotionError`] — and never a geometric one, which is the whole reason
+    /// this is separate from [`super::solve_train`].
+    pub fn motion(&self) -> Result<TrainMotion, MotionError> {
+        let (system, at) = self.system()?;
+        let conditions = self.conditions(&at, system.shafts());
+        let solution = system.motion(&conditions).map_err(MotionError::Refused)?;
+        let mobility = system
+            .mobility()
+            .ok_or(MotionError::Refused(Refusal::Overflow))?;
+
+        let wirings: Vec<Wiring> = self.stages.iter().map(super::Stage::wiring).collect();
+        let mut shafts = vec![ShaftMotion {
+            stage: None,
+            label: "housing",
+            speed: solution.values[HOUSING],
+        }];
+        for (k, w) in wirings.iter().enumerate() {
+            for (local, s) in w.shafts.iter().enumerate().skip(1) {
+                shafts.push(ShaftMotion {
+                    stage: Some(k),
+                    label: s.label,
+                    speed: solution.values[at[k].of(local)],
+                });
+            }
+        }
+        let ratios: Vec<Option<Ratio>> = wirings
+            .iter()
+            .enumerate()
+            .map(|(k, w)| {
+                let (i, o) = (at[k].of(w.input), at[k].of(w.output));
+                solution.values[i].checked_div(solution.values[o])
+            })
+            .collect();
+        let total = match (wirings.first(), wirings.last()) {
+            (Some(f), Some(l)) => {
+                let i = at[0].of(f.input);
+                let o = at[wirings.len() - 1].of(l.output);
+                solution.values[i].checked_div(solution.values[o])
+            }
+            _ => None,
+        };
+        Ok(TrainMotion {
+            shafts,
+            ratios,
+            total,
+            mobility,
+            at,
+            solution,
+        })
+    }
+}

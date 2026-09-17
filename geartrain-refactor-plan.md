@@ -579,16 +579,31 @@ bugs, and the cross-check is the only thing that can** — so a kind's sign
 should be read off its own `MeshKind` rather than written into the wiring by
 hand, which makes the fault unrepresentable instead of merely detectable.
 
-**Phase 3 — the graph answers.** Kind-matched accessors and `carry` are
-replaced by graph readings; `planetary::power` leaves production and stays as a
-test oracle. The kinematic solve is separated from the geometric one so that a
-stage that will not close still reports its ratio (§1.3a) — and the error
-taxonomy is reorganised along that same seam, which is where `NoContact`'s
-three meanings are separated and the two wrong sentences fixed (§1.3c). Every
-golden diff is examined one at a time: a change detector's diff is a question
-even when the answer looks better, and `kinematics.txt`'s `unclosed` and
-`chain-unclosed` rows turning from *no answer* into ratios is the diff this
-phase exists to produce.
+**Phase 3 — the graph answers.** Split in two when it was reached, because
+one half moves no number and the other moves many, and mixing them makes every
+diff unreadable.
+
+**3a — the train assembles the graph, and motion is answerable without
+geometry.** One `System` over every stage, the chain as coupling rows, and
+`Train::motion` reporting exact ratios, shaft speeds and mobility from tooth
+counts and topology alone. §1.3(a) lands here: `kinematics.txt`'s `unclosed`
+and `chain-unclosed` fixtures print their ratios under the line where the
+geometry refused. **The corpus diff is purely additive** — nothing existing
+moved, which is what makes 3b's diff readable.
+
+**3b — the existing numbers start coming from the graph.** Kind-matched
+accessors and `carry` are replaced by graph readings; `planetary::power` leaves
+production for speeds and stays as a test oracle. §1.3(d)'s sign resolution
+lands here, which moves every pair's reported ratio and every torque sign
+downstream of it, and the error taxonomy is reorganised along the same seam —
+where `NoContact`'s three meanings are separated and the two wrong sentences
+fixed (§1.3c). Every golden diff is examined one at a time: a change detector's
+diff is a question even when the answer looks better.
+
+**Loss stays with the kinds until Phase 7.** The graph's torque solve is ideal;
+a stage's efficiency is not, and the per-mesh power direction that makes it
+general is the hardest piece of the work. Saying so here is better than a phase
+that quietly needs it.
 
 **Phase 4 — ports, conditions, mobility.** Ports as named shafts, conditions as
 a list under the existing relief walk, the affine family as a result. Load cases

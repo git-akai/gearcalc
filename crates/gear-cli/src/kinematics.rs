@@ -206,6 +206,51 @@ fn shafts(s: &StageResult) -> Option<([&'static str; 3], &[gear_core::train::Sha
         .map(|h| (["grounded", "crank", "output"], h.cases.as_slice()))
 }
 
+/// **What the graph says**, from tooth counts and topology alone.
+///
+/// Printed for every fixture whether or not the geometry solved, because it
+/// needs none of it: a train whose stage cannot be built still turns at a
+/// ratio, and the two rows under `no answer:` below are the whole of the fault
+/// the refactor opens on, recorded so that fixing it is a diff here.
+///
+/// The ratios are **exact** — a quotient of tooth counts written as one, so a
+/// reduction of exactly 49 says 49 and an arrangement whose meshes cancel says
+/// it does not turn rather than printing a very large number.
+fn graph(train: &Train) {
+    match train.motion() {
+        Ok(m) => {
+            println!(
+                "  graph    mobility {} degree(s){}   total ratio {}",
+                m.mobility.degrees,
+                if m.mobility.untouched.is_empty() {
+                    String::new()
+                } else {
+                    format!("  ({} shaft(s) untouched)", m.mobility.untouched.len())
+                },
+                m.total
+                    .map_or_else(|| "does not turn".to_string(), |r| r.to_string()),
+            );
+            for (k, r) in m.ratios.iter().enumerate() {
+                println!(
+                    "    stage {}  ratio {}",
+                    k + 1,
+                    r.map_or_else(|| "does not turn".to_string(), |r| r.to_string())
+                );
+            }
+            for s in &m.shafts {
+                println!(
+                    "    shaft {:<9} of {:<7} speed {}",
+                    s.label,
+                    s.stage
+                        .map_or_else(|| "the train".to_string(), |k| format!("stage {}", k + 1)),
+                    s.speed,
+                );
+            }
+        }
+        Err(e) => println!("  graph    no motion: {e:?}"),
+    }
+}
+
 /// One fixture, end to end.
 fn report(name: &str, train: &Train, r: &TrainResult) {
     println!("== {name} ==");
@@ -285,6 +330,7 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
             );
         }
     }
+    graph(train);
     println!();
 }
 
@@ -307,11 +353,17 @@ pub fn run(which: Option<&str>) {
         found = true;
         match solve_train(train, &lib) {
             Ok(r) => report(name, train, &r),
-            // A fixture that refuses is recorded as refusing. It is also the
-            // fault the plan opens with — a geometric refusal takes the
-            // kinematics with it, though a ratio needs only tooth counts and
-            // topology — so a line here is evidence rather than an omission.
-            Err(e) => println!("== {name} ==\n  no answer: {e}\n"),
+            // A fixture that refuses is recorded as refusing — but only the
+            // *geometry* refused, so the graph still answers underneath it.
+            // The two `unclosed` fixtures are the whole of the fault the
+            // refactor opens on, in one place: the `no answer` line is the
+            // train's, and the `graph` block beneath it is what the train
+            // already knows and does not report.
+            Err(e) => {
+                println!("== {name} ==\n  no answer: {e}");
+                graph(train);
+                println!();
+            }
         }
     }
     if !found {

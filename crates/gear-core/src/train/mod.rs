@@ -52,7 +52,9 @@ pub use planetary::{
     PlanetaryStage,
 };
 pub(crate) use wiring::{arranged, teeth_of};
-pub use wiring::{MeshSpec, Mount, Offsets, ShaftSpec, Wiring, WiringError};
+pub use wiring::{
+    MeshSpec, MotionError, Mount, Offsets, ShaftMotion, ShaftSpec, TrainMotion, Wiring, WiringError,
+};
 
 /// The three contact ratios.
 #[derive(Clone, Copy, Debug)]
@@ -5510,6 +5512,110 @@ mod tests {
         );
     }
 
+    /// **A train's motion is its stages' motions, chained** — and the chain is
+    /// a coupling row rather than a product of ratios taken by hand.
+    ///
+    /// `turns_per_port_turn` multiplies the stage ratios to refer a speed, a
+    /// sweep or a revolution count from a port to any stage. That is the
+    /// graph's answer for the special case of a path, hand-derived, and this
+    /// holds that the two agree — on magnitudes, since `StageResult::ratio` is
+    /// signed on some kinds and not on others (recorded in the plan; resolved
+    /// where the graph starts answering).
+    ///
+    /// It also holds the thing a product cannot say: the **mobility** of the
+    /// assembled train equals the number of conditions it is given, so a chain
+    /// is neither over- nor under-determined by construction, and a stage kind
+    /// that introduced a shaft nothing constrains would fail here rather than
+    /// quietly widening the answer.
+    #[test]
+    fn the_chained_graph_agrees_with_the_product_of_the_stage_ratios() {
+        let lib = library();
+        let mut checked = 0u32;
+        for train in [two_stage(), mixed_train()] {
+            let r = solve_train(&train, &lib).expect("these trains solve");
+            let m = train.motion().expect("...and have a motion");
+
+            // Exactly as many conditions as degrees of freedom.
+            let (system, at) = train.system().unwrap();
+            let asked = train
+                .conditions(&at, system.shafts())
+                .iter()
+                .filter(|c| **c != crate::kinematics::Condition::Free)
+                .count();
+            assert_eq!(
+                asked, m.mobility.degrees,
+                "a chain should be exactly determined"
+            );
+            assert!(m.solution.is_unique());
+            assert!(
+                m.solution.redundant.is_empty(),
+                "{:?}",
+                m.solution.redundant
+            );
+
+            for (k, stage) in r.stages.iter().enumerate() {
+                let graph = m.ratios[k].expect("every stage here turns").to_f64();
+                assert!(
+                    (graph.abs() - stage.ratio().abs()).abs() < 1e-9 * stage.ratio().abs(),
+                    "stage {k}: graph {graph} vs {}",
+                    stage.ratio()
+                );
+                checked += 1;
+            }
+            let total = m.total.expect("the train turns").to_f64();
+            assert!(
+                (total.abs() - r.total_ratio.abs()).abs() < 1e-9 * r.total_ratio.abs(),
+                "total: graph {total} vs {}",
+                r.total_ratio
+            );
+            // And `turns_per_port_turn`, which is the same product read from
+            // either end, against the graph's own shaft speeds.
+            let ratios: Vec<f64> = r.stages.iter().map(StageResult::ratio).collect();
+            let wirings: Vec<Wiring> = train.stages.iter().map(Stage::wiring).collect();
+            for (k, w) in wirings.iter().enumerate() {
+                let graph = m.solution.values[m.shaft_of(k, w.input)].to_f64();
+                let hand = turns_per_port_turn(&ratios, Port::Start, k);
+                assert!(
+                    (graph.abs() - hand.abs()).abs() < 1e-9 * hand.abs(),
+                    "stage {k} input speed: graph {graph} vs {hand}"
+                );
+                checked += 1;
+            }
+        }
+        assert!(checked >= 10, "only {checked} readings checked");
+    }
+
+    /// **A train with a stage that cannot be built still has a shaft line.**
+    ///
+    /// `solve_train` refuses the whole train — every ratio, every efficiency,
+    /// every backlash — when any one stage will not close, though the stages
+    /// beside it are fine and a ratio needs no geometry at all. That is the
+    /// fault the refactor opens on; this is the law that says the two questions
+    /// are separable, asserted on a train whose *first* stage is perfectly
+    /// good.
+    #[test]
+    fn a_train_that_will_not_close_still_reports_its_ratios() {
+        let lib = library();
+        let mut broken = PlanetaryStage::default();
+        broken.sun.teeth = 17;
+        broken.planet.teeth = 17;
+        broken.ring.teeth = 80;
+        let mut train = two_stage();
+        train.stages.push(Stage::Planetary(Box::new(broken)));
+
+        assert!(
+            solve_train(&train, &lib).is_err(),
+            "the third stage is the one that cannot be built"
+        );
+        let m = train.motion().expect("its motion needs none of that");
+        assert_eq!(m.ratios.len(), 3);
+        for (k, r) in m.ratios.iter().enumerate() {
+            assert!(r.is_some(), "stage {k} turns");
+        }
+        // 17-tooth sun, 80-tooth ring, sun in and ring held: 97/17, exactly.
+        assert_eq!(m.ratios[2], crate::ratio::Ratio::new(97, 17));
+    }
+
     /// Every freedom a stage's groups mention, flat.
     fn mentioned(stage: &Stage) -> Vec<Freedom> {
         stage
@@ -6659,6 +6765,17 @@ mod tests {
                 ..LoadCase::fatigue(operating_torque, operating_speed)
             },
         ]
+    }
+
+    /// **A chain of three kinds**, so the graph's assembly meets a stage with
+    /// three shafts sitting between two with two — which a train of one kind
+    /// cannot exercise and which is where a coupling to the wrong shaft would
+    /// show.
+    fn mixed_train() -> Train {
+        let mut t = two_stage();
+        t.stages.insert(1, Stage::Planetary(Box::default()));
+        t.stages.push(Stage::Worm(PairStage::worm()));
+        t
     }
 
     fn two_stage() -> Train {
