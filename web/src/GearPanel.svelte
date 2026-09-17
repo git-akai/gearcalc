@@ -994,14 +994,13 @@
   dt {
     color: var(--muted);
   }
+  /* At the weight a geartrain card's readout has; these were 600. */
   dd {
     margin: 0;
     text-align: right;
     font-variant-numeric: tabular-nums;
-    font-weight: 600;
   }
   dd.na {
-    font-weight: 400;
     color: var(--muted);
     font-style: italic;
     text-align: right;

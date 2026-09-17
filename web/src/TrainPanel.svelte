@@ -654,7 +654,7 @@
          are the tool's: a ring's dedendum and root radius are not inputs of its
          own, and reading the cutter first is reading them. -->
     {@const cut = opts.cutter}
-    <h4>{t("ui.train_ring_cutter")}</h4>
+    <h4 class="section-heading">{t("ui.train_ring_cutter")}</h4>
     <label>
       <span>{t("ui.train_cutter_teeth")}</span>
       <input type="number" step="1" min="1" bind:value={cut.teeth} />
@@ -664,7 +664,7 @@
     {@render numberField("ui.train_cutter_addendum", () => cut.addendum, (v) => (cut.addendum = v), 0.05, "ui.train_m")}
     {@render numberField("ui.train_cutter_tip_round", () => cut.tip_round, (v) => (cut.tip_round = v), 0.02, "ui.train_m")}
   {/if}
-  <h4 class:later={opts.cutter !== undefined}>{title}</h4>
+  <h4 class="section-heading" class:later={opts.cutter !== undefined}>{title}</h4>
   <label class:invalid={g && outside(gear.teeth, g.ranges.teeth)}>
     <span>{t(opts.teethLabel ?? "ui.train_tooth_count")}</span>
     <input type="number" step="1" bind:value={gear.teeth} />
@@ -1340,22 +1340,22 @@
     <section class="stage" class:off={!c.enabled}>
       <div class="casehead">
         <button class="head section-heading" onclick={() => (tab.openCases[i] = !tab.openCases[i])}>
-          <span class="caret">{tab.openCases[i] ? "▾" : "▸"}</span>
+          <span class="caret aside">{tab.openCases[i] ? "▾" : "▸"}</span>
           <strong>{caseName(i)}</strong>
-          <span class="kind">{kindLabel(c.kind)}</span>
-          <span class="teeth"
+          <span class="kind aside">{kindLabel(c.kind)}</span>
+          <span class="teeth aside"
             >{num(c.torque, 3)} {t("ui.train_nm")} · {num(c.speed, 0)} {t("ui.train_rpm")} ·
             {t("ui.train_at_port", { port: portLabel(c.port) })}</span
           >
           {#if cres}
-            <span class="eff"
+            <span class="eff aside"
               >{num(cres.delivered_torque, 3)} {t("ui.train_nm")}
               {t("ui.train_at_port", { port: portLabel(cres.delivered_at) })}</span
             >
           {/if}
         </button>
         <span class="control">
-          <Switch label={t("ui.train_case_enabled")} on={c.enabled} set={(v) => (c.enabled = v)} />
+          <Switch small label={t("ui.train_case_enabled")} on={c.enabled} set={(v) => (c.enabled = v)} />
         </span>
       </div>
       {#if tab.openCases[i]}
@@ -1487,17 +1487,17 @@
           ? [t("ui.train_the_worm"), t("ui.train_the_wheel")]
           : [gearName(i, 0), gearName(i, 1)]}
         <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
-          <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
+          <span class="caret aside">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
           {#if worm}
-            <span class="kind">{t("ui.train_worm")}</span>
+            <span class="kind aside">{t("ui.train_worm")}</span>
           {:else if stage.shaft_angle !== 0}
-            <span class="kind">{t("ui.train_crossed")}</span>
+            <span class="kind aside">{t("ui.train_crossed")}</span>
           {/if}
-          <span class="teeth">z {stage.gears[0].teeth} / {stage.gears[1].teeth}</span>
+          <span class="teeth aside">z {stage.gears[0].teeth} / {stage.gears[1].teeth}</span>
           {#if pres}
-            <span class="ratio">{pres.ratio.toFixed(4)} : 1</span>
-            <span class="eff">{pct(pres.mesh.efficiency.forward)} %</span>
+            <span class="ratio aside">{pres.ratio.toFixed(4)} : 1</span>
+            <span class="eff aside">{pct(pres.mesh.efficiency.forward)} %</span>
           {/if}
         </button>
 
@@ -1662,13 +1662,13 @@
       {:else if stage.kind === "planetary"}
         {@const pres = res && res.kind === "planetary" ? res : null}
         <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
-          <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
+          <span class="caret aside">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
-          <span class="kind">{t("ui.train_planetary")}</span>
-          <span class="teeth">z {stage.sun.teeth} / {stage.planet.teeth} / {stage.ring.teeth}</span>
+          <span class="kind aside">{t("ui.train_planetary")}</span>
+          <span class="teeth aside">z {stage.sun.teeth} / {stage.planet.teeth} / {stage.ring.teeth}</span>
           {#if pres}
-            <span class="ratio">{pres.ratio.toFixed(4)} : 1</span>
-            <span class="eff">{pct(pres.efficiency.forward)} %</span>
+            <span class="ratio aside">{pres.ratio.toFixed(4)} : 1</span>
+            <span class="eff aside">{pct(pres.efficiency.forward)} %</span>
           {/if}
         </button>
         {#if tab.open[i]}
@@ -1863,7 +1863,7 @@
                 [t("ui.train_mesh_sun_planet"), pres?.sun_planet, pres?.sun_coprime_with_planets, "ui.train_the_sun", "ui.train_the_planet"],
                 [t("ui.train_mesh_planet_ring"), pres?.planet_ring, pres?.ring_coprime_with_planets, "ui.train_the_planet", "ui.train_the_ring"],
               ] as const as [label, m, coprime, first, second] (label)}
-                <h4 class="mesh">{label}</h4>
+                <h4 class="mesh section-heading">{label}</h4>
                 <dl class="out indent">
                   <!-- **Two coprime checks, and they are different questions.**
                        This one is the central member against the *planet count*
@@ -1892,13 +1892,13 @@
       {:else if stage.kind === "hula"}
         {@const hres = res && res.kind === "hula" ? res : null}
         <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
-          <span class="caret">{tab.open[i] ? "▾" : "▸"}</span>
+          <span class="caret aside">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
-          <span class="kind">{t("ui.train_hula")}</span>
-          <span class="teeth">z {stage.gears.map((g) => g.teeth).join(" / ")}</span>
+          <span class="kind aside">{t("ui.train_hula")}</span>
+          <span class="teeth aside">z {stage.gears.map((g) => g.teeth).join(" / ")}</span>
           {#if hres}
-            <span class="ratio">{hres.ratio.toFixed(2)} : 1</span>
-            <span class="eff">{pct(hres.efficiency.forward)} %</span>
+            <span class="ratio aside">{hres.ratio.toFixed(2)} : 1</span>
+            <span class="eff aside">{pct(hres.efficiency.forward)} %</span>
           {/if}
         </button>
         {#if tab.open[i]}
@@ -1979,7 +1979,7 @@
                    labelled from a stale answer before the first one arrived. -->
               {@const ring = hulaRing(stage, m)}
               {@const pinion = ring === m * 2 ? m * 2 + 1 : m * 2}
-              <h4 class="mesh">{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
+              <h4 class="mesh section-heading">{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
               <div class="grid shared">
                 {@render numberField("ui.train_normal_module", () => stage.module[m], (v) => (stage.module[m] = v), 0.05, "ui.train_mm")}
                 {@render numberField("ui.train_tooth_thickness_mod", () => stage.thickness_mod[m], (v) => (stage.thickness_mod[m] = v), 0.05, "ui.train_k", t("ui.train_hula_note_thickness_mod"))}
@@ -2201,14 +2201,13 @@
     gap: var(--field-gap);
     max-width: 34rem;
   }
-  /* The boxes sit further right than a gear card's, toward the middle of the
-     stage. A stage's field names are the long ones — "Minimum planet
-     clearance", "Static friction, planet–ring" — and with the narrow label
-     column they wrapped while the box floated close enough to read as part of
-     the name. Only the shared block: the gear cards below are half as wide and
-     their own column is right for them. */
+  /* The same box every other row has. These were 9 rem, on an argument
+     about long field names wrapping that a narrower box does not bear on —
+     the label column is what is left of the block after the box, so a
+     narrower box gives a name *more* room — and a stage's row was the one
+     place in the application with a box of its own width. */
   .grid.shared > label {
-    grid-template-columns: 1fr 9rem 3.5rem;
+    grid-template-columns: 1fr var(--field-box) var(--unit-cell);
   }
   /* The `auto` toggle takes a column of its own, out of the label's share, so
      the number keeps the edge every other number in the panel shares. */
@@ -2216,7 +2215,7 @@
     grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
   }
   .grid.shared > label.auto {
-    grid-template-columns: 1fr auto 9rem 3.5rem;
+    grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
   }
   .gear label.auto {
     grid-template-columns: 1fr auto var(--field-box) var(--unit-cell);
@@ -2227,7 +2226,7 @@
     grid-template-columns: 1fr auto auto var(--field-box) var(--unit-cell);
   }
   .grid.shared > label.auto.constrained {
-    grid-template-columns: 1fr auto auto 9rem 3.5rem;
+    grid-template-columns: 1fr auto auto var(--field-box) var(--unit-cell);
   }
   .gear label.auto.constrained {
     grid-template-columns: 1fr auto auto var(--field-box) var(--unit-cell);
@@ -2367,11 +2366,6 @@
   /* One mesh's readout, sitting under its heading. */
   h4.mesh {
     margin: 0.75rem 0 0;
-    font-size: 0.8rem;
-    font-weight: 400;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted);
   }
   .out.indent {
     padding-left: 0.9rem;
@@ -2429,6 +2423,11 @@
   }
   .head strong {
     font-weight: inherit;
+  }
+  /* The band of load cases and the band of stages are two lists, and the
+     second stands off from the first's add buttons. */
+  .stages + .stages {
+    margin-top: 1rem;
   }
   /* A load case's heading is a button and a switch side by side: the button
      opens it, the switch takes it out of every rating — and a switch cannot
@@ -2530,13 +2529,9 @@
   .gear h4.later {
     margin-top: 0.8rem;
   }
+  /* Its face is `app.css`'s `.section-heading`; only the margin is its own. */
   .gear h4 {
     margin: 0 0 0.4rem;
-    font-size: 0.8rem;
-    font-weight: 400;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted);
   }
   .sub {
     font-size: 0.78rem;

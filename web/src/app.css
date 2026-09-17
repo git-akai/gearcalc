@@ -170,14 +170,22 @@ header.tab-bar .actions button.danger,
    kind of thing. A control that shows a *state* (a switch, an `auto` toggle)
    is not one of these and keeps its own size and highlight. */
 
-/* **A section heading**, on either tab: the geartrain's size, the gear tab's
-   colour, and no weight — a heading is a place to look, not a thing to read
-   twice, and the two tabs had one at 0.7 rem in capitals and the other at
-   0.9 rem in bold. */
+/* **A section heading**, on either tab: small capitals, bold, muted — the
+   geartrain's card titles, which the gear tab's sections and the geartrain's
+   stage and case headings now share. What sits beside a heading's name — a
+   stage's tooth counts, a case's load — is a figure, and keeps its own case
+   and weight (`.section-heading .aside`). */
 .section-heading {
-  font-size: 0.9rem;
-  font-weight: 400;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--muted);
+}
+.section-heading .aside {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
 }
 /* A select drawn as a button: no value shows, only its label, since choosing
    an entry acts at once and the control returns to the label. */
