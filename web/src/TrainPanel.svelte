@@ -1584,8 +1584,8 @@
                 {@render numberField("ui.train_worm_axial_clearance", () => stage.axial_clearance, (v) => (stage.axial_clearance = v), 0.01, "ui.train_mm")}
               {/if}
               {#if stage.shaft_angle === 0}
-                {@render loadSharing(stage)}
                 {@render overlapField(stage, pres?.mesh.line?.contact_ratios.overlap, [pres?.mesh])}
+                {@render loadSharing(stage)}
               {/if}
               <!-- One search for either mesh: the loss integral along a line
                    contact, the friction balance along a point's. -->
@@ -1721,8 +1721,8 @@
                 </select>
                 <em></em>
               </label>
-              {@render loadSharing(stage)}
               {@render overlapField(stage, pres?.overlap, [pres?.sun_planet, pres?.planet_ring])}
+              {@render loadSharing(stage)}
               {@render efficiencyToggle(stage.optimisation)}
             </div>
 
@@ -1947,8 +1947,8 @@
                 <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
                 <em>{t("ui.train_mm")}</em>
               </label>
-              {@render loadSharing(stage)}
               {@render overlapField(stage, hres?.overlap, hres?.meshes.map((m) => m.report) ?? [])}
+              {@render loadSharing(stage)}
               {@render efficiencyToggle(stage.optimisation)}
             </div>
 
