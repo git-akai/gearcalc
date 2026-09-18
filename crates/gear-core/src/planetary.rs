@@ -809,6 +809,56 @@ mod tests {
         out
     }
 
+    /// **A genuinely driving input always has a flow**, and that is why the
+    /// refusal a set can meet is the *back-driven* one.
+    ///
+    /// [`power`] returns `None` three ways: a degenerate Willis coefficient, an
+    /// input that is not driving (`T ω ≤ 0`), and neither sign of the rolling
+    /// power confirming itself. A stage asks it twice — forward at unit speed
+    /// and unit torque, and backward with the output's own reaction — and only
+    /// the second can refuse, which is self-locking and is an *answer*.
+    ///
+    /// This is the standing evidence for that, and for
+    /// `gear_io::strings::UNFIRED`'s exemption of `error.train_no_power_flow`:
+    /// **an absence has a date**, and a note claiming one is worth less than a
+    /// sweep that fails if it stops being true. Sun against ring across the
+    /// whole plausible range, `η₀` from near-lossless down to 0.3 — far below
+    /// anything two involute meshes produce — and every arrangement.
+    #[test]
+    fn a_driving_input_always_has_a_flow() {
+        let mut checked = 0u32;
+        for zs in (1..=119).step_by(2) {
+            for zr in (1..=249).step_by(3) {
+                let i0 = -f64::from(zr) / f64::from(zs);
+                for eta0 in [0.999, 0.97, 0.9, 0.7, 0.5, 0.3] {
+                    for arrangement in arrangements() {
+                        assert!(
+                            power(i0, arrangement, 1.0, 1.0, eta0).is_some(),
+                            "z {zs}/{zr}, eta0 {eta0}, {arrangement:?} refused a driving input"
+                        );
+                        checked += 1;
+                    }
+                }
+            }
+        }
+        assert!(checked > 100_000, "only {checked} combinations swept");
+
+        // ...and the two refusals that *are* reachable, so this is a statement
+        // about driving inputs rather than about `power` never saying no.
+        let ordinary = Arrangement {
+            input: PlanetaryShaft::Sun,
+            fixed: PlanetaryShaft::Carrier,
+        };
+        assert!(
+            power(basic_ratio(teeth()), ordinary, 1.0, -1.0, 0.97).is_none(),
+            "a shaft with T omega < 0 is not an input"
+        );
+        assert!(
+            power(0.0, ordinary, 1.0, 1.0, 0.97).is_none(),
+            "a zero basic ratio leaves the ring with no Willis coefficient"
+        );
+    }
+
     /// **The three classical ratios, arrived at rather than written down.**
     ///
     /// Each falls out of the one Willis relation with a different shaft held, so

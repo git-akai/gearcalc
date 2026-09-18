@@ -449,7 +449,12 @@ impl PlanetaryStage {
             planet_tip_diameter: 0.0,
             clearance: stage.clearance.manual,
         };
-        let layout = crate::planetary::solve(&set).ok_or(TrainError::NoContact)?;
+        // **Not a contact failure.** The teeth are fine; what has no answer
+        // is the assembly, because no planet shift brings the sun mesh and the
+        // ring mesh to one physical distance. It said "the teeth never
+        // contact" for years, at a reader who would then go and look at the
+        // teeth (`docs/corrections.md`).
+        let layout = crate::planetary::solve(&set).ok_or(TrainError::NoCommonDistance)?;
         // The solve works in thickness shifts, so take the modification back out
         // to get each member's profile shift proper. Only the absorber's has
         // actually moved, but taking it out of all three is the same expression
@@ -994,7 +999,10 @@ pub fn solve_planetary_stage_with(
         1.0,
         eta0.forward,
     )
-    .ok_or(TrainError::NoContact)?;
+    // Also not a contact failure: `power` returns `None` when neither sign of
+    // the rolling power is self-consistent — the set is self-locking — or when
+    // the shaft named as the input is not the one driving.
+    .ok_or(TrainError::NoPowerFlow)?;
     // Driving backward: the output shaft becomes the input, the same shaft held.
     //
     // **Its torque has to be a driving one.** The forward solution leaves that

@@ -522,7 +522,7 @@
     shaft planet    of stage 2 speed 34/215
 
 == unclosed ==
-  no answer: stage 1: the teeth never come into contact
+  no answer: stage 1: no profile shift brings the two centre distances together; these tooth counts cannot be assembled
   graph    mobility 3 degree(s)  (1 shaft(s) untouched)   total ratio 97/17
     stage 1  ratio 97/17
     shaft ground    of the train speed 0
@@ -532,7 +532,7 @@
     shaft planet    of stage 1 speed -63/97
 
 == chain-unclosed ==
-  no answer: stage 2: the teeth never come into contact
+  no answer: stage 2: no profile shift brings the two centre distances together; these tooth counts cannot be assembled
   graph    mobility 3 degree(s)   total ratio -4171/289
     stage 1  ratio -43/17
     stage 2  ratio 97/17

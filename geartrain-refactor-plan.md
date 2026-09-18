@@ -113,12 +113,28 @@ centre distances simply cannot be brought together. The three sites:
 | `ContactPath::new(…).ok_or(NoContact)` ×2 | the teeth genuinely never touch | correct |
 
 This is a *user-visible* wrong sentence, since the variant renders through
-`error.train_no_contact` in five catalogues. It is **deferred to Phase 3**
-rather than patched now: the error taxonomy is one of the things the
-kinematics/geometry split reorganises — a closure failure and a power-flow
-refusal end up on opposite sides of it — and fixing the wording twice would be
-the churn this project's file-format rule exists to avoid. Recorded here so the
-deferral is a decision rather than an oversight.
+`error.train_no_contact` in five catalogues. **Split in Phase 3b** into
+`NoCommonDistance` and `NoPowerFlow`, each with its own key and five messages.
+
+Two things the split turned up, both worth more than the wording:
+
+- **`NoCommonDistance` is now fired from the model** in `gear_io::strings`'s
+  sweep, where `NoContact` beside it is still *constructed by hand* — which
+  that block's own comment says is the weaker standard, since it checks that a
+  key has a message and not that the case is live.
+- **`NoPowerFlow` cannot be fired at all**, and saying so took a measurement. A
+  set asks `planetary::power` twice and only the forward call is a `?`; the
+  backward one treats a set that cannot be back-driven as an *answer*, which is
+  what self-locking is. A genuinely driving input refused **never**, across 1.1
+  million combinations. So it is an `UNFIRED` exemption with its evidence — and
+  with a standing test, `a_driving_input_always_has_a_flow`, that fails if the
+  absence stops being true and that also asserts the two refusals which *are*
+  reachable, so it is a statement about driving inputs rather than about
+  `power` never saying no.
+
+A third variant, `Wiring`, was drafted and **withdrawn**: it had no producer
+yet, and a note nothing can fire is a thing this project adds with evidence
+rather than in advance. It returns with the call site that needs it.
 
 **(d) `StageResult::ratio()` means two different things.** A pair's is
 `Mesh::ratio`, whose own doc says *"ignoring sign"*; an epicyclic set's is

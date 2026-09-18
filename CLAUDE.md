@@ -223,10 +223,11 @@ And elsewhere:
   seeing what fired, not assumed. It is where a law belongs that decides it: a
   profile law wants the whole grid `tests/common` builds, and a guard's value
   wants a recorded output.
-- **One note nothing can fire** is named in `strings.rs`'s `UNFIRED` with its
-  evidence. Live code, a live message, deliberately not deleted on suspicion —
-  and the evidence carries the breadth of the search that found nothing, because
-  an absence has a date.
+- **Two notes nothing can fire** are named in `strings.rs`'s `UNFIRED` with
+  their evidence. Live code, a live message, deliberately not deleted on
+  suspicion — and the evidence carries the breadth of the search that found
+  nothing, because an absence has a date. The newer one also carries a *test*
+  that fails if the absence stops being true, which a sentence cannot.
 
 ---
 

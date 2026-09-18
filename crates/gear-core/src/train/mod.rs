@@ -1578,7 +1578,29 @@ pub enum TrainError {
     /// The pair cannot mesh, or the shifts put it outside the involute domain.
     Mesh(MeshError),
     /// No usable path of contact — the teeth do not reach each other.
+    ///
+    /// **Three different things used to say this**, and two of them were not
+    /// about teeth at all: a set whose centre distances no shift can bring
+    /// together, and a power flow with no self-consistent answer. Both are
+    /// their own variants below, and both used to render *"the teeth never
+    /// contact"* at a reader who would then go and look at the teeth. See
+    /// `docs/corrections.md`.
     NoContact,
+    /// **No profile shift brings the two centre distances together.**
+    ///
+    /// An epicyclic set's meshes share one physical distance and nothing in
+    /// the tooth counts makes them agree; a shift is solved to close the gap,
+    /// and for most counts none can ([`crate::planetary::shift_bracket`]). It
+    /// is a statement about the *assembly*, not about contact — the teeth are
+    /// fine, and the kinematics is unaffected, which is why a train reports its
+    /// ratios through this.
+    NoCommonDistance,
+    /// **No self-consistent power flow.** The arrangement is self-locking, or
+    /// the shaft named as the input is not the one driving (`T ω ≤ 0`) — see
+    /// [`crate::planetary::power`], which tries both signs of the rolling power
+    /// and keeps the physical one, or neither.
+    NoPowerFlow,
+
     /// A material name that is not in the library.
     UnknownMaterial(String),
     /// A tooth so undercut there is no root section left to rate.
@@ -1628,6 +1650,8 @@ impl crate::note::Explain for TrainError {
             Self::Hula(e) => e.note(),
             Self::Screw(e) => e.note(),
             Self::NoContact => Note::new(key::ERROR_TRAIN_NO_CONTACT),
+            Self::NoCommonDistance => Note::new(key::ERROR_TRAIN_NO_COMMON_DISTANCE),
+            Self::NoPowerFlow => Note::new(key::ERROR_TRAIN_NO_POWER_FLOW),
             Self::UnknownMaterial(n) => {
                 Note::new(key::ERROR_TRAIN_UNKNOWN_MATERIAL).text("name", n.clone())
             }
@@ -1676,6 +1700,16 @@ impl std::fmt::Display for TrainError {
                 ),
             },
             Self::NoContact => write!(f, "the teeth never come into contact"),
+            Self::NoCommonDistance => write!(
+                f,
+                "no profile shift brings the two centre distances together; \
+                 these tooth counts cannot be assembled"
+            ),
+            Self::NoPowerFlow => write!(
+                f,
+                "no self-consistent power flow: the arrangement is self-locking, \
+                 or the shaft named as the input is not the one driving"
+            ),
             Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
             Self::NoRootSection => write!(f, "the tooth is too undercut to have a root section"),
             Self::Empty => write!(f, "the geartrain has no stages"),

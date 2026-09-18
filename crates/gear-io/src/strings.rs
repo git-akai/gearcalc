@@ -1371,6 +1371,30 @@ mod tests {
             // section left to rate, and no stages at all.
             use gear_core::train::{Train, TrainError};
             err(TrainError::NoContact.note());
+            // **...and a set whose centre distances no shift can bring
+            // together, fired from the model rather than built by hand.** At a
+            // 17-tooth sun and 17-tooth planets only `z_ring ∈ [48, 54]` admits
+            // any planet shift at all, so 80 is genuinely impossible. It used
+            // to say *the teeth never contact*, at a reader who would then go
+            // and look at the teeth.
+            {
+                let mut set = gear_core::train::PlanetaryStage::default();
+                set.sun.teeth = 17;
+                set.planet.teeth = 17;
+                set.ring.teeth = 80;
+                let out = gear_core::train::solve_planetary_stage(
+                    &set,
+                    &gear_core::train::StageLoads::just(1.0),
+                    &lib,
+                );
+                assert!(
+                    matches!(out, Err(TrainError::NoCommonDistance)),
+                    "this set is the one that cannot be assembled"
+                );
+                if let Err(e) = out {
+                    err(e.note());
+                }
+            }
             err(TrainError::UnknownMaterial("nothing by that name".into()).note());
             err(TrainError::NoRootSection.note());
             if let Err(e) = gear_core::train::solve_train(
@@ -1498,7 +1522,27 @@ mod tests {
     ///
     /// *A case that cannot solve is not a case*, and an `if let Ok` around one
     /// is how it stays that way quietly.
-    const UNFIRED: &[&str] = &["clamp.ring_fully_filleted"];
+    /// - `error.train_no_power_flow` — an epicyclic set with no self-consistent
+    ///   power flow. The site is live and the message is right; what no design
+    ///   reaches is the **forward** solve refusing.
+    ///
+    ///   `planetary::power` is asked twice by a set: once forward at unit speed
+    ///   and unit torque, and once backward with the output's own reaction as
+    ///   the input. Only the first is a `?`; the second is a `map_or(0.0, …)`,
+    ///   because a set that cannot be back-driven is self-locking and that is
+    ///   an *answer* rather than a refusal (`docs/reference.md#planetary-sets`).
+    ///   And a genuinely driving input appears never to refuse: swept over
+    ///   **1.1 million** combinations — sun 1…119 against ring 1…249, `η₀` from
+    ///   0.999 down to 0.3, all six arrangements — with no `None` at all, and
+    ///   `planetary::tests::a_driving_input_always_has_a_flow` holds that in the
+    ///   crate rather than in a note.
+    ///
+    ///   So it is an exemption with a reason rather than a hole: the two ways
+    ///   `power` can refuse are a degenerate Willis coefficient, which wants
+    ///   `z_ring = 0` or `z_ring = −z_sun`, and neither branch confirming
+    ///   itself, which is the back-driven case the other call site already
+    ///   treats as an answer.
+    const UNFIRED: &[&str] = &["clamp.ring_fully_filleted", "error.train_no_power_flow"];
 
     #[test]
     fn a_document_that_is_not_a_catalogue_is_refused() {
