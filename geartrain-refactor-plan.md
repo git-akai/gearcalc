@@ -574,6 +574,65 @@ Three things follow and each must be stated rather than assumed:
 
 ---
 
+### 4.7 One stage shape — kinds are presets, not structure
+
+**The direction, taken at the Phase 4 review.** An epicyclic set is a spur
+pair with more reference frames — a planet's axis stands still in a carrier
+where a pair's stands still in ground — and nothing else about it is
+fundamental. The centre-distance law that §4.4 states for planet shafts is
+not an epicyclic law either: a layshaft transmission has several pairs
+between the same two axes, every one at the same distance, and today it can
+only be written as several unrelated stages. So the general stage is not "the
+general *epicyclic* stage" with the pair kept beside it. It is **the** stage,
+and a pair, a set, a hula stage and a Wolfrom are tick patterns in it.
+
+**The shape.** `Wiring` already holds the topology — shafts, which frame each
+member's axis stands still in, which members mesh, with what sign. The stage
+is that topology made input, with the geometry each part of it owns:
+
+```text
+Stage
+  shafts    one per shaft after ground: the frame its axis stands still in
+            (ground, or another shaft — a carrier), and how many times it is
+            replicated about that frame's axis (N planets; 1 otherwise)
+  members   one per gear: its StageGear, and the shaft it spins with
+  meshes    one per mesh: the two members, external or internal, and what a
+            mesh owns — module, friction (sliding, static), thickness mod,
+            and the cutter that cuts its ring
+  axes      one per pair of shafts that mesh, in their common frame: the
+            distance between the two axes (auto or given), the angle between
+            them (0 for parallel, the worm's 90), the clearance and its
+            tolerances — the pair's `centre_distance`, the set's, and the
+            hula's `offset`, which were one quantity written three times
+  pressure_angle · overlap · optimisation · load_sharing   (as now)
+```
+
+The closure law becomes **one distance per axis pair**: automatic, it is
+absorbed by whichever shift is left automatic on that pair's meshes, as
+`planetary::solve` does today for the planet; given, every mesh on the pair
+has a shift sum to reach (`shift_sum_for`). A planet's carrier radius and a
+layshaft's centre distance are the same field.
+
+**Kinds are presets — a layer above the core, which is what a kind was for.**
+`Stage::{Spur, Worm, Planetary, Hula}` go; `kind` survives as the word a
+document or a panel uses to *lay out* a shape and to choose which inputs to
+put in front of a designer (the worm's treatment, applied to all four). The
+older intent — keep kind as a layer above the core to preserve the core's
+shapes — is kept exactly by making the core hold one shape.
+
+**What this costs, and it is accepted.** The result type unifies with the
+input: one `StageResult` of members, meshes and shafts, with the layout
+checks a set has and a pair does not as `Option`s. That revisits
+`docs/rationale.md#each-stage-kind-keeps-its-own-result-type`, whose claim
+was that a new kind should be new kinematics and no new rating machinery;
+the claim held (Phases 2–4 added no rating code), and the division it argued
+for was between *kinds*, which no longer exist. The rationale is rewritten,
+not contradicted. The panel's four branches become one card over the shape
+with a preset's vocabulary laid on it. Loss must follow power mesh by mesh
+(§4.6), since a general shape has no `η₀` to raise to a power — so Phase 7's
+model is built inside Phase 5 and verified against Pennestrì on the simple
+set before any figure is believed.
+
 ## 5. What gets deleted
 
 The user's standing instruction is that new functionality broadens or replaces
@@ -589,9 +648,11 @@ criterion.
 | `carry`, `turns_per_port_turn`, the backlash referral | the three matrix readings | ~120 |
 | `Port` as a two-valued enum | a named shaft | — |
 | `ShaftsCase`'s `[f64; 3]` | per-shaft lists | — |
-| `Stage::Hula` as a kind | a preset of the epicyclic stage, vocabulary gated by the arrangement | up to ~3000 |
-| `Stage::Planetary` as a kind, once the grid reproduces it | a preset | up to ~2700 |
-| four stage branches in `TrainPanel.svelte` | two — a pair, and a grid | ~600 |
+| `Stage::Hula` as a kind | a preset of the one stage shape, vocabulary gated by the arrangement | up to ~3000 |
+| `Stage::Planetary` as a kind, once the shape reproduces it | a preset | up to ~2700 |
+| `Stage::Spur` and `Stage::Worm` as kinds, `train/pair.rs`'s assembly | presets of the same shape (§4.7); the crossed-axis mesh stays, as an axis pair with an angle | ~1400 |
+| four result types | one `StageResult` over members, meshes and shafts | — |
+| four stage branches in `TrainPanel.svelte` | one card over the shape, a preset's vocabulary laid on it | ~800 |
 
 The two large entries are Phases 5–6 and sit outside the first delivery
 (§10.1); their size is conditional on the reproduction actually holding.
@@ -749,23 +810,52 @@ does not, and a conflict between two statements is named at the later one
 rather than relieved (`docs/rationale.md#a-planetary-needs-the-held-shaft-named`).
 **Phase 4 is complete**, and with it the first delivery (§10.1).
 
-**Phase 5 — the general epicyclic stage.** The mesh grid, the one-radius-per-
-planet-shaft closure, the gutter toggle. `Stage::Planetary` becomes a preset
-once the corpus does not move. Wolfrom, Ravigneaux, Simpson, meshed-planet and
-stepped sets arrive with it and cost nothing each.
+**Phase 5 — one stage shape.** Restated at the Phase 4 review (§4.7, §10.7):
+not the general epicyclic stage beside the pair, but the stage every kind is
+a tick pattern of. Split so that each half has the corpus as its gate.
 
-**Phase 6 — the hula stage absorbed.** The general stage reproduces every hula
-figure; the kind goes and its vocabulary stays, gated by the arrangement
-(§4.4, §10.2). If any figure cannot be reproduced, the kind stays and
-`docs/corrections.md` records why — an honest failure is a better outcome than a
-special case smuggled back in.
+**5a — the shape, and every kind converted to it.** `train/stage.rs`: the
+shape above, `Constrained`'s six answers written once over it, and `From`
+each of the four kinds — the corpus fixtures and the `tests/common` grid
+solved through both paths and compared figure for figure, on every kind,
+before anything is deleted. Per-mesh loss arrives here because the shape
+needs it: a direction per mesh, `2^M` assignments filtered by the two
+consistency conditions, verified to reproduce `η₀^w` on the simple set and
+the pair's own mesh efficiency on a pair. **Nothing in the corpus moves in
+5a** except where a per-mesh model is shown right and the old one wrong, and
+then §10.3 applies: a reason and a check that is not the diff.
 
-**Phase 7 — loss generalised, and the audit.** Per-mesh power direction,
-circulating-power reporting, sensitivity `dR/dN`. Every figure that moves gets a
-reason and an independent check, and every figure that does *not* move gets
-evidence that the new path was reached at all (§10.3). Then the pass the
-standing instruction asks for: what the new learnings let us ablate, and whether
-the four documents describe what now exists.
+**5b — the kinds retire.** The four solvers delegate and then go; one
+`StageResult`; `kind` in the document format becomes the preset that lays a
+shape out, with the change log saying so and `deny_unknown_fields` refusing
+the old fields. The panel's four branches become one card. The corpus is
+re-recorded once, with every difference from 5a's record explained.
+
+**5c — the arrangements the shape makes free**, each with a
+`gear-cli kinematics` fixture and a row in `tools/train_kinematics.py`: a
+layshaft transmission (several pairs on two axes, one distance), a Wolfrom,
+a stepped planet, a planocentric at one tooth of difference, a Ravigneaux.
+The gutter — a planet meshing a planet — is the one piece with no precedent
+in the crate and goes last.
+
+**5d — the carrier radius from the tip bound**, on any arrangement whose
+internal mesh's tip circles cross (`TipRoom` already answers this): the
+hula's sizing strategy reaching every arrangement that needs it. Moves no
+shipped number, since no shipped set crosses.
+
+**Phase 6 — the hula preset.** With 5a–5d done the hula stage is a tick
+pattern with a vocabulary; it reproduces its corpus through the shape and
+`train/hula.rs` goes with the stage-level half of `hula.rs`. If any figure
+cannot be reproduced the kind stays and `docs/corrections.md` records why.
+
+**Phase 7 — the division of a load, and the audit.** The per-mesh loss model
+lands in 5a because the shape needs it; what remains here is what it makes
+possible: a load that leaves by two ports (`LoadShared` lifted), circulating
+power reported, sensitivity `dR/dN`. Every figure that moves gets a reason
+and an independent check, and every figure that does *not* move gets evidence
+that the new path was reached at all (§10.3). Then the pass the standing
+instruction asks for: what the new learnings let us ablate, and whether the
+four documents describe what now exists.
 
 **Optional, scoped separately.** The lever diagram (the `m = 2` nullspace
 rendered — the solution, not a decoration); the inverse problem, searching
@@ -929,6 +1019,15 @@ screen. *Revisited in 4e: the law restates the input, and the input stays.*
 
 **5. The lever diagram** — deferred, and scoped separately. The tool draws no
 epicyclic today and `state.md` records that as deliberate.
+
+**7. Kinds go; one shape stays.** Taken at the Phase 4 review, on the
+direction that the stated goals for a unified structure rank above the
+interface, which can always be reshaped to sit apart from the core. A spur
+pair, a set and a hula stage are one shape with different frames, and the
+centre-distance law is one distance per axis pair wherever two axes carry
+meshing gears — so the general stage is the stage, not a second kind beside
+the pair. §4.7 has the shape; Phase 5 has the order. The older intent to keep
+kind as a layer above the core is kept by making it exactly that: a preset.
 
 **6. Branch and cadence.** `train-as-graph` off `main`, one commit per phase,
 each green against everything `CLAUDE.md` marks "yes". Nothing merged without
