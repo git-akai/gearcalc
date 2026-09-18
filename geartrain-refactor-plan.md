@@ -693,10 +693,26 @@ every shaft's exact speed and its text, the ratios) beside the ratings, and
 composes a constraint itself. The corpus did not move; the wasm recording
 gained one entry and lost no number.
 
-**4b–4e, not yet built.** Load cases naming a shaft instead of `Port::{Start,
-End}`; the affine family for mobility above one, in the result and on screen;
-the condition panel proper, where any shaft of any stage takes a constraint;
-`reacted` derived beside the input; relief over constraints.
+**4b — a load case names a shaft.** `Port` is `Start`, `End` or `At(ShaftRef)`:
+the two names resolve through the boundaries — `Start` is the carrier of a
+carrier-driven set at the head — and a case written at the shaft is the same
+case to the bit, which a test holds on three trains and a corpus fixture
+prints beside its chain-named twin. The direction a load travels is no longer
+a table on the port (`Port::drive`, `Port::far` are gone): `Train::route`
+walks the graph from the entry shaft, forward through a stage entered by its
+input and backward through one entered by its output, to the far end. Two
+refusals arrived with it, by name: a load on a shaft no load can be put on,
+and one on a shaft two stages share — the latter the stated boundary of a
+one-route, one-efficiency-per-stage loss model, which is Phase 7's to lift.
+The route found a fault the walk had hidden: a set behind a pair, driven by
+its ring, was handed a boundary whose output was its input and solved at a
+ratio of one (`docs/corrections.md`). `MotionReport` lists the open ports,
+named, and the panel's two port selects offer exactly those.
+
+**4c–4e, not yet built.** The affine family for mobility above one, in the
+result and on screen; the condition panel proper, where any shaft of any stage
+takes a constraint; `reacted` derived beside the input; relief over
+constraints.
 
 **Phase 5 — the general epicyclic stage.** The mesh grid, the one-radius-per-
 planet-shaft closure, the gutter toggle. `Stage::Planetary` becomes a preset

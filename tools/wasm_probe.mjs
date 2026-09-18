@@ -130,9 +130,21 @@ const out = {
       return [k, JSON.parse(w.adopt_member(JSON.stringify({ train, materials: library, stage: 0, member })))];
     }),
   ),
-  solve_train: call("solve_train", () =>
-    JSON.parse(w.solve_train(JSON.stringify({ train: defaults.train, library }))),
-  ),
+  // The default train, and the same train with a set behind its pair whose
+  // first load case is written **at the set's carrier** rather than at `end`
+  // — one shaft, two spellings, and the recording holds both so a payload
+  // that reads the named one differently shows here.
+  solve_train: call("solve_train", () => {
+    const t = structuredClone(defaults.train);
+    const named = { ...t, stages: [t.stages[0], structuredClone(defaults.planetary_stage)] };
+    named.load_cases = t.load_cases.map((c, i) =>
+      i === 0 ? { ...c, port: { at: { kind: "of", stage: 1, shaft: 2 } } } : c,
+    );
+    return [
+      ["default", JSON.parse(w.solve_train(JSON.stringify({ train: t, library })))],
+      ["named", JSON.parse(w.solve_train(JSON.stringify({ train: named, library })))],
+    ];
+  }),
   export_train: call("export_train", () => w.export_train(JSON.stringify(trainDoc))),
   import_train: call("import_train", () =>
     JSON.parse(w.import_train(w.export_train(JSON.stringify(trainDoc)))),

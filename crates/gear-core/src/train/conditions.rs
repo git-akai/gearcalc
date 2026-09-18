@@ -74,7 +74,9 @@ pub enum Constraint {
     Held,
     /// Turned by something outside the train.
     Driven,
-    /// Neither — it does what the rest decides, and carries no torque.
+    /// Neither — it does what the rest decides. Whether it carries a torque
+    /// is a load case's question, not this one's: the output of a set is
+    /// free in exactly this sense and carries the whole load.
     Free,
 }
 
@@ -327,6 +329,32 @@ pub struct TrainMotion {
 }
 
 impl TrainMotion {
+    /// **`x` at one shaft, read at another**: a speed, a sweep or a
+    /// revolution count stated at `per`, as `of` sees it through the ratios —
+    /// and zero where `per` does not turn, which is a shaft nothing drives.
+    ///
+    /// **Divided exactly, and the float multiplied in last.** Both speeds
+    /// are quotients of tooth counts; the quotient is taken exactly and
+    /// [`Ratio::scale`] multiplies before it divides, so the answer rounds
+    /// once. `x * (a/b).to_f64()` rounds twice, and the second rounding put
+    /// a recorded speed one ULP from the correctly rounded value — measured
+    /// here, on `30000 · 17/43`, when this was first written that way.
+    #[must_use]
+    pub fn read(&self, x: f64, of: ShaftRef, per: ShaftRef) -> f64 {
+        self.solution.values[self.global(of)]
+            .checked_div(self.solution.values[self.global(per)])
+            .map_or(0.0, |r| r.scale(x))
+    }
+
+    /// A shaft reference's index in the assembled system.
+    #[must_use]
+    pub fn global(&self, r: ShaftRef) -> Shaft {
+        match r {
+            ShaftRef::Ground => GROUND,
+            ShaftRef::Of { stage, shaft } => self.shaft_of(stage, shaft),
+        }
+    }
+
     /// The global index of one of a stage's own shafts.
     #[must_use]
     pub fn shaft_of(&self, stage: usize, local: Shaft) -> Shaft {
@@ -552,20 +580,24 @@ impl Train {
                 .skip(1)
                 .find(|(_, c)| matches!(c, Condition::Drive(_)))
                 .map(|(i, _)| i);
-            let (conventional_in, conventional_out) = ports.ends(
-                &local
-                    .iter()
-                    .enumerate()
-                    .skip(1)
-                    .filter(|(_, c)| **c == Condition::Ground)
-                    .map(|(i, _)| i)
-                    .collect::<Vec<_>>(),
-                driven,
-            );
+            let held: Vec<Shaft> = local
+                .iter()
+                .enumerate()
+                .skip(1)
+                .filter(|(_, c)| **c == Condition::Ground)
+                .map(|(i, _)| i)
+                .collect();
             let input = driven
                 .or_else(|| side(true, true))
-                .unwrap_or(conventional_in);
-            let output = side(false, false).unwrap_or(conventional_out);
+                .unwrap_or_else(|| ports.ends(&held, None).0);
+            // **The output is chosen knowing the input.** A set behind a pair
+            // and coupled to it by its *ring* had its conventional output
+            // read with no input in hand — and the convention, with the sun
+            // held, is "carrier in, ring out", so the ring was named both
+            // ends. The set solved, at a ratio of exactly one, and nothing
+            // said so until a load was routed through it and found it had
+            // nowhere to leave by.
+            let output = side(false, false).unwrap_or_else(|| ports.ends(&held, Some(input)).1);
             local[input] = Condition::Drive(Ratio::ONE);
             out.push(StageBoundary {
                 conditions: local,
@@ -629,6 +661,194 @@ impl Train {
             at,
             solution,
         })
+    }
+}
+
+// ------------------------------------------------- where a load travels ---
+
+use super::Port;
+use crate::contact::Drive;
+
+/// **The route one load takes** from the shaft it enters by to the far end of
+/// the shaft line: each stage it crosses, in order, with the direction it
+/// crosses it in — and the port it arrives at, whatever holds it there.
+///
+/// This is the chain read off the graph for one load rather than assumed of
+/// it: a load entering at the conventional start walks forward through every
+/// stage and one entering at the end walks back, as they always did, and one
+/// entering by a set's carrier is *backward* through that set and forward
+/// through everything after it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Route {
+    pub steps: Vec<(usize, Drive)>,
+    pub far: ShaftRef,
+}
+
+impl Route {
+    /// The direction the load crosses stage `k` in, where it reaches it.
+    #[must_use]
+    pub fn drive_at(&self, k: usize) -> Option<Drive> {
+        self.steps.iter().find(|(s, _)| *s == k).map(|(_, d)| *d)
+    }
+}
+
+/// Why a load cannot be routed from a shaft.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RouteError {
+    /// The shaft is not one a load can be put on: ground, a held shaft, a
+    /// shaft the train does not have, or a stage's shaft that is not a port.
+    NotAPort,
+    /// The shaft sits between two stages, so the load could leave by either
+    /// end and the route is not one route.
+    Shared,
+}
+
+/// A shaft a load can enter the train by, with the name it answers to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct OpenPort {
+    /// `Start` or `End` where the chain names it, else the shaft itself.
+    pub port: Port,
+    pub at: ShaftRef,
+    pub label: ShaftLabel,
+}
+
+impl Train {
+    /// **The shaft a port names**, under the constraints in force.
+    ///
+    /// `Start` is the first stage's input and `End` the last stage's output —
+    /// read off the boundaries, so a set at the head of a chain driven by its
+    /// carrier has its carrier as the start — and `At` is itself.
+    #[must_use]
+    pub fn port_shaft(&self, boundaries: &[StageBoundary], port: Port) -> ShaftRef {
+        let last = boundaries.len().saturating_sub(1);
+        match port {
+            Port::Start => ShaftRef::Of {
+                stage: 0,
+                shaft: boundaries.first().map_or(0, |b| b.input),
+            },
+            Port::End => ShaftRef::Of {
+                stage: last,
+                shaft: boundaries.last().map_or(0, |b| b.output),
+            },
+            Port::At(r) => r,
+        }
+    }
+
+    /// The name a shaft answers to as a port: `Start` or `End` where it is
+    /// one of the chain's two ends, else itself. The inverse of
+    /// [`Self::port_shaft`], so a result names a shaft the way the input
+    /// would have.
+    #[must_use]
+    pub fn port_named(&self, boundaries: &[StageBoundary], at: ShaftRef) -> Port {
+        [Port::Start, Port::End]
+            .into_iter()
+            .find(|&p| self.port_shaft(boundaries, p) == at)
+            .unwrap_or(Port::At(at))
+    }
+
+    /// **Every shaft a load can enter by**: each stage's ports that are
+    /// neither held nor coupled to another stage, each with the name the
+    /// chain gives it. What a picker offers.
+    #[must_use]
+    pub fn open_ports(&self, boundaries: &[StageBoundary]) -> Vec<OpenPort> {
+        let couplings = self.couplings_in_force();
+        let joined = |r: ShaftRef| couplings.iter().any(|c| c.a == r || c.b == r);
+        let mut out = Vec::new();
+        for (k, stage) in self.stages.iter().enumerate() {
+            let w = stage.wiring();
+            let Some(b) = boundaries.get(k) else { break };
+            for shaft in stage.ports().ports {
+                let at = ShaftRef::Of { stage: k, shaft };
+                if b.conditions[shaft] != Condition::Ground && !joined(at) {
+                    out.push(OpenPort {
+                        port: self.port_named(boundaries, at),
+                        at,
+                        label: w.shafts[shaft],
+                    });
+                }
+            }
+        }
+        out
+    }
+
+    /// **The route a load entering at `from` takes** to the far end of the
+    /// shaft line.
+    ///
+    /// At each stage the load arrives by that stage's input or its output —
+    /// forward or backward through it — and leaves by the other, which is
+    /// coupled to the next stage or is where the route ends. A shaft that is
+    /// neither end of its stage's boundary is held, or is no port at all, and
+    /// no load can be put on it; a shaft coupled to a stage on *both* sides
+    /// gives the load two ways out, which is a division this model does not
+    /// make ([`super::TrainError::LoadShared`]).
+    ///
+    /// # Errors
+    ///
+    /// [`RouteError`].
+    pub fn route(&self, boundaries: &[StageBoundary], from: ShaftRef) -> Result<Route, RouteError> {
+        let couplings = self.couplings_in_force();
+        // The stage a coupling joins `r` to, and the shaft it enters there.
+        let across = |r: ShaftRef| -> Vec<ShaftRef> {
+            couplings
+                .iter()
+                .filter_map(|c| {
+                    if c.a == r {
+                        Some(c.b)
+                    } else if c.b == r {
+                        Some(c.a)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
+        // Crossing one stage: the direction, and the shaft the load leaves by.
+        let cross = |r: ShaftRef| -> Result<(usize, Drive, ShaftRef), RouteError> {
+            let ShaftRef::Of { stage, shaft } = r else {
+                return Err(RouteError::NotAPort);
+            };
+            let b = boundaries.get(stage).ok_or(RouteError::NotAPort)?;
+            let (drive, leaves) = if shaft == b.input && shaft != b.output {
+                (Drive::Forward, b.output)
+            } else if shaft == b.output && shaft != b.input {
+                (Drive::Backward, b.input)
+            } else {
+                return Err(RouteError::NotAPort);
+            };
+            Ok((
+                stage,
+                drive,
+                ShaftRef::Of {
+                    stage,
+                    shaft: leaves,
+                },
+            ))
+        };
+        // Entering by a shaft another stage is coupled to is entering between
+        // two stages.
+        if !across(from).is_empty() {
+            return Err(RouteError::Shared);
+        }
+        let mut steps = Vec::new();
+        let mut here = from;
+        loop {
+            let (stage, drive, leaves) = cross(here)?;
+            if steps.iter().any(|(s, _)| *s == stage) {
+                return Err(RouteError::Shared);
+            }
+            steps.push((stage, drive));
+            match across(leaves).as_slice() {
+                [] => return Ok(Route { steps, far: leaves }),
+                [next] => here = *next,
+                _ => return Err(RouteError::Shared),
+            }
+        }
     }
 }
 
@@ -728,6 +948,9 @@ pub struct MotionReport {
     pub ratios: Vec<Option<Exact>>,
     /// The first stage's input to the last stage's output.
     pub total: Option<Exact>,
+    /// Every shaft a load can enter by, named — what a load case's picker
+    /// offers, in the order the chain runs.
+    pub ports: Vec<OpenPort>,
 }
 
 impl Train {
@@ -792,6 +1015,7 @@ impl Train {
                 .collect(),
             ratios: m.ratios.iter().map(|r| r.map(Exact::from)).collect(),
             total: m.total.map(Exact::from),
+            ports: self.open_ports(&self.boundaries().ok()?),
         })
     }
 }

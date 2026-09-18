@@ -2109,9 +2109,11 @@ are asked at [`ring::mesh_with`](#limits) rather than restated here.
 ## Trains
 
 Per stage `i = z_out/z_in`; a worm's is `z_wheel/z_starts` and a planetary's
-comes from its own kinematics. Total ratio is the product. A train has two
-**ports** — `start`, the first stage's first member, and `end`, the last
-stage's last member — and every load enters at one of them.
+comes from its own kinematics. Total ratio is the product. A train's **ports**
+are every shaft a load can enter by — each stage's ports that are neither held
+nor coupled to another stage — and a chain names its two ends `start`, the
+first stage's input, and `end`, the last stage's output, *under the
+constraints in force*. A load enters at any of them.
 
 ### Constraints and couplings
 
@@ -2192,7 +2194,7 @@ per enabled case. A case is:
 ```text
 kind       ultimate | fatigue      which allowable it is judged against
 enabled    on | off                off takes part in nothing; the inputs stand
-port       start | end             where the torque enters
+port       start | end | a shaft   where the torque enters
 reacted    on | off                whether the far end holds it
 torque     N·m at the port
 speed      rpm at the port         zero is a load held still
@@ -2209,10 +2211,21 @@ can reverse the roots, and nothing else: where a load enters, what holds it and
 how big it is are the same questions for either kind. Cases may overlap or
 exceed one another freely; nothing is clamped against anything.
 
-**Carrying a load.** Direction is derived from the port and never stored: a
-load from `start` drives the stages forward in order, a load from `end` drives
-them backward in reverse order. At each stage the load is referred to that
-stage's first member — a division by the ratio when it arrives from the far
+**Carrying a load.** Direction is derived from the port and never stored, by
+**routing** the load from the shaft it enters at: a stage it enters by the
+input of is crossed forward and one it enters by the output of is crossed
+backward, and the shaft it leaves by is coupled to the next stage or is where
+the route ends. A load from `start` drives the stages forward in order and a
+load from `end` drives them backward in reverse, as they always did; a load
+entering a set by its carrier at the tail of a chain is backward through the
+set and backward through everything before it. Two things are refused by
+name rather than routed: a load on a shaft no load can be put on — ground, a
+held shaft, a planet — and a load on the shaft **two stages share**, which
+could leave by either end. How such a load divides is a statement about what
+holds it at each end, with a loss model that follows power mesh by mesh, and
+this model refers a load along one route with one efficiency per stage; the
+refusal is the boundary of the model and it is stated as one. At each stage
+the load is referred to that stage's first member — a division by the ratio when it arrives from the far
 side, and nothing else — and leaves attenuated by the stage's efficiency **in
 the direction it is travelling**:
 
@@ -2364,9 +2377,11 @@ continuous     runtime_hours at the case's own speed
 
 An intermittent sweep is measured at a **named port** — the sweep is a fact
 about the mechanism's motion, not about where its load enters, so a 25° sweep
-of the output is stated at `end` whichever shaft drives it — and every other
-shaft's revolutions follow through the ratios: `(range/360) × actuations ×
-(turns of this shaft per turn of that port)`. Continuous: `rpm × 60 × hours` at
+of the output is stated at `end` whichever shaft drives it, and a sweep of a
+set's carrier can be stated at the carrier — and every other shaft's
+revolutions follow through the ratios: `(range/360) × actuations × (turns of
+this shaft per turn of that port)`, the quotient taken exactly off the graph
+and the float multiplied in last. Continuous: `rpm × 60 × hours` at
 each shaft's own speed, from the case's speed at its port through the same
 ratios. An ultimate case counts nothing: it is survived once.
 

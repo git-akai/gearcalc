@@ -205,6 +205,10 @@ pub mod key {
     pub const ERROR_TRAIN_NO_ROOT_SECTION: &str = "error.train_no_root_section";
     /// `error.train_empty`
     pub const ERROR_TRAIN_EMPTY: &str = "error.train_empty";
+    /// `error.train_load_port`
+    pub const ERROR_TRAIN_LOAD_PORT: &str = "error.train_load_port";
+    /// `error.train_load_shared`
+    pub const ERROR_TRAIN_LOAD_SHARED: &str = "error.train_load_shared";
     /// `error.hula_locked`
     pub const ERROR_HULA_LOCKED: &str = "error.hula_locked";
     /// `error.hula_coaxial`
@@ -282,6 +286,8 @@ pub mod key {
         ERROR_TRAIN_UNKNOWN_MATERIAL,
         ERROR_TRAIN_NO_ROOT_SECTION,
         ERROR_TRAIN_EMPTY,
+        ERROR_TRAIN_LOAD_PORT,
+        ERROR_TRAIN_LOAD_SHARED,
         ERROR_HULA_LOCKED,
         ERROR_HULA_COAXIAL,
         ERROR_HULA_OFFSET_TOO_SMALL,

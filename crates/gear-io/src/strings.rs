@@ -1433,6 +1433,43 @@ mod tests {
             ) {
                 err(e.note());
             }
+            // **A load case that names a shaft it cannot enter by, and one
+            // that enters between two stages** — both fired from the model,
+            // on a two-pair chain: a load on the held ground, and a load on
+            // the shaft the two pairs share.
+            {
+                use gear_core::train::{LoadCase, PairStage, Port, ShaftRef, Stage, Train};
+                let at = |port| Train {
+                    load_cases: vec![LoadCase {
+                        port,
+                        ..LoadCase::ultimate(2.0, 3000.0)
+                    }],
+                    reversed_bending: false,
+                    stages: vec![
+                        Stage::Spur(PairStage::default()),
+                        Stage::Spur(PairStage::default()),
+                    ],
+                    couplings: Vec::new(),
+                    constraints: Vec::new(),
+                };
+                for port in [
+                    Port::At(ShaftRef::Ground),
+                    Port::At(ShaftRef::Of { stage: 1, shaft: 1 }),
+                ] {
+                    let out = gear_core::train::solve_train(&at(port), &lib);
+                    assert!(
+                        matches!(
+                            out,
+                            Err(TrainError::LoadPort { case: 0 }
+                                | TrainError::LoadShared { case: 0 })
+                        ),
+                        "a load at {port:?} is refused by name, not solved: {out:?}"
+                    );
+                    if let Err(e) = out {
+                        err(e.note());
+                    }
+                }
+            }
 
             // A hula stage, refused five ways. Each is reachable from ordinary
             // inputs rather than contrived: two meshes that cancel, a pair whose

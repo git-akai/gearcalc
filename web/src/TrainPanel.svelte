@@ -7,7 +7,8 @@
     type Figure,
     CASE_KINDS,
     type CaseKindSpec,
-    PORTS,
+    portKey,
+    portOptions,
     type CaseKind,
     type Port,
     type LoadCase,
@@ -169,7 +170,25 @@
    *  port, from the same tables the selects offer them from. */
   const caseName = (i: number) => t("ui.train_case_heading", { number: String(i + 1) });
   const kindLabel = (k: CaseKind) => t(CASE_KINDS.find((x) => x.key === k)?.label ?? k);
-  const portLabel = (p: Port) => t(PORTS.find((x) => x.key === p)?.label ?? p);
+  /** The word for a port: the chain's two ends by name, and a named shaft
+   *  as its stage and the shaft's own name — read off the topology the core
+   *  sent, so a shaft's name is the wiring's and not a guess from its index. */
+  const portLabel = (p: Port): string => {
+    if (p === "start") return t("ui.train_port_start");
+    if (p === "end") return t("ui.train_port_end");
+    if (p.at.kind === "ground") return t("ui.train_ground");
+    const { stage, shaft } = p.at;
+    const spec = result.topology[stage]?.ports.find((x) => x.shaft === shaft);
+    return t("ui.train_port_at", {
+      stage: stageName(stage),
+      shaft: spec ? shaftName(tab.train, stage, spec.label) : String(shaft),
+    });
+  };
+  /** The ports a case's select offers, keyed for the select; a port is set
+   *  by looking its key up here, never by parsing the key. */
+  const portOptionsNow = $derived(portOptions(result.motion));
+  const portByKey = (key: string): Port =>
+    portOptionsNow.find((o) => o.key === key)?.port ?? "start";
   /** **Every result names its case**, so a readout that stands for a case looks
    *  its figures up by that index rather than by position: a case switched off
    *  has no result and its row draws blank, and the rows are the train's cases
@@ -1396,9 +1415,9 @@
                  added and shown on the heading, not switched here. -->
             <label>
               <span>{t("ui.train_case_port")}</span>
-              <select bind:value={c.port}>
-                {#each PORTS as p (p.key)}
-                  <option value={p.key}>{t(p.label)}</option>
+              <select value={portKey(c.port)} onchange={(e) => (c.port = portByKey(e.currentTarget.value))}>
+                {#each portOptionsNow as p (p.key)}
+                  <option value={p.key}>{portLabel(p.port)}</option>
                 {/each}
               </select>
               <em></em>
@@ -1442,9 +1461,9 @@
                 </label>
                 <label>
                   <span>{t("ui.train_actuation_range_at")}</span>
-                  <select bind:value={act.at}>
-                    {#each PORTS as p (p.key)}
-                      <option value={p.key}>{t(p.label)}</option>
+                  <select value={portKey(act.at)} onchange={(e) => (act.at = portByKey(e.currentTarget.value))}>
+                    {#each portOptionsNow as p (p.key)}
+                      <option value={p.key}>{portLabel(p.port)}</option>
                     {/each}
                   </select>
                   <em></em>

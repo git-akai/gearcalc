@@ -1613,11 +1613,8 @@ fn train_report(mode: Option<&str>) {
 /// Every load case of a train: what was applied where, what arrived at the far
 /// end, and what the shaft line had to say about it.
 fn print_train_cases(train: &gear_core::train::Train, r: &gear_core::train::TrainResult) {
-    use gear_core::train::{CaseKind, Duty, Port};
-    let port = |p: Port| match p {
-        Port::Start => "start",
-        Port::End => "end",
-    };
+    use gear_core::train::{CaseKind, Duty};
+    let port = kinematics::port;
     for c in &r.cases {
         let input = &train.load_cases[c.case];
         let duty = match (input.kind, input.duty) {

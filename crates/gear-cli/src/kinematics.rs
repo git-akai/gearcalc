@@ -39,7 +39,7 @@
 //! arrives, and their going is the point.
 
 use gear_core::train::{
-    solve_train, Duty, LoadCase, PairStage, PlanetaryStage, Port, ShaftConstraint, Stage,
+    solve_train, Duty, LoadCase, PairStage, PlanetaryStage, Port, ShaftConstraint, ShaftRef, Stage,
     StageGear, StageResult, Train, TrainResult,
 };
 
@@ -94,7 +94,7 @@ fn pair(z1: u32, z2: u32, helix: f64) -> Stage {
 /// arrangement any more — that is a fact about the train, and this is the
 /// shape a file writes it in.
 fn arranged(k: usize, input: &str, fixed: &str) -> Vec<ShaftConstraint> {
-    use gear_core::train::{Constraint, ShaftRef};
+    use gear_core::train::Constraint;
     // The set's shafts, in its wiring's order: ground, sun, carrier, ring,
     // planet. All three central shafts are stated, because a train's
     // constraints lay over the kind's conventions shaft by shaft, and holding
@@ -225,7 +225,7 @@ fn fixtures() -> Vec<(String, Train)> {
             vec![
                 ShaftConstraint::held(1, 2),
                 ShaftConstraint {
-                    at: gear_core::train::ShaftRef::Of { stage: 1, shaft: 3 },
+                    at: ShaftRef::Of { stage: 1, shaft: 3 },
                     constraint: gear_core::train::Constraint::Free,
                 },
             ],
@@ -244,6 +244,30 @@ fn fixtures() -> Vec<(String, Train)> {
         "chain-unclosed".to_string(),
         train(vec![pair(17, 43, 0.0), unclosed()]),
     ));
+    // **The same chain with its loads written at shafts by reference** —
+    // the shaft `end` resolves to, which with the carrier held is the set's
+    // *ring*, and the pair's first member for `start`. The fixture above and
+    // this one must print the same figures, and both are recorded so that
+    // the two spellings cannot drift. (A first draft wrote the carrier here
+    // by hand and was refused: the carrier is held. That is the reason the
+    // names exist.)
+    out.push(("pair-then-set-named".to_string(), {
+        let mut t = out
+            .iter()
+            .find(|(name, _)| name == "pair-then-set")
+            .map(|(_, t)| t.clone())
+            .expect("the fixture above");
+        let boundaries = t.boundaries().expect("a chain has boundaries");
+        t.load_cases = t
+            .load_cases
+            .iter()
+            .map(|c| LoadCase {
+                port: Port::At(t.port_shaft(&boundaries, c.port)),
+                ..*c
+            })
+            .collect();
+        t
+    }));
     out
 }
 
@@ -408,10 +432,14 @@ fn shaft_name(stages: &[Stage], s: &gear_core::train::ShaftMotion) -> String {
     }
 }
 
-fn port(p: Port) -> &'static str {
+/// A port as the harness prints it: the chain's two names as words, and a
+/// named shaft as `stage.shaft`, one-based both ways as the front end counts.
+pub fn port(p: Port) -> String {
     match p {
-        Port::Start => "start",
-        Port::End => "end",
+        Port::Start => "start".into(),
+        Port::End => "end".into(),
+        Port::At(ShaftRef::Ground) => "ground".into(),
+        Port::At(ShaftRef::Of { stage, shaft }) => format!("{}.{shaft}", stage + 1),
     }
 }
 

@@ -98,6 +98,13 @@
 //!   because the train's constraints lay over the conventions shaft by shaft
 //!   and holding the carrier *instead of* the ring has to say so about the
 //!   ring. `[[train.couplings]]` arrived beside it, empty meaning the chain.
+//! - **A load case's `port` may name a shaft.** `"start"` and `"end"` still
+//!   mean the chain's two ends — the first stage's input and the last
+//!   stage's output under the constraints in force — and a third spelling,
+//!   `port = { at = { kind = "of", stage = 1, shaft = 2 } }`, names any
+//!   shaft a stage lists as a port, in the same reference a constraint uses.
+//!   A duty's `at` takes the same three. Nothing an older file wrote
+//!   changed meaning.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
@@ -275,6 +282,19 @@ mod tests {
                         reacted: true,
                         ..LoadCase::fatigue(0.05, 100.0)
                     },
+                    // ...and one written at a shaft by reference — the
+                    // hula stage's output gear, which is also `end` — so the
+                    // third spelling of a port round-trips.
+                    LoadCase {
+                        port: Port::At(ShaftRef::Of { stage: 4, shaft: 4 }),
+                        duty: Duty::Intermittent {
+                            range_degrees: 90.0,
+                            at: Port::At(ShaftRef::Of { stage: 0, shaft: 1 }),
+                            actuations: 50,
+                            reversing: true,
+                        },
+                        ..LoadCase::fatigue(0.05, 100.0)
+                    },
                 ],
                 reversed_bending: false,
                 stages: vec![
@@ -351,12 +371,13 @@ mod tests {
         assert!(text.contains("Inputs only"));
         assert!(text.contains("name = \"Test train\""));
         // One tag a stage, one a load case — and one on each end of a
-        // coupling and on each constraint's shaft, since a `ShaftRef` says
-        // which kind of place it names.
+        // coupling, on each constraint's shaft, and on each port a load case
+        // names by reference, since a `ShaftRef` says which kind of place it
+        // names.
         assert_eq!(
             text.matches("kind = ").count(),
-            5 + 4 + 2 + 3,
-            "one tag a stage, a load case, a coupling end and a constraint:\n{text}"
+            5 + 5 + 2 + 3 + 2,
+            "one tag a stage, a load case, a coupling end, a constraint and a named port:\n{text}"
         );
         for kind in ["spur", "worm", "planetary", "hula", "ultimate", "fatigue"] {
             assert!(text.contains(&format!("kind = \"{kind}\"")), "no {kind}");

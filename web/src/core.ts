@@ -355,13 +355,23 @@ export const CASE_KINDS: CaseKindSpec[] = [
   },
 ];
 
-/** Where a load can enter, in the order a select offers them. The core's
- *  `Port::ALL` is the list; this is its catalogue keys, so a third port is a
- *  row here and a value there. */
-export const PORTS: { key: Port; label: string }[] = [
-  { key: "start", label: "ui.train_port_start" },
-  { key: "end", label: "ui.train_port_end" },
-];
+/** **A port as a select's value.** A port is a name or a shaft reference,
+ *  and a `<select>` binds to strings, so each is keyed by a string that
+ *  round-trips through {@link portOptions} — the option list the core sent
+ *  — rather than being parsed back. Nothing here decides what a port is. */
+export function portKey(p: Port): string {
+  if (p === "start" || p === "end") return p;
+  return p.at.kind === "ground" ? "at:ground" : `at:${p.at.stage}.${p.at.shaft}`;
+}
+
+/** **Where a load can enter**, in the order the chain runs: the open ports
+ *  the core reports with the motion — its two ends by name, and any other
+ *  uncoupled, un-held shaft by reference — or, where the train has no motion
+ *  to report, the two names alone so a case can still be written. */
+export function portOptions(motion: MotionReport | null): { key: string; port: Port }[] {
+  const ports: Port[] = motion?.ports.map((p) => p.port) ?? ["start", "end"];
+  return ports.map((port) => ({ key: portKey(port), port }));
+}
 
 export interface FieldSpec {
   key: keyof GearParams;

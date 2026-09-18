@@ -42,8 +42,9 @@ mod planetary;
 mod wiring;
 
 pub use conditions::{
-    Constraint, Coupling, Exact, MotionError, MotionReport, PortSpec, Ports, ShaftConstraint,
-    ShaftMotion, ShaftRef, ShaftReport, StageBoundary, StagePorts, TrainMotion,
+    Constraint, Coupling, Exact, MotionError, MotionReport, OpenPort, PortSpec, Ports, Route,
+    RouteError, ShaftConstraint, ShaftMotion, ShaftRef, ShaftReport, StageBoundary, StagePorts,
+    TrainMotion,
 };
 pub use crossed::solve_crossed_pair;
 pub use hula::{
@@ -1621,6 +1622,19 @@ pub enum TrainError {
     NoRootSection,
     /// The train has no stages, so there is nothing to accumulate.
     Empty,
+    /// **A load case enters by a shaft no load can be put on**: ground, a
+    /// held shaft, a shaft the train does not have, or one of a stage's
+    /// shafts that is not a port — a planet's. Zero-based, as the cases are
+    /// indexed; the front end numbers from 1.
+    LoadPort { case: usize },
+    /// **A load case enters between two stages, and could leave by either
+    /// end.** How such a load divides is a statement about what holds it at
+    /// each end — the rowspace of the shaft line, with a loss model that
+    /// follows power mesh by mesh — and this model refers a load along one
+    /// route with one efficiency per stage. So it says so rather than
+    /// choosing an end, and the refusal is the boundary of the model, not of
+    /// the mechanism.
+    LoadShared { case: usize },
     /// A hula stage that has no geometry — see [`crate::hula::Error`].
     Hula(crate::hula::Error),
     /// **Which stage could not be solved**, wrapped around why.
@@ -1702,6 +1716,12 @@ impl crate::note::Explain for TrainError {
             }
             Self::NoRootSection => Note::new(key::ERROR_TRAIN_NO_ROOT_SECTION),
             Self::Empty => Note::new(key::ERROR_TRAIN_EMPTY),
+            Self::LoadPort { case } => {
+                Note::new(key::ERROR_TRAIN_LOAD_PORT).text("case", (case + 1).to_string())
+            }
+            Self::LoadShared { case } => {
+                Note::new(key::ERROR_TRAIN_LOAD_SHARED).text("case", (case + 1).to_string())
+            }
             // The stage number belongs to the reader rather than to the reason,
             // so the note is the cause's and the number reaches the front end
             // through the error's own shape.
@@ -1777,6 +1797,18 @@ impl std::fmt::Display for TrainError {
             Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
             Self::NoRootSection => write!(f, "the tooth is too undercut to have a root section"),
             Self::Empty => write!(f, "the geartrain has no stages"),
+            Self::LoadPort { case } => write!(
+                f,
+                "load case {}: enters by a shaft no load can be put on — ground, a held \
+                 shaft, or one that is not a port",
+                case + 1
+            ),
+            Self::LoadShared { case } => write!(
+                f,
+                "load case {}: enters between two stages and could leave by either end; \
+                 this model refers a load along one route",
+                case + 1
+            ),
             Self::InStage { stage, cause } => write!(f, "stage {}: {cause}", stage + 1),
         }
     }
@@ -3110,14 +3142,21 @@ pub fn allowable(material: &Material, kind: CaseKind) -> f64 {
     }
 }
 
-/// Where a load enters the train.
+/// Where a load enters the train, or where a sweep is measured.
 ///
-/// A train has no forward (`docs/rationale.md#direction-is-the-readers-not-the-mechanisms`): it has
-/// two ends, and a load applied at either one works its way toward the other.
-/// The direction a load travels in is derived from its port and never stored —
-/// [`Port::drive`] is the one place the two are related — so a train with a
-/// third entry point some day is a third value here and not a branch anywhere.
-/// [`Port::ALL`] is what a picker shows.
+/// A train has no forward (`docs/rationale.md#direction-is-the-readers-not-the-mechanisms`): a
+/// load applied at a shaft works its way toward whatever holds it, and the
+/// direction it travels in at each stage is found by walking the shaft line
+/// from that shaft ([`Train::route`]) — never stored.
+///
+/// Two names and a reference. `Start` and `End` are the two ports a chain
+/// names for itself — the first stage's input and the last stage's output,
+/// *under the constraints in force* — and they survive a stage being added
+/// or rearranged, which is why they are names rather than indices. `At` is
+/// any shaft a stage lists as a port ([`Ports`]): a load that enters a set by
+/// its carrier while its sun is turned from upstream, or a sweep measured at
+/// a shaft the chain does not end at. [`Train::port_shaft`] resolves all
+/// three to a shaft and nothing downstream of it knows which was written.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
@@ -3127,33 +3166,12 @@ pub fn allowable(material: &Material, kind: CaseKind) -> f64 {
 )]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum Port {
-    /// The first stage's first member.
+    /// The first stage's input.
     Start,
-    /// The last stage's last member.
+    /// The last stage's output.
     End,
-}
-
-impl Port {
-    /// Every port a train has, in the order a picker shows them.
-    pub const ALL: [Self; 2] = [Self::Start, Self::End];
-
-    /// The direction a load entering here drives the stages in.
-    #[must_use]
-    pub const fn drive(self) -> Drive {
-        match self {
-            Self::Start => Drive::Forward,
-            Self::End => Drive::Backward,
-        }
-    }
-
-    /// The port a load entering here is carried toward.
-    #[must_use]
-    pub const fn far(self) -> Self {
-        match self {
-            Self::Start => Self::End,
-            Self::End => Self::Start,
-        }
-    }
+    /// A named shaft.
+    At(ShaftRef),
 }
 
 /// How a fatigue load is applied over the life of the train — what turns a
@@ -3710,48 +3728,13 @@ pub struct TrainResult {
     pub stages: Vec<StageResult>,
 }
 
-/// **How many times stage `k`'s first member turns for one turn of the shaft a
-/// load case is measured at** — the whole shaft line's kinematics in one
-/// number, so that a speed, a sweep or a revolution count stated at a port
-/// reaches every stage by the same multiplication.
-///
-/// Read off the graph rather than multiplied out: `at` is each stage's input
-/// speed at one turn of the *start*, and `end` is the last stage's output, so
-/// the quotient is the factor either port wants. **It is signed**, which the
-/// product of the stage ratios was not — a pair reports its ratio as a
-/// magnitude ([`crate::mesh::Mesh::ratio`]) — and the sign is what makes a
-/// stage's output member and the next stage's input member, which are one
-/// physical shaft, report one speed instead of two.
-///
-/// The name says which way round it is, and the sentence that used to sit here
-/// said the other: it is turns *of the stage* per turn of the port.
-fn turns_per_port_turn(
-    at: &[crate::ratio::Ratio],
-    end: crate::ratio::Ratio,
-    port: Port,
-    k: usize,
-) -> f64 {
-    match port {
-        Port::Start => at[k].to_f64(),
-        // **Divided exactly, then read as a float once.** Both speeds are
-        // quotients of tooth counts, and `a.to_f64() / b.to_f64()` rounds three
-        // times where `(a/b).to_f64()` rounds once — which showed up as a
-        // recorded figure moving in its last two digits, away from the
-        // correctly rounded value, for a change that was supposed to move only
-        // signs. Exact arithmetic is worth having only if it is spent last.
-        Port::End => at[k]
-            .checked_div(end)
-            .map_or(0.0, crate::ratio::Ratio::to_f64),
-    }
-}
-
 /// Where one load case is carried, and what each stage feels of it.
 ///
 /// # The model
 ///
-/// A load exists only where something holds it. Applied at a port it works its
-/// way toward the other, referred at each stage to that stage's own first
-/// member — a division by the ratio when it arrives from the far side and
+/// A load exists only where something holds it. Applied at a shaft it works
+/// its way along its [`Route`] to the far end, referred at each stage to that
+/// stage's own first member — a division by the ratio when it arrives from the far side and
 /// nothing else, since the mesh force is set by the torque at the wheel and the
 /// losses sit between the mesh and the shaft beyond — and leaving attenuated
 /// by the stage's efficiency **in the direction it is travelling**. A stage
@@ -3776,17 +3759,11 @@ fn turns_per_port_turn(
 /// the shaft line and again for the ratings. The second pass is not a
 /// refinement of the first — it is the same arithmetic with the loads it was
 /// missing.
-fn carry(stages: &[StageResult], case: &LoadCase) -> (Vec<f64>, Option<usize>, f64) {
-    let n = stages.len();
-    let drive = case.port.drive();
-    let order: Vec<usize> = match drive {
-        Drive::Forward => (0..n).collect(),
-        Drive::Backward => (0..n).rev().collect(),
-    };
-    let mut torques = vec![0.0; n];
+fn carry(stages: &[StageResult], route: &Route, case: &LoadCase) -> (Vec<f64>, Option<usize>, f64) {
+    let mut torques = vec![0.0; stages.len()];
     let mut at_port = case.torque;
     let mut reacted_at = None;
-    for &k in &order {
+    for &(k, drive) in &route.steps {
         let s = &stages[k];
         // **A referral is a magnitude; the direction of rotation is the
         // motion's.** A stage's ratio says two things at once — how much a
@@ -3876,16 +3853,6 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     // couplings — which is where a set's arrangement lives now — handed to the
     // stage beside its loads.
     let boundaries = train.boundaries()?;
-    // Each stage's input speed, and the last stage's output, at one turn of the
-    // start port.
-    let at: Vec<crate::ratio::Ratio> = boundaries
-        .iter()
-        .enumerate()
-        .map(|(k, b)| motion.solution.values[motion.shaft_of(k, b.input)])
-        .collect();
-    let end = boundaries.last().map_or(crate::ratio::Ratio::ONE, |b| {
-        motion.solution.values[motion.shaft_of(boundaries.len() - 1, b.output)]
-    });
     // The reduction the graph already holds exactly, read as a float once
     // rather than reciprocated as one.
     let total_ratio = motion
@@ -3903,15 +3870,17 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     let mut cases = Vec::new();
     let mut per_stage: Vec<Vec<StageLoad>> = vec![Vec::new(); train.stages.len()];
     for (index, case) in train.enabled_cases() {
-        let (torques, reacted_at, delivered_torque) = carry(&first, case);
-        let far = case.port.far();
-        // The far port turns `total_ratio` times slower going forward and
-        // faster going back: the same table as every stage's own factor.
-        let delivered_speed = case.speed
-            * match far {
-                Port::End => 1.0 / total_ratio,
-                Port::Start => total_ratio,
-            };
+        // **Where the load enters is a shaft, and where it goes is read off
+        // the graph** — forward through a stage it enters by the input of,
+        // backward through one it enters by the output of — rather than a
+        // direction stored beside the port.
+        let entry = train.port_shaft(&boundaries, case.port);
+        let route = train.route(&boundaries, entry).map_err(|e| match e {
+            RouteError::NotAPort => TrainError::LoadPort { case: index },
+            RouteError::Shared => TrainError::LoadShared { case: index },
+        })?;
+        let (torques, reacted_at, delivered_torque) = carry(&first, &route, case);
+        let delivered_speed = motion.read(case.speed, route.far, entry);
         let mut notes = Vec::new();
         match reacted_at {
             Some(k) => {
@@ -3922,15 +3891,22 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
         }
         cases.push(TrainCase {
             case: index,
-            delivered_at: far,
+            delivered_at: train.port_named(&boundaries, route.far),
             delivered_torque,
             delivered_speed,
             reacted_at,
             notes,
         });
         for (k, loads) in per_stage.iter_mut().enumerate() {
-            let by = turns_per_port_turn(&at, end, case.port, k);
-            let speed = case.speed * by;
+            // How many times this stage's input turns per turn of the shaft
+            // the case is stated at: the whole shaft line's kinematics in one
+            // exact quotient, so a speed, a sweep or a revolution count stated
+            // anywhere reaches every stage by the same multiplication.
+            let input = ShaftRef::Of {
+                stage: k,
+                shaft: boundaries[k].input,
+            };
+            let speed = motion.read(case.speed, input, entry);
             // How often this stage's first member comes round over a fatigue
             // case's duty: a sweep stated at a port, or a time at the case's
             // own speed, and either reaches here through the ratios.
@@ -3946,9 +3922,13 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
                         // **A sweep is a magnitude.** It is stated at a port as
                         // degrees of motion, and how many turns that is of some
                         // other shaft does not depend on which way either turns.
-                        revolutions: (range_degrees / 360.0)
-                            * n
-                            * turns_per_port_turn(&at, end, sweep_at, k).abs(),
+                        revolutions: motion
+                            .read(
+                                (range_degrees / 360.0) * n,
+                                input,
+                                train.port_shaft(&boundaries, sweep_at),
+                            )
+                            .abs(),
                         reversing_actuations: reversing.then_some(n),
                     }
                 }
@@ -3960,7 +3940,9 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
             loads.push(StageLoad {
                 case: index,
                 kind: case.kind,
-                drive: case.port.drive(),
+                // A stage the route does not reach carries nothing of this
+                // case, and nothing is the same load either way round.
+                drive: route.drive_at(k).unwrap_or(Drive::Forward),
                 torque: torques[k],
                 speed,
                 turns,
@@ -6128,7 +6110,178 @@ mod tests {
                 shaft: ring
             }
         );
-        solve_train(&t, &lib).expect("solves ring-in behind a pair");
+        let r = solve_train(&t, &lib).expect("solves ring-in behind a pair");
+        // ...and leaves by the carrier, at the ring-in ratio — not by the
+        // ring it came in by, at a ratio of one, which is what it did.
+        let b = t.boundaries().unwrap();
+        assert_eq!((b[1].input, b[1].output), (ring, carrier));
+        let set = r.stages[1].ratio();
+        assert!(set > 1.0 && set < 2.0, "ring in, sun held: {set}");
+    }
+
+    /// **A port is a name for a shaft, and naming the shaft is the same load.**
+    /// `Start` and `End` resolve through the boundaries to a stage's shaft,
+    /// and a case written `At` that shaft — the wheel of the last pair, the
+    /// carrier of a set — is one case, not a third kind of thing: every
+    /// stage's torque, speed and turns, and what is delivered where, agree to
+    /// the bit. Both ways round, on a chain of three kinds and on a lone set,
+    /// with the sweep of a fatigue duty stated at the named shaft too.
+    #[test]
+    fn a_load_named_by_its_shaft_is_the_load_named_by_the_chain() {
+        let lib = library();
+        let lone_set = || {
+            let mut t = two_stage();
+            t.stages = vec![Stage::Planetary(Box::default())];
+            t
+        };
+        let mut checked = 0;
+        for train in [two_stage(), mixed_train(), lone_set()] {
+            let boundaries = train.boundaries().unwrap();
+            for name in [Port::Start, Port::End] {
+                let shaft = train.port_shaft(&boundaries, name);
+                assert_eq!(train.port_named(&boundaries, shaft), name);
+                let mut by_name = train.clone();
+                let mut by_shaft = train.clone();
+                for (a, b) in by_name.load_cases.iter_mut().zip(&mut by_shaft.load_cases) {
+                    a.port = name;
+                    b.port = Port::At(shaft);
+                    a.duty = Duty::Intermittent {
+                        range_degrees: 25.0,
+                        at: name,
+                        actuations: 1000,
+                        reversing: false,
+                    };
+                    b.duty = Duty::Intermittent {
+                        range_degrees: 25.0,
+                        at: Port::At(shaft),
+                        actuations: 1000,
+                        reversing: false,
+                    };
+                }
+                let (n, s) = (
+                    solve_train(&by_name, &lib).expect("by name"),
+                    solve_train(&by_shaft, &lib).expect("by shaft"),
+                );
+                for (a, b) in n.cases.iter().zip(&s.cases) {
+                    assert_eq!(a.delivered_at, b.delivered_at);
+                    assert_eq!(a.delivered_torque, b.delivered_torque);
+                    assert_eq!(a.delivered_speed, b.delivered_speed);
+                    assert_eq!(a.reacted_at, b.reacted_at);
+                }
+                for (x, y) in n.stages.iter().zip(&s.stages) {
+                    for (g, h) in x.members().iter().zip(y.members()) {
+                        for (c, d) in g.cases.iter().zip(&h.cases) {
+                            assert_eq!(c.torque, d.torque);
+                            assert_eq!(c.speed, d.speed);
+                            assert_eq!(c.cycles, d.cycles);
+                            checked += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(checked > 40, "{checked} member-cases compared");
+    }
+
+    /// **The route is read off the graph**, and it says which way a load
+    /// crosses each stage and where it ends up — forward through a stage it
+    /// enters by the input of, backward through one it enters by the output
+    /// of. A load entering a set by its *carrier* at the tail of a chain is
+    /// backward through the set and backward through the pair before it; one
+    /// on a shaft no load can be put on — ground, the held ring, the planet
+    /// — is refused by name, and one on the shaft two stages share is refused
+    /// as shared rather than sent one way.
+    #[test]
+    fn a_route_says_which_way_a_load_crosses_each_stage() {
+        let lib = library();
+        let (sun, carrier, ring, planet) = (1, 2, 3, 4);
+        let mut t = two_stage();
+        t.stages = vec![
+            Stage::Spur(PairStage::default()),
+            Stage::Planetary(Box::default()),
+        ];
+        let b = t.boundaries().unwrap();
+        let at = |stage, shaft| ShaftRef::Of { stage, shaft };
+
+        let forward = t.route(&b, at(0, 1)).unwrap();
+        assert_eq!(
+            forward.steps,
+            vec![(0, Drive::Forward), (1, Drive::Forward)]
+        );
+        assert_eq!(forward.far, at(1, carrier));
+        let back = t.route(&b, at(1, carrier)).unwrap();
+        assert_eq!(back.steps, vec![(1, Drive::Backward), (0, Drive::Backward)]);
+        assert_eq!(back.far, at(0, 1));
+
+        for bad in [
+            ShaftRef::Ground,
+            at(1, ring),
+            at(1, planet),
+            at(0, 9),
+            at(5, 1),
+        ] {
+            assert_eq!(t.route(&b, bad), Err(RouteError::NotAPort), "{bad:?}");
+        }
+        assert_eq!(t.route(&b, at(1, sun)), Err(RouteError::Shared));
+        assert_eq!(t.route(&b, at(0, 2)), Err(RouteError::Shared));
+
+        // ...and the refusals reach a load case by number.
+        let mut shared = t.clone();
+        shared.load_cases[1].port = Port::At(at(1, sun));
+        assert_eq!(
+            solve_train(&shared, &lib).err(),
+            Some(TrainError::LoadShared { case: 1 })
+        );
+        let mut held = t.clone();
+        held.load_cases[2].port = Port::At(at(1, ring));
+        assert_eq!(
+            solve_train(&held, &lib).err(),
+            Some(TrainError::LoadPort { case: 2 })
+        );
+
+        // A set driven by its carrier at the head of a chain: `Start` *is*
+        // the carrier now, and the load walks the set backward.
+        let mut t = two_stage();
+        t.stages = vec![
+            Stage::Planetary(Box::default()),
+            Stage::Spur(PairStage::default()),
+        ];
+        let t = t.arranged(0, carrier, ring);
+        let b = t.boundaries().unwrap();
+        assert_eq!(t.port_shaft(&b, Port::Start), at(0, carrier));
+        let r = t.route(&b, at(0, carrier)).unwrap();
+        assert_eq!(r.steps, vec![(0, Drive::Forward), (1, Drive::Forward)]);
+        let r = solve_train(&t, &lib).expect("carrier-driven set at the head");
+        assert!(
+            r.total_ratio.abs() < 1.0,
+            "a carrier-driven set multiplies speed"
+        );
+    }
+
+    /// **The open ports are what a load can enter by**, each with the name
+    /// the chain gives it: a chain's two ends are `Start` and `End`, and a
+    /// released ring — un-held, uncoupled — is a third, by its own reference.
+    #[test]
+    fn the_open_ports_are_the_chains_ends_and_whatever_else_is_uncoupled() {
+        let at = |stage, shaft| ShaftRef::Of { stage, shaft };
+        let t = mixed_train();
+        let ports = t.open_ports(&t.boundaries().unwrap());
+        assert_eq!(
+            ports.iter().map(|p| (p.port, p.at)).collect::<Vec<_>>(),
+            vec![(Port::Start, at(0, 1)), (Port::End, at(3, 2))]
+        );
+        let mut t = two_stage();
+        t.stages = vec![Stage::Planetary(Box::default())];
+        t.constraints = vec![ShaftConstraint {
+            at: at(0, 3),
+            constraint: Constraint::Free,
+        }];
+        let ports = t.open_ports(&t.boundaries().unwrap());
+        assert_eq!(
+            ports.iter().map(|p| p.port).collect::<Vec<_>>(),
+            vec![Port::Start, Port::End, Port::At(at(0, 3))]
+        );
+        assert_eq!(ports[2].label, ShaftLabel::Member { member: 2 });
     }
 
     /// Every freedom a stage's groups mention, flat.

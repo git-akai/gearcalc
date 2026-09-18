@@ -54,6 +54,7 @@ export type { MeshReport } from "./core/MeshReport";
 export type { MotionReport } from "./core/MotionReport";
 export type { Note } from "./core/Note";
 export type { Offset } from "./core/Offset";
+export type { OpenPort } from "./core/OpenPort";
 export type { Optimisation } from "./core/Optimisation";
 export type { Overrides } from "./core/Overrides";
 export type { PairKind } from "./core/PairKind";
