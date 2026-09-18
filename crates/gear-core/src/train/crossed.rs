@@ -176,6 +176,7 @@ pub fn solve_crossed_pair(
     kind: PairKind,
     loads: &StageLoads,
     lib: &MaterialLibrary,
+    motion: &[super::MemberMotion],
 ) -> Result<PairResult, TrainError> {
     // The shifts, decided once — a given distance is reached through them by
     // the rack law, or through the size where both are pinned
@@ -551,16 +552,19 @@ pub fn solve_crossed_pair(
                 .iter()
                 .zip(&contact)
                 .map(|(c, patch)| {
-                    // The second member turns `1/i` times for each turn of the
-                    // first, whichever way the load travels — its speed and its
-                    // engagements alike.
-                    let by = if i == 0 { 1.0 } else { 1.0 / s.ratio };
+                    // **What this member does comes from the graph**, as it
+                    // does for every kind: crossing the shafts changes what the
+                    // teeth do to each other and changes nothing at all about
+                    // the speeds, so a worm stage's motion is a spur stage's.
+                    let m = motion[i];
                     GearCase {
                         case: c.case,
                         torque: member_torque(i, c),
-                        speed: c.speed * by,
-                        speed_against_carrier: c.speed * by,
-                        cycles: c.turns.map(|t| super::loaded_cycles(t.scaled(by))),
+                        speed: m.speed.scale(c.speed),
+                        speed_against_carrier: m.against_frame.scale(c.speed),
+                        cycles: c
+                            .turns
+                            .map(|t| super::loaded_cycles(t.scaled(m.engagements))),
                         // **No bending, and that is a decision rather than a
                         // gap.** The tooth a beam formula would measure is not
                         // the tooth this mesh loads: a crossed pair's contact
@@ -633,8 +637,14 @@ pub fn solve_crossed_pair(
                 .map(|(c, patch)| MeshCase {
                     case: c.case,
                     contact: patch,
+                    // **How fast the surfaces slide past each other**, which
+                    // is a speed with no sign to it: a pair rubbing at 3 m/s
+                    // rubs at 3 m/s whichever way round it is turning. The
+                    // stage's own speed is signed now — it comes off the graph
+                    // — and a worm downstream of a reversing stage would
+                    // otherwise report a negative rub.
                     sliding_velocity: s.sliding_ratio
-                        * (c.speed / 60.0 * std::f64::consts::TAU)
+                        * (c.speed / 60.0 * std::f64::consts::TAU).abs()
                         * (f64::from(p[0].teeth) * p[0].module
                             / p[0].helix_angle.to_radians().cos()
                             / 2.0),

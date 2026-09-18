@@ -2728,7 +2728,10 @@ mod tests {
             ]}}"#;
 
         let v = solved(req);
-        assert!((v["total_ratio"].as_f64().unwrap() - 43.0 / 17.0).abs() < 1e-12);
+        // **Negative**, because an external pair reverses and a train's ratio
+        // says so now: it is read off the graph rather than multiplied out of
+        // the stage ratios, and a pair reports its own as a magnitude.
+        assert!((v["total_ratio"].as_f64().unwrap() + 43.0 / 17.0).abs() < 1e-12);
         assert!(v["cases"][0]["delivered_torque"].as_f64().unwrap() > 2.0);
         assert_eq!(v["cases"][0]["delivered_at"], "end");
 

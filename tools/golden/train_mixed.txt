@@ -16,18 +16,18 @@ stage 1  spur  z 17/43  beta 0 deg  ratio 2.5294  a_w 30.0257 mm  coprime
       case 2  T     0.0000 Nm        0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -
       case 3  T     2.0000 Nm     2400.0 rpm  sigma_F    750.0  sigma_H   2308.6 MPa  cycles 1.440e8 / 1.440e8
   2        0.0000    0.895
-      case 1  T     5.0588 Nm     1186.0 rpm  sigma_F    635.0  sigma_H   2097.6 MPa  cycles -
-      case 2  T     0.0000 Nm        0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -
-      case 3  T     5.0588 Nm      948.8 rpm  sigma_F    635.0  sigma_H   2097.6 MPa  cycles 5.693e7 / 5.693e7
+      case 1  T     5.0588 Nm    -1186.0 rpm  sigma_F    635.0  sigma_H   2097.6 MPa  cycles -
+      case 2  T     0.0000 Nm       -0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -
+      case 3  T     5.0588 Nm     -948.8 rpm  sigma_F    635.0  sigma_H   2097.6 MPa  cycles 5.693e7 / 5.693e7
 
 stage 2  worm  z 1/40  ratio 40.0000  a 23.7273 mm  lead angle 8.2132 deg
   efficiency  61.805 % forward / 0.000 % backward  (cannot be back-driven)
   contact  4574.4 / 772.0 / 4574.4 MPa by case   patch 2.1417 x 1.2984 mm   sliding 439.2 / 0.0 / 351.4 mm/s by case
   member     b mm   material
   worm     13.539   4340 Hardened Steel
-      case 1  T     4.9751 Nm     1186.0 rpm  sigma_F        -  sigma_H   4574.4 MPa  cycles -
-      case 2  T     0.0000 Nm        0.0 rpm  sigma_F        -  sigma_H    772.0 MPa  cycles -
-      case 3  T     4.9751 Nm      948.8 rpm  sigma_F        -  sigma_H   4574.4 MPa  cycles 5.693e7 / 5.693e7
+      case 1  T     4.9751 Nm    -1186.0 rpm  sigma_F        -  sigma_H   4574.4 MPa  cycles -
+      case 2  T     0.0000 Nm       -0.0 rpm  sigma_F        -  sigma_H    772.0 MPa  cycles -
+      case 3  T     4.9751 Nm     -948.8 rpm  sigma_F        -  sigma_H   4574.4 MPa  cycles 5.693e7 / 5.693e7
   wheel     4.690   Brass C360
       case 1  T   122.9936 Nm       29.7 rpm  sigma_F        -  sigma_H   4574.4 MPa  cycles -
       case 2  T     0.6000 Nm        0.0 rpm  sigma_F        -  sigma_H    772.0 MPa  cycles -

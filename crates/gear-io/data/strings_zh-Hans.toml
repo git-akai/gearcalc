@@ -89,6 +89,7 @@ screw_axes_are_parallel = "轴线平行：蜗杆级需要交错轴，平行的�
 train_no_contact = "轮齿始终未进入接触"
 train_no_common_distance = "没有任何变位系数能使两个中心距相等；该齿数组合无法装配"
 train_no_power_flow = "没有自洽的功率流：该构型自锁，或指定为输入的轴并非主动轴"
+train_wiring = "该级不构成机构：某个构件没有齿，或两轮的轴心无法保持固定距离"
 train_unknown_material = "材料库中没有名为 {name} 的材料"
 train_no_root_section = "轮齿根切过度，已无齿根危险截面"
 train_empty = "该齿轮系没有任何级"

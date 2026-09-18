@@ -94,6 +94,7 @@ screw_axes_are_parallel = "eixos paralelos: um estágio de sem-fim precisa de ei
 train_no_contact = "os dentes nunca entram em contato"
 train_no_common_distance = "nenhum deslocamento de perfil aproxima as duas distâncias entre centros; estes números de dentes não podem ser montados"
 train_no_power_flow = "nenhum fluxo de potência autoconsistente: o arranjo é autobloqueante, ou o veio indicado como entrada não é o que aciona"
+train_wiring = "este estágio não descreve um mecanismo: um membro sem dentes, ou duas engrenagens cujos eixos não podem manter distância fixa"
 train_unknown_material = "não há material chamado {name} na biblioteca"
 train_no_root_section = "o dente está demasiado adelgaçado para ter secção de raiz"
 train_empty = "o trem de engrenagens não tem estágios"

@@ -1371,6 +1371,28 @@ mod tests {
             // section left to rate, and no stages at all.
             use gear_core::train::{Train, TrainError};
             err(TrainError::NoContact.note());
+            // **...and a member with no teeth**, which is the one refusal a
+            // wiring has that a *design* can reach: `teeth` is a `u32` and
+            // nothing stops a designer typing zero. It was answered with "the
+            // tooth is too undercut to have a root section", which describes a
+            // tooth that exists.
+            {
+                let mut st = gear_core::train::PairStage::default();
+                st.gears[1].teeth = 0;
+                let out = gear_core::train::solve_pair_stage(
+                    &st,
+                    gear_core::train::PairKind::Spur,
+                    &gear_core::train::StageLoads::just(1.0),
+                    &lib,
+                );
+                assert!(
+                    matches!(out, Err(TrainError::Wiring(_))),
+                    "a member with no teeth is no mechanism, whatever else is wrong"
+                );
+                if let Err(e) = out {
+                    err(e.note());
+                }
+            }
             // **...and a set whose centre distances no shift can bring
             // together, fired from the model rather than built by hand.** At a
             // 17-tooth sun and 17-tooth planets only `z_ring ∈ [48, 54]` admits

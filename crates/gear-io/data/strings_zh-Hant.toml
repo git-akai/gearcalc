@@ -89,6 +89,7 @@ screw_axes_are_parallel = "軸線平行：蝸桿級需要交錯軸，平行的�
 train_no_contact = "輪齒始終未進入接觸"
 train_no_common_distance = "沒有任何變位係數能使兩個中心距相等；該齒數組合無法裝配"
 train_no_power_flow = "沒有自洽的功率流：該構型自鎖，或指定為輸入的軸並非主動軸"
+train_wiring = "該級不構成機構：某個構件沒有齒，或兩輪的軸心無法保持固定距離"
 train_unknown_material = "材料庫中沒有名為 {name} 的材料"
 train_no_root_section = "輪齒過切過度，已無齒根危險截面"
 train_empty = "該齒輪系沒有任何級"

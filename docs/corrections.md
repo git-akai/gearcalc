@@ -320,6 +320,21 @@ A stage's ratio says two things at once, and a reader has to be told which one
 is being taken. Where a *magnitude* is meant the code now says `.abs()` at the
 site, with the reason beside it.
 
+### Exact arithmetic is worth having only if it is spent last
+
+A quotient of tooth counts held exactly and then converted with `to_f64()`
+before being multiplied by a speed rounds **twice**; `(x · num) / den` rounds
+once, since `x · num` is exact for the small integers a tooth count makes.
+Caught by the wasm payload's recorded answer, which prints seventeen digits
+where the golden corpus prints six: a change meant to move only *signs* moved a
+member's speed one ULP off the correctly rounded value, and the corpus could
+not have shown it.
+
+Two lessons, and the second is the one worth keeping. A conversion is a
+rounding and belongs at the end of the arithmetic, not in the middle of it —
+and **the two change detectors see different things**, so a figure that clears
+one is not a figure that has been looked at.
+
 ### Units are a diagnosis
 
 A radial-assembly threshold came out scaling with ring *size* when a
@@ -369,6 +384,7 @@ whose units are wrong is wrong however plausible.
 | [4.10](reference.md#angularly-varying-profile-shift) | ...and parametrised on **angle** | The flank is re-entrant below the base circle, so a flank point can sit at a larger angle than the fillet junction and take a displacement it must never have. Radius is the monotone invariant ([the generated profile](reference.md#the-generated-profile)) and is what measures position along the profile |
 | [8.0](rationale.md#notes-must-not-move-the-controls) | A gear tab's type-specific inputs left set when the type changed | Switching an eccentric gear back to external left its shift amplitude in place, so the gear stayed eccentric with no control on screen to say so — and the eccentricity outputs keyed on that *value* rather than on the type, so they stayed too. Changing type now returns every field the new type does not use to its default, read from `FIELDS` rather than from a second list |
 | [4.10](reference.md#angularly-varying-profile-shift) | Only the cutter *tip round* shared across the teeth | The **depth** is a tool setting too. `Tooth::new` raises the cutter depth when it would go non-positive, which pinned four teeth to one root radius while their neighbours followed the envelope — a flat spot and a corner on the high side at positive shift, and the low side at negative. Both settings are the tool's and are settled once; what is a fact about *one tooth* is reported instead |
+| [4.11](reference.md#trains) | Each stage kind working its members' speeds out for itself | They disagreed about **sign**. A pair took `1/i` from `Mesh::ratio`, which is a magnitude, so its second member reported turning forwards while turning backwards; an epicyclic set's came from `planetary::power` and was signed. So a stage's output member and the next stage's input member — **one piece of metal** — reported opposite speeds, and a two-stage spur train agreed only by accident. Every member's motion is one reading of the shaft-line graph now, and `a_shaft_shared_by_two_stages_reports_one_speed` is the law. 107 recorded figures moved, every one of them a sign and not a magnitude |
 | [4.11](reference.md#tooth-cycles) | The planet count applied to **every** member's engagements | *Once for each parallel mesh path* is true of a central member and false of a planet: a sun tooth passes all N planets in one turn against the carrier, and a planet tooth meets the one sun, because it *is* one of the N and the others have teeth of their own. The shipped set reported its planet's cycles **three times over**. The rule in the reference was right all along; what was missing was anywhere for the two members of a mesh to differ, `MeshSpec::paths` looking symmetric. The test asserted the over-count too, having been written from the same expression — and the figure was outside the corpus entirely until the graph work added a fixture that prints an epicyclic member's cycles |
 | [4.11](reference.md#trains) | A stage's **signed** ratio used to refer a torque to the next stage | Every stage after a reversing one was handed a **negative** torque, and a negative tangential force has no Hertzian contact to press at any face width — so it refused with *"the teeth never come into contact"*, which is true of nothing: those teeth mesh perfectly well. **A planetary set with its carrier held could not be followed by any stage at all** (`i = −6`, and the pair after it saw −11.6 N·m). Found by the graph refactor asking a question no shipped fixture asks, since none puts a reversing stage in front of another |
 | [4.11](reference.md#trains) | ...and the same ratio used to refer a **backlash** | Play does not cancel: two independent sources of lost motion add up whichever way their shafts turn. Signed, a reversing stage downstream made an upstream stage's play *subtract* — a spur pair ahead of that same set reported **0.0422°** where the two stages have 0.0552°, 23.5 % light. One conflation, two readings, and the second was reachable where the first was not: that train solved happily and simply under-reported |

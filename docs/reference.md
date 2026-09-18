@@ -2122,6 +2122,19 @@ negative torque — which has no Hertzian contact to press at any face width, so
 it refused — and made an upstream stage's play *subtract* rather than add
 ([corrections](corrections.md)).
 
+**Every ratio and every speed here is signed, and comes from one place.** The
+shaft line is solved as a graph of shafts and meshes — one row per mesh in the
+frame carrying its axes, one per coupling — so a stage's ratio, its members'
+speeds and each member's speed against the frame of its mesh are readings of
+one answer rather than three arithmetics that have to agree. They did not: a
+pair worked its second member's speed out as `1/i` and reported it turning
+forwards while it turned backwards, so a stage's output member and the next
+stage's input member — one piece of metal — reported opposite signs.
+
+What stays a **magnitude** is what has no direction to carry: a torque
+referral, an accumulated backlash, a tooth count, a sweep stated in degrees,
+and the speed at which two surfaces rub.
+
 **Backlash accumulates referred to the output shaft**, so the last stage
 dominates — and it accumulates as a **sum of magnitudes**, because two
 independent sources of lost motion add up whichever way their shafts turn:

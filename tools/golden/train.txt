@@ -16,9 +16,9 @@ stage 1  spur  z 17/43  beta 0 deg  ratio 2.5294  a_w 30.0257 mm  coprime
       case 2  T     0.0000 Nm        0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -
       case 3  T     2.0000 Nm     2400.0 rpm  sigma_F    750.0  sigma_H   2308.6 MPa  cycles 1.440e8 / 1.440e8
   2        0.0000    0.895
-      case 1  T     5.0588 Nm     1186.0 rpm  sigma_F    635.0  sigma_H   2097.6 MPa  cycles -
-      case 2  T     0.0000 Nm        0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -
-      case 3  T     5.0588 Nm      948.8 rpm  sigma_F    635.0  sigma_H   2097.6 MPa  cycles 5.693e7 / 5.693e7
+      case 1  T     5.0588 Nm    -1186.0 rpm  sigma_F    635.0  sigma_H   2097.6 MPa  cycles -
+      case 2  T     0.0000 Nm       -0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -
+      case 3  T     5.0588 Nm     -948.8 rpm  sigma_F    635.0  sigma_H   2097.6 MPa  cycles 5.693e7 / 5.693e7
 
 stage 2  spur  z 13/31  beta 15 deg  ratio 2.3846  a_w 22.9511 mm  coprime
   contact ratio  transverse 1.4144   overlap 0.2228   total 1.6372   <- no full axial overlap
@@ -26,9 +26,9 @@ stage 2  spur  z 13/31  beta 15 deg  ratio 2.3846  a_w 22.9511 mm  coprime
   contact at the pitch point  sigma_H 2297.6 / 0.0 / 2297.6 MPa by case   rho 1.407 mm
   gear          x     b mm
   1        0.1586    2.704
-      case 1  T     4.9751 Nm     1186.0 rpm  sigma_F    750.0  sigma_H   2618.4 MPa  cycles -
-      case 2  T     0.0000 Nm        0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -
-      case 3  T     4.9751 Nm      948.8 rpm  sigma_F    750.0  sigma_H   2618.4 MPa  cycles 5.693e7 / 5.693e7
+      case 1  T     4.9751 Nm    -1186.0 rpm  sigma_F    750.0  sigma_H   2618.4 MPa  cycles -
+      case 2  T     0.0000 Nm       -0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -
+      case 3  T     4.9751 Nm     -948.8 rpm  sigma_F    750.0  sigma_H   2618.4 MPa  cycles 5.693e7 / 5.693e7
   2        0.0000    2.704
       case 1  T    11.8637 Nm      497.4 rpm  sigma_F    719.0  sigma_H   2297.6 MPa  cycles -
       case 2  T     0.0000 Nm        0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -

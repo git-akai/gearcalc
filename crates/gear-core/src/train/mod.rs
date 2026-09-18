@@ -53,7 +53,8 @@ pub use planetary::{
 };
 pub(crate) use wiring::{arranged, teeth_of};
 pub use wiring::{
-    MeshSpec, MotionError, Mount, Offsets, ShaftMotion, ShaftSpec, TrainMotion, Wiring, WiringError,
+    MemberMotion, MeshSpec, MotionError, Mount, Offsets, ShaftMotion, ShaftSpec, TrainMotion,
+    Wiring, WiringError,
 };
 
 /// The three contact ratios.
@@ -1595,6 +1596,14 @@ pub enum TrainError {
     /// fine, and the kinematics is unaffected, which is why a train reports its
     /// ratios through this.
     NoCommonDistance,
+    /// **The stage's members and meshes do not describe a mechanism.**
+    ///
+    /// The one refusal here a *design* can reach is a member with no teeth —
+    /// `StageGear::teeth` is a `u32` and nothing stops a designer typing zero.
+    /// It used to be reported as *"the tooth is too undercut to have a root
+    /// section"*, which describes a tooth that exists, and the check now runs
+    /// **before** any geometry so the answer is about what is wrong.
+    Wiring(WiringError),
     /// **No self-consistent power flow.** The arrangement is self-locking, or
     /// the shaft named as the input is not the one driving (`T ω ≤ 0`) — see
     /// [`crate::planetary::power`], which tries both signs of the rolling power
@@ -1630,6 +1639,34 @@ pub enum TrainError {
 /// every other solver here — which is what lets it name a material the library
 /// does not have, or a member too undercut to rate, without inventing a second
 /// place to say so.
+/// So a train's motion can refuse in the vocabulary a train refuses in.
+///
+/// A motion failure is never geometric — that is the whole point of the split —
+/// so the only things it can carry are a stage whose wiring is not a mechanism
+/// and a train with no stages.
+impl From<MotionError> for TrainError {
+    fn from(e: MotionError) -> Self {
+        match e {
+            MotionError::Empty => Self::Empty,
+            MotionError::Wiring(stage, cause) => Self::InStage {
+                stage,
+                cause: Box::new(Self::Wiring(cause)),
+            },
+            // The conditions a chain gives itself are exactly its mobility, and
+            // `the_chained_graph_agrees…` holds that; a conflict here would be
+            // a defect in the assembly rather than in a design.
+            MotionError::Refused(_) => Self::Wiring(WiringError::NotAMesh(0)),
+        }
+    }
+}
+
+/// So a kind's wiring can refuse in the vocabulary every stage refuses in.
+impl From<WiringError> for TrainError {
+    fn from(e: WiringError) -> Self {
+        Self::Wiring(e)
+    }
+}
+
 impl From<crate::hula::Error> for TrainError {
     fn from(e: crate::hula::Error) -> Self {
         Self::Hula(e)
@@ -1652,6 +1689,7 @@ impl crate::note::Explain for TrainError {
             Self::NoContact => Note::new(key::ERROR_TRAIN_NO_CONTACT),
             Self::NoCommonDistance => Note::new(key::ERROR_TRAIN_NO_COMMON_DISTANCE),
             Self::NoPowerFlow => Note::new(key::ERROR_TRAIN_NO_POWER_FLOW),
+            Self::Wiring(_) => Note::new(key::ERROR_TRAIN_WIRING),
             Self::UnknownMaterial(n) => {
                 Note::new(key::ERROR_TRAIN_UNKNOWN_MATERIAL).text("name", n.clone())
             }
@@ -1705,6 +1743,20 @@ impl std::fmt::Display for TrainError {
                 "no profile shift brings the two centre distances together; \
                  these tooth counts cannot be assembled"
             ),
+            Self::Wiring(e) => match e {
+                WiringError::MemberWithoutTeeth(i) => {
+                    write!(f, "member {} has no teeth", i + 1)
+                }
+                WiringError::NoCommonFrame(k) => write!(
+                    f,
+                    "mesh {}'s two members' axes are not fixed in one frame, so \
+                     they cannot stay a fixed distance apart",
+                    k + 1
+                ),
+                WiringError::NotAMesh(k) => {
+                    write!(f, "mesh {} is not a mesh this stage has", k + 1)
+                }
+            },
             Self::NoPowerFlow => write!(
                 f,
                 "no self-consistent power flow: the arrangement is self-locking, \
@@ -3584,18 +3636,38 @@ pub struct TrainResult {
     pub stages: Vec<StageResult>,
 }
 
-/// How many times the shaft a load case is measured at turns for each turn of
-/// stage `k`'s first member — the whole shaft line's kinematics in one number,
-/// so that a speed, a sweep or a revolution count stated at a port reaches
-/// every stage by the same multiplication.
+/// **How many times stage `k`'s first member turns for one turn of the shaft a
+/// load case is measured at** — the whole shaft line's kinematics in one
+/// number, so that a speed, a sweep or a revolution count stated at a port
+/// reaches every stage by the same multiplication.
 ///
-/// Going forward from the start a stage's input turns slower than the port by
-/// everything before it; going back from the end it turns faster by everything
-/// from it onward. `ratios` is each stage's own.
-fn turns_per_port_turn(ratios: &[f64], port: Port, k: usize) -> f64 {
+/// Read off the graph rather than multiplied out: `at` is each stage's input
+/// speed at one turn of the *start*, and `end` is the last stage's output, so
+/// the quotient is the factor either port wants. **It is signed**, which the
+/// product of the stage ratios was not — a pair reports its ratio as a
+/// magnitude ([`crate::mesh::Mesh::ratio`]) — and the sign is what makes a
+/// stage's output member and the next stage's input member, which are one
+/// physical shaft, report one speed instead of two.
+///
+/// The name says which way round it is, and the sentence that used to sit here
+/// said the other: it is turns *of the stage* per turn of the port.
+fn turns_per_port_turn(
+    at: &[crate::ratio::Ratio],
+    end: crate::ratio::Ratio,
+    port: Port,
+    k: usize,
+) -> f64 {
     match port {
-        Port::Start => 1.0 / ratios[..k].iter().product::<f64>(),
-        Port::End => ratios[k..].iter().product::<f64>(),
+        Port::Start => at[k].to_f64(),
+        // **Divided exactly, then read as a float once.** Both speeds are
+        // quotients of tooth counts, and `a.to_f64() / b.to_f64()` rounds three
+        // times where `(a/b).to_f64()` rounds once — which showed up as a
+        // recorded figure moving in its last two digits, away from the
+        // correctly rounded value, for a change that was supposed to move only
+        // signs. Exact arithmetic is worth having only if it is spent last.
+        Port::End => at[k]
+            .checked_div(end)
+            .map_or(0.0, crate::ratio::Ratio::to_f64),
     }
 }
 
@@ -3720,8 +3792,30 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
             .collect()
     };
     let first = solve(&|_| StageLoads::just(1.0))?;
-    let ratios: Vec<f64> = first.iter().map(StageResult::ratio).collect();
-    let total_ratio: f64 = ratios.iter().product();
+
+    // **The shaft line comes from the graph, not from a product of ratios.**
+    // It needs no geometry — a ratio is tooth counts and a topology — and it is
+    // *signed*, where `StageResult::ratio` is a magnitude on a pair and a
+    // signed reduction on an epicyclic set. That difference is what made one
+    // physical shaft report two speeds, one at the end of a stage and the other
+    // at the start of the next (`docs/corrections.md`).
+    let motion = train.motion()?;
+    let wirings: Vec<Wiring> = train.stages.iter().map(Stage::wiring).collect();
+    // Each stage's input speed, and the last stage's output, at one turn of the
+    // start port.
+    let at: Vec<crate::ratio::Ratio> = wirings
+        .iter()
+        .enumerate()
+        .map(|(k, w)| motion.solution.values[motion.shaft_of(k, w.input)])
+        .collect();
+    let end = wirings.last().map_or(crate::ratio::Ratio::ONE, |w| {
+        motion.solution.values[motion.shaft_of(wirings.len() - 1, w.output)]
+    });
+    // The reduction the graph already holds exactly, read as a float once
+    // rather than reciprocated as one.
+    let total_ratio = motion
+        .total
+        .map_or(f64::INFINITY, crate::ratio::Ratio::to_f64);
 
     // --- what each stage is loaded by, case by case.
     let mut cases = Vec::new();
@@ -3753,7 +3847,7 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
             notes,
         });
         for (k, loads) in per_stage.iter_mut().enumerate() {
-            let by = turns_per_port_turn(&ratios, case.port, k);
+            let by = turns_per_port_turn(&at, end, case.port, k);
             let speed = case.speed * by;
             // How often this stage's first member comes round over a fatigue
             // case's duty: a sweep stated at a port, or a time at the case's
@@ -3761,15 +3855,18 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
             let turns = case.counted().map(|duty| match *duty {
                 Duty::Intermittent {
                     range_degrees,
-                    at,
+                    at: sweep_at,
                     actuations,
                     reversing,
                 } => {
                     let n = f64::from(actuations);
                     Turns {
+                        // **A sweep is a magnitude.** It is stated at a port as
+                        // degrees of motion, and how many turns that is of some
+                        // other shaft does not depend on which way either turns.
                         revolutions: (range_degrees / 360.0)
                             * n
-                            * turns_per_port_turn(&ratios, at, k),
+                            * turns_per_port_turn(&at, end, sweep_at, k).abs(),
                         reversing_actuations: reversing.then_some(n),
                     }
                 }
@@ -5627,13 +5724,21 @@ mod tests {
                 "total: graph {total} vs {}",
                 r.total_ratio
             );
-            // And `turns_per_port_turn`, which is the same product read from
-            // either end, against the graph's own shaft speeds.
+            // **The product of the stage ratios, which used to be production
+            // code and is now the fixture.**
+            //
+            // `turns_per_port_turn` referred a port's speed to a stage by
+            // multiplying out `Π i`; it reads the graph now, so comparing the
+            // graph against it would be comparing a thing with itself. The
+            // expression it replaced is written out here instead, which is what
+            // the plan means by the old model becoming a test fixture: it is
+            // still the independent answer, it is simply no longer the one the
+            // tool ships.
             let ratios: Vec<f64> = r.stages.iter().map(StageResult::ratio).collect();
             let wirings: Vec<Wiring> = train.stages.iter().map(Stage::wiring).collect();
             for (k, w) in wirings.iter().enumerate() {
                 let graph = m.solution.values[m.shaft_of(k, w.input)].to_f64();
-                let hand = turns_per_port_turn(&ratios, Port::Start, k);
+                let hand = 1.0 / ratios[..k].iter().product::<f64>();
                 assert!(
                     (graph.abs() - hand.abs()).abs() < 1e-9 * hand.abs(),
                     "stage {k} input speed: graph {graph} vs {hand}"
@@ -5741,6 +5846,115 @@ mod tests {
         // ...and it is strictly more than the last stage alone, which is what
         // "subtracting" would have taken it below.
         assert!(r.backlash.forward.nominal > r.stages[1].backlash().forward.nominal);
+    }
+
+    /// **One shaft, one speed** — a stage's output member and the next stage's
+    /// input member are the same piece of metal and must say the same thing.
+    ///
+    /// They did not. Every kind worked its members' speeds out for itself, and
+    /// they disagreed about *sign*: a pair's second member came back positive
+    /// while turning backwards (`Mesh::ratio` is a magnitude), where an
+    /// epicyclic set's came back signed. So a two-stage train reported
+    /// `+1186 rpm` at the end of stage 1 and `+1186 rpm` at the start of stage
+    /// 2 — agreeing by accident — and a set in front of a pair reported
+    /// `−500` and `+500` for one shaft.
+    ///
+    /// Now every member's motion comes from the graph, through
+    /// `Wiring::unit_motion`, and the coupling is a row in the same system.
+    /// This is the law that says so, across three kinds and two junctions.
+    #[test]
+    fn a_shaft_shared_by_two_stages_reports_one_speed() {
+        let lib = library();
+        let mut checked = 0u32;
+        for train in [two_stage(), mixed_train()] {
+            let r = solve_train(&train, &lib).expect("these trains solve");
+            let wirings: Vec<Wiring> = train.stages.iter().map(Stage::wiring).collect();
+            // **Which member sits on a shaft is the wiring's answer, not the
+            // member order's.** An epicyclic set's output is its *carrier*,
+            // which carries no gear at all — the planet rides it and spins with
+            // its own shaft — so "the stage's last member" is right for a pair
+            // and wrong for a set, and a first draft of this test asserted it.
+            let on = |k: usize, shaft: usize| -> Vec<usize> {
+                wirings[k]
+                    .mounts
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, m)| m.spins_with == shaft)
+                    .map(|(i, _)| i)
+                    .collect()
+            };
+            for k in 1..r.stages.len() {
+                let before = r.stages[k - 1].members();
+                let after = r.stages[k].members();
+                for out in on(k - 1, wirings[k - 1].output) {
+                    for into in on(k, wirings[k].input) {
+                        for (a, b) in before[out].cases.iter().zip(&after[into].cases) {
+                            assert!(
+                                (a.speed - b.speed).abs() < 1e-9 * a.speed.abs().max(1.0),
+                                "stage {k}: case {} leaves at {} and arrives at {}",
+                                a.case + 1,
+                                a.speed,
+                                b.speed
+                            );
+                            checked += 1;
+                        }
+                    }
+                }
+            }
+            // ...and the far port's delivered speed is what the member on that
+            // shaft turns at, where one sits there.
+            let k = r.stages.len() - 1;
+            let last = r.stages[k].members();
+            for into in on(k, wirings[k].output) {
+                for c in &r.cases {
+                    let member = &last[into].cases[c.case];
+                    assert!(
+                        (member.speed - c.delivered_speed).abs()
+                            < 1e-9 * c.delivered_speed.abs().max(1.0),
+                        "case {}: delivered {} but the member turns {}",
+                        c.case + 1,
+                        c.delivered_speed,
+                        member.speed
+                    );
+                    checked += 1;
+                }
+            }
+        }
+        // **A junction at an epicyclic set's carrier compares nothing**, and
+        // that is the model rather than a gap: no gear sits on a carrier, so
+        // there is no member whose speed to check. Pinned here so the count
+        // below is a fact rather than a number that happened to pass.
+        let set = Stage::Planetary(Box::<PlanetaryStage>::default());
+        let w = set.wiring();
+        assert!(
+            !w.mounts.iter().any(|m| m.spins_with == w.output),
+            "a set driven sun-in with its ring held outputs on the carrier, \
+             which carries no gear"
+        );
+        assert!(checked >= 12, "only {checked} couplings checked");
+    }
+
+    /// **A reversing train says so**, which the product of its stage ratios
+    /// could not: a pair reports its own ratio as a magnitude, so a train of
+    /// one external pair claimed its output turned with its input.
+    #[test]
+    fn a_trains_ratio_carries_the_direction_its_output_turns() {
+        let lib = library();
+        let one = |stage| {
+            let mut t = two_stage();
+            t.stages = vec![stage];
+            solve_train(&t, &lib).expect("solves").total_ratio
+        };
+        // One external mesh reverses; two do not.
+        assert!(one(Stage::Spur(PairStage::default())) < 0.0);
+        let mut two = two_stage();
+        two.load_cases.clear();
+        assert!(solve_train(&two, &lib).expect("solves").total_ratio > 0.0);
+        // A worm is an external mesh like any other.
+        assert!(one(Stage::Worm(PairStage::worm())) < 0.0);
+        // ...and an epicyclic set carries the sign its own kinematics gives:
+        // sun in with the ring held turns the carrier the same way.
+        assert!(one(Stage::Planetary(Box::default())) > 0.0);
     }
 
     /// Every freedom a stage's groups mention, flat.
@@ -9077,7 +9291,12 @@ mod tests {
             train.load_cases = cases;
             let r = solve_train(&train, &lib).expect("a shaft line solves");
             assert!(r.cases.is_empty());
-            assert!(r.total_ratio > 1.0 && r.total_efficiency.forward > 0.0);
+            // **The magnitude**, because a train's ratio is signed now: it
+            // comes off the graph and says whether the output reverses, where
+            // the product of the stage ratios could not — a pair reports its
+            // own as a magnitude. This train has an odd number of external
+            // meshes, so it turns backwards and says so.
+            assert!(r.total_ratio.abs() > 1.0 && r.total_efficiency.forward > 0.0);
             for s in &r.stages {
                 for g in s.members() {
                     assert!(g.cases.is_empty());

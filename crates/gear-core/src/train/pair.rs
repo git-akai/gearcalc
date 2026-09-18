@@ -972,10 +972,16 @@ pub fn solve_pair_stage_with(
 ) -> Result<PairResult, TrainError> {
     // The size once, before anything reads a helix angle off it.
     let sized = stage.sized();
+    // **What the members do, before anything is cut.** Asked first because it
+    // needs no geometry — a ratio is tooth counts and topology — and because it
+    // is where a member with no teeth is caught, which used to be reported as a
+    // tooth too undercut to have a root section.
+    let motion =
+        super::Constrained::wiring(&sized).unit_motion(&super::teeth_of(sized.members()))?;
     if sized.is_crossed() {
-        return super::crossed::solve_crossed_pair(&sized, kind, loads, lib);
+        return super::crossed::solve_crossed_pair(&sized, kind, loads, lib, &motion);
     }
-    solve_parallel(&sized, loads, lib, reversal)
+    solve_parallel(&sized, loads, lib, reversal, &motion)
 }
 
 /// The parallel-axis mesh: line contact, a bending rating, one efficiency.
@@ -984,6 +990,7 @@ fn solve_parallel(
     loads: &StageLoads,
     lib: &MaterialLibrary,
     reversal: super::Reversal,
+    motion: &[super::MemberMotion],
 ) -> Result<PairResult, TrainError> {
     // The shifts once, not once per gear: with the optimiser on, `shifts` is a
     // search, and asking each gear for its own would run it twice for one
@@ -1214,8 +1221,11 @@ fn solve_parallel(
         // and the figures are the ones this stage's own arithmetic produced.
         // Each case's torque on this gear is the mesh projection of the
         // stage's, which for a parallel pair has no efficiency in it whichever
-        // way the case travels; its speed and engagements follow the ratio.
-        let by = if i == 0 { 1.0 } else { 1.0 / ratio };
+        // way the case travels; **its motion comes from the graph**, which is
+        // the one place every kind's speeds come from now — and which knows
+        // that the second member of an external pair turns the other way, where
+        // `1/ratio` did not.
+        let m = motion[i];
         let cases = rating(i, &rated, effective, effective)
             .rated()
             .into_iter()
@@ -1224,7 +1234,11 @@ fn solve_parallel(
                 let torque = Load::new(load.torque, effective)
                     .across_mesh(&g[0], &g[i])
                     .torque;
-                r.into_case(torque, (load.speed * by, load.speed * by), by)
+                r.into_case(
+                    torque,
+                    (m.speed.scale(load.speed), m.against_frame.scale(load.speed)),
+                    m.engagements,
+                )
             })
             .collect();
         gears.push(GearResult::of(super::MemberFacts {

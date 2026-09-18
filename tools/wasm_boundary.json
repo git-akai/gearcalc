@@ -958,23 +958,23 @@
    "ok": [
     [
      "en",
-     454
+     457
     ],
     [
      "de",
-     454
+     457
     ],
     [
      "pt",
-     454
+     457
     ],
     [
      "zh-Hans",
-     454
+     457
     ],
     [
      "zh-Hant",
-     454
+     457
     ]
    ]
   },
@@ -5994,7 +5994,7 @@
   "solve_train": {
    "ok": {
     "result": {
-     "total_ratio": "2.5294117647058822",
+     "total_ratio": "-2.5294117647058822",
      "total_efficiency": {
       "forward": "0.98344976317774957",
       "backward": "0.98344976317774957"
@@ -6016,7 +6016,7 @@
        "case": 0,
        "delivered_at": "end",
        "delivered_torque": "0.24875494009790136",
-       "delivered_speed": "11860.465116279071",
+       "delivered_speed": "-11860.465116279071",
        "reacted_at": null,
        "notes": []
       },
@@ -6037,7 +6037,7 @@
        "case": 2,
        "delivered_at": "end",
        "delivered_torque": "0.049750988019580278",
-       "delivered_speed": "11860.465116279071",
+       "delivered_speed": "-11860.465116279071",
        "reacted_at": null,
        "notes": []
       }
@@ -6324,8 +6324,8 @@
           {
            "case": 0,
            "torque": "0.25294117647058822",
-           "speed": "11860.465116279071",
-           "speed_against_carrier": "11860.465116279071",
+           "speed": "-11860.465116279071",
+           "speed_against_carrier": "-11860.465116279071",
            "cycles": null,
            "bending_stress": "1155.6212155470978",
            "contact_stress": "2829.7982061263888",
@@ -6350,8 +6350,8 @@
           {
            "case": 2,
            "torque": "0.050588235294117649",
-           "speed": "11860.465116279071",
-           "speed_against_carrier": "11860.465116279071",
+           "speed": "-11860.465116279071",
+           "speed_against_carrier": "-11860.465116279071",
            "cycles": {
             "bending": 70,
             "contact": 70

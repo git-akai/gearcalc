@@ -170,6 +170,22 @@ impl Ratio {
         self.num as f64 / self.den as f64
     }
 
+    /// **`x` times this ratio**, rounded as few times as the arithmetic allows.
+    ///
+    /// `x * self.to_f64()` rounds twice — once for the quotient and once for
+    /// the product — and `(x * num) / den` rounds **once** whenever `x · num`
+    /// is exactly representable, which it is for the small integer numerators a
+    /// tooth count makes. Exact arithmetic is worth having only if it is spent
+    /// last, and this is where a speed stops being exact.
+    ///
+    /// Measured: a member's speed came back one ULP from the correctly rounded
+    /// value when the ratio was converted first, and on the correctly rounded
+    /// value when the multiplication came first.
+    #[must_use]
+    pub fn scale(self, x: f64) -> f64 {
+        x * (self.num as f64) / (self.den as f64)
+    }
+
     /// Ordering, or `None` where the comparison itself would overflow.
     ///
     /// Not `Ord`, because a total order that can fail is not one. Everything

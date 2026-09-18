@@ -179,7 +179,14 @@ pub enum WiringError {
     /// cannot stay engaged: the distance between their axes changes as the two
     /// frames turn against each other.
     NoCommonFrame(usize),
-    /// A member index, shaft index or tooth count a wiring cannot mean.
+    /// **A member with no teeth**, by index. The one refusal here a *design*
+    /// can reach — `StageGear::teeth` is a `u32` and nothing stops a designer
+    /// typing zero — and it is checked before any geometry, because a gear with
+    /// no teeth used to be reported as *"the tooth is too undercut to have a
+    /// root section"*, which describes a tooth that exists.
+    MemberWithoutTeeth(usize),
+    /// A member or shaft index a wiring names and does not have, or a gear
+    /// meshing itself. A kind's defect rather than a design's.
     NotAMesh(usize),
 }
 
@@ -253,10 +260,14 @@ impl Wiring {
     ) -> Result<(), WiringError> {
         for (k, m) in self.meshes.iter().enumerate() {
             let frame = self.frame(k)?;
-            let (za, zb) = (
-                i64::from(*teeth.get(m.a).ok_or(WiringError::NotAMesh(k))?),
-                i64::from(*teeth.get(m.b).ok_or(WiringError::NotAMesh(k))?),
-            );
+            let count = |member: usize| -> Result<i64, WiringError> {
+                match teeth.get(member) {
+                    None => Err(WiringError::NotAMesh(k)),
+                    Some(0) => Err(WiringError::MemberWithoutTeeth(member)),
+                    Some(z) => Ok(i64::from(*z)),
+                }
+            };
+            let (za, zb) = (count(m.a)?, count(m.b)?);
             system
                 .mesh(MeshRow {
                     a: at.of(self.mounts[m.a].spins_with),
@@ -271,6 +282,43 @@ impl Wiring {
         Ok(())
     }
 
+    /// **Every member's motion at one turn of this stage's input**, from the
+    /// topology and the tooth counts alone.
+    ///
+    /// No module, no shift, no material: a stage that will not close still
+    /// turns, and this is what can be asked of it either way.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::alone`], and `None` where the arrangement leaves the input
+    /// shaft at rest, which is a stage that cannot be driven the way it says.
+    pub fn unit_motion(&self, teeth: &[u32]) -> Result<Vec<MemberMotion>, WiringError> {
+        let system = self.alone(teeth)?;
+        let solution = system
+            .motion(&self.conditions)
+            .map_err(|_| WiringError::NotAMesh(0))?;
+        let input = solution.values[self.input].to_f64();
+        Ok(self
+            .mounts
+            .iter()
+            .enumerate()
+            .map(|(i, mount)| {
+                let speed = solution.values[mount.spins_with];
+                let frame = solution.values[mount.axis_fixed_in];
+                MemberMotion {
+                    speed,
+                    against_frame: speed.checked_sub(frame).unwrap_or(Ratio::ZERO),
+                    engagements: crate::train::engagements(
+                        speed.to_f64(),
+                        frame.to_f64(),
+                        input,
+                        f64::from(self.paths_seen(i)),
+                    ),
+                }
+            })
+            .collect())
+    }
+
     /// The system for this stage on its own, against its own ground.
     ///
     /// # Errors
@@ -281,6 +329,30 @@ impl Wiring {
         self.add_to(&mut system, teeth, &Offsets::alone())?;
         Ok(system)
     }
+}
+
+/// **What one member does at one turn of its stage's input shaft.**
+///
+/// The one place a kind's speeds come from. Three kinds each worked these out
+/// for themselves — a pair from its tooth-count ratio, a set from
+/// `planetary::power`, a hula stage from the two products — and between them
+/// they disagreed about *sign*: a pair's second member came back positive while
+/// turning backwards, so the output member of one stage and the input member of
+/// the next reported opposite signs for one physical shaft.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MemberMotion {
+    /// Turns per turn of the stage's input — **signed**, so a member that runs
+    /// backwards says so, and **exact**, so a case's speed is rounded once
+    /// when it is scaled by it ([`Ratio::scale`]) rather than twice.
+    pub speed: Ratio,
+    /// ...against the frame of its mesh, which is what its teeth see. A pair's
+    /// frame is ground and this is its own speed; a held ring's is **not zero**
+    /// while its speed is.
+    pub against_frame: Ratio,
+    /// How often it is engaged per turn of the stage's input — its motion
+    /// against its frame, over the paths its own teeth meet
+    /// ([`Wiring::paths_seen`]).
+    pub engagements: f64,
 }
 
 /// Where a stage's shafts sit in a larger system.

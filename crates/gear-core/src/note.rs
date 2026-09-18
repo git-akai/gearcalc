@@ -197,6 +197,8 @@ pub mod key {
     pub const ERROR_TRAIN_NO_COMMON_DISTANCE: &str = "error.train_no_common_distance";
     /// `error.train_no_power_flow`
     pub const ERROR_TRAIN_NO_POWER_FLOW: &str = "error.train_no_power_flow";
+    /// `error.train_wiring`
+    pub const ERROR_TRAIN_WIRING: &str = "error.train_wiring";
     /// `error.train_unknown_material`
     pub const ERROR_TRAIN_UNKNOWN_MATERIAL: &str = "error.train_unknown_material";
     /// `error.train_no_root_section`
@@ -276,6 +278,7 @@ pub mod key {
         ERROR_TRAIN_NO_CONTACT,
         ERROR_TRAIN_NO_COMMON_DISTANCE,
         ERROR_TRAIN_NO_POWER_FLOW,
+        ERROR_TRAIN_WIRING,
         ERROR_TRAIN_UNKNOWN_MATERIAL,
         ERROR_TRAIN_NO_ROOT_SECTION,
         ERROR_TRAIN_EMPTY,
