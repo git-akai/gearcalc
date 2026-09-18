@@ -1,26 +1,24 @@
-//! **The pair**: two gears on shafts at any angle, and the one primitive the
-//! spur, helical, crossed and worm kinds are all built from.
+//! **The pair preset**: what a spur, helical, crossed or worm stage is built
+//! from, and the readings and bounds a shape shares with it.
 //!
-//! A stage kind is a *layer* over this — a preset, a vocabulary, and a choice
-//! of which inputs to put in front of a designer — and not a second model.
-//! [`super::Stage::Spur`] and [`super::Stage::Worm`] carry the same
-//! [`PairStage`]; what a worm stage adds is that its first member states a
-//! pitch diameter where a gear states a helix angle, an axial float, and the
-//! conventional proportions a worm and its wheel are given ([`PairKind`]). Everything else
-//! — module, angle, shifts, addenda, frictions, distance, clearance,
-//! materials, face widths — is the same field meaning the same thing.
+//! [`PairStage`] holds a pair's inputs as a designer states them — two gears,
+//! a module, a shaft angle, a distance and its clearance — and
+//! [`super::shape::Shape::from_pair`] lays them out as two axes in the
+//! ground, one mesh and one distance. It no longer solves anything: the shape
+//! does, and a distance whose angle is not zero is routed to
+//! [`super::crossed`] as the pair it is. What a worm stage adds is that its
+//! first member states a pitch diameter where a gear states a helix angle, an
+//! axial float, and the conventional proportions a worm and its wheel are
+//! given ([`PairKind`], carried on the shape as `Distance::worm`).
 //!
-//! What genuinely differs is the **mesh**, and it must: parallel axes touch
-//! along a line and lose power to sliding along the profile, crossed axes touch
-//! at a point and slide lengthwise. So this file solves the parallel mesh and
-//! [`super::crossed`] the crossed one, both into one [`super::CrossedResult`]
-//! whose [`super::MeshReport`] is one shape for either — the physics being one
-//! model with the shaft angle as a parameter, and every field that meets at
-//! the limit measured to. A worm stage used to be a separate
-//! type with a separate result — no profile shift, no addendum, members that
-//! were not gears — and its centre distance could only be reached by resizing
-//! the worm. `docs/corrections.md` records what that cost, and the audit's
-//! record (`docs/history/audit.md`, F83) what deleting it moved: nothing.
+//! What stays here besides the preset is what every shape reads through it:
+//! [`ShiftAsked`] — who decides a shift and what it must satisfy, with the
+//! search floor and the true minimum told apart — and [`Reading`]s of the
+//! helix. A worm stage used to be a separate type with a separate result — no
+//! profile shift, no addendum, members that were not gears — and its centre
+//! distance could only be reached by resizing the worm. `docs/corrections.md`
+//! records what that cost, and the audit's record (`docs/history/audit.md`,
+//! F83) what deleting it moved: nothing.
 
 use super::{Freedom, Reading, StageGear, TrainError};
 use crate::auto::automatic_profile_shift;

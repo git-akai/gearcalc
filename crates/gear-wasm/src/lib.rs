@@ -1168,13 +1168,13 @@ fn defaults_impl() -> Result<String, String> {
             // Off, like every other correction this crate could apply and does
             // not: a reversed root is disclosed rather than silently derated.
             reversed_bending: false,
-            stages: vec![Stage::Spur(spur.clone())],
+            stages: vec![Stage::spur(spur.clone())],
             couplings: Vec::new(),
             constraints: Vec::new(),
         },
-        spur_stage: Stage::Spur(spur),
-        worm_stage: Stage::Worm(worm),
-        planetary_stage: Stage::Planetary(Box::new(planetary)),
+        spur_stage: Stage::spur(spur),
+        worm_stage: Stage::worm(worm),
+        planetary_stage: Stage::planetary(planetary),
         hula_stage: Stage::Hula(Box::new(hula)),
         ultimate_case: LoadCase::ultimate(0.1, 30_000.0),
         fatigue_case: LoadCase::fatigue(0.02, 30_000.0),
@@ -1379,7 +1379,14 @@ fn adopt_member_impl(input: &str) -> Result<String, String> {
             req.member + 1
         ));
     }
-    if matches!(stage, gear_core::train::Stage::Worm(_)) && req.member == 0 {
+    // A worm is the first member of a distance sized as a worm — the thread
+    // the tab cannot hold; its wheel it can.
+    let is_worm = stage.as_shape().is_some_and(|s| {
+        s.distances
+            .first()
+            .is_some_and(|d| d.worm && s.meshes.first().is_some_and(|m| m.a == req.member))
+    });
+    if is_worm {
         return Err("a worm is not a gear the tab can hold".to_string());
     }
     let lib = req.materials.unwrap_or_else(gear_io::default_library);
@@ -1502,10 +1509,11 @@ mod tests {
         let mut stage = d["spur_stage"].clone();
         // Whatever the shipped default gear is, asked of both surfaces. Read
         // rather than written down, so this cannot drift from the defaults.
-        let teeth = stage["gears"][0]["teeth"].clone();
-        let dedendum = stage["gears"][0]["dedendum"].clone();
+        let teeth = stage["members"][0]["gear"]["teeth"].clone();
+        let dedendum = stage["members"][0]["gear"]["dedendum"].clone();
         // A shift the stage will not move, so both surfaces describe one gear.
-        stage["gears"][0]["profile_shift"] = serde_json::json!({"auto": false, "manual": 0.0});
+        stage["members"][0]["gear"]["profile_shift"] =
+            serde_json::json!({"auto": false, "manual": 0.0});
 
         let train = serde_json::json!({
             "train": {
@@ -1520,7 +1528,7 @@ mod tests {
         });
         let solved: serde_json::Value =
             serde_json::from_str(&solve_train_impl(&train.to_string()).unwrap()).unwrap();
-        let member = &solved["result"]["stages"][0]["gears"][0]["ranges"]["profile_shift"];
+        let member = &solved["result"]["stages"][0]["members"][0]["ranges"]["profile_shift"];
         assert!(
             member.is_object(),
             "the stage's gear has no ranges: {member}"
@@ -1563,7 +1571,7 @@ mod tests {
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let crossed = {
             let mut c = d["spur_stage"].clone();
-            c["shaft_angle"] = serde_json::json!(90.0);
+            c["distances"][0]["angle"] = serde_json::json!(90.0);
             c
         };
         let document = serde_json::json!({
@@ -1683,8 +1691,11 @@ mod tests {
         let ring = adopt("planetary_stage", 2);
         let a = &ring["adopted"];
         assert_eq!(a["internal"], true);
-        assert_eq!(a["cutter"], d["planetary_stage"]["cutter"]);
-        assert_eq!(a["params"]["teeth"], d["planetary_stage"]["ring"]["teeth"]);
+        assert_eq!(a["cutter"], d["planetary_stage"]["members"][2]["ring"]);
+        assert_eq!(
+            a["params"]["teeth"],
+            d["planetary_stage"]["members"][2]["gear"]["teeth"]
+        );
         assert!(ring["failure"].is_null());
 
         let sun = adopt("planetary_stage", 0);
@@ -2106,19 +2117,29 @@ mod tests {
     /// **A planetary stage crosses the boundary with nothing added for it.**
     ///
     /// `Stage` is a tagged enum and `Train` already carried a `Vec` of them, so
-    /// the new kind needed no entry point of its own. That is the claim worth
-    /// checking rather than assuming — "it should just work" is exactly what
-    /// turns out to be false at a serde boundary.
+    /// the set needed no entry point of its own — and since the kinds retired
+    /// into the one shape, not even a tag: a set is a shape whose planet's
+    /// axis is carried. That is the claim worth checking rather than assuming
+    /// — "it should just work" is exactly what turns out to be false at a
+    /// serde boundary.
     ///
-    /// The assertions look for the shape a planetary result has and no other kind
-    /// does: three shafts instead of two, a *solved* planet shift, and two meshes
-    /// each with their own answers.
+    /// The request is the shipped set put through `defaults`, so the fields
+    /// this asserts on are the fields a front end actually sends. The
+    /// assertions look for what a set has and a pair does not: five local
+    /// shafts (the ground, then sun, carrier, ring, planet), a *solved* planet
+    /// shift, and two meshes each with their own answers.
     #[test]
     fn a_planetary_stage_crosses_the_boundary_with_its_own_shape() {
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let mut set = d["planetary_stage"].clone();
+        set["members"][0]["gear"]["teeth"] = 24.into();
+        set["members"][1]["gear"]["teeth"] = 18.into();
+        set["members"][2]["gear"]["teeth"] = 60.into();
+        set["distances"][0]["clearance"] = serde_json::json!({"auto": false, "manual": 0.02});
         // **The arrangement is the train's**, as two constraints on the set's
         // shafts — sun (1) driven, ring (3) held. The set carries none of its
-        // own, and a document that still sends one is refused by name.
-        let req = r#"{"train":{
+        // own.
+        let req = serde_json::json!({"train": {
             "constraints": [
                 { "at": { "kind": "of", "stage": 0, "shaft": 1 }, "constraint": "driven" },
                 { "at": { "kind": "of", "stage": 0, "shaft": 3 }, "constraint": "held" }
@@ -2128,38 +2149,24 @@ mod tests {
                 { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.0, "speed": 0.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
                 { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 1.6, "speed": 2400.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } }
             ],
-            "stages": [
-              {"kind":"planetary",
-               "module":1.0,"pressure_angle":20.0,"overlap":{"auto":true,"manual":1.0},
-               "sliding_friction_sun_planet":0.06,"static_friction_sun_planet":0.16,
-               "sliding_friction_planet_ring":0.06,"static_friction_planet_ring":0.16,
-               "thickness_mod":1.0,"planets":3,
-               "centre_distance":{"auto":true,"manual":0.0},
-               "clearance":{"auto":false,"manual":0.02},"tolerance_plus":0.02,"tolerance_minus":0.02,
-               "min_planet_clearance":0.3,
-               "cutter":{"teeth":20,"addendum":1.25,"tip_round":0.2},
-               "sun":{"teeth":24,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"helix_angle":{"auto":true,"manual":0.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},"material":"4340 Hardened Steel"},
-               "planet":{"teeth":18,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"helix_angle":{"auto":true,"manual":0.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},"material":"4340 Hardened Steel"},
-               "ring":{"teeth":60,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"helix_angle":{"auto":true,"manual":0.0},"addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,"dedendum":1.25,"root_radius":0.38,"face_width":{"auto":true,"manual":0.0},"face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},"material":"4340 Hardened Steel"}
-              }
-            ]}}"#;
+            "stages": [set]
+        }});
 
-        let v = solved(req);
+        let v = solved(&req.to_string());
         let stage = &v["stages"][0];
-        assert_eq!(stage["kind"], "planetary");
+        assert_eq!(stage["kind"], "shape");
 
         // Ring held, sun driving: the classical 1 + z_r/z_s.
         assert!((v["total_ratio"].as_f64().unwrap() - 3.5).abs() < 1e-12);
-        assert_eq!(stage["output"], "carrier");
-        assert_eq!(stage["arrangement"]["fixed"], "ring");
 
-        // Three shafts, the held one exactly still, and the torques balancing
-        // — in the first load case, at its own speed.
+        // Five local shafts, the held one exactly still, and the torques
+        // balancing — in the first load case, at its own speed.
         let shafts = &stage["cases"][0];
         let speeds = shafts["speeds"].as_array().unwrap();
-        assert_eq!(speeds.len(), 3);
-        assert_eq!(speeds[2].as_f64().unwrap(), 0.0, "the ring is held");
-        assert!((speeds[0].as_f64().unwrap() - 3000.0).abs() < 1e-9);
+        assert_eq!(speeds.len(), 5);
+        assert_eq!(speeds[0].as_f64().unwrap(), 0.0, "the ground is still");
+        assert_eq!(speeds[3].as_f64().unwrap(), 0.0, "the ring is held");
+        assert!((speeds[1].as_f64().unwrap() - 3000.0).abs() < 1e-9);
         let sum: f64 = shafts["torques"]
             .as_array()
             .unwrap()
@@ -2168,20 +2175,29 @@ mod tests {
             .sum();
         assert!(sum.abs() < 1e-9, "torques must balance, got {sum}");
 
-        // The planet's shift is *solved*, not sent: 12 + 2x30 = 72 is the ideal
+        // The planet's shift is *solved*, not sent: 24 + 2x18 = 60 is the ideal
         // ring, so what moves it is the running clearance alone — the planet
         // thinned by that much opens both meshes — and it comes back negative,
-        // small, with a closed residual.
-        let x_p = stage["planet"]["gear"]["profile_shift"].as_f64().unwrap();
-        let c = stage["clearance"].as_f64().unwrap();
+        // small, closing the distance.
+        let x_p = stage["members"][1]["profile_shift"].as_f64().unwrap();
+        let c = stage["distances"][0]["clearance"].as_f64().unwrap();
         assert!(
             c > 0.0 && x_p < 0.0 && x_p.abs() < 2.0 * c,
             "x_p {x_p} at clearance {c}"
         );
-        assert!(stage["planet"]["shift_residual"].as_f64().unwrap() < 1e-12);
+        // The one distance closes on both meshes: each runs at it, and each
+        // is opened by the same clearance — outward for the sun's mesh, inward
+        // for the ring's, which is what a signed clearance reads as.
+        let running = stage["distances"][0]["running"].as_f64().unwrap();
+        for nominal in stage["distances"][0]["nominal"].as_array().unwrap() {
+            assert!(
+                ((running - nominal.as_f64().unwrap()).abs() - c).abs() < 1e-9,
+                "nominal {nominal}, running {running}, clearance {c}"
+            );
+        }
         // A planet's root is loaded on both flanks, and with no correction asked
         // for the stage says so rather than derating it out of sight.
-        let notes = stage["planet"]["gear"]["notes"]
+        let notes = stage["members"][1]["notes"]
             .as_array()
             .expect("a gear carries its own notes");
         assert!(
@@ -2192,35 +2208,29 @@ mod tests {
         );
 
         // Two meshes with their own answers, and every member rated.
-        for mesh in ["sun_planet", "planet_ring"] {
-            assert!(
-                stage[mesh]["line"]["contact_ratios"]["transverse"]
-                    .as_f64()
-                    .unwrap()
-                    > 1.0
-            );
+        let meshes = stage["meshes"].as_array().unwrap();
+        assert_eq!(meshes.len(), 2);
+        for (k, mesh) in meshes.iter().enumerate() {
+            assert!(mesh["contact_ratio"].as_f64().unwrap() > 1.0);
             // The two cases that carry a load press the flanks; the one from
             // the end carries nothing and presses with exactly nothing.
             for (case, loaded) in [(0, true), (1, false), (2, true)] {
-                let pressure = stage[mesh]["cases"][case]["contact"]["at_pitch_point"]
+                let pressure = mesh["cases"][case]["contact"]["at_pitch_point"]
                     .as_f64()
                     .unwrap();
-                assert_eq!(pressure > 0.0, loaded, "{mesh} case {case}: {pressure}");
+                assert_eq!(pressure > 0.0, loaded, "mesh {k} case {case}: {pressure}");
             }
         }
-        for who in ["sun", "ring"] {
+        for who in 0..3 {
             assert!(
-                stage[who]["cases"][0]["bending_stress"].as_f64().unwrap() > 0.0,
-                "{who} must be rated"
+                stage["members"][who]["cases"][0]["bending_stress"]
+                    .as_f64()
+                    .unwrap()
+                    > 0.0,
+                "member {who} must be rated"
             );
         }
-        assert!(
-            stage["planet"]["gear"]["cases"][0]["bending_stress"]
-                .as_f64()
-                .unwrap()
-                > 0.0
-        );
-        assert_eq!(stage["equal_spacing"], true);
+        assert_eq!(stage["layout"]["equal_spacing"], true);
         // What the stage *assumes* has to come across too — here, equal load
         // sharing between planets, which no calculation can establish. Crossing
         // as a key and its values, not as a sentence: the words are the string
@@ -2327,87 +2337,52 @@ mod tests {
 
     #[test]
     fn a_mixed_train_crosses_the_boundary_with_both_shapes_intact() {
-        let req = r#"{"train":{
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let mut spur = d["spur_stage"].clone();
+        spur["members"][0]["gear"]["teeth"] = 17.into();
+        spur["members"][1]["gear"]["teeth"] = 43.into();
+        spur["distances"][0]["clearance"] = serde_json::json!({"auto": false, "manual": 0.02});
+        let mut worm = d["worm_stage"].clone();
+        worm["members"][0]["gear"]["teeth"] = 1.into();
+        worm["members"][1]["gear"]["teeth"] = 40.into();
+        worm["members"][0]["pitch_diameter"] = serde_json::json!({"auto": false, "manual": 7.0});
+        worm["distances"][0]["clearance"] = serde_json::json!({"auto": false, "manual": 0.02});
+        let req = serde_json::json!({"train": {
             "load_cases": [
                 { "kind": "ultimate", "enabled": true, "port": "start", "reacted": true, "torque": 2.0, "speed": 3000.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
                 { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.0, "speed": 0.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
                 { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 1.6, "speed": 2400.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } }
             ],
-            "stages": [
-              {"kind":"spur",
-               "module":1.0,"pressure_angle":20.0,"pitch_diameter":{"auto":true,"manual":17.0},"overlap":{"auto":true,"manual":1.0},"sliding_friction":0.06,"static_friction":0.16,
-               "thickness_mod":1.0,
-               "centre_distance":{"auto":true,"manual":0.0},
-               "clearance":{"auto":false,"manual":0.02},"tolerance_plus":0.02,"tolerance_minus":0.02,
-               "gears":[
-                 {"teeth":17,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"helix_angle":{"auto":true,"manual":0.0},
-                  "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
-                  "dedendum":1.25,"root_radius":0.38,
-                  "face_width":{"auto":true,"manual":0.0},
-                  "face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},
-                  "material":"4340 Hardened Steel"},
-                 {"teeth":43,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"helix_angle":{"auto":true,"manual":0.0},
-                  "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
-                  "dedendum":1.25,"root_radius":0.38,
-                  "face_width":{"auto":true,"manual":0.0},
-                  "face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},
-                  "material":"4340 Hardened Steel"}
-               ]},
-              {"kind":"worm",
-               "module":1.0,"pressure_angle":20.0,"shaft_angle":90.0,"sliding_friction":0.06,"static_friction":0.16,
-               "thickness_mod":1.0,
-               "pitch_diameter":{"auto":false,"manual":7.0},"overlap":{"auto":true,"manual":1.0},
-               "centre_distance":{"auto":true,"manual":0.0},
-               "clearance":{"auto":false,"manual":0.02},"tolerance_plus":0.02,"tolerance_minus":0.02,
-               "axial_clearance":0.04,
-               "gears":[
-                 {"teeth":1,"profile_shift":{"auto":false,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"helix_angle":{"auto":true,"manual":0.0},
-                  "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
-                  "dedendum":1.25,"root_radius":0.38,
-                  "face_width":{"auto":false,"manual":10.0},
-                  "face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},
-                  "material":"4340 Hardened Steel"},
-                 {"teeth":40,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"helix_angle":{"auto":true,"manual":0.0},
-                  "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
-                  "dedendum":1.25,"root_radius":0.38,
-                  "face_width":{"auto":true,"manual":10.0},
-                  "face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},
-                  "material":"Brass C360"}
-               ]}
-            ]}}"#;
+            "stages": [spur, worm]
+        }});
 
-        let v = solved(req);
+        let v = solved(&req.to_string());
         let want = (43.0 / 17.0) * 40.0;
         assert!((v["total_ratio"].as_f64().unwrap() - want).abs() < 1e-9);
 
-        // Both stages are pairs, and each says which mesh it has.
-        assert_eq!(v["stages"][0]["kind"], "pair");
-        assert_eq!(v["stages"][1]["kind"], "pair");
-        // ...and one mesh report, saying which contact it is by what it
-        // carries: the transverse figures on parallel shafts, the zone on
-        // crossed ones.
-        assert!(
-            v["stages"][0]["mesh"]["line"].is_object() && v["stages"][0]["mesh"]["point"].is_null()
-        );
-        assert!(
-            v["stages"][1]["mesh"]["point"].is_object() && v["stages"][1]["mesh"]["line"].is_null()
-        );
+        // Both stages are the one shape, and each says which contact it has
+        // by what its mesh carries: the transverse figures on parallel shafts,
+        // the zone on crossed ones.
+        assert_eq!(v["stages"][0]["kind"], "shape");
+        assert_eq!(v["stages"][1]["kind"], "shape");
+        let (spur, worm) = (&v["stages"][0], &v["stages"][1]);
+        assert!(spur["meshes"][0]["line"].is_object() && spur["meshes"][0]["point"].is_null());
+        assert!(worm["meshes"][0]["point"].is_object() && worm["meshes"][0]["line"].is_null());
         // The sliding a line contact has at its pitch point is exactly none.
-        assert_eq!(v["stages"][0]["mesh"]["sliding_ratio"], 0.0);
-        assert!(v["stages"][1]["mesh"]["sliding_ratio"].as_f64().unwrap() > 1.0);
+        assert_eq!(spur["meshes"][0]["sliding_ratio"], 0.0);
+        assert!(worm["meshes"][0]["sliding_ratio"].as_f64().unwrap() > 1.0);
         assert!(
-            v["stages"][0]["gears"][0]["cases"][0]["bending_stress"]
+            spur["members"][0]["cases"][0]["bending_stress"]
                 .as_f64()
                 .unwrap()
                 > 0.0
         );
 
-        let worm = &v["stages"][1];
         assert!(
-            worm["gears"][0]["pitch_diameter"].as_f64().unwrap() > 0.0,
+            worm["members"][0]["pitch_diameter"].as_f64().unwrap() > 0.0,
             "a worm stage's members are gears like any other"
         );
-        let mesh = &worm["mesh"];
+        let mesh = &worm["meshes"][0];
         assert!(
             mesh["cases"][0]["contact"]["max_pressure"]
                 .as_f64()
@@ -2419,7 +2394,7 @@ mod tests {
         // ...while the spur stage puts the same number in both, which is the
         // point of reporting it directionally everywhere rather than only where
         // it differs.
-        let spur_eff = &v["stages"][0]["mesh"]["efficiency"];
+        let spur_eff = &spur["meshes"][0]["efficiency"];
         assert_eq!(spur_eff["forward"], spur_eff["backward"]);
         // And the train reports both totals, plus backlash at each end.
         //
@@ -2435,7 +2410,7 @@ mod tests {
         assert!(v["backlash"]["backward"]["nominal"].as_f64().unwrap() > 0.0);
         // The sliding speed is each case's own, at that case's speed.
         assert!(mesh["cases"][0]["sliding_velocity"].as_f64().unwrap() > 0.0);
-        assert!(worm["gears"][1]["cases"][0]["speed"].as_f64().unwrap() > 0.0);
+        assert!(worm["members"][1]["cases"][0]["speed"].as_f64().unwrap() > 0.0);
     }
 
     /// **Every number that crosses is a number**, or a `null` at a field that is
@@ -2476,6 +2451,11 @@ mod tests {
         "binding_mesh",
         // A single planet has no neighbour to clear.
         "planet_clearance",
+        // A stage with nothing replicated has no layout to report, and a
+        // layout of one copy has no spacing to be equal.
+        "layout",
+        "equal_spacing",
+        "simultaneous_meshing",
         // A crossed gear pair is not a worm and has no published proportions,
         // and no parallel-axis member has any either.
         "recommended_face_width",
@@ -2624,18 +2604,24 @@ mod tests {
         ];
         walk.extend(d["train"]["stages"].as_array().unwrap());
         for stage in walk {
+            // A shape keeps its gears under `members[].gear`; the hula stage
+            // still names its four.
+            let mut members: Vec<&serde_json::Value> = Vec::new();
+            if let Some(m) = stage["members"].as_array() {
+                members.extend(m.iter().map(|m| &m["gear"]));
+            }
             for key in ["gears", "sun", "planet", "ring", "worm", "wheel"] {
-                let members: Vec<&serde_json::Value> = match stage[key].as_array() {
-                    Some(a) => a.iter().collect(),
-                    None if stage[key].is_object() => vec![&stage[key]],
-                    None => vec![],
-                };
-                for g in members {
-                    if let Some(w) = g.get("face_width") {
-                        assert_eq!(w["auto"], true, "a seeded width is not automatic");
-                        assert_eq!(w["manual"], 5.0, "a seeded width is not 5 mm");
-                        seeded += 1;
-                    }
+                match stage[key].as_array() {
+                    Some(a) => members.extend(a.iter()),
+                    None if stage[key].is_object() => members.push(&stage[key]),
+                    None => {}
+                }
+            }
+            for g in members {
+                if let Some(w) = g.get("face_width") {
+                    assert_eq!(w["auto"], true, "a seeded width is not automatic");
+                    assert_eq!(w["manual"], 5.0, "a seeded width is not 5 mm");
+                    seeded += 1;
                 }
             }
         }
@@ -2656,7 +2642,8 @@ mod tests {
         }
         // ...and the case that started this: a width with nothing to size it.
         let mut bare = stages[0].clone();
-        for g in bare["gears"].as_array_mut().unwrap() {
+        for m in bare["members"].as_array_mut().unwrap() {
+            let g = &mut m["gear"];
             g["face_width"] = serde_json::json!({ "auto": true, "manual": 6.0 });
             g["face_sources"] = serde_json::json!({
                 "bending": { "ultimate": false, "fatigue": false },
@@ -2730,36 +2717,23 @@ mod tests {
     #[test]
     fn a_two_stage_train_crosses_the_boundary() {
         // The shape the UI will send: a train, and no library, meaning "use the
-        // one you ship with".
-        let req = r#"{"train":{
+        // one you ship with" — with the stage the panel seeds, at the tooth
+        // counts of the regression canary.
+        let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
+        let mut spur = d["spur_stage"].clone();
+        spur["members"][0]["gear"]["teeth"] = 17.into();
+        spur["members"][1]["gear"]["teeth"] = 43.into();
+        spur["distances"][0]["clearance"] = serde_json::json!({"auto": false, "manual": 0.02});
+        let req = serde_json::json!({"train": {
             "load_cases": [
                 { "kind": "ultimate", "enabled": true, "port": "start", "reacted": true, "torque": 2.0, "speed": 3000.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
                 { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.0, "speed": 0.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
                 { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 1.6, "speed": 2400.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } }
             ],
-            "stages": [
-              {"kind":"spur",
-               "module":1.0,"pressure_angle":20.0,"pitch_diameter":{"auto":true,"manual":17.0},"overlap":{"auto":true,"manual":1.0},"sliding_friction":0.06,"static_friction":0.16,
-               "thickness_mod":1.0,
-               "centre_distance":{"auto":true,"manual":0.0},
-               "clearance":{"auto":false,"manual":0.02},"tolerance_plus":0.02,"tolerance_minus":0.02,
-               "gears":[
-                 {"teeth":17,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"helix_angle":{"auto":true,"manual":0.0},
-                  "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
-                  "dedendum":1.25,"root_radius":0.38,
-                  "face_width":{"auto":true,"manual":0.0},
-                  "face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},
-                  "material":"4340 Hardened Steel"},
-                 {"teeth":43,"profile_shift":{"auto":true,"manual":0.0},"working_depth":{"auto":true,"manual":1.0},"helix_angle":{"auto":true,"manual":0.0},
-                  "addendum":{"auto":false,"manual":1.0},"min_tip_width":0.1,
-                  "dedendum":1.25,"root_radius":0.38,
-                  "face_width":{"auto":true,"manual":0.0},
-                  "face_sources":{"bending":{"ultimate":true,"fatigue":true},"contact":{"ultimate":true,"fatigue":true}},
-                  "material":"4340 Hardened Steel"}
-               ]}
-            ]}}"#;
+            "stages": [spur]
+        }});
 
-        let v = solved(req);
+        let v = solved(&req.to_string());
         // **Negative**, because an external pair reverses and a train's ratio
         // says so now: it is read off the graph rather than multiplied out of
         // the stage ratios, and a pair reports its own as a magnitude.
@@ -2767,7 +2741,7 @@ mod tests {
         assert!(v["cases"][0]["delivered_torque"].as_f64().unwrap() > 2.0);
         assert_eq!(v["cases"][0]["delivered_at"], "end");
 
-        let g0 = &v["stages"][0]["gears"][0];
+        let g0 = &v["stages"][0]["members"][0];
         // The automatic face width came back, and so did the cycle count.
         assert!(g0["face_width"].as_f64().unwrap() > 0.0);
         assert!(g0["cases"][2]["cycles"]["bending"].as_f64().unwrap() > 0.0);
@@ -2775,7 +2749,7 @@ mod tests {
         assert!((g0["cases"][0]["speed"].as_f64().unwrap() - 3000.0).abs() < 1e-9);
         // Spur stage: the overlap ratio is exactly zero, not merely small.
         assert_eq!(
-            v["stages"][0]["mesh"]["line"]["contact_ratios"]["overlap"]
+            v["stages"][0]["meshes"][0]["line"]["contact_ratios"]["overlap"]
                 .as_f64()
                 .unwrap(),
             0.0
@@ -2828,7 +2802,8 @@ mod tests {
         let mut train = sound["train"].clone();
         let stage = train["stages"][0].clone();
         train["stages"] = serde_json::json!([stage.clone(), stage]);
-        train["stages"][1]["centre_distance"] = serde_json::json!({"auto": false, "manual": 0.0});
+        train["stages"][1]["distances"][0]["distance"] =
+            serde_json::json!({"auto": false, "manual": 0.0});
         let req = serde_json::json!({ "train": train }).to_string();
         let v: serde_json::Value = serde_json::from_str(&solve_train_impl(&req).unwrap()).unwrap();
         assert!(

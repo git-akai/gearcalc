@@ -2106,6 +2106,83 @@ that bite *inside* a mesh — a tip reaching past a flank — belong to the pair
 are asked at [`ring::mesh_with`](#limits) rather than restated here.
 
 
+## The stage
+
+Every stage but the hula stage is one **shape**: a graph the geometry is hung
+on, and a solve that reads what to do off it rather than off a kind.
+
+```text
+axis       carried_by  a shaft, or none for an axis fixed in the ground
+           count       how many copies stand round the carrier — planets
+shaft      axis        the axis it spins about; shaft 0 is the ground
+member     shaft, gear, module, k, ring cutter (none for an external gear),
+           pitch diameter (a helix reading — a worm's way of stating its size)
+mesh       a, b, sliding and static friction
+distance   two axes, the angle between them, worm (a sizing convention),
+           distance, clearance, tolerance ±, axial clearance
+```
+
+Everything else is derived, and the derivations are the definitions. A mesh
+is **internal** exactly when one of its members has a cutter, and its sign is
+the mesh kind's. A mesh's **frame** is the carrier common to its two axes.
+The **wiring** is the members' shafts and the meshes' frames, and it feeds
+`kinematics.rs` as any other. The **ports** are the shafts not replicated;
+the shaft held by convention is the last ring's. A spur pair is two ground
+axes, one mesh, one distance; a worm is the same at 90° with `worm` set; a
+set is three axes of which the planet's is carried by the carrier shaft and
+replicated `N` times, two meshes and one distance. `gear-wasm`'s `defaults`
+builds each, and a document names them by writing the shape
+(`kind = "shape"`).
+
+**Closing the distances.** Each member's shift has one role: given (the
+designer typed it), free (a search chooses it, or it stands at the undercut
+floor), *reaches* a given distance, or *absorbs* an automatic one. A given
+distance fixes each mesh on it a shift sum — closed form — and the sum is
+handed to a member of the mesh that is not given, in mesh order, so a member
+reached from one mesh feeds the next; a mesh both of whose members are given
+must already reach it, or the stage refuses. An automatic distance is
+whatever the shifts leave on the first mesh, and every later mesh on it
+absorbs the difference on one of its members — the shared member preferred,
+solved by bracketed Newton ([planetary sets](#planetary-sets)) — or, with no
+member left to move, must already agree to a nanometre. A member reaching
+or absorbing a distance is held to the **true** undercut minimum, not to the
+search's `max(x_min, 0)`: it is not choosing, it is following a distance the
+designer stated, and a 43-tooth gear at −0.15 is what a housing distance
+below the nominal *means* ([who decides a shift](#who-decides-a-shift-and-what-it-must-satisfy)).
+
+**The search**, where the optimiser is on, is over the free members — in
+sum-and-division coordinates wherever both members of one mesh are free — and
+the objective is the product of every mesh's efficiency, each trial cut and
+checked as a pair's is. The helix is read once per stage: a member's given
+angle, a given first pitch diameter, or a given overlap on the first mesh;
+propagated across each mesh as `β_b = −sign·β_a`; and sized from a given
+distance when every shift is pinned.
+
+**Loads.** Motion is solved first, on the tooth counts and topology alone,
+then the flow of power mesh by mesh with each mesh's loss in the direction it
+turns ([efficiency](#efficiency-parallel-axes) reproduces Pennestrì's
+`η₀^w` on every arrangement). A case enters at the stage's input, forward,
+at the torque the train hands it; or at the output, backward, at that torque
+times the ratio — what the train's walk means by referring a load from the
+far side. Every mesh is pressed with its **driver's** force: where the
+driven member's torque is the one the row states, the flank sees it over
+`η`, in bending as `1/η` and in contact as `1/√η`. A member's reported torque
+per case is the torque **its teeth carry** — its worst mesh's pressing
+torque at its own radius — and the shaft torques, signed so that torque
+times the forward speed is positive where power enters, are the stage's
+`cases`. A backward case's signs follow that rule and not the forward case's:
+the shaft it enters by is the one whose product is positive.
+
+**What it reports.** The ratio, signed; the efficiency both ways; the play
+at the output driven forward and at the input driven back, from the
+mechanism's play coefficients over every mesh's angular backlash plus a
+helical member's axial slide; each distance's nominal per mesh, running and
+clearance; the layout of a replicated axis — count, even spacing, simultaneous
+meshing, tip clearance between neighbours; every shaft's speed and torque per
+case; and the members and meshes as any stage reports them. Every mesh's
+operating angle is the **running** mesh's, opened by the clearance, not the
+zero-backlash one.
+
 ## Trains
 
 Per stage `i = z_out/z_in`; a worm's is `z_wheel/z_starts` and a planetary's
@@ -2278,23 +2355,20 @@ did, and a note where it was held by a stage or by nothing.
 
 **Every rating is per case, at that case's torque and in that case's
 direction.** Which way a stage is driven decides how a load distributes through
-it — where `η₀` multiplies in an epicyclic set, which flank a screw pair
-presses — so a case's direction is carried beside its torque rather than folded
-into a magnitude first. A parallel-axis pair distributes one tangential force
-the same way whichever end drives; a screw pair and an epicyclic set do not,
-and for them a load from each end is a different distribution and not a
-different size. A parallel-axis pair evaluates each case at its own load. The
-epicyclic kinds solve their power flow once at unit torque and scale it, a
-power flow being linear in the torque through it, and evaluate every rating
-once at the largest torque a mesh carries in any case, each case being that
-scaled — bending linear in torque, contact as its square root — so a case
-carrying nothing is a scale of zero rather than a refusal.
+it — where each mesh's `η` multiplies, which flank a screw pair presses — so a
+case's direction is carried beside its torque rather than folded into a
+magnitude first. The shape solves its power flow once in each direction at
+unit torque and scales it, a power flow being linear in the torque through
+it, and evaluates every rating once at the largest torque a mesh carries in
+any case, each case being that scaled — bending linear in torque, contact as
+its square root — so a case carrying nothing is a scale of zero rather than a
+refusal ([the stage](#the-stage)).
 
-A gear reports, per case, the torque it carries at its own radius, its speed,
-its speed **against the carrier of its mesh** (its own speed on a pair; a held
-ring's is not zero while its speed is), its cycles on a fatigue case, both
-stresses and the widths each would need. A mesh reports its contact per case,
-and an epicyclic kind its three shafts' speeds and torques per case.
+A gear reports, per case, the torque its teeth carry at its own radius, its
+speed, its speed **against the carrier of its mesh** (its own speed on a pair;
+a held ring's is not zero while its speed is), its cycles on a fatigue case,
+both stresses and the widths each would need. A mesh reports its contact per
+case, and a stage every shaft's speed and torque per case.
 
 **Load sharing.** A stage input, `LoadSharing`, **off by default**, on every
 kind that reports a bending stress. It reaches bending alone — a contact rating

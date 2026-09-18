@@ -831,6 +831,20 @@ shape out, with the change log saying so and `deny_unknown_fields` refusing
 the old fields. The panel's four branches become one card. The corpus is
 re-recorded once, with every difference from 5a's record explained.
 
+*5a and 5b are done.* The shape is `train/shape.rs` and the flow
+`train/flow.rs`; the pair, the worm and every arrangement of the set were
+gated against the kinds' own solves at `ac0dccc` (the gate tests live in
+that commit and were deleted with the kinds). Four figures moved and are in
+`docs/corrections.md`: the set's driven-side meshes pressed `η` short, a
+backward case read as the sun's delivered torque, a pair's operating angle
+quoted at zero backlash, and a given distance refused where a reaching member
+could go below zero shift. `kind = "shape"` in the document format, with
+`PairStage`/`PlanetaryStage` left as the builders `defaults` uses; one card
+in the panel over the shape; `members.ts` names sun, planet, ring, worm and
+wheel off the graph. Two residuals recorded in `docs/state.md`: `Freedom`
+still addresses one distance, and a mesh's thickness coefficients are not
+held to sum to 2.
+
 **5c — the arrangements the shape makes free**, each with a
 `gear-cli kinematics` fixture and a row in `tools/train_kinematics.py`: a
 layshaft transmission (several pairs on two axes, one distance), a Wolfrom,

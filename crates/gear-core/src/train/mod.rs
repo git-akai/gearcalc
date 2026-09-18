@@ -1,17 +1,21 @@
 //! Geartrains: a stage at a time, and the accumulation along the shaft line.
 //!
-//! Each stage shape has its own module — `pair`, `planetary`, `hula` — and what
-//! stays here is the vocabulary they share ([`Backlash`], [`TrainError`], the
-//! duty cycle) and the train that strings them together.
+//! **One stage shape.** A stage is a [`shape::Shape`] — axes, the shafts on
+//! them, members, meshes and distances — or, until the shape can size a
+//! distance from a tip bound, a [`HulaStage`]. What stays here is the
+//! vocabulary every stage shares ([`Backlash`], [`TrainError`], the duty
+//! cycle, [`GearResult`], [`MeshReport`]), relief over a stage's inputs, and
+//! the train that strings stages together.
 //!
-//! **A kind is a layer, not a model.** The spur, helical, crossed and worm
-//! stages are one [`PairStage`] under two names — [`Stage::Spur`] and
-//! [`Stage::Worm`] — and produce one [`CrossedResult`]. And a line contact and a
-//! point contact are one [`MeshReport`]: the physics is one model with the
-//! shaft angle as a parameter — one Hertz answer, one friction balance, one
-//! backlash projection, one interference relation, each holding at the limit
-//! — so the report is one shape with the numbers moving, and what only one of
-//! the two has is the little in [`LineContact`] and [`PointContact`].
+//! **A kind is a preset, not a model.** A spur pair, a crossed pair, a worm
+//! and a planetary set are the ways [`Stage::spur`], [`Stage::worm`] and
+//! [`Stage::planetary`] fill a shape in, and the solve reads what a stage
+//! *is* off the shape. A line contact and a point contact are one
+//! [`MeshReport`]: the physics is one model with the shaft angle as a
+//! parameter — one Hertz answer, one friction balance, one backlash
+//! projection, one interference relation, each holding at the limit — so the
+//! report is one shape with the numbers moving, and what only one of the two
+//! has is the little in [`LineContact`] and [`PointContact`].
 //!
 //! # What is state and what is not
 //!
@@ -19,12 +23,14 @@
 //! result is recomputed from them, so nothing can go stale. Two consequences are
 //! visible in the shapes below:
 //!
-//! - Values shared across a stage — normal module, pressure angle, helix angle —
-//!   are stored **once on the stage**, not per gear, so the two cannot disagree
-//!   (docs/rationale.md#inputs-are-the-only-state).
-//! - Tooth thickness modification is stored as `k₁` alone, with `k₂ = 2 − k₁`
-//!   derived, because a meshing pair must sum to 2. The invariant is unwritable
-//!   rather than merely tested.
+//! - What a stage shares — the pressure angle, the overlap, the sharing model
+//!   — is stored **once on the stage**; what a member owns — its module, its
+//!   thickness coefficient — is the member's, and a mesh whose members
+//!   disagree about the module is refused ([`crate::mesh::MeshError::Incompatible`])
+//!   rather than averaged (docs/rationale.md#inputs-are-the-only-state).
+//! - A mesh's two thickness coefficients ordinarily sum to 2, which a preset
+//!   writes; a pair that does not is a thicker or thinner mesh, carried into
+//!   the shift sum as an equivalent shift and not refused.
 
 use crate::auto::{addendum_for_tip_width, automatic_profile_shift, Ranges};
 use crate::contact::{Directional, Drive};

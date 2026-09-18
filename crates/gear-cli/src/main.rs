@@ -35,20 +35,123 @@ fn worm_stage(starts: u32, wheel_teeth: u32, worm_diameter: f64) -> gear_core::t
     stage
 }
 
+/// **A stage of two members and one mesh, read as the pair it is** — the
+/// harness's own view of a shape's result, so the commands that build pairs
+/// print them by the names a pair has. Nothing in the core has this shape
+/// any more; a stage's result is a shape's ([`gear_core::train::shape`]).
+struct Pair<'a> {
+    ratio: f64,
+    centre_distance: f64,
+    clearance: f64,
+    mesh: &'a gear_core::train::MeshReport,
+    gears: [&'a gear_core::train::GearResult; 2],
+    notes: &'a [gear_core::note::Note],
+}
+
+/// The pair a shape's result is, where it is one.
+fn pair(r: &gear_core::train::StageResult) -> Option<Pair<'_>> {
+    let s = r.as_shape()?;
+    if s.members.len() != 2 || s.meshes.len() != 1 {
+        return None;
+    }
+    let d = s.distances.first()?;
+    Some(Pair {
+        ratio: s.ratio,
+        centre_distance: d.running,
+        clearance: d.clearance,
+        mesh: &s.meshes[0],
+        gears: [&s.members[0], &s.members[1]],
+        notes: &s.notes,
+    })
+}
+
+/// **A stage of three members and two meshes, read as the set it is** — sun,
+/// planet, ring; sun–planet, planet–ring — for the commands that build one.
+struct SetView<'a> {
+    ratio: f64,
+    efficiency: gear_core::contact::Directional<f64>,
+    centre_distance: f64,
+    centre_distance_nominal: [f64; 2],
+    /// How far the two meshes disagree about the one distance, each opened
+    /// by the clearance its own way.
+    residual: f64,
+    /// The two meshes in series: `η₀`.
+    eta0: f64,
+    sun: &'a gear_core::train::GearResult,
+    planet: &'a gear_core::train::GearResult,
+    ring: &'a gear_core::train::GearResult,
+    sun_planet: &'a gear_core::train::MeshReport,
+    planet_ring: &'a gear_core::train::MeshReport,
+    layout: Option<&'a gear_core::train::shape::LayoutReport>,
+    notes: &'a [gear_core::note::Note],
+}
+
+/// The set a shape's result is, where it is one.
+fn set_view(r: &gear_core::train::StageResult) -> Option<SetView<'_>> {
+    let s = r.as_shape()?;
+    if s.members.len() != 3 || s.meshes.len() != 2 {
+        return None;
+    }
+    let d = s.distances.first()?;
+    let (n0, n1) = (*d.nominal.first()?, *d.nominal.get(1)?);
+    Some(SetView {
+        ratio: s.ratio,
+        efficiency: s.efficiency,
+        centre_distance: d.running,
+        centre_distance_nominal: [n0, n1],
+        residual: ((n0 + d.clearance) - (n1 - d.clearance)).abs(),
+        eta0: s.meshes[0].efficiency.forward * s.meshes[1].efficiency.forward,
+        sun: &s.members[0],
+        planet: &s.members[1],
+        ring: &s.members[2],
+        sun_planet: &s.meshes[0],
+        planet_ring: &s.meshes[1],
+        layout: s.layout.as_ref(),
+        notes: &s.notes,
+    })
+}
+
+/// A set through the shape, as the commands here build one.
+fn solve_set(
+    stage: &gear_core::train::PlanetaryStage,
+    loads: &gear_core::train::StageLoads,
+    lib: &gear_core::material::MaterialLibrary,
+) -> Result<gear_core::train::StageResult, gear_core::train::TrainError> {
+    gear_core::train::solve_any(
+        &gear_core::train::Stage::planetary(stage.clone()),
+        loads,
+        lib,
+    )
+}
+
+/// A pair through the shape, as the commands here build one.
+fn solve_pair(
+    stage: &gear_core::train::PairStage,
+    kind: gear_core::train::PairKind,
+    loads: &gear_core::train::StageLoads,
+    lib: &gear_core::material::MaterialLibrary,
+) -> Result<gear_core::train::StageResult, gear_core::train::TrainError> {
+    let as_stage = match kind {
+        gear_core::train::PairKind::Spur => gear_core::train::Stage::spur(stage.clone()),
+        gear_core::train::PairKind::Worm => gear_core::train::Stage::worm(stage.clone()),
+    };
+    gear_core::train::solve_any(&as_stage, loads, lib)
+}
+
 /// The mesh a pair reports, checked to be the point contact these commands
 /// built a crossed pair for.
-fn point(r: &gear_core::train::PairResult) -> &gear_core::train::MeshReport {
+fn point<'a>(r: &Pair<'a>) -> &'a gear_core::train::MeshReport {
     assert!(
         r.mesh.point.is_some(),
         "this command builds crossed pairs, which report a point contact"
     );
-    &r.mesh
+    r.mesh
 }
 
 /// The transverse figures a line contact reports — the commands that read them
 /// are the ones that built a parallel pair.
-fn line(r: &gear_core::train::PairResult) -> &gear_core::train::LineContact {
-    transverse(&r.mesh)
+fn line<'a>(r: &Pair<'a>) -> &'a gear_core::train::LineContact {
+    transverse(r.mesh)
 }
 
 /// The same, of any mesh a command built on parallel shafts.
@@ -1082,7 +1185,7 @@ fn train_file_report(path: Option<&str>) {
             ],
             reversed_bending: false,
             stages: vec![
-                Stage::Spur(
+                Stage::spur(
                     PairStage {
                         gears: [
                             StageGear {
@@ -1099,8 +1202,8 @@ fn train_file_report(path: Option<&str>) {
                     }
                     .with_additional_helix(15.0),
                 ),
-                Stage::Worm(PairStage::worm()),
-                Stage::Planetary(Box::<PlanetaryStage>::default()),
+                Stage::worm(PairStage::worm()),
+                Stage::planetary(PlanetaryStage::default()),
             ],
             couplings: Vec::new(),
             constraints: Vec::new(),
@@ -1207,9 +1310,7 @@ fn train_file_report(path: Option<&str>) {
 /// that cost.
 fn shifts_report(z1: u32, z2: u32) {
     use gear_core::params::Auto;
-    use gear_core::train::{
-        solve_pair_stage, Optimisation, PairKind, PairStage, StageGear, StageLoads,
-    };
+    use gear_core::train::{Optimisation, PairKind, PairStage, StageGear, StageLoads};
 
     let lib = gear_io::default_library();
     let stage = |on: bool, at: Option<f64>| PairStage {
@@ -1225,7 +1326,7 @@ fn shifts_report(z1: u32, z2: u32) {
         ..PairStage::default()
     };
     let solved = |on: bool, at: Option<f64>| {
-        solve_pair_stage(&stage(on, at), PairKind::Spur, &StageLoads::just(2.0), &lib)
+        solve_pair(&stage(on, at), PairKind::Spur, &StageLoads::just(2.0), &lib)
     };
 
     println!("pair z {z1}/{z2}  module 1  alpha 20 deg  mu 0.06\n");
@@ -1233,7 +1334,7 @@ fn shifts_report(z1: u32, z2: u32) {
         "{:<34} {:>9} {:>9} {:>9} {:>9} {:>10}",
         "", "x1", "x2", "sum", "eps", "eta fwd"
     );
-    let row = |name: &str, r: &gear_core::train::PairResult| {
+    let row = |name: &str, r: &Pair| {
         println!(
             "{name:<34} {:>9.4} {:>9.4} {:>9.4} {:>9.4} {:>9.3} %",
             r.gears[0].profile_shift,
@@ -1245,6 +1346,10 @@ fn shifts_report(z1: u32, z2: u32) {
     };
     let (Ok(floor), Ok(best)) = (solved(false, None), solved(true, None)) else {
         eprintln!("that pair has no answer");
+        return;
+    };
+    let (Some(floor), Some(best)) = (pair(&floor), pair(&best)) else {
+        eprintln!("that stage is not a pair");
         return;
     };
     row("least shift that clears undercut", &floor);
@@ -1268,8 +1373,8 @@ fn shifts_report(z1: u32, z2: u32) {
     // is about. This is how a distance no admissible shifts reach comes to be in
     // the change detector rather than only in a test (F55) — and most rows say
     // nothing, which is the point.
-    let said = |r: &gear_core::train::PairResult| {
-        for n in &r.notes {
+    let said = |r: &Pair| {
+        for n in r.notes {
             if n.is(gear_core::note::key::STAGE_CENTRE_DISTANCE_NOT_REACHED)
                 || n.is(gear_core::note::key::STAGE_CLEARANCE_NEGATIVE)
             {
@@ -1282,8 +1387,9 @@ fn shifts_report(z1: u32, z2: u32) {
         let a = tight + (free_at - tight) * f64::from(k) / 6.0;
         match solved(true, Some(a)) {
             Ok(r) => {
-                row(&format!("{a:.4}"), &r);
-                said(&r);
+                let p = pair(&r).expect("a pair");
+                row(&format!("{a:.4}"), &p);
+                said(&p);
             }
             Err(e) => println!("{a:.4}: {e}"),
         }
@@ -1309,8 +1415,9 @@ fn shifts_report(z1: u32, z2: u32) {
         let a = tight + (free_at - tight) * f64::from(k) / 3.0;
         match solved(false, Some(a)) {
             Ok(r) => {
-                row(&format!("{a:.4}"), &r);
-                said(&r);
+                let p = pair(&r).expect("a pair");
+                row(&format!("{a:.4}"), &p);
+                said(&p);
             }
             Err(e) => println!("{a:.4}: {e}"),
         }
@@ -1328,8 +1435,7 @@ fn shifts_report(z1: u32, z2: u32) {
 fn epicyclic_shifts_report() {
     use gear_core::params::Auto;
     use gear_core::train::{
-        solve_hula_stage, solve_planetary_stage, HulaStage, Optimisation, PlanetaryStage,
-        StageLoads,
+        solve_any, solve_hula_stage, HulaStage, Optimisation, PlanetaryStage, Stage, StageLoads,
     };
 
     let lib = gear_io::default_library();
@@ -1391,20 +1497,24 @@ fn epicyclic_shifts_report() {
         set.ring.teeth = sun + 2 * planet;
         set.sun.profile_shift = Auto::automatic(0.0);
         set.ring.profile_shift = Auto::automatic(0.0);
-        match solve_planetary_stage(&set, &StageLoads::just(2.0), &lib) {
-            Ok(r) => println!(
-                "{:<12} {:>9.4} {:>9.4} {:>9.4} {:>10.4} % {:>16}",
-                format!("{sun}/{planet}"),
-                r.sun.profile_shift,
-                r.planet.gear.profile_shift,
-                r.ring.profile_shift,
-                100.0 * r.fixed_carrier_efficiency.forward,
-                // A clamp on any member is the tool declining to make what was
-                // asked for, which is what the search may not choose.
-                [&r.sun, &r.planet.gear, &r.ring]
-                    .iter()
-                    .all(|g| g.clamps.is_empty())
-            ),
+        match solve_any(&Stage::planetary(set), &StageLoads::just(2.0), &lib) {
+            Ok(r) => {
+                let members = r.members();
+                let meshes = r.meshes();
+                println!(
+                    "{:<12} {:>9.4} {:>9.4} {:>9.4} {:>10.4} % {:>16}",
+                    format!("{sun}/{planet}"),
+                    members[0].profile_shift,
+                    members[1].profile_shift,
+                    members[2].profile_shift,
+                    // `η₀`: the two meshes in series, which is what the search
+                    // maximises.
+                    100.0 * meshes[0].efficiency.forward * meshes[1].efficiency.forward,
+                    // A clamp on any member is the tool declining to make what was
+                    // asked for, which is what the search may not choose.
+                    members.iter().all(|g| g.clamps.is_empty())
+                );
+            }
             Err(e) => println!("{sun}/{planet}: {e}"),
         }
     }
@@ -1438,9 +1548,7 @@ fn epicyclic_shifts_report() {
 
 fn train_report(mode: Option<&str>) {
     use gear_core::params::Auto;
-    use gear_core::train::{
-        solve_train, Duty, LoadCase, PairStage, Port, Stage, StageGear, StageResult, Train,
-    };
+    use gear_core::train::{solve_train, Duty, LoadCase, PairStage, Port, Stage, StageGear, Train};
 
     let lib = gear_io::default_library();
     let auto_width = |teeth: u32| StageGear {
@@ -1533,7 +1641,7 @@ fn train_report(mode: Option<&str>) {
                 ..StageGear::default()
             };
             vec![
-                Stage::Spur(
+                Stage::spur(
                     PairStage {
                         load_sharing: gear_core::contact::LoadSharing::LinearRamp,
                         gears: [toggled(17, false, true), toggled(43, true, false)],
@@ -1541,7 +1649,7 @@ fn train_report(mode: Option<&str>) {
                     }
                     .with_additional_helix(30.0),
                 ),
-                Stage::Spur(PairStage {
+                Stage::spur(PairStage {
                     load_sharing: gear_core::contact::LoadSharing::LinearRamp,
                     gears: [toggled(13, true, false), toggled(31, false, true)],
                     ..PairStage::default()
@@ -1549,19 +1657,19 @@ fn train_report(mode: Option<&str>) {
             ]
         } else if matches!(mode, Some("mixed" | "held")) {
             vec![
-                Stage::Spur(PairStage {
+                Stage::spur(PairStage {
                     gears: [auto_width(17), auto_width(43)],
                     ..PairStage::default()
                 }),
-                Stage::Worm(PairStage::worm()),
+                Stage::worm(PairStage::worm()),
             ]
         } else {
             vec![
-                Stage::Spur(PairStage {
+                Stage::spur(PairStage {
                     gears: [auto_width(17), auto_width(43)],
                     ..PairStage::default()
                 }),
-                Stage::Spur(
+                Stage::spur(
                     PairStage {
                         gears: [auto_width(13), auto_width(31)],
                         ..PairStage::default()
@@ -1598,14 +1706,14 @@ fn train_report(mode: Option<&str>) {
     print_train_cases(&train, &r);
 
     for (k, s) in r.stages.iter().enumerate() {
-        match (train.stages[k].as_pair(), s) {
-            // One report, and which contact it is decides the rows — the
-            // same rows for every line contact and for every point.
-            (Some((st, kind)), StageResult::Pair(res)) => match res.mesh.line {
-                Some(line) => print_line_pair(k, st, kind, res, &line),
-                None => print_point_pair(k, st, kind, res, &res.mesh),
+        // One report, and which contact it is decides the rows — the same
+        // rows for every line contact and for every point.
+        match pair(s) {
+            Some(res) => match res.mesh.line {
+                Some(line) => print_line_pair(k, kind_name(&train.stages[k]), &res, &line),
+                None => print_point_pair(k, kind_name(&train.stages[k]), &res, res.mesh),
             },
-            _ => println!("\nstage {}: kind and result disagree", k + 1),
+            None => println!("\nstage {}: not a pair", k + 1),
         }
     }
 }
@@ -1682,22 +1790,16 @@ fn print_gear_cases(cases: &[gear_core::train::GearCase]) {
 }
 
 /// A pair with its shafts parallel: line contact, a bending rating.
-fn print_line_pair(
-    k: usize,
-    st: &gear_core::train::PairStage,
-    kind: gear_core::train::PairKind,
-    s: &gear_core::train::PairResult,
-    line: &gear_core::train::LineContact,
-) {
-    let mesh = &s.mesh;
+fn print_line_pair(k: usize, kind: &str, s: &Pair, line: &gear_core::train::LineContact) {
+    let mesh = s.mesh;
     let helix = s.gears[0].helix_angle;
     let ratios = &line.contact_ratios;
     println!(
         "\nstage {}  {}  z {}/{}  beta {} deg  ratio {:.4}  a_w {:.4} mm{}",
         k + 1,
-        kind_name(kind),
-        st.gears[0].teeth,
-        st.gears[1].teeth,
+        kind,
+        s.gears[0].params.teeth,
+        s.gears[1].params.teeth,
         helix,
         s.ratio,
         s.centre_distance,
@@ -1741,33 +1843,29 @@ fn print_line_pair(
         );
         print_gear_cases(&g.cases);
     }
-    for n in s.mesh.notes.iter().chain(&s.notes) {
+    for n in s.mesh.notes.iter().chain(s.notes) {
         println!("  note: {}", words().render(n));
     }
 }
 
 /// The kind, as a designer names it.
-fn kind_name(kind: gear_core::train::PairKind) -> &'static str {
-    match kind {
-        gear_core::train::PairKind::Spur => "spur",
-        gear_core::train::PairKind::Worm => "worm",
+/// The word the harness prints for a pair: what the shape's one distance
+/// says it is sized as.
+fn kind_name(stage: &gear_core::train::Stage) -> &'static str {
+    match stage.as_shape().and_then(|s| s.distances.first()) {
+        Some(d) if d.worm => "worm",
+        _ => "spur",
     }
 }
 
 /// A pair with its shafts crossed: point contact, two efficiencies.
-fn print_point_pair(
-    k: usize,
-    st: &gear_core::train::PairStage,
-    kind: gear_core::train::PairKind,
-    s: &gear_core::train::PairResult,
-    m: &gear_core::train::MeshReport,
-) {
+fn print_point_pair(k: usize, kind: &str, s: &Pair, m: &gear_core::train::MeshReport) {
     println!(
         "\nstage {}  {}  z {}/{}  ratio {:.4}  a {:.4} mm  lead angle {:.4} deg",
         k + 1,
-        kind_name(kind),
-        st.gears[0].teeth,
-        st.gears[1].teeth,
+        kind,
+        s.gears[0].params.teeth,
+        s.gears[1].params.teeth,
         s.ratio,
         s.centre_distance,
         s.gears[0].lead_angle
@@ -1790,15 +1888,15 @@ fn print_point_pair(
     );
     println!("  {:<6} {:>8}   material", "member", "b mm");
     let names = match kind {
-        gear_core::train::PairKind::Worm => ["worm", "wheel"],
-        gear_core::train::PairKind::Spur => ["1", "2"],
+        "worm" => ["worm", "wheel"],
+        _ => ["1", "2"],
     };
     for (name, g) in names.iter().zip(&s.gears) {
         println!("  {name:<6} {:>8.3}   {}", g.face_width, g.material.name);
         print_gear_cases(&g.cases);
     }
     println!("  bending not reported, flank type ZI - see docs/reference.md#crossed-axes");
-    for n in s.mesh.notes.iter().chain(&s.notes) {
+    for n in s.mesh.notes.iter().chain(s.notes) {
         println!("  note: {}", words().render(n));
     }
 }
@@ -2805,17 +2903,18 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
 
 /// A worm stage end to end: geometry, both directions, contact and backlash.
 fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: f64) {
-    use gear_core::train::{solve_pair_stage, PairKind, StageLoads};
+    use gear_core::train::{PairKind, StageLoads};
 
     let stage = worm_stage(starts, wheel_teeth, worm_diameter);
     let lib = gear_io::default_library();
-    let r = match solve_pair_stage(&stage, PairKind::Worm, &StageLoads::just(torque), &lib) {
+    let solved = match solve_pair(&stage, PairKind::Worm, &StageLoads::just(torque), &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("cannot solve that stage: {e}");
             return;
         }
     };
+    let r = pair(&solved).expect("a worm stage is a pair");
 
     println!(
         "worm stage  z {starts}/{wheel_teeth}  module {}  ratio {:.4}:1  a {:.4} mm",
@@ -2854,7 +2953,7 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
          {:15}1-15 % lower, rising with lead angle - see docs/reference.md#crossed-axes",
         ""
     );
-    for note in m.notes.iter().chain(&r.notes) {
+    for note in m.notes.iter().chain(r.notes) {
         println!("  ! {}", words().render(note));
     }
 }
@@ -2962,7 +3061,7 @@ fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_sh
 /// A planetary stage, end to end, in all six arrangements.
 fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix: f64) {
     use gear_core::planetary::{Arrangement, PlanetaryShaft};
-    use gear_core::train::{solve_planetary_stage, PlanetaryStage, StageGear};
+    use gear_core::train::{PlanetaryStage, StageGear};
 
     let lib = gear_io::default_library();
     let base = PlanetaryStage {
@@ -3009,13 +3108,19 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
             // The arrangement is what the set is *asked*, not what it is:
             // the same stage, six boundaries.
             let asked = PlanetaryStage::boundary_for(Arrangement { input, fixed });
-            match solve_planetary_stage(
+            let output = all
+                .iter()
+                .copied()
+                .find(|&m| m != input && m != fixed)
+                .unwrap_or(input);
+            match solve_set(
                 &base,
                 &gear_core::train::StageLoads::at(2.0, 3000.0).under(asked),
                 &lib,
             ) {
                 Err(e) => println!("  {:>7} in, {:>7} held: {e}", name(input), name(fixed)),
-                Ok(r) => {
+                Ok(solved) => {
+                    let r = set_view(&solved).expect("a set");
                     if !shown {
                         println!(
                             "\nrunning centre distance {:.6} mm (zero-backlash {:.6} sun-planet, \
@@ -3023,20 +3128,22 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                             r.centre_distance,
                             r.centre_distance_nominal[0],
                             r.centre_distance_nominal[1],
-                            r.planet.shift_residual,
+                            r.residual,
                             r.sun.profile_shift,
-                            r.planet.gear.profile_shift,
+                            r.planet.profile_shift,
                             r.ring.profile_shift,
                         );
                         println!(
                             "eps_a  sun-planet {:.3}   planet-ring {:.3}   \
                              eta_0 {:.4}   even spacing {}   planet gap {}",
-                            transverse(&r.sun_planet).contact_ratios.transverse,
-                            transverse(&r.planet_ring).contact_ratios.transverse,
-                            r.fixed_carrier_efficiency.forward,
-                            r.equal_spacing,
-                            r.planet_clearance
-                                .map_or_else(|| "n/a".into(), |g| format!("{g:.3} mm"))
+                            transverse(r.sun_planet).contact_ratios.transverse,
+                            transverse(r.planet_ring).contact_ratios.transverse,
+                            r.eta0,
+                            r.layout
+                                .and_then(|l| l.equal_spacing)
+                                .map_or_else(|| "n/a".into(), |b| b.to_string()),
+                            r.layout
+                                .map_or_else(|| "n/a".into(), |l| format!("{:.3} mm", l.clearance))
                         );
                         // **The internal mesh, asked what an internal mesh is
                         // asked.** A set never put the question until the tip
@@ -3048,10 +3155,9 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                         // **Both meshes now**, because a tip reaching past a
                         // flank's usable end is every mesh's question and had
                         // been asked of the internal one alone.
-                        for (name, m) in [
-                            ("sun-planet", &r.sun_planet),
-                            ("planet-ring", &r.planet_ring),
-                        ] {
+                        for (name, m) in
+                            [("sun-planet", r.sun_planet), ("planet-ring", r.planet_ring)]
+                        {
                             println!(
                                 "{name} flank interference  member 1 {}  member 2 {}{}",
                                 m.flank_interference[0],
@@ -3072,7 +3178,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                             r.sun.cases[0]
                                 .bending_stress
                                 .map_or_else(|| "-".into(), |v| format!("{v:.1} MPa")),
-                            r.planet.gear.cases[0]
+                            r.planet.cases[0]
                                 .bending_stress
                                 .map_or_else(|| "-".into(), |v| format!("{v:.1} MPa")),
                             r.ring.cases[0]
@@ -3089,7 +3195,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
                         "{:>9} {:>9} {:>9} {:>12.4} {:>10.3} %",
                         name(input),
                         name(fixed),
-                        name(r.output),
+                        name(output),
                         r.ratio,
                         r.efficiency.forward * 100.0
                     );
@@ -3101,19 +3207,15 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
         return;
     }
     let stage = base.clone();
-    if let Ok(r) =
-        solve_planetary_stage(&stage, &gear_core::train::StageLoads::at(2.0, 3000.0), &lib)
-    {
+    if let Ok(solved) = solve_set(&stage, &gear_core::train::StageLoads::at(2.0, 3000.0), &lib) {
+        let r = set_view(&solved).expect("a set");
         println!();
-        for (which, mesh) in [
-            ("sun-planet", &r.sun_planet),
-            ("planet-ring", &r.planet_ring),
-        ] {
+        for (which, mesh) in [("sun-planet", r.sun_planet), ("planet-ring", r.planet_ring)] {
             for note in &mesh.notes {
                 println!("note: {which}: {}", words().render(note));
             }
         }
-        for note in &r.notes {
+        for note in r.notes {
             println!("note: {}", words().render(note));
         }
     }
@@ -3126,8 +3228,9 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
     //
     // Here rather than nowhere because a path the harness never walks is a path
     // the change detector cannot see, which this project has recorded six times.
-    let free = solve_planetary_stage(&base, &gear_core::train::StageLoads::at(2.0, 3000.0), &lib);
+    let free = solve_set(&base, &gear_core::train::StageLoads::at(2.0, 3000.0), &lib);
     if let Ok(free) = free {
+        let free = set_view(&free).expect("a set");
         println!("\ncentre distance given, shifts chosen to reach it");
         println!(
             "{:<12} {:>9} {:>9} {:>9} {:>11} {:>9}",
@@ -3137,21 +3240,20 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
             let asked = free.centre_distance + 0.1 * f64::from(step);
             let mut stage = base.clone();
             stage.centre_distance = gear_core::Auto::fixed(asked);
-            match solve_planetary_stage(
-                &stage,
-                &gear_core::train::StageLoads::at(2.0, 3000.0),
-                &lib,
-            ) {
+            match solve_set(&stage, &gear_core::train::StageLoads::at(2.0, 3000.0), &lib) {
                 Err(e) => println!("{asked:<12.4} {e}"),
-                Ok(r) => println!(
-                    "{:<12.4} {:>9.4} {:>9.4} {:>9.4} {:>11.1e} {:>9.4}",
-                    r.centre_distance,
-                    r.sun.profile_shift,
-                    r.planet.gear.profile_shift,
-                    r.ring.profile_shift,
-                    r.planet.shift_residual,
-                    r.fixed_carrier_efficiency.forward
-                ),
+                Ok(solved) => {
+                    let r = set_view(&solved).expect("a set");
+                    println!(
+                        "{:<12.4} {:>9.4} {:>9.4} {:>9.4} {:>11.1e} {:>9.4}",
+                        r.centre_distance,
+                        r.sun.profile_shift,
+                        r.planet.profile_shift,
+                        r.ring.profile_shift,
+                        r.residual,
+                        r.eta0
+                    );
+                }
             }
         }
     }
@@ -3165,7 +3267,7 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
 /// by tooth count and helix, so `β₁` is what there is to choose. Nothing else
 /// about the pair changes — it is the same screw geometry either way.
 fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
-    use gear_core::train::{solve_pair_stage, PairKind, StageLoads};
+    use gear_core::train::{PairKind, StageLoads};
 
     let lib = gear_io::default_library();
     println!(
@@ -3200,12 +3302,13 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
             println!("{beta1:>7.1} {:>7} — no such pair", shaft_angle - beta1);
             continue;
         };
-        match solve_pair_stage(&stage, PairKind::Spur, &StageLoads::just(2.0), &lib) {
+        match solve_pair(&stage, PairKind::Spur, &StageLoads::just(2.0), &lib) {
             Err(e) => println!(
                 "{beta1:>7.1} {:>7.1}  {e}",
                 g.wheel_helix_angle_rad.to_degrees()
             ),
-            Ok(r) => {
+            Ok(solved) => {
+                let r = pair(&solved).expect("a pair");
                 any = true;
                 // **What a locked row says, in words**, printed under it rather
                 // than left to the reader to infer from a blank efficiency.
@@ -3285,14 +3388,23 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
         ("least shift that clears undercut", &even),
         ("least loss", &free),
     ] {
-        match solve_pair_stage(stage, PairKind::Spur, &StageLoads::just(2.0), &lib) {
-            Ok(r) => println!(
-                "{name:<34} {:>9.4} {:>9.4} {:>9.4} {:>9.4} {:>9.3} %",
+        match solve_pair(stage, PairKind::Spur, &StageLoads::just(2.0), &lib).map(|solved| {
+            let r = pair(&solved).expect("a pair");
+            (
                 r.gears[0].profile_shift,
                 r.gears[1].profile_shift,
                 r.centre_distance,
                 r.mesh.contact_ratio,
-                100.0 * r.mesh.efficiency.forward
+                r.mesh.efficiency.forward,
+            )
+        }) {
+            Ok((x1, x2, a, eps, eta)) => println!(
+                "{name:<34} {:>9.4} {:>9.4} {:>9.4} {:>9.4} {:>9.3} %",
+                x1,
+                x2,
+                a,
+                eps,
+                100.0 * eta
             ),
             Err(e) => println!("{name:<34} {e}"),
         }

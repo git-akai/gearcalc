@@ -10,7 +10,7 @@
 //! that owns the sentence owns the check on it.
 
 use gear_core::contact::LoadSharing;
-use gear_core::train::{solve_pair_stage, PairKind, PairStage, StageGear, StageLoads};
+use gear_core::train::{solve_any, PairStage, Stage, StageGear, StageLoads};
 
 /// **The sharing note's number, and its lack of a sign.**
 ///
@@ -34,9 +34,9 @@ fn the_sharing_note_quotes_a_number_the_sweep_still_produces() {
             gears: [g.clone(), g],
             ..Default::default()
         };
-        solve_pair_stage(&stage, PairKind::Spur, &StageLoads::just(2.0), &lib)
+        solve_any(&Stage::spur(stage), &StageLoads::just(2.0), &lib)
             .ok()
-            .and_then(|r| r.gears[0].cases[0].bending_stress)
+            .and_then(|r| r.members()[0].cases[0].bending_stress)
     };
 
     let mut seen: Vec<f64> = Vec::new();

@@ -86,7 +86,7 @@ fn pair(z1: u32, z2: u32, helix: f64) -> Stage {
     if helix != 0.0 {
         s = s.with_first_helix(helix);
     }
-    Stage::Spur(s)
+    Stage::spur(s)
 }
 
 /// **An arrangement as a train's constraints**: which of a set's shafts is
@@ -112,7 +112,7 @@ fn arranged(k: usize, input: &str, fixed: &str) -> Vec<ShaftConstraint> {
 /// A default epicyclic set. What drives it and what holds it is the train's
 /// to say ([`arranged`]); alone, it is solved sun in and ring held.
 fn set() -> Stage {
-    Stage::Planetary(Box::default())
+    Stage::planetary(PlanetaryStage::default())
 }
 
 /// **A set whose two centre distances no planet shift can bring together.**
@@ -127,7 +127,7 @@ fn unclosed() -> Stage {
     p.sun.teeth = 17;
     p.planet.teeth = 17;
     p.ring.teeth = 80;
-    Stage::Planetary(Box::new(p))
+    Stage::planetary(p)
 }
 
 /// **Every fixture, and why each is here.**
@@ -158,7 +158,7 @@ fn fixtures() -> Vec<(String, Train)> {
         // one that can refuse to be driven at all.
         (
             "worm".to_string(),
-            train(vec![Stage::Worm(PairStage::worm())]),
+            train(vec![Stage::worm(PairStage::worm())]),
         ),
     ];
     // **All six arrangements**, because which shaft is held is the whole of
@@ -188,7 +188,7 @@ fn fixtures() -> Vec<(String, Train)> {
         train(vec![
             pair(17, 43, 0.0),
             set(),
-            Stage::Worm(PairStage::worm()),
+            Stage::worm(PairStage::worm()),
         ]),
     ));
     // **A reversing stage, in front of another and behind one.** An epicyclic
@@ -290,18 +290,46 @@ fn fixtures() -> Vec<(String, Train)> {
     out
 }
 
-/// The shafts an epicyclic kind reports, by name, or nothing for a kind whose
-/// shafts are its members.
-///
-/// **Transitional.** It is the one reading below that has to know what kind it
-/// is holding, and it is there because no accessor reports a stage's shafts —
-/// only its gears. The graph's `shafts()` replaces it.
-fn shafts(s: &StageResult) -> Option<([&'static str; 3], &[gear_core::train::ShaftsCase])> {
-    if let Some(p) = s.as_planetary() {
-        return Some((["sun", "carrier", "ring"], &p.cases));
+/// One shaft's `(case, speed, torque)` per load case.
+type ShaftLine = Vec<(usize, f64, f64)>;
+
+/// **Every shaft's speed and torque per case**, named as the harness names
+/// shafts: a shape's from its own per-shaft cases, a hula stage's from its
+/// three.
+fn shaft_cases(stage: &Stage, s: &StageResult) -> Vec<(String, ShaftLine)> {
+    match s {
+        StageResult::Shape(r) => {
+            let w = stage.wiring();
+            (1..w.shafts.len())
+                .map(|i| {
+                    (
+                        named(
+                            std::slice::from_ref(stage),
+                            gear_core::train::ShaftRef::Of { stage: 0, shaft: i },
+                            w.shafts[i],
+                        ),
+                        r.cases
+                            .iter()
+                            .map(|c| (c.case, c.speeds[i], c.torques[i]))
+                            .collect(),
+                    )
+                })
+                .collect()
+        }
+        StageResult::Hula(h) => ["grounded", "crank", "output"]
+            .iter()
+            .enumerate()
+            .map(|(i, label)| {
+                (
+                    (*label).to_string(),
+                    h.cases
+                        .iter()
+                        .map(|c| (c.case, c.speeds[i], c.torques[i]))
+                        .collect(),
+                )
+            })
+            .collect(),
     }
-    s.as_hula()
-        .map(|h| (["grounded", "crank", "output"], h.cases.as_slice()))
 }
 
 /// **What the graph says**, from tooth counts and topology alone.
@@ -417,16 +445,14 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
             s.backlash().forward.nominal,
             s.backlash().backward.nominal,
         );
-        if let Some((names, cases)) = shafts(s) {
-            for (i, label) in names.iter().enumerate() {
-                for c in cases {
-                    println!(
-                        "    shaft {label:<9} case {}  speed {:>14.6}  torque {:>14.6}",
-                        c.case + 1,
-                        c.speeds[i],
-                        c.torques[i],
-                    );
-                }
+        for (label, cases) in shaft_cases(&train.stages[k], s) {
+            for (case, speed, torque) in cases {
+                println!(
+                    "    shaft {label:<9} case {}  speed {:>14.6}  torque {:>14.6}",
+                    case + 1,
+                    speed,
+                    torque,
+                );
             }
         }
         for (i, g) in s.members().iter().enumerate() {
@@ -477,13 +503,38 @@ fn named(stages: &[Stage], at: ShaftRef, label: gear_core::train::ShaftLabel) ->
         (ShaftLabel::Ground, _) => "ground".into(),
         (ShaftLabel::Carrier { .. }, Some(Stage::Hula(_))) => "crank".into(),
         (ShaftLabel::Carrier { .. }, _) => "carrier".into(),
-        (ShaftLabel::Member { member }, Some(Stage::Planetary(_))) => {
-            ["sun", "planet", "ring"][member].into()
-        }
         (ShaftLabel::Member { member }, Some(Stage::Hula(_))) => {
             ["grounded", "wobble", "wobble", "output"][member].into()
         }
-        (ShaftLabel::Member { member }, _) => ["first", "second"][member].into(),
+        (ShaftLabel::Member { member }, Some(Stage::Shape(shape))) => member_role(shape, member),
+        (ShaftLabel::Member { member }, None) => format!("member {}", member + 1),
+    }
+}
+
+/// **A member's name from its place in the shape**, not from a kind: a
+/// member on an axis a carrier carries is a planet, a ring beside one is a
+/// ring and any other central member a sun; with no carrier the members are
+/// first and second, as a pair's were.
+fn member_role(shape: &gear_core::train::shape::Shape, member: usize) -> String {
+    let m = &shape.members[member];
+    let carried = |shaft: usize| {
+        shape
+            .shafts
+            .get(shaft.wrapping_sub(1))
+            .is_some_and(|s| shape.axes[s.axis].carried_by.is_some())
+    };
+    let epicyclic = shape.axes.iter().any(|a| a.carried_by.is_some());
+    if !epicyclic {
+        return ["first", "second"]
+            .get(member)
+            .map_or_else(|| format!("member {}", member + 1), |s| (*s).to_string());
+    }
+    if m.ring.is_some() {
+        "ring".into()
+    } else if carried(m.shaft) {
+        "planet".into()
+    } else {
+        "sun".into()
     }
 }
 

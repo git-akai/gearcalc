@@ -97,6 +97,8 @@ pub mod key {
     pub const GEAR_ADDENDUM_HELD_TO_TIP_WIDTH: &str = "gear.addendum_held_to_tip_width";
     /// `gear.shift_raised_for_undercut`
     pub const GEAR_SHIFT_RAISED_FOR_UNDERCUT: &str = "gear.shift_raised_for_undercut";
+    /// `gear.bending_unrated_in_mesh`
+    pub const GEAR_BENDING_UNRATED_IN_MESH: &str = "gear.bending_unrated_in_mesh";
     /// `gear.ring_addendum_clamped`
     pub const GEAR_RING_ADDENDUM_CLAMPED: &str = "gear.ring_addendum_clamped";
     /// `gear.face_width_no_source`
@@ -254,6 +256,7 @@ pub mod key {
         GEAR_ADDENDUM_ABOVE_TIP_WIDTH,
         GEAR_ADDENDUM_HELD_TO_TIP_WIDTH,
         GEAR_SHIFT_RAISED_FOR_UNDERCUT,
+        GEAR_BENDING_UNRATED_IN_MESH,
         GEAR_RING_ADDENDUM_CLAMPED,
         GEAR_FACE_WIDTH_NO_SOURCE,
         GEAR_REVERSED_BENDING_UNCORRECTED,

@@ -91,12 +91,12 @@ const out = {
     ["spur_stage", "worm_stage", "planetary_stage", "hula_stage"].map((k) => {
       const stage = structuredClone(defaults[k]);
       const pin = (a) => (a ? { auto: false, manual: 0.1 } : a);
-      if (stage.centre_distance) stage.centre_distance = pin(stage.centre_distance);
+      // A shape keeps its distance on `distances[0]` and its gears under
+      // `members[].gear`; the hula stage still names its four.
+      for (const d of stage.distances ?? []) d.distance = pin(d.distance);
+      for (const m of stage.members ?? []) m.gear.profile_shift = pin(m.gear.profile_shift);
       for (const g of stage.gears ?? []) g.profile_shift = pin(g.profile_shift);
-      for (const m of ["sun", "planet", "ring"]) {
-        if (stage[m]) stage[m].profile_shift = pin(stage[m].profile_shift);
-      }
-      const just = stage.centre_distance ? "centre_distance" : { member: [0, "shift"] };
+      const just = stage.distances ? "centre_distance" : { member: [0, "shift"] };
       // ...and a figure for the shift relief turns back given on a hula
       // stage, so the seeding is exercised too.
       const figures = [{ freedom: { member: [1, "shift"] }, value: 0.25 }];

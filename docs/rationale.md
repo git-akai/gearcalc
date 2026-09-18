@@ -1538,14 +1538,15 @@ reading that a worm is a thread. In the model this crate actually runs both
 flanks are involute helicoids on cylinders, a worm is a helical gear with a
 few starts at a steep helix, and its wheel is a helical gear at the
 complementary one; everything a gear can be asked, both can be asked. So
-`Stage::Spur` and `Stage::Worm` carry one `PairStage` now and produce one
-`PairResult` with one `MeshReport` — the mesh being one model with the shaft
+the spur and worm presets carried one `PairStage` from then on and produced
+one result with one `MeshReport` — the mesh being one model with the shaft
 angle as a parameter, so the same rows with the numbers moving rather than a
 readout changing shape, and what only a line or only a point contact has in a
 `LineContact` or a `PointContact` beside them. A kind is a *layer* over that
 primitive: a preset, the words a
 designer uses, which inputs a panel shows, and the conventional proportions a
-worm's faces take ([`PairKind`]). It costs the core one enum read in one
+worm's faces take (`Distance::worm`, once `PairKind`). It cost the core one
+enum read in one
 place, and it bought the worm a shift, an addendum, an interference check and
 a mode 3 that moves the wheel's shift as DIN 3975 has it — none of which the
 separate type could carry, and which the audit had recorded as its ideal
@@ -1590,10 +1591,22 @@ own copy of everyone's.
 The test of the division is what a new kind would cost. It should be new
 *kinematics* — how its shafts relate, where its meshes sit, what carries what —
 and no new rating machinery at all: `MemberRating` and `MeshReport` are keyed on
-members and meshes rather than on named roles, and `planetary::power` takes a
-basic ratio rather than a set of tooth counts. **That claim is untested until
-something tests it**, and it is written here so the next kind is measured against
-it rather than copied from the nearest neighbour.
+members and meshes rather than on named roles. **That claim was tested, and
+it held so well that the kinds went.** Building one `Shape` — axes, shafts,
+members, meshes, distances — and running a pair, a worm and every arrangement
+of a set through it beside the kinds' own solves reproduced every figure but
+four, each a fault in a kind ([corrections](corrections.md#the-log)) and not
+a difference of model. So the kinds are presets now, over one shape and one
+result: `Stage::Shape`, with `PairStage` and `PlanetaryStage` as the builders
+`defaults` uses and a document may still be written in. An epicyclic set is
+more reference frames than a pair, not a different thing, and a centre
+distance shared by several meshes is a layshaft's question as much as a
+set's; what a kind kept apart — three shafts here, two there, a planet's own
+row — the shape reads off its graph. This section's first paragraph is kept
+as the rule it was and the record of how it was read: *its own result type*
+was the arrangement's own facts, and the arrangement is data now. The hula
+stage is the one kind left, until the shape can size a distance from a tip
+bound (`geartrain-refactor-plan.md`, *Phase 6*).
 
 ### Helical is not a lesser case
 

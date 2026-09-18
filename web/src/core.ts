@@ -30,7 +30,6 @@ import type {
   PairKind,
   LineContact,
   ContactPatch,
-  PairResult,
   PairStage,
   PointContact,
   Cutter,
@@ -52,14 +51,22 @@ import type {
   Overrides,
   PerToothClamps,
   PinsOut,
-  PlanetResult,
-  PlanetaryResult,
   PlanetaryStage,
   Ranges,
   RingRequest,
   RingSummary,
   ShiftRange,
   SpanOut,
+  Shape,
+  ShapeResult,
+  Member,
+  MeshInput,
+  Distance,
+  DistanceReport,
+  LayoutReport,
+  ShaftCase,
+  Axis,
+  ShaftOn,
   Stage,
   StageGear,
   StageResult,
@@ -100,7 +107,6 @@ export type {
   PairKind,
   LineContact,
   ContactPatch,
-  PairResult,
   PairStage,
   PointContact,
   Cutter,
@@ -123,14 +129,22 @@ export type {
   Overrides,
   PerToothClamps,
   PinsOut,
-  PlanetResult,
-  PlanetaryResult,
   PlanetaryStage,
   Ranges,
   RingRequest,
   RingSummary,
   ShiftRange,
   SpanOut,
+  Shape,
+  ShapeResult,
+  Member,
+  MeshInput,
+  Distance,
+  DistanceReport,
+  LayoutReport,
+  ShaftCase,
+  Axis,
+  ShaftOn,
   Stage,
   StageGear,
   StageResult,
@@ -277,14 +291,19 @@ export const KINDS: KindSpec[] = [
   },
 ];
 
-/// What kind of stage a geartrain holds.
-export type StageKind = "spur" | "worm" | "planetary" | "hula";
+/** **A preset over the one stage shape.** A stage is a `Shape` — axes,
+ *  shafts, members, meshes and distances — or, until the shape can size a
+ *  distance from a tip bound, a hula stage; a spur pair, a worm and a
+ *  planetary set are the ways the core fills a shape in, not kinds of their
+ *  own. What this side names is the button, and what the button adds is
+ *  whatever `defaults` says the preset is. */
+export type StagePreset = "spur" | "worm" | "planetary" | "hula";
 
 export interface StageKindSpec {
-  key: StageKind;
+  key: StagePreset;
   /** Catalogue key for the button that adds one. */
   label: string;
-  /** A fresh stage of this kind, from the core. */
+  /** A fresh stage of this preset, from the core. */
   fresh: () => Stage;
   /** Offered only while the developer mode is on — the same knock the gear
    *  tab's eccentric kind is behind, through the same table shape, so one
@@ -292,16 +311,16 @@ export interface StageKindSpec {
   developer?: boolean;
 }
 
-/** The stage kinds, as data, for the same reason `KINDS` and `FIELDS` are: the
- *  "add stage" buttons render from this, so a fifth kind is a row rather than a
+/** The stage presets, as data, for the same reason `KINDS` and `FIELDS` are: the
+ *  "add stage" buttons render from this, so a fifth preset is a row rather than a
  *  hand-written button that has to be remembered.
  *
- *  A **crossed** pair is deliberately not here. It is a spur stage with its
- *  shafts at an angle, not a kind of its own, and the core says so. */
+ *  A **crossed** pair is deliberately not here. It is a pair whose shafts are
+ *  at an angle, not a preset of its own, and the core says so. */
 // A default stage arrives **tagged** — Rust's `Stage` is an internally tagged
-// enum, so the object carries its own `kind`. They used to be four hand-written
-// accessors and three hand-written buttons; a kind is one row here now, and the
-// tag is what the panel branches on.
+// enum, so the object carries its own `kind`: `shape` for the first three,
+// `hula` for the last. The panel branches on that tag and on nothing else;
+// what a shape *is* — a pair, a set — it reads off the shape itself.
 export const STAGE_KINDS: StageKindSpec[] = [
   {
     key: "spur",

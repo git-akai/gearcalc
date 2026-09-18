@@ -29,7 +29,7 @@ offset_nominal: number,
  * **The minimum far-side clearance the stage was held to**, zero where the
  * crank offset was given instead and the input went unread — the same
  * question every stage answers about its own clearance (see
- * [`super::PairResult::clearance`]).
+ * [`super::CrossedResult::clearance`]).
  */
 clearance: number, 
 /**

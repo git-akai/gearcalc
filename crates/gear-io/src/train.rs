@@ -101,6 +101,23 @@
 //!   still says so means the same thing.) A drive replaces the conventional
 //!   drive the same way. `[[train.couplings]]` arrived beside it, empty
 //!   meaning the chain.
+//! - **The stage kinds are one shape.** `kind = "spur"`, `"worm"` and
+//!   `"planetary"` are gone and a file that still says one is refused by
+//!   name; every such stage is `kind = "shape"` now, and says what it is
+//!   made of: `[[train.stages.axes]]` (each `count = N`, and `carried_by =
+//!   <shaft>` where a carrier carries it), `[[train.stages.shafts]]` (each
+//!   `axis = i`, numbered from one as the constraints number them),
+//!   `[[train.stages.members]]` (each with its `shaft`, `module`,
+//!   `thickness_mod`, its `gear` table, a `ring` table naming the cutter
+//!   where it is one, and a `pitch_diameter` reading), `[[train.stages.
+//!   meshes]]` (`a`, `b`, and the two frictions) and `[[train.stages.
+//!   distances]]` (`axes = [i, j]`, `angle`, `worm`, `distance`, `clearance`,
+//!   the tolerances and `axial_clearance`). A spur pair is two ground axes
+//!   with one mesh; a set is a central axis with a planet axis carried by
+//!   its second shaft, `count` planets, two meshes and one distance; a worm
+//!   is a pair whose distance is at `angle = 90` with `worm = true`. The
+//!   panel writes these from its presets, and a person can write any shape
+//!   the graph admits. The hula stage is still its own kind, for now.
 //! - **A load case's `port` may name a shaft.** `"start"` and `"end"` still
 //!   mean the chain's two ends — the first stage's input and the last
 //!   stage's output under the constraints in force — and a third spelling,
@@ -301,20 +318,20 @@ mod tests {
                 ],
                 reversed_bending: false,
                 stages: vec![
-                    Stage::Spur(
+                    Stage::spur(
                         PairStage {
                             ..PairStage::default()
                         }
                         .with_additional_helix(15.0),
                     ),
-                    Stage::Worm(PairStage::worm()),
-                    Stage::Worm(
+                    Stage::worm(PairStage::worm()),
+                    Stage::worm(
                         PairStage {
                             ..PairStage::worm()
                         }
                         .with_first_helix(45.0),
                     ),
-                    Stage::Planetary(Box::<PlanetaryStage>::default()),
+                    Stage::planetary(PlanetaryStage::default()),
                     Stage::Hula(Box::default()),
                 ],
                 // One coupling and one of each constraint, so the tagged
@@ -382,8 +399,15 @@ mod tests {
             5 + 5 + 2 + 3 + 2,
             "one tag a stage, a load case, a coupling end, a constraint and a named port:\n{text}"
         );
-        for kind in ["spur", "worm", "planetary", "hula", "ultimate", "fatigue"] {
+        for kind in ["shape", "hula", "ultimate", "fatigue"] {
             assert!(text.contains(&format!("kind = \"{kind}\"")), "no {kind}");
+        }
+        // ...and the shapes say what they are made of, by name.
+        for table in ["axes", "shafts", "members", "meshes", "distances"] {
+            assert!(
+                text.contains(&format!("[[train.stages.{table}]]")),
+                "no {table}"
+            );
         }
     }
 
@@ -435,7 +459,11 @@ mod tests {
     fn a_field_the_shape_no_longer_has_is_refused_and_named() {
         let text = to_toml(&document()).unwrap();
         // ...on a stage.
-        let stale = text.replacen("kind = \"spur\"", "kind = \"spur\"\nsomething_old = 1.0", 1);
+        let stale = text.replacen(
+            "kind = \"shape\"",
+            "kind = \"shape\"\nsomething_old = 1.0",
+            1,
+        );
         match from_toml(&stale) {
             Err(TrainError::Parse(e)) => {
                 assert!(e.to_string().contains("something_old"), "{e}")
@@ -473,16 +501,18 @@ mod tests {
     #[test]
     fn an_automatic_input_survives_as_a_toggle_and_a_value() {
         let mut doc = document();
-        if let Stage::Spur(s) = &mut doc.train.stages[0] {
-            s.centre_distance = Auto::fixed(31.5);
-            s.gears[0].face_width = Auto::automatic(4.0);
+        if let Some(s) = doc.train.stages[0].as_shape_mut() {
+            s.distances[0].distance = Auto::fixed(31.5);
+            s.members[0].gear.face_width = Auto::automatic(4.0);
         }
         let back = from_toml(&to_toml(&doc).unwrap()).unwrap().document;
-        let Stage::Spur(s) = &back.train.stages[0] else {
-            panic!("stage 1 came back a different kind");
-        };
-        assert!(!s.centre_distance.auto && (s.centre_distance.manual - 31.5).abs() < 1e-12);
-        assert!(s.gears[0].face_width.auto && (s.gears[0].face_width.manual - 4.0).abs() < 1e-12);
+        let s = back.train.stages[0]
+            .as_shape()
+            .expect("stage 1 came back a different kind");
+        let d = s.distances[0].distance;
+        assert!(!d.auto && (d.manual - 31.5).abs() < 1e-12);
+        let w = s.members[0].gear.face_width;
+        assert!(w.auto && (w.manual - 4.0).abs() < 1e-12);
     }
 
     /// **A file asking for what no stage can honour is adjusted on the way
@@ -494,16 +524,15 @@ mod tests {
     #[test]
     fn a_file_asking_for_what_no_stage_honours_is_adjusted_and_says_so() {
         let mut doc = document();
-        if let Stage::Worm(w) = &mut doc.train.stages[1] {
-            w.overlap = Auto::fixed(1.5);
-        } else {
-            panic!("stage 2 is the worm");
-        }
+        doc.train.stages[1]
+            .as_shape_mut()
+            .expect("stage 2 is the worm")
+            .overlap = Auto::fixed(1.5);
         let back = from_toml(&to_toml(&doc).unwrap()).unwrap();
         assert!(back.adjusted);
-        let Stage::Worm(w) = &back.document.train.stages[1] else {
-            panic!("stage 2 came back a different kind");
-        };
+        let w = back.document.train.stages[1]
+            .as_shape()
+            .expect("stage 2 came back a different kind");
         assert!(w.overlap.auto, "a crossed pair's ratio cannot stand given");
         assert!((w.overlap.manual - 1.5).abs() < 1e-12, "the number is kept");
         // ...and a second read of the adjusted document adjusts nothing.

@@ -288,14 +288,32 @@ designed, below the standard only in the regime `mesh.overlap_below_one`
 already flags. `tools/iso_6336_3_stack.py` multiplies the set out
 ([rationale](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither)).
 
+**One stage shape.** Every stage but the hula stage is one `Shape` — axes,
+the shafts on them, members, meshes, distances — and a spur pair, a crossed
+pair, a worm and a planetary set are *presets* over it: what `defaults`
+fills in, a vocabulary, and which inputs the panel puts forward. There is no
+kind in the core to branch on. What a stage is, the solve reads off the
+shape — a mesh is internal because a member has a cutter, a set is an axis
+carried by a shaft and replicated, a worm is a distance marked as one — and
+the panel names the members the same way (`members.ts`). Closing the
+distances is one plan over every member's role (given, free, reaches,
+absorbs), the power flow is followed mesh by mesh with each mesh's loss in
+the direction it turns, and every mesh is pressed with its driver's force
+([reference](reference.md#the-stage), [rationale](rationale.md#each-stage-kind-keeps-its-own-result-type)).
+Retiring the kinds into it moved four figures, each recorded in
+[corrections](corrections.md#the-log) with its size: a set's driven-side
+meshes pressed `η` short (0.55 % on the ring's bending); a backward case read
+as the sun's delivered torque (`1/η` high inside the set); a pair's operating
+angle quoted at zero backlash (0.10°); and a given distance refused where a
+reaching member could have gone below zero shift. Every other figure in the
+corpus and the wasm record is unmoved.
+
 **Crossed axes.** One model rather than a family: the lead angle exact, the path
 of contact from two properties of an involute helicoid, elliptical contact,
 sliding as a vector, and one friction balance containing both older efficiency
-formulas. A crossed gear pair is a spur stage with an axis angle, and a worm is
-the same stage with its first member stating a pitch diameter where a gear
-states a helix angle — one `PairStage`
-under the spur and worm kinds, where the kind is a preset, a vocabulary and a
-choice of which inputs to show ([rationale](rationale.md#each-stage-kind-keeps-its-own-result-type)).
+formulas. A crossed gear pair is a pair with an axis angle, and a worm is
+the same pair with its first member stating a pitch diameter where a gear
+states a helix angle — one shape under the spur and worm presets.
 A profile shift enters the crossed mesh as a rack's does, exactly, so a worm's
 wheel absorbs a housing distance by its shift and the worm's diameter absorbs it
 when both shifts are pinned; the interference verdict is the parallel relation
@@ -623,6 +641,22 @@ whose size is unmeasured is a debt still owed, and is marked as one.
 - **A note slot is as tall as the tallest note that field can show.** Every real
   message fits; a validation message longer than its field's bound note would
   still move the controls when it appeared.
+- **A shape's freedoms address one distance.** `Freedom::CentreDistance` and
+  `Freedom::Clearance` name *the* distance, as the kinds had one; every
+  preset has one, and relief reads `distances[0]`. A shape with two distances
+  — a layshaft, Phase 5c — needs the freedom to carry the index before its
+  second distance can be relieved at all. Nothing silent: the second
+  distance's inputs are simply outside relief until then.
+- **A mesh's two thickness coefficients are not held to sum to 2.** The shape
+  carries `k` per member, where the kinds carried one per stage and wrote the
+  pair themselves. A pair that does not sum to 2 is a legitimate mesh — the
+  excess enters the shift sum as an equivalent shift and the zero-backlash
+  distance moves with it — so it is not refused, and the card's note says
+  what the ordinary choice is. Size: none, it is an input; what is missing is
+  a remark on the result when the sum is not 2.
+- **A planet's net shaft torque is reported as zero**, which is what it is —
+  a free idler's two meshes balance — and what the set's kind never printed.
+  The torque its teeth carry is on its card, per mesh, as every member's is.
 
 ---
 

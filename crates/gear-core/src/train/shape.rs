@@ -790,14 +790,26 @@ impl Shape {
 
     /// **The shifts the stage settles on**: closed where nothing is searched,
     /// searched for efficiency over the free ones where that was asked.
-    fn chosen_at(&self, search: &crate::auto::Search, helix: &[f64]) -> Chosen {
+    fn chosen_at(&self, search: &crate::auto::Search, helix: &[f64]) -> Result<Chosen, TrainError> {
         let plan = self.plan(helix);
         let settled: Vec<f64> = plan.asked.iter().map(|a| a.settled).collect();
-        let fallback = |how| Chosen {
-            shifts: self
-                .closed(&plan, &[], helix)
-                .unwrap_or_else(|| settled.clone()),
-            how,
+        // **Where nothing was searched, the closure is the answer** — and
+        // where it has none, what that means depends on what failed. A sum
+        // on a given distance that no shift reaches leaves the shifts where
+        // they were asked and the mesh saying it did not reach the distance
+        // (`distance_notes`); an automatic distance that no absorber can
+        // close is a set that cannot be assembled, and is refused for it.
+        let fallback = |how| -> Result<Chosen, TrainError> {
+            match self.closed(&plan, &[], helix) {
+                Some(shifts) => Ok(Chosen { shifts, how }),
+                None if plan.constraints.iter().any(|c| c.absorber.is_some()) => {
+                    Err(TrainError::NoCommonDistance)
+                }
+                None => Ok(Chosen {
+                    shifts: settled.clone(),
+                    how,
+                }),
+            }
         };
         if !self.optimisation.enabled {
             return fallback(super::Searched::NotAsked);
@@ -904,15 +916,15 @@ impl Shape {
             let x = self.closed(&plan, &place(v), helix)?;
             self.trial_efficiency(&plan, &x, helix)
         };
-        search.maximise(&box_, &objective).map_or_else(
-            || fallback(super::Searched::FoundNothing),
-            |v| Chosen {
+        match search.maximise(&box_, &objective) {
+            None => fallback(super::Searched::FoundNothing),
+            Some(v) => Ok(Chosen {
                 shifts: self
                     .closed(&plan, &place(&v), helix)
                     .unwrap_or_else(|| settled.clone()),
                 how: super::Searched::Chose,
-            },
-        )
+            }),
+        }
     }
 
     /// The shifts the shape settles on under a search — what the tests
@@ -920,7 +932,9 @@ impl Shape {
     #[cfg(test)]
     pub(crate) fn shifts_at(&self, search: &crate::auto::Search) -> Vec<f64> {
         let helix = self.helix_angles();
-        self.chosen_at(search, &helix).shifts
+        self.chosen_at(search, &helix)
+            .map(|c| c.shifts)
+            .unwrap_or_else(|_| self.asked(&helix).iter().map(|a| a.settled).collect())
     }
 
     /// Every member cut and every mesh at its running distance, at these
@@ -1335,7 +1349,7 @@ pub fn solve_shape(
     }
 
     // ---- the shifts, and every member and mesh built at them.
-    let chosen = shape.chosen_at(&crate::auto::Search::SHIPPED, &helix);
+    let chosen = shape.chosen_at(&crate::auto::Search::SHIPPED, &helix)?;
     let x = chosen.shifts;
     let built = shape.build(&x, &helix)?;
 
@@ -1473,10 +1487,13 @@ pub fn solve_shape(
             ));
         }
     }
-    // A rack-cut member that cannot be rated refuses the stage, as it
-    // always did; a ring refuses only its own rating.
+    // **A member with no root section in any of its meshes refuses the
+    // stage**; one rated in some mesh keeps that rating and says which flank
+    // went unrated — a planet whose ring-side load point falls off its flank
+    // is still rated on its sun side, which is what the set's own kind did
+    // without saying so. A ring refuses only its own rating.
     for (m, b) in shape.members.iter().zip(&bendings) {
-        if m.ring.is_none() && b.iter().any(|(_, b)| b.is_none()) {
+        if m.ring.is_none() && b.iter().all(|(_, b)| b.is_none()) {
             return Err(TrainError::NoRootSection);
         }
     }
@@ -1783,6 +1800,19 @@ pub fn solve_shape(
             );
         }
         out.extend(g.face_width_note());
+        // ...and each mesh whose load point leaves this member no section
+        // to rate, where another mesh's did.
+        if bendings[i].iter().any(|(_, b)| b.is_some()) {
+            for (k, b) in &bendings[i] {
+                if b.is_none() {
+                    // Numbered as the panel numbers meshes, from one.
+                    out.push(
+                        Note::new(key::GEAR_BENDING_UNRATED_IN_MESH)
+                            .text("mesh", (k + 1).to_string()),
+                    );
+                }
+            }
+        }
         if let BuiltMember::Ring { ring, .. } = &built.members[i] {
             if ring.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_RAISED)) {
                 out.push(Note::new(key::GEAR_RING_ADDENDUM_CLAMPED));

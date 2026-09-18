@@ -4,8 +4,8 @@ running centre distance 20.999928 mm (zero-backlash 20.979928 sun-planet, 21.019
 eps_a  sun-planet 1.553   planet-ring 1.923   eta_0 0.9713   even spacing true   planet gap 16.413 mm
 sun-planet flank interference  member 1 false  member 2 false
 planet-ring flank interference  member 1 true  member 2 false   tips false (+2.9333 deg of pinion)
-sigma_H at pitch  sun-planet 333.1 MPa   planet-ring 207.6 MPa
-sigma_F  sun 14.9 MPa   planet 16.3 MPa   ring 10.2 MPa
+sigma_H at pitch  sun-planet 333.1 MPa   planet-ring 208.7 MPa
+sigma_F  sun 14.9 MPa   planet 16.3 MPa   ring 10.3 MPa
 
     input      held    output        ratio  efficiency
       sun   carrier      ring      -2.5000     97.135 %

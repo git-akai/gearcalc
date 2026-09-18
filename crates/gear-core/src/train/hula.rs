@@ -259,8 +259,7 @@ impl Default for HulaStage {
 ///
 /// The rating is a [`GearResult`], as it is for every other stage kind here, and
 /// what this adds is what the *arrangement* makes of the member: which side of
-/// its pair it is, and the four radii a stage of this kind is read by. The same
-/// shape a planet takes ([`super::PlanetResult`]), for the same reason — a
+/// its pair it is, and the four radii a stage of this kind is read by — a
 /// member with something extra to say says it beside the answer every member
 /// gives, not instead of it.
 #[derive(Clone, Debug)]

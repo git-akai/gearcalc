@@ -7,7 +7,7 @@
 // geartrain panel alone; the gear tab's *adopt* list needs the same numbers,
 // so they are written once here and both panels read them.
 
-import { t, type ShaftLabel, type Stage, type Train } from "./core";
+import { t, type Shape, type ShaftLabel, type Stage, type Train } from "./core";
 
 /** One member of a train, as a list can show it. */
 export interface MemberRef {
@@ -25,7 +25,7 @@ export interface MemberRef {
 
 /** How many members a stage has, in the core's member order. */
 export function memberCount(stage: Stage): number {
-  return stage.kind === "planetary" ? 3 : stage.gears.length;
+  return stage.kind === "hula" ? stage.gears.length : stage.members.length;
 }
 
 /** The gear number of one member, counting every member of the stages
@@ -43,19 +43,45 @@ export function hulaRing(stage: Stage & { kind: "hula" }, mesh: number): number 
   return stage.gears[a].teeth >= stage.gears[b].teeth ? a : b;
 }
 
+/** Whether a member's axis is carried — turns in a frame that is not the
+ *  ground's — which is what makes it a planet. */
+export function carried(shape: Shape, member: number): boolean {
+  const axis = shape.axes[shape.shafts[shape.members[member].shaft - 1]?.axis];
+  return axis !== undefined && axis.carried_by !== null;
+}
+
+/** Whether a shape is a worm drive: its first distance says so, as a preset's
+ *  word, and the worm is the first member of the first mesh on it. */
+export const isWorm = (shape: Shape): boolean => shape.distances[0]?.worm === true;
+
+/** **What a shape's member is, read off the shape.** A ring is a member with a
+ *  cutter; a planet is one on a carried axis; a sun is what meshes with a
+ *  planet from the ground; a worm and its wheel are the two ends of a distance
+ *  marked as one. Anything else is a gear and goes by its number. The core
+ *  keeps no such names — a set is a tick pattern of the shape, not a kind —
+ *  so the words are found here, from the same facts the core solves on. */
+export function shapeRole(shape: Shape, member: number): string | null {
+  const m = shape.members[member];
+  if (isWorm(shape)) {
+    const first = shape.meshes[0];
+    if (first?.a === member) return t("ui.train_worm_member");
+    if (first?.b === member) return t("ui.train_wormwheel");
+  }
+  if (m.ring !== null) return t("ui.train_ring");
+  if (carried(shape, member)) return t("ui.train_planet");
+  const meetsAPlanet = shape.meshes.some(
+    (x) => (x.a === member && carried(shape, x.b)) || (x.b === member && carried(shape, x.a)),
+  );
+  return meetsAPlanet ? t("ui.train_sun") : null;
+}
+
 /** The card's own name for a member, without its number. `null` where the
  *  name *is* the number — a pair's gears. */
 function roleName(stage: Stage, member: number): string | null {
-  switch (stage.kind) {
-    case "spur":
-      return null;
-    case "worm":
-      return t(member === 0 ? "ui.train_worm_member" : "ui.train_wormwheel");
-    case "planetary":
-      return t(["ui.train_sun", "ui.train_planet", "ui.train_ring"][member]);
-    case "hula":
-      return t(hulaRing(stage, Math.floor(member / 2)) === member ? "ui.train_ring" : "ui.train_pinion");
+  if (stage.kind === "hula") {
+    return t(hulaRing(stage, Math.floor(member / 2)) === member ? "ui.train_ring" : "ui.train_pinion");
   }
+  return shapeRole(stage, member);
 }
 
 /** **The name a shaft goes by**, from what the core says it is: ground, the
@@ -95,7 +121,9 @@ export function memberRefs(train: Train): MemberRef[] {
           role === null
             ? t("ui.train_gear_name", { number: String(number) })
             : t("ui.train_member_numbered", { name: role, number: String(number) }),
-        adoptable: !(stage.kind === "worm" && j === 0),
+        // A worm is a thread with proportions of its own: the first member
+        // of the first mesh on a distance marked as a worm drive.
+        adoptable: !(stage.kind === "shape" && isWorm(stage) && stage.meshes[0]?.a === j),
       });
     }
   });
