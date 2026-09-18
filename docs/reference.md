@@ -2113,11 +2113,21 @@ comes from its own kinematics. Total ratio is the product. A train has two
 **ports** — `start`, the first stage's first member, and `end`, the last
 stage's last member — and every load enters at one of them.
 
+**A ratio says two things, and only one of them refers a load.** Its *size* is
+how much a torque is multiplied by across the stage and how much a play is
+divided by on the way to the output; its *sign* is whether the output turns the
+other way, which is a fact about the shaft line. Every referral below takes the
+size, `|i|`. Taking the sign instead handed the stage after a reversing one a
+negative torque — which has no Hertzian contact to press at any face width, so
+it refused — and made an upstream stage's play *subtract* rather than add
+([corrections](corrections.md)).
+
 **Backlash accumulates referred to the output shaft**, so the last stage
-dominates:
+dominates — and it accumulates as a **sum of magnitudes**, because two
+independent sources of lost motion add up whichever way their shafts turn:
 
 ```text
-θ_out,total = Σ_k  j_θ,k / Π_{j>k} i_j
+θ_out,total = Σ_k  j_θ,k / Π_{j>k} |i_j|
 ```
 
 ### Load cases

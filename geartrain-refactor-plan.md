@@ -134,12 +134,26 @@ It is already visible in the corpus: `kinematics.txt` shows a pair delivering
 divides by `ratio()`, so the sign reaches every reported torque downstream of an
 epicyclic stage and none downstream of a pair.
 
-The graph gives the signed answer naturally, so **Phase 3 resolves it in that
-direction** and the sign appearing on a pair's ratio is a deliberate golden diff
-with `train_kinematics.py`'s independent answer beside it. Which of the two
-conventions a *readout* should use — signed ratio, or magnitude with the
-direction stated separately — is a UI question for Phase 4, and a different one
-from what the model holds.
+**It is also two live bugs, found and fixed in Phase 3b**, and neither was
+reachable from a shipped fixture because no shipped train puts a reversing
+stage next to another:
+
+- **a stage after a reversing one could not be solved at all.** The referral
+  handed it a negative torque, and a negative tangential force has no Hertzian
+  contact to press at any face width — so it refused with *"the teeth never
+  come into contact"*, which is true of nothing. A planetary set with its
+  carrier held (`i = −6`) could not be followed by any stage.
+- **a backlash came back 23.5 % light.** Play does not cancel, and a reversing
+  stage downstream made an upstream stage's contribution *subtract*: 0.0422°
+  reported where the two stages have 0.0552°. That train solved happily and
+  simply under-reported, which is the worse of the two failure modes.
+
+The resolution separates what the accessor was conflating. **A referral is a
+magnitude; the direction of rotation is the motion's.** `carry` and the
+backlash walk take `.abs()` with the reason at the site, and the *ratio* itself
+becomes the signed kinematic fact the graph gives. Which convention a **readout**
+should use — a signed ratio, or a magnitude with the direction stated beside it
+— is a UI question for Phase 4, and a different one from what the model holds.
 
 ---
 

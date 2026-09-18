@@ -3608,9 +3608,25 @@ fn carry(stages: &[StageResult], case: &LoadCase) -> (Vec<f64>, Option<usize>, f
     let mut reacted_at = None;
     for &k in &order {
         let s = &stages[k];
+        // **A referral is a magnitude; the direction of rotation is the
+        // motion's.** A stage's ratio says two things at once — how much a
+        // torque is multiplied by, and whether the output turns the other way
+        // — and only the first belongs here. The second changes the *sign of
+        // every shaft downstream*, which is a fact about the shaft line and
+        // not about how hard a tooth is pressed.
+        //
+        // **Measured, and it was live on any train with a reversing stage.**
+        // An epicyclic set reports a signed ratio where a pair reports a
+        // magnitude (`docs/corrections.md`), so a set with its carrier held —
+        // ratio −6 — handed the stage after it **−11.6 N·m**, and the pair
+        // refused with *"the teeth never come into contact"*: a negative
+        // tangential force has no Hertzian contact to press, at any face
+        // width. So a planetary set with its carrier held could not be
+        // followed by anything at all, and nothing said why.
+        let referral = s.ratio().abs();
         let referred = match drive {
             Drive::Forward => at_port,
-            Drive::Backward => at_port / s.ratio(),
+            Drive::Backward => at_port / referral,
         };
         torques[k] = referred;
         let efficiency = *s.efficiency().get(drive);
@@ -3620,7 +3636,7 @@ fn carry(stages: &[StageResult], case: &LoadCase) -> (Vec<f64>, Option<usize>, f
             break;
         }
         at_port = match drive {
-            Drive::Forward => referred * s.ratio() * efficiency,
+            Drive::Forward => referred * referral * efficiency,
             Drive::Backward => referred * efficiency,
         };
     }
@@ -3756,7 +3772,17 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     // is the output, so the contribution is multiplied by everything upstream
     // instead: those shafts turn faster, and the same play is a larger angle
     // there. The last stage dominates either way, and by more going backward.
+    //
+    // **The referral is a magnitude here for a second reason: play does not
+    // cancel.** Two independent sources of lost motion add up whichever way
+    // their shafts turn, so a reversing stage between a source and the output
+    // must not subtract it. Signed, it did: a spur pair ahead of a set with its
+    // carrier held — ratio −6 — reported **0.0422°** of forward backlash where
+    // the two stages between them have 0.0552°, the pair's contribution coming
+    // in negative and taking 23.5 % off the answer. It is the same conflation
+    // `carry` above records, met on the other reading of a ratio.
     let refer = |drive: Drive, pick: fn(&Backlash) -> f64| -> f64 {
+        let referral = |s: &StageResult| s.ratio().abs();
         stages
             .iter()
             .enumerate()
@@ -3764,12 +3790,11 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
                 let stage = pick(s.backlash().get(drive));
                 match drive {
                     Drive::Forward => {
-                        let downstream: f64 =
-                            stages[k + 1..].iter().map(StageResult::ratio).product();
+                        let downstream: f64 = stages[k + 1..].iter().map(referral).product();
                         stage / downstream
                     }
                     Drive::Backward => {
-                        let upstream: f64 = stages[..k].iter().map(StageResult::ratio).product();
+                        let upstream: f64 = stages[..k].iter().map(referral).product();
                         stage * upstream
                     }
                 }
@@ -5614,6 +5639,74 @@ mod tests {
         }
         // 17-tooth sun, 80-tooth ring, sun in and ring held: 97/17, exactly.
         assert_eq!(m.ratios[2], crate::ratio::Ratio::new(97, 17));
+    }
+
+    /// **A reversing stage is a stage**, and everything after it still solves.
+    ///
+    /// An epicyclic set reports a signed ratio where a pair reports a magnitude
+    /// — one accessor, two meanings — and the sign leaked into two places that
+    /// wanted a size:
+    ///
+    /// - **the torque referral.** A set with its carrier held has `i = −6`, so
+    ///   the stage after it was handed **−11.6 N·m**, and a negative tangential
+    ///   force has no Hertzian contact to press at any face width. The pair
+    ///   refused with *"the teeth never come into contact"*, which is true of
+    ///   nothing: those teeth mesh perfectly well. **A planetary set with its
+    ///   carrier held could not be followed by any stage at all.**
+    /// - **the backlash referral.** Play does not cancel — two independent
+    ///   sources of lost motion add up whichever way their shafts turn — and a
+    ///   reversing stage downstream made an upstream stage's contribution
+    ///   *subtract*. A spur pair ahead of that same set reported 0.0422° where
+    ///   the two stages have 0.0552°, 23.5 % light.
+    ///
+    /// Neither was reachable from a shipped fixture, because no shipped train
+    /// puts a reversing stage in front of another. That is the standing trap of
+    /// `docs/corrections.md`: *an axis nobody turns is an axis nobody tests* —
+    /// and it is the corpus's `set-then-pair` and `pair-then-set` fixtures that
+    /// turn it now.
+    #[test]
+    fn a_reversing_stage_does_not_poison_the_stages_around_it() {
+        use crate::planetary::{Arrangement, PlanetaryShaft};
+        let lib = library();
+        let reversing = || {
+            Stage::Planetary(Box::new(PlanetaryStage {
+                arrangement: Arrangement {
+                    input: PlanetaryShaft::Sun,
+                    fixed: PlanetaryShaft::Carrier,
+                },
+                ..PlanetaryStage::default()
+            }))
+        };
+
+        // --- the set ahead of a pair. It used to refuse outright.
+        let mut t = two_stage();
+        t.stages = vec![reversing(), Stage::Spur(PairStage::default())];
+        let r = solve_train(&t, &lib).expect("a reversing stage can be followed");
+        assert!(r.stages[0].ratio() < 0.0, "this set reverses");
+        for (k, s) in r.stages.iter().enumerate() {
+            for g in s.members() {
+                assert!(
+                    g.cases[0].torque >= 0.0,
+                    "stage {k}: a referral is a magnitude, not {}",
+                    g.cases[0].torque
+                );
+            }
+        }
+
+        // --- and behind one, where the play is referred through it.
+        let mut t = two_stage();
+        t.stages = vec![Stage::Spur(PairStage::default()), reversing()];
+        let r = solve_train(&t, &lib).expect("...and can follow one");
+        let want = r.stages[0].backlash().forward.nominal / r.stages[1].ratio().abs()
+            + r.stages[1].backlash().forward.nominal;
+        assert!(
+            (r.backlash.forward.nominal - want).abs() < 1e-12,
+            "play accumulates: {} vs {want}",
+            r.backlash.forward.nominal
+        );
+        // ...and it is strictly more than the last stage alone, which is what
+        // "subtracting" would have taken it below.
+        assert!(r.backlash.forward.nominal > r.stages[1].backlash().forward.nominal);
     }
 
     /// Every freedom a stage's groups mention, flat.
@@ -8638,7 +8731,13 @@ mod tests {
         let lib = test_library();
         let mut t = two_stage();
         t.load_cases[BACK].torque = 5.0;
-        let r = solve_train(&t, &lib).unwrap();
+        let r = match solve_train(&t, &lib) {
+            Ok(r) => r,
+            Err(e) => {
+                println!("PROBE refused: {e}");
+                panic!("probe")
+            }
+        };
         for s in &r.stages {
             for g in &spur(s).gears {
                 assert_eq!(
@@ -8684,7 +8783,13 @@ mod tests {
             static_friction: 0.3,
             ..PairStage::worm()
         }));
-        let r = solve_train(&t, &lib).unwrap();
+        let r = match solve_train(&t, &lib) {
+            Ok(r) => r,
+            Err(e) => {
+                println!("PROBE refused: {e}");
+                panic!("probe")
+            }
+        };
         let (worm, screw) = worm(&r.stages[2]);
         assert!(
             screw.efficiency.locked().backward,
@@ -8735,7 +8840,13 @@ mod tests {
                 ..PairStage::worm()
             }),
         );
-        let r = solve_train(&t, &lib).unwrap();
+        let r = match solve_train(&t, &lib) {
+            Ok(r) => r,
+            Err(e) => {
+                println!("PROBE refused: {e}");
+                panic!("probe")
+            }
+        };
         let mut forward_only = t.clone();
         forward_only.load_cases[BACK].torque = 0.0;
         let forward_only = solve_train(&forward_only, &lib).unwrap();

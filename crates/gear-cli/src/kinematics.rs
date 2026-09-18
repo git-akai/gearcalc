@@ -176,6 +176,20 @@ fn fixtures() -> Vec<(String, Train)> {
             Stage::Worm(PairStage::worm()),
         ]),
     ));
+    // **A reversing stage, in front of another and behind one.** An epicyclic
+    // set with its carrier held has a negative ratio, and no shipped fixture
+    // ever put one next to a second stage — so the two places the sign leaked
+    // into a size were both outside the change detector. A set that could not
+    // be followed by anything at all, and a backlash 23.5 % light, are what
+    // that cost; these two rows are what keeps them caught.
+    out.push((
+        "set-then-pair".to_string(),
+        train(vec![set("sun", "carrier"), pair(17, 43, 0.0)]),
+    ));
+    out.push((
+        "pair-then-set".to_string(),
+        train(vec![pair(17, 43, 0.0), set("sun", "carrier")]),
+    ));
     // **A train that does not close, recorded as it currently answers.** A
     // ratio needs tooth counts and topology; neither of these fixtures has
     // anything wrong with its kinematics. The first says what a set with no
