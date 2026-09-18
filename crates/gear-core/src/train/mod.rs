@@ -40,6 +40,7 @@ pub mod flow;
 mod hula;
 mod pair;
 mod planetary;
+pub mod shape;
 mod wiring;
 
 pub use conditions::{

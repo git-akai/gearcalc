@@ -190,7 +190,7 @@ pub fn solve(shafts: usize, meshes: &[MeshFlow], speed: &[f64], asked: &Asked) -
         }
         let efficiency = p_out.abs() / input_power;
         let flow = Flow {
-            mesh_torques: c,
+            mesh_torques: c.iter().zip(meshes).map(|(c, m)| c * m.za).collect(),
             directions,
             shaft_torques,
             efficiency,
