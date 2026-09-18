@@ -83,25 +83,41 @@ pub struct Mount {
     /// carrier*, not ground (see the module note). For a fixed-axis pair it is
     /// ground.
     pub axis_fixed_in: Shaft,
+    /// **Whether this member is one of a mesh's parallel instances** — a
+    /// planet, of which there are N — as against a member the N of them all
+    /// meet, which is a central one.
+    ///
+    /// It is the same distinction as riding a carrier versus sitting on its
+    /// axis, and it exists because [`MeshSpec::paths`] is **not symmetric**: a
+    /// sun tooth passes all N planets in one revolution against the carrier,
+    /// and a planet tooth meets the one sun. Applying N to both counts a
+    /// planet's engagements N times over — which the crate did, three times
+    /// over on the shipped set, until the wiring gave the two members of a
+    /// mesh somewhere to differ ([`Wiring::paths_seen`]).
+    pub replicated: bool,
 }
 
 impl Mount {
-    /// A member riding a carrier at some radius.
+    /// A member riding a carrier at some radius — a planet, replicated once
+    /// per path of every mesh it is in.
     #[must_use]
     pub const fn riding(spins_with: Shaft, carrier: Shaft) -> Self {
         Self {
             spins_with,
             axis_fixed_in: carrier,
+            replicated: true,
         }
     }
 
     /// A member whose axis **is** the frame's axis — a sun, a ring, a hula
-    /// stage's two fixed-axis gears — so it stands still in that frame.
+    /// stage's two fixed-axis gears — so it stands still in that frame, and
+    /// there is one of it however many planets meet it.
     #[must_use]
     pub const fn coaxial_with(spins_with: Shaft, frame: Shaft) -> Self {
         Self {
             spins_with,
             axis_fixed_in: frame,
+            replicated: false,
         }
     }
 }
@@ -183,6 +199,39 @@ impl Wiring {
             return Err(WiringError::NoCommonFrame(mesh));
         }
         Ok(a.axis_fixed_in)
+    }
+
+    /// **How many parallel mesh paths this member's own teeth meet**, per
+    /// revolution against the frame of its mesh.
+    ///
+    /// A central member meets every instance: a sun tooth passes all N planets
+    /// in one turn against the carrier. A **planet meets one of each**, because
+    /// it *is* one of the instances — the other planets have their own teeth
+    /// and are not in its mesh at all.
+    ///
+    /// # It was N for every member, and that is N times too many for a planet
+    ///
+    /// `docs/reference.md#tooth-cycles` states the rule correctly — *once for
+    /// each parallel mesh path* — and the planetary stage applied the planet
+    /// count to all three members alike, so the shipped set reported its
+    /// planet's cycles **three times over**. Nothing caught it because
+    /// `MeshSpec::paths` looks symmetric and the two members of a mesh had
+    /// nowhere to differ; [`Mount::replicated`] is that somewhere.
+    ///
+    /// A member in more than one mesh takes the largest, since the count is one
+    /// number per member rather than one per mesh — a planet's two meshes are
+    /// one path each, so the two agree and nothing is hidden by the choice.
+    #[must_use]
+    pub fn paths_seen(&self, member: usize) -> u32 {
+        if self.mounts.get(member).is_some_and(|m| m.replicated) {
+            return 1;
+        }
+        self.meshes
+            .iter()
+            .filter(|m| m.a == member || m.b == member)
+            .map(|m| m.paths)
+            .max()
+            .unwrap_or(1)
     }
 
     /// **The system this wiring and these tooth counts make**, with `teeth` one

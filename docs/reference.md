@@ -2322,8 +2322,18 @@ teeth are engaged once per revolution *relative to the carrier of its mesh*,
 once for each parallel mesh path.
 
 ```text
-engagements_m = |ω_m − ω_carrier| / |ω_input| × N        per input revolution
+engagements_m = |ω_m − ω_carrier| / |ω_input| × paths_m   per input revolution
 ```
+
+**`paths_m` is the member's, and it is not the mesh's.** A mesh repeated N times
+round an axis presents N paths to the member every instance meets — a sun tooth
+passes all N planets in one turn against the carrier, and so does a ring tooth —
+and **one** to a member that *is* one of the instances: a planet meets the one
+sun, the other planets having teeth of their own. Applying N to every member
+counts a planet's engagements N times over, which this tool did until the wiring
+gave the two members of a mesh somewhere to differ
+([corrections](corrections.md)). A hula stage has `N = 1`, where the question
+does not arise.
 
 A simple pair has no carrier and one path, so this is the member's own
 revolutions and nothing more. An epicyclic set has both: in the carrier's frame

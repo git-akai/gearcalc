@@ -1463,6 +1463,14 @@ pub fn solve_planetary_stage_with(
         unit_speed[2] - carrier,
     ];
     let input_unit = forward.speeds[in_i];
+    // **How many parallel paths each member's own teeth meet**, from the
+    // wiring rather than from the planet count applied to everyone. A sun
+    // tooth passes all N planets in one turn against the carrier; a planet
+    // tooth meets the one sun, because it *is* one of the N. See
+    // `Wiring::paths_seen` — the count was N for all three members, so this
+    // set reported its planet's cycles N times over.
+    let wiring = super::Constrained::wiring(stage);
+    let paths = |which: usize| f64::from(wiring.paths_seen(which));
     // Each member's torque in each case: the central members' are their
     // shaft's share of one mesh path; **a planet is not one of the three
     // shafts**, so its is the sun's carried across the mesh they share — the
@@ -1500,7 +1508,7 @@ pub fn solve_planetary_stage_with(
                         unit_speed[which] * c.speed,
                         against_carrier[which] * c.speed,
                     ),
-                    super::engagements(unit_speed[which], carrier, input_unit, planets),
+                    super::engagements(unit_speed[which], carrier, input_unit, paths(which)),
                 )
             })
             .collect();

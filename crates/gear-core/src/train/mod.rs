@@ -7394,6 +7394,22 @@ mod tests {
     ///   carrier, which is 1.4 times too many;
     /// - the **planet** was referred to the sun's speed rather than to the input
     ///   shaft's, right only where those are the same shaft.
+    ///
+    /// # And a fourth, which this test asserted for a while
+    ///
+    /// *Per planet* is true of a **central** member and false of a planet. A
+    /// sun tooth passes all N planets in one turn against the carrier; a planet
+    /// tooth meets the one sun, because it *is* one of the N and the others
+    /// have their own teeth. Applying the count to all three members reported
+    /// the shipped set's planet cycles **three times over**, and this test
+    /// asserted it, having been written from the same expression.
+    ///
+    /// The rule in `docs/reference.md#tooth-cycles` was right all along —
+    /// *once for each parallel mesh path* — and what was missing was anywhere
+    /// for the two members of a mesh to differ. `Wiring::paths_seen` is that
+    /// somewhere, and it is what this now reads: **the expectation comes from
+    /// the wiring's own answer**, so a kind that gets its mounts wrong fails
+    /// here rather than agreeing with itself.
     #[test]
     fn an_epicyclic_members_cycles_are_its_turns_against_the_carrier() {
         let lib = library();
@@ -7424,21 +7440,31 @@ mod tests {
                     let shafts = &p.cases[CYCLIC];
                     let carrier = shafts.speeds[1];
                     let n = f64::from(p.planets);
-                    for (which, got, speed) in [
-                        ("sun", cycles(&p.sun).bending, shafts.speeds[0]),
-                        ("ring", cycles(&p.ring).bending, shafts.speeds[2]),
+                    let w = train.stages[0].wiring();
+                    for (member, which, got, speed) in [
+                        (0, "sun", cycles(&p.sun).bending, shafts.speeds[0]),
+                        (2, "ring", cycles(&p.ring).bending, shafts.speeds[2]),
                         (
+                            1,
                             "planet",
                             cycles(&p.planet.gear).bending,
                             p.planet.gear.cases[CYCLIC].speed,
                         ),
                     ] {
-                        let expected = want(speed, carrier, n);
+                        let paths = f64::from(w.paths_seen(member));
+                        let expected = want(speed, carrier, paths);
                         assert!(
                             (got - expected).abs() <= 1.0,
                             "{which}: {got} engagements against {expected}"
                         );
                     }
+                    // ...and the two answers are genuinely different, or the
+                    // reading above would pass on a wiring that had never heard
+                    // of a planet.
+                    assert_eq!(w.paths_seen(0), p.planets, "a sun meets every planet");
+                    assert_eq!(w.paths_seen(2), p.planets, "and so does a ring");
+                    assert_eq!(w.paths_seen(1), 1, "a planet meets the one sun");
+                    assert!(n > 1.0, "this fixture has to have more than one planet");
                     // **A shaft that does not turn is still loaded**, which is
                     // the case the old rule could not state: it counted the
                     // input's revolutions, so a held ring came out as though it
