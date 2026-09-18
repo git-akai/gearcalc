@@ -1071,6 +1071,7 @@ fn coefficient<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> 
 /// stage, because they are shared.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
@@ -1821,6 +1822,7 @@ pub(super) fn test_library() -> MaterialLibrary {
 /// does not differ at all.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(feature = "serde", serde(default))]
 #[cfg_attr(
     feature = "typescript",
@@ -2101,6 +2103,7 @@ pub(crate) fn member_inputs<'a>(
 /// were shown rather than a stale zero.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
@@ -2238,6 +2241,7 @@ pub(crate) fn helix_for_overlap(overlap: f64, module: f64, width: f64) -> Option
 /// automatic. Least precious first, and stated by the stage.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
@@ -2823,6 +2827,7 @@ impl StageResult {
 /// toggle says whether that kind of ask counts at all.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
@@ -3034,6 +3039,7 @@ impl CaseKind {
 /// no path by which one kind is answered and the other not.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
@@ -3195,6 +3201,7 @@ impl Duty {
 /// the same kind of thing entering elsewhere, and [`Port`] is what says where.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
@@ -3548,6 +3555,7 @@ pub fn solve_any_with(
 /// A whole geartrain.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),

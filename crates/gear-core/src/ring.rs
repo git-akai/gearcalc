@@ -60,6 +60,7 @@ use crate::tooth::Tooth;
 /// module and depth are *different parts* if they were shaped differently.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
@@ -94,6 +95,7 @@ impl Default for Cutter {
 /// the curve is defined.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),

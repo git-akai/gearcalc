@@ -89,6 +89,15 @@
 //! wrong — a file loading with a field defaulted rather than read — is exactly
 //! what a refusal prevents.
 //!
+//! **And the refusal is enforced, not assumed.** For a while this note promised
+//! it and the parser delivered only half: a field that went *missing* was
+//! refused, but serde reads past an *unknown* field by default, so a field that
+//! had been **removed** from the shape would have been dropped in silence and
+//! the file would have loaded describing a different gearbox — the very fault
+//! above. Every struct the document is made of says `deny_unknown_fields`
+//! now, and `a_field_the_shape_no_longer_has_is_refused_and_named` holds it
+//! from both ends (`docs/corrections.md`).
+//!
 //! # What *is* adjusted on import
 //!
 //! A file can say what the panel cannot: a crossed pair with its axial
@@ -348,6 +357,40 @@ mod tests {
         doc.train.stages.clear();
         let text = toml::to_string_pretty(&doc).unwrap();
         assert!(matches!(from_toml(&text), Err(TrainError::NoStages)));
+    }
+
+    /// **A field the shape no longer has is refused, not dropped.**
+    ///
+    /// The module note promises that a file written before a shape change is
+    /// refused loudly, and for a while that was true only of a field that went
+    /// *missing*: serde ignores an unknown field by default, so a field that
+    /// had been **removed** — an arrangement that moved to the train, say —
+    /// would have been read past in silence and the file would have described
+    /// a different gearbox. Every struct the document is made of now says
+    /// `deny_unknown_fields`, and this is the case that holds it: a stage with
+    /// a field nobody has, and a train with one, are both parse errors that
+    /// name the field.
+    #[test]
+    fn a_field_the_shape_no_longer_has_is_refused_and_named() {
+        let text = to_toml(&document()).unwrap();
+        // ...on a stage.
+        let stale = text.replacen("kind = \"spur\"", "kind = \"spur\"\nsomething_old = 1.0", 1);
+        match from_toml(&stale) {
+            Err(TrainError::Parse(e)) => {
+                assert!(e.to_string().contains("something_old"), "{e}")
+            }
+            other => panic!("a stale field must be a parse error, not {other:?}"),
+        }
+        // ...and on the train itself.
+        let stale = text.replacen(
+            "reversed_bending",
+            "an_old_flag = true\nreversed_bending",
+            1,
+        );
+        match from_toml(&stale) {
+            Err(TrainError::Parse(e)) => assert!(e.to_string().contains("an_old_flag"), "{e}"),
+            other => panic!("a stale field must be a parse error, not {other:?}"),
+        }
     }
 
     /// Nonsense is refused with the parser's own message rather than a panic or

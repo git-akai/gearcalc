@@ -188,6 +188,7 @@ pub fn reversed_bending_allowable(m: &Material) -> Value {
 /// One material property: its value, and how far it can be trusted.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
@@ -224,6 +225,7 @@ impl Value {
 /// internally except where the domain's own convention is unambiguous.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
@@ -300,6 +302,7 @@ impl Material {
 /// an explicit export.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
@@ -358,6 +361,7 @@ impl Material {
 /// A set of materials, in presentation order.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),

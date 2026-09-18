@@ -54,6 +54,7 @@ use crate::{Auto, GearParams};
 /// A hula stage as its inputs describe it.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),

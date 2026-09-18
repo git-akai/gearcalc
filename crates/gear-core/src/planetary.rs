@@ -557,6 +557,7 @@ impl PlanetaryShaft {
 /// shaft as well is what makes the six modes of docs/reference.md#planetary-sets reachable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 #[cfg_attr(
     feature = "typescript",
     derive(ts_rs::TS),
