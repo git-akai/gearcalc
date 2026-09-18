@@ -44,7 +44,7 @@ mod wiring;
 pub use conditions::{
     Constraint, Coupling, Exact, MotionError, MotionReport, OpenPort, PortSpec, Ports, Route,
     RouteError, ShaftConstraint, ShaftMotion, ShaftRef, ShaftReport, StageBoundary, StagePorts,
-    TrainMotion,
+    Term, TrainMotion,
 };
 pub use crossed::solve_crossed_pair;
 pub use hula::{
@@ -1622,6 +1622,23 @@ pub enum TrainError {
     NoRootSection,
     /// The train has no stages, so there is nothing to accumulate.
     Empty,
+    /// **The train is short of conditions**: with what it holds and drives,
+    /// its shafts have this many more degrees of freedom than one motion.
+    /// The motion is still reported, as a family — a differential's carrier
+    /// at half the sum of its sides is an answer, and a useful one — but a
+    /// rating wants one torque at one speed, so the stages are not rated
+    /// until a shaft is held or driven for each.
+    Underdetermined { short: usize },
+    /// **Two conditions cannot both hold**, at this shaft: what it is asked
+    /// to do contradicts what the meshes and the other conditions already
+    /// decided — a sun driven while its carrier and its ring are both held.
+    Overdetermined { at: ShaftRef },
+    /// A constraint, a coupling or a load case names a stage or a shaft the
+    /// train does not have.
+    NoSuchShaft { at: ShaftRef },
+    /// The tooth counts along the shaft line multiply past what an exact
+    /// ratio can hold, and a ratio is refused rather than wrapped.
+    Overflow,
     /// **A load case enters by a shaft no load can be put on**: ground, a
     /// held shaft, a shaft the train does not have, or one of a stage's
     /// shafts that is not a port — a planet's. Zero-based, as the cases are
@@ -1671,12 +1688,9 @@ impl From<MotionError> for TrainError {
                 stage,
                 cause: Box::new(Self::Wiring(cause)),
             },
-            // A constraint or coupling naming a shaft that is not there, or
-            // conditions that contradict the structure: the boundary did not
-            // determine a motion, which is what `Unsolvable` says.
-            MotionError::NoSuchShaft(_) | MotionError::Refused(_) => {
-                Self::Wiring(WiringError::Unsolvable)
-            }
+            MotionError::NoSuchShaft(at) => Self::NoSuchShaft { at },
+            MotionError::Conflicts(at) => Self::Overdetermined { at },
+            MotionError::Overflow => Self::Overflow,
         }
     }
 }
@@ -1692,6 +1706,19 @@ impl From<crate::hula::Error> for TrainError {
     fn from(e: crate::hula::Error) -> Self {
         Self::Hula(e)
     }
+}
+
+/// A note about one shaft, carrying where it is as the front end counts —
+/// stage and shaft from one — or `0` and `0` for ground, which every stage
+/// shares and no stage numbers.
+fn located(key: &'static str, at: ShaftRef) -> Note {
+    let (stage, shaft) = match at {
+        ShaftRef::Ground => (0, 0),
+        ShaftRef::Of { stage, shaft } => (stage + 1, shaft),
+    };
+    Note::new(key)
+        .text("stage", stage.to_string())
+        .text("shaft", shaft.to_string())
 }
 
 impl crate::note::Explain for TrainError {
@@ -1710,12 +1737,22 @@ impl crate::note::Explain for TrainError {
             Self::NoContact => Note::new(key::ERROR_TRAIN_NO_CONTACT),
             Self::NoCommonDistance => Note::new(key::ERROR_TRAIN_NO_COMMON_DISTANCE),
             Self::NoPowerFlow => Note::new(key::ERROR_TRAIN_NO_POWER_FLOW),
+            // A stage whose boundary leaves it more than one motion is not a
+            // stage that describes no mechanism, and the two used to share a
+            // sentence.
+            Self::Wiring(WiringError::Unsolvable) => Note::new(key::ERROR_TRAIN_STAGE_UNDETERMINED),
             Self::Wiring(_) => Note::new(key::ERROR_TRAIN_WIRING),
             Self::UnknownMaterial(n) => {
                 Note::new(key::ERROR_TRAIN_UNKNOWN_MATERIAL).text("name", n.clone())
             }
             Self::NoRootSection => Note::new(key::ERROR_TRAIN_NO_ROOT_SECTION),
             Self::Empty => Note::new(key::ERROR_TRAIN_EMPTY),
+            Self::Underdetermined { short } => {
+                Note::new(key::ERROR_TRAIN_UNDERDETERMINED).text("short", short.to_string())
+            }
+            Self::Overdetermined { at } => located(key::ERROR_TRAIN_OVERDETERMINED, *at),
+            Self::NoSuchShaft { at } => located(key::ERROR_TRAIN_NO_SUCH_SHAFT, *at),
+            Self::Overflow => Note::new(key::ERROR_TRAIN_OVERFLOW),
             Self::LoadPort { case } => {
                 Note::new(key::ERROR_TRAIN_LOAD_PORT).text("case", (case + 1).to_string())
             }
@@ -1727,6 +1764,14 @@ impl crate::note::Explain for TrainError {
             // through the error's own shape.
             Self::InStage { cause, .. } => cause.note(),
         }
+    }
+}
+
+/// A shaft as the harness writes it: one-based stage and the shaft's index.
+fn place(at: ShaftRef) -> String {
+    match at {
+        ShaftRef::Ground => "ground".to_string(),
+        ShaftRef::Of { stage, shaft } => format!("stage {}, shaft {shaft}", stage + 1),
     }
 }
 
@@ -1785,8 +1830,8 @@ impl std::fmt::Display for TrainError {
                 }
                 WiringError::Unsolvable => write!(
                     f,
-                    "what the stage is asked does not determine its motion, or \
-                     contradicts it"
+                    "with what the train holds and drives, this stage has more than one \
+                     free shaft, and a rating wants one motion to rate under"
                 ),
             },
             Self::NoPowerFlow => write!(
@@ -1797,6 +1842,19 @@ impl std::fmt::Display for TrainError {
             Self::UnknownMaterial(n) => write!(f, "no material named {n:?} in the library"),
             Self::NoRootSection => write!(f, "the tooth is too undercut to have a root section"),
             Self::Empty => write!(f, "the geartrain has no stages"),
+            Self::Underdetermined { short } => write!(
+                f,
+                "the train is {short} condition(s) short of one motion: hold or drive \
+                 another shaft, or read the family the graph reports"
+            ),
+            Self::Overdetermined { at } => {
+                write!(f, "two conditions cannot both hold at {}", place(*at))
+            }
+            Self::NoSuchShaft { at } => write!(f, "no such shaft: {}", place(*at)),
+            Self::Overflow => write!(
+                f,
+                "the tooth counts along the shaft line multiply past what an exact ratio holds"
+            ),
             Self::LoadPort { case } => write!(
                 f,
                 "load case {}: enters by a shaft no load can be put on — ground, a held \
@@ -3849,6 +3907,14 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     // physical shaft report two speeds, one at the end of a stage and the other
     // at the start of the next (`docs/corrections.md`).
     let motion = train.motion()?;
+    // **A family is not rated.** The motion is still reported — the boundary
+    // sends it beside the refusal — but every stage's rating wants one torque
+    // at one speed, and which one is the designer's to say.
+    if !motion.solution.is_unique() {
+        return Err(TrainError::Underdetermined {
+            short: motion.solution.residual.len(),
+        });
+    }
     // **What each stage is asked**, from the train's constraints and
     // couplings — which is where a set's arrangement lives now — handed to the
     // stage beside its loads.
@@ -6282,6 +6348,158 @@ mod tests {
             vec![Port::Start, Port::End, Port::At(at(0, 3))]
         );
         assert_eq!(ports[2].label, ShaftLabel::Member { member: 2 });
+    }
+
+    /// **A train one condition short reports the family and refuses the
+    /// rating**, by name. A set with its ring released and its sun driven has
+    /// one free parameter; every shaft's speed is a particular value plus one
+    /// term per turn of the free shaft, and at every value of that parameter
+    /// the family satisfies Willis — `z_s ω_s + z_r ω_r = (z_s + z_r) ω_c` —
+    /// exactly, with the sun at one turn throughout. The report's terms are
+    /// the same family read as floats.
+    #[test]
+    fn a_train_one_condition_short_reports_the_family_and_refuses_the_rating() {
+        let lib = library();
+        let mut t = two_stage();
+        t.stages = vec![Stage::Planetary(Box::default())];
+        t.constraints = vec![ShaftConstraint {
+            at: ShaftRef::Of { stage: 0, shaft: 3 },
+            constraint: Constraint::Free,
+        }];
+        assert_eq!(
+            solve_train(&t, &lib).err(),
+            Some(TrainError::Underdetermined { short: 1 })
+        );
+        let m = t.motion().expect("the motion is a family, not a refusal");
+        assert_eq!(m.solution.residual.len(), 1, "{:?}", m.solution);
+        let r = t.motion_report().expect("...and it is reported");
+        assert_eq!(r.free.len(), 1);
+        assert!(
+            r.total.is_none() && r.ratios[0].is_none(),
+            "a family has no quotient"
+        );
+        let (sun, carrier, ring) = (1, 2, 3);
+        let z = |k: usize| crate::ratio::Ratio::whole(i64::from(t.stages[0].members()[k].teeth));
+        let (zs, zr) = (z(0), z(2));
+        for p in [0i64, 1, -2, 7] {
+            let p = crate::ratio::Ratio::whole(p);
+            let at = |shaft: usize| {
+                let i = m.shaft_of(0, shaft);
+                m.solution.values[i]
+                    .checked_add(m.solution.residual[0].direction[i].checked_mul(p).unwrap())
+                    .unwrap()
+            };
+            assert_eq!(at(sun), crate::ratio::Ratio::ONE);
+            let lhs = zs
+                .checked_mul(at(sun))
+                .unwrap()
+                .checked_add(zr.checked_mul(at(ring)).unwrap())
+                .unwrap();
+            let rhs = zs
+                .checked_add(zr)
+                .unwrap()
+                .checked_mul(at(carrier))
+                .unwrap();
+            assert_eq!(lhs, rhs, "Willis at p = {p}");
+            // ...and the report is the same family, read as floats.
+            for shaft in [sun, carrier, ring] {
+                let s = &r.shafts[m.shaft_of(0, shaft)];
+                let read = s.speed.value
+                    + s.terms
+                        .iter()
+                        .map(|term| term.coefficient.value * p.to_f64())
+                        .sum::<f64>();
+                assert!(
+                    (read - at(shaft).to_f64()).abs() < 1e-12,
+                    "shaft {shaft} at p = {p}"
+                );
+            }
+        }
+    }
+
+    /// **Two drives a designer writes on one set are both kept**, and are
+    /// one motion: at one turn each of the sun and the carrier the whole set
+    /// turns as one, so the ring turns at exactly one too. What is refused is
+    /// the *rating*, by its own name — a set with two inputs has no held
+    /// shaft for the power flow to be worked out against — and not the
+    /// motion. (A first version of the overlay let the second drive remove
+    /// the first, and a differential's two inputs came out as one input and
+    /// a family.)
+    #[test]
+    fn two_drives_on_one_set_are_both_kept_and_are_one_motion() {
+        let lib = library();
+        let mut t = two_stage();
+        t.stages = vec![Stage::Planetary(Box::default())];
+        t.constraints = vec![
+            ShaftConstraint::driven(0, 1),
+            ShaftConstraint::driven(0, 2),
+            ShaftConstraint {
+                at: ShaftRef::Of { stage: 0, shaft: 3 },
+                constraint: Constraint::Free,
+            },
+        ];
+        let driven = t
+            .constraints_in_force()
+            .iter()
+            .filter(|c| c.constraint == Constraint::Driven)
+            .count();
+        assert_eq!(driven, 2);
+        let m = t.motion().expect("one motion");
+        assert!(m.solution.is_unique());
+        assert_eq!(
+            m.solution.values[m.shaft_of(0, 3)],
+            crate::ratio::Ratio::ONE
+        );
+        assert!(matches!(
+            solve_train(&t, &lib),
+            Err(TrainError::InStage {
+                stage: 0,
+                ref cause
+            }) if **cause == TrainError::Wiring(WiringError::Unsolvable)
+        ));
+    }
+
+    /// **Every other way the conditions can fail to give one motion is
+    /// named**: a shaft asked two things that contradict, a shaft the train
+    /// does not have, and tooth counts whose product outgrows an exact ratio
+    /// — and none of them is the wiring sentence, which describes a stage
+    /// that is no mechanism.
+    #[test]
+    fn a_conflict_a_missing_shaft_and_an_overflow_are_each_named() {
+        let lib = library();
+        let set = |constraints| {
+            let mut t = two_stage();
+            t.stages = vec![Stage::Planetary(Box::default())];
+            t.constraints = constraints;
+            t
+        };
+        assert!(matches!(
+            solve_train(&set(vec![ShaftConstraint::held(0, 2)]), &lib),
+            Err(TrainError::Overdetermined {
+                at: ShaftRef::Of { stage: 0, .. }
+            })
+        ));
+        assert_eq!(
+            solve_train(&set(vec![ShaftConstraint::held(7, 1)]), &lib).err(),
+            Some(TrainError::NoSuchShaft {
+                at: ShaftRef::Of { stage: 7, shaft: 1 }
+            })
+        );
+        let huge = |teeth| StageGear {
+            teeth,
+            ..StageGear::default()
+        };
+        let mut wide = two_stage();
+        wide.stages = (0..6)
+            .map(|k| {
+                Stage::Spur(PairStage {
+                    gears: [huge(4_000_000_000 + k), huge(4_000_000_001 + k)],
+                    ..PairStage::default()
+                })
+            })
+            .collect();
+        assert_eq!(solve_train(&wide, &lib).err(), Some(TrainError::Overflow));
+        assert!(wide.motion_report().is_none());
     }
 
     /// Every freedom a stage's groups mention, flat.

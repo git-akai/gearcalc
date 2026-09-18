@@ -2,12 +2,20 @@
 import type { Exact } from "./Exact";
 import type { ShaftLabel } from "./ShaftLabel";
 import type { ShaftRef } from "./ShaftRef";
+import type { Term } from "./Term";
 
 /**
  * One shaft of the train's motion, for the front end.
  */
 export type ShaftReport = { at: ShaftRef, label: ShaftLabel, 
 /**
- * Turns per turn of what is driven.
+ * Turns per turn of what is driven — the whole answer where it is one
+ * answer, and the particular part of it where it is a family.
  */
-speed: Exact, };
+speed: Exact, 
+/**
+ * **The rest of a family**: one term per free shaft this one depends
+ * on, *coefficient turns per turn of that shaft*. Empty where the
+ * answer is one answer.
+ */
+terms: Array<Term>, };

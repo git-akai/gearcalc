@@ -709,9 +709,24 @@ its ring, was handed a boundary whose output was its input and solved at a
 ratio of one (`docs/corrections.md`). `MotionReport` lists the open ports,
 named, and the panel's two port selects offer exactly those.
 
-**4c–4e, not yet built.** The affine family for mobility above one, in the
-result and on screen; the condition panel proper, where any shaft of any stage
-takes a constraint; `reacted` derived beside the input; relief over
+**4c — the family, and every other way the conditions can fail, named.**
+A train short of conditions reports its motion as a family — each shaft's
+speed a particular value plus one term per free shaft, *per turn of a port*
+(the solver's own parameter is whatever column fell last, a planet, and
+`Solution::rebased` moves it to the first open port the freedom moves) — and
+refuses the rating by its own name, `Underdetermined { short }`. Conditions
+are absorbed conventions-first so a conflict is named at the designer's
+statement (`Overdetermined { at }`); a constraint on a shaft the train lacks,
+an `i128` overflow and a stage left more than one free shaft each have a
+sentence, and none of them is the wiring one. The mobility reported is the
+mechanism's — ground is a shaft in the matrix and the frame in the world.
+The panel shows the shaft line: every shaft's exact speed, the family where
+there is one, and "1 short" where the ratings wait. Found on the way: the
+overlay let a designer's second drive on one set remove the first, so a
+differential's two inputs came out as one input and a family.
+
+**4d–4e, not yet built.** The condition panel proper, where any shaft of any
+stage takes a constraint; `reacted` derived beside the input; relief over
 constraints.
 
 **Phase 5 — the general epicyclic stage.** The mesh grid, the one-radius-per-

@@ -2150,10 +2150,31 @@ train states its own couplings, they replace the chain entirely.
 is one system — ground shared, each stage's shafts appended, one row per mesh
 in the frame of its axes, one per coupling — and its solution at one turn of
 whatever is driven is reported as every shaft's exact speed, each stage's ratio,
-the total, and the **mobility**: how many conditions the train still wants, and
-which shafts nothing touches. That is why a train whose centre distances cannot
-be made to agree still reports its ratios: Willis needs tooth counts and a
-topology, and the refusal is the geometry's.
+the total, and the **mobility**: how many conditions the mechanism needs beyond
+its frame, and how many it has. That is why a train whose centre distances
+cannot be made to agree still reports its ratios: Willis needs tooth counts and
+a topology, and the refusal is the geometry's.
+
+**A train short of conditions reports a family.** A set with its ring released
+and its sun driven has one free parameter, and every shaft's speed is a
+particular value plus a term per turn of a shaft the conditions left free:
+
+```text
+ω_ring = −1/6 + 7/6 · ω_carrier        z_s = 12, z_r = 72, sun at one turn
+```
+
+The parameter is a **port** — the first open one the freedom moves — because the
+solver's own choice is whichever column fell last in its elimination, which is
+a planet, and nobody reads a differential per turn of a planet. Re-basing the
+family changes nothing about which motions it contains. The ratings are
+refused, by name: a rating wants one torque at one speed, and which is the
+designer's to say. Each other way the conditions can fail has its own sentence
+too — two that contradict, named at the statement the designer made rather
+than the convention it contradicts, since conditions are absorbed conventions
+first; a shaft the train does not have; a stage whose boundary leaves it more
+than one free shaft, which is a set driven at two of its ports and is one
+motion with no arrangement to rate under; and tooth counts whose product
+outgrows an exact ratio, refused rather than wrapped.
 
 **A ratio says two things, and only one of them refers a load.** Its *size* is
 how much a torque is multiplied by across the stage and how much a play is

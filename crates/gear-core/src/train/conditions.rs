@@ -289,8 +289,16 @@ pub enum MotionError {
     /// A constraint or coupling names a stage or a shaft the train does not
     /// have.
     NoSuchShaft(ShaftRef),
-    /// The constraints and the structure cannot both hold, at this shaft.
-    Refused(Refusal),
+    /// **The constraints and the structure cannot both hold, at this shaft**
+    /// — a condition asked of it contradicts what the meshes and the earlier
+    /// conditions already decided. Named, because "over-determined" is not
+    /// something a designer can act on and "the sun cannot turn while the
+    /// carrier and the ring are both held" is.
+    Conflicts(ShaftRef),
+    /// An exact answer too large to represent: the product of tooth counts
+    /// along the shaft line has outgrown `i128`, and a ratio is refused
+    /// rather than wrapped ([`crate::ratio`]).
+    Overflow,
 }
 
 /// One shaft of an assembled train.
@@ -437,6 +445,11 @@ impl Train {
                 out.push(ShaftConstraint::driven(0, ports.input()));
             }
         }
+        // The conventional drive goes from every stage the train drives
+        // itself — **before** any of the train's own are laid, so that two
+        // drives the designer wrote on one set are both kept. Written the
+        // other way round, the second drive removed the first, and a
+        // differential's two inputs came out as one input and a family.
         for own in &self.constraints {
             if own.constraint == Constraint::Driven {
                 if let ShaftRef::Of { stage, .. } = own.at {
@@ -446,6 +459,8 @@ impl Train {
                     });
                 }
             }
+        }
+        for own in &self.constraints {
             out.retain(|c| c.at != own.at);
             out.push(*own);
         }
@@ -617,10 +632,44 @@ impl Train {
     pub fn motion(&self) -> Result<TrainMotion, MotionError> {
         let (system, at) = self.system()?;
         let conditions = self.conditions(&at, system.shafts())?;
-        let solution = system.motion(&conditions).map_err(MotionError::Refused)?;
-        let mobility = system
-            .mobility()
-            .ok_or(MotionError::Refused(Refusal::Overflow))?;
+        // **Conventions in first, the train's own last**, so that a conflict
+        // is named at the statement the designer made rather than at the
+        // convention it contradicts: holding a set's carrier beside its
+        // held ring is reported at the carrier.
+        let order: Vec<Shaft> = std::iter::once(Ok(GROUND))
+            .chain(
+                self.constraints_in_force()
+                    .iter()
+                    .map(|c| self.resolve(&at, c.at)),
+            )
+            .collect::<Result<_, _>>()?;
+        let solution = system.motion_in(&conditions, &order).map_err(|e| match e {
+            Refusal::Conflicts(i) => MotionError::Conflicts(self.locate(&at, i)),
+            Refusal::NoMotion | Refusal::Overflow => MotionError::Overflow,
+        })?;
+        // **A family reads per turn of a port.** The solver parameterises
+        // what is free at whichever shaft fell last in its elimination —
+        // a planet, on a set with its ring released — and a designer wants
+        // the ring. The ports nothing holds or couples come first, then any
+        // port, and a planet only where no port moves with the freedom.
+        let couplings = self.couplings_in_force();
+        let joined = |r: ShaftRef| couplings.iter().any(|c| c.a == r || c.b == r);
+        let mut preferred: Vec<Shaft> = Vec::new();
+        for open in [true, false] {
+            for (k, stage) in self.stages.iter().enumerate() {
+                for shaft in stage.ports().ports {
+                    let r = ShaftRef::Of { stage: k, shaft };
+                    let i = at[k].of(shaft);
+                    if (conditions[i] == Condition::Free && !joined(r)) == open
+                        && !preferred.contains(&i)
+                    {
+                        preferred.push(i);
+                    }
+                }
+            }
+        }
+        let solution = solution.rebased(&preferred).ok_or(MotionError::Overflow)?;
+        let mobility = system.mobility().ok_or(MotionError::Overflow)?;
         let boundaries = self.boundaries()?;
 
         let mut shafts = vec![ShaftMotion {
@@ -642,14 +691,17 @@ impl Train {
             .enumerate()
             .map(|(k, b)| {
                 let (i, o) = (at[k].of(b.input), at[k].of(b.output));
-                solution.values[i].checked_div(solution.values[o])
+                // `None` where the answer is a family: the quotient of two
+                // families is not a number, and the particular values alone
+                // would print one as if it were.
+                solution.ratio(i, o)
             })
             .collect();
         let total = match (boundaries.first(), boundaries.last()) {
             (Some(f), Some(l)) => {
                 let i = at[0].of(f.input);
                 let o = at[boundaries.len() - 1].of(l.output);
-                solution.values[i].checked_div(solution.values[o])
+                solution.ratio(i, o)
             }
             _ => None,
         };
@@ -920,8 +972,27 @@ pub struct StagePorts {
 pub struct ShaftReport {
     pub at: ShaftRef,
     pub label: ShaftLabel,
-    /// Turns per turn of what is driven.
+    /// Turns per turn of what is driven — the whole answer where it is one
+    /// answer, and the particular part of it where it is a family.
     pub speed: Exact,
+    /// **The rest of a family**: one term per free shaft this one depends
+    /// on, *coefficient turns per turn of that shaft*. Empty where the
+    /// answer is one answer.
+    pub terms: Vec<Term>,
+}
+
+/// One term of a shaft's speed in a family: so many turns per turn of a
+/// shaft the conditions left free.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct Term {
+    pub per: ShaftRef,
+    pub coefficient: Exact,
 }
 
 /// **The train's motion as the front end receives it** — present whenever the
@@ -935,19 +1006,30 @@ pub struct ShaftReport {
     ts(export, export_to = "core/")
 )]
 pub struct MotionReport {
-    /// How many independent constraints the train needs.
+    /// How many independent conditions the mechanism needs beyond its frame
+    /// — 1 for a chain, 2 for a set with nothing held.
     pub mobility: usize,
     /// How many it has been given, so a panel can say *one short* or *one
     /// too many* rather than leaving a designer to count.
     pub constrained: usize,
-    /// Shafts nothing constrains — named, not counted.
+    /// Shafts no mesh touches — named, not counted. Ground is the frame and
+    /// is not listed.
     pub untouched: Vec<ShaftRef>,
     pub shafts: Vec<ShaftReport>,
     /// One per stage, input over output. `None` where the output does not
     /// turn.
     pub ratios: Vec<Option<Exact>>,
-    /// The first stage's input to the last stage's output.
+    /// The first stage's input to the last stage's output. `None` where the
+    /// answer is a family, since a quotient of two families is not a number.
     pub total: Option<Exact>,
+    /// **The shafts whose turn parameterises a family** — one per condition
+    /// the train is short — and empty where the answer is one answer. Every
+    /// [`ShaftReport::terms`] is per turn of one of these.
+    pub free: Vec<ShaftRef>,
+    /// Shafts whose condition said nothing the structure had not already
+    /// said. Not a fault — a ring held and also coupled to ground is a
+    /// designer being explicit — but worth a reader's knowing.
+    pub redundant: Vec<ShaftRef>,
     /// Every shaft a load can enter by, named — what a load case's picker
     /// offers, in the order the chain runs.
     pub ports: Vec<OpenPort>,
@@ -977,44 +1059,86 @@ impl Train {
             .collect()
     }
 
+    /// A shaft of the assembled system, as a reference: the inverse of
+    /// [`Self::resolve`].
+    fn locate(&self, at: &[Offsets], i: Shaft) -> ShaftRef {
+        if i == GROUND {
+            return ShaftRef::Ground;
+        }
+        let stage = at.iter().rposition(|o| o.first <= i).unwrap_or(0);
+        ShaftRef::Of {
+            stage,
+            shaft: i - at[stage].first + 1,
+        }
+    }
+
     /// The train's motion in the shape the boundary sends, or `None` where
     /// there is none to send.
+    ///
+    /// **A family is sent as a family.** Where the conditions leave `m`
+    /// shafts free, every shaft's speed is a particular value plus one term
+    /// per free shaft — `ω_i = v_i + Σ_k c_ik · ω_k` — with the free shafts
+    /// named in `free`, so a differential's *"the carrier turns at half the
+    /// sum of its two sides"* is what a reader sees rather than a refusal.
     #[must_use]
     pub fn motion_report(&self) -> Option<MotionReport> {
         let m = self.motion().ok()?;
-        let (at, _) = self.layout();
-        let locate = |i: Shaft| -> ShaftRef {
-            if i == GROUND {
-                return ShaftRef::Ground;
-            }
-            let stage = at.iter().rposition(|o| o.first <= i).unwrap_or(0);
-            ShaftRef::Of {
-                stage,
-                shaft: i - at[stage].first + 1,
-            }
-        };
+        let at = &m.at;
+        // **The mechanism's mobility, not the matrix's.** Ground is a shaft
+        // in the system and the frame in the world: it counts one degree
+        // and one condition in the matrix, and neither to a designer, who
+        // reads "mobility 2, one given" of a set with its ring released.
         let constrained = self
             .constraints_in_force()
             .iter()
             .filter(|c| c.constraint != Constraint::Free)
-            .count()
-            + 1; // ground
+            .count();
+        let free: Vec<ShaftRef> = m
+            .solution
+            .residual
+            .iter()
+            .map(|r| self.locate(at, r.at))
+            .collect();
         Some(MotionReport {
-            mobility: m.mobility.degrees,
+            mobility: m.mobility.degrees.saturating_sub(1),
             constrained,
-            untouched: m.mobility.untouched.iter().map(|&i| locate(i)).collect(),
+            untouched: m
+                .mobility
+                .untouched
+                .iter()
+                .filter(|&&i| i != GROUND)
+                .map(|&i| self.locate(at, i))
+                .collect(),
             shafts: m
                 .shafts
                 .iter()
                 .enumerate()
                 .map(|(i, s)| ShaftReport {
-                    at: locate(i),
+                    at: self.locate(at, i),
                     label: s.label,
                     speed: s.speed.into(),
+                    terms: m
+                        .solution
+                        .residual
+                        .iter()
+                        .zip(&free)
+                        .filter(|(r, _)| !r.direction[i].is_zero())
+                        .map(|(r, &per)| Term {
+                            per,
+                            coefficient: r.direction[i].into(),
+                        })
+                        .collect(),
                 })
                 .collect(),
             ratios: m.ratios.iter().map(|r| r.map(Exact::from)).collect(),
             total: m.total.map(Exact::from),
+            free,
+            redundant: m
+                .solution
+                .redundant
+                .iter()
+                .map(|&i| self.locate(at, i))
+                .collect(),
             ports: self.open_ports(&self.boundaries().ok()?),
         })
     }

@@ -82,6 +82,7 @@ export type { Stage } from "./core/Stage";
 export type { StageGear } from "./core/StageGear";
 export type { StagePorts } from "./core/StagePorts";
 export type { StageResult } from "./core/StageResult";
+export type { Term } from "./core/Term";
 export type { TipRoom } from "./core/TipRoom";
 export type { Train } from "./core/Train";
 export type { TrainCase } from "./core/TrainCase";

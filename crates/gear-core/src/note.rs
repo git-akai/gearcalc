@@ -205,6 +205,16 @@ pub mod key {
     pub const ERROR_TRAIN_NO_ROOT_SECTION: &str = "error.train_no_root_section";
     /// `error.train_empty`
     pub const ERROR_TRAIN_EMPTY: &str = "error.train_empty";
+    /// `error.train_underdetermined`
+    pub const ERROR_TRAIN_UNDERDETERMINED: &str = "error.train_underdetermined";
+    /// `error.train_overdetermined`
+    pub const ERROR_TRAIN_OVERDETERMINED: &str = "error.train_overdetermined";
+    /// `error.train_no_such_shaft`
+    pub const ERROR_TRAIN_NO_SUCH_SHAFT: &str = "error.train_no_such_shaft";
+    /// `error.train_overflow`
+    pub const ERROR_TRAIN_OVERFLOW: &str = "error.train_overflow";
+    /// `error.train_stage_undetermined`
+    pub const ERROR_TRAIN_STAGE_UNDETERMINED: &str = "error.train_stage_undetermined";
     /// `error.train_load_port`
     pub const ERROR_TRAIN_LOAD_PORT: &str = "error.train_load_port";
     /// `error.train_load_shared`
@@ -286,6 +296,11 @@ pub mod key {
         ERROR_TRAIN_UNKNOWN_MATERIAL,
         ERROR_TRAIN_NO_ROOT_SECTION,
         ERROR_TRAIN_EMPTY,
+        ERROR_TRAIN_UNDERDETERMINED,
+        ERROR_TRAIN_OVERDETERMINED,
+        ERROR_TRAIN_NO_SUCH_SHAFT,
+        ERROR_TRAIN_OVERFLOW,
+        ERROR_TRAIN_STAGE_UNDETERMINED,
         ERROR_TRAIN_LOAD_PORT,
         ERROR_TRAIN_LOAD_SHARED,
         ERROR_HULA_LOCKED,

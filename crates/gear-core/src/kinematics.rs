@@ -211,6 +211,65 @@ impl Solution {
         self.residual.is_empty()
     }
 
+    /// **The same family, parameterised by the shafts named** — so a
+    /// differential reads *per turn of the ring* rather than per turn of a
+    /// planet nobody drives.
+    ///
+    /// A family is a particular answer plus a basis for what is free, and any
+    /// shaft a direction moves can be the parameter of that direction: the
+    /// basis is re-normalised at the first of `preferred` each direction
+    /// moves and not yet taken, and the particular answer moved to where that
+    /// shaft stands still. Directions that move none of the preferred shafts
+    /// keep the parameter they had. The set of answers is unchanged — every
+    /// answer the old family contained the new one contains, and no other.
+    ///
+    /// `None` on overflow, which is a refusal rather than a wrap.
+    #[must_use]
+    pub fn rebased(&self, preferred: &[Shaft]) -> Option<Self> {
+        let mut values = self.values.clone();
+        let mut residual = self.residual.clone();
+        let mut taken: Vec<Shaft> = Vec::new();
+        for k in 0..residual.len() {
+            let Some(&at) = preferred
+                .iter()
+                .find(|&&j| !taken.contains(&j) && !residual[k].direction[j].is_zero())
+            else {
+                continue;
+            };
+            taken.push(at);
+            // Normalise direction `k` at `at`...
+            let unit = residual[k].direction[at];
+            for d in &mut residual[k].direction {
+                *d = d.checked_div(unit)?;
+            }
+            residual[k].at = at;
+            // ...and take `at` out of the particular answer and every other
+            // direction, so the parameter is that shaft's own speed.
+            let dk = residual[k].direction.clone();
+            let v = values[at];
+            for (x, d) in values.iter_mut().zip(&dk) {
+                *x = x.checked_sub(v.checked_mul(*d)?)?;
+            }
+            for (other, r) in residual.iter_mut().enumerate() {
+                if other == k {
+                    continue;
+                }
+                let c = r.direction[at];
+                if c.is_zero() {
+                    continue;
+                }
+                for (x, d) in r.direction.iter_mut().zip(&dk) {
+                    *x = x.checked_sub(c.checked_mul(*d)?)?;
+                }
+            }
+        }
+        Some(Self {
+            values,
+            residual,
+            redundant: self.redundant.clone(),
+        })
+    }
+
     /// The ratio of one shaft's value to another's, exactly — `None` where the
     /// divisor is zero, or where the answer is a family and the quotient is not
     /// a number at all.
@@ -367,7 +426,28 @@ impl System {
     /// [`Refusal::Conflicts`] naming the condition that contradicts what is
     /// already decided, or [`Refusal::Overflow`].
     pub fn motion(&self, conditions: &[Condition]) -> Result<Solution, Refusal> {
-        self.solve(&vec![Ratio::ZERO; self.rows.len()], conditions)
+        self.solve(&vec![Ratio::ZERO; self.rows.len()], conditions, &[])
+    }
+
+    /// [`Self::motion`], with the conditions absorbed **in the order given**
+    /// — `first` names shafts whose conditions go in before the rest, which
+    /// are then taken in shaft order.
+    ///
+    /// The order changes no answer. What it changes is *which* condition a
+    /// conflict is reported at: a condition is refused against what is
+    /// already in, so the last one in is the one named, and a caller that
+    /// puts the conventions in first has the designer's own statement named
+    /// rather than the convention it contradicts.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::motion`].
+    pub fn motion_in(
+        &self,
+        conditions: &[Condition],
+        first: &[Shaft],
+    ) -> Result<Solution, Refusal> {
+        self.solve(&vec![Ratio::ZERO; self.rows.len()], conditions, first)
     }
 
     /// **Where each shaft stands per unit of play in one mesh** — the same
@@ -390,7 +470,7 @@ impl System {
         let row = *self.mesh_rows.get(which)?;
         let mut rhs = vec![Ratio::ZERO; self.rows.len()];
         rhs[row] = Ratio::ONE;
-        Some(self.solve(&rhs, conditions))
+        Some(self.solve(&rhs, conditions, &[]))
     }
 
     /// **The torque on every shaft**, from the ones that are known.
@@ -487,7 +567,12 @@ impl System {
 
     /// The structural rows with this right-hand side, then the conditions, one
     /// at a time so that the one that conflicts can be named.
-    fn solve(&self, rhs: &[Ratio], conditions: &[Condition]) -> Result<Solution, Refusal> {
+    fn solve(
+        &self,
+        rhs: &[Ratio],
+        conditions: &[Condition],
+        first: &[Shaft],
+    ) -> Result<Solution, Refusal> {
         let mut reduced = Reduced::new(self.shafts);
         for (row, b) in self.rows.iter().zip(rhs) {
             let mut augmented = row.clone();
@@ -501,7 +586,12 @@ impl System {
             }
         }
         let mut redundant = Vec::new();
-        for (i, c) in conditions.iter().enumerate() {
+        let order = first
+            .iter()
+            .copied()
+            .chain((0..conditions.len()).filter(|i| !first.contains(i)));
+        for i in order {
+            let Some(c) = conditions.get(i) else { continue };
             let value = match c {
                 Condition::Free => continue,
                 Condition::Ground => Ratio::ZERO,
@@ -709,6 +799,83 @@ mod tests {
         let mut c = vec![Condition::Free; n];
         c[GROUND] = Condition::Ground;
         c
+    }
+
+    /// **Re-basing a family changes which shaft it is read per turn of, and
+    /// nothing else.** A set with only its sun driven is a one-parameter
+    /// family; the solver parameterises it at whichever column fell last, and
+    /// re-based at the ring every answer the first family contained the
+    /// second contains — evaluated at the ring speed the first gave — and its
+    /// direction is a unit at the ring. Two-parameter too: nothing driven at
+    /// all, re-based at the carrier and the ring.
+    #[test]
+    fn a_family_rebased_at_a_port_is_the_same_family() {
+        let sys = set(teeth());
+        let evaluate = |f: &Solution, p: &[Ratio]| -> Vec<Ratio> {
+            (0..sys.shafts())
+                .map(|i| {
+                    f.residual.iter().zip(p).fold(f.values[i], |acc, (r, q)| {
+                        acc.checked_add(r.direction[i].checked_mul(*q).unwrap())
+                            .unwrap()
+                    })
+                })
+                .collect()
+        };
+        for (conditions, preferred) in [
+            (
+                {
+                    let mut c = base(5);
+                    c[SUN] = Condition::Drive(Ratio::ONE);
+                    c
+                },
+                vec![RING],
+            ),
+            (base(5), vec![CARRIER, RING]),
+        ] {
+            let first = sys.motion(&conditions).unwrap();
+            assert_eq!(first.residual.len(), preferred.len());
+            let second = first.rebased(&preferred).unwrap();
+            for (k, &at) in preferred.iter().enumerate() {
+                assert_eq!(second.residual[k].at, at);
+                assert_eq!(second.residual[k].direction[at], Ratio::ONE);
+                assert!(second.values[at].is_zero());
+                for (other, r) in second.residual.iter().enumerate() {
+                    assert!(
+                        other == k || r.direction[at].is_zero(),
+                        "{at} appears twice"
+                    );
+                }
+            }
+            for p in [[w(0), w(0)], [w(1), w(-3)], [w(5), w(2)]] {
+                let answer = evaluate(&first, &p[..first.residual.len()]);
+                let q: Vec<Ratio> = preferred.iter().map(|&at| answer[at]).collect();
+                assert_eq!(evaluate(&second, &q), answer, "at {p:?}");
+            }
+        }
+    }
+
+    /// **A conflict is named at the last condition in**, and the order of
+    /// absorption is the caller's: with the ring's hold put in first, holding
+    /// the carrier beside it is what is refused, and the other way round the
+    /// ring is.
+    #[test]
+    fn the_order_conditions_go_in_decides_which_one_a_conflict_names() {
+        let sys = set(teeth());
+        let mut c = base(5);
+        c[SUN] = Condition::Drive(Ratio::ONE);
+        c[CARRIER] = Condition::Ground;
+        c[RING] = Condition::Ground;
+        assert_eq!(
+            sys.motion_in(&c, &[GROUND, RING, SUN]),
+            Err(Refusal::Conflicts(CARRIER))
+        );
+        assert_eq!(
+            sys.motion_in(&c, &[GROUND, CARRIER, SUN]),
+            Err(Refusal::Conflicts(RING))
+        );
+        // ...and the order changes no answer where there is one.
+        c[CARRIER] = Condition::Free;
+        assert_eq!(sys.motion_in(&c, &[GROUND, RING, SUN]), sys.motion(&c));
     }
 
     /// **`mesh` and `couple` cannot build a row that locks up wrong**, at any

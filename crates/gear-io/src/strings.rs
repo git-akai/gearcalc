@@ -1470,6 +1470,74 @@ mod tests {
                     }
                 }
             }
+            // **Every way the train's own conditions can fail to give one
+            // motion**, each fired from the model on a set whose shafts are
+            // sun 1, carrier 2, ring 3: the ring released with nothing else
+            // held (one short); the carrier held beside the ring (the sun
+            // cannot turn); a constraint on a shaft no stage has; two drives
+            // on the set, which is one motion but no arrangement to rate
+            // under; and a chain whose tooth counts multiply past `i128`.
+            {
+                use gear_core::train::{
+                    Constraint, LoadCase, PairStage, PlanetaryStage, ShaftConstraint, ShaftRef,
+                    Stage, StageGear, Train,
+                };
+                let free = |stage, shaft| ShaftConstraint {
+                    at: ShaftRef::Of { stage, shaft },
+                    constraint: Constraint::Free,
+                };
+                let set = |constraints| Train {
+                    load_cases: vec![LoadCase::ultimate(2.0, 3000.0)],
+                    reversed_bending: false,
+                    stages: vec![Stage::Planetary(Box::<PlanetaryStage>::default())],
+                    couplings: Vec::new(),
+                    constraints,
+                };
+                let huge = |teeth| StageGear {
+                    teeth,
+                    ..StageGear::default()
+                };
+                let wide = Train {
+                    stages: (0..6)
+                        .map(|k| {
+                            Stage::Spur(PairStage {
+                                gears: [huge(4_000_000_000 + k), huge(4_000_000_001 + k)],
+                                ..PairStage::default()
+                            })
+                        })
+                        .collect(),
+                    ..set(Vec::new())
+                };
+                let trains = [
+                    (set(vec![free(0, 3)]), "underdetermined"),
+                    (set(vec![ShaftConstraint::held(0, 2)]), "overdetermined"),
+                    (set(vec![ShaftConstraint::held(7, 1)]), "no such shaft"),
+                    (
+                        set(vec![
+                            ShaftConstraint::driven(0, 1),
+                            ShaftConstraint::driven(0, 2),
+                            free(0, 3),
+                        ]),
+                        "stage undetermined",
+                    ),
+                    (wide, "overflow"),
+                ];
+                for (train, what) in trains {
+                    let e = gear_core::train::solve_train(&train, &lib).expect_err(what);
+                    assert!(
+                        matches!(
+                            e,
+                            TrainError::Underdetermined { .. }
+                                | TrainError::Overdetermined { .. }
+                                | TrainError::NoSuchShaft { .. }
+                                | TrainError::Overflow
+                                | TrainError::InStage { .. }
+                        ),
+                        "{what}: {e:?}"
+                    );
+                    err(e.note());
+                }
+            }
 
             // A hula stage, refused five ways. Each is reachable from ordinary
             // inputs rather than contrived: two meshes that cancel, a pair whose

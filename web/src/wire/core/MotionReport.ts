@@ -11,7 +11,8 @@ import type { ShaftReport } from "./ShaftReport";
  */
 export type MotionReport = { 
 /**
- * How many independent constraints the train needs.
+ * How many independent conditions the mechanism needs beyond its frame
+ * — 1 for a chain, 2 for a set with nothing held.
  */
 mobility: number, 
 /**
@@ -20,7 +21,8 @@ mobility: number,
  */
 constrained: number, 
 /**
- * Shafts nothing constrains — named, not counted.
+ * Shafts no mesh touches — named, not counted. Ground is the frame and
+ * is not listed.
  */
 untouched: Array<ShaftRef>, shafts: Array<ShaftReport>, 
 /**
@@ -29,9 +31,22 @@ untouched: Array<ShaftRef>, shafts: Array<ShaftReport>,
  */
 ratios: Array<Exact | null>, 
 /**
- * The first stage's input to the last stage's output.
+ * The first stage's input to the last stage's output. `None` where the
+ * answer is a family, since a quotient of two families is not a number.
  */
 total: Exact | null, 
+/**
+ * **The shafts whose turn parameterises a family** — one per condition
+ * the train is short — and empty where the answer is one answer. Every
+ * [`ShaftReport::terms`] is per turn of one of these.
+ */
+free: Array<ShaftRef>, 
+/**
+ * Shafts whose condition said nothing the structure had not already
+ * said. Not a fault — a ring held and also coupled to ground is a
+ * designer being explicit — but worth a reader's knowing.
+ */
+redundant: Array<ShaftRef>, 
 /**
  * Every shaft a load can enter by, named — what a load case's picker
  * offers, in the order the chain runs.

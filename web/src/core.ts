@@ -77,6 +77,7 @@ import type {
   StagePorts,
   MotionReport,
   ShaftLabel,
+  ShaftRef,
   Exact,
 } from "./wire";
 export type { CaseKind, LoadCase, Port };
@@ -147,6 +148,7 @@ export type {
   StagePorts,
   MotionReport,
   ShaftLabel,
+  ShaftRef,
   Exact,
 } from "./wire";
 

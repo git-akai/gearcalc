@@ -244,6 +244,37 @@ fn fixtures() -> Vec<(String, Train)> {
         "chain-unclosed".to_string(),
         train(vec![pair(17, 43, 0.0), unclosed()]),
     ));
+    // **A train that is one condition short, one that has two drives, and
+    // one that asks two things of a shaft** — recorded for what each answers,
+    // since each used to answer with the wiring sentence. The first is a set
+    // with its ring released: no rating, and a *family* under the line, every
+    // shaft's speed per turn of the free one. The second drives the sun and
+    // the carrier together, which is one motion — the whole set turns as one
+    // — and no arrangement to rate. The third holds the carrier beside the
+    // ring, so the sun cannot turn.
+    let free = |shaft| ShaftConstraint {
+        at: ShaftRef::Of { stage: 0, shaft },
+        constraint: gear_core::train::Constraint::Free,
+    };
+    out.push((
+        "ring-released".to_string(),
+        asked(vec![set()], vec![free(3)]),
+    ));
+    out.push((
+        "two-drives".to_string(),
+        asked(
+            vec![set()],
+            vec![
+                ShaftConstraint::driven(0, 1),
+                ShaftConstraint::driven(0, 2),
+                free(3),
+            ],
+        ),
+    ));
+    out.push((
+        "conflict".to_string(),
+        asked(vec![set()], vec![ShaftConstraint::held(0, 2)]),
+    ));
     // **The same chain with its loads written at shafts by reference** —
     // the shaft `end` resolves to, which with the carrier held is the set's
     // *ring*, and the pair's first member for `start`. The fixture above and
@@ -296,37 +327,69 @@ fn shafts(s: &StageResult) -> Option<([&'static str; 3], &[gear_core::train::Sha
 /// reduction of exactly 49 says 49 and an arrangement whose meshes cancel says
 /// it does not turn rather than printing a very large number.
 fn graph(train: &Train) {
-    match train.motion() {
-        Ok(m) => {
-            println!(
-                "  graph    mobility {} degree(s){}   total ratio {}",
-                m.mobility.degrees,
-                if m.mobility.untouched.is_empty() {
-                    String::new()
-                } else {
-                    format!("  ({} shaft(s) untouched)", m.mobility.untouched.len())
-                },
-                m.total
-                    .map_or_else(|| "does not turn".to_string(), |r| r.to_string()),
-            );
-            for (k, r) in m.ratios.iter().enumerate() {
-                println!(
-                    "    stage {}  ratio {}",
-                    k + 1,
-                    r.map_or_else(|| "does not turn".to_string(), |r| r.to_string())
-                );
-            }
-            for s in &m.shafts {
-                println!(
-                    "    shaft {:<9} of {:<7} speed {}",
-                    shaft_name(&train.stages, s),
-                    s.stage
-                        .map_or_else(|| "the train".to_string(), |k| format!("stage {}", k + 1)),
-                    s.speed,
-                );
-            }
+    let m = match train.motion() {
+        Ok(_) => train.motion_report().expect("a motion has a report"),
+        Err(e) => {
+            println!("  graph    no motion: {e:?}");
+            return;
         }
-        Err(e) => println!("  graph    no motion: {e:?}"),
+    };
+    let by_ref = |r: gear_core::train::ShaftRef| -> String {
+        m.shafts
+            .iter()
+            .find(|s| s.at == r)
+            .map_or_else(|| format!("{r:?}"), |s| named(&train.stages, s.at, s.label))
+    };
+    // A quotient that is not there is a family where the answer is one, and
+    // an output that does not turn where it is not.
+    let quotient = |r: &Option<gear_core::train::Exact>| -> String {
+        match r {
+            Some(x) => x.text.clone(),
+            None if m.free.is_empty() => "does not turn".to_string(),
+            None => "a family".to_string(),
+        }
+    };
+    println!(
+        "  graph    mobility {} degree(s), {} given{}{}   total ratio {}",
+        m.mobility,
+        m.constrained,
+        if m.untouched.is_empty() {
+            String::new()
+        } else {
+            format!("  ({} shaft(s) untouched)", m.untouched.len())
+        },
+        if m.free.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "  free: {}",
+                m.free
+                    .iter()
+                    .map(|&r| by_ref(r))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        },
+        quotient(&m.total),
+    );
+    for (k, r) in m.ratios.iter().enumerate() {
+        println!("    stage {}  ratio {}", k + 1, quotient(r));
+    }
+    for s in &m.shafts {
+        let terms: String = s
+            .terms
+            .iter()
+            .map(|t| format!(" + {} × ω({})", t.coefficient.text, by_ref(t.per)))
+            .collect();
+        println!(
+            "    shaft {:<9} of {:<7} speed {}{terms}",
+            named(&train.stages, s.at, s.label),
+            match s.at {
+                gear_core::train::ShaftRef::Ground => "the train".to_string(),
+                gear_core::train::ShaftRef::Of { stage, .. } => format!("stage {}", stage + 1),
+            },
+            s.speed.text,
+        );
     }
 }
 
@@ -416,9 +479,13 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
 /// What to call a shaft here — the harness's English, which the core does not
 /// have. A member's shaft is named after the member's role where its kind has
 /// one, so the corpus reads as it did.
-fn shaft_name(stages: &[Stage], s: &gear_core::train::ShaftMotion) -> String {
+fn named(stages: &[Stage], at: ShaftRef, label: gear_core::train::ShaftLabel) -> String {
     use gear_core::train::ShaftLabel;
-    match (s.label, s.stage.map(|k| &stages[k])) {
+    let stage = match at {
+        ShaftRef::Ground => None,
+        ShaftRef::Of { stage, .. } => stages.get(stage),
+    };
+    match (label, stage) {
         (ShaftLabel::Ground, _) => "ground".into(),
         (ShaftLabel::Carrier { .. }, Some(Stage::Hula(_))) => "crank".into(),
         (ShaftLabel::Carrier { .. }, _) => "carrier".into(),

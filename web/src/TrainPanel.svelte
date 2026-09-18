@@ -11,6 +11,8 @@
     portOptions,
     type CaseKind,
     type Port,
+    type ShaftRef,
+    type ShaftLabel,
     type LoadCase,
     type GearCase,
     type MeshCase,
@@ -176,12 +178,19 @@
   const portLabel = (p: Port): string => {
     if (p === "start") return t("ui.train_port_start");
     if (p === "end") return t("ui.train_port_end");
-    if (p.at.kind === "ground") return t("ui.train_ground");
-    const { stage, shaft } = p.at;
-    const spec = result.topology[stage]?.ports.find((x) => x.shaft === shaft);
+    return refLabel(p.at);
+  };
+  /** A shaft by reference: its stage and its own name. The label is the
+   *  wiring's where the caller has it — a shaft-line row carries its own —
+   *  and looked up among the stage's ports otherwise, which is every shaft a
+   *  port can name. */
+  const refLabel = (at: ShaftRef, label?: ShaftLabel): string => {
+    if (at.kind === "ground") return t("ui.train_ground");
+    const { stage, shaft } = at;
+    const known = label ?? result.topology[stage]?.ports.find((x) => x.shaft === shaft)?.label;
     return t("ui.train_port_at", {
       stage: stageName(stage),
-      shaft: spec ? shaftName(tab.train, stage, spec.label) : String(shaft),
+      shaft: known ? shaftName(tab.train, stage, known) : String(shaft),
     });
   };
   /** The ports a case's select offers, keyed for the select; a port is set
@@ -1361,6 +1370,42 @@
         >
       </dd>
     </dl>
+    <!-- **The shaft line, from tooth counts and topology alone** — present
+         whether or not the geometry solved, since a ratio needs neither a
+         module nor a material. Every shaft's speed per turn of what is driven,
+         exactly; and where the train is a condition short, the *family*: each
+         speed as a value plus so many turns per turn of a shaft the conditions
+         left free, which for a differential is the answer a designer wanted. -->
+    {#if result.motion}
+      {@const m = result.motion}
+      <details class="shaftline" open>
+        <summary class="section-heading">
+          {t("ui.train_shaft_line")}
+          <span class="aside">
+            {t("ui.train_mobility", { mobility: String(m.mobility), given: String(m.constrained) })}
+          </span>
+        </summary>
+        {#if m.free.length > 0}
+          <p class="notice">{t("ui.train_conditions_short", { short: String(m.free.length) })}</p>
+        {/if}
+        <dl class="out">
+          {#each m.shafts as s (portKey({ at: s.at }))}
+            {#if s.at.kind !== "ground"}
+              <dt>{refLabel(s.at, s.label)}</dt>
+              <dd>
+                {s.speed.text}{#each s.terms as term (portKey({ at: term.per }))}
+                  <span class="term">+ {term.coefficient.text} × {t("ui.train_per_turn_of", { shaft: refLabel(term.per) })}</span>
+                {/each}
+              </dd>
+            {/if}
+          {/each}
+        </dl>
+        <small class="notice">{t("ui.train_turns_per_drive")}</small>
+        {#each m.redundant as r (portKey({ at: r }))}
+          <p class="notice">{t("ui.train_redundant_at", { shaft: refLabel(r) })}</p>
+        {/each}
+      </details>
+    {/if}
     <!-- Why there is no answer at all — through the catalogue like every other
          message, naming the stage where one is to blame. -->
     {#if failure}
@@ -2246,6 +2291,22 @@
   /* No top margin here: it is beside the inputs, not below them. */
   .train .summary .out {
     margin-top: 0;
+  }
+  .train .summary .shaftline {
+    margin-top: 0.75rem;
+  }
+  .train .summary .shaftline summary {
+    cursor: pointer;
+  }
+  .train .summary .shaftline .out {
+    margin-top: 0.3rem;
+  }
+  /* A term of a family sits after the particular value, on its own line, so
+     `1/7 + 6/7 × per turn of the ring` reads as one sum however long the
+     shaft's name. */
+  .train .summary .shaftline .term {
+    display: block;
+    color: var(--muted);
   }
   .grid {
     display: grid;
