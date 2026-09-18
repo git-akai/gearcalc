@@ -4245,7 +4245,7 @@ mod tests {
         let flat = solve_train(&pair(0.0), &lib).expect("the parallel pair solves");
         let spur = flat.stages[0]
             .as_shape()
-            .map(|s| s.pair_view())
+            .map(shape::ShapeResult::pair_view)
             .expect("parallel answers as a spur result");
         let said: Vec<&str> = spur.gears[0]
             .clamps
@@ -4263,7 +4263,7 @@ mod tests {
         let angled = solve_train(&pair(20.0), &lib).expect("the crossed pair solves");
         let screw = angled.stages[0]
             .as_shape()
-            .map(|s| s.pair_view())
+            .map(shape::ShapeResult::pair_view)
             .expect("a crossed pair answers as a pair");
         let gear = &screw.gears[0];
         let crossed: Vec<&str> = gear
@@ -5034,7 +5034,7 @@ mod tests {
                 // own rating is gated in `crossed::tests`.
                 if stage
                     .as_shape()
-                    .map(|s| s.pair_view())
+                    .map(shape::ShapeResult::pair_view)
                     .is_some_and(|p| p.mesh.point.is_some())
                 {
                     continue;
@@ -5055,9 +5055,18 @@ mod tests {
                         forward_won += 1;
                     }
                     checked += 1;
+                    // **A member in two meshes carries two tooth loads** and
+                    // reports the larger; its stress is the larger of two
+                    // too, and which mesh gives it can differ by direction.
+                    // The law is exact for a member in one mesh, and for a
+                    // planet within the meshes' efficiencies of each other.
+                    let meshes_in = train.stages[k].as_shape().map_or(1, |s| {
+                        s.meshes.iter().filter(|m| m.a == i || m.b == i).count()
+                    });
+                    let tol = if meshes_in > 1 { 2e-2 } else { 1e-9 };
                     if let (Some(a), Some(b)) = (start.bending_stress, end.bending_stress) {
                         assert!(
-                            (b / a - want).abs() < 1e-9 * want,
+                            (b / a - want).abs() < tol * want,
                             "stage {k} member {i}: bending {b} against {a} is {}, \
                              where {back} N·m from the end and {forward} N·m from \
                              the start make {want}",
@@ -5066,7 +5075,7 @@ mod tests {
                     }
                     let (a, b) = (start.contact_stress, end.contact_stress);
                     assert!(
-                        (b / a - want.sqrt()).abs() < 1e-9 * want.sqrt(),
+                        (b / a - want.sqrt()).abs() < tol * want.sqrt(),
                         "stage {k} member {i}: contact {b} against {a} is {}, \
                          where the torques make {}",
                         b / a,
@@ -5508,7 +5517,7 @@ mod tests {
             // force, and its own two-member relation is gated in `crossed`.
             let Some(spur) = stage
                 .as_shape()
-                .map(|s| s.pair_view())
+                .map(shape::ShapeResult::pair_view)
                 .filter(|p| p.mesh.line.is_some())
             else {
                 continue;
@@ -6896,7 +6905,7 @@ mod tests {
         let r = solve_train(&t, &lib).expect("solves");
         let notes = &r.stages[0]
             .as_shape()
-            .map(|s| s.pair_view())
+            .map(shape::ShapeResult::pair_view)
             .expect("a pair")
             .notes;
         assert!(
@@ -6911,7 +6920,7 @@ mod tests {
         let r = solve_train(&t, &lib).expect("solves");
         let pair = r.stages[0]
             .as_shape()
-            .map(|s| s.pair_view())
+            .map(shape::ShapeResult::pair_view)
             .expect("a pair");
         assert!(!pair
             .notes
@@ -6962,13 +6971,16 @@ mod tests {
         );
     }
 
-    /// **An epicyclic kind's clearance cannot be automatic, even when it is the
-    /// input the designer just touched.** A set's is the amount its two
-    /// zero-backlash distances differ by, which the shifts are solved from; a
-    /// hula stage's shifts absorb the crank, so no given offset leaves a
-    /// nominal one to subtract from. So the second pass of `relieved` — the
-    /// one that does not spare `just` — pins it, and the toggle snapping back
-    /// is the tool saying so.
+    /// **Of a distance and its clearance at most one is automatic**, on every
+    /// shape — and which one is pinned back is decided by what was just
+    /// touched. A set used to pin its clearance whatever was touched, since
+    /// its kind could not run at a given distance with the clearance left to
+    /// fall where it may; the shape can, as a pair always could, so the set
+    /// has the pair's rule now: touching the clearance pins the distance and
+    /// touching the distance pins the clearance, and the number in a box
+    /// relief did not turn is kept. A hula stage's shifts absorb its crank,
+    /// so no given offset leaves a nominal one to subtract from, and its
+    /// clearance is pinned back whatever was touched.
     #[test]
     fn an_epicyclic_kinds_clearance_is_pinned_back_whatever_was_touched() {
         let set = PlanetaryStage {
@@ -6985,16 +6997,24 @@ mod tests {
             Some(Freedom::Member(1, MemberFreedom::Shift)),
             None,
         ] {
-            let (auto, manual) = {
-                let relieved = Stage::planetary(set.clone()).relieved(just);
-                let c = relieved.as_shape().unwrap().distances[0].clearance;
-                (c.auto, c.manual)
-            };
+            let relieved = Stage::planetary(set.clone()).relieved(just);
+            let d = relieved.as_shape().unwrap().distances[0];
             assert!(
-                !auto,
-                "a set: relieving after {just:?} should pin the clearance"
+                !(d.clearance.auto && d.distance.auto),
+                "a set: relieving after {just:?} should pin one of the two"
             );
-            assert_eq!(manual, 0.02, "and leave the number where it was");
+            if just == Some(Freedom::Clearance) {
+                assert!(
+                    d.clearance.auto && !d.distance.auto,
+                    "the clearance just touched is spared"
+                );
+            } else {
+                assert!(!d.clearance.auto, "the clearance is the first to be pinned");
+            }
+            assert_eq!(
+                d.clearance.manual, 0.02,
+                "and the number is left where it was"
+            );
             let (auto, manual) = match Stage::Hula(Box::new(hula.clone())).relieved(just) {
                 Stage::Hula(h) => (h.running_clearance.auto, h.running_clearance.manual),
                 _ => unreachable!(),
@@ -7144,7 +7164,7 @@ mod tests {
             let r = solve_train(&t, &lib).expect("all three of these solve");
             let s = r.stages[0]
                 .as_shape()
-                .map(|s| s.pair_view())
+                .map(shape::ShapeResult::pair_view)
                 .expect("a spur stage");
             let keys: Vec<String> = s.notes.iter().map(|n| n.key.clone()).collect();
             (s.clearance, keys)
@@ -7307,7 +7327,7 @@ mod tests {
             let r = solve_train(&t, &lib).expect("the stage solves either way");
             let s = r.stages[0]
                 .as_shape()
-                .map(|s| s.pair_view())
+                .map(shape::ShapeResult::pair_view)
                 .expect("a spur stage");
             (s.clearance, s.centre_distance, s.gears[0].helix_angle)
         };
@@ -7346,7 +7366,10 @@ mod tests {
 
         // ...and the group says exactly that many: five inputs bound by one
         // relation, so four may stand and the distance is the first to give —
-        // the size being one entry of three readings, which comes last.
+        // the size being one entry of three readings, which comes last. The
+        // clearance gives after the shifts: a set's three shifts can leave
+        // the relation over by two, and a clearance relieved is one the group
+        // below pins straight back.
         let groups = Stage::spur(PairStage::default()).freedoms();
         let relation = groups
             .iter()
@@ -7354,7 +7377,11 @@ mod tests {
             .expect("the pair's relation");
         assert_eq!(relation.given_at_most, 4);
         assert_eq!(relation.order[0], vec![Freedom::CentreDistance]);
-        assert_eq!(relation.order[1], vec![Freedom::Clearance]);
+        assert_eq!(
+            relation.order[1],
+            vec![Freedom::Member(0, MemberFreedom::Shift)]
+        );
+        assert_eq!(relation.order[3], vec![Freedom::Clearance]);
         assert_eq!(
             relation.order[4],
             vec![
@@ -7427,7 +7454,7 @@ mod tests {
                         };
                         let s = r.stages[0]
                             .as_shape()
-                            .map(|s| s.pair_view())
+                            .map(shape::ShapeResult::pair_view)
                             .expect("a spur stage");
 
                         checked += 1;
@@ -7490,7 +7517,7 @@ mod tests {
 
                     let s = r.stages[0]
                         .as_shape()
-                        .map(|s| s.pair_view())
+                        .map(shape::ShapeResult::pair_view)
                         .expect("a spur stage");
                     checked += 1;
                     assert!(
@@ -7584,7 +7611,7 @@ mod tests {
 
         for (k, stage) in r.stages.iter().enumerate() {
             let d = stage.backlash();
-            let opens = stage.as_shape().is_some_and(|s| s.layout.is_none());
+            let opens = stage.as_shape().is_none_or(|s| s.layout.is_none());
             check(&format!("stage {k} forward"), &d.forward, opens);
             check(&format!("stage {k} backward"), &d.backward, opens);
         }
@@ -9425,7 +9452,7 @@ mod tests {
                     }
                 });
 
-                let Some(sp) = s.as_shape().map(|s| s.pair_view()) else {
+                let Some(sp) = s.as_shape().map(shape::ShapeResult::pair_view) else {
                     continue;
                 };
                 for (i, (g, want)) in sp.gears.iter().zip(expected).enumerate() {
