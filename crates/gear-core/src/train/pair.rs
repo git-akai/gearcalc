@@ -1472,9 +1472,9 @@ impl Constrained for PairStage {
         const SECOND: usize = 2;
         super::Wiring {
             shafts: vec![
-                super::ShaftSpec { label: "ground" },
-                super::ShaftSpec { label: "first" },
-                super::ShaftSpec { label: "second" },
+                super::ShaftLabel::Ground,
+                super::ShaftLabel::Member { member: 0 },
+                super::ShaftLabel::Member { member: 1 },
             ],
             mounts: vec![
                 super::Mount::coaxial_with(FIRST, GROUND),

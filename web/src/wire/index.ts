@@ -64,6 +64,7 @@ export type { PointContact } from "./core/PointContact";
 export type { Port } from "./core/Port";
 export type { Power } from "./core/Power";
 export type { Ranges } from "./core/Ranges";
+export type { ShaftLabel } from "./core/ShaftLabel";
 export type { ShaftsCase } from "./core/ShaftsCase";
 export type { ShiftRange } from "./core/ShiftRange";
 export type { Sinusoid } from "./core/Sinusoid";

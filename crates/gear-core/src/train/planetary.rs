@@ -1765,11 +1765,11 @@ impl super::Constrained for PlanetaryStage {
             .unwrap_or(self.arrangement.input);
         super::Wiring {
             shafts: vec![
-                super::ShaftSpec { label: "ground" },
-                super::ShaftSpec { label: "sun" },
-                super::ShaftSpec { label: "carrier" },
-                super::ShaftSpec { label: "ring" },
-                super::ShaftSpec { label: "planet" },
+                super::ShaftLabel::Ground,
+                super::ShaftLabel::Member { member: 0 },
+                super::ShaftLabel::Carrier { index: 0 },
+                super::ShaftLabel::Member { member: 2 },
+                super::ShaftLabel::Member { member: 1 },
             ],
             // Members in `StageResult::members()` order: sun, planet, ring.
             mounts: vec![

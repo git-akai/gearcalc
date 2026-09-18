@@ -60,14 +60,33 @@ use super::StageGear;
 use crate::kinematics::{Condition, MeshRow, Shaft, System, GROUND};
 use crate::mesh::MeshKind;
 
-/// A shaft a stage introduces.
+/// **What a shaft is**, structurally — which is the only thing `gear-core` may
+/// say about it, a name being a word the application shows.
 ///
-/// The label is for the harness and for `Debug`; when ports reach the front end
-/// it becomes a catalogue key, because a shaft's name is a word the application
-/// shows and those live in `strings_<code>.toml`.
+/// It was a `&'static str` — `"sun"`, `"crank"`, `"wobble"` — which is English
+/// in the core (rule 2) and a *role* rather than a fact. A general epicyclic
+/// stage has no sun; it has central members and carriers, and this is the list
+/// that survives that: ground, the shaft a member spins with, or a carrier —
+/// a frame that is nobody's shaft. The front end names the second after the
+/// member (`gearNumber`) and the third with its own word, as it already does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ShaftSpec {
-    pub label: &'static str,
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
+pub enum ShaftLabel {
+    /// The one held frame — see [`GROUND`].
+    Ground,
+    /// The shaft a member spins with, by member index in
+    /// [`super::StageResult::members`] order. Where several members share one
+    /// — a compound planet, a wobble body — it is the first of them.
+    Member { member: usize },
+    /// A frame that carries meshes and is no member's shaft: a set's carrier,
+    /// a hula stage's crank. Numbered within the stage.
+    Carrier { index: usize },
 }
 
 /// Where one member sits: what it turns with, and what its axis stands still
@@ -153,7 +172,7 @@ pub struct MeshSpec {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Wiring {
     /// Shaft 0 is always ground.
-    pub shafts: Vec<ShaftSpec>,
+    pub shafts: Vec<ShaftLabel>,
     /// One per member, in [`super::StageResult::members`] order.
     pub mounts: Vec<Mount>,
     /// One per mesh, in [`super::StageResult::meshes`] order.
@@ -467,7 +486,7 @@ pub struct ShaftMotion {
     /// Which stage introduced it, and `None` for ground, which every
     /// stage shares.
     pub stage: Option<usize>,
-    pub label: &'static str,
+    pub label: ShaftLabel,
     /// Turns per turn of the driven port — exactly.
     pub speed: Ratio,
 }
@@ -604,14 +623,14 @@ impl Train {
         let wirings: Vec<Wiring> = self.stages.iter().map(super::Stage::wiring).collect();
         let mut shafts = vec![ShaftMotion {
             stage: None,
-            label: "ground",
+            label: ShaftLabel::Ground,
             speed: solution.values[GROUND],
         }];
         for (k, w) in wirings.iter().enumerate() {
-            for (local, s) in w.shafts.iter().enumerate().skip(1) {
+            for (local, label) in w.shafts.iter().enumerate().skip(1) {
                 shafts.push(ShaftMotion {
                     stage: Some(k),
-                    label: s.label,
+                    label: *label,
                     speed: solution.values[at[k].of(local)],
                 });
             }

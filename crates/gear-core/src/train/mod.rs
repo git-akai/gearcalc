@@ -53,7 +53,7 @@ pub use planetary::{
 };
 pub(crate) use wiring::{arranged, teeth_of};
 pub use wiring::{
-    MemberMotion, MeshSpec, MotionError, Mount, Offsets, ShaftMotion, ShaftSpec, TrainMotion,
+    MemberMotion, MeshSpec, MotionError, Mount, Offsets, ShaftLabel, ShaftMotion, TrainMotion,
     UnitMotion, Wiring, WiringError,
 };
 

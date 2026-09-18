@@ -254,7 +254,7 @@ fn graph(train: &Train) {
             for s in &m.shafts {
                 println!(
                     "    shaft {:<9} of {:<7} speed {}",
-                    s.label,
+                    shaft_name(&train.stages, s),
                     s.stage
                         .map_or_else(|| "the train".to_string(), |k| format!("stage {}", k + 1)),
                     s.speed,
@@ -346,6 +346,25 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
     }
     graph(train);
     println!();
+}
+
+/// What to call a shaft here — the harness's English, which the core does not
+/// have. A member's shaft is named after the member's role where its kind has
+/// one, so the corpus reads as it did.
+fn shaft_name(stages: &[Stage], s: &gear_core::train::ShaftMotion) -> String {
+    use gear_core::train::ShaftLabel;
+    match (s.label, s.stage.map(|k| &stages[k])) {
+        (ShaftLabel::Ground, _) => "ground".into(),
+        (ShaftLabel::Carrier { .. }, Some(Stage::Hula(_))) => "crank".into(),
+        (ShaftLabel::Carrier { .. }, _) => "carrier".into(),
+        (ShaftLabel::Member { member }, Some(Stage::Planetary(_))) => {
+            ["sun", "planet", "ring"][member].into()
+        }
+        (ShaftLabel::Member { member }, Some(Stage::Hula(_))) => {
+            ["grounded", "wobble", "wobble", "output"][member].into()
+        }
+        (ShaftLabel::Member { member }, _) => ["first", "second"][member].into(),
+    }
 }
 
 fn port(p: Port) -> &'static str {

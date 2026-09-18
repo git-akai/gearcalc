@@ -1468,11 +1468,11 @@ impl super::Constrained for HulaStage {
         };
         super::Wiring {
             shafts: vec![
-                super::ShaftSpec { label: "ground" },
-                super::ShaftSpec { label: "grounded" },
-                super::ShaftSpec { label: "crank" },
-                super::ShaftSpec { label: "wobble" },
-                super::ShaftSpec { label: "output" },
+                super::ShaftLabel::Ground,
+                super::ShaftLabel::Member { member: 0 },
+                super::ShaftLabel::Carrier { index: 0 },
+                super::ShaftLabel::Member { member: 1 },
+                super::ShaftLabel::Member { member: 3 },
             ],
             mounts: vec![
                 super::Mount::coaxial_with(GEAR1, CRANK),
