@@ -738,9 +738,16 @@ an earlier stage is coupled to is *where the chain enters*, not a condition
 card's two selects with them. Removing a stage re-indexes the constraints and
 couplings that name later stages, which nothing did before.
 
-**4e, not yet built.** `reacted` derived beside the input; relief over
-constraints — which, with a convention giving way to a statement of its kind,
-is largely what the overlay now does.
+**4e — closed by analysis, not by code.** Deriving `reacted` by the rowspace
+law restates the flag: with the far port allowed a torque the rowspace
+supplies one, with it allowed none there is none, and whether it is allowed
+one is what the flag says (`docs/rationale.md#a-load-exists-only-where-it-is-reacted`).
+What is derivable — where the reaction lands once declared — was already
+reported beside it. Relief over constraints is the overlay's rule: a
+convention gives way to a statement of its kind, a statement the designer made
+does not, and a conflict between two statements is named at the later one
+rather than relieved (`docs/rationale.md#a-planetary-needs-the-held-shaft-named`).
+**Phase 4 is complete**, and with it the first delivery (§10.1).
 
 **Phase 5 — the general epicyclic stage.** The mesh grid, the one-radius-per-
 planet-shaft closure, the gutter toggle. `Stage::Planetary` becomes a preset
@@ -918,7 +925,7 @@ now.** "Nothing holds this" is useful vocabulary for a designer, and whether the
 law can replace it without loss is a *usability* question that cannot be
 answered until the UI meets the new core. So: derive it, report it, keep the
 input, and revisit once Phase 4's panel exists and the two can be compared on
-screen.
+screen. *Revisited in 4e: the law restates the input, and the input stays.*
 
 **5. The lever diagram** — deferred, and scoped separately. The tool draws no
 epicyclic today and `state.md` records that as deliberate.

@@ -1303,6 +1303,16 @@ train used to decide it by direction: a load from the input was always held
 only case. It is a switch per load now, defaulting to what the direction used
 to imply.
 
+The graph refactor asked whether the switch could be *derived* — "nothing
+reacts it" as "no torque in the rowspace of the shaft line puts that load on
+that shaft" — and the answer is that the law restates the switch. With the
+far port allowed a torque, the rowspace supplies one; with it allowed none,
+there is none; and whether it is allowed one is exactly what the switch says.
+What *is* derivable is where the reaction lands once it is declared — a
+self-locking stage holding it first, the far port otherwise — and that is
+reported beside the switch on every case. So the switch stays, and the plan's
+promise to derive it is closed here rather than kept.
+
 **Why a two-pass solve.** A stage's torque depends on the ratio and efficiency
 of every stage between it and the port, which are not known until those stages
 are solved. Ratio and efficiency do not depend on torque, so the train is solved
@@ -1499,6 +1509,19 @@ determine an answer: a sun-driven set behaves quite differently with the ring
 held than with the carrier held, and the two are not variants of one answer. This
 is an **input** the specification omitted, and inventing a default for it would
 be choosing a machine on the user's behalf.
+
+It is the **train's** input now, not the set's: which shaft is held and which
+driven is a constraint on a port, laid over what the kind holds *by
+convention* — the ring, for a set, and the panel says so in the words
+"convention: held" beside every port, so the default is named rather than
+invented. A convention is the weakest statement there is and gives way to any
+statement of its kind about the same stage: holding the carrier releases the
+ring without a word about it. A statement the designer made does not give
+way — two holds on one set lock it, and the train says which condition
+cannot hold rather than quietly dropping one. That asymmetry is the whole of
+"relief over constraints": the machinery that relieves a *number* exists
+because an automatic value has nothing to say for itself, and a constraint a
+designer wrote has.
 
 ### Each stage kind keeps its own result type
 
