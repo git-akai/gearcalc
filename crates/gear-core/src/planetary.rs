@@ -540,7 +540,7 @@ impl PlanetaryShaft {
     ///
     /// A planetary set has three shafts and exactly two are chosen — one driven,
     /// one held — so the third is not a choice at all.
-    fn other(a: Self, b: Self) -> Option<Self> {
+    pub(crate) fn other(a: Self, b: Self) -> Option<Self> {
         Self::ALL
             .into_iter()
             .find(|&m| m != a && m != b)
