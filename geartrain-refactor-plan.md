@@ -725,9 +725,22 @@ there is one, and "1 short" where the ratings wait. Found on the way: the
 overlay let a designer's second drive on one set remove the first, so a
 differential's two inputs came out as one input and a family.
 
-**4d–4e, not yet built.** The condition panel proper, where any shaft of any
-stage takes a constraint; `reacted` derived beside the input; relief over
-constraints.
+**4d — every port takes a constraint, on every kind.** Each stage card
+lists its ports with one choice each — held, driven, free, or the convention
+*as the overlay leaves it*, which the core reports per port (`by_convention`)
+rather than the panel guessing from the kind. Two rules made a single select
+per shaft enough: a hold the train writes on a stage replaces the kind's
+conventional holds on that stage (as a drive already replaced its drive), so
+holding a set's carrier releases its ring in one line; and a drive on a shaft
+an earlier stage is coupled to is *where the chain enters*, not a condition
+— its speed is the coupling's. With those, `Train::arranged` and the
+`arrange_stage` entry point had nothing left to do and are gone, the planetary
+card's two selects with them. Removing a stage re-indexes the constraints and
+couplings that name later stages, which nothing did before.
+
+**4e, not yet built.** `reacted` derived beside the input; relief over
+constraints — which, with a convention giving way to a statement of its kind,
+is largely what the overlay now does.
 
 **Phase 5 — the general epicyclic stage.** The mesh grid, the one-radius-per-
 planet-shaft closure, the gutter toggle. `Stage::Planetary` becomes a preset

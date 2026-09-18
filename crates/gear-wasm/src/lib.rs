@@ -1462,36 +1462,6 @@ fn relieve_stage_impl(input: &str) -> Result<String, String> {
 /// with that stage's constraints stated in full and, where the stage is in
 /// the middle of a chain, the chain moved to enter at `driven`.
 ///
-/// The panel's one gesture on a set's card, done here rather than there
-/// because the two halves of it are different layers: what is *held* is a
-/// constraint, and where the load *comes in* is a constraint on the first
-/// stage and a coupling on every other. Writing a drive on a mid-chain sun
-/// asks it to turn at one speed while the coupling turns it at another, which
-/// the solver refuses — and did, the first time the panel tried
-/// ([`gear_core::train::Train::arranged`]).
-///
-/// # Errors
-///
-/// A malformed train, which would be a defect on this side of the boundary.
-#[wasm_bindgen]
-pub fn arrange_stage(input: &str) -> Result<String, JsError> {
-    arrange_stage_impl(input).map_err(|e| JsError::new(&e))
-}
-
-#[derive(Deserialize)]
-struct ArrangeRequest {
-    train: gear_core::train::Train,
-    stage: usize,
-    driven: usize,
-    held: usize,
-}
-
-fn arrange_stage_impl(input: &str) -> Result<String, String> {
-    let req: ArrangeRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
-    serde_json::to_string(&req.train.arranged(req.stage, req.driven, req.held))
-        .map_err(|e| e.to_string())
-}
-
 /// Version of the core, so the UI can show what it is actually running.
 #[wasm_bindgen]
 #[must_use]

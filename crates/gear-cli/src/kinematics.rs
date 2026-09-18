@@ -94,28 +94,19 @@ fn pair(z1: u32, z2: u32, helix: f64) -> Stage {
 /// arrangement any more — that is a fact about the train, and this is the
 /// shape a file writes it in.
 fn arranged(k: usize, input: &str, fixed: &str) -> Vec<ShaftConstraint> {
-    use gear_core::train::Constraint;
     // The set's shafts, in its wiring's order: ground, sun, carrier, ring,
-    // planet. All three central shafts are stated, because a train's
-    // constraints lay over the kind's conventions shaft by shaft, and holding
-    // the carrier *instead of* the ring has to say so about the ring.
+    // planet. One line each: a hold or a drive on a stage replaces the
+    // kind's convention of that kind, so holding the carrier releases the
+    // ring without a word about it.
     let shaft = |s: &str| match s {
         "sun" => 1,
         "carrier" => 2,
         _ => 3,
     };
-    (1..=3)
-        .map(|s| ShaftConstraint {
-            at: ShaftRef::Of { stage: k, shaft: s },
-            constraint: if s == shaft(input) {
-                Constraint::Driven
-            } else if s == shaft(fixed) {
-                Constraint::Held
-            } else {
-                Constraint::Free
-            },
-        })
-        .collect()
+    vec![
+        ShaftConstraint::driven(k, shaft(input)),
+        ShaftConstraint::held(k, shaft(fixed)),
+    ]
 }
 
 /// A default epicyclic set. What drives it and what holds it is the train's
@@ -217,18 +208,12 @@ fn fixtures() -> Vec<(String, Train)> {
         ),
     ));
     // The set at stage 1 is driven by the coupling, so only its held shaft
-    // and the shaft it releases are stated.
+    // is stated; the ring it releases follows by rule.
     out.push((
         "pair-then-set".to_string(),
         asked(
             vec![pair(17, 43, 0.0), set()],
-            vec![
-                ShaftConstraint::held(1, 2),
-                ShaftConstraint {
-                    at: ShaftRef::Of { stage: 1, shaft: 3 },
-                    constraint: gear_core::train::Constraint::Free,
-                },
-            ],
+            vec![ShaftConstraint::held(1, 2)],
         ),
     ));
     // **A train that does not close, recorded as it currently answers.** A
@@ -250,8 +235,8 @@ fn fixtures() -> Vec<(String, Train)> {
     // with its ring released: no rating, and a *family* under the line, every
     // shaft's speed per turn of the free one. The second drives the sun and
     // the carrier together, which is one motion — the whole set turns as one
-    // — and no arrangement to rate. The third holds the carrier beside the
-    // ring, so the sun cannot turn.
+    // — and no arrangement to rate. The third holds the carrier and the ring
+    // both, so the sun cannot turn.
     let free = |shaft| ShaftConstraint {
         at: ShaftRef::Of { stage: 0, shaft },
         constraint: gear_core::train::Constraint::Free,
@@ -273,7 +258,10 @@ fn fixtures() -> Vec<(String, Train)> {
     ));
     out.push((
         "conflict".to_string(),
-        asked(vec![set()], vec![ShaftConstraint::held(0, 2)]),
+        asked(
+            vec![set()],
+            vec![ShaftConstraint::held(0, 2), ShaftConstraint::held(0, 3)],
+        ),
     ));
     // **The same chain with its loads written at shafts by reference** —
     // the shaft `end` resolves to, which with the carrier held is the set's

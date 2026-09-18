@@ -420,19 +420,28 @@ impl Train {
 
     /// **The constraints in force**: each kind's conventions — its own holds,
     /// and the first stage's input driven — with the train's own laid over
-    /// them, shaft by shaft.
+    /// them.
     ///
     /// Laid over rather than replacing, so that a train stating one thing
     /// keeps the rest: holding a set's carrier does not silently release the
-    /// drive on the stage before it. Two things follow and both are what a
+    /// drive on the stage before it. Three things follow and each is what a
     /// designer means:
     ///
     /// - a constraint on a shaft **replaces** the convention on that shaft, so
     ///   `Free` on a conventionally held ring releases it;
+    /// - a hold on any shaft of a stage **replaces the conventional holds on
+    ///   that stage** — "hold the carrier" means instead of the ring, not as
+    ///   well, and a set locked by holding two of its shafts is what a
+    ///   designer asks for by writing both;
     /// - a drive on any shaft of a stage **replaces the conventional drive on
-    ///   that stage** — "driven by the carrier" means instead of the sun, not
-    ///   as well, and two drives on one set is a family a designer asks for by
-    ///   writing both.
+    ///   that stage**, the same way, and two drives are the designer's.
+    ///
+    /// A convention is the weakest statement there is, and gives way to any
+    /// statement of the same kind about the same stage. (The second rule
+    /// arrived after the first delivery: a hold used to replace the hold on
+    /// its own shaft only, so holding the carrier needed the ring written
+    /// free as well, and a panel offering one select per shaft had to write
+    /// two.)
     #[must_use]
     pub fn constraints_in_force(&self) -> Vec<ShaftConstraint> {
         let mut out: Vec<ShaftConstraint> = Vec::new();
@@ -445,19 +454,20 @@ impl Train {
                 out.push(ShaftConstraint::driven(0, ports.input()));
             }
         }
-        // The conventional drive goes from every stage the train drives
-        // itself — **before** any of the train's own are laid, so that two
-        // drives the designer wrote on one set are both kept. Written the
-        // other way round, the second drive removed the first, and a
-        // differential's two inputs came out as one input and a family.
+        // The conventions of a kind go from every stage the train says the
+        // same kind of thing about — **before** any of the train's own are
+        // laid, so that two drives the designer wrote on one set are both
+        // kept. Written the other way round, the second drive removed the
+        // first, and a differential's two inputs came out as one input and a
+        // family.
         for own in &self.constraints {
-            if own.constraint == Constraint::Driven {
-                if let ShaftRef::Of { stage, .. } = own.at {
-                    out.retain(|c| {
-                        !(c.constraint == Constraint::Driven
-                            && matches!(c.at, ShaftRef::Of { stage: s, .. } if s == stage))
-                    });
-                }
+            if let (ShaftRef::Of { stage, .. }, Constraint::Held | Constraint::Driven) =
+                (own.at, own.constraint)
+            {
+                out.retain(|c| {
+                    !(c.constraint == own.constraint
+                        && matches!(c.at, ShaftRef::Of { stage: s, .. } if s == stage))
+                });
             }
         }
         for own in &self.constraints {
@@ -469,7 +479,7 @@ impl Train {
 
     /// Where each stage's shafts begin in the assembled system, and how many
     /// shafts there are.
-    fn layout(&self) -> (Vec<Offsets>, usize) {
+    pub(crate) fn layout(&self) -> (Vec<Offsets>, usize) {
         let mut at = Vec::with_capacity(self.stages.len());
         let mut next = 1;
         for stage in &self.stages {
@@ -538,13 +548,42 @@ impl Train {
     pub fn conditions(&self, at: &[Offsets], shafts: usize) -> Result<Vec<Condition>, MotionError> {
         let mut out = vec![Condition::Free; shafts];
         out[GROUND] = Condition::Ground;
+        let couplings = self.couplings_in_force();
         for c in self.constraints_in_force() {
             let i = self.resolve(at, c.at)?;
-            if i != GROUND {
-                out[i] = c.constraint.condition();
+            if i == GROUND {
+                continue;
             }
+            // **A driven shaft that a coupling turns is not a drive.** "Driven"
+            // on a shaft coupled to an earlier stage says where the chain
+            // enters — the port the load is referred to — and its speed is
+            // the coupling's; a drive of one turn there as well would ask the
+            // shaft for two speeds, which is how this came to be.
+            out[i] = match c.constraint {
+                Constraint::Driven if self.turned_by_a_coupling(&couplings, c.at) => {
+                    Condition::Free
+                }
+                other => other.condition(),
+            };
         }
         Ok(out)
+    }
+
+    /// Whether a coupling from an earlier stage turns this shaft.
+    fn turned_by_a_coupling(&self, couplings: &[Coupling], r: ShaftRef) -> bool {
+        let ShaftRef::Of { stage, .. } = r else {
+            return false;
+        };
+        couplings.iter().any(|c| {
+            let other = if c.a == r {
+                c.b
+            } else if c.b == r {
+                c.a
+            } else {
+                return false;
+            };
+            matches!(other, ShaftRef::Of { stage: o, .. } if o < stage)
+        })
     }
 
     /// **What each stage is asked**, as its own solver needs it: its local
@@ -565,10 +604,23 @@ impl Train {
         let (at, shafts) = self.layout();
         let conditions = self.conditions(&at, shafts)?;
         let couplings = self.couplings_in_force();
+        let in_force = self.constraints_in_force();
         let mut out = Vec::with_capacity(self.stages.len());
         for (k, stage) in self.stages.iter().enumerate() {
             let w = stage.wiring();
             let ports = stage.ports();
+            // The port the train says power enters this stage by — a drive
+            // at the head, or the chain's entry behind it — read from the
+            // constraint rather than the condition, since a coupled drive is
+            // no condition ([`Self::conditions`]).
+            let driven = in_force.iter().find_map(|c| match c.at {
+                ShaftRef::Of { stage, shaft }
+                    if stage == k && c.constraint == Constraint::Driven =>
+                {
+                    Some(shaft)
+                }
+                _ => None,
+            });
             let mut local: Vec<Condition> = (0..w.shafts.len())
                 .map(|s| conditions[at[k].of(s)])
                 .collect();
@@ -589,12 +641,6 @@ impl Train {
                     }
                 })
             };
-            let driven = local
-                .iter()
-                .enumerate()
-                .skip(1)
-                .find(|(_, c)| matches!(c, Condition::Drive(_)))
-                .map(|(i, _)| i);
             let held: Vec<Shaft> = local
                 .iter()
                 .enumerate()
@@ -602,8 +648,11 @@ impl Train {
                 .filter(|(_, c)| **c == Condition::Ground)
                 .map(|(i, _)| i)
                 .collect();
-            let input = driven
-                .or_else(|| side(true, true))
+            // An explicit coupling from an earlier stage says where the chain
+            // enters; failing that the train's own drive; failing that the
+            // kind's convention.
+            let input = side(true, true)
+                .or(driven)
                 .unwrap_or_else(|| ports.ends(&held, None).0);
             // **The output is chosen knowing the input.** A set behind a pair
             // and coupled to it by its *ring* had its conventional output
@@ -943,6 +992,13 @@ pub struct PortSpec {
     /// The local shaft index a [`ShaftRef`] names it by.
     pub shaft: Shaft,
     pub label: ShaftLabel,
+    /// **What this port is asked if the train says nothing about it** — the
+    /// kind's convention *as the overlay leaves it*, with everything else
+    /// the train states in force: a set's ring reads `free` here once its
+    /// carrier is held, because holding the carrier releases it. What a
+    /// panel's "convention" choice would come to, computed by the rule
+    /// rather than guessed from the kind.
+    pub by_convention: Constraint,
 }
 
 /// **A stage's ports and its conventional holds**, so a panel can offer
@@ -957,8 +1013,6 @@ pub struct PortSpec {
 )]
 pub struct StagePorts {
     pub ports: Vec<PortSpec>,
-    /// What the kind holds when the train says nothing.
-    pub held_by_convention: Vec<Shaft>,
 }
 
 /// One shaft of the train's motion, for the front end.
@@ -1041,19 +1095,31 @@ impl Train {
     pub fn topology(&self) -> Vec<StagePorts> {
         self.stages
             .iter()
-            .map(|stage| {
+            .enumerate()
+            .map(|(k, stage)| {
                 let w = stage.wiring();
-                let p = stage.ports();
                 StagePorts {
-                    ports: p
+                    ports: stage
+                        .ports()
                         .ports
                         .iter()
-                        .map(|&shaft| PortSpec {
-                            shaft,
-                            label: w.shafts[shaft],
+                        .map(|&shaft| {
+                            let at = ShaftRef::Of { stage: k, shaft };
+                            // The train without its own word on this shaft,
+                            // and what the overlay then asks of it.
+                            let mut without = self.clone();
+                            without.constraints.retain(|c| c.at != at);
+                            PortSpec {
+                                shaft,
+                                label: w.shafts[shaft],
+                                by_convention: without
+                                    .constraints_in_force()
+                                    .iter()
+                                    .find(|c| c.at == at)
+                                    .map_or(Constraint::Free, |c| c.constraint),
+                            }
                         })
                         .collect(),
-                    held_by_convention: p.held,
                 }
             })
             .collect()
@@ -1089,9 +1155,11 @@ impl Train {
         // and one condition in the matrix, and neither to a designer, who
         // reads "mobility 2, one given" of a set with its ring released.
         let constrained = self
-            .constraints_in_force()
+            .conditions(at, m.solution.values.len())
+            .ok()?
             .iter()
-            .filter(|c| c.constraint != Constraint::Free)
+            .skip(1)
+            .filter(|c| **c != Condition::Free)
             .count();
         let free: Vec<ShaftRef> = m
             .solution
@@ -1141,95 +1209,5 @@ impl Train {
                 .collect(),
             ports: self.open_ports(&self.boundaries().ok()?),
         })
-    }
-}
-
-// -------------------------------------------------- arranging one stage ---
-
-impl Train {
-    /// **This train with one stage told what drives it and what it holds** —
-    /// the one gesture a panel offers on a set's card, done by the rules the
-    /// core already keeps rather than by the panel.
-    ///
-    /// Two things that used to be one field, kept apart because they are
-    /// different layers: **what is held** is a constraint; **where the load
-    /// comes in** is a constraint only on a stage nothing drives from
-    /// upstream — the first of a chain — and a *coupling* everywhere else,
-    /// since a stage in the middle of a chain is turned by the stage before
-    /// it, and writing a drive on its sun as well would ask the sun to turn at
-    /// one speed while the coupling turns it at another. That contradiction
-    /// is exactly what the solver refuses, and it is how this came to exist.
-    ///
-    /// Every port of the stage is stated — held, driven, or free — because the
-    /// train's constraints lay over the kind's conventions shaft by shaft. The
-    /// chain is materialised where it was implicit, so the coupling into this
-    /// stage can be moved to `driven` and the one out of it to the port left
-    /// free.
-    #[must_use]
-    pub fn arranged(&self, stage: usize, driven: Shaft, held: Shaft) -> Self {
-        let mut out = self.clone();
-        let Some(kind) = self.stages.get(stage) else {
-            return out;
-        };
-        let ports = kind.ports();
-        let couplings = self.couplings_in_force();
-        // Whether one of this stage's shafts is coupled to an earlier stage —
-        // in which case that is what drives it, and "driven by" names the port
-        // the coupling enters rather than a motor.
-        let at_stage = |r: ShaftRef| matches!(r, ShaftRef::Of { stage: s, .. } if s == stage);
-        let earlier = |r: ShaftRef| match r {
-            ShaftRef::Ground => false,
-            ShaftRef::Of { stage: o, .. } => o < stage,
-        };
-        let entered_from_upstream = couplings
-            .iter()
-            .any(|c| (at_stage(c.b) && earlier(c.a)) || (at_stage(c.a) && earlier(c.b)));
-
-        // --- what is held, and what is driven where a drive is what is meant.
-        out.constraints
-            .retain(|c| !matches!(c.at, ShaftRef::Of { stage: s, .. } if s == stage));
-        for &p in &ports.ports {
-            let constraint = if p == held {
-                Constraint::Held
-            } else if p == driven && !entered_from_upstream {
-                Constraint::Driven
-            } else {
-                Constraint::Free
-            };
-            out.constraints.push(ShaftConstraint {
-                at: ShaftRef::Of { stage, shaft: p },
-                constraint,
-            });
-        }
-
-        // --- where the chain enters and leaves, where either is a coupling.
-        // The chain is materialised so there is a coupling to move; an end at
-        // this stage that faces an earlier stage moves to `driven`, and one
-        // that faces a later stage moves to the port left over.
-        if couplings.iter().any(|c| at_stage(c.a) || at_stage(c.b)) {
-            let leaves_by = ports
-                .ports
-                .iter()
-                .copied()
-                .find(|&p| p != driven && p != held)
-                .unwrap_or(driven);
-            let moved = |here: ShaftRef, there: ShaftRef| -> ShaftRef {
-                if !at_stage(here) {
-                    return here;
-                }
-                ShaftRef::Of {
-                    stage,
-                    shaft: if earlier(there) { driven } else { leaves_by },
-                }
-            };
-            out.couplings = couplings
-                .into_iter()
-                .map(|c| Coupling {
-                    a: moved(c.a, c.b),
-                    b: moved(c.b, c.a),
-                })
-                .collect();
-        }
-        out
     }
 }

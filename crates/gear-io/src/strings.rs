@@ -1473,7 +1473,7 @@ mod tests {
             // **Every way the train's own conditions can fail to give one
             // motion**, each fired from the model on a set whose shafts are
             // sun 1, carrier 2, ring 3: the ring released with nothing else
-            // held (one short); the carrier held beside the ring (the sun
+            // held (one short); the carrier and the ring both held (the sun
             // cannot turn); a constraint on a shaft no stage has; two drives
             // on the set, which is one motion but no arrangement to rate
             // under; and a chain whose tooth counts multiply past `i128`.
@@ -1510,7 +1510,13 @@ mod tests {
                 };
                 let trains = [
                     (set(vec![free(0, 3)]), "underdetermined"),
-                    (set(vec![ShaftConstraint::held(0, 2)]), "overdetermined"),
+                    (
+                        set(vec![
+                            ShaftConstraint::held(0, 2),
+                            ShaftConstraint::held(0, 3),
+                        ]),
+                        "overdetermined",
+                    ),
                     (set(vec![ShaftConstraint::held(7, 1)]), "no such shaft"),
                     (
                         set(vec![

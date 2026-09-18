@@ -2130,15 +2130,26 @@ constraint   ShaftRef → held | driven | free      ShaftRef: ground, or stage k
 coupling     ShaftRef = ShaftRef                  two shafts that turn as one
 ```
 
-**Conventions are laid under, and a constraint replaces one shaft's.** With no
-constraints, every kind's convention stands: a pair's first member drives, a
-set's ring is held and its sun drives, the first stage of a chain is driven and
-each stage's conventional output is coupled to the next stage's conventional
-input. A constraint on a shaft replaces the convention *on that shaft* — `free`
-on a set's ring releases it and nothing else moves — with one rule on top: a
-`driven` anywhere on a stage replaces that stage's conventional drive, since
-"driven by the carrier" means instead of the sun and not as well. Two drives on
-one set are what a designer writes when a differential's two inputs are meant.
+**Conventions are laid under, and a statement replaces the convention of its
+kind.** With no constraints, every kind's convention stands: a pair's first
+member drives, a set's ring is held and its sun drives, the first stage of a
+chain is driven and each stage's conventional output is coupled to the next
+stage's conventional input. A constraint on a shaft replaces the convention *on
+that shaft* — `free` on a set's ring releases it and nothing else moves — and a
+`held` or a `driven` anywhere on a stage replaces that stage's conventional
+holds or drive: "hold the carrier" means instead of the ring and "driven by
+the carrier" means instead of the sun, neither as well. A convention is the
+weakest statement there is and gives way to any of the same kind about the
+same stage; what a designer writes twice — two holds, two drives — stands
+twice, which is a locked set or a differential's two inputs.
+
+**A drive behind a coupling is where the chain enters, not a speed.** `driven`
+on a shaft that an earlier stage is coupled to says which port the load is
+referred to, and its speed is the coupling's; a drive of one turn there as
+well would ask the shaft for two speeds, and did. So the same word arranges a
+set at the head of a chain and behind one, and the panel offers each port one
+choice — held, driven, free, or the convention as the overlay leaves it —
+on every kind alike.
 
 **The chain reads its ends off the constraints.** A stage's input is the first
 of its ports not held, or the one driven; its output the next not held. So

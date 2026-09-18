@@ -565,8 +565,8 @@
     shaft planet    of stage 1 speed 1
 
 == conflict ==
-  no answer: two conditions cannot both hold at stage 1, shaft 2
-  graph    no motion: Conflicts(Of { stage: 0, shaft: 2 })
+  no answer: two conditions cannot both hold at stage 1, shaft 3
+  graph    no motion: Conflicts(Of { stage: 0, shaft: 3 })
 
 == pair-then-set-named ==
   total    ratio      15.176471   efficiency  95.685183 / 95.685183  %   backlash   0.055170 / 0.837281   deg

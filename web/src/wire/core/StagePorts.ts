@@ -6,8 +6,4 @@ import type { PortSpec } from "./PortSpec";
  * exactly the shafts a train may constrain or couple — read from the kind's
  * own wiring rather than written into the front end a second time.
  */
-export type StagePorts = { ports: Array<PortSpec>, 
-/**
- * What the kind holds when the train says nothing.
- */
-held_by_convention: Array<number>, };
+export type StagePorts = { ports: Array<PortSpec>, };

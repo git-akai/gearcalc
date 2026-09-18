@@ -94,10 +94,13 @@
 //!   constraints at all means what it always meant: each kind's conventions,
 //!   with the first stage's input driven. So `{ input = "sun", fixed =
 //!   "ring" }` is nothing to write, and `{ input = "sun", fixed = "carrier" }`
-//!   is three lines: shaft 1 driven, shaft 2 held, shaft 3 free — all three,
-//!   because the train's constraints lay over the conventions shaft by shaft
-//!   and holding the carrier *instead of* the ring has to say so about the
-//!   ring. `[[train.couplings]]` arrived beside it, empty meaning the chain.
+//!   is one line, shaft 2 held: a hold the train writes on a stage replaces
+//!   the kind's conventional holds on that stage, so holding the carrier
+//!   *instead of* the ring needs no word about the ring. (For a while it
+//!   needed three lines — the ring written free as well — and a file that
+//!   still says so means the same thing.) A drive replaces the conventional
+//!   drive the same way. `[[train.couplings]]` arrived beside it, empty
+//!   meaning the chain.
 //! - **A load case's `port` may name a shaft.** `"start"` and `"end"` still
 //!   mean the chain's two ends — the first stage's input and the last
 //!   stage's output under the constraints in force — and a third spelling,

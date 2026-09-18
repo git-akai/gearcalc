@@ -6107,82 +6107,103 @@ mod tests {
         assert!(one(Stage::Planetary(Box::default())) > 0.0);
     }
 
-    /// **"Driven by" is a drive on the first stage and a coupling everywhere
-    /// else** — and `Train::arranged` is what knows the difference.
-    ///
-    /// The panel's one gesture on a set, done by the core: a set at the head of
-    /// a train told *sun in, carrier held* gets a drive on its sun; the same
-    /// set behind a pair gets the chain moved to enter at its sun and no drive
-    /// at all, because the pair is what turns it. Writing the drive there as
-    /// well asks the sun to turn at one speed while the coupling turns it at
-    /// another, which the solver refuses — and did, the first time a panel
-    /// tried it.
+    /// **A statement about a stage's shafts replaces the convention of its
+    /// kind, and only that.** Holding a set's carrier is *instead of* the
+    /// ring — one line, and the ring is released without being written; a
+    /// drive on its carrier at the head of a chain is instead of the sun and
+    /// makes the carrier `Start`; and the same drive *behind* a pair is no
+    /// condition at all but the port the chain enters by — the coupling turns
+    /// it — so the set solves, entered at the carrier, leaving by the ring.
+    /// What does not give way is a statement of another kind: the pair before
+    /// the set keeps its drive.
     #[test]
-    fn arranging_a_stage_writes_a_drive_at_the_head_and_moves_the_chain_elsewhere() {
+    fn a_hold_or_a_drive_on_a_stage_replaces_the_kinds_convention_and_nothing_else() {
         let lib = library();
         let set = || Stage::Planetary(Box::<PlanetaryStage>::default());
         let (sun, carrier, ring) = (1, 2, 3);
+        let of = |stage, shaft| ShaftRef::Of { stage, shaft };
 
-        // --- at the head: a drive on the sun, the carrier held, the ring free.
+        // --- one line: the carrier held, the ring released.
         let mut t = two_stage();
         t.stages = vec![set(), Stage::Spur(PairStage::default())];
-        let t = t.arranged(0, sun, carrier);
-        let own: Vec<_> = t
-            .constraints
+        t.constraints = vec![ShaftConstraint::held(0, carrier)];
+        let held: Vec<ShaftRef> = t
+            .constraints_in_force()
             .iter()
-            .filter(|c| matches!(c.at, ShaftRef::Of { stage: 0, .. }))
-            .map(|c| c.constraint)
+            .filter(|c| c.constraint == Constraint::Held)
+            .map(|c| c.at)
             .collect();
-        assert!(own.contains(&Constraint::Driven), "{own:?}");
+        assert_eq!(held, vec![of(0, carrier)]);
         let r = solve_train(&t, &lib).expect("solves");
+        assert!(r.stages[0].ratio() < 0.0, "carrier held reverses");
+
+        // --- at the head: driven by the carrier, and the carrier is `Start`.
+        t.constraints = vec![ShaftConstraint::driven(0, carrier)];
+        let b = t.boundaries().unwrap();
+        assert_eq!(t.port_shaft(&b, Port::Start), of(0, carrier));
+        assert_eq!((b[0].input, b[0].output), (carrier, sun));
+        let r = solve_train(&t, &lib).expect("carrier-driven at the head");
         assert!(
-            r.stages[0].ratio() < 0.0,
-            "carrier held reverses: {}",
-            r.stages[0].ratio()
+            r.stages[0].ratio().abs() < 1.0,
+            "a carrier-driven set speeds up"
+        );
+        assert_eq!(
+            t.constraints_in_force()
+                .iter()
+                .filter(|c| c.constraint == Constraint::Driven)
+                .count(),
+            1,
+            "the conventional drive on the sun gave way"
         );
 
-        // --- behind a pair: no drive, the chain enters at the sun and leaves
-        // by the ring, and it still solves.
+        // --- behind a pair: the same drive is the chain's entry, not a
+        // condition, and the drive on the pair stands.
         let mut t = two_stage();
         t.stages = vec![Stage::Spur(PairStage::default()), set()];
-        let t = t.arranged(1, sun, carrier);
-        let own: Vec<_> = t
-            .constraints
-            .iter()
-            .filter(|c| matches!(c.at, ShaftRef::Of { stage: 1, .. }))
-            .map(|c| c.constraint)
-            .collect();
-        assert!(!own.contains(&Constraint::Driven), "{own:?}");
+        t.constraints = vec![ShaftConstraint::driven(1, carrier)];
         assert_eq!(
-            t.couplings,
+            t.couplings_in_force(),
             vec![Coupling {
-                a: ShaftRef::Of { stage: 0, shaft: 2 },
-                b: ShaftRef::Of {
-                    stage: 1,
-                    shaft: sun
-                },
+                a: of(0, 2),
+                b: of(1, carrier),
             }]
         );
-        let r = solve_train(&t, &lib).expect("solves behind a pair");
-        assert!(r.stages[1].ratio() < 0.0);
-
-        // ...and asked the other way — driven by the ring, sun held — the
-        // chain enters at the ring.
-        let t = t.arranged(1, ring, sun);
+        let (at, n) = t.layout();
+        let conditions = t.conditions(&at, n).unwrap();
         assert_eq!(
-            t.couplings[0].b,
-            ShaftRef::Of {
-                stage: 1,
-                shaft: ring
-            }
+            conditions[at[1].of(carrier)],
+            crate::kinematics::Condition::Free,
+            "turned by the coupling"
         );
-        let r = solve_train(&t, &lib).expect("solves ring-in behind a pair");
-        // ...and leaves by the carrier, at the ring-in ratio — not by the
-        // ring it came in by, at a ratio of one, which is what it did.
+        assert_eq!(
+            conditions[at[0].of(1)],
+            crate::kinematics::Condition::Drive(crate::ratio::Ratio::ONE)
+        );
+        let b = t.boundaries().unwrap();
+        assert_eq!((b[1].input, b[1].output), (carrier, sun));
+        assert_eq!(
+            t.motion_report().unwrap().constrained,
+            2,
+            "ring held, pair driven"
+        );
+        let r = solve_train(&t, &lib).expect("solves behind a pair");
+        assert!(r.stages[1].ratio().abs() < 1.0);
+
+        // ...and asked the other way — driven by the ring, sun held — one
+        // line each, and the chain enters at the ring and leaves by the
+        // carrier at the ring-in ratio, not by the ring at a ratio of one.
+        t.constraints = vec![
+            ShaftConstraint::driven(1, ring),
+            ShaftConstraint::held(1, sun),
+        ];
         let b = t.boundaries().unwrap();
         assert_eq!((b[1].input, b[1].output), (ring, carrier));
-        let set = r.stages[1].ratio();
-        assert!(set > 1.0 && set < 2.0, "ring in, sun held: {set}");
+        let r = solve_train(&t, &lib).expect("solves ring-in behind a pair");
+        let set_ratio = r.stages[1].ratio();
+        assert!(
+            set_ratio > 1.0 && set_ratio < 2.0,
+            "ring in, sun held: {set_ratio}"
+        );
     }
 
     /// **A port is a name for a shaft, and naming the shaft is the same load.**
@@ -6312,7 +6333,7 @@ mod tests {
             Stage::Planetary(Box::default()),
             Stage::Spur(PairStage::default()),
         ];
-        let t = t.arranged(0, carrier, ring);
+        t.constraints = vec![ShaftConstraint::driven(0, carrier)];
         let b = t.boundaries().unwrap();
         assert_eq!(t.port_shaft(&b, Port::Start), at(0, carrier));
         let r = t.route(&b, at(0, carrier)).unwrap();
@@ -6473,12 +6494,22 @@ mod tests {
             t.constraints = constraints;
             t
         };
-        assert!(matches!(
-            solve_train(&set(vec![ShaftConstraint::held(0, 2)]), &lib),
-            Err(TrainError::Overdetermined {
-                at: ShaftRef::Of { stage: 0, .. }
+        // Holding the carrier alone releases the ring by rule; holding both
+        // is a locked set, and the sun driven against it is the conflict —
+        // named at the last statement the designer made, the ring.
+        assert_eq!(
+            solve_train(
+                &set(vec![
+                    ShaftConstraint::held(0, 2),
+                    ShaftConstraint::held(0, 3)
+                ]),
+                &lib
+            )
+            .err(),
+            Some(TrainError::Overdetermined {
+                at: ShaftRef::Of { stage: 0, shaft: 3 }
             })
-        ));
+        );
         assert_eq!(
             solve_train(&set(vec![ShaftConstraint::held(7, 1)]), &lib).err(),
             Some(TrainError::NoSuchShaft {

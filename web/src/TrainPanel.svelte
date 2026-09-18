@@ -30,10 +30,8 @@
     type PairResult,
     type MeshReport,
     type LoadSharing,
-    type PortSpec,
     type Constraint,
     constraintOn,
-    arrangeStage,
     note,
     t,
   } from "./core";
@@ -113,30 +111,27 @@
   const figuresOf = (stage: Stage): Figure[] =>
     result.figures[tab.train.stages.indexOf(stage)] ?? [];
 
-  /** Tell stage `i` what drives it and what it holds, and take the core's
-   *  answer — its constraints and, where the chain had to move, its couplings.
-   *  The two lists are written back rather than the whole train, so every
-   *  other input keeps its identity in the panel. */
-  function arrange(i: number, driven: number, held: number) {
-    const out = arrangeStage($state.snapshot(tab.train), i, driven, held);
-    tab.train.constraints = out.constraints;
-    tab.train.couplings = out.couplings;
+  /** **What the train asks of one shaft**, written as a constraint or, for
+   *  the empty choice, withdrawn so the kind's convention stands again. A
+   *  constraint is a choice and not a number, so it is written here; what
+   *  the choice *does* — a hold on a set releasing the ring it held by
+   *  convention, a drive behind a pair being where the chain enters — is
+   *  the core's rule, read back through the shaft line. */
+  function constrain(stage: number, shaft: number, c: Constraint | "") {
+    const at: ShaftRef = { kind: "of", stage, shaft };
+    tab.train.constraints = tab.train.constraints.filter(
+      (x) => !(x.at.kind === "of" && x.at.stage === stage && x.at.shaft === shaft),
+    );
+    if (c !== "") tab.train.constraints.push({ at, constraint: c });
   }
-
-  /** **What a stage is presently asked**, read back from the train's
-   *  constraints — or, where it states none, from the kind's conventions the
-   *  core sent with the ports: the conventional holds, and the first port not
-   *  held as the input. Read, not decided: a set with its carrier held is
-   *  driven at whichever port the constraints or the chain leave. */
-  function arrangementOf(stage: number, ports: PortSpec[]): { driven: number; held: number } {
-    const stated = (c: Constraint) =>
-      ports.find((p) => constraintOn(tab.train, stage, p.shaft) === c)?.shaft;
-    const convention = result.topology[stage]?.held_by_convention ?? [];
-    const held = stated("held") ?? convention[0] ?? ports[0]?.shaft ?? 0;
-    const driven =
-      stated("driven") ?? ports.find((p) => p.shaft !== held)?.shaft ?? ports[0]?.shaft ?? 0;
-    return { driven, held };
-  }
+  /** The word for what a shaft is asked, or for what its kind's convention
+   *  asks where the train says nothing. */
+  const constraintWord = (c: Constraint) =>
+    t(
+      { held: "ui.train_constraint_held", driven: "ui.train_constraint_driven", free: "ui.train_constraint_free" }[
+        c
+      ],
+    );
 
   /** Which duty a fatigue case is counted over. Switching seeds the other
    *  shape from the core's own defaults — a fresh case's intermittent duty,
@@ -224,6 +219,20 @@
    *  reader has to infer. */
   function removeStage(i: number) {
     tab.train.stages.splice(i, 1);
+    // The constraints and couplings name stages by index: those on the
+    // removed stage go with it, and those after it move down with the
+    // stages they belong to. Left alone, holding stage 3's carrier would
+    // hold whatever became stage 3.
+    const moved = (r: ShaftRef): ShaftRef | null =>
+      r.kind !== "of" ? r : r.stage === i ? null : r.stage > i ? { ...r, stage: r.stage - 1 } : r;
+    tab.train.constraints = tab.train.constraints.flatMap((c) => {
+      const at = moved(c.at);
+      return at ? [{ ...c, at }] : [];
+    });
+    tab.train.couplings = tab.train.couplings.flatMap((c) => {
+      const [a, b] = [moved(c.a), moved(c.b)];
+      return a && b ? [{ a, b }] : [];
+    });
     // The expansions are keyed by index, so the ones after the hole move down
     // with the stages they belong to. Left alone, deleting a stage reopens
     // whichever stage inherited its number.
@@ -1033,6 +1042,39 @@
      Bound through a getter and a setter rather than an object, because a plain
      `f64` has no object to hold an `auto` flag in — which is the same reason
      `autoNumber` can take one and this cannot. -->
+<!-- **What the train asks of each of a stage's ports** — held, driven, free,
+     or nothing, in which case the kind's convention stands and is named. The
+     ports and their names come from the core (`topology`), so a stage kind
+     with a fourth port is one more row here and no change to this file, and
+     the same rows serve a pair, a set and a hula stage alike. A hold or a
+     drive written here replaces the kind's convention *of that kind* on the
+     stage — holding a set's carrier releases its ring — which is the core's
+     rule and is read back, not repeated. -->
+{#snippet shafts(i: number)}
+  {@const ports = result.topology[i]?.ports ?? []}
+  {#if ports.length > 0}
+    <h4 class="shafts">{t("ui.train_shafts")}</h4>
+    {#each ports as p (p.shaft)}
+      {@const stated = constraintOn(tab.train, i, p.shaft)}
+      <label>
+        <span>{shaftName(tab.train, i, p.label)}</span>
+        <select
+          value={stated ?? ""}
+          onchange={(e) => constrain(i, p.shaft, e.currentTarget.value as Constraint | "")}
+        >
+          <option value=""
+            >{t("ui.train_constraint_convention", { what: constraintWord(p.by_convention) })}</option
+          >
+          {#each ["held", "driven", "free"] as const as c (c)}
+            <option value={c}>{constraintWord(c)}</option>
+          {/each}
+        </select>
+        <em></em>
+      </label>
+    {/each}
+  {/if}
+{/snippet}
+
 {#snippet numberField(
   key: string,
   get: () => number,
@@ -1700,6 +1742,7 @@
               <!-- One search for either mesh: the loss integral along a line
                    contact, the friction balance along a point's. -->
               {@render efficiencyToggle(stage.optimisation)}
+              {@render shafts(i)}
             </div>
 
             <div class="gears">
@@ -1754,8 +1797,6 @@
         {/if}
       {:else if stage.kind === "planetary"}
         {@const pres = res && res.kind === "planetary" ? res : null}
-        {@const ports = result.topology[i]?.ports ?? []}
-        {@const arranged = arrangementOf(i, ports)}
         <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
           <span class="caret aside">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
@@ -1815,42 +1856,10 @@
                 <input type="number" step="1" min="1" bind:value={stage.planets} />
                 <em></em>
               </label>
-              <!-- **Which shaft drives and which is held is the train's**,
-                   stated as constraints on this stage's ports, and the set
-                   carries no arrangement of its own any more. The ports and
-                   their names come from the core (`topology`), so a stage
-                   kind with a fourth port is one more option here and no
-                   change to this file. Both selects hand the gesture to the
-                   core (`arrangeStage`), which writes every port's constraint
-                   and, for a stage in the middle of a chain, moves the chain
-                   rather than writing a drive that would fight it. -->
-              <label>
-                <span>{t("ui.train_driven_by")}</span>
-                <select
-                  value={arranged.driven}
-                  onchange={(e) => arrange(i, Number(e.currentTarget.value), arranged.held)}
-                >
-                  {#each ports as p (p.shaft)}
-                    <option value={p.shaft}>{shaftName(tab.train, i, p.label)}</option>
-                  {/each}
-                </select>
-                <em></em>
-              </label>
-              <label>
-                <span>{t("ui.train_held")}</span>
-                <select
-                  value={arranged.held}
-                  onchange={(e) => arrange(i, arranged.driven, Number(e.currentTarget.value))}
-                >
-                  {#each ports as p (p.shaft)}
-                    <option value={p.shaft}>{shaftName(tab.train, i, p.label)}</option>
-                  {/each}
-                </select>
-                <em></em>
-              </label>
               {@render overlapField(stage, pres?.overlap, [pres?.sun_planet, pres?.planet_ring])}
               {@render loadSharing(stage)}
               {@render efficiencyToggle(stage.optimisation)}
+              {@render shafts(i)}
             </div>
 
             <!-- **One of the three shifts closes the set**, and which one is
@@ -2077,6 +2086,7 @@
               {@render overlapField(stage, hres?.overlap, hres?.meshes.map((m) => m.report) ?? [])}
               {@render loadSharing(stage)}
               {@render efficiencyToggle(stage.optimisation)}
+              {@render shafts(i)}
             </div>
 
 
@@ -2488,6 +2498,10 @@
     gap: 0.15rem 0.75rem;
     margin: 0.75rem 0 0;
     font-size: 0.85rem;
+  }
+  /* The shafts' rows sit under their own small heading, in the shared grid. */
+  h4.shafts {
+    margin: 0.75rem 0 0;
   }
   /* One mesh's readout, sitting under its heading. */
   h4.mesh {
