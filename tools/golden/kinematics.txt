@@ -3,7 +3,7 @@
   case 1       2.0000 Nm /   3000.00 rpm at start  ->      4.9751 Nm /  -1186.05 rpm at end    held at -
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.2333 Nm /     -0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      4.9751 Nm /   -948.84 rpm at end    held at -
-  stage 1  ratio       2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+  stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
     member 1  z 17  
       case 1  speed    3000.000000  vs frame    3000.000000  torque       2.000000  cycles -
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.237209  cycles -
@@ -24,7 +24,7 @@
   case 1       2.0000 Nm /   3000.00 rpm at start  ->      4.9774 Nm /  -1186.05 rpm at end    held at -
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.2334 Nm /     -0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      4.9774 Nm /   -948.84 rpm at end    held at -
-  stage 1  ratio       2.529412   efficiency  98.389569 / 98.389569  %   backlash   0.038879 / 0.098341   deg
+  stage 1  ratio      -2.529412   efficiency  98.389569 / 98.389569  %   backlash   0.038879 / 0.098341   deg
     member 1  z 17  
       case 1  speed    3000.000000  vs frame    3000.000000  torque       2.000000  cycles -
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.237209  cycles -
@@ -45,7 +45,7 @@
   case 1       2.0000 Nm /   3000.00 rpm at start  ->     49.4437 Nm /    -75.00 rpm at end    held at -
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0000 Nm /     -0.00 rpm at start  held at 1
   case 3       2.0000 Nm /   2400.00 rpm at start  ->     49.4437 Nm /    -60.00 rpm at end    held at -
-  stage 1  ratio      40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
+  stage 1  ratio     -40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
     member 1  z 1   
       case 1  speed    3000.000000  vs frame    3000.000000  torque       2.000000  cycles -
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.000000  cycles -
@@ -329,7 +329,7 @@
   case 1       2.0000 Nm /   3000.00 rpm at start  ->     11.6260 Nm /    497.37 rpm at end    held at -
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0959 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->     11.6260 Nm /    397.90 rpm at end    held at -
-  stage 1  ratio       2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+  stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
     member 1  z 17  
       case 1  speed    3000.000000  vs frame    3000.000000  torque       2.000000  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.097482  cycles -
@@ -339,7 +339,7 @@
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.246572  cycles -
       case 3  speed    -948.837209  vs frame    -948.837209  torque       5.058824  cycles 5.693023e7 / 5.693023e7
     mesh 1  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
-  stage 2  ratio       2.384615   efficiency  97.996440 / 97.996440  %   backlash   0.056468 / 0.134654   deg
+  stage 2  ratio      -2.384615   efficiency  97.996440 / 97.996440  %   backlash   0.056468 / 0.134654   deg
     member 1  z 13  
       case 1  speed   -1186.046512  vs frame   -1186.046512  torque       4.975099  cycles -
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.251613  cycles -
@@ -363,7 +363,7 @@
   case 1       2.0000 Nm /   3000.00 rpm at start  ->    840.9967 Nm /      4.24 rpm at end    held at -
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0000 Nm /      0.00 rpm at start  held at 3
   case 3       2.0000 Nm /   2400.00 rpm at start  ->    840.9967 Nm /      3.39 rpm at end    held at -
-  stage 1  ratio       2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+  stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
     member 1  z 17  
       case 1  speed    3000.000000  vs frame    3000.000000  torque       2.000000  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
@@ -397,7 +397,7 @@
       case 3  speed      -0.000000  vs frame     135.548173  torque       9.681089  cycles 2.439867e7 / 2.439867e7
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
-  stage 3  ratio      40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
+  stage 3  ratio     -40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
     member 1  z 1   
       case 1  speed    -169.435216  vs frame    -169.435216  torque      34.018366  cycles -
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.000000  cycles -
@@ -450,7 +450,7 @@
       case 3  speed    -400.000000  vs frame    -400.000000  torque       3.891818  cycles 7.200000e7 / 7.200000e7
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
-  stage 2  ratio       2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+  stage 2  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
     member 1  z 17  
       case 1  speed    -500.000000  vs frame    -500.000000  torque      11.675453  cycles -
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.237209  cycles -
@@ -476,7 +476,7 @@
   case 1       2.0000 Nm /   3000.00 rpm at start  ->     29.0433 Nm /    197.67 rpm at end    held at -
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0378 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->     29.0433 Nm /    158.14 rpm at end    held at -
-  stage 1  ratio       2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+  stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
     member 1  z 17  
       case 1  speed    3000.000000  vs frame    3000.000000  torque       2.000000  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.038466  cycles -

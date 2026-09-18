@@ -54,7 +54,7 @@ pub use planetary::{
 pub(crate) use wiring::{arranged, teeth_of};
 pub use wiring::{
     MemberMotion, MeshSpec, MotionError, Mount, Offsets, ShaftMotion, ShaftSpec, TrainMotion,
-    Wiring, WiringError,
+    UnitMotion, Wiring, WiringError,
 };
 
 /// The three contact ratios.
@@ -4055,7 +4055,8 @@ mod tests {
                 // ...and the worm carries it referred by the ratio and attenuated
                 // by the loss the mesh takes carrying it that way.
                 let worm = w.gears[0].cases[BACK].torque;
-                let want = wheel / w.ratio * m.efficiency.backward.max(0.0);
+                // Referred by the *size* of the ratio, which is what a referral is.
+                let want = wheel / w.ratio.abs() * m.efficiency.backward.max(0.0);
                 assert!(
                     (worm - want).abs() < 1e-9 * applied,
                     "the worm reports {worm} where {wheel} at the wheel over a \
@@ -4986,7 +4987,9 @@ mod tests {
         // still carries this.
         let (from_output, ratio, eta) = driven(0.0, load);
         // ...and driven forward hard enough to put the same torque on the wheel.
-        let (from_input, _, _) = driven(load / (ratio * eta), 0.0);
+        // `|ratio|`: the reduction is signed now and a worm's is negative, and
+        // what refers a torque is its size — the same reading `carry` takes.
+        let (from_input, _, _) = driven(load / (ratio.abs() * eta), 0.0);
 
         let apart = (from_output / from_input - 1.0).abs();
         assert!(
@@ -5369,7 +5372,8 @@ mod tests {
                 continue;
             }
             checked += 1;
-            let want = spur.ratio;
+            // Torques are in the *size* of the ratio; the sign is the shaft's.
+            let want = spur.ratio.abs();
             assert!(
                 (b / a - want).abs() < 1e-9 * want.abs(),
                 "stage {k}: the two members react {a} and {b}, a ratio of {}, \
@@ -5460,13 +5464,13 @@ mod tests {
     /// since the lock-up invariant is silent on a wrong sign and on a
     /// misattributed frame alike (`crate::kinematics`, measured).
     ///
-    /// What is compared is the **magnitude** of the ratio, with the sign
-    /// checked separately and only where the kind reports one — because it does
-    /// not always: a pair's ratio is `Mesh::ratio`, whose own documentation
-    /// says *"ignoring sign"*, while a set's is signed. That disagreement
-    /// between two kinds' meaning of one accessor is recorded rather than
-    /// papered over here; resolving it is a deliberate change of a reported
-    /// number and belongs with the phase that makes the graph answer.
+    /// The ratio is compared **signed and to the float**, since every kind's
+    /// reported ratio is now the graph's own reading. For a while this compared
+    /// magnitudes and checked the sign on the epicyclic kinds only, because a
+    /// pair's ratio was `Mesh::ratio` — *"ignoring sign"* by its own
+    /// documentation — while a set's was signed; that disagreement is resolved
+    /// and recorded (`docs/corrections.md`), and this is where it would show up
+    /// again.
     #[test]
     fn the_graph_gives_every_kind_the_kinematics_it_gives_itself() {
         let lib = library();
@@ -5489,19 +5493,18 @@ mod tests {
             let graph = m
                 .ratio(w.input, w.output)
                 .unwrap_or_else(|| panic!("{name}: the output does not turn"));
+            // **Signed, and exact to the float**: every kind's reported ratio
+            // is the graph's own reading now (`UnitMotion::ratio`), so this is
+            // the same number read twice — once through the stage and once
+            // here — and anything short of equality would be a kind that had
+            // grown a second source. It used to compare magnitudes and check
+            // the sign only on the epicyclic kinds, because a pair's ratio was
+            // `z₂/z₁` and could not say its output reversed.
             let want = r.ratio();
             assert!(
-                (graph.to_f64().abs() - want.abs()).abs() < 1e-9 * want.abs().max(1.0),
+                (graph.to_f64() - want).abs() < 1e-12 * want.abs().max(1.0),
                 "{name}: graph {graph} vs stage {want}"
             );
-            // The two epicyclic kinds report a signed ratio; a pair does not.
-            if stage.as_pair().is_none() {
-                assert_eq!(
-                    f64::from(graph.signum()),
-                    want.signum(),
-                    "{name}: graph {graph} vs stage {want}"
-                );
-            }
 
             // --- every member's speed, and its speed against its own frame.
             //
@@ -7578,11 +7581,13 @@ mod tests {
         // was the thing that had to change and not the arithmetic.
         let s0 = spur(&r.stages[0]);
         let (a, b) = (cycles(&s0.gears[0]).bending, cycles(&s0.gears[1]).bending);
+        // Counts are magnitudes; the ratio carries a sign now.
+        let ratio = s0.ratio.abs();
         assert!(
-            (a / b - s0.ratio).abs() < (1.0 + s0.ratio) / b,
+            (a / b - ratio).abs() < (1.0 + ratio) / b,
             "{a}/{b} = {} against a stage ratio of {}",
             a / b,
-            s0.ratio
+            ratio
         );
 
         // The same sweep at the start port: the input gear turns exactly once
@@ -8764,7 +8769,8 @@ mod tests {
             let case = &train.load_cases[CYCLIC];
 
             // The revolutions each member turns, before anything rounds them.
-            let ratios: Vec<f64> = r.stages.iter().map(StageResult::ratio).collect();
+            // Revolutions are counted, not signed: `|ratio|` throughout.
+            let ratios: Vec<f64> = r.stages.iter().map(|s| s.ratio().abs()).collect();
             for (k, s) in r.stages.iter().enumerate() {
                 let upstream: f64 = ratios[..k].iter().product();
                 let speed_in = case.speed / upstream;
@@ -9038,7 +9044,8 @@ mod tests {
         let mut at = 5.0;
         for s in h.stages.iter().rev() {
             let p = spur(s);
-            let expect = at / p.ratio;
+            // A referral is a magnitude; the ratio carries a sign now.
+            let expect = at / p.ratio.abs();
             assert!(
                 (p.gears[0].cases[BACK].torque.abs() - expect).abs() < 1e-9 * expect,
                 "the load referred to this stage's input is {expect}, not {}",

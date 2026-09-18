@@ -355,8 +355,14 @@ tolerance anywhere in the kinematics and no "a bound records where the sweep
 stopped".
 
 `gear-core/src/ratio.rs` holds the exact rational: `i128` numerator and
-denominator, normalised, with checked arithmetic. `hula::Ratio` is deleted into
-it — it is the same type with a narrower name.
+denominator, normalised, with checked arithmetic.
+
+*(An earlier draft said `hula::Ratio` would be deleted into it as "the same
+type with a narrower name". It is not the same type: its denominator `D` is
+**un-normalised on purpose**, because `|D|` is the hula design rule and a
+normalised `324/1` would lose the `D = 4` that a `1296/4` carries. What the two
+share is a value, and that is checked — `a_hula_arrangement_reduces_by_its_two_products`
+— rather than merged.)*
 
 ### 4.2 Exact where the answer is integers, floating where it is not
 
@@ -583,7 +589,6 @@ criterion.
 | `carry`, `turns_per_port_turn`, the backlash referral | the three matrix readings | ~120 |
 | `Port` as a two-valued enum | a named shaft | — |
 | `ShaftsCase`'s `[f64; 3]` | per-shaft lists | — |
-| `hula::Ratio` | `ratio::Rational` | ~25 |
 | `Stage::Hula` as a kind | a preset of the epicyclic stage, vocabulary gated by the arrangement | up to ~3000 |
 | `Stage::Planetary` as a kind, once the grid reproduces it | a preset | up to ~2700 |
 | four stage branches in `TrainPanel.svelte` | two — a pair, and a grid | ~600 |

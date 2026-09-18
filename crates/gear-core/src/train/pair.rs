@@ -990,7 +990,7 @@ fn solve_parallel(
     loads: &StageLoads,
     lib: &MaterialLibrary,
     reversal: super::Reversal,
-    motion: &[super::MemberMotion],
+    motion: &super::UnitMotion,
 ) -> Result<PairResult, TrainError> {
     // The shifts once, not once per gear: with the optimiser on, `shifts` is a
     // search, and asking each gear for its own would run it twice for one
@@ -1213,7 +1213,11 @@ fn solve_parallel(
     // case and the same expression: a load case is a torque, and nothing else
     // about the stage knows which one it is looking at.
     let rated = rate_all(effective)?;
-    let ratio = f64::from(stage.gears[1].teeth) / f64::from(stage.gears[0].teeth);
+    // **The reduction is the graph's**: input turns per output turn, signed —
+    // an external pair's output turns the other way and its ratio says so.
+    // `z₂/z₁` said the magnitude, which is what a torque referral wants and is
+    // taken as `|i|` where one is (`solve_train`), and not what a ratio is.
+    let ratio = motion.ratio();
 
     let mut gears = Vec::with_capacity(2);
     for i in 0..2 {
@@ -1225,7 +1229,7 @@ fn solve_parallel(
         // the one place every kind's speeds come from now — and which knows
         // that the second member of an external pair turns the other way, where
         // `1/ratio` did not.
-        let m = motion[i];
+        let m = motion.members[i];
         let cases = rating(i, &rated, effective, effective)
             .rated()
             .into_iter()

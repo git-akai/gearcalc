@@ -1454,31 +1454,21 @@ pub fn solve_planetary_stage_with(
     // and a case's speed scales them; its teeth are engaged by its turns against
     // the carrier, which the same unit speeds give (`train::engagements`).
     //
-    // **The planet's own rotation**, from the kinematics rather than from the
-    // shaft beside it: its absolute speed is not the carrier's, and what its
-    // teeth see is not the sun's speed relative to the carrier
-    // ([`crate::planetary::Power::planet_speed`]).
-    let (planet_absolute, planet_relative) = forward.planet_speed(teeth);
-    let carrier = forward.speeds[PlanetaryShaft::Carrier.index_pub()];
-    let unit_speed = [
-        forward.speeds[PlanetaryShaft::Sun.index_pub()],
-        planet_absolute,
-        forward.speeds[PlanetaryShaft::Ring.index_pub()],
-    ];
-    let against_carrier = [
-        unit_speed[0] - carrier,
-        planet_relative,
-        unit_speed[2] - carrier,
-    ];
-    let input_unit = forward.speeds[in_i];
-    // **How many parallel paths each member's own teeth meet**, from the
-    // wiring rather than from the planet count applied to everyone. A sun
-    // tooth passes all N planets in one turn against the carrier; a planet
-    // tooth meets the one sun, because it *is* one of the N. See
-    // `Wiring::paths_seen` — the count was N for all three members, so this
-    // set reported its planet's cycles N times over.
-    let wiring = super::Constrained::wiring(stage);
-    let paths = |which: usize| f64::from(wiring.paths_seen(which));
+    // **Every member's motion comes from the graph**, as it does for every
+    // kind: its speed, its speed against the carrier — which is what its teeth
+    // see, and on a set with the ring held not even the same sign as its own —
+    // and how often it is engaged, over the paths its own teeth meet.
+    //
+    // Three things used to be worked out here and are not any more. The
+    // planet's absolute and relative speeds came from `Power::planet_speed`, a
+    // second kinematics beside Willis; the two central members' came from
+    // `Power::speeds`; and the engagement count applied the planet count to
+    // all three members, which is N times too many for the planet
+    // (`Wiring::paths_seen`). The graph answers all three from the topology,
+    // and `the_graph_gives_every_kind_the_kinematics_it_gives_itself` holds it
+    // against what this used to compute.
+    let motion =
+        super::Constrained::wiring(stage).unit_motion(&super::teeth_of(stage.members()))?;
     // Each member's torque in each case: the central members' are their
     // shaft's share of one mesh path; **a planet is not one of the three
     // shafts**, so its is the sun's carried across the mesh they share — the
@@ -1510,13 +1500,11 @@ pub fn solve_planetary_stage_with(
             .into_iter()
             .map(|r| {
                 let c = r.load;
+                let m = motion.members[which];
                 r.into_case(
                     member_torque(which, &c),
-                    (
-                        unit_speed[which] * c.speed,
-                        against_carrier[which] * c.speed,
-                    ),
-                    super::engagements(unit_speed[which], carrier, input_unit, paths(which)),
+                    (m.speed.scale(c.speed), m.against_frame.scale(c.speed)),
+                    m.engagements,
                 )
             })
             .collect();
@@ -1536,7 +1524,10 @@ pub fn solve_planetary_stage_with(
     Ok(PlanetaryResult {
         arrangement: stage.arrangement,
         output: forward.output,
-        ratio: forward.ratio,
+        // The graph's, and it agrees with `forward.ratio` to the bit on every
+        // arrangement — which `the_graph_gives_every_kind…` holds — so this is
+        // one source rather than two that happen to agree.
+        ratio: motion.ratio(),
         clearance: stage.clearance.manual,
         centre_distance_nominal: layout.nominal,
         centre_distance: centre,

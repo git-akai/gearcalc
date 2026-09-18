@@ -176,7 +176,7 @@ pub fn solve_crossed_pair(
     kind: PairKind,
     loads: &StageLoads,
     lib: &MaterialLibrary,
-    motion: &[super::MemberMotion],
+    motion: &super::UnitMotion,
 ) -> Result<PairResult, TrainError> {
     // The shifts, decided once — a given distance is reached through them by
     // the rack law, or through the size where both are pinned
@@ -556,7 +556,7 @@ pub fn solve_crossed_pair(
                     // does for every kind: crossing the shafts changes what the
                     // teeth do to each other and changes nothing at all about
                     // the speeds, so a worm stage's motion is a spur stage's.
-                    let m = motion[i];
+                    let m = motion.members[i];
                     GearCase {
                         case: c.case,
                         torque: member_torque(i, c),
@@ -616,7 +616,8 @@ pub fn solve_crossed_pair(
     notes.extend(chosen.how.note());
 
     Ok(PairResult {
-        ratio: s.ratio,
+        // Signed, from the graph — a worm is an external mesh like any other.
+        ratio: motion.ratio(),
         centre_distance_nominal: s.centre_distance,
         centre_distance: centre,
         // As on a parallel stage: the running distance less the geometric
@@ -1092,7 +1093,9 @@ mod tests {
     #[test]
     fn a_worm_stage_reports_contact_and_two_efficiencies_and_no_bending() {
         let r = solved(&PairStage::worm());
-        assert!((r.ratio - 40.0).abs() < 1e-12);
+        // Negative: a worm is an external mesh, its wheel turns the other way,
+        // and a ratio is signed now — it is the graph's rather than `z₂/z₁`.
+        assert!((r.ratio + 40.0).abs() < 1e-12);
         assert!(r.mesh.efficiency.forward > 0.0 && r.mesh.efficiency.forward < 1.0);
         assert!(
             r.mesh.efficiency.backward < r.mesh.efficiency.forward,
@@ -1113,7 +1116,9 @@ mod tests {
             point(&r).cases[0].contact.patch_width
         );
         // Torque follows the ratio and the operative efficiency.
-        let expected = 2.0 * r.ratio * r.mesh.efficiency.forward;
+        // `|ratio|`: the reduction is signed and a worm's is negative; the
+        // torque the wheel carries is the size of it times the input.
+        let expected = 2.0 * r.ratio.abs() * r.mesh.efficiency.forward;
         assert!((r.gears[1].cases[0].torque - expected).abs() < 1e-12 * expected);
     }
 
@@ -2551,7 +2556,8 @@ mod tests {
             &super::super::test_library(),
         )
         .unwrap();
-        assert!((r.ratio - 23.0 / 17.0).abs() < 1e-12);
+        // Negative for the same reason a worm's is: an external mesh reverses.
+        assert!((r.ratio + 23.0 / 17.0).abs() < 1e-12);
         assert!(r.mesh.efficiency.forward > 0.0 && r.mesh.efficiency.forward < 1.0);
         assert!(point(&r).cases[0].contact.max_pressure > 0.0);
         assert!(!r.mesh.efficiency.locked().backward);

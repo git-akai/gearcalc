@@ -6,7 +6,7 @@ train  total ratio 6.0317:1   total efficiency 96.375 % forward / 96.375 % backw
               note: load reaches no gear; nothing reacts it and the train is free to turn
        case 3  fatigue  2.000 Nm / 2400 rpm at start, held at the far end   ->   11.626 Nm / 397.9 rpm at end   1000 h
 
-stage 1  spur  z 17/43  beta 0 deg  ratio 2.5294  a_w 30.0257 mm  coprime
+stage 1  spur  z 17/43  beta 0 deg  ratio -2.5294  a_w 30.0257 mm  coprime
   contact ratio  transverse 1.5993   overlap 0.0000   total 1.5993
   efficiency 98.345 % forward / 98.345 % backward
   contact at the pitch point  sigma_H 2097.6 / 0.0 / 2097.6 MPa by case   rho 1.733 mm
@@ -20,7 +20,7 @@ stage 1  spur  z 17/43  beta 0 deg  ratio 2.5294  a_w 30.0257 mm  coprime
       case 2  T     0.0000 Nm       -0.0 rpm  sigma_F      0.0  sigma_H      0.0 MPa  cycles -
       case 3  T     5.0588 Nm     -948.8 rpm  sigma_F    635.0  sigma_H   2097.6 MPa  cycles 5.693e7 / 5.693e7
 
-stage 2  spur  z 13/31  beta 15 deg  ratio 2.3846  a_w 22.9511 mm  coprime
+stage 2  spur  z 13/31  beta 15 deg  ratio -2.3846  a_w 22.9511 mm  coprime
   contact ratio  transverse 1.4144   overlap 0.2228   total 1.6372   <- no full axial overlap
   efficiency 97.996 % forward / 97.996 % backward
   contact at the pitch point  sigma_H 2297.6 / 0.0 / 2297.6 MPa by case   rho 1.407 mm

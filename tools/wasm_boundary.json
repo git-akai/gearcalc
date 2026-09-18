@@ -6045,7 +6045,7 @@
      "stages": [
       {
        "kind": "pair",
-       "ratio": "2.5294117647058822",
+       "ratio": "-2.5294117647058822",
        "centre_distance_nominal": "30.005652520608507",
        "clearance": "0.019999999999999574",
        "centre_distance": "30.025652520608507",

@@ -292,13 +292,13 @@ impl Wiring {
     ///
     /// As [`Self::alone`], and `None` where the arrangement leaves the input
     /// shaft at rest, which is a stage that cannot be driven the way it says.
-    pub fn unit_motion(&self, teeth: &[u32]) -> Result<Vec<MemberMotion>, WiringError> {
+    pub fn unit_motion(&self, teeth: &[u32]) -> Result<UnitMotion, WiringError> {
         let system = self.alone(teeth)?;
         let solution = system
             .motion(&self.conditions)
             .map_err(|_| WiringError::NotAMesh(0))?;
         let input = solution.values[self.input].to_f64();
-        Ok(self
+        let members = self
             .mounts
             .iter()
             .enumerate()
@@ -316,7 +316,11 @@ impl Wiring {
                     ),
                 }
             })
-            .collect())
+            .collect();
+        Ok(UnitMotion {
+            members,
+            output: solution.values[self.output],
+        })
     }
 
     /// The system for this stage on its own, against its own ground.
@@ -353,6 +357,38 @@ pub struct MemberMotion {
     /// against its frame, over the paths its own teeth meet
     /// ([`Wiring::paths_seen`]).
     pub engagements: f64,
+}
+
+/// **Everything a stage's motion comes to at one turn of its input**: each
+/// member's, and the stage's own reduction.
+///
+/// The reduction is here rather than derived from the members because a
+/// stage's output is a **shaft**, and a shaft need not carry a gear — an
+/// epicyclic set's output is its carrier, which no member spins with. Reading
+/// "the last member's speed" for it is right on a pair and wrong on a set, and
+/// this type exists because that was written twice before it was noticed.
+#[derive(Clone, Debug, PartialEq)]
+pub struct UnitMotion {
+    /// One per member, in [`super::StageResult::members`] order.
+    pub members: Vec<MemberMotion>,
+    /// The output shaft's speed, turns per turn of the input — the wiring's
+    /// `output`, whatever sits on it.
+    pub output: Ratio,
+}
+
+impl UnitMotion {
+    /// **The stage's reduction**: input turns per output turn, signed. An
+    /// external pair's output turns the other way and its ratio says so;
+    /// infinity where the output does not turn, which is what two meshes
+    /// cancelling is.
+    ///
+    /// One reading, where `StageResult::ratio()` used to mean three: `z₂/z₁`
+    /// on a pair, a magnitude; the Willis answer on a set, signed; the two
+    /// products on a hula stage.
+    #[must_use]
+    pub fn ratio(&self) -> f64 {
+        self.output.recip().map_or(f64::INFINITY, Ratio::to_f64)
+    }
 }
 
 /// Where a stage's shafts sit in a larger system.

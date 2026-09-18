@@ -780,21 +780,17 @@ pub fn solve_hula_stage_at(
     // ring's centre (`MeshKind::run_at`).
     let offset = MeshKind::Internal.run_at(layout.offset, stage.running_clearance.manual);
 
-    // Kinematics, **per turn of the crank**. The crank is the carrier of both
-    // meshes; the wobble body follows from the first mesh with gear 1 held,
-    // and the output from the ratio the two products give — the same
-    // expression, not a second one. A load case's speed scales these, and its
-    // teeth are engaged by how far each turns against the crank
-    // (`train::engagements`), which a case held still still does per sweep.
+    // **Every member's motion comes from the graph**, per turn of the crank —
+    // the crank being the carrier of both meshes, and the shaft the load is
+    // referred to. It used to be worked out here as `1 − z₁/z₂` for the wobble
+    // body and `1/R` for the output, which is Willis written a second time;
+    // the graph writes it once, and `a_hula_arrangement_reduces_by_its_two_products`
+    // holds that the two agree, `3721/16` on the shipped counts.
+    let motion = super::Constrained::wiring(stage)
+        .unit_motion(&super::teeth_of(super::Constrained::members(stage)))?;
+    let output_speed = motion.output;
+    // Tooth counts as floats, for the operating-radius reading below.
     let z = teeth.0.map(f64::from);
-    let wobble_speed = 1.0 - z[0] / z[1];
-    let output_speed = 1.0 / layout.ratio.value();
-
-    let unit_speed = |i: usize| match i {
-        0 => 0.0,
-        1 | 2 => wobble_speed,
-        _ => output_speed,
-    };
 
     // **The parts, and nothing yet about the load they carry.** What a member is
     // rated at depends on the torque the power flow gives it, the power flow
@@ -1183,15 +1179,15 @@ pub fn solve_hula_stage_at(
                     load.torque
                 }
             };
-            let engaged = super::engagements(unit_speed(i), 1.0, 1.0, 1.0);
+            let m = motion.members[i];
             let cases = rated
                 .into_iter()
                 .map(|r| {
                     let c = r.load;
                     r.into_case(
                         torque_in(&c),
-                        (unit_speed(i) * c.speed, (unit_speed(i) - 1.0) * c.speed),
-                        engaged,
+                        (m.speed.scale(c.speed), m.against_frame.scale(c.speed)),
+                        m.engagements,
                     )
                 })
                 .collect();
@@ -1355,11 +1351,11 @@ pub fn solve_hula_stage_at(
             .iter()
             .map(|c| ShaftsCase {
                 case: c.case,
-                speeds: [0.0, c.speed, output_speed * c.speed],
+                speeds: [0.0, c.speed, output_speed.scale(c.speed)],
                 torques: shaft_torques(c),
             })
             .collect(),
-        ratio: layout.ratio.value(),
+        ratio: motion.ratio(),
         ratio_products: [layout.ratio.numerator, layout.ratio.denominator],
         offset_nominal: layout.offset,
         clearance: stage.clearance_taken(),

@@ -5,7 +5,7 @@ train  total ratio 6.0317:1   total efficiency 96.482 % forward / 96.482 % backw
        case 2  ultimate 5.000 Nm / 0 rpm at end, held at the far end   ->   0.800 Nm / 0.0 rpm at start
        case 3  fatigue  2.000 Nm / 3000 rpm at start, held at the far end   ->   11.639 Nm / 497.4 rpm at end   90 deg at end x 600000, reversing
 
-stage 1  spur  z 17/43  beta 30 deg  ratio 2.5294  a_w 34.6610 mm  coprime
+stage 1  spur  z 17/43  beta 30 deg  ratio -2.5294  a_w 34.6610 mm  coprime
   contact ratio  transverse 1.3205   overlap 0.2674   total 1.5879   <- no full axial overlap
   efficiency 98.454 % forward / 98.454 % backward
   contact at the pitch point  sigma_H 1183.9 / 754.5 / 1183.9 MPa by case   rho 2.363 mm
@@ -20,7 +20,7 @@ stage 1  spur  z 17/43  beta 30 deg  ratio 2.5294  a_w 34.6610 mm  coprime
       case 3  T     5.0588 Nm    -1186.0 rpm  sigma_F    266.3  sigma_H   1183.9 MPa  cycles 6.000e5 / 3.000e5
   note: axial contact ratio below 1; helical in form but loaded like a spur gear
 
-stage 2  spur  z 13/31  beta 0 deg  ratio 2.3846  a_w 22.2508 mm  coprime
+stage 2  spur  z 13/31  beta 0 deg  ratio -2.3846  a_w 22.2508 mm  coprime
   contact ratio  transverse 1.4488   overlap 0.0000   total 1.4488
   efficiency 97.998 % forward / 97.998 % backward
   contact at the pitch point  sigma_H 1479.7 / 960.1 / 1479.7 MPa by case   rho 1.407 mm

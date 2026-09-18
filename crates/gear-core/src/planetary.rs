@@ -599,6 +599,14 @@ pub struct Power {
 impl Power {
     /// **The planet's own rotation**, absolute and relative to the carrier.
     ///
+    /// **An oracle, not the model.** Nothing shipped reads this any more: a
+    /// planet's speed comes off the shaft-line graph with every other member's
+    /// (`train::Wiring::unit_motion`). It is kept, test-only, because it is a
+    /// *second derivation* — Willis on the sun mesh in the carrier's frame —
+    /// and the graph is held against it in `kinematics::tests`. That is the
+    /// plan's sequencing done as it said: the old model becomes the fixture
+    /// rather than being deleted with nothing to stand in its place.
+    ///
     /// The planet is not one of the three shafts — [`Power`] is about a set with
     /// a basic ratio, and a basic ratio does not say how many teeth the thing
     /// between the two central members has — so its speed is a question for the
@@ -622,6 +630,7 @@ impl Power {
     ///
     /// Returns `(absolute, relative to the carrier)`, in the unit the speeds
     /// were given in.
+    #[cfg(test)]
     #[must_use]
     pub fn planet_speed(&self, teeth: Teeth) -> (f64, f64) {
         let carrier = self.speeds[PlanetaryShaft::Carrier.index_pub()];

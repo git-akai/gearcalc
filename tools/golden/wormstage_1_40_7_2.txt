@@ -1,4 +1,4 @@
-worm stage  z 1/40  module 1  ratio 40.0000:1  a 23.7273 mm
+worm stage  z 1/40  module 1  ratio -40.0000:1  a 23.7273 mm
   lead angle 8.2132 deg   wheel helix 8.2132 deg   lead 3.1741 mm
 
   member      torque Nm   face mm   d mm      material
