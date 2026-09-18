@@ -574,6 +574,7 @@ mod tests {
                 gear_core::train::StageResult::Pair(p) => p.notes.clone(),
                 gear_core::train::StageResult::Planetary(p) => p.notes.clone(),
                 gear_core::train::StageResult::Hula(h) => h.notes.clone(),
+                gear_core::train::StageResult::Shape(s) => s.notes.clone(),
             };
             out.extend(r.members().iter().flat_map(|g| g.notes.iter().cloned()));
             out.extend(r.meshes().iter().flat_map(|m| m.notes.iter().cloned()));

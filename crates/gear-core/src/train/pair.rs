@@ -13,7 +13,7 @@
 //! What genuinely differs is the **mesh**, and it must: parallel axes touch
 //! along a line and lose power to sliding along the profile, crossed axes touch
 //! at a point and slide lengthwise. So this file solves the parallel mesh and
-//! [`super::crossed`] the crossed one, both into one [`super::PairResult`]
+//! [`super::crossed`] the crossed one, both into one [`super::CrossedResult`]
 //! whose [`super::MeshReport`] is one shape for either — the physics being one
 //! model with the shaft angle as a parameter, and every field that meets at
 //! the limit measured to. A worm stage used to be a separate
@@ -22,17 +22,12 @@
 //! the worm. `docs/corrections.md` records what that cost, and the audit's
 //! record (`docs/history/audit.md`, F83) what deleting it moved: nothing.
 
-use super::{
-    Backlash, CaseLoadings, Constrained, ContactPatch, ContactRatios, Freedom, GearResult, Loading,
-    MemberRating, PairResult, Reading, StageGear, StageLoads, TrainError, PROBE,
-};
+use super::{Freedom, Reading, StageGear, TrainError};
 use crate::auto::automatic_profile_shift;
-use crate::contact::{efficiency, ContactPath, Directional, LoadSharing};
-use crate::material::{contact_modulus, Material, MaterialLibrary};
-use crate::mesh::{Mesh, MeshKind, MeshSide};
+use crate::contact::LoadSharing;
+use crate::mesh::{Mesh, MeshKind};
 use crate::params::{Auto, GearParams};
 use crate::screw::{Screw, ScrewParams};
-use crate::strength::{bending_stress, contact_stress, Load, RootStressModel, PARALLEL_AXES};
 use crate::tooth::Tooth;
 
 /// **What a gear's two shift controls come to**, read once so every stage reads
@@ -92,13 +87,12 @@ pub(crate) struct ShiftAsked {
 /// **How a member's shift came to be**, which is what decides the undercut
 /// bound it answers to.
 ///
-/// Three ways, and they want three different answers to the same question —
-/// which is why this is a type rather than a boolean about whether a shift was
-/// typed. See [`undercut_bound`].
+/// Two ways, and they want two different answers to the same question —
+/// which is why this is a type rather than a boolean. A shift a designer
+/// typed is the third way, and it is pinned before any bound is asked
+/// ([`crate::auto::Cut::Pinned`]). See [`undercut_bound`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Decided {
-    /// A designer typed it. Already held to its own bound when it was read.
-    Given,
     /// A search is choosing it, and may pick any admissible value.
     Chosen,
     /// A relation left it — the planet's shift closing an epicyclic set's two
@@ -133,7 +127,6 @@ pub(crate) fn undercut_bound(
     }
     match how {
         Decided::Chosen => Some(automatic_profile_shift(p, depth)),
-        Decided::Given => None,
         Decided::Absorbed => Some(crate::auto::minimum_profile_shift(p, depth).with_cutter_radius),
     }
 }
@@ -495,6 +488,37 @@ impl PairStage {
     /// share — and so `β₁ + β₂ = Σ` holds by construction rather than by a test.
     /// A stated helix is kept in its own words, to the bit, rather than
     /// becoming a diameter and coming back through an arccosine.
+    /// Either member's helix and the first member's diameter as readings of
+    /// the one size, and the ratio where it decides it — what the shape
+    /// declares to relief for every member; kept here for the crossed
+    /// model's own reading of the pair.
+    fn readings(&self) -> Vec<Reading> {
+        let z1 = f64::from(self.gears[0].teeth.max(1)) * self.module;
+        let mut out = vec![
+            Reading::helix(0, &self.gears[0], |b| b),
+            Reading::helix(1, &self.gears[1], |b| self.shaft_angle - b),
+            Reading {
+                freedom: Freedom::FirstPitchDiameter,
+                // `cos β = z m_n / d`, clamped so a diameter below the tooth's
+                // own reads as straight teeth rather than a NaN.
+                helix: (!self.pitch_diameter.auto).then(|| {
+                    (z1 / self.pitch_diameter.manual)
+                        .clamp(-1.0, 1.0)
+                        .acos()
+                        .to_degrees()
+                }),
+            },
+        ];
+        if self.overlap_reads_size() {
+            out.push(Reading::overlap(
+                &self.overlap,
+                self.module,
+                self.given_width(),
+            ));
+        }
+        out
+    }
+
     #[must_use]
     pub fn helix_angles(&self) -> [f64; 2] {
         let first = super::stated_helix(&self.readings()).unwrap_or_else(|| {
@@ -936,570 +960,20 @@ impl PairStage {
     }
 }
 
-/// Solve one pair, given the torque on its first gear.
-///
-/// One entry for every kind of pair: the shaft angle decides whether the mesh
-/// is the parallel one solved here or the crossed one
-/// ([`super::crossed::solve_crossed_pair`]), and the kind decides the little a
-/// kind decides ([`PairKind`]).
-///
-/// # Errors
-///
-/// [`TrainError`] when the pair cannot mesh, never reaches contact, names a
-/// material the library does not have, or is too undercut to rate.
-pub fn solve_pair_stage(
+/// The pair kind's old entry point, kept for the tests written against it:
+/// the pair through the shape, read back as a pair.
+#[cfg(test)]
+pub(crate) fn solve_pair_stage(
     stage: &PairStage,
     kind: PairKind,
-    loads: &StageLoads,
-    lib: &MaterialLibrary,
-) -> Result<PairResult, TrainError> {
-    solve_pair_stage_with(stage, kind, loads, lib, super::Reversal::default())
-}
-
-/// The same, told how the train treats a root loaded on both flanks.
-///
-/// A parallel-axis gear reverses only when a load case's **duty** does, so
-/// with ordinary one-way loads this is the call above and nothing moves.
-///
-/// # Errors
-///
-/// As [`solve_pair_stage`].
-pub fn solve_pair_stage_with(
-    stage: &PairStage,
-    kind: PairKind,
-    loads: &StageLoads,
-    lib: &MaterialLibrary,
-    reversal: super::Reversal,
-) -> Result<PairResult, TrainError> {
-    // The size once, before anything reads a helix angle off it.
-    let sized = stage.sized();
-    // **What the members do, before anything is cut.** Asked first because it
-    // needs no geometry — a ratio is tooth counts and topology — and because it
-    // is where a member with no teeth is caught, which used to be reported as a
-    // tooth too undercut to have a root section.
-    let wiring = super::Constrained::wiring(&sized);
-    let boundary = super::StageBoundary::of(loads, &wiring, &super::Constrained::ports(&sized));
-    let motion = wiring.unit_motion(&super::teeth_of(sized.members()), &boundary)?;
-    if sized.is_crossed() {
-        return super::crossed::solve_crossed_pair(&sized, kind, loads, lib, &motion);
-    }
-    solve_parallel(&sized, loads, lib, reversal, &motion)
-}
-
-/// The parallel-axis mesh: line contact, a bending rating, one efficiency.
-fn solve_parallel(
-    stage: &PairStage,
-    loads: &StageLoads,
-    lib: &MaterialLibrary,
-    reversal: super::Reversal,
-    motion: &super::UnitMotion,
-) -> Result<PairResult, TrainError> {
-    // The shifts once, not once per gear: with the optimiser on, `shifts` is a
-    // search, and asking each gear for its own would run it twice for one
-    // answer.
-    let chosen = stage.chosen_at(&crate::auto::Search::SHIPPED);
-    let x = chosen.shifts;
-    let p = [stage.params_at(0, x[0]), stage.params_at(1, x[1])];
-    let g = [Tooth::new(p[0]), Tooth::new(p[1])];
-    let mesh = Mesh::new(&g[0], &g[1], MeshKind::External).map_err(TrainError::Mesh)?;
-
-    // Owned rather than borrowed, because a gear's own overrides may replace
-    // properties of the library entry and the result is a different material.
-    let materials: Vec<Material> = stage
-        .gears
-        .iter()
-        .map(|s| {
-            lib.get(&s.material)
-                .ok_or_else(|| TrainError::UnknownMaterial(s.material.clone()))
-                .map(|m| m.overridden(&s.material_overrides))
-        })
-        .collect::<Result<_, _>>()?;
-
-    // --- centre distance and the clearance it is opened by.
-    //
-    // **Where the clearance is read is the rule**, and there is nothing else to
-    // it. With the distance automatic it is the zero-backlash distance opened
-    // out, and that opening *is* the backlash. With the distance given by hand
-    // there is nothing left to move — the shifts sit where they sit, the
-    // distance is whatever was typed — so the clearance is not read here, and
-    // the backlash is a consequence rather than a choice. Unless the shifts are
-    // being chosen, in which case *they* absorb it: `shifts_at` pins the sum a
-    // clearance inside the given distance, so the designer gets both the housing
-    // and the play. [`PairResult::clearance`] reports what came of it, derived.
-    //
-    // This used to be a `clearance_taken()` returning zero in the given-distance
-    // case, which reads as the rule and enforced none of it: **every caller of
-    // it already ran where its condition held**, so the arm returning zero was
-    // dead. Removing it moved no test and no recorded figure — which is what a
-    // conditional that decides nothing does, while suggesting there are two
-    // answers here.
-    // The number in the box. Read here only where the distance is automatic —
-    // which is the branch below — and there the clearance is what *makes* the
-    // distance, so it is an input by definition. With both automatic nothing
-    // would determine either, and `Stage::relieved` is what stops a designer
-    // reaching that state; a hand-written document that does reach it gets the
-    // value it wrote rather than a refusal.
-    let clearance = stage.clearance.manual;
-    let centre = if stage.centre_distance.auto {
-        mesh.running_distance(clearance)
-    } else {
-        stage.centre_distance.manual
-    };
-
-    // --- the pair as it actually runs.
-    //
-    // `mesh` is the **zero-backlash** pair, which is where the profile shifts put
-    // it; `operating` is that plus the assembly clearance, which is where the
-    // teeth actually touch. Everything about contact — the path, the operating
-    // radii, the relative curvature, the Hertz stress and the efficiency
-    // integral — belongs to the second, and only backlash belongs to the first,
-    // which measures play *against* the zero-backlash reference. Rating at
-    // `mesh` was rating a pair nobody builds: the clearance is not a tolerance
-    // to be ignored, it is the reason there is any backlash to report.
-    //
-    // A crossed stage reaches the same place by a different road (docs/reference.md#centre-distance-and-backlash): its line
-    // of action slides instead of turning, so `Screw::path_of_contact_at` takes
-    // the distance rather than the pair being re-described at it.
-    let operating = mesh.at(centre).map_err(TrainError::Mesh)?;
-    let path = ContactPath::new(&g[0], g[1].ra, &operating).ok_or(TrainError::NoContact)?;
-
-    // --- face width. `b_min` does not depend on the `b` it was measured at
-    // (docs/reference.md#contact-stress), so one evaluation at any width gives every minimum, and
-    // nothing has to be iterated.
-    let e_star = contact_modulus(&materials[0], &materials[1]);
-
-    // The critical section, and the share of the load acting on it. With
-    // sharing off — the default — this *is* `bending_section` and a share of
-    // exactly 1, so the ordinary rating is untouched to the bit.
-    let bending = [0usize, 1].map(|i| {
-        super::Bending::of(
-            &g[i],
-            path.contact_ratio,
-            stage.load_sharing,
-            stage.gears[i].rim_thickness,
-        )
-    });
-    let [Some(first), Some(second)] = bending else {
-        return Err(TrainError::NoRootSection);
-    };
-    let bending = [first, second];
-    let sections = [bending[0].section, bending[1].section];
-    let load_share = [bending[0].share, bending[1].share];
-    let rims = [bending[0].rim, bending[1].rim];
-
-    // Every rating at one width, one set per load case. `b_min` does not
-    // depend on the `b` it was measured at, so the probe pass is still one
-    // evaluation per case and nothing iterates. **A parallel-axis mesh carries
-    // one tangential force whichever way it turns**, so a case's direction
-    // changes nothing here and only its torque is read.
-    type Evaluated = (crate::strength::ContactStress, [Option<f64>; 2]);
-    let rate = |torque: f64, width: f64| -> Result<Evaluated, TrainError> {
-        let load = Load::new(torque, width);
-        let cs = contact_stress(&path, &operating, &g[0], PARALLEL_AXES, &load, e_star)
-            .ok_or(TrainError::NoContact)?;
-        let sf = [0usize, 1].map(|i| {
-            let li = load.across_mesh(&g[0], &g[i]);
-            // The share this tooth carries where it is rated — exactly 1 unless
-            // a sharing model was asked for, so nothing scales by default.
-            bending_stress(
-                &sections[i],
-                li.tangential(&g[i]),
-                li.face_width,
-                RootStressModel::DolanBroghamer,
-                rims[i],
-            )
-            .map(|s| s * load_share[i])
-        });
-        Ok((cs, sf))
-    };
-    let rate_all = |width: f64| -> Result<Vec<Evaluated>, TrainError> {
-        loads.cases.iter().map(|c| rate(c.torque, width)).collect()
-    };
-    let probed = rate_all(PROBE)?;
-
-    // **A pair is one mesh, so each member is in a list of one** — and it says
-    // so through the same type an epicyclic set's planet says it is in two.
-    // What is this stage's own is that each load case is *evaluated* rather
-    // than scaled: it has its own torque, and nothing here has to claim the
-    // stresses are linear in it (`Loading::for_cases` is that claim, and the
-    // stages that make it are the ones whose power split does not depend on the
-    // magnitude passing through them).
-    let rating = |i: usize, at: &[Evaluated], measured_at: f64, carried_at: f64| MemberRating {
-        material: &materials[i],
-        reversal,
-        // Nothing about the pair itself reverses a root; a case's duty may.
-        always_reverses: false,
-        cases: loads
-            .cases
-            .iter()
-            .zip(at)
-            .map(|(load, (cs, sf))| CaseLoadings {
-                load: *load,
-                meshes: vec![Loading {
-                    bending: sf[i],
-                    // **This gear's** governing point, not the pair's envelope:
-                    // the width a gear needs follows from the stress it is
-                    // rated at.
-                    contact: cs.governing(i),
-                    measured_at,
-                    carried_at,
-                }],
-            })
-            .collect(),
-    };
-
-    let mut notes = Vec::new();
-    // What the rating has to say about each gear. Per gear, because that is
-    // whose it is — and because two gears raising the same note would give one
-    // stage-level list two entries with one key.
-    let gear_notes = |i: usize| {
-        let mut out = Vec::new();
-        // ...and whether its rim is thinner than ISO 6336-3 will rate.
-        out.extend(super::rim_below_minimum(rims[i]));
-        // ...and whether the cutter has eaten into the flank, which no toggle
-        // can prevent once a shift is given and `no undercut` is off.
-        out.extend(super::undercut_note(&g[i]));
-        // ...and whether this root is loaded both ways, which for a parallel
-        // pair is a duty's doing alone.
-        out.extend(reversal.note_for(loads.any_reverse()));
-        // **A bound that moved this gear's own number belongs to this gear.**
-        // A note naming an input is one the reader wants under that input, not
-        // in a list at the foot of the stage where they have to match it back
-        // up by tooth count.
-        let g = &stage.gears[i];
-        out.extend(g.shift_asked(&stage.base_params(i)).note());
-        out.extend(
-            g.addendum_asked(&GearParams {
-                profile_shift: x[i],
-                ..stage.base_params(i)
-            })
-            .note(),
-        );
-        // ...and an automatic width nothing sizes, which stands at its box.
-        out.extend(g.face_width_note());
-        out
-    };
-    // **What the mesh needs, not what one gear needs.** The narrower face
-    // carries the pair, so a width that satisfies only its own gear satisfies
-    // nothing: give gear 2 a weaker material and it asks for more, and sizing
-    // gear 1 to its own smaller figure pulls the effective width — and gear 2
-    // with it — under what gear 2 required. Each gear's toggles still choose
-    // which of *its* ratings count; the width they resolve to is the largest ask
-    // in the mesh.
-    // ...and the width a given axial contact ratio needs, which is a floor
-    // under an automatic width beside the ratings' asks — the mesh's one
-    // helix, so one floor for both members.
-    let helix = stage.helix_angles()[0];
-    let for_overlap = super::width_for_overlap(&stage.overlap, helix, stage.module);
-    let asks = [0usize, 1].map(|i| {
-        let g = &stage.gears[i];
-        // An automatic width with every source switched off has nothing to
-        // invert, so it stands at the number in its box and the stage says so
-        // (`FaceSources::width_for`). Said rather than divided by, which is
-        // what it was: a zero width made every stress infinite.
-        g.face_sources
-            .width_for(
-                &rating(i, &probed, PROBE, PROBE).asks(),
-                g.face_width.manual,
-            )
-            .max(for_overlap.unwrap_or(0.0))
-    });
-    let wanted = asks[0].max(asks[1]);
-    let widths = [0usize, 1].map(|i| stage.gears[i].face_width.resolve(wanted));
-
-    // The spec is explicit: the *narrower* gear carries the mesh, so both gears
-    // are rated at the smaller width regardless of which one owns it.
-    let effective = widths[0].min(widths[1]);
-
-    // Every rating again, at the width actually in force. One evaluation per
-    // case and the same expression: a load case is a torque, and nothing else
-    // about the stage knows which one it is looking at.
-    let rated = rate_all(effective)?;
-    // **The reduction is the graph's**: input turns per output turn, signed —
-    // an external pair's output turns the other way and its ratio says so.
-    // `z₂/z₁` said the magnitude, which is what a torque referral wants and is
-    // taken as `|i|` where one is (`solve_train`), and not what a ratio is.
-    let ratio = motion.ratio();
-
-    let mut gears = Vec::with_capacity(2);
-    for i in 0..2 {
-        // Measured at the width in force and carried at it, so nothing scales
-        // and the figures are the ones this stage's own arithmetic produced.
-        // Each case's torque on this gear is the mesh projection of the
-        // stage's, which for a parallel pair has no efficiency in it whichever
-        // way the case travels; **its motion comes from the graph**, which is
-        // the one place every kind's speeds come from now — and which knows
-        // that the second member of an external pair turns the other way, where
-        // `1/ratio` did not.
-        let m = motion.members[i];
-        let cases = rating(i, &rated, effective, effective)
-            .rated()
-            .into_iter()
-            .map(|r| {
-                let load = r.load;
-                let torque = Load::new(load.torque, effective)
-                    .across_mesh(&g[0], &g[i])
-                    .torque;
-                r.into_case(
-                    torque,
-                    (m.speed.scale(load.speed), m.against_frame.scale(load.speed)),
-                    m.engagements,
-                )
-            })
-            .collect();
-        gears.push(GearResult::of(super::MemberFacts {
-            profile_shift: p[i].profile_shift,
-            params: &p[i],
-            input: &stage.gears[i],
-            cases,
-            face_width: widths[i],
-            // A parallel pair's face is sized by a rating, and the rating is
-            // the recommendation.
-            recommended_face_width: None,
-            material: materials[i].clone(),
-            clamps: g[i].clamps.notes.clone(),
-            notes: gear_notes(i),
-        }));
-    }
-
-    // --- contact ratios. eps_beta needs the face width, which is why it could
-    // not exist before this milestone.
-    let contact_ratios = ContactRatios::of(path.contact_ratio, effective, helix, stage.module);
-
-    // --- backlash at the three centre distances.
-    //
-    // Two displacements open the flanks, and both are projections onto the
-    // common normal: the centre-distance error, which the mesh already turns
-    // into transverse play, and the first member's axial float, a rigid slide
-    // that opens one flank as far as it closes the other — `j_axial sin β_b1`
-    // along the normal, lost once. The crossed mesh projects the same two onto
-    // the same normal (`crossed::angular_backlash`); a spur gear's `β_b` is
-    // zero and the term with it.
-    let slide = {
-        let bb =
-            crate::plane::base_helix_angle(helix.to_radians(), stage.pressure_angle.to_radians());
-        stage.axial_clearance * bb.sin().abs()
-    };
-    let p_bn = std::f64::consts::PI * stage.module * stage.pressure_angle.to_radians().cos();
-    let angular = |a: f64, at: MeshSide| -> f64 {
-        let teeth = stage.gears[at.index()].teeth;
-        (mesh.angular_backlash(a, at).unwrap_or(0.0)
-            + crate::mesh::angular_play(slide, teeth, p_bn))
-        .to_degrees()
-    };
-    // Reported by direction rather than by member: the output of a forward
-    // drive is gear 2, of a backward drive gear 1, and the same gap subtends a
-    // different angle at each.
-    // **Per member, which is what the gap is.** A mesh has one gap and two ends
-    // to see it from; which end is the *output* is a question about the drive,
-    // and `MeshReport::backlash_by_drive` is the one place that turns the first
-    // reading into the second. It used to be a `match` from `Drive` to
-    // `MeshSide` written out here as well.
-    let at_member = |at: MeshSide| {
-        Backlash::banded(centre, stage.tolerance_minus, stage.tolerance_plus, |d| {
-            angular(d, at)
-        })
-    };
-    let backlash = [at_member(MeshSide::First), at_member(MeshSide::Second)];
-
-    // What the *distance* has to say: whether the shifts reached the one
-    // that was given, and whether the pair can be assembled at all. Both are
-    // `train::distance_notes`, so every kind with a centre distance says the
-    // same thing in the same words.
-    notes.extend(super::distance_notes(
-        stage.nominal_distance(),
-        mesh.a_w,
-        centre - mesh.a_w,
-    ));
-    // ...and whether the optimiser found anything to choose. A search that
-    // agreed with the floor and a search that found nothing look identical from
-    // the shifts alone (`super::Searched`).
-    notes.extend(chosen.how.note());
-    // ...and whether a given ratio could be read: past `ε_β π m_n / b = 1` no
-    // helix reaches it and the helix stood at its box; on straight teeth no
-    // width buys any overlap and the floor was nothing.
-    notes.extend(super::overlap_notes(
-        stage.size_taken_by_overlap(),
-        &stage.overlap,
-        stage.module,
-        stage.given_width(),
-        stage.helix_angles()[0],
-    ));
-
-    Ok(PairResult {
-        ratio,
-        centre_distance_nominal: mesh.a_w,
-        centre_distance: centre,
-        // The gap the pair runs at, which is the two distances above it and a
-        // subtraction rather than the input echoed back.
-        clearance: centre - mesh.a_w,
-        mesh: {
-            // Breaking away is decided at rest, running is decided sliding —
-            // one rule, applied to every stage kind (`Directional::once_moving`).
-            // A parallel-axis mesh is never near the threshold, so this passes
-            // the sliding figure through and always will; it is here so there is
-            // no stage kind the rule has to be remembered for.
-            let with = |mu: f64| Directional::of(|d| efficiency(&path, &operating, &g[0], mu, d));
-            super::line_mesh_report(
-                loads,
-                super::LineMesh {
-                    coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
-                    contact_ratios,
-                    operating_pressure_angle: mesh.alpha_w.to_degrees(),
-                    efficiency: with(stage.sliding_friction)
-                        .once_moving(&with(stage.static_friction)),
-                    // Each case evaluated at its own load, so nothing scales.
-                    contact: rated
-                        .iter()
-                        .map(|(cs, _)| ContactPatch::line(cs, 1.0, effective, e_star))
-                        .collect(),
-                    // Per member, in the order the mesh was built — which
-                    // `MeshReport::backlash_by_drive` is the one place that turns into
-                    // the per-direction reading a stage reports.
-                    backlash,
-                    // **Asked of the mesh as it runs**, opened by the assembly
-                    // clearance — which is the mesh every other figure here is read off,
-                    // and the less conservative of the two: opening a centre distance
-                    // moves a tip away from the flank it might have reached.
-                    flank_interference: mesh
-                        .flank_interference([g[0].flank_ends(), g[1].flank_ends()]),
-                    // A parallel-axis pair is external: its tips meet on the line of
-                    // centres or not at all, which `bottom_clearance` already asks.
-                    tips: None,
-                    // What the sharing model has to say about this mesh, raised
-                    // where the section and the share are worked out
-                    // (`train::Bending`). One mesh, so one note at most.
-                    notes: bending[0].note.clone().into_iter().collect(),
-                },
-            )
-        },
-        gears: [gears[0].clone(), gears[1].clone()],
-        notes,
-    })
-}
-
-/// What the pair declares to the relief and size resolver every kind shares.
-impl Constrained for PairStage {
-    fn members(&self) -> Vec<&StageGear> {
-        self.gears.iter().collect()
-    }
-
-    fn inputs(&mut self) -> Vec<(Freedom, &mut Auto<f64>)> {
-        let mut out = vec![
-            (Freedom::CentreDistance, &mut self.centre_distance),
-            (Freedom::Clearance, &mut self.clearance),
-            (Freedom::FirstPitchDiameter, &mut self.pitch_diameter),
-            (Freedom::Overlap, &mut self.overlap),
-        ];
-        out.extend(super::member_inputs(self.gears.iter_mut()));
-        out
-    }
-
-    /// Either member's helix, the first member's diameter, and the ratio
-    /// where it is given the size to decide — in that order, the ratio last
-    /// because it is asked for least often and so is the last to give.
-    fn readings(&self) -> Vec<Reading> {
-        let z1 = f64::from(self.gears[0].teeth.max(1)) * self.module;
-        let mut out = vec![
-            Reading::helix(0, &self.gears[0], |b| b),
-            Reading::helix(1, &self.gears[1], |b| self.shaft_angle - b),
-            Reading {
-                freedom: Freedom::FirstPitchDiameter,
-                // `cos β = z m_n / d`, clamped so a diameter below the tooth's
-                // own reads as straight teeth rather than a NaN.
-                helix: (!self.pitch_diameter.auto).then(|| {
-                    (z1 / self.pitch_diameter.manual)
-                        .clamp(-1.0, 1.0)
-                        .acos()
-                        .to_degrees()
-                }),
-            },
-        ];
-        if self.overlap_reads_size() {
-            out.push(Reading::overlap(
-                &self.overlap,
-                self.module,
-                self.given_width(),
-            ));
-        }
-        out
-    }
-
-    /// **A pair's distance, its two shifts and its size**:
-    /// `a = a₀(size, x₁ + x₂) + clearance` is one relation, so four of the
-    /// five may be given — for every kind of pair alike, since a worm's
-    /// diameter and a helical pair's helix are the same freedom. The distance
-    /// comes first because it is the one a designer expects to give way when
-    /// they pin everything else; the shifts come before the size because a
-    /// shift moves the teeth where a size changes them, which is also the
-    /// preference the solve has when both are free to absorb
-    /// ([`PairStage::first_pitch_diameter`]).
-    ///
-    /// **The size is one entry with three or four readings.** Every reading
-    /// automatic is a state with an answer — the shaft angle shared evenly,
-    /// unless a given distance with both shifts pinned decides the size — so
-    /// none of them has to stand. The ratio is among them only while it
-    /// decides the helix; while a width is automatic it is a floor under that
-    /// width, in no argument with anything, and on crossed shafts it is
-    /// nothing at all and is turned back automatic.
-    fn freedoms(&self) -> Vec<super::FreedomGroup> {
-        let mut groups = vec![
-            super::one_relation(vec![
-                vec![Freedom::CentreDistance],
-                vec![Freedom::Clearance],
-                vec![Freedom::Member(0, super::MemberFreedom::Shift)],
-                vec![Freedom::Member(1, super::MemberFreedom::Shift)],
-                super::entry(&self.readings()),
-            ]),
-            super::distance_and_clearance(),
-        ];
-        if self.is_crossed() {
-            groups.push(super::always_automatic(Freedom::Overlap));
-        }
-        groups
-    }
-
-    /// **Two shafts whose axes stand still in ground, and one mesh framed on
-    /// it.**
-    ///
-    /// The shaft angle does not appear: crossing the shafts changes what the
-    /// teeth do to each other — a line contact becomes a point, the sliding
-    /// turns lengthwise — and changes nothing whatever about the speeds, which
-    /// are `z₁/z₂` on parallel shafts and on crossed ones alike. So a worm
-    /// stage's wiring is a spur stage's, and that is the model saying a kind is
-    /// a layer rather than a second kinematics.
-    fn wiring(&self) -> super::Wiring {
-        use crate::kinematics::GROUND;
-        const FIRST: usize = 1;
-        const SECOND: usize = 2;
-        // The two ports are named again in `ports`, which is the convention
-        // a chain reads; here they are only where the members spin.
-        super::Wiring {
-            shafts: vec![
-                super::ShaftLabel::Ground,
-                super::ShaftLabel::Member { member: 0 },
-                super::ShaftLabel::Member { member: 1 },
-            ],
-            mounts: vec![
-                super::Mount::coaxial_with(FIRST, GROUND),
-                super::Mount::coaxial_with(SECOND, GROUND),
-            ],
-            meshes: vec![super::MeshSpec {
-                a: 0,
-                b: 1,
-                kind: crate::mesh::MeshKind::External,
-                paths: 1,
-            }],
-        }
-    }
-
-    /// First member in, second out, nothing held: the way round a pair is
-    /// written, and a convention rather than a fact — a train may drive it
-    /// from either end.
-    fn ports(&self) -> super::Ports {
-        super::Ports {
-            ports: vec![1, 2],
-            held: Vec::new(),
-        }
-    }
+    loads: &super::StageLoads,
+    lib: &crate::material::MaterialLibrary,
+) -> Result<super::CrossedResult, TrainError> {
+    super::shape::solve_shape(
+        &super::shape::Shape::from_pair(stage, kind),
+        loads,
+        lib,
+        super::Reversal::default(),
+    )
+    .map(|r| r.pair_view())
 }

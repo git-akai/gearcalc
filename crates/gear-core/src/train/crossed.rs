@@ -67,7 +67,7 @@
 //! at `Σ = 0` is the degeneracy, not a seam in the code.
 
 use super::{
-    Backlash, ContactPatch, GearCase, GearResult, MeshCase, MeshReport, PairKind, PairResult,
+    Backlash, ContactPatch, CrossedResult, GearCase, GearResult, MeshCase, MeshReport, PairKind,
     PairStage, PointContact, StageLoads, TrainError,
 };
 
@@ -177,7 +177,7 @@ pub fn solve_crossed_pair(
     loads: &StageLoads,
     lib: &MaterialLibrary,
     motion: &super::UnitMotion,
-) -> Result<PairResult, TrainError> {
+) -> Result<CrossedResult, TrainError> {
     // The shifts, decided once — a given distance is reached through them by
     // the rack law, or through the size where both are pinned
     // (`PairStage::first_pitch_diameter`).
@@ -615,7 +615,7 @@ pub fn solve_crossed_pair(
     }
     notes.extend(chosen.how.note());
 
-    Ok(PairResult {
+    Ok(CrossedResult {
         // Signed, from the graph — a worm is an external mesh like any other.
         ratio: motion.ratio(),
         centre_distance_nominal: s.centre_distance,
@@ -727,7 +727,7 @@ fn angular_backlash(s: &Screw, stage: &PairStage, delta: f64, at: MeshSide) -> f
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use super::super::{solve_pair_stage, StageGear};
+    use super::super::{pair::solve_pair_stage, StageGear};
     use super::*;
     use crate::params::Auto;
 
@@ -740,7 +740,7 @@ mod tests {
         stage: &PairStage,
         loads: &StageLoads,
         lib: &MaterialLibrary,
-    ) -> Result<PairResult, TrainError> {
+    ) -> Result<CrossedResult, TrainError> {
         solve_pair_stage(stage, PairKind::Worm, loads, lib)
     }
 
@@ -749,7 +749,7 @@ mod tests {
         stage: &PairStage,
         loads: &StageLoads,
         lib: &MaterialLibrary,
-    ) -> Result<PairResult, TrainError> {
+    ) -> Result<CrossedResult, TrainError> {
         solve_pair_stage(stage, PairKind::Spur, loads, lib)
     }
 
@@ -776,7 +776,7 @@ mod tests {
 
     /// The mesh a solved pair reports, checked to be the point contact a
     /// crossed pair has.
-    fn point(r: &PairResult) -> &MeshReport {
+    fn point(r: &CrossedResult) -> &MeshReport {
         assert!(
             r.mesh.point.is_some() && r.mesh.line.is_none(),
             "a crossed pair reports a point contact"
@@ -784,7 +784,7 @@ mod tests {
         &r.mesh
     }
 
-    fn solved(stage: &PairStage) -> PairResult {
+    fn solved(stage: &PairStage) -> CrossedResult {
         solve_pair_stage(stage, PairKind::Worm, &StageLoads::just(2.0), &library()).unwrap()
     }
 
@@ -1482,7 +1482,7 @@ mod tests {
         // which slides less, which delivers more torque — so the two figures
         // are compared as a ratio, which divides the load out: the same mesh
         // rated at its worst against rated at its pitch point.
-        let severity = |r: &PairResult| {
+        let severity = |r: &CrossedResult| {
             point(r).cases[0].contact.max_pressure / point(r).cases[0].contact.at_pitch_point
         };
         // The margin is small, and the reason is worth knowing: a narrow face
@@ -2118,7 +2118,7 @@ mod tests {
             };
             st
         };
-        let shifts = |r: &PairResult| [r.gears[0].profile_shift, r.gears[1].profile_shift];
+        let shifts = |r: &CrossedResult| [r.gears[0].profile_shift, r.gears[1].profile_shift];
 
         // The shipped worm: the floor is the answer, and the search says so
         // by choosing rather than by finding nothing.

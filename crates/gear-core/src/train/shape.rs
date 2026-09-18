@@ -57,6 +57,11 @@ use crate::tooth::Tooth;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Axis {
     /// The shaft whose frame this axis stands still in, where it is not
     /// ground's: a carrier. `None` is an axis fixed in ground.
@@ -71,6 +76,11 @@ pub struct Axis {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct ShaftOn {
     pub axis: usize,
 }
@@ -79,6 +89,11 @@ pub struct ShaftOn {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Member {
     /// The shaft it spins with, numbered as [`ShaftOn`] is.
     pub shaft: Shaft,
@@ -100,6 +115,11 @@ pub struct Member {
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct MeshInput {
     /// Indices into [`Shape::members`]. On an internal mesh `b` is the ring.
     pub a: usize,
@@ -113,6 +133,11 @@ pub struct MeshInput {
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Distance {
     pub axes: [usize; 2],
     /// The angle between the two axes, degrees: 0 for parallel, 90 for a
@@ -141,6 +166,11 @@ pub struct Distance {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct Shape {
     /// Normal pressure angle, degrees. Shared by every member.
     pub pressure_angle: f64,
@@ -270,7 +300,7 @@ impl Shape {
     /// (its helix, or its pitch diameter), else its mate's through the mesh
     /// they share — the opposite hand across an external mesh, the same
     /// across an internal one — else straight teeth.
-    fn helix_angles(&self) -> Vec<f64> {
+    pub(crate) fn helix_angles(&self) -> Vec<f64> {
         let readings = self.readings();
         let stated = |i: usize| -> Option<f64> {
             readings.iter().find_map(|r| match r.freedom {
@@ -791,6 +821,21 @@ impl Shape {
         )
     }
 
+    /// The shifts the shape settles on under a search — what the tests
+    /// written against the kinds' own choosers ask.
+    #[cfg(test)]
+    pub(crate) fn shifts_at(&self, search: &crate::auto::Search) -> Vec<f64> {
+        let helix = self.helix_angles();
+        self.chosen_at(search, &helix).shifts
+    }
+
+    /// Every member cut and every mesh at its running distance, at these
+    /// shifts, the helices as the readings decide.
+    #[cfg(test)]
+    pub(crate) fn build_at(&self, x: &[f64]) -> Result<Built, TrainError> {
+        self.build(x, &self.helix_angles())
+    }
+
     /// The product of every mesh's efficiency at these shifts, or nothing
     /// where any mesh is inadmissible ([`crate::auto::MeshTrial`]).
     fn trial_efficiency(&self, plan: &Plan, x: &[f64], helix: &[f64]) -> Option<f64> {
@@ -894,24 +939,33 @@ fn pull_in(g: &impl Fn(f64) -> f64, from: f64, toward: f64) -> Option<f64> {
 
 /// One member as cut: by a rack, or by a pinion cutter with the tooth the
 /// mesh geometry reads it as.
-enum BuiltMember {
+pub(crate) enum BuiltMember {
     Rack { tooth: Tooth },
     Ring { ring: Box<Ring>, as_gear: Tooth },
 }
 
 impl BuiltMember {
     /// The tooth the mesh geometry is built on.
-    fn as_gear(&self) -> &Tooth {
+    pub(crate) fn as_gear(&self) -> &Tooth {
         match self {
             Self::Rack { tooth } | Self::Ring { as_gear: tooth, .. } => tooth,
         }
     }
 
     /// The tip radius, as the cutter left it.
-    fn tip_radius(&self) -> f64 {
+    pub(crate) fn tip_radius(&self) -> f64 {
         match self {
             Self::Rack { tooth } => tooth.ra,
             Self::Ring { ring, .. } => ring.ra,
+        }
+    }
+
+    /// The root radius, as the cutter left it.
+    #[cfg(test)]
+    pub(crate) fn root_radius(&self) -> f64 {
+        match self {
+            Self::Rack { tooth } => tooth.rf,
+            Self::Ring { ring, .. } => ring.rf,
         }
     }
 
@@ -922,7 +976,7 @@ impl BuiltMember {
         }
     }
 
-    fn params(&self) -> &GearParams {
+    pub(crate) fn params(&self) -> &GearParams {
         &self.as_gear().params
     }
 
@@ -948,21 +1002,21 @@ impl BuiltMember {
 }
 
 /// One mesh as it runs.
-struct BuiltMesh {
-    kind: MeshKind,
+pub(crate) struct BuiltMesh {
+    pub(crate) kind: MeshKind,
     /// At zero backlash, where the shifts put it.
-    design: Mesh,
+    pub(crate) design: Mesh,
     /// At the running distance, where the teeth touch.
-    operating: Mesh,
-    path: ContactPath,
-    running: f64,
+    pub(crate) operating: Mesh,
+    pub(crate) path: ContactPath,
+    pub(crate) running: f64,
 }
 
-struct Built {
-    members: Vec<BuiltMember>,
-    meshes: Vec<BuiltMesh>,
+pub(crate) struct Built {
+    pub(crate) members: Vec<BuiltMember>,
+    pub(crate) meshes: Vec<BuiltMesh>,
     /// Per distance: the running distance every mesh on it agrees at.
-    running: Vec<Option<f64>>,
+    pub(crate) running: Vec<Option<f64>>,
 }
 
 impl Shape {
@@ -1034,6 +1088,11 @@ impl Shape {
 /// What one distance came to.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct DistanceReport {
     /// The zero-backlash distance of each mesh on it, in mesh order.
     pub nominal: Vec<f64>,
@@ -1046,6 +1105,11 @@ pub struct DistanceReport {
 /// What the layout of a replicated axis came to, where there is one.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct LayoutReport {
     pub count: u32,
     /// Whether `N` equally spaced instances assemble: `Some` where the
@@ -1061,6 +1125,11 @@ pub struct LayoutReport {
 /// Every shaft's speed and torque in one load case.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct ShaftCase {
     pub case: usize,
     /// Per local shaft, ground first.
@@ -1071,6 +1140,11 @@ pub struct ShaftCase {
 /// What a shape produces.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
 pub struct ShapeResult {
     /// Input turns per output turn, signed.
     pub ratio: f64,
@@ -1733,6 +1807,26 @@ pub fn solve_shape(
     })
 }
 
+impl ShapeResult {
+    /// **A shape of two members and one mesh read as the pair it is** — the
+    /// crossed model's own result shape, which the tests written against the
+    /// pair kind still read. Test-only: nothing in production wants a
+    /// stage's result in a kind's shape.
+    #[cfg(test)]
+    pub(crate) fn pair_view(&self) -> super::CrossedResult {
+        let d = &self.distances[0];
+        super::CrossedResult {
+            ratio: self.ratio,
+            centre_distance_nominal: d.nominal[0],
+            clearance: d.clearance,
+            centre_distance: d.running,
+            mesh: self.meshes[0].clone(),
+            gears: [self.members[0].clone(), self.members[1].clone()],
+            notes: self.notes.clone(),
+        }
+    }
+}
+
 impl super::flow::Flow {
     /// The efficiency the flow charged mesh `k` in the direction it chose.
     fn efficiency_of_mesh(&self, k: usize, etas: &[Directional<f64>]) -> f64 {
@@ -1850,6 +1944,11 @@ impl Constrained for Shape {
             groups.push(super::distance_and_clearance());
             // One distance is addressed by name; see `inputs`.
             break;
+        }
+        // On crossed shafts an axial contact ratio is nothing at all, and is
+        // turned back automatic.
+        if self.distances.iter().any(|d| d.angle != 0.0) {
+            groups.push(super::always_automatic(Freedom::Overlap));
         }
         groups
     }
@@ -2084,65 +2183,23 @@ impl From<&super::PlanetaryStage> for Shape {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    //! **The laws a stage obeys, asked of the shape.** Most of these were
+    //! written against the planetary kind and moved here when it retired;
+    //! they read the shape's members and meshes by position — sun, planet,
+    //! ring; sun–planet, planet–ring — as the preset lays them out.
+    //!
+    //! The gate that held the shape against the kinds figure for figure —
+    //! every member's every case and every mesh's every figure, on a pair, a
+    //! worm, and every arrangement of a set — lived beside the kinds while
+    //! both existed and went with them (`git show ac0dccc`); what it found is
+    //! in `docs/corrections.md`, and the corpus records what moved.
+
     use super::*;
     use crate::train::{test_library, PairKind, PairStage, PlanetaryStage, StageLoad};
 
-    /// **Two results compared figure by figure**, through their `Debug`
-    /// forms: the structure must match token for token, and every number
-    /// within `tol` relative. Returns what differed, with the field it sat
-    /// under, so a gate that fails says where.
-    fn differences(
-        what: &str,
-        a: &impl std::fmt::Debug,
-        b: &impl std::fmt::Debug,
-        tol: f64,
-    ) -> Vec<String> {
-        let tokens = |s: String| -> Vec<String> {
-            let mut out = Vec::new();
-            let mut cur = String::new();
-            for ch in s.chars() {
-                if ch.is_alphanumeric() || ch == '.' || ch == '-' || ch == '_' || ch == '+' {
-                    cur.push(ch);
-                } else {
-                    if !cur.is_empty() {
-                        out.push(std::mem::take(&mut cur));
-                    }
-                }
-            }
-            if !cur.is_empty() {
-                out.push(cur);
-            }
-            out
-        };
-        let (ta, tb) = (tokens(format!("{a:?}")), tokens(format!("{b:?}")));
-        let mut out = Vec::new();
-        if ta.len() != tb.len() {
-            out.push(format!("{what}: {} tokens vs {}", ta.len(), tb.len()));
-        }
-        let mut field = String::new();
-        for (x, y) in ta.iter().zip(&tb) {
-            match (x.parse::<f64>(), y.parse::<f64>()) {
-                (Ok(p), Ok(q)) => {
-                    let scale = p.abs().max(q.abs()).max(1e-300);
-                    if (p - q).abs() > tol * scale && !(p.is_nan() && q.is_nan()) {
-                        out.push(format!("{what}.{field}: {p} vs {q}"));
-                    }
-                }
-                _ => {
-                    if x != y {
-                        out.push(format!("{what}.{field}: {x} vs {y}"));
-                    } else if x.chars().next().is_some_and(char::is_alphabetic) {
-                        field.clone_from(x);
-                    }
-                }
-            }
-        }
-        out
-    }
-
     /// Both directions and both kinds, at a torque and a speed.
     fn loads() -> StageLoads {
-        let mut l = forward();
+        let mut l = StageLoads::at(2.0, 3000.0);
         l.cases.push(StageLoad {
             case: 2,
             kind: super::super::CaseKind::Ultimate,
@@ -2151,275 +2208,49 @@ mod tests {
             speed: 0.0,
             turns: None,
         });
-        l.cases.push(StageLoad {
-            case: 3,
-            kind: super::super::CaseKind::Fatigue,
-            drive: Drive::Backward,
-            torque: 0.4,
-            speed: -1000.0,
-            turns: Some(super::super::Turns {
-                revolutions: 1e6,
-                reversing_actuations: None,
-            }),
-        });
         l
     }
 
-    /// Forward only, both kinds.
-    fn forward() -> StageLoads {
-        StageLoads::at(2.0, 3000.0)
+    /// A set through the shape, under its convention or a boundary.
+    fn solve_set(set: &PlanetaryStage, loads: &StageLoads) -> Result<ShapeResult, TrainError> {
+        solve_shape(
+            &Shape::from(set),
+            loads,
+            &test_library(),
+            super::super::Reversal::default(),
+        )
     }
 
-    fn gate(
-        what: &str,
-        kind_members: &[&GearResult],
-        kind_meshes: &[&MeshReport],
-        shape: &ShapeResult,
-        tol: f64,
-        allow: &[&str],
-    ) {
-        let mut diffs = Vec::new();
-        for (i, (a, b)) in kind_members.iter().zip(&shape.members).enumerate() {
-            diffs.extend(differences(&format!("{what} member {i}"), a, b, tol));
-        }
-        for (i, (a, b)) in kind_meshes.iter().zip(&shape.meshes).enumerate() {
-            diffs.extend(differences(&format!("{what} mesh {i}"), a, b, tol));
-        }
-        assert_eq!(kind_members.len(), shape.members.len());
-        assert_eq!(kind_meshes.len(), shape.meshes.len());
-        let unexplained: Vec<&String> = diffs
-            .iter()
-            .filter(|d| !allow.iter().any(|a| d.contains(a)))
-            .collect();
-        assert!(
-            unexplained.is_empty(),
-            "{what}:\n{}",
-            unexplained
-                .iter()
-                .map(|d| format!("  {d}"))
-                .collect::<Vec<_>>()
-                .join("\n")
-        );
-    }
-
-    /// **A pair through the shape is the pair**, figure for figure, on the
-    /// default pair, a helical one, one with its distance given, and one with
-    /// the optimiser on — both directions, both kinds of case.
+    /// **A crossed distance reaches the point-contact model**, and the shape
+    /// reports what it reports: a point contact, no bending on the worm.
     #[test]
-    fn a_pair_through_the_shape_is_the_pair() {
-        let lib = test_library();
-        let given = PairStage {
-            centre_distance: Auto::fixed(31.0),
-            ..PairStage::default()
-        };
-        let tuned = PairStage {
-            optimisation: Optimisation {
-                enabled: true,
-                ..Optimisation::default()
-            },
-            ..PairStage::default()
-        };
-        for (what, pair) in [
-            ("default", PairStage::default()),
-            ("helical", PairStage::default().with_additional_helix(15.0)),
-            ("given distance", given),
-            ("optimised", tuned),
+    fn a_crossed_distance_is_a_point_contact() {
+        for (pair, kind) in [
+            (PairStage::worm(), PairKind::Worm),
+            (PairStage::worm().with_first_helix(45.0), PairKind::Spur),
         ] {
-            let shape = Shape::from(&pair);
-            // **Forward cases figure for figure**, but for two things said
-            // rather than let through: a driven member's torque is what it
-            // delivers, `η` of the ideal projection the pair reported; and
-            // the operating pressure angle is the mesh's *as it runs*, where
-            // the pair quoted the zero-backlash one beside figures read off
-            // the running mesh (`docs/corrections.md`).
-            let kind =
-                super::super::solve_pair_stage(&pair, PairKind::Spur, &forward(), &lib).unwrap();
-            let ours =
-                solve_shape(&shape, &forward(), &lib, super::super::Reversal::default()).unwrap();
-            assert!((kind.ratio - ours.ratio).abs() < 1e-12, "{what} ratio");
-            assert!(
-                (kind.mesh.efficiency.forward - ours.efficiency.forward).abs() < 1e-12,
-                "{what} η"
-            );
-            assert!(
-                (kind.mesh.efficiency.backward - ours.efficiency.backward).abs() < 1e-12,
-                "{what} η back"
-            );
-            let kb = kind.mesh.backlash_by_drive();
-            assert!(
-                (kb.forward.nominal - ours.backlash.forward.nominal).abs() < 1e-12,
-                "{what} play {} vs {}",
-                kb.forward.nominal,
-                ours.backlash.forward.nominal
-            );
-            assert!(
-                (kb.backward.nominal - ours.backlash.backward.nominal).abs() < 1e-12,
-                "{what} play back"
-            );
-            assert!(
-                (kind.centre_distance - ours.distances[0].running).abs() < 1e-12,
-                "{what} distance"
-            );
-            gate(
-                what,
-                &kind.gears.iter().collect::<Vec<_>>(),
-                &[&kind.mesh],
-                &ours,
-                1e-9,
-                &["member 1.torque", "operating_pressure_angle"],
-            );
-            for (g, o) in kind.gears.iter().zip(&ours.members) {
-                for (a, b) in g.cases.iter().zip(&o.cases) {
-                    assert!(
-                        (b.torque - a.torque).abs() <= 1e-12
-                            || (b.torque - a.torque * kind.mesh.efficiency.forward).abs() < 1e-12,
-                        "{what}: {} vs {}",
-                        a.torque,
-                        b.torque
-                    );
-                }
-            }
-            // ...and backward cases within a part in a thousand, the rest
-            // being the same reading of a load — the mesh force referred to
-            // the first member — applied to a driven member.
-            let kind =
-                super::super::solve_pair_stage(&pair, PairKind::Spur, &loads(), &lib).unwrap();
-            let ours =
-                solve_shape(&shape, &loads(), &lib, super::super::Reversal::default()).unwrap();
-            gate(
-                what,
-                &kind.gears.iter().collect::<Vec<_>>(),
-                &[&kind.mesh],
-                &ours,
-                1e-3,
-                &["torque", "operating_pressure_angle"],
-            );
-        }
-    }
-
-    /// **A worm through the shape is the worm**: the point-contact model
-    /// reached through the shape's one crossed distance, figure for figure.
-    #[test]
-    fn a_worm_through_the_shape_is_the_worm() {
-        let lib = test_library();
-        for (what, pair, kind) in [
-            ("worm", PairStage::worm(), PairKind::Worm),
-            (
-                "crossed helical",
-                PairStage::worm().with_first_helix(45.0),
-                PairKind::Spur,
-            ),
-        ] {
-            let kind_result = super::super::solve_pair_stage(&pair, kind, &loads(), &lib).unwrap();
             let shape = Shape::from_pair(&pair, kind);
-            let ours =
-                solve_shape(&shape, &loads(), &lib, super::super::Reversal::default()).unwrap();
-            assert!(
-                (kind_result.ratio - ours.ratio).abs() < 1e-12,
-                "{what} ratio"
-            );
-            gate(
-                what,
-                &kind_result.gears.iter().collect::<Vec<_>>(),
-                &[&kind_result.mesh],
-                &ours,
-                1e-12,
-                &[],
-            );
+            assert!(shape.as_crossed_pair().is_some());
+            let r = solve_shape(
+                &shape,
+                &loads(),
+                &test_library(),
+                super::super::Reversal::default(),
+            )
+            .unwrap();
+            assert!(r.meshes[0].point.is_some());
+            assert_eq!(r.members.len(), 2);
+            assert!(r.ratio < 0.0, "an external pair reverses: {}", r.ratio);
         }
     }
 
-    /// **A set through the shape is the set**, on the default set under its
-    /// convention.
+    /// **Every arrangement of a set solves through the shape** and reports a
+    /// ratio the graph gives, an efficiency below one both ways, and a play
+    /// at whichever shaft is the output.
     #[test]
-    fn a_set_through_the_shape_is_the_set() {
-        let lib = test_library();
-        let set = PlanetaryStage::default();
-        let shape = Shape::from(&set);
-        let kind = super::super::solve_planetary_stage(&set, &forward(), &lib).unwrap();
-        let ours =
-            solve_shape(&shape, &forward(), &lib, super::super::Reversal::default()).unwrap();
-        assert!((kind.ratio - ours.ratio).abs() < 1e-12, "ratio");
-        assert!(
-            (kind.efficiency.forward - ours.efficiency.forward).abs() < 1e-12,
-            "η {} vs {}",
-            kind.efficiency.forward,
-            ours.efficiency.forward
-        );
-        assert!(
-            (kind.efficiency.backward - ours.efficiency.backward).abs() < 1e-12,
-            "η back {} vs {}",
-            kind.efficiency.backward,
-            ours.efficiency.backward
-        );
-        assert!(
-            (kind.backlash.forward.nominal - ours.backlash.forward.nominal).abs() < 1e-12,
-            "play {} vs {}",
-            kind.backlash.forward.nominal,
-            ours.backlash.forward.nominal
-        );
-        assert!(
-            (kind.centre_distance - ours.distances[0].running).abs() < 1e-12,
-            "distance"
-        );
-        // The planet's torque: the set quoted the sun's ideal projection
-        // across their mesh, the shape what the mesh delivers to it.
-        // ...and the ring's stresses: the set pressed the ring's flanks with
-        // the ring's own delivered torque read across the mesh — the driven
-        // side's, `η` short of the force — where the sun's mesh was pressed
-        // with the sun's, the driver's. The shape presses every mesh with its
-        // driver's, which is one force; the ring's figures rise by `1/η` in
-        // bending and `1/√η` in contact, exactly.
-        gate(
-            "set forward",
-            &[&kind.sun, &kind.planet.gear, &kind.ring],
-            &[&kind.sun_planet, &kind.planet_ring],
-            &ours,
-            1e-9,
-            &[
-                "member 1.torque",
-                "member 2.Some",
-                "member 2.contact_stress",
-                "mesh 1.max_pressure",
-                "mesh 1.at_pitch_point",
-                "mesh 1.patch_width",
-            ],
-        );
-        let eta = kind.planet_ring.efficiency.forward;
-        for (a, b) in kind.ring.cases.iter().zip(&ours.members[2].cases) {
-            assert!(
-                (b.contact_stress - a.contact_stress / eta.sqrt()).abs() < 1e-9,
-                "{} vs {}",
-                a.contact_stress,
-                b.contact_stress
-            );
-            assert!((b.bending_stress.unwrap() - a.bending_stress.unwrap() / eta).abs() < 1e-9);
-        }
-        // Driven backward, a set read a case's torque as the sun's delivered
-        // torque where the train hands it the mesh force referred there, and
-        // pressed the flanks with the delivered torque where the force is the
-        // driver's: the two nearly cancel, and the figures are within a part
-        // in five hundred.
-        let kind = super::super::solve_planetary_stage(&set, &loads(), &lib).unwrap();
-        let ours = solve_shape(&shape, &loads(), &lib, super::super::Reversal::default()).unwrap();
-        gate(
-            "set both",
-            &[&kind.sun, &kind.planet.gear, &kind.ring],
-            &[&kind.sun_planet, &kind.planet_ring],
-            &ours,
-            2e-3,
-            &["torque", "member 2", "mesh 1"],
-        );
-        // ...and the ring's, which the set pressed with the driven side's
-        // force in both directions, within the backward efficiency.
-        for (a, b) in kind.ring.cases.iter().zip(&ours.members[2].cases) {
-            let k = b.bending_stress.unwrap() / a.bending_stress.unwrap();
-            assert!((0.97..1.01).contains(&k), "{k}");
-        }
-
-        // **Every arrangement**, forward: the ratio, the efficiency, the play
-        // and every figure but the ones said above.
+    fn every_arrangement_of_a_set_solves() {
         use crate::planetary::{Arrangement, PlanetaryShaft};
+        let set = PlanetaryStage::default();
         let mut checked = 0;
         for input in PlanetaryShaft::ALL {
             for fixed in PlanetaryShaft::ALL {
@@ -2428,114 +2259,34 @@ mod tests {
                 }
                 let arrangement = Arrangement { input, fixed };
                 let boundary = PlanetaryStage::boundary_for(arrangement);
-                let what = format!("{arrangement:?}");
-                let kind = super::super::solve_planetary_stage(
-                    &set,
-                    &forward().under(boundary.clone()),
-                    &lib,
+                let r = solve_set(&set, &loads().under(boundary)).unwrap();
+                let want = crate::planetary::power(
+                    crate::planetary::basic_ratio(crate::planetary::Teeth {
+                        sun: 12,
+                        planet: 30,
+                        ring: 72,
+                    }),
+                    arrangement,
+                    1.0,
+                    1.0,
+                    1.0,
                 )
                 .unwrap();
-                let ours = solve_shape(
-                    &shape,
-                    &forward().under(boundary),
-                    &lib,
-                    super::super::Reversal::default(),
-                )
-                .unwrap();
                 assert!(
-                    (kind.ratio - ours.ratio).abs() < 1e-12,
-                    "{what} ratio {} vs {}",
-                    kind.ratio,
-                    ours.ratio
+                    (r.ratio - want.ratio).abs() < 1e-12,
+                    "{arrangement:?}: {} vs {}",
+                    r.ratio,
+                    want.ratio
                 );
                 assert!(
-                    (kind.efficiency.forward - ours.efficiency.forward).abs() < 1e-12,
-                    "{what} η {} vs {}",
-                    kind.efficiency.forward,
-                    ours.efficiency.forward
+                    r.efficiency.forward > 0.9 && r.efficiency.forward < 1.0,
+                    "{arrangement:?}"
                 );
                 assert!(
-                    (kind.efficiency.backward - ours.efficiency.backward).abs() < 1e-12,
-                    "{what} η back {} vs {}",
-                    kind.efficiency.backward,
-                    ours.efficiency.backward
+                    r.efficiency.backward > 0.9 && r.efficiency.backward < 1.0,
+                    "{arrangement:?}"
                 );
-                assert!(
-                    (kind.backlash.forward.nominal - ours.backlash.forward.nominal).abs() < 1e-12,
-                    "{what} play {} vs {}",
-                    kind.backlash.forward.nominal,
-                    ours.backlash.forward.nominal
-                );
-                assert!(
-                    (kind.backlash.backward.nominal - ours.backlash.backward.nominal).abs() < 1e-12,
-                    "{what} play back {} vs {}",
-                    kind.backlash.backward.nominal,
-                    ours.backlash.backward.nominal
-                );
-                // Wherever the planet drives the sun rather than the sun the
-                // planet — driven by the carrier or by the ring — the set
-                // pressed that mesh with the sun's delivered torque, the
-                // driven side's, as it did the ring's in every arrangement.
-                // The shape presses with the driver's, `1/η` more, exactly.
-                let sp_moves = |allow: &[&str]| {
-                    let mut diffs = Vec::new();
-                    for (i, (a, b)) in [&kind.sun, &kind.planet.gear, &kind.ring]
-                        .iter()
-                        .zip(&ours.members)
-                        .enumerate()
-                    {
-                        diffs.extend(differences(&format!("member {i}"), a, b, 1e-9));
-                    }
-                    for (i, (a, b)) in [&kind.sun_planet, &kind.planet_ring]
-                        .iter()
-                        .zip(&ours.meshes)
-                        .enumerate()
-                    {
-                        diffs.extend(differences(&format!("mesh {i}"), a, b, 1e-9));
-                    }
-                    diffs.retain(|d| !allow.iter().any(|a| d.contains(a)));
-                    diffs
-                };
-                let allow = [
-                    "torque",
-                    "member 2.Some",
-                    "member 2.contact_stress",
-                    "mesh 1.max_pressure",
-                    "mesh 1.at_pitch_point",
-                    "mesh 1.patch_width",
-                ];
-                let left = sp_moves(&allow);
-                if !left.is_empty() {
-                    let sp_fields = [
-                        "member 0.Some",
-                        "member 0.contact_stress",
-                        "member 1.Some",
-                        "member 1.contact_stress",
-                        "mesh 0.max_pressure",
-                        "mesh 0.at_pitch_point",
-                        "mesh 0.patch_width",
-                    ];
-                    assert!(
-                        left.iter().all(|d| sp_fields.iter().any(|f| d.contains(f))),
-                        "{what}: {left:?}"
-                    );
-                    let eta = kind.sun_planet.efficiency.forward;
-                    for (a, b) in kind.sun.cases.iter().zip(&ours.members[0].cases) {
-                        assert!(
-                            (b.bending_stress.unwrap() - a.bending_stress.unwrap() / eta).abs()
-                                < 1e-9,
-                            "{what}"
-                        );
-                        assert!(
-                            (b.contact_stress - a.contact_stress / eta.sqrt()).abs() < 1e-9,
-                            "{what}"
-                        );
-                    }
-                    assert!(
-                        input != PlanetaryShaft::Sun,
-                        "{what}: the sun drives its mesh"
-                    );
-                }
+                assert!(r.backlash.forward.nominal > 0.0);
                 checked += 1;
             }
         }

@@ -355,7 +355,7 @@ pub struct HulaResult {
     /// **The minimum far-side clearance the stage was held to**, zero where the
     /// crank offset was given instead and the input went unread — the same
     /// question every stage answers about its own clearance (see
-    /// [`super::PairResult::clearance`]).
+    /// [`super::CrossedResult::clearance`]).
     pub clearance: f64,
     /// The offset actually run at — the running clearance *inside* the
     /// zero-backlash one, both meshes being internal.
