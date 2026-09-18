@@ -7,7 +7,7 @@
 // geartrain panel alone; the gear tab's *adopt* list needs the same numbers,
 // so they are written once here and both panels read them.
 
-import { t, type Stage, type Train } from "./core";
+import { t, type ShaftLabel, type Stage, type Train } from "./core";
 
 /** One member of a train, as a list can show it. */
 export interface MemberRef {
@@ -55,6 +55,21 @@ function roleName(stage: Stage, member: number): string | null {
       return t(["ui.train_sun", "ui.train_planet", "ui.train_ring"][member]);
     case "hula":
       return t(hulaRing(stage, Math.floor(member / 2)) === member ? "ui.train_ring" : "ui.train_pinion");
+  }
+}
+
+/** **The name a shaft goes by**, from what the core says it is: ground, the
+ *  shaft a member spins with — named after the member — or a carrier, which
+ *  a hula stage calls its crank. Nothing here decides which shaft is which;
+ *  that arrives with the label. */
+export function shaftName(train: Train, stage: number, label: ShaftLabel): string {
+  switch (label.kind) {
+    case "ground":
+      return t("ui.train_ground");
+    case "member":
+      return memberName(train, stage, label.member);
+    case "carrier":
+      return t(train.stages[stage].kind === "hula" ? "ui.train_hula_crank" : "ui.train_carrier");
   }
 }
 

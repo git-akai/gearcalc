@@ -521,7 +521,7 @@ been. They are not a backlog.
 | Worm profile drawing and DXF | A crossed pair draws as its two helical gears already |
 | A planetary **set's** drawing | The viewport draws single gears; a set needs the carrier and N planets placed. **Not planned** — nothing depends on it, and the set's numbers are all reported without it |
 | A ring's own bounds for a stage member | The gear card shows a rack's buildable range, which is not a ring's, so it shows nothing there and says so |
-| A third port | A train has a start and an end; a load case names one. A stage kind with a third shaft a load could enter by would add a value to `Port`, and nothing else knows a direction |
+| A load case naming a third shaft | A train's *constraints* now address any port of any stage — a planetary set's ring can be driven and its carrier held from the document or the panel, and `motion` reports every shaft's speed under them. But a **load case** still names `Port::{Start, End}`, so a torque enters and leaves at the chain's two ends only; a load on a third shaft, and the affine family a train with mobility above one owes, are the rest of the plan's Phase 4 |
 | A coupled glass POM grade | Can be added if one is wanted; it must be *coupled*, not filled |
 
 ---

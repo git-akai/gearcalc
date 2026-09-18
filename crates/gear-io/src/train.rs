@@ -84,6 +84,21 @@
 //!   the axial contact ratio; `{ auto = true, manual = 1.0 }` is what an
 //!   older file meant.
 //!
+//! - **A planetary set's `arrangement` moved onto the train.** Which shaft is
+//!   held and which driven is a fact about how the train is wired, so the
+//!   stage no longer carries `arrangement = { input, fixed }` and a file that
+//!   still does is refused by name. It is `[[train.constraints]]` now — one
+//!   per shaft, `at = { kind = "of", stage = 0, shaft = 1 }` with
+//!   `constraint = "driven"`, `"held"` or `"free"` — where a set's shafts are
+//!   numbered sun 1, carrier 2, ring 3 in its wiring. A file with no
+//!   constraints at all means what it always meant: each kind's conventions,
+//!   with the first stage's input driven. So `{ input = "sun", fixed =
+//!   "ring" }` is nothing to write, and `{ input = "sun", fixed = "carrier" }`
+//!   is three lines: shaft 1 driven, shaft 2 held, shaft 3 free — all three,
+//!   because the train's constraints lay over the conventions shaft by shaft
+//!   and holding the carrier *instead of* the ring has to say so about the
+//!   ring. `[[train.couplings]]` arrived beside it, empty meaning the chain.
+//!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go
 //! wrong — a file loading with a field defaulted rather than read — is exactly
@@ -228,7 +243,10 @@ pub fn to_toml(doc: &TrainDocument) -> Result<String, TrainError> {
 mod tests {
     use super::*;
     use gear_core::params::Auto;
-    use gear_core::train::{Duty, LoadCase, PairStage, PlanetaryStage, Port, Stage};
+    use gear_core::train::{
+        Constraint, Coupling, Duty, LoadCase, PairStage, PlanetaryStage, Port, ShaftConstraint,
+        ShaftRef, Stage,
+    };
 
     /// One of every stage kind, so the `kind` tag is exercised in both
     /// directions and no variant can quietly stop round-tripping.
@@ -276,6 +294,22 @@ mod tests {
                     Stage::Planetary(Box::<PlanetaryStage>::default()),
                     Stage::Hula(Box::default()),
                 ],
+                // One coupling and one of each constraint, so the tagged
+                // `ShaftRef` and the `Constraint` values are exercised both
+                // ways — a set at stage 3 with its carrier held instead of its
+                // ring, and its ring said free.
+                couplings: vec![Coupling {
+                    a: ShaftRef::Of { stage: 0, shaft: 2 },
+                    b: ShaftRef::Of { stage: 1, shaft: 1 },
+                }],
+                constraints: vec![
+                    ShaftConstraint::held(3, 2),
+                    ShaftConstraint {
+                        at: ShaftRef::Of { stage: 3, shaft: 3 },
+                        constraint: Constraint::Free,
+                    },
+                    ShaftConstraint::driven(0, 1),
+                ],
             },
         }
     }
@@ -316,10 +350,13 @@ mod tests {
         assert!(text.starts_with("# Geartrain."), "no header:\n{text}");
         assert!(text.contains("Inputs only"));
         assert!(text.contains("name = \"Test train\""));
+        // One tag a stage, one a load case — and one on each end of a
+        // coupling and on each constraint's shaft, since a `ShaftRef` says
+        // which kind of place it names.
         assert_eq!(
             text.matches("kind = ").count(),
-            5 + 4,
-            "one tag a stage and one a load case:\n{text}"
+            5 + 4 + 2 + 3,
+            "one tag a stage, a load case, a coupling end and a constraint:\n{text}"
         );
         for kind in ["spur", "worm", "planetary", "hula", "ultimate", "fatigue"] {
             assert!(text.contains(&format!("kind = \"{kind}\"")), "no {kind}");

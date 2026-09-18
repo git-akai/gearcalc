@@ -34,12 +34,17 @@ use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
 use crate::tooth::Tooth;
 
+mod conditions;
 pub mod crossed;
 mod hula;
 mod pair;
 mod planetary;
 mod wiring;
 
+pub use conditions::{
+    Constraint, Coupling, Exact, MotionError, MotionReport, PortSpec, Ports, ShaftConstraint,
+    ShaftMotion, ShaftRef, ShaftReport, StageBoundary, StagePorts, TrainMotion,
+};
 pub use crossed::solve_crossed_pair;
 pub use hula::{
     solve_hula_stage, solve_hula_stage_with, stage_efficiency, HulaGear, HulaMesh, HulaResult,
@@ -51,10 +56,9 @@ pub use planetary::{
     solve_planetary_stage, solve_planetary_stage_with, PlanetResult, PlanetaryResult,
     PlanetaryStage,
 };
-pub(crate) use wiring::{arranged, teeth_of};
+pub(crate) use wiring::teeth_of;
 pub use wiring::{
-    MemberMotion, MeshSpec, MotionError, Mount, Offsets, ShaftLabel, ShaftMotion, TrainMotion,
-    UnitMotion, Wiring, WiringError,
+    MemberMotion, MeshSpec, Mount, Offsets, ShaftLabel, UnitMotion, Wiring, WiringError,
 };
 
 /// The three contact ratios.
@@ -1653,10 +1657,12 @@ impl From<MotionError> for TrainError {
                 stage,
                 cause: Box::new(Self::Wiring(cause)),
             },
-            // The conditions a chain gives itself are exactly its mobility, and
-            // `the_chained_graph_agrees…` holds that; a conflict here would be
-            // a defect in the assembly rather than in a design.
-            MotionError::Refused(_) => Self::Wiring(WiringError::NotAMesh(0)),
+            // A constraint or coupling naming a shaft that is not there, or
+            // conditions that contradict the structure: the boundary did not
+            // determine a motion, which is what `Unsolvable` says.
+            MotionError::NoSuchShaft(_) | MotionError::Refused(_) => {
+                Self::Wiring(WiringError::Unsolvable)
+            }
         }
     }
 }
@@ -1757,6 +1763,11 @@ impl std::fmt::Display for TrainError {
                 WiringError::NotAMesh(k) => {
                     write!(f, "mesh {} is not a mesh this stage has", k + 1)
                 }
+                WiringError::Unsolvable => write!(
+                    f,
+                    "what the stage is asked does not determine its motion, or \
+                     contradicts it"
+                ),
             },
             Self::NoPowerFlow => write!(
                 f,
@@ -2351,19 +2362,23 @@ pub(crate) fn readings_group(readings: &[Reading]) -> FreedomGroup {
 /// **What a kind declares so the machinery shared by every kind can serve it**
 /// — the whole of what a new kind owes.
 ///
-/// Five questions: which members it has, which inputs relief may turn and by
+/// Six questions: which members it has, which inputs relief may turn and by
 /// what name, how its helix may be stated, which of its inputs argue with each
-/// other, and **where its shafts and meshes sit**. Everything that walks those
-/// — counting, relieving, seeding a box, reading the helix the readings state,
-/// assembling the kinematic system — is written once above the kinds, so a
-/// kind that answers the five has all of it without writing any.
+/// other, **where its shafts and meshes sit**, and **which shafts a train may
+/// address** and what convention holds when it addresses none. Everything
+/// that walks those — counting, relieving, seeding a box, reading the helix
+/// the readings state, assembling the kinematic system, laying a train's
+/// constraints over the convention — is written once above the kinds, so a
+/// kind that answers the six has all of it without writing any.
 ///
-/// The fifth is the newest, and it is the one that tests the claim
-/// `docs/rationale.md#each-stage-kind-keeps-its-own-result-type` makes and
-/// calls untested: that a new kind should be new **kinematics** and no new
+/// The fifth and sixth are the newest, and they are the ones that test the
+/// claim `docs/rationale.md#each-stage-kind-keeps-its-own-result-type` makes
+/// and calls untested: that a new kind should be new **kinematics** and no new
 /// rating machinery. A kind states its topology here and the one solver in
 /// [`crate::kinematics`] answers every question about motion, torque and play
-/// that used to be answered per kind.
+/// that used to be answered per kind; it states its ports here and the train's
+/// [`conditions`] decide which is driven and which
+/// held, which used to be a field on the kind.
 pub(crate) trait Constrained {
     /// The members in the order [`StageResult::members`] reports them.
     fn members(&self) -> Vec<&StageGear>;
@@ -2377,6 +2392,10 @@ pub(crate) trait Constrained {
     /// **Where this kind's shafts and meshes sit** — topology alone, with no
     /// module, no shift and no distance in it. See [`Wiring`].
     fn wiring(&self) -> Wiring;
+    /// **The kind's conventional ports and what it holds by convention** — what
+    /// a chain is built from and a lone stage is solved under, and nothing a
+    /// train's own constraints cannot override. See [`Ports`].
+    fn ports(&self) -> Ports;
 }
 
 impl Stage {
@@ -2439,6 +2458,20 @@ impl Stage {
     #[must_use]
     pub fn wiring(&self) -> Wiring {
         self.kind().wiring()
+    }
+
+    /// **The kind's conventional ports and holds** ([`Ports`]) — what a chain
+    /// is built from and a lone stage is solved under.
+    #[must_use]
+    pub fn ports(&self) -> Ports {
+        self.kind().ports()
+    }
+
+    /// **What this stage is asked when it stands alone**: its kind's
+    /// conventions, as a boundary its own solver can take.
+    #[must_use]
+    pub fn conventional_boundary(&self) -> StageBoundary {
+        StageBoundary::conventional(&self.wiring(), &self.ports())
     }
 
     /// **This stage's kinematic system**, from its wiring and its tooth counts.
@@ -3312,10 +3345,18 @@ impl StageLoad {
     }
 }
 
-/// Every load case a stage is rated for, in the train's order.
+/// Every load case a stage is rated for, in the train's order — and what the
+/// stage is asked, since both come from the train and a stage needs both to
+/// rate anything.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StageLoads {
     pub cases: Vec<StageLoad>,
+    /// **Which of the stage's shafts are held and which driven**, assembled by
+    /// [`solve_train`] from the train's constraints and couplings
+    /// ([`Train::boundaries`]). `None` is a stage asked about on its own — by
+    /// a test, the harness, the sweep — which is solved under its kind's
+    /// conventions ([`Stage::conventional_boundary`]).
+    pub boundary: Option<StageBoundary>,
 }
 
 impl StageLoads {
@@ -3343,6 +3384,16 @@ impl StageLoads {
                     turns: None,
                 })
                 .collect(),
+            boundary: None,
+        }
+    }
+
+    /// These loads, with the stage asked this rather than its convention.
+    #[must_use]
+    pub fn under(self, boundary: StageBoundary) -> Self {
+        Self {
+            boundary: Some(boundary),
+            ..self
         }
     }
 
@@ -3577,6 +3628,21 @@ pub struct Train {
     #[cfg_attr(feature = "serde", serde(default))]
     pub reversed_bending: bool,
     pub stages: Vec<Stage>,
+    /// **Which shafts turn as one.** Empty is the chain — each stage's
+    /// conventional output to the next stage's input — which is what every
+    /// train meant before this existed, so the absence is unambiguous and
+    /// defaults rather than refuses. Written out, a train can join any two
+    /// shafts: a coaxial output, a locked clutch, a second stage on a set's
+    /// ring. See [`Coupling`].
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub couplings: Vec<Coupling>,
+    /// **What is asked of each shaft** — held, driven or free. Empty is each
+    /// kind's convention with the first stage's input driven, for the same
+    /// reason the couplings default. Written out, this is where a planetary
+    /// set's arrangement lives now, and where a second input or a third port
+    /// is one more line. See [`ShaftConstraint`].
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub constraints: Vec<ShaftConstraint>,
 }
 
 impl Train {
@@ -3799,8 +3865,6 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
             })
             .collect()
     };
-    let first = solve(&|_| StageLoads::just(1.0))?;
-
     // **The shaft line comes from the graph, not from a product of ratios.**
     // It needs no geometry — a ratio is tooth counts and a topology — and it is
     // *signed*, where `StageResult::ratio` is a magnitude on a pair and a
@@ -3808,22 +3872,32 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     // physical shaft report two speeds, one at the end of a stage and the other
     // at the start of the next (`docs/corrections.md`).
     let motion = train.motion()?;
-    let wirings: Vec<Wiring> = train.stages.iter().map(Stage::wiring).collect();
+    // **What each stage is asked**, from the train's constraints and
+    // couplings — which is where a set's arrangement lives now — handed to the
+    // stage beside its loads.
+    let boundaries = train.boundaries()?;
     // Each stage's input speed, and the last stage's output, at one turn of the
     // start port.
-    let at: Vec<crate::ratio::Ratio> = wirings
+    let at: Vec<crate::ratio::Ratio> = boundaries
         .iter()
         .enumerate()
-        .map(|(k, w)| motion.solution.values[motion.shaft_of(k, w.input)])
+        .map(|(k, b)| motion.solution.values[motion.shaft_of(k, b.input)])
         .collect();
-    let end = wirings.last().map_or(crate::ratio::Ratio::ONE, |w| {
-        motion.solution.values[motion.shaft_of(wirings.len() - 1, w.output)]
+    let end = boundaries.last().map_or(crate::ratio::Ratio::ONE, |b| {
+        motion.solution.values[motion.shaft_of(boundaries.len() - 1, b.output)]
     });
     // The reduction the graph already holds exactly, read as a float once
     // rather than reciprocated as one.
     let total_ratio = motion
         .total
         .map_or(f64::INFINITY, crate::ratio::Ratio::to_f64);
+
+    // The first pass, too, is solved under what the train asks: a set's
+    // arrangement decides its power flow, and the train is where it is asked.
+    let first = solve(&|k| StageLoads {
+        boundary: Some(boundaries[k].clone()),
+        ..StageLoads::just(1.0)
+    })?;
 
     // --- what each stage is loaded by, case by case.
     let mut cases = Vec::new();
@@ -3895,6 +3969,7 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
     }
     let stages = solve(&|k| StageLoads {
         cases: per_stage[k].clone(),
+        boundary: Some(boundaries[k].clone()),
     })?;
 
     let total_efficiency = Directional::of(|d| {
@@ -5417,35 +5492,39 @@ mod tests {
     /// which shaft is held is the whole of what an epicyclic set's ratio
     /// depends on, and a sweep that leaves it at the preset checks one sixth of
     /// the model.
-    fn every_wiring() -> Vec<(String, Stage)> {
+    fn every_wiring() -> Vec<(String, Stage, StageBoundary)> {
         use crate::planetary::{Arrangement, PlanetaryShaft};
+        let conventional = |name: String, stage: Stage| {
+            let b = stage.conventional_boundary();
+            (name, stage, b)
+        };
         let mut out = Vec::new();
         for (z1, z2) in [(17_u32, 43_u32), (9, 37), (13, 13)] {
             let mut s = PairStage::default();
             s.gears[0].teeth = z1;
             s.gears[1].teeth = z2;
-            out.push((format!("spur {z1}/{z2}"), Stage::Spur(s)));
+            out.push(conventional(format!("spur {z1}/{z2}"), Stage::Spur(s)));
         }
-        out.push(("worm".into(), Stage::Worm(PairStage::worm())));
+        out.push(conventional("worm".into(), Stage::Worm(PairStage::worm())));
+        // **The arrangement is what a set is asked, not what it is**: one
+        // stage per tooth count, six boundaries each.
         for teeth in [[12_u32, 30, 72], [24, 18, 60], [17, 17, 51]] {
+            let mut p = PlanetaryStage::default();
+            for (g, z) in [&mut p.sun, &mut p.planet, &mut p.ring]
+                .into_iter()
+                .zip(teeth)
+            {
+                g.teeth = z;
+            }
             for input in PlanetaryShaft::ALL {
                 for fixed in PlanetaryShaft::ALL {
                     if input == fixed {
                         continue;
                     }
-                    let mut p = PlanetaryStage {
-                        arrangement: Arrangement { input, fixed },
-                        ..PlanetaryStage::default()
-                    };
-                    for (g, z) in [&mut p.sun, &mut p.planet, &mut p.ring]
-                        .into_iter()
-                        .zip(teeth)
-                    {
-                        g.teeth = z;
-                    }
                     out.push((
                         format!("set {teeth:?} {input:?} in, {fixed:?} held"),
-                        Stage::Planetary(Box::new(p)),
+                        Stage::Planetary(Box::new(p.clone())),
+                        PlanetaryStage::boundary_for(Arrangement { input, fixed }),
                     ));
                 }
             }
@@ -5456,7 +5535,10 @@ mod tests {
             for (g, z) in h.gears.iter_mut().zip(teeth) {
                 g.teeth = z;
             }
-            out.push((format!("hula {teeth:?}"), Stage::Hula(Box::new(h))));
+            out.push(conventional(
+                format!("hula {teeth:?}"),
+                Stage::Hula(Box::new(h)),
+            ));
         }
         out
     }
@@ -5483,23 +5565,23 @@ mod tests {
     fn the_graph_gives_every_kind_the_kinematics_it_gives_itself() {
         let lib = library();
         let mut checked = 0u32;
-        for (name, stage) in every_wiring() {
+        for (name, stage, b) in every_wiring() {
             let w = stage.wiring();
             let system = stage.system().unwrap_or_else(|e| panic!("{name}: {e:?}"));
             assert!(system.lock_up_is_free(), "{name}");
             let m = system
-                .motion(&w.conditions)
+                .motion(&b.conditions)
                 .unwrap_or_else(|e| panic!("{name}: {e:?}"));
             assert!(
                 m.is_unique(),
                 "{name}: the arrangement should determine every shaft, not {m:?}"
             );
 
-            // --- the ratio, against the kind's own.
-            let r = solve_any(&stage, &StageLoads::at(1.0, 1.0), &lib)
+            // --- the ratio, against the kind's own, asked the same thing.
+            let r = solve_any(&stage, &StageLoads::at(1.0, 1.0).under(b.clone()), &lib)
                 .unwrap_or_else(|e| panic!("{name}: {e}"));
             let graph = m
-                .ratio(w.input, w.output)
+                .ratio(b.input, b.output)
                 .unwrap_or_else(|| panic!("{name}: the output does not turn"));
             // **Signed, and exact to the float**: every kind's reported ratio
             // is the graph's own reading now (`UnitMotion::ratio`), so this is
@@ -5588,16 +5670,13 @@ mod tests {
                     if input == fixed {
                         continue;
                     }
-                    stage.arrangement = Arrangement { input, fixed };
+                    let arrangement = Arrangement { input, fixed };
+                    let b = PlanetaryStage::boundary_for(arrangement);
                     let w = stage.wiring();
                     let system = Stage::Planetary(Box::new(stage.clone())).system().unwrap();
-                    let Some(p) = planetary::power(
-                        planetary::basic_ratio(teeth),
-                        stage.arrangement,
-                        1.0,
-                        1.0,
-                        1.0,
-                    ) else {
+                    let Some(p) =
+                        planetary::power(planetary::basic_ratio(teeth), arrangement, 1.0, 1.0, 1.0)
+                    else {
                         // A lossless flow that will not solve is `power`'s own
                         // refusal and not the graph's business.
                         continue;
@@ -5608,7 +5687,7 @@ mod tests {
                     let mut applied = vec![None; w.shafts.len()];
                     applied[crate::kinematics::GROUND] = Some(Ratio::ZERO);
                     applied[w.mounts[1].spins_with] = Some(Ratio::ZERO);
-                    applied[w.input] = Some(Ratio::ONE);
+                    applied[b.input] = Some(Ratio::ONE);
                     let t = system.torques(&applied).unwrap();
                     assert!(t.is_unique(), "{teeth:?} {input:?}/{fixed:?}");
                     for role in PlanetaryShaft::ALL {
@@ -5628,8 +5707,8 @@ mod tests {
                         checked += 1;
                     }
                     // ...and the speeds, which the same conditions give.
-                    let motion = system.motion(&w.conditions).unwrap();
-                    assert!(matches!(w.conditions[w.input], Condition::Drive(_)));
+                    let motion = system.motion(&b.conditions).unwrap();
+                    assert!(matches!(b.conditions[b.input], Condition::Drive(_)));
                     for role in PlanetaryShaft::ALL {
                         let shaft = match role {
                             PlanetaryShaft::Sun => w.mounts[0].spins_with,
@@ -5669,12 +5748,12 @@ mod tests {
             solve_any(&stage, &StageLoads::just(1.0), &lib).is_err(),
             "this set is the one that cannot be built"
         );
-        let w = stage.wiring();
-        let m = stage.system().unwrap().motion(&w.conditions).unwrap();
+        let b = stage.conventional_boundary();
+        let m = stage.system().unwrap().motion(&b.conditions).unwrap();
         // Sun in, ring held: the carrier runs at z_s/(z_s + z_r) of the sun,
         // whatever the geometry can or cannot be made to do.
         assert_eq!(
-            m.ratio(w.input, w.output).unwrap(),
+            m.ratio(b.input, b.output).unwrap(),
             crate::ratio::Ratio::new(17 + 80, 17).unwrap()
         );
     }
@@ -5706,6 +5785,7 @@ mod tests {
             let (system, at) = train.system().unwrap();
             let asked = train
                 .conditions(&at, system.shafts())
+                .unwrap()
                 .iter()
                 .filter(|c| **c != crate::kinematics::Condition::Free)
                 .count();
@@ -5746,9 +5826,9 @@ mod tests {
             // still the independent answer, it is simply no longer the one the
             // tool ships.
             let ratios: Vec<f64> = r.stages.iter().map(StageResult::ratio).collect();
-            let wirings: Vec<Wiring> = train.stages.iter().map(Stage::wiring).collect();
-            for (k, w) in wirings.iter().enumerate() {
-                let graph = m.solution.values[m.shaft_of(k, w.input)].to_f64();
+            let boundaries = train.boundaries().unwrap();
+            for (k, b) in boundaries.iter().enumerate() {
+                let graph = m.solution.values[m.shaft_of(k, b.input)].to_f64();
                 let hand = 1.0 / ratios[..k].iter().product::<f64>();
                 assert!(
                     (graph.abs() - hand.abs()).abs() < 1e-9 * hand.abs(),
@@ -5816,21 +5896,28 @@ mod tests {
     /// turn it now.
     #[test]
     fn a_reversing_stage_does_not_poison_the_stages_around_it() {
-        use crate::planetary::{Arrangement, PlanetaryShaft};
         let lib = library();
-        let reversing = || {
-            Stage::Planetary(Box::new(PlanetaryStage {
-                arrangement: Arrangement {
-                    input: PlanetaryShaft::Sun,
-                    fixed: PlanetaryShaft::Carrier,
+        // A set with its **carrier** held reverses. Which shaft is held is the
+        // train's to say now, so it is a constraint on the train and the set
+        // itself is the default one. Shaft 2 is the carrier in the set's wiring.
+        let reversing = || Stage::Planetary(Box::<PlanetaryStage>::default());
+        // The set's three central shafts, stated in full: the train's
+        // constraints lay over the kind's conventions shaft by shaft, so
+        // holding the carrier *instead of* the ring says so about the ring.
+        let carrier_held = |stage: usize| {
+            vec![
+                ShaftConstraint::held(stage, 2),
+                ShaftConstraint {
+                    at: ShaftRef::Of { stage, shaft: 3 },
+                    constraint: Constraint::Free,
                 },
-                ..PlanetaryStage::default()
-            }))
+            ]
         };
 
         // --- the set ahead of a pair. It used to refuse outright.
         let mut t = two_stage();
         t.stages = vec![reversing(), Stage::Spur(PairStage::default())];
+        t.constraints = carrier_held(0);
         let r = solve_train(&t, &lib).expect("a reversing stage can be followed");
         assert!(r.stages[0].ratio() < 0.0, "this set reverses");
         for (k, s) in r.stages.iter().enumerate() {
@@ -5846,6 +5933,7 @@ mod tests {
         // --- and behind one, where the play is referred through it.
         let mut t = two_stage();
         t.stages = vec![Stage::Spur(PairStage::default()), reversing()];
+        t.constraints = carrier_held(1);
         let r = solve_train(&t, &lib).expect("...and can follow one");
         let want = r.stages[0].backlash().forward.nominal / r.stages[1].ratio().abs()
             + r.stages[1].backlash().forward.nominal;
@@ -5880,6 +5968,7 @@ mod tests {
         for train in [two_stage(), mixed_train()] {
             let r = solve_train(&train, &lib).expect("these trains solve");
             let wirings: Vec<Wiring> = train.stages.iter().map(Stage::wiring).collect();
+            let boundaries = train.boundaries().unwrap();
             // **Which member sits on a shaft is the wiring's answer, not the
             // member order's.** An epicyclic set's output is its *carrier*,
             // which carries no gear at all — the planet rides it and spins with
@@ -5897,8 +5986,8 @@ mod tests {
             for k in 1..r.stages.len() {
                 let before = r.stages[k - 1].members();
                 let after = r.stages[k].members();
-                for out in on(k - 1, wirings[k - 1].output) {
-                    for into in on(k, wirings[k].input) {
+                for out in on(k - 1, boundaries[k - 1].output) {
+                    for into in on(k, boundaries[k].input) {
                         for (a, b) in before[out].cases.iter().zip(&after[into].cases) {
                             assert!(
                                 (a.speed - b.speed).abs() < 1e-9 * a.speed.abs().max(1.0),
@@ -5916,7 +6005,7 @@ mod tests {
             // shaft turns at, where one sits there.
             let k = r.stages.len() - 1;
             let last = r.stages[k].members();
-            for into in on(k, wirings[k].output) {
+            for into in on(k, boundaries[k].output) {
                 for c in &r.cases {
                     let member = &last[into].cases[c.case];
                     assert!(
@@ -5938,7 +6027,9 @@ mod tests {
         let set = Stage::Planetary(Box::<PlanetaryStage>::default());
         let w = set.wiring();
         assert!(
-            !w.mounts.iter().any(|m| m.spins_with == w.output),
+            !w.mounts
+                .iter()
+                .any(|m| m.spins_with == set.ports().output()),
             "a set driven sun-in with its ring held outputs on the carrier, \
              which carries no gear"
         );
@@ -5966,6 +6057,78 @@ mod tests {
         // ...and an epicyclic set carries the sign its own kinematics gives:
         // sun in with the ring held turns the carrier the same way.
         assert!(one(Stage::Planetary(Box::default())) > 0.0);
+    }
+
+    /// **"Driven by" is a drive on the first stage and a coupling everywhere
+    /// else** — and `Train::arranged` is what knows the difference.
+    ///
+    /// The panel's one gesture on a set, done by the core: a set at the head of
+    /// a train told *sun in, carrier held* gets a drive on its sun; the same
+    /// set behind a pair gets the chain moved to enter at its sun and no drive
+    /// at all, because the pair is what turns it. Writing the drive there as
+    /// well asks the sun to turn at one speed while the coupling turns it at
+    /// another, which the solver refuses — and did, the first time a panel
+    /// tried it.
+    #[test]
+    fn arranging_a_stage_writes_a_drive_at_the_head_and_moves_the_chain_elsewhere() {
+        let lib = library();
+        let set = || Stage::Planetary(Box::<PlanetaryStage>::default());
+        let (sun, carrier, ring) = (1, 2, 3);
+
+        // --- at the head: a drive on the sun, the carrier held, the ring free.
+        let mut t = two_stage();
+        t.stages = vec![set(), Stage::Spur(PairStage::default())];
+        let t = t.arranged(0, sun, carrier);
+        let own: Vec<_> = t
+            .constraints
+            .iter()
+            .filter(|c| matches!(c.at, ShaftRef::Of { stage: 0, .. }))
+            .map(|c| c.constraint)
+            .collect();
+        assert!(own.contains(&Constraint::Driven), "{own:?}");
+        let r = solve_train(&t, &lib).expect("solves");
+        assert!(
+            r.stages[0].ratio() < 0.0,
+            "carrier held reverses: {}",
+            r.stages[0].ratio()
+        );
+
+        // --- behind a pair: no drive, the chain enters at the sun and leaves
+        // by the ring, and it still solves.
+        let mut t = two_stage();
+        t.stages = vec![Stage::Spur(PairStage::default()), set()];
+        let t = t.arranged(1, sun, carrier);
+        let own: Vec<_> = t
+            .constraints
+            .iter()
+            .filter(|c| matches!(c.at, ShaftRef::Of { stage: 1, .. }))
+            .map(|c| c.constraint)
+            .collect();
+        assert!(!own.contains(&Constraint::Driven), "{own:?}");
+        assert_eq!(
+            t.couplings,
+            vec![Coupling {
+                a: ShaftRef::Of { stage: 0, shaft: 2 },
+                b: ShaftRef::Of {
+                    stage: 1,
+                    shaft: sun
+                },
+            }]
+        );
+        let r = solve_train(&t, &lib).expect("solves behind a pair");
+        assert!(r.stages[1].ratio() < 0.0);
+
+        // ...and asked the other way — driven by the ring, sun held — the
+        // chain enters at the ring.
+        let t = t.arranged(1, ring, sun);
+        assert_eq!(
+            t.couplings[0].b,
+            ShaftRef::Of {
+                stage: 1,
+                shaft: ring
+            }
+        );
+        solve_train(&t, &lib).expect("solves ring-in behind a pair");
     }
 
     /// Every freedom a stage's groups mention, flat.
@@ -7150,6 +7313,8 @@ mod tests {
                     ..PairStage::default()
                 }),
             ],
+            couplings: Vec::new(),
+            constraints: Vec::new(),
         }
     }
 
@@ -8710,6 +8875,8 @@ mod tests {
             load_cases: vec![LoadCase::ultimate(1.0, 1.0)],
             reversed_bending: false,
             stages: vec![],
+            couplings: Vec::new(),
+            constraints: Vec::new(),
         };
         assert_eq!(solve_train(&t, &library()).unwrap_err(), TrainError::Empty);
     }

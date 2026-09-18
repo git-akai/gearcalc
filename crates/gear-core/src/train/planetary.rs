@@ -88,8 +88,6 @@ pub struct PlanetaryStage {
     pub thickness_mod: f64,
     /// How many planets. One is legal; it just has no neighbour to clear.
     pub planets: u32,
-    /// Which shaft drives and which is held.
-    pub arrangement: Arrangement,
     /// What the set is asked to optimise, and what it may not do to get there.
     /// See [`Optimisation`]: the sun's and the ring's shifts are searched
     /// together and the planet's follows, and both meshes are held to the
@@ -160,10 +158,6 @@ impl Default for PlanetaryStage {
             thickness_mod: 1.0,
             load_sharing: crate::contact::LoadSharing::None,
             planets: 3,
-            arrangement: Arrangement {
-                input: PlanetaryShaft::Sun,
-                fixed: PlanetaryShaft::Ring,
-            },
             centre_distance: Auto::automatic(0.0),
             clearance: Auto::fixed(0.02),
             optimisation: Optimisation::default(),
@@ -224,6 +218,10 @@ pub struct PlanetResult {
     ts(export, export_to = "core/")
 )]
 pub struct PlanetaryResult {
+    /// **The arrangement the set was solved under** — which shaft drove and
+    /// which was held, read from the train's constraints
+    /// ([`super::StageBoundary`]). A result rather than an input: the set no
+    /// longer carries one of its own.
     pub arrangement: Arrangement,
     /// The shaft the other two leave over.
     pub output: PlanetaryShaft,
@@ -281,6 +279,31 @@ pub struct PlanetaryResult {
 }
 
 impl PlanetaryStage {
+    /// **An arrangement as a boundary** — the set's own vocabulary for its
+    /// three central shafts, turned into what its solver takes.
+    ///
+    /// For a set asked about alone: the harness, a test, the sweep. In a train
+    /// the same thing is two [`super::ShaftConstraint`]s on the train, and the
+    /// set never sees the words.
+    #[must_use]
+    pub fn boundary_for(arrangement: Arrangement) -> super::StageBoundary {
+        let shaft = |m: PlanetaryShaft| match m {
+            PlanetaryShaft::Sun => SHAFT_SUN,
+            PlanetaryShaft::Carrier => SHAFT_CARRIER,
+            PlanetaryShaft::Ring => SHAFT_RING,
+        };
+        let output = PlanetaryShaft::ALL
+            .into_iter()
+            .find(|&m| m != arrangement.input && m != arrangement.fixed)
+            .unwrap_or(arrangement.input);
+        super::StageBoundary::holding(
+            5,
+            &[shaft(arrangement.fixed)],
+            shaft(arrangement.input),
+            shaft(output),
+        )
+    }
+
     /// The three members in the order [`super::StageResult::members`] reports
     /// them: sun, planet, ring.
     #[must_use]
@@ -881,6 +904,15 @@ pub fn solve_planetary_stage_with(
     reversal: super::Reversal,
 ) -> Result<PlanetaryResult, TrainError> {
     let teeth = stage.teeth();
+    // **What the set is asked comes from outside it.** Which shaft is held
+    // and which driven is a fact about how the train is wired, not about the
+    // set's geometry, and it reaches here with the loads
+    // ([`super::StageBoundary`]); a set asked about alone is solved under its
+    // convention — ring held, sun driven. The power-flow solve still speaks
+    // in roles, so the boundary is read into an [`Arrangement`] once, here.
+    let wiring = super::Constrained::wiring(stage);
+    let boundary = super::StageBoundary::of(loads, &wiring, &super::Constrained::ports(stage));
+    let arrangement = arrangement_of(&boundary)?;
     // The sun and the planet are rack-cut and can be raised to clear undercut;
     // a ring is not asked. Collected here and handed to the member each one is
     // about, so a note naming an input reaches the reader under that input.
@@ -995,7 +1027,7 @@ pub fn solve_planetary_stage_with(
     // is a scale of zero rather than a flow that refuses to exist.
     let forward = planetary::power(
         planetary::basic_ratio(teeth),
-        stage.arrangement,
+        arrangement,
         1.0,
         1.0,
         eta0.forward,
@@ -1015,7 +1047,7 @@ pub fn solve_planetary_stage_with(
     let out = forward.output.index_pub();
     let reversed = Arrangement {
         input: forward.output,
-        fixed: stage.arrangement.fixed,
+        fixed: arrangement.fixed,
     };
     let backward = planetary::power(
         planetary::basic_ratio(teeth),
@@ -1032,7 +1064,7 @@ pub fn solve_planetary_stage_with(
     let at_rest = Directional {
         forward: planetary::power(
             planetary::basic_ratio(teeth),
-            stage.arrangement,
+            arrangement,
             1.0,
             1.0,
             eta0_at_rest.forward,
@@ -1072,7 +1104,7 @@ pub fn solve_planetary_stage_with(
     // it had all along. Normalised so the shaft the load was referred to carries
     // what the train referred there, since a power flow is linear in the torque
     // through it. **Per shaft, not per planet.**
-    let in_i = stage.arrangement.input.index_pub();
+    let in_i = arrangement.input.index_pub();
     let shaft_torques = |drive: Drive, applied: f64| -> [f64; 3] {
         match drive {
             Drive::Forward => forward.torques.map(|t| t * applied),
@@ -1402,7 +1434,7 @@ pub fn solve_planetary_stage_with(
         // Forward the output shaft is where the play shows; backward the shaft
         // that was driving becomes the one being measured.
         forward: backlash_at(forward.output),
-        backward: backlash_at(stage.arrangement.input),
+        backward: backlash_at(arrangement.input),
     };
 
     // ---- what the answer does not include.
@@ -1468,8 +1500,7 @@ pub fn solve_planetary_stage_with(
     // (`Wiring::paths_seen`). The graph answers all three from the topology,
     // and `the_graph_gives_every_kind_the_kinematics_it_gives_itself` holds it
     // against what this used to compute.
-    let motion =
-        super::Constrained::wiring(stage).unit_motion(&super::teeth_of(stage.members()))?;
+    let motion = wiring.unit_motion(&super::teeth_of(stage.members()), &boundary)?;
     // Each member's torque in each case: the central members' are their
     // shaft's share of one mesh path; **a planet is not one of the three
     // shafts**, so its is the sun's carried across the mesh they share — the
@@ -1523,7 +1554,7 @@ pub fn solve_planetary_stage_with(
     };
 
     Ok(PlanetaryResult {
-        arrangement: stage.arrangement,
+        arrangement,
         output: forward.output,
         // The graph's, and it agrees with `forward.ratio` to the bit on every
         // arrangement — which `the_graph_gives_every_kind…` holds — so this is
@@ -1662,6 +1693,47 @@ pub fn solve_planetary_stage_with(
 }
 
 /// What the set declares to the relief and size resolver every kind shares.
+/// Where a set's shafts sit in its wiring: ground, then the three central
+/// shafts in [`PlanetaryShaft`] order, then the planet's. One list, read by
+/// the wiring, the ports and the solve alike.
+const SHAFT_SUN: usize = 1;
+const SHAFT_CARRIER: usize = 2;
+const SHAFT_RING: usize = 3;
+
+/// The role a local shaft plays, for the power-flow solve that still speaks in
+/// roles — and `None` for the planet's shaft or ground, which are neither.
+const fn role_of(shaft: usize) -> Option<PlanetaryShaft> {
+    match shaft {
+        SHAFT_SUN => Some(PlanetaryShaft::Sun),
+        SHAFT_CARRIER => Some(PlanetaryShaft::Carrier),
+        SHAFT_RING => Some(PlanetaryShaft::Ring),
+        _ => None,
+    }
+}
+
+/// **The arrangement a boundary describes**: the one held central shaft and
+/// the one the load comes in by, as the roles [`planetary::power`] takes.
+///
+/// A set has exactly three central shafts and a boundary must hold one and
+/// drive another for the flow to be determined; anything else is a boundary
+/// that does not describe a three-shaft set's power flow — two held, none
+/// held, the planet's shaft driven — and is refused with that reason rather
+/// than solved as something it is not. Mobility above one is answered at the
+/// train level; a stage's *rating* wants one flow.
+fn arrangement_of(boundary: &super::StageBoundary) -> Result<Arrangement, TrainError> {
+    let held = boundary.held();
+    let unsolvable = TrainError::Wiring(super::WiringError::Unsolvable);
+    let (&fixed_shaft, []) = held.split_first().ok_or(unsolvable.clone())? else {
+        return Err(unsolvable);
+    };
+    let fixed = role_of(fixed_shaft).ok_or(unsolvable.clone())?;
+    let input = role_of(boundary.input).ok_or(unsolvable.clone())?;
+    if input == fixed {
+        return Err(unsolvable);
+    }
+    Ok(Arrangement { input, fixed })
+}
+
 impl super::Constrained for PlanetaryStage {
     fn members(&self) -> Vec<&StageGear> {
         self.members().to_vec()
@@ -1746,24 +1818,13 @@ impl super::Constrained for PlanetaryStage {
     /// planet is the same planet — and it is what a member's engagements are
     /// counted over.
     ///
-    /// **Which shaft is held is stated here for now**, from the stage's own
-    /// `arrangement`, so the graph can be asked the question this kind already
-    /// answers. It belongs to the train, and the plan moves it there.
+    /// **Which shaft is held is not stated here.** It is the train's to say
+    /// ([`super::ShaftConstraint`]), and the solve reads its arrangement from
+    /// the boundary it is handed; [`Self::ports`] is only the convention a
+    /// chain builds from.
     fn wiring(&self) -> super::Wiring {
-        // Shaft indices, and the order the three roles map onto them.
-        const SUN: usize = 1;
-        const CARRIER: usize = 2;
-        const RING: usize = 3;
         const PLANET: usize = 4;
-        let shaft = |m: PlanetaryShaft| match m {
-            PlanetaryShaft::Sun => SUN,
-            PlanetaryShaft::Carrier => CARRIER,
-            PlanetaryShaft::Ring => RING,
-        };
-        let output = PlanetaryShaft::ALL
-            .into_iter()
-            .find(|&m| m != self.arrangement.input && m != self.arrangement.fixed)
-            .unwrap_or(self.arrangement.input);
+        let (sun, carrier, ring) = (SHAFT_SUN, SHAFT_CARRIER, SHAFT_RING);
         super::Wiring {
             shafts: vec![
                 super::ShaftLabel::Ground,
@@ -1774,9 +1835,9 @@ impl super::Constrained for PlanetaryStage {
             ],
             // Members in `StageResult::members()` order: sun, planet, ring.
             mounts: vec![
-                super::Mount::coaxial_with(SUN, CARRIER),
-                super::Mount::riding(PLANET, CARRIER),
-                super::Mount::coaxial_with(RING, CARRIER),
+                super::Mount::coaxial_with(sun, carrier),
+                super::Mount::riding(PLANET, carrier),
+                super::Mount::coaxial_with(ring, carrier),
             ],
             meshes: vec![
                 super::MeshSpec {
@@ -1794,13 +1855,16 @@ impl super::Constrained for PlanetaryStage {
                     paths: self.planets.max(1),
                 },
             ],
-            conditions: super::arranged(
-                5,
-                shaft(self.arrangement.input),
-                &[shaft(self.arrangement.fixed)],
-            ),
-            input: shaft(self.arrangement.input),
-            output: shaft(output),
+        }
+    }
+
+    /// Ring held, sun in, carrier out — the arrangement most sets are built
+    /// for, and the one the shipped set has always defaulted to. The other five
+    /// are a train's constraints, not a different stage.
+    fn ports(&self) -> super::Ports {
+        super::Ports {
+            ports: vec![SHAFT_SUN, SHAFT_CARRIER, SHAFT_RING],
+            held: vec![SHAFT_RING],
         }
     }
 }
@@ -2345,11 +2409,12 @@ mod tests {
             ),
         ];
         for (input, fixed, output, ratio) in want {
-            let stage = PlanetaryStage {
-                arrangement: Arrangement { input, fixed },
-                ..stage_of(24, 18, 60, 0.0)
-            };
-            let r = solve_planetary_stage(&stage, &StageLoads::just(2.0), &test_library()).unwrap();
+            // The same stage, asked six things.
+            let stage = stage_of(24, 18, 60, 0.0);
+            let asked = PlanetaryStage::boundary_for(Arrangement { input, fixed });
+            let r =
+                solve_planetary_stage(&stage, &StageLoads::just(2.0).under(asked), &test_library())
+                    .unwrap();
             assert_eq!(r.output, output);
             assert!(
                 (r.ratio - ratio).abs() < 1e-12,
@@ -2364,14 +2429,17 @@ mod tests {
     /// algebra.
     #[test]
     fn a_held_carrier_gives_exactly_the_product_of_the_mesh_efficiencies() {
-        let stage = PlanetaryStage {
-            arrangement: Arrangement {
-                input: PlanetaryShaft::Sun,
-                fixed: PlanetaryShaft::Carrier,
-            },
-            ..stage_of(24, 18, 60, 0.0)
-        };
-        let r = solve_planetary_stage(&stage, &StageLoads::just(2.0), &test_library()).unwrap();
+        let stage = stage_of(24, 18, 60, 0.0);
+        let carrier_held = PlanetaryStage::boundary_for(Arrangement {
+            input: PlanetaryShaft::Sun,
+            fixed: PlanetaryShaft::Carrier,
+        });
+        let r = solve_planetary_stage(
+            &stage,
+            &StageLoads::just(2.0).under(carrier_held),
+            &test_library(),
+        )
+        .unwrap();
         let product = r.sun_planet.efficiency.forward * r.planet_ring.efficiency.forward;
         assert!((r.fixed_carrier_efficiency.forward - product).abs() < 1e-15);
         assert!(
@@ -2436,22 +2504,15 @@ mod tests {
         let lib = test_library();
         for (s, p, r) in [(24u32, 18u32, 60u32), (17, 17, 52), (30, 15, 62)] {
             // Ring held: the sun and the carrier are the two possible outputs.
-            let sun_in = PlanetaryStage {
-                arrangement: Arrangement {
-                    input: PlanetaryShaft::Sun,
+            let stage = stage_of(s, p, r, 0.0);
+            let asked = |input| {
+                StageLoads::just(2.0).under(PlanetaryStage::boundary_for(Arrangement {
+                    input,
                     fixed: PlanetaryShaft::Ring,
-                },
-                ..stage_of(s, p, r, 0.0)
+                }))
             };
-            let carrier_in = PlanetaryStage {
-                arrangement: Arrangement {
-                    input: PlanetaryShaft::Carrier,
-                    fixed: PlanetaryShaft::Ring,
-                },
-                ..stage_of(s, p, r, 0.0)
-            };
-            let a = solve_planetary_stage(&sun_in, &StageLoads::just(2.0), &lib).unwrap();
-            let b = solve_planetary_stage(&carrier_in, &StageLoads::just(2.0), &lib).unwrap();
+            let a = solve_planetary_stage(&stage, &asked(PlanetaryShaft::Sun), &lib).unwrap();
+            let b = solve_planetary_stage(&stage, &asked(PlanetaryShaft::Carrier), &lib).unwrap();
 
             // `a` outputs at the carrier, `b` at the sun.
             let at_carrier = a.backlash.forward.nominal;

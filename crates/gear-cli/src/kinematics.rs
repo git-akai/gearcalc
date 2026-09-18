@@ -39,8 +39,8 @@
 //! arrives, and their going is the point.
 
 use gear_core::train::{
-    solve_train, Duty, LoadCase, PairStage, PlanetaryStage, Port, Stage, StageGear, StageResult,
-    Train, TrainResult,
+    solve_train, Duty, LoadCase, PairStage, PlanetaryStage, Port, ShaftConstraint, Stage,
+    StageGear, StageResult, Train, TrainResult,
 };
 
 /// The loads every fixture is rated for: one from each port, held at the far
@@ -89,21 +89,39 @@ fn pair(z1: u32, z2: u32, helix: f64) -> Stage {
     Stage::Spur(s)
 }
 
-/// An epicyclic set driven by one shaft with another held.
-fn set(input: &str, fixed: &str) -> Stage {
-    use gear_core::planetary::{Arrangement, PlanetaryShaft};
+/// **An arrangement as a train's constraints**: which of a set's shafts is
+/// driven and which held, for the set at stage `k`. The set itself carries no
+/// arrangement any more — that is a fact about the train, and this is the
+/// shape a file writes it in.
+fn arranged(k: usize, input: &str, fixed: &str) -> Vec<ShaftConstraint> {
+    use gear_core::train::{Constraint, ShaftRef};
+    // The set's shafts, in its wiring's order: ground, sun, carrier, ring,
+    // planet. All three central shafts are stated, because a train's
+    // constraints lay over the kind's conventions shaft by shaft, and holding
+    // the carrier *instead of* the ring has to say so about the ring.
     let shaft = |s: &str| match s {
-        "sun" => PlanetaryShaft::Sun,
-        "carrier" => PlanetaryShaft::Carrier,
-        _ => PlanetaryShaft::Ring,
+        "sun" => 1,
+        "carrier" => 2,
+        _ => 3,
     };
-    Stage::Planetary(Box::new(PlanetaryStage {
-        arrangement: Arrangement {
-            input: shaft(input),
-            fixed: shaft(fixed),
-        },
-        ..PlanetaryStage::default()
-    }))
+    (1..=3)
+        .map(|s| ShaftConstraint {
+            at: ShaftRef::Of { stage: k, shaft: s },
+            constraint: if s == shaft(input) {
+                Constraint::Driven
+            } else if s == shaft(fixed) {
+                Constraint::Held
+            } else {
+                Constraint::Free
+            },
+        })
+        .collect()
+}
+
+/// A default epicyclic set. What drives it and what holds it is the train's
+/// to say ([`arranged`]); alone, it is solved sun in and ring held.
+fn set() -> Stage {
+    Stage::Planetary(Box::default())
 }
 
 /// **A set whose two centre distances no planet shift can bring together.**
@@ -114,13 +132,11 @@ fn set(input: &str, fixed: &str) -> Stage {
 /// needs the tooth counts and nothing else — and the fixture is here to record
 /// that the tool currently reports none of them.
 fn unclosed() -> Stage {
-    let Stage::Planetary(mut p) = set("sun", "ring") else {
-        unreachable!("set() builds a planetary stage")
-    };
+    let mut p = PlanetaryStage::default();
     p.sun.teeth = 17;
     p.planet.teeth = 17;
     p.ring.teeth = 80;
-    Stage::Planetary(p)
+    Stage::Planetary(Box::new(p))
 }
 
 /// **Every fixture, and why each is here.**
@@ -132,6 +148,14 @@ fn fixtures() -> Vec<(String, Train)> {
         load_cases: loads(),
         reversed_bending: false,
         stages,
+        couplings: Vec::new(),
+        constraints: Vec::new(),
+    };
+    // ...and one told what to hold and drive, which is how every arrangement
+    // but the conventional one is stated now.
+    let asked = |stages: Vec<Stage>, constraints: Vec<ShaftConstraint>| Train {
+        constraints,
+        ..train(stages)
     };
     let mut out = vec![
         // The two parallel-axis readings: a spur pair has no axial overlap and
@@ -155,7 +179,7 @@ fn fixtures() -> Vec<(String, Train)> {
             if input != fixed {
                 out.push((
                     format!("set-{input}-{fixed}"),
-                    train(vec![set(input, fixed)]),
+                    asked(vec![set()], arranged(0, input, fixed)),
                 ));
             }
         }
@@ -172,7 +196,7 @@ fn fixtures() -> Vec<(String, Train)> {
         "mixed".to_string(),
         train(vec![
             pair(17, 43, 0.0),
-            set("sun", "ring"),
+            set(),
             Stage::Worm(PairStage::worm()),
         ]),
     ));
@@ -182,13 +206,30 @@ fn fixtures() -> Vec<(String, Train)> {
     // into a size were both outside the change detector. A set that could not
     // be followed by anything at all, and a backlash 23.5 % light, are what
     // that cost; these two rows are what keeps them caught.
+    // A set with its carrier held reverses, and in a chain the set at
+    // stage `k` is *driven by the coupling*, so only its held shaft is stated;
+    // the drive belongs to the first stage's input.
     out.push((
         "set-then-pair".to_string(),
-        train(vec![set("sun", "carrier"), pair(17, 43, 0.0)]),
+        asked(
+            vec![set(), pair(17, 43, 0.0)],
+            arranged(0, "sun", "carrier"),
+        ),
     ));
+    // The set at stage 1 is driven by the coupling, so only its held shaft
+    // and the shaft it releases are stated.
     out.push((
         "pair-then-set".to_string(),
-        train(vec![pair(17, 43, 0.0), set("sun", "carrier")]),
+        asked(
+            vec![pair(17, 43, 0.0), set()],
+            vec![
+                ShaftConstraint::held(1, 2),
+                ShaftConstraint {
+                    at: gear_core::train::ShaftRef::Of { stage: 1, shaft: 3 },
+                    constraint: gear_core::train::Constraint::Free,
+                },
+            ],
+        ),
     ));
     // **A train that does not close, recorded as it currently answers.** A
     // ratio needs tooth counts and topology; neither of these fixtures has

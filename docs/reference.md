@@ -2113,6 +2113,46 @@ comes from its own kinematics. Total ratio is the product. A train has two
 **ports** — `start`, the first stage's first member, and `end`, the last
 stage's last member — and every load enters at one of them.
 
+### Constraints and couplings
+
+A train is one shaft line, and what holds it still or turns it is the
+**train's** to say, not a stage's. There is no housing in the model: a shaft is
+fixed to ground, driven from outside, or free to do what the rest decides, and
+ground is one more shaft that happens to be held — the same row in the same
+matrix as any other. A stage kind that used to carry "sun in, ring fixed" as a
+field carries none, and answers instead which of its shafts are **ports** — the
+ones a train may address — and which of those it holds *by convention*.
+
+```text
+constraint   ShaftRef → held | driven | free      ShaftRef: ground, or stage k's shaft j
+coupling     ShaftRef = ShaftRef                  two shafts that turn as one
+```
+
+**Conventions are laid under, and a constraint replaces one shaft's.** With no
+constraints, every kind's convention stands: a pair's first member drives, a
+set's ring is held and its sun drives, the first stage of a chain is driven and
+each stage's conventional output is coupled to the next stage's conventional
+input. A constraint on a shaft replaces the convention *on that shaft* — `free`
+on a set's ring releases it and nothing else moves — with one rule on top: a
+`driven` anywhere on a stage replaces that stage's conventional drive, since
+"driven by the carrier" means instead of the sun and not as well. Two drives on
+one set are what a designer writes when a differential's two inputs are meant.
+
+**The chain reads its ends off the constraints.** A stage's input is the first
+of its ports not held, or the one driven; its output the next not held. So
+holding a set's carrier makes its ring the port the next stage couples to, and
+a designer who changes what is held does not also rewire the chain. Where a
+train states its own couplings, they replace the chain entirely.
+
+**Motion needs none of the geometry.** With every constraint in force the train
+is one system — ground shared, each stage's shafts appended, one row per mesh
+in the frame of its axes, one per coupling — and its solution at one turn of
+whatever is driven is reported as every shaft's exact speed, each stage's ratio,
+the total, and the **mobility**: how many conditions the train still wants, and
+which shafts nothing touches. That is why a train whose centre distances cannot
+be made to agree still reports its ratios: Willis needs tooth counts and a
+topology, and the refusal is the geometry's.
+
 **A ratio says two things, and only one of them refers a load.** Its *size* is
 how much a torque is multiplied by across the stage and how much a play is
 divided by on the way to the output; its *sign* is whether the output turns the

@@ -103,6 +103,19 @@ const out = {
       return [k, JSON.parse(w.relieve_stage(JSON.stringify({ stage, just, figures })))];
     }),
   ),
+  // **A set arranged at the head of a train and behind a pair** — a drive
+  // on its sun in the first, the chain moved to its sun in the second — so
+  // both halves of the gesture are recorded.
+  arrange_stage: call("arrange_stage", () => {
+    const t = structuredClone(defaults.train);
+    const set = structuredClone(defaults.planetary_stage);
+    const head = { ...t, stages: [set, t.stages[0]] };
+    const behind = { ...t, stages: [t.stages[0], set] };
+    return [
+      ["head", JSON.parse(w.arrange_stage(JSON.stringify({ train: head, stage: 0, driven: 1, held: 2 })))],
+      ["behind", JSON.parse(w.arrange_stage(JSON.stringify({ train: behind, stage: 1, driven: 1, held: 2 })))],
+    ];
+  }),
   // **One member of each kind adopted**, including a planetary ring so the
   // cutter travels, and a worm stage's wheel — its worm is refused, which
   // the entry point's own test holds.

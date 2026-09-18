@@ -781,6 +781,17 @@ pub struct TrainOutcome {
     /// (`StageResult::figure`) and the panel need not know at all: it hands
     /// this list back with the stage, and never learns which field is which.
     pub figures: Vec<Vec<gear_core::train::Figure>>,
+    /// **Every stage's ports**, with the label the panel names each by — so a
+    /// designer is offered exactly the shafts a train may hold, drive or
+    /// couple, read from the kind's wiring rather than written into the front
+    /// end a second time. Present on success and failure alike: it needs no
+    /// geometry.
+    pub topology: Vec<gear_core::train::StagePorts>,
+    /// **The train's motion** — exact ratios, every shaft's speed, mobility —
+    /// present whenever the tooth counts and topology give one, which is
+    /// whether or not the geometry solved. A train mid-edit whose stage will
+    /// not close still turns, and this is what says at what.
+    pub motion: Option<gear_core::train::MotionReport>,
 }
 
 /// Why a train has no answer, and where.
@@ -804,6 +815,8 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
     let req: TrainRequest =
         serde_json::from_str(input).map_err(|e| format!("bad train request: {e}"))?;
     let lib = req.materials.unwrap_or_else(gear_io::default_library);
+    let topology = req.train.topology();
+    let motion = req.train.motion_report();
     let outcome = match gear_core::train::solve_train(&req.train, &lib) {
         Ok(result) => TrainOutcome {
             figures: req
@@ -824,6 +837,8 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
                 .collect(),
             result: Some(result),
             failure: None,
+            topology,
+            motion,
         },
         Err(e) => {
             let stage = match &e {
@@ -839,6 +854,8 @@ fn solve_train_impl(input: &str) -> Result<String, String> {
                     stage,
                 }),
                 figures: Vec::new(),
+                topology,
+                motion,
             }
         }
     };
@@ -1152,6 +1169,8 @@ fn defaults_impl() -> Result<String, String> {
             // not: a reversed root is disclosed rather than silently derated.
             reversed_bending: false,
             stages: vec![Stage::Spur(spur.clone())],
+            couplings: Vec::new(),
+            constraints: Vec::new(),
         },
         spur_stage: Stage::Spur(spur),
         worm_stage: Stage::Worm(worm),
@@ -1433,6 +1452,43 @@ struct RelieveRequest {
 fn relieve_stage_impl(input: &str) -> Result<String, String> {
     let req: RelieveRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
     serde_json::to_string(&req.stage.relieved_from(req.just, &req.figures))
+        .map_err(|e| e.to_string())
+}
+
+/// **A train with one stage told what drives it and what it holds.**
+///
+/// `{ train, stage, driven, held }` JSON in — the train as it stands, the
+/// stage by index, and two of its ports by local shaft — and the train out
+/// with that stage's constraints stated in full and, where the stage is in
+/// the middle of a chain, the chain moved to enter at `driven`.
+///
+/// The panel's one gesture on a set's card, done here rather than there
+/// because the two halves of it are different layers: what is *held* is a
+/// constraint, and where the load *comes in* is a constraint on the first
+/// stage and a coupling on every other. Writing a drive on a mid-chain sun
+/// asks it to turn at one speed while the coupling turns it at another, which
+/// the solver refuses — and did, the first time the panel tried
+/// ([`gear_core::train::Train::arranged`]).
+///
+/// # Errors
+///
+/// A malformed train, which would be a defect on this side of the boundary.
+#[wasm_bindgen]
+pub fn arrange_stage(input: &str) -> Result<String, JsError> {
+    arrange_stage_impl(input).map_err(|e| JsError::new(&e))
+}
+
+#[derive(Deserialize)]
+struct ArrangeRequest {
+    train: gear_core::train::Train,
+    stage: usize,
+    driven: usize,
+    held: usize,
+}
+
+fn arrange_stage_impl(input: &str) -> Result<String, String> {
+    let req: ArrangeRequest = serde_json::from_str(input).map_err(|e| e.to_string())?;
+    serde_json::to_string(&req.train.arranged(req.stage, req.driven, req.held))
         .map_err(|e| e.to_string())
 }
 
@@ -2089,7 +2145,14 @@ mod tests {
     /// each with their own answers.
     #[test]
     fn a_planetary_stage_crosses_the_boundary_with_its_own_shape() {
+        // **The arrangement is the train's**, as two constraints on the set's
+        // shafts — sun (1) driven, ring (3) held. The set carries none of its
+        // own, and a document that still sends one is refused by name.
         let req = r#"{"train":{
+            "constraints": [
+                { "at": { "kind": "of", "stage": 0, "shaft": 1 }, "constraint": "driven" },
+                { "at": { "kind": "of", "stage": 0, "shaft": 3 }, "constraint": "held" }
+            ],
             "load_cases": [
                 { "kind": "ultimate", "enabled": true, "port": "start", "reacted": true, "torque": 2.0, "speed": 3000.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
                 { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.0, "speed": 0.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
@@ -2101,7 +2164,6 @@ mod tests {
                "sliding_friction_sun_planet":0.06,"static_friction_sun_planet":0.16,
                "sliding_friction_planet_ring":0.06,"static_friction_planet_ring":0.16,
                "thickness_mod":1.0,"planets":3,
-               "arrangement":{"input":"sun","fixed":"ring"},
                "centre_distance":{"auto":true,"manual":0.0},
                "clearance":{"auto":false,"manual":0.02},"tolerance_plus":0.02,"tolerance_minus":0.02,
                "min_planet_clearance":0.3,

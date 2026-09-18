@@ -787,8 +787,12 @@ pub fn solve_hula_stage_at(
     // body and `1/R` for the output, which is Willis written a second time;
     // the graph writes it once, and `a_hula_arrangement_reduces_by_its_two_products`
     // holds that the two agree, `3721/16` on the shipped counts.
-    let motion = super::Constrained::wiring(stage)
-        .unit_motion(&super::teeth_of(super::Constrained::members(stage)))?;
+    let wiring = super::Constrained::wiring(stage);
+    let boundary = super::StageBoundary::of(loads, &wiring, &super::Constrained::ports(stage));
+    let motion = wiring.unit_motion(
+        &super::teeth_of(super::Constrained::members(stage)),
+        &boundary,
+    )?;
     let output_speed = motion.output;
     // Tooth counts as floats, for the operating-radius reading below.
     let z = teeth.0.map(f64::from);
@@ -1482,11 +1486,16 @@ impl super::Constrained for HulaStage {
                 super::Mount::coaxial_with(GEAR4, CRANK),
             ],
             meshes: vec![mesh(0), mesh(1)],
-            // Gear 1 grounded and the crank driven: the arrangement this kind
-            // has, stated so the graph can be asked what it answers.
-            conditions: super::arranged(5, CRANK, &[GEAR1]),
-            input: CRANK,
-            output: GEAR4,
+        }
+    }
+
+    /// Gear 1 held, the crank driven, gear 4 out: the arrangement this kind
+    /// was written for. A train may hold and drive it otherwise — the solve
+    /// reads its arrangement from what it is handed, not from here.
+    fn ports(&self) -> super::Ports {
+        super::Ports {
+            ports: vec![2, 4, 1],
+            held: vec![1],
         }
     }
 }

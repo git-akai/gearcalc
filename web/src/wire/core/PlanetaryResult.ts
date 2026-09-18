@@ -12,7 +12,14 @@ import type { ShaftsCase } from "./ShaftsCase";
 /**
  * Everything a planetary stage produces.
  */
-export type PlanetaryResult = { arrangement: Arrangement, 
+export type PlanetaryResult = { 
+/**
+ * **The arrangement the set was solved under** — which shaft drove and
+ * which was held, read from the train's constraints
+ * ([`super::StageBoundary`]). A result rather than an input: the set no
+ * longer carries one of its own.
+ */
+arrangement: Arrangement, 
 /**
  * The shaft the other two leave over.
  */

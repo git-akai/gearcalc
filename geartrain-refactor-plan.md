@@ -673,7 +673,30 @@ name a port. `reacted` derived by the rowspace law *and* kept as an input
 (§10.4), with the two reported side by side so the comparison can be made on
 screen. Wire types, five string catalogues, and the condition panel in the UI.
 **This is the phase that delivers multiple inputs and outputs, and where the
-first delivery ends** (§10.1).
+first delivery ends** (§10.1). Split when reached, along the same seam as
+Phase 3: what the *train* holds, and what the *user* is shown.
+
+**4a — constraints and couplings are the train's.** `train/conditions.rs`:
+a `ShaftRef` names ground or one stage's shaft, a `Constraint` is `Held`,
+`Driven` or `Free`, and the train carries a list of them beside a list of
+`Coupling`s. A kind no longer stores an arrangement — `PlanetaryStage` lost
+its `arrangement` field, the document format refuses it and its change log
+says where it went — and instead answers `ports()`: which shafts a person may
+address, and which of them convention holds. Every stage's `StageBoundary`
+is *derived*, constraints laid over convention shaft by shaft, and the chain's
+default couplings are read against the constraints so a Driven mid-train
+replaces that stage's conventional drive rather than fighting it. The
+boundary reports `topology` (each stage's ports) and `motion` (mobility,
+every shaft's exact speed and its text, the ratios) beside the ratings, and
+`arrange_stage` is the one gesture — `Train::arranged(stage, driven, held)`
+— that the panel's "Driven by" and "Held" selects call, so the UI never
+composes a constraint itself. The corpus did not move; the wasm recording
+gained one entry and lost no number.
+
+**4b–4e, not yet built.** Load cases naming a shaft instead of `Port::{Start,
+End}`; the affine family for mobility above one, in the result and on screen;
+the condition panel proper, where any shaft of any stage takes a constraint;
+`reacted` derived beside the input; relief over constraints.
 
 **Phase 5 — the general epicyclic stage.** The mesh grid, the one-radius-per-
 planet-shaft closure, the gutter toggle. `Stage::Planetary` becomes a preset

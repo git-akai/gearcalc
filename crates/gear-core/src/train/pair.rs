@@ -977,8 +977,9 @@ pub fn solve_pair_stage_with(
     // needs no geometry — a ratio is tooth counts and topology — and because it
     // is where a member with no teeth is caught, which used to be reported as a
     // tooth too undercut to have a root section.
-    let motion =
-        super::Constrained::wiring(&sized).unit_motion(&super::teeth_of(sized.members()))?;
+    let wiring = super::Constrained::wiring(&sized);
+    let boundary = super::StageBoundary::of(loads, &wiring, &super::Constrained::ports(&sized));
+    let motion = wiring.unit_motion(&super::teeth_of(sized.members()), &boundary)?;
     if sized.is_crossed() {
         return super::crossed::solve_crossed_pair(&sized, kind, loads, lib, &motion);
     }
@@ -1471,6 +1472,8 @@ impl Constrained for PairStage {
         use crate::kinematics::GROUND;
         const FIRST: usize = 1;
         const SECOND: usize = 2;
+        // The two ports are named again in `ports`, which is the convention
+        // a chain reads; here they are only where the members spin.
         super::Wiring {
             shafts: vec![
                 super::ShaftLabel::Ground,
@@ -1487,9 +1490,16 @@ impl Constrained for PairStage {
                 kind: crate::mesh::MeshKind::External,
                 paths: 1,
             }],
-            conditions: super::arranged(3, FIRST, &[]),
-            input: FIRST,
-            output: SECOND,
+        }
+    }
+
+    /// First member in, second out, nothing held: the way round a pair is
+    /// written, and a convention rather than a fact — a train may drive it
+    /// from either end.
+    fn ports(&self) -> super::Ports {
+        super::Ports {
+            ports: vec![1, 2],
+            held: Vec::new(),
         }
     }
 }

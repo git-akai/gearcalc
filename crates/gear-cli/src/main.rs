@@ -1102,6 +1102,8 @@ fn train_file_report(path: Option<&str>) {
                 Stage::Worm(PairStage::worm()),
                 Stage::Planetary(Box::<PlanetaryStage>::default()),
             ],
+            couplings: Vec::new(),
+            constraints: Vec::new(),
         },
     };
 
@@ -1568,6 +1570,8 @@ fn train_report(mode: Option<&str>) {
                 ),
             ]
         },
+        couplings: Vec::new(),
+        constraints: Vec::new(),
     };
 
     let r = match solve_train(&train, &lib) {
@@ -3005,13 +3009,12 @@ fn planetary_stage_report(sun: u32, planet: u32, ring: u32, planets: u32, helix:
             if input == fixed {
                 continue;
             }
-            let stage = PlanetaryStage {
-                arrangement: Arrangement { input, fixed },
-                ..base.clone()
-            };
+            // The arrangement is what the set is *asked*, not what it is:
+            // the same stage, six boundaries.
+            let asked = PlanetaryStage::boundary_for(Arrangement { input, fixed });
             match solve_planetary_stage(
-                &stage,
-                &gear_core::train::StageLoads::at(2.0, 3000.0),
+                &base,
+                &gear_core::train::StageLoads::at(2.0, 3000.0).under(asked),
                 &lib,
             ) {
                 Err(e) => println!("  {:>7} in, {:>7} held: {e}", name(input), name(fixed)),

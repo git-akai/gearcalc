@@ -27,6 +27,10 @@
     type PairResult,
     type MeshReport,
     type LoadSharing,
+    type PortSpec,
+    type Constraint,
+    constraintOn,
+    arrangeStage,
     note,
     t,
   } from "./core";
@@ -35,7 +39,7 @@
   import FieldNote from "./FieldNote.svelte";
   import Switch from "./Switch.svelte";
   import { notes, type Notes } from "./notes";
-  import { gearNumber as trainGearNumber, hulaRing } from "./members";
+  import { gearNumber as trainGearNumber, hulaRing, shaftName } from "./members";
 
   /** **Resolving an over-determined stage is the core's rule, not this file's.**
    *
@@ -105,6 +109,31 @@
    *  train has not solved, and the box keeps what it had. */
   const figuresOf = (stage: Stage): Figure[] =>
     result.figures[tab.train.stages.indexOf(stage)] ?? [];
+
+  /** Tell stage `i` what drives it and what it holds, and take the core's
+   *  answer — its constraints and, where the chain had to move, its couplings.
+   *  The two lists are written back rather than the whole train, so every
+   *  other input keeps its identity in the panel. */
+  function arrange(i: number, driven: number, held: number) {
+    const out = arrangeStage($state.snapshot(tab.train), i, driven, held);
+    tab.train.constraints = out.constraints;
+    tab.train.couplings = out.couplings;
+  }
+
+  /** **What a stage is presently asked**, read back from the train's
+   *  constraints — or, where it states none, from the kind's conventions the
+   *  core sent with the ports: the conventional holds, and the first port not
+   *  held as the input. Read, not decided: a set with its carrier held is
+   *  driven at whichever port the constraints or the chain leave. */
+  function arrangementOf(stage: number, ports: PortSpec[]): { driven: number; held: number } {
+    const stated = (c: Constraint) =>
+      ports.find((p) => constraintOn(tab.train, stage, p.shaft) === c)?.shaft;
+    const convention = result.topology[stage]?.held_by_convention ?? [];
+    const held = stated("held") ?? convention[0] ?? ports[0]?.shaft ?? 0;
+    const driven =
+      stated("driven") ?? ports.find((p) => p.shaft !== held)?.shaft ?? ports[0]?.shaft ?? 0;
+    return { driven, held };
+  }
 
   /** Which duty a fatigue case is counted over. Switching seeds the other
    *  shape from the core's own defaults — a fresh case's intermittent duty,
@@ -1661,6 +1690,8 @@
         {/if}
       {:else if stage.kind === "planetary"}
         {@const pres = res && res.kind === "planetary" ? res : null}
+        {@const ports = result.topology[i]?.ports ?? []}
+        {@const arranged = arrangementOf(i, ports)}
         <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
           <span class="caret aside">{tab.open[i] ? "▾" : "▸"}</span>
           <strong>{stageName(i)}</strong>
@@ -1720,21 +1751,36 @@
                 <input type="number" step="1" min="1" bind:value={stage.planets} />
                 <em></em>
               </label>
+              <!-- **Which shaft drives and which is held is the train's**,
+                   stated as constraints on this stage's ports, and the set
+                   carries no arrangement of its own any more. The ports and
+                   their names come from the core (`topology`), so a stage
+                   kind with a fourth port is one more option here and no
+                   change to this file. Both selects hand the gesture to the
+                   core (`arrangeStage`), which writes every port's constraint
+                   and, for a stage in the middle of a chain, moves the chain
+                   rather than writing a drive that would fight it. -->
               <label>
                 <span>{t("ui.train_driven_by")}</span>
-                <select bind:value={stage.arrangement.input}>
-                  <option value="sun">{t("ui.train_sun")}</option>
-                  <option value="carrier">{t("ui.train_carrier")}</option>
-                  <option value="ring">{t("ui.train_ring")}</option>
+                <select
+                  value={arranged.driven}
+                  onchange={(e) => arrange(i, Number(e.currentTarget.value), arranged.held)}
+                >
+                  {#each ports as p (p.shaft)}
+                    <option value={p.shaft}>{shaftName(tab.train, i, p.label)}</option>
+                  {/each}
                 </select>
                 <em></em>
               </label>
               <label>
                 <span>{t("ui.train_held")}</span>
-                <select bind:value={stage.arrangement.fixed}>
-                  <option value="sun">{t("ui.train_sun")}</option>
-                  <option value="carrier">{t("ui.train_carrier")}</option>
-                  <option value="ring">{t("ui.train_ring")}</option>
+                <select
+                  value={arranged.held}
+                  onchange={(e) => arrange(i, arranged.driven, Number(e.currentTarget.value))}
+                >
+                  {#each ports as p (p.shaft)}
+                    <option value={p.shaft}>{shaftName(tab.train, i, p.label)}</option>
+                  {/each}
                 </select>
                 <em></em>
               </label>

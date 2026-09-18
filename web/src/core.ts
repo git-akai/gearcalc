@@ -71,6 +71,13 @@ import type {
   Adopted,
   TrainFailure,
   Variation,
+  Constraint,
+  ShaftConstraint,
+  PortSpec,
+  StagePorts,
+  MotionReport,
+  ShaftLabel,
+  Exact,
 } from "./wire";
 export type { CaseKind, LoadCase, Port };
 export type {
@@ -134,6 +141,13 @@ export type {
   Adopted,
   TrainFailure,
   Variation,
+  Constraint,
+  ShaftConstraint,
+  PortSpec,
+  StagePorts,
+  MotionReport,
+  ShaftLabel,
+  Exact,
 } from "./wire";
 
 import init, {
@@ -155,6 +169,7 @@ import init, {
   import_train,
   export_train,
   relieve_stage,
+  arrange_stage,
   adopt_member,
 } from "./wasm/gear_wasm.js";
 
@@ -774,8 +789,33 @@ export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutc
         stage: null,
       },
       figures: [],
+      topology: [],
+      motion: null,
     };
   }
+}
+
+/** **What a train asks of one of a stage's shafts**, as it stands: the
+ *  constraint the train states, or `null` where it states none and the
+ *  kind's convention holds. Read here, never decided here — which shaft a
+ *  set holds by convention is the core's, and arrives as
+ *  `topology[stage].held_by_convention`. */
+export function constraintOn(train: Train, stage: number, shaft: number): Constraint | null {
+  const c = train.constraints.find(
+    (c) => c.at.kind === "of" && c.at.stage === stage && c.at.shaft === shaft,
+  );
+  return c ? c.constraint : null;
+}
+
+/** **Tell one stage what drives it and what it holds**, by the core's rules
+ *  rather than this file's. What is held is a constraint; where the load
+ *  comes in is a constraint on the first stage and a *coupling* on every
+ *  other, and the panel is not the place to know which — the core rewrites
+ *  the train's constraints and, where it must, its couplings
+ *  (`Train::arranged`). Takes a plain snapshot and gives the train back; the
+ *  panel writes the two lists into its state, as it does a relieved stage. */
+export function arrangeStage(train: Train, stage: number, driven: number, held: number): Train {
+  return JSON.parse(arrange_stage(JSON.stringify({ train, stage, driven, held }))) as Train;
 }
 
 // The words live in `strings.svelte.ts` — it has to be a rune module, because

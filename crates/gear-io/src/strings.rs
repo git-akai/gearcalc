@@ -1186,6 +1186,8 @@ mod tests {
                 ],
                 reversed_bending: false,
                 stages,
+                couplings: Vec::new(),
+                constraints: Vec::new(),
             };
             // A load nothing reacts...
             if let Ok(r) =
@@ -1424,6 +1426,8 @@ mod tests {
                     load_cases: vec![gear_core::train::LoadCase::ultimate(2.0, 3000.0)],
                     reversed_bending: false,
                     stages: Vec::new(),
+                    couplings: Vec::new(),
+                    constraints: Vec::new(),
                 },
                 &lib,
             ) {
