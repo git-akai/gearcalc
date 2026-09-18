@@ -1728,8 +1728,8 @@ impl super::Constrained for PlanetaryStage {
 
     /// **Four shafts and two meshes framed on the carrier.**
     ///
-    /// The sun and the ring are `coaxial_with` the *carrier* rather than the
-    /// housing, and that is the whole of why the frame needs no field of its
+    /// The sun and the ring are `coaxial_with` the *carrier* rather than
+    /// ground, and that is the whole of why the frame needs no field of its
     /// own: a member on the carrier's own axis stands still in the carrier's
     /// frame, so the frame of each mesh is the one shaft both its members name
     /// ([`super::Wiring`]).
@@ -1758,7 +1758,7 @@ impl super::Constrained for PlanetaryStage {
             .unwrap_or(self.arrangement.input);
         super::Wiring {
             shafts: vec![
-                super::ShaftSpec { label: "housing" },
+                super::ShaftSpec { label: "ground" },
                 super::ShaftSpec { label: "sun" },
                 super::ShaftSpec { label: "carrier" },
                 super::ShaftSpec { label: "ring" },

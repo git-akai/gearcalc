@@ -22,8 +22,8 @@
 //!
 //! What makes that single-valued is stating [`Mount::axis_fixed_in`] as *the
 //! frame the member is stationary in for meshing purposes*, which for a central
-//! member is the carrier it is coaxial with rather than the housing its
-//! bearings are in. A sun's axis genuinely stands still in the carrier's frame
+//! member is the carrier it is coaxial with rather than ground. A sun's axis
+//! genuinely stands still in the carrier's frame
 //! — they share an axis — and naming the carrier is what leaves the intersection
 //! with a planet's frame a single shaft.
 //!
@@ -57,7 +57,7 @@
 //!   with any of this.
 
 use super::StageGear;
-use crate::kinematics::{Condition, MeshRow, Shaft, System, HOUSING};
+use crate::kinematics::{Condition, MeshRow, Shaft, System, GROUND};
 use crate::mesh::MeshKind;
 
 /// A shaft a stage introduces.
@@ -80,8 +80,8 @@ pub struct Mount {
     pub spins_with: Shaft,
     /// **The frame its axis is stationary in.** For a member riding a carrier
     /// that is the carrier; for a member coaxial with a carrier it is *that
-    /// carrier*, not the housing (see the module note). For a fixed-axis pair
-    /// it is the housing.
+    /// carrier*, not ground (see the module note). For a fixed-axis pair it is
+    /// ground.
     pub axis_fixed_in: Shaft,
 }
 
@@ -136,7 +136,7 @@ pub struct MeshSpec {
 /// what meshes what.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Wiring {
-    /// Shaft 0 is always the housing.
+    /// Shaft 0 is always ground.
     pub shafts: Vec<ShaftSpec>,
     /// One per member, in [`super::StageResult::members`] order.
     pub mounts: Vec<Mount>,
@@ -189,7 +189,7 @@ impl Wiring {
     /// entry per member in the same order as [`Self::mounts`].
     ///
     /// `at` is where this stage's shafts begin in a larger system, so a train
-    /// can lay several stages over one housing; a stage asked about on its own
+    /// can lay several stages over one ground; a stage asked about on its own
     /// passes [`Offsets::alone`].
     ///
     /// # Errors
@@ -222,7 +222,7 @@ impl Wiring {
         Ok(())
     }
 
-    /// The system for this stage on its own, with its own housing.
+    /// The system for this stage on its own, against its own ground.
     ///
     /// # Errors
     ///
@@ -236,7 +236,7 @@ impl Wiring {
 
 /// Where a stage's shafts sit in a larger system.
 ///
-/// The housing is shared — there is one of it — so shaft 0 maps to shaft 0 and
+/// Ground is shared — there is one of it — so shaft 0 maps to shaft 0 and
 /// everything else is displaced. A stage asked about on its own is the identity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Offsets {
@@ -254,8 +254,8 @@ impl Offsets {
     /// The global index of one of this stage's shafts.
     #[must_use]
     pub const fn of(&self, local: Shaft) -> Shaft {
-        if local == HOUSING {
-            HOUSING
+        if local == GROUND {
+            GROUND
         } else {
             local + self.first - 1
         }
@@ -268,14 +268,14 @@ pub(crate) fn teeth_of<'a>(members: impl IntoIterator<Item = &'a StageGear>) -> 
     members.into_iter().map(|g| g.teeth).collect()
 }
 
-/// Conditions for a stage on its own: the housing held, one shaft driven at
+/// Conditions for a stage on its own: ground held, one shaft driven at
 /// unit speed, another held where the arrangement holds one, and the rest free.
 ///
 /// One helper because all three kinds want the same shape and a kind writing it
 /// out is a kind that can write it out differently.
 pub(crate) fn arranged(shafts: usize, input: Shaft, held: &[Shaft]) -> Vec<Condition> {
     let mut out = vec![Condition::Free; shafts];
-    out[HOUSING] = Condition::Ground;
+    out[GROUND] = Condition::Ground;
     for &h in held {
         out[h] = Condition::Ground;
     }
@@ -307,7 +307,7 @@ pub enum MotionError {
 /// One shaft of an assembled train.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ShaftMotion {
-    /// Which stage introduced it, and `None` for the housing, which every
+    /// Which stage introduced it, and `None` for ground, which every
     /// stage shares.
     pub stage: Option<usize>,
     pub label: &'static str,
@@ -351,7 +351,7 @@ impl TrainMotion {
     ///
     /// The second is what its teeth see and what its cycles are counted from,
     /// and it is the same subtraction for every kind: a pair's frame is the
-    /// housing and the difference is the member's own speed; an epicyclic
+    /// ground and the difference is the member's own speed; an epicyclic
     /// member's frame is its carrier, and a held ring's difference is *not*
     /// zero while its speed is.
     #[must_use]
@@ -367,7 +367,7 @@ impl Train {
     /// **The whole train as one system**, and where each stage's shafts sit in
     /// it.
     ///
-    /// One housing, shared; each stage's other shafts appended in order; and a
+    /// One ground, shared; each stage's other shafts appended in order; and a
     /// rigid coupling from each stage's output to the next stage's input, which
     /// is what a shaft line *is*. The chain is the default and the only
     /// topology a train can presently describe — a coupling list of its own is
@@ -407,7 +407,7 @@ impl Train {
     /// **What the train is asked**, one condition per shaft of the assembled
     /// system.
     ///
-    /// The housing is held; every shaft a stage's own arrangement holds is
+    /// Ground is held; every shaft a stage's own arrangement holds is
     /// held; and the **first** stage's input is driven at unit speed. The
     /// intermediate stages' drives are dropped, since a stage in a chain is
     /// turned by the one before it rather than by a motor of its own — which is
@@ -415,11 +415,11 @@ impl Train {
     #[must_use]
     pub fn conditions(&self, at: &[Offsets], shafts: usize) -> Vec<Condition> {
         let mut out = vec![Condition::Free; shafts];
-        out[HOUSING] = Condition::Ground;
+        out[GROUND] = Condition::Ground;
         let wirings: Vec<Wiring> = self.stages.iter().map(super::Stage::wiring).collect();
         for (k, w) in wirings.iter().enumerate() {
             for (local, c) in w.conditions.iter().enumerate() {
-                if local != HOUSING && *c == Condition::Ground {
+                if local != GROUND && *c == Condition::Ground {
                     out[at[k].of(local)] = Condition::Ground;
                 }
             }
@@ -447,8 +447,8 @@ impl Train {
         let wirings: Vec<Wiring> = self.stages.iter().map(super::Stage::wiring).collect();
         let mut shafts = vec![ShaftMotion {
             stage: None,
-            label: "housing",
-            speed: solution.values[HOUSING],
+            label: "ground",
+            speed: solution.values[GROUND],
         }];
         for (k, w) in wirings.iter().enumerate() {
             for (local, s) in w.shafts.iter().enumerate().skip(1) {

@@ -1472,7 +1472,7 @@ impl super::Constrained for HulaStage {
         };
         super::Wiring {
             shafts: vec![
-                super::ShaftSpec { label: "housing" },
+                super::ShaftSpec { label: "ground" },
                 super::ShaftSpec { label: "grounded" },
                 super::ShaftSpec { label: "crank" },
                 super::ShaftSpec { label: "wobble" },

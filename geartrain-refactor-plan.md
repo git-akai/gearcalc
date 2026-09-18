@@ -268,7 +268,7 @@ described as doing the other's job.
 no gears, no teeth, no geometry, no stages.
 
 ```rust
-/// A body with one angular velocity. The housing is one of these.
+/// A body with one angular velocity. Ground is one of these.
 struct Shaft(usize);
 
 /// One row: two signed tooth counts and the frame they are seen from.
@@ -281,6 +281,33 @@ struct Coupling(Shaft, Shaft);
 /// What is asked of a shaft, and there are only three things.
 enum Condition { Ground, Drive(Rational), Free }
 ```
+
+**Ground is a frame like any other, which happens to be held.** Not a different
+kind of thing: it is a shaft, it appears in mesh rows as a frame, it carries
+torque, and what makes it ground is the condition on it. Shaft zero is
+bookkeeping — every stage needs the *same* one — not physics.
+
+**There is no housing.** An element is fixed to ground, carries a load, or is
+attached to another element. Calling the reference a housing invites two wrong
+readings and both bite in the arrangements this refactor exists for: that the
+reference is a component with an interface to size, and that a **frame** must
+stand still. A frame is whatever shaft carries a mesh's axes, and in a Wolfrom
+that is a carrier — turning, and shared by several meshes at once.
+`LoadCase::reacted` is the same idea under an older name: *reacted at the far
+end* is the far port held, and §10.4's question is whether the word buys
+anything the condition does not.
+
+Two readings follow that are easy to conflate, so they are named apart: **a held
+shaft's reaction** is the entry on that shaft, and **what is taken to ground**
+is the sum over the held shafts. A holding constraint is external, so its
+reaction sits on the shaft it holds; ground itself carries only what something
+*meshes* against it, which in a pure epicyclic is nothing at all.
+
+The crate does use "housing" elsewhere, for the real part whose bore centres set
+a centre distance — a worm's wheel absorbing a housing distance by its shift.
+That is a different thing with a different job, and the two are named apart on
+purpose. `tools/check_units.py` exists because a name meaning two things in two
+modules is how a bug is made; this is the same discipline applied to a noun.
 
 and over them:
 

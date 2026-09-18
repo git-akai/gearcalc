@@ -5436,10 +5436,10 @@ mod tests {
                         continue;
                     };
                     // The planet carries no external torque and nothing in a
-                    // pure epicyclic meshes against the housing, so both are
+                    // pure epicyclic meshes against ground, so both are
                     // exact zeros rather than unknowns.
                     let mut applied = vec![None; w.shafts.len()];
-                    applied[crate::kinematics::HOUSING] = Some(Ratio::ZERO);
+                    applied[crate::kinematics::GROUND] = Some(Ratio::ZERO);
                     applied[w.mounts[1].spins_with] = Some(Ratio::ZERO);
                     applied[w.input] = Some(Ratio::ONE);
                     let t = system.torques(&applied).unwrap();

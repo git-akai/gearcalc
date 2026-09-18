@@ -15,7 +15,7 @@
     mesh 1  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
   graph    mobility 2 degree(s)   total ratio -43/17
     stage 1  ratio -43/17
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft first     of stage 1 speed 1
     shaft second    of stage 1 speed -17/43
 
@@ -36,7 +36,7 @@
     mesh 1  efficiency  98.389569 / 98.389569  %  contact ratio   1.5591  coprime
   graph    mobility 2 degree(s)   total ratio -43/17
     stage 1  ratio -43/17
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft first     of stage 1 speed 1
     shaft second    of stage 1 speed -17/43
 
@@ -57,7 +57,7 @@
     mesh 1  efficiency  61.804609 / 0.000000   %  contact ratio   1.8140  coprime
   graph    mobility 2 degree(s)   total ratio -40
     stage 1  ratio -40
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft first     of stage 1 speed 1
     shaft second    of stage 1 speed -1/40
 
@@ -92,7 +92,7 @@
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 3 degree(s)  (1 shaft(s) untouched)   total ratio -6
     stage 1  ratio -6
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft sun       of stage 1 speed 1
     shaft carrier   of stage 1 speed 0
     shaft ring      of stage 1 speed -1/6
@@ -129,7 +129,7 @@
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 3 degree(s)  (1 shaft(s) untouched)   total ratio 7
     stage 1  ratio 7
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft sun       of stage 1 speed 1
     shaft carrier   of stage 1 speed 1/7
     shaft ring      of stage 1 speed 0
@@ -166,7 +166,7 @@
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 3 degree(s)  (1 shaft(s) untouched)   total ratio 6/7
     stage 1  ratio 6/7
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft sun       of stage 1 speed 0
     shaft carrier   of stage 1 speed 1
     shaft ring      of stage 1 speed 7/6
@@ -203,7 +203,7 @@
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 3 degree(s)  (1 shaft(s) untouched)   total ratio 1/7
     stage 1  ratio 1/7
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft sun       of stage 1 speed 7
     shaft carrier   of stage 1 speed 1
     shaft ring      of stage 1 speed 0
@@ -240,7 +240,7 @@
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 3 degree(s)  (1 shaft(s) untouched)   total ratio 7/6
     stage 1  ratio 7/6
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft sun       of stage 1 speed 0
     shaft carrier   of stage 1 speed 6/7
     shaft ring      of stage 1 speed 1
@@ -277,7 +277,7 @@
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   graph    mobility 3 degree(s)  (1 shaft(s) untouched)   total ratio -1/6
     stage 1  ratio -1/6
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft sun       of stage 1 speed -6
     shaft carrier   of stage 1 speed 0
     shaft ring      of stage 1 speed 1
@@ -318,7 +318,7 @@
     mesh 2  efficiency  99.950663 / 99.950663  %  contact ratio   1.3499  coprime
   graph    mobility 3 degree(s)  (1 shaft(s) untouched)   total ratio 3721/16
     stage 1  ratio 3721/16
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft grounded  of stage 1 speed 0
     shaft crank     of stage 1 speed 1
     shaft wobble    of stage 1 speed -4/61
@@ -352,7 +352,7 @@
   graph    mobility 2 degree(s)   total ratio 1333/221
     stage 1  ratio -43/17
     stage 2  ratio -31/13
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft first     of stage 1 speed 1
     shaft second    of stage 1 speed -17/43
     shaft first     of stage 2 speed -17/43
@@ -411,7 +411,7 @@
     stage 1  ratio -43/17
     stage 2  ratio 7
     stage 3  ratio -40
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft first     of stage 1 speed 1
     shaft second    of stage 1 speed -17/43
     shaft sun       of stage 2 speed -17/43
@@ -425,7 +425,7 @@
   no answer: stage 1: the teeth never come into contact
   graph    mobility 3 degree(s)  (1 shaft(s) untouched)   total ratio 97/17
     stage 1  ratio 97/17
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft sun       of stage 1 speed 1
     shaft carrier   of stage 1 speed 17/97
     shaft ring      of stage 1 speed 0
@@ -436,7 +436,7 @@
   graph    mobility 3 degree(s)   total ratio -4171/289
     stage 1  ratio -43/17
     stage 2  ratio 97/17
-    shaft housing   of the train speed 0
+    shaft ground    of the train speed 0
     shaft first     of stage 1 speed 1
     shaft second    of stage 1 speed -17/43
     shaft sun       of stage 2 speed -17/43

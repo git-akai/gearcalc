@@ -24,7 +24,7 @@
 //!
 //! | arrangement | rows |
 //! |---|---|
-//! | a fixed-axis pair | one, framed on the housing |
+//! | a fixed-axis pair | one, framed on ground |
 //! | a planetary set | two, framed on the carrier |
 //! | a hula stage | two, framed on the crank |
 //! | a compound or meshed-planet set | one per mesh, framed on its carrier |
@@ -82,13 +82,39 @@
 
 use crate::ratio::Ratio;
 
-/// A body with one angular velocity. The housing is one of these — pinned by a
+/// A body with one angular velocity. Ground is one of these — pinned by a
 /// condition, not by being a different kind of thing.
 pub type Shaft = usize;
 
-/// **The housing.** Shaft zero by construction, so that a fixed-axis mesh has a
-/// frame to be written in and a reaction has somewhere to be reported.
-pub const HOUSING: Shaft = 0;
+/// **Ground — a frame like any other, which happens to be held.**
+///
+/// It is not a different kind of thing and nothing here treats it as one: it is
+/// a [`Shaft`], it appears in mesh rows as a frame, it carries torque, and what
+/// makes it ground is [`Condition::Ground`] on it and nothing else. Turn that
+/// condition into a [`Condition::Drive`] and the whole train is being measured
+/// from a turning frame, which is a coherent question with a coherent answer.
+///
+/// **Why it is shaft zero** is the only thing special about it, and it is a
+/// bookkeeping fact rather than a physical one: every stage needs the *same*
+/// one, so that a fixed-axis mesh in stage 1 and a grounded ring in stage 3 are
+/// held against one frame rather than two ([`crate::train::Offsets`] maps every
+/// stage's other shafts and leaves this alone).
+///
+/// **A train here has no housing.** An element is fixed to ground, carries a
+/// load, or is attached to another element. Calling the reference a housing
+/// invites two wrong readings, and both bite in the arrangements this module
+/// exists for: that the reference is a component with an interface to size, and
+/// that a *frame* must stand still. A frame is whatever shaft carries a mesh's
+/// axes, and in a compound set that is a **carrier** — turning, and shared by
+/// several meshes at once.
+///
+/// *(This crate does say "housing" elsewhere, for the real part whose bore
+/// centres set a centre distance — a worm's wheel absorbing a housing distance
+/// by its shift, `docs/reference.md`. That is a different thing with a
+/// different job, and the two are named apart on purpose: a noun meaning two
+/// things in two modules is the fault `tools/check_units.py` exists for in the
+/// angle domain.)*
+pub const GROUND: Shaft = 0;
 
 /// What is asked of a shaft. Three things, and no fourth.
 ///
@@ -131,8 +157,9 @@ pub enum Refusal {
 /// A shaft that no mesh and no coupling touches adds a degree of freedom that
 /// belongs to nothing — the handoff this work answers is right that counting it
 /// silently is a trap — so it is **named** rather than folded into the number.
-/// The commonest one is the housing itself, in a train made only of epicyclic
-/// meshes, and it stops being untouched the moment anything is grounded.
+/// The commonest one is ground itself, in a train made only of epicyclic
+/// meshes — nothing in one meshes against it — and it stops being untouched
+/// the moment a fixed-axis stage joins the train.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Mobility {
     /// `shafts − rank`: how many independent conditions the train needs.
@@ -171,7 +198,7 @@ pub struct Solution {
     pub residual: Vec<Residual>,
     /// The **shafts** whose condition, or whose given torque, said nothing the
     /// structure had not already said. Not an error — a ring grounded and also
-    /// coupled to the housing is a designer being explicit — but worth
+    /// coupled to ground is a designer being explicit — but worth
     /// reporting, since it is also how an over-determined train looks when it
     /// happens to be consistent.
     pub redundant: Vec<Shaft>,
@@ -223,15 +250,15 @@ pub struct System {
 }
 
 impl System {
-    /// A system of `shafts` bodies, of which [`HOUSING`] is one.
+    /// A system of `shafts` bodies, of which [`GROUND`] is one.
     ///
     /// # Panics
     ///
-    /// If asked for no shafts at all, which is not a mechanism: the housing
-    /// always exists.
+    /// If asked for no shafts at all, which is not a mechanism: ground always
+    /// exists.
     #[must_use]
     pub fn new(shafts: usize) -> Self {
-        assert!(shafts > 0, "the housing is always a shaft");
+        assert!(shafts > 0, "ground is always a shaft");
         Self {
             shafts,
             rows: Vec::new(),
@@ -376,8 +403,20 @@ impl System {
     ///
     /// `applied` is one entry per shaft: `Some` where the torque is known — an
     /// input, a load, or the exact zero a free shaft carries — and `None` where
-    /// it is the reaction being solved for. A grounded shaft is the ordinary
-    /// `None`, and the housing's answer is the reaction sizing its interface.
+    /// it is the reaction being solved for. A held shaft is the ordinary
+    /// `None`, and what comes back on it is **that shaft's own reaction**.
+    ///
+    /// **What is taken to ground is the sum over the held shafts**, not the
+    /// entry at [`GROUND`]. A holding constraint is external, so its reaction
+    /// appears on the shaft it holds; `GROUND` itself carries only what
+    /// something *meshes* against it — everything, in a fixed-axis train, and
+    /// exactly nothing in a pure epicyclic, where the held ring carries the lot.
+    /// Both readings are right and they are different questions.
+    ///
+    /// The conditions are deliberately absent from this solve. Virtual work is
+    /// taken over the motions the **structure** allows, and a holding condition
+    /// is not structure — it is the thing whose reaction is being solved for.
+    /// Adding its row here would put the answer on both sides of the equation.
     ///
     /// **Loss is not here**, and that is a statement rather than an omission: a
     /// mesh's efficiency depends on which way power crosses it, which makes the
@@ -611,9 +650,9 @@ mod tests {
         Ratio::whole(n)
     }
 
-    /// An ordinary fixed-axis pair: two gears on the housing.
+    /// An ordinary fixed-axis pair: two gears whose axes stand still in ground.
     ///
-    /// Shafts `[housing, a, b]`.
+    /// Shafts `[ground, a, b]`.
     fn pair(za: i64, zb: i64) -> System {
         let mut s = System::new(3);
         s.mesh(MeshRow {
@@ -621,14 +660,14 @@ mod tests {
             b: 2,
             za,
             zb,
-            frame: HOUSING,
+            frame: GROUND,
         })
         .unwrap();
         s
     }
 
     /// A planetary set, **with no shaft held**: that is a condition, not a
-    /// structure. Shafts `[housing, sun, carrier, ring, planet]`, and the
+    /// structure. Shafts `[ground, sun, carrier, ring, planet]`, and the
     /// ring's tooth count enters negative because a ring is a gear with a
     /// negative tooth count.
     fn set(t: Teeth) -> System {
@@ -665,10 +704,10 @@ mod tests {
         }
     }
 
-    /// Conditions for a set: everything free, then the housing grounded.
+    /// Conditions for a set: everything free, then ground held.
     fn base(n: usize) -> Vec<Condition> {
         let mut c = vec![Condition::Free; n];
-        c[HOUSING] = Condition::Ground;
+        c[GROUND] = Condition::Ground;
         c
     }
 
@@ -701,7 +740,7 @@ mod tests {
         ] {
             let mut s = set(t);
             assert!(s.lock_up_is_free(), "{t:?}");
-            s.couple(RING, HOUSING).unwrap();
+            s.couple(RING, GROUND).unwrap();
             assert!(s.lock_up_is_free(), "{t:?} with the ring coupled");
             checked += 2;
         }
@@ -870,7 +909,7 @@ mod tests {
 
     /// **A set with nothing held is a differential, and that is an answer.**
     ///
-    /// Two degrees of freedom once the housing is pinned, so one drive leaves
+    /// Two degrees of freedom once ground is pinned, so one drive leaves
     /// one parameter, and the family that comes back *is* the differential's
     /// equation.
     ///
@@ -893,10 +932,10 @@ mod tests {
         let t = teeth();
         let s = set(t);
         let m = s.mobility().unwrap();
-        // Four bodies, two meshes — plus the housing, which nothing in a pure
+        // Four bodies, two meshes — plus ground, which nothing in a pure
         // epicyclic touches and which is named rather than counted silently.
         assert_eq!(m.degrees, 3);
-        assert_eq!(m.untouched, vec![HOUSING]);
+        assert_eq!(m.untouched, vec![GROUND]);
 
         let mut c = base(s.shafts());
         c[SUN] = Condition::Drive(Ratio::ONE);
@@ -973,7 +1012,7 @@ mod tests {
     /// power balance rather than a formula anyone wrote down.
     ///
     /// Checked on a pair, where the answer is known — the wheel carries the
-    /// tooth-count ratio and the housing the sum — and asserted as the law
+    /// tooth-count ratio and ground the sum — and asserted as the law
     /// `Σ τ ω = 0` on both.
     #[test]
     fn torque_balances_the_power_it_is_solved_from() {
@@ -982,12 +1021,12 @@ mod tests {
         c[1] = Condition::Drive(Ratio::ONE);
         let speeds = s.motion(&c).unwrap();
 
-        // Gear 1 is driven at 2; gear 2's and the housing's are the reactions.
+        // Gear 1 is driven at 2; gear 2's and ground's are the reactions.
         let applied = vec![None, Some(w(2)), None];
         let t = s.torques(&applied).unwrap();
         assert!(t.is_unique());
         assert_eq!(t.values[2], Ratio::new(2 * 43, 17).unwrap());
-        assert_eq!(t.values[HOUSING], Ratio::new(-2 * 60, 17).unwrap());
+        assert_eq!(t.values[GROUND], Ratio::new(-2 * 60, 17).unwrap());
         // The three sum to zero — the pair is in equilibrium — and the power
         // does too.
         let sum = t
@@ -1023,10 +1062,10 @@ mod tests {
                 c[input] = Condition::Drive(Ratio::ONE);
                 let speeds = s.motion(&c).unwrap();
                 // The planet carries no external torque, and neither does the
-                // housing: nothing outside the set touches either.
+                // ground: nothing outside the set touches either.
                 let mut applied = vec![None; s.shafts()];
                 applied[PLANET] = Some(Ratio::ZERO);
-                applied[HOUSING] = Some(Ratio::ZERO);
+                applied[GROUND] = Some(Ratio::ZERO);
                 applied[input] = Some(Ratio::ONE);
                 let tq = s.torques(&applied).unwrap();
                 assert!(tq.is_unique(), "input {input}, fixed {fixed}");
@@ -1058,14 +1097,14 @@ mod tests {
     /// same rows the speeds came from.
     #[test]
     fn play_at_a_shaft_is_the_chain_referral_the_reference_derives() {
-        // Shafts: housing, a, b, c — two meshes, `b` shared.
+        // Shafts: ground, a, b, c — two meshes, `b` shared.
         let mut s = System::new(4);
         s.mesh(MeshRow {
             a: 1,
             b: 2,
             za: 17,
             zb: 43,
-            frame: HOUSING,
+            frame: GROUND,
         })
         .unwrap();
         s.mesh(MeshRow {
@@ -1073,7 +1112,7 @@ mod tests {
             b: 3,
             za: 13,
             zb: 31,
-            frame: HOUSING,
+            frame: GROUND,
         })
         .unwrap();
         let mut c = base(4);
@@ -1111,7 +1150,7 @@ mod tests {
     /// a refusal rather than a very large number.
     #[test]
     fn a_hula_arrangement_reduces_by_its_two_products() {
-        // Shafts: housing, gear 1, crank, wobble, gear 4. Both meshes are
+        // Shafts: ground, gear 1, crank, wobble, gear 4. Both meshes are
         // internal, so the larger member of each carries the negative count.
         let build = |z: [i64; 4]| {
             let mut s = System::new(5);
@@ -1154,13 +1193,13 @@ mod tests {
     }
 
     /// A shaft nothing touches is named rather than counted, on the case that
-    /// produces it: a pure epicyclic, whose housing takes part in no mesh until
+    /// produces it: a pure epicyclic, in which nothing meshes against ground until
     /// something is grounded to it.
     #[test]
     fn a_shaft_no_constraint_touches_is_named() {
         let mut s = set(teeth());
-        assert_eq!(s.mobility().unwrap().untouched, vec![HOUSING]);
-        s.couple(RING, HOUSING).unwrap();
+        assert_eq!(s.mobility().unwrap().untouched, vec![GROUND]);
+        s.couple(RING, GROUND).unwrap();
         let m = s.mobility().unwrap();
         assert!(m.untouched.is_empty());
         assert_eq!(m.degrees, 2);
@@ -1177,7 +1216,7 @@ mod tests {
                 b: 9,
                 za: 17,
                 zb: 43,
-                frame: HOUSING
+                frame: GROUND
             })
             .is_none());
         assert!(s
@@ -1186,7 +1225,7 @@ mod tests {
                 b: 2,
                 za: 0,
                 zb: 43,
-                frame: HOUSING
+                frame: GROUND
             })
             .is_none());
         assert!(s
@@ -1195,7 +1234,7 @@ mod tests {
                 b: 1,
                 za: 17,
                 zb: 43,
-                frame: HOUSING
+                frame: GROUND
             })
             .is_none());
         assert!(s.couple(1, 1).is_none());

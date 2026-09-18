@@ -1439,7 +1439,8 @@ impl Constrained for PairStage {
         groups
     }
 
-    /// **Two shafts on the housing, one mesh framed on it.**
+    /// **Two shafts whose axes stand still in ground, and one mesh framed on
+    /// it.**
     ///
     /// The shaft angle does not appear: crossing the shafts changes what the
     /// teeth do to each other — a line contact becomes a point, the sliding
@@ -1448,18 +1449,18 @@ impl Constrained for PairStage {
     /// stage's wiring is a spur stage's, and that is the model saying a kind is
     /// a layer rather than a second kinematics.
     fn wiring(&self) -> super::Wiring {
-        use crate::kinematics::HOUSING;
+        use crate::kinematics::GROUND;
         const FIRST: usize = 1;
         const SECOND: usize = 2;
         super::Wiring {
             shafts: vec![
-                super::ShaftSpec { label: "housing" },
+                super::ShaftSpec { label: "ground" },
                 super::ShaftSpec { label: "first" },
                 super::ShaftSpec { label: "second" },
             ],
             mounts: vec![
-                super::Mount::coaxial_with(FIRST, HOUSING),
-                super::Mount::coaxial_with(SECOND, HOUSING),
+                super::Mount::coaxial_with(FIRST, GROUND),
+                super::Mount::coaxial_with(SECOND, GROUND),
             ],
             meshes: vec![super::MeshSpec {
                 a: 0,

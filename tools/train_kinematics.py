@@ -119,7 +119,7 @@ class Train:
     """Shafts, gears on them, and meshes between them -- as a layout."""
 
     def __init__(self):
-        self.shafts = ["housing"]
+        self.shafts = ["ground"]
         self.gears = []          # (name, shaft, frame, radius, offset)
         self.meshes = []         # (gear a, gear b)
 
@@ -446,12 +446,17 @@ def power_balance(label, t, applied, conditions, fail):
     from the velocity constraints -- two answers from one matrix, and the law
     that ties them.
 
-    The housing's reaction comes back **zero** on a pure epicyclic, and that is
-    right rather than a miss: nothing in such a set meshes against the housing,
-    so no row touches it and no torque can reach it. The reaction is on the
-    shaft that is actually held. It reaches the housing the moment anything is
-    coupled to it -- which is what a fixed-axis pair does, and where the
-    17/43 line's -120/17 comes from."""
+    Ground's reaction comes back **zero** on a pure epicyclic, and that is
+    right rather than a miss: nothing in such a set meshes against ground, so no
+    row touches it and no torque can reach it. The reaction is on the shaft that
+    is actually held. It reaches ground the moment something meshes against it
+    -- which is what a fixed-axis pair does, and where the 17/43 line's -120/17
+    comes from.
+
+    **Ground is a reference, not a part.** A train here has no housing: an
+    element is fixed to ground, carries a load, or is attached to another
+    element. A frame need not stand still either -- in a compound set it is a
+    carrier, and it turns."""
     n = len(t.shafts)
     speeds, basis = t.speeds(conditions)
     if basis:
@@ -466,7 +471,7 @@ def power_balance(label, t, applied, conditions, fail):
     ok = power == 0 and total == 0
     print(
         f"  {label:<38}{'ok' if ok else 'FAIL':>9}   "
-        f"power {power}  sum {total}  reaction at housing {torques[0]}"
+        f"power {power}  sum {total}  reaction at ground {torques[0]}"
     )
     return fail + (not ok)
 
