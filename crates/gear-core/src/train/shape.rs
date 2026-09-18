@@ -115,6 +115,16 @@ pub struct MeshInput {
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub struct Distance {
     pub axes: [usize; 2],
+    /// The angle between the two axes, degrees: 0 for parallel, 90 for a
+    /// worm and its wheel. A mesh on crossed axes is a point contact with a
+    /// model of its own ([`super::crossed`]), and the rest of the stage
+    /// cannot yet share a member with it.
+    pub angle: f64,
+    /// **Size the two members as a worm and its wheel** — the worm's length
+    /// and the wheel's face from the conventional proportions — rather than
+    /// as two crossed helical gears. A preset's word, and an input because
+    /// the recommendation is one a designer takes or leaves.
+    pub worm: bool,
     /// The running distance, mm: automatic is whatever the shifts leave,
     /// opened by the clearance.
     pub distance: Auto<f64>,
@@ -1095,6 +1105,32 @@ pub fn solve_shape(
     let boundary = super::StageBoundary::of(loads, &wiring, &Constrained::ports(shape));
     let teeth = super::teeth_of(shape.members());
     let motion = wiring.unit_motion(&teeth, &boundary)?;
+
+    // ---- crossed axes: the point-contact model, over the pair it is
+    // written for.
+    if let Some((pair, kind)) = shape.as_crossed_pair() {
+        let sized = pair.sized();
+        let r = super::crossed::solve_crossed_pair(&sized, kind, loads, lib, &motion)?;
+        return Ok(ShapeResult {
+            ratio: r.ratio,
+            efficiency: r.mesh.efficiency,
+            backlash: r.mesh.backlash_by_drive(),
+            distances: vec![DistanceReport {
+                nominal: vec![r.centre_distance_nominal],
+                running: r.centre_distance,
+                clearance: r.clearance,
+            }],
+            overlap: 0.0,
+            layout: None,
+            cases: Vec::new(),
+            members: r.gears.to_vec(),
+            meshes: vec![r.mesh],
+            notes: r.notes,
+        });
+    }
+    if shape.distances.iter().any(|d| d.angle != 0.0) {
+        return Err(TrainError::Wiring(super::WiringError::Unsolvable));
+    }
     let system = wiring.alone(&teeth)?;
     let speed: Vec<f64> = system
         .motion(&boundary.conditions)
@@ -1871,9 +1907,17 @@ impl Constrained for Shape {
 // ----------------------------------------------------- from each kind ---
 
 impl From<&super::PairStage> for Shape {
-    /// Two axes in ground, one mesh, one distance. A crossed pair is the
-    /// same shape with an angle, which the shape does not carry yet.
+    /// A spur or crossed gear pair: [`Shape::from_pair`] without the worm's
+    /// proportions.
     fn from(p: &super::PairStage) -> Self {
+        Self::from_pair(p, super::PairKind::Spur)
+    }
+}
+
+impl Shape {
+    /// Two axes in ground at the pair's shaft angle, one mesh, one distance.
+    #[must_use]
+    pub fn from_pair(p: &super::PairStage, kind: super::PairKind) -> Self {
         let member = |i: usize, thickness_mod: f64| Member {
             shaft: i + 1,
             gear: p.gears[i].clone(),
@@ -1912,6 +1956,8 @@ impl From<&super::PairStage> for Shape {
             }],
             distances: vec![Distance {
                 axes: [0, 1],
+                angle: p.shaft_angle,
+                worm: kind == super::PairKind::Worm,
                 distance: p.centre_distance,
                 clearance: p.clearance,
                 tolerance_plus: p.tolerance_plus,
@@ -1919,6 +1965,49 @@ impl From<&super::PairStage> for Shape {
                 axial_clearance: p.axial_clearance,
             }],
         }
+    }
+
+    /// **A crossed pair, read back as the pair the screw model takes.** The
+    /// point-contact model in [`super::crossed`] is written over a
+    /// [`super::PairStage`], and a shape whose one distance is at an angle
+    /// is exactly one of those; the view is built here so that model is
+    /// called and not copied. `None` where the shape is more than a pair.
+    fn as_crossed_pair(&self) -> Option<(super::PairStage, super::PairKind)> {
+        let d = self.distances.first()?;
+        if d.angle == 0.0
+            || self.distances.len() != 1
+            || self.members.len() != 2
+            || self.meshes.len() != 1
+        {
+            return None;
+        }
+        let m = self.meshes[0];
+        let (a, b) = (&self.members[m.a], &self.members[m.b]);
+        Some((
+            super::PairStage {
+                module: a.module,
+                pressure_angle: self.pressure_angle,
+                shaft_angle: d.angle,
+                pitch_diameter: a.pitch_diameter,
+                overlap: self.overlap,
+                sliding_friction: m.sliding_friction,
+                static_friction: m.static_friction,
+                thickness_mod: a.thickness_mod,
+                centre_distance: d.distance,
+                clearance: d.clearance,
+                tolerance_plus: d.tolerance_plus,
+                tolerance_minus: d.tolerance_minus,
+                optimisation: self.optimisation,
+                load_sharing: self.load_sharing,
+                axial_clearance: d.axial_clearance,
+                gears: [a.gear.clone(), b.gear.clone()],
+            },
+            if d.worm {
+                super::PairKind::Worm
+            } else {
+                super::PairKind::Spur
+            },
+        ))
     }
 }
 
@@ -1980,6 +2069,8 @@ impl From<&super::PlanetaryStage> for Shape {
             ],
             distances: vec![Distance {
                 axes: [0, 1],
+                angle: 0.0,
+                worm: false,
                 distance: s.centre_distance,
                 clearance: s.clearance,
                 tolerance_plus: s.tolerance_plus,
@@ -2206,6 +2297,38 @@ mod tests {
         }
     }
 
+    /// **A worm through the shape is the worm**: the point-contact model
+    /// reached through the shape's one crossed distance, figure for figure.
+    #[test]
+    fn a_worm_through_the_shape_is_the_worm() {
+        let lib = test_library();
+        for (what, pair, kind) in [
+            ("worm", PairStage::worm(), PairKind::Worm),
+            (
+                "crossed helical",
+                PairStage::worm().with_first_helix(45.0),
+                PairKind::Spur,
+            ),
+        ] {
+            let kind_result = super::super::solve_pair_stage(&pair, kind, &loads(), &lib).unwrap();
+            let shape = Shape::from_pair(&pair, kind);
+            let ours =
+                solve_shape(&shape, &loads(), &lib, super::super::Reversal::default()).unwrap();
+            assert!(
+                (kind_result.ratio - ours.ratio).abs() < 1e-12,
+                "{what} ratio"
+            );
+            gate(
+                what,
+                &kind_result.gears.iter().collect::<Vec<_>>(),
+                &[&kind_result.mesh],
+                &ours,
+                1e-12,
+                &[],
+            );
+        }
+    }
+
     /// **A set through the shape is the set**, on the default set under its
     /// convention.
     #[test]
@@ -2293,5 +2416,129 @@ mod tests {
             let k = b.bending_stress.unwrap() / a.bending_stress.unwrap();
             assert!((0.97..1.01).contains(&k), "{k}");
         }
+
+        // **Every arrangement**, forward: the ratio, the efficiency, the play
+        // and every figure but the ones said above.
+        use crate::planetary::{Arrangement, PlanetaryShaft};
+        let mut checked = 0;
+        for input in PlanetaryShaft::ALL {
+            for fixed in PlanetaryShaft::ALL {
+                if input == fixed {
+                    continue;
+                }
+                let arrangement = Arrangement { input, fixed };
+                let boundary = PlanetaryStage::boundary_for(arrangement);
+                let what = format!("{arrangement:?}");
+                let kind = super::super::solve_planetary_stage(
+                    &set,
+                    &forward().under(boundary.clone()),
+                    &lib,
+                )
+                .unwrap();
+                let ours = solve_shape(
+                    &shape,
+                    &forward().under(boundary),
+                    &lib,
+                    super::super::Reversal::default(),
+                )
+                .unwrap();
+                assert!(
+                    (kind.ratio - ours.ratio).abs() < 1e-12,
+                    "{what} ratio {} vs {}",
+                    kind.ratio,
+                    ours.ratio
+                );
+                assert!(
+                    (kind.efficiency.forward - ours.efficiency.forward).abs() < 1e-12,
+                    "{what} η {} vs {}",
+                    kind.efficiency.forward,
+                    ours.efficiency.forward
+                );
+                assert!(
+                    (kind.efficiency.backward - ours.efficiency.backward).abs() < 1e-12,
+                    "{what} η back {} vs {}",
+                    kind.efficiency.backward,
+                    ours.efficiency.backward
+                );
+                assert!(
+                    (kind.backlash.forward.nominal - ours.backlash.forward.nominal).abs() < 1e-12,
+                    "{what} play {} vs {}",
+                    kind.backlash.forward.nominal,
+                    ours.backlash.forward.nominal
+                );
+                assert!(
+                    (kind.backlash.backward.nominal - ours.backlash.backward.nominal).abs() < 1e-12,
+                    "{what} play back {} vs {}",
+                    kind.backlash.backward.nominal,
+                    ours.backlash.backward.nominal
+                );
+                // Wherever the planet drives the sun rather than the sun the
+                // planet — driven by the carrier or by the ring — the set
+                // pressed that mesh with the sun's delivered torque, the
+                // driven side's, as it did the ring's in every arrangement.
+                // The shape presses with the driver's, `1/η` more, exactly.
+                let sp_moves = |allow: &[&str]| {
+                    let mut diffs = Vec::new();
+                    for (i, (a, b)) in [&kind.sun, &kind.planet.gear, &kind.ring]
+                        .iter()
+                        .zip(&ours.members)
+                        .enumerate()
+                    {
+                        diffs.extend(differences(&format!("member {i}"), a, b, 1e-9));
+                    }
+                    for (i, (a, b)) in [&kind.sun_planet, &kind.planet_ring]
+                        .iter()
+                        .zip(&ours.meshes)
+                        .enumerate()
+                    {
+                        diffs.extend(differences(&format!("mesh {i}"), a, b, 1e-9));
+                    }
+                    diffs.retain(|d| !allow.iter().any(|a| d.contains(a)));
+                    diffs
+                };
+                let allow = [
+                    "torque",
+                    "member 2.Some",
+                    "member 2.contact_stress",
+                    "mesh 1.max_pressure",
+                    "mesh 1.at_pitch_point",
+                    "mesh 1.patch_width",
+                ];
+                let left = sp_moves(&allow);
+                if !left.is_empty() {
+                    let sp_fields = [
+                        "member 0.Some",
+                        "member 0.contact_stress",
+                        "member 1.Some",
+                        "member 1.contact_stress",
+                        "mesh 0.max_pressure",
+                        "mesh 0.at_pitch_point",
+                        "mesh 0.patch_width",
+                    ];
+                    assert!(
+                        left.iter().all(|d| sp_fields.iter().any(|f| d.contains(f))),
+                        "{what}: {left:?}"
+                    );
+                    let eta = kind.sun_planet.efficiency.forward;
+                    for (a, b) in kind.sun.cases.iter().zip(&ours.members[0].cases) {
+                        assert!(
+                            (b.bending_stress.unwrap() - a.bending_stress.unwrap() / eta).abs()
+                                < 1e-9,
+                            "{what}"
+                        );
+                        assert!(
+                            (b.contact_stress - a.contact_stress / eta.sqrt()).abs() < 1e-9,
+                            "{what}"
+                        );
+                    }
+                    assert!(
+                        input != PlanetaryShaft::Sun,
+                        "{what}: the sun drives its mesh"
+                    );
+                }
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 6);
     }
 }
