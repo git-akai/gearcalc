@@ -2547,26 +2547,6 @@ pub fn solve_shape(
     })
 }
 
-impl ShapeResult {
-    /// **A shape of two members and one mesh read as the pair it is** — the
-    /// crossed model's own result shape, which the tests written against the
-    /// pair kind still read. Test-only: nothing in production wants a
-    /// stage's result in a kind's shape.
-    #[cfg(test)]
-    pub(crate) fn pair_view(&self) -> super::CrossedResult {
-        let d = &self.distances[0];
-        super::CrossedResult {
-            ratio: self.ratio,
-            centre_distance_nominal: d.nominal[0],
-            clearance: d.clearance,
-            centre_distance: d.running,
-            mesh: self.meshes[0].clone(),
-            gears: [self.members[0].clone(), self.members[1].clone()],
-            notes: self.notes.clone(),
-        }
-    }
-}
-
 impl super::flow::Flow {
     /// The efficiency the flow charged mesh `k` in the direction it chose.
     fn efficiency_of_mesh(&self, k: usize, etas: &[Directional<f64>]) -> f64 {

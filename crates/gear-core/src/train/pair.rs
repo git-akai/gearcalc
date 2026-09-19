@@ -958,20 +958,19 @@ impl PairStage {
     }
 }
 
-/// The pair kind's old entry point, kept for the tests written against it:
-/// the pair through the shape, read back as a pair.
+/// The pair presets' old entry point, kept for the tests written against
+/// it: a pair through the shape.
 #[cfg(test)]
 pub(crate) fn solve_pair_stage(
     stage: &PairStage,
     kind: PairKind,
     loads: &super::StageLoads,
     lib: &crate::material::MaterialLibrary,
-) -> Result<super::CrossedResult, TrainError> {
+) -> Result<super::shape::ShapeResult, TrainError> {
     super::shape::solve_shape(
         &super::shape::Shape::from_pair(stage, kind),
         loads,
         lib,
         super::Reversal::default(),
     )
-    .map(|r| r.pair_view())
 }

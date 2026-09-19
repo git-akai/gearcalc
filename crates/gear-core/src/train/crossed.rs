@@ -67,8 +67,8 @@
 //! at `Σ = 0` is the degeneracy, not a seam in the code.
 
 use super::{
-    Backlash, ContactPatch, CrossedResult, GearCase, GearResult, MeshCase, MeshReport, PairKind,
-    PairStage, PointContact, StageLoads, TrainError,
+    Backlash, ContactPatch, GearCase, GearResult, MeshCase, MeshReport, PairKind, PairStage,
+    PointContact, StageLoads, TrainError,
 };
 
 /// Quadrature points for the path-averaged friction balance.
@@ -153,6 +153,30 @@ pub mod proportions {
     }
 }
 
+/// **What the crossed-axis model produces**: the point-contact half of a
+/// pair, which [`super::shape::solve_shape`] reaches through a view of the
+/// shape as the pair this model is written over and reads into the shape's
+/// own result. The model's output and nothing else's — a stage's result is
+/// [`super::shape::ShapeResult`].
+#[derive(Clone, Debug)]
+pub(crate) struct CrossedResult {
+    /// `z₂ / z₁`.
+    pub ratio: f64,
+    /// Zero-backlash centre distance, mm.
+    pub centre_distance_nominal: f64,
+    /// `centre_distance − centre_distance_nominal`, derived rather than
+    /// echoed, so the answer cannot disagree with the two numbers it comes
+    /// from.
+    pub clearance: f64,
+    /// The centre distance actually used, including clearance.
+    pub centre_distance: f64,
+    /// The one mesh, as every mesh reports: a point contact here.
+    pub mesh: MeshReport,
+    pub gears: [GearResult; 2],
+    /// Anything the pair had to say about the design.
+    pub notes: Vec<crate::note::Note>,
+}
+
 /// Solve a pair whose shafts cross — a worm stage, or a crossed gear pair.
 ///
 /// One solve for both, because they are one thing: crossed-axis screw gearing
@@ -171,7 +195,7 @@ pub mod proportions {
 ///
 /// [`TrainError`] if the pair cannot exist or names a material the library does
 /// not have.
-pub fn solve_crossed_pair(
+pub(crate) fn solve_crossed_pair(
     stage: &PairStage,
     kind: PairKind,
     loads: &StageLoads,
@@ -732,6 +756,7 @@ fn angular_backlash(s: &Screw, stage: &PairStage, delta: f64, at: MeshSide) -> f
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use super::super::shape::ShapeResult;
     use super::super::{pair::solve_pair_stage, StageGear};
     use super::*;
     use crate::params::Auto;
@@ -745,7 +770,7 @@ mod tests {
         stage: &PairStage,
         loads: &StageLoads,
         lib: &MaterialLibrary,
-    ) -> Result<CrossedResult, TrainError> {
+    ) -> Result<ShapeResult, TrainError> {
         solve_pair_stage(stage, PairKind::Worm, loads, lib)
     }
 
@@ -754,7 +779,7 @@ mod tests {
         stage: &PairStage,
         loads: &StageLoads,
         lib: &MaterialLibrary,
-    ) -> Result<CrossedResult, TrainError> {
+    ) -> Result<ShapeResult, TrainError> {
         solve_pair_stage(stage, PairKind::Spur, loads, lib)
     }
 
@@ -781,15 +806,15 @@ mod tests {
 
     /// The mesh a solved pair reports, checked to be the point contact a
     /// crossed pair has.
-    fn point(r: &CrossedResult) -> &MeshReport {
+    fn point(r: &ShapeResult) -> &MeshReport {
         assert!(
-            r.mesh.point.is_some() && r.mesh.line.is_none(),
+            r.meshes[0].point.is_some() && r.meshes[0].line.is_none(),
             "a crossed pair reports a point contact"
         );
-        &r.mesh
+        &r.meshes[0]
     }
 
-    fn solved(stage: &PairStage) -> CrossedResult {
+    fn solved(stage: &PairStage) -> ShapeResult {
         solve_pair_stage(stage, PairKind::Worm, &StageLoads::just(2.0), &library()).unwrap()
     }
 
@@ -813,9 +838,9 @@ mod tests {
             &library(),
         )
         .expect("the parallel counterpart is buildable")
-        .mesh
-        .efficiency
-        .forward
+        .meshes[0]
+            .efficiency
+            .forward
     }
 
     /// **A worm stage runs at the centre distance it was given** — by its
@@ -992,7 +1017,7 @@ mod tests {
             ];
             let line_length = (0..2)
                 .map(|i| {
-                    r.gears[i].face_width
+                    r.members[i].face_width
                         / crate::plane::base_helix_angle(betas[i], s.normal_pressure_angle_rad)
                             .cos()
                 })
@@ -1047,19 +1072,29 @@ mod tests {
 
             let wheel = 0.04 / (s.wheel_pitch_diameter / 2.0);
             assert!(
-                (r.mesh.backlash_by_drive().forward.nominal.to_radians() - wheel).abs()
+                (r.meshes[0].backlash_by_drive().forward.nominal.to_radians() - wheel).abs()
                     < 1e-12 * wheel,
                 "z₁={starts}: wheel backlash {} vs j/r₂ {}",
-                r.mesh.backlash_by_drive().forward.nominal.to_radians(),
+                r.meshes[0].backlash_by_drive().forward.nominal.to_radians(),
                 wheel
             );
 
             let worm = std::f64::consts::TAU * 0.04 / s.lead;
             assert!(
-                (r.mesh.backlash_by_drive().backward.nominal.to_radians() - worm).abs()
+                (r.meshes[0]
+                    .backlash_by_drive()
+                    .backward
+                    .nominal
+                    .to_radians()
+                    - worm)
+                    .abs()
                     < 1e-12 * worm,
                 "z₁={starts}: worm backlash {} vs 2π j/lead {}",
-                r.mesh.backlash_by_drive().backward.nominal.to_radians(),
+                r.meshes[0]
+                    .backlash_by_drive()
+                    .backward
+                    .nominal
+                    .to_radians(),
                 worm
             );
         }
@@ -1079,16 +1114,16 @@ mod tests {
         };
         let r = solved(&stage);
         assert_eq!(
-            r.mesh.backlash_by_drive().forward.nominal,
+            r.meshes[0].backlash_by_drive().forward.nominal,
             0.0,
             "nominal, with no slack at all"
         );
         assert!(
-            r.mesh.backlash_by_drive().forward.maximum > 0.0,
+            r.meshes[0].backlash_by_drive().forward.maximum > 0.0,
             "opening the centres opens the mesh"
         );
         assert_eq!(
-            r.mesh.backlash_by_drive().forward.minimum,
+            r.meshes[0].backlash_by_drive().forward.minimum,
             0.0,
             "tighter than nominal is contact"
         );
@@ -1101,9 +1136,9 @@ mod tests {
         // Negative: a worm is an external mesh, its wheel turns the other way,
         // and a ratio is signed now — it is the graph's rather than `z₂/z₁`.
         assert!((r.ratio + 40.0).abs() < 1e-12);
-        assert!(r.mesh.efficiency.forward > 0.0 && r.mesh.efficiency.forward < 1.0);
+        assert!(r.meshes[0].efficiency.forward > 0.0 && r.meshes[0].efficiency.forward < 1.0);
         assert!(
-            r.mesh.efficiency.backward < r.mesh.efficiency.forward,
+            r.meshes[0].efficiency.backward < r.meshes[0].efficiency.forward,
             "back-driving is the worse direction"
         );
         assert!(
@@ -1123,8 +1158,8 @@ mod tests {
         // Torque follows the ratio and the operative efficiency.
         // `|ratio|`: the reduction is signed and a worm's is negative; the
         // torque the wheel carries is the size of it times the input.
-        let expected = 2.0 * r.ratio.abs() * r.mesh.efficiency.forward;
-        assert!((r.gears[1].cases[0].torque - expected).abs() < 1e-12 * expected);
+        let expected = 2.0 * r.ratio.abs() * r.meshes[0].efficiency.forward;
+        assert!((r.members[1].cases[0].torque - expected).abs() < 1e-12 * expected);
     }
 
     /// **Why the automatic face width here is a proportion and not a rating.**
@@ -1216,22 +1251,22 @@ mod tests {
     fn automatic_takes_the_recommendation_and_manual_is_left_alone() {
         let auto = solved(&PairStage::worm());
         assert_eq!(
-            Some(auto.gears[0].face_width),
-            auto.gears[0].recommended_face_width,
+            Some(auto.members[0].face_width),
+            auto.members[0].recommended_face_width,
             "an automatic worm length is the recommendation"
         );
         assert_eq!(
-            Some(auto.gears[1].face_width),
-            auto.gears[1].recommended_face_width,
+            Some(auto.members[1].face_width),
+            auto.members[1].recommended_face_width,
             "an automatic wheel face width is the recommendation"
         );
 
         let manual = solved(&member(PairStage::worm(), 0, |g| {
             g.face_width = Auto::fixed(3.5);
         }));
-        assert!((manual.gears[0].face_width - 3.5).abs() < 1e-12);
+        assert!((manual.members[0].face_width - 3.5).abs() < 1e-12);
         assert_eq!(
-            manual.gears[0].recommended_face_width, auto.gears[0].recommended_face_width,
+            manual.members[0].recommended_face_width, auto.members[0].recommended_face_width,
             "the recommendation is reported whether or not it is in use"
         );
     }
@@ -1256,15 +1291,15 @@ mod tests {
         let lib = library();
         let as_gears = solve_crossed(&stage, &StageLoads::just(2.0), &lib).unwrap();
         let as_worm = solve_worm(&stage, &StageLoads::just(2.0), &lib).unwrap();
-        assert!(as_gears.gears[0].recommended_face_width.is_none());
-        assert!(as_gears.gears[1].recommended_face_width.is_none());
-        assert!(as_worm.gears[0].recommended_face_width.is_some());
-        assert!(as_worm.gears[1].recommended_face_width.is_some());
+        assert!(as_gears.members[0].recommended_face_width.is_none());
+        assert!(as_gears.members[1].recommended_face_width.is_none());
+        assert!(as_worm.members[0].recommended_face_width.is_some());
+        assert!(as_worm.members[1].recommended_face_width.is_some());
         // **Nothing sizes the gear pair's automatic face**: a point contact's
         // pressure does not depend on it, so it stands at its box and says so
         // — while the width at which contact stays continuous is reported
         // beside it as a figure.
-        for (i, gear) in as_gears.gears.iter().enumerate() {
+        for (i, gear) in as_gears.members.iter().enumerate() {
             assert_eq!(
                 gear.face_width, stage.gears[i].face_width.manual,
                 "member {i}"
@@ -1375,13 +1410,12 @@ mod tests {
             "with the contact centred, half the face is exactly half the contact"
         );
         assert!(
-            narrow
-                .mesh
+            narrow.meshes[0]
                 .notes
                 .iter()
                 .any(|s| s.is(key::MESH_CONTACT_RATIO_BELOW_ONE)),
             "a contact ratio below 1 must be said, on the mesh: {:?}",
-            narrow.mesh.notes
+            narrow.meshes[0].notes
         );
 
         // Generous, and the teeth are what end it — a wider face buys nothing.
@@ -1414,7 +1448,7 @@ mod tests {
         assert!(m.contact_ratio > 0.0);
         // The proportions still size the face; continuity is reported beside
         // them rather than instead of them.
-        assert!(r.gears[0].recommended_face_width.is_some());
+        assert!(r.members[0].recommended_face_width.is_some());
         assert!(m.point.unwrap().face_width_for_continuity.is_some());
 
         // The tips are the teeth's: a taller worm thread lengthens the zone.
@@ -1487,7 +1521,7 @@ mod tests {
         // which slides less, which delivers more torque — so the two figures
         // are compared as a ratio, which divides the load out: the same mesh
         // rated at its worst against rated at its pitch point.
-        let severity = |r: &CrossedResult| {
+        let severity = |r: &ShapeResult| {
             point(r).cases[0].contact.max_pressure / point(r).cases[0].contact.at_pitch_point
         };
         // The margin is small, and the reason is worth knowing: a narrow face
@@ -1542,9 +1576,9 @@ mod tests {
             let classical = classical.expect("a screw geometry");
             for drive in Drive::BOTH {
                 assert!(
-                    r.mesh.efficiency.get(drive) <= classical.get(drive),
+                    r.meshes[0].efficiency.get(drive) <= classical.get(drive),
                     "{drive:?}: the path average {} should not beat the pitch point {}",
-                    r.mesh.efficiency.get(drive),
+                    r.meshes[0].efficiency.get(drive),
                     classical.get(drive)
                 );
             }
@@ -1555,8 +1589,8 @@ mod tests {
                     <= stage.geometry().unwrap().locking_friction().backward
             );
             assert_eq!(
-                r.mesh.efficiency.locked().backward,
-                r.mesh.efficiency.backward <= 0.0,
+                r.meshes[0].efficiency.locked().backward,
+                r.meshes[0].efficiency.backward <= 0.0,
                 "self-locking is what the reported figure says, not a second opinion"
             );
         }
@@ -1582,7 +1616,7 @@ mod tests {
         let r = solve_crossed(&crossed, &StageLoads::just(2.0), &lib).unwrap();
         point(&r).point.expect("a path");
         assert!(
-            r.mesh.efficiency.forward < parallel_counterpart(&crossed, PairKind::Spur),
+            r.meshes[0].efficiency.forward < parallel_counterpart(&crossed, PairKind::Spur),
             "a crossed pair must still lose more than the same teeth parallel"
         );
     }
@@ -1642,18 +1676,18 @@ mod tests {
             );
             let parallel = parallel_counterpart(&stage(sigma), PairKind::Spur);
             assert!(
-                r.mesh.efficiency.forward < previous,
+                r.meshes[0].efficiency.forward < previous,
                 "Σ={sigma}°: turning the shafts further must cost more"
             );
-            previous = r.mesh.efficiency.forward;
+            previous = r.meshes[0].efficiency.forward;
 
             // Below the parallel figure everywhere the difference is physical,
             // and above it by no more than that formula's own linearisation
             // where the two are the same mesh.
             assert!(
-                r.mesh.efficiency.forward < parallel + 2e-4,
+                r.meshes[0].efficiency.forward < parallel + 2e-4,
                 "Σ={sigma}°: {} against the parallel {parallel}",
-                r.mesh.efficiency.forward
+                r.meshes[0].efficiency.forward
             );
         }
 
@@ -1663,9 +1697,9 @@ mod tests {
         let worm = solved(&PairStage::worm());
         let parallel = parallel_counterpart(&PairStage::worm(), PairKind::Worm);
         assert!(
-            worm.mesh.efficiency.forward < parallel,
+            worm.meshes[0].efficiency.forward < parallel,
             "the worm keeps {} against {parallel} with its shafts parallel",
-            worm.mesh.efficiency.forward
+            worm.meshes[0].efficiency.forward
         );
     }
 
@@ -1681,14 +1715,14 @@ mod tests {
             }
             .with_first_diameter(25.0),
         );
-        assert!(r.mesh.efficiency.locked().backward);
+        assert!(r.meshes[0].efficiency.locked().backward);
         assert!(
-            r.mesh
+            r.meshes[0]
                 .notes
                 .iter()
                 .any(|n| n.is(key::MESH_SELF_LOCKING) || n.is(key::MESH_NEAR_SELF_LOCKING)),
             "notes: {:?}",
-            r.mesh.notes
+            r.meshes[0].notes
         );
     }
 
@@ -1890,12 +1924,20 @@ mod tests {
         let b = solve_worm(&as_screw, &StageLoads::just(2.0), &lib).unwrap();
         for (name, x, y) in [
             ("ratio", a.ratio, b.ratio),
-            ("centre distance", a.centre_distance, b.centre_distance),
-            ("lead angle", a.gears[0].lead_angle, b.gears[0].lead_angle),
+            (
+                "centre distance",
+                a.distances[0].running,
+                b.distances[0].running,
+            ),
+            (
+                "lead angle",
+                a.members[0].lead_angle,
+                b.members[0].lead_angle,
+            ),
             (
                 "efficiency",
-                a.mesh.efficiency.forward,
-                b.mesh.efficiency.forward,
+                a.meshes[0].efficiency.forward,
+                b.meshes[0].efficiency.forward,
             ),
             (
                 "contact",
@@ -1904,8 +1946,8 @@ mod tests {
             ),
             (
                 "backlash",
-                a.mesh.backlash_by_drive().forward.nominal,
-                b.mesh.backlash_by_drive().forward.nominal,
+                a.meshes[0].backlash_by_drive().forward.nominal,
+                b.meshes[0].backlash_by_drive().forward.nominal,
             ),
         ] {
             assert_eq!(x.to_bits(), y.to_bits(), "{name}: {x} against {y}");
@@ -1994,15 +2036,15 @@ mod tests {
                 &lib,
             )
             .expect("a parallel pair")
-            .mesh
-            .backlash_by_drive()
-            .forward
-            .nominal;
+            .meshes[0]
+                .backlash_by_drive()
+                .forward
+                .nominal;
             // As close to parallel as the screw model will go. The pair is still
             // crossed, so it is still the crossed law answering.
             let crossed = solve_crossed(&stage(0.001, clearance), &StageLoads::just(2.0), &lib)
                 .expect("a crossed pair")
-                .mesh
+                .meshes[0]
                 .backlash_by_drive()
                 .forward
                 .nominal;
@@ -2048,11 +2090,11 @@ mod tests {
         };
         let parallel = solve_pair_stage(&float(0.0), PairKind::Spur, &StageLoads::just(2.0), &lib)
             .expect("a parallel pair")
-            .mesh
+            .meshes[0]
             .backlash_by_drive();
         let crossed = solve_crossed(&float(0.001), &StageLoads::just(2.0), &lib)
             .expect("a crossed pair")
-            .mesh
+            .meshes[0]
             .backlash_by_drive();
         for (name, p, c) in [
             ("forward", parallel.forward.nominal, crossed.forward.nominal),
@@ -2079,7 +2121,7 @@ mod tests {
         let spur = PairStage { ..float(0.0) }.with_additional_helix(0.0);
         let play = solve_pair_stage(&spur, PairKind::Spur, &StageLoads::just(2.0), &lib)
             .expect("a spur pair")
-            .mesh
+            .meshes[0]
             .backlash_by_drive()
             .forward
             .nominal;
@@ -2123,7 +2165,7 @@ mod tests {
             };
             st
         };
-        let shifts = |r: &CrossedResult| [r.gears[0].profile_shift, r.gears[1].profile_shift];
+        let shifts = |r: &ShapeResult| [r.members[0].profile_shift, r.members[1].profile_shift];
 
         // The shipped worm: the floor is the answer, and the search says so
         // by choosing rather than by finding nothing.
@@ -2154,17 +2196,17 @@ mod tests {
         };
         let floor = solve_crossed(&crossed(5.0), &StageLoads::just(2.0), &lib).unwrap();
         let best = solve_crossed(&optimised(crossed(5.0)), &StageLoads::just(2.0), &lib).unwrap();
-        assert_eq!(best.mesh.flank_interference, [false, false]);
+        assert_eq!(best.meshes[0].flank_interference, [false, false]);
         assert!(
-            best.mesh.contact_ratio >= Optimisation::default().min_contact_ratio - 1e-9,
+            best.meshes[0].contact_ratio >= Optimisation::default().min_contact_ratio - 1e-9,
             "the floor is the crossed count: {}",
-            best.mesh.contact_ratio
+            best.meshes[0].contact_ratio
         );
         assert!(
-            best.mesh.efficiency.forward > floor.mesh.efficiency.forward + 1e-3,
+            best.meshes[0].efficiency.forward > floor.meshes[0].efficiency.forward + 1e-3,
             "at 5° the shifts are worth something: {} against the floor's {}",
-            best.mesh.efficiency.forward,
-            floor.mesh.efficiency.forward
+            best.meshes[0].efficiency.forward,
+            floor.meshes[0].efficiency.forward
         );
 
         // Converged: the same ceiling the parallel search is held to.
@@ -2175,7 +2217,7 @@ mod tests {
             }
             solve_crossed(&fixed, &StageLoads::just(2.0), &lib)
                 .unwrap()
-                .mesh
+                .meshes[0]
                 .efficiency
                 .forward
         };
@@ -2206,10 +2248,11 @@ mod tests {
             );
         }
         assert!(
-            (near.mesh.efficiency.forward - parallel.mesh.efficiency.forward).abs() < 5e-3,
+            (near.meshes[0].efficiency.forward - parallel.meshes[0].efficiency.forward).abs()
+                < 5e-3,
             "{} against {}",
-            near.mesh.efficiency.forward,
-            parallel.mesh.efficiency.forward
+            near.meshes[0].efficiency.forward,
+            parallel.meshes[0].efficiency.forward
         );
     }
 
@@ -2277,13 +2320,13 @@ mod tests {
                 &lib,
             )
             .expect("a parallel pair")
-            .mesh
-            .backlash_by_drive()
-            .forward
-            .nominal;
+            .meshes[0]
+                .backlash_by_drive()
+                .forward
+                .nominal;
             let crossed = solve_crossed(&stage(0.001, clearance), &StageLoads::just(2.0), &lib)
                 .expect("a crossed pair")
-                .mesh
+                .meshes[0]
                 .backlash_by_drive()
                 .forward
                 .nominal;
@@ -2323,32 +2366,32 @@ mod tests {
         //    sliding one — the static coefficient changes nothing but the sign
         //    it was consulted for.
         let free = solved(&stage(0.06, threshold * 0.5));
-        assert!(free.mesh.efficiency.backward > 0.0);
+        assert!(free.meshes[0].efficiency.backward > 0.0);
         let alone = solved(&stage(0.06, 0.06));
         assert!(
-            (free.mesh.efficiency.backward - alone.mesh.efficiency.backward).abs() < 1e-12,
+            (free.meshes[0].efficiency.backward - alone.meshes[0].efficiency.backward).abs()
+                < 1e-12,
             "the static coefficient must not leak into the number: {} against {}",
-            free.mesh.efficiency.backward,
-            alone.mesh.efficiency.backward
+            free.meshes[0].efficiency.backward,
+            alone.meshes[0].efficiency.backward
         );
 
         // 2. Static above it, sliding below: it never starts, so **zero** — not
         //    the sliding figure, which describes a motion that does not happen.
         let stuck = solved(&stage(0.06, threshold * 1.2));
-        assert_eq!(stuck.mesh.efficiency.backward, 0.0);
+        assert_eq!(stuck.meshes[0].efficiency.backward, 0.0);
         assert!(
-            stuck.mesh.efficiency.forward > 0.0,
+            stuck.meshes[0].efficiency.forward > 0.0,
             "forward is unaffected: it is not the direction near the threshold"
         );
         assert!(
-            (stuck.mesh.efficiency.forward - alone.mesh.efficiency.forward).abs() < 1e-12,
+            (stuck.meshes[0].efficiency.forward - alone.meshes[0].efficiency.forward).abs() < 1e-12,
             "and forward runs on the sliding coefficient like anything else"
         );
 
         // 3. Both above: still zero, and by the same route.
         assert_eq!(
-            solved(&stage(threshold * 1.2, threshold * 1.2))
-                .mesh
+            solved(&stage(threshold * 1.2, threshold * 1.2)).meshes[0]
                 .efficiency
                 .backward,
             0.0
@@ -2356,7 +2399,7 @@ mod tests {
 
         // The note names the coefficient that decided it, so a reader knows
         // which input to go and change.
-        let notes = &stuck.mesh.notes;
+        let notes = &stuck.meshes[0].notes;
         let locked = notes
             .iter()
             .find(|n| n.is(key::MESH_SELF_LOCKING))
@@ -2400,13 +2443,13 @@ mod tests {
             )
             .expect("a stage");
             assert_eq!(
-                r.mesh.efficiency.forward.to_bits(),
-                reference.mesh.efficiency.forward.to_bits(),
+                r.meshes[0].efficiency.forward.to_bits(),
+                reference.meshes[0].efficiency.forward.to_bits(),
                 "static μ {statik} moved a parallel stage"
             );
             assert_eq!(
-                r.mesh.efficiency.backward.to_bits(),
-                reference.mesh.efficiency.backward.to_bits()
+                r.meshes[0].efficiency.backward.to_bits(),
+                reference.meshes[0].efficiency.backward.to_bits()
             );
         }
     }
@@ -2439,7 +2482,7 @@ mod tests {
         for clearance in [0.0_f64, 0.02, 0.1, 0.3] {
             let r = solved(&stage(clearance));
             let eps = point(&r).contact_ratio;
-            let eta = r.mesh.efficiency.forward;
+            let eta = r.meshes[0].efficiency.forward;
             if let Some((was_eps, was_eta)) = previous {
                 assert!(
                     eps < was_eps,
@@ -2499,7 +2542,8 @@ mod tests {
         let mesh = |sigma: f64, clearance: f64| {
             solve_crossed(&stage(sigma, clearance), &StageLoads::just(2.0), &lib)
                 .expect("a crossed pair")
-                .mesh
+                .meshes[0]
+                .clone()
         };
 
         // At a right angle the same clearance costs almost nothing...
@@ -2563,9 +2607,9 @@ mod tests {
         .unwrap();
         // Negative for the same reason a worm's is: an external mesh reverses.
         assert!((r.ratio + 23.0 / 17.0).abs() < 1e-12);
-        assert!(r.mesh.efficiency.forward > 0.0 && r.mesh.efficiency.forward < 1.0);
+        assert!(r.meshes[0].efficiency.forward > 0.0 && r.meshes[0].efficiency.forward < 1.0);
         assert!(point(&r).cases[0].contact.max_pressure > 0.0);
-        assert!(!r.mesh.efficiency.locked().backward);
+        assert!(!r.meshes[0].efficiency.locked().backward);
 
         // **Where a crossed pair sits, stated as comparisons rather than a
         // threshold.** It slides hard at the pitch point — `1/cos γ₁`, which is
@@ -2584,15 +2628,15 @@ mod tests {
         )
         .unwrap();
         assert!(
-            r.mesh.efficiency.forward > worm.mesh.efficiency.forward,
+            r.meshes[0].efficiency.forward > worm.meshes[0].efficiency.forward,
             "a crossed gear pair should beat a worm: {} vs {}",
-            r.mesh.efficiency.forward,
-            worm.mesh.efficiency.forward
+            r.meshes[0].efficiency.forward,
+            worm.meshes[0].efficiency.forward
         );
         assert!(
-            r.mesh.efficiency.forward < 0.95,
+            r.meshes[0].efficiency.forward < 0.95,
             "...but it slides too much to approach a parallel-axis mesh: {}",
-            r.mesh.efficiency.forward
+            r.meshes[0].efficiency.forward
         );
 
         // ...and more shaft angle means more sliding means less efficiency.
@@ -2609,9 +2653,9 @@ mod tests {
                 &super::super::test_library(),
             )
             .unwrap()
-            .mesh
-            .efficiency
-            .forward;
+            .meshes[0]
+                .efficiency
+                .forward;
             assert!(
                 e < previous,
                 "Sigma={sigma}: {e} should be below {previous}"
