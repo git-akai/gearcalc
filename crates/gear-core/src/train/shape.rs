@@ -2015,18 +2015,13 @@ pub fn solve_shape(
         f64::from(wiring.paths_seen(m.a).max(wiring.paths_seen(m.b)))
     };
     // The tangential force a mesh instance carries in a case, quoted as a
-    // torque at member `a`: the driving member's torque, read across.
+    // torque at member `a`: the driving member's torque, read across —
+    // which is what the flow's mesh torque is, whichever member drives.
     let pressing_torque_at_a = |k: usize, c: &super::StageLoad| -> f64 {
         let Some((scale, f)) = scale_for(c) else {
             return 0.0;
         };
-        let on_a = (f.mesh_torques[k] * scale / paths(k)).abs();
-        match f.directions[k] {
-            Drive::Forward => on_a,
-            // `b` drives: its torque is `η` more than the row says of `a`'s,
-            // and the force on the flanks is its.
-            Drive::Backward => on_a / f.efficiency_of_mesh(k, &sliding),
-        }
+        (f.mesh_torques[k] * scale / paths(k)).abs()
     };
     // Each mesh's worst pressing torque over the cases, and every case as a
     // scale of it — one evaluation per mesh, every case a multiplication.
@@ -2545,13 +2540,6 @@ pub fn solve_shape(
         meshes,
         notes,
     })
-}
-
-impl super::flow::Flow {
-    /// The efficiency the flow charged mesh `k` in the direction it chose.
-    fn efficiency_of_mesh(&self, k: usize, etas: &[Directional<f64>]) -> f64 {
-        *etas[k].get(self.directions[k])
-    }
 }
 
 // -------------------------------------------------- what a stage owes ---

@@ -25,10 +25,15 @@
 //! the tooth counts signed. Virtual work over that row puts the torques on the
 //! three shafts in the ratio `z_a : z_b : −(z_a + z_b)` — one tangential force
 //! `F` at the two reference cylinders and its reaction at the carrier radius.
-//! With loss, the driven member's torque is `η` of what the row says
-//! (`τ_b = η · c z_b` where `a` drives `b`, and `c z_b / η` where `b` drives
-//! `a`), and the frame's is the negative sum, which is the moment balance of
-//! the three bodies. That is the whole of the model, and it is written once.
+//! With loss, the driven member's torque is `η` of what the row says: the
+//! mesh is parametrised by its **driver's** torque `t` at its own count, so
+//! `τ_a = t z_a, τ_b = η t z_b` where `a` drives `b` and `τ_b = t z_b, τ_a =
+//! η t z_a` where `b` drives `a`, and the frame's is the negative sum, which
+//! is the moment balance of the three bodies. Written from the driver's side
+//! so that `η = 0` is a mesh that **holds** — the driver presses the flanks
+//! and the driven member gets nothing, which is what a self-locking screw
+//! under a load from the wheel is — rather than a division by nought. That
+//! is the whole of the model, and it is written once.
 //!
 //! # No gear here
 //!
@@ -53,7 +58,9 @@ pub struct MeshFlow {
     pub zb: f64,
     /// The mesh's own efficiency: `forward` where `a` drives `b`, `backward`
     /// where `b` drives `a`. Zero or below in a direction is a mesh that
-    /// cannot be driven that way — a self-locking screw.
+    /// cannot be driven that way — a self-locking screw — and *holds* under a
+    /// load from that side: the driver's torque presses the flanks and
+    /// nothing comes out the other.
     pub efficiency: Directional<f64>,
     /// How many identical instances of this mesh act in parallel — one per
     /// planet — so a torque on a central member is `paths` times what one
@@ -77,9 +84,11 @@ pub struct Asked {
 /// The flow as it came out.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Flow {
-    /// Per mesh, **the torque on member `a` summed over its paths** — what one
-    /// instance carries is this over `paths`. Signed: positive drives `a` the
-    /// way its speed goes.
+    /// Per mesh, **the driver's torque read across to member `a`**, summed
+    /// over its paths — what presses the flanks, at `a`'s reference cylinder,
+    /// whichever member is driving; what one instance carries is this over
+    /// `paths`. Signed: positive drives `a` the way its speed goes. The driven
+    /// member's own torque is `η` of what this says at its count.
     pub mesh_torques: Vec<f64>,
     /// Per mesh, which member drives: `Forward` is `a`.
     pub directions: Vec<Drive>,
@@ -113,10 +122,12 @@ const ZERO: f64 = 1e-12;
 
 /// **The power flow**, given every shaft's speed per turn of the input.
 ///
-/// `None` where no assignment of directions is self-consistent — a stage that
-/// locks in this direction, or an input that is not the one driving — or
-/// where the known torques do not determine the mesh torques, which is a
-/// stage with more free shafts than a rating can be taken under.
+/// `None` where no assignment of directions is self-consistent — an input
+/// that is not the one driving — or where the known torques do not determine
+/// the mesh torques, which is a stage with more free shafts than a rating can
+/// be taken under. A stage that locks in this direction is **not** `None`:
+/// its locked mesh holds, the flow through it stops there, and the
+/// efficiency is nought.
 #[must_use]
 pub fn solve(shafts: usize, meshes: &[MeshFlow], speed: &[f64], asked: &Asked) -> Option<Flow> {
     let input_power = asked.torque * speed[asked.input];
@@ -144,32 +155,34 @@ pub fn solve(shafts: usize, meshes: &[MeshFlow], speed: &[f64], asked: &Asked) -
                 }
             })
             .collect();
-        // The driven side's factor under this assignment, or nothing where the
-        // mesh cannot be driven this way at all.
+        // The driven side's factor under this assignment: `η`, and nought
+        // where the mesh cannot be driven this way at all — it then holds.
         let factor: Option<Vec<f64>> = meshes
             .iter()
             .zip(&directions)
             .map(|(mesh, d)| {
                 let eta = *mesh.efficiency.get(*d);
-                (eta > 0.0 && eta.is_finite()).then_some(match d {
-                    Drive::Forward => eta,
-                    Drive::Backward => 1.0 / eta,
-                })
+                eta.is_finite().then_some(eta.max(0.0))
             })
             .collect();
         let Some(factor) = factor else { continue };
-        // The torque each mesh puts on each shaft per unit of its `c`.
+        // The torque each mesh puts on each shaft per unit of its driver's
+        // `t`: the driver's count whole, the driven member's under `η`.
         let per_unit = |k: usize, s: Shaft| -> f64 {
             let mesh = &meshes[k];
+            let (on_a, on_b) = match directions[k] {
+                Drive::Forward => (mesh.za, factor[k] * mesh.zb),
+                Drive::Backward => (factor[k] * mesh.za, mesh.zb),
+            };
             let mut t = 0.0;
             if mesh.a == s {
-                t += mesh.za;
+                t += on_a;
             }
             if mesh.b == s {
-                t += factor[k] * mesh.zb;
+                t += on_b;
             }
             if mesh.frame == s {
-                t -= mesh.za + factor[k] * mesh.zb;
+                t -= on_a + on_b;
             }
             t
         };
@@ -189,13 +202,21 @@ pub fn solve(shafts: usize, meshes: &[MeshFlow], speed: &[f64], asked: &Asked) -
         let shaft_torques: Vec<f64> = (0..shafts)
             .map(|s| (0..m).map(|k| per_unit(k, s) * c[k]).sum())
             .collect();
+        // The power the assumed driver puts into each mesh: its torque
+        // times its speed relative to the frame.
+        let driving_power = |k: usize| -> f64 {
+            let mesh = &meshes[k];
+            match directions[k] {
+                Drive::Forward => c[k] * mesh.za * (speed[mesh.a] - speed[mesh.frame]),
+                Drive::Backward => c[k] * mesh.zb * (speed[mesh.b] - speed[mesh.frame]),
+            }
+        };
         // Each mesh's assumed direction must be the one the solution puts
-        // power across it: `a` drives where its torque works with its speed
-        // relative to the frame.
-        let consistent = meshes.iter().enumerate().all(|(k, mesh)| {
-            let p_a = c[k] * mesh.za * (speed[mesh.a] - speed[mesh.frame]);
-            p_a.abs() <= ZERO * input_power
-                || (p_a > 0.0) == matches!(directions[k], Drive::Forward)
+        // power across it: the driver's torque works with its speed relative
+        // to the frame.
+        let consistent = (0..m).all(|k| {
+            let p = driving_power(k);
+            p.abs() <= ZERO * input_power || p > 0.0
         });
         if !consistent {
             continue;
@@ -206,20 +227,10 @@ pub fn solve(shafts: usize, meshes: &[MeshFlow], speed: &[f64], asked: &Asked) -
             continue;
         }
         let efficiency = p_out.abs() / input_power;
-        // The power on the **driving** side of each mesh: `a`'s where `a`
-        // drives, and `a`'s over the mesh's efficiency where it is driven —
-        // so a mesh's loss is `(1 − η)` of this, exactly.
-        let mesh_powers = meshes
-            .iter()
-            .enumerate()
-            .map(|(k, mesh)| {
-                let at_a = (c[k] * mesh.za * (speed[mesh.a] - speed[mesh.frame])).abs();
-                let driving = match directions[k] {
-                    Drive::Forward => at_a,
-                    Drive::Backward => at_a / *mesh.efficiency.get(Drive::Backward),
-                };
-                driving / input_power
-            })
+        // The power on the **driving** side of each mesh, so a mesh's loss
+        // is `(1 − η)` of this, exactly.
+        let mesh_powers = (0..m)
+            .map(|k| driving_power(k).abs() / input_power)
             .collect();
         let flow = Flow {
             mesh_torques: c.iter().zip(meshes).map(|(c, m)| c * m.za).collect(),
@@ -466,7 +477,11 @@ mod tests {
         .unwrap();
         assert!((back.efficiency - 0.9).abs() < 1e-12);
         assert_eq!(back.directions, vec![Drive::Backward]);
-        assert!(solve(
+        // **A locked mesh holds.** Driven from the wheel it transmits
+        // nothing: the wheel's torque is the load, the worm's is nought, and
+        // the efficiency is nought — a flow rather than a refusal, so the
+        // flanks the load is held on can be rated.
+        let held = solve(
             3,
             &[mesh(0.0)],
             &[0.0, -43.0 / 17.0, 1.0],
@@ -477,7 +492,14 @@ mod tests {
                 reactions: vec![],
             },
         )
-        .is_none());
+        .unwrap();
+        assert_eq!(held.efficiency, 0.0);
+        assert_eq!(held.shaft_torques[1], 0.0);
+        assert_eq!(held.directions, vec![Drive::Backward]);
+        // The driver's torque read across to `a`: the wheel's, at the worm's
+        // count.
+        assert!((held.mesh_torques[0].abs() - 17.0 / 43.0).abs() < 1e-12);
+        assert!((held.mesh_powers[0] - 1.0).abs() < 1e-12);
     }
 
     /// Two inputs on a set leave the mesh torques undetermined, and the

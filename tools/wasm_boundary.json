@@ -6586,7 +6586,7 @@
          },
          "circulation": {
           "forward": 1,
-          "backward": "1.0000000000000002"
+          "backward": 1
          },
          "backlash": {
           "forward": {
@@ -6993,7 +6993,7 @@
           {
            "power_through": {
             "forward": 1,
-            "backward": "1.0000000000000002"
+            "backward": 1
            },
            "coprime": true,
            "contact_ratio": "1.5993089920130348",
@@ -7276,7 +7276,7 @@
        "total_ratio": "-17.705882352941178",
        "total_efficiency": {
         "forward": "0.96065153358379951",
-        "backward": "0.96056310757421925"
+        "backward": "0.96056310757421903"
        },
        "backlash": {
         "forward": {
@@ -7294,7 +7294,7 @@
         {
          "case": 0,
          "delivered_at": "start",
-         "delivered_torque": "0.0054251072520803091",
+         "delivered_torque": "0.0054251072520803082",
          "delivered_speed": "-531176.47058823530",
          "reacted_at": null,
          "notes": []
@@ -7335,7 +7335,7 @@
          },
          "circulation": {
           "forward": 1,
-          "backward": "1.0000000000000002"
+          "backward": 1
          },
          "backlash": {
           "forward": {
@@ -7370,9 +7370,9 @@
             210000
            ],
            "torques": [
-            "0.019378367115464860",
-            "-0.0054251072520803091",
-            "-0.013953259863384550"
+            "0.019378367115464853",
+            "-0.0054251072520803073",
+            "-0.013953259863384545"
            ]
           },
           {
@@ -7428,15 +7428,15 @@
            "cases": [
             {
              "case": 0,
-             "torque": "0.0055164050622683106",
+             "torque": "0.0055164050622683080",
              "speed": "-531176.47058823530",
              "speed_against_carrier": "-531176.47058823530",
              "cycles": null,
-             "bending_stress": "206.86518983506164",
-             "contact_stress": "1212.4495010041055",
+             "bending_stress": "206.86518983506156",
+             "contact_stress": "1212.4495010041053",
              "min_face_width": {
-              "bending": "0.0013568297872905792",
-              "contact": "0.0070637060820865358"
+              "bending": "0.0013568297872905788",
+              "contact": "0.0070637060820865315"
              }
             },
             {
@@ -7595,15 +7595,15 @@
            "cases": [
             {
              "case": 0,
-             "torque": "0.013953259863384550",
+             "torque": "0.013953259863384544",
              "speed": 210000,
              "speed_against_carrier": 210000,
              "cycles": null,
-             "bending_stress": "175.13392097551289",
-             "contact_stress": "1101.6226312278034",
+             "bending_stress": "175.13392097551284",
+             "contact_stress": "1101.6226312278031",
              "min_face_width": {
-              "bending": "0.0011487042403510986",
-              "contact": "0.0058313754007326786"
+              "bending": "0.0011487042403510981",
+              "contact": "0.0058313754007326751"
              }
             },
             {
@@ -7742,7 +7742,7 @@
           {
            "power_through": {
             "forward": 1,
-            "backward": "1.0000000000000002"
+            "backward": 1
            },
            "coprime": true,
            "contact_ratio": "1.5993089920130348",
@@ -7759,11 +7759,11 @@
             {
              "case": 0,
              "contact": {
-              "max_pressure": "1212.4495010041057",
-              "at_pitch_point": "1101.6226312278036",
+              "max_pressure": "1212.4495010041055",
+              "at_pitch_point": "1101.6226312278034",
               "worst_position": "-0.72692830932574104",
               "patch_length": "0.0089530416457613803",
-              "patch_width": "0.081007878944565556",
+              "patch_width": "0.081007878944565542",
               "curvature_along": 0,
               "curvature_across": "0.57719271777557857"
              },
@@ -7837,7 +7837,7 @@
          ],
          "efficiency": {
           "forward": "0.97681810454630269",
-          "backward": "0.97672819043691828"
+          "backward": "0.97672819043691805"
          },
          "circulation": {
           "forward": "1.6957583035698947",
@@ -7889,10 +7889,10 @@
            ],
            "torques": [
             0,
-            "-0.013953259863384547",
+            "-0.013953259863384544",
             "0.10000000000000001",
-            "-0.086046740136615452",
-            "-1.1102230246251566e-17"
+            "-0.086046740136615465",
+            0
            ]
           },
           {
@@ -7956,14 +7956,14 @@
            "cases": [
             {
              "case": 0,
-             "torque": "0.0047538424104135316",
+             "torque": "0.0047538424104135307",
              "speed": 210000,
              "speed_against_carrier": 180000,
              "cycles": null,
-             "bending_stress": "184.97578374608929",
+             "bending_stress": "184.97578374608923",
              "contact_stress": "1376.0881106560994",
              "min_face_width": {
-              "bending": "0.0015213286121828606",
+              "bending": "0.0015213286121828601",
               "contact": "0.011409536208854133"
              }
             },
@@ -8123,14 +8123,14 @@
            "cases": [
             {
              "case": 0,
-             "torque": "0.011950936130085478",
+             "torque": "0.011950936130085481",
              "speed": -42000,
              "speed_against_carrier": -72000,
              "cycles": null,
-             "bending_stress": "214.99362825157991",
+             "bending_stress": "214.99362825157985",
              "contact_stress": "1264.6825700966951",
              "min_face_width": {
-              "bending": "0.0017682096081566075",
+              "bending": "0.0017682096081566069",
               "contact": "0.0096369270634700833"
              }
             },
@@ -8295,15 +8295,15 @@
            "cases": [
             {
              "case": 0,
-             "torque": "0.028682246712205147",
+             "torque": "0.028682246712205154",
              "speed": 0,
              "speed_against_carrier": -30000,
              "cycles": null,
-             "bending_stress": "124.23158467755184",
-             "contact_stress": "605.31926651979029",
+             "bending_stress": "124.23158467755189",
+             "contact_stress": "605.31926651979052",
              "min_face_width": {
-              "bending": "0.0010217394973506806",
-              "contact": "0.0022077225829899602"
+              "bending": "0.0010217394973506811",
+              "contact": "0.0022077225829899619"
              }
             },
             {
@@ -8442,7 +8442,7 @@
           {
            "power_through": {
             "forward": "0.85714285714285721",
-            "backward": "0.85569163387443570"
+            "backward": "0.85569163387443548"
            },
            "coprime": false,
            "contact_ratio": "1.4368913435664123",
@@ -8527,7 +8527,7 @@
           {
            "power_through": {
             "forward": "0.83861544642703745",
-            "backward": "0.86046740136615452"
+            "backward": "0.86046740136615463"
            },
            "coprime": false,
            "contact_ratio": "1.9726210851406283",
@@ -8544,11 +8544,11 @@
             {
              "case": 0,
              "contact": {
-              "max_pressure": "613.12522193444477",
-              "at_pitch_point": "517.74328618220750",
+              "max_pressure": "613.12522193444488",
+              "at_pitch_point": "517.74328618220761",
               "worst_position": "-1.1736989589106406",
               "patch_length": "0.011226407660367640",
-              "patch_width": "0.15683571856508408",
+              "patch_width": "0.15683571856508410",
               "curvature_along": 0,
               "curvature_across": "0.15076087484409292"
              },

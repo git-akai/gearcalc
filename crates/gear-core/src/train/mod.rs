@@ -7727,7 +7727,14 @@ mod tests {
     #[test]
     fn a_parallel_axis_train_reports_equal_efficiencies_and_cannot_lock() {
         let r = solve_train(&two_stage(), &library()).unwrap();
-        assert_eq!(r.total_efficiency.forward, r.total_efficiency.backward);
+        // To the last bits: the two directions are two solves of the flow
+        // with the driver on the other row, and differ by rounding alone.
+        assert!(
+            (r.total_efficiency.forward - r.total_efficiency.backward).abs() < 1e-14,
+            "{} vs {}",
+            r.total_efficiency.forward,
+            r.total_efficiency.backward
+        );
         assert!(!r.total_efficiency.locked().backward);
     }
 

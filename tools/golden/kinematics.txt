@@ -93,7 +93,7 @@
     shaft ring      case 2  speed       0.000000  torque      -0.600000
     shaft ring      case 3  speed    -400.000000  torque      11.675453
     shaft planet    case 1  speed   -1200.000000  torque       0.000000
-    shaft planet    case 2  speed       0.000000  torque      -0.000000
+    shaft planet    case 2  speed       0.000000  torque       0.000000
     shaft planet    case 3  speed    -960.000000  torque       0.000000
     member 1  z 12  
       case 1  speed    3000.000000  vs frame    3000.000000  torque       0.666667  cycles -
@@ -134,7 +134,7 @@
     shaft ring      case 2  speed       0.000000  torque      -0.516280
     shaft ring      case 3  speed       0.000000  torque      11.675453
     shaft planet    case 1  speed    -600.000000  torque       0.000000
-    shaft planet    case 2  speed      -0.000000  torque      -0.000000
+    shaft planet    case 2  speed      -0.000000  torque       0.000000
     shaft planet    case 3  speed    -480.000000  torque       0.000000
     member 1  z 12  
       case 1  speed    3000.000000  vs frame    2571.428571  torque       0.666667  cycles -
@@ -215,9 +215,9 @@
     shaft ring      case 1  speed       0.000000  torque      -1.720935
     shaft ring      case 2  speed       0.000000  torque       3.502636
     shaft ring      case 3  speed       0.000000  torque      -1.720935
-    shaft planet    case 1  speed   -4200.000000  torque      -0.000000
+    shaft planet    case 1  speed   -4200.000000  torque       0.000000
     shaft planet    case 2  speed      -0.000000  torque       0.000000
-    shaft planet    case 3  speed   -3360.000000  torque      -0.000000
+    shaft planet    case 3  speed   -3360.000000  torque       0.000000
     member 1  z 12  
       case 1  speed   21000.000000  vs frame   18000.000000  torque       0.095077  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.200000  cycles -
@@ -338,9 +338,9 @@
     shaft ring 1    case 1  speed       0.000000  torque     379.028728
     shaft ring 1    case 2  speed       0.000000  torque      -0.597990
     shaft ring 1    case 3  speed       0.000000  torque     379.028728
-    shaft planet 1  case 1  speed    -196.721311  torque      -0.000000
+    shaft planet 1  case 1  speed    -196.721311  torque       0.000000
     shaft planet 1  case 2  speed      -0.000000  torque       0.000000
-    shaft planet 1  case 3  speed    -157.377049  torque      -0.000000
+    shaft planet 1  case 3  speed    -157.377049  torque       0.000000
     member 1  z 65  
       case 1  speed       0.000000  vs frame   -3000.000000  torque     379.203155  cycles -
       case 2  speed       0.000000  vs frame      -0.000000  torque       0.597990  cycles -
@@ -381,7 +381,7 @@
     shaft member 6  case 2  speed       0.000000  torque       0.600000
     shaft member 6  case 3  speed    1014.274258  torque      -4.590415
     shaft member 2  case 1  speed   -1186.046512  torque       0.000000
-    shaft member 2  case 2  speed      -0.000000  torque      -0.000000
+    shaft member 2  case 2  speed      -0.000000  torque       0.000000
     shaft member 2  case 3  speed    -948.837209  torque       0.000000
     shaft member 4  case 1  speed     549.631310  torque       0.000000
     shaft member 4  case 2  speed       0.000000  torque       0.000000
@@ -581,7 +581,7 @@
     shaft planet 1  case 2  speed       0.000000  torque       0.000000
     shaft planet 1  case 3  speed   -5066.666667  torque       0.000000
     shaft planet 2  case 1  speed    4333.333333  torque       0.000000
-    shaft planet 2  case 2  speed      -0.000000  torque      -0.000000
+    shaft planet 2  case 2  speed      -0.000000  torque       0.000000
     shaft planet 2  case 3  speed    3466.666667  torque       0.000000
     member 1  z 24  
       case 1  speed    3000.000000  vs frame    4000.000000  torque       0.666667  cycles -
@@ -690,7 +690,7 @@
     shaft ring      case 2  speed      -0.000000  torque       1.116480
     shaft ring      case 3  speed       0.000000  torque      -3.951604
     shaft planet 1  case 1  speed    5113.636364  torque       0.000000
-    shaft planet 1  case 2  speed      -0.000000  torque       0.000000
+    shaft planet 1  case 2  speed      -0.000000  torque      -0.000000
     shaft planet 1  case 3  speed    4090.909091  torque       0.000000
     shaft planet 2  case 1  speed  -12500.000000  torque       0.000000
     shaft planet 2  case 2  speed       0.000000  torque       0.000000
@@ -748,12 +748,12 @@
     shaft ring      case 1  speed     580.645161  torque       0.000000
     shaft ring      case 2  speed       0.000000  torque       0.000000
     shaft ring      case 3  speed     464.516129  torque       0.000000
-    shaft planet 1  case 1  speed    -409.090909  torque      -0.000000
-    shaft planet 1  case 2  speed      -0.000000  torque      -0.000000
-    shaft planet 1  case 3  speed    -327.272727  torque      -0.000000
-    shaft planet 2  case 1  speed    3000.000000  torque       0.000000
+    shaft planet 1  case 1  speed    -409.090909  torque       0.000000
+    shaft planet 1  case 2  speed      -0.000000  torque       0.000000
+    shaft planet 1  case 3  speed    -327.272727  torque       0.000000
+    shaft planet 2  case 1  speed    3000.000000  torque      -0.000000
     shaft planet 2  case 2  speed       0.000000  torque      -0.000000
-    shaft planet 2  case 3  speed    2400.000000  torque       0.000000
+    shaft planet 2  case 3  speed    2400.000000  torque      -0.000000
     member 1  z 18  
       case 1  speed    3000.000000  vs frame    1875.000000  torque       0.666667  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.073779  cycles -
@@ -870,7 +870,7 @@
     shaft ring      case 2  speed      -0.000000  torque      -0.000000
     shaft ring      case 3  speed      -0.000000  torque      29.043267
     shaft planet    case 1  speed     237.209302  torque       0.000000
-    shaft planet    case 2  speed       0.000000  torque      -0.000000
+    shaft planet    case 2  speed       0.000000  torque       0.000000
     shaft planet    case 3  speed     189.767442  torque       0.000000
     member 1  z 12  
       case 1  speed   -1186.046512  vs frame   -1016.611296  torque       1.658366  cycles -
@@ -928,7 +928,7 @@
     shaft ring      case 2  speed      -0.000000  torque      -0.233283
     shaft ring      case 3  speed    -400.000000  torque      11.675453
     shaft planet    case 1  speed   -1200.000000  torque       0.000000
-    shaft planet    case 2  speed      -0.000000  torque      -0.000000
+    shaft planet    case 2  speed      -0.000000  torque       0.000000
     shaft planet    case 3  speed    -960.000000  torque       0.000000
     member 1  z 12  
       case 1  speed    3000.000000  vs frame    3000.000000  torque       0.666667  cycles -
@@ -1006,7 +1006,7 @@
     shaft ring      case 2  speed       0.000000  torque      -0.600000
     shaft ring      case 3  speed     158.139535  torque      29.043267
     shaft planet    case 1  speed     474.418605  torque       0.000000
-    shaft planet    case 2  speed       0.000000  torque      -0.000000
+    shaft planet    case 2  speed       0.000000  torque       0.000000
     shaft planet    case 3  speed     379.534884  torque       0.000000
     member 1  z 12  
       case 1  speed   -1186.046512  vs frame   -1186.046512  torque       1.658366  cycles -
@@ -1114,7 +1114,7 @@
     shaft ring      case 2  speed       0.000000  torque      -0.600000
     shaft ring      case 3  speed     158.139535  torque      29.043267
     shaft planet    case 1  speed     474.418605  torque       0.000000
-    shaft planet    case 2  speed       0.000000  torque      -0.000000
+    shaft planet    case 2  speed       0.000000  torque       0.000000
     shaft planet    case 3  speed     379.534884  torque       0.000000
     member 1  z 12  
       case 1  speed   -1186.046512  vs frame   -1186.046512  torque       1.658366  cycles -
