@@ -362,6 +362,84 @@ impl Shape {
         (!d.distance.auto).then_some(d.distance.manual)
     }
 
+    /// **Whether `count` identical planets on an axis can be assembled
+    /// equally spaced**, and whether they all mesh in the same phase.
+    ///
+    /// `None` where the rule below does not reach: an axis with a mesh to
+    /// another replicated axis, whose phase is not a central member's.
+    ///
+    /// # The rule
+    ///
+    /// A mesh between a central member `c` and a gear `p` on the axis is
+    /// the phase relation `z_c(θ_c − φ) + z_p(ψ − φ) ≡ K (mod 2π)`, the
+    /// kinematic row integrated, with the counts signed as the rows sign
+    /// them (a ring's negative), `φ` the planet's place round the carrier
+    /// and `ψ` its own turn. With every central member held at `θ_c = 0`
+    /// and the planets at `φ_j = 2πj/N`, two meshes `i, i'` on one axis
+    /// each fix `ψ_j` up to a whole tooth of their own gear, and the two
+    /// agree exactly when
+    ///
+    /// ```text
+    /// j (z_ci z_pi' − z_ci' z_pi) / N  ∈  z_pi ℤ + z_pi' ℤ  =  gcd(z_pi, z_pi') ℤ
+    /// ```
+    ///
+    /// for every `j` — that is, `N · gcd(z_pi, z_pi')` divides
+    /// `z_ci z_pi' − z_ci' z_pi`. On a simple planet, `z_pi = z_pi'`, this
+    /// is the textbook `N | z_s + z_r`; on a stepped planet it is
+    /// `N · gcd(z_p1, z_p2) | z_s z_p2 + z_r z_p1`. Simultaneous meshing —
+    /// every planet in the same phase — is `N | z_c` for every central
+    /// member the axis meets. `assembly` in this module's tests holds the
+    /// rule to a search over the phases that shares none of it.
+    #[must_use]
+    pub fn assembly(&self, axis: usize) -> Option<(bool, bool)> {
+        let count = self.axes.get(axis)?.count;
+        // Each mesh from this axis to a central member: (signed central
+        // count, the axis gear's count).
+        let mut pairs: Vec<(i64, i64)> = Vec::new();
+        for (k, m) in self.meshes.iter().enumerate() {
+            let on = |i: usize| self.axis_of_shaft(self.shaft_of(i)) == Some(axis);
+            let (planet, central) = match (on(m.a), on(m.b)) {
+                (true, false) => (m.a, m.b),
+                (false, true) => (m.b, m.a),
+                _ => continue,
+            };
+            // A central member that is itself carried is another planet's,
+            // and the rule does not reach it.
+            if self
+                .axis_of_shaft(self.shaft_of(central))
+                .is_some_and(|a| self.axes[a].carried_by.is_some())
+            {
+                return None;
+            }
+            let sign = match self.kind_of(k)? {
+                MeshKind::External => 1,
+                MeshKind::Internal => -1,
+            };
+            pairs.push((
+                sign * i64::from(self.members[central].gear.teeth),
+                i64::from(self.members[planet].gear.teeth),
+            ));
+        }
+        if pairs.len() < 2 {
+            return None;
+        }
+        let n = i64::from(count);
+        let gcd = |mut a: i64, mut b: i64| {
+            while b != 0 {
+                (a, b) = (b, a % b);
+            }
+            a.abs()
+        };
+        let mut equal = true;
+        for (i, &(c1, p1)) in pairs.iter().enumerate() {
+            for &(c2, p2) in &pairs[i + 1..] {
+                equal &= (c1 * p2 - c2 * p1) % (n * gcd(p1, p2)) == 0;
+            }
+        }
+        let simultaneous = pairs.iter().all(|&(c, _)| c % n == 0);
+        Some((equal, simultaneous))
+    }
+
     /// **What each member is, read off the shape** — the one rule, for the
     /// harness's English and the panel's catalogue alike. A ring is a member
     /// with a cutter; a planet is one on a carried axis; a sun meets a planet
@@ -3108,25 +3186,9 @@ pub fn solve_shape(
                 .map(|&i| 2.0 * built.members[i].tip_radius())
                 .fold(0.0_f64, f64::max);
             let clearance = 2.0 * running * (std::f64::consts::PI / f64::from(count)).sin() - tip;
-            // The assembly rule is known for one gear on the axis meshing two
-            // central members, and is not asserted elsewhere.
-            let simple = (on_axis.len() == 1)
-                .then(|| {
-                    let centrals: Vec<u32> = shape
-                        .meshes
-                        .iter()
-                        .filter(|m| m.a == on_axis[0] || m.b == on_axis[0])
-                        .map(|m| {
-                            shape.members[if m.a == on_axis[0] { m.b } else { m.a }]
-                                .gear
-                                .teeth
-                        })
-                        .collect();
-                    (centrals.len() == 2).then_some(centrals)
-                })
-                .flatten();
-            let equal_spacing = simple.as_ref().map(|c| (c[0] + c[1]) % count == 0);
-            let simultaneous_meshing = simple.as_ref().map(|c| c.iter().all(|z| z % count == 0));
+            let assembly = shape.assembly(axis);
+            let equal_spacing = assembly.map(|a| a.0);
+            let simultaneous_meshing = assembly.map(|a| a.1);
             Some(LayoutReport {
                 axis,
                 count,
@@ -5308,5 +5370,105 @@ mod member_names {
             .member_names()
             .iter()
             .all(|n| n.role == MemberRole::Gear && n.ordinal.is_none()));
+    }
+}
+
+#[cfg(test)]
+mod assembly {
+    //! **The assembly rule against a search over the phases** that shares
+    //! none of its arithmetic: each mesh on the axis fixes the planet's
+    //! turn up to a whole tooth of its own gear, and the planets assemble
+    //! where some tooth of the first gear makes every other mesh's phase
+    //! whole too, at every station round the carrier.
+
+    use super::super::arrangements as arr;
+    use super::super::PlanetaryStage;
+    use super::Shape;
+    use crate::params::Auto;
+
+    /// Whether `n` stations can each find a turn `ψ` that puts every mesh
+    /// `(z_c, z_p)` in phase — `z_p ψ ≡ (z_c + z_p) φ (mod 2π)`, the
+    /// kinematic row integrated — trying every tooth of the first gear.
+    fn assembles_by_search(pairs: &[(i64, i64)], n: i64) -> bool {
+        let tau = std::f64::consts::TAU;
+        (0..n).all(|j| {
+            let phi = tau * j as f64 / n as f64;
+            let (c1, p1) = pairs[0];
+            (0..p1).any(|a| {
+                let psi = ((c1 + p1) as f64 * phi + tau * a as f64) / p1 as f64;
+                pairs[1..].iter().all(|&(c, p)| {
+                    let residual = (p as f64 * psi - (c + p) as f64 * phi) / tau;
+                    (residual - residual.round()).abs() < 1e-9
+                })
+            })
+        })
+    }
+
+    #[test]
+    fn the_rule_agrees_with_the_search_on_simple_and_stepped_sets() {
+        let mut checked = 0;
+        for n in 2..=5_u32 {
+            for sun in [12_u32, 17, 24, 30] {
+                for p1 in [8_u32, 12, 18, 20] {
+                    for p2 in [8_u32, 10, 12, 17, 18] {
+                        for ring in [48_u32, 59, 60, 72, 81] {
+                            if ring <= p2 + 1 {
+                                continue;
+                            }
+                            let shape = arr::stepped(sun, [p1, p2], [ring, ring + 1], n);
+                            // The first planet gear meshes the sun and the
+                            // first ring, the second the second ring; the
+                            // rule reads all three meshes.
+                            let Some((equal, simultaneous)) = shape.assembly(1) else {
+                                panic!("a stepped planet's assembly has an answer");
+                            };
+                            let pairs = [
+                                (i64::from(sun), i64::from(p1)),
+                                (-i64::from(ring), i64::from(p1)),
+                                (-i64::from(ring + 1), i64::from(p2)),
+                            ];
+                            assert_eq!(
+                                equal,
+                                assembles_by_search(&pairs, i64::from(n)),
+                                "stepped {sun}/{p1}/{p2}/{ring} × {n}"
+                            );
+                            assert_eq!(
+                                simultaneous,
+                                [sun, ring, ring + 1].iter().all(|z| z % n == 0)
+                            );
+                            checked += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(checked > 1000);
+        // ...and on a simple set the rule is the textbook `N | z_s + z_r`.
+        for n in 2..=6_u32 {
+            for (sun, planet) in [(24_u32, 18_u32), (17, 20), (30, 15)] {
+                for ring in [sun + 2 * planet, sun + 2 * planet + 1] {
+                    let mut set = PlanetaryStage::default();
+                    set.sun.teeth = sun;
+                    set.planet.teeth = planet;
+                    set.ring.teeth = ring;
+                    set.planets = n;
+                    set.planet.profile_shift = Auto::automatic(0.0);
+                    let shape = Shape::from(&set);
+                    assert_eq!(
+                        shape.assembly(1),
+                        Some(((sun + ring) % n == 0, sun % n == 0 && ring % n == 0))
+                    );
+                }
+            }
+        }
+    }
+
+    /// An axis meshing another planet's axis is outside the rule, and says
+    /// so rather than guessing.
+    #[test]
+    fn a_planet_meshing_a_planet_has_no_answer() {
+        let shape = arr::ravigneaux([18, 30], [22, 18], 62, 3);
+        assert_eq!(shape.assembly(1), None);
+        assert_eq!(shape.assembly(2), None);
     }
 }

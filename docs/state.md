@@ -661,10 +661,11 @@ whose size is unmeasured is a debt still owed, and is marked as one.
 - **A note slot is as tall as the tallest note that field can show.** Every real
   message fits; a validation message longer than its field's bound note would
   still move the controls when it appeared.
-- **A layout's assembly rule is asserted for one gear on the axis meshing
-  two central members** and reported as no answer elsewhere — a stepped
-  planet's two rings, a Ravigneaux's planets — where the condition exists
-  and is not written.
+- **A layout's assembly rule reaches every mesh from the axis to a central
+  member** — a stepped planet's three included — and is reported as no
+  answer where the axis meshes another planet's, a Ravigneaux's, whose
+  phase is not a central member's: the condition exists there and is not
+  written.
 - **Every mesh on a replicated axis is taken to carry `N` paths**, and the
   meshes between two replicated axes — a Ravigneaux's planet–planet mesh —
   `N` as well, which is right where the two counts agree and unwritten

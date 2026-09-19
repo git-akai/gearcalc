@@ -1742,9 +1742,15 @@ the only honest question is whether it actually undercuts, and the bound it
 answers to is `x_min` rather than a chooser's `max(x_min, 0)`
 ([`train::undercut_bound`](#efficiency-parallel-axes)).
 
-**Layout checks**, all closed form: equal spacing needs `(z_s + z_r) mod N = 0`;
-simultaneous meshing needs `N | z_s` and `N | z_r`; planet clearance is
-`2 a_w sin(π/N) − d_a,planet`.
+**Layout checks**, all closed form. Equal spacing of `N` identical planets
+needs, for every two meshes `i, i'` from the planet axis to central members
+(counts signed, a ring's negative), `N · gcd(z_pi, z_pi') | z_ci z_pi' −
+z_ci' z_pi` — each mesh fixes the planet's turn up to a whole tooth of its
+own gear, and the two must agree at every station; on a simple planet this
+is the textbook `(z_s + z_r) mod N = 0`, on a stepped one `N · gcd(z_p1,
+z_p2) | z_s z_p2 + z_r z_p1`, and `Shape::assembly` is held to a search over
+the phases. Simultaneous meshing needs `N | z_c` for every central member
+the axis meets; planet clearance is `2 a_w sin(π/N) − d_a,planet`.
 
 **Efficiency** — Pennestrì–Freudenstein, all six arrangements from one piece of
 algebra:
