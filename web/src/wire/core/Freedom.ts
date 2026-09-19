@@ -11,4 +11,4 @@ import type { MemberFreedom } from "./MemberFreedom";
  * stage's four — and is resolved once for every member ([`member_inputs`]), so
  * a member input that arrives costs one line there and none per preset.
  */
-export type Freedom = "centre_distance" | "clearance" | "first_pitch_diameter" | "overlap" | { "member": [number, MemberFreedom] };
+export type Freedom = { "centre_distance": number } | { "clearance": number } | "first_pitch_diameter" | "overlap" | { "member": [number, MemberFreedom] };

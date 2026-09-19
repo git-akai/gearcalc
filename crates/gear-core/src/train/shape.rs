@@ -3283,15 +3283,13 @@ impl Constrained for Shape {
         self.members.iter().map(|m| &m.gear).collect()
     }
 
-    /// Every input relief may turn: each distance's, the overlap, and each
-    /// member's. **One distance is addressed for now** — `Freedom` names a
-    /// stage's centre distance and clearance without saying which pair of
-    /// axes, and every shape a preset builds has one.
+    /// Every input relief may turn: each distance's, by index, the overlap,
+    /// and each member's.
     fn inputs(&mut self) -> Vec<(Freedom, &mut Auto<f64>)> {
         let mut out = Vec::new();
-        if let Some(d) = self.distances.first_mut() {
-            out.push((Freedom::CentreDistance, &mut d.distance));
-            out.push((Freedom::Clearance, &mut d.clearance));
+        for (k, d) in self.distances.iter_mut().enumerate() {
+            out.push((Freedom::CentreDistance(k), &mut d.distance));
+            out.push((Freedom::Clearance(k), &mut d.clearance));
         }
         out.push((Freedom::Overlap, &mut self.overlap));
         let mut members = self.members.iter_mut();
@@ -3377,13 +3375,13 @@ impl Constrained for Shape {
                     }
                 }
             }
-            let mut order = vec![vec![Freedom::CentreDistance]];
+            let mut order = vec![vec![Freedom::CentreDistance(d)]];
             order.extend(
                 members
                     .iter()
                     .map(|&i| vec![Freedom::Member(i, MemberFreedom::Shift)]),
             );
-            order.push(vec![Freedom::Clearance]);
+            order.push(vec![Freedom::Clearance(d)]);
             order.push(super::entry(&readings));
             let entries = order.len();
             groups.push(FreedomGroup {
@@ -3391,9 +3389,7 @@ impl Constrained for Shape {
                 automatic_at_most: entries,
                 order,
             });
-            groups.push(super::distance_and_clearance());
-            // One distance is addressed by name; see `inputs`.
-            break;
+            groups.push(super::distance_and_clearance(d));
         }
         // On crossed shafts an axial contact ratio is nothing at all, and is
         // turned back automatic.
@@ -4257,8 +4253,8 @@ mod tests {
             .find(|g| g.order.len() == 6)
             .expect("a set declares one relation over its distance");
         assert_eq!(relation.given_at_most, 4);
-        assert_eq!(relation.order[0], vec![Freedom::CentreDistance]);
-        assert_eq!(relation.order[4], vec![Freedom::Clearance]);
+        assert_eq!(relation.order[0], vec![Freedom::CentreDistance(0)]);
+        assert_eq!(relation.order[4], vec![Freedom::Clearance(0)]);
     }
 
     /// **A set runs at the centre distance it was given**, and both of its

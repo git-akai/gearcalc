@@ -661,13 +661,6 @@ whose size is unmeasured is a debt still owed, and is marked as one.
 - **A note slot is as tall as the tallest note that field can show.** Every real
   message fits; a validation message longer than its field's bound note would
   still move the controls when it appeared.
-- **A shape's freedoms address one distance.** `Freedom::CentreDistance` and
-  `Freedom::Clearance` name *the* distance, as the stage types had one; every
-  preset has one, and relief reads `distances[0]`. A Ravigneaux has three,
-  and its second and third are outside relief: a designer who pins both
-  shifts of a mesh on the third distance and the distance too is refused by
-  the solve rather than relieved by the panel. The freedom wants the index
-  before such a shape is offered as a preset.
 - **A layout's assembly rule is asserted for one gear on the axis meshing
   two central members** and reported as no answer elsewhere — a stepped
   planet's two rings, a Ravigneaux's planets — where the condition exists

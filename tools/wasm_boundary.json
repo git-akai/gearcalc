@@ -7084,11 +7084,15 @@
       "figures": [
        [
         {
-         "freedom": "centre_distance",
+         "freedom": {
+          "centre_distance": 0
+         },
          "value": "30.025652520608507"
         },
         {
-         "freedom": "clearance",
+         "freedom": {
+          "clearance": 0
+         },
          "value": "0.019999999999999574"
         },
         {
@@ -8629,11 +8633,15 @@
       "figures": [
        [
         {
-         "freedom": "centre_distance",
+         "freedom": {
+          "centre_distance": 0
+         },
          "value": "30.025652520608507"
         },
         {
-         "freedom": "clearance",
+         "freedom": {
+          "clearance": 0
+         },
          "value": "0.019999999999999574"
         },
         {
@@ -8701,11 +8709,15 @@
        ],
        [
         {
-         "freedom": "centre_distance",
+         "freedom": {
+          "centre_distance": 0
+         },
          "value": "21.145278775291828"
         },
         {
-         "freedom": "clearance",
+         "freedom": {
+          "clearance": 0
+         },
          "value": "0.019999999999999574"
         },
         {

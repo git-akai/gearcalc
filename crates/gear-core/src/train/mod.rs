@@ -2078,10 +2078,11 @@ pub(crate) fn distance_notes(target: Option<f64>, nominal: f64, clearance: f64) 
 )]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum Freedom {
-    /// The distance the stage's members run at.
-    CentreDistance,
+    /// The distance a pair of the stage's axes run at, by the distance's
+    /// index in the shape — a pair has one, a Ravigneaux three.
+    CentreDistance(usize),
     /// What portion of that distance is running play.
-    Clearance,
+    Clearance(usize),
     /// A pair's first member's pitch diameter — the same freedom as its helix
     /// read as a size, which is a worm's reading.
     FirstPitchDiameter,
@@ -2317,15 +2318,16 @@ pub struct FreedomGroup {
 
 /// **Two ways of saying one number, so one of them must be said.** A distance
 /// is nominal + clearance and an automatic clearance is distance − nominal;
-/// with both automatic neither has anything to derive from. The group of a
-/// distance the shape may relieve; a distance it holds — every epicyclic
-/// preset's — cannot derive a clearance at all and says so with
-/// [`always_given`].
-pub(crate) fn distance_and_clearance() -> FreedomGroup {
+/// with both automatic neither has anything to derive from. The group of
+/// distance `d`, one per distance the shape has.
+pub(crate) fn distance_and_clearance(d: usize) -> FreedomGroup {
     FreedomGroup {
         given_at_most: 2,
         automatic_at_most: 1,
-        order: vec![vec![Freedom::Clearance], vec![Freedom::CentreDistance]],
+        order: vec![
+            vec![Freedom::Clearance(d)],
+            vec![Freedom::CentreDistance(d)],
+        ],
     }
 }
 
@@ -2743,11 +2745,11 @@ impl StageResult {
     #[must_use]
     pub fn figure(&self, f: Freedom) -> Option<f64> {
         match f {
-            Freedom::CentreDistance => match self {
-                Self::Shape(r) => r.distances.first().map(|d| d.running),
+            Freedom::CentreDistance(d) => match self {
+                Self::Shape(r) => r.distances.get(d).map(|d| d.running),
             },
-            Freedom::Clearance => match self {
-                Self::Shape(r) => r.distances.first().map(|d| d.clearance),
+            Freedom::Clearance(d) => match self {
+                Self::Shape(r) => r.distances.get(d).map(|d| d.clearance),
             },
             Freedom::FirstPitchDiameter => self.members().first().map(|g| g.pitch_diameter),
             Freedom::Overlap => match self {
@@ -5448,6 +5450,26 @@ mod tests {
         ]
     }
 
+    /// The presets and every arrangement the shape reaches with no code of
+    /// its own — for a law about every stage a document can write, which the
+    /// relief laws are: a Ravigneaux has three distances and relief has to
+    /// find each of them.
+    fn every_stage() -> Vec<Stage> {
+        use arrangements as arr;
+        let shape = |s| Stage::Shape(Box::new(s));
+        let mut out = every_preset();
+        out.extend([
+            shape(arr::layshaft((17, 43), &[(19, 41), (31, 29)], 1)),
+            shape(arr::wolfrom(18, [60, 61], 3)),
+            shape(arr::stepped(24, [18, 17], [60, 59], 3)),
+            shape(arr::planocentric(30, 33)),
+            shape(arr::meshed_planets(24, [18, 18], 96, 3)),
+            shape(arr::ravigneaux([18, 30], [22, 18], 62, 3)),
+            shape(arr::worm_and_pair((1, 40), (17, 43))),
+        ]);
+        out
+    }
+
     /// **Every kind, at a spread of tooth counts and every arrangement** — the
     /// grid the wiring laws below are asserted over.
     ///
@@ -6546,7 +6568,7 @@ mod tests {
     /// group bites.
     #[test]
     fn every_declared_freedom_names_an_input_the_stage_has() {
-        for stage in every_preset() {
+        for stage in every_stage() {
             let has: Vec<Freedom> = stage.toggles().into_iter().map(|(f, _)| f).collect();
             for g in &stage.freedoms() {
                 assert!(
@@ -6585,7 +6607,7 @@ mod tests {
     /// everything pinned, everything freed, and each single toggle turned.
     #[test]
     fn relief_is_idempotent_from_any_start() {
-        for stage in every_preset() {
+        for stage in every_stage() {
             let all = stage.toggles();
             let mut starts = vec![stage.clone()];
             for auto in [false, true] {
@@ -6671,8 +6693,8 @@ mod tests {
                 .collect()
         };
         let nudge = |f: Freedom, a: &mut Auto<f64>| match f {
-            Freedom::CentreDistance => a.manual += 0.2,
-            Freedom::Clearance => a.manual += 0.01,
+            Freedom::CentreDistance(_) => a.manual += 0.2,
+            Freedom::Clearance(_) => a.manual += 0.01,
             Freedom::FirstPitchDiameter => a.manual *= 1.05,
             Freedom::Overlap => a.manual += 0.1,
             Freedom::Member(_, MemberFreedom::Shift) => a.manual += 0.05,
@@ -6763,7 +6785,11 @@ mod tests {
     fn a_crossed_pairs_ratio_cannot_stand_given() {
         let mut crossed = PairStage::worm();
         crossed.overlap = Auto::fixed(1.5);
-        for just in [None, Some(Freedom::Overlap), Some(Freedom::CentreDistance)] {
+        for just in [
+            None,
+            Some(Freedom::Overlap),
+            Some(Freedom::CentreDistance(0)),
+        ] {
             let relieved = Stage::worm(crossed.clone()).relieved(just);
             let p = relieved.as_shape().unwrap();
             assert!(
@@ -6838,11 +6864,11 @@ mod tests {
         };
         let figures = [
             Figure {
-                freedom: Freedom::Clearance,
+                freedom: Freedom::Clearance(0),
                 value: Some(0.123_456_789),
             },
             Figure {
-                freedom: Freedom::CentreDistance,
+                freedom: Freedom::CentreDistance(0),
                 value: Some(99.0),
             },
         ];
@@ -6879,8 +6905,8 @@ mod tests {
             ..HulaStage::default()
         };
         for just in [
-            Some(Freedom::Clearance),
-            Some(Freedom::CentreDistance),
+            Some(Freedom::Clearance(0)),
+            Some(Freedom::CentreDistance(0)),
             Some(Freedom::Member(1, MemberFreedom::Shift)),
             None,
         ] {
@@ -6890,7 +6916,7 @@ mod tests {
                 !(d.clearance.auto && d.distance.auto),
                 "a set: relieving after {just:?} should pin one of the two"
             );
-            if just == Some(Freedom::Clearance) {
+            if just == Some(Freedom::Clearance(0)) {
                 assert!(
                     d.clearance.auto && !d.distance.auto,
                     "the clearance just touched is spared"
@@ -6925,7 +6951,7 @@ mod tests {
     /// undo a design that was never over-determined.
     #[test]
     fn an_over_determined_stage_relieves_to_its_limit_and_keeps_what_was_just_pinned() {
-        for stage in every_preset() {
+        for stage in every_stage() {
             let mut over = stage.clone();
             for f in mentioned(&stage) {
                 if let Some(a) = over.input_mut(f) {
@@ -7262,12 +7288,12 @@ mod tests {
             .find(|g| g.order.len() == 5)
             .expect("the pair's relation");
         assert_eq!(relation.given_at_most, 4);
-        assert_eq!(relation.order[0], vec![Freedom::CentreDistance]);
+        assert_eq!(relation.order[0], vec![Freedom::CentreDistance(0)]);
         assert_eq!(
             relation.order[1],
             vec![Freedom::Member(0, MemberFreedom::Shift)]
         );
-        assert_eq!(relation.order[3], vec![Freedom::Clearance]);
+        assert_eq!(relation.order[3], vec![Freedom::Clearance(0)]);
         assert_eq!(
             relation.order[4],
             vec![
@@ -7290,7 +7316,7 @@ mod tests {
             .find(|g| g.automatic_at_most < g.order.len())
             .expect("a distance and a clearance cannot both be derived");
         assert_eq!(both.automatic_at_most, 1);
-        assert_eq!(both.order[0], vec![Freedom::Clearance]);
+        assert_eq!(both.order[0], vec![Freedom::Clearance(0)]);
     }
 
     /// **A given distance and a given clearance decide the shifts — with the

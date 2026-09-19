@@ -1774,7 +1774,7 @@
                   d.distance,
                   dres?.running,
                   0.1,
-                  () => relieveStage(stage, "centre_distance", figures),
+                  () => relieveStage(stage, { centre_distance: k }, figures),
                   // An automatic distance the tips sized says which mesh
                   // held it open, under the number it opened to.
                   dres?.sized_by == null
@@ -1794,7 +1794,7 @@
                   d.clearance,
                   dres?.clearance,
                   0.01,
-                  () => relieveStage(stage, "clearance", figures),
+                  () => relieveStage(stage, { clearance: k }, figures),
                   undefined,
                   "ui.train_mm",
                 )}
