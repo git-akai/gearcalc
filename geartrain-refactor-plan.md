@@ -677,16 +677,21 @@ Everything above them is unconditional and lands in Phases 0–4.
   that is a finding worth having rather than a cost to pay quietly.
 
 **The ledger's outcome, measured** — `crates/**/*.rs` with the test modules
-split off and blank lines dropped, at `293924f` (where the plan began) against
-the clean-up's close:
+split off and blank lines dropped, at `293924f` (where the plan began),
+at the clean-up's close, and at the outliers pass's close:
 
-| | began | closed | Δ |
-|---|---|---|---|
-| production code | 17,212 | 19,838 | **+2,626** |
-| comment | 13,616 | 14,154 | +538 |
-| test | 27,459 | 28,956 | +1,497 |
-| documents (live) | 5,113 | 5,501 | +388 |
-| web source | 5,677 | 5,653 | −24 |
+| | began | clean-up | outliers | Δ overall |
+|---|---|---|---|---|
+| production code | 17,212 | 19,838 | 19,890 | **+2,678** |
+| comment | 13,616 | 14,154 | 13,988 | +372 |
+| test | 27,459 | 28,956 | 29,268 | +1,809 |
+| documents (live) | 5,113 | 5,501 | 5,537 | +424 |
+| web source | 5,677 | 5,653 | 5,678 | +1 |
+
+The outliers pass was near enough a wash in code: the crossed solve and
+`PairStage`'s chooser went (`crossed.rs` −342, `pair.rs` −243) and the
+shape took the point contact, the naming rule and the assembly rule
+(`shape.rs` +593), with the two new laws and the worm pair in tests.
 
 The code did not shrink, and the table above said it would; where the lines
 went is the honest reading. **The stage types and their solvers went**:

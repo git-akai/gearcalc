@@ -4,8 +4,8 @@ A **map**, not a summary. The four documents in `docs/` say what the tool
 computes, why, what was once wrong and what is built; this says where things are
 and what it costs to change them.
 
-It exists because the project is about 19,800 lines of production code carrying
-14,200 lines of comment, alongside 5,500 lines of standalone document — **prose
+It exists because the project is about 19,900 lines of production code carrying
+14,000 lines of comment, alongside 5,500 lines of standalone document — **prose
 and code are about 1 to 1**. That ratio is the reason the model
 decisions here are auditable and it is not a target to reduce. What it does mean
 is that finding the right file matters more here than in most codebases, and
@@ -15,9 +15,9 @@ until this file existed there was no way to do it but read the crate.
 `docs/history/`, which is the **superseded** design record that nothing points
 at. A ratio quoted from a `wc` over a glob is a figure like any other; this one
 counts `crates/**/*.rs` with the test modules split off, blank lines dropped,
-at the tree the geartrain refactor's clean-up closed on — 16,100 / 12,900 /
-5,000 at the tree the audit closed on, and 17,200 / 13,600 / 5,100 where the
-refactor began. `geartrain-refactor-plan.md#5-what-gets-deleted` says where the 2,600 lines
+at the tree the geartrain refactor's outliers pass closed on — 16,100 /
+12,900 / 5,000 at the tree the audit closed on, and 17,200 / 13,600 / 5,100
+where the refactor began. `geartrain-refactor-plan.md#5-what-gets-deleted` says where the 2,600 lines
 of code went.)*
 
 > The audit that built this file is closed. Its record is
