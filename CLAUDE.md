@@ -17,7 +17,7 @@ at. A ratio quoted from a `wc` over a glob is a figure like any other; this one
 counts `crates/**/*.rs` with the test modules split off, blank lines dropped,
 at the tree the geartrain refactor's clean-up closed on — 16,100 / 12,900 /
 5,000 at the tree the audit closed on, and 17,200 / 13,600 / 5,100 where the
-refactor began. `geartrain-refactor-plan.md` §5 says where the 2,600 lines
+refactor began. `geartrain-refactor-plan.md#5-what-gets-deleted` says where the 2,600 lines
 of code went.)*
 
 > The audit that built this file is closed. Its record is
