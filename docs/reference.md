@@ -2277,10 +2277,13 @@ carrier turning against the sun) and a Ravigneaux (two suns, long and short
 planets, one ring, the planet–planet mesh a distance between two carried
 axes), and a worm feeding a spur pair (a point contact and a line contact
 on two distances, the stage locking backward where the worm does). Each
-has a `gear-cli kinematics` fixture and each but the Wolfrom — which closes
-only by shift — and the worm pair — whose crossed mesh the plane script
-does not lay out — a row in `tools/train_kinematics.py`, which now lays
-axes out off the line of centres where a Ravigneaux's short planet stands. The shafts are numbered so that the shape's own convention — first
+has a `gear-cli kinematics` fixture and each but the worm pair — whose
+crossed mesh the plane script does not lay out — a row in
+`tools/train_kinematics.py`, which derives the rows from velocities along
+each mesh's line of action, the common tangent to the two base circles:
+profile shift does not move a base circle, so a Wolfrom whose rings sit a
+tooth apart at one radius has a row without anything closing, and the mesh
+sense is which tangent exists rather than a sign. The shafts are numbered so that the shape's own convention — first
 port driven, first ring held, the next free port the output — gives the
 textbook arrangement with nothing stated.
 

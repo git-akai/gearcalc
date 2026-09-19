@@ -162,9 +162,11 @@ fix is the same one: no count outside the table that is the list.
 neither covers the other, which is worth saying because they look alike.
 `hula_kinematics.py` integrates the no-slip condition through a full revolution,
 in 200 000 steps, on one arrangement; `train_kinematics.py` writes rigid-body
-velocities at one instant, on any topology — a pair, an epicyclic set in all six
-arrangements, a compound planet, meshed planets, a hula stage — and adds torque
-from virtual work. Instantaneous over everything, and integrated over the one
+velocities along each mesh's line of action — the common tangent to the two
+**base circles**, which profile shift does not touch, so nothing has to
+close — at one instant, on any topology: a pair, an epicyclic set in all six
+arrangements, a compound planet, a Wolfrom, meshed planets, a Ravigneaux, a
+hula stage; and adds torque from virtual work. Instantaneous over everything, and integrated over the one
 case where standing still is worth doubting.
 
 `crossed_path.py` builds both flanks as parametric surfaces and reaches the line
@@ -304,9 +306,10 @@ The arrangements it reaches with no code of their own — a layshaft, a
 Wolfrom, a stepped planet, a planocentric, meshed planets, a Ravigneaux, a
 worm feeding a spur pair — are written as lists of what sits where in
 `train/arrangements.rs`, each with a `gear-cli kinematics` fixture and a
-textbook ratio held in a test, and each but the Wolfrom and the worm pair
-re-derived from rigid-body velocities in `tools/train_kinematics.py`, now
-over a plane rather than a line. A distance at an angle is a point contact
+textbook ratio held in a test, and each but the worm pair — whose crossed
+mesh the plane script does not lay out — re-derived from rigid-body
+velocities along the base circles' common tangent in
+`tools/train_kinematics.py`. A distance at an angle is a point contact
 the shape builds beside its line contacts, so a worm is a mesh like any
 other and a stage that locks backward is a stage whose flow holds there.
 An automatic distance is what the shifts leave, opened out where an internal

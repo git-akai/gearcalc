@@ -20,24 +20,33 @@ knows the words sun, ring or planet.
 
 # What is derived here
 
-**A layout, in millimetres.** Each gear has a pitch radius and an axis at some
-offset from the axis of the frame that carries it. Two gears mesh when the
-distance between their axes is r_a + r_b (external) or |r_a - r_b| (internal) --
-which is *derived* from the layout rather than declared, so a topology whose
-centre distances do not agree is refused here before any speed is asked for.
-That is the same closure law the crate's epicyclic kinds solve a profile shift
-to satisfy.
+**A layout, in millimetres, and base circles.** Each gear has a base radius
+`r_b = z m cos(alpha) / 2` and an axis at some offset from the axis of the
+frame that carries it. Profile shift moves the cutting tool -- it changes
+tooth thickness, tip and root, and where the operating pitch point falls --
+and does not touch the base circle; involute flanks are generated from that
+circle, and conjugate action between two involutes is insensitive to centre
+distance, which is the defining property of the form. So nothing here has to
+close: a layout is a layout, and the only thing a mesh asks of it is that the
+two base circles admit the common tangent that is its line of action. Whether
+that tangent is the one that crosses between the centres or the one that does
+not -- an external mesh or an internal one -- is read off the base circles
+themselves: disjoint circles mesh externally, intersecting ones internally.
+The mesh sense is therefore a choice of tangent, not an arithmetic sign, and
+shares no expression with `MeshKind::sign`.
 
 **A velocity, from rigid-body motion.** Gear a spins at w_a about an axis at
 p_a, and that axis is carried by the frame, which spins at w_f about the origin.
-The material point of gear a at the pitch point P therefore moves at
+A material point of gear a at a point X on the line of action moves at
 
-    v = w_f (z_hat x p_a) + w_a (z_hat x (P - p_a))
+    v = w_f (z_hat x p_a) + w_a (z_hat x (X - p_a))
 
-and the two gears' material points at P have the same velocity, because teeth in
-contact do not slide along the line of the pitch circles. With every axis on the
-x-axis this is one scalar equation per mesh. It contains no tooth count at all:
-the counts enter only as radii, through `r = z/2` at one module.
+and the two flanks in contact at X have the same velocity component along the
+line of action -- the involute's law -- which is one scalar equation per mesh
+whatever X is, since `(X - p_a) . n_hat` is the base radius wherever X sits on
+the tangent. It contains no tooth count at all: the counts enter only as base
+radii. The line is built in floating point; each row is then read back as the
+rational it is to a part in 10^9, and every solve below is exact.
 
 **A torque, from virtual work.** For a lossless train the external torques do no
 net work over any motion the structure allows, so `sum(T_i w_i) = 0` for every
@@ -114,13 +123,40 @@ def solve(rows, width):
 
 # ------------------------------------------------------------------- the model
 
+# The pressure angle every layout here is cut at. Only the base radii depend
+# on it, and every row is a ratio of base radii, so the choice cancels; it is
+# here so the tangent construction is the real one and not a stand-in.
+PRESSURE_ANGLE_DEG = 20.0
+
+
+def base_radius(teeth):
+    """`r_b = z m cos(alpha) / 2` at one module."""
+    import math
+
+    return teeth * math.cos(math.radians(PRESSURE_ANGLE_DEG)) / 2.0
+
+
+def exact(row, unit):
+    """A floating row read back as the rational it is, each coefficient over
+    `unit` -- gear a's base radius -- so that `cos(alpha)` cancels and what is
+    left is a small rational. Refused rather than rounded where a coefficient
+    is not one to a part in 10^9."""
+    out = []
+    for c in row:
+        q = F(c / unit).limit_denominator(10**6)
+        if abs(float(q) - c / unit) > 1e-9:
+            raise ValueError(f"a row coefficient {c / unit} is not a rational of small height")
+        out.append(q)
+    return out
+
 
 class Train:
+
     """Shafts, gears on them, and meshes between them -- as a layout."""
 
     def __init__(self):
         self.shafts = ["ground"]
-        self.gears = []          # (name, shaft, frame, radius, offset)
+        self.gears = []          # (name, shaft, frame, teeth, offset)
         self.meshes = []         # (gear a, gear b)
 
     def shaft(self, name):
@@ -133,7 +169,7 @@ class Train:
         the x-axis, or an `(x, y)` pair for an axis off it, which a Ravigneaux's
         second planet is."""
         at = tuple(F(v) for v in offset) if isinstance(offset, tuple) else (F(offset), F(0))
-        self.gears.append((name, shaft, frame, F(teeth, 2), at))
+        self.gears.append((name, shaft, frame, teeth, at))
         return len(self.gears) - 1
 
     def mesh(self, a, b):
@@ -141,77 +177,82 @@ class Train:
 
     # -- geometry, which is where a mesh's kind comes from ------------------
 
-    def pitch_point(self, a, b):
-        """Where the two pitch circles touch, and a check that they touch at
-        all.
+    def line_of_action(self, a, b):
+        """The common tangent to the two base circles that is the mesh's line
+        of action, as a unit normal `n` with the line `{x : n . (x - p_a) =
+        r_ba}`, and whether the mesh is internal.
 
         Both gears' axes are carried by the same frame, so their offsets are
-        measured from one origin and the distance between the axes is the
-        length of the difference. External contact wants r_a + r_b, internal
-        |r_a - r_b|; the layout decides which, and a layout that is neither is
-        refused. The distance is rational by construction of every layout
-        here -- on the x-axis trivially, and off it by choosing counts whose
-        triangle is Heronian -- so nothing is rounded.
+        measured from one origin. Two base circles that do not meet admit the
+        tangents that cross between the centres, and one of those is an
+        external mesh's line of action; two that intersect admit only the
+        tangents that do not cross, and one of those is an internal mesh's.
+        Nothing about closure is asked: any distance at which the tangent
+        exists is a distance the pair runs at, which is the involute's whole
+        point. One inside the other admits no tangent and is no mesh.
         """
-        (_, _, fa, ra, oa) = self.gears[a]
-        (_, _, fb, rb, ob) = self.gears[b]
+        (_, _, fa, za, oa) = self.gears[a]
+        (_, _, fb, zb, ob) = self.gears[b]
         if fa != fb:
             raise ValueError("a mesh's two gears must share a frame")
-        d = (ob[0] - oa[0], ob[1] - oa[1])
-        d2 = d[0] * d[0] + d[1] * d[1]
-        if d2 == (ra + rb) ** 2:
-            # External: the pitch point lies between the two axes.
-            k = ra / (ra + rb)
-            return (oa[0] + k * d[0], oa[1] + k * d[1])
-        if d2 == (ra - rb) ** 2:
-            # Internal: the smaller gear sits inside the larger, and the pitch
-            # point is on the far side of it from the larger's axis.
-            inner, outer = (a, b) if ra < rb else (b, a)
-            (_, _, _, ri, oi) = self.gears[inner]
-            (_, _, _, ro, oo) = self.gears[outer]
-            if ro == ri:
-                raise ValueError("an internal mesh of equal radii has no pitch point")
-            k = ri / (ro - ri)
-            return (oi[0] + k * (oi[0] - oo[0]), oi[1] + k * (oi[1] - oo[1]))
-        raise ValueError(
-            f"centre distance² {d2} is neither {(ra + rb) ** 2} nor {(ra - rb) ** 2}: "
-            "the layout does not close"
-        )
-
-    # -- the constraints ----------------------------------------------------
+        r_a, r_b = base_radius(za), base_radius(zb)
+        d = (float(ob[0] - oa[0]), float(ob[1] - oa[1]))
+        dist = (d[0] ** 2 + d[1] ** 2) ** 0.5
+        e = (d[0] / dist, d[1] / dist)
+        e_perp = (-e[1], e[0])
+        if dist >= r_a + r_b:
+            internal = False
+            # Circle b on the far side of the line: n . (p_b - p_a) = r_a + r_b.
+            c = (r_a + r_b) / dist
+        elif dist > abs(r_b - r_a):
+            internal = True
+            # Both circles on the same side: n . (p_b - p_a) = r_a - r_b.
+            c = (r_a - r_b) / dist
+        else:
+            raise ValueError(
+                f"base circles of {r_a:.4f} and {r_b:.4f} at {dist:.4f}: one inside "
+                "the other, no common tangent, no mesh"
+            )
+        s = (1.0 - c * c) ** 0.5
+        n = (c * e[0] + s * e_perp[0], c * e[1] + s * e_perp[1])
+        return n, internal
 
     def rows(self):
-        """One row per mesh, over the shaft speeds.
+        """One row per mesh, over the shaft speeds -- exact, read back from
+        the line of action.
 
-        `v = w_f (z x p) + w (z x (P - p))` for each gear at the pitch point,
-        and the two are equal along the common tangent -- the only direction
-        a material point at the pitch point of either gear can move, both
-        `P - p` lying on the line of centres:
+        `v = w_f (z x p) + w (z x (X - p))` for each gear at a point X on the
+        line of action, and the two are equal along the line, `t = z x n`:
 
-            [w_f * (z x o_a) + w_a * (z x (P - o_a))] . t
-                = [w_f * (z x o_b) + w_b * (z x (P - o_b))] . t
+            [w_f (z x o_a) + w_a (z x (X - o_a))] . t
+                = [w_f (z x o_b) + w_b (z x (X - o_b))] . t
 
-        with `t = z x (P - o_a)`. With every axis on the x-axis every vector
-        here points along y and the equation is the scalar one this file was
-        first written with; off the axis it is the same equation with a dot
-        product in it.
+        and `(z x u) . (z x n) = u . n`, so the row is
+
+            w_f (o_a . n) + w_a r_ba  =  w_f (o_b . n) + w_b (n . (X - o_b))
+
+        with `n . (X - o_b)` the base radius of b, negative where the tangent
+        crosses between the centres. The frame's coefficient is the difference
+        of the two axes' distances to the line, which is what makes the row
+        exact once it is read back: every coefficient is a base radius or a
+        sum of two, and the common `cos(alpha)` cancels.
         """
-        cross = lambda p: (-p[1], p[0])
-        dot = lambda p, q: p[0] * q[0] + p[1] * q[1]
         out = []
         for (a, b) in self.meshes:
-            (_, sa, fa, _, oa) = self.gears[a]
-            (_, sb, _, _, ob) = self.gears[b]
-            p = self.pitch_point(a, b)
-            arm_a = cross((p[0] - oa[0], p[1] - oa[1]))
-            arm_b = cross((p[0] - ob[0], p[1] - ob[1]))
-            t = arm_a
-            row = [F(0)] * (len(self.shafts) + 1)
-            row[sa] += dot(arm_a, t)
-            row[fa] += dot(cross(oa), t)
-            row[sb] -= dot(arm_b, t)
-            row[fa] -= dot(cross(ob), t)
-            out.append(row)
+            (_, sa, fa, za, oa) = self.gears[a]
+            (_, sb, _, zb, ob) = self.gears[b]
+            n, internal = self.line_of_action(a, b)
+            r_a, r_b = base_radius(za), base_radius(zb)
+            on_a = r_a
+            on_b = r_b if internal else -r_b
+            frame = (float(oa[0]) * n[0] + float(oa[1]) * n[1]) - (
+                float(ob[0]) * n[0] + float(ob[1]) * n[1]
+            )
+            row = [0.0] * (len(self.shafts) + 1)
+            row[sa] += on_a
+            row[sb] -= on_b
+            row[fa] += frame
+            out.append(exact(row, on_a))
         return out
 
     def speeds(self, conditions):
@@ -263,12 +304,12 @@ def crate_rows(t, internal):
     """`z_a (w_a - w_f) + z_b (w_b - w_f) = 0`, the ring's count negative."""
     out = []
     for k, (a, b) in enumerate(t.meshes):
-        (_, sa, fa, ra, _) = t.gears[a]
-        (_, sb, _, rb, _) = t.gears[b]
-        za, zb = ra * 2, rb * 2
+        (_, sa, fa, za, _) = t.gears[a]
+        (_, sb, _, zb, _) = t.gears[b]
+        za, zb = F(za), F(zb)
         if k in internal:
             # Whichever of the two is the ring carries the negative count.
-            if ra > rb:
+            if za > zb:
                 za = -za
             else:
                 zb = -zb
@@ -292,15 +333,10 @@ def crate_speeds(t, internal, conditions):
 
 
 def internal_meshes(t):
-    """Which meshes the *layout* makes internal -- derived, not declared."""
-    out = set()
-    for k, (a, b) in enumerate(t.meshes):
-        (_, _, _, ra, oa) = t.gears[a]
-        (_, _, _, rb, ob) = t.gears[b]
-        d2 = (ob[0] - oa[0]) ** 2 + (ob[1] - oa[1]) ** 2
-        if d2 == (ra - rb) ** 2:
-            out.add(k)
-    return out
+    """Which meshes the *layout* makes internal -- derived from the base
+    circles, not declared: the ones whose line of action is the tangent that
+    does not cross between the centres."""
+    return {k for k, (a, b) in enumerate(t.meshes) if t.line_of_action(a, b)[1]}
 
 
 # ----------------------------------------------------------------- topologies
@@ -350,18 +386,11 @@ def simple_set(zs, zp, zr):
 
 def compound_set(zs, zp1, zr1, zp2, zr2):
     """A stepped planet: one carrier, one sun, two rings, a planet shaft
-    carrying two gears. The two meshes to the rings must sit at the same carrier radius --
-    the closure law every epicyclic here obeys -- and the layout says so.
-
-    **At zero profile shift that is a condition on the counts**, and a strict
-    one: with z_s = 24 and z_p1 = 18 the carrier radius is 21, so a second
-    planet of 17 teeth admits z_r2 = 59 and nothing else. A real Wolfrom is
-    designed at 58 and absorbs the millimetre in profile shift, which is
-    exactly the solve `gear_core::planetary` performs and which this file
-    deliberately does not have. So a refusal here is the *zero-shift* layout
-    refusing, not the design being impossible -- and it is worth having,
-    because it is the one place this check can say anything about closure at
-    all."""
+    carrying two gears, every mesh at the one carrier radius. Nothing has
+    to close: the radius is the sun mesh's reference one, and the two ring
+    meshes run at it whatever their reference distances would be, as the
+    involute lets them -- the profile shift that absorbs the difference is
+    the crate's business, and the ratio is not its."""
     t = Train()
     sun, carrier, r1, r2, planet = (
         t.shaft("sun"),
@@ -380,6 +409,28 @@ def compound_set(zs, zp1, zr1, zp2, zr2):
     t.mesh(gp1, gr1)
     t.mesh(gp2, gr2)
     return t, dict(sun=sun, carrier=carrier, ring1=r1, ring2=r2, planet=planet)
+
+
+def wolfrom(zp, zr1, zr2):
+    """A Wolfrom proper: one planet gear meshing two rings a tooth apart at
+    one carrier radius, the first ring held, the carrier in, the second ring
+    out. The two rings' reference distances to the planet differ by half a
+    module, so no zero-shift layout closes; the base circles do not care,
+    and the row is the same law as the stepped planet's."""
+    t = Train()
+    carrier, r1, r2, planet = (
+        t.shaft("carrier"),
+        t.shaft("ring1"),
+        t.shaft("ring2"),
+        t.shaft("planet"),
+    )
+    e = F(zr1 - zp, 2)
+    gp = t.gear("p", planet, carrier, zp, e)
+    gr1 = t.gear("r1", r1, carrier, zr1, 0)
+    gr2 = t.gear("r2", r2, carrier, zr2, 0)
+    t.mesh(gp, gr1)
+    t.mesh(gp, gr2)
+    return t, dict(carrier=carrier, ring1=r1, ring2=r2, planet=planet)
 
 
 def meshed_planets(zs, zp1, zp2, zr):
@@ -407,8 +458,7 @@ def meshed_planets(zs, zp1, zp2, zr):
 
 def hula(z):
     """Gears 1 and 4 on the fixed axis, 2 and 3 on a wobble body carried by a
-    crank. Both meshes internal, and both at the crank's one offset -- which is
-    the same closure law as a compound planet's, met from the other side."""
+    crank. Both meshes internal, and both at the crank's one offset."""
     t = Train()
     g1s, crank, wob, g4s = (
         t.shaft("g1"),
@@ -416,9 +466,9 @@ def hula(z):
         t.shaft("wobble"),
         t.shaft("g4"),
     )
+    # The crank's one offset, from the first pair; the second runs at it
+    # whatever its own reference offset, as the involute lets it.
     e = F(abs(z[0] - z[1]), 2)
-    if e != F(abs(z[3] - z[2]), 2):
-        return None, None
     g1 = t.gear("1", g1s, crank, z[0], 0)
     g2 = t.gear("2", wob, crank, z[1], e)
     g3 = t.gear("3", wob, crank, z[2], e)
@@ -458,8 +508,7 @@ def ravigneaux(zs1, zs2, zpl, zps, zr):
     """A small sun meshing the long planet, which meshes the ring; a large
     sun meshing the short planet, which meshes the long one. The short
     planet's axis is **off the line of centres**: it stands where its two
-    distances put it, and the counts are chosen so that point is rational
-    (the triangle of the three distances is Heronian)."""
+    reference distances put it."""
     t = Train()
     s1, carrier, s2, ring, pl, ps = (
         t.shaft("sun1"),
@@ -473,10 +522,7 @@ def ravigneaux(zs1, zs2, zpl, zps, zr):
     r_s = F(zs2 + zps, 2)
     d = F(zpl + zps, 2)
     x = (r_l * r_l + r_s * r_s - d * d) / (2 * r_l)
-    y2 = r_s * r_s - x * x
-    y = F(int(y2.numerator ** 0.5 + 0.5), int(y2.denominator ** 0.5 + 0.5))
-    if y * y != y2:
-        raise ValueError(f"the short planet's position is irrational at these counts: y² = {y2}")
+    y = F(float(r_s * r_s - x * x) ** 0.5)
     g_s1 = t.gear("s1", s1, carrier, zs1, 0)
     g_s2 = t.gear("s2", s2, carrier, zs2, 0)
     g_l = t.gear("pl", pl, carrier, zpl, r_l)
@@ -595,16 +641,23 @@ def main():
 
     print("\ncompound and meshed planets -- no model change, only ticks\n")
     # A stepped planet: one planet shaft, two gears, two rings at one carrier
-    # radius. z_r = z_s + 2 z_p on the first half; the second ring answers to
-    # the same carrier radius, which is what makes `z_r2` the design
-    # variable. (A Wolfrom proper — one planet gear, two rings — closes only
-    # by profile shift, which this zero-shift layout cannot write; the
-    # crate's fixture carries it and the stepped rows are the same law.)
+    # radius; and a Wolfrom proper, whose two rings sit a tooth apart at one
+    # radius and which the crate closes by profile shift — the base circles
+    # need no closing, so it has a row here too.
     t, s = compound_set(24, 18, 60, 17, 59)
     fail = compare(
         "stepped planet, ring1 held, sun driven",
         t,
         {0: 0, s["ring1"]: 0, s["sun"]: 1},
+        s,
+        verbose,
+        fail,
+    )
+    t, s = wolfrom(18, 60, 61)
+    fail = compare(
+        "wolfrom 18/60/61, ring1 held, carrier driven",
+        t,
+        {0: 0, s["ring1"]: 0, s["carrier"]: 1},
         s,
         verbose,
         fail,
@@ -645,9 +698,6 @@ def main():
     print("\na hula stage -- two internal meshes on one crank\n")
     for z in ([65, 61, 57, 61], [18, 17, 17, 18], [19, 18, 17, 16]):
         t, s = hula(z)
-        if t is None:
-            print(f"  {str(z):<38} SKIP    the two meshes want different offsets")
-            continue
         fail = compare(
             f"z {z}, gear 1 held, crank driven",
             t,

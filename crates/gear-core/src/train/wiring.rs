@@ -54,8 +54,9 @@
 //!   were injected against that gate and all six fired;
 //! - **the relation itself** — that a row written this way is what rigid-body
 //!   motion gives — is checked by `tools/train_kinematics.py`, which derives
-//!   every topology from velocities at the pitch point and shares no expression
-//!   with any of this.
+//!   every topology from velocities along the base circles' common tangent
+//!   and shares no expression with any of this: the mesh sense there is
+//!   which tangent the two circles admit, not [`MeshKind::sign`].
 
 use super::StageGear;
 use crate::kinematics::{MeshRow, Shaft, System, GROUND};
