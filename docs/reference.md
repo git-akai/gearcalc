@@ -2264,10 +2264,12 @@ two rings), a planocentric reducer (one planet on an eccentric carrier, its
 own turn the output), meshed planets (sun, planet, planet, ring — the
 carrier turning against the sun) and a Ravigneaux (two suns, long and short
 planets, one ring, the planet–planet mesh a distance between two carried
-axes). Each has a `gear-cli kinematics` fixture and each but the Wolfrom —
-which closes only by shift — a row in `tools/train_kinematics.py`, which
-now lays axes out off the line of centres where a Ravigneaux's short planet
-stands. The shafts are numbered so that the shape's own convention — first
+axes), and a worm feeding a spur pair (a point contact and a line contact
+on two distances, the stage locking backward where the worm does). Each
+has a `gear-cli kinematics` fixture and each but the Wolfrom — which closes
+only by shift — and the worm pair — whose crossed mesh the plane script
+does not lay out — a row in `tools/train_kinematics.py`, which now lays
+axes out off the line of centres where a Ravigneaux's short planet stands. The shafts are numbered so that the shape's own convention — first
 port driven, last ring held, the next free port the output — gives the
 textbook arrangement with nothing stated.
 

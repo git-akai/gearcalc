@@ -301,11 +301,14 @@ absorbs), the power flow is followed mesh by mesh with each mesh's loss in
 the direction it turns, and every mesh is pressed with its driver's force
 ([reference](reference.md#the-stage), [rationale](rationale.md#one-stage-one-result)).
 The arrangements it reaches with no code of their own — a layshaft, a
-Wolfrom, a stepped planet, a planocentric, meshed planets, a Ravigneaux —
-are written as lists of what sits where in `train/arrangements.rs`, each
-with a `gear-cli kinematics` fixture and a textbook ratio held in a test,
-and each but the Wolfrom re-derived from rigid-body velocities in
-`tools/train_kinematics.py`, now over a plane rather than a line.
+Wolfrom, a stepped planet, a planocentric, meshed planets, a Ravigneaux, a
+worm feeding a spur pair — are written as lists of what sits where in
+`train/arrangements.rs`, each with a `gear-cli kinematics` fixture and a
+textbook ratio held in a test, and each but the Wolfrom and the worm pair
+re-derived from rigid-body velocities in `tools/train_kinematics.py`, now
+over a plane rather than a line. A distance at an angle is a point contact
+the shape builds beside its line contacts, so a worm is a mesh like any
+other and a stage that locks backward is a stage whose flow holds there.
 An automatic distance is what the shifts leave, opened out where an internal
 mesh's tips would cross at it — or, where a far-side gap was asked, the least
 distance that gives it, the shifts following: the hula stage's crank, sized

@@ -196,6 +196,13 @@ fn fixtures() -> Vec<(String, Train)> {
                 1,
             ))]),
         ));
+        // A worm feeding a spur pair in one stage: a point contact and a
+        // line contact on two distances, the stage locking where the worm
+        // does.
+        out.push((
+            "wormpair".to_string(),
+            train(vec![shape(arr::worm_and_pair((1, 40), (17, 43)))]),
+        ));
         // A Wolfrom under its convention: carrier in, first ring held, second
         // ring out — 61 : 1 on a one-tooth difference.
         out.push((

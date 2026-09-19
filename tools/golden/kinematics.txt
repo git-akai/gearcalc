@@ -440,6 +440,47 @@
     shaft member 4  of stage 1 speed 323/1763
     shaft member 8  of stage 1 speed 1
 
+== wormpair ==
+  total    ratio     101.176471   efficiency  60.781728 / 0.000000   %   backlash   0.055440 / 5.609180   deg
+  case 1       2.0000 Nm /   3000.00 rpm at start  ->    122.9936 Nm /     29.65 rpm at end    held at -
+  case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0000 Nm /      0.00 rpm at start  held at 1
+  case 3       2.0000 Nm /   2400.00 rpm at start  ->    122.9936 Nm /     23.72 rpm at end    held at -
+  stage 1  ratio     101.176471   efficiency  60.781728 / 0.000000   %   backlash   0.055440 / 5.609180   deg
+    power through the teeth   1.618046 / 1.983450     one more tooth on each member: 50.588235 103.705882 95.555556 103.529412
+    shaft member 1  case 1  speed    3000.000000  torque       2.000000
+    shaft member 1  case 2  speed       0.000000  torque      -0.002289
+    shaft member 1  case 3  speed    2400.000000  torque       2.000000
+    shaft member 4  case 1  speed      29.651163  torque    -122.993614
+    shaft member 4  case 2  speed       0.000000  torque       0.600000
+    shaft member 4  case 3  speed      23.720930  torque    -122.993614
+    shaft member 2  case 1  speed     -75.000000  torque       0.000000
+    shaft member 2  case 2  speed      -0.000000  torque       0.000000
+    shaft member 2  case 3  speed     -60.000000  torque       0.000000
+    member 1  z 1   
+      case 1  speed    3000.000000  vs frame    3000.000000  torque       2.000000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.005832  cycles -
+      case 3  speed    2400.000000  vs frame    2400.000000  torque       2.000000  cycles 1.440000e8 / 1.440000e8
+    member 2  z 40  
+      case 1  speed     -75.000000  vs frame     -75.000000  torque      80.000000  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.233283  cycles -
+      case 3  speed     -60.000000  vs frame     -60.000000  torque      80.000000  cycles 3.600000e6 / 3.600000e6
+    member 3  z 17  
+      case 1  speed     -75.000000  vs frame     -75.000000  torque      49.443687  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.237209  cycles -
+      case 3  speed     -60.000000  vs frame     -60.000000  torque      49.443687  cycles 3.600000e6 / 3.600000e6
+    member 4  z 43  
+      case 1  speed      29.651163  vs frame      29.651163  torque     125.063443  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.600000  cycles -
+      case 3  speed      23.720930  vs frame      23.720930  torque     125.063443  cycles 1.423256e6 / 1.423256e6
+    mesh 1  efficiency  61.804609 / 0.000000   %  contact ratio   1.8140  coprime
+    mesh 2  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
+  graph    mobility 1 degree(s), 1 given   total ratio 1720/17
+    stage 1  ratio 1720/17
+    shaft ground    of the train speed 0
+    shaft member 1  of stage 1 speed 1
+    shaft member 4  of stage 1 speed 17/1720
+    shaft member 2  of stage 1 speed -1/40
+
 == wolfrom ==
   total    ratio      61.000000   efficiency  45.356184 / 0.000000   %   backlash   0.048937 / 2.985130   deg
   case 1       2.0000 Nm /   3000.00 rpm at start  ->     55.3345 Nm /     49.18 rpm at end    held at -

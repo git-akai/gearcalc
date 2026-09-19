@@ -121,9 +121,15 @@ impl Builder {
 
     /// An automatic distance between two axes, at the shipped clearance.
     pub fn distance(&mut self, axes: [usize; 2]) -> &mut Self {
+        self.crossed(axes, 0.0)
+    }
+
+    /// An automatic distance between two axes at a shaft angle, degrees —
+    /// the point contact of crossed shafts where the angle is not nought.
+    pub fn crossed(&mut self, axes: [usize; 2], angle: f64) -> &mut Self {
         self.shape.distances.push(Distance {
             axes,
-            angle: 0.0,
+            angle,
             worm: false,
             distance: Auto::automatic(0.0),
             clearance: Auto::fixed(0.02),
@@ -322,6 +328,36 @@ pub fn ravigneaux(suns: [u32; 2], planets: [u32; 2], ring: u32, count: u32) -> S
     b.build()
 }
 
+/// **A worm feeding a spur pair in one stage**: the worm on its own axis at
+/// a right angle to a wheel shaft that also carries a pinion, and the gear
+/// the pinion drives on a third axis parallel to it. Two distances, one at
+/// an angle; a point contact and a line contact in one shape, which is what
+/// a crossed distance being a mesh like any other buys.
+///
+/// Shafts: worm 1, output 2, wheel 3; members: worm, wheel, pinion, gear.
+#[must_use]
+pub fn worm_and_pair(worm: (u32, u32), pair: (u32, u32)) -> Shape {
+    let mut b = Builder::new(1.0);
+    let worm_axis = b.axis();
+    let wheel_axis = b.axis();
+    let out_axis = b.axis();
+    let worm_shaft = b.shaft(worm_axis);
+    let output = b.shaft(out_axis);
+    let wheel_shaft = b.shaft(wheel_axis);
+    let w = b.gear(worm_shaft, worm.0);
+    let wheel = b.gear(wheel_shaft, worm.1);
+    let pinion = b.gear(wheel_shaft, pair.0);
+    let gear = b.gear(output, pair.1);
+    b.mesh(w, wheel)
+        .mesh(pinion, gear)
+        .crossed([worm_axis, wheel_axis], 90.0)
+        .distance([wheel_axis, out_axis]);
+    // A worm's size is its diameter, not a helix: seven millimetres at one
+    // start is the worm preset's.
+    b.shape.members[0].pitch_diameter = Auto::fixed(7.0);
+    b.build()
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -358,6 +394,40 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// **A point contact and a line contact in one stage** multiply as any
+    /// two meshes do: the ratio is the worm's times the pair's, the
+    /// efficiency the product of the two meshes' own, the wheel is rated by
+    /// contact alone and the pinion on its shaft by bending as well, and
+    /// the stage locks backward exactly where the worm does.
+    #[test]
+    fn a_worm_and_a_spur_pair_share_one_stage() {
+        let shape = worm_and_pair((1, 40), (17, 43));
+        let r = solve(&shape, &[], 1, 2);
+        assert!(
+            (r.ratio.abs() - 40.0 * 43.0 / 17.0).abs() < 1e-9,
+            "{}",
+            r.ratio
+        );
+        every_distance_closes(&r);
+        assert!(r.meshes[0].point.is_some() && r.meshes[1].line.is_some());
+        let product = r.meshes[0].efficiency.forward * r.meshes[1].efficiency.forward;
+        assert!(
+            (r.efficiency.forward - product).abs() < 1e-9,
+            "{} vs {product}",
+            r.efficiency.forward
+        );
+        assert_eq!(
+            r.efficiency.backward <= 0.0,
+            r.meshes[0].efficiency.backward <= 0.0,
+            "the stage locks where its worm does"
+        );
+        assert!(r.members[1].cases[0].bending_stress.is_none());
+        assert!(r.members[2].cases[0].bending_stress.is_some());
+        assert!(r.members[1].cases[0].contact_stress > 0.0);
+        // The wheel and the pinion turn as one: the same shaft.
+        assert_eq!(r.members[1].cases[0].speed, r.members[2].cases[0].speed);
     }
 
     #[test]
