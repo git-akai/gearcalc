@@ -3079,97 +3079,107 @@ fn worm_stage_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, torque: 
 /// Prints every candidate rather than picking one, because the choice is a
 /// designer's: the geometric ideal needs no shift but rarely spaces the planets
 /// evenly, and the one that does costs a shift. Both facts are on the same row.
+///
+/// Through the shape, one ring count at a time — the planet closing the set
+/// as it closes any automatic distance — rather than through a ring search
+/// of its own: the sweep is the same walk with the same closure, and the
+/// row a count does not admit says why in the stage's own words.
 fn planetary_report(sun: u32, planet: u32, planets: u32, sun_shift: f64, ring_shift: f64) {
-    use gear_core::plane::BasicRack;
-    use gear_core::planetary::{ring_candidates, shift_bracket, solve, Set, Teeth};
+    use gear_core::params::Auto;
+    use gear_core::train::{solve_any, PlanetaryStage, Stage, StageLoads, TrainError};
 
+    let lib = gear_io::default_library();
     let module = 1.0;
-    let set = Set {
-        rack: BasicRack::new(module, 20.0, 0.0),
-        teeth: Teeth {
-            sun,
-            planet,
-            ring: 0,
-        },
-        planets,
-        // The ring search is the planet's: its completeness rests on the
-        // planet's shift rising with the ring's count.
-        shift: [sun_shift, 0.0, ring_shift],
-        absorber: gear_core::planetary::Member::Planet,
-        // The ring search asks which distances the counts *can* reach, so it
-        // names none of its own.
-        distance: None,
-        // A planet's tip diameter at a standard addendum, which is what the
-        // clearance column is measured against.
-        planet_tip_diameter: module * (f64::from(planet) + 2.0),
-        // The counts a set can reach are asked at zero backlash; a running
-        // clearance moves every row's shift by the same small amount.
-        clearance: 0.0,
-    };
-
+    let ideal = sun + 2 * planet;
     println!(
         "planetary  z_sun {sun}  z_planet {planet}  N {planets}  \
          x_sun {sun_shift}  x_ring {ring_shift}  module {module}  alpha 20 deg"
     );
-    println!(
-        "ideal ring (needs no planet shift): {}",
-        Teeth::ideal_ring(sun, planet)
-    );
+    println!("ideal ring (needs no planet shift): {ideal}");
 
-    // Everything the involute domain admits, whatever shift it costs. The range
-    // is deliberately wide: this is the "what is possible" listing.
-    let all = ring_candidates(
-        &set,
-        (f64::NEG_INFINITY, f64::INFINITY),
-        4 * (sun + 2 * planet),
-    );
-    if all.is_empty() {
+    // Every count the closure admits, from a ring too small to hold the
+    // planets up to four times the ideal — the "what is possible" listing.
+    // The counts a set can reach are asked at zero backlash; a running
+    // clearance moves every row's shift by the same small amount.
+    let at = |ring: u32| -> Result<gear_core::train::StageResult, TrainError> {
+        let mut set = PlanetaryStage {
+            module,
+            planets,
+            clearance: Auto::fixed(0.0),
+            ..PlanetaryStage::default()
+        };
+        set.sun.teeth = sun;
+        set.planet.teeth = planet;
+        set.ring.teeth = ring;
+        set.sun.profile_shift = Auto::fixed(sun_shift);
+        set.ring.profile_shift = Auto::fixed(ring_shift);
+        set.planet.profile_shift = Auto::automatic(0.0);
+        // A listing of what the counts admit, not a design: the shifts are
+        // taken as typed, not raised off undercut.
+        for g in [&mut set.sun, &mut set.planet, &mut set.ring] {
+            g.no_undercut = false;
+        }
+        solve_any(&Stage::planetary(set), &StageLoads::just(2.0), &lib)
+    };
+    let mut rows = Vec::new();
+    let mut below: Option<(u32, TrainError)> = None;
+    let mut refused: Option<(u32, TrainError)> = None;
+    for ring in (planet + 1)..=(4 * ideal) {
+        match at(ring) {
+            Ok(r) => rows.push((ring, r)),
+            Err(e) => {
+                if rows.is_empty() {
+                    below = Some((ring, e));
+                } else {
+                    refused = Some((ring, e));
+                    break;
+                }
+            }
+        }
+    }
+    if rows.is_empty() {
         println!("\nno ring tooth count admits a solution for that sun and planet");
         return;
+    }
+    if let Some((ring, e)) = below {
+        println!("\nwhy it starts: z_ring {ring}: {e}");
     }
 
     println!(
         "\n{:>6} {:>10} {:>12} {:>10} {:>9} {:>7} {:>7} {:>11}",
         "z_ring", "x_planet", "c2c mm", "residual", "a_w sun", "even", "simult", "clearance"
     );
-    for (ring, l) in &all {
-        let clearance = l
-            .planet_clearance
-            .map_or_else(|| "     n/a".to_string(), |c| format!("{c:8.3}"));
+    for (ring, r) in &rows {
+        let s = r.as_shape().expect("a set is a shape");
+        let d = &s.distances[0];
+        let layout = s.layouts.first();
+        let clearance = layout.map_or_else(
+            || "     n/a".to_string(),
+            |l| format!("{:8.3}", l.clearance),
+        );
         println!(
             "{ring:>6} {:>10.4} {:>12.6} {:>10.1e} {:>9.3} {:>7} {:>7} {clearance:>11}",
-            l.shift[gear_core::planetary::Member::Planet.index()],
-            l.centre_distance,
-            l.residual,
-            l.alpha_w_sun.to_degrees(),
-            if l.equal_spacing { "yes" } else { "no" },
-            if l.simultaneous_meshing { "yes" } else { "no" },
+            s.members[1].profile_shift,
+            d.running,
+            (d.nominal[0] - d.nominal[1]).abs(),
+            transverse(&s.meshes[0]).operating_pressure_angle,
+            if layout.and_then(|l| l.equal_spacing) == Some(true) {
+                "yes"
+            } else {
+                "no"
+            },
+            if layout.and_then(|l| l.simultaneous_meshing) == Some(true) {
+                "yes"
+            } else {
+                "no"
+            },
         );
     }
 
-    // The bracket is why the list stops where it does, so say so with numbers.
-    let widest = all.last().map(|(z, _)| *z).unwrap_or(0);
-    let beyond = Set {
-        teeth: Teeth {
-            ring: widest + 1,
-            ..set.teeth
-        },
-        ..set
-    };
-    print!("\nwhy it stops: z_ring {} ", widest + 1);
-    match shift_bracket(&beyond) {
-        None => println!("has no admissible planet shift at all"),
-        Some((lo, hi)) => {
-            let inside = solve(&beyond).is_some();
-            println!(
-                "admits x_planet in [{lo:.4}, {hi:.4}] but {}",
-                if inside {
-                    "was excluded by the sweep limit"
-                } else {
-                    "no shift in it equalises the two centre distances"
-                }
-            );
-        }
+    // Why the list stops where it does, in the stage's own words.
+    match refused {
+        Some((ring, e)) => println!("\nwhy it stops: z_ring {ring}: {e}"),
+        None => println!("\nwhy it stops: the sweep's own limit, four times the ideal ring"),
     }
 }
 

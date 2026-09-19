@@ -664,8 +664,14 @@ Everything above them is unconditional and lands in Phases 0–4.
   axes, and shaft angle is a genuine parameter there; folding it into the
   epicyclic grid would be collapsing two different assembly problems, not one.
   Its kinematics joins the graph like everything else.
-- `planetary::solve`'s shift absorption, `shift_bracket`, `ring_candidates`.
-  These are the closure solve and they generalise rather than go.
+- ~~`planetary::solve`'s shift absorption, `shift_bracket`, `ring_candidates`.
+  These are the closure solve and they generalise rather than go.~~ They
+  generalised (`shape.rs`'s plan, `absorb` and the leverage rule) and then
+  went, in Phase 7's ablation: `gear-cli planetary` walks the ring counts
+  through the shape's own closure, and the closure's laws — the ideal ring
+  at zero shift, one run of admissible counts with the shift rising along
+  it — are asked of the shape. What `crate::planetary` keeps is the set's
+  vocabulary and Pennestrì's closed form, the independent check.
 - Every rating type. If any of them moves, the division argued in
   `docs/rationale.md#each-stage-kind-keeps-its-own-result-type` was wrong, and
   that is a finding worth having rather than a cost to pay quietly.
@@ -891,6 +897,13 @@ every kind took and the operating angle quoted running; `hulaband`
 reproduces row for row once the search learned to size the crank again at
 what each round chose. Three faults surfaced on the way and are in
 `docs/corrections.md`.
+
+*Phase 7, the ablation half, in progress:* the set's own closure solver and
+ring search are gone (above); `gear-cli planetary` reproduces its listing
+through the shape row for row, with the shifts taken as typed, and says why
+the listing starts and stops in the stage's own words — its clearance
+column reads the planet's actual tip now, and a count whose planet is too
+undercut to rate is refused rather than listed.
 
 **Phase 7 — the division of a load, and the audit.** The per-mesh loss model
 lands in 5a because the shape needs it; what remains here is what it makes

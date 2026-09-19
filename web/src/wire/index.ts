@@ -8,7 +8,6 @@
 // than a type error — the duplicated-default fault (`docs/corrections.md`) one
 // level up, and the last place the project still had it.
 
-export type { Arrangement } from "./core/Arrangement";
 export type { Auto } from "./core/Auto";
 export type { Axis } from "./core/Axis";
 export type { Backlash } from "./core/Backlash";
@@ -40,7 +39,6 @@ export type { GearCase } from "./core/GearCase";
 export type { GearParams } from "./core/GearParams";
 export type { GearResult } from "./core/GearResult";
 export type { HulaStage } from "./core/HulaStage";
-export type { Layout } from "./core/Layout";
 export type { LayoutReport } from "./core/LayoutReport";
 export type { LineContact } from "./core/LineContact";
 export type { LoadCase } from "./core/LoadCase";
@@ -61,12 +59,10 @@ export type { Overrides } from "./core/Overrides";
 export type { PairKind } from "./core/PairKind";
 export type { PairStage } from "./core/PairStage";
 export type { PerToothClamps } from "./core/PerToothClamps";
-export type { PlanetaryShaft } from "./core/PlanetaryShaft";
 export type { PlanetaryStage } from "./core/PlanetaryStage";
 export type { PointContact } from "./core/PointContact";
 export type { Port } from "./core/Port";
 export type { PortSpec } from "./core/PortSpec";
-export type { Power } from "./core/Power";
 export type { Ranges } from "./core/Ranges";
 export type { ShaftCase } from "./core/ShaftCase";
 export type { ShaftConstraint } from "./core/ShaftConstraint";

@@ -15,7 +15,6 @@ import type {
   Figure,
   Freedom,
   FreedomGroup,
-  Arrangement,
   CaseKind,
   LoadCase,
   Port,
@@ -89,7 +88,6 @@ import type {
 } from "./wire";
 export type { CaseKind, LoadCase, Port };
 export type {
-  Arrangement,
   Duty,
   GearCase,
   MeshCase,

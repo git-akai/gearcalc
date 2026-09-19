@@ -1353,6 +1353,15 @@ impl Shape {
             .collect()
     }
 
+    /// The shifts the closure settles on, or why it could not — what the
+    /// laws of the set's closure ask, with no rating in the way.
+    #[cfg(test)]
+    pub(crate) fn closure(&self) -> Result<Vec<f64>, TrainError> {
+        let helix = self.helix_angles();
+        self.chosen_at(&crate::auto::Search::SHIPPED, &helix)
+            .map(|c| c.shifts)
+    }
+
     /// The shifts the shape settles on under a search — what the tests
     /// written against the kinds' own choosers ask.
     #[cfg(test)]
@@ -3026,6 +3035,97 @@ mod tests {
     /// **Every arrangement of a set solves through the shape** and reports a
     /// ratio the graph gives, an efficiency below one both ways, and a play
     /// at whichever shaft is the output.
+    /// A set as the closure's laws ask it: the shifts as typed, no
+    /// undercut floor, zero backlash, the planet closing it.
+    fn closure_set(sun: u32, planet: u32, ring: u32) -> Shape {
+        let mut set = PlanetaryStage {
+            clearance: Auto::fixed(0.0),
+            ..PlanetaryStage::default()
+        };
+        set.sun.teeth = sun;
+        set.planet.teeth = planet;
+        set.ring.teeth = ring;
+        set.sun.profile_shift = Auto::fixed(0.0);
+        set.ring.profile_shift = Auto::fixed(0.0);
+        for g in [&mut set.sun, &mut set.planet, &mut set.ring] {
+            g.no_undercut = false;
+        }
+        Shape::from(&set)
+    }
+
+    /// **The ideal ring needs no planet shift** — `z_r = z_s + 2 z_p` puts
+    /// the planet exactly halfway, so the shift is zero, not nearly zero, and
+    /// the common distance is the reference one. The check the whole closure
+    /// has to pass, kept from the set's own solver.
+    #[test]
+    fn the_ideal_ring_needs_no_planet_shift() {
+        for (sun, planet) in [(17u32, 17u32), (20, 25), (13, 31), (40, 15)] {
+            let ring = sun + 2 * planet;
+            let shape = closure_set(sun, planet, ring);
+            let x = shape.closure().unwrap();
+            assert!(
+                x[1].abs() < 1e-12,
+                "z={sun}/{planet}/{ring}: shift {}",
+                x[1]
+            );
+            let b = shape.build_at(&x).unwrap();
+            let a_ref = f64::from(sun + planet) / 2.0;
+            assert!((b.running[0].unwrap() - a_ref).abs() < 1e-12);
+        }
+    }
+
+    /// **The required planet shift rises with the ring's count**, which is
+    /// what made the set's own ring search provably complete, and **the
+    /// counts that close form one run with no hole in it** — the ideal ring
+    /// inside it. A hole would be a bracket's endpoint rounded outside the
+    /// involute domain it was meant to sit on, which the set's solver once
+    /// had on a 24/16 set with four planets.
+    #[test]
+    fn the_admissible_ring_counts_are_one_run_and_the_shift_rises_along_it() {
+        for (sun, planet) in [
+            (17u32, 17u32),
+            (18, 18),
+            (24, 16),
+            (13, 31),
+            (40, 15),
+            (20, 25),
+            (9, 21),
+            (31, 13),
+        ] {
+            let ideal = sun + 2 * planet;
+            let mut found: Vec<(u32, f64)> = Vec::new();
+            for ring in (planet + 1)..=(2 * ideal) {
+                if let Ok(x) = closure_set(sun, planet, ring).closure() {
+                    found.push((ring, x[1]));
+                }
+            }
+            assert!(!found.is_empty(), "z={sun}/{planet}: nothing admissible");
+            let (first, last) = (found[0].0, found.last().unwrap().0);
+            assert_eq!(
+                found.iter().map(|f| f.0).collect::<Vec<_>>(),
+                (first..=last).collect::<Vec<u32>>(),
+                "z={sun}/{planet}: the admissible run has a hole in it"
+            );
+            assert!(
+                found.iter().any(|f| f.0 == ideal),
+                "z={sun}/{planet}: {ideal} missing"
+            );
+            for w in found.windows(2) {
+                assert!(
+                    w[1].1 > w[0].1,
+                    "z={sun}/{planet}: the shift fell from {:?} to {:?}",
+                    w[0],
+                    w[1]
+                );
+            }
+        }
+        // The 17/17 run the set's solver named: 48 to 54.
+        let run: Vec<u32> = (40..=70)
+            .filter(|&z| closure_set(17, 17, z).closure().is_ok())
+            .collect();
+        assert_eq!(run, (48..=54).collect::<Vec<u32>>());
+    }
+
     #[test]
     fn every_arrangement_of_a_set_solves() {
         use crate::planetary::{Arrangement, PlanetaryShaft};

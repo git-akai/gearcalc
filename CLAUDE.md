@@ -76,7 +76,7 @@ of a gear is worth more than knowing what it does.
 | `mesh.rs` | Two gears in mesh: centre distance, operating angle, backlash | load, material, or strength |
 | `contact.rs` | The path of contact and how load is shared along it | stress |
 | `screw.rs` | Crossed-axis screw gearing — one model for a worm and a crossed pair | that a worm is special |
-| `planetary.rs` | Planetary **layout** and Willis/Pennestrì kinematics — the independent check the shape's flow is held to | tooth form |
+| `planetary.rs` | The set's **vocabulary** — sun, carrier, ring; an arrangement — and Pennestrì's closed form, the independent check the shape's flow is held to on every arrangement. No solve: the set's closure is the shape's | tooth form, geometry |
 | `strength.rs` | The critical section, both notch models, `Y_F`, `K_f`, Hertz beside it. `ToothOutline` is the seam that makes one model serve a tooth and a ring | which stage kind is asking |
 | `metrology.rs` | Span over teeth, over-pins, and what they take round a revolution | tolerances (that is `jgma.rs`) |
 | `jgma.rs` | JGMA 116-02 tolerance tables, transcribed and checked | how a tolerance is used |
