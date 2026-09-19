@@ -15,7 +15,21 @@ export type ShapeResult = {
 /**
  * Input turns per output turn, signed.
  */
-ratio: number, efficiency: Directional<number>, 
+ratio: number, 
+/**
+ * **The ratio one more tooth on each member would give**, in member
+ * order — the graph's exact answer at `z_i + 1`, which is what a
+ * designer choosing counts wants beside the ratio: where a tooth
+ * moves it a lot, and where it moves it not at all.
+ */
+ratio_per_tooth: Array<number>, efficiency: Directional<number>, 
+/**
+ * **The power crossing the teeth, over the power in**, in each
+ * direction: one on a pair, under one on a set, and many times one
+ * where power circulates ([`super::flow::Flow::circulation`]). Zero
+ * where the stage does not turn that way.
+ */
+circulation: Directional<number>, 
 /**
  * Play at the output shaft driven forward, at the input driven back.
  */

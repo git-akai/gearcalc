@@ -311,6 +311,11 @@ mesh's tips would cross at it — or, where a far-side gap was asked, the least
 distance that gives it, the shifts following: the hula stage's crank, sized
 by the shape for every arrangement with an internal mesh, and held to the
 figures the kind recorded before it retired.
+Two figures the graph makes free are reported beside the ratio and the
+efficiency: what one more tooth on each member would make the ratio, and
+the power through the teeth over the power in, per mesh and summed. A load
+on a shaft two stages share goes the way that holds it, and is refused only
+where it would be held at both ends.
 Retiring the kinds into it moved four figures, each recorded in
 [corrections](corrections.md#the-log) with its size: a set's driven-side
 meshes pressed `η` short (0.55 % on the ring's bending); a backward case read

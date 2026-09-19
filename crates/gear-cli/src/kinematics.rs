@@ -515,6 +515,22 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
             s.backlash().forward.nominal,
             s.backlash().backward.nominal,
         );
+        // What the teeth pass over what comes in, both ways, and what one
+        // more tooth on each member would make the ratio — the two figures
+        // Phase 7 added, recorded so their path is known to be walked.
+        if let Some(shape) = s.as_shape() {
+            println!(
+                "    power through the teeth {:>10.6} / {:<10.6}   one more tooth on each member: {}",
+                shape.circulation.forward,
+                shape.circulation.backward,
+                shape
+                    .ratio_per_tooth
+                    .iter()
+                    .map(|r| format!("{r:.6}"))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
+        }
         for (label, cases) in shaft_cases(&train.stages[k], s) {
             for (case, speed, torque) in cases {
                 println!(

@@ -1353,6 +1353,29 @@ impl Shape {
             .collect()
     }
 
+    /// **The ratio with one more tooth on each member**, off the graph
+    /// alone; the ratio itself where a count cannot change it, or where the
+    /// changed counts are no mechanism.
+    fn ratio_per_tooth(
+        &self,
+        wiring: &Wiring,
+        teeth: &[u32],
+        boundary: &super::StageBoundary,
+    ) -> Vec<f64> {
+        let base = wiring
+            .unit_motion(teeth, boundary)
+            .map_or(f64::NAN, |m| m.ratio());
+        (0..teeth.len())
+            .map(|i| {
+                let mut more = teeth.to_vec();
+                more[i] += 1;
+                wiring
+                    .unit_motion(&more, boundary)
+                    .map_or(base, |m| m.ratio())
+            })
+            .collect()
+    }
+
     /// The shifts the closure settles on, or why it could not — what the
     /// laws of the set's closure ask, with no rating in the way.
     #[cfg(test)]
@@ -1789,7 +1812,17 @@ pub struct ShaftCase {
 pub struct ShapeResult {
     /// Input turns per output turn, signed.
     pub ratio: f64,
+    /// **The ratio one more tooth on each member would give**, in member
+    /// order — the graph's exact answer at `z_i + 1`, which is what a
+    /// designer choosing counts wants beside the ratio: where a tooth
+    /// moves it a lot, and where it moves it not at all.
+    pub ratio_per_tooth: Vec<f64>,
     pub efficiency: Directional<f64>,
+    /// **The power crossing the teeth, over the power in**, in each
+    /// direction: one on a pair, under one on a set, and many times one
+    /// where power circulates ([`super::flow::Flow::circulation`]). Zero
+    /// where the stage does not turn that way.
+    pub circulation: Directional<f64>,
     /// Play at the output shaft driven forward, at the input driven back.
     pub backlash: Directional<super::Backlash>,
     pub distances: Vec<DistanceReport>,
@@ -1829,7 +1862,13 @@ pub fn solve_shape(
         let r = super::crossed::solve_crossed_pair(&sized, kind, loads, lib, &motion)?;
         return Ok(ShapeResult {
             ratio: r.ratio,
+            ratio_per_tooth: shape.ratio_per_tooth(&wiring, &teeth, &boundary),
             efficiency: r.mesh.efficiency,
+            // The one mesh carries the whole of it, either way it turns.
+            circulation: Directional {
+                forward: f64::from(u8::from(r.mesh.efficiency.forward > 0.0)),
+                backward: f64::from(u8::from(r.mesh.efficiency.backward > 0.0)),
+            },
             backlash: r.mesh.backlash_by_drive(),
             distances: vec![DistanceReport {
                 nominal: vec![r.centre_distance_nominal],
@@ -2415,6 +2454,10 @@ pub fn solve_shape(
             super::line_mesh_report(
                 loads,
                 super::LineMesh {
+                    power_through: Directional {
+                        forward: moving.forward.as_ref().map_or(0.0, |f| f.mesh_powers[k]),
+                        backward: moving.backward.as_ref().map_or(0.0, |b| b.mesh_powers[k]),
+                    },
                     coprime: super::gcd(
                         shape.members[m.a].gear.teeth,
                         shape.members[m.b].gear.teeth,
@@ -2470,7 +2513,18 @@ pub fn solve_shape(
 
     Ok(ShapeResult {
         ratio: motion.ratio(),
+        ratio_per_tooth: shape.ratio_per_tooth(&wiring, &teeth, &boundary),
         efficiency: stage_efficiency,
+        circulation: Directional {
+            forward: moving
+                .forward
+                .as_ref()
+                .map_or(0.0, super::flow::Flow::circulation),
+            backward: moving
+                .backward
+                .as_ref()
+                .map_or(0.0, super::flow::Flow::circulation),
+        },
         backlash,
         distances,
         overlap,
@@ -3124,6 +3178,54 @@ mod tests {
             .filter(|&z| closure_set(17, 17, z).closure().is_ok())
             .collect();
         assert_eq!(run, (48..=54).collect::<Vec<u32>>());
+    }
+
+    /// **The ratio with one more tooth is the graph's own**, member by
+    /// member: on a pair the wheel's tooth moves it by exactly `1/z₁`, the
+    /// pinion's by the classical quotient; on a set with its ring held the
+    /// planet's count moves the ratio not at all.
+    #[test]
+    fn one_more_tooth_moves_the_ratio_as_the_graph_says() {
+        let lib = test_library();
+        let pair = Shape::from_pair(&PairStage::default(), PairKind::Spur);
+        let r = solve_shape(&pair, &loads(), &lib, super::super::Reversal::default()).unwrap();
+        assert!((r.ratio_per_tooth[1] + 44.0 / 17.0).abs() < 1e-12);
+        assert!((r.ratio_per_tooth[0] + 43.0 / 18.0).abs() < 1e-12);
+        assert!(
+            (r.circulation.forward - 1.0).abs() < 1e-12,
+            "a pair passes it all once"
+        );
+        let set = PlanetaryStage::default();
+        let r = solve_set(&set, &loads(), &lib).unwrap();
+        assert!((r.ratio - 7.0).abs() < 1e-12);
+        assert!(
+            (r.ratio_per_tooth[0] - (1.0 + 72.0 / 13.0)).abs() < 1e-12,
+            "a sun's tooth"
+        );
+        assert!(
+            (r.ratio_per_tooth[1] - 7.0).abs() < 1e-12,
+            "a planet's tooth moves nothing"
+        );
+        assert!(
+            (r.ratio_per_tooth[2] - (1.0 + 73.0 / 12.0)).abs() < 1e-12,
+            "a ring's tooth"
+        );
+        // ...and the power through a set's sun mesh is under the power in,
+        // the carrier carrying the rest bodily: with the ring held, the
+        // fraction the sun turns against the carrier — and the same power,
+        // less that mesh's loss, crosses the ring mesh after it.
+        let (sun_mesh, ring_mesh) = (&r.meshes[0], &r.meshes[1]);
+        assert!((sun_mesh.power_through.forward - 6.0 / 7.0).abs() < 1e-9);
+        assert!(
+            (ring_mesh.power_through.forward - 6.0 / 7.0 * sun_mesh.efficiency.forward).abs()
+                < 1e-9
+        );
+        assert!(
+            (r.circulation.forward
+                - (sun_mesh.power_through.forward + ring_mesh.power_through.forward))
+                .abs()
+                < 1e-12
+        );
     }
 
     #[test]

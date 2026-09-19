@@ -193,6 +193,12 @@ impl Backlash {
     ts(export, export_to = "core/")
 )]
 pub struct MeshReport {
+    /// **The power crossing this mesh, over the power into the stage**, in
+    /// each direction: one where all of it crosses, less where a carrier
+    /// carries part of it bodily, more where power circulates
+    /// ([`flow::Flow::mesh_powers`]). Zero where the stage does not turn
+    /// that way.
+    pub power_through: Directional<f64>,
     /// Whether the two members' tooth counts share no factor — a hunting pair,
     /// which spreads wear evenly instead of repeatedly bringing the same two
     /// teeth together.
@@ -411,6 +417,7 @@ impl ContactPatch {
 /// restating which of its fields a line contact leaves at their degenerate
 /// values.
 pub(crate) struct LineMesh {
+    pub power_through: Directional<f64>,
     pub coprime: bool,
     pub contact_ratios: ContactRatios,
     /// Transverse operating pressure angle, degrees — the report's unit.
@@ -444,6 +451,7 @@ pub(crate) fn line_mesh_report(loads: &StageLoads, m: LineMesh) -> MeshReport {
     }
     MeshReport {
         notes,
+        power_through: m.power_through,
         coprime: m.coprime,
         contact_ratio: m.contact_ratios.total,
         // No friction locks a line contact — see the field.
@@ -1614,13 +1622,12 @@ pub enum TrainError {
     /// shafts that is not a port — a planet's. Zero-based, as the cases are
     /// indexed; the front end numbers from 1.
     LoadPort { case: usize },
-    /// **A load case enters between two stages, and could leave by either
-    /// end.** How such a load divides is a statement about what holds it at
-    /// each end — the rowspace of the shaft line, with a loss model that
-    /// follows power mesh by mesh — and this model refers a load along one
-    /// route with one efficiency per stage. So it says so rather than
-    /// choosing an end, and the refusal is the boundary of the model, not of
-    /// the mechanism.
+    /// **A load case enters between two stages, and is held at both ends.**
+    /// A load with two ways out goes the way that holds it — a stage that
+    /// locks in that direction, with nothing holding the other end — and
+    /// one that is held at both divides by stiffness, which is a statement
+    /// this model does not make. So it says so rather than choosing an end,
+    /// and the refusal is the boundary of the model, not of the mechanism.
     LoadShared { case: usize },
     /// **No distance clears the tips of this mesh**: an automatic distance
     /// with an internal mesh on it opened out through the involute domain
@@ -3827,11 +3834,39 @@ pub fn solve_train(train: &Train, lib: &MaterialLibrary) -> Result<TrainResult, 
         // backward through one it enters by the output of — rather than a
         // direction stored beside the port.
         let entry = train.port_shaft(&boundaries, case.port);
-        let route = train.route(&boundaries, entry).map_err(|e| match e {
+        let routes = train.routes(&boundaries, entry).map_err(|e| match e {
             RouteError::NotAPort => TrainError::LoadPort { case: index },
             RouteError::Shared => TrainError::LoadShared { case: index },
         })?;
-        let (torques, reacted_at, delivered_torque) = carry(&first, &route, case);
+        // **A load with two ways out goes the way that holds it.** Between
+        // two stages of a chain the load can go back or on, and what carries
+        // it is what holds its far end: a stage that locks in that direction
+        // holds it there, and one such lock with nothing else holding is one
+        // route carrying the whole load. Two holds — two locks, or a lock
+        // beside a far end the case says is held, or both far ends held —
+        // divide it by stiffness, which is a statement this model does not
+        // make, and the refusal says so.
+        let carried: Vec<(Vec<f64>, Option<usize>, f64)> =
+            routes.iter().map(|r| carry(&first, r, case)).collect();
+        let locked: Vec<usize> = (0..routes.len())
+            .filter(|&i| carried[i].1.is_some())
+            .collect();
+        let (route, torques, reacted_at, delivered_torque) = match (routes.len(), locked.as_slice())
+        {
+            (1, _) => {
+                let (t, r, d) = carried.into_iter().next().expect("one route");
+                (&routes[0], t, r, d)
+            }
+            (_, [one]) if !case.reacted => {
+                let (t, r, d) = carried[*one].clone();
+                (&routes[*one], t, r, d)
+            }
+            (_, []) if !case.reacted => {
+                // Nothing holds it at any end: the train turns under it.
+                (&routes[0], vec![0.0; train.stages.len()], None, 0.0)
+            }
+            _ => return Err(TrainError::LoadShared { case: index }),
+        };
         let delivered_speed = motion.read(case.speed, route.far, entry);
         let mut notes = Vec::new();
         match reacted_at {
@@ -6242,13 +6277,28 @@ mod tests {
         assert_eq!(t.route(&b, at(1, sun)), Err(RouteError::Shared));
         assert_eq!(t.route(&b, at(0, 2)), Err(RouteError::Shared));
 
-        // ...and the refusals reach a load case by number.
+        // ...and the refusals reach a load case by number. A load between
+        // the two stages with **both ends held** is the division this model
+        // does not make; with neither held nothing carries it, which the
+        // case says.
         let mut shared = t.clone();
         shared.load_cases[1].port = Port::At(at(1, sun));
+        shared.load_cases[1].reacted = true;
         assert_eq!(
             solve_train(&shared, &lib).err(),
             Some(TrainError::LoadShared { case: 1 })
         );
+        shared.load_cases[1].reacted = false;
+        let r = solve_train(&shared, &lib).expect("nothing holds it, so nothing carries it");
+        assert!(r.cases[1]
+            .notes
+            .iter()
+            .any(|n| n.is(key::TRAIN_LOAD_NOT_REACTED)));
+        for stage in &r.stages {
+            for g in stage.members() {
+                assert_eq!(g.cases[1].torque, 0.0, "a load nothing holds loads nothing");
+            }
+        }
         let mut held = t.clone();
         held.load_cases[2].port = Port::At(at(1, ring));
         assert_eq!(
@@ -9532,6 +9582,54 @@ mod tests {
             derated.gears[0].cases[1].min_face_width.contact,
             wide.gears[0].cases[1].min_face_width.contact,
             "and it must not reach the other gear"
+        );
+    }
+
+    /// **A load between two stages goes the way that holds it.** A worm
+    /// ahead of a pair locks against a load from its wheel; a load put on
+    /// the shaft the two share, with neither far end held, can only be
+    /// carried by the worm — so the worm is loaded, the pair is not, and
+    /// the case says where it was held. The same load with the far ends held
+    /// as well would be held twice, and is refused as such.
+    #[test]
+    fn a_load_between_two_stages_goes_the_way_that_holds_it() {
+        let lib = library();
+        let mut t = two_stage();
+        t.stages = vec![
+            Stage::worm(PairStage::worm()),
+            Stage::spur(PairStage::default()),
+        ];
+        // The shared shaft: the worm's wheel, coupled to the pair's first.
+        t.load_cases[BACK].port = Port::At(ShaftRef::Of { stage: 0, shaft: 2 });
+        t.load_cases[BACK].reacted = false;
+        t.load_cases[BACK].torque = 0.5;
+        let r = solve_train(&t, &lib).expect("the worm holds it");
+        assert_eq!(r.cases[BACK].reacted_at, Some(0), "held by the worm");
+        let worm = r.stages[0].members();
+        let pair = r.stages[1].members();
+        assert!(
+            worm[1].cases[BACK].torque > 0.0,
+            "the wheel carries the load"
+        );
+        assert_eq!(
+            pair[0].cases[BACK].torque, 0.0,
+            "the pair carries none of it"
+        );
+        assert_eq!(pair[1].cases[BACK].torque, 0.0);
+        // ...and the same shaft named from the pair's side is the same load.
+        let mut same = t.clone();
+        same.load_cases[BACK].port = Port::At(ShaftRef::Of { stage: 1, shaft: 1 });
+        let again = solve_train(&same, &lib).expect("the same shaft");
+        assert_eq!(again.cases[BACK].reacted_at, Some(0));
+        assert!(
+            (again.stages[0].members()[1].cases[BACK].torque - worm[1].cases[BACK].torque).abs()
+                < 1e-12
+        );
+        // Held at the far end as well: two holds, and a refusal.
+        t.load_cases[BACK].reacted = true;
+        assert_eq!(
+            solve_train(&t, &lib).err(),
+            Some(TrainError::LoadShared { case: BACK })
         );
     }
 

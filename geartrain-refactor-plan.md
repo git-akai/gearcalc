@@ -914,6 +914,19 @@ that the new path was reached at all (§10.3). Then the pass the standing
 instruction asks for: what the new learnings let us ablate, and whether the
 four documents describe what now exists.
 
+*Done:* a load between two stages goes the way that holds it — a stage
+locked in that direction, with nothing else holding — and is refused only
+where it would be held at both ends (`a_load_between_two_stages_goes_the_
+way_that_holds_it`); `MeshReport::power_through` and
+`ShapeResult::circulation`, the driving side's power over the power in,
+held to the law that a stage's loss is each mesh's loss on the power
+crossing it, exactly, and to `η |R − 1|` on a hula's meshes;
+`ShapeResult::ratio_per_tooth`, the graph at `z_i + 1`, held to the
+classical quotients. All three print in `gear-cli kinematics`, so the
+corpus walks them. The ablation: the set's closure solver and ring search,
+and the hula kind, above. What the four documents say of what exists is the
+pass left.
+
 **Optional, scoped separately.** The lever diagram (the `m = 2` nullspace
 rendered — the solution, not a decoration); the inverse problem, searching
 integer tooth counts for a target ratio under closure and assembly at once.

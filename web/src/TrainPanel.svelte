@@ -522,6 +522,8 @@
       <small class="warn">{note(n)}</small>
     {/each}
   </dd>
+  <dt>{t("ui.train_mesh_power_through")}</dt>
+  <dd>{m ? t("ui.train_circulation_both", { forward: num(m.power_through.forward, 2), backward: num(m.power_through.backward, 2) }) : BLANK}</dd>
   <dt>{t("ui.train_mesh_efficiency")}</dt>
   <dd>
     {bothWays(m?.efficiency)}
@@ -1865,7 +1867,15 @@
                  showing its solved value. -->
             <dl class="out">
               <dt>{t("ui.train_ratio")}</dt>
-              <dd>{num(sres?.ratio, 4)} : 1</dd>
+              <dd>
+                {num(sres?.ratio, 4)} : 1
+                <!-- What one more tooth on each member would make it: the
+                     graph's exact answer, so a designer choosing counts sees
+                     where a tooth tells and where it does not. -->
+                {#if sres}
+                  <small>{t("ui.train_ratio_per_tooth")}: {sres.ratio_per_tooth.map((r, j) => `${name(j)} ${num(r, 4)}`).join(" · ")}</small>
+                {/if}
+              </dd>
               {#if worm && sres}
                 <dt>{t("ui.train_lead_angle")}</dt>
                 <dd>
@@ -1879,6 +1889,14 @@
                 {#if lockedWays(sres?.efficiency)}
                   <small class="warn">{lockedWays(sres?.efficiency)}</small>
                 {/if}
+              </dd>
+              <!-- The power the teeth pass, as a multiple of the power in:
+                   one on a pair, and where it is many the stage's loss is
+                   the meshes' loss that many times over. -->
+              <dt>{t("ui.train_circulation")}</dt>
+              <dd>
+                {sres ? t("ui.train_circulation_both", { forward: num(sres.circulation.forward, 2), backward: num(sres.circulation.backward, 2) }) : BLANK}
+                <small>{t("ui.train_note_circulation")}</small>
               </dd>
               <!-- The two shafts the same two plays are seen from: driving
                    forward the play is read at the output, and driving backward

@@ -33,6 +33,14 @@ import type { TipRoom } from "./TipRoom";
  */
 export type MeshReport = { 
 /**
+ * **The power crossing this mesh, over the power into the stage**, in
+ * each direction: one where all of it crosses, less where a carrier
+ * carries part of it bodily, more where power circulates
+ * ([`flow::Flow::mesh_powers`]). Zero where the stage does not turn
+ * that way.
+ */
+power_through: Directional<number>, 
+/**
  * Whether the two members' tooth counts share no factor — a hunting pair,
  * which spreads wear evenly instead of repeatedly bringing the same two
  * teeth together.

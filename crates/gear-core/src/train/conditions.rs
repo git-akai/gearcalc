@@ -898,20 +898,42 @@ impl Train {
     }
 
     /// **The route a load entering at `from` takes** to the far end of the
-    /// shaft line.
+    /// shaft line, where there is one way for it to go.
     ///
     /// At each stage the load arrives by that stage's input or its output —
     /// forward or backward through it — and leaves by the other, which is
     /// coupled to the next stage or is where the route ends. A shaft that is
     /// neither end of its stage's boundary is held, or is no port at all, and
-    /// no load can be put on it; a shaft coupled to a stage on *both* sides
-    /// gives the load two ways out, which is a division this model does not
-    /// make ([`super::TrainError::LoadShared`]).
+    /// no load can be put on it; a shaft coupled to another stage gives the
+    /// load two ways out, and [`Self::routes`] is what says both.
     ///
     /// # Errors
     ///
     /// [`RouteError`].
     pub fn route(&self, boundaries: &[StageBoundary], from: ShaftRef) -> Result<Route, RouteError> {
+        match self.routes(boundaries, from)?.as_slice() {
+            [one] => Ok(one.clone()),
+            _ => Err(RouteError::Shared),
+        }
+    }
+
+    /// **Every route a load entering at `from` can take**: one where the
+    /// shaft is one stage's port alone, and one per side where it is
+    /// coupled to another stage — the load between two stages of a chain
+    /// can go back through the earlier one or on through the later, and
+    /// which of them *carries* it is what holds each far end
+    /// ([`super::solve_train`]).
+    ///
+    /// # Errors
+    ///
+    /// [`RouteError::NotAPort`] for a shaft no load can enter by, and
+    /// [`RouteError::Shared`] for a route that comes back to a stage it has
+    /// crossed, which is a loop this model does not follow.
+    pub fn routes(
+        &self,
+        boundaries: &[StageBoundary],
+        from: ShaftRef,
+    ) -> Result<Vec<Route>, RouteError> {
         let couplings = self.couplings_in_force();
         // The stage a coupling joins `r` to, and the shaft it enters there.
         let across = |r: ShaftRef| -> Vec<ShaftRef> {
@@ -950,25 +972,29 @@ impl Train {
                 },
             ))
         };
-        // Entering by a shaft another stage is coupled to is entering between
-        // two stages.
-        if !across(from).is_empty() {
-            return Err(RouteError::Shared);
-        }
-        let mut steps = Vec::new();
-        let mut here = from;
-        loop {
-            let (stage, drive, leaves) = cross(here)?;
-            if steps.iter().any(|(s, _)| *s == stage) {
-                return Err(RouteError::Shared);
+        // One way out per stage the shaft belongs to: its own, and each it
+        // is coupled to.
+        let mut out = Vec::new();
+        for start in std::iter::once(from).chain(across(from)) {
+            let mut steps = Vec::new();
+            let mut here = start;
+            loop {
+                let (stage, drive, leaves) = cross(here)?;
+                if steps.iter().any(|(s, _)| *s == stage) {
+                    return Err(RouteError::Shared);
+                }
+                steps.push((stage, drive));
+                match across(leaves).as_slice() {
+                    [] => {
+                        out.push(Route { steps, far: leaves });
+                        break;
+                    }
+                    [next] => here = *next,
+                    _ => return Err(RouteError::Shared),
+                }
             }
-            steps.push((stage, drive));
-            match across(leaves).as_slice() {
-                [] => return Ok(Route { steps, far: leaves }),
-                [next] => here = *next,
-                _ => return Err(RouteError::Shared),
-            }
         }
+        Ok(out)
     }
 }
 

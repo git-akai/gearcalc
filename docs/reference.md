@@ -2215,7 +2215,15 @@ times the forward speed is positive where power enters, are the stage's
 `cases`. A backward case's signs follow that rule and not the forward case's:
 the shaft it enters by is the one whose product is positive.
 
-**What it reports.** The ratio, signed; the efficiency both ways; the play
+**What it reports.** The ratio, signed, and **the ratio one more tooth on
+each member would give** — the graph's exact answer at `z_i + 1`, which is
+where a tooth tells and where it does not: a planet's moves a set's ratio
+by nothing; the efficiency both ways, and **the power through the teeth**
+over the power in, per mesh and summed — one on a pair's mesh, `6/7` on a
+set's sun mesh with the ring held (the carrier carrying the rest bodily),
+and `η |R − 1|` on each of a hula's, which is where its efficiency goes:
+a stage's loss is each mesh's loss on the power crossing it, exactly, and
+the driving side's power is what the figure counts so that it is; the play
 at the output driven forward and at the input driven back, from the
 mechanism's play coefficients over every mesh's angular backlash at **its
 own** distance plus a helical member's axial slide, the band being every

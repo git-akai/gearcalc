@@ -1247,23 +1247,23 @@
    "ok": [
     [
      "en",
-     444
+     449
     ],
     [
      "de",
-     444
+     449
     ],
     [
      "pt",
-     444
+     449
     ],
     [
      "zh-Hans",
-     444
+     449
     ],
     [
      "zh-Hant",
-     444
+     449
     ]
    ]
   },
@@ -6576,9 +6576,17 @@
         {
          "kind": "shape",
          "ratio": "-2.5294117647058822",
+         "ratio_per_tooth": [
+          "-2.3888888888888888",
+          "-2.5882352941176472"
+         ],
          "efficiency": {
           "forward": "0.98344976317774946",
           "backward": "0.98344976317774968"
+         },
+         "circulation": {
+          "forward": 1,
+          "backward": "1.0000000000000002"
          },
          "backlash": {
           "forward": {
@@ -6983,6 +6991,10 @@
          ],
          "meshes": [
           {
+           "power_through": {
+            "forward": 1,
+            "backward": "1.0000000000000002"
+           },
            "coprime": true,
            "contact_ratio": "1.5993089920130348",
            "efficiency": {
@@ -7313,9 +7325,17 @@
         {
          "kind": "shape",
          "ratio": "-2.5294117647058822",
+         "ratio_per_tooth": [
+          "-2.3888888888888888",
+          "-2.5882352941176472"
+         ],
          "efficiency": {
           "forward": "0.98344976317774946",
           "backward": "0.98344976317774968"
+         },
+         "circulation": {
+          "forward": 1,
+          "backward": "1.0000000000000002"
          },
          "backlash": {
           "forward": {
@@ -7720,6 +7740,10 @@
          ],
          "meshes": [
           {
+           "power_through": {
+            "forward": 1,
+            "backward": "1.0000000000000002"
+           },
            "coprime": true,
            "contact_ratio": "1.5993089920130348",
            "efficiency": {
@@ -7806,9 +7830,18 @@
         {
          "kind": "shape",
          "ratio": 7,
+         "ratio_per_tooth": [
+          "6.5384615384615383",
+          7,
+          "7.0833333333333330"
+         ],
          "efficiency": {
           "forward": "0.97681810454630269",
           "backward": "0.97672819043691828"
+         },
+         "circulation": {
+          "forward": "1.6957583035698947",
+          "backward": "1.7161590352405902"
          },
          "backlash": {
           "forward": {
@@ -8407,6 +8440,10 @@
          ],
          "meshes": [
           {
+           "power_through": {
+            "forward": "0.85714285714285721",
+            "backward": "0.85569163387443570"
+           },
            "coprime": false,
            "contact_ratio": "1.4368913435664123",
            "efficiency": {
@@ -8488,6 +8525,10 @@
            "point": null
           },
           {
+           "power_through": {
+            "forward": "0.83861544642703745",
+            "backward": "0.86046740136615452"
+           },
            "coprime": false,
            "contact_ratio": "1.9726210851406283",
            "efficiency": {

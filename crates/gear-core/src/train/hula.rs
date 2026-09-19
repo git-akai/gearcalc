@@ -458,6 +458,59 @@ mod tests {
         }
     }
 
+    /// **The power circulates, and the figure says by how much.** On a pair
+    /// everything crosses the one mesh, once; on a hula each mesh passes
+    /// about `η |R − 1|` times the input to cancel to the output — 88× at
+    /// 324 : 1 keeping 27 %, 9× at 8.5 : 1 keeping 93 % — and the stage's loss is
+    /// each mesh's loss on the power crossing it, exactly, which is what
+    /// `η = 1/[R(1 − η₀) + η₀]` folds into one line.
+    #[test]
+    fn the_circulating_power_is_the_reductions_worth() {
+        let r = solve(&stage(), 1000.0).unwrap();
+        let through = r.circulation.forward;
+        assert!(through > 100.0, "324 : 1 circulates: {through}× the input");
+        // The loss is each mesh's loss on the power crossing it: what the
+        // teeth pass, less what comes out, over the input — to the
+        // per-mesh accounting the flow keeps, exactly.
+        let lost = 1.0 - r.efficiency.forward;
+        let by_mesh: f64 = r
+            .meshes
+            .iter()
+            .map(|m| (1.0 - m.efficiency.forward) * m.power_through.forward)
+            .sum();
+        assert!(
+            (lost - by_mesh).abs() < 1e-9,
+            "loss {lost} against the meshes' {by_mesh}"
+        );
+        assert!(
+            (r.meshes[0].power_through.forward + r.meshes[1].power_through.forward - through).abs()
+                < 1e-12
+        );
+        // ...and each mesh passes about `R η` times the input, on the
+        // stage that cancels and on one that does not.
+        let mut s = stage();
+        for (gear, count) in s.gears.iter_mut().zip([19u32, 18, 18, 17]) {
+            gear.teeth = count;
+        }
+        let plain = solve(&s, 1000.0).unwrap();
+        // The output turns `R` times slower than the crank, so relative to
+        // the crank the mesh sees the output's torque at `|1 − 1/R|` of the
+        // crank's speed: `η |R − 1|` of the input, give or take the loss's
+        // own share.
+        for r in [&r, &plain] {
+            let expect = (r.ratio - 1.0).abs() * r.efficiency.forward;
+            for m in &r.meshes {
+                let got = m.power_through.forward;
+                assert!(
+                    (got - expect).abs() / expect < 0.05,
+                    "{} : 1 keeping {}: a mesh passes {got}× against about {expect}×",
+                    r.ratio,
+                    r.efficiency.forward
+                );
+            }
+        }
+    }
+
     /// **The power flow collapses to one relation**, and the shape's flow —
     /// mesh by mesh, with each mesh's loss in the direction it turns — agrees
     /// with it everywhere: `η = 1/[R(1 − η₀) + η₀]`, written from the torque

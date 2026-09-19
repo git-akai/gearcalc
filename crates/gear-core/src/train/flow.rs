@@ -89,6 +89,23 @@ pub struct Flow {
     pub shaft_torques: Vec<f64>,
     /// `|P_out| / P_in`.
     pub efficiency: f64,
+    /// **The power crossing each mesh, over the power in** — the driving
+    /// side's `|τ (ω − ω_frame)|` per unit of what the input delivers, so
+    /// that each mesh's loss is `(1 − η)` of it exactly. One on a
+    /// pair's mesh, where all of it crosses; under one on a set's, where the
+    /// carrier carries part of it bodily; and many times one where power
+    /// circulates — a hula stage at hundreds to one, whose two meshes each
+    /// pass a large multiple of the input to cancel to the output, which is
+    /// where its efficiency goes.
+    pub mesh_powers: Vec<f64>,
+}
+
+impl Flow {
+    /// The power crossing every mesh, over the power in.
+    #[must_use]
+    pub fn circulation(&self) -> f64 {
+        self.mesh_powers.iter().sum()
+    }
 }
 
 /// A tolerance for "this power is zero", relative to the powers in play.
@@ -189,11 +206,27 @@ pub fn solve(shafts: usize, meshes: &[MeshFlow], speed: &[f64], asked: &Asked) -
             continue;
         }
         let efficiency = p_out.abs() / input_power;
+        // The power on the **driving** side of each mesh: `a`'s where `a`
+        // drives, and `a`'s over the mesh's efficiency where it is driven —
+        // so a mesh's loss is `(1 − η)` of this, exactly.
+        let mesh_powers = meshes
+            .iter()
+            .enumerate()
+            .map(|(k, mesh)| {
+                let at_a = (c[k] * mesh.za * (speed[mesh.a] - speed[mesh.frame])).abs();
+                let driving = match directions[k] {
+                    Drive::Forward => at_a,
+                    Drive::Backward => at_a / *mesh.efficiency.get(Drive::Backward),
+                };
+                driving / input_power
+            })
+            .collect();
         let flow = Flow {
             mesh_torques: c.iter().zip(meshes).map(|(c, m)| c * m.za).collect(),
             directions,
             shaft_torques,
             efficiency,
+            mesh_powers,
         };
         // Two assignments can both be consistent where a mesh carries no
         // power at all and either direction is vacuously right; they give one

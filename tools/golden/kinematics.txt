@@ -4,6 +4,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.2333 Nm /     -0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      4.9751 Nm /   -948.84 rpm at end    held at -
   stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+    power through the teeth   1.000000 / 1.000000     one more tooth on each member: -2.388889 -2.588235
     shaft first     case 1  speed    3000.000000  torque       2.000000
     shaft first     case 2  speed      -0.000000  torque      -0.233283
     shaft first     case 3  speed    2400.000000  torque       2.000000
@@ -31,6 +32,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.2334 Nm /     -0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      4.9774 Nm /   -948.84 rpm at end    held at -
   stage 1  ratio      -2.529412   efficiency  98.389569 / 98.389569  %   backlash   0.038879 / 0.098341   deg
+    power through the teeth   1.000000 / 1.000000     one more tooth on each member: -2.388889 -2.588235
     shaft first     case 1  speed    3000.000000  torque       2.000000
     shaft first     case 2  speed      -0.000000  torque      -0.233389
     shaft first     case 3  speed    2400.000000  torque       2.000000
@@ -58,6 +60,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0000 Nm /     -0.00 rpm at start  held at 1
   case 3       2.0000 Nm /   2400.00 rpm at start  ->     49.4437 Nm /    -60.00 rpm at end    held at -
   stage 1  ratio     -40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
+    power through the teeth   1.000000 / 0.000000     one more tooth on each member: -20.000000 -41.000000
     member 1  z 1   
       case 1  speed    3000.000000  vs frame    3000.000000  torque       2.000000  cycles -
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.000000  cycles -
@@ -79,6 +82,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0973 Nm /     -0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->     11.6755 Nm /   -400.00 rpm at end    held at -
   stage 1  ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
+    power through the teeth   1.978385 / 1.994450     one more tooth on each member: -5.538462 -6.000000 -6.083333
     shaft sun       case 1  speed    3000.000000  torque       2.000000
     shaft sun       case 2  speed      -0.000000  torque      -0.097295
     shaft sun       case 3  speed    2400.000000  torque       2.000000
@@ -119,6 +123,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0837 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->     13.6755 Nm /    342.86 rpm at end    held at -
   stage 1  ratio       7.000000   efficiency  97.681810 / 97.672819  %   backlash   0.041724 / 0.292068   deg
+    power through the teeth   1.695758 / 1.716159     one more tooth on each member: 6.538462 7.000000 7.083333
     shaft sun       case 1  speed    3000.000000  torque       2.000000
     shaft sun       case 2  speed       0.000000  torque      -0.083720
     shaft sun       case 3  speed    2400.000000  torque       2.000000
@@ -159,6 +164,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.6973 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      1.7075 Nm /   2800.00 rpm at end    held at -
   stage 1  ratio       0.857143   efficiency  99.604466 / 99.613635  %   backlash   0.048678 / 0.041724   deg
+    power through the teeth   0.289334 / 0.284921     one more tooth on each member: 0.847059 0.857143 0.858824
     shaft sun       case 1  speed       0.000000  torque      -0.292495
     shaft sun       case 2  speed       0.000000  torque       0.097295
     shaft sun       case 3  speed       0.000000  torque      -0.292495
@@ -199,6 +205,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      4.1026 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      0.2791 Nm /  16800.00 rpm at end    held at -
   stage 1  ratio       0.142857   efficiency  97.672819 / 97.681810  %   backlash   0.292068 / 0.041724   deg
+    power through the teeth   1.716159 / 1.695758     one more tooth on each member: 0.152941 0.142857 0.141176
     shaft sun       case 1  speed   21000.000000  torque      -0.279065
     shaft sun       case 2  speed       0.000000  torque       0.600000
     shaft sun       case 3  speed   16800.000000  torque      -0.279065
@@ -239,6 +246,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.5123 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      2.3243 Nm /   2057.14 rpm at end    held at -
   stage 1  ratio       1.166667   efficiency  99.613635 / 99.604466  %   backlash   0.041724 / 0.048678   deg
+    power through the teeth   0.284921 / 0.289334     one more tooth on each member: 1.180556 1.166667 1.164384
     shaft sun       case 1  speed       0.000000  torque       0.324318
     shaft sun       case 2  speed       0.000000  torque      -0.087748
     shaft sun       case 3  speed       0.000000  torque       0.324318
@@ -279,6 +287,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      3.5026 Nm /     -0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      0.3243 Nm / -14400.00 rpm at end    held at -
   stage 1  ratio      -0.166667   efficiency  97.295446 / 97.295446  %   backlash   0.292068 / 0.048678   deg
+    power through the teeth   1.994450 / 1.978385     one more tooth on each member: -0.180556 -0.166667 -0.164384
     shaft sun       case 1  speed  -18000.000000  torque       0.324318
     shaft sun       case 2  speed       0.000000  torque      -0.600000
     shaft sun       case 3  speed  -14400.000000  torque       0.324318
@@ -319,6 +328,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0020 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->    381.0287 Nm /     10.32 rpm at end    held at -
   stage 1  ratio     232.562500   efficiency  81.919641 / 77.908095  %   backlash   0.065428 / 15.216172  deg
+    power through the teeth 379.296745 / 463.460222   one more tooth on each member: -90.756098 49.116883 -75.938776 49.116883
     shaft carrier   case 1  speed    3000.000000  torque       2.000000
     shaft carrier   case 2  speed       0.000000  torque      -0.002010
     shaft carrier   case 3  speed    2400.000000  torque       2.000000
@@ -363,6 +373,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.2460 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      4.5904 Nm /   1014.27 rpm at end    held at -
   stage 1  ratio       2.366224   efficiency  96.998754 / 96.998754  %   backlash   0.099391 / 0.235181   deg
+    power through the teeth   1.983450 / 1.986311     one more tooth on each member: 2.234767 2.421252 2.366224 2.366224 2.292279 2.447818 2.366224 2.366224
     shaft member 1  case 1  speed    3000.000000  torque       2.000000
     shaft member 1  case 2  speed       0.000000  torque      -0.245958
     shaft member 1  case 3  speed    2400.000000  torque       2.000000
@@ -429,6 +440,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0000 Nm /      0.00 rpm at start  held at 1
   case 3       2.0000 Nm /   2400.00 rpm at start  ->     55.3345 Nm /     39.34 rpm at end    held at -
   stage 1  ratio      61.000000   efficiency  45.356184 / 0.000000   %   backlash   0.048937 / 2.985130   deg
+    power through the teeth  54.142533 / 0.000000     one more tooth on each member: 61.000000 inf 31.000000
     shaft carrier   case 1  speed    3000.000000  torque       2.000000
     shaft carrier   case 2  speed       0.000000  torque       0.000000
     shaft carrier   case 3  speed    2400.000000  torque       2.000000
@@ -469,6 +481,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0000 Nm /      0.00 rpm at start  held at 1
   case 3       2.0000 Nm /   2400.00 rpm at start  ->    116.0208 Nm /     27.12 rpm at end    held at -
   stage 1  ratio      88.500000   efficiency  65.548466 / 0.000000   %   backlash   0.056749 / 5.022252   deg
+    power through the teeth  33.083841 / 50.046629    one more tooth on each member: 85.971429 38.846535 -206.500000 150.450000 63.000000
     shaft sun       case 1  speed    3000.000000  torque       2.000000
     shaft sun       case 2  speed       0.000000  torque      -0.003289
     shaft sun       case 3  speed    2400.000000  torque       2.000000
@@ -522,6 +535,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0582 Nm /     -0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->     19.4312 Nm /   -240.00 rpm at end    held at -
   stage 1  ratio     -10.000000   efficiency  97.155934 / 97.080449  %   backlash   0.095762 / 0.957619   deg
+    power through the teeth  10.715593 / 11.000000    one more tooth on each member: -15.500000 -7.500000
     shaft carrier   case 1  speed    3000.000000  torque       2.000000
     shaft carrier   case 2  speed      -0.000000  torque      -0.058248
     shaft carrier   case 3  speed    2400.000000  torque       2.000000
@@ -553,6 +567,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.1869 Nm /     -0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      5.6015 Nm /   -800.00 rpm at end    held at -
   stage 1  ratio      -3.000000   efficiency  93.358179 / 93.466662  %   backlash   0.069648 / 0.208944   deg
+    power through the teeth   3.922025 / 3.879367     one more tooth on each member: -2.840000 -3.000000 -3.000000 -3.041667
     shaft sun       case 1  speed    3000.000000  torque       2.000000
     shaft sun       case 2  speed      -0.000000  torque      -0.186933
     shaft sun       case 3  speed    2400.000000  torque       2.000000
@@ -602,6 +617,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.1322 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      8.7039 Nm /    540.00 rpm at end    held at -
   stage 1  ratio       4.444444   efficiency  97.918525 / 97.905870  %   backlash   0.041706 / 0.185361   deg
+    power through the teeth   1.534831 / 1.553631     one more tooth on each member: 4.263158 4.444444 4.444444 4.444444 4.500000
     shaft sun 1     case 1  speed    3000.000000  torque       2.000000
     shaft sun 1     case 2  speed       0.000000  torque      -0.132173
     shaft sun 1     case 3  speed    2400.000000  torque       2.000000
@@ -660,6 +676,7 @@
   case 2       0.6000 Nm /      0.00 rpm at 1.2    ->      0.5165 Nm /     -0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      1.9516 Nm /  -2250.00 rpm at end    held at -
   stage 1  ratio      -1.066667   efficiency  91.481430 / 91.818656  %   backlash   0.156564 / 0.167001   deg
+    power through the teeth   5.707116 / 5.518598     one more tooth on each member: -1.066667 -1.000000 -1.066667 -1.066667 -1.100000
     shaft sun 1     case 1  speed  -12500.000000  torque       0.000000
     shaft sun 1     case 2  speed       0.000000  torque       0.000000
     shaft sun 1     case 3  speed  -10000.000000  torque       0.000000
@@ -718,6 +735,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.2170 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->      5.1478 Nm /    900.00 rpm at end    held at -
   stage 1  ratio       2.666667   efficiency  96.521026 / 96.446859  %   backlash   0.104114 / 0.277636   deg
+    power through the teeth   1.838539 / 1.880253     one more tooth on each member: 2.578947 2.722222 2.666667 2.666667 2.666667
     shaft sun 1     case 1  speed    3000.000000  torque       2.000000
     shaft sun 1     case 2  speed       0.000000  torque      -0.217005
     shaft sun 1     case 3  speed    2400.000000  torque       2.000000
@@ -776,6 +794,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0959 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->     11.6260 Nm /    397.90 rpm at end    held at -
   stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+    power through the teeth   1.000000 / 1.000000     one more tooth on each member: -2.388889 -2.588235
     shaft first     case 1  speed    3000.000000  torque       2.000000
     shaft first     case 2  speed       0.000000  torque      -0.095868
     shaft first     case 3  speed    2400.000000  torque       2.000000
@@ -792,6 +811,7 @@
       case 3  speed    -948.837209  vs frame    -948.837209  torque       5.058824  cycles 5.693023e7 / 5.693023e7
     mesh 1  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
   stage 2  ratio      -2.384615   efficiency  97.996440 / 97.996440  %   backlash   0.056468 / 0.134654   deg
+    power through the teeth   1.000000 / 1.000000     one more tooth on each member: -2.214286 -2.461538
     shaft first     case 1  speed   -1186.046512  torque       4.975099
     shaft first     case 2  speed      -0.000000  torque      -0.246572
     shaft first     case 3  speed    -948.837209  torque       4.975099
@@ -822,6 +842,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0000 Nm /      0.00 rpm at start  held at 3
   case 3       2.0000 Nm /   2400.00 rpm at start  ->    840.9967 Nm /      3.39 rpm at end    held at -
   stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+    power through the teeth   1.000000 / 1.000000     one more tooth on each member: -2.388889 -2.588235
     shaft first     case 1  speed    3000.000000  torque       2.000000
     shaft first     case 2  speed       0.000000  torque      -0.000000
     shaft first     case 3  speed    2400.000000  torque       2.000000
@@ -838,6 +859,7 @@
       case 3  speed    -948.837209  vs frame    -948.837209  torque       5.058824  cycles 5.693023e7 / 5.693023e7
     mesh 1  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
   stage 2  ratio       7.000000   efficiency  97.681810 / 97.672819  %   backlash   0.041724 / 0.292068   deg
+    power through the teeth   1.695758 / 1.716159     one more tooth on each member: 6.538462 7.000000 7.083333
     shaft sun       case 1  speed   -1186.046512  torque       4.975099
     shaft sun       case 2  speed      -0.000000  torque      -0.000000
     shaft sun       case 3  speed    -948.837209  torque       4.975099
@@ -865,6 +887,7 @@
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   stage 3  ratio     -40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
+    power through the teeth   1.000000 / 0.000000     one more tooth on each member: -20.000000 -41.000000
     member 1  z 1   
       case 1  speed    -169.435216  vs frame    -169.435216  torque      34.018366  cycles -
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.000000  cycles -
@@ -894,6 +917,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0378 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->     29.0433 Nm /    158.14 rpm at end    held at -
   stage 1  ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
+    power through the teeth   1.978385 / 1.994450     one more tooth on each member: -5.538462 -6.000000 -6.083333
     shaft sun       case 1  speed    3000.000000  torque       2.000000
     shaft sun       case 2  speed       0.000000  torque      -0.037829
     shaft sun       case 3  speed    2400.000000  torque       2.000000
@@ -921,6 +945,7 @@
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   stage 2  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+    power through the teeth   1.000000 / 1.000000     one more tooth on each member: -2.388889 -2.588235
     shaft first     case 1  speed    -500.000000  torque      11.675453
     shaft first     case 2  speed      -0.000000  torque      -0.233283
     shaft first     case 3  speed    -400.000000  torque      11.675453
@@ -953,6 +978,7 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0378 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->     29.0433 Nm /    158.14 rpm at end    held at -
   stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+    power through the teeth   1.000000 / 1.000000     one more tooth on each member: -2.388889 -2.588235
     shaft first     case 1  speed    3000.000000  torque       2.000000
     shaft first     case 2  speed       0.000000  torque      -0.037829
     shaft first     case 3  speed    2400.000000  torque       2.000000
@@ -969,6 +995,7 @@
       case 3  speed    -948.837209  vs frame    -948.837209  torque       5.058824  cycles 5.693023e7 / 5.693023e7
     mesh 1  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
   stage 2  ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
+    power through the teeth   1.978385 / 1.994450     one more tooth on each member: -5.538462 -6.000000 -6.083333
     shaft sun       case 1  speed   -1186.046512  torque       4.975099
     shaft sun       case 2  speed      -0.000000  torque      -0.097295
     shaft sun       case 3  speed    -948.837209  torque       4.975099
@@ -1059,6 +1086,7 @@
   case 2       0.6000 Nm /      0.00 rpm at 2.3    ->      0.0378 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at 1.1    ->     29.0433 Nm /    158.14 rpm at end    held at -
   stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
+    power through the teeth   1.000000 / 1.000000     one more tooth on each member: -2.388889 -2.588235
     shaft first     case 1  speed    3000.000000  torque       2.000000
     shaft first     case 2  speed       0.000000  torque      -0.037829
     shaft first     case 3  speed    2400.000000  torque       2.000000
@@ -1075,6 +1103,7 @@
       case 3  speed    -948.837209  vs frame    -948.837209  torque       5.058824  cycles 5.693023e7 / 5.693023e7
     mesh 1  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
   stage 2  ratio      -6.000000   efficiency  97.295446 / 97.295446  %   backlash   0.048678 / 0.292068   deg
+    power through the teeth   1.978385 / 1.994450     one more tooth on each member: -5.538462 -6.000000 -6.083333
     shaft sun       case 1  speed   -1186.046512  torque       4.975099
     shaft sun       case 2  speed      -0.000000  torque      -0.097295
     shaft sun       case 3  speed    -948.837209  torque       4.975099

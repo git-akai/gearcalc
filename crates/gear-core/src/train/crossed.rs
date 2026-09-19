@@ -624,6 +624,11 @@ pub fn solve_crossed_pair(
         // one, rather than the input read back.
         clearance: centre - s.centre_distance,
         mesh: MeshReport {
+            // The one mesh carries the whole of it, either way it turns.
+            power_through: Directional {
+                forward: f64::from(u8::from(efficiency.forward > 0.0)),
+                backward: f64::from(u8::from(efficiency.backward > 0.0)),
+            },
             coprime: super::gcd(stage.gears[0].teeth, stage.gears[1].teeth) == 1,
             contact_ratio,
             efficiency,
