@@ -106,7 +106,7 @@ load_sharing: LoadSharing,
  */
 cutter: [Cutter, Cutter], 
 /**
- * The four gears, in [`Teeth`]'s order: the grounded one, the two that
+ * The four gears in the order the arrangement is read: the grounded one, the two that
  * ride the wobble body, then the output.
  */
 gears: [StageGear, StageGear, StageGear, StageGear], };

@@ -4,17 +4,17 @@ hula  z 19/18/17/18  module 1/1  alpha 20 deg  clearance 0.2 mm
   efficiency 31.310 % forward, 0.000 % back-driven  (self-locking)   (the two meshes alone, crank held: 0.9932)
   backlash at the output 0.405565 deg (min 0.000000, max 0.803147)   at the crank 131.4032 deg
 
-  mesh 1  ring z19 x+0.4519  pinion z18 x+0.0000   alpha_w 50.965 deg   shaper z14
-    far-side gap 0.2779 mm (as cut 0.2779)   contact ratio 0.9735
+  mesh 1  ring z19 x+0.4519  pinion z18 x+0.0000   alpha_w 49.673 deg   shaper z14
+    far-side gap 0.2779 mm   contact ratio 0.9735
     backlash 0.20858 / 0.19760 deg   flank interference: pinion false  ring false   tip false (+0.0000 deg)
     ! contact ratio 0.973: below 1, the pair loses contact between teeth
-    sigma_H 626.5 MPa at the pitch point   rho 8.2376 mm
-    z19   T   200.8899 Nm  b  10.000 mm  sigma_F        —  sigma_H  1277.6 MPa
+    sigma_H 627.5 MPa at the pitch point   rho 8.2376 mm
+    z19   T   201.5572 Nm  b  10.000 mm  sigma_F        —  sigma_H  1279.7 MPa
     ! z19: flank and fillet do not meet: cutter does not reach this ring's flank; profile not generated
-    z18   T   190.3167 Nm  b  10.000 mm  sigma_F   6663.3  sigma_H  3003.2 MPa
+    z18   T   190.9489 Nm  b  10.000 mm  sigma_F   6685.4  sigma_H  3008.2 MPa
 
-  mesh 2  pinion z17 x+0.0000  ring z18 x+0.4519   alpha_w 50.965 deg   shaper z13
-    far-side gap 0.2779 mm (as cut 0.2779)   contact ratio 0.9712
+  mesh 2  pinion z17 x+0.0000  ring z18 x+0.4519   alpha_w 49.673 deg   shaper z13
+    far-side gap 0.2779 mm   contact ratio 0.9712
     backlash 0.22085 / 0.20858 deg   flank interference: pinion false  ring false   tip false (+0.0106 deg)
     ! contact ratio 0.971: below 1, the pair loses contact between teeth
     sigma_H 683.8 MPa at the pitch point   rho 6.9091 mm

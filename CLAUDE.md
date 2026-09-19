@@ -76,8 +76,7 @@ of a gear is worth more than knowing what it does.
 | `mesh.rs` | Two gears in mesh: centre distance, operating angle, backlash | load, material, or strength |
 | `contact.rs` | The path of contact and how load is shared along it | stress |
 | `screw.rs` | Crossed-axis screw gearing — one model for a worm and a crossed pair | that a worm is special |
-| `hula.rs` | The hula **arrangement**: four counts, one crank offset, the shifts that close it | loads and ratings |
-| `planetary.rs` | Planetary **layout** and Willis/Pennestrì kinematics | tooth form |
+| `planetary.rs` | Planetary **layout** and Willis/Pennestrì kinematics — the independent check the shape's flow is held to | tooth form |
 | `strength.rs` | The critical section, both notch models, `Y_F`, `K_f`, Hertz beside it. `ToothOutline` is the seam that makes one model serve a tooth and a ring | which stage kind is asking |
 | `metrology.rs` | Span over teeth, over-pins, and what they take round a revolution | tolerances (that is `jgma.rs`) |
 | `jgma.rs` | JGMA 116-02 tolerance tables, transcribed and checked | how a tolerance is used |
@@ -90,7 +89,7 @@ of a gear is worth more than knowing what it does.
 
 | File | Answers |
 |---|---|
-| `mod.rs` | **What every stage shares**: the load cases and the walk that carries each along its route to the far end, `StageLoads`, `MemberRating`, `Bending`, `MeshReport`, `GearResult` and its `GearCase` per load, the engagement rule, `Stage` (a shape, or the hula stage) and the train that strings stages together — and **relief**: `Freedom`, `Reading`, `FreedomGroup` and the walk over them, which a stage feeds through `Constrained` and never writes. `Constrained` is the whole of what a stage owes: six questions: the fifth is its wiring and the sixth its ports |
+| `mod.rs` | **What every stage shares**: the load cases and the walk that carries each along its route to the far end, `StageLoads`, `MemberRating`, `Bending`, `MeshReport`, `GearResult` and its `GearCase` per load, the engagement rule, `Stage` (one variant, the shape, keeping its tag) and the train that strings stages together — and **relief**: `Freedom`, `Reading`, `FreedomGroup` and the walk over them, which a stage feeds through `Constrained` and never writes. `Constrained` is the whole of what a stage owes: six questions: the fifth is its wiring and the sixth its ports |
 | `wiring.rs` | **Where a kind's shafts and meshes sit** — topology alone, no geometry, feeding `kinematics.rs`. The frame is *derived* from the two members' common frame rather than stored, and a mesh's sign is its `MeshKind`'s |
 | `conditions.rs` | **What the train holds over the kinds' conventions**: a `Constraint` on a `ShaftRef` (held, driven, free), a `Coupling` between two stages' shafts, and the `StageBoundary` each stage is handed — derived, never stored. `Train::motion` and `Train::route` — where a load goes, read off the graph — live here; the arrangement a kind used to keep is now read off its boundary, and a hold or a drive the train writes on a stage replaces the kind's convention of that kind |
 | `shape.rs` | **The one stage**: axes (carried or not, replicated or not), shafts on them, members, meshes, distances — and the solve that reads what to do off that graph: mesh kind from a cutter, frame from the axes, wiring and ports from the shafts; each shift's role (given, free, reaches, absorbs) and the plan that closes every distance, an automatic one sized by its tips where they would cross; the search in sum-and-division coordinates; the helix read once and propagated; every mesh pressed with its driver's force. A spur pair, a crossed pair, a worm and a planetary set are presets over it |
@@ -99,7 +98,7 @@ of a gear is worth more than knowing what it does.
 | `pair.rs` | The pair **preset** and its readings: what `defaults` builds a spur or a worm from, the undercut bound a search or an absorber is held to, and the helix readings a shape shares. No solve |
 | `planetary.rs` | The set **preset**: three members, the shafts they sit on, the boundary a convention gives it. No solve |
 | `crossed.rs` | The crossed-axis solve for a distance whose angle is not zero — worm or crossed gear pair, one model; the shape routes such a distance here as a pair |
-| `hula.rs` | The hula stage: the one kind left, until the shape can size a distance from a tip bound. Kinematically a compound planet with one planet and both meshes internal, which its `wiring` says in one place |
+| `hula.rs` | The hula **preset** — four gears on a crank as a designer states them — and `stage_efficiency`, the closed form the per-mesh flow is checked against. No solve: kinematically a compound planet with one planet and both meshes internal, which `Shape::from` lays out |
 
 ### The other crates
 
@@ -123,7 +122,7 @@ string catalogues is what five languages costs.
 | Change | Files | Then run |
 |---|---|---|
 | **A model or formula** | the one module in `gear-core` | `cargo nextest run` · `tools/check_golden.sh` · `tools/check_figures.py` |
-| **A stage-level input** | `train/shape.rs` (or `hula.rs`) — its field on the shape, a member, a mesh or a distance, and its `Constrained` impl if relief may turn it or it argues with another · `train/mod.rs` if shared · `auto.rs` if a search reads it · 5 × `strings_*.toml` · `web/src/TrainPanel.svelte` | the above, plus `tools/check_bindings.sh --write` and `tools/check_strings.py`. The relief laws in `train/mod.rs`'s tests run over every preset, so a freedom the solve does not read fails there |
+| **A stage-level input** | `train/shape.rs` — its field on the shape, a member, a mesh or a distance, and its `Constrained` impl if relief may turn it or it argues with another · `train/mod.rs` if shared · `auto.rs` if a search reads it · 5 × `strings_*.toml` · `web/src/TrainPanel.svelte` | the above, plus `tools/check_bindings.sh --write` and `tools/check_strings.py`. The relief laws in `train/mod.rs`'s tests run over every preset, so a freedom the solve does not read fails there |
 | **A load-case input** | `LoadCase` in `train/mod.rs` · `solve_train`'s walk if it changes what a stage is handed (`StageLoad`) · `gear-wasm`'s `defaults` · `gear-io/src/train.rs`'s change log · 5 × `strings_*.toml` · `web/src/TrainPanel.svelte` | as above; `gear-cli train` and `--write` the corpus |
 | **A per-gear input** | `params.rs` · the generator that reads it · `auto.rs` (`admissible_ranges`) · 5 × `strings_*.toml` · `web/src/GearPanel.svelte` — and, if it is a stage member's toggle, one line in `train/mod.rs`'s `member_inputs` and one in `MemberFreedom`, for every kind at once | as above |
 | **A stage arrangement** | none of the core, if the shape already holds it: a preset is a builder in `pair.rs`/`planetary.rs` and a `defaults` entry in `gear-wasm`, a button row in `web/src/core.ts` and a name rule in `web/src/members.ts`. What the shape cannot yet close — a second relieved distance, a tip-bound sizing — is a change to `shape.rs`'s plan, and **nothing in `MemberRating`, `MeshReport`, `Bending` or `GearResult` should move** | `cargo nextest run` — `every_arrangement_of_a_set_solves` and the relief laws sweep every preset · `gear-cli kinematics` and `tools/train_kinematics.py` · the corpus |

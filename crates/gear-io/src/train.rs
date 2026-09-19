@@ -276,8 +276,8 @@ mod tests {
     use super::*;
     use gear_core::params::Auto;
     use gear_core::train::{
-        Constraint, Coupling, Duty, LoadCase, PairStage, PlanetaryStage, Port, ShaftConstraint,
-        ShaftRef, Stage,
+        Constraint, Coupling, Duty, HulaStage, LoadCase, PairStage, PlanetaryStage, Port,
+        ShaftConstraint, ShaftRef, Stage,
     };
 
     /// One of every stage kind, so the `kind` tag is exercised in both
@@ -337,7 +337,7 @@ mod tests {
                         .with_first_helix(45.0),
                     ),
                     Stage::planetary(PlanetaryStage::default()),
-                    Stage::Hula(Box::default()),
+                    Stage::hula(HulaStage::default()),
                 ],
                 // One coupling and one of each constraint, so the tagged
                 // `ShaftRef` and the `Constraint` values are exercised both
@@ -404,7 +404,7 @@ mod tests {
             5 + 5 + 2 + 3 + 2,
             "one tag a stage, a load case, a coupling end, a constraint and a named port:\n{text}"
         );
-        for kind in ["shape", "hula", "ultimate", "fatigue"] {
+        for kind in ["shape", "ultimate", "fatigue"] {
             assert!(text.contains(&format!("kind = \"{kind}\"")), "no {kind}");
         }
         // ...and the shapes say what they are made of, by name.

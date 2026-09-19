@@ -571,7 +571,6 @@ mod tests {
         }
         fn every_note_of(r: &gear_core::train::StageResult) -> Vec<Note> {
             let mut out: Vec<Note> = match r {
-                gear_core::train::StageResult::Hula(h) => h.notes.clone(),
                 gear_core::train::StageResult::Shape(s) => s.notes.clone(),
             };
             out.extend(r.members().iter().flat_map(|g| g.notes.iter().cloned()));
@@ -588,11 +587,6 @@ mod tests {
                 let mut out: Vec<Note> = self.cases.iter().flat_map(|c| c.notes.clone()).collect();
                 out.extend(self.stages.iter().flat_map(every_note_of));
                 out
-            }
-        }
-        impl EveryNote for gear_core::train::HulaResult {
-            fn every_note(&self) -> Vec<Note> {
-                every_note_of(&gear_core::train::StageResult::Hula(Box::new(self.clone())))
             }
         }
         let mut record = |notes: &[Note]| {
@@ -829,9 +823,7 @@ mod tests {
         }
         // **Both ends of a tooth pushed past what it can carry.** A tall
         // addendum on a small pinion comes to a point, so the tip-width bound
-        // cuts it down — and the hula stage reports the same finding
-        // rather than acting on it, since holding the tooth would put a solve
-        // inside its closed-form crank solve.
+        // cuts it down.
         {
             let gear = |teeth: u32| gear_core::train::StageGear {
                 teeth,
@@ -848,30 +840,6 @@ mod tests {
                 // A bound that moved a gear's own number rides that gear.
                 for g in r.members() {
                     record(&g.notes);
-                }
-            }
-            // **The drive is asked for a tip it cannot have, not for a tooth it
-            // cannot build.** A 1.6-module addendum on a one-tooth-difference
-            // internal pair leaves no path of contact at all, so the stage
-            // refuses and the note it was here to fire never gets raised. The
-            // bound bites from the other end instead: the shipped tooth stands,
-            // and a minimum tip width no tooth of that height can meet is what
-            // the stage reports it would have to be cut down to. Which is the
-            // whole point of this note — the hula stage says what the
-            // addendum would have to be and leaves it alone.
-            let mut drive = gear_core::train::HulaStage::default();
-            for g in &mut drive.gears {
-                g.min_tip_width = 2.0;
-            }
-            if let Ok(r) = gear_core::train::solve_hula_stage(
-                &drive,
-                &gear_core::train::StageLoads::just(2.0),
-                &lib,
-            ) {
-                record(&r.every_note());
-                for g in &r.gears {
-                    record(&g.gear.clamps);
-                    record(&g.gear.notes);
                 }
             }
         }
@@ -1055,8 +1023,8 @@ mod tests {
             for (g, z) in hula.gears.iter_mut().zip([18u32, 19, 19, 20]) {
                 g.teeth = z;
             }
-            if let Ok(r) = gear_core::train::solve_hula_stage(
-                &hula,
+            if let Ok(r) = gear_core::train::solve_any(
+                &gear_core::train::Stage::hula(hula),
                 &gear_core::train::StageLoads::just(2.0),
                 &lib,
             ) {
@@ -1548,45 +1516,25 @@ mod tests {
                 }
             }
 
-            // A hula stage, refused five ways. Each is reachable from ordinary
-            // inputs rather than contrived: two meshes that cancel, a pair whose
-            // gears have the same tooth count, a crank offset under the base
-            // circles, a clearance no offset can give, and a bound no offset can
-            // clear.
+            // **A distance no tips can clear**: a planocentric asked for a
+            // far-side gap wider than any distance a pinion still inside its
+            // ring can give.
             {
-                use gear_core::hula::{self, Offset, Set, Split, Teeth};
-                let drive = |teeth: [u32; 4], clearance: f64, offset: Offset| Set {
-                    teeth: Teeth(teeth),
-                    module: [1.0, 1.0],
-                    pressure_angle: 20.0,
-                    helix_angle: 0.0,
-                    addendum: [0.8; 4],
-                    clearance,
-                    running_clearance: 0.0,
-                    offset,
-                    split: [Split::Pinion(0.0); 2],
-                };
-                let cases = [
-                    drive([19, 18, 18, 19], 0.3, Offset::Clearance),
-                    drive([18, 18, 17, 18], 0.3, Offset::Clearance),
-                    drive([19, 18, 17, 18], 0.3, Offset::Given(0.01)),
-                    // The gap rises without bound with the offset, so every
-                    // finite clearance is reachable; what is refused is one
-                    // that is not a number at all.
-                    drive([19, 18, 17, 18], f64::INFINITY, Offset::Clearance),
-                ];
-                for set in cases {
-                    if let Err(e) = hula::solve(&set) {
+                let mut shape = gear_core::train::arrangements::planocentric(40, 41);
+                shape.distances[0].tip_clearance = 1000.0;
+                match gear_core::train::solve_any(
+                    &gear_core::train::Stage::Shape(Box::new(shape)),
+                    &gear_core::train::StageLoads::just(2.0),
+                    &lib,
+                ) {
+                    Err(e) => {
+                        assert!(
+                            matches!(e, gear_core::train::TrainError::TipsUnclearable { .. }),
+                            "{e:?}"
+                        );
                         err(e.note());
                     }
-                }
-                // A bound no offset can clear: one that is never satisfied.
-                if let Err(e) =
-                    hula::solve_with(&drive([19, 18, 17, 18], 0.3, Offset::Clearance), &|_, _| {
-                        -1.0
-                    })
-                {
-                    err(e.note());
+                    Ok(_) => panic!("no distance gives a metre of tip gap"),
                 }
             }
         }

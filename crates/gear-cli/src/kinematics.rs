@@ -175,7 +175,10 @@ fn fixtures() -> Vec<(String, Train)> {
             }
         }
     }
-    out.push(("hula".to_string(), train(vec![Stage::Hula(Box::default())])));
+    out.push((
+        "hula".to_string(),
+        train(vec![Stage::hula(gear_core::train::HulaStage::default())]),
+    ));
     // **The arrangements the shape reaches with no code of their own**
     // (`gear_core::train::arrangements`), each under its textbook boundary,
     // which the shape's convention — first shaft driven, last ring held —
@@ -396,19 +399,6 @@ fn shaft_cases(stage: &Stage, s: &StageResult) -> Vec<(String, ShaftLine)> {
                 })
                 .collect()
         }
-        StageResult::Hula(h) => ["grounded", "crank", "output"]
-            .iter()
-            .enumerate()
-            .map(|(i, label)| {
-                (
-                    (*label).to_string(),
-                    h.cases
-                        .iter()
-                        .map(|c| (c.case, c.speeds[i], c.torques[i]))
-                        .collect(),
-                )
-            })
-            .collect(),
     }
 }
 
@@ -581,11 +571,7 @@ fn named(stages: &[Stage], at: ShaftRef, label: gear_core::train::ShaftLabel) ->
     };
     match (label, stage) {
         (ShaftLabel::Ground, _) => "ground".into(),
-        (ShaftLabel::Carrier { .. }, Some(Stage::Hula(_))) => "crank".into(),
         (ShaftLabel::Carrier { .. }, _) => "carrier".into(),
-        (ShaftLabel::Member { member }, Some(Stage::Hula(_))) => {
-            ["grounded", "wobble", "wobble", "output"][member].into()
-        }
         (ShaftLabel::Member { member }, Some(Stage::Shape(shape))) => member_role(shape, member),
         (ShaftLabel::Member { member }, None) => format!("member {}", member + 1),
     }

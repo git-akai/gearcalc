@@ -866,232 +866,302 @@
      ]
     },
     "hula_stage": {
-     "kind": "hula",
-     "module": [
-      1,
-      1
-     ],
+     "kind": "shape",
      "pressure_angle": 20,
      "overlap": {
       "auto": true,
       "manual": 1
-     },
-     "thickness_mod": [
-      1,
-      1
-     ],
-     "sliding_friction": [
-      "0.080000000000000002",
-      "0.080000000000000002"
-     ],
-     "static_friction": [
-      "0.16000000000000000",
-      "0.16000000000000000"
-     ],
-     "clearance": "0.29999999999999999",
-     "running_clearance": {
-      "auto": false,
-      "manual": "0.020000000000000000"
-     },
-     "tolerance_plus": "0.020000000000000000",
-     "tolerance_minus": "0.020000000000000000",
-     "offset": {
-      "auto": true,
-      "manual": 0
      },
      "optimisation": {
       "enabled": false,
       "min_contact_ratio": 1
      },
      "load_sharing": "none",
-     "cutter": [
+     "min_planet_clearance": 0,
+     "axes": [
       {
-       "teeth": 20,
-       "addendum": 1,
-       "tip_round": "0.20000000000000001"
+       "carried_by": null,
+       "count": 1
       },
       {
-       "teeth": 20,
-       "addendum": 1,
-       "tip_round": "0.20000000000000001"
+       "carried_by": 1,
+       "count": 1
       }
      ],
-     "gears": [
+     "shafts": [
       {
-       "teeth": 65,
-       "profile_shift": {
-        "auto": true,
-        "manual": 0
-       },
-       "no_undercut": true,
-       "working_depth": {
-        "auto": true,
-        "manual": 1
-       },
-       "addendum": "0.69999999999999996",
-       "no_sharp_tip": true,
-       "min_tip_width": "0.10000000000000001",
-       "dedendum": 1,
-       "root_radius": "0.38000000000000000",
-       "helix_angle": {
-        "auto": true,
-        "manual": 0
-       },
-       "face_width": {
-        "auto": true,
-        "manual": 5
-       },
-       "face_sources": {
-        "bending": {
-         "ultimate": true,
-         "fatigue": true
+       "axis": 0
+      },
+      {
+       "axis": 0
+      },
+      {
+       "axis": 0
+      },
+      {
+       "axis": 1
+      }
+     ],
+     "members": [
+      {
+       "shaft": 3,
+       "gear": {
+        "teeth": 65,
+        "profile_shift": {
+         "auto": true,
+         "manual": 0
         },
-        "contact": {
-         "ultimate": false,
-         "fatigue": false
+        "no_undercut": true,
+        "working_depth": {
+         "auto": true,
+         "manual": 1
+        },
+        "addendum": "0.69999999999999996",
+        "no_sharp_tip": true,
+        "min_tip_width": "0.10000000000000001",
+        "dedendum": 1,
+        "root_radius": "0.38000000000000000",
+        "helix_angle": {
+         "auto": true,
+         "manual": 0
+        },
+        "face_width": {
+         "auto": true,
+         "manual": 5
+        },
+        "face_sources": {
+         "bending": {
+          "ultimate": true,
+          "fatigue": true
+         },
+         "contact": {
+          "ultimate": false,
+          "fatigue": false
+         }
+        },
+        "rim_thickness": null,
+        "material": "4340 Hardened Steel",
+        "material_overrides": {
+         "density": null,
+         "elastic_modulus": null,
+         "poissons_ratio": null,
+         "ultimate_allowable": null,
+         "fatigue_allowable": null
         }
        },
-       "rim_thickness": null,
-       "material": "4340 Hardened Steel",
-       "material_overrides": {
-        "density": null,
-        "elastic_modulus": null,
-        "poissons_ratio": null,
-        "ultimate_allowable": null,
-        "fatigue_allowable": null
+       "module": 1,
+       "thickness_mod": 1,
+       "ring": {
+        "teeth": 20,
+        "addendum": 1,
+        "tip_round": "0.20000000000000001"
+       },
+       "pitch_diameter": {
+        "auto": true,
+        "manual": 0
        }
       },
       {
-       "teeth": 61,
-       "profile_shift": {
-        "auto": true,
-        "manual": 0
-       },
-       "no_undercut": true,
-       "working_depth": {
-        "auto": true,
-        "manual": 1
-       },
-       "addendum": "0.69999999999999996",
-       "no_sharp_tip": true,
-       "min_tip_width": "0.10000000000000001",
-       "dedendum": 1,
-       "root_radius": "0.38000000000000000",
-       "helix_angle": {
-        "auto": true,
-        "manual": 0
-       },
-       "face_width": {
-        "auto": true,
-        "manual": 5
-       },
-       "face_sources": {
-        "bending": {
-         "ultimate": true,
-         "fatigue": true
+       "shaft": 4,
+       "gear": {
+        "teeth": 61,
+        "profile_shift": {
+         "auto": true,
+         "manual": 0
         },
-        "contact": {
-         "ultimate": false,
-         "fatigue": false
+        "no_undercut": true,
+        "working_depth": {
+         "auto": true,
+         "manual": 1
+        },
+        "addendum": "0.69999999999999996",
+        "no_sharp_tip": true,
+        "min_tip_width": "0.10000000000000001",
+        "dedendum": 1,
+        "root_radius": "0.38000000000000000",
+        "helix_angle": {
+         "auto": true,
+         "manual": 0
+        },
+        "face_width": {
+         "auto": true,
+         "manual": 5
+        },
+        "face_sources": {
+         "bending": {
+          "ultimate": true,
+          "fatigue": true
+         },
+         "contact": {
+          "ultimate": false,
+          "fatigue": false
+         }
+        },
+        "rim_thickness": null,
+        "material": "4340 Hardened Steel",
+        "material_overrides": {
+         "density": null,
+         "elastic_modulus": null,
+         "poissons_ratio": null,
+         "ultimate_allowable": null,
+         "fatigue_allowable": null
         }
        },
-       "rim_thickness": null,
-       "material": "4340 Hardened Steel",
-       "material_overrides": {
-        "density": null,
-        "elastic_modulus": null,
-        "poissons_ratio": null,
-        "ultimate_allowable": null,
-        "fatigue_allowable": null
+       "module": 1,
+       "thickness_mod": 1,
+       "ring": null,
+       "pitch_diameter": {
+        "auto": true,
+        "manual": 0
        }
       },
       {
-       "teeth": 57,
-       "profile_shift": {
-        "auto": true,
-        "manual": 0
-       },
-       "no_undercut": true,
-       "working_depth": {
-        "auto": true,
-        "manual": 1
-       },
-       "addendum": "0.69999999999999996",
-       "no_sharp_tip": true,
-       "min_tip_width": "0.10000000000000001",
-       "dedendum": 1,
-       "root_radius": "0.38000000000000000",
-       "helix_angle": {
-        "auto": true,
-        "manual": 0
-       },
-       "face_width": {
-        "auto": true,
-        "manual": 5
-       },
-       "face_sources": {
-        "bending": {
-         "ultimate": true,
-         "fatigue": true
+       "shaft": 4,
+       "gear": {
+        "teeth": 57,
+        "profile_shift": {
+         "auto": true,
+         "manual": 0
         },
-        "contact": {
-         "ultimate": false,
-         "fatigue": false
+        "no_undercut": true,
+        "working_depth": {
+         "auto": true,
+         "manual": 1
+        },
+        "addendum": "0.69999999999999996",
+        "no_sharp_tip": true,
+        "min_tip_width": "0.10000000000000001",
+        "dedendum": 1,
+        "root_radius": "0.38000000000000000",
+        "helix_angle": {
+         "auto": true,
+         "manual": 0
+        },
+        "face_width": {
+         "auto": true,
+         "manual": 5
+        },
+        "face_sources": {
+         "bending": {
+          "ultimate": true,
+          "fatigue": true
+         },
+         "contact": {
+          "ultimate": false,
+          "fatigue": false
+         }
+        },
+        "rim_thickness": null,
+        "material": "4340 Hardened Steel",
+        "material_overrides": {
+         "density": null,
+         "elastic_modulus": null,
+         "poissons_ratio": null,
+         "ultimate_allowable": null,
+         "fatigue_allowable": null
         }
        },
-       "rim_thickness": null,
-       "material": "4340 Hardened Steel",
-       "material_overrides": {
-        "density": null,
-        "elastic_modulus": null,
-        "poissons_ratio": null,
-        "ultimate_allowable": null,
-        "fatigue_allowable": null
+       "module": 1,
+       "thickness_mod": 1,
+       "ring": null,
+       "pitch_diameter": {
+        "auto": true,
+        "manual": 0
        }
       },
       {
-       "teeth": 61,
-       "profile_shift": {
-        "auto": true,
-        "manual": 0
-       },
-       "no_undercut": true,
-       "working_depth": {
-        "auto": true,
-        "manual": 1
-       },
-       "addendum": "0.69999999999999996",
-       "no_sharp_tip": true,
-       "min_tip_width": "0.10000000000000001",
-       "dedendum": 1,
-       "root_radius": "0.38000000000000000",
-       "helix_angle": {
-        "auto": true,
-        "manual": 0
-       },
-       "face_width": {
-        "auto": true,
-        "manual": 5
-       },
-       "face_sources": {
-        "bending": {
-         "ultimate": true,
-         "fatigue": true
+       "shaft": 2,
+       "gear": {
+        "teeth": 61,
+        "profile_shift": {
+         "auto": true,
+         "manual": 0
         },
-        "contact": {
-         "ultimate": false,
-         "fatigue": false
+        "no_undercut": true,
+        "working_depth": {
+         "auto": true,
+         "manual": 1
+        },
+        "addendum": "0.69999999999999996",
+        "no_sharp_tip": true,
+        "min_tip_width": "0.10000000000000001",
+        "dedendum": 1,
+        "root_radius": "0.38000000000000000",
+        "helix_angle": {
+         "auto": true,
+         "manual": 0
+        },
+        "face_width": {
+         "auto": true,
+         "manual": 5
+        },
+        "face_sources": {
+         "bending": {
+          "ultimate": true,
+          "fatigue": true
+         },
+         "contact": {
+          "ultimate": false,
+          "fatigue": false
+         }
+        },
+        "rim_thickness": null,
+        "material": "4340 Hardened Steel",
+        "material_overrides": {
+         "density": null,
+         "elastic_modulus": null,
+         "poissons_ratio": null,
+         "ultimate_allowable": null,
+         "fatigue_allowable": null
         }
        },
-       "rim_thickness": null,
-       "material": "4340 Hardened Steel",
-       "material_overrides": {
-        "density": null,
-        "elastic_modulus": null,
-        "poissons_ratio": null,
-        "ultimate_allowable": null,
-        "fatigue_allowable": null
+       "module": 1,
+       "thickness_mod": 1,
+       "ring": {
+        "teeth": 20,
+        "addendum": 1,
+        "tip_round": "0.20000000000000001"
+       },
+       "pitch_diameter": {
+        "auto": true,
+        "manual": 0
        }
+      }
+     ],
+     "meshes": [
+      {
+       "a": 1,
+       "b": 0,
+       "sliding_friction": "0.080000000000000002",
+       "static_friction": "0.16000000000000000"
+      },
+      {
+       "a": 2,
+       "b": 3,
+       "sliding_friction": "0.080000000000000002",
+       "static_friction": "0.16000000000000000"
+      }
+     ],
+     "distances": [
+      {
+       "axes": [
+        0,
+        1
+       ],
+       "angle": 0,
+       "worm": false,
+       "distance": {
+        "auto": true,
+        "manual": 0
+       },
+       "clearance": {
+        "auto": false,
+        "manual": "0.020000000000000000"
+       },
+       "tip_clearance": "0.29999999999999999",
+       "tolerance_plus": "0.020000000000000000",
+       "tolerance_minus": "0.020000000000000000",
+       "axial_clearance": 0
       }
      ]
     },
@@ -1177,23 +1247,23 @@
    "ok": [
     [
      "en",
-     469
+     444
     ],
     [
      "de",
-     469
+     444
     ],
     [
      "pt",
-     469
+     444
     ],
     [
      "zh-Hans",
-     469
+     444
     ],
     [
      "zh-Hant",
-     469
+     444
     ]
    ]
   },
@@ -6042,232 +6112,302 @@
     [
      "hula_stage",
      {
-      "kind": "hula",
-      "module": [
-       1,
-       1
-      ],
+      "kind": "shape",
       "pressure_angle": 20,
       "overlap": {
        "auto": true,
        "manual": 1
-      },
-      "thickness_mod": [
-       1,
-       1
-      ],
-      "sliding_friction": [
-       "0.080000000000000002",
-       "0.080000000000000002"
-      ],
-      "static_friction": [
-       "0.16000000000000000",
-       "0.16000000000000000"
-      ],
-      "clearance": "0.29999999999999999",
-      "running_clearance": {
-       "auto": false,
-       "manual": "0.020000000000000000"
-      },
-      "tolerance_plus": "0.020000000000000000",
-      "tolerance_minus": "0.020000000000000000",
-      "offset": {
-       "auto": true,
-       "manual": 0
       },
       "optimisation": {
        "enabled": false,
        "min_contact_ratio": 1
       },
       "load_sharing": "none",
-      "cutter": [
+      "min_planet_clearance": 0,
+      "axes": [
        {
-        "teeth": 20,
-        "addendum": 1,
-        "tip_round": "0.20000000000000001"
+        "carried_by": null,
+        "count": 1
        },
        {
-        "teeth": 20,
-        "addendum": 1,
-        "tip_round": "0.20000000000000001"
+        "carried_by": 1,
+        "count": 1
        }
       ],
-      "gears": [
+      "shafts": [
        {
-        "teeth": 65,
-        "profile_shift": {
+        "axis": 0
+       },
+       {
+        "axis": 0
+       },
+       {
+        "axis": 0
+       },
+       {
+        "axis": 1
+       }
+      ],
+      "members": [
+       {
+        "shaft": 3,
+        "gear": {
+         "teeth": 65,
+         "profile_shift": {
+          "auto": false,
+          "manual": "0.10000000000000001"
+         },
+         "no_undercut": true,
+         "working_depth": {
+          "auto": true,
+          "manual": 1
+         },
+         "addendum": "0.69999999999999996",
+         "no_sharp_tip": true,
+         "min_tip_width": "0.10000000000000001",
+         "dedendum": 1,
+         "root_radius": "0.38000000000000000",
+         "helix_angle": {
+          "auto": true,
+          "manual": 0
+         },
+         "face_width": {
+          "auto": true,
+          "manual": 5
+         },
+         "face_sources": {
+          "bending": {
+           "ultimate": true,
+           "fatigue": true
+          },
+          "contact": {
+           "ultimate": false,
+           "fatigue": false
+          }
+         },
+         "rim_thickness": null,
+         "material": "4340 Hardened Steel",
+         "material_overrides": {
+          "density": null,
+          "elastic_modulus": null,
+          "poissons_ratio": null,
+          "ultimate_allowable": null,
+          "fatigue_allowable": null
+         }
+        },
+        "module": 1,
+        "thickness_mod": 1,
+        "ring": {
+         "teeth": 20,
+         "addendum": 1,
+         "tip_round": "0.20000000000000001"
+        },
+        "pitch_diameter": {
+         "auto": true,
+         "manual": 0
+        }
+       },
+       {
+        "shaft": 4,
+        "gear": {
+         "teeth": 61,
+         "profile_shift": {
+          "auto": true,
+          "manual": "0.10000000000000001"
+         },
+         "no_undercut": true,
+         "working_depth": {
+          "auto": true,
+          "manual": 1
+         },
+         "addendum": "0.69999999999999996",
+         "no_sharp_tip": true,
+         "min_tip_width": "0.10000000000000001",
+         "dedendum": 1,
+         "root_radius": "0.38000000000000000",
+         "helix_angle": {
+          "auto": true,
+          "manual": 0
+         },
+         "face_width": {
+          "auto": true,
+          "manual": 5
+         },
+         "face_sources": {
+          "bending": {
+           "ultimate": true,
+           "fatigue": true
+          },
+          "contact": {
+           "ultimate": false,
+           "fatigue": false
+          }
+         },
+         "rim_thickness": null,
+         "material": "4340 Hardened Steel",
+         "material_overrides": {
+          "density": null,
+          "elastic_modulus": null,
+          "poissons_ratio": null,
+          "ultimate_allowable": null,
+          "fatigue_allowable": null
+         }
+        },
+        "module": 1,
+        "thickness_mod": 1,
+        "ring": null,
+        "pitch_diameter": {
+         "auto": true,
+         "manual": 0
+        }
+       },
+       {
+        "shaft": 4,
+        "gear": {
+         "teeth": 57,
+         "profile_shift": {
+          "auto": false,
+          "manual": "0.10000000000000001"
+         },
+         "no_undercut": true,
+         "working_depth": {
+          "auto": true,
+          "manual": 1
+         },
+         "addendum": "0.69999999999999996",
+         "no_sharp_tip": true,
+         "min_tip_width": "0.10000000000000001",
+         "dedendum": 1,
+         "root_radius": "0.38000000000000000",
+         "helix_angle": {
+          "auto": true,
+          "manual": 0
+         },
+         "face_width": {
+          "auto": true,
+          "manual": 5
+         },
+         "face_sources": {
+          "bending": {
+           "ultimate": true,
+           "fatigue": true
+          },
+          "contact": {
+           "ultimate": false,
+           "fatigue": false
+          }
+         },
+         "rim_thickness": null,
+         "material": "4340 Hardened Steel",
+         "material_overrides": {
+          "density": null,
+          "elastic_modulus": null,
+          "poissons_ratio": null,
+          "ultimate_allowable": null,
+          "fatigue_allowable": null
+         }
+        },
+        "module": 1,
+        "thickness_mod": 1,
+        "ring": null,
+        "pitch_diameter": {
+         "auto": true,
+         "manual": 0
+        }
+       },
+       {
+        "shaft": 2,
+        "gear": {
+         "teeth": 61,
+         "profile_shift": {
+          "auto": false,
+          "manual": "0.10000000000000001"
+         },
+         "no_undercut": true,
+         "working_depth": {
+          "auto": true,
+          "manual": 1
+         },
+         "addendum": "0.69999999999999996",
+         "no_sharp_tip": true,
+         "min_tip_width": "0.10000000000000001",
+         "dedendum": 1,
+         "root_radius": "0.38000000000000000",
+         "helix_angle": {
+          "auto": true,
+          "manual": 0
+         },
+         "face_width": {
+          "auto": true,
+          "manual": 5
+         },
+         "face_sources": {
+          "bending": {
+           "ultimate": true,
+           "fatigue": true
+          },
+          "contact": {
+           "ultimate": false,
+           "fatigue": false
+          }
+         },
+         "rim_thickness": null,
+         "material": "4340 Hardened Steel",
+         "material_overrides": {
+          "density": null,
+          "elastic_modulus": null,
+          "poissons_ratio": null,
+          "ultimate_allowable": null,
+          "fatigue_allowable": null
+         }
+        },
+        "module": 1,
+        "thickness_mod": 1,
+        "ring": {
+         "teeth": 20,
+         "addendum": 1,
+         "tip_round": "0.20000000000000001"
+        },
+        "pitch_diameter": {
+         "auto": true,
+         "manual": 0
+        }
+       }
+      ],
+      "meshes": [
+       {
+        "a": 1,
+        "b": 0,
+        "sliding_friction": "0.080000000000000002",
+        "static_friction": "0.16000000000000000"
+       },
+       {
+        "a": 2,
+        "b": 3,
+        "sliding_friction": "0.080000000000000002",
+        "static_friction": "0.16000000000000000"
+       }
+      ],
+      "distances": [
+       {
+        "axes": [
+         0,
+         1
+        ],
+        "angle": 0,
+        "worm": false,
+        "distance": {
          "auto": false,
          "manual": "0.10000000000000001"
         },
-        "no_undercut": true,
-        "working_depth": {
-         "auto": true,
-         "manual": 1
-        },
-        "addendum": "0.69999999999999996",
-        "no_sharp_tip": true,
-        "min_tip_width": "0.10000000000000001",
-        "dedendum": 1,
-        "root_radius": "0.38000000000000000",
-        "helix_angle": {
-         "auto": true,
-         "manual": 0
-        },
-        "face_width": {
-         "auto": true,
-         "manual": 5
-        },
-        "face_sources": {
-         "bending": {
-          "ultimate": true,
-          "fatigue": true
-         },
-         "contact": {
-          "ultimate": false,
-          "fatigue": false
-         }
-        },
-        "rim_thickness": null,
-        "material": "4340 Hardened Steel",
-        "material_overrides": {
-         "density": null,
-         "elastic_modulus": null,
-         "poissons_ratio": null,
-         "ultimate_allowable": null,
-         "fatigue_allowable": null
-        }
-       },
-       {
-        "teeth": 61,
-        "profile_shift": {
-         "auto": true,
-         "manual": "0.10000000000000001"
-        },
-        "no_undercut": true,
-        "working_depth": {
-         "auto": true,
-         "manual": 1
-        },
-        "addendum": "0.69999999999999996",
-        "no_sharp_tip": true,
-        "min_tip_width": "0.10000000000000001",
-        "dedendum": 1,
-        "root_radius": "0.38000000000000000",
-        "helix_angle": {
-         "auto": true,
-         "manual": 0
-        },
-        "face_width": {
-         "auto": true,
-         "manual": 5
-        },
-        "face_sources": {
-         "bending": {
-          "ultimate": true,
-          "fatigue": true
-         },
-         "contact": {
-          "ultimate": false,
-          "fatigue": false
-         }
-        },
-        "rim_thickness": null,
-        "material": "4340 Hardened Steel",
-        "material_overrides": {
-         "density": null,
-         "elastic_modulus": null,
-         "poissons_ratio": null,
-         "ultimate_allowable": null,
-         "fatigue_allowable": null
-        }
-       },
-       {
-        "teeth": 57,
-        "profile_shift": {
-         "auto": true,
-         "manual": "0.10000000000000001"
-        },
-        "no_undercut": true,
-        "working_depth": {
-         "auto": true,
-         "manual": 1
-        },
-        "addendum": "0.69999999999999996",
-        "no_sharp_tip": true,
-        "min_tip_width": "0.10000000000000001",
-        "dedendum": 1,
-        "root_radius": "0.38000000000000000",
-        "helix_angle": {
-         "auto": true,
-         "manual": 0
-        },
-        "face_width": {
-         "auto": true,
-         "manual": 5
-        },
-        "face_sources": {
-         "bending": {
-          "ultimate": true,
-          "fatigue": true
-         },
-         "contact": {
-          "ultimate": false,
-          "fatigue": false
-         }
-        },
-        "rim_thickness": null,
-        "material": "4340 Hardened Steel",
-        "material_overrides": {
-         "density": null,
-         "elastic_modulus": null,
-         "poissons_ratio": null,
-         "ultimate_allowable": null,
-         "fatigue_allowable": null
-        }
-       },
-       {
-        "teeth": 61,
-        "profile_shift": {
+        "clearance": {
          "auto": false,
-         "manual": "0.10000000000000001"
+         "manual": "0.020000000000000000"
         },
-        "no_undercut": true,
-        "working_depth": {
-         "auto": true,
-         "manual": 1
-        },
-        "addendum": "0.69999999999999996",
-        "no_sharp_tip": true,
-        "min_tip_width": "0.10000000000000001",
-        "dedendum": 1,
-        "root_radius": "0.38000000000000000",
-        "helix_angle": {
-         "auto": true,
-         "manual": 0
-        },
-        "face_width": {
-         "auto": true,
-         "manual": 5
-        },
-        "face_sources": {
-         "bending": {
-          "ultimate": true,
-          "fatigue": true
-         },
-         "contact": {
-          "ultimate": false,
-          "fatigue": false
-         }
-        },
-        "rim_thickness": null,
-        "material": "4340 Hardened Steel",
-        "material_overrides": {
-         "density": null,
-         "elastic_modulus": null,
-         "poissons_ratio": null,
-         "ultimate_allowable": null,
-         "fatigue_allowable": null
-        }
+        "tip_clearance": "0.29999999999999999",
+        "tolerance_plus": "0.020000000000000000",
+        "tolerance_minus": "0.020000000000000000",
+        "axial_clearance": 0
        }
       ]
      }
@@ -8418,7 +8558,8 @@
            ],
            "tips": {
             "tip_interference": false,
-            "tip_margin": "2.0230945329989174"
+            "tip_margin": "2.0230945329989174",
+            "far_gap": "40.315337340751441"
            },
            "notes": [],
            "line": {

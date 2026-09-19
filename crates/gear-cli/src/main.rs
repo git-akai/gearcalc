@@ -124,6 +124,95 @@ fn solve_set(
     )
 }
 
+/// **A stage of four members on a crank, read as the hula stage it is** —
+/// the grounded gear, the two on the wobble body, the output; two meshes at
+/// one crank offset — for the commands that build one.
+struct HulaView<'a> {
+    ratio: f64,
+    /// `z₂z₄` and `D = z₂z₄ − z₁z₃`, the two products the reduction is
+    /// written in: counted here from the teeth, since the graph's exact ratio
+    /// is the same quotient.
+    ratio_products: [i64; 2],
+    /// The crank offset at zero backlash on the first mesh, and as run.
+    offset_nominal: f64,
+    offset: f64,
+    /// Which mesh's tips sized the offset, where the tips did.
+    binding_mesh: Option<usize>,
+    efficiency: gear_core::contact::Directional<f64>,
+    /// The two meshes alone, crank held: their efficiencies multiplied.
+    fixed_carrier_efficiency: f64,
+    backlash: gear_core::contact::Directional<gear_core::train::Backlash>,
+    /// Speeds and torques per case on the grounded gear's shaft, the crank
+    /// and the output — the shape's shafts 3, 1 and 2.
+    cases: Vec<(usize, [f64; 3], [f64; 3])>,
+    /// Each member with whether it is a ring, in the stage's order.
+    gears: Vec<(&'a gear_core::train::GearResult, bool)>,
+    meshes: &'a [gear_core::train::MeshReport],
+    notes: &'a [gear_core::note::Note],
+}
+
+/// The hula stage a shape's result is.
+fn hula_view<'a>(
+    stage: &'a gear_core::train::Stage,
+    r: &'a gear_core::train::StageResult,
+) -> Option<HulaView<'a>> {
+    let shape = stage.as_shape()?;
+    let s = r.as_shape()?;
+    if s.members.len() != 4 || s.meshes.len() != 2 {
+        return None;
+    }
+    let d = s.distances.first()?;
+    let z: Vec<i64> = shape
+        .members
+        .iter()
+        .map(|m| i64::from(m.gear.teeth))
+        .collect();
+    let numerator = z[1] * z[3];
+    Some(HulaView {
+        ratio: s.ratio,
+        ratio_products: [numerator, numerator - z[0] * z[2]],
+        offset_nominal: *d.nominal.first()?,
+        offset: d.running,
+        binding_mesh: d.sized_by,
+        efficiency: s.efficiency,
+        fixed_carrier_efficiency: s.meshes.iter().map(|m| m.efficiency.forward).product(),
+        backlash: s.backlash,
+        cases: s
+            .cases
+            .iter()
+            .map(|c| {
+                (
+                    c.case,
+                    [c.speeds[3], c.speeds[1], c.speeds[2]],
+                    [c.torques[3], c.torques[1], c.torques[2]],
+                )
+            })
+            .collect(),
+        gears: s
+            .members
+            .iter()
+            .zip(&shape.members)
+            .map(|(g, m)| (g, m.ring.is_some()))
+            .collect(),
+        meshes: &s.meshes,
+        notes: &s.notes,
+    })
+}
+
+/// A hula stage through the shape under its own arrangement — crank driven,
+/// grounded gear held, output out — whatever its counts make the rings.
+fn solve_hula(
+    stage: &gear_core::train::HulaStage,
+    loads: &gear_core::train::StageLoads,
+    lib: &gear_core::material::MaterialLibrary,
+) -> Result<(gear_core::train::Stage, gear_core::train::StageResult), gear_core::train::TrainError>
+{
+    let as_stage = gear_core::train::Stage::hula(stage.clone());
+    let boundary = gear_core::train::StageBoundary::holding(5, &[3], 1, 2);
+    let r = gear_core::train::solve_any(&as_stage, &loads.clone().under(boundary), lib)?;
+    Ok((as_stage, r))
+}
+
 /// A pair through the shape, as the commands here build one.
 fn solve_pair(
     stage: &gear_core::train::PairStage,
@@ -546,12 +635,13 @@ fn main() {
 
 /// A hula stage, from the arrangement down to what the teeth do.
 ///
-/// Drives `train::solve_hula_stage` rather than assembling the parts itself:
+/// Drives the shape under the hula's own arrangement rather than assembling
+/// the parts itself:
 /// the stage is where an arrangement becomes gears, and a harness that built its own
 /// would be a second answer to the same question — which is how the two start
 /// disagreeing.
 fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth: Option<u32>) {
-    use gear_core::train::{solve_hula_stage, HulaStage, StageLoads};
+    use gear_core::train::{HulaStage, StageLoads};
 
     let lib = gear_io::default_library();
     let teeth = [n + 1, n, n - 1, n];
@@ -575,12 +665,16 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         cutter.teeth = cutter_teeth.unwrap_or_else(|| stocked.min(ring.saturating_sub(5)).max(4));
     }
 
-    let result = match solve_hula_stage(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
+    let (as_stage, solved) = match solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("that stage has no geometry: {e}");
             return;
         }
+    };
+    let Some(result) = hula_view(&as_stage, &solved) else {
+        eprintln!("that stage is not a hula stage");
+        return;
     };
 
     println!(
@@ -601,9 +695,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
     );
     println!(
         "  speeds  crank {:.1}  wobble {:+.3}  output {:+.4} rpm",
-        result.cases[0].speeds[1],
-        result.gears[1].gear.cases[0].speed,
-        result.gears[3].gear.cases[0].speed
+        result.cases[0].1[1], result.gears[1].0.cases[0].speed, result.gears[3].0.cases[0].speed
     );
     println!(
         "  efficiency {:.3} % forward, {:.3} % back-driven{}   (the two meshes alone, crank held: {:.4})",
@@ -614,7 +706,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         } else {
             ""
         },
-        result.fixed_carrier_efficiency.forward
+        result.fixed_carrier_efficiency
     );
     println!(
         "  backlash at the output {:.6} deg (min {:.6}, max {:.6})   at the crank {:.4} deg",
@@ -625,41 +717,39 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
     );
 
     for (index, mesh) in result.meshes.iter().enumerate() {
-        let members: Vec<&gear_core::train::HulaGear> =
-            result.gears[index * 2..index * 2 + 2].iter().collect();
+        let members = &result.gears[index * 2..index * 2 + 2];
         println!(
             "\n  mesh {}  {}   alpha_w {:.3} deg   shaper z{}",
             index + 1,
             members
                 .iter()
-                .map(|g| format!(
+                .map(|(g, ring)| format!(
                     "{} z{} x{:+.4}",
-                    if g.ring { "ring" } else { "pinion" },
-                    g.teeth,
-                    g.gear.profile_shift
+                    if *ring { "ring" } else { "pinion" },
+                    g.params.teeth,
+                    g.profile_shift
                 ))
                 .collect::<Vec<_>>()
                 .join("  "),
-            transverse(&mesh.report).operating_pressure_angle,
+            transverse(mesh).operating_pressure_angle,
             stage.cutter[index].teeth
         );
         println!(
-            "    far-side gap {:.4} mm (as cut {:.4})   contact ratio {:.4}",
-            mesh.clearance,
-            mesh.clearance_as_cut,
-            transverse(&mesh.report).contact_ratios.transverse
+            "    far-side gap {:.4} mm   contact ratio {:.4}",
+            mesh.tips.map_or(f64::NAN, |t| t.far_gap),
+            transverse(mesh).contact_ratios.transverse
         );
         println!(
             "    backlash {:.5} / {:.5} deg   flank interference: pinion {}  ring {}   \
              tip {} ({:+.4} deg)",
-            mesh.report.backlash[0].nominal,
-            mesh.report.backlash[1].nominal,
-            mesh.report.flank_interference[0],
-            mesh.report.flank_interference[1],
-            mesh.report.tips.is_some_and(|t| t.tip_interference),
-            mesh.report.tips.map_or(0.0, |t| t.tip_margin)
+            mesh.backlash[0].nominal,
+            mesh.backlash[1].nominal,
+            mesh.flank_interference[0],
+            mesh.flank_interference[1],
+            mesh.tips.is_some_and(|t| t.tip_interference),
+            mesh.tips.map_or(0.0, |t| t.tip_margin)
         );
-        for note in &mesh.report.notes {
+        for note in &mesh.notes {
             println!("    ! {}", words().render(note));
         }
         // What the teeth are worth, which a stage of this kind needs as much as
@@ -667,26 +757,26 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         // the torque on the way as well — the output pair carries the whole of it.
         println!(
             "    sigma_H {:.1} MPa at the pitch point   rho {:.4} mm",
-            mesh.report.cases[0].contact.at_pitch_point,
-            1.0 / mesh.report.cases[0].contact.curvature_across
+            mesh.cases[0].contact.at_pitch_point,
+            1.0 / mesh.cases[0].contact.curvature_across
         );
-        for gear in &members {
+        for (gear, _) in members {
             println!(
                 "    z{:<4} T {:>10.4} Nm  b {:>7.3} mm  sigma_F {:>8}  sigma_H {:>7.1} MPa",
-                gear.teeth,
-                gear.gear.cases[0].torque,
-                gear.gear.face_width,
-                gear.gear.cases[0]
+                gear.params.teeth,
+                gear.cases[0].torque,
+                gear.face_width,
+                gear.cases[0]
                     .bending_stress
                     .map_or_else(|| "—".to_string(), |s| format!("{s:.1}")),
-                gear.gear.cases[0].contact_stress,
+                gear.cases[0].contact_stress,
             );
-            for note in gear.gear.clamps.iter().chain(&gear.gear.notes) {
-                println!("    ! z{}: {}", gear.teeth, words().render(note));
+            for note in gear.clamps.iter().chain(&gear.notes) {
+                println!("    ! z{}: {}", gear.params.teeth, words().render(note));
             }
         }
     }
-    for note in &result.notes {
+    for note in result.notes {
         println!("  ! {}", words().render(note));
     }
 }
@@ -967,7 +1057,7 @@ fn roll_pair(ring: &gear_core::ring::Ring, pinion: &gear_core::Gear, a: f64, tit
 /// out — the useful statement is which bound stops it, and that is what these
 /// rows are.
 fn hula_band(z0: u32, clearance_in_modules: f64) {
-    use gear_core::train::{solve_hula_stage, HulaStage, StageLoads};
+    use gear_core::train::{HulaStage, StageLoads};
 
     let lib = gear_io::default_library();
 
@@ -983,7 +1073,13 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
         let n = z0 * d;
         let module = 1.0 / f64::from(d);
         let teeth = [n + d, n, n - d, n];
-        let mut best: Option<(f64, u32, f64, gear_core::train::HulaResult)> = None;
+        let mut best: Option<(
+            f64,
+            u32,
+            f64,
+            gear_core::train::Stage,
+            gear_core::train::StageResult,
+        )> = None;
         for addendum in [0.8, 0.7, 0.6, 0.5, 0.4] {
             for cutter in [10u32, 14, 20, 28] {
                 if cutter + 2 >= n {
@@ -1002,12 +1098,22 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                     for (gear, count) in stage.gears.iter_mut().zip(teeth) {
                         gear.teeth = count;
                         gear.addendum = addendum;
-                        gear.profile_shift = gear_core::params::Auto::fixed(x);
+                    }
+                    // **The ring's shift is the one given**, and the pinion's
+                    // follows to the crank the tips size — the member the
+                    // kind took as given when it was handed both, and what a
+                    // shape reads off the toggles: a mesh with both members
+                    // given reaches nothing.
+                    for mesh in 0..2 {
+                        let (a, b) = (mesh * 2, mesh * 2 + 1);
+                        let ring = if teeth[a] > teeth[b] { a } else { b };
+                        stage.gears[ring].profile_shift = gear_core::params::Auto::fixed(x);
                     }
                     for c in &mut stage.cutter {
                         c.teeth = cutter;
                     }
-                    let Ok(r) = solve_hula_stage(&stage, &StageLoads::at(2.0, 1000.0), &lib) else {
+                    let Ok((as_stage, r)) = solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib)
+                    else {
                         continue;
                     };
                     // **The whole question**, through the one method that asks
@@ -1015,32 +1121,34 @@ fn hula_band(z0: u32, clearance_in_modules: f64) {
                     // asked only about the tips crossing once the other two
                     // conditions moved onto the mesh report — which let fouling
                     // candidates win four of these rows.
-                    let admissible = r.meshes.iter().all(|m| {
-                        transverse(&m.report).contact_ratios.transverse >= 1.0
-                            && m.report.teeth_clear()
-                    }) && r.gears.iter().all(|g| g.gear.as_asked());
+                    let admissible =
+                        r.meshes().iter().all(|m| {
+                            transverse(m).contact_ratios.transverse >= 1.0 && m.teeth_clear()
+                        }) && r.members().iter().all(|g| g.as_asked());
                     if !admissible {
                         continue;
                     }
-                    if best
-                        .as_ref()
-                        .is_none_or(|(_, _, _, b)| r.efficiency.forward > b.efficiency.forward)
-                    {
-                        best = Some((x, cutter, addendum, r));
+                    if best.as_ref().is_none_or(|(_, _, _, _, b)| {
+                        r.efficiency().forward > b.efficiency().forward
+                    }) {
+                        best = Some((x, cutter, addendum, as_stage, r));
                     }
                 }
             }
         }
         match best {
             None => println!("{d:>3} {n:>6} {module:>7.3}   nothing admissible"),
-            Some((x, cutter, h, r)) => println!(
-                "{d:>3} {n:>6} {module:>7.3} {h:>5.1} {cutter:>6} {x:>+7.2} {:>9.4}% {:>7.2}% {:>8.2} {:>7.4} {:>9.5}",
-                r.fixed_carrier_efficiency.forward * 100.0,
-                r.efficiency.forward * 100.0,
-                transverse(&r.meshes[0].report).operating_pressure_angle,
-                transverse(&r.meshes[0].report).contact_ratios.transverse,
-                r.backlash.forward.nominal
-            ),
+            Some((x, cutter, h, as_stage, r)) => {
+                let v = hula_view(&as_stage, &r).expect("a hula stage");
+                println!(
+                    "{d:>3} {n:>6} {module:>7.3} {h:>5.1} {cutter:>6} {x:>+7.2} {:>9.4}% {:>7.2}% {:>8.2} {:>7.4} {:>9.5}",
+                    v.fixed_carrier_efficiency * 100.0,
+                    v.efficiency.forward * 100.0,
+                    transverse(&v.meshes[0]).operating_pressure_angle,
+                    transverse(&v.meshes[0]).contact_ratios.transverse,
+                    v.backlash.forward.nominal
+                );
+            }
         }
     }
 }
@@ -1085,13 +1193,12 @@ fn mesh_sweep(z_ring: u32, z_pinion: u32, ring_addendum: f64, pinion_addendum: f
 
 /// The same roll, on the hula pair the **stage** produces.
 ///
-/// Through `solve_hula_stage` rather than the arrangement alone, because the
-/// offset answers to the tips as well as to the far-side gap and a harness
-/// rolling the stage before that bound was applied would be measuring one
-/// nobody builds.
+/// Through the shape rather than a pair built by hand, because the offset
+/// answers to the tips as well as to the far-side gap and a harness rolling
+/// a pair before that bound was applied would be measuring one nobody builds.
 fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     use gear_core::ring::Ring;
-    use gear_core::train::{solve_hula_stage, HulaStage, StageLoads};
+    use gear_core::train::{HulaStage, StageLoads};
 
     let lib = gear_io::default_library();
     let teeth = [n + 1, n, n - 1, n];
@@ -1102,19 +1209,23 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
     for (gear, count) in stage.gears.iter_mut().zip(teeth) {
         gear.teeth = count;
     }
-    let result = match solve_hula_stage(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
+    let (as_stage, solved) = match solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("that stage has no geometry: {e}");
             return;
         }
     };
+    let Some(result) = hula_view(&as_stage, &solved) else {
+        eprintln!("that stage is not a hula stage");
+        return;
+    };
     let (a, b) = (mesh_index * 2, mesh_index * 2 + 1);
-    let (ring_i, pinion_i) = if result.gears[a].ring { (a, b) } else { (b, a) };
+    let (ring_i, pinion_i) = if result.gears[a].1 { (a, b) } else { (b, a) };
     let params = |i: usize| GearParams {
         module: stage.module[mesh_index],
-        teeth: result.gears[i].teeth,
-        profile_shift: result.gears[i].gear.profile_shift,
+        teeth: result.gears[i].0.params.teeth,
+        profile_shift: result.gears[i].0.profile_shift,
         addendum: stage.gears[i].addendum,
         dedendum: stage.gears[i].dedendum,
         thickness_mod: stage.thickness_mod[mesh_index],
@@ -1130,14 +1241,14 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
         &format!(
             "hula mesh {}  ring z{} x{:+.4}  pinion z{} x{:+.4}   gap asked {clearance} got {:.4} mm   alpha_w {:.2} deg   tip {} ({:+.4} deg)",
             mesh_index + 1,
-            result.gears[ring_i].teeth,
-            result.gears[ring_i].gear.profile_shift,
-            result.gears[pinion_i].teeth,
-            result.gears[pinion_i].gear.profile_shift,
-            m.clearance,
-            transverse(&m.report).operating_pressure_angle,
-            m.report.tips.is_some_and(|t| t.tip_interference),
-            m.report.tips.map_or(0.0, |t| t.tip_margin)
+            result.gears[ring_i].0.params.teeth,
+            result.gears[ring_i].0.profile_shift,
+            result.gears[pinion_i].0.params.teeth,
+            result.gears[pinion_i].0.profile_shift,
+            m.tips.map_or(f64::NAN, |t| t.far_gap),
+            transverse(m).operating_pressure_angle,
+            m.tips.is_some_and(|t| t.tip_interference),
+            m.tips.map_or(0.0, |t| t.tip_margin)
         ),
     );
 }
@@ -1434,9 +1545,7 @@ fn shifts_report(z1: u32, z2: u32) {
 /// for — 26 of 30 sets swept came back with a ring the cutter had to alter.
 fn epicyclic_shifts_report() {
     use gear_core::params::Auto;
-    use gear_core::train::{
-        solve_any, solve_hula_stage, HulaStage, Optimisation, PlanetaryStage, Stage, StageLoads,
-    };
+    use gear_core::train::{solve_any, HulaStage, Optimisation, PlanetaryStage, Stage, StageLoads};
 
     let lib = gear_io::default_library();
     let on = Optimisation {
@@ -1467,18 +1576,21 @@ fn epicyclic_shifts_report() {
         for (g, z) in hula.gears.iter_mut().zip([n, n + d, n + d, n + 2 * d]) {
             g.teeth = z;
         }
-        match solve_hula_stage(&hula, &StageLoads::at(2.0, 1000.0), &lib) {
+        match solve_hula(&hula, &StageLoads::at(2.0, 1000.0), &lib) {
             Err(e) => println!("{d:<12} {e}"),
-            Ok(r) => println!(
-                "{d:<12} {:>9.4} {:>9.4} {:>10.4} %   {}",
-                r.gears[1].gear.profile_shift,
-                r.gears[3].gear.profile_shift,
-                r.fixed_carrier_efficiency.forward * 100.0,
-                r.notes
-                    .iter()
-                    .find(|n| n.is(gear_core::note::key::STAGE_OPTIMISER_FOUND_NOTHING))
-                    .map_or("a shift to choose", |_| "nothing admissible"),
-            ),
+            Ok((as_stage, r)) => {
+                let v = hula_view(&as_stage, &r).expect("a hula stage");
+                println!(
+                    "{d:<12} {:>9.4} {:>9.4} {:>10.4} %   {}",
+                    v.gears[1].0.profile_shift,
+                    v.gears[3].0.profile_shift,
+                    v.fixed_carrier_efficiency * 100.0,
+                    v.notes
+                        .iter()
+                        .find(|n| n.is(gear_core::note::key::STAGE_OPTIMISER_FOUND_NOTHING))
+                        .map_or("a shift to choose", |_| "nothing admissible"),
+                );
+            }
         }
     }
 
@@ -1532,15 +1644,18 @@ fn epicyclic_shifts_report() {
         for (gear, count) in stage.gears.iter_mut().zip([n + 1, n, n - 1, n]) {
             gear.teeth = count;
         }
-        match solve_hula_stage(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
-            Ok(r) => println!(
-                "{:<12} {:>9.4} {:>9.4} {:>10.4} % {:>16}",
-                n,
-                r.gears[1].gear.profile_shift,
-                r.gears[2].gear.profile_shift,
-                100.0 * r.efficiency.forward,
-                r.gears.iter().all(|g| g.gear.clamps.is_empty())
-            ),
+        match solve_hula(&stage, &StageLoads::at(2.0, 1000.0), &lib) {
+            Ok((_, r)) => {
+                let members = r.members();
+                println!(
+                    "{:<12} {:>9.4} {:>9.4} {:>10.4} % {:>16}",
+                    n,
+                    members[1].profile_shift,
+                    members[2].profile_shift,
+                    100.0 * r.efficiency().forward,
+                    members.iter().all(|g| g.clamps.is_empty())
+                );
+            }
             Err(e) => println!("{n}: {e}"),
         }
     }

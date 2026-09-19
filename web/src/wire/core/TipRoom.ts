@@ -48,4 +48,12 @@ tip_interference: boolean,
  * the tip circles do not cross at all — the ordinary case, where there is
  * no place for the tips to meet.
  */
-tip_margin: number, };
+tip_margin: number, 
+/**
+ * **The far-side gap**, mm: the room between the pinion's tip and the
+ * ring's on the side away from contact, `r_tip,ring − r_tip,pinion +
+ * a`. At a few teeth of difference it is what the distance is sized to
+ * ([`shape::Distance::tip_clearance`]); on an ordinary internal mesh it
+ * is a large number nobody reads.
+ */
+far_gap: number, };

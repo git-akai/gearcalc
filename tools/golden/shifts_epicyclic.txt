@@ -2,7 +2,7 @@ hula stages  z, by tooth difference
 
 d             x mesh 1  x mesh 2    eta0 fwd   what the optimiser found
 1               0.4672    0.4672    99.3423 %   nothing admissible
-3               0.3676    0.3973    99.8949 %   a shift to choose
+3               0.3856    0.4856    99.9001 %   a shift to choose
 6               0.0386    0.0386    99.9178 %   a shift to choose
 
 epicyclic sets  z_sun/z_planet, ring = sun + 2 planet

@@ -1175,7 +1175,7 @@ fn defaults_impl() -> Result<String, String> {
         spur_stage: Stage::spur(spur),
         worm_stage: Stage::worm(worm),
         planetary_stage: Stage::planetary(planetary),
-        hula_stage: Stage::Hula(Box::new(hula)),
+        hula_stage: Stage::hula(hula),
         ultimate_case: LoadCase::ultimate(0.1, 30_000.0),
         fatigue_case: LoadCase::fatigue(0.02, 30_000.0),
         continuous_duty: gear_core::train::Duty::Continuous {
@@ -2248,9 +2248,9 @@ mod tests {
 
     /// **A hula stage crosses the boundary carrying its ratings.**
     ///
-    /// Its own shape and no other kind's: four gears on three shafts, two meshes
-    /// whose reports are nested rather than spread across the mesh, and a
-    /// grounded member that is loaded while it does not turn.
+    /// The one preset with two internal meshes on a distance the tips size:
+    /// four gears on a crank, a grounded member that is loaded while it does
+    /// not turn, and a distance the report says was held open by a mesh.
     ///
     /// The request is the shipped stage put through `defaults`, so the fields
     /// this asserts on are the fields a front end actually sends — a hand-typed
@@ -2269,15 +2269,12 @@ mod tests {
         }});
         let v = solved(&train.to_string());
         let stage = &v["stages"][0];
-        assert_eq!(stage["kind"], "hula");
+        assert_eq!(stage["kind"], "shape");
 
-        // Four gears, each with the geometry the arrangement gives it *and* the
-        // rating every stage member carries.
-        let gears = stage["gears"].as_array().expect("four gears");
+        // Four gears, each with the rating every stage member carries.
+        let gears = stage["members"].as_array().expect("four gears");
         assert_eq!(gears.len(), 4);
-        for (i, g) in gears.iter().enumerate() {
-            assert!(g["tip_radius"].as_f64().unwrap() > 0.0, "gear {i}");
-            let rated = &g["gear"];
+        for (i, rated) in gears.iter().enumerate() {
             assert!(rated["face_width"].as_f64().unwrap() > 0.0, "gear {i}");
             assert!(
                 rated["cases"][0]["torque"].as_f64().unwrap().abs() > 0.0,
@@ -2297,33 +2294,30 @@ mod tests {
             // ...and an ultimate case counts nothing.
             assert!(rated["cases"][0]["cycles"].is_null(), "gear {i}");
         }
-        assert_eq!(gears[0]["gear"]["cases"][0]["speed"].as_f64().unwrap(), 0.0);
+        assert_eq!(gears[0]["cases"][0]["speed"].as_f64().unwrap(), 0.0);
 
-        // Two meshes, each reporting what any parallel-axis mesh reports, under
-        // the one key the panel reads it by.
+        // Two meshes, each reporting what any parallel-axis mesh reports,
+        // with the room their tips have.
         for m in 0..2 {
             let mesh = &stage["meshes"][m];
             assert!(
-                mesh["report"]["line"]["contact_ratios"]["transverse"]
+                mesh["line"]["contact_ratios"]["transverse"]
                     .as_f64()
                     .unwrap()
                     > 0.0
             );
+            assert!(mesh["line"]["operating_pressure_angle"].as_f64().unwrap() > 0.0);
             assert!(
-                mesh["report"]["line"]["operating_pressure_angle"]
+                mesh["cases"][0]["contact"]["at_pitch_point"]
                     .as_f64()
                     .unwrap()
                     > 0.0
             );
-            assert!(
-                mesh["report"]["cases"][0]["contact"]["at_pitch_point"]
-                    .as_f64()
-                    .unwrap()
-                    > 0.0
-            );
-            assert!(mesh["clearance"].as_f64().unwrap() > 0.0, "mesh {m}");
+            assert!(mesh["tips"]["far_gap"].as_f64().unwrap() > 0.0, "mesh {m}");
         }
-        // The three shafts are in equilibrium, and the drive says so in the
+        // The crank offset was sized by one of the meshes' tips.
+        assert!(stage["distances"][0]["sized_by"].is_number());
+        // The shafts are in equilibrium, and the drive says so in the
         // vocabulary a stage says anything in.
         let sum: f64 = stage["cases"][0]["torques"]
             .as_array()

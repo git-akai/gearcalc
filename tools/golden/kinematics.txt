@@ -314,45 +314,48 @@
     shaft planet    of stage 1 speed 12/5
 
 == hula ==
-  total    ratio     232.562500   efficiency  81.919634 / 77.908086  %   backlash   0.065428 / 15.216173  deg
+  total    ratio     232.562500   efficiency  81.919641 / 77.908095  %   backlash   0.065428 / 15.216172  deg
   case 1       2.0000 Nm /   3000.00 rpm at start  ->    381.0287 Nm /     12.90 rpm at end    held at -
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0020 Nm /      0.00 rpm at start  held at -
   case 3       2.0000 Nm /   2400.00 rpm at start  ->    381.0287 Nm /     10.32 rpm at end    held at -
-  stage 1  ratio     232.562500   efficiency  81.919634 / 77.908086  %   backlash   0.065428 / 15.216173  deg
-    shaft grounded  case 1  speed       0.000000  torque     379.028699
-    shaft grounded  case 2  speed       0.000000  torque       0.767558
-    shaft grounded  case 3  speed       0.000000  torque     379.028699
-    shaft crank     case 1  speed    3000.000000  torque       2.000000
-    shaft crank     case 2  speed       0.000000  torque       0.002580
-    shaft crank     case 3  speed    2400.000000  torque       2.000000
-    shaft output    case 1  speed      12.899758  torque    -381.028699
-    shaft output    case 2  speed       0.000000  torque      -0.770138
-    shaft output    case 3  speed      10.319807  torque    -381.028699
+  stage 1  ratio     232.562500   efficiency  81.919641 / 77.908095  %   backlash   0.065428 / 15.216172  deg
+    shaft carrier   case 1  speed    3000.000000  torque       2.000000
+    shaft carrier   case 2  speed       0.000000  torque      -0.002010
+    shaft carrier   case 3  speed    2400.000000  torque       2.000000
+    shaft ring 2    case 1  speed      12.899758  torque    -381.028728
+    shaft ring 2    case 2  speed       0.000000  torque       0.600000
+    shaft ring 2    case 3  speed      10.319807  torque    -381.028728
+    shaft ring 1    case 1  speed       0.000000  torque     379.028728
+    shaft ring 1    case 2  speed       0.000000  torque      -0.597990
+    shaft ring 1    case 3  speed       0.000000  torque     379.028728
+    shaft planet 1  case 1  speed    -196.721311  torque      -0.000000
+    shaft planet 1  case 2  speed      -0.000000  torque       0.000000
+    shaft planet 1  case 3  speed    -157.377049  torque      -0.000000
     member 1  z 65  
-      case 1  speed       0.000000  vs frame   -3000.000000  torque     379.028699  cycles -
-      case 2  speed       0.000000  vs frame      -0.000000  torque       0.767558  cycles -
-      case 3  speed       0.000000  vs frame   -2400.000000  torque     379.028699  cycles 1.440000e8 / 1.440000e8
+      case 1  speed       0.000000  vs frame   -3000.000000  torque     379.203155  cycles -
+      case 2  speed       0.000000  vs frame      -0.000000  torque       0.597990  cycles -
+      case 3  speed       0.000000  vs frame   -2400.000000  torque     379.203155  cycles 1.440000e8 / 1.440000e8
     member 2  z 61  
-      case 1  speed    -196.721311  vs frame   -3196.721311  torque     355.703856  cycles -
-      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.720324  cycles -
-      case 3  speed    -157.377049  vs frame   -2557.377049  torque     355.703856  cycles 1.534426e8 / 1.534426e8
+      case 1  speed    -196.721311  vs frame   -3196.721311  torque     355.867576  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.561191  cycles -
+      case 3  speed    -157.377049  vs frame   -2557.377049  torque     355.867576  cycles 1.534426e8 / 1.534426e8
     member 3  z 57  
-      case 1  speed    -196.721311  vs frame   -3196.721311  torque     356.043211  cycles -
-      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.719637  cycles -
-      case 3  speed    -157.377049  vs frame   -2557.377049  torque     356.043211  cycles 1.534426e8 / 1.534426e8
+      case 1  speed    -196.721311  vs frame   -3196.721311  torque     356.043238  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.560932  cycles -
+      case 3  speed    -157.377049  vs frame   -2557.377049  torque     356.043238  cycles 1.534426e8 / 1.534426e8
     member 4  z 61  
-      case 1  speed      12.899758  vs frame   -2987.100242  torque     381.028699  cycles -
-      case 2  speed       0.000000  vs frame      -0.000000  torque       0.770138  cycles -
-      case 3  speed      10.319807  vs frame   -2389.680193  torque     381.028699  cycles 1.433808e8 / 1.433808e8
+      case 1  speed      12.899758  vs frame   -2987.100242  torque     381.028728  cycles -
+      case 2  speed       0.000000  vs frame      -0.000000  torque       0.600296  cycles -
+      case 3  speed      10.319807  vs frame   -2389.680193  torque     381.028728  cycles 1.433808e8 / 1.433808e8
     mesh 1  efficiency  99.954002 / 99.954002  %  contact ratio   1.3488  coprime
     mesh 2  efficiency  99.950663 / 99.950663  %  contact ratio   1.3499  coprime
   graph    mobility 2 degree(s), 2 given   total ratio 3721/16
     stage 1  ratio 3721/16
     shaft ground    of the train speed 0
-    shaft grounded  of stage 1 speed 0
-    shaft crank     of stage 1 speed 1
-    shaft wobble    of stage 1 speed -4/61
-    shaft output    of stage 1 speed 16/3721
+    shaft carrier   of stage 1 speed 1
+    shaft ring 2    of stage 1 speed 16/3721
+    shaft ring 1    of stage 1 speed 0
+    shaft planet 1  of stage 1 speed -4/61
 
 == layshaft ==
   total    ratio       2.366224   efficiency  96.998754 / 96.998754  %   backlash   0.099391 / 0.235181   deg

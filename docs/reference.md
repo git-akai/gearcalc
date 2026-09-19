@@ -1786,6 +1786,17 @@ eccentric, so **both pairs are separated by the same distance**, the crank's
 offset, and that shared number is what makes the arrangement one mechanism
 rather than two independent meshes.
 
+**It is a preset of [the stage](#the-stage)**, as every kind is: a central
+axis carrying the grounded gear, the crank and the output; a wobble axis the
+crank carries, with both wobble gears on one shaft; two internal meshes on
+the one distance between the axes, which the tips size where it is
+automatic. Everything below — the offset from the gap and the tips, the
+shifts that reach it, the circulating power, the play at either shaft — the
+shape solves as it solves any arrangement, and `hula_recorded` in
+`train/shape.rs` holds it to the figures the kind recorded, to the digits the
+corpus printed, before it retired. What is this arrangement's own is the
+algebra here, which is how those figures are read.
+
 ```text
 ratio        R = z₂z₄ / D,      D = z₂z₄ − z₁z₃          (Willis, both meshes)
 shift        Σx = Σz (inv α_w − inv α_t) / (2 tan α_n)   Σx = x_pinion − x_ring
@@ -1814,9 +1825,9 @@ until the one that asked for most is met and the rest have more than they asked
 for. The tips bind below about a quarter of a module of gap, and the gap above
 it — so a design asking for less than the tips allow is answered with what can be
 built rather than with what was requested, and the figure it actually got is
-reported beside the one it asked for. The tip bound is **supplied to the solve**
-rather than written inside it, because it belongs to the pair; a copy of it in
-the arrangement would be a second answer to a question that already has one.
+reported beside the one it asked for. Both bounds are the mesh's own
+(`TipRoom`), read off the parts a trial offset would produce, which is why
+the shape can size any distance with an internal mesh on it the same way.
 
 **One offset, and what is left over.** Only the *difference* of a pair's two
 shifts reaches either quantity above: the operating pressure angle takes it
@@ -1942,12 +1953,16 @@ addendum, the shaper and each mesh's shift division free (`gear-cli hulaband`):
 <!-- figures: gear-cli hulaband 18 -->
 | d | z | module | meshes | the stage | α_w | backlash out |
 |---|---|---|---|---|---|---|
-| 1 | 18 | 1.000 | 99.383 % | **33.4 %** | 45.7° | 0.371° |
-| 2 | 36 | 0.500 | 99.784 % | **58.9 %** | 36.6° | 0.154° |
-| 3 | 54 | 0.333 | 99.956 % | **87.6 %** | 26.8° | 0.077° |
-| 4 | 72 | 0.250 | 99.980 % | **94.0 %** | 21.0° | 0.046° |
-| 6 | 108 | 0.167 | 99.982 % | **94.6 %** | 18.4° | 0.027° |
-| 9 | 162 | 0.111 | 99.915 % | **78.5 %** | 14.7° | 0.014° |
+| 1 | 18 | 1.000 | 99.383 % | **33.4 %** | 43.9° | 0.371° |
+| 2 | 36 | 0.500 | 99.784 % | **58.9 %** | 35.2° | 0.154° |
+| 3 | 54 | 0.333 | 99.956 % | **87.6 %** | 25.4° | 0.077° |
+| 4 | 72 | 0.250 | 99.980 % | **94.0 %** | 19.4° | 0.046° |
+| 6 | 108 | 0.167 | 99.982 % | **94.6 %** | 17.3° | 0.027° |
+| 9 | 162 | 0.111 | 99.915 % | **78.5 %** | 13.6° | 0.014° |
+
+*(The operating angle is the **running** mesh's, 0.02 mm inside the
+zero-backlash crank; the kind that generated the first version of this table
+quoted the zero-backlash angle.)*
 
 **These are optimised divisions, and they sit on a bound rather than at an
 optimum.** The *sum* of a mesh's two shifts is never free — the crank offset is
@@ -1964,7 +1979,7 @@ wants to know is which bound stops it — and that is what these are.
 
 Three times better at four teeth of difference than at one, on the same
 reduction in the same envelope — and an eighth of the backlash. The mesh
-figures explain it: a one-tooth pair has to be opened to 45° of operating
+figures explain it: a one-tooth pair has to be opened to 44° of operating
 pressure angle to clear itself, and the loss carries `1/z₁ + 1/z₂`, which halves
 as the counts double. It turns over past six, where the contact ratio has grown
 and the path sits further from the pitch point again.
@@ -1983,10 +1998,10 @@ Optimised that way, each pair on its own at `z = 36`, `h_a = 0.6`, `μ = 0.08`:
 <!-- figures-by-test: the_four_hula_studies_are_the_ones_this_code_prints -->
 | d | reduction | α_w | the pair keeps | the stage keeps |
 |---|---|---|---|---|
-| 2 | 324 | 34.5° | 99.893 % | 58.4 % |
-| 3 | 144 | 26.8° | 99.966 % | 90.3 % |
-| 4 | 81 | 22.3° | 99.959 % | 93.3 % |
-| 5 | 52 | 20.1° | 99.948 % | 94.3 % |
+| 2 | 324 | 33.0° | 99.893 % | 58.4 % |
+| 3 | 144 | 25.2° | 99.966 % | 90.6 % |
+| 4 | 81 | 20.9° | 99.959 % | 93.3 % |
+| 5 | 52 | 18.8° | 99.948 % | 94.3 % |
 
 **The two pairs land at the same operating pressure angle** — to a hundredth of
 a degree, at every difference — not because the meshes are tied but because a
@@ -2007,7 +2022,7 @@ wrong:
 | d | least loss (Σx, x_ring, x_pinion) | least shift | stage, best | stage, least |
 |---|---|---|---|---|
 | 2 | −0.19, +0.37, +0.18 | −0.20, +0.20, +0.00 | 58.39 % | 54.81 % |
-| 3 | −0.09, +0.52, +0.42 | −0.11, +0.11, +0.00 | 90.29 % | 79.52 % |
+| 3 | −0.09, +0.51, +0.42 | −0.11, +0.11, +0.00 | 90.57 % | 79.52 % |
 | 4 | −0.03, +0.37, +0.34 | −0.05, +0.05, +0.00 | 93.25 % | 91.72 % |
 | 5 | +0.00, +0.00, +0.00 | +0.00, +0.00, +0.00 | 94.25 % | 94.25 % |
 
@@ -2035,8 +2050,8 @@ the *other* mesh's angle out by rather more than the first one gained. At
 | m₁/m₂ | 0.80 | 0.90 | **1.00** | 1.10 | 1.30 |
 |---|---|---|---|---|---|
 | offset, mm | 0.813 | 0.813 | **0.813** | 0.884 | 1.028 |
-| α_w, mesh 1 | 62.5° | 58.6° | **54.7°** | 54.2° | 53.5° |
-| α_w, mesh 2 | 54.7° | 54.7° | **54.7°** | 57.9° | 62.8° |
+| α_w, mesh 1 | 61.7° | 57.8° | **53.6°** | 53.3° | 52.7° |
+| α_w, mesh 2 | 53.6° | 53.6° | **53.6°** | 57.1° | 62.2° |
 
 Equal modules is a corner where both bounds are active at once, and the stage
 efficiency falls away either side of it — 27.4 % at equality against 23.7 % at

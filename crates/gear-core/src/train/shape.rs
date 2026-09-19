@@ -715,13 +715,26 @@ impl Shape {
             if i == b {
                 if plan.role[a] == Role::Free && free.is_empty() {
                     // Nothing searched: divide the sum between the two, as
-                    // a pair with both shifts automatic does.
+                    // a pair with both shifts automatic does. Where no
+                    // admissible division reaches a distance the *designer*
+                    // stated, that is the answer and the mesh says so
+                    // (`distance_notes`); where the distance is one the
+                    // tips sized, the first stands at its floor and the
+                    // second takes the whole of the rest — what a hula's
+                    // ring did for its crank: a shift past what its cutter
+                    // reaches is a part that says so through its clamps,
+                    // not a crank refused.
                     let floor = [plan.asked[a].search_floor, plan.asked[b].search_floor];
                     let at = |k: usize, v: f64| self.params_at([a, b][k], v, helix);
-                    let both =
-                        crate::auto::divide_shift_sum(&at, sign, sum - ta - sign * tb, floor)?;
-                    x[a] = both[0];
-                    x[b] = both[1];
+                    let sized = self.given_running(d).is_none();
+                    match crate::auto::divide_shift_sum(&at, sign, sum - ta - sign * tb, floor) {
+                        Some(both) => {
+                            x[a] = both[0];
+                            x[b] = both[1];
+                        }
+                        None if sized => x[b] = (sum - x[a] - ta) / sign - tb,
+                        None => return None,
+                    }
                 } else {
                     x[b] = (sum - x[a] - ta) / sign - tb;
                 }
@@ -847,32 +860,41 @@ impl Shape {
         helix: &[f64],
         held: &[Option<f64>],
     ) -> Option<(f64, usize)> {
-        let built = self.build(x, helix, held).ok()?;
-        let running = built.running[distance]?;
+        // The parts alone, not the whole build: a trial distance on the way
+        // to the one that clears may leave a mesh with no path of contact,
+        // which is nothing to the question of where its tips stand.
+        let meshes = self.meshes_on(distance);
+        let running = match held.get(distance).copied().flatten() {
+            Some(e) => e,
+            None => self
+                .running_target(distance)
+                .or_else(|| self.running_of(*meshes.first()?, x, helix))?,
+        };
         let asked = self.distances[distance].tip_clearance;
-        self.meshes_on(distance)
+        meshes
             .into_iter()
             .filter(|&k| self.kind_of(k) == Some(MeshKind::Internal))
             .map(|k| {
                 let m = self.meshes[k];
-                let (pinion, ring) = (&built.members[m.a], &built.members[m.b]);
-                // The pinion's tip on the side away from contact stands
-                // `r_tip − e` from the ring's centre, and the ring's tip
-                // circle `r_tip,ring` — so the gap grows with the distance.
-                let far = ring.tip_radius() - pinion.tip_radius() + running - asked;
-                let crossing = match ring {
-                    BuiltMember::Ring { ring, .. } => {
-                        super::TipRoom::at(ring, pinion.as_gear(), running).map_or(f64::NAN, |t| {
-                            if t.tip_interference {
-                                -1.0
-                            } else {
-                                t.tip_margin
-                            }
-                        })
-                    }
-                    BuiltMember::Rack { .. } => f64::INFINITY,
-                };
-                (far.min(crossing), k)
+                let pinion = Tooth::new(self.params_at(m.a, x[m.a], helix));
+                let ring = self.members[m.b]
+                    .ring
+                    .map(|cutter| Ring::cut_by(&self.params_at(m.b, x[m.b], helix), &cutter));
+                // Both rooms rise with the distance: the pinion's tip on the
+                // side away from contact stands `r_tip − e` from the ring's
+                // centre, and the tips' room where their circles cross opens
+                // as the pinion moves out.
+                let room = ring.map_or(f64::INFINITY, |ring| {
+                    super::TipRoom::at(&ring, &pinion, running).map_or(f64::NAN, |t| {
+                        let crossing = if t.tip_interference {
+                            -1.0
+                        } else {
+                            t.tip_margin
+                        };
+                        (t.far_gap - asked).min(crossing)
+                    })
+                });
+                (room, k)
             })
             .min_by(|p, q| p.0.total_cmp(&q.0))
     }
@@ -890,8 +912,8 @@ impl Shape {
     ///
     /// # Errors
     ///
-    /// [`TrainError::Hula`] where no distance in the involute domain clears
-    /// the tips on some mesh.
+    /// [`TrainError::TipsUnclearable`] where no distance in the involute
+    /// domain clears the tips on some mesh.
     fn sized(&self, helix: &[f64], plan: &Plan, free: &[f64]) -> Result<TipSizing, TrainError> {
         let mut held = plan.held.clone();
         let mut bound_by = vec![None; self.distances.len()];
@@ -904,18 +926,13 @@ impl Shape {
             {
                 continue;
             }
-            // At what the shifts leave, with nothing holding this distance.
+            // **A gap asked for is a distance asked for**: the least at which
+            // the tips clear by it, the shifts following — a hula's crank,
+            // which its kind solved from the clearance and nothing else.
+            // With no gap asked the shifts' own distance stands, opened out
+            // only where the tips would cross at it.
+            let asked = self.distances[d].tip_clearance > 0.0;
             held[d] = None;
-            let loose = self.plan_held(helix, held.clone());
-            let Some(x) = self.closed(&loose, free, helix) else {
-                continue;
-            };
-            let Some((room, mesh)) = self.tip_room(d, &x, helix, &held) else {
-                continue;
-            };
-            if room >= 0.0 {
-                continue;
-            }
             // Held at `e`, the plan reaches it; the room at that plan's
             // closure is what is driven to zero.
             let room_at = |e: f64| -> f64 {
@@ -926,36 +943,106 @@ impl Shape {
                     .and_then(|x| self.tip_room(d, &x, helix, &h))
                     .map_or(f64::NAN, |(room, _)| room)
             };
-            let from = self
-                .build(&x, helix, &held)
-                .ok()
-                .and_then(|b| b.running[d])
-                .ok_or(TrainError::Hula(crate::hula::Error::BoundUnreachable(mesh)))?;
-            // Open out by growing steps until the tips clear, then close in.
-            let mut lo = from;
-            let mut hi = from;
+            // At what the shifts leave, with nothing holding this distance
+            // — or, where that is no mesh at all (a ring pinned low enough
+            // that its pinion's floor puts the pair outside the involute
+            // domain) and a gap was asked, from the domain's own floor.
+            let loose = self.plan_held(helix, held.clone());
+            let meshes = self.meshes_on(d);
+            let mesh_0 = *meshes.first().unwrap_or(&0);
+            let (from, room, mesh) = match self.closed(&loose, free, helix).and_then(|x| {
+                let (room, mesh) = self.tip_room(d, &x, helix, &held)?;
+                let from = self
+                    .running_target(d)
+                    .or_else(|| self.running_of(mesh_0, &x, helix))?;
+                Some((from, room, mesh))
+            }) {
+                Some(found) => found,
+                None if asked => {
+                    let floor = meshes
+                        .iter()
+                        .map(|&k| {
+                            let rack = self.rack_of(k, helix);
+                            rack.mt * self.tooth_sum(k).abs() / 2.0 * rack.alpha_t.cos()
+                        })
+                        .fold(0.0_f64, f64::max)
+                        * (1.0 + 1e-6);
+                    let room = room_at(floor);
+                    if room.is_nan() {
+                        return Err(TrainError::TipsUnclearable { mesh: mesh_0 });
+                    }
+                    (floor, room, mesh_0)
+                }
+                None => continue,
+            };
+            if room >= 0.0 && !asked {
+                continue;
+            }
+            // Bracket the root by growing steps — outward from a distance
+            // the tips cross at, inward from one with room to spare — then
+            // close in. Inward, the involute domain may end before the room
+            // does; the shifts' own distance then stands, the tips asking
+            // nothing of it.
+            let (mut lo, mut hi) = (from, from);
             let mut step = from.abs().max(1.0) * 0.01;
             let mut found = false;
-            for _ in 0..40 {
-                hi = lo + step;
-                let r = room_at(hi);
-                if r.is_nan() {
-                    // Past the involute domain on some mesh: come back in.
-                    step *= 0.5;
+            if room < 0.0 {
+                // No internal mesh runs more than a couple of reference
+                // distances out — past that the pinion has left its ring —
+                // so a walk that gets there has found that nothing clears.
+                let reach = self.rack_of(mesh_0, helix).mt * self.tooth_sum(mesh_0).abs();
+                for _ in 0..40 {
+                    hi = lo + step;
+                    if hi > from + reach {
+                        break;
+                    }
+                    let r = room_at(hi);
+                    if r.is_nan() {
+                        // Past the involute domain on some mesh: come back in.
+                        step *= 0.5;
+                        continue;
+                    }
+                    if r >= 0.0 {
+                        found = true;
+                        break;
+                    }
+                    lo = hi;
+                    step *= 1.5;
+                }
+                if !found {
+                    return Err(TrainError::TipsUnclearable { mesh });
+                }
+            } else {
+                for _ in 0..80 {
+                    lo = hi - step;
+                    if lo <= 0.0 {
+                        break;
+                    }
+                    let r = room_at(lo);
+                    if r.is_nan() {
+                        // Below the involute domain on some mesh: come back
+                        // out, by halves, until the step is nothing.
+                        step *= 0.5;
+                        if step < 1e-12 * from.abs().max(1.0) {
+                            break;
+                        }
+                        continue;
+                    }
+                    if r < 0.0 {
+                        found = true;
+                        break;
+                    }
+                    hi = lo;
+                    step *= 1.5;
+                }
+                if !found {
+                    // The tips clear all the way to the domain's floor: they
+                    // ask nothing of the distance, and the shifts' own stands.
                     continue;
                 }
-                if r >= 0.0 {
-                    found = true;
-                    break;
-                }
-                lo = hi;
-                step *= 1.5;
-            }
-            if !found {
-                return Err(TrainError::Hula(crate::hula::Error::BoundUnreachable(mesh)));
             }
             let e = crate::solve::brent(room_at, lo, hi, crate::solve::Tol::default())
-                .ok_or(TrainError::Hula(crate::hula::Error::BoundUnreachable(mesh)))?;
+                .ok_or(TrainError::TipsUnclearable { mesh })?;
             // Lean to the clear side of the root by the solver's own
             // tolerance, so the parts built at it have the room asked for.
             let e = if room_at(e) < 0.0 {
@@ -989,33 +1076,34 @@ impl Shape {
         // they were asked and the mesh saying it did not reach the distance
         // (`distance_notes`); an automatic distance that no absorber can
         // close is a set that cannot be assembled, and is refused for it.
-        let fallback = |how| -> Result<Chosen, TrainError> {
-            match self.closed(&plan, &[], helix) {
-                Some(shifts) => Ok(Chosen {
-                    shifts,
-                    how,
-                    held: plan.held.clone(),
-                    bound_by: bound_by.clone(),
-                }),
-                None if plan.constraints.iter().any(|c| c.absorber.is_some()) => {
-                    Err(TrainError::NoCommonDistance)
+        let fallback =
+            |plan: &Plan, bound_by: &[Option<usize>], how| -> Result<Chosen, TrainError> {
+                match self.closed(plan, &[], helix) {
+                    Some(shifts) => Ok(Chosen {
+                        shifts,
+                        how,
+                        held: plan.held.clone(),
+                        bound_by: bound_by.to_vec(),
+                    }),
+                    None if plan.constraints.iter().any(|c| c.absorber.is_some()) => {
+                        Err(TrainError::NoCommonDistance)
+                    }
+                    None => Ok(Chosen {
+                        shifts: settled.clone(),
+                        how,
+                        held: plan.held.clone(),
+                        bound_by: bound_by.to_vec(),
+                    }),
                 }
-                None => Ok(Chosen {
-                    shifts: settled.clone(),
-                    how,
-                    held: plan.held.clone(),
-                    bound_by: bound_by.clone(),
-                }),
-            }
-        };
+            };
         if !self.optimisation.enabled {
-            return fallback(super::Searched::NotAsked);
+            return fallback(&plan, &bound_by, super::Searched::NotAsked);
         }
         let free: Vec<usize> = (0..self.members.len())
             .filter(|&i| plan.role[i] == Role::Free)
             .collect();
         if free.is_empty() {
-            return fallback(super::Searched::NotAsked);
+            return fallback(&plan, &bound_by, super::Searched::NotAsked);
         }
         // Each free member's own interval.
         let Some(intervals) = free
@@ -1037,7 +1125,7 @@ impl Shape {
             })
             .collect::<Option<Vec<_>>>()
         else {
-            return fallback(super::Searched::FoundNothing);
+            return fallback(&plan, &bound_by, super::Searched::FoundNothing);
         };
         // **The sum and the division, not the two shifts**, wherever both
         // members of one mesh are free: the sum sets the operating pressure
@@ -1110,36 +1198,159 @@ impl Shape {
             }
             out
         };
-        let objective = |v: &[f64]| -> Option<f64> {
-            let x = self.closed(&plan, &place(v), helix)?;
-            self.trial_efficiency(&plan, &x, helix)
-        };
-        match search.maximise(&box_, &objective) {
-            None => fallback(super::Searched::FoundNothing),
-            Some(v) => {
-                // The division the search chose moves the tips a little, so
-                // a distance the tips size is sized again at it — the
-                // hula's own round, taken once: a second round moved no
-                // shipped figure by a digit there.
-                let chosen = place(&v);
-                let mut plan = plan;
-                if bound_by.iter().any(Option::is_some) {
-                    let (held, again) = self.sized(helix, &plan, &chosen)?;
-                    if held != plan.held {
-                        plan = self.plan_held(helix, held);
-                        bound_by = again;
+        let cache: TeethCache = std::cell::RefCell::new(std::collections::HashMap::new());
+        // **Meshes that share nothing are searched apart.** The objective is
+        // a product over the meshes, and where a distance is held — stated
+        // or sized — each mesh on it answers to its own members alone, so
+        // the product is largest where every factor is and one search in
+        // `n` variables is several in fewer: a hula's two meshes at a held
+        // crank, which its kind searched one at a time for a thirteenth of
+        // the work. Meshes on an automatic distance with more than one mesh
+        // are one component, an absorber carrying any member's move across
+        // it; and an axis that touches two meshes joins them.
+        let components = self.search_components(&plan, &axes, &free);
+        // **A sized distance and the divisions chosen at it settle
+        // together.** The division a search chooses moves the tips a
+        // little, so a distance the tips size is sized again at what was
+        // chosen, and the search run again at that distance — the hula
+        // kind's own rounds. Three at most; the second usually moves nothing
+        // and the third never has.
+
+        let mut found: Option<Vec<f64>> = None;
+        for _ in 0..3 {
+            let objective = |v: &[f64], only: Option<&[usize]>| -> Option<f64> {
+                let x = self.closed(&plan, &place(v), helix)?;
+                self.trial_efficiency(&plan, &x, helix, Some(&cache), only)
+            };
+            let this_round = if components.len() > 1 {
+                let mut at: Vec<f64> = box_.iter().map(|(lo, hi)| 0.5 * (lo + hi)).collect();
+                let mut any = false;
+                for (component, meshes) in &components {
+                    let sub_box: Vec<(f64, f64)> = component.iter().map(|&k| box_[k]).collect();
+                    let sub = |w: &[f64]| -> Option<f64> {
+                        let mut v = at.clone();
+                        for (j, &k) in component.iter().enumerate() {
+                            v[k] = w[j];
+                        }
+                        objective(&v, Some(meshes))
+                    };
+                    if let Some(w) = search.maximise(&sub_box, &sub) {
+                        for (j, &k) in component.iter().enumerate() {
+                            at[k] = w[j];
+                        }
+                        any = true;
                     }
                 }
-                Ok(Chosen {
-                    shifts: self
-                        .closed(&plan, &chosen, helix)
-                        .unwrap_or_else(|| settled.clone()),
-                    how: super::Searched::Chose,
-                    held: plan.held.clone(),
-                    bound_by,
-                })
+                any.then_some(at)
+            } else {
+                search.maximise(&box_, &|v| objective(v, None))
+            };
+            let Some(v) = this_round else {
+                break;
+            };
+            let chosen = place(&v);
+            found = Some(v);
+            if !bound_by.iter().any(Option::is_some) {
+                break;
+            }
+            let (held, again) = self.sized(helix, &plan, &chosen)?;
+            let moved = held.iter().zip(&plan.held).any(|(a, b)| match (a, b) {
+                (Some(a), Some(b)) => (a - b).abs() > search.resolution * 1e-3,
+                (a, b) => a.is_some() != b.is_some(),
+            });
+            if !moved {
+                break;
+            }
+            plan = self.plan_held(helix, held);
+            bound_by = again;
+        }
+        match found {
+            None => fallback(&plan, &bound_by, super::Searched::FoundNothing),
+            Some(v) => Ok(Chosen {
+                shifts: self
+                    .closed(&plan, &place(&v), helix)
+                    .unwrap_or_else(|| settled.clone()),
+                how: super::Searched::Chose,
+                held: plan.held.clone(),
+                bound_by,
+            }),
+        }
+    }
+
+    /// **The search's axes grouped by the meshes they can move**: two axes
+    /// are one component where they touch one mesh, or two meshes on an
+    /// automatic distance that an absorber ties together. Each component is
+    /// its axis indices and the meshes they score.
+    fn search_components(
+        &self,
+        plan: &Plan,
+        axes: &[Coordinate],
+        free: &[usize],
+    ) -> Vec<(Vec<usize>, Vec<usize>)> {
+        let n_meshes = self.meshes.len();
+        // Union-find over meshes, then over axes through the meshes they touch.
+        let mut parent: Vec<usize> = (0..n_meshes + axes.len()).collect();
+        fn find(parent: &mut [usize], i: usize) -> usize {
+            let mut r = i;
+            while parent[r] != r {
+                r = parent[r];
+            }
+            let mut i = i;
+            while parent[i] != r {
+                let next = parent[i];
+                parent[i] = r;
+                i = next;
+            }
+            r
+        }
+        let union = |parent: &mut Vec<usize>, a: usize, b: usize| {
+            let (ra, rb) = (find(parent, a), find(parent, b));
+            if ra != rb {
+                parent[ra] = rb;
+            }
+        };
+        for d in 0..self.distances.len() {
+            if plan.held[d].is_none() {
+                let on = self.meshes_on(d);
+                for w in on.windows(2) {
+                    union(&mut parent, w[0], w[1]);
+                }
             }
         }
+        let members_of = |c: &Coordinate| -> Vec<usize> {
+            match *c {
+                Coordinate::Own(j) => vec![free[j]],
+                Coordinate::Sum(pa, pb, _) | Coordinate::Division(pa, pb, _) => {
+                    vec![free[pa], free[pb]]
+                }
+            }
+        };
+        for (k, axis) in axes.iter().enumerate() {
+            for i in members_of(axis) {
+                for (m, mesh) in self.meshes.iter().enumerate() {
+                    if mesh.a == i || mesh.b == i {
+                        union(&mut parent, n_meshes + k, m);
+                    }
+                }
+            }
+        }
+        let mut out: Vec<(usize, Vec<usize>, Vec<usize>)> = Vec::new();
+        for k in 0..axes.len() {
+            let root = find(&mut parent, n_meshes + k);
+            match out.iter_mut().find(|(r, _, _)| *r == root) {
+                Some((_, list, _)) => list.push(k),
+                None => out.push((root, vec![k], Vec::new())),
+            }
+        }
+        for m in 0..n_meshes {
+            let root = find(&mut parent, m);
+            if let Some((_, _, meshes)) = out.iter_mut().find(|(r, _, _)| *r == root) {
+                meshes.push(m);
+            }
+        }
+        out.into_iter()
+            .map(|(_, axes, meshes)| (axes, meshes))
+            .collect()
     }
 
     /// The shifts the shape settles on under a search — what the tests
@@ -1162,10 +1373,17 @@ impl Shape {
 
     /// The product of every mesh's efficiency at these shifts, or nothing
     /// where any mesh is inadmissible ([`crate::auto::MeshTrial`]).
-    fn trial_efficiency(&self, plan: &Plan, x: &[f64], helix: &[f64]) -> Option<f64> {
-        let built = self.build(x, helix, &plan.held).ok()?;
+    fn trial_efficiency(
+        &self,
+        plan: &Plan,
+        x: &[f64],
+        helix: &[f64],
+        cache: Option<&TeethCache>,
+        only: Option<&[usize]>,
+    ) -> Option<f64> {
+        let built = self.build_cached(x, helix, &plan.held, cache).ok()?;
         let cut = |i: usize| -> crate::auto::Cut<'_> {
-            match &built.members[i] {
+            match &*built.members[i] {
                 BuiltMember::Ring { ring, .. } => crate::auto::Cut::ByShaper { ring },
                 BuiltMember::Rack { tooth } => {
                     if plan.role[i] == Role::Given {
@@ -1189,6 +1407,11 @@ impl Shape {
         };
         let mut product = 1.0;
         for (k, bm) in built.meshes.iter().enumerate() {
+            // A component's search scores its own meshes; the rest are a
+            // constant factor it cannot move.
+            if only.is_some_and(|m| !m.contains(&k)) {
+                continue;
+            }
             let m = self.meshes[k];
             product *= crate::auto::MeshTrial {
                 members: [cut(m.a), cut(m.b)],
@@ -1245,6 +1468,10 @@ struct Plan {
 /// per distance the mesh whose tips sized it.
 type TipSizing = (Vec<Option<f64>>, Vec<Option<usize>>);
 
+/// The teeth a search has cut, by member, shift and helix.
+type TeethCache =
+    std::cell::RefCell<std::collections::HashMap<(usize, u64, u64), std::rc::Rc<BuiltMember>>>;
+
 /// One axis of the efficiency search, over the free members.
 #[derive(Clone, Copy, Debug)]
 enum Coordinate {
@@ -1263,14 +1490,24 @@ struct Chosen {
     bound_by: Vec<Option<usize>>,
 }
 
-/// Halve toward `toward` until `g` is finite there.
+/// **The nearest point to `from` at which `g` is finite**, stepping toward
+/// `toward` by a step that starts negligible and doubles. A bracket's end
+/// sits on the edge of the involute domain, where the geometry is refused
+/// exactly and exists a hair inside; halving toward the middle instead
+/// stepped a third of the way in at once and, on a hula's mesh, past the
+/// root — which read as *no common distance* on a stage that had one.
 fn pull_in(g: &impl Fn(f64) -> f64, from: f64, toward: f64) -> Option<f64> {
-    let mut x = from;
-    for _ in 0..crate::solve::Tol::default().max_iter {
+    if g(from).is_finite() {
+        return Some(from);
+    }
+    let span = toward - from;
+    let mut step = span * 1e-9;
+    while step.abs() <= span.abs() {
+        let x = from + step;
         if g(x).is_finite() {
             return Some(x);
         }
-        x = 0.5 * (x + toward);
+        step *= 2.0;
     }
     None
 }
@@ -1353,7 +1590,9 @@ pub(crate) struct BuiltMesh {
 }
 
 pub(crate) struct Built {
-    pub(crate) members: Vec<BuiltMember>,
+    /// Shared, so a search that moves one member's shift rebuilds that
+    /// member and reuses the rest ([`TeethCache`]).
+    pub(crate) members: Vec<std::rc::Rc<BuiltMember>>,
     pub(crate) meshes: Vec<BuiltMesh>,
     /// Per distance: the running distance every mesh on it agrees at.
     pub(crate) running: Vec<Option<f64>>,
@@ -1363,17 +1602,48 @@ impl Shape {
     /// **Every member cut and every mesh at its running distance**, at these
     /// shifts.
     fn build(&self, x: &[f64], helix: &[f64], held: &[Option<f64>]) -> Result<Built, TrainError> {
-        let members: Vec<BuiltMember> = (0..self.members.len())
-            .map(|i| {
-                let p = self.params_at(i, x[i], helix);
-                match &self.members[i].ring {
-                    Some(cutter) => BuiltMember::Ring {
-                        ring: Box::new(Ring::cut_by(&p, cutter)),
-                        as_gear: Tooth::new(p),
-                    },
-                    None => BuiltMember::Rack {
-                        tooth: Tooth::new(p),
-                    },
+        self.build_cached(x, helix, held, None)
+    }
+
+    /// [`Self::build`], with the teeth a search has already cut kept for it:
+    /// a search over one mesh's division moves two members of a shape and
+    /// rebuilds two, where cutting a ring is the whole cost of a trial.
+    fn build_cached(
+        &self,
+        x: &[f64],
+        helix: &[f64],
+        held: &[Option<f64>],
+        cache: Option<&TeethCache>,
+    ) -> Result<Built, TrainError> {
+        let cut = |i: usize| -> std::rc::Rc<BuiltMember> {
+            let p = self.params_at(i, x[i], helix);
+            std::rc::Rc::new(match &self.members[i].ring {
+                Some(cutter) => BuiltMember::Ring {
+                    ring: Box::new(Ring::cut_by(&p, cutter)),
+                    as_gear: Tooth::new(p),
+                },
+                None => BuiltMember::Rack {
+                    tooth: Tooth::new(p),
+                },
+            })
+        };
+        let members: Vec<std::rc::Rc<BuiltMember>> = (0..self.members.len())
+            .map(|i| match cache {
+                None => cut(i),
+                Some(cache) => {
+                    let key = (i, x[i].to_bits(), helix[i].to_bits());
+                    let mut kept = cache.borrow_mut();
+                    if let Some(m) = kept.get(&key) {
+                        return std::rc::Rc::clone(m);
+                    }
+                    let m = cut(i);
+                    // A search walks a few hundred trials; the cache is
+                    // never let past a few thousand teeth.
+                    if kept.len() > 4096 {
+                        kept.clear();
+                    }
+                    kept.insert(key, std::rc::Rc::clone(&m));
+                    m
                 }
             })
             .collect();
@@ -2041,7 +2311,7 @@ pub fn solve_shape(
             .iter()
             .find_map(|(_, b)| b.as_ref().and_then(|b| b.rim));
         out.extend(super::rim_below_minimum(rim));
-        if let BuiltMember::Rack { tooth } = &built.members[i] {
+        if let BuiltMember::Rack { tooth } = &*built.members[i] {
             out.extend(super::undercut_note(tooth));
         }
         out.extend(reversal.note_for(reversal.reverses(always_reverses(i), loads.any_reverse())));
@@ -2070,7 +2340,7 @@ pub fn solve_shape(
                 }
             }
         }
-        if let BuiltMember::Ring { ring, .. } = &built.members[i] {
+        if let BuiltMember::Ring { ring, .. } = &*built.members[i] {
             if ring.clamps.iter().any(|c| c.is(key::CLAMP_RING_TIP_RAISED)) {
                 out.push(Note::new(key::GEAR_RING_ADDENDUM_CLAMPED));
             }
@@ -2167,7 +2437,7 @@ pub fn solve_shape(
                     flank_interference: bm
                         .operating
                         .flank_interference([a.flank_ends(), b.flank_ends()]),
-                    tips: match b {
+                    tips: match &**b {
                         BuiltMember::Ring { ring, .. } => {
                             super::TipRoom::at(ring, a.as_gear(), bm.running)
                         }
@@ -3807,16 +4077,21 @@ mod tests {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
-mod hula_gate {
-    //! **The hula stage through the shape is the hula stage**, figure by
-    //! figure — the gate the kinds were held at before they retired
-    //! (`ac0dccc`), asked of the one kind left. A difference is a question:
-    //! either the shape has the hula's model wrong, or the kind had a fault
-    //! the shape does not, and `docs/corrections.md` records which.
+mod hula_recorded {
+    //! **The hula stage through the shape is the hula stage**, held to the
+    //! figures the kind recorded before it retired. The gate that ran the
+    //! two side by side lived at `2b71654` and found them the same to 1e-6
+    //! — ratio, crank offset and the mesh that held it open, every shift
+    //! and width, every mesh's figures, the stage's efficiency both ways and
+    //! its backlash at both shafts — apart from the two differences the
+    //! set's retirement had already recorded (`docs/corrections.md`): a
+    //! driven member pressed with its driver's force, and a case from the
+    //! output entered at the output rather than read as the crank's
+    //! delivered torque. What is held here is what the corpus printed for
+    //! `gear-cli hula 18 0.2` and what `docs/reference.md#the-hula-stage`
+    //! quotes for the shipped stage, to the digits they print.
 
-    use super::super::{
-        solve_hula_stage, test_library, HulaStage, Reversal, StageLoads, StageResult,
-    };
+    use super::super::{test_library, HulaStage, Reversal, StageLoads};
     use super::*;
 
     fn hula_18(clearance: f64) -> HulaStage {
@@ -3833,218 +4108,148 @@ mod hula_gate {
         stage
     }
 
-    fn close(a: f64, b: f64, tol: f64, what: &str) {
-        assert!(
-            (a - b).abs() <= tol * a.abs().max(b.abs()).max(1e-9),
-            "{what}: kind {a} vs shape {b}"
-        );
-    }
-
-    fn gate(stage: &HulaStage, loads: &StageLoads) {
-        gate_with(stage, loads, false);
-    }
-
-    /// `backward`: the loads carry a case from the output, which the kind
-    /// read as the crank's *delivered* torque and normalised its flow to —
-    /// so everything inside stood `1/η_backward` high, 28 % on the shipped
-    /// stage — where the shape enters it at the output at the torque times
-    /// the ratio, the train's own meaning (`docs/corrections.md`, the set's
-    /// backward case). The gate holds that factor rather than agreement.
-    fn gate_with(stage: &HulaStage, loads: &StageLoads, backward: bool) {
-        let lib = test_library();
-        let kind = solve_hula_stage(stage, loads, &lib).unwrap();
-        let shape = Shape::from(stage);
+    /// The hula's own boundary: crank driven, grounded gear held, output
+    /// out — shafts 1, 3 and 2 of the shape.
+    fn solve(stage: &HulaStage, loads: StageLoads) -> ShapeResult {
         let boundary = super::super::StageBoundary::holding(5, &[3], 1, 2);
-        let r = solve_shape(
-            &shape,
-            &loads.clone().under(boundary),
-            &lib,
+        solve_shape(
+            &Shape::from(stage),
+            &loads.under(boundary),
+            &test_library(),
             Reversal::default(),
         )
-        .unwrap();
-        close(kind.ratio, r.ratio, 1e-12, "ratio");
-        close(kind.offset, r.distances[0].running, 1e-6, "crank offset");
+        .unwrap()
+    }
+
+    fn close(a: f64, b: f64, tol: f64, what: &str) {
+        assert!((a - b).abs() <= tol, "{what}: recorded {a}, shape {b}");
+    }
+
+    #[test]
+    fn the_harness_hula_is_what_the_corpus_recorded() {
+        let r = solve(&hula_18(0.2), StageLoads::at(2.0, 1000.0));
+        close(324.0, r.ratio, 1e-9, "ratio");
+        let d = &r.distances[0];
+        close(0.726_026, d.running, 1e-6, "crank offset, running");
         close(
-            kind.offset_nominal,
-            r.distances[0].nominal[0],
+            0.746_026,
+            d.nominal[0],
             1e-6,
-            "nominal offset, mesh 1",
+            "crank offset at zero backlash",
         );
-        assert_eq!(kind.binding_mesh, r.distances[0].sized_by, "held open by");
-        // **Every mesh is pressed with its driver's force** in the shape,
-        // where the kind pressed each with the torque its row stated —
-        // `η` short on a driven member (`docs/corrections.md`, the set's
-        // driven-side meshes). So a driven member's torque, bending and
-        // contact stand `1/η`, `1/η` and `1/√η` over the kind's, and every
-        // other figure is the kind's.
-        for (i, (g, m)) in kind.gears.iter().zip(&r.members).enumerate() {
+        assert_eq!(d.sized_by, Some(0), "held open by mesh 1");
+        // The rings at +0.4519, the pinions at their floor.
+        for (i, want) in [(0, 0.4519), (1, 0.0), (2, 0.0), (3, 0.4519)] {
             close(
-                g.gear.profile_shift,
-                m.profile_shift,
-                1e-6,
+                want,
+                r.members[i].profile_shift,
+                5e-5,
                 &format!("gear {i} shift"),
             );
-            let eta = r.meshes[i / 2].efficiency.forward;
-            for (ck, cs) in g.gear.cases.iter().zip(&m.cases) {
-                close(
-                    ck.speed,
-                    cs.speed,
-                    1e-9,
-                    &format!("gear {i} case {} speed", ck.case),
-                );
-                let from_output = loads
-                    .cases
-                    .iter()
-                    .any(|l| l.case == ck.case && l.drive == crate::contact::Drive::Backward);
-                if backward && from_output {
-                    let ratio = cs.torque / ck.torque;
-                    assert!(
-                        (ratio - r.efficiency.backward).abs() < 2e-3,
-                        "gear {i} from the output: kind {} vs shape {} at η_b {}",
-                        ck.torque,
-                        cs.torque,
-                        r.efficiency.backward
-                    );
-                    continue;
-                }
-                if ck.torque == 0.0 {
-                    assert_eq!(cs.torque, 0.0);
-                    continue;
-                }
-                let scale = cs.torque / ck.torque;
-                let driven = (scale - 1.0 / eta).abs() < 1e-6;
-                assert!(
-                    driven || (scale - 1.0).abs() < 1e-6,
-                    "gear {i} case {} torque: kind {} vs shape {} (η {eta})",
-                    ck.case,
-                    ck.torque,
-                    cs.torque
-                );
-                let (kb, kc) = if driven {
-                    (1.0 / eta, 1.0 / eta.sqrt())
-                } else {
-                    (1.0, 1.0)
-                };
-                match (ck.bending_stress, cs.bending_stress) {
-                    (Some(a), Some(b)) => close(a * kb, b, 1e-6, &format!("gear {i} bending")),
-                    (a, b) => assert_eq!(a.is_some(), b.is_some(), "gear {i} rated"),
-                }
-                close(
-                    ck.contact_stress * kc,
-                    cs.contact_stress,
-                    1e-6,
-                    &format!("gear {i} contact"),
-                );
-            }
-        }
-        for (k, (hm, sm)) in kind.meshes.iter().zip(&r.meshes).enumerate() {
-            // To the sizing's own tolerance: the two solvers find the
-            // crank offset by different roots and agree to a nanometre.
-            close(
-                hm.report.contact_ratio,
-                sm.contact_ratio,
-                1e-6,
-                &format!("mesh {k} ε"),
-            );
-            close(
-                hm.report.efficiency.forward,
-                sm.efficiency.forward,
-                1e-6,
-                &format!("mesh {k} η"),
-            );
-            close(
-                hm.report.backlash[0].nominal,
-                sm.backlash[0].nominal,
-                1e-6,
-                &format!("mesh {k} backlash"),
-            );
-            let tips = sm.tips.unwrap();
-            assert_eq!(
-                hm.report.tips.unwrap().tip_interference,
-                tips.tip_interference
-            );
         }
         close(
-            kind.efficiency.forward,
-            r.efficiency.forward,
-            1e-6,
-            "stage η forward",
+            31.310,
+            r.efficiency.forward * 100.0,
+            5e-4,
+            "forward efficiency, %",
+        );
+        close(0.0, r.efficiency.backward, 1e-12, "self-locking");
+        close(
+            0.9932,
+            r.meshes[0].efficiency.forward * r.meshes[1].efficiency.forward,
+            5e-5,
+            "the two meshes alone",
         );
         close(
-            kind.efficiency.backward,
-            r.efficiency.backward,
-            1e-6,
-            "stage η backward",
-        );
-        close(
-            kind.backlash.forward.nominal,
+            0.405_565,
             r.backlash.forward.nominal,
             1e-6,
             "backlash at the output",
         );
         close(
-            kind.backlash.backward.nominal,
+            131.4032,
             r.backlash.backward.nominal,
-            1e-6,
+            5e-5,
             "backlash at the crank",
         );
-        // The three shafts the kind reports — grounded, crank, output — are
-        // the shape's 3, 1 and 2.
-        for (ck, cs) in kind.cases.iter().zip(&r.cases) {
-            let from_output = loads
-                .cases
-                .iter()
-                .any(|l| l.case == ck.case && l.drive == crate::contact::Drive::Backward);
-            if backward && from_output {
-                // The output carries exactly what the case states times the
-                // ratio; the kind had it over `η_backward`.
-                close(
-                    cs.torques[2].abs(),
-                    0.5 * r.ratio.abs(),
-                    1e-9,
-                    "the load at the output",
-                );
-                close(
-                    ck.torques[2].abs() * r.efficiency.backward,
-                    cs.torques[2].abs(),
-                    2e-3,
-                    "the kind's output over η_b",
-                );
-                continue;
-            }
-            for (kind_i, shape_i) in [(0, 3), (1, 1), (2, 2)] {
-                close(
-                    ck.speeds[kind_i],
-                    cs.speeds[shape_i],
-                    1e-9,
-                    &format!("case {} shaft {kind_i} speed", ck.case),
-                );
-                close(
-                    ck.torques[kind_i],
-                    cs.torques[shape_i],
-                    1e-6,
-                    &format!("case {} shaft {kind_i} torque", ck.case),
-                );
-            }
+        // The operating angle is the **running** mesh's, 0.02 mm inside the
+        // zero-backlash offset the kind quoted its 50.965° at — the stated
+        // change every pair took with the shape (`docs/corrections.md`).
+        for (k, (aw, eps, far, tip)) in [
+            (49.673, 0.9735, 0.2779, 0.0),
+            (49.673, 0.9712, 0.2779, 0.0106),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let m = &r.meshes[k];
+            close(aw, m.line.unwrap().operating_pressure_angle, 5e-4, "α_w");
+            close(eps, m.contact_ratio, 5e-5, "ε");
+            let tips = m.tips.unwrap();
+            close(far, tips.far_gap, 5e-5, "far-side gap");
+            close(tip, tips.tip_margin, 5e-5, "tip margin");
+            assert!(!tips.tip_interference);
         }
-        let _ = StageResult::Shape(Box::new(r));
+        // **Every mesh is pressed with its driver's force** — the stated
+        // change every driven member took with the shape. The kind
+        // anchored each mesh at the torque the power flow put on its
+        // central member: the output's, which drives its wobble gear in the
+        // crank's frame and so is the flank force itself; and the grounded
+        // ring's, which is *driven* by its wobble gear and stood `η₁` under
+        // the force on its flank — so the whole of mesh 1 is `1/η₁` over
+        // what the kind printed, bending with it, and mesh 2 is the kind's.
+        let eta1 = r.meshes[0].efficiency.forward;
+        close(
+            200.8899 / eta1,
+            r.members[0].cases[0].torque,
+            5e-4,
+            "z19 torque over η₁",
+        );
+        close(
+            190.3167 / eta1,
+            r.members[1].cases[0].torque,
+            5e-4,
+            "z18 torque over η₁",
+        );
+        close(191.6182, r.members[2].cases[0].torque, 5e-4, "z17 torque");
+        close(
+            202.8899,
+            r.members[3].cases[0].torque,
+            5e-4,
+            "output z18 torque",
+        );
+        close(
+            6663.3 / eta1,
+            r.members[1].cases[0].bending_stress.unwrap(),
+            0.05,
+            "z18 σ_F",
+        );
+        close(
+            7171.7,
+            r.members[2].cases[0].bending_stress.unwrap(),
+            0.05,
+            "z17 σ_F",
+        );
+        for i in [0, 3] {
+            assert!(
+                r.members[i].cases[0].bending_stress.is_none(),
+                "no fillet, no rating"
+            );
+        }
     }
 
     #[test]
-    fn the_shipped_hula_stage_is_itself_through_the_shape() {
-        gate(&HulaStage::default(), &StageLoads::at(2.0, 3000.0));
+    fn the_shipped_hula_stage_reports_the_figures_the_documents_quote() {
+        let r = solve(&HulaStage::default(), StageLoads::at(2.0, 1000.0));
+        close(3721.0 / 16.0, r.ratio, 1e-9, "the reduction");
+        close(81.92, r.efficiency.forward * 100.0, 0.005, "forward, %");
+        close(77.91, r.efficiency.backward * 100.0, 0.005, "backward, %");
     }
 
+    /// A case from the output enters at the output at the torque times the
+    /// ratio, and the crank delivers that over `η_backward`.
     #[test]
-    fn the_harness_hula_is_itself_through_the_shape() {
-        gate(&hula_18(0.2), &StageLoads::at(2.0, 1000.0));
-    }
-
-    /// ...and under a load from the output as well — the shipped stage can
-    /// be back-driven, at 78 % — where the kind normalised its flow at the
-    /// wrong shaft.
-    #[test]
-    fn a_hula_stage_driven_backward_is_itself_through_the_shape() {
+    fn a_case_from_the_output_is_entered_at_the_output() {
         let mut loads = StageLoads::at(2.0, 3000.0);
         loads.cases.push(super::super::StageLoad {
             case: 2,
@@ -4054,6 +4259,19 @@ mod hula_gate {
             speed: 0.0,
             turns: None,
         });
-        gate_with(&HulaStage::default(), &loads, true);
+        let r = solve(&HulaStage::default(), loads);
+        let c = &r.cases[2];
+        close(
+            0.5 * r.ratio,
+            c.torques[2].abs(),
+            1e-9,
+            "the output carries the case",
+        );
+        close(
+            0.5 * r.efficiency.backward,
+            c.torques[1].abs(),
+            1e-9,
+            "the crank delivers it over η_b",
+        );
     }
 }

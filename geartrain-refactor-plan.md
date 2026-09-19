@@ -882,6 +882,16 @@ pattern with a vocabulary; it reproduces its corpus through the shape and
 `train/hula.rs` goes with the stage-level half of `hula.rs`. If any figure
 cannot be reproduced the kind stays and `docs/corrections.md` records why.
 
+*Phase 6 is done.* `Shape::from(&HulaStage)`; `train/hula.rs` is the preset
+and the closed-form relation `stage_efficiency` the flow is checked against;
+`crate::hula` is gone, its five refusals one (`TipsUnclearable`) with the
+other four the mesh's own. The kind's corpus reproduces through the shape
+(`hula_recorded`, the doc tables' gates) apart from the two stated changes
+every kind took and the operating angle quoted running; `hulaband`
+reproduces row for row once the search learned to size the crank again at
+what each round chose. Three faults surfaced on the way and are in
+`docs/corrections.md`.
+
 **Phase 7 — the division of a load, and the audit.** The per-mesh loss model
 lands in 5a because the shape needs it; what remains here is what it makes
 possible: a load that leaves by two ports (`LoadShared` lifted), circulating

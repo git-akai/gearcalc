@@ -91,8 +91,6 @@ pub mod key {
     // stage's list where a reader would have to match it back up.
     /// `gear.face_width_as_entered`
     pub const GEAR_FACE_WIDTH_AS_ENTERED: &str = "gear.face_width_as_entered";
-    /// `gear.addendum_above_tip_width`
-    pub const GEAR_ADDENDUM_ABOVE_TIP_WIDTH: &str = "gear.addendum_above_tip_width";
     /// `gear.addendum_held_to_tip_width`
     pub const GEAR_ADDENDUM_HELD_TO_TIP_WIDTH: &str = "gear.addendum_held_to_tip_width";
     /// `gear.shift_raised_for_undercut`
@@ -221,16 +219,8 @@ pub mod key {
     pub const ERROR_TRAIN_LOAD_PORT: &str = "error.train_load_port";
     /// `error.train_load_shared`
     pub const ERROR_TRAIN_LOAD_SHARED: &str = "error.train_load_shared";
-    /// `error.hula_locked`
-    pub const ERROR_HULA_LOCKED: &str = "error.hula_locked";
-    /// `error.hula_coaxial`
-    pub const ERROR_HULA_COAXIAL: &str = "error.hula_coaxial";
-    /// `error.hula_offset_too_small`
-    pub const ERROR_HULA_OFFSET_TOO_SMALL: &str = "error.hula_offset_too_small";
-    /// `error.hula_clearance_unreachable`
-    pub const ERROR_HULA_CLEARANCE_UNREACHABLE: &str = "error.hula_clearance_unreachable";
-    /// `error.hula_bound_unreachable`
-    pub const ERROR_HULA_BOUND_UNREACHABLE: &str = "error.hula_bound_unreachable";
+    /// `error.train_tips_unclearable`
+    pub const ERROR_TRAIN_TIPS_UNCLEARABLE: &str = "error.train_tips_unclearable";
 
     /// Every key above, for the catalogue coverage tests.
     pub const ALL: &[&str] = &[
@@ -253,7 +243,6 @@ pub mod key {
         CLAMP_TOOTH_THICKNESS_CAPPED,
         CLAMP_TOOTH_THICKNESS_RAISED,
         GEAR_FACE_WIDTH_AS_ENTERED,
-        GEAR_ADDENDUM_ABOVE_TIP_WIDTH,
         GEAR_ADDENDUM_HELD_TO_TIP_WIDTH,
         GEAR_SHIFT_RAISED_FOR_UNDERCUT,
         GEAR_BENDING_UNRATED_IN_MESH,
@@ -306,11 +295,7 @@ pub mod key {
         ERROR_TRAIN_STAGE_UNDETERMINED,
         ERROR_TRAIN_LOAD_PORT,
         ERROR_TRAIN_LOAD_SHARED,
-        ERROR_HULA_LOCKED,
-        ERROR_HULA_COAXIAL,
-        ERROR_HULA_OFFSET_TOO_SMALL,
-        ERROR_HULA_CLEARANCE_UNREACHABLE,
-        ERROR_HULA_BOUND_UNREACHABLE,
+        ERROR_TRAIN_TIPS_UNCLEARABLE,
     ];
 }
 

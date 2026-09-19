@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """The hula stage's ratio, integrated from the rolling pitch circles.
 
-`gear_core::hula` reports a ratio as two integer products, `R = z2 z4 / D` with
-`D = z2 z4 - z1 z3`, which is Willis applied to both meshes. This reaches the
+The graph (`gear_core::kinematics`) gives a hula stage the exact ratio
+`R = z2 z4 / D` with `D = z2 z4 - z1 z3`, which is Willis applied to both
+meshes; `gear-cli hula` prints it as those two products. This reaches the
 same number from the other end -- by stepping the crank round and integrating
 the no-slip condition at each pitch point -- and shares no expression with it.
 It is the same standard the crossed-axis path is held to by `crossed_path.py`.

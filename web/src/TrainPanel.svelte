@@ -41,7 +41,6 @@
   import Switch from "./Switch.svelte";
   import { notes, type Notes } from "./notes";
   import {
-    hulaRing,
     shaftName,
     memberName,
     isWorm,
@@ -322,7 +321,7 @@
    *  rather than repeating the keys. */
   const FIELD_NOTES = {
     profile_shift: ["gear.shift_raised_for_undercut"],
-    addendum: ["gear.addendum_held_to_tip_width", "gear.addendum_above_tip_width"],
+    addendum: ["gear.addendum_held_to_tip_width"],
     face_width: ["gear.face_width_no_source", "gear.face_width_as_entered"],
   } as const;
   const UNDER_A_FIELD: readonly string[] = Object.values(FIELD_NOTES).flat();
@@ -596,6 +595,13 @@
 
        Named by member rather than by the classical pair, because the classical
        names describe which member is a ring and the condition does not. -->
+  <!-- The room an internal mesh's tips have on the side away from contact
+       — what sizes the distance at a few teeth of difference, and a large
+       number nobody reads on an ordinary ring. -->
+  {#if m?.tips}
+    <dt>{t("ui.train_far_side_gap")}</dt>
+    <dd>{num(m.tips.far_gap, 4)} {t("ui.train_mm")}</dd>
+  {/if}
   {#if m}
     <dt>{t("ui.train_interference")}</dt>
     <dd>
@@ -1943,228 +1949,6 @@
             >
           </div>
         {/if}
-      {:else if stage.kind === "hula"}
-        {@const hres = res && res.kind === "hula" ? res : null}
-        <button class="head section-heading" onclick={() => (tab.open[i] = !tab.open[i])}>
-          <span class="caret aside">{tab.open[i] ? "▾" : "▸"}</span>
-          <strong>{stageName(i)}</strong>
-          <span class="kind aside">{t("ui.train_hula")}</span>
-          <span class="teeth aside">z {stage.gears.map((g) => g.teeth).join(" / ")}</span>
-          {#if hres}
-            <span class="ratio aside">{hres.ratio.toFixed(2)} : 1</span>
-            <span class="eff aside">{pct(hres.efficiency.forward)} %</span>
-          {/if}
-        </button>
-        {#if tab.open[i]}
-          <div class="body">
-            <div class="grid shared">
-              {@render numberField("ui.train_pressure_angle", () => stage.pressure_angle, (v) => (stage.pressure_angle = v), 0.5, "°")}
-              <label>
-                <span>{t("ui.train_hula_gap")}</span>
-                {#if hres && hres.clearance === 0}
-                  <input type="number" value={0} disabled class="computed" />
-                {:else}
-                  <input type="number" step="0.05" bind:value={stage.clearance} />
-                {/if}
-                <em>{t("ui.train_mm")}</em>
-                <FieldNote notes={notes(t("ui.train_hula_note_gap"), null)} />
-              </label>
-              <!-- The crank offset is this arrangement's centre distance and is
-                   entered as one: automatic derives it from the clearances the
-                   parts must keep, a number given by hand is what it runs at.
-                   It carried a mode select and a second box before, which said
-                   the same thing in two controls neither of which looked like
-                   the field it replaced. What it settled at was also reported
-                   again below; the note it earned there belongs here, beside
-                   the number a designer is reading. -->
-              {@render autoNumber(
-                "ui.train_hula_crank_offset",
-                stage.offset,
-                hres?.offset,
-                0.01,
-                undefined,
-                hres
-                  ? `${t("ui.train_nominal_value", { value: hres.offset_nominal.toFixed(4) })}${
-                      hres.binding_mesh !== null
-                        ? ` · ${t("ui.train_hula_held_open_by", { mesh: String(hres.binding_mesh + 1) })}`
-                        : ""
-                    }`
-                  : null,
-                "ui.train_mm",
-              )}
-              <!-- The crank offset above is this kind's centre distance, and
-                   this is what portion of it is play — the same pair of numbers
-                   every other kind has, so the same pair of controls. The box
-                   shows the running offset, as every other kind's distance box
-                   does, with the zero-backlash one as its annotation; it used
-                   to show the nominal and annotate the running one, the one
-                   kind the other way round. -->
-              {@render autoNumber(
-                "ui.train_c2c_clearance",
-                stage.running_clearance,
-                hres?.running_clearance,
-                0.01,
-                () => relieveStage(stage, "clearance", figures),
-                undefined,
-                "ui.train_mm",
-              )}
-              <label>
-                <span>{t("ui.train_c2c_tolerance_plus")}</span>
-                <input type="number" step="0.01" bind:value={stage.tolerance_plus} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              <label>
-                <span>{t("ui.train_c2c_tolerance_minus")}</span>
-                <input type="number" step="0.01" bind:value={stage.tolerance_minus} />
-                <em>{t("ui.train_mm")}</em>
-              </label>
-              {@render overlapField(stage, hres?.overlap, hres?.meshes.map((m) => m.report) ?? [])}
-              {@render loadSharing(stage)}
-              {@render efficiencyToggle(stage.optimisation)}
-              {@render shafts(i)}
-            </div>
-
-
-            {#each [0, 1] as m (m)}
-              <!-- **Which member is the ring is a tooth count, not a result.**
-                   Two axes one crank offset apart can only be an internal pair,
-                   so the ring is whichever has more teeth — `hula::Teeth::pair`
-                   says the same thing in the core. Reading it off the solve
-                   instead left the cards, and the tool that shapes the ring,
-                   labelled from a stale answer before the first one arrived. -->
-              {@const ring = hulaRing(stage, m)}
-              {@const pinion = ring === m * 2 ? m * 2 + 1 : m * 2}
-              <h4 class="mesh section-heading">{t("ui.train_hula_mesh", { mesh: String(m + 1) })}</h4>
-              <div class="grid shared">
-                {@render numberField("ui.train_normal_module", () => stage.module[m], (v) => (stage.module[m] = v), 0.05, "ui.train_mm")}
-                {@render numberField("ui.train_tooth_thickness_mod", () => stage.thickness_mod[m], (v) => (stage.thickness_mod[m] = v), 0.05, "ui.train_k", t("ui.train_hula_note_thickness_mod"))}
-                {@render numberField("ui.train_sliding_friction", () => stage.sliding_friction[m], (v) => (stage.sliding_friction[m] = v), 0.01, "")}
-                {@render numberField("ui.train_static_friction", () => stage.static_friction[m], (v) => (stage.static_friction[m] = v), 0.01, "", t("ui.train_note_static_friction"))}
-              </div>
-              <div class="gears">
-                {#each [ring, pinion] as j (j)}
-                  {@render gearCard(
-                    t(j === ring ? "ui.train_ring" : "ui.train_pinion") +
-                      " — " +
-                      t(
-                        ["ui.train_hula_role_grounded", "ui.train_hula_role_wobble", "ui.train_hula_role_wobble", "ui.train_hula_role_output"][j],
-                      ),
-                    stage.gears[j],
-                    hres?.gears[j].gear,
-                    {
-                      cut: j === ring ? "shaper" : "rack",
-                      cutter: j === ring ? stage.cutter[m] : undefined,
-                      relief: { stage, member: j, figures },
-                      // **What a member's teeth see is its speed against the
-                      // crank**, which is the carrier of both meshes — so the
-                      // fixed-frame figure needs the same annotation a planet's
-                      // does, and for the same reason. The grounded gear is the
-                      // case that makes it worth saying: it stands still and is
-                      // engaged once every crank turn.
-                      carrier: t("ui.train_the_crank"),
-                    },
-                  )}
-                {/each}
-              </div>
-              <!-- Not indented: an epicyclic set's mesh readouts sit under a
-                   heading of their own and are inset from it, where these stand
-                   in their mesh's own section beneath its gear cards — the same
-                   place a pair's readout stands in its stage. -->
-              <dl class="out">
-                <!-- What every parallel-axis mesh reports, then what only this
-                     arrangement has — the same order the spur and screw
-                     readouts take. The mesh was built pinion first, so the
-                     pinion leads the pair of backlash figures. -->
-                {@render meshRows(hres?.meshes[m].report, [
-                  t("ui.train_the_pinion"),
-                  t("ui.train_the_ring"),
-                ])}
-                <dt>{t("ui.train_hula_clearance_result")}</dt>
-                <dd>
-                  {num(hres?.meshes[m].clearance, 4)} {t("ui.train_mm")}
-                  <small>
-                    {t("ui.train_hula_clearance_as_cut", {
-                      value: num(hres?.meshes[m].clearance_as_cut, 4),
-                    })}
-                  </small>
-                </dd>
-              </dl>
-              <!-- A clamp that is about the part rather than about a box is
-                   drawn on the card that owns it, like every other stage's —
-                   the pair-wide list that used to stand here was the only place
-                   in the application where one gear's finding was filed under
-                   two gears. -->
-            {/each}
-
-            <!-- The stage as a whole, under the meshes it is made of — where every
-                 other stage puts its readout. -->
-              <!-- Ordered as the spur and screw readouts are — the distance the
-                   pair runs at, contact, efficiency, backlash — with what only
-                   this arrangement has following on. -->
-              <dl class="out">
-                <dt>{t("ui.train_ratio")}</dt>
-                <dd>
-                  {num(hres?.ratio, 4)} : 1
-                  <small>{`${t("ui.train_hula_ratio_products", {
-                        numerator: String(hres?.ratio_products[0]),
-                        denominator: String(hres?.ratio_products[1]),
-                      })} · ${t("ui.train_hula_note_ratio", {
-                        denominator: String(hres?.ratio_products[1]),
-                      })}`}</small>
-                </dd>
-                <dt>{t("ui.train_efficiency")}</dt>
-                <dd>
-                  {bothWays(hres?.efficiency)}
-                  {#if lockedWays(hres?.efficiency)}
-                    <small class="warn">{lockedWays(hres?.efficiency)}</small>
-                  {/if}
-                </dd>
-                <!-- The two shafts the same two plays are seen from, which
-                     differ by the whole reduction — so both are named, as the
-                     spur stage names its two members. -->
-                <dt>{t("ui.train_backlash")}</dt>
-                <dd>
-                  {t("ui.train_at_the_shaft", {
-                    angle: num(hres?.backlash.forward.nominal, 5),
-                    shaft: t("ui.train_hula_role_output"),
-                  })}
-                  <small
-                    >{range(num(hres?.backlash.forward.minimum, 5), num(hres?.backlash.forward.maximum, 5))}</small
-                  >
-                  · {t("ui.train_at_the_shaft", {
-                    angle: num(hres?.backlash.backward.nominal, 5),
-                    shaft: t("ui.train_hula_role_crank"),
-                  })}
-                </dd>
-                <!-- **The crank alone**, because it is the one shaft here that
-                     is not a gear. The wobble body's speed and the output's are
-                     printed on the cards of the gears that turn at them, and a
-                     row repeating them was the same figure twice on one page. -->
-                <dt>{t("ui.train_hula_crank")}</dt>
-                <dd>
-                  {#each hres?.cases ?? [] as sc (sc.case)}
-                    <span class="line"
-                      >{caseName(sc.case)}: {num(sc.speeds[1], 1)} {t("ui.train_rpm")} · {num(sc.torques[1], 4)} {t("ui.train_nm")}</span
-                    >
-                  {/each}
-                </dd>
-              </dl>
-
-              <!-- What the stage had to say that no one gear owns, as every
-                   other stage kind reports its own. -->
-              {#if (hres?.notes.length ?? 0) > 0}
-                <ul class="notes">
-                  {#each hres?.notes ?? [] as n, i (i)}<li>{note(n)}</li>{/each}
-                </ul>
-              {/if}
-
-            <button
-              class="action danger"
-              onclick={() => removeStage(i)}>{t("ui.train_remove_stage")}</button
-            >
-          </div>
-        {/if}
-
       {/if}
     </section>
   {/each}

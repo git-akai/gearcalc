@@ -56,10 +56,7 @@ pub use conditions::{
     Term, TrainMotion,
 };
 pub use crossed::solve_crossed_pair;
-pub use hula::{
-    solve_hula_stage, solve_hula_stage_with, stage_efficiency, HulaGear, HulaMesh, HulaResult,
-    HulaStage,
-};
+pub use hula::{stage_efficiency, HulaStage};
 pub(crate) use pair::ShiftAsked;
 pub use pair::{PairKind, PairStage};
 pub use planetary::PlanetaryStage;
@@ -276,26 +273,6 @@ pub struct MeshReport {
     pub line: Option<LineContact>,
     /// What a point contact has and a line does not.
     pub point: Option<PointContact>,
-}
-
-/// What one load case puts on the **shafts** of an epicyclic kind, by
-/// [`PlanetaryShaft`](crate::planetary::PlanetaryShaft) index — the set's sun,
-/// carrier and ring, or the hula stage's grounded gear, crank and output. The
-/// members print their own; this is where the shaft that is not a gear reads.
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(
-    feature = "typescript",
-    derive(ts_rs::TS),
-    ts(export, export_to = "core/")
-)]
-pub struct ShaftsCase {
-    /// Index into the train's list of load cases.
-    pub case: usize,
-    /// rpm. The held shaft is exactly zero.
-    pub speeds: [f64; 3],
-    /// N·m. They sum to zero.
-    pub torques: [f64; 3],
 }
 
 /// What one load case does to one mesh.
@@ -544,6 +521,12 @@ pub struct TipRoom {
     /// the tip circles do not cross at all — the ordinary case, where there is
     /// no place for the tips to meet.
     pub tip_margin: f64,
+    /// **The far-side gap**, mm: the room between the pinion's tip and the
+    /// ring's on the side away from contact, `r_tip,ring − r_tip,pinion +
+    /// a`. At a few teeth of difference it is what the distance is sized to
+    /// ([`shape::Distance::tip_clearance`]); on an ordinary internal mesh it
+    /// is a large number nobody reads.
+    pub far_gap: f64,
 }
 
 impl TipRoom {
@@ -562,6 +545,7 @@ impl TipRoom {
         crate::ring::mesh_at(ring, pinion, running).map(|m| Self {
             tip_interference: m.tip_interference,
             tip_margin: m.tip_margin.to_degrees(),
+            far_gap: ring.ra - pinion.ra + running,
         })
     }
 
@@ -1022,22 +1006,6 @@ impl AddendumAsked {
     pub(crate) fn note(&self) -> Option<crate::note::Note> {
         self.clamped.then(|| {
             crate::note::Note::new(crate::note::key::GEAR_ADDENDUM_HELD_TO_TIP_WIDTH)
-                .number("addendum", self.used, 4)
-        })
-    }
-
-    /// **The same finding where the stage cannot act on it**, which is a report
-    /// rather than a clamp.
-    ///
-    /// A hula stage solves its crank offset from a gap written in the
-    /// tips, in closed form with an analytic derivative. An addendum that moved
-    /// with the shift — which moves with the offset — would put a tip-width
-    /// solve inside that root-find and take the derivative away with it. Not
-    /// every bound an input creates needs a solver behind it: this one says
-    /// what the tooth would have to be and leaves the number alone.
-    pub(crate) fn warning(&self) -> Option<crate::note::Note> {
-        self.clamped.then(|| {
-            crate::note::Note::new(crate::note::key::GEAR_ADDENDUM_ABOVE_TIP_WIDTH)
                 .number("addendum", self.used, 4)
         })
     }
@@ -1527,7 +1495,6 @@ impl GearResult {
         self.clamps.is_empty()
             && !self.notes.iter().any(|n| {
                 n.is(key::GEAR_SHIFT_RAISED_FOR_UNDERCUT)
-                    || n.is(key::GEAR_ADDENDUM_ABOVE_TIP_WIDTH)
                     || n.is(key::GEAR_ADDENDUM_HELD_TO_TIP_WIDTH)
             })
     }
@@ -1655,8 +1622,12 @@ pub enum TrainError {
     /// choosing an end, and the refusal is the boundary of the model, not of
     /// the mechanism.
     LoadShared { case: usize },
-    /// A hula stage that has no geometry — see [`crate::hula::Error`].
-    Hula(crate::hula::Error),
+    /// **No distance clears the tips of this mesh**: an automatic distance
+    /// with an internal mesh on it opened out through the involute domain
+    /// and the tips never came clear by what was asked
+    /// ([`shape::Distance::tip_clearance`]). Zero-based, as the meshes are
+    /// indexed; the front end numbers from 1.
+    TipsUnclearable { mesh: usize },
     /// **Which stage could not be solved**, wrapped around why.
     ///
     /// A train is a chain: a stage that fails takes the shaft line with it, so
@@ -1671,13 +1642,6 @@ pub enum TrainError {
     },
 }
 
-/// So a hula stage can report its findings in the vocabulary every other stage
-/// kind reports in. It had a refusal type of its own, from before the train had
-/// an arm to put one in; now that it has, the arrangement's own error is a
-/// [`TrainError`] like a mesh's, and the stage returns the same `Result` as
-/// every other solver here — which is what lets it name a material the library
-/// does not have, or a member too undercut to rate, without inventing a second
-/// place to say so.
 /// So a train's motion can refuse in the vocabulary a train refuses in.
 ///
 /// A motion failure is never geometric — that is the whole point of the split —
@@ -1705,12 +1669,6 @@ impl From<WiringError> for TrainError {
     }
 }
 
-impl From<crate::hula::Error> for TrainError {
-    fn from(e: crate::hula::Error) -> Self {
-        Self::Hula(e)
-    }
-}
-
 /// A note about one shaft, carrying where it is as the front end counts —
 /// stage and shaft from one — or `0` and `0` for ground, which every stage
 /// shares and no stage numbers.
@@ -1735,7 +1693,8 @@ impl crate::note::Explain for TrainError {
             Self::Mesh(e) => e.note(),
             // The drive diagnoses itself; the train carries the note rather
             // than restating it.
-            Self::Hula(e) => e.note(),
+            Self::TipsUnclearable { mesh } => Note::new(key::ERROR_TRAIN_TIPS_UNCLEARABLE)
+                .count("mesh", u32::try_from(*mesh + 1).unwrap_or(1)),
             Self::Screw(e) => e.note(),
             Self::NoContact => Note::new(key::ERROR_TRAIN_NO_CONTACT),
             Self::NoCommonDistance => Note::new(key::ERROR_TRAIN_NO_COMMON_DISTANCE),
@@ -1784,7 +1743,9 @@ impl std::fmt::Display for TrainError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Mesh(e) => write!(f, "{e}"),
-            Self::Hula(e) => write!(f, "the arrangement has no geometry: {e:?}"),
+            Self::TipsUnclearable { mesh } => {
+                write!(f, "mesh {}: no distance clears the teeth", mesh + 1)
+            }
             Self::Screw(e) => match e {
                 crate::screw::ScrewError::NotPositive => {
                     write!(f, "a module, diameter or tooth count is not positive")
@@ -1974,13 +1935,13 @@ impl Default for Optimisation {
 /// Serialised with a `kind` tag alongside the stage's own fields, so a train
 /// file says what each stage is rather than relying on position.
 ///
-/// **One shape, and the hula stage still beside it.** Every kind a train
-/// used to have — a spur pair, a worm, a planetary set — is a tick pattern
-/// of [`shape::Shape`] and is built as one through the constructors below;
-/// the kind a document or a panel names is a *preset* over that shape, not
-/// a second type in the core. The hula stage stays a kind until the shape
-/// can size a distance from a tip bound (`geartrain-refactor-plan.md`,
-/// *Phase 6*).
+/// **One shape.** Every kind a train used to have — a spur pair, a worm, a
+/// planetary set, a hula stage — is a tick pattern of [`shape::Shape`] and
+/// is built as one through the constructors below; the kind a document or a
+/// panel names is a *preset* over that shape, not a second type in the
+/// core. The enum has one variant and keeps its tag, so a document says
+/// `kind = "shape"` and a stage of another nature, should one ever be
+/// needed, has a place to go.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
@@ -1991,7 +1952,6 @@ impl Default for Optimisation {
 #[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
 pub enum Stage {
     Shape(Box<shape::Shape>),
-    Hula(Box<HulaStage>),
 }
 
 impl Stage {
@@ -2013,20 +1973,24 @@ impl Stage {
         Self::Shape(Box::new(shape::Shape::from(&p)))
     }
 
-    /// The shape, where this is one.
+    /// A hula stage, as a shape.
+    #[must_use]
+    pub fn hula(h: HulaStage) -> Self {
+        Self::Shape(Box::new(shape::Shape::from(&h)))
+    }
+
+    /// The shape.
     #[must_use]
     pub fn as_shape(&self) -> Option<&shape::Shape> {
         match self {
             Self::Shape(s) => Some(s),
-            Self::Hula(_) => None,
         }
     }
 
-    /// The shape, mutably, where this is one.
+    /// The shape, mutably.
     pub fn as_shape_mut(&mut self) -> Option<&mut shape::Shape> {
         match self {
             Self::Shape(s) => Some(s),
-            Self::Hula(_) => None,
         }
     }
 }
@@ -2404,22 +2368,6 @@ pub struct FreedomGroup {
     pub order: Vec<Vec<Freedom>>,
 }
 
-/// **A single relation** among its inputs, so exactly one of them is the one
-/// the others decide. Written once rather than as a count per kind, because a
-/// count per kind is a count to get wrong — and the first draft did, by one,
-/// on the kind with the most tests.
-///
-/// Says nothing about how many may be *automatic*: every input in one of these
-/// has a rule of its own to fall back on, so leaving them all automatic is a
-/// design with nothing pinned rather than a contradiction.
-pub(crate) fn one_relation(order: Vec<Vec<Freedom>>) -> FreedomGroup {
-    FreedomGroup {
-        given_at_most: order.len() - 1,
-        automatic_at_most: order.len(),
-        order,
-    }
-}
-
 /// **Two ways of saying one number, so one of them must be said.** A distance
 /// is nominal + clearance and an automatic clearance is distance − nominal;
 /// with both automatic neither has anything to derive from. A pair's group;
@@ -2430,18 +2378,6 @@ pub(crate) fn distance_and_clearance() -> FreedomGroup {
         given_at_most: 2,
         automatic_at_most: 1,
         order: vec![vec![Freedom::Clearance], vec![Freedom::CentreDistance]],
-    }
-}
-
-/// **An input that is always given**, alone in its group with none allowed
-/// automatic, so relief pins it back whatever was touched — the tool saying
-/// that nothing can hand it back, rather than offering a toggle and reading
-/// the box regardless.
-pub(crate) fn always_given(f: Freedom) -> FreedomGroup {
-    FreedomGroup {
-        given_at_most: 1,
-        automatic_at_most: 0,
-        order: vec![vec![f]],
     }
 }
 
@@ -2459,17 +2395,6 @@ pub(crate) fn always_automatic(f: Freedom) -> FreedomGroup {
 /// The readings as one entry, for a group to count as one input.
 pub(crate) fn entry(readings: &[Reading]) -> Vec<Freedom> {
     readings.iter().map(|r| r.freedom).collect()
-}
-
-/// **The readings of the helix as a group of their own**, for a kind whose
-/// size is in no other relation: nothing counts it against a distance, so all
-/// the group holds is that at most one reading stands.
-pub(crate) fn readings_group(readings: &[Reading]) -> FreedomGroup {
-    FreedomGroup {
-        given_at_most: 1,
-        automatic_at_most: 1,
-        order: vec![entry(readings)],
-    }
 }
 
 /// **What a kind declares so the machinery shared by every kind can serve it**
@@ -2514,14 +2439,12 @@ pub(crate) trait Constrained {
 impl Stage {
     fn kind(&self) -> &dyn Constrained {
         match self {
-            Self::Hula(h) => &**h,
             Self::Shape(s) => &**s,
         }
     }
 
     fn kind_mut(&mut self) -> &mut dyn Constrained {
         match self {
-            Self::Hula(h) => &mut **h,
             Self::Shape(s) => &mut **s,
         }
     }
@@ -2599,19 +2522,11 @@ impl Stage {
     }
 
     /// **The pinion cutter a member is cut by, where it is a ring** — which is
-    /// the one question *is this member internal?* has, asked of the stage
-    /// that knows: a pair has no ring, a set's ring is its third member, and
-    /// a hula stage's are the larger gear of each mesh, cut by that mesh's
-    /// cutter. `None` for every rack-cut member, including a worm.
+    /// the one question *is this member internal?* has, and the member says
+    /// it of itself. `None` for every rack-cut member, including a worm.
     #[must_use]
     pub fn member_cutter(&self, i: usize) -> Option<&crate::ring::Cutter> {
         match self {
-            Self::Hula(h) => {
-                let teeth = crate::hula::Teeth(h.gears.each_ref().map(|g| g.teeth));
-                let pair = teeth.pair(i / 2).ok()?;
-                (pair.ring == i).then_some(&h.cutter[i / 2])
-            }
-            // The shape says it of the member itself.
             Self::Shape(s) => s.members.get(i).and_then(|m| m.ring.as_ref()),
         }
     }
@@ -2794,13 +2709,13 @@ impl Stage {
     }
 }
 
-/// What a stage produced, of whichever kind.
+/// What a stage produced.
 ///
-/// **Each shape keeps its own result** — a pair's, a set's, a hula stage's —
-/// and the two pair kinds share one. What the train needs from any of them is
-/// small enough to read through the accessors below — ratio, efficiency, the
-/// backlash at the output member — so the accumulation never asks what kind it
-/// was, without every result having to pretend to be the same shape.
+/// One result, the shape's, under the tag the stage carries. What the train
+/// needs from it is small enough to read through the accessors below —
+/// ratio, efficiency, the backlash at the output member, every member and
+/// every mesh — which is what a sweep over "every number every stage
+/// reports" walks.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -2810,12 +2725,9 @@ impl Stage {
 )]
 #[cfg_attr(feature = "serde", serde(tag = "kind", rename_all = "snake_case"))]
 pub enum StageResult {
-    // Both variants are boxed. A result carries material records, admissible
-    // ranges and notes, so a `Vec<StageResult>` would otherwise pay the
-    // largest of them for every stage. The boxes are invisible to readers and
-    // to serde.
+    // Boxed: a result carries material records, admissible ranges and notes,
+    // and the box is invisible to readers and to serde.
     Shape(Box<shape::ShapeResult>),
-    Hula(Box<HulaResult>),
 }
 
 impl StageResult {
@@ -2823,7 +2735,6 @@ impl StageResult {
     #[must_use]
     pub fn ratio(&self) -> f64 {
         match self {
-            Self::Hula(r) => r.ratio,
             Self::Shape(r) => r.ratio,
         }
     }
@@ -2836,7 +2747,6 @@ impl StageResult {
     #[must_use]
     pub fn efficiency(&self) -> Directional<f64> {
         match self {
-            Self::Hula(r) => r.efficiency,
             Self::Shape(r) => r.efficiency,
         }
     }
@@ -2849,7 +2759,6 @@ impl StageResult {
     #[must_use]
     pub fn backlash(&self) -> Directional<Backlash> {
         match self {
-            Self::Hula(r) => r.backlash,
             Self::Shape(r) => r.backlash,
         }
     }
@@ -2873,7 +2782,6 @@ impl StageResult {
     #[must_use]
     pub fn members(&self) -> Vec<&GearResult> {
         match self {
-            Self::Hula(r) => r.gears.iter().map(|g| &g.gear).collect(),
             Self::Shape(r) => r.members.iter().collect(),
         }
     }
@@ -2887,16 +2795,13 @@ impl StageResult {
     pub fn figure(&self, f: Freedom) -> Option<f64> {
         match f {
             Freedom::CentreDistance => match self {
-                Self::Hula(r) => Some(r.offset),
                 Self::Shape(r) => r.distances.first().map(|d| d.running),
             },
             Freedom::Clearance => match self {
-                Self::Hula(r) => Some(r.running_clearance),
                 Self::Shape(r) => r.distances.first().map(|d| d.clearance),
             },
             Freedom::FirstPitchDiameter => self.members().first().map(|g| g.pitch_diameter),
             Freedom::Overlap => match self {
-                Self::Hula(r) => Some(r.overlap),
                 Self::Shape(r) => r
                     .meshes
                     .first()
@@ -2921,26 +2826,15 @@ impl StageResult {
     #[must_use]
     pub fn meshes(&self) -> Vec<&MeshReport> {
         match self {
-            Self::Hula(r) => r.meshes.iter().map(|m| &m.report).collect(),
             Self::Shape(r) => r.meshes.iter().collect(),
         }
     }
 
-    /// The hula result, if that is what this is.
-    #[must_use]
-    pub fn as_hula(&self) -> Option<&HulaResult> {
-        match self {
-            Self::Hula(r) => Some(r),
-            _ => None,
-        }
-    }
-
-    /// The shape's result, if that is what this is.
+    /// The shape's result.
     #[must_use]
     pub fn as_shape(&self) -> Option<&shape::ShapeResult> {
         match self {
             Self::Shape(r) => Some(r),
-            _ => None,
         }
     }
 }
@@ -3665,9 +3559,6 @@ pub fn solve_any_with(
     reversal: Reversal,
 ) -> Result<StageResult, TrainError> {
     match stage {
-        Stage::Hula(s) => {
-            solve_hula_stage_with(s, loads, lib, reversal).map(|r| StageResult::Hula(Box::new(r)))
-        }
         Stage::Shape(s) => {
             shape::solve_shape(s, loads, lib, reversal).map(|r| StageResult::Shape(Box::new(r)))
         }
@@ -4109,6 +4000,23 @@ mod tests {
         shape::solve_shape(&shape::Shape::from(stage), loads, lib, Reversal::default())
     }
 
+    /// The hula kind's old entry point: the hula stage through the shape,
+    /// under its own arrangement — crank driven, grounded gear held, output
+    /// out, which are the shape's shafts 1, 3 and 2.
+    fn solve_hula_stage(
+        stage: &HulaStage,
+        loads: &StageLoads,
+        lib: &MaterialLibrary,
+    ) -> Result<shape::ShapeResult, TrainError> {
+        let boundary = StageBoundary::holding(5, &[3], 1, 2);
+        shape::solve_shape(
+            &shape::Shape::from(stage),
+            &loads.clone().under(boundary),
+            lib,
+            Reversal::default(),
+        )
+    }
+
     /// The old entry points, as the tests were written against them.
     fn solve_spur_stage(
         stage: &PairStage,
@@ -4484,7 +4392,6 @@ mod tests {
     #[test]
     fn every_kind_that_searches_asks_the_same_of_its_meshes() {
         use crate::auto::Search;
-        let lib = library();
         let mut checked = 0u32;
 
         // --- a pair, rebuilt through the stage's own constructors.
@@ -4563,9 +4470,7 @@ mod tests {
             }
         }
 
-        // --- a hula stage, from what it reports rather than from what built it.
-        // Its two meshes share one crank, so the offset *is* their centre
-        // distance, and the two radii are on the members' own cards.
+        // --- a hula stage, both of its meshes, at the crank the shape sizes.
         for n in [12_u32, 18, 30] {
             let mut stage = HulaStage {
                 optimisation: Optimisation {
@@ -4577,28 +4482,21 @@ mod tests {
             for (gear, count) in stage.gears.iter_mut().zip([n + 1, n, n - 1, n]) {
                 gear.teeth = count;
             }
-            let Ok(r) = solve_hula_stage(&stage, &StageLoads::just(2.0), &lib) else {
+            let shape = shape::Shape::from(&stage);
+            let Ok(b) = shape.build_at(&shape.shifts_at(&Search::SHIPPED)) else {
                 continue;
             };
-            for mesh in 0..2 {
-                // The ring is the member of the pair with more teeth, which the
-                // stage's own inputs say and its cards echo as the larger tip.
-                let (ring, pinion) = {
-                    let (a, b) = (&r.gears[mesh * 2], &r.gears[mesh * 2 + 1]);
-                    if stage.gears[mesh * 2].teeth > stage.gears[mesh * 2 + 1].teeth {
-                        (a, b)
-                    } else {
-                        (b, a)
-                    }
-                };
-                let gaps = [
-                    (ring.root_radius - r.offset) - pinion.tip_radius,
-                    (ring.tip_radius - r.offset) - pinion.root_radius,
-                ];
+            for (m, mesh) in b.meshes.iter().enumerate() {
+                let (a, z) = (shape.meshes[m].a, shape.meshes[m].b);
+                let (pinion, ring) = (&b.members[a], &b.members[z]);
+                let gaps = mesh.operating.bottom_clearance(
+                    [pinion.tip_radius(), ring.tip_radius()],
+                    [pinion.root_radius(), ring.root_radius()],
+                );
                 for (i, gap) in gaps.iter().enumerate() {
                     assert!(
                         *gap > 0.0,
-                        "N {n} mesh {mesh} member {i} bottoms out by {} mm",
+                        "N {n} mesh {m} member {i} bottoms out by {} mm",
                         -gap
                     );
                     checked += 1;
@@ -5029,7 +4927,7 @@ mod tests {
             train
                 .stages
                 .push(Stage::planetary(PlanetaryStage::default()));
-            train.stages.push(Stage::Hula(Box::default()));
+            train.stages.push(Stage::hula(HulaStage::default()));
 
             let r = solve_train(&train, &lib).expect("a train that solves");
             for (k, stage) in r.stages.iter().enumerate() {
@@ -5253,7 +5151,7 @@ mod tests {
             Stage::spur(PairStage::default()),
             Stage::worm(PairStage::worm()),
             Stage::planetary(PlanetaryStage::default()),
-            Stage::Hula(Box::default()),
+            Stage::hula(HulaStage::default()),
         ] {
             let mut train = two_stage();
             train.stages = vec![stage];
@@ -5430,7 +5328,7 @@ mod tests {
                 Stage::planetary(PlanetaryStage::default()),
                 vec![false, true],
             ),
-            (Stage::Hula(Box::default()), vec![true, true]),
+            (Stage::hula(HulaStage::default()), vec![true, true]),
             // A worm's one mesh is external too, and it is in the walk now:
             // a point contact answers in the same report as a line.
             (Stage::worm(PairStage::worm()), vec![false]),
@@ -5560,7 +5458,7 @@ mod tests {
             Stage::spur(PairStage::default()),
             Stage::worm(PairStage::worm()),
             Stage::planetary(PlanetaryStage::default()),
-            Stage::Hula(Box::new(hula)),
+            Stage::hula(hula),
         ]
     }
 
@@ -5617,10 +5515,7 @@ mod tests {
             for (g, z) in h.gears.iter_mut().zip(teeth) {
                 g.teeth = z;
             }
-            out.push(conventional(
-                format!("hula {teeth:?}"),
-                Stage::Hula(Box::new(h)),
-            ));
+            out.push(conventional(format!("hula {teeth:?}"), Stage::hula(h)));
         }
         out
     }
@@ -6628,16 +6523,6 @@ mod tests {
                 Stage::Shape(s) => (0..s.members.len())
                     .filter(|&i| s.members[i].ring.is_some())
                     .collect(),
-                Stage::Hula(h) => (0..2)
-                    .map(|m| {
-                        let (a, b) = (2 * m, 2 * m + 1);
-                        if h.gears[a].teeth > h.gears[b].teeth {
-                            a
-                        } else {
-                            b
-                        }
-                    })
-                    .collect(),
             };
             assert_eq!(
                 rings, expect,
@@ -7022,15 +6907,16 @@ mod tests {
                 d.clearance.manual, 0.02,
                 "and the number is left where it was"
             );
-            let (auto, manual) = match Stage::Hula(Box::new(hula.clone())).relieved(just) {
-                Stage::Hula(h) => (h.running_clearance.auto, h.running_clearance.manual),
-                _ => unreachable!(),
-            };
+            let relieved = Stage::hula(hula.clone()).relieved(just);
+            let d = relieved.as_shape().unwrap().distances[0];
             assert!(
-                !auto,
-                "a hula stage: relieving after {just:?} should pin the clearance"
+                !(d.clearance.auto && d.distance.auto),
+                "a hula stage: relieving after {just:?} should pin one of the two"
             );
-            assert_eq!(manual, 0.02, "and leave the number where it was");
+            assert_eq!(
+                d.clearance.manual, 0.02,
+                "and leave the number where it was"
+            );
         }
     }
 
@@ -7236,7 +7122,7 @@ mod tests {
             Stage::spur(PairStage::default()),
             Stage::worm(PairStage::worm()),
             Stage::planetary(PlanetaryStage::default()),
-            Stage::Hula(Box::default()),
+            Stage::hula(HulaStage::default()),
         ] {
             let Some(group) = stage
                 .freedoms()
@@ -7574,7 +7460,7 @@ mod tests {
             Stage::spur(PairStage::default()),
             Stage::worm(PairStage::worm()),
             Stage::planetary(PlanetaryStage::default()),
-            Stage::Hula(Box::default()),
+            Stage::hula(HulaStage::default()),
             Stage::spur(PairStage {
                 shaft_angle: 90.0,
                 ..PairStage::default()
@@ -7654,13 +7540,13 @@ mod tests {
             };
             let mut t = two_stage();
             t.load_cases[BACK].torque = 0.5;
-            t.stages = vec![Stage::worm(PairStage::worm()), Stage::Hula(Box::new(h))];
+            t.stages = vec![Stage::worm(PairStage::worm()), Stage::hula(h)];
             let r = solve_train(&t, &lib).expect("a train that solves");
-            let s = r.stages[1].as_hula().expect("a hula stage");
-            let at = |g: &HulaGear, case: usize| g.gear.cases[case].torque;
+            let s = r.stages[1].as_shape().expect("a hula stage");
+            let at = |g: &GearResult, case: usize| g.cases[case].torque;
             (
-                at(&s.gears[3], PEAK) / at(&s.gears[0], PEAK),
-                at(&s.gears[3], BACK) / at(&s.gears[0], BACK),
+                at(&s.members[3], PEAK) / at(&s.members[0], PEAK),
+                at(&s.members[3], BACK) / at(&s.members[0], BACK),
             )
         };
         let (forward, backward) = ratios(0.0);
@@ -7669,9 +7555,13 @@ mod tests {
             "with no friction the stage distributes torque alike either way, \
              but forward gives {forward} and backward {backward}"
         );
+        // **By `η₁η₂`**, which is what the two pressing torques differ by
+        // when the driving side of each mesh swaps — the kind's row torques
+        // differed by its square, since a driven member's row stands `η`
+        // under the force on its flank.
         let (forward, backward) = ratios(0.08);
         assert!(
-            (forward - backward).abs() / forward.abs() > 1e-3,
+            (forward - backward).abs() / forward.abs() > 5e-4,
             "with friction the two directions must place the loss differently, \
              but both give {forward}"
         );
@@ -8315,7 +8205,7 @@ mod tests {
                     ..PlanetaryStage::default()
                 }),
             ),
-            ("hula", Stage::Hula(Box::default())),
+            ("hula", Stage::hula(HulaStage::default())),
         ] {
             let mut train = two_stage();
             train.load_cases[CYCLIC].duty = Duty::Continuous { runtime_hours: 1.0 };
@@ -8329,8 +8219,31 @@ mod tests {
             let want = |member: f64, carrier: f64, paths: f64| {
                 (turns * ((member - carrier) / 3000.0).abs() * paths).ceil()
             };
-            match &r.stages[0] {
-                StageResult::Shape(p) => {
+            let StageResult::Shape(p) = &r.stages[0];
+            if name == "hula" {
+                // The hula's shafts: ground, crank, output, grounded, wobble.
+                let crank = p.cases[CYCLIC].speeds[1];
+                for g in &p.members {
+                    let c = &g.cases[CYCLIC];
+                    let expected = want(c.speed, crank, 1.0);
+                    assert!(
+                        (cycles(g).bending - expected).abs() <= 1.0,
+                        "z{}: {} engagements against {expected}",
+                        g.params.teeth,
+                        cycles(g).bending
+                    );
+                    // ...and the speed its teeth see is the one against the
+                    // crank, reported rather than left to be subtracted.
+                    assert!((c.speed_against_carrier - (c.speed - crank)).abs() < 1e-9);
+                }
+                // The grounded gear stands still and is engaged once a crank
+                // turn, which is the whole duty's worth of revolutions.
+                assert!(
+                    (cycles(&p.members[0]).bending - turns).abs() <= 1.0,
+                    "the grounded gear meets the wobble body once a crank turn"
+                );
+            } else {
+                {
                     // The shape's shafts: ground, sun, carrier, ring, planet.
                     let shafts = &p.cases[CYCLIC];
                     let carrier = shafts.speeds[2];
@@ -8374,28 +8287,6 @@ mod tests {
                         (cycles(ring).bending - (turns * zs / (zs + zr) * n).ceil()).abs() <= 1.0,
                         "a held ring counts carrier turns: {}",
                         cycles(ring).bending
-                    );
-                }
-                StageResult::Hula(h) => {
-                    let crank = h.cases[CYCLIC].speeds[1];
-                    for g in &h.gears {
-                        let c = &g.gear.cases[CYCLIC];
-                        let expected = want(c.speed, crank, 1.0);
-                        assert!(
-                            (cycles(&g.gear).bending - expected).abs() <= 1.0,
-                            "z{}: {} engagements against {expected}",
-                            g.teeth,
-                            cycles(&g.gear).bending
-                        );
-                        // ...and the speed its teeth see is the one against the
-                        // crank, reported rather than left to be subtracted.
-                        assert!((c.speed_against_carrier - (c.speed - crank)).abs() < 1e-9);
-                    }
-                    // The grounded gear stands still and is engaged once a crank
-                    // turn, which is the whole duty's worth of revolutions.
-                    assert!(
-                        (cycles(&h.gears[0].gear).bending - turns).abs() <= 1.0,
-                        "the grounded gear meets the wobble body once a crank turn"
                     );
                 }
             }
@@ -8515,7 +8406,7 @@ mod tests {
             .gears
             .iter()
             .chain(set_r.members.iter())
-            .chain(hula_r.gears.iter().map(|g| &g.gear))
+            .chain(hula_r.members.iter())
             .collect();
         assert_eq!(members.len(), 9);
         for g in members {
@@ -8546,7 +8437,7 @@ mod tests {
             .gears
             .iter()
             .chain(set_r.members.iter())
-            .chain(hula_r.gears.iter().map(|g| &g.gear))
+            .chain(hula_r.members.iter())
             .collect();
         for (i, g) in members.iter().enumerate() {
             assert!(
@@ -8632,8 +8523,11 @@ mod tests {
             ] {
                 out.push((what.to_string(), g.cases[0].bending_stress));
             }
-            for g in &h.gears {
-                out.push((format!("hula z{}", g.teeth), g.gear.cases[0].bending_stress));
+            for g in &h.members {
+                out.push((
+                    format!("hula z{}", g.params.teeth),
+                    g.cases[0].bending_stress,
+                ));
             }
             out
         };
@@ -8693,11 +8587,11 @@ mod tests {
         };
         let off = solve(LoadSharing::None);
         let on = solve(LoadSharing::LinearRamp);
-        for (a, b) in off.gears.iter().zip(&on.gears) {
+        for (a, b) in off.members.iter().zip(&on.members) {
             assert_eq!(
-                a.gear.cases[0].bending_stress, b.gear.cases[0].bending_stress,
+                a.cases[0].bending_stress, b.cases[0].bending_stress,
                 "z{}: below the band the model has nothing to find",
-                a.teeth
+                a.params.teeth
             );
         }
         // ...and the reason, rather than the symptom: the shipped stage's
@@ -8705,9 +8599,9 @@ mod tests {
         // and the paragraph above needs rewriting.
         for m in &off.meshes {
             assert!(
-                m.report.line.unwrap().contact_ratios.transverse < 2.0,
+                m.line.unwrap().contact_ratios.transverse < 2.0,
                 "a hula mesh above the band would change the claim: {}",
-                m.report.line.unwrap().contact_ratios.transverse
+                m.line.unwrap().contact_ratios.transverse
             );
         }
     }
@@ -8784,11 +8678,20 @@ mod tests {
             solve_planetary_stage(&set, &StageLoads::just(2.0), &lib).unwrap();
         });
 
+        // **Raised from 20 to 60 ms with the kind's retirement**, and the
+        // reason: the kind searched each mesh's division alone at a crank it
+        // solved once a round, in closed form; the shape sizes the crank by
+        // a bracketed root over built teeth, then searches each mesh apart
+        // (`search_components`), with the teeth it has cut kept between
+        // trials. Some 25 ms in the suite against the kind's 2.6, and the
+        // ceiling is a little over twice that rather than five times: the
+        // multiplier is for a loaded machine, and twice is what this stage
+        // has needed on one.
         let drive = HulaStage {
             optimisation: tuned,
             ..HulaStage::default()
         };
-        each("hula stage's", 20, &|| {
+        each("hula stage's", 60, &|| {
             solve_hula_stage(&drive, &StageLoads::just(2.0), &lib).unwrap();
         });
     }
@@ -8972,27 +8875,15 @@ mod tests {
             },
             ..HulaStage::default()
         };
-        let r = solve_hula_stage(&drive, &StageLoads::just(2.0), &test_library())
+        let shape = shape::Shape::from(&drive);
+        let built = shape
+            .build_at(&shape.shifts_at(&crate::auto::Search::SHIPPED))
             .expect("the stage solves");
-        for (i, g) in r.gears.iter().enumerate() {
-            if g.ring {
+        for (i, m) in shape.members.iter().enumerate() {
+            if m.ring.is_some() {
                 continue;
             }
-            cuttable(
-                &GearParams {
-                    module: drive.module[i / 2],
-                    pressure_angle: drive.pressure_angle,
-                    helix_angle: drive.helix_angle(),
-                    teeth: g.teeth,
-                    profile_shift: g.gear.profile_shift,
-                    addendum: drive.gears[i].addendum,
-                    dedendum: drive.gears[i].dedendum,
-                    root_radius: drive.gears[i].root_radius,
-                    thickness_mod: drive.thickness_mod[i / 2],
-                    ..GearParams::default()
-                },
-                "the stage's pinion",
-            );
+            cuttable(built.members[i].params(), "the stage's pinion");
         }
     }
 
@@ -9814,7 +9705,7 @@ mod tests {
         train
             .stages
             .push(Stage::planetary(PlanetaryStage::default()));
-        train.stages.push(Stage::Hula(Box::default()));
+        train.stages.push(Stage::hula(HulaStage::default()));
         train.load_cases = vec![
             LoadCase::ultimate(2.0, 3000.0),
             LoadCase {
@@ -9940,7 +9831,7 @@ mod tests {
             train
                 .stages
                 .push(Stage::planetary(PlanetaryStage::default()));
-            train.stages.push(Stage::Hula(Box::default()));
+            train.stages.push(Stage::hula(HulaStage::default()));
             if let Some(s) = train.stages[0].as_shape_mut() {
                 for m in &mut s.members {
                     m.gear.face_width = Auto::automatic(7.0);

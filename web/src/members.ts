@@ -25,7 +25,7 @@ export interface MemberRef {
 
 /** How many members a stage has, in the core's member order. */
 export function memberCount(stage: Stage): number {
-  return stage.kind === "hula" ? stage.gears.length : stage.members.length;
+  return stage.members.length;
 }
 
 /** The gear number of one member, counting every member of the stages
@@ -34,13 +34,6 @@ export function gearNumber(train: Train, stage: number, member: number): number 
   let n = member + 1;
   for (let i = 0; i < stage; i++) n += memberCount(train.stages[i]);
   return n;
-}
-
-/** Which member of a hula mesh is its ring: the larger gear, as the core
- *  decides it (`hula::Teeth::pair`). Read here for a label only. */
-export function hulaRing(stage: Stage & { kind: "hula" }, mesh: number): number {
-  const [a, b] = [mesh * 2, mesh * 2 + 1];
-  return stage.gears[a].teeth >= stage.gears[b].teeth ? a : b;
 }
 
 /** Whether a member's axis is carried — turns in a frame that is not the
@@ -61,26 +54,31 @@ export const isWorm = (shape: Shape): boolean => shape.distances[0]?.worm === tr
  *  keeps no such names — a set is a tick pattern of the shape, not a kind —
  *  so the words are found here, from the same facts the core solves on. */
 export function shapeRole(shape: Shape, member: number): string | null {
-  const m = shape.members[member];
-  if (isWorm(shape)) {
-    const first = shape.meshes[0];
-    if (first?.a === member) return t("ui.train_worm_member");
-    if (first?.b === member) return t("ui.train_wormwheel");
-  }
-  if (m.ring !== null) return t("ui.train_ring");
-  if (carried(shape, member)) return t("ui.train_planet");
-  const meetsAPlanet = shape.meshes.some(
-    (x) => (x.a === member && carried(shape, x.b)) || (x.b === member && carried(shape, x.a)),
-  );
-  return meetsAPlanet ? t("ui.train_sun") : null;
+  const role = (i: number): string | null => {
+    const m = shape.members[i];
+    if (isWorm(shape)) {
+      const first = shape.meshes[0];
+      if (first?.a === i) return t("ui.train_worm_member");
+      if (first?.b === i) return t("ui.train_wormwheel");
+    }
+    if (m.ring !== null) return t("ui.train_ring");
+    if (carried(shape, i)) return t("ui.train_planet");
+    const meetsAPlanet = shape.meshes.some(
+      (x) => (x.a === i && carried(shape, x.b)) || (x.b === i && carried(shape, x.a)),
+    );
+    return meetsAPlanet ? t("ui.train_sun") : null;
+  };
+  const name = role(member);
+  if (name === null) return null;
+  // Numbered where a role is shared — a hula stage's two rings and two
+  // wobble gears, a Wolfrom's two rings — by the order the shape lists them.
+  const alike = shape.members.map((_, i) => i).filter((i) => role(i) === name);
+  return alike.length > 1 ? `${name} ${alike.indexOf(member) + 1}` : name;
 }
 
 /** The card's own name for a member, without its number. `null` where the
  *  name *is* the number — a pair's gears. */
 function roleName(stage: Stage, member: number): string | null {
-  if (stage.kind === "hula") {
-    return t(hulaRing(stage, Math.floor(member / 2)) === member ? "ui.train_ring" : "ui.train_pinion");
-  }
   return shapeRole(stage, member);
 }
 
@@ -95,7 +93,7 @@ export function shaftName(train: Train, stage: number, label: ShaftLabel): strin
     case "member":
       return memberName(train, stage, label.member);
     case "carrier":
-      return t(train.stages[stage].kind === "hula" ? "ui.train_hula_crank" : "ui.train_carrier");
+      return t("ui.train_carrier");
   }
 }
 
@@ -123,7 +121,7 @@ export function memberRefs(train: Train): MemberRef[] {
             : t("ui.train_member_numbered", { name: role, number: String(number) }),
         // A worm is a thread with proportions of its own: the first member
         // of the first mesh on a distance marked as a worm drive.
-        adoptable: !(stage.kind === "shape" && isWorm(stage) && stage.meshes[0]?.a === j),
+        adoptable: !(isWorm(stage) && stage.meshes[0]?.a === j),
       });
     }
   });

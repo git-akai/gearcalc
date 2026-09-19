@@ -288,11 +288,11 @@ designed, below the standard only in the regime `mesh.overlap_below_one`
 already flags. `tools/iso_6336_3_stack.py` multiplies the set out
 ([rationale](rationale.md#the-helix-factors-are-a-pair-and-this-tool-can-take-neither)).
 
-**One stage shape.** Every stage but the hula stage is one `Shape` — axes,
-the shafts on them, members, meshes, distances — and a spur pair, a crossed
-pair, a worm and a planetary set are *presets* over it: what `defaults`
+**One stage shape.** Every stage is one `Shape` — axes, the shafts on
+them, members, meshes, distances — and a spur pair, a crossed pair, a worm,
+a planetary set and a hula stage are *presets* over it: what `defaults`
 fills in, a vocabulary, and which inputs the panel puts forward. There is no
-kind in the core to branch on. What a stage is, the solve reads off the
+kind in the core to branch on; `Stage` has one variant and keeps its tag. What a stage is, the solve reads off the
 shape — a mesh is internal because a member has a cutter, a set is an axis
 carried by a shaft and replicated, a worm is a distance marked as one — and
 the panel names the members the same way (`members.ts`). Closing the
@@ -306,9 +306,11 @@ are written as lists of what sits where in `train/arrangements.rs`, each
 with a `gear-cli kinematics` fixture and a textbook ratio held in a test,
 and each but the Wolfrom re-derived from rigid-body velocities in
 `tools/train_kinematics.py`, now over a plane rather than a line.
-An automatic distance is the larger of what the shifts leave and what an
-internal mesh's tips need, so a planocentric at a few teeth of difference is
-sized as the hula stage sizes its crank.
+An automatic distance is what the shifts leave, opened out where an internal
+mesh's tips would cross at it — or, where a far-side gap was asked, the least
+distance that gives it, the shifts following: the hula stage's crank, sized
+by the shape for every arrangement with an internal mesh, and held to the
+figures the kind recorded before it retired.
 Retiring the kinds into it moved four figures, each recorded in
 [corrections](corrections.md#the-log) with its size: a set's driven-side
 meshes pressed `η` short (0.55 % on the ring's bending); a backward case read
@@ -511,8 +513,9 @@ proof-read before anyone leans on it. Correcting one changes no calculation:
 **Materials, export, UI.** An eight-material library with per-value provenance ·
 DXF with exact arcs for external *and* internal gears, written to the published
 R2000 minimum so a reader that repairs nothing still opens it — confirmed
-importing into SOLIDWORKS · geartrain stages: spur/helical, crossed, worm,
-planetary and **hula**, the last behind the developer knock · geartrains
+importing into SOLIDWORKS · geartrain presets: spur/helical, crossed, worm,
+planetary and **hula**, the last behind the developer knock, all one shape ·
+geartrains
 exported and imported as TOML, inputs only · gear tabs with external and internal
 kinds, and eccentric in the same developer mode.
 
