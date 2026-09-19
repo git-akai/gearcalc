@@ -282,6 +282,15 @@
     const label = result.topology[stage]?.ports.find((p) => p.shaft === s)?.label;
     return label ? shaftName(tab.train, stage, label) : String(s);
   };
+  /** Whether a mesh is internal and on distance `k` of a shape: one of
+   *  its members has a cutter, and its two members' axes are the distance's. */
+  const internalOn = (shape: Shape, m: { a: number; b: number }, k: number): boolean => {
+    const axisOf = (member: number) => shape.shafts[shape.members[member].shaft - 1]?.axis;
+    const [a, b] = [axisOf(m.a), axisOf(m.b)];
+    const d = shape.distances[k];
+    const on = (d.axes[0] === a && d.axes[1] === b) || (d.axes[0] === b && d.axes[1] === a);
+    return on && (shape.members[m.a].ring !== null) !== (shape.members[m.b].ring !== null);
+  };
   /** **An axis by the members on it**, which is how a designer knows one:
    *  "gear 3" is an axis, and so is "sun". A carrier's axis has no member
    *  and goes by the shaft that carries it. */
@@ -1758,9 +1767,20 @@
                   dres?.running,
                   0.1,
                   () => relieveStage(stage, "centre_distance", figures),
-                  undefined,
+                  // An automatic distance the tips sized says which mesh
+                  // held it open, under the number it opened to.
+                  dres?.sized_by == null
+                    ? undefined
+                    : t("ui.train_hula_held_open_by", { mesh: String(dres.sized_by + 1) }),
                   "ui.train_mm",
                 )}
+                <!-- The far-side tip gap an internal mesh on this distance
+                     is held to — what sizes the distance at a few teeth of
+                     difference. Offered where there is such a mesh, and
+                     read while the distance is automatic. -->
+                {#if stage.meshes.some((m) => internalOn(stage, m, k))}
+                  {@render numberField("ui.train_tip_gap", () => d.tip_clearance, (v) => (d.tip_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_tip_gap"))}
+                {/if}
                 {@render autoNumber(
                   "ui.train_c2c_clearance",
                   d.clearance,

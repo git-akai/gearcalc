@@ -28,7 +28,17 @@ distance: Auto<number>,
 /**
  * The assembly clearance every mesh on this pair runs with.
  */
-clearance: Auto<number>, tolerance_plus: number, tolerance_minus: number, 
+clearance: Auto<number>, 
+/**
+ * **The least far-side tip gap an internal mesh on this distance may
+ * run at**, mm — the gap between the pinion's tip and the ring's on
+ * the side away from contact, which at a few teeth of difference is
+ * what sets the distance. Read while the distance is automatic: an
+ * automatic distance is what the shifts leave *or* what the tips need,
+ * whichever is larger, and the shifts then reach it. A given distance
+ * leaves whatever gap it leaves, reported and not asked for.
+ */
+tip_clearance: number, tolerance_plus: number, tolerance_minus: number, 
 /**
  * Axial float of the first axis's members, mm — a rigid slide that
  * opens one flank as far as it closes the other on a helical mesh.

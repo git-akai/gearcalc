@@ -2454,6 +2454,9 @@ mod tests {
         // A layout's assembly rule is known for one gear on the axis meshing
         // two central members, and is a question with no answer elsewhere.
         "equal_spacing",
+        // A distance the shifts left where it was, or one the designer gave,
+        // was sized by no mesh's tips.
+        "sized_by",
         "simultaneous_meshing",
         // A crossed gear pair is not a worm and has no published proportions,
         // and no parallel-axis member has any either.

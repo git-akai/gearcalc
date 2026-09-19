@@ -514,29 +514,29 @@
     shaft planet 1  of stage 1 speed -24/35
 
 == planocentric ==
-  total    ratio     -10.000000   efficiency  98.810701 / 98.797702  %   backlash   0.052669 / 0.526691   deg
-  case 1       2.0000 Nm /   3000.00 rpm at start  ->     19.7621 Nm /   -300.00 rpm at end    held at -
-  case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0593 Nm /     -0.00 rpm at start  held at -
-  case 3       2.0000 Nm /   2400.00 rpm at start  ->     19.7621 Nm /   -240.00 rpm at end    held at -
-  stage 1  ratio     -10.000000   efficiency  98.810701 / 98.797702  %   backlash   0.052669 / 0.526691   deg
+  total    ratio     -10.000000   efficiency  97.155934 / 97.080449  %   backlash   0.095762 / 0.957619   deg
+  case 1       2.0000 Nm /   3000.00 rpm at start  ->     19.4312 Nm /   -300.00 rpm at end    held at -
+  case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0582 Nm /     -0.00 rpm at start  held at -
+  case 3       2.0000 Nm /   2400.00 rpm at start  ->     19.4312 Nm /   -240.00 rpm at end    held at -
+  stage 1  ratio     -10.000000   efficiency  97.155934 / 97.080449  %   backlash   0.095762 / 0.957619   deg
     shaft carrier   case 1  speed    3000.000000  torque       2.000000
-    shaft carrier   case 2  speed      -0.000000  torque      -0.059279
+    shaft carrier   case 2  speed      -0.000000  torque      -0.058248
     shaft carrier   case 3  speed    2400.000000  torque       2.000000
-    shaft ring      case 1  speed       0.000000  torque     -21.762140
-    shaft ring      case 2  speed      -0.000000  torque       0.659279
-    shaft ring      case 3  speed       0.000000  torque     -21.762140
-    shaft planet    case 1  speed    -300.000000  torque      19.762140
+    shaft ring      case 1  speed       0.000000  torque     -21.431187
+    shaft ring      case 2  speed      -0.000000  torque       0.658248
+    shaft ring      case 3  speed       0.000000  torque     -21.431187
+    shaft planet    case 1  speed    -300.000000  torque      19.431187
     shaft planet    case 2  speed       0.000000  torque      -0.600000
-    shaft planet    case 3  speed    -240.000000  torque      19.762140
+    shaft planet    case 3  speed    -240.000000  torque      19.431187
     member 1  z 30  
-      case 1  speed    -300.000000  vs frame   -3300.000000  torque      19.783764  cycles -
+      case 1  speed    -300.000000  vs frame   -3300.000000  torque      19.482897  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.600000  cycles -
-      case 3  speed    -240.000000  vs frame   -2640.000000  torque      19.783764  cycles 1.584000e8 / 1.584000e8
+      case 3  speed    -240.000000  vs frame   -2640.000000  torque      19.482897  cycles 1.584000e8 / 1.584000e8
     member 2  z 33  
-      case 1  speed       0.000000  vs frame   -3000.000000  torque      21.762140  cycles -
+      case 1  speed       0.000000  vs frame   -3000.000000  torque      21.431187  cycles -
       case 2  speed      -0.000000  vs frame       0.000000  torque       0.660000  cycles -
-      case 3  speed       0.000000  vs frame   -2400.000000  torque      21.762140  cycles 1.440000e8 / 1.440000e8
-    mesh 1  efficiency  99.890700 / 99.890700  %  contact ratio   2.7172  shares a factor
+      case 3  speed       0.000000  vs frame   -2400.000000  torque      21.431187  cycles 1.440000e8 / 1.440000e8
+    mesh 1  efficiency  99.734586 / 99.734586  %  contact ratio   1.7700  shares a factor
   graph    mobility 2 degree(s), 2 given   total ratio -10
     stage 1  ratio -10
     shaft ground    of the train speed 0

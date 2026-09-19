@@ -127,6 +127,7 @@ impl Builder {
             worm: false,
             distance: Auto::automatic(0.0),
             clearance: Auto::fixed(0.02),
+            tip_clearance: 0.0,
             tolerance_plus: 0.02,
             tolerance_minus: 0.02,
             axial_clearance: 0.0,
@@ -433,6 +434,89 @@ mod tests {
             // One planet: no replicated axis, so nothing to lay out.
             assert!(r.layouts.is_empty());
         }
+    }
+
+    /// **A distance the tips size**: a planocentric at one tooth of
+    /// difference cannot run at the half-module the shifts leave — the
+    /// pinion's tip would stand inside the ring's on the far side — so the
+    /// distance opens out to where the tips clear by what was asked, the
+    /// shifts reach it, and the report says which mesh held it open.
+    #[test]
+    fn a_four_tooth_planocentric_is_sized_by_its_tips() {
+        // The hula stage's second mesh, on its own: 57 in 61, teeth cut to
+        // 0.7 of a module, three tenths of far-side gap asked.
+        let mut shape = planocentric(57, 61);
+        for m in &mut shape.members {
+            m.gear.addendum = 0.7;
+            m.gear.dedendum = 1.0;
+        }
+        shape.members[1].ring = Some(Cutter {
+            teeth: 20,
+            addendum: 1.0,
+            ..Cutter::default()
+        });
+        shape.distances[0].tip_clearance = 0.3;
+        let r = solve(&shape, &[2], 1, 3);
+        let d = &r.distances[0];
+        assert_eq!(d.sized_by, Some(0), "the one mesh sized it");
+        assert!(
+            d.running > 2.0,
+            "opened past the two modules the counts leave: {}",
+            d.running
+        );
+        every_distance_closes(&r);
+        // The far-side gap is what was asked, to the solver's tolerance, and
+        // the tips do not cross.
+        let (pinion, ring) = (&r.members[0], &r.members[1]);
+        let ring_tip = crate::ring::Ring::cut_by(&ring.params, &shape.members[1].ring.unwrap()).ra;
+        let far = ring_tip - crate::tooth::Tooth::new(pinion.params).ra + d.running;
+        assert!((far - 0.3).abs() < 1e-6 || far > 0.3, "far-side gap {far}");
+        assert_eq!(r.meshes[0].tips.map(|t| t.tip_interference), Some(false));
+        assert!((1.0 / r.ratio + 4.0 / 57.0).abs() < 1e-12);
+        // ...and a distance the designer states is not sized: it leaves what
+        // it leaves, and says so through the mesh's own room.
+        shape.distances[0].distance = Auto::fixed(2.0);
+        let r = solve(&shape, &[2], 1, 3);
+        assert_eq!(r.distances[0].sized_by, None);
+    }
+
+    /// **The shape's sizing is the hula stage's**, on the mesh the hula's
+    /// harness reports held open by its tips: `gear-cli hula 18 0.2` runs
+    /// 19/18 at a crank offset of 0.726026 mm (0.746026 at zero backlash),
+    /// its tip margin at nought and its far-side gap 0.2779 with 0.2 asked.
+    /// A planocentric of that pair, cut to the hula's proportions, is sized
+    /// to the same offset by the shape — two solvers, one bound.
+    #[test]
+    fn the_shape_sizes_a_distance_where_the_hula_stage_does() {
+        let hula = super::super::HulaStage::default();
+        let mut shape = planocentric(18, 19);
+        for (m, g) in shape
+            .members
+            .iter_mut()
+            .zip([&hula.gears[1], &hula.gears[0]])
+        {
+            m.gear = StageGear {
+                teeth: m.gear.teeth,
+                ..g.clone()
+            };
+        }
+        shape.members[1].ring = Some(Cutter {
+            teeth: 14,
+            ..hula.cutter[0]
+        });
+        shape.distances[0].tip_clearance = 0.2;
+        let r = solve(&shape, &[2], 1, 3);
+        let d = &r.distances[0];
+        assert_eq!(d.sized_by, Some(0));
+        assert!(
+            (d.running - 0.726_026).abs() < 2e-5,
+            "the hula's crank offset: {}",
+            d.running
+        );
+        assert!(
+            (r.members[1].profile_shift - 0.4519).abs() < 2e-4,
+            "the ring's shift"
+        );
     }
 
     #[test]

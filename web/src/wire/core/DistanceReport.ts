@@ -15,4 +15,11 @@ running: number,
 /**
  * `running − nominal` of the first mesh, signed as the mesh reads it.
  */
-clearance: number, };
+clearance: number, 
+/**
+ * **The mesh whose tips sized this distance**, where an automatic one
+ * was opened out past what the shifts left so that its tips clear
+ * ([`Distance::tip_clearance`]); `None` where the shifts' own distance
+ * stood, or the distance was given.
+ */
+sized_by: number | null, };

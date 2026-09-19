@@ -118,6 +118,11 @@
 //!   is a pair whose distance is at `angle = 90` with `worm = true`. The
 //!   panel writes these from its presets, and a person can write any shape
 //!   the graph admits. The hula stage is still its own kind, for now.
+//! - **A distance carries `tip_clearance`**, the least far-side tip gap an
+//!   internal mesh on it may run at, mm: an automatic distance is what the
+//!   shifts leave or what the tips need, whichever is larger. Absent means
+//!   zero — the tips must not cross and nothing more — so a file written
+//!   before it reads as it did.
 //! - **A load case's `port` may name a shaft.** `"start"` and `"end"` still
 //!   mean the chain's two ends — the first stage's input and the last
 //!   stage's output under the constraints in force — and a third spelling,

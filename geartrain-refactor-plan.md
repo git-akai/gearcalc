@@ -869,6 +869,14 @@ internal mesh's tip circles cross (`TipRoom` already answers this): the
 hula's sizing strategy reaching every arrangement that needs it. Moves no
 shipped number, since no shipped set crosses.
 
+*5d is done.* `Distance::tip_clearance`, and an automatic distance that is
+the larger of what the shifts leave and what the tips need — the far-side
+gap and the crossing room, both rising with the distance, so the least that
+clears is a bracketed root. The shape sizes the hula's own 19/18 mesh to its
+crank offset within 2 × 10⁻⁵ mm (`the_shape_sizes_a_distance_where_the_
+hula_stage_does`). No preset moved; the planocentric fixture, which crossed
+its tips at what the shifts left, opened out and its figures moved with it.
+
 **Phase 6 — the hula preset.** With 5a–5d done the hula stage is a tick
 pattern with a vocabulary; it reproduces its corpus through the shape and
 `train/hula.rs` goes with the stage-level half of `hula.rs`. If any figure

@@ -2119,7 +2119,7 @@ member     shaft, gear, module, k, ring cutter (none for an external gear),
            pitch diameter (a helix reading — a worm's way of stating its size)
 mesh       a, b, sliding and static friction
 distance   two axes, the angle between them, worm (a sizing convention),
-           distance, clearance, tolerance ±, axial clearance
+           distance, clearance, tip clearance, tolerance ±, axial clearance
 ```
 
 Everything else is derived, and the derivations are the definitions. A mesh
@@ -2158,6 +2158,24 @@ or absorbing a distance is held to the **true** undercut minimum, not to the
 search's `max(x_min, 0)`: it is not choosing, it is following a distance the
 designer stated, and a 43-tooth gear at −0.15 is what a housing distance
 below the nominal *means* ([who decides a shift](#who-decides-a-shift-and-what-it-must-satisfy)).
+
+**A distance the tips size.** An automatic distance is what the shifts
+leave *or what the tips need*, whichever is larger. Each internal mesh on
+it has two rooms, both rising with the distance: the far-side gap between
+the pinion's tip and the ring's, away from contact — `r_tip,ring − r_tip,pinion
++ e`, the hula's `clearance_at` — held to the distance's `tip_clearance`;
+and the room the tips have where their circles cross
+([interference](#interference-a-tip-reaching-past-the-flank-it-meshes-with)),
+held to nought. Where the least of them is negative at what the shifts
+leave, the distance opens out — growing steps to a bracket, Brent to the
+root — to the least at which every tip clears, that distance is then *held*
+and every mesh on it reaches it as it reaches a stated one, and the report
+names the mesh whose tips sized it (`sized_by`). The division a search
+chooses moves the tips a little, so a sized distance is sized once more at
+what the search chose. It is the hula stage's sizing reaching every
+arrangement with an internal mesh: on the hula's own 19/18 the shape sizes
+to its crank offset within 2 × 10⁻⁵ mm, and a shipped preset is never
+sized, its tips clearing where the shifts leave them.
 
 **The search**, where the optimiser is on, is over the free members — in
 sum-and-division coordinates wherever both members of one mesh are free — and

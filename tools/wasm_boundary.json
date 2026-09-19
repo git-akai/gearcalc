@@ -268,6 +268,7 @@
           "auto": false,
           "manual": "0.020000000000000000"
          },
+         "tip_clearance": 0,
          "tolerance_plus": "0.020000000000000000",
          "tolerance_minus": "0.020000000000000000",
          "axial_clearance": 0
@@ -443,6 +444,7 @@
         "auto": false,
         "manual": "0.020000000000000000"
        },
+       "tip_clearance": 0,
        "tolerance_plus": "0.020000000000000000",
        "tolerance_minus": "0.020000000000000000",
        "axial_clearance": 0
@@ -614,6 +616,7 @@
         "auto": false,
         "manual": "0.020000000000000000"
        },
+       "tip_clearance": 0,
        "tolerance_plus": "0.020000000000000000",
        "tolerance_minus": "0.020000000000000000",
        "axial_clearance": "0.040000000000000001"
@@ -855,6 +858,7 @@
         "auto": false,
         "manual": "0.020000000000000000"
        },
+       "tip_clearance": 0,
        "tolerance_plus": "0.020000000000000000",
        "tolerance_minus": "0.020000000000000000",
        "axial_clearance": 0
@@ -1173,23 +1177,23 @@
    "ok": [
     [
      "en",
-     467
+     469
     ],
     [
      "de",
-     467
+     469
     ],
     [
      "pt",
-     467
+     469
     ],
     [
      "zh-Hans",
-     467
+     469
     ],
     [
      "zh-Hant",
-     467
+     469
     ]
    ]
   },
@@ -5607,6 +5611,7 @@
          "auto": false,
          "manual": "0.020000000000000000"
         },
+        "tip_clearance": 0,
         "tolerance_plus": "0.020000000000000000",
         "tolerance_minus": "0.020000000000000000",
         "axial_clearance": 0
@@ -5781,6 +5786,7 @@
          "auto": false,
          "manual": "0.020000000000000000"
         },
+        "tip_clearance": 0,
         "tolerance_plus": "0.020000000000000000",
         "tolerance_minus": "0.020000000000000000",
         "axial_clearance": "0.040000000000000001"
@@ -6025,6 +6031,7 @@
          "auto": false,
          "manual": "0.020000000000000000"
         },
+        "tip_clearance": 0,
         "tolerance_plus": "0.020000000000000000",
         "tolerance_minus": "0.020000000000000000",
         "axial_clearance": 0
@@ -6451,7 +6458,8 @@
             "30.005652520608507"
            ],
            "running": "30.025652520608507",
-           "clearance": "0.019999999999999574"
+           "clearance": "0.019999999999999574",
+           "sized_by": null
           }
          ],
          "overlap": 0,
@@ -7187,7 +7195,8 @@
             "30.005652520608507"
            ],
            "running": "30.025652520608507",
-           "clearance": "0.019999999999999574"
+           "clearance": "0.019999999999999574",
+           "sized_by": null
           }
          ],
          "overlap": 0,
@@ -7680,7 +7689,8 @@
             "21.165278775291828"
            ],
            "running": "21.145278775291828",
-           "clearance": "0.019999999999999574"
+           "clearance": "0.019999999999999574",
+           "sized_by": null
           }
          ],
          "overlap": 0,
@@ -8820,7 +8830,7 @@
    ]
   },
   "export_train": {
-   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\ncouplings = []\nconstraints = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\nport = \"start\"\nreacted = true\ntorque = 0.1\nspeed = 30000.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = \"end\"\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\nport = \"end\"\nreacted = false\ntorque = 3.0\nspeed = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = \"end\"\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\nport = \"start\"\nreacted = true\ntorque = 0.02\nspeed = 30000.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = \"end\"\nactuations = 1000\nreversing = false\n\n[[train.stages]]\nkind = \"shape\"\npressure_angle = 20.0\nload_sharing = \"none\"\nmin_planet_clearance = 0.0\n\n[train.stages.overlap]\nauto = true\nmanual = 1.0\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.axes]]\ncount = 1\n\n[[train.stages.axes]]\ncount = 1\n\n[[train.stages.shafts]]\naxis = 0\n\n[[train.stages.shafts]]\naxis = 1\n\n[[train.stages.members]]\nshaft = 1\nmodule = 1.0\nthickness_mod = 1.0\n\n[train.stages.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.stages.members]]\nshaft = 2\nmodule = 1.0\nthickness_mod = 1.0\n\n[train.stages.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.stages.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\n\n[[train.stages.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.stages.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.stages.distances.clearance]\nauto = false\nmanual = 0.02\n"
+   "ok": "# Geartrain.\n#\n# Inputs only — every ratio, stress, efficiency and backlash is recomputed from\n# these, so nothing here can go stale. Units: mm, degrees, rpm, N·m.\n#\n# Materials are named; the library that defines them is a separate document.\n# Editing this file by hand is expected.\n\nname = \"probe\"\n\n[train]\nreversed_bending = false\ncouplings = []\nconstraints = []\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\nport = \"start\"\nreacted = true\ntorque = 0.1\nspeed = 30000.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = \"end\"\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"ultimate\"\nenabled = true\nport = \"end\"\nreacted = false\ntorque = 3.0\nspeed = 0.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = \"end\"\nactuations = 1000\nreversing = false\n\n[[train.load_cases]]\nkind = \"fatigue\"\nenabled = true\nport = \"start\"\nreacted = true\ntorque = 0.02\nspeed = 30000.0\n\n[train.load_cases.duty.intermittent]\nrange_degrees = 25.0\nat = \"end\"\nactuations = 1000\nreversing = false\n\n[[train.stages]]\nkind = \"shape\"\npressure_angle = 20.0\nload_sharing = \"none\"\nmin_planet_clearance = 0.0\n\n[train.stages.overlap]\nauto = true\nmanual = 1.0\n\n[train.stages.optimisation]\nenabled = false\nmin_contact_ratio = 1.2\n\n[[train.stages.axes]]\ncount = 1\n\n[[train.stages.axes]]\ncount = 1\n\n[[train.stages.shafts]]\naxis = 0\n\n[[train.stages.shafts]]\naxis = 1\n\n[[train.stages.members]]\nshaft = 1\nmodule = 1.0\nthickness_mod = 1.0\n\n[train.stages.members.gear]\nteeth = 17\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 17.0\n\n[[train.stages.members]]\nshaft = 2\nmodule = 1.0\nthickness_mod = 1.0\n\n[train.stages.members.gear]\nteeth = 43\nno_undercut = true\naddendum = 1.0\nno_sharp_tip = true\nmin_tip_width = 0.1\ndedendum = 1.25\nroot_radius = 0.38\nmaterial = \"4340 Hardened Steel\"\n\n[train.stages.members.gear.profile_shift]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.working_depth]\nauto = true\nmanual = 1.0\n\n[train.stages.members.gear.helix_angle]\nauto = true\nmanual = 0.0\n\n[train.stages.members.gear.face_width]\nauto = true\nmanual = 5.0\n\n[train.stages.members.gear.face_sources.bending]\nultimate = true\nfatigue = true\n\n[train.stages.members.gear.face_sources.contact]\nultimate = false\nfatigue = false\n\n[train.stages.members.gear.material_overrides]\n\n[train.stages.members.pitch_diameter]\nauto = true\nmanual = 0.0\n\n[[train.stages.meshes]]\na = 0\nb = 1\nsliding_friction = 0.08\nstatic_friction = 0.16\n\n[[train.stages.distances]]\naxes = [\n    0,\n    1,\n]\nangle = 0.0\nworm = false\ntip_clearance = 0.0\ntolerance_plus = 0.02\ntolerance_minus = 0.02\naxial_clearance = 0.0\n\n[train.stages.distances.distance]\nauto = true\nmanual = 0.0\n\n[train.stages.distances.clearance]\nauto = false\nmanual = 0.02\n"
   },
   "import_train": {
    "ok": {
@@ -9044,6 +9054,7 @@
            "auto": false,
            "manual": "0.020000000000000000"
           },
+          "tip_clearance": 0,
           "tolerance_plus": "0.020000000000000000",
           "tolerance_minus": "0.020000000000000000",
           "axial_clearance": 0

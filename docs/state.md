@@ -306,6 +306,9 @@ are written as lists of what sits where in `train/arrangements.rs`, each
 with a `gear-cli kinematics` fixture and a textbook ratio held in a test,
 and each but the Wolfrom re-derived from rigid-body velocities in
 `tools/train_kinematics.py`, now over a plane rather than a line.
+An automatic distance is the larger of what the shifts leave and what an
+internal mesh's tips need, so a planocentric at a few teeth of difference is
+sized as the hula stage sizes its crank.
 Retiring the kinds into it moved four figures, each recorded in
 [corrections](corrections.md#the-log) with its size: a set's driven-side
 meshes pressed `η` short (0.55 % on the ring's bending); a backward case read

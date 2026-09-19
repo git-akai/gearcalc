@@ -155,6 +155,15 @@ pub struct Distance {
     pub distance: Auto<f64>,
     /// The assembly clearance every mesh on this pair runs with.
     pub clearance: Auto<f64>,
+    /// **The least far-side tip gap an internal mesh on this distance may
+    /// run at**, mm — the gap between the pinion's tip and the ring's on
+    /// the side away from contact, which at a few teeth of difference is
+    /// what sets the distance. Read while the distance is automatic: an
+    /// automatic distance is what the shifts leave *or* what the tips need,
+    /// whichever is larger, and the shifts then reach it. A given distance
+    /// leaves whatever gap it leaves, reported and not asked for.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub tip_clearance: f64,
     pub tolerance_plus: f64,
     pub tolerance_minus: f64,
     /// Axial float of the first axis's members, mm — a rigid slide that
@@ -526,8 +535,17 @@ impl Shape {
 
     // ---------------------------------------------------------- closure ---
 
-    /// **Who decides each shift.**
+    /// **Who decides each shift**, with every distance held that is stated.
     fn plan(&self, helix: &[f64]) -> Plan {
+        let held: Vec<Option<f64>> = (0..self.distances.len())
+            .map(|d| self.given_running(d))
+            .collect();
+        self.plan_held(helix, held)
+    }
+
+    /// [`Self::plan`] with the distances held as given — stated, or sized
+    /// by the tips.
+    fn plan_held(&self, helix: &[f64], held: Vec<Option<f64>>) -> Plan {
         let asked = self.asked(helix);
         let n = self.members.len();
         let in_meshes = |i: usize| self.meshes.iter().filter(|m| m.a == i || m.b == i).count();
@@ -542,12 +560,12 @@ impl Shape {
             .collect();
         let mut constraints: Vec<Constraint> = Vec::new();
         let mut reaches_in_order: Vec<(usize, usize)> = Vec::new();
-        for d in 0..self.distances.len() {
+        for (d, held_at) in held.iter().enumerate() {
             let meshes = self.meshes_on(d);
             let Some((&first, rest)) = meshes.split_first() else {
                 continue;
             };
-            if self.given_running(d).is_some() {
+            if held_at.is_some() {
                 // Every mesh has a sum to reach. A mesh with one free member
                 // has it reach the sum — and a shared member reached that way
                 // is then fixed for the next mesh, so those go first and
@@ -655,30 +673,29 @@ impl Shape {
             role,
             constraints,
             reaches: reaches_in_order,
+            held,
         }
     }
 
     /// **The shifts every mesh on every distance agrees at**, given what
-    /// the search set the free ones to. `None` where a sum cannot be reached
-    /// or a distance cannot be closed.
+    /// the search set the free ones to — `free` being one value per
+    /// member, read at the free ones, or empty for every free member at
+    /// its floor. `None` where a sum cannot be reached or a distance cannot
+    /// be closed.
     fn closed(&self, plan: &Plan, free: &[f64], helix: &[f64]) -> Option<Vec<f64>> {
         let n = self.members.len();
         let mut x: Vec<f64> = (0..n).map(|i| plan.asked[i].settled).collect();
-        let mut next = 0;
         for (i, v) in x.iter_mut().enumerate() {
             match plan.role[i] {
                 Role::Given => *v = plan.asked[i].given.unwrap_or(*v),
-                Role::Free => {
-                    *v = free.get(next).copied().unwrap_or(*v);
-                    next += 1;
-                }
+                Role::Free => *v = free.get(i).copied().unwrap_or(*v),
                 Role::Settled | Role::Reaches(_) | Role::Absorbs(_) => {}
             }
         }
         // Sums on given distances, in the order they were planned.
         for &(i, m) in &plan.reaches {
             let d = self.distance_of(m)?;
-            let running = self.given_running(d)?;
+            let running = plan.held[d]?;
             let kind = self.kind_of(m)?;
             let rack = self.rack_of(m, helix);
             let nominal = kind.nominal_of(running, self.distances[d].clearance.manual);
@@ -816,10 +833,155 @@ impl Shape {
         )
     }
 
+    /// **How much room the tips on one distance have**, at these shifts, in
+    /// the frame where zero is the bound: the least over its internal
+    /// meshes of the far-side gap less what was asked, mm, and the room the
+    /// tips have where their circles cross, degrees — two quantities, one
+    /// sign, since only where the least of them turns positive is asked.
+    /// `None` where the meshes cannot be built at all, and the mesh at the
+    /// minimum beside the figure.
+    fn tip_room(
+        &self,
+        distance: usize,
+        x: &[f64],
+        helix: &[f64],
+        held: &[Option<f64>],
+    ) -> Option<(f64, usize)> {
+        let built = self.build(x, helix, held).ok()?;
+        let running = built.running[distance]?;
+        let asked = self.distances[distance].tip_clearance;
+        self.meshes_on(distance)
+            .into_iter()
+            .filter(|&k| self.kind_of(k) == Some(MeshKind::Internal))
+            .map(|k| {
+                let m = self.meshes[k];
+                let (pinion, ring) = (&built.members[m.a], &built.members[m.b]);
+                // The pinion's tip on the side away from contact stands
+                // `r_tip − e` from the ring's centre, and the ring's tip
+                // circle `r_tip,ring` — so the gap grows with the distance.
+                let far = ring.tip_radius() - pinion.tip_radius() + running - asked;
+                let crossing = match ring {
+                    BuiltMember::Ring { ring, .. } => {
+                        super::TipRoom::at(ring, pinion.as_gear(), running).map_or(f64::NAN, |t| {
+                            if t.tip_interference {
+                                -1.0
+                            } else {
+                                t.tip_margin
+                            }
+                        })
+                    }
+                    BuiltMember::Rack { .. } => f64::INFINITY,
+                };
+                (far.min(crossing), k)
+            })
+            .min_by(|p, q| p.0.total_cmp(&q.0))
+    }
+
+    /// **The distances the tips size**, where an automatic one would run
+    /// its internal meshes' tips into each other at what the shifts leave —
+    /// a hula's two meshes at a tooth of difference, a planocentric's one.
+    /// Each such distance opens out to the least at which every tip clears
+    /// by what was asked, the room rising with the distance on every
+    /// internal mesh, and the shifts then reach it as they reach a stated
+    /// distance. Everything else stands as the plan had it.
+    ///
+    /// `free` is where the search has the free members, since which
+    /// division a mesh's shift sum takes moves its tips a little.
+    ///
+    /// # Errors
+    ///
+    /// [`TrainError::Hula`] where no distance in the involute domain clears
+    /// the tips on some mesh.
+    fn sized(&self, helix: &[f64], plan: &Plan, free: &[f64]) -> Result<TipSizing, TrainError> {
+        let mut held = plan.held.clone();
+        let mut bound_by = vec![None; self.distances.len()];
+        for d in 0..self.distances.len() {
+            if self.given_running(d).is_some()
+                || !self
+                    .meshes_on(d)
+                    .iter()
+                    .any(|&k| self.kind_of(k) == Some(MeshKind::Internal))
+            {
+                continue;
+            }
+            // At what the shifts leave, with nothing holding this distance.
+            held[d] = None;
+            let loose = self.plan_held(helix, held.clone());
+            let Some(x) = self.closed(&loose, free, helix) else {
+                continue;
+            };
+            let Some((room, mesh)) = self.tip_room(d, &x, helix, &held) else {
+                continue;
+            };
+            if room >= 0.0 {
+                continue;
+            }
+            // Held at `e`, the plan reaches it; the room at that plan's
+            // closure is what is driven to zero.
+            let room_at = |e: f64| -> f64 {
+                let mut h = held.clone();
+                h[d] = Some(e);
+                let plan = self.plan_held(helix, h.clone());
+                self.closed(&plan, free, helix)
+                    .and_then(|x| self.tip_room(d, &x, helix, &h))
+                    .map_or(f64::NAN, |(room, _)| room)
+            };
+            let from = self
+                .build(&x, helix, &held)
+                .ok()
+                .and_then(|b| b.running[d])
+                .ok_or(TrainError::Hula(crate::hula::Error::BoundUnreachable(mesh)))?;
+            // Open out by growing steps until the tips clear, then close in.
+            let mut lo = from;
+            let mut hi = from;
+            let mut step = from.abs().max(1.0) * 0.01;
+            let mut found = false;
+            for _ in 0..40 {
+                hi = lo + step;
+                let r = room_at(hi);
+                if r.is_nan() {
+                    // Past the involute domain on some mesh: come back in.
+                    step *= 0.5;
+                    continue;
+                }
+                if r >= 0.0 {
+                    found = true;
+                    break;
+                }
+                lo = hi;
+                step *= 1.5;
+            }
+            if !found {
+                return Err(TrainError::Hula(crate::hula::Error::BoundUnreachable(mesh)));
+            }
+            let e = crate::solve::brent(room_at, lo, hi, crate::solve::Tol::default())
+                .ok_or(TrainError::Hula(crate::hula::Error::BoundUnreachable(mesh)))?;
+            // Lean to the clear side of the root by the solver's own
+            // tolerance, so the parts built at it have the room asked for.
+            let e = if room_at(e) < 0.0 {
+                hi.min(e + 1e-9)
+            } else {
+                e
+            };
+            held[d] = Some(e);
+            bound_by[d] = self
+                .closed(&self.plan_held(helix, held.clone()), free, helix)
+                .and_then(|x| self.tip_room(d, &x, helix, &held))
+                .map(|(_, k)| k);
+        }
+        Ok((held, bound_by))
+    }
+
     /// **The shifts the stage settles on**: closed where nothing is searched,
-    /// searched for efficiency over the free ones where that was asked.
+    /// searched for efficiency over the free ones where that was asked —
+    /// and, first, every automatic distance the tips size opened out to
+    /// where they clear ([`Self::sized`]).
     fn chosen_at(&self, search: &crate::auto::Search, helix: &[f64]) -> Result<Chosen, TrainError> {
-        let plan = self.plan(helix);
+        let mut plan = self.plan(helix);
+        let (held, mut bound_by) = self.sized(helix, &plan, &[])?;
+        if held != plan.held {
+            plan = self.plan_held(helix, held);
+        }
         let settled: Vec<f64> = plan.asked.iter().map(|a| a.settled).collect();
         // **Where nothing was searched, the closure is the answer** — and
         // where it has none, what that means depends on what failed. A sum
@@ -829,13 +991,20 @@ impl Shape {
         // close is a set that cannot be assembled, and is refused for it.
         let fallback = |how| -> Result<Chosen, TrainError> {
             match self.closed(&plan, &[], helix) {
-                Some(shifts) => Ok(Chosen { shifts, how }),
+                Some(shifts) => Ok(Chosen {
+                    shifts,
+                    how,
+                    held: plan.held.clone(),
+                    bound_by: bound_by.clone(),
+                }),
                 None if plan.constraints.iter().any(|c| c.absorber.is_some()) => {
                     Err(TrainError::NoCommonDistance)
                 }
                 None => Ok(Chosen {
                     shifts: settled.clone(),
                     how,
+                    held: plan.held.clone(),
+                    bound_by: bound_by.clone(),
                 }),
             }
         };
@@ -920,19 +1089,20 @@ impl Shape {
                 }
             })
             .collect();
+        // The search's point as one value per member, the free ones set.
         let place = |v: &[f64]| -> Vec<f64> {
-            let mut out = vec![0.0; free.len()];
+            let mut out = settled.clone();
             let mut k = 0;
             while k < axes.len() {
                 match axes[k] {
                     Coordinate::Own(j) => {
-                        out[j] = v[k];
+                        out[free[j]] = v[k];
                         k += 1;
                     }
                     Coordinate::Sum(pa, pb, sign) => {
                         let (s, d) = (v[k], v[k + 1]);
-                        out[pa] = (s + d) / 2.0;
-                        out[pb] = (s - d) / (2.0 * sign);
+                        out[free[pa]] = (s + d) / 2.0;
+                        out[free[pb]] = (s - d) / (2.0 * sign);
                         k += 2;
                     }
                     Coordinate::Division(..) => unreachable!("a division follows its sum"),
@@ -946,12 +1116,29 @@ impl Shape {
         };
         match search.maximise(&box_, &objective) {
             None => fallback(super::Searched::FoundNothing),
-            Some(v) => Ok(Chosen {
-                shifts: self
-                    .closed(&plan, &place(&v), helix)
-                    .unwrap_or_else(|| settled.clone()),
-                how: super::Searched::Chose,
-            }),
+            Some(v) => {
+                // The division the search chose moves the tips a little, so
+                // a distance the tips size is sized again at it — the
+                // hula's own round, taken once: a second round moved no
+                // shipped figure by a digit there.
+                let chosen = place(&v);
+                let mut plan = plan;
+                if bound_by.iter().any(Option::is_some) {
+                    let (held, again) = self.sized(helix, &plan, &chosen)?;
+                    if held != plan.held {
+                        plan = self.plan_held(helix, held);
+                        bound_by = again;
+                    }
+                }
+                Ok(Chosen {
+                    shifts: self
+                        .closed(&plan, &chosen, helix)
+                        .unwrap_or_else(|| settled.clone()),
+                    how: super::Searched::Chose,
+                    held: plan.held.clone(),
+                    bound_by,
+                })
+            }
         }
     }
 
@@ -969,13 +1156,14 @@ impl Shape {
     /// shifts, the helices as the readings decide.
     #[cfg(test)]
     pub(crate) fn build_at(&self, x: &[f64]) -> Result<Built, TrainError> {
-        self.build(x, &self.helix_angles())
+        let helix = self.helix_angles();
+        self.build(x, &helix, &self.plan(&helix).held)
     }
 
     /// The product of every mesh's efficiency at these shifts, or nothing
     /// where any mesh is inadmissible ([`crate::auto::MeshTrial`]).
     fn trial_efficiency(&self, plan: &Plan, x: &[f64], helix: &[f64]) -> Option<f64> {
-        let built = self.build(x, helix).ok()?;
+        let built = self.build(x, helix, &plan.held).ok()?;
         let cut = |i: usize| -> crate::auto::Cut<'_> {
             match &built.members[i] {
                 BuiltMember::Ring { ring, .. } => crate::auto::Cut::ByShaper { ring },
@@ -1043,11 +1231,19 @@ struct Plan {
     asked: Vec<super::pair::ShiftAsked>,
     role: Vec<Role>,
     constraints: Vec<Constraint>,
+    /// **The running distance each distance is held to**, where it is: the
+    /// one stated with its clearance, or the one the tips sized it to
+    /// ([`Shape::sized`]). A held distance is one every mesh on it reaches.
+    held: Vec<Option<f64>>,
     /// The members that reach a sum on a given distance, **in the order
     /// they were planned** — a shared member reached from one mesh is what
     /// the next mesh's member reaches from.
     reaches: Vec<(usize, usize)>,
 }
+
+/// What the tips sized: the running distance each distance is held to, and
+/// per distance the mesh whose tips sized it.
+type TipSizing = (Vec<Option<f64>>, Vec<Option<usize>>);
 
 /// One axis of the efficiency search, over the free members.
 #[derive(Clone, Copy, Debug)]
@@ -1061,6 +1257,10 @@ enum Coordinate {
 struct Chosen {
     shifts: Vec<f64>,
     how: super::Searched,
+    /// The running distance each distance was held to — see [`Plan::held`].
+    held: Vec<Option<f64>>,
+    /// Per distance, the mesh whose tips sized it, where the tips did.
+    bound_by: Vec<Option<usize>>,
 }
 
 /// Halve toward `toward` until `g` is finite there.
@@ -1162,7 +1362,7 @@ pub(crate) struct Built {
 impl Shape {
     /// **Every member cut and every mesh at its running distance**, at these
     /// shifts.
-    fn build(&self, x: &[f64], helix: &[f64]) -> Result<Built, TrainError> {
+    fn build(&self, x: &[f64], helix: &[f64], held: &[Option<f64>]) -> Result<Built, TrainError> {
         let members: Vec<BuiltMember> = (0..self.members.len())
             .map(|i| {
                 let p = self.params_at(i, x[i], helix);
@@ -1192,9 +1392,14 @@ impl Shape {
             // mesh's zero-backlash distance opened by the clearance — and
             // every later mesh on an automatic distance must agree with it,
             // which the closure arranged unless no shift was free to.
+            let target = held
+                .get(d)
+                .copied()
+                .flatten()
+                .or_else(|| self.running_target(d));
             let at = match running[d] {
                 Some(r) => {
-                    if self.running_target(d).is_none()
+                    if target.is_none()
                         && (design.running_distance(self.distances[d].clearance.manual) - r).abs()
                             > 1e-9 * r.abs().max(1.0)
                     {
@@ -1203,7 +1408,7 @@ impl Shape {
                     r
                 }
                 None => {
-                    let r = self.running_target(d).unwrap_or_else(|| {
+                    let r = target.unwrap_or_else(|| {
                         design.running_distance(self.distances[d].clearance.manual)
                     });
                     running[d] = Some(r);
@@ -1250,6 +1455,11 @@ pub struct DistanceReport {
     pub running: f64,
     /// `running − nominal` of the first mesh, signed as the mesh reads it.
     pub clearance: f64,
+    /// **The mesh whose tips sized this distance**, where an automatic one
+    /// was opened out past what the shifts left so that its tips clear
+    /// ([`Distance::tip_clearance`]); `None` where the shifts' own distance
+    /// stood, or the distance was given.
+    pub sized_by: Option<usize>,
 }
 
 /// What the layout of one replicated axis came to.
@@ -1346,6 +1556,7 @@ pub fn solve_shape(
                 nominal: vec![r.centre_distance_nominal],
                 running: r.centre_distance,
                 clearance: r.clearance,
+                sized_by: None,
             }],
             overlap: 0.0,
             layouts: Vec::new(),
@@ -1382,7 +1593,7 @@ pub fn solve_shape(
     // ---- the shifts, and every member and mesh built at them.
     let chosen = shape.chosen_at(&crate::auto::Search::SHIPPED, &helix)?;
     let x = chosen.shifts;
-    let built = shape.build(&x, &helix)?;
+    let built = shape.build(&x, &helix, &chosen.held)?;
 
     // ---- materials.
     let materials: Vec<Material> = shape
@@ -1742,6 +1953,7 @@ pub fn solve_shape(
             nominal,
             running,
             clearance,
+            sized_by: chosen.bound_by.get(d).copied().flatten(),
         });
     }
     notes.extend(chosen.how.note());
@@ -2262,6 +2474,7 @@ impl Shape {
                 worm: kind == super::PairKind::Worm,
                 distance: p.centre_distance,
                 clearance: p.clearance,
+                tip_clearance: 0.0,
                 tolerance_plus: p.tolerance_plus,
                 tolerance_minus: p.tolerance_minus,
                 axial_clearance: p.axial_clearance,
@@ -2375,6 +2588,7 @@ impl From<&super::PlanetaryStage> for Shape {
                 worm: false,
                 distance: s.centre_distance,
                 clearance: s.clearance,
+                tip_clearance: 0.0,
                 tolerance_plus: s.tolerance_plus,
                 tolerance_minus: s.tolerance_minus,
                 axial_clearance: 0.0,
