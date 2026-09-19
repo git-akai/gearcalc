@@ -399,6 +399,42 @@ mod tests {
         }
     }
 
+    /// **A planet's teeth carry one instance's share, on every mesh it is
+    /// in** — a planet–planet mesh included. A planet is a free idler: the
+    /// tooth load its second mesh carries is its first mesh's less that
+    /// mesh's loss, so a planet's reported torque — the larger of its two —
+    /// is its sun's tooth load, itself one instance's share, read across the
+    /// sun mesh, to within the mesh's efficiency. The mesh between two
+    /// planets was divided by what its members see — one path each — rather
+    /// than by its own count, and the meshed planets' and the Ravigneaux's
+    /// planets carried `N` times their share on that mesh.
+    #[test]
+    fn a_planet_carries_one_instances_share_on_every_mesh() {
+        let cases = [
+            (meshed_planets(24, [18, 18], 96, 3), 1, 3),
+            (ravigneaux([18, 30], [22, 18], 62, 3), 1, 3),
+        ];
+        for (shape, input, held) in cases {
+            let r = solve(&shape, &[held], input, 2);
+            let sun = 0;
+            for (i, m) in shape.members.iter().enumerate() {
+                let axis = shape.shafts[m.shaft - 1].axis;
+                if shape.axes[axis].carried_by.is_none() {
+                    continue;
+                }
+                // The sun's tooth load — one instance's — read across to
+                // this planet.
+                let share = r.members[sun].cases[0].torque * f64::from(m.gear.teeth)
+                    / f64::from(shape.members[sun].gear.teeth);
+                let got = r.members[i].cases[0].torque;
+                assert!(
+                    got <= share * 1.0001 && got >= share * 0.9,
+                    "member {i}: {got} against one instance's share {share}"
+                );
+            }
+        }
+    }
+
     /// **A point contact and a line contact in one stage** multiply as any
     /// two meshes do: the ratio is the worm's times the pair's, the
     /// efficiency the product of the two meshes' own, the wheel is rated by

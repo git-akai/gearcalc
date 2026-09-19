@@ -668,7 +668,8 @@ whose size is unmeasured is a debt still owed, and is marked as one.
 - **Every mesh on a replicated axis is taken to carry `N` paths**, and the
   meshes between two replicated axes — a Ravigneaux's planet–planet mesh —
   `N` as well, which is right where the two counts agree and unwritten
-  where they do not.
+  where they do not (the wiring refuses nothing there; the larger count is
+  taken).
 - **A mesh's two thickness coefficients are not held to sum to 2.** The shape
   carries `k` per member, where the stage types carried one per stage and wrote the
   pair themselves. A pair that does not sum to 2 is a legitimate mesh — the

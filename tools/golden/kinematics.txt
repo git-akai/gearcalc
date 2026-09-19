@@ -635,13 +635,13 @@
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.063511  cycles -
       case 3  speed    2400.000000  vs frame    3200.000000  torque       0.666667  cycles 5.760000e8 / 5.760000e8
     member 2  z 18  
-      case 1  speed   -6333.333333  vs frame   -5333.333333  torque       1.471653  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.145978  cycles -
-      case 3  speed   -5066.666667  vs frame   -4266.666667  torque       1.471653  cycles 2.560000e8 / 2.560000e8
+      case 1  speed   -6333.333333  vs frame   -5333.333333  torque       0.500000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.048659  cycles -
+      case 3  speed   -5066.666667  vs frame   -4266.666667  torque       0.500000  cycles 2.560000e8 / 2.560000e8
     member 3  z 18  
-      case 1  speed    4333.333333  vs frame    5333.333333  torque       1.471653  cycles -
-      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.145978  cycles -
-      case 3  speed    3466.666667  vs frame    4266.666667  torque       1.471653  cycles 2.560000e8 / 2.560000e8
+      case 1  speed    4333.333333  vs frame    5333.333333  torque       0.490551  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.049183  cycles -
+      case 3  speed    3466.666667  vs frame    4266.666667  torque       0.490551  cycles 2.560000e8 / 2.560000e8
     member 4  z 96  
       case 1  speed       0.000000  vs frame    1000.000000  torque       2.561111  cycles -
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.262311  cycles -
@@ -751,13 +751,13 @@
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.175241  cycles -
       case 3  speed    2400.000000  vs frame    4650.000000  torque       0.666667  cycles 8.370000e8 / 8.370000e8
     member 3  z 22  
-      case 1  speed    5113.636364  vs frame    7926.136364  torque       1.440881  cycles -
-      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.393227  cycles -
-      case 3  speed    4090.909091  vs frame    6340.909091  torque       1.440881  cycles 3.804545e8 / 3.804545e8
+      case 1  speed    5113.636364  vs frame    7926.136364  torque       0.480294  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.132057  cycles -
+      case 3  speed    4090.909091  vs frame    6340.909091  torque       0.480294  cycles 3.804545e8 / 3.804545e8
     member 4  z 18  
-      case 1  speed  -12500.000000  vs frame   -9687.500000  torque       1.178902  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.321731  cycles -
-      case 3  speed  -10000.000000  vs frame   -7750.000000  torque       1.178902  cycles 4.650000e8 / 4.650000e8
+      case 1  speed  -12500.000000  vs frame   -9687.500000  torque       0.400000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.107244  cycles -
+      case 3  speed  -10000.000000  vs frame   -7750.000000  torque       0.400000  cycles 4.650000e8 / 4.650000e8
     member 5  z 62  
       case 1  speed       0.000000  vs frame    2812.500000  torque       1.327061  cycles -
       case 2  speed      -0.000000  vs frame      -0.000000  torque       0.372160  cycles -
@@ -810,13 +810,13 @@
       case 2  speed       0.000000  vs frame      -0.000000  torque       0.127665  cycles -
       case 3  speed       0.000000  vs frame    -900.000000  torque       1.068040  cycles 1.620000e8 / 1.620000e8
     member 3  z 22  
-      case 1  speed    -409.090909  vs frame   -1534.090909  torque       2.396598  cycles -
-      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.275925  cycles -
-      case 3  speed    -327.272727  vs frame   -1227.272727  torque       2.396598  cycles 7.363636e7 / 7.363636e7
+      case 1  speed    -409.090909  vs frame   -1534.090909  torque       0.814815  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.091975  cycles -
+      case 3  speed    -327.272727  vs frame   -1227.272727  torque       0.814815  cycles 7.363636e7 / 7.363636e7
     member 4  z 18  
-      case 1  speed    3000.000000  vs frame    1875.000000  torque       1.960853  cycles -
-      case 2  speed       0.000000  vs frame       0.000000  torque       0.225757  cycles -
-      case 3  speed    2400.000000  vs frame    1500.000000  torque       1.960853  cycles 9.000000e7 / 9.000000e7
+      case 1  speed    3000.000000  vs frame    1875.000000  torque       0.653618  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.076599  cycles -
+      case 3  speed    2400.000000  vs frame    1500.000000  torque       0.653618  cycles 9.000000e7 / 9.000000e7
     member 5  z 62  
       case 1  speed     580.645161  vs frame    -544.354839  torque       0.000000  cycles -
       case 2  speed       0.000000  vs frame      -0.000000  torque       0.000000  cycles -

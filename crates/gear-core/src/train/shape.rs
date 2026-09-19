@@ -2695,10 +2695,12 @@ pub fn solve_shape(
         let at_entry = f.shaft_torques[entry];
         (at_entry != 0.0).then(|| (torque / at_entry.abs(), f))
     };
-    let paths = |k: usize| -> f64 {
-        let m = shape.meshes[k];
-        f64::from(wiring.paths_seen(m.a).max(wiring.paths_seen(m.b)))
-    };
+    // **How many instances of a mesh act in parallel** — one per planet —
+    // which is the mesh's own count, not what either member sees: a
+    // planet sees one path of every mesh it is in, and a mesh between two
+    // planets is still one of `N`. The flow's torques are totals over the
+    // instances, since a central member's is; one instance carries a share.
+    let paths = |k: usize| -> f64 { f64::from(wiring.meshes[k].paths) };
     // The tangential force a mesh instance carries in a case, quoted as a
     // torque at member `a`: the driving member's torque, read across —
     // which is what the flow's mesh torque is, whichever member drives.
