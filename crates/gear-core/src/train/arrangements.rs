@@ -182,9 +182,11 @@ pub fn layshaft(input: (u32, u32), pairs: &[(u32, u32)], engaged: usize) -> Shap
 /// sun; the ratio is `z_r2 / (z_r2 − z_r1)` at one planet, which is what
 /// makes a difference of a few teeth a large reduction.
 ///
-/// Shafts: carrier 1, second ring 2, first ring 3, planet 4 — the held
-/// ring last, which is the shape's convention for what is held, so the
-/// textbook arrangement is the one it takes with nothing stated.
+/// Shafts: carrier 1, second ring 2, first ring 3, planet 4; members: the
+/// planet, the first ring, the second. The first ring listed is the one the
+/// shape holds by convention and the output is the next free port after the
+/// driven one, so the textbook arrangement is the one it takes with nothing
+/// stated.
 #[must_use]
 pub fn wolfrom(planet: u32, rings: [u32; 2], count: u32) -> Shape {
     let mut b = Builder::new(1.0);
@@ -208,10 +210,11 @@ pub fn wolfrom(planet: u32, rings: [u32; 2], count: u32) -> Shape {
 /// compound set at one carrier radius, which the second ring's shift
 /// closes.
 ///
-/// Shafts: sun 1, second ring 2, carrier 3, first ring 4, planet 5 — the
-/// held ring last and the output ring next after the sun, so the convention
-/// gives the compound reduction; a hold on the carrier or a drive elsewhere
-/// gives the others.
+/// Shafts: sun 1, second ring 2, carrier 3, first ring 4, planet 5; the
+/// first ring is listed first among the rings and so held by convention,
+/// and the second ring is the next free port after the sun, so the
+/// convention gives the compound reduction; a hold on the carrier or a
+/// drive elsewhere gives the others.
 #[must_use]
 pub fn stepped(sun: u32, planets: [u32; 2], rings: [u32; 2], count: u32) -> Shape {
     let mut b = Builder::new(1.0);

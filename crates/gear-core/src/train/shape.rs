@@ -2400,7 +2400,7 @@ impl Constrained for Shape {
 
     /// **Every shaft that is not replicated is a port**, in shaft order — a
     /// pair's two members, a set's sun, carrier and ring — and what is held
-    /// by convention is the last ring's shaft, where there is a ring.
+    /// by convention is the first ring's shaft, where there is a ring.
     fn ports(&self) -> Ports {
         let ports: Vec<Shaft> = (1..=self.shafts.len())
             .filter(|&s| !self.replicated(s))
@@ -2408,7 +2408,6 @@ impl Constrained for Shape {
         let held: Vec<Shaft> = self
             .members
             .iter()
-            .rev()
             .filter(|m| m.ring.is_some())
             .map(|m| m.shaft)
             .find(|s| ports.contains(s))
@@ -2591,6 +2590,86 @@ impl From<&super::PlanetaryStage> for Shape {
                 tip_clearance: 0.0,
                 tolerance_plus: s.tolerance_plus,
                 tolerance_minus: s.tolerance_minus,
+                axial_clearance: 0.0,
+            }],
+        }
+    }
+}
+
+impl From<&super::HulaStage> for Shape {
+    /// **The hula stage as a shape**: a central axis with the grounded gear,
+    /// the crank and the output on it, a wobble axis carried by the crank
+    /// with the two wobble gears on one shaft, two internal meshes on the
+    /// one distance — the crank offset — which the tips size where it is
+    /// automatic. Which member of each pair is the ring is a tooth count,
+    /// the larger; the pinion's `k` is the ring's too, as the kind had it.
+    /// Shafts: crank 1, output 2, grounded 3, wobble 4 — the driven one
+    /// first, the output next, the grounded gear's ring the first ring
+    /// listed and so the one held by convention.
+    fn from(h: &super::HulaStage) -> Self {
+        let mesh_of = |i: usize| i / 2;
+        let is_ring = |i: usize| {
+            let (a, b) = (mesh_of(i) * 2, mesh_of(i) * 2 + 1);
+            h.gears[i].teeth > h.gears[if i == a { b } else { a }].teeth
+        };
+        let shaft_of = |i: usize| match i {
+            0 => 3,
+            3 => 2,
+            _ => 4,
+        };
+        let members: Vec<Member> = (0..4)
+            .map(|i| Member {
+                shaft: shaft_of(i),
+                gear: h.gears[i].clone(),
+                module: h.module[mesh_of(i)],
+                thickness_mod: h.thickness_mod[mesh_of(i)],
+                ring: is_ring(i).then_some(h.cutter[mesh_of(i)]),
+                pitch_diameter: Auto::automatic(0.0),
+            })
+            .collect();
+        let mesh = |m: usize| {
+            let (a, b) = (m * 2, m * 2 + 1);
+            let (pinion, ring) = if is_ring(a) { (b, a) } else { (a, b) };
+            MeshInput {
+                a: pinion,
+                b: ring,
+                sliding_friction: h.sliding_friction[m],
+                static_friction: h.static_friction[m],
+            }
+        };
+        Self {
+            pressure_angle: h.pressure_angle,
+            overlap: h.overlap,
+            optimisation: h.optimisation,
+            load_sharing: h.load_sharing,
+            min_planet_clearance: 0.0,
+            axes: vec![
+                Axis {
+                    carried_by: None,
+                    count: 1,
+                },
+                Axis {
+                    carried_by: Some(1),
+                    count: 1,
+                },
+            ],
+            shafts: vec![
+                ShaftOn { axis: 0 },
+                ShaftOn { axis: 0 },
+                ShaftOn { axis: 0 },
+                ShaftOn { axis: 1 },
+            ],
+            members,
+            meshes: vec![mesh(0), mesh(1)],
+            distances: vec![Distance {
+                axes: [0, 1],
+                angle: 0.0,
+                worm: false,
+                distance: h.offset,
+                clearance: h.running_clearance,
+                tip_clearance: h.clearance,
+                tolerance_plus: h.tolerance_plus,
+                tolerance_minus: h.tolerance_minus,
                 axial_clearance: 0.0,
             }],
         }
@@ -3723,5 +3802,258 @@ mod tests {
         stage.ring.profile_shift = Auto::fixed(0.25);
         let r = solve_set(&stage, &StageLoads::just(2.0), &test_library()).expect("solves");
         assert!((r.members[2].profile_shift - 0.25).abs() < 1e-9);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod hula_gate {
+    //! **The hula stage through the shape is the hula stage**, figure by
+    //! figure — the gate the kinds were held at before they retired
+    //! (`ac0dccc`), asked of the one kind left. A difference is a question:
+    //! either the shape has the hula's model wrong, or the kind had a fault
+    //! the shape does not, and `docs/corrections.md` records which.
+
+    use super::super::{
+        solve_hula_stage, test_library, HulaStage, Reversal, StageLoads, StageResult,
+    };
+    use super::*;
+
+    fn hula_18(clearance: f64) -> HulaStage {
+        let mut stage = HulaStage {
+            clearance,
+            ..HulaStage::default()
+        };
+        for (g, z) in stage.gears.iter_mut().zip([19, 18, 17, 18]) {
+            g.teeth = z;
+        }
+        for (m, c) in stage.cutter.iter_mut().enumerate() {
+            c.teeth = [14, 13][m];
+        }
+        stage
+    }
+
+    fn close(a: f64, b: f64, tol: f64, what: &str) {
+        assert!(
+            (a - b).abs() <= tol * a.abs().max(b.abs()).max(1e-9),
+            "{what}: kind {a} vs shape {b}"
+        );
+    }
+
+    fn gate(stage: &HulaStage, loads: &StageLoads) {
+        gate_with(stage, loads, false);
+    }
+
+    /// `backward`: the loads carry a case from the output, which the kind
+    /// read as the crank's *delivered* torque and normalised its flow to —
+    /// so everything inside stood `1/η_backward` high, 28 % on the shipped
+    /// stage — where the shape enters it at the output at the torque times
+    /// the ratio, the train's own meaning (`docs/corrections.md`, the set's
+    /// backward case). The gate holds that factor rather than agreement.
+    fn gate_with(stage: &HulaStage, loads: &StageLoads, backward: bool) {
+        let lib = test_library();
+        let kind = solve_hula_stage(stage, loads, &lib).unwrap();
+        let shape = Shape::from(stage);
+        let boundary = super::super::StageBoundary::holding(5, &[3], 1, 2);
+        let r = solve_shape(
+            &shape,
+            &loads.clone().under(boundary),
+            &lib,
+            Reversal::default(),
+        )
+        .unwrap();
+        close(kind.ratio, r.ratio, 1e-12, "ratio");
+        close(kind.offset, r.distances[0].running, 1e-6, "crank offset");
+        close(
+            kind.offset_nominal,
+            r.distances[0].nominal[0],
+            1e-6,
+            "nominal offset, mesh 1",
+        );
+        assert_eq!(kind.binding_mesh, r.distances[0].sized_by, "held open by");
+        // **Every mesh is pressed with its driver's force** in the shape,
+        // where the kind pressed each with the torque its row stated —
+        // `η` short on a driven member (`docs/corrections.md`, the set's
+        // driven-side meshes). So a driven member's torque, bending and
+        // contact stand `1/η`, `1/η` and `1/√η` over the kind's, and every
+        // other figure is the kind's.
+        for (i, (g, m)) in kind.gears.iter().zip(&r.members).enumerate() {
+            close(
+                g.gear.profile_shift,
+                m.profile_shift,
+                1e-6,
+                &format!("gear {i} shift"),
+            );
+            let eta = r.meshes[i / 2].efficiency.forward;
+            for (ck, cs) in g.gear.cases.iter().zip(&m.cases) {
+                close(
+                    ck.speed,
+                    cs.speed,
+                    1e-9,
+                    &format!("gear {i} case {} speed", ck.case),
+                );
+                let from_output = loads
+                    .cases
+                    .iter()
+                    .any(|l| l.case == ck.case && l.drive == crate::contact::Drive::Backward);
+                if backward && from_output {
+                    let ratio = cs.torque / ck.torque;
+                    assert!(
+                        (ratio - r.efficiency.backward).abs() < 2e-3,
+                        "gear {i} from the output: kind {} vs shape {} at η_b {}",
+                        ck.torque,
+                        cs.torque,
+                        r.efficiency.backward
+                    );
+                    continue;
+                }
+                if ck.torque == 0.0 {
+                    assert_eq!(cs.torque, 0.0);
+                    continue;
+                }
+                let scale = cs.torque / ck.torque;
+                let driven = (scale - 1.0 / eta).abs() < 1e-6;
+                assert!(
+                    driven || (scale - 1.0).abs() < 1e-6,
+                    "gear {i} case {} torque: kind {} vs shape {} (η {eta})",
+                    ck.case,
+                    ck.torque,
+                    cs.torque
+                );
+                let (kb, kc) = if driven {
+                    (1.0 / eta, 1.0 / eta.sqrt())
+                } else {
+                    (1.0, 1.0)
+                };
+                match (ck.bending_stress, cs.bending_stress) {
+                    (Some(a), Some(b)) => close(a * kb, b, 1e-6, &format!("gear {i} bending")),
+                    (a, b) => assert_eq!(a.is_some(), b.is_some(), "gear {i} rated"),
+                }
+                close(
+                    ck.contact_stress * kc,
+                    cs.contact_stress,
+                    1e-6,
+                    &format!("gear {i} contact"),
+                );
+            }
+        }
+        for (k, (hm, sm)) in kind.meshes.iter().zip(&r.meshes).enumerate() {
+            // To the sizing's own tolerance: the two solvers find the
+            // crank offset by different roots and agree to a nanometre.
+            close(
+                hm.report.contact_ratio,
+                sm.contact_ratio,
+                1e-6,
+                &format!("mesh {k} ε"),
+            );
+            close(
+                hm.report.efficiency.forward,
+                sm.efficiency.forward,
+                1e-6,
+                &format!("mesh {k} η"),
+            );
+            close(
+                hm.report.backlash[0].nominal,
+                sm.backlash[0].nominal,
+                1e-6,
+                &format!("mesh {k} backlash"),
+            );
+            let tips = sm.tips.unwrap();
+            assert_eq!(
+                hm.report.tips.unwrap().tip_interference,
+                tips.tip_interference
+            );
+        }
+        close(
+            kind.efficiency.forward,
+            r.efficiency.forward,
+            1e-6,
+            "stage η forward",
+        );
+        close(
+            kind.efficiency.backward,
+            r.efficiency.backward,
+            1e-6,
+            "stage η backward",
+        );
+        close(
+            kind.backlash.forward.nominal,
+            r.backlash.forward.nominal,
+            1e-6,
+            "backlash at the output",
+        );
+        close(
+            kind.backlash.backward.nominal,
+            r.backlash.backward.nominal,
+            1e-6,
+            "backlash at the crank",
+        );
+        // The three shafts the kind reports — grounded, crank, output — are
+        // the shape's 3, 1 and 2.
+        for (ck, cs) in kind.cases.iter().zip(&r.cases) {
+            let from_output = loads
+                .cases
+                .iter()
+                .any(|l| l.case == ck.case && l.drive == crate::contact::Drive::Backward);
+            if backward && from_output {
+                // The output carries exactly what the case states times the
+                // ratio; the kind had it over `η_backward`.
+                close(
+                    cs.torques[2].abs(),
+                    0.5 * r.ratio.abs(),
+                    1e-9,
+                    "the load at the output",
+                );
+                close(
+                    ck.torques[2].abs() * r.efficiency.backward,
+                    cs.torques[2].abs(),
+                    2e-3,
+                    "the kind's output over η_b",
+                );
+                continue;
+            }
+            for (kind_i, shape_i) in [(0, 3), (1, 1), (2, 2)] {
+                close(
+                    ck.speeds[kind_i],
+                    cs.speeds[shape_i],
+                    1e-9,
+                    &format!("case {} shaft {kind_i} speed", ck.case),
+                );
+                close(
+                    ck.torques[kind_i],
+                    cs.torques[shape_i],
+                    1e-6,
+                    &format!("case {} shaft {kind_i} torque", ck.case),
+                );
+            }
+        }
+        let _ = StageResult::Shape(Box::new(r));
+    }
+
+    #[test]
+    fn the_shipped_hula_stage_is_itself_through_the_shape() {
+        gate(&HulaStage::default(), &StageLoads::at(2.0, 3000.0));
+    }
+
+    #[test]
+    fn the_harness_hula_is_itself_through_the_shape() {
+        gate(&hula_18(0.2), &StageLoads::at(2.0, 1000.0));
+    }
+
+    /// ...and under a load from the output as well — the shipped stage can
+    /// be back-driven, at 78 % — where the kind normalised its flow at the
+    /// wrong shaft.
+    #[test]
+    fn a_hula_stage_driven_backward_is_itself_through_the_shape() {
+        let mut loads = StageLoads::at(2.0, 3000.0);
+        loads.cases.push(super::super::StageLoad {
+            case: 2,
+            kind: super::super::CaseKind::Ultimate,
+            drive: crate::contact::Drive::Backward,
+            torque: 0.5,
+            speed: 0.0,
+            turns: None,
+        });
+        gate_with(&HulaStage::default(), &loads, true);
     }
 }
