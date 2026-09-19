@@ -354,6 +354,419 @@
     shaft wobble    of stage 1 speed -4/61
     shaft output    of stage 1 speed 16/3721
 
+== layshaft ==
+  total    ratio       2.366224   efficiency  96.998754 / 96.998754  %   backlash   0.099391 / 0.235181   deg
+  case 1       2.0000 Nm /   3000.00 rpm at start  ->      4.5904 Nm /   1267.84 rpm at end    held at -
+  case 2       0.6000 Nm /      0.00 rpm at end    ->      0.2460 Nm /      0.00 rpm at start  held at -
+  case 3       2.0000 Nm /   2400.00 rpm at start  ->      4.5904 Nm /   1014.27 rpm at end    held at -
+  stage 1  ratio       2.366224   efficiency  96.998754 / 96.998754  %   backlash   0.099391 / 0.235181   deg
+    shaft member 1  case 1  speed    3000.000000  torque       2.000000
+    shaft member 1  case 2  speed       0.000000  torque      -0.245958
+    shaft member 1  case 3  speed    2400.000000  torque       2.000000
+    shaft member 6  case 1  speed    1267.842823  torque      -4.590415
+    shaft member 6  case 2  speed       0.000000  torque       0.600000
+    shaft member 6  case 3  speed    1014.274258  torque      -4.590415
+    shaft member 2  case 1  speed   -1186.046512  torque       0.000000
+    shaft member 2  case 2  speed      -0.000000  torque      -0.000000
+    shaft member 2  case 3  speed    -948.837209  torque       0.000000
+    shaft member 4  case 1  speed     549.631310  torque       0.000000
+    shaft member 4  case 2  speed       0.000000  torque       0.000000
+    shaft member 4  case 3  speed     439.705048  torque       0.000000
+    shaft member 8  case 1  speed    3000.000000  torque       0.000000
+    shaft member 8  case 2  speed       0.000000  torque       0.000000
+    shaft member 8  case 3  speed    2400.000000  torque       0.000000
+    member 1  z 17  
+      case 1  speed    3000.000000  vs frame    3000.000000  torque       2.000000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.250098  cycles -
+      case 3  speed    2400.000000  vs frame    2400.000000  torque       2.000000  cycles 1.440000e8 / 1.440000e8
+    member 2  z 43  
+      case 1  speed   -1186.046512  vs frame   -1186.046512  torque       5.058824  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.632600  cycles -
+      case 3  speed    -948.837209  vs frame    -948.837209  torque       5.058824  cycles 5.693023e7 / 5.693023e7
+    member 3  z 19  
+      case 1  speed   -1186.046512  vs frame   -1186.046512  torque       0.000000  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.000000  cycles -
+      case 3  speed    -948.837209  vs frame    -948.837209  torque       0.000000  cycles 5.693023e7 / 5.693023e7
+    member 4  z 41  
+      case 1  speed     549.631310  vs frame     549.631310  torque       0.000000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed     439.705048  vs frame     439.705048  torque       0.000000  cycles 2.638230e7 / 2.638230e7
+    member 5  z 31  
+      case 1  speed   -1186.046512  vs frame   -1186.046512  torque       4.975099  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.641379  cycles -
+      case 3  speed    -948.837209  vs frame    -948.837209  torque       4.975099  cycles 5.693023e7 / 5.693023e7
+    member 6  z 29  
+      case 1  speed    1267.842823  vs frame    1267.842823  torque       4.654125  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.600000  cycles -
+      case 3  speed    1014.274258  vs frame    1014.274258  torque       4.654125  cycles 6.085646e7 / 6.085646e7
+    member 7  z 43  
+      case 1  speed   -1186.046512  vs frame   -1186.046512  torque       0.000000  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.000000  cycles -
+      case 3  speed    -948.837209  vs frame    -948.837209  torque       0.000000  cycles 5.693023e7 / 5.693023e7
+    member 8  z 17  
+      case 1  speed    3000.000000  vs frame    3000.000000  torque       0.000000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed    2400.000000  vs frame    2400.000000  torque       0.000000  cycles 1.440000e8 / 1.440000e8
+    mesh 1  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
+    mesh 2  efficiency  98.439013 / 98.439013  %  contact ratio   1.6093  coprime
+    mesh 3  efficiency  98.631123 / 98.631123  %  contact ratio   1.6321  coprime
+    mesh 4  efficiency  98.344976 / 98.344976  %  contact ratio   1.5993  coprime
+  graph    mobility 1 degree(s), 1 given   total ratio 1247/527
+    stage 1  ratio 1247/527
+    shaft ground    of the train speed 0
+    shaft member 1  of stage 1 speed 1
+    shaft member 6  of stage 1 speed 527/1247
+    shaft member 2  of stage 1 speed -17/43
+    shaft member 4  of stage 1 speed 323/1763
+    shaft member 8  of stage 1 speed 1
+
+== wolfrom ==
+  total    ratio     -60.000000   efficiency  44.445454 / 0.000000   %   backlash   0.049752 / 2.985130   deg
+  case 1       2.0000 Nm /   3000.00 rpm at start  ->     53.3345 Nm /    -50.00 rpm at end    held at -
+  case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0000 Nm /     -0.00 rpm at start  held at 1
+  case 3       2.0000 Nm /   2400.00 rpm at start  ->     53.3345 Nm /    -40.00 rpm at end    held at -
+  stage 1  ratio     -60.000000   efficiency  44.445454 / 0.000000   %   backlash   0.049752 / 2.985130   deg
+    shaft carrier   case 1  speed    3000.000000  torque       2.000000
+    shaft carrier   case 2  speed      -0.000000  torque       0.000000
+    shaft carrier   case 3  speed    2400.000000  torque       2.000000
+    shaft ring 2    case 1  speed       0.000000  torque     -55.334545
+    shaft ring 2    case 2  speed      -0.000000  torque       0.000000
+    shaft ring 2    case 3  speed       0.000000  torque     -55.334545
+    shaft ring 1    case 1  speed     -50.000000  torque      53.334545
+    shaft ring 1    case 2  speed       0.000000  torque       0.000000
+    shaft ring 1    case 3  speed     -40.000000  torque      53.334545
+    shaft planet    case 1  speed   -7166.666667  torque       0.000000
+    shaft planet    case 2  speed       0.000000  torque       0.000000
+    shaft planet    case 3  speed   -5733.333333  torque       0.000000
+    member 1  z 18  
+      case 1  speed   -7166.666667  vs frame  -10166.666667  torque       5.442742  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed   -5733.333333  vs frame   -8133.333333  torque       5.442742  cycles 4.880000e8 / 4.880000e8
+    member 2  z 60  
+      case 1  speed     -50.000000  vs frame   -3050.000000  torque      17.952548  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed     -40.000000  vs frame   -2440.000000  torque      17.952548  cycles 4.392000e8 / 4.392000e8
+    member 3  z 61  
+      case 1  speed       0.000000  vs frame   -3000.000000  torque      18.444848  cycles -
+      case 2  speed      -0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed       0.000000  vs frame   -2400.000000  torque      18.444848  cycles 4.320000e8 / 4.320000e8
+    mesh 1  efficiency  99.028738 / 99.028738  %  contact ratio   1.9162  shares a factor
+    mesh 2  efficiency  98.953143 / 98.953143  %  contact ratio   2.1215  coprime
+  graph    mobility 2 degree(s), 2 given   total ratio -60
+    stage 1  ratio -60
+    shaft ground    of the train speed 0
+    shaft carrier   of stage 1 speed 1
+    shaft ring 2    of stage 1 speed 0
+    shaft ring 1    of stage 1 speed -1/60
+    shaft planet    of stage 1 speed -43/18
+
+== stepped ==
+  total    ratio       3.602941   efficiency  97.875395 / 97.857911  %   backlash   0.039724 / 0.143125   deg
+  case 1       2.0000 Nm /   3000.00 rpm at start  ->      7.0528 Nm /    832.65 rpm at end    held at -
+  case 2       0.6000 Nm /      0.00 rpm at end    ->      0.1630 Nm /      0.00 rpm at start  held at -
+  case 3       2.0000 Nm /   2400.00 rpm at start  ->      7.0528 Nm /    666.12 rpm at end    held at -
+  stage 1  ratio       3.602941   efficiency  97.875395 / 97.857911  %   backlash   0.039724 / 0.143125   deg
+    shaft sun       case 1  speed    3000.000000  torque       2.000000
+    shaft sun       case 2  speed       0.000000  torque      -0.162963
+    shaft sun       case 3  speed    2400.000000  torque       2.000000
+    shaft ring 2    case 1  speed       0.000000  torque       5.052786
+    shaft ring 2    case 2  speed       0.000000  torque      -0.437037
+    shaft ring 2    case 3  speed       0.000000  torque       5.052786
+    shaft carrier   case 1  speed     832.653061  torque      -7.052786
+    shaft carrier   case 2  speed       0.000000  torque       0.600000
+    shaft carrier   case 3  speed     666.122449  torque      -7.052786
+    shaft ring 1    case 1  speed     -34.285714  torque       0.000000
+    shaft ring 1    case 2  speed      -0.000000  torque       0.000000
+    shaft ring 1    case 3  speed     -27.428571  torque       0.000000
+    shaft planet 1  case 1  speed   -2057.142857  torque       0.000000
+    shaft planet 1  case 2  speed      -0.000000  torque      -0.000000
+    shaft planet 1  case 3  speed   -1645.714286  torque       0.000000
+    member 1  z 24  
+      case 1  speed    3000.000000  vs frame    2167.346939  torque       0.666667  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.055373  cycles -
+      case 3  speed    2400.000000  vs frame    1733.877551  torque       0.666667  cycles 3.120980e8 / 3.120980e8
+    member 2  z 18  
+      case 1  speed   -2057.142857  vs frame   -2889.795918  torque       0.500000  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.041530  cycles -
+      case 3  speed   -1645.714286  vs frame   -2311.836735  torque       0.500000  cycles 1.387102e8 / 1.387102e8
+    member 3  z 17  
+      case 1  speed   -2057.142857  vs frame   -2889.795918  torque       0.490503  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.041975  cycles -
+      case 3  speed   -1645.714286  vs frame   -2311.836735  torque       0.490503  cycles 1.387102e8 / 1.387102e8
+    member 4  z 60  
+      case 1  speed     -34.285714  vs frame    -866.938776  torque       0.000000  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.000000  cycles -
+      case 3  speed     -27.428571  vs frame    -693.551020  torque       0.000000  cycles 1.248392e8 / 1.248392e8
+    member 5  z 59  
+      case 1  speed       0.000000  vs frame    -832.653061  torque       1.702333  cycles -
+      case 2  speed       0.000000  vs frame      -0.000000  torque       0.145679  cycles -
+      case 3  speed       0.000000  vs frame    -666.122449  torque       1.702333  cycles 1.199020e8 / 1.199020e8
+    mesh 1  efficiency  98.100561 / 98.100561  %  contact ratio   1.5532  shares a factor
+    mesh 2  efficiency  99.015487 / 99.015487  %  contact ratio   1.9233  shares a factor
+    mesh 3  efficiency  98.938438 / 98.938438  %  contact ratio   1.9207  coprime
+  graph    mobility 2 degree(s), 2 given   total ratio 245/68
+    stage 1  ratio 245/68
+    shaft ground    of the train speed 0
+    shaft sun       of stage 1 speed 1
+    shaft ring 2    of stage 1 speed 0
+    shaft carrier   of stage 1 speed 68/245
+    shaft ring 1    of stage 1 speed -2/175
+    shaft planet 1  of stage 1 speed -24/35
+
+== planocentric ==
+  total    ratio     -10.000000   efficiency  98.810701 / 98.797702  %   backlash   0.052669 / 0.526691   deg
+  case 1       2.0000 Nm /   3000.00 rpm at start  ->     19.7621 Nm /   -300.00 rpm at end    held at -
+  case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0593 Nm /     -0.00 rpm at start  held at -
+  case 3       2.0000 Nm /   2400.00 rpm at start  ->     19.7621 Nm /   -240.00 rpm at end    held at -
+  stage 1  ratio     -10.000000   efficiency  98.810701 / 98.797702  %   backlash   0.052669 / 0.526691   deg
+    shaft carrier   case 1  speed    3000.000000  torque       2.000000
+    shaft carrier   case 2  speed      -0.000000  torque      -0.059279
+    shaft carrier   case 3  speed    2400.000000  torque       2.000000
+    shaft ring      case 1  speed       0.000000  torque     -21.762140
+    shaft ring      case 2  speed      -0.000000  torque       0.659279
+    shaft ring      case 3  speed       0.000000  torque     -21.762140
+    shaft planet    case 1  speed    -300.000000  torque      19.762140
+    shaft planet    case 2  speed       0.000000  torque      -0.600000
+    shaft planet    case 3  speed    -240.000000  torque      19.762140
+    member 1  z 30  
+      case 1  speed    -300.000000  vs frame   -3300.000000  torque      19.783764  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.600000  cycles -
+      case 3  speed    -240.000000  vs frame   -2640.000000  torque      19.783764  cycles 1.584000e8 / 1.584000e8
+    member 2  z 33  
+      case 1  speed       0.000000  vs frame   -3000.000000  torque      21.762140  cycles -
+      case 2  speed      -0.000000  vs frame       0.000000  torque       0.660000  cycles -
+      case 3  speed       0.000000  vs frame   -2400.000000  torque      21.762140  cycles 1.440000e8 / 1.440000e8
+    mesh 1  efficiency  99.890700 / 99.890700  %  contact ratio   2.7172  shares a factor
+  graph    mobility 2 degree(s), 2 given   total ratio -10
+    stage 1  ratio -10
+    shaft ground    of the train speed 0
+    shaft carrier   of stage 1 speed 1
+    shaft ring      of stage 1 speed 0
+    shaft planet    of stage 1 speed -1/10
+
+== meshed-planets ==
+  total    ratio      -3.000000   efficiency  93.358179 / 93.466662  %   backlash   0.069648 / 0.208944   deg
+  case 1       2.0000 Nm /   3000.00 rpm at start  ->      5.6015 Nm /  -1000.00 rpm at end    held at -
+  case 2       0.6000 Nm /      0.00 rpm at end    ->      0.1869 Nm /     -0.00 rpm at start  held at -
+  case 3       2.0000 Nm /   2400.00 rpm at start  ->      5.6015 Nm /   -800.00 rpm at end    held at -
+  stage 1  ratio      -3.000000   efficiency  93.358179 / 93.466662  %   backlash   0.069648 / 0.208944   deg
+    shaft sun       case 1  speed    3000.000000  torque       2.000000
+    shaft sun       case 2  speed      -0.000000  torque      -0.186933
+    shaft sun       case 3  speed    2400.000000  torque       2.000000
+    shaft carrier   case 1  speed   -1000.000000  torque       5.601491
+    shaft carrier   case 2  speed       0.000000  torque      -0.600000
+    shaft carrier   case 3  speed    -800.000000  torque       5.601491
+    shaft ring      case 1  speed       0.000000  torque      -7.601491
+    shaft ring      case 2  speed      -0.000000  torque       0.786933
+    shaft ring      case 3  speed       0.000000  torque      -7.601491
+    shaft planet 1  case 1  speed   -6333.333333  torque       0.000000
+    shaft planet 1  case 2  speed       0.000000  torque       0.000000
+    shaft planet 1  case 3  speed   -5066.666667  torque       0.000000
+    shaft planet 2  case 1  speed    4333.333333  torque       0.000000
+    shaft planet 2  case 2  speed      -0.000000  torque      -0.000000
+    shaft planet 2  case 3  speed    3466.666667  torque       0.000000
+    member 1  z 24  
+      case 1  speed    3000.000000  vs frame    4000.000000  torque       0.666667  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.063511  cycles -
+      case 3  speed    2400.000000  vs frame    3200.000000  torque       0.666667  cycles 5.760000e8 / 5.760000e8
+    member 2  z 18  
+      case 1  speed   -6333.333333  vs frame   -5333.333333  torque       1.471653  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.145978  cycles -
+      case 3  speed   -5066.666667  vs frame   -4266.666667  torque       1.471653  cycles 2.560000e8 / 2.560000e8
+    member 3  z 18  
+      case 1  speed    4333.333333  vs frame    5333.333333  torque       1.471653  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.145978  cycles -
+      case 3  speed    3466.666667  vs frame    4266.666667  torque       1.471653  cycles 2.560000e8 / 2.560000e8
+    member 4  z 96  
+      case 1  speed       0.000000  vs frame    1000.000000  torque       2.561111  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.262311  cycles -
+      case 3  speed       0.000000  vs frame     800.000000  torque       2.561111  cycles 1.440000e8 / 1.440000e8
+    mesh 1  efficiency  98.110213 / 98.110213  %  contact ratio   1.5461  shares a factor
+    mesh 2  efficiency  97.891587 / 97.891587  %  contact ratio   1.5100  shares a factor
+    mesh 3  efficiency  98.934827 / 98.934827  %  contact ratio   1.8312  shares a factor
+  graph    mobility 2 degree(s), 2 given   total ratio -3
+    stage 1  ratio -3
+    shaft ground    of the train speed 0
+    shaft sun       of stage 1 speed 1
+    shaft carrier   of stage 1 speed -1/3
+    shaft ring      of stage 1 speed 0
+    shaft planet 1  of stage 1 speed -19/9
+    shaft planet 2  of stage 1 speed 13/9
+
+== ravigneaux-small-sun ==
+  total    ratio       4.444444   efficiency  97.918525 / 97.905870  %   backlash   0.041706 / 0.185361   deg
+  case 1       2.0000 Nm /   3000.00 rpm at start  ->      8.7039 Nm /    675.00 rpm at end    held at -
+  case 2       0.6000 Nm /      0.00 rpm at end    ->      0.1322 Nm /      0.00 rpm at start  held at -
+  case 3       2.0000 Nm /   2400.00 rpm at start  ->      8.7039 Nm /    540.00 rpm at end    held at -
+  stage 1  ratio       4.444444   efficiency  97.918525 / 97.905870  %   backlash   0.041706 / 0.185361   deg
+    shaft sun 1     case 1  speed    3000.000000  torque       2.000000
+    shaft sun 1     case 2  speed       0.000000  torque      -0.132173
+    shaft sun 1     case 3  speed    2400.000000  torque       2.000000
+    shaft carrier   case 1  speed     675.000000  torque      -8.703869
+    shaft carrier   case 2  speed       0.000000  torque       0.600000
+    shaft carrier   case 3  speed     540.000000  torque      -8.703869
+    shaft sun 2     case 1  speed    -720.000000  torque       0.000000
+    shaft sun 2     case 2  speed      -0.000000  torque       0.000000
+    shaft sun 2     case 3  speed    -576.000000  torque       0.000000
+    shaft ring      case 1  speed       0.000000  torque       6.703869
+    shaft ring      case 2  speed       0.000000  torque      -0.467827
+    shaft ring      case 3  speed       0.000000  torque       6.703869
+    shaft planet 1  case 1  speed   -1227.272727  torque       0.000000
+    shaft planet 1  case 2  speed      -0.000000  torque       0.000000
+    shaft planet 1  case 3  speed    -981.818182  torque       0.000000
+    shaft planet 2  case 1  speed    3000.000000  torque       0.000000
+    shaft planet 2  case 2  speed       0.000000  torque       0.000000
+    shaft planet 2  case 3  speed    2400.000000  torque       0.000000
+    member 1  z 18  
+      case 1  speed    3000.000000  vs frame    2325.000000  torque       0.666667  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.044937  cycles -
+      case 3  speed    2400.000000  vs frame    1860.000000  torque       0.666667  cycles 3.348000e8 / 3.348000e8
+    member 2  z 30  
+      case 1  speed    -720.000000  vs frame   -1395.000000  torque       0.000000  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.000000  cycles -
+      case 3  speed    -576.000000  vs frame   -1116.000000  torque       0.000000  cycles 2.008800e8 / 2.008800e8
+    member 3  z 22  
+      case 1  speed   -1227.272727  vs frame   -1902.272727  torque       0.814815  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.055334  cycles -
+      case 3  speed    -981.818182  vs frame   -1521.818182  torque       0.814815  cycles 9.130909e7 / 9.130909e7
+    member 4  z 18  
+      case 1  speed    3000.000000  vs frame    2325.000000  torque       0.000000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed    2400.000000  vs frame    1860.000000  torque       0.000000  cycles 1.116000e8 / 1.116000e8
+    member 5  z 62  
+      case 1  speed       0.000000  vs frame    -675.000000  torque       2.251350  cycles -
+      case 2  speed       0.000000  vs frame      -0.000000  torque       0.155942  cycles -
+      case 3  speed       0.000000  vs frame    -540.000000  torque       2.251350  cycles 9.720000e7 / 9.720000e7
+    mesh 1  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
+    mesh 2  efficiency  99.257031 / 99.257031  %  contact ratio   1.9395  shares a factor
+    mesh 3  efficiency  98.241874 / 98.241874  %  contact ratio   1.5719  shares a factor
+    mesh 4  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
+  graph    mobility 2 degree(s), 2 given   total ratio 40/9
+    stage 1  ratio 40/9
+    shaft ground    of the train speed 0
+    shaft sun 1     of stage 1 speed 1
+    shaft carrier   of stage 1 speed 9/40
+    shaft sun 2     of stage 1 speed -6/25
+    shaft ring      of stage 1 speed 0
+    shaft planet 1  of stage 1 speed -9/22
+    shaft planet 2  of stage 1 speed 1
+
+== ravigneaux-large-sun ==
+  total    ratio      -1.066667   efficiency  91.481430 / 91.818656  %   backlash   0.156564 / 0.167001   deg
+  case 1       2.0000 Nm /   3000.00 rpm at start  ->      1.9516 Nm /  -2812.50 rpm at end    held at -
+  case 2       0.6000 Nm /      0.00 rpm at 1.2    ->      0.5165 Nm /     -0.00 rpm at start  held at -
+  case 3       2.0000 Nm /   2400.00 rpm at start  ->      1.9516 Nm /  -2250.00 rpm at end    held at -
+  stage 1  ratio      -1.066667   efficiency  91.481430 / 91.818656  %   backlash   0.156564 / 0.167001   deg
+    shaft sun 1     case 1  speed  -12500.000000  torque       0.000000
+    shaft sun 1     case 2  speed       0.000000  torque       0.000000
+    shaft sun 1     case 3  speed  -10000.000000  torque       0.000000
+    shaft carrier   case 1  speed   -2812.500000  torque       1.951604
+    shaft carrier   case 2  speed       0.000000  torque      -0.600000
+    shaft carrier   case 3  speed   -2250.000000  torque       1.951604
+    shaft sun 2     case 1  speed    3000.000000  torque       2.000000
+    shaft sun 2     case 2  speed      -0.000000  torque      -0.516480
+    shaft sun 2     case 3  speed    2400.000000  torque       2.000000
+    shaft ring      case 1  speed       0.000000  torque      -3.951604
+    shaft ring      case 2  speed      -0.000000  torque       1.116480
+    shaft ring      case 3  speed       0.000000  torque      -3.951604
+    shaft planet 1  case 1  speed    5113.636364  torque       0.000000
+    shaft planet 1  case 2  speed      -0.000000  torque       0.000000
+    shaft planet 1  case 3  speed    4090.909091  torque       0.000000
+    shaft planet 2  case 1  speed  -12500.000000  torque       0.000000
+    shaft planet 2  case 2  speed       0.000000  torque       0.000000
+    shaft planet 2  case 3  speed  -10000.000000  torque       0.000000
+    member 1  z 18  
+      case 1  speed  -12500.000000  vs frame   -9687.500000  torque       0.000000  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.000000  cycles -
+      case 3  speed  -10000.000000  vs frame   -7750.000000  torque       0.000000  cycles 1.395000e9 / 1.395000e9
+    member 2  z 30  
+      case 1  speed    3000.000000  vs frame    5812.500000  torque       0.666667  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.175241  cycles -
+      case 3  speed    2400.000000  vs frame    4650.000000  torque       0.666667  cycles 8.370000e8 / 8.370000e8
+    member 3  z 22  
+      case 1  speed    5113.636364  vs frame    7926.136364  torque       1.440881  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.393227  cycles -
+      case 3  speed    4090.909091  vs frame    6340.909091  torque       1.440881  cycles 3.804545e8 / 3.804545e8
+    member 4  z 18  
+      case 1  speed  -12500.000000  vs frame   -9687.500000  torque       1.178902  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.321731  cycles -
+      case 3  speed  -10000.000000  vs frame   -7750.000000  torque       1.178902  cycles 4.650000e8 / 4.650000e8
+    member 5  z 62  
+      case 1  speed       0.000000  vs frame    2812.500000  torque       1.327061  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.372160  cycles -
+      case 3  speed       0.000000  vs frame    2250.000000  torque       1.327061  cycles 4.050000e8 / 4.050000e8
+    mesh 1  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
+    mesh 2  efficiency  99.257031 / 99.257031  %  contact ratio   1.9395  shares a factor
+    mesh 3  efficiency  98.241874 / 98.241874  %  contact ratio   1.5719  shares a factor
+    mesh 4  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
+  graph    mobility 2 degree(s), 2 given   total ratio -16/15
+    stage 1  ratio -16/15
+    shaft ground    of the train speed 0
+    shaft sun 1     of stage 1 speed -25/6
+    shaft carrier   of stage 1 speed -15/16
+    shaft sun 2     of stage 1 speed 1
+    shaft ring      of stage 1 speed 0
+    shaft planet 1  of stage 1 speed 75/44
+    shaft planet 2  of stage 1 speed -25/6
+
+== ravigneaux-ring-free ==
+  total    ratio       2.666667   efficiency  96.521026 / 96.446859  %   backlash   0.104114 / 0.277636   deg
+  case 1       2.0000 Nm /   3000.00 rpm at start  ->      5.1478 Nm /   1125.00 rpm at end    held at -
+  case 2       0.6000 Nm /      0.00 rpm at end    ->      0.2170 Nm /      0.00 rpm at start  held at -
+  case 3       2.0000 Nm /   2400.00 rpm at start  ->      5.1478 Nm /    900.00 rpm at end    held at -
+  stage 1  ratio       2.666667   efficiency  96.521026 / 96.446859  %   backlash   0.104114 / 0.277636   deg
+    shaft sun 1     case 1  speed    3000.000000  torque       2.000000
+    shaft sun 1     case 2  speed       0.000000  torque      -0.217005
+    shaft sun 1     case 3  speed    2400.000000  torque       2.000000
+    shaft carrier   case 1  speed    1125.000000  torque      -5.147788
+    shaft carrier   case 2  speed       0.000000  torque       0.600000
+    shaft carrier   case 3  speed     900.000000  torque      -5.147788
+    shaft sun 2     case 1  speed       0.000000  torque       3.147788
+    shaft sun 2     case 2  speed       0.000000  torque      -0.382995
+    shaft sun 2     case 3  speed       0.000000  torque       3.147788
+    shaft ring      case 1  speed     580.645161  torque       0.000000
+    shaft ring      case 2  speed       0.000000  torque       0.000000
+    shaft ring      case 3  speed     464.516129  torque       0.000000
+    shaft planet 1  case 1  speed    -409.090909  torque      -0.000000
+    shaft planet 1  case 2  speed      -0.000000  torque      -0.000000
+    shaft planet 1  case 3  speed    -327.272727  torque      -0.000000
+    shaft planet 2  case 1  speed    3000.000000  torque       0.000000
+    shaft planet 2  case 2  speed       0.000000  torque      -0.000000
+    shaft planet 2  case 3  speed    2400.000000  torque       0.000000
+    member 1  z 18  
+      case 1  speed    3000.000000  vs frame    1875.000000  torque       0.666667  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.073779  cycles -
+      case 3  speed    2400.000000  vs frame    1500.000000  torque       0.666667  cycles 2.700000e8 / 2.700000e8
+    member 2  z 30  
+      case 1  speed       0.000000  vs frame   -1125.000000  torque       1.068040  cycles -
+      case 2  speed       0.000000  vs frame      -0.000000  torque       0.127665  cycles -
+      case 3  speed       0.000000  vs frame    -900.000000  torque       1.068040  cycles 1.620000e8 / 1.620000e8
+    member 3  z 22  
+      case 1  speed    -409.090909  vs frame   -1534.090909  torque       2.396598  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.275925  cycles -
+      case 3  speed    -327.272727  vs frame   -1227.272727  torque       2.396598  cycles 7.363636e7 / 7.363636e7
+    member 4  z 18  
+      case 1  speed    3000.000000  vs frame    1875.000000  torque       1.960853  cycles -
+      case 2  speed       0.000000  vs frame       0.000000  torque       0.225757  cycles -
+      case 3  speed    2400.000000  vs frame    1500.000000  torque       1.960853  cycles 9.000000e7 / 9.000000e7
+    member 5  z 62  
+      case 1  speed     580.645161  vs frame    -544.354839  torque       0.000000  cycles -
+      case 2  speed       0.000000  vs frame      -0.000000  torque       0.000000  cycles -
+      case 3  speed     464.516129  vs frame    -435.483871  torque       0.000000  cycles 7.838710e7 / 7.838710e7
+    mesh 1  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
+    mesh 2  efficiency  99.257031 / 99.257031  %  contact ratio   1.9395  shares a factor
+    mesh 3  efficiency  98.241874 / 98.241874  %  contact ratio   1.5719  shares a factor
+    mesh 4  efficiency  98.042652 / 98.042652  %  contact ratio   1.5419  shares a factor
+  graph    mobility 2 degree(s), 2 given   total ratio 8/3
+    stage 1  ratio 8/3
+    shaft ground    of the train speed 0
+    shaft sun 1     of stage 1 speed 1
+    shaft carrier   of stage 1 speed 3/8
+    shaft sun 2     of stage 1 speed 0
+    shaft ring      of stage 1 speed 6/31
+    shaft planet 1  of stage 1 speed -3/22
+    shaft planet 2  of stage 1 speed 1
+
 == chain ==
   total    ratio       6.031674   efficiency  96.374575 / 96.374575  %   backlash   0.072802 / 0.439117   deg
   case 1       2.0000 Nm /   3000.00 rpm at start  ->     11.6260 Nm /    497.37 rpm at end    held at -

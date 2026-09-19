@@ -2142,9 +2142,18 @@ handed to a member of the mesh that is not given, in mesh order, so a member
 reached from one mesh feeds the next; a mesh both of whose members are given
 must already reach it, or the stage refuses. An automatic distance is
 whatever the shifts leave on the first mesh, and every later mesh on it
-absorbs the difference on one of its members — the shared member preferred,
-solved by bracketed Newton ([planetary sets](#planetary-sets)) — or, with no
-member left to move, must already agree to a nanometre. A member reaching
+absorbs the difference on one of its members, solved by bracketed Newton
+([planetary sets](#planetary-sets)) — or, with no member left to move, must
+already agree to a nanometre. **Which member can absorb is a matter of
+leverage**, not membership: a shift moves an external mesh's distance one
+way and an internal mesh's the other, so a planet between a sun and a ring
+moves the two distances apart at twice the rate of any other member, while a
+planet between two rings moves them together and can close nothing. The
+member with the most leverage on the difference absorbs it, from the later
+mesh by preference, and never one that would move a mesh already closed —
+which is what closing the meshes one after another relies on. A Wolfrom's
+second ring therefore closes on its own shift; a stepped planet's second
+ring on its own or its planet's. A member reaching
 or absorbing a distance is held to the **true** undercut minimum, not to the
 search's `max(x_min, 0)`: it is not choosing, it is following a distance the
 designer stated, and a 43-tooth gear at −0.15 is what a housing distance
@@ -2175,13 +2184,32 @@ the shaft it enters by is the one whose product is positive.
 
 **What it reports.** The ratio, signed; the efficiency both ways; the play
 at the output driven forward and at the input driven back, from the
-mechanism's play coefficients over every mesh's angular backlash plus a
-helical member's axial slide; each distance's nominal per mesh, running and
-clearance; the layout of a replicated axis — count, even spacing, simultaneous
-meshing, tip clearance between neighbours; every shaft's speed and torque per
-case; and the members and meshes as any stage reports them. Every mesh's
-operating angle is the **running** mesh's, opened by the clearance, not the
+mechanism's play coefficients over every mesh's angular backlash at **its
+own** distance plus a helical member's axial slide, the band being every
+distance at the same end of its own tolerance; each distance's nominal per
+mesh, running and clearance; the layout of every replicated axis — count,
+even spacing, simultaneous meshing, tip clearance between neighbours at the
+radius the carrier holds it at; every shaft's speed and torque per case; and
+the members and meshes as any stage reports them. Every mesh's operating
+angle is the **running** mesh's, opened by the clearance, not the
 zero-backlash one.
+
+**The arrangements it reaches** with no code of their own are written down
+in `train/arrangements.rs` as lists of what sits where, through a builder
+whose whole vocabulary is an axis, a shaft, a gear or ring, a mesh and a
+distance: a layshaft transmission (one distance, a pair per ratio, the
+disengaged pairs' gears idling on shafts of their own), a Wolfrom (one
+planet, two rings, no sun), a stepped planet (two gears on the planet shaft,
+two rings), a planocentric reducer (one planet on an eccentric carrier, its
+own turn the output), meshed planets (sun, planet, planet, ring — the
+carrier turning against the sun) and a Ravigneaux (two suns, long and short
+planets, one ring, the planet–planet mesh a distance between two carried
+axes). Each has a `gear-cli kinematics` fixture and each but the Wolfrom —
+which closes only by shift — a row in `tools/train_kinematics.py`, which
+now lays axes out off the line of centres where a Ravigneaux's short planet
+stands. The shafts are numbered so that the shape's own convention — first
+port driven, last ring held, the next free port the output — gives the
+textbook arrangement with nothing stated.
 
 ## Trains
 
@@ -2232,7 +2260,11 @@ on every kind alike.
 of its ports not held, or the one driven; its output the next not held. So
 holding a set's carrier makes its ring the port the next stage couples to, and
 a designer who changes what is held does not also rewire the chain. Where a
-train states its own couplings, they replace the chain entirely.
+train states its own couplings, they replace the chain entirely. And **a load
+written at a free port is a statement of where power leaves**, where "the
+next not held" is only a preference: a Ravigneaux with its ring held and its
+large sun driven has its small sun and its carrier both free, and a case at
+the carrier makes the carrier the output, the small sun spinning free.
 
 **Motion needs none of the geometry.** With every constraint in force the train
 is one system — ground shared, each stage's shafts appended, one row per mesh

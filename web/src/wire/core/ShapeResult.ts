@@ -19,4 +19,8 @@ ratio: number, efficiency: Directional<number>,
 /**
  * Play at the output shaft driven forward, at the input driven back.
  */
-backlash: Directional<Backlash>, distances: Array<DistanceReport>, overlap: number, layout: LayoutReport | null, cases: Array<ShaftCase>, members: Array<GearResult>, meshes: Array<MeshReport>, notes: Array<Note>, };
+backlash: Directional<Backlash>, distances: Array<DistanceReport>, overlap: number, 
+/**
+ * One per replicated axis, in axis order.
+ */
+layouts: Array<LayoutReport>, cases: Array<ShaftCase>, members: Array<GearResult>, meshes: Array<MeshReport>, notes: Array<Note>, };

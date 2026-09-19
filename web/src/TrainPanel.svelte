@@ -1657,7 +1657,7 @@
         {@const worm = isWorm(stage)}
         {@const crossed = stage.distances.some((d) => d.angle !== 0)}
         {@const epicyclic = stage.axes.some((a) => a.carried_by !== null)}
-        {@const replicated = stage.axes.findIndex((a) => a.count > 1)}
+        {@const replicated = stage.axes.map((a, k) => (a.count > 1 ? k : -1)).filter((k) => k >= 0)}
         {@const name = (j: number) => memberName(tab.train, i, j)}
         {@const carriers = stage.shafts
           .map((_, s) => s + 1)
@@ -1690,14 +1690,17 @@
               <!-- One search for either contact: the loss integral along a
                    line, the friction balance along a point's. -->
               {@render efficiencyToggle(stage.optimisation)}
-              {#if replicated >= 0}
-                <!-- A replicated axis is a set of planets: how many, and how
-                     close their tips may come. Asked only where there is one. -->
+              <!-- A replicated axis is a set of planets: how many, and how
+                   close their tips may come. Asked only where there is one,
+                   and once per such axis where there are more. -->
+              {#each replicated as k (k)}
                 <label>
-                  <span>{t("ui.train_planets")}</span>
-                  <input type="number" step="1" min="1" bind:value={stage.axes[replicated].count} />
+                  <span>{replicated.length > 1 ? t("ui.train_planets_on", { axis: axisName(stage, i, k) }) : t("ui.train_planets")}</span>
+                  <input type="number" step="1" min="1" bind:value={stage.axes[k].count} />
                   <em></em>
                 </label>
+              {/each}
+              {#if replicated.length > 0}
                 {@render numberField("ui.train_minimum_planet_clearance", () => stage.min_planet_clearance, (v) => (stage.min_planet_clearance = v), 0.05, "ui.train_mm", t("ui.train_note_planet_clearance"))}
               {/if}
               {@render shafts(i)}
@@ -1873,19 +1876,15 @@
                   {/each}
                 </dd>
               {/each}
-              {#if replicated >= 0}
-                {@const lay = sres?.layout}
-                <dt>{t("ui.train_planet_clearance")}</dt>
+              {#each replicated as k (k)}
+                {@const lay = sres?.layouts.find((l) => l.axis === k)}
+                <dt>{replicated.length > 1 ? t("ui.train_planet_clearance_on", { axis: axisName(stage, i, k) }) : t("ui.train_planet_clearance")}</dt>
                 <dd>
                   {#if lay}
-                    {lay.count < 2
-                      ? t("ui.train_one_planet_no_neighbour")
-                      : `${num(lay.clearance, 3)} mm`}
-                    {#if lay.count >= 2}
-                      <small class:warn={!lay.clearance_ok}>
-                        {t(lay.clearance_ok ? "ui.train_meets_the_minimum" : "ui.train_below_the_minimum")}
-                      </small>
-                    {/if}
+                    {num(lay.clearance, 3)} mm
+                    <small class:warn={!lay.clearance_ok}>
+                      {t(lay.clearance_ok ? "ui.train_meets_the_minimum" : "ui.train_below_the_minimum")}
+                    </small>
                   {/if}
                 </dd>
                 <!-- Two separate layout checks, so two rows. Even spacing is
@@ -1897,7 +1896,7 @@
                 <dd>{lay?.equal_spacing == null ? BLANK : lay.equal_spacing ? t("ui.train_yes") : t("ui.train_no")}</dd>
                 <dt>{t("ui.train_simultaneous_meshing")}</dt>
                 <dd>{lay?.simultaneous_meshing == null ? BLANK : lay.simultaneous_meshing ? t("ui.train_yes") : t("ui.train_no")}</dd>
-              {/if}
+              {/each}
             </dl>
 
             <!-- Each mesh, stacked like the readout above rather than a table

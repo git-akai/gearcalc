@@ -176,6 +176,86 @@ fn fixtures() -> Vec<(String, Train)> {
         }
     }
     out.push(("hula".to_string(), train(vec![Stage::Hula(Box::default())])));
+    // **The arrangements the shape reaches with no code of their own**
+    // (`gear_core::train::arrangements`), each under its textbook boundary,
+    // which the shape's convention — first shaft driven, last ring held —
+    // gives some of and the constraints the rest. `tools/train_kinematics.py`
+    // derives the same speeds from rigid-body velocities.
+    {
+        use gear_core::train::arrangements as arr;
+        let shape = |s| Stage::Shape(Box::new(s));
+        // Three ratios on one layshaft, the second engaged: 17/43 in, then
+        // 31/29 out, the idlers turning free.
+        out.push((
+            "layshaft".to_string(),
+            train(vec![shape(arr::layshaft(
+                (17, 43),
+                &[(19, 41), (31, 29), (43, 17)],
+                1,
+            ))]),
+        ));
+        // A Wolfrom under its convention: carrier in, first ring held, second
+        // ring out — 61 : 1 on a one-tooth difference.
+        out.push((
+            "wolfrom".to_string(),
+            train(vec![shape(arr::wolfrom(18, [60, 61], 3))]),
+        ));
+        // A stepped planet under its convention: sun in, first ring held,
+        // second ring out — the compound reduction.
+        out.push((
+            "stepped".to_string(),
+            train(vec![shape(arr::stepped(24, [18, 17], [60, 59], 3))]),
+        ));
+        // A planocentric: carrier in, ring held by convention, the planet's
+        // own turn out.
+        out.push((
+            "planocentric".to_string(),
+            train(vec![shape(arr::planocentric(30, 33))]),
+        ));
+        // Meshed planets under their convention: sun in, ring held, carrier
+        // out, turning against the sun.
+        out.push((
+            "meshed-planets".to_string(),
+            train(vec![shape(arr::meshed_planets(24, [18, 18], 96, 3))]),
+        ));
+        // A Ravigneaux, three ways. It has two degrees of freedom, so one
+        // member is held and one driven: the small sun in with the ring held
+        // by convention (first gear); the large sun in with the ring held
+        // (reverse, through the planet–planet mesh); and the small sun in
+        // with the large sun held, the ring running free. The carrier (2)
+        // is the output each time.
+        let ravigneaux = || arr::ravigneaux([18, 30], [22, 18], 62, 3);
+        out.push((
+            "ravigneaux-small-sun".to_string(),
+            train(vec![shape(ravigneaux())]),
+        ));
+        // With the large sun driven the small sun and the carrier are both
+        // free, and `end` is the first of them — the small sun, spinning
+        // free. The carrier is the output a designer means, so the loads
+        // name it, which is what a port by reference is for.
+        out.push(("ravigneaux-large-sun".to_string(), {
+            let mut t = asked(
+                vec![shape(ravigneaux())],
+                vec![ShaftConstraint::driven(0, 3)],
+            );
+            t.load_cases = t
+                .load_cases
+                .iter()
+                .map(|c| LoadCase {
+                    port: match c.port {
+                        Port::End => Port::At(ShaftRef::Of { stage: 0, shaft: 2 }),
+                        other => other,
+                    },
+                    ..*c
+                })
+                .collect();
+            t
+        }));
+        out.push((
+            "ravigneaux-ring-free".to_string(),
+            asked(vec![shape(ravigneaux())], vec![ShaftConstraint::held(0, 3)]),
+        ));
+    }
     // Chains, because the accumulation is the third place the same kinematics
     // is written: two pairs, and a chain with an epicyclic set in the middle of
     // it so that a stage with three shafts sits between two with two.
@@ -513,10 +593,10 @@ fn named(stages: &[Stage], at: ShaftRef, label: gear_core::train::ShaftLabel) ->
 
 /// **A member's name from its place in the shape**, not from a kind: a
 /// member on an axis a carrier carries is a planet, a ring beside one is a
-/// ring and any other central member a sun; with no carrier the members are
-/// first and second, as a pair's were.
+/// ring and any other central member a sun — numbered where a role is
+/// shared; with no carrier the members are first and second, as a pair's
+/// were, or numbered where there are more.
 fn member_role(shape: &gear_core::train::shape::Shape, member: usize) -> String {
-    let m = &shape.members[member];
     let carried = |shaft: usize| {
         shape
             .shafts
@@ -525,16 +605,33 @@ fn member_role(shape: &gear_core::train::shape::Shape, member: usize) -> String 
     };
     let epicyclic = shape.axes.iter().any(|a| a.carried_by.is_some());
     if !epicyclic {
-        return ["first", "second"]
-            .get(member)
-            .map_or_else(|| format!("member {}", member + 1), |s| (*s).to_string());
+        return if shape.members.len() == 2 {
+            ["first", "second"][member].to_string()
+        } else {
+            format!("member {}", member + 1)
+        };
     }
-    if m.ring.is_some() {
-        "ring".into()
-    } else if carried(m.shaft) {
-        "planet".into()
+    let role = |i: usize| {
+        let m = &shape.members[i];
+        if m.ring.is_some() {
+            "ring"
+        } else if carried(m.shaft) {
+            "planet"
+        } else {
+            "sun"
+        }
+    };
+    let name = role(member);
+    // Numbered where the role is shared — a Wolfrom's two rings, a
+    // Ravigneaux's two suns — by the order the shape lists them in.
+    let alike: Vec<usize> = (0..shape.members.len())
+        .filter(|&i| role(i) == name)
+        .collect();
+    if alike.len() == 1 {
+        name.into()
     } else {
-        "sun".into()
+        let n = alike.iter().position(|&i| i == member).unwrap_or(0) + 1;
+        format!("{name} {n}")
     }
 }
 

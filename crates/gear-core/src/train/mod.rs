@@ -40,6 +40,7 @@ use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
 use crate::tooth::Tooth;
 
+pub mod arrangements;
 mod conditions;
 pub mod crossed;
 pub mod flow;
@@ -7617,7 +7618,7 @@ mod tests {
 
         for (k, stage) in r.stages.iter().enumerate() {
             let d = stage.backlash();
-            let opens = stage.as_shape().is_none_or(|s| s.layout.is_none());
+            let opens = stage.as_shape().is_none_or(|s| s.layouts.is_empty());
             check(&format!("stage {k} forward"), &d.forward, opens);
             check(&format!("stage {k} backward"), &d.backward, opens);
         }
@@ -8333,7 +8334,7 @@ mod tests {
                     // The shape's shafts: ground, sun, carrier, ring, planet.
                     let shafts = &p.cases[CYCLIC];
                     let carrier = shafts.speeds[2];
-                    let planets = p.layout.as_ref().map_or(1, |l| l.count);
+                    let planets = p.layouts.first().map_or(1, |l| l.count);
                     let n = f64::from(planets);
                     let w = train.stages[0].wiring();
                     let (sun, planet, ring) = (&p.members[0], &p.members[1], &p.members[2]);

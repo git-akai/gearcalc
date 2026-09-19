@@ -106,7 +106,7 @@ fn set_view(r: &gear_core::train::StageResult) -> Option<SetView<'_>> {
         ring: &s.members[2],
         sun_planet: &s.meshes[0],
         planet_ring: &s.meshes[1],
-        layout: s.layout.as_ref(),
+        layout: s.layouts.first(),
         notes: &s.notes,
     })
 }

@@ -602,15 +602,42 @@ impl Shape {
                 }
             } else {
                 // Each mesh past the first runs at the first's distance, and
-                // one member absorbs the difference: the one in most meshes,
-                // taken from the later mesh by preference.
+                // one member absorbs the difference. **Which member can** is
+                // a question of leverage, not of membership: a shift moves a
+                // distance one way on an external mesh and the other on an
+                // internal one, so a planet between a sun and a ring moves
+                // the two apart at twice the rate while a planet between two
+                // rings moves them together and closes nothing. The member
+                // with the most leverage on the difference absorbs it, from
+                // the later mesh by preference — and never one that would
+                // disturb a mesh already closed, which is what solving the
+                // constraints one after another relies on.
+                let mut closed: Vec<usize> = vec![first];
                 for &m in rest {
                     let MeshInput { a, b, .. } = self.meshes[m];
                     let MeshInput { a: fa, b: fb, .. } = self.meshes[first];
-                    let absorber = [a, b, fa, fb]
+                    let lever = |i: usize, mesh: usize| -> f64 {
+                        let mm = self.meshes[mesh];
+                        let sign = self.kind_of(mesh).map_or(1.0, MeshKind::sign);
+                        let c = f64::from(u8::from(mm.a == i)) + if mm.b == i { sign } else { 0.0 };
+                        c * self.tooth_sum(mesh).signum()
+                    };
+                    let undisturbed = |i: usize| {
+                        closed.iter().all(|&q| {
+                            q == m
+                                || (q == first && closed.len() == 1)
+                                || (self.meshes[q].a != i && self.meshes[q].b != i)
+                        })
+                    };
+                    // Reversed, so that among equals the later mesh's own
+                    // member — the last — is the one kept.
+                    let absorber = [fb, fa, b, a]
                         .into_iter()
-                        .filter(|&i| role[i] == Role::Free)
-                        .max_by_key(|&i| in_meshes(i));
+                        .filter(|&i| role[i] == Role::Free && undisturbed(i))
+                        .map(|i| (i, (lever(i, first) - lever(i, m)).abs()))
+                        .filter(|&(_, leverage)| leverage > 0.0)
+                        .max_by(|p, q| p.1.total_cmp(&q.1))
+                        .map(|(i, _)| i);
                     if let Some(i) = absorber {
                         role[i] = Role::Absorbs(constraints.len());
                     }
@@ -619,6 +646,7 @@ impl Shape {
                         mesh: m,
                         absorber,
                     });
+                    closed.push(m);
                 }
             }
         }
@@ -1224,7 +1252,7 @@ pub struct DistanceReport {
     pub clearance: f64,
 }
 
-/// What the layout of a replicated axis came to, where there is one.
+/// What the layout of one replicated axis came to.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -1233,6 +1261,8 @@ pub struct DistanceReport {
     ts(export, export_to = "core/")
 )]
 pub struct LayoutReport {
+    /// The axis, as [`Shape::axes`] numbers them.
+    pub axis: usize,
     pub count: u32,
     /// Whether `N` equally spaced instances assemble: `Some` where the
     /// arrangement is one the rule is known for — one gear on the axis
@@ -1275,7 +1305,8 @@ pub struct ShapeResult {
     pub backlash: Directional<super::Backlash>,
     pub distances: Vec<DistanceReport>,
     pub overlap: f64,
-    pub layout: Option<LayoutReport>,
+    /// One per replicated axis, in axis order.
+    pub layouts: Vec<LayoutReport>,
     pub cases: Vec<ShaftCase>,
     pub members: Vec<GearResult>,
     pub meshes: Vec<MeshReport>,
@@ -1317,7 +1348,7 @@ pub fn solve_shape(
                 clearance: r.clearance,
             }],
             overlap: 0.0,
-            layout: None,
+            layouts: Vec::new(),
             cases: Vec::new(),
             members: r.gears.to_vec(),
             meshes: vec![r.mesh],
@@ -1636,18 +1667,27 @@ pub fn solve_shape(
             .and_then(Result::ok)
             .map_or(0.0, |s| s.values[at].to_f64().abs())
     };
+    // **Each mesh's play at its own distance**, and the band is every
+    // distance at the same end of its own tolerance at once: `t` is −1, 0
+    // or +1 and each mesh reads its distance's minus, running or plus. A
+    // first draft evaluated every mesh at the *first* distance, which on a
+    // shape with one distance is the same thing and on a Ravigneaux put a
+    // planet–planet mesh 7 mm from where it runs.
+    let at_band = |k: usize, t: f64| -> f64 {
+        let d = &shape.distances[shape.distance_of(k).unwrap_or(0)];
+        built.meshes[k].running
+            + if t < 0.0 {
+                -d.tolerance_minus
+            } else if t > 0.0 {
+                d.tolerance_plus
+            } else {
+                0.0
+            }
+    };
     let backlash_at = |at: Shaft, input: Shaft| -> super::Backlash {
-        let d0 = shape.distances.first();
-        let (nominal, minus, plus) = d0.map_or((0.0, 0.0, 0.0), |d| {
-            (
-                built.running[0].unwrap_or(0.0),
-                d.tolerance_minus,
-                d.tolerance_plus,
-            )
-        });
-        super::Backlash::banded(nominal, minus, plus, |a| {
+        super::Backlash::banded(0.0, 1.0, 1.0, |t| {
             (0..shape.meshes.len())
-                .map(|k| coefficient(k, at, input) * play_of(k, a))
+                .map(|k| coefficient(k, at, input) * play_of(k, at_band(k, t)))
                 .sum::<f64>()
                 .to_degrees()
         })
@@ -1714,23 +1754,26 @@ pub fn solve_shape(
             helix[m.a],
         ));
     }
-    // ---- the layout of a replicated axis, where there is one.
-    let layout = shape
+    // ---- the layout of every replicated axis.
+    let layouts: Vec<LayoutReport> = shape
         .axes
         .iter()
         .enumerate()
-        .find(|(_, a)| a.count > 1)
-        .and_then(|(axis, a)| {
+        .filter(|(_, a)| a.count > 1)
+        .filter_map(|(axis, a)| {
             let count = a.count;
             let on_axis: Vec<usize> = (0..n)
                 .filter(|&i| shape.axis_of_shaft(shape.shaft_of(i)) == Some(axis))
                 .collect();
-            let running = shape
-                .meshes
+            // The radius the instances stand at: the distance from the axis
+            // the carrier turns about, not whatever mesh comes first — a
+            // planet meshing another planet has a distance that is neither.
+            let central = a.carried_by.and_then(|c| shape.axis_of_shaft(c))?;
+            let d = shape
+                .distances
                 .iter()
-                .enumerate()
-                .find(|(_, m)| on_axis.contains(&m.a) || on_axis.contains(&m.b))
-                .map(|(k, _)| built.meshes[k].running)?;
+                .position(|d| d.axes == [central, axis] || d.axes == [axis, central])?;
+            let running = built.running[d]?;
             let tip = on_axis
                 .iter()
                 .map(|&i| 2.0 * built.members[i].tip_radius())
@@ -1756,14 +1799,16 @@ pub fn solve_shape(
             let equal_spacing = simple.as_ref().map(|c| (c[0] + c[1]) % count == 0);
             let simultaneous_meshing = simple.as_ref().map(|c| c.iter().all(|z| z % count == 0));
             Some(LayoutReport {
+                axis,
                 count,
                 equal_spacing,
                 simultaneous_meshing,
                 clearance,
                 clearance_ok: clearance >= shape.min_planet_clearance,
             })
-        });
-    if let Some(l) = &layout {
+        })
+        .collect();
+    for l in &layouts {
         notes.push(Note::new(key::STAGE_PLANETS_SHARE_LOAD_EQUALLY).count("planets", l.count));
         if l.equal_spacing == Some(false) {
             notes.push(Note::new(key::STAGE_PLANETS_NOT_EVENLY_SPACED).count("planets", l.count));
@@ -1938,7 +1983,7 @@ pub fn solve_shape(
         backlash,
         distances,
         overlap,
-        layout,
+        layouts,
         cases: loads
             .cases
             .iter()
@@ -3303,7 +3348,7 @@ mod tests {
     #[test]
     fn the_layout_checks_reach_the_result() {
         let r = solved(24, 18, 60);
-        let layout = r.layout.as_ref().expect("three planets have a layout");
+        let layout = r.layouts.first().expect("three planets have a layout");
         assert_eq!(layout.equal_spacing, Some(true), "(24+60)/3 = 28");
         assert!(layout.clearance > 0.0);
         assert!(layout.clearance_ok);
@@ -3315,7 +3360,7 @@ mod tests {
             ..stage_of(24, 18, 60, 0.0)
         };
         let r = solve_set(&one, &StageLoads::just(2.0), &test_library()).unwrap();
-        assert!(r.layout.is_none(), "one planet has no layout to check");
+        assert!(r.layouts.is_empty(), "one planet has no layout to check");
     }
 
     /// **Helical works, to parity with spur.** Every figure a spur set reports,

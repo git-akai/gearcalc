@@ -661,7 +661,26 @@ impl Train {
             // ends. The set solved, at a ratio of exactly one, and nothing
             // said so until a load was routed through it and found it had
             // nowhere to leave by.
-            let output = side(false, false).unwrap_or_else(|| ports.ends(&held, Some(input)).1);
+            // ...and a **load written at a free port** is a statement of
+            // where power leaves, where the convention — the next free port
+            // in order — is only a preference: a Ravigneaux with its ring
+            // held and its large sun driven has the small sun and the
+            // carrier both free, and a load at the carrier says which is the
+            // output.
+            let stated = self.load_cases.iter().find_map(|c| match c.port {
+                Port::At(ShaftRef::Of { stage, shaft })
+                    if stage == k
+                        && shaft != input
+                        && ports.ports.contains(&shaft)
+                        && !held.contains(&shaft) =>
+                {
+                    Some(shaft)
+                }
+                _ => None,
+            });
+            let output = side(false, false)
+                .or(stated)
+                .unwrap_or_else(|| ports.ends(&held, Some(input)).1);
             local[input] = Condition::Drive(Ratio::ONE);
             out.push(StageBoundary {
                 conditions: local,

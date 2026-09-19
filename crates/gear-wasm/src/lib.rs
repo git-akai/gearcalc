@@ -2230,7 +2230,7 @@ mod tests {
                 "member {who} must be rated"
             );
         }
-        assert_eq!(stage["layout"]["equal_spacing"], true);
+        assert_eq!(stage["layouts"][0]["equal_spacing"], true);
         // What the stage *assumes* has to come across too — here, equal load
         // sharing between planets, which no calculation can establish. Crossing
         // as a key and its values, not as a sentence: the words are the string
@@ -2451,9 +2451,8 @@ mod tests {
         "binding_mesh",
         // A single planet has no neighbour to clear.
         "planet_clearance",
-        // A stage with nothing replicated has no layout to report, and a
-        // layout of one copy has no spacing to be equal.
-        "layout",
+        // A layout's assembly rule is known for one gear on the axis meshing
+        // two central members, and is a question with no answer elsewhere.
         "equal_spacing",
         "simultaneous_meshing",
         // A crossed gear pair is not a worm and has no published proportions,

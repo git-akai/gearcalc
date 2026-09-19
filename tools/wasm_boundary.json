@@ -1173,23 +1173,23 @@
    "ok": [
     [
      "en",
-     466
+     467
     ],
     [
      "de",
-     466
+     467
     ],
     [
      "pt",
-     466
+     467
     ],
     [
      "zh-Hans",
-     466
+     467
     ],
     [
      "zh-Hant",
-     466
+     467
     ]
    ]
   },
@@ -6455,7 +6455,7 @@
           }
          ],
          "overlap": 0,
-         "layout": null,
+         "layouts": [],
          "cases": [
           {
            "case": 0,
@@ -7191,7 +7191,7 @@
           }
          ],
          "overlap": 0,
-         "layout": null,
+         "layouts": [],
          "cases": [
           {
            "case": 0,
@@ -7684,13 +7684,16 @@
           }
          ],
          "overlap": 0,
-         "layout": {
-          "count": 3,
-          "equal_spacing": true,
-          "simultaneous_meshing": true,
-          "clearance": "4.9648143099324713",
-          "clearance_ok": true
-         },
+         "layouts": [
+          {
+           "axis": 1,
+           "count": 3,
+           "equal_spacing": true,
+           "simultaneous_meshing": true,
+           "clearance": "4.9648143099324713",
+           "clearance_ok": true
+          }
+         ],
          "cases": [
           {
            "case": 0,

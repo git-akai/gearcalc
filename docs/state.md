@@ -300,6 +300,12 @@ distances is one plan over every member's role (given, free, reaches,
 absorbs), the power flow is followed mesh by mesh with each mesh's loss in
 the direction it turns, and every mesh is pressed with its driver's force
 ([reference](reference.md#the-stage), [rationale](rationale.md#each-stage-kind-keeps-its-own-result-type)).
+The arrangements it reaches with no code of their own — a layshaft, a
+Wolfrom, a stepped planet, a planocentric, meshed planets, a Ravigneaux —
+are written as lists of what sits where in `train/arrangements.rs`, each
+with a `gear-cli kinematics` fixture and a textbook ratio held in a test,
+and each but the Wolfrom re-derived from rigid-body velocities in
+`tools/train_kinematics.py`, now over a plane rather than a line.
 Retiring the kinds into it moved four figures, each recorded in
 [corrections](corrections.md#the-log) with its size: a set's driven-side
 meshes pressed `η` short (0.55 % on the ring's bending); a backward case read
@@ -643,10 +649,19 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   still move the controls when it appeared.
 - **A shape's freedoms address one distance.** `Freedom::CentreDistance` and
   `Freedom::Clearance` name *the* distance, as the kinds had one; every
-  preset has one, and relief reads `distances[0]`. A shape with two distances
-  — a layshaft, Phase 5c — needs the freedom to carry the index before its
-  second distance can be relieved at all. Nothing silent: the second
-  distance's inputs are simply outside relief until then.
+  preset has one, and relief reads `distances[0]`. A Ravigneaux has three,
+  and its second and third are outside relief: a designer who pins both
+  shifts of a mesh on the third distance and the distance too is refused by
+  the solve rather than relieved by the panel. The freedom wants the index
+  before such a shape is offered as a preset.
+- **A layout's assembly rule is asserted for one gear on the axis meshing
+  two central members** and reported as no answer elsewhere — a stepped
+  planet's two rings, a Ravigneaux's planets — where the condition exists
+  and is not written.
+- **Every mesh on a replicated axis is taken to carry `N` paths**, and the
+  meshes between two replicated axes — a Ravigneaux's planet–planet mesh —
+  `N` as well, which is right where the two counts agree and unwritten
+  where they do not.
 - **A mesh's two thickness coefficients are not held to sum to 2.** The shape
   carries `k` per member, where the kinds carried one per stage and wrote the
   pair themselves. A pair that does not sum to 2 is a legitimate mesh — the

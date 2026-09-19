@@ -129,8 +129,11 @@ class Train:
 
     def gear(self, name, shaft, frame, teeth, offset=F(0)):
         """A gear of `teeth` teeth at one module, on `shaft`, its axis carried
-        by `frame` at `offset` from that frame's own axis."""
-        self.gears.append((name, shaft, frame, F(teeth, 2), F(offset)))
+        by `frame` at `offset` from that frame's own axis -- a distance along
+        the x-axis, or an `(x, y)` pair for an axis off it, which a Ravigneaux's
+        second planet is."""
+        at = tuple(F(v) for v in offset) if isinstance(offset, tuple) else (F(offset), F(0))
+        self.gears.append((name, shaft, frame, F(teeth, 2), at))
         return len(self.gears) - 1
 
     def mesh(self, a, b):
@@ -139,32 +142,39 @@ class Train:
     # -- geometry, which is where a mesh's kind comes from ------------------
 
     def pitch_point(self, a, b):
-        """Where the two pitch circles touch, on the x-axis, and a check that
-        they touch at all.
+        """Where the two pitch circles touch, and a check that they touch at
+        all.
 
         Both gears' axes are carried by the same frame, so their offsets are
         measured from one origin and the distance between the axes is the
-        difference. External contact wants r_a + r_b, internal |r_a - r_b|; the
-        layout decides which, and a layout that is neither is refused.
+        length of the difference. External contact wants r_a + r_b, internal
+        |r_a - r_b|; the layout decides which, and a layout that is neither is
+        refused. The distance is rational by construction of every layout
+        here -- on the x-axis trivially, and off it by choosing counts whose
+        triangle is Heronian -- so nothing is rounded.
         """
         (_, _, fa, ra, oa) = self.gears[a]
         (_, _, fb, rb, ob) = self.gears[b]
         if fa != fb:
             raise ValueError("a mesh's two gears must share a frame")
-        d = ob - oa
-        if abs(d) == ra + rb:
+        d = (ob[0] - oa[0], ob[1] - oa[1])
+        d2 = d[0] * d[0] + d[1] * d[1]
+        if d2 == (ra + rb) ** 2:
             # External: the pitch point lies between the two axes.
-            return oa + (ra if d > 0 else -ra)
-        if abs(d) == abs(ra - rb):
+            k = ra / (ra + rb)
+            return (oa[0] + k * d[0], oa[1] + k * d[1])
+        if d2 == (ra - rb) ** 2:
             # Internal: the smaller gear sits inside the larger, and the pitch
             # point is on the far side of it from the larger's axis.
             inner, outer = (a, b) if ra < rb else (b, a)
             (_, _, _, ri, oi) = self.gears[inner]
-            (_, _, _, _, oo) = self.gears[outer]
-            direction = 1 if oi >= oo else -1
-            return oi + direction * ri
+            (_, _, _, ro, oo) = self.gears[outer]
+            if ro == ri:
+                raise ValueError("an internal mesh of equal radii has no pitch point")
+            k = ri / (ro - ri)
+            return (oi[0] + k * (oi[0] - oo[0]), oi[1] + k * (oi[1] - oo[1]))
         raise ValueError(
-            f"centre distance {abs(d)} is neither {ra + rb} nor {abs(ra - rb)}: "
+            f"centre distance² {d2} is neither {(ra + rb) ** 2} nor {(ra - rb) ** 2}: "
             "the layout does not close"
         )
 
@@ -174,22 +184,33 @@ class Train:
         """One row per mesh, over the shaft speeds.
 
         `v = w_f (z x p) + w (z x (P - p))` for each gear at the pitch point,
-        and the two are equal. With every axis on the x-axis, `z x p` is `p`
-        turned a quarter turn, so both velocities point the same way and the
-        equation is scalar:
+        and the two are equal along the common tangent -- the only direction
+        a material point at the pitch point of either gear can move, both
+        `P - p` lying on the line of centres:
 
-            w_f * o_a + w_a * (P - o_a) = w_f * o_b + w_b * (P - o_b)
+            [w_f * (z x o_a) + w_a * (z x (P - o_a))] . t
+                = [w_f * (z x o_b) + w_b * (z x (P - o_b))] . t
+
+        with `t = z x (P - o_a)`. With every axis on the x-axis every vector
+        here points along y and the equation is the scalar one this file was
+        first written with; off the axis it is the same equation with a dot
+        product in it.
         """
+        cross = lambda p: (-p[1], p[0])
+        dot = lambda p, q: p[0] * q[0] + p[1] * q[1]
         out = []
         for (a, b) in self.meshes:
             (_, sa, fa, _, oa) = self.gears[a]
             (_, sb, _, _, ob) = self.gears[b]
             p = self.pitch_point(a, b)
+            arm_a = cross((p[0] - oa[0], p[1] - oa[1]))
+            arm_b = cross((p[0] - ob[0], p[1] - ob[1]))
+            t = arm_a
             row = [F(0)] * (len(self.shafts) + 1)
-            row[sa] += p - oa
-            row[fa] += oa
-            row[sb] -= p - ob
-            row[fa] -= ob
+            row[sa] += dot(arm_a, t)
+            row[fa] += dot(cross(oa), t)
+            row[sb] -= dot(arm_b, t)
+            row[fa] -= dot(cross(ob), t)
             out.append(row)
         return out
 
@@ -276,7 +297,8 @@ def internal_meshes(t):
     for k, (a, b) in enumerate(t.meshes):
         (_, _, _, ra, oa) = t.gears[a]
         (_, _, _, rb, ob) = t.gears[b]
-        if abs(ob - oa) == abs(ra - rb):
+        d2 = (ob[0] - oa[0]) ** 2 + (ob[1] - oa[1]) ** 2
+        if d2 == (ra - rb) ** 2:
             out.add(k)
     return out
 
@@ -327,8 +349,8 @@ def simple_set(zs, zp, zr):
 
 
 def compound_set(zs, zp1, zr1, zp2, zr2):
-    """A Wolfrom: one carrier, one sun, two rings, a planet shaft carrying two
-    gears. The two meshes to the rings must sit at the same carrier radius --
+    """A stepped planet: one carrier, one sun, two rings, a planet shaft
+    carrying two gears. The two meshes to the rings must sit at the same carrier radius --
     the closure law every epicyclic here obeys -- and the layout says so.
 
     **At zero profile shift that is a condition on the counts**, and a strict
@@ -404,6 +426,67 @@ def hula(z):
     t.mesh(g1, g2)
     t.mesh(g3, g4)
     return t, dict(g1=g1s, crank=crank, wobble=wob, g4=g4s)
+
+
+def layshaft(z_in, pairs, engaged):
+    """An input and an output shaft on one axis, a layshaft beside them, one
+    pair per ratio at the one distance -- every disengaged pair's output-side
+    gear idling on a shaft of its own. The same arrangement
+    `gear_core::train::arrangements::layshaft` lays out."""
+    t = Train()
+    inp, out, lay = t.shaft("input"), t.shaft("output"), t.shaft("lay")
+    e = F(z_in[0] + z_in[1], 2)
+    t.mesh(t.gear("in", inp, 0, z_in[0], 0), t.gear("lay0", lay, 0, z_in[1], e))
+    for i, (on_lay, on_out) in enumerate(pairs):
+        shaft = out if i == engaged else t.shaft(f"idler{i}")
+        t.mesh(t.gear(f"lay{i + 1}", lay, 0, on_lay, e), t.gear(f"out{i}", shaft, 0, on_out, 0))
+    return t, dict(input=inp, output=out, lay=lay)
+
+
+def planocentric(zp, zr):
+    """One planet on an eccentric carrier, one ring; the planet's own turn is
+    the output."""
+    t = Train()
+    carrier, ring, planet = t.shaft("carrier"), t.shaft("ring"), t.shaft("planet")
+    gp = t.gear("p", planet, carrier, zp, F(zr - zp, 2))
+    gr = t.gear("r", ring, carrier, zr, 0)
+    t.mesh(gp, gr)
+    return t, dict(carrier=carrier, ring=ring, planet=planet)
+
+
+def ravigneaux(zs1, zs2, zpl, zps, zr):
+    """A small sun meshing the long planet, which meshes the ring; a large
+    sun meshing the short planet, which meshes the long one. The short
+    planet's axis is **off the line of centres**: it stands where its two
+    distances put it, and the counts are chosen so that point is rational
+    (the triangle of the three distances is Heronian)."""
+    t = Train()
+    s1, carrier, s2, ring, pl, ps = (
+        t.shaft("sun1"),
+        t.shaft("carrier"),
+        t.shaft("sun2"),
+        t.shaft("ring"),
+        t.shaft("long"),
+        t.shaft("short"),
+    )
+    r_l = F(zs1 + zpl, 2)
+    r_s = F(zs2 + zps, 2)
+    d = F(zpl + zps, 2)
+    x = (r_l * r_l + r_s * r_s - d * d) / (2 * r_l)
+    y2 = r_s * r_s - x * x
+    y = F(int(y2.numerator ** 0.5 + 0.5), int(y2.denominator ** 0.5 + 0.5))
+    if y * y != y2:
+        raise ValueError(f"the short planet's position is irrational at these counts: y² = {y2}")
+    g_s1 = t.gear("s1", s1, carrier, zs1, 0)
+    g_s2 = t.gear("s2", s2, carrier, zs2, 0)
+    g_l = t.gear("pl", pl, carrier, zpl, r_l)
+    g_s = t.gear("ps", ps, carrier, zps, (x, y))
+    g_r = t.gear("r", ring, carrier, zr, 0)
+    t.mesh(g_s1, g_l)
+    t.mesh(g_l, g_r)
+    t.mesh(g_s2, g_s)
+    t.mesh(g_s, g_l)
+    return t, dict(sun1=s1, carrier=carrier, sun2=s2, ring=ring)
 
 
 # ---------------------------------------------------------------------- cases
@@ -511,12 +594,15 @@ def main():
     fail = compare("sun driven, nothing held", t, {0: 0, s["sun"]: 1}, s, verbose, fail)
 
     print("\ncompound and meshed planets -- no model change, only ticks\n")
-    # A Wolfrom: one planet shaft, two gears, two rings at one carrier radius.
-    # z_r = z_s + 2 z_p on the first half; the second ring answers to the same
-    # carrier radius, which is what makes `z_r2` the design variable.
+    # A stepped planet: one planet shaft, two gears, two rings at one carrier
+    # radius. z_r = z_s + 2 z_p on the first half; the second ring answers to
+    # the same carrier radius, which is what makes `z_r2` the design
+    # variable. (A Wolfrom proper — one planet gear, two rings — closes only
+    # by profile shift, which this zero-shift layout cannot write; the
+    # crate's fixture carries it and the stepped rows are the same law.)
     t, s = compound_set(24, 18, 60, 17, 59)
     fail = compare(
-        "wolfrom, ring1 held, sun driven",
+        "stepped planet, ring1 held, sun driven",
         t,
         {0: 0, s["ring1"]: 0, s["sun"]: 1},
         s,
@@ -532,6 +618,29 @@ def main():
         verbose,
         fail,
     )
+
+    print("\nthe arrangements the shape reaches -- the same rows, more of them\n")
+    t, s = layshaft((17, 43), [(19, 41), (31, 29), (43, 17)], 1)
+    fail = compare("layshaft, second pair engaged", t, {0: 0, s["input"]: 1}, s, verbose, fail)
+    t, s = planocentric(30, 33)
+    fail = compare(
+        "planocentric 30/33, carrier in, ring held",
+        t,
+        {0: 0, s["ring"]: 0, s["carrier"]: 1},
+        s,
+        verbose,
+        fail,
+    )
+    t, s = ravigneaux(18, 30, 22, 18, 62)
+    for driven, held in (("sun1", "ring"), ("sun2", "ring"), ("sun1", "sun2")):
+        fail = compare(
+            f"ravigneaux, {driven} driven, {held} held",
+            t,
+            {0: 0, s[held]: 0, s[driven]: 1},
+            s,
+            verbose,
+            fail,
+        )
 
     print("\na hula stage -- two internal meshes on one crank\n")
     for z in ([65, 61, 57, 61], [18, 17, 17, 18], [19, 18, 17, 16]):

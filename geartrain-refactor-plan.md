@@ -852,6 +852,18 @@ a stepped planet, a planocentric at one tooth of difference, a Ravigneaux.
 The gutter — a planet meshing a planet — is the one piece with no precedent
 in the crate and goes last.
 
+*5c is done*, through `train/arrangements.rs`: a builder whose vocabulary
+is an axis, a shaft, a gear or ring, a mesh and a distance, and the six
+arrangements written in it — layshaft, Wolfrom, stepped planet,
+planocentric, meshed planets, Ravigneaux — each with a `gear-cli
+kinematics` fixture, a textbook ratio held in a test, and a row in
+`tools/train_kinematics.py` (all but the Wolfrom, which closes only by
+shift and which a zero-shift layout cannot write). Two faults in the shape
+surfaced on the way and are in `docs/corrections.md`: every mesh's play
+referred at the first distance, and the absorber chosen by membership
+rather than leverage. `layouts` is one per replicated axis now, and a load
+written at a free port names the stage's output.
+
 **5d — the carrier radius from the tip bound**, on any arrangement whose
 internal mesh's tip circles cross (`TipRoom` already answers this): the
 hula's sizing strategy reaching every arrangement that needs it. Moves no
