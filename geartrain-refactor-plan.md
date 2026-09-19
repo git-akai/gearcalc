@@ -676,6 +676,36 @@ Everything above them is unconditional and lands in Phases 0–4.
   `docs/rationale.md#one-stage-one-result` (then *each stage kind keeps its own result type*) was wrong, and
   that is a finding worth having rather than a cost to pay quietly.
 
+**The ledger's outcome, measured** — `crates/**/*.rs` with the test modules
+split off and blank lines dropped, at `293924f` (where the plan began) against
+the clean-up's close:
+
+| | began | closed | Δ |
+|---|---|---|---|
+| production code | 17,212 | 19,838 | **+2,626** |
+| comment | 13,616 | 14,154 | +538 |
+| test | 27,459 | 28,956 | +1,497 |
+| documents (live) | 5,113 | 5,501 | +388 |
+| web source | 5,677 | 5,653 | −24 |
+
+The code did not shrink, and the table above said it would; where the lines
+went is the honest reading. **The stage types and their solvers went**:
+`train/planetary.rs` −1,008, `train/hula.rs` −700, `hula.rs` −264,
+`train/pair.rs` −252, `planetary.rs` −240 — **−2,464**. **What replaced
+them** is `train/shape.rs` +2,385, `train/flow.rs` +185 and
+`train/arrangements.rs` +224 — **+2,794**, so the one model costs 330 lines
+more than the four it replaced, and holds six arrangements the four could
+not, each a list of what sits where. **What did not exist before** is the
+rest: the graph (`kinematics.rs` +362, `ratio.rs` +120, `train/wiring.rs`
++194), the train's constraints, couplings and routes (`train/conditions.rs`
++812), and the harness that records what the graph answers
+(`gear-cli/kinematics.rs` +487) — **+1,975**; `gear-cli/main.rs` +198 for
+the commands over them, and some 120 across the boundary and the shared
+vocabulary. The ledger's "up to ~3000" and "~2700" for the two epicyclic
+types counted their comment and test lines with them; those went too
+(−1,850 of comment, −2,230 of test in the five files), and were written
+again against the shape.
+
 ---
 
 ## 6. Phases
