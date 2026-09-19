@@ -752,6 +752,21 @@ mod tests {
                 }
             }
         }
+        // A mesh whose two thickness coefficients do not sum to 2 — a
+        // preset cannot write one, since a pair carries one coefficient and
+        // its complement; a shape can, and says what the excess became.
+        {
+            let mut shape =
+                gear_core::train::shape::Shape::from(&gear_core::train::PairStage::default());
+            shape.members[1].thickness_mod = 1.2;
+            if let Ok(r) = gear_core::train::solve_any(
+                &gear_core::train::Stage::Shape(Box::new(shape)),
+                &gear_core::train::StageLoads::just(2.0),
+                &lib,
+            ) {
+                record(&r.every_note());
+            }
+        }
         // Load sharing switched on, which is off by default and so unreachable
         // from the grid above. The tall tooth is the point: a **high contact
         // ratio** design — the addendum a real one is given — puts the virtual

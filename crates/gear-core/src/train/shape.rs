@@ -2115,10 +2115,11 @@ fn point_mesh_report(
     p: &PointBuilt,
     face: [f64; 2],
     static_friction: f64,
+    thickness: Option<Note>,
     m: PointMesh,
 ) -> MeshReport {
     let s = &p.screw;
-    let mut notes = Vec::new();
+    let mut notes: Vec<Note> = thickness.into_iter().collect();
     // Asked in both directions: a worm that cannot be back-driven is the
     // familiar case and the one the word "self-locking" is for; a crossed
     // pair at a steep helix split cannot be driven *forward*. Same
@@ -3259,6 +3260,22 @@ pub fn solve_shape(
                 member_backlash(k, MeshSide::First),
                 member_backlash(k, MeshSide::Second),
             ];
+            // **A mesh's two thickness coefficients ordinarily sum to 2** —
+            // one member's teeth thickened by what the other's are thinned —
+            // and a pair that does not is a legitimate mesh: the excess
+            // enters the shift sum as an equivalent shift and the
+            // zero-backlash distance moves with it. So it is not refused,
+            // and the mesh says what it did with the difference.
+            let thickness_note = {
+                let sum = shape.members[m.a].thickness_mod + shape.members[m.b].thickness_mod;
+                ((sum - 2.0).abs() > 1e-9).then(|| {
+                    let shift = std::f64::consts::PI * (sum - 2.0)
+                        / (4.0 * shape.pressure_angle.to_radians().tan());
+                    Note::new(key::MESH_THICKNESS_SUM_NOT_TWO)
+                        .number("sum", sum, 3)
+                        .number("shift", shift, 4)
+                })
+            };
             match &bm.contact {
                 BuiltContact::Line(l) => super::line_mesh_report(
                     loads,
@@ -3299,6 +3316,7 @@ pub fn solve_shape(
                             .find(|(kk, _)| *kk == k)
                             .and_then(|(_, b)| b.as_ref().and_then(|b| b.note.clone()))
                             .into_iter()
+                            .chain(thickness_note.clone())
                             .collect(),
                     },
                 ),
@@ -3307,6 +3325,7 @@ pub fn solve_shape(
                     p,
                     face_of(k, &final_width),
                     m.static_friction,
+                    thickness_note,
                     PointMesh {
                         power_through,
                         coprime,

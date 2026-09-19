@@ -68,6 +68,7 @@ reversed_bending_applied = "a raiz é carregada por ambos os flancos e é avalia
 overlap_below_one = "razão de recobrimento abaixo de 1; helicoidal na forma mas carregada como uma engrenagem de dentes retos"
 contact_ratio_below_one = "razão de contacto {ratio}: abaixo de 1, o par perde o contacto entre dentes"
 load_sharing_out_of_band = "partilha de carga com razão de contacto virtual de {ratio}: sem zona de contacto de um só par, a rampa está a extrapolar, e o seu efeito no valor não tem direção fixa — medido entre um alívio de 24 % e um aumento de 15 %"
+thickness_sum_not_two = "os coeficientes de espessura somam {sum} em vez de 2: o excesso entra no engrenamento como um desvio equivalente de {shift}"
 self_locking = "autobloqueante: μ estático {friction} contra um limiar de {threshold}, pelo que o segundo membro não consegue accionar o primeiro"
 near_self_locking = "próximo do autobloqueio: μ estático {friction} perto do limiar {threshold}, portanto o retroacionamento depende de um coeficiente estimado"
 forward_locking = "não pode ser acionado no sentido direto: μ estático {friction} contra um limiar de {threshold}, portanto o primeiro membro não consegue acionar o segundo"

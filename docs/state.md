@@ -673,9 +673,9 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   carries `k` per member, where the stage types carried one per stage and wrote the
   pair themselves. A pair that does not sum to 2 is a legitimate mesh — the
   excess enters the shift sum as an equivalent shift and the zero-backlash
-  distance moves with it — so it is not refused, and the card's note says
-  what the ordinary choice is. Size: none, it is an input; what is missing is
-  a remark on the result when the sum is not 2.
+  distance moves with it — so it is not refused: the mesh says the sum and
+  the equivalent shift it became (`mesh.thickness_sum_not_two`), and the
+  card's note says what the ordinary choice is.
 - **A planet's net shaft torque is reported as zero**, which is what it is —
   a free idler's two meshes balance — and what the set's own solver never printed.
   The torque its teeth carry is on its card, per mesh, as every member's is.

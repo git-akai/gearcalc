@@ -160,12 +160,14 @@ impl ShiftAsked {
 ///   wheel take the conventional proportions of a worm drive
 ///   ([`super::crossed::proportions`]), a crossed gear pair the width at which
 ///   contact is just continuous;
-/// - **the words** — *starts*, *worm*, *wheel* — and which inputs a panel puts
-///   in front of the designer, which is the front end's to read off the kind
-///   and nothing the core has to know.
+/// - **the words** — *starts*, *worm*, *wheel* — which the shape reads off
+///   the same flag ([`super::shape::Shape::member_names`]).
 ///
 /// Nothing in it is a constraint the model needs: a `Worm` at a shaft angle of
-/// zero is a legal, if strange, helical pair and solves as one.
+/// zero is a legal, if strange, helical pair and solves as one. On the shape
+/// it is one bit, `Distance::worm`; this enum exists so a preset is built
+/// by a name rather than a boolean, and nothing in the core reads it — the
+/// two constructors that take it write the bit and are done.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(

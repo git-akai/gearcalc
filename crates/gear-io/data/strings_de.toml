@@ -67,6 +67,7 @@ reversed_bending_applied = "Zahnfuß wird von beiden Flanken belastet und gegen 
 overlap_below_one = "Sprungüberdeckung unter 1; schrägverzahnt in der Form, aber belastet wie ein Geradzahnrad"
 contact_ratio_below_one = "Überdeckung {ratio}: unter 1, das Paar verliert zwischen den Zähnen den Kontakt"
 load_sharing_out_of_band = "Lastaufteilung bei einer virtuellen Überdeckung von {ratio}: ohne Einzeleingriffsbereich extrapoliert die Rampe, und ihre Wirkung auf den Wert hat keine feste Richtung — gemessen zwischen 24 % Entlastung und 15 % Erhöhung"
+thickness_sum_not_two = "Dickenfaktoren summieren sich zu {sum} statt 2: der Überschuss geht als äquivalente Profilverschiebung von {shift} in den Eingriff ein"
 self_locking = "selbsthemmend: Haftreibung μ {friction} gegenüber einer Grenze von {threshold}, das zweite Glied kann das erste also nicht antreiben"
 near_self_locking = "nahe der Selbsthemmung: Haftreibung μ {friction} nahe der Grenze {threshold}, das Rücktreiben hängt damit an einem geschätzten Beiwert"
 forward_locking = "nicht vorwärts antreibbar: Haftreibung μ {friction} gegenüber einer Grenze von {threshold}, das erste Glied kann das zweite also nicht antreiben"

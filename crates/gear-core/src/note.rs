@@ -129,6 +129,8 @@ pub mod key {
     pub const MESH_SELF_LOCKING: &str = "mesh.self_locking";
     /// `mesh.load_sharing_out_of_band`
     pub const MESH_LOAD_SHARING_OUT_OF_BAND: &str = "mesh.load_sharing_out_of_band";
+    /// `mesh.thickness_sum_not_two`
+    pub const MESH_THICKNESS_SUM_NOT_TWO: &str = "mesh.thickness_sum_not_two";
 
     // ---- the stage -------------------------------------------------- //
     //
@@ -259,6 +261,7 @@ pub mod key {
         MESH_OVERLAP_BELOW_ONE,
         MESH_SELF_LOCKING,
         MESH_LOAD_SHARING_OUT_OF_BAND,
+        MESH_THICKNESS_SUM_NOT_TWO,
         STAGE_CENTRE_DISTANCE_NOT_REACHED,
         STAGE_CLEARANCE_NEGATIVE,
         STAGE_OPTIMISER_FOUND_NOTHING,

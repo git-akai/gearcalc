@@ -63,6 +63,7 @@ reversed_bending_applied = "齿根两侧齿面均受载，按单向许用应力�
 overlap_below_one = "纵向重合度小于 1；外形是斜齿而受力如同直齿"
 contact_ratio_below_one = "重合度 {ratio}：低于 1，齿对在齿与齿之间失去接触"
 load_sharing_out_of_band = "虚拟重合度为 {ratio} 时的载荷分配：不存在单齿啮合区，斜坡模型属于外推，其对结果的影响方向不固定——实测介于降低 24 % 与升高 15 % 之间"
+thickness_sum_not_two = "齿厚系数之和为 {sum} 而非 2：多出的部分以 {shift} 的等效变位进入啮合"
 self_locking = "自锁：静摩擦系数 μ {friction} 对比阈值 {threshold}，因此第二个构件无法驱动第一个"
 near_self_locking = "接近自锁：静摩擦系数 μ {friction} 接近阈值 {threshold}，反驱能力因而取决于一个估算的系数"
 forward_locking = "无法正向驱动：静摩擦系数 μ {friction}，阈值为 {threshold}，因此第一构件无法驱动第二构件"
