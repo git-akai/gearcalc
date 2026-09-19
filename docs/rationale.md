@@ -1604,9 +1604,10 @@ distance shared by several meshes is a layshaft's question as much as a
 set's; what a kind kept apart — three shafts here, two there, a planet's own
 row — the shape reads off its graph. This section's first paragraph is kept
 as the rule it was and the record of how it was read: *its own result type*
-was the arrangement's own facts, and the arrangement is data now. The hula
-stage is the one kind left, until the shape can size a distance from a tip
-bound (`geartrain-refactor-plan.md`, *Phase 6*).
+was the arrangement's own facts, and the arrangement is data now — the hula
+stage's too, once the shape learned to size a distance from a tip bound
+(`geartrain-refactor-plan.md`, *Phases 5d and 6*), so that no kind is left
+and `Stage` has one variant.
 
 ### Helical is not a lesser case
 

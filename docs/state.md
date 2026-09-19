@@ -1100,12 +1100,13 @@ Not a queue with a head; this is what a next session would pick from.
   — the fixed-carrier efficiency takes each mesh once, which is right, but no
   member reports what *it* loses. Nothing depends on it and nothing is wrong;
   it is the next thing a member-over-meshes model makes askable.
-- **The stage kinds that need more than three shafts.** `MemberRating` and
+- **Arrangements that need more than the shape has.** `MemberRating` and
   `MeshReport` are per member and per mesh rather than per named role, and
-  `planetary::power` takes a basic ratio rather than a set of tooth counts — so
-  a fourth kind should be new *kinematics* and no new rating machinery. That
-  claim was tested once, the other way: the worm kind was deleted as a type
-  and became a preset over the pair, and no answer moved.
+  every stage is one shape — so an arrangement is a list of what sits where,
+  and the six in `train/arrangements.rs` cost no rating machinery. What an
+  arrangement can still want that the shape has not got is a second relieved
+  distance (`Freedom` names one), a crossed distance sharing a member with a
+  parallel one, and a planet meshing a planet on a *given* spacing.
 - **The transverse rack round at a steep helix**, in the ledger above. The
   honest transverse tool is a normal round's elliptical section, which neither
   circle is; until then a worm's fillet is the cap's and its interference
