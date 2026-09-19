@@ -2713,7 +2713,7 @@ pub fn solve_shape(
                 za: f64::from(shape.members[m.a].gear.teeth),
                 zb: built.meshes[k].kind.sign() * f64::from(shape.members[m.b].gear.teeth),
                 efficiency: etas[k],
-                paths: f64::from(wiring.paths_seen(m.a).max(wiring.paths_seen(m.b))),
+                paths: f64::from(wiring.meshes[k].paths),
             })
             .collect();
         Directional::of(|d| {

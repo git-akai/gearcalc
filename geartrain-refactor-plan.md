@@ -877,9 +877,9 @@ quoted at zero backlash, and a given distance refused where a reaching member
 could go below zero shift. `kind = "shape"` in the document format, with
 `PairStage`/`PlanetaryStage` left as the builders `defaults` uses; one card
 in the panel over the shape; `members.ts` names sun, planet, ring, worm and
-wheel off the graph. Two residuals recorded in `docs/state.md`: `Freedom`
-still addresses one distance, and a mesh's thickness coefficients are not
-held to sum to 2.
+wheel off the graph. Two residuals were recorded in `docs/state.md` and
+have since closed: `Freedom` names its distance, and a mesh says when its
+thickness coefficients do not sum to 2.
 
 **5c — the arrangements the shape makes free**, each with a
 `gear-cli kinematics` fixture and a row in `tools/train_kinematics.py`: a
@@ -965,6 +965,26 @@ vocabulary — in the four documents, the map, the strings and every comment
 *kind* for a mesh's, a pair's and a load case's. What was a stage type is
 named as one, in the past tense, where the lesson still applies. The line
 counts against the beginning are in §5's closing paragraph.
+
+*The outliers pass, done* — what still sat outside the one shape after
+the clean-up, in the order they were worth taking: **the crossed distance**
+is a point contact the shape builds beside its line contacts, the crossed
+solve, `CrossedResult` and `PairStage`'s second chooser gone, the flow
+parametrised by each mesh's driver so a locked mesh holds, and a worm
+feeding a spur pair the first arrangement with both contacts; **a freedom
+names its distance**, so relief reaches a Ravigneaux's three; **what a
+member is** is read off the shape once and travels with the topology;
+`PairKind` is documented as the one bit it is; a mesh **says when its
+thickness coefficients do not sum to 2**; the **assembly rule** reaches
+every mesh from a planet axis to a central member and is held to a search
+over the phases; and, found on the way, **a mesh between two planets was
+divided by one path rather than `N`**, which a free-idler law now holds.
+The kinematic oracle writes its rows along the base circles' common
+tangent, so nothing has to close and the Wolfrom has a row. What is still
+outside: the conventional hold is one positional rule (first ring), stated
+rather than declared; a Ravigneaux's planet–planet assembly and its paths
+where two counts differ have no answer and say so; the plane oracle does
+not lay out a crossed mesh.
 
 **Optional, scoped separately.** The lever diagram (the `m = 2` nullspace
 rendered — the solution, not a decoration); the inverse problem, searching

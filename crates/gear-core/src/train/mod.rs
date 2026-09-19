@@ -4362,7 +4362,7 @@ mod tests {
         );
     }
 
-    /// **Every kind that searches asks the same of its meshes.**
+    /// **Every search asks the same of its meshes.**
     ///
     /// A constraint belongs to the mesh, not to the arrangement around it: a
     /// mesh whose teeth reach past the root circle they run into bottoms out
@@ -4901,7 +4901,7 @@ mod tests {
     /// 23 % low. The member torques themselves had already been put right
     /// (`docs/corrections.md`); the ratings had not, and nothing compared them.
     ///
-    /// Every kind that reports per-member stresses is walked, through
+    /// Every preset that reports per-member stresses is walked, through
     /// `StageResult::members()` rather than five named paths, for the reason that
     /// accessor exists.
     #[test]

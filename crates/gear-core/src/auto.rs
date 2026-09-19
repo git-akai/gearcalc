@@ -1133,9 +1133,9 @@ impl Cut<'_> {
 /// (`docs/corrections.md`). **A constraint belongs to the mesh, not to the
 /// arrangement it sits in** — a mesh that bottoms out is a mesh that bottoms
 /// out whether a carrier is turning around it or not — so it is asked once here
-/// and every kind that builds a mesh gets it.
+/// and every arrangement that builds a mesh gets it.
 ///
-/// What a stage kind still owns is what it genuinely does own: how its meshes
+/// What the shape still owns is what it genuinely does own: how its meshes
 /// are *assembled* — at a clearance-opened centre distance, from a shaper cut,
 /// around a crank — and which of them a candidate has. Those are the mechanics.
 /// This is what is asked of the result.
