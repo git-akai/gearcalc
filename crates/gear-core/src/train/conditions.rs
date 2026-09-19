@@ -1,6 +1,6 @@
 //! **What a train asks of its shafts, and how its stages are joined** — the
 //! boundary layer, kept apart from the topology ([`super::wiring`]) and the
-//! geometry (each kind's own file).
+//! geometry ([`super::shape`]).
 //!
 //! Three layers with three edit frequencies, and this is the one that changes
 //! most: which shaft is held and which is driven is what a designer turns to
@@ -24,9 +24,9 @@
 //!
 //! # The chain is the default, not the only shape
 //!
-//! A train with no couplings of its own is a chain — each kind's conventional
-//! *output port* coupled to the next kind's *input port* — and a train with no
-//! constraints of its own holds what each kind holds by convention and drives
+//! A train with no couplings of its own is a chain — each stage's conventional
+//! *output port* coupled to the next stage's *input port* — and a train with no
+//! constraints of its own holds what each stage holds by convention and drives
 //! the first stage's input. That is what every file written before these lists
 //! existed meant, so their absence is unambiguous and they default rather than
 //! refuse. Written out, they can say anything a graph of shafts can say.
@@ -141,7 +141,7 @@ pub struct Coupling {
     pub b: ShaftRef,
 }
 
-/// **A kind's conventional ports and what it holds by default** — what a chain
+/// **A stage's conventional ports and what it holds by default** — what a chain
 /// is built from when a train says nothing of its own, and what a stage asked
 /// about on its own is solved under.
 ///
@@ -206,8 +206,8 @@ impl Ports {
 /// shaft, and which shaft power comes in and leaves by.
 ///
 /// Assembled by the train from its constraints and couplings — the same way a
-/// [`super::StageLoads`] is assembled from its load cases — or from a kind's
-/// own [`Ports`] where a stage is solved alone.
+/// [`super::StageLoads`] is assembled from its load cases — or from the
+/// stage's own [`Ports`] where it is solved alone.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StageBoundary {
     /// One per local shaft, ground first.
@@ -220,8 +220,8 @@ pub struct StageBoundary {
 
 impl StageBoundary {
     /// **The boundary a stage solves under**: the one the train handed it with
-    /// its loads, or its kind's convention where it is being asked alone. One
-    /// helper because three kinds would otherwise write the same `unwrap_or`.
+    /// its loads, or its own convention where it is being asked alone. One
+    /// helper because three stage types once wrote the same `unwrap_or`.
     #[must_use]
     pub fn of(loads: &super::StageLoads, wiring: &Wiring, ports: &Ports) -> Self {
         loads
@@ -230,7 +230,7 @@ impl StageBoundary {
             .unwrap_or_else(|| Self::conventional(wiring, ports))
     }
 
-    /// A stage on its own, under its kind's conventions: ground held, the
+    /// A stage on its own, under its own conventions: ground held, the
     /// conventional shafts held, the conventional input driven at one turn.
     #[must_use]
     pub fn conventional(wiring: &Wiring, ports: &Ports) -> Self {
@@ -372,7 +372,7 @@ impl TrainMotion {
 
 impl Train {
     /// **The couplings in force**: the train's own, or — where it has none —
-    /// the chain, each kind's conventional output to the next kind's input.
+    /// the chain, each stage's conventional output to the next stage's input.
     #[must_use]
     pub fn couplings_in_force(&self) -> Vec<Coupling> {
         if !self.couplings.is_empty() {
@@ -418,7 +418,7 @@ impl Train {
         ports.ends(&held, driven)
     }
 
-    /// **The constraints in force**: each kind's conventions — its own holds,
+    /// **The constraints in force**: each stage's conventions — its own holds,
     /// and the first stage's input driven — with the train's own laid over
     /// them.
     ///
@@ -454,7 +454,7 @@ impl Train {
                 out.push(ShaftConstraint::driven(0, ports.input()));
             }
         }
-        // The conventions of a kind go from every stage the train says the
+        // The conventions of a stage go from every stage the train says the
         // same kind of thing about — **before** any of the train's own are
         // laid, so that two drives the designer wrote on one set are both
         // kept. Written the other way round, the second drive removed the
@@ -592,7 +592,7 @@ impl Train {
     /// A stage in a train is driven by what it is coupled to as often as by a
     /// motor, so a shaft coupled to an *earlier* stage is its input and is
     /// driven at one turn for the stage's own solve; a shaft coupled to a
-    /// later one is its output. Where neither says, the kind's conventions
+    /// later one is its output. Where neither says, the stage's conventions
     /// do. This is the chain read off the graph rather than assumed of it,
     /// and it is the one place "earlier" means anything — a general graph has
     /// no order, and the train-level family ([`Train::motion`]) needs none.
@@ -650,7 +650,7 @@ impl Train {
                 .collect();
             // An explicit coupling from an earlier stage says where the chain
             // enters; failing that the train's own drive; failing that the
-            // kind's convention.
+            // stage's convention.
             let input = side(true, true)
                 .or(driven)
                 .unwrap_or_else(|| ports.ends(&held, None).0);
@@ -1038,17 +1038,17 @@ pub struct PortSpec {
     pub shaft: Shaft,
     pub label: ShaftLabel,
     /// **What this port is asked if the train says nothing about it** — the
-    /// kind's convention *as the overlay leaves it*, with everything else
+    /// stage's convention *as the overlay leaves it*, with everything else
     /// the train states in force: a set's ring reads `free` here once its
     /// carrier is held, because holding the carrier releases it. What a
     /// panel's "convention" choice would come to, computed by the rule
-    /// rather than guessed from the kind.
+    /// rather than guessed from the preset.
     pub by_convention: Constraint,
 }
 
 /// **A stage's ports and its conventional holds**, so a panel can offer
-/// exactly the shafts a train may constrain or couple — read from the kind's
-/// own wiring rather than written into the front end a second time.
+/// exactly the shafts a train may constrain or couple — read from the
+/// stage's own wiring rather than written into the front end a second time.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(

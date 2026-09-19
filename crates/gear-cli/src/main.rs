@@ -285,7 +285,7 @@ fn both_ways(e: gear_core::contact::Directional<f64>) -> String {
 /// the exhaustive list, "next to the code it describes, where it cannot fall out
 /// of step with the commands it lists" — and it listed thirteen of twenty-one.
 /// Proximity is not a mechanism. The same table shape, for the same reason, is
-/// what the front end's gear kinds and stage kinds became.
+/// what the front end's gear kinds and stage presets became.
 struct Command {
     name: &'static str,
     /// The arguments as a reader would type them, defaults in the summary.
@@ -413,7 +413,7 @@ const COMMANDS: &[Command] = &[
     Command {
         name: "shifts",
         args: "[z1] [z2] | epicyclic",
-        summary: "the shifts a pair loses least at, free and against a given centre distance (9, 37); `epicyclic` asks the two kinds that choose more than two",
+        summary: "the shifts a pair loses least at, free and against a given centre distance (9, 37); `epicyclic` asks the two presets that choose more than two",
         run: |a| {
             if a.get(1).map(String::as_str) == Some("epicyclic") {
                 epicyclic_shifts_report();
@@ -426,7 +426,7 @@ const COMMANDS: &[Command] = &[
         // optimiser at all: no `gear-cli` command set `Optimisation::enabled`,
         // so every answer it chooses was outside the change detector. That is
         // the fault `docs/corrections.md` records of a load from the end, met
-        // again, and it is worth covering **each kind that searches** rather
+        // again, and it is worth covering **each preset that searches** rather
         // than the one whose table is documented.
         record: Record::Cases(&["shifts 9 37", "shifts 17 43", "shifts epicyclic"]),
         slow: false
@@ -442,7 +442,7 @@ const COMMANDS: &[Command] = &[
     Command {
         name: "kinematics",
         args: "[fixture]",
-        summary: "motion, torque, loss and play alone, for every stage kind and every epicyclic arrangement — what a graph over shafts and meshes has to reproduce",
+        summary: "motion, torque, loss and play alone, for every preset and every epicyclic arrangement — what a graph over shafts and meshes has to reproduce",
         run: |a| kinematics::run(a.get(1).map(String::as_str)),
         record: Record::Cases(&["kinematics"]),
         slow: false
@@ -752,7 +752,7 @@ fn hula_report(n: u32, clearance: f64, m_outer: f64, m_inner: f64, cutter_teeth:
         for note in &mesh.notes {
             println!("    ! {}", words().render(note));
         }
-        // What the teeth are worth, which a stage of this kind needs as much as
+        // What the teeth are worth, which a worm stage needs as much as
         // the geometry: the reduction multiplies the mesh loss, and it multiplies
         // the torque on the way as well — the output pair carries the whole of it.
         println!(
@@ -1272,7 +1272,7 @@ fn train_file_report(path: Option<&str>) {
     let doc = TrainDocument {
         name: "Elevation drive".to_string(),
         train: Train {
-            // Both kinds, both ports, both duties: everything the document can
+            // Both case kinds, both ports, both duties: everything the document can
             // carry for a load, so the round trip is asked of all of it.
             load_cases: vec![
                 LoadCase::ultimate(2.0, 3000.0),
@@ -1535,7 +1535,7 @@ fn shifts_report(z1: u32, z2: u32) {
     }
 }
 
-/// **What the two epicyclic kinds choose, and whether their tools leave it.**
+/// **What the two epicyclic presets choose, and whether their tools leave it.**
 ///
 /// A set and a hula stage each search more than one shift, against a constraint
 /// their planet or their crank closes. The figure beside each is the one that
@@ -1963,8 +1963,8 @@ fn print_line_pair(k: usize, kind: &str, s: &Pair, line: &gear_core::train::Line
     }
 }
 
-/// The kind, as a designer names it.
-/// The word the harness prints for a pair: what the shape's one distance
+/// The pair's kind, as a designer names it — the word the harness prints for
+/// a pair: what the shape's one distance
 /// says it is sized as.
 fn kind_name(stage: &gear_core::train::Stage) -> &'static str {
     match stage.as_shape().and_then(|s| s.distances.first()) {

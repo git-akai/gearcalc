@@ -2,8 +2,8 @@
   import {
     defaults,
     solveTrain,
-    STAGE_KINDS,
-    type StageKindSpec,
+    STAGE_PRESETS,
+    type StagePresetSpec,
     type Figure,
     CASE_KINDS,
     type CaseKindSpec,
@@ -51,9 +51,9 @@
    *
    *  Which of a stage's inputs argue with each other, how many may stand and
    *  which gives way first are facts about the geometry, and they lived here as
-   *  three functions — one per stage kind — each restating a relation Rust
+   *  three functions — one per stage type — each restating a relation Rust
    *  already enforces. That is an engineering rule outside Rust and the same
-   *  idea written once per kind: a fifth kind would have arrived with no relief
+   *  idea written once per type: a new arrangement would have arrived with no relief
    *  at all, and one of the three carried a justification that went stale the
    *  moment the core stopped needing it.
    *
@@ -117,7 +117,7 @@
     result.figures[tab.train.stages.indexOf(stage)] ?? [];
 
   /** **What the train asks of one shaft**, written as a constraint or, for
-   *  the empty choice, withdrawn so the kind's convention stands again. A
+   *  the empty choice, withdrawn so the stage's convention stands again. A
    *  constraint is a choice and not a number, so it is written here; what
    *  the choice *does* — a hold on a set releasing the ring it held by
    *  convention, a drive behind a pair being where the chain enters — is
@@ -129,7 +129,7 @@
     );
     if (c !== "") tab.train.constraints.push({ at, constraint: c });
   }
-  /** The word for what a shaft is asked, or for what its kind's convention
+  /** The word for what a shaft is asked, or for what its stage's convention
    *  asks where the train says nothing. */
   const constraintWord = (c: Constraint) =>
     t(
@@ -205,13 +205,13 @@
   const forCase = <T extends { case: number }>(list: T[] | undefined, i: number) =>
     list?.find((c) => c.case === i);
 
-  /** The kinds on offer. A kind the developer mode hides cannot already be in
+  /** The presets on offer. A preset the developer mode hides cannot already be in
    *  a train the reader is looking at — the picker is the only way one arrives
    *  — so nothing is stranded by the mode being off. */
-  const stageKinds = $derived(STAGE_KINDS.filter((k) => !k.developer || developer.enabled));
+  const stagePresets = $derived(STAGE_PRESETS.filter((k) => !k.developer || developer.enabled));
 
-  function addStageOfKind(kind: StageKindSpec) {
-    tab.train.stages.push(kind.fresh());
+  function addStagePreset(preset: StagePresetSpec) {
+    tab.train.stages.push(preset.fresh());
     tab.open[tab.train.stages.length - 1] = true;
   }
 
@@ -248,7 +248,7 @@
       if (at < i) tab.open[at] = v;
       else if (at > i) tab.open[at - 1] = v;
     }
-    if (tab.train.stages.length === 0) addStageOfKind(STAGE_KINDS[0]);
+    if (tab.train.stages.length === 0) addStagePreset(STAGE_PRESETS[0]);
   }
 
   /** The candidates for one note slot: a blank to reserve the space, the note
@@ -1090,11 +1090,11 @@
      `f64` has no object to hold an `auto` flag in — which is the same reason
      `autoNumber` can take one and this cannot. -->
 <!-- **What the train asks of each of a stage's ports** — held, driven, free,
-     or nothing, in which case the kind's convention stands and is named. The
-     ports and their names come from the core (`topology`), so a stage kind
+     or nothing, in which case the stage's convention stands and is named. The
+     ports and their names come from the core (`topology`), so an arrangement
      with a fourth port is one more row here and no change to this file, and
      the same rows serve a pair, a set and a hula stage alike. A hold or a
-     drive written here replaces the kind's convention *of that kind* on the
+     drive written here replaces the stage's convention *of that kind* on the
      stage — holding a set's carrier releases its ring — which is the core's
      rule and is read back, not repeated. -->
 {#snippet shafts(i: number)}
@@ -1281,12 +1281,12 @@
      against: sliding loss falls with the length of the path, so without a floor
      the least-loss pair is always the one whose teeth barely reach. -->
 <!-- **How the load is divided while two tooth pairs are engaged**, offered by
-     every stage kind that reports a bending stress.
+     every stage that reports a bending stress.
 
      Off by default and deliberately so: the ramp behind it is an uncalibrated
      placeholder rather than a stiffness model. Offered rather than hidden,
      because an estimate a designer chooses is a feature and one applied on
-     their behalf is not — and one field rather than one per kind, because it
+     their behalf is not — and one field rather than one per preset, because it
      selects a *model* and a stage running two meshes under two readings of the
      same thing would be reporting a comparison rather than a design.
 
@@ -1779,7 +1779,7 @@
                   // held it open, under the number it opened to.
                   dres?.sized_by == null
                     ? undefined
-                    : t("ui.train_hula_held_open_by", { mesh: String(dres.sized_by + 1) }),
+                    : t("ui.train_distance_sized_by", { mesh: String(dres.sized_by + 1) }),
                   "ui.train_mm",
                 )}
                 <!-- The far-side tip gap an internal mesh on this distance
@@ -1971,12 +1971,12 @@
     </section>
   {/each}
 
-  <!-- One button a kind, from the table rather than by hand: a kind marked for
+  <!-- One button a preset, from the table rather than by hand: a preset marked for
        the developer mode is not offered until the sidebar's title has been
        knocked on, which is the same gate the gear tab's eccentric kind is
        behind and the same table shape. -->
-  {#each stageKinds as k (k.key)}
-    <button class="action add" onclick={() => addStageOfKind(k)}>{t(k.label)}</button>
+  {#each stagePresets as k (k.key)}
+    <button class="action add" onclick={() => addStagePreset(k)}>{t(k.label)}</button>
   {/each}
 </div>
 

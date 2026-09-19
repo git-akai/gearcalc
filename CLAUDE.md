@@ -219,13 +219,17 @@ And elsewhere:
   against a published standard. They go when that command does.
 - **`verify.rs` is in the library rather than in `tests/`** so the CLI can sweep
   it over thousands of cases.
-- **Five modules carry no `#[cfg(test)]`** — `metrology.rs`, `params.rs`,
-  `tooth.rs`, `train/pair.rs`, `verify.rs` — and four of them are covered from
-  somewhere else: the integration suite for the first, third and last, and the
-  golden corpus for the guards in `params.rs`. Measured by perturbing each and
-  seeing what fired, not assumed. It is where a law belongs that decides it: a
-  profile law wants the whole grid `tests/common` builds, and a guard's value
-  wants a recorded output.
+- **Eight modules carry no `#[cfg(test)]` module** — `metrology.rs`,
+  `params.rs`, `tooth.rs`, `verify.rs`, `train/pair.rs`, `train/conditions.rs`,
+  `train/wiring.rs`, `train/planetary.rs` — and seven of them are covered from
+  somewhere else: the integration suite for the first, third and fourth, the
+  golden corpus for the guards in `params.rs`, and `train/mod.rs`'s and
+  `train/shape.rs`'s laws for the last three (a wiring that miscounts paths, a
+  convention that names the wrong output, a preset that holds the wrong shaft
+  each fail there). Measured by perturbing each and seeing what fired, not
+  assumed. It is where a law belongs that decides it: a profile law wants the
+  whole grid `tests/common` builds, a guard's value wants a recorded output,
+  and a stage's law wants every preset.
 - **Two notes nothing can fire** are named in `strings.rs`'s `UNFIRED` with
   their evidence. Live code, a live message, deliberately not deleted on
   suspicion — and the evidence carries the breadth of the search that found

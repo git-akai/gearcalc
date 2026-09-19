@@ -290,14 +290,13 @@ export const KINDS: KindSpec[] = [
 ];
 
 /** **A preset over the one stage shape.** A stage is a `Shape` — axes,
- *  shafts, members, meshes and distances — or, until the shape can size a
- *  distance from a tip bound, a hula stage; a spur pair, a worm and a
- *  planetary set are the ways the core fills a shape in, not kinds of their
- *  own. What this side names is the button, and what the button adds is
+ *  shafts, members, meshes and distances; a spur pair, a worm, a planetary
+ *  set and a hula stage are the ways the core fills a shape in, not types of
+ *  their own. What this side names is the button, and what the button adds is
  *  whatever `defaults` says the preset is. */
 export type StagePreset = "spur" | "worm" | "planetary" | "hula";
 
-export interface StageKindSpec {
+export interface StagePresetSpec {
   key: StagePreset;
   /** Catalogue key for the button that adds one. */
   label: string;
@@ -310,16 +309,16 @@ export interface StageKindSpec {
 }
 
 /** The stage presets, as data, for the same reason `KINDS` and `FIELDS` are: the
- *  "add stage" buttons render from this, so a fifth preset is a row rather than a
+ *  "add stage" buttons render from this, so a new preset is a row rather than a
  *  hand-written button that has to be remembered.
  *
  *  A **crossed** pair is deliberately not here. It is a pair whose shafts are
  *  at an angle, not a preset of its own, and the core says so. */
 // A default stage arrives **tagged** — Rust's `Stage` is an internally tagged
-// enum, so the object carries its own `kind`: `shape` for the first three,
-// `hula` for the last. The panel branches on that tag and on nothing else;
-// what a shape *is* — a pair, a set — it reads off the shape itself.
-export const STAGE_KINDS: StageKindSpec[] = [
+// enum with one variant, so the object carries `kind: "shape"`. The panel
+// branches on nothing; what a shape *is* — a pair, a set, a hula stage — it
+// reads off the shape itself (`members.ts`).
+export const STAGE_PRESETS: StagePresetSpec[] = [
   {
     key: "spur",
     label: "ui.train_add_spur_stage",
@@ -354,7 +353,7 @@ export interface CaseKindSpec {
   fresh: () => LoadCase;
 }
 
-/** The load case kinds, as data, for the reason the stage kinds are: the "add
+/** The load case kinds, as data, for the reason the stage presets are: the "add
  *  load case" buttons and the kind select render from this, and a kind decides
  *  which allowable the core judges against and which inputs are put in front
  *  of the designer — nothing else. */
@@ -713,20 +712,20 @@ export function exportLibrary(
 //  Geartrains
 // --------------------------------------------------------------------- //
 
-/** **Resolve an over-determined stage**, whatever kind it is.
+/** **Resolve an over-determined stage**, whatever preset it came from.
  *
  *  `just` is the input the designer has this moment pinned, and is never the one
  *  relieved; `null` where what changed was not a toggle — a shaft angle — and
  *  nothing is spared. Which inputs argue with each other, how many may stand
  *  and which gives way first are facts about the geometry, so Rust decides all
- *  of it — this used to be three functions here, one per stage kind, each
+ *  of it — this used to be three functions here, one per stage type, each
  *  restating a relation the core already enforces, and none of them tested.
  *
  *  Written **in place**, leaf by leaf, rather than by replacing the stage: the
  *  caller holds a reactive proxy and a wholesale swap would detach every input
  *  bound to it. Only leaves that differ are written, and this side does not
  *  know which they are — it used to list every field relief could touch by
- *  name, per kind, so a kind with a field named otherwise got no relief and
+ *  name, per type, so a type with a field named otherwise got no relief and
  *  nothing said so. Now the core hands back the stage as it should stand and
  *  the copy is shape-blind.
  *
@@ -825,7 +824,7 @@ export function solveTrain(train: Train, materials?: MaterialLibrary): TrainOutc
 
 /** **What a train asks of one of a stage's shafts**, as it stands: the
  *  constraint the train states, or `null` where it states none and the
- *  kind's convention holds. Read here, never decided here — what that
+ *  stage's convention holds. Read here, never decided here — what that
  *  convention comes to is the core's, and arrives as each port's
  *  `by_convention` in `topology`. */
 export function constraintOn(train: Train, stage: number, shaft: number): Constraint | null {

@@ -28,18 +28,6 @@ pub struct Teeth {
     pub ring: u32,
 }
 
-impl Teeth {
-    /// The ring tooth count that needs no planet shift at all.
-    ///
-    /// `z_s + 2 z_p` puts the planet exactly halfway, so both centre distances
-    /// are their reference values and agree without help. It is the sanity check
-    /// the whole closure has to pass.
-    #[must_use]
-    pub fn ideal_ring(sun: u32, planet: u32) -> u32 {
-        sun + 2 * planet
-    }
-}
-
 // ------------------------------------------------------------- kinematics ---
 
 /// One of the three shafts a planetary set presents.

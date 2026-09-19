@@ -8,11 +8,11 @@
 //! shaft, two internal meshes on the one distance between the axes — the
 //! crank offset — which the tips size where it is automatic
 //! ([`super::shape::Distance::tip_clearance`]). Which member of each pair is the ring is a
-//! tooth count, the larger. Everything the kind used to solve for itself —
+//! tooth count, the larger. Everything the stage's own solver once did —
 //! the offset from the clearances, the shifts that reach it, the power flow
 //! with its circulating power, the play at either shaft — the shape solves
-//! as it solves any arrangement, and `hula_gate` in `shape.rs` holds it to
-//! the kind's own figures, which are recorded in `docs/reference.md`.
+//! as it solves any arrangement, and `hula_recorded` in `shape.rs` holds it
+//! to that solver's figures, which are recorded in `docs/reference.md`.
 //!
 //! What stays here is the preset, and [`stage_efficiency`] — the closed form
 //! this family's efficiency collapses to, kept as the independent statement

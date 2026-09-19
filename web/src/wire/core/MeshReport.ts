@@ -129,7 +129,7 @@ flank_interference: [boolean, boolean],
  */
 tips: TipRoom | null, 
 /**
- * **What this mesh has to say**, on every kind alike: contact that does not
+ * **What this mesh has to say**, on every mesh alike: contact that does not
  * stay continuous, a helical pair without full axial overlap, a sharing
  * model that is extrapolating, a screw pair that locks or nearly does,
  * or one that loses more than it keeps. A set has two meshes and says

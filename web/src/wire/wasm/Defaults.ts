@@ -26,7 +26,7 @@ export type Defaults = { gear: GearTabDefaults,
  */
 train: Train, 
 /**
- * One of each stage kind, for the "add stage" menu. A crossed gear pair is
+ * One of each preset, for the "add stage" menu. A crossed gear pair is
  * **not** one of them — it is a spur stage with its shafts at an angle
  * (docs/reference.md#crossed-axes).
  */

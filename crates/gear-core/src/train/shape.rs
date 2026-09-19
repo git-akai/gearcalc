@@ -1,4 +1,4 @@
-//! **The stage every kind is a tick pattern of** — axes, shafts on them,
+//! **The stage every preset is a tick pattern of** — axes, shafts on them,
 //! members on the shafts, meshes between members, and one distance per pair
 //! of axes that mesh.
 //!
@@ -7,7 +7,7 @@
 //! the central one, replicated `N` times, with two meshes on the one
 //! distance between the axes. A hula stage is the same with `N = 1`, both
 //! meshes internal and a compound planet. A layshaft transmission is two
-//! ground axes with several meshes on one distance. None of these is a kind
+//! ground axes with several meshes on one distance. None of these is a type
 //! here: the shape says which frames there are, and everything else — the
 //! wiring the kinematics reads, the closure the shifts obey, where the power
 //! goes — is derived from it once (`geartrain-refactor-plan.md`, *One stage
@@ -928,7 +928,7 @@ impl Shape {
             }
             // **A gap asked for is a distance asked for**: the least at which
             // the tips clear by it, the shifts following — a hula's crank,
-            // which its kind solved from the clearance and nothing else.
+            // which the hula's own solver took from the clearance and nothing else.
             // With no gap asked the shifts' own distance stands, opened out
             // only where the tips would cross at it.
             let asked = self.distances[d].tip_clearance > 0.0;
@@ -1204,7 +1204,7 @@ impl Shape {
         // or sized — each mesh on it answers to its own members alone, so
         // the product is largest where every factor is and one search in
         // `n` variables is several in fewer: a hula's two meshes at a held
-        // crank, which its kind searched one at a time for a thirteenth of
+        // crank, which the hula's own solver searched one at a time for a thirteenth of
         // the work. Meshes on an automatic distance with more than one mesh
         // are one component, an absorber carrying any member's move across
         // it; and an axis that touches two meshes joins them.
@@ -1212,8 +1212,8 @@ impl Shape {
         // **A sized distance and the divisions chosen at it settle
         // together.** The division a search chooses moves the tips a
         // little, so a distance the tips size is sized again at what was
-        // chosen, and the search run again at that distance — the hula
-        // kind's own rounds. Three at most; the second usually moves nothing
+        // chosen, and the search run again at that distance — the rounds the
+        // hula's own solver ran. Three at most; the second usually moves nothing
         // and the third never has.
 
         let mut found: Option<Vec<f64>> = None;
@@ -1386,7 +1386,7 @@ impl Shape {
     }
 
     /// The shifts the shape settles on under a search — what the tests
-    /// written against the kinds' own choosers ask.
+    /// written against the retired stage types' own choosers ask.
     #[cfg(test)]
     pub(crate) fn shifts_at(&self, search: &crate::auto::Search) -> Vec<f64> {
         let helix = self.helix_angles();
@@ -1837,7 +1837,7 @@ pub struct ShapeResult {
 
 /// # Errors
 ///
-/// As every stage kind's own solve: a mesh that cannot mesh, no contact, a
+/// A mesh that cannot mesh, no contact, a
 /// distance no shift reaches, a material not in the library, a member whose
 /// root cannot be rated, or a boundary that leaves the motion undetermined.
 pub fn solve_shape(
@@ -2554,7 +2554,7 @@ impl super::flow::Flow {
     }
 }
 
-// -------------------------------------------------- what every kind owes ---
+// -------------------------------------------------- what a stage owes ---
 
 impl Constrained for Shape {
     fn members(&self) -> Vec<&StageGear> {
@@ -2564,7 +2564,7 @@ impl Constrained for Shape {
     /// Every input relief may turn: each distance's, the overlap, and each
     /// member's. **One distance is addressed for now** — `Freedom` names a
     /// stage's centre distance and clearance without saying which pair of
-    /// axes, and every shape converted from a kind has one.
+    /// axes, and every shape a preset builds has one.
     fn inputs(&mut self) -> Vec<(Freedom, &mut Auto<f64>)> {
         let mut out = Vec::new();
         if let Some(d) = self.distances.first_mut() {
@@ -2730,7 +2730,7 @@ impl Constrained for Shape {
     }
 }
 
-// ----------------------------------------------------- from each kind ---
+// ---------------------------------------------------- from each preset ---
 
 impl From<&super::PairStage> for Shape {
     /// A spur or crossed gear pair: [`Shape::from_pair`] without the worm's
@@ -2841,8 +2841,8 @@ impl Shape {
 impl From<&super::PlanetaryStage> for Shape {
     /// A central axis with the sun, the carrier and the ring on it, a planet
     /// axis carried by the carrier and replicated `N` times, two meshes on
-    /// the one distance between them. Shafts numbered as the kind numbered
-    /// them: sun 1, carrier 2, ring 3, planet 4.
+    /// the one distance between them. Shafts numbered as the set's own
+    /// solver numbered them: sun 1, carrier 2, ring 3, planet 4.
     fn from(s: &super::PlanetaryStage) -> Self {
         let member =
             |shaft: Shaft, gear: &StageGear, thickness_mod: f64, ring: Option<Cutter>| Member {
@@ -2915,7 +2915,8 @@ impl From<&super::HulaStage> for Shape {
     /// with the two wobble gears on one shaft, two internal meshes on the
     /// one distance — the crank offset — which the tips size where it is
     /// automatic. Which member of each pair is the ring is a tooth count,
-    /// the larger; the pinion's `k` is the ring's too, as the kind had it.
+    /// the larger; the pinion's `k` is the ring's too, as the hula's own
+    /// solver had it.
     /// Shafts: crank 1, output 2, grounded 3, wobble 4 — the driven one
     /// first, the output next, the grounded gear's ring the first ring
     /// listed and so the one held by convention.
@@ -2997,17 +2998,17 @@ mod tests {
     //! they read the shape's members and meshes by position — sun, planet,
     //! ring; sun–planet, planet–ring — as the preset lays them out.
     //!
-    //! The gate that held the shape against the kinds figure for figure —
-    //! every member's every case and every mesh's every figure, on a pair, a
-    //! worm, and every arrangement of a set — lived beside the kinds while
-    //! both existed and went with them (`git show ac0dccc`); what it found is
+    //! The gate that held the shape against the retired stage types figure
+    //! for figure — every member's every case and every mesh's every figure,
+    //! on a pair, a worm, and every arrangement of a set — lived beside them
+    //! while both existed and went with them (`git show ac0dccc`); what it found is
     //! in `docs/corrections.md`, and the corpus records what moved.
 
     use super::*;
     use crate::planetary::{Arrangement, PlanetaryShaft};
     use crate::train::{test_library, PairKind, PairStage, PlanetaryStage, StageLoad};
 
-    /// Both directions and both kinds, at a torque and a speed.
+    /// Both directions and both case kinds, at a torque and a speed.
     fn loads() -> StageLoads {
         let mut l = StageLoads::at(2.0, 3000.0);
         l.cases.push(StageLoad {
@@ -3254,7 +3255,7 @@ mod tests {
         assert_eq!(checked, 6);
     }
 
-    // ---- the set's laws, ported from its kind ----
+    // ---- the set's laws, ported from its own solver ----
 
     /// **A probe width leaves no trace.**
     ///
@@ -4261,7 +4262,7 @@ mod tests {
 #[allow(clippy::unwrap_used)]
 mod hula_recorded {
     //! **The hula stage through the shape is the hula stage**, held to the
-    //! figures the kind recorded before it retired. The gate that ran the
+    //! figures its own solver recorded before it retired. The gate that ran the
     //! two side by side lived at `2b71654` and found them the same to 1e-6
     //! — ratio, crank offset and the mesh that held it open, every shift
     //! and width, every mesh's figures, the stage's efficiency both ways and
@@ -4355,7 +4356,7 @@ mod hula_recorded {
             "backlash at the crank",
         );
         // The operating angle is the **running** mesh's, 0.02 mm inside the
-        // zero-backlash offset the kind quoted its 50.965° at — the stated
+        // zero-backlash offset the old solver quoted its 50.965° at — the stated
         // change every pair took with the shape (`docs/corrections.md`).
         for (k, (aw, eps, far, tip)) in [
             (49.673, 0.9735, 0.2779, 0.0),
@@ -4373,13 +4374,13 @@ mod hula_recorded {
             assert!(!tips.tip_interference);
         }
         // **Every mesh is pressed with its driver's force** — the stated
-        // change every driven member took with the shape. The kind
+        // change every driven member took with the shape. The old solver
         // anchored each mesh at the torque the power flow put on its
         // central member: the output's, which drives its wobble gear in the
         // crank's frame and so is the flank force itself; and the grounded
         // ring's, which is *driven* by its wobble gear and stood `η₁` under
         // the force on its flank — so the whole of mesh 1 is `1/η₁` over
-        // what the kind printed, bending with it, and mesh 2 is the kind's.
+        // what it printed, bending with it, and mesh 2 is unchanged.
         let eta1 = r.meshes[0].efficiency.forward;
         close(
             200.8899 / eta1,

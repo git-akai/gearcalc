@@ -10,7 +10,6 @@
  * a peak against a fatigue allowable asks the wrong question, and it is what
  * this crate did before the two kinds existed. Everything else about a load
  * case — where it enters, what holds it, how big it is — is the same question
- * for either kind, and a kind is otherwise a preset and a vocabulary, as
- * [`PairKind`] is over a pair.
+ * for either kind, and a kind is otherwise a vocabulary.
  */
 export type CaseKind = "ultimate" | "fatigue";

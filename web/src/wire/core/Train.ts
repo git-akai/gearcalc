@@ -36,7 +36,7 @@ reversed_bending: boolean, stages: Array<Stage>,
 couplings: Array<Coupling>, 
 /**
  * **What is asked of each shaft** — held, driven or free. Empty is each
- * kind's convention with the first stage's input driven, for the same
+ * stage's convention with the first stage's input driven, for the same
  * reason the couplings default. Written out, this is where a planetary
  * set's arrangement lives now, and where a second input or a third port
  * is one more line. See [`ShaftConstraint`].

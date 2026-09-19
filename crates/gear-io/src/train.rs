@@ -70,7 +70,7 @@
 //!   port its range was always measured at, and a continuous one losing its
 //!   `operating_speed` to the case's own `speed`.
 //! - **The helix moved onto the members.** A pair's `sizing` — one of three
-//!   readings of its size — is gone; every member of every kind carries
+//!   readings of its size — is gone; every member of every stage carries
 //!   `helix_angle = { auto, manual }`, a pair carries `pitch_diameter =
 //!   { auto, manual }` for its first member, and a planetary set's and a hula
 //!   stage's stage-level `helix_angle` went with it. At most one reading is
@@ -91,11 +91,11 @@
 //!   per shaft, `at = { kind = "of", stage = 0, shaft = 1 }` with
 //!   `constraint = "driven"`, `"held"` or `"free"` — where a set's shafts are
 //!   numbered sun 1, carrier 2, ring 3 in its wiring. A file with no
-//!   constraints at all means what it always meant: each kind's conventions,
+//!   constraints at all means what it always meant: each stage's conventions,
 //!   with the first stage's input driven. So `{ input = "sun", fixed =
 //!   "ring" }` is nothing to write, and `{ input = "sun", fixed = "carrier" }`
 //!   is one line, shaft 2 held: a hold the train writes on a stage replaces
-//!   the kind's conventional holds on that stage, so holding the carrier
+//!   the stage's conventional holds on that stage, so holding the carrier
 //!   *instead of* the ring needs no word about the ring. (For a while it
 //!   needed three lines — the ring written free as well — and a file that
 //!   still says so means the same thing.) A drive replaces the conventional
@@ -150,7 +150,7 @@
 //! A file can say what the panel cannot: a crossed pair with its axial
 //! contact ratio given, a pair with its distance and both shifts and a helix
 //! pinned at once. An input that stands given and is read by nothing is the
-//! thing this tool refuses to have (`docs/rationale.md#what-a-kind-owes-relief`),
+//! thing this tool refuses to have (`docs/rationale.md#what-a-stage-owes-relief`),
 //! so every stage read is **relieved** exactly as a stage in the panel is after
 //! any change — by the core, with nothing just touched — and the reader says
 //! whether that moved anything ([`Imported::adjusted`]). A hand-edited value
@@ -280,13 +280,13 @@ mod tests {
         ShaftConstraint, ShaftRef, Stage,
     };
 
-    /// One of every stage kind, so the `kind` tag is exercised in both
-    /// directions and no variant can quietly stop round-tripping.
+    /// One of every preset, so the `kind` tag and every preset's layout are
+    /// exercised in both directions and none can quietly stop round-tripping.
     fn document() -> TrainDocument {
         TrainDocument {
             name: "Test train".into(),
             train: Train {
-                // One of every kind at every port, and both duties, so the
+                // One of every preset at every port, and both duties, so the
                 // tags and the nested tables are exercised in both directions.
                 load_cases: vec![
                     LoadCase::ultimate(0.25, 12_000.0),

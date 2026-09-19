@@ -118,7 +118,7 @@ cargo run --bin gear-cli -- shifts 9 37            # the shifts a pair loses lea
 cargo run --bin gear-cli -- train                  # a two-stage train
 cargo run --bin gear-cli -- train mixed            # ...with a worm stage in it
 cargo run --bin gear-cli -- train held             # ...that worm holding more than it drives
-cargo run --bin gear-cli -- kinematics             # motion, torque, loss and play alone, every kind and every arrangement
+cargo run --bin gear-cli -- kinematics             # motion, torque, loss and play alone, every preset and every arrangement
 cargo run --bin gear-cli -- trainfile [path]       # a train to TOML and back, answers compared
 cargo run --bin gear-cli -- worm 1 40 7 90         # a worm pair, both directions
 cargo run --bin gear-cli -- wormstage 1 40 7 2     # a worm stage, end to end
@@ -252,7 +252,7 @@ location: where a boundary is drawn, and what a directory is not for.
 | `crates/gear-core` | All mathematics. No I/O, no UI, no wasm. `serde` and `ts-rs`, both optional and both about the shape a type takes when it leaves. |
 | `gear-core/src/gear.rs` | `Gear` — the assembly, and the only place a gear is drawn. An ordinary gear is `Δx = 0`. |
 | `gear-core/src/strength.rs` | The bending model: the critical section both kinds of member share, the notch factors and which fillet radius each reads, and the Hertz contact beside it. |
-| `gear-core/src/train/mod.rs` | What every stage kind shares: the load cases and the walk that carries each toward the far port, `MemberRating` — every mesh a member is in, in every case, and the worst mesh — `Bending`, `MeshReport`, the engagement rule, and the train that strings the stages together. |
+| `gear-core/src/train/mod.rs` | What every stage shares: the load cases and the walk that carries each toward the far port, `MemberRating` — every mesh a member is in, in every case, and the worst mesh — `Bending`, `MeshReport`, the engagement rule, and the train that strings the stages together. |
 | `crates/gear-io` | File formats: DXF export, the TOML material library and geartrain documents, and the string catalogue. |
 | `crates/gear-wasm` | The WebAssembly boundary. JSON in, JSON out. |
 | `crates/gear-cli` | Development harness — drive the mathematics without a browser. |
@@ -292,14 +292,14 @@ already flags. `tools/iso_6336_3_stack.py` multiplies the set out
 them, members, meshes, distances — and a spur pair, a crossed pair, a worm,
 a planetary set and a hula stage are *presets* over it: what `defaults`
 fills in, a vocabulary, and which inputs the panel puts forward. There is no
-kind in the core to branch on; `Stage` has one variant and keeps its tag. What a stage is, the solve reads off the
-shape — a mesh is internal because a member has a cutter, a set is an axis
+type in the core to branch on; `Stage` has one variant and keeps its tag.
+What a stage is, the solve reads off the shape — a mesh is internal because a member has a cutter, a set is an axis
 carried by a shaft and replicated, a worm is a distance marked as one — and
 the panel names the members the same way (`members.ts`). Closing the
 distances is one plan over every member's role (given, free, reaches,
 absorbs), the power flow is followed mesh by mesh with each mesh's loss in
 the direction it turns, and every mesh is pressed with its driver's force
-([reference](reference.md#the-stage), [rationale](rationale.md#each-stage-kind-keeps-its-own-result-type)).
+([reference](reference.md#the-stage), [rationale](rationale.md#one-stage-one-result)).
 The arrangements it reaches with no code of their own — a layshaft, a
 Wolfrom, a stepped planet, a planocentric, meshed planets, a Ravigneaux —
 are written as lists of what sits where in `train/arrangements.rs`, each
@@ -310,13 +310,13 @@ An automatic distance is what the shifts leave, opened out where an internal
 mesh's tips would cross at it — or, where a far-side gap was asked, the least
 distance that gives it, the shifts following: the hula stage's crank, sized
 by the shape for every arrangement with an internal mesh, and held to the
-figures the kind recorded before it retired.
+figures its own solver recorded before it retired.
 Two figures the graph makes free are reported beside the ratio and the
 efficiency: what one more tooth on each member would make the ratio, and
 the power through the teeth over the power in, per mesh and summed. A load
 on a shaft two stages share goes the way that holds it, and is refused only
 where it would be held at both ends.
-Retiring the kinds into it moved four figures, each recorded in
+Retiring the stage types into it moved four figures, each recorded in
 [corrections](corrections.md#the-log) with its size: a set's driven-side
 meshes pressed `η` short (0.55 % on the ring's bending); a backward case read
 as the sun's delivered torque (`1/η` high inside the set); a pair's operating
@@ -360,8 +360,8 @@ else asked that is the planet thinned by the clearance; the shipped 12/30/72
 has a sun small enough to need shift, so it opens with +0.298 on the sun and
 −0.170 on the planet, and its planet–ring mesh fouls at a full-depth ring as
 the reference records. The
-ring search, layout checks, Willis kinematics, Pennestrì–Freudenstein
-efficiency in all six arrangements, and backlash referred to the output shaft —
+ring sweep (`gear-cli planetary`), layout checks, Willis kinematics,
+Pennestrì–Freudenstein efficiency in all six arrangements, and backlash referred to the output shaft —
 which on the ideal ring a centre tolerance cannot move, the sun mesh gaining
 what the ring mesh loses. The set's clearance is always given: it is what the
 two nominal distances differ by, and no one distance could hand it back.
@@ -387,9 +387,9 @@ value instead, for a reason that is measured rather than tidy
 ([reference](reference.md#efficiency-parallel-axes)). Where the bound cannot
 reach at all — a shift a *relation* leaves over, which nobody chose and nothing
 can move — the tooth is reported undercut instead, on every rack-cut member of
-every stage kind. A ring has only the first control: its flank is its shaper's, and undercut is not a question that can be
-asked of it. The hula stage's "shift given on" select is gone with it — a
-mesh has one shift to give, and which member gives it is what the toggles say.
+every stage. A ring has only the first control: its flank is its shaper's, and
+undercut is not a question that can be asked of it. A mesh has one shift to
+give, and which member gives it is what the toggles say.
 
 The addendum carries the same pair, on the other end of the tooth: `no sharp
 tip` holds it to the tallest that keeps a tip `min_tip_width` wide, where an
@@ -399,7 +399,7 @@ is a closed-form solve on the tips, and an addendum moving with the shift would
 put an iteration inside it.
 
 **Every parallel-axis mesh reports the same things**, from one type rather than a
-copy per stage kind: the operating pressure angle, all three contact ratios,
+copy per stage type: the operating pressure angle, all three contact ratios,
 whether the pair hunts, the efficiency both ways, the contact stress the two
 members share, and the one gap seen from each of its ends. A crossed pair has
 none of it — its line of action slides rather than turning, so there is no such
@@ -411,9 +411,9 @@ those would need, and the worst mesh answering figure by figure. Most members ar
 in one mesh, a planet is in two, and adding a third is adding a list entry rather
 than an arm to an expression. The loadings are held **per load case** rather than
 as one list and a factor, because "the next case is this one times a number"
-is a claim about a stage's *power flow* and not about gearing — every kind here
-can make it, and one that could not would build each case for itself with nothing
-added.
+is a claim about a stage's *power flow* and not about gearing — the shape's
+flow, linear in the torque through it, can make it, and one that could not
+would build each case for itself with nothing added.
 
 **A stage that cannot be built still shows what built it.** A geartrain
 mid-edit is regularly one that will not solve, so every input, note and label
@@ -465,7 +465,7 @@ directions. Contact is `max(elliptical, line)` on **both** mesh kinds now — a
 crossed pair's ellipse lengthens as its shafts come parallel, so the line its
 teeth actually provide is what carries the load there, and rating on the ellipse
 alone under-stated a near-parallel pair eightfold. Load sharing is a stage input
-on **every kind that reports a bending stress**, off by default, reaching
+on **every stage that reports a bending stress**, off by default, reaching
 bending alone — a ring included, which had no shared section of its own. Below a
 virtual contact ratio of 2 the model finds the point the unshared rating already
 took and reports the same tooth, which is the model rather than a fault; a hula
@@ -524,8 +524,8 @@ geartrains
 exported and imported as TOML, inputs only · gear tabs with external and internal
 kinds, and eccentric in the same developer mode.
 
-**One word for a stage kind, and it is "stage"** — a worm stage, a hula stage,
-never a drive ([rationale](rationale.md#a-stage-kind-is-a-stage)). "Drive" names
+**One word for an arrangement, and it is "stage"** — a worm stage, a hula stage,
+never a drive ([rationale](rationale.md#an-arrangement-is-a-stage)). "Drive" names
 which way power flows and how the train is actuated, and nothing else.
 
 ---
@@ -539,7 +539,7 @@ been. They are not a backlog.
 |---|---|
 | **Crossed-axis bending** | The beam formula has no honest reading of a point load on a wide tooth, and choosing an effective width is a convention that multiplies a stress. [rationale](rationale.md#a-worm-stage-reports-no-bending-stress) |
 | **ISO/AGMA correction factors** | Narrow validated bands, balanced only as a complete set, against `σ_Flim` values this project does not have. [rationale](rationale.md#no-isoagma-correction-factors). `Y_S` and `Y_B` are the exceptions and are applied, neither being half of a pair; `Y_β`, `f_ε` and `Y_DT` are declined and recorded in full below |
-| **Equal planet load sharing** | The remedy is a mesh-load factor of the kind above. Said in every planetary result's notes. |
+| **Equal planet load sharing** | The remedy is a mesh-load factor of the kind above. Said in the notes of every stage with a replicated axis. |
 | **An S-N curve per material** | The two points it needs do not exist for six of the eight materials. [rationale](rationale.md#material-data-ships-estimates-deliberately) |
 | **Radial assembly** | Attempted, diagnosed and shelved with its findings; it blocks nothing, and planets are commonly installed axially. |
 
@@ -659,7 +659,7 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   message fits; a validation message longer than its field's bound note would
   still move the controls when it appeared.
 - **A shape's freedoms address one distance.** `Freedom::CentreDistance` and
-  `Freedom::Clearance` name *the* distance, as the kinds had one; every
+  `Freedom::Clearance` name *the* distance, as the stage types had one; every
   preset has one, and relief reads `distances[0]`. A Ravigneaux has three,
   and its second and third are outside relief: a designer who pins both
   shifts of a mesh on the third distance and the distance too is refused by
@@ -674,14 +674,14 @@ whose size is unmeasured is a debt still owed, and is marked as one.
   `N` as well, which is right where the two counts agree and unwritten
   where they do not.
 - **A mesh's two thickness coefficients are not held to sum to 2.** The shape
-  carries `k` per member, where the kinds carried one per stage and wrote the
+  carries `k` per member, where the stage types carried one per stage and wrote the
   pair themselves. A pair that does not sum to 2 is a legitimate mesh — the
   excess enters the shift sum as an equivalent shift and the zero-backlash
   distance moves with it — so it is not refused, and the card's note says
   what the ordinary choice is. Size: none, it is an input; what is missing is
   a remark on the result when the sum is not 2.
 - **A planet's net shaft torque is reported as zero**, which is what it is —
-  a free idler's two meshes balance — and what the set's kind never printed.
+  a free idler's two meshes balance — and what the set's own solver never printed.
   The torque its teeth carry is on its card, per mesh, as every member's is.
 
 ---

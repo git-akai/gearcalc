@@ -698,8 +698,8 @@ mod tests {
         }
 
         // Stages: spur, worm, crossed and planetary, over inputs that fire the
-        // notes each of them can raise. The three pair kinds are one solve
-        // with a kind on it; the names here say which the case is about.
+        // notes each of them can raise. Every one of them is the one shape;
+        // the names here say which preset the case is about.
         let lib = crate::default_library();
         let solve_spur = |stage: &gear_core::train::PairStage,
                           loads: &gear_core::train::StageLoads,
@@ -1610,26 +1610,30 @@ mod tests {
     ///
     /// *A case that cannot solve is not a case*, and an `if let Ok` around one
     /// is how it stays that way quietly.
-    /// - `error.train_no_power_flow` — an epicyclic set with no self-consistent
-    ///   power flow. The site is live and the message is right; what no design
-    ///   reaches is the **forward** solve refusing.
+    /// - `error.train_no_power_flow` — a stage with no self-consistent power
+    ///   flow. The site is live (`train::shape`, the **forward** flow) and the
+    ///   message is right; what no design reaches is that flow refusing.
     ///
-    ///   `planetary::power` is asked twice by a set: once forward at unit speed
-    ///   and unit torque, and once backward with the output's own reaction as
-    ///   the input. Only the first is a `?`; the second is a `map_or(0.0, …)`,
-    ///   because a set that cannot be back-driven is self-locking and that is
-    ///   an *answer* rather than a refusal (`docs/reference.md#planetary-sets`).
-    ///   And a genuinely driving input appears never to refuse: swept over
-    ///   **1.1 million** combinations — sun 1…119 against ring 1…249, `η₀` from
-    ///   0.999 down to 0.3, all six arrangements — with no `None` at all, and
-    ///   `planetary::tests::a_driving_input_always_has_a_flow` holds that in the
-    ///   crate rather than in a note.
+    ///   `flow::solve` is asked twice by a stage: once forward at unit speed
+    ///   and unit torque, and once backward with the output as the input. Only
+    ///   the first is a refusal; the second is a `map_or(0.0, …)`, because a
+    ///   stage that cannot be back-driven is self-locking and that is an
+    ///   *answer* rather than a refusal (`docs/reference.md#the-stage`). A
+    ///   genuinely driving input appears never to refuse: the flow is held to
+    ///   Pennestrì's closed form on every arrangement (`flow::tests`), and
+    ///   that form was swept over **1.1 million** combinations — sun 1…119
+    ///   against ring 1…249, `η₀` from 0.999 down to 0.3, all six arrangements
+    ///   — with no refusal at all, which
+    ///   `planetary::tests::a_driving_input_always_has_a_flow` holds in the
+    ///   crate rather than in a note. The one mesh that can lock, the
+    ///   crossed-axis one, is solved in `train::crossed` and never reaches
+    ///   this flow; a parallel-axis mesh's efficiency is never nought.
     ///
-    ///   So it is an exemption with a reason rather than a hole: the two ways
-    ///   `power` can refuse are a degenerate Willis coefficient, which wants
-    ///   `z_ring = 0` or `z_ring = −z_sun`, and neither branch confirming
-    ///   itself, which is the back-driven case the other call site already
-    ///   treats as an answer.
+    ///   So it is an exemption with a reason rather than a hole: the ways the
+    ///   flow can refuse are an input that does not turn, which the motion
+    ///   solve has already refused as undetermined, and no assignment of
+    ///   directions confirming itself, which is the back-driven case the other
+    ///   call site already treats as an answer.
     const UNFIRED: &[&str] = &["clamp.ring_fully_filleted", "error.train_no_power_flow"];
 
     #[test]

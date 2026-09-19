@@ -47,10 +47,11 @@
 //!
 //! Two different things, and neither covers the other:
 //!
-//! - **the declaration** — that *this* kind's shafts, frames and mesh kinds are
-//!   the ones it actually has — is checked against the kind's own kinematics,
-//!   in `train::tests`. Six wiring faults were injected against that gate and
-//!   all six fired;
+//! - **the declaration** — that *this* stage's shafts, frames and mesh kinds
+//!   are the ones it actually has — was checked against each retired stage
+//!   type's own kinematics, in `train::tests`, and is checked now against
+//!   Pennestrì's closed form and the reference tables. Six wiring faults
+//!   were injected against that gate and all six fired;
 //! - **the relation itself** — that a row written this way is what rigid-body
 //!   motion gives — is checked by `tools/train_kinematics.py`, which derives
 //!   every topology from velocities at the pitch point and shares no expression
@@ -117,31 +118,6 @@ pub struct Mount {
     pub replicated: bool,
 }
 
-impl Mount {
-    /// A member riding a carrier at some radius — a planet, replicated once
-    /// per path of every mesh it is in.
-    #[must_use]
-    pub const fn riding(spins_with: Shaft, carrier: Shaft) -> Self {
-        Self {
-            spins_with,
-            axis_fixed_in: carrier,
-            replicated: true,
-        }
-    }
-
-    /// A member whose axis **is** the frame's axis — a sun, a ring, a hula
-    /// stage's two fixed-axis gears — so it stands still in that frame, and
-    /// there is one of it however many planets meet it.
-    #[must_use]
-    pub const fn coaxial_with(spins_with: Shaft, frame: Shaft) -> Self {
-        Self {
-            spins_with,
-            axis_fixed_in: frame,
-            replicated: false,
-        }
-    }
-}
-
 /// One mesh, by member index.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MeshSpec {
@@ -156,7 +132,7 @@ pub struct MeshSpec {
     /// rowspace and the same rank. So the convention is for the reader and for
     /// the geometry that reads it, and a wiring cannot get the kinematics wrong
     /// by writing the pair the other way round. Every *other* transposition
-    /// tried against these tests — the kind, the frame, the shaft a member
+    /// tried against these tests — the mesh kind, the frame, the shaft a member
     /// spins with — is caught.
     pub a: usize,
     pub b: usize,
@@ -194,7 +170,7 @@ pub enum WiringError {
     /// root section"*, which describes a tooth that exists.
     MemberWithoutTeeth(usize),
     /// A member or shaft index a wiring names and does not have, or a gear
-    /// meshing itself. A kind's defect rather than a design's.
+    /// meshing itself. A preset's defect rather than a design's.
     NotAMesh(usize),
     /// **The stage's boundary does not determine its motion**, or contradicts
     /// it: too few of its shafts held or driven for one answer, or two
@@ -359,7 +335,7 @@ impl Wiring {
 
 /// **What one member does at one turn of its stage's input shaft.**
 ///
-/// The one place a kind's speeds come from. Three kinds each worked these out
+/// The one place a stage's speeds come from. Three stage types each worked these out
 /// for themselves — a pair from its tooth-count ratio, a set from
 /// `planetary::power`, a hula stage from the two products — and between them
 /// they disagreed about *sign*: a pair's second member came back positive while

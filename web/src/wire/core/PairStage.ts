@@ -12,7 +12,7 @@ import type { StageGear } from "./StageGear";
  * size is a diameter someone chose — one stage, as the specification has it,
  * with the shaft angle and which reading of the size is given as the inputs
  * that distinguish them. It
- * is not four kinds of stage: the tooth counts, the module, the shifts, the
+ * is not four types of stage: the tooth counts, the module, the shifts, the
  * materials and the tolerances mean the same thing throughout, and only the
  * *mesh* differs.
  *
@@ -75,7 +75,7 @@ shaft_angle: number,
  * follows from that. Automatic with every size reading automatic, the
  * size is solved to reach a given centre distance, but only where both
  * shifts are pinned: a shift is the thing that absorbs a distance by
- * preference ([`Self::first_pitch_diameter`]). A worm stage is the kind
+ * preference ([`Self::first_pitch_diameter`]). A worm stage is the case
  * that was built for — it has no profile shift by convention, so its
  * size is what a housing decides — and a helical pair cut to fit a
  * standard centre distance is the same request on parallel shafts.

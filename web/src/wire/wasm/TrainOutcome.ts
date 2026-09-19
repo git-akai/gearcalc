@@ -31,7 +31,7 @@ figures: Array<Array<Figure>>,
 /**
  * **Every stage's ports**, with the label the panel names each by — so a
  * designer is offered exactly the shafts a train may hold, drive or
- * couple, read from the kind's wiring rather than written into the front
+ * couple, read from the stage's wiring rather than written into the front
  * end a second time. Present on success and failure alike: it needs no
  * geometry.
  */

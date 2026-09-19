@@ -100,7 +100,7 @@ centre_distance: Auto<number>,
  * ([`crate::mesh::MeshKind::run_at`]) — which is what the absorbing shift
  * is solved to leave. That is why it cannot be derived: a given distance
  * and given shifts leave one gap on each mesh, and there is no one number
- * for this field to be. It carries the same `Auto` every kind's does so
+ * for this field to be. It carries the same `Auto` every distance's does so
  * the front end can offer it the same way; [`super::Stage::freedoms`]
  * says it may not be automatic, and relief pins it.
  */

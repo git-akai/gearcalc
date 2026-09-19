@@ -128,7 +128,7 @@ reversed_bending_applied = "root is loaded by both flanks and is rated against {
 # ---------------------------------------------------------------- mesh notes
 #
 # A finding about one mesh, drawn beside the figure it is about — the contact
-# ratio, the efficiency, the bending stress — on whichever stage kind the mesh
+# ratio, the efficiency, the bending stress — on whichever stage the mesh
 # is in. A set has two meshes and says which.
 
 [mesh]
@@ -369,7 +369,7 @@ train_from_bending_fatigue = "from bending, fatigue"
 train_from_bending_ultimate = "from bending, ultimate"
 train_from_contact_fatigue = "from contact, fatigue"
 train_from_contact_ultimate = "from contact, ultimate"
-train_hula_held_open_by = "held open by mesh {mesh}"
+train_distance_sized_by = "held open by mesh {mesh}"
 train_mobility = "mobility {mobility}, {given} given"
 train_note_not_reacted = "held only by a stage that cannot be driven this way; otherwise the load turns the train"
 train_note_overlap = "ε_β = b sin β / (π m_n); given, a floor under an automatic face width, or the helix when every width is given"

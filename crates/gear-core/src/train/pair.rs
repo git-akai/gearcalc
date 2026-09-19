@@ -149,8 +149,8 @@ impl ShiftAsked {
     }
 }
 
-/// **Which pair this is, to a designer** — the layer over [`PairStage`] that a
-/// stage kind is.
+/// **Which pair this is, to a designer** — the layer over [`PairStage`] that
+/// a preset is.
 ///
 /// The model underneath is one model: a worm is a helical gear with a few
 /// starts at a steep helix, its wheel a helical gear at the complementary one,
@@ -191,7 +191,7 @@ pub enum PairKind {
 /// size is a diameter someone chose — one stage, as the specification has it,
 /// with the shaft angle and which reading of the size is given as the inputs
 /// that distinguish them. It
-/// is not four kinds of stage: the tooth counts, the module, the shifts, the
+/// is not four types of stage: the tooth counts, the module, the shifts, the
 /// materials and the tolerances mean the same thing throughout, and only the
 /// *mesh* differs.
 ///
@@ -255,7 +255,7 @@ pub struct PairStage {
     /// follows from that. Automatic with every size reading automatic, the
     /// size is solved to reach a given centre distance, but only where both
     /// shifts are pinned: a shift is the thing that absorbs a distance by
-    /// preference ([`Self::first_pitch_diameter`]). A worm stage is the kind
+    /// preference ([`Self::first_pitch_diameter`]). A worm stage is the case
     /// that was built for — it has no profile shift by convention, so its
     /// size is what a housing decides — and a helical pair cut to fit a
     /// standard centre distance is the same request on parallel shafts.
@@ -360,7 +360,7 @@ impl Default for PairStage {
 }
 
 impl PairStage {
-    /// **The worm kind's preset**: a single start of 7 mm pitch diameter at a
+    /// **The worm preset**: a single start of 7 mm pitch diameter at a
     /// right angle to a 40-tooth brass wheel, with the float a worm's thrust
     /// bearing leaves it.
     ///

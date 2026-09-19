@@ -27,7 +27,7 @@
  *
  * It was a hula stage's, in four fields of its own, and the epicyclic set with
  * the same internal mesh in it reported nothing — so a designer was told
- * whether the teeth foul or not according to which stage kind they had picked.
+ * whether the teeth foul or not according to which stage type they had picked.
  * The set's shipped proportions fail the involute question and had never said
  * so. *A constraint belongs to the mesh*, and so does what it found: a ring's
  * tip is the mesh's business wherever the ring is.

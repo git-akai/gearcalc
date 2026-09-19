@@ -5,7 +5,7 @@
 //! ([`super::PairStage`], [`super::PlanetaryStage`]); these are the ones the
 //! shape reaches with no code of their own, kept here so the harness
 //! (`gear-cli kinematics`) and the suite can name them, and so a future
-//! preset is a function of tooth counts rather than a kind. Each is a
+//! preset is a function of tooth counts rather than a type of its own. Each is a
 //! textbook arrangement, and the test beside each holds the ratio the
 //! textbook gives.
 //!

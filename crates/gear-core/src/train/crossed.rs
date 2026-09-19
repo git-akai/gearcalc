@@ -1,7 +1,7 @@
 //! The crossed-axis mesh: point contact, along a line of action that cannot
 //! turn.
 //!
-//! **Not a stage kind.** A worm stage and a crossed gear pair are one
+//! **Not a stage of its own.** A worm stage and a crossed gear pair are one
 //! [`super::PairStage`] whose shafts are not parallel, and this is the mesh
 //! they share; the parallel mesh is [`super::pair`]'s. It fills the same
 //! [`super::MeshReport`] a parallel mesh does — two efficiencies where the
@@ -180,7 +180,7 @@ pub(crate) struct CrossedResult {
 /// Solve a pair whose shafts cross — a worm stage, or a crossed gear pair.
 ///
 /// One solve for both, because they are one thing: crossed-axis screw gearing
-/// between two involute helicoids. The kind decides one thing here, the
+/// between two involute helicoids. The pair's kind decides one thing here, the
 /// automatic face width where no rating sizes one ([`PairKind`]):
 ///
 /// - a **worm** and its wheel take the conventional proportions of a worm
@@ -290,7 +290,7 @@ pub(crate) fn solve_crossed_pair(
         .map(|path| path.limited_by_face(&s, widths).map_or(*path, |(z, _)| z));
     // **Two coefficients, and only one of them is an efficiency.** The static
     // one decides whether the drive breaks away at all; the sliding one decides
-    // how well it runs once it has. This is the stage kind the rule is *for* —
+    // how well it runs once it has. This is the mesh the rule is *for* —
     // a worm is the only mesh here that sits near its own threshold — but the
     // rule lives in `Directional::once_moving` and every stage applies it.
     let with = |mu: f64| {
@@ -577,7 +577,7 @@ pub(crate) fn solve_crossed_pair(
                 .zip(&contact)
                 .map(|(c, patch)| {
                     // **What this member does comes from the graph**, as it
-                    // does for every kind: crossing the shafts changes what the
+                    // does for every member: crossing the shafts changes what the
                     // teeth do to each other and changes nothing at all about
                     // the speeds, so a worm stage's motion is a spur stage's.
                     let m = motion.members[i];
@@ -1271,14 +1271,14 @@ mod tests {
         );
     }
 
-    /// **The kind decides the proportions, not the reading.**
+    /// **The pair's kind decides the proportions, not the reading.**
     ///
     /// The proportions describe a worm carrying an enveloping wheel. A crossed
     /// gear pair is two helical gears touching at a point, so quoting them
     /// there would be shipping a convention outside the case it was written
     /// for — and quietly, since the number would look like any other. The same
     /// 17/23 pair at 45° is a worm drive if a designer says it is and a gear
-    /// pair otherwise, and only the kind says which: as a gear pair its
+    /// pair otherwise, and only [`PairKind`] says which: as a gear pair its
     /// automatic face is the width that keeps contact continuous, with no
     /// recommendation beside it.
     #[test]

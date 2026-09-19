@@ -783,7 +783,7 @@ pub struct TrainOutcome {
     pub figures: Vec<Vec<gear_core::train::Figure>>,
     /// **Every stage's ports**, with the label the panel names each by — so a
     /// designer is offered exactly the shafts a train may hold, drive or
-    /// couple, read from the kind's wiring rather than written into the front
+    /// couple, read from the stage's wiring rather than written into the front
     /// end a second time. Present on success and failure alike: it needs no
     /// geometry.
     pub topology: Vec<gear_core::train::StagePorts>,
@@ -1027,7 +1027,7 @@ pub struct Defaults {
     pub gear: GearTabDefaults,
     /// A fresh geartrain, with one spur stage in it.
     pub train: gear_core::train::Train,
-    /// One of each stage kind, for the "add stage" menu. A crossed gear pair is
+    /// One of each preset, for the "add stage" menu. A crossed gear pair is
     /// **not** one of them — it is a spur stage with its shafts at an angle
     /// (docs/reference.md#crossed-axes).
     pub spur_stage: gear_core::train::Stage,
@@ -1430,7 +1430,7 @@ fn adopt_member_impl(input: &str) -> Result<String, String> {
 ///
 /// Which inputs argue, how many may stand and which gives way first are facts
 /// about the geometry, and they used to live in the panel as three functions,
-/// one per stage kind, restating a relation the core already enforces. **It is
+/// one per stage type, restating a relation the core already enforces. **It is
 /// the same relation the solve reads from the other end**, so the two have to
 /// agree or a designer is offered an input the solve will disregard.
 ///
@@ -1567,7 +1567,7 @@ mod tests {
     #[test]
     fn a_geartrain_survives_export_and_import_as_the_same_answers() {
         // Start from the defaults the UI hands out, so the tested path is the
-        // one a user actually takes, and give it one of every stage kind.
+        // one a user actually takes, and give it one of every preset.
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let crossed = {
             let mut c = d["spur_stage"].clone();
@@ -1582,8 +1582,8 @@ mod tests {
                 { "kind": "ultimate", "enabled": true, "port": "end", "reacted": false, "torque": 0.1, "speed": 0.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } },
                 { "kind": "fatigue", "enabled": true, "port": "start", "reacted": true, "torque": 0.2, "speed": 9600.0, "duty": { "continuous": { "runtime_hours": 1000.0 } } }
             ],
-                // Every stage kind, and a crossed pair too — which is a spur
-                // stage with its shafts at an angle, not a kind of its own.
+                // Every preset, and a crossed pair too — which is a spur
+                // stage with its shafts at an angle, not a preset of its own.
                 "stages": [d["spur_stage"], crossed, d["worm_stage"], d["planetary_stage"]],
             }
         });
@@ -1825,9 +1825,8 @@ mod tests {
         assert_eq!(a, b);
     }
 
-    /// A train with two kinds of stage in it, which is what the `kind` tag on
-    /// each stage is for. The worm result has a different shape from the spur
-    /// one, and both have to survive the same boundary.
+    /// A train with two presets in it. The worm's result has a point contact
+    /// where the spur's has a line, and both have to survive the same boundary.
     /// A ring crosses the boundary: its own request shape, its own summary, an
     /// outline the viewport can draw and a DXF the CAD can read.
     /// **An eccentric gear crosses whole, and a concentric one says why it has
@@ -2586,7 +2585,7 @@ mod tests {
         assert_eq!(d["continuous_duty"]["continuous"]["runtime_hours"], 1000.0);
         assert_eq!(d["train"]["reversed_bending"], false);
 
-        // **The face width a panel seeds, on every gear of every stage kind it
+        // **The face width a panel seeds, on every gear of every preset it
         // offers.** It is the one number here that is not written once: the
         // core's default is a plain 10 mm and the tab wants the width the rating
         // asks for, so each gear is rebuilt with an automatic 5 mm — and a walk
@@ -2622,15 +2621,15 @@ mod tests {
             }
         }
         // Two on a pair, three on a set, four on a hula stage, two on a worm,
-        // and the pair again inside the train — every member of every kind the
+        // and the pair again inside the train — every member of every preset the
         // panel can open.
         assert_eq!(seeded, 13, "a member's width went unseeded");
     }
 
     #[test]
     fn every_number_that_crosses_is_a_number() {
-        // Every stage kind the defaults can build, in one train, so the walk
-        // covers every result shape there is.
+        // Every preset the defaults can build, in one train, so the walk
+        // covers every layout there is.
         let d: serde_json::Value = serde_json::from_str(&defaults_impl().unwrap()).unwrap();
         let mut stages = d["train"]["stages"].as_array().unwrap().clone();
         for extra in ["worm_stage", "planetary_stage", "hula_stage"] {

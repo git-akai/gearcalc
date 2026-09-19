@@ -87,8 +87,8 @@ impl ContactRatios {
     /// The three, from the transverse one and the mesh they belong to.
     ///
     /// `ε_β = b sin β / (π m_n)` and `ε_γ = ε_α + ε_β` — one line each, but
-    /// written out once per stage kind they were three copies of the same two
-    /// lines, and a fourth stage away from being four. The width is the mesh's
+    /// written out once per stage type they were three copies of the same two
+    /// lines, and a fourth type away from being four. The width is the mesh's
     /// **effective** one, the narrower of the two members, because that is the
     /// width that carries the pair.
     #[must_use]
@@ -144,7 +144,7 @@ impl Backlash {
     /// is therefore a candidate for either end, and the band is the extremes
     /// of the three rather than of the two.
     ///
-    /// It was written out four times, once per stage kind, each closing over its
+    /// It was written out four times, once per stage type, each closing over its
     /// own way of turning a distance into an angle. That is the part that
     /// genuinely differs — a parallel mesh, a screw pair and a crank each reach
     /// it differently — so it is the argument, and the three lines around it are
@@ -269,7 +269,7 @@ pub struct MeshReport {
     /// which has no such question: an external pair's tip circles cross on the
     /// line of centres or not at all.
     pub tips: Option<TipRoom>,
-    /// **What this mesh has to say**, on every kind alike: contact that does not
+    /// **What this mesh has to say**, on every mesh alike: contact that does not
     /// stay continuous, a helical pair without full axial overlap, a sharing
     /// model that is extrapolating, a screw pair that locks or nearly does,
     /// or one that loses more than it keeps. A set has two meshes and says
@@ -412,8 +412,8 @@ impl ContactPatch {
     }
 }
 
-/// **What a line contact's builder has in hand**, gathered so the three kinds
-/// that report one fill the report through one function rather than each
+/// **What a line contact's builder has in hand**, gathered so every caller
+/// that reports one fills the report through one function rather than
 /// restating which of its fields a line contact leaves at their degenerate
 /// values.
 pub(crate) struct LineMesh {
@@ -438,8 +438,8 @@ pub(crate) struct LineMesh {
 /// the transverse figures in [`LineContact`].
 pub(crate) fn line_mesh_report(loads: &StageLoads, m: LineMesh) -> MeshReport {
     // The two findings every line contact's ratios can raise, asked here so
-    // that no kind has to remember to — the pair asked both and neither
-    // epicyclic kind asked either.
+    // that no caller has to remember to — the pair stage asked both and
+    // neither epicyclic stage asked either, while there were such stages.
     let mut notes = m.notes;
     let r = &m.contact_ratios;
     if r.transverse < 1.0 {
@@ -505,7 +505,7 @@ pub(crate) fn line_mesh_report(loads: &StageLoads, m: LineMesh) -> MeshReport {
 ///
 /// It was a hula stage's, in four fields of its own, and the epicyclic set with
 /// the same internal mesh in it reported nothing — so a designer was told
-/// whether the teeth foul or not according to which stage kind they had picked.
+/// whether the teeth foul or not according to which stage type they had picked.
 /// The set's shipped proportions fail the involute question and had never said
 /// so. *A constraint belongs to the mesh*, and so does what it found: a ring's
 /// tip is the mesh's business wherever the ring is.
@@ -668,9 +668,9 @@ pub(crate) const PROBE: f64 = 10.0;
 /// being asked outside the band it was described in.
 ///
 /// All three are per *(member, mesh)*, which is why they travel together and
-/// why this is one place rather than one per stage kind. It had been none: the
+/// why this is one place rather than one per stage type. It had been none: the
 /// pair asked for the section and the share inline and raised the note itself,
-/// and the two epicyclic kinds asked for neither — so the one estimate this
+/// and the two epicyclic stages asked for neither — so the one estimate this
 /// crate ships reached one stage of three, and a set that switched the model on
 /// got it on the members it happened to share code with.
 pub(crate) struct Bending {
@@ -765,8 +765,8 @@ pub(crate) fn rim_below_minimum(rim: Option<crate::strength::RimSupport>) -> Opt
 /// **What one mesh does to one member**: the two stresses it produces there,
 /// and the widths they belong to.
 ///
-/// A member is not always in one mesh. A planet is in two, and a stage kind
-/// nobody has written yet may put a member in more — so a rating is taken over
+/// A member is not always in one mesh. A planet is in two, and an arrangement
+/// nobody has laid out yet may put a member in more — so a rating is taken over
 /// *however many there are* rather than over a named pair, and adding a mesh to
 /// a member is adding an entry to a list rather than an arm to an expression.
 ///
@@ -814,9 +814,10 @@ impl Loading {
     ///
     /// Bending is linear in torque and contact goes as its square root
     /// (docs/reference.md#load-cases), so where a stage's power split does not
-    /// depend on the *magnitude* of what passes through it — which is every
-    /// kind here, and is a fact about each kind rather than about gearing — a
-    /// second load case is this rather than a second solve. A stage whose flow
+    /// depend on the *magnitude* of what passes through it — which the shape's
+    /// flow guarantees, being linear in the torque through it, and is a fact
+    /// about the flow rather than about gearing — a second load case is this
+    /// rather than a second solve. A stage whose flow
     /// does not have that property builds each case's loadings itself, which is
     /// why they are held per case rather than as one list and a factor.
     fn under(self, k: f64) -> Self {
@@ -855,10 +856,11 @@ pub(crate) struct CaseLoadings {
 
 /// **What one member's ratings come to**, over every mesh it is in.
 ///
-/// Every stage kind asks the same questions of every member it builds — two
+/// The stage asks the same questions of every member it builds — two
 /// stresses in every load case, and the width each of those would need — and
-/// each of them had been writing the arithmetic out for itself. What
-/// genuinely differs between kinds is what the meshes do to the member and
+/// each of the stage types that preceded it had been writing the arithmetic
+/// out for itself. What genuinely differs between members is what the meshes
+/// do to the member and
 /// which allowable a reversed root answers to, and both arrive here as values.
 ///
 /// **The worst mesh wins, figure by figure.** A planet's root is loaded by the
@@ -881,9 +883,9 @@ pub(crate) struct MemberRating<'a> {
     ///
     /// Per case rather than one list and a factor, because "the next case is
     /// this one times a number" is a claim about a *stage's power flow* rather
-    /// than about gearing. It holds for every kind here and
-    /// [`Loading::for_cases`] is how they say so; a kind whose flow does not
-    /// scale with what passes through it builds each case for itself, and needs
+    /// than about gearing. It holds for the shape's flow and
+    /// [`Loading::for_cases`] is how it says so; a flow that did not scale with
+    /// what passes through it would build each case for itself, and would need
     /// nothing added here to do it.
     pub cases: Vec<CaseLoadings>,
 }
@@ -1046,11 +1048,11 @@ fn coefficient<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> 
 
 // -------------------------------------------------- the shared member ---
 //
-// `StageGear` is what *every* stage kind describes a member with, so it lives
-// here with the rest of the shared vocabulary rather than in the kind that
+// `StageGear` is what every member of a stage is described with, so it lives
+// here with the rest of the shared vocabulary rather than in the preset that
 // happened to need it first. It was declared in `spur.rs` and re-exported from
 // this module, which read as though the parallel-axis stage owned it — and this
-// module's own comment says it holds "what every stage kind shares".
+// module's own comment says it holds "what every stage shares".
 
 /// One gear of a stage.
 ///
@@ -1403,17 +1405,17 @@ pub struct GearResult {
 }
 
 /// The facts a stage has about one of its members, gathered so that assembling
-/// a [`GearResult`] is one expression rather than one per stage kind.
+/// a [`GearResult`] is one expression rather than one per stage type.
 ///
 /// # Why this exists
 ///
-/// Three kinds built a `GearResult` field by field, listing the same seventeen
+/// Three stage types built a `GearResult` field by field, listing the same seventeen
 /// names each time. Sixteen agreed. The seventeenth did not: a member's share
 /// of a load from the far end was the mesh projection of the backward torque in
 /// the spur stage and this gear's forward torque scaled by `|t| / |forward|` in
 /// the other two — the same number wherever the projection is linear, which it
 /// is, **except in sign**. A stage with a negative ratio gave a signed figure
-/// from one kind and a magnitude from another, for the field beside the forward
+/// from one type and a magnitude from another, for the field beside the forward
 /// torque, which is signed.
 ///
 /// That is the fault `docs/corrections.md` opens with: a duplicated formula is a
@@ -1427,15 +1429,15 @@ pub(crate) struct MemberFacts<'a> {
     /// Every load case's readout, from [`Rated::into_case`].
     ///
     /// **The torque in each is given by the stage rather than derived here**,
-    /// and that is the finding. Three kinds referred a back-driving load by
+    /// and that is the finding. Three stage types referred a back-driving load by
     /// scaling this member's *forward* torque, which is exact wherever the
     /// forward torque is a geometric projection or the two directional
-    /// efficiencies agree — true of every parallel-axis kind. A worm stage is
+    /// efficiencies agree — true of every parallel-axis mesh. A worm stage is
     /// neither: its wheel's forward torque carries a forward efficiency of 62 %
     /// that a backward load does not share, and its backward efficiency is
-    /// zero. So each kind projects each case's torque through its own
-    /// construction in that case's direction, and this holds no formula a kind
-    /// could need to disagree with.
+    /// zero. So the stage projects each case's torque through its flow in that
+    /// case's direction, and this holds no formula a caller could need to
+    /// disagree with.
     pub cases: Vec<GearCase>,
     /// The width this member is *rated at*, which is its mesh's rather than its
     /// own ([`Widths`]).
@@ -1450,7 +1452,7 @@ pub(crate) struct MemberFacts<'a> {
 impl GearResult {
     /// One member's result, from what the stage knows about it.
     ///
-    /// Every stage kind comes through here, so a field cannot be filled two ways
+    /// Every member comes through here, so a field cannot be filled two ways
     /// — see [`MemberFacts`] for the one that was.
     pub(crate) fn of(f: MemberFacts) -> Self {
         let pitch_diameter =
@@ -1622,7 +1624,7 @@ impl From<MotionError> for TrainError {
     }
 }
 
-/// So a kind's wiring can refuse in the vocabulary every stage refuses in.
+/// So the wiring can refuse in the vocabulary the stage refuses in.
 impl From<WiringError> for TrainError {
     fn from(e: WiringError) -> Self {
         Self::Wiring(e)
@@ -1799,7 +1801,7 @@ impl std::fmt::Display for TrainError {
 impl std::error::Error for TrainError {}
 
 /// A self-contained material library for tests, so `gear-core` keeps no
-/// dependency on `gear-io`. Shared by every stage kind's tests.
+/// dependency on `gear-io`. Shared by every preset's tests.
 #[cfg(test)]
 pub(super) fn test_library() -> MaterialLibrary {
     use crate::material::{Basis, Family, Measure, Value};
@@ -1974,7 +1976,7 @@ impl Default for Stage {
 ///   answer to choose and the stage kept what it had.
 ///
 /// The first is the tool working. The second is a design with no room in it, and
-/// it was silent on every kind — the audit's record (`docs/history/audit.md`,
+/// it was silent on every stage — the audit's record (`docs/history/audit.md`,
 /// F58) measured both ends of it on one
 /// stage before this existed to tell them apart.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1997,7 +1999,7 @@ pub(crate) struct Chosen<const N: usize> {
 }
 
 impl Searched {
-    /// The note this deserves, if any — so no kind has to remember the wording
+    /// The note this deserves, if any — so no caller has to remember the wording
     /// or which of the three states is worth saying out loud.
     pub(crate) fn note(self) -> Option<Note> {
         (self == Self::FoundNothing).then(|| Note::new(key::STAGE_OPTIMISER_FOUND_NOTHING))
@@ -2008,8 +2010,8 @@ impl Searched {
 /// anything.
 ///
 /// Two findings, and both were silent. They are here rather than in each stage's
-/// own file because every kind that has a centre distance can reach them, and a
-/// rule one kind asks is a rule the others forget — which `docs/corrections.md`
+/// own file because every distance can reach them, and a rule one stage type
+/// asked was a rule the others forgot — which `docs/corrections.md`
 /// records happening to the tip-room flags and to the axial-overlap warning.
 ///
 /// # The distance was given and the shifts could not reach it
@@ -2073,8 +2075,8 @@ pub(crate) fn distance_notes(target: Option<f64>, nominal: f64, clearance: f64) 
 /// a clearance, a ratio, a worm's diameter — and one of each per member.
 /// `Member(i, _)` indexes the members in the order [`StageResult::members`]
 /// reports them — a pair's two gears, a set's sun, planet and ring, a hula
-/// stage's four — and is resolved once for every kind ([`member_inputs`]), so
-/// a member input that arrives costs one line there and none per kind.
+/// stage's four — and is resolved once for every member ([`member_inputs`]), so
+/// a member input that arrives costs one line there and none per preset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
@@ -2123,7 +2125,7 @@ pub enum MemberFreedom {
 }
 
 /// **Every constrainable input a run of members has**, by name — the one
-/// place a [`MemberFreedom`] meets the field it names, for every kind at once.
+/// place a [`MemberFreedom`] meets the field it names, for every member at once.
 pub(crate) fn member_inputs<'a>(
     gears: impl IntoIterator<Item = &'a mut StageGear>,
 ) -> Vec<(Freedom, &'a mut Auto<f64>)> {
@@ -2168,7 +2170,7 @@ pub struct Figure {
 ///
 /// The helix is one number a stage's members share — `β₂ = Σ − β₁` on a pair,
 /// the hand flipped across an external mesh in a set, one angle on a hula
-/// stage's four — so a kind has several inputs that all say it: each member's
+/// stage's four — so a stage has several inputs that all say it: each member's
 /// helix, a pair's first pitch diameter (`d = z m_n / cos β`), and the axial
 /// contact ratio where every face is given and the ratio can be turned into a
 /// helix at the width the mesh carries. Those are *readings* of one freedom,
@@ -2221,7 +2223,7 @@ pub(crate) fn stated_helix(readings: &[Reading]) -> Option<f64> {
 /// — where the ratio is given and the helix can carry one. `None` where the
 /// ratio is automatic or the teeth are straight, which no width makes helical.
 ///
-/// One home for the relation every kind with a line contact asks, read as a
+/// One home for the relation every line contact asks, read as a
 /// width: the ask an automatic face width adds to its ratings'.
 pub(crate) fn width_for_overlap(overlap: &Auto<f64>, helix_deg: f64, module: f64) -> Option<f64> {
     let sin = helix_deg.to_radians().sin().abs();
@@ -2272,14 +2274,14 @@ pub(crate) fn helix_for_overlap(overlap: f64, module: f64, width: f64) -> Option
 ///
 /// # Why the *stage* declares this rather than the front end
 ///
-/// It was three functions in TypeScript, one per stage kind, each restating a
+/// It was three functions in TypeScript, one per stage type, each restating a
 /// relation the core already enforces. That is two faults at once: an
 /// engineering rule written outside Rust, and the same idea written once per
-/// kind — so a fifth kind arrives with no relief at all, and a rule that changes
-/// changes in one of four places. It is also untestable there, and was untested.
+/// type — so a new arrangement arrived with no relief at all, and a rule that
+/// changed changed in one of four places. It is also untestable there, and was untested.
 ///
-/// The stage kinds genuinely differ in *what* is related, which is why this is a
-/// declaration and not a constant: a pair relates its distance to its two
+/// The arrangements genuinely differ in *what* is related, which is why this
+/// is a declaration and not a constant: a pair relates its distance to its two
 /// shifts, an epicyclic set relates its three shifts to each other through the
 /// two distances that must agree, and a hula stage relates each mesh's pair
 /// separately because its crank fixes their difference one mesh at a time.
@@ -2306,9 +2308,9 @@ pub struct FreedomGroup {
     /// neither has anything to derive from. One of the two has to be a number
     /// somebody gave.
     ///
-    /// A kind with **no** distance input would say `0` here — its clearance
+    /// A stage with **no** distance input would say `0` here — its clearance
     /// could never be derived, because there is nothing to derive it from. That
-    /// is the same statement, counted; every kind has the input now, so none
+    /// is the same statement, counted; every distance has the input, so none
     /// says it.
     pub automatic_at_most: usize,
     /// The inputs in the argument, **relief order, least precious first**.
@@ -2330,8 +2332,9 @@ pub struct FreedomGroup {
 
 /// **Two ways of saying one number, so one of them must be said.** A distance
 /// is nominal + clearance and an automatic clearance is distance − nominal;
-/// with both automatic neither has anything to derive from. A pair's group;
-/// the two epicyclic kinds cannot derive a clearance at all and say so with
+/// with both automatic neither has anything to derive from. The group of a
+/// distance the shape may relieve; a distance it holds — every epicyclic
+/// preset's — cannot derive a clearance at all and says so with
 /// [`always_given`].
 pub(crate) fn distance_and_clearance() -> FreedomGroup {
     FreedomGroup {
@@ -2357,8 +2360,8 @@ pub(crate) fn entry(readings: &[Reading]) -> Vec<Freedom> {
     readings.iter().map(|r| r.freedom).collect()
 }
 
-/// **What a kind declares so the machinery shared by every kind can serve it**
-/// — the whole of what a new kind owes.
+/// **What the stage declares so the machinery above it can serve it** — the
+/// whole of what a stage owes.
 ///
 /// Six questions: which members it has, which inputs relief may turn and by
 /// what name, how its helix may be stated, which of its inputs argue with each
@@ -2366,17 +2369,18 @@ pub(crate) fn entry(readings: &[Reading]) -> Vec<Freedom> {
 /// address** and what convention holds when it addresses none. Everything
 /// that walks those — counting, relieving, seeding a box, reading the helix
 /// the readings state, assembling the kinematic system, laying a train's
-/// constraints over the convention — is written once above the kinds, so a
-/// kind that answers the six has all of it without writing any.
+/// constraints over the convention — is written once above the shape, so
+/// whatever answers the six has all of it without writing any.
 ///
-/// The fifth and sixth are the newest, and they are the ones that test the
-/// claim `docs/rationale.md#each-stage-kind-keeps-its-own-result-type` makes
-/// and calls untested: that a new kind should be new **kinematics** and no new
-/// rating machinery. A kind states its topology here and the one solver in
-/// [`crate::kinematics`] answers every question about motion, torque and play
-/// that used to be answered per kind; it states its ports here and the train's
-/// [`conditions`] decide which is driven and which
-/// held, which used to be a field on the kind.
+/// The fifth and sixth are the ones that tested the claim
+/// `docs/rationale.md#one-stage-one-result` makes: that a new arrangement
+/// should be new **kinematics** and no new rating machinery. The stage states
+/// its topology here and the one solver in [`crate::kinematics`] answers every
+/// question about motion, torque and play that used to be answered per stage
+/// type; it states its ports here and the train's [`conditions`] decide which
+/// is driven and which held, which used to be a field on the type. The claim
+/// held so well that the types went: one `impl` answers the six, and the
+/// trait is kept as the statement of what it answers.
 pub(crate) trait Constrained {
     /// The members in the order [`StageResult::members`] reports them.
     fn members(&self) -> Vec<&StageGear>;
@@ -2385,55 +2389,55 @@ pub(crate) trait Constrained {
     fn inputs(&mut self) -> Vec<(Freedom, &mut Auto<f64>)>;
     /// The readings of the helix, relief order, least precious first.
     fn readings(&self) -> Vec<Reading>;
-    /// Every argument this kind's inputs can get into with each other.
+    /// Every argument the stage's inputs can get into with each other.
     fn freedoms(&self) -> Vec<FreedomGroup>;
-    /// **Where this kind's shafts and meshes sit** — topology alone, with no
+    /// **Where the stage's shafts and meshes sit** — topology alone, with no
     /// module, no shift and no distance in it. See [`Wiring`].
     fn wiring(&self) -> Wiring;
-    /// **The kind's conventional ports and what it holds by convention** — what
+    /// **The stage's conventional ports and what it holds by convention** — what
     /// a chain is built from and a lone stage is solved under, and nothing a
     /// train's own constraints cannot override. See [`Ports`].
     fn ports(&self) -> Ports;
 }
 
 impl Stage {
-    fn kind(&self) -> &dyn Constrained {
+    fn shape(&self) -> &dyn Constrained {
         match self {
             Self::Shape(s) => &**s,
         }
     }
 
-    fn kind_mut(&mut self) -> &mut dyn Constrained {
+    fn shape_mut(&mut self) -> &mut dyn Constrained {
         match self {
             Self::Shape(s) => &mut **s,
         }
     }
 
-    /// **The input a [`Freedom`] names**, where this kind has it. `None` is the
+    /// **The input a [`Freedom`] names**, where this stage has it. `None` is the
     /// same thing [`Self::freedoms`] says by not mentioning it.
     pub(crate) fn input_mut(&mut self, f: Freedom) -> Option<&mut Auto<f64>> {
-        self.kind_mut()
+        self.shape_mut()
             .inputs()
             .into_iter()
             .find_map(|(g, a)| (g == f).then_some(a))
     }
 
-    /// Whether the input a freedom names is given. An input this kind does
+    /// Whether the input a freedom names is given. An input this stage does
     /// not have is neither given nor automatic.
     fn is_given(&mut self, f: Freedom) -> bool {
         self.input_mut(f).is_some_and(|a| !a.auto)
     }
 
     /// **Every input relief may turn, and whether it is automatic** — in the
-    /// one order the kind declares, so a caller lining two stages up against
+    /// one order the stage declares, so a caller lining two stages up against
     /// each other can do it by name rather than by field.
     #[must_use]
     pub fn toggles(&self) -> Vec<(Freedom, bool)> {
-        // Read through a copy: the kinds hand their inputs out mutably, once,
+        // Read through a copy: the shape hands its inputs out mutably, once,
         // and a second accessor for reading would be the same list twice.
         let mut probe = self.clone();
         probe
-            .kind_mut()
+            .shape_mut()
             .inputs()
             .into_iter()
             .map(|(f, a)| (f, a.auto))
@@ -2444,24 +2448,24 @@ impl Stage {
     /// them — the order [`Freedom::Member`] indexes.
     #[must_use]
     pub fn members(&self) -> Vec<&StageGear> {
-        self.kind().members()
+        self.shape().members()
     }
 
     /// **Where this stage's shafts and meshes sit** ([`Wiring`]) — the topology
     /// the one kinematic solver is assembled from, with no geometry in it.
     #[must_use]
     pub fn wiring(&self) -> Wiring {
-        self.kind().wiring()
+        self.shape().wiring()
     }
 
-    /// **The kind's conventional ports and holds** ([`Ports`]) — what a chain
+    /// **The stage's conventional ports and holds** ([`Ports`]) — what a chain
     /// is built from and a lone stage is solved under.
     #[must_use]
     pub fn ports(&self) -> Ports {
-        self.kind().ports()
+        self.shape().ports()
     }
 
-    /// **What this stage is asked when it stands alone**: its kind's
+    /// **What this stage is asked when it stands alone**: its own
     /// conventions, as a boundary its own solver can take.
     #[must_use]
     pub fn conventional_boundary(&self) -> StageBoundary {
@@ -2500,7 +2504,7 @@ impl Stage {
     /// them.
     #[must_use]
     pub fn freedoms(&self) -> Vec<FreedomGroup> {
-        self.kind().freedoms()
+        self.shape().freedoms()
     }
 
     /// **This stage with its over-determined inputs relieved.**
@@ -2517,7 +2521,7 @@ impl Stage {
     ///
     /// # Why this is here and not in the panel
     ///
-    /// It was three functions in TypeScript, one per stage kind. Rule 1 puts an
+    /// It was three functions in TypeScript, one per stage type. Rule 1 puts an
     /// engineering rule in Rust, rule 4 says one idea belongs in one place, and
     /// neither was being followed — nor was any of it tested. What decided it is
     /// that the rule is not the panel's to know: **it is the same relation the
@@ -2612,7 +2616,7 @@ impl Stage {
                 group.automatic_at_most
             };
             // An entry is given while any reading is, automatic while all
-            // are; one the kind has no input for is neither.
+            // are; one the stage has no input for is neither.
             let state = |s: &mut Self, entry: &[Freedom]| -> Option<bool> {
                 let present: Vec<bool> = entry
                     .iter()
@@ -2723,12 +2727,12 @@ impl StageResult {
         }
     }
 
-    /// **Every member of this stage that is a gear**, whatever kind it is.
+    /// **Every member of this stage that is a gear**, whatever its role.
     ///
-    /// The kind-independent accessors beside this one — [`Self::ratio`],
+    /// The role-independent accessors beside this one — [`Self::ratio`],
     /// [`Self::efficiency`], [`Self::backlash`] — say what every stage has. This
     /// says what every *member* has, and it is the one that was missing: a sweep
-    /// over "every number every member reports" had to know the five kinds and
+    /// over "every number every member reports" had to know five stage types and
     /// name their fields, which is how a formula comes to be written five times
     /// and one of them to be wrong (`docs/corrections.md`, and F30 of the audit
     /// that added this).
@@ -2780,8 +2784,8 @@ impl StageResult {
     /// The companion of [`Self::members`], and for the same reason: a question
     /// about *a mesh* — is contact continuous, do the tips foul, how much play
     /// is there — is asked of a stage by asking each of its meshes, and a walk
-    /// that names the kinds is a walk that forgets one. A pair has one, either
-    /// epicyclic kind has two — and a crossed pair has one like any other,
+    /// that names the arrangements is a walk that forgets one. A pair has one, a
+    /// set has two — and a crossed pair has one like any other,
     /// which reports a point contact in the same type.
     #[must_use]
     pub fn meshes(&self) -> Vec<&MeshReport> {
@@ -2990,8 +2994,7 @@ impl Reversal {
 /// a peak against a fatigue allowable asks the wrong question, and it is what
 /// this crate did before the two kinds existed. Everything else about a load
 /// case — where it enters, what holds it, how big it is — is the same question
-/// for either kind, and a kind is otherwise a preset and a vocabulary, as
-/// [`PairKind`] is over a pair.
+/// for either kind, and a kind is otherwise a vocabulary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
@@ -3289,7 +3292,7 @@ pub struct StageLoads {
     /// **Which of the stage's shafts are held and which driven**, assembled by
     /// [`solve_train`] from the train's constraints and couplings
     /// ([`Train::boundaries`]). `None` is a stage asked about on its own — by
-    /// a test, the harness, the sweep — which is solved under its kind's
+    /// a test, the harness, the sweep — which is solved under its own
     /// conventions ([`Stage::conventional_boundary`]).
     pub boundary: Option<StageBoundary>,
 }
@@ -3381,7 +3384,7 @@ pub struct Cycles {
 /// The greatest common divisor of two tooth counts.
 ///
 /// One home, because it was two: a coprime check is what says whether a pair
-/// hunts, and every stage kind that has a mesh asks it.
+/// hunts, and every mesh asks it.
 pub(crate) const fn gcd(mut a: u32, mut b: u32) -> u32 {
     while b != 0 {
         let t = b;
@@ -3394,7 +3397,7 @@ pub(crate) const fn gcd(mut a: u32, mut b: u32) -> u32 {
 /// **How often one member of an epicyclic set is engaged**, per revolution of
 /// the shaft the train counted revolutions on.
 ///
-/// One rule, and both epicyclic kinds here obey it: a member's teeth are
+/// One rule, and every carried axis obeys it: a member's teeth are
 /// engaged once per revolution **relative to the carrier**, once for each
 /// parallel mesh path the set has. In the carrier's frame the arm stands still
 /// and everything else turns past it, which is what makes the relative speed the
@@ -3410,8 +3413,8 @@ pub(crate) const fn gcd(mut a: u32, mut b: u32) -> u32 {
 /// referred to the *sun's* speed rather than to the input's, so it was right
 /// only in the arrangements where those are the same shaft.
 ///
-/// A ratio of speeds, so their magnitude cancels — which is why every kind asks
-/// it of its **unit** kinematics, the speeds at one turn of its input, rather
+/// A ratio of speeds, so their magnitude cancels — which is why it is asked
+/// of the **unit** kinematics, the speeds at one turn of its input, rather
 /// than of a load case's: a case held still is still engaged by every sweep
 /// its duty counts. A train whose input shaft does not turn has no ratio to
 /// take, and answers zero.
@@ -3493,7 +3496,7 @@ impl Turns {
 ///
 /// # Errors
 ///
-/// Whatever the stage kind reports.
+/// Whatever the stage reports.
 pub fn solve_any(
     stage: &Stage,
     loads: &StageLoads,
@@ -3511,7 +3514,7 @@ pub fn solve_any(
 ///
 /// # Errors
 ///
-/// Whatever the stage kind reports.
+/// Whatever the stage reports.
 pub fn solve_any_with(
     stage: &Stage,
     loads: &StageLoads,
@@ -3559,7 +3562,7 @@ pub struct Train {
     #[cfg_attr(feature = "serde", serde(default))]
     pub couplings: Vec<Coupling>,
     /// **What is asked of each shaft** — held, driven or free. Empty is each
-    /// kind's convention with the first stage's input driven, for the same
+    /// stage's convention with the first stage's input driven, for the same
     /// reason the couplings default. Written out, this is where a planetary
     /// set's arrangement lives now, and where a second input or a third port
     /// is one more line. See [`ShaftConstraint`].
@@ -3976,7 +3979,7 @@ mod tests {
         (p, &p.meshes[0])
     }
 
-    /// The set kind's old entry point: the set through the shape.
+    /// The set preset through the shape, under its own conventions.
     fn solve_planetary_stage(
         stage: &PlanetaryStage,
         loads: &StageLoads,
@@ -3985,7 +3988,7 @@ mod tests {
         shape::solve_shape(&shape::Shape::from(stage), loads, lib, Reversal::default())
     }
 
-    /// The hula kind's old entry point: the hula stage through the shape,
+    /// The hula preset through the shape,
     /// under its own arrangement — crank driven, grounded gear held, output
     /// out, which are the shape's shafts 1, 3 and 2.
     fn solve_hula_stage(
@@ -4117,7 +4120,7 @@ mod tests {
     ///
     /// `docs/corrections.md` records that gap being closed once already — "a gear
     /// in a geartrain never said it was undercut … reported now on every
-    /// rack-cut member of every stage kind". It reached four kinds of five.
+    /// rack-cut member of every stage kind". It reached four stage types of five.
     ///
     /// The shaft angle is the helix angle doubled, so a crossed pair's teeth are
     /// genuinely *different* teeth from the parallel pair's — at 45° of helix a
@@ -4183,19 +4186,19 @@ mod tests {
     ///
     /// A walk over `StageResult::members()` rather than over five named field
     /// paths, which is what that accessor is for: the fault it is looking for is
-    /// a member quietly missing a figure, and a sweep that names the kinds can
-    /// only miss it in the kind nobody named. F30 — a self-locking worm's wheel
+    /// a member quietly missing a figure, and a sweep that names the presets
+    /// can only miss it in the one nobody named. F30 — a self-locking worm's wheel
     /// reporting 2.2e307 N·m — was in the fifth.
     ///
     /// The claim is deliberately the weak one: **present, finite, and signed
-    /// like the stage's.** A *quantitative* law across kinds does not exist, and
+    /// like the stage's.** A *quantitative* law across arrangements does not exist, and
     /// finding that out is what this test cost. A parallel-axis member's forward
     /// torque is a geometric projection with no efficiency in it, so the ratio
     /// of backward to forward is the same for both members. A screw pair's
     /// output torque carries a forward efficiency that the backward load does
     /// not share, so its two members differ by exactly `1/η_forward` — by
-    /// construction, and correctly — which is why each kind projects each case's
-    /// torque through its own construction in that case's direction.
+    /// construction, and correctly — which is why the flow projects each case's
+    /// torque through the meshes in that case's direction.
     #[test]
     fn every_member_of_a_reacting_stage_reports_its_share() {
         let lib = library();
@@ -4216,13 +4219,13 @@ mod tests {
         }));
 
         let r = solve_train(&train, &lib).expect("a train that solves");
-        let (mut checked, mut kinds) = (0u32, 0u32);
+        let (mut checked, mut stages) = (0u32, 0u32);
         for (k, stage) in r.stages.iter().enumerate() {
             let members = stage.members();
             if members.is_empty() {
                 continue;
             }
-            kinds += 1;
+            stages += 1;
             for g in members {
                 let back = g.cases[BACK].torque;
                 let forward = g.cases[PEAK].torque;
@@ -4239,7 +4242,7 @@ mod tests {
                 );
             }
         }
-        assert!(kinds >= 3, "only {kinds} stage kinds contributed members");
+        assert!(stages >= 3, "only {stages} stages contributed members");
         assert!(checked >= 6, "only {checked} members carried the load");
     }
 
@@ -4363,19 +4366,19 @@ mod tests {
     ///
     /// A constraint belongs to the mesh, not to the arrangement around it: a
     /// mesh whose teeth reach past the root circle they run into bottoms out
-    /// whether a carrier is turning about it or not. Three kinds each wrote the
-    /// question out for themselves and between them answered it three ways — the
-    /// pair asked about bottoming, neither epicyclic kind did; the pair and the
+    /// whether a carrier is turning about it or not. Three stage types each
+    /// wrote the question out for themselves and between them answered it three
+    /// ways — the pair asked about bottoming, neither epicyclic type did; the pair and the
     /// set asked whether each member could be cut, and a ring was asked by
     /// nobody.
     ///
     /// `auto::MeshTrial` is the one place now, and this is the claim that says
-    /// so from the outside: **whatever each kind chose, the mesh it chose is one
-    /// the shared contract admits.** A kind that stops asking chooses something
-    /// that fails here; a kind added later that never asks fails here the first
-    /// time its answer is pushed against a bound.
+    /// so from the outside: **whatever the search chose, the mesh it chose is
+    /// one the shared contract admits.** A search that stops asking chooses
+    /// something that fails here; a search added later that never asks fails
+    /// here the first time its answer is pushed against a bound.
     #[test]
-    fn every_kind_that_searches_asks_the_same_of_its_meshes() {
+    fn every_search_asks_the_same_of_its_meshes() {
         use crate::auto::Search;
         let mut checked = 0u32;
 
@@ -4507,8 +4510,8 @@ mod tests {
     /// which is the one question it has an answer to, and it is free: every
     /// caller has already cut the ring to get the mesh it is scoring.
     ///
-    /// Both epicyclic kinds, because the last time a rule reached one of them
-    /// and not the other it cost a second entry in `docs/corrections.md`.
+    /// Both epicyclic presets, because the last time a rule reached one of
+    /// them and not the other it cost a second entry in `docs/corrections.md`.
     #[test]
     fn a_search_chooses_only_parts_its_tool_leaves_alone() {
         let lib = library();
@@ -4992,7 +4995,7 @@ mod tests {
     /// **A back-driving load reaches the wheel undiminished**, and the only
     /// thing the direction changes about the rating is which flank carries it.
     ///
-    /// A screw pair is the kind whose distribution depends on direction: driving
+    /// A screw pair is the mesh whose distribution depends on direction: driving
     /// forward the wheel carries the worm's torque stepped up *and cut by the
     /// mesh's own loss*, while a back-driving load arrives at the wheel already.
     /// So a stage rated at `max(T_in, T_back)` and then stepped up and cut once
@@ -5130,7 +5133,7 @@ mod tests {
     /// limit is a closed form — the patch closes to a point and the pressure with
     /// it (`crate::hertz::elliptical_contact`).
     ///
-    /// Asserted on every kind rather than on the one that failed, since what is
+    /// Asserted on every preset rather than on the one that failed, since what is
     /// being claimed is a property of the tool and not a patch to a stage.
     #[test]
     fn a_stage_carrying_nothing_is_a_stage() {
@@ -5176,10 +5179,10 @@ mod tests {
     /// The three ways an internal pair's teeth can foul were four fields on a
     /// *hula stage's* mesh row, and the epicyclic set with the same ring mesh in
     /// it reported nothing: a designer was told whether the teeth foul according
-    /// to which stage kind they had picked. They are on [`MeshReport`] now, and
-    /// this is the walk that says every kind gets them — through
+    /// to which stage type they had picked. They are on [`MeshReport`] now, and
+    /// this is the walk that says every mesh gets them — through
     /// [`StageResult::meshes`], which is the same shape as `members()` and
-    /// exists so a walk cannot forget a kind by naming them.
+    /// exists so a walk cannot forget an arrangement by naming them.
     ///
     /// `None` on an external mesh is the other half of the claim, and it is not
     /// three answers of `false`: an external pair's members curve opposite ways,
@@ -5309,7 +5312,7 @@ mod tests {
     #[test]
     fn an_internal_mesh_is_asked_what_an_internal_mesh_is_asked() {
         let lib = library();
-        // Which of each kind's meshes have a ring in them, in the order
+        // Which of each preset's meshes have a ring in them, in the order
         // `meshes()` returns them: a pair none, a set its second, a hula both.
         for (stage, internal) in [
             (Stage::spur(PairStage::default()), vec![false]),
@@ -5329,7 +5332,7 @@ mod tests {
             assert_eq!(
                 meshes.len(),
                 internal.len(),
-                "the walk found a different number of meshes than the kind has"
+                "the walk found a different number of meshes than the preset has"
             );
             for (mesh, is_internal) in meshes.iter().zip(&internal) {
                 assert_eq!(
@@ -5435,8 +5438,8 @@ mod tests {
         );
     }
 
-    /// The four presets, one of each kind, for a law about every kind.
-    fn every_kind() -> Vec<Stage> {
+    /// The four presets, for a law about every one of them.
+    fn every_preset() -> Vec<Stage> {
         let mut hula = HulaStage::default();
         hula.gears[0].profile_shift = Auto::automatic(0.0);
         vec![
@@ -5505,26 +5508,28 @@ mod tests {
         out
     }
 
-    /// **The graph reproduces every kind's own kinematics**, which is the whole
+    /// **The graph reproduces every preset's kinematics**, which is the whole
     /// of what the wiring has to earn.
     ///
-    /// Three kinds each solve their speeds a different way —
+    /// Three stage types each solved their speeds a different way —
     /// `Mesh::ratio` for a pair, `planetary::power` for a set, the two
     /// products through that same solve for a hula stage — and one system of
-    /// mesh rows has to give all three. Agreeing everywhere is what says the
-    /// declaration is right; **and it is the only thing that can say so**,
+    /// mesh rows had to give all three. It did, and the types went; what this
+    /// holds now is that a stage solved under its boundary reports the ratio
+    /// the wiring reads for that boundary, so the plumbing between the two
+    /// cannot pick a different port. **It is the only thing that can say so**,
     /// since the lock-up invariant is silent on a wrong sign and on a
     /// misattributed frame alike (`crate::kinematics`, measured).
     ///
-    /// The ratio is compared **signed and to the float**, since every kind's
-    /// reported ratio is now the graph's own reading. For a while this compared
-    /// magnitudes and checked the sign on the epicyclic kinds only, because a
+    /// The ratio is compared **signed and to the float**, since every stage's
+    /// reported ratio is the graph's own reading. For a while this compared
+    /// magnitudes and checked the sign on the epicyclic types only, because a
     /// pair's ratio was `Mesh::ratio` — *"ignoring sign"* by its own
     /// documentation — while a set's was signed; that disagreement is resolved
     /// and recorded (`docs/corrections.md`), and this is where it would show up
     /// again.
     #[test]
-    fn the_graph_gives_every_kind_the_kinematics_it_gives_itself() {
+    fn the_graph_gives_every_preset_the_kinematics_it_reports() {
         let lib = library();
         let mut checked = 0u32;
         for (name, stage, b) in every_wiring() {
@@ -5539,18 +5544,18 @@ mod tests {
                 "{name}: the arrangement should determine every shaft, not {m:?}"
             );
 
-            // --- the ratio, against the kind's own, asked the same thing.
+            // --- the ratio, against the stage's own, asked the same thing.
             let r = solve_any(&stage, &StageLoads::at(1.0, 1.0).under(b.clone()), &lib)
                 .unwrap_or_else(|e| panic!("{name}: {e}"));
             let graph = m
                 .ratio(b.input, b.output)
                 .unwrap_or_else(|| panic!("{name}: the output does not turn"));
-            // **Signed, and exact to the float**: every kind's reported ratio
-            // is the graph's own reading now (`UnitMotion::ratio`), so this is
+            // **Signed, and exact to the float**: every stage's reported ratio
+            // is the graph's own reading (`UnitMotion::ratio`), so this is
             // the same number read twice — once through the stage and once
-            // here — and anything short of equality would be a kind that had
-            // grown a second source. It used to compare magnitudes and check
-            // the sign only on the epicyclic kinds, because a pair's ratio was
+            // here — and anything short of equality would be a second source
+            // grown somewhere. It used to compare magnitudes and check
+            // the sign only on the epicyclic types, because a pair's ratio was
             // `z₂/z₁` and could not say its output reversed.
             let want = r.ratio();
             assert!(
@@ -5728,13 +5733,13 @@ mod tests {
     /// sweep or a revolution count from a port to any stage. That is the
     /// graph's answer for the special case of a path, hand-derived, and this
     /// holds that the two agree — on magnitudes, since `StageResult::ratio` is
-    /// signed on some kinds and not on others (recorded in the plan; resolved
+    /// signed on some stage types and not on others (recorded in the plan; resolved
     /// where the graph starts answering).
     ///
     /// It also holds the thing a product cannot say: the **mobility** of the
     /// assembled train equals the number of conditions it is given, so a chain
-    /// is neither over- nor under-determined by construction, and a stage kind
-    /// that introduced a shaft nothing constrains would fail here rather than
+    /// is neither over- nor under-determined by construction, and an
+    /// arrangement that introduced a shaft nothing constrains would fail here rather than
     /// quietly widening the answer.
     #[test]
     fn the_chained_graph_agrees_with_the_product_of_the_stage_ratios() {
@@ -5865,7 +5870,7 @@ mod tests {
         // itself is the default one. Shaft 2 is the carrier in the set's wiring.
         let reversing = || Stage::planetary(PlanetaryStage::default());
         // The set's three central shafts, stated in full: the train's
-        // constraints lay over the kind's conventions shaft by shaft, so
+        // constraints lay over the stage's conventions shaft by shaft, so
         // holding the carrier *instead of* the ring says so about the ring.
         let carrier_held = |stage: usize| {
             vec![
@@ -5923,7 +5928,7 @@ mod tests {
     ///
     /// Now every member's motion comes from the graph, through
     /// `Wiring::unit_motion`, and the coupling is a row in the same system.
-    /// This is the law that says so, across three kinds and two junctions.
+    /// This is the law that says so, across three presets and two junctions.
     #[test]
     fn a_shaft_shared_by_two_stages_reports_one_speed() {
         let lib = library();
@@ -6126,7 +6131,7 @@ mod tests {
     /// and a case written `At` that shaft — the wheel of the last pair, the
     /// carrier of a set — is one case, not a third kind of thing: every
     /// stage's torque, speed and turns, and what is delivered where, agree to
-    /// the bit. Both ways round, on a chain of three kinds and on a lone set,
+    /// the bit. Both ways round, on a chain of three presets and on a lone set,
     /// with the sweep of a fatigue duty stated at the named shaft too.
     #[test]
     fn a_load_named_by_its_shaft_is_the_load_named_by_the_chain() {
@@ -6475,7 +6480,7 @@ mod tests {
     /// **A member's result carries the tooth it was cut with**, agreeing with
     /// every figure the result quotes beside it — so a gear tab that adopts
     /// the member shows the tooth the stage rated, and not a rebuild from the
-    /// inputs that could drift from it. On every kind, every member: the
+    /// inputs that could drift from it. On every preset, every member: the
     /// shift, the addendum and the helix in `params` are the ones in force,
     /// the count and module are the stage's, and a rack-cut member rebuilt
     /// from `params` alone is the reported pitch diameter; a ring is the
@@ -6484,7 +6489,7 @@ mod tests {
     fn a_members_result_carries_the_tooth_it_was_cut_with() {
         let lib = library();
         let mut checked = 0u32;
-        for stage in every_kind() {
+        for stage in every_preset() {
             let mut t = two_stage();
             t.stages = vec![stage.clone()];
             let r = solve_train(&t, &lib).expect("every preset solves");
@@ -6543,7 +6548,7 @@ mod tests {
     /// group bites.
     #[test]
     fn every_declared_freedom_names_an_input_the_stage_has() {
-        for stage in every_kind() {
+        for stage in every_preset() {
             let has: Vec<Freedom> = stage.toggles().into_iter().map(|(f, _)| f).collect();
             for g in &stage.freedoms() {
                 assert!(
@@ -6582,7 +6587,7 @@ mod tests {
     /// everything pinned, everything freed, and each single toggle turned.
     #[test]
     fn relief_is_idempotent_from_any_start() {
-        for stage in every_kind() {
+        for stage in every_preset() {
             let all = stage.toggles();
             let mut starts = vec![stage.clone()];
             for auto in [false, true] {
@@ -6677,7 +6682,7 @@ mod tests {
             Freedom::Member(_, MemberFreedom::FaceWidth) => a.manual += 1.0,
         };
         let mut checked = 0u32;
-        for stage in every_kind() {
+        for stage in every_preset() {
             // Every box seeded with what the preset came to, as the panel
             // seeds a box a designer pins — so pinning everything pins the
             // design the preset already was, not a distance of nought.
@@ -6858,7 +6863,7 @@ mod tests {
     /// **Of a distance and its clearance at most one is automatic**, on every
     /// shape — and which one is pinned back is decided by what was just
     /// touched. A set used to pin its clearance whatever was touched, since
-    /// its kind could not run at a given distance with the clearance left to
+    /// its own solver could not run at a given distance with the clearance left to
     /// fall where it may; the shape can, as a pair always could, so the set
     /// has the pair's rule now: touching the clearance pins the distance and
     /// touching the distance pins the clearance, and the number in a box
@@ -6912,7 +6917,7 @@ mod tests {
         }
     }
 
-    /// **Relieving an over-determined stage**, on every kind that has a relation
+    /// **Relieving an over-determined stage**, on every preset that has a relation
     /// — behaviour that had no test at all while it lived in the panel.
     ///
     /// Three claims, and the third is the one that makes it a rule rather than a
@@ -6922,7 +6927,7 @@ mod tests {
     /// undo a design that was never over-determined.
     #[test]
     fn an_over_determined_stage_relieves_to_its_limit_and_keeps_what_was_just_pinned() {
-        for stage in every_kind() {
+        for stage in every_preset() {
             let mut over = stage.clone();
             for f in mentioned(&stage) {
                 if let Some(a) = over.input_mut(f) {
@@ -6944,7 +6949,7 @@ mod tests {
                     "{just:?} was just pinned and must not be the one relieved"
                 );
             }
-            // Already inside the limit — every kind's preset is, with a
+            // Already inside the limit — every preset is, with a
             // clearance and a worm's diameter given — nothing moves. Asserted
             // against every freedom as `just`, so it cannot pass by picking a
             // lucky one.
@@ -7118,10 +7123,10 @@ mod tests {
                 .into_iter()
                 .find(|g| g.automatic_at_most < g.order.len())
             else {
-                panic!("every kind has a clearance, so every kind bounds it");
+                panic!("every preset has a clearance, so every preset bounds it");
             };
 
-            // Both automatic — or, for a kind with no distance, the clearance
+            // Both automatic — or, for a preset that holds its distance, the clearance
             // alone — which is the state that has no answer.
             let mut loose = stage.clone();
             let order: Vec<Freedom> = group.order.iter().flatten().copied().collect();
@@ -7158,8 +7163,8 @@ mod tests {
                 checked += 1;
             }
         }
-        // Two inputs on each of the two pair kinds, and the one input the two
-        // epicyclic kinds each bound on its own.
+        // Two inputs on each of the two pair presets, and the one input the two
+        // epicyclic presets each bound on their own.
         assert!(checked >= 6, "only {checked} cases");
     }
 
@@ -7373,7 +7378,7 @@ mod tests {
     /// it reported 0.02 with the optimiser on and 0.000 with it off.
     ///
     /// Asserted as the identity rather than against those figures, so it says
-    /// the same thing on every kind and at every distance.
+    /// the same thing on every preset and at every distance.
     #[test]
     fn the_reported_clearance_is_the_gap_the_stage_runs_at() {
         let lib = library();
@@ -7408,7 +7413,7 @@ mod tests {
                         s.distances[0].nominal[0],
                         s.distances[0].running
                     );
-                    // ...and the same identity on the kind that has no shift to
+                    // ...and the same identity on the preset that has no shift to
                     // absorb anything, which is where an echoed input and a
                     // derived gap part company hardest.
                     let (w, _) = worm(&r.stages[1]);
@@ -7428,17 +7433,17 @@ mod tests {
         assert!(checked >= 12, "only {checked} configurations solved");
     }
 
-    /// **A tolerance band opens the way round it says it does**, on every kind
+    /// **A tolerance band opens the way round it says it does**, on every preset
     /// that reports one.
     ///
     /// Less centre distance is less room and so less play. That is one claim,
-    /// and it was written out four times — once per stage kind, each closing
+    /// and it was written out four times — once per stage type, each closing
     /// over its own way of turning a distance into an angle. Getting it
     /// backwards in one of them would have produced a band that reads perfectly
     /// well and is inside out, and nothing anywhere asserted the direction.
     ///
     /// `Backlash::banded` is the one construction now; this is the claim it
-    /// makes, checked through all four kinds rather than at the constructor,
+    /// makes, checked through all four presets rather than at the constructor,
     /// because the argument each passes is the part that could still be wrong.
     #[test]
     fn a_tolerance_band_widens_with_the_centre_distance() {
@@ -7454,7 +7459,7 @@ mod tests {
                 ..PairStage::default()
             }),
         ];
-        let r = solve_train(&train, &lib).expect("a train of every kind");
+        let r = solve_train(&train, &lib).expect("a train of every preset");
 
         let mut checked = 0u32;
         let mut check = |what: &str, b: &Backlash, opens: bool| {
@@ -7544,8 +7549,8 @@ mod tests {
              but forward gives {forward} and backward {backward}"
         );
         // **By `η₁η₂`**, which is what the two pressing torques differ by
-        // when the driving side of each mesh swaps — the kind's row torques
-        // differed by its square, since a driven member's row stands `η`
+        // when the driving side of each mesh swaps — the hula's own solver's
+        // row torques differed by its square, since a driven member's row stands `η`
         // under the force on its flank.
         let (forward, backward) = ratios(0.08);
         assert!(
@@ -7627,8 +7632,8 @@ mod tests {
         ]
     }
 
-    /// **A chain of three kinds**, so the graph's assembly meets a stage with
-    /// three shafts sitting between two with two — which a train of one kind
+    /// **A chain of three presets**, so the graph's assembly meets a stage with
+    /// three shafts sitting between two with two — which a train of one preset
     /// cannot exercise and which is where a coupling to the wrong shaft would
     /// show.
     fn mixed_train() -> Train {
@@ -8152,7 +8157,7 @@ mod tests {
     }
 
     /// **An epicyclic member is engaged once per turn against the carrier**, per
-    /// planet — for every member and both kinds, which is the whole of
+    /// planet — for every member and both epicyclic presets, which is the whole of
     /// [`engagements`].
     ///
     /// Checked against arithmetic the stage shares nothing with: the counts a
@@ -8182,7 +8187,7 @@ mod tests {
     /// *once for each parallel mesh path* — and what was missing was anywhere
     /// for the two members of a mesh to differ. `Wiring::paths_seen` is that
     /// somewhere, and it is what this now reads: **the expectation comes from
-    /// the wiring's own answer**, so a kind that gets its mounts wrong fails
+    /// the wiring's own answer**, so a preset that gets its mounts wrong fails
     /// here rather than agreeing with itself.
     #[test]
     fn an_epicyclic_members_cycles_are_its_turns_against_the_carrier() {
@@ -8340,7 +8345,7 @@ mod tests {
     /// the CLI printed `inf`, and the generated TypeScript said `number` of a
     /// field that could arrive `null`.
     ///
-    /// Asked of all three stage kinds that have the control, because it is one
+    /// Asked of all three presets that have the control, because it is one
     /// rule and this is the shape of a bound reaching the search it was written
     /// in and no other.
     #[test]
@@ -8422,7 +8427,7 @@ mod tests {
         }
         // The note still fires — the point is that it is now the *only* thing
         // that happens, not that it stopped happening — and it fires on the
-        // gear whose width it is about, on every kind, not in a stage's list.
+        // gear whose width it is about, on every preset, not in a stage's list.
         let members: Vec<&GearResult> = spur_r
             .members
             .iter()
@@ -8438,7 +8443,7 @@ mod tests {
         }
     }
 
-    /// **The sharing model reaches every member of every kind that has one.**
+    /// **The sharing model reaches every member of every preset that has one.**
     ///
     /// It was a spur input only, so the one estimate this crate ships reached
     /// one stage of three — and a ring had no shared section at all, so even
@@ -8668,12 +8673,12 @@ mod tests {
             solve_planetary_stage(&set, &StageLoads::just(2.0), &lib).unwrap();
         });
 
-        // **Raised from 20 to 60 ms with the kind's retirement**, and the
-        // reason: the kind searched each mesh's division alone at a crank it
+        // **Raised from 20 to 60 ms when the hula's own solver retired**, and
+        // the reason: that solver searched each mesh's division alone at a crank it
         // solved once a round, in closed form; the shape sizes the crank by
         // a bracketed root over built teeth, then searches each mesh apart
         // (`search_components`), with the teeth it has cut kept between
-        // trials. Some 25 ms in the suite against the kind's 2.6, and the
+        // trials. Some 25 ms in the suite against the old solver's 2.6, and the
         // ceiling is a little over twice that rather than five times: the
         // multiplier is for a loaded machine, and twice is what this stage
         // has needed on one.
@@ -9735,7 +9740,7 @@ mod tests {
     /// number, not their order, not whether one is switched off. A scale taken
     /// against "the worst torque a mesh carries" is exactly the kind of shared
     /// reference that could make a case move when its neighbour did, and the
-    /// epicyclic kinds rate through one (`StageLoads::scaled`); the scale is
+    /// shape rates through one (`StageLoads::scaled`); the scale is
     /// exact in the mathematics, and this holds it to the digits the corpus
     /// prints. **Run against a scale read from the wrong case, it fails on
     /// every member**, which is the fault this is for.
@@ -9851,7 +9856,7 @@ mod tests {
         }
     }
 
-    /// **A train with no load case is a shaft line**, and every kind solves it.
+    /// **A train with no load case is a shaft line**, and every preset solves it.
     ///
     /// Ratios, efficiencies and backlash stand; every member reports no case;
     /// and an automatic face width, with nothing to ask, stands at its box —

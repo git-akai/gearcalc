@@ -1,11 +1,12 @@
-//! **What every stage kind says about motion and torque, before any of it
-//! moves.**
+//! **What every preset and arrangement says about motion and torque, before
+//! any of it moves.**
 //!
-//! This is the characterisation the geartrain refactor is measured against.
-//! The plan (`geartrain-refactor-plan.md`) replaces three hand-written
+//! This was the characterisation the geartrain refactor was measured against:
+//! the plan (`geartrain-refactor-plan.md`) replaced three hand-written
 //! kinematic models — `planetary::power`, the hula stage's mapping onto it, and
 //! `solve_train`'s chain walk — with one graph, and the only honest way to know
-//! whether that reproduced them is to have written them down first.
+//! whether that reproduced them was to have written them down first. It is
+//! the record the graph is still held to, in the golden corpus.
 //!
 //! # What it prints, and what it deliberately does not
 //!
@@ -20,23 +21,21 @@
 //! - per train — total ratio, efficiency and backlash both ways, and where each
 //!   load case ends up;
 //! - per stage — ratio, efficiency and backlash both ways;
-//! - per shaft of an epicyclic kind — speed and torque in every case,
+//! - per shaft of an epicyclic preset — speed and torque in every case,
 //!   **including the shaft that is not a gear**;
 //! - per member — its speed, its speed *against the frame of its mesh*, its
 //!   torque and its cycles, in every case;
 //! - per mesh — efficiency both ways, the contact ratio its loss is read over,
 //!   and whether it hunts.
 //!
-//! # Why the members and the meshes are read kind-independently
+//! # Why the members and the meshes are read through the shape
 //!
-//! `StageResult::members()` and `::meshes()` already answer for any kind, and
-//! everything below reads through them so that this harness cannot be the place
-//! a kind is forgotten. The one thing it cannot ask that way is **which members
-//! a mesh joins and in whose frame** — no accessor reports it, which is the gap
-//! the graph closes — so a mesh is identified here by its position in the
-//! stage's own order, and the shafts of the two epicyclic kinds are read
-//! through their own result types. Both of those readings go when the graph
-//! arrives, and their going is the point.
+//! `StageResult::members()` and `::meshes()` answer for any stage, and
+//! everything below reads through them so that this harness cannot be the
+//! place an arrangement is forgotten. Which members a mesh joins and in whose
+//! frame, and what each shaft is called, are read off the shape ([`member_role`])
+//! rather than off a result type of the arrangement's own — the two readings
+//! that were per type went with the types.
 
 use gear_core::train::{
     solve_train, Duty, LoadCase, PairStage, PlanetaryStage, Port, ShaftConstraint, ShaftRef, Stage,
@@ -96,7 +95,7 @@ fn pair(z1: u32, z2: u32, helix: f64) -> Stage {
 fn arranged(k: usize, input: &str, fixed: &str) -> Vec<ShaftConstraint> {
     // The set's shafts, in its wiring's order: ground, sun, carrier, ring,
     // planet. One line each: a hold or a drive on a stage replaces the
-    // kind's convention of that kind, so holding the carrier releases the
+    // stage's convention of that kind, so holding the carrier releases the
     // ring without a word about it.
     let shaft = |s: &str| match s {
         "sun" => 1,
@@ -154,7 +153,7 @@ fn fixtures() -> Vec<(String, Train)> {
         // itself a thing the graph must reproduce rather than assume.
         ("pair".to_string(), train(vec![pair(17, 43, 0.0)])),
         ("helical".to_string(), train(vec![pair(17, 43, 20.0)])),
-        // A worm: the one kind whose two directions genuinely differ, and the
+        // A worm: the one preset whose two directions genuinely differ, and the
         // one that can refuse to be driven at all.
         (
             "worm".to_string(),
@@ -577,8 +576,8 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
 }
 
 /// What to call a shaft here — the harness's English, which the core does not
-/// have. A member's shaft is named after the member's role where its kind has
-/// one, so the corpus reads as it did.
+/// have. A member's shaft is named after the member's role where the shape
+/// gives it one, so the corpus reads as it did.
 fn named(stages: &[Stage], at: ShaftRef, label: gear_core::train::ShaftLabel) -> String {
     use gear_core::train::ShaftLabel;
     let stage = match at {
@@ -593,7 +592,7 @@ fn named(stages: &[Stage], at: ShaftRef, label: gear_core::train::ShaftLabel) ->
     }
 }
 
-/// **A member's name from its place in the shape**, not from a kind: a
+/// **A member's name from its place in the shape**, not from a preset: a
 /// member on an axis a carrier carries is a planet, a ring beside one is a
 /// ring and any other central member a sun — numbered where a role is
 /// shared; with no carrier the members are first and second, as a pair's

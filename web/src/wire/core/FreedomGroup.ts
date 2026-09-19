@@ -11,14 +11,14 @@ import type { Freedom } from "./Freedom";
  *
  * # Why the *stage* declares this rather than the front end
  *
- * It was three functions in TypeScript, one per stage kind, each restating a
+ * It was three functions in TypeScript, one per stage type, each restating a
  * relation the core already enforces. That is two faults at once: an
  * engineering rule written outside Rust, and the same idea written once per
- * kind — so a fifth kind arrives with no relief at all, and a rule that changes
- * changes in one of four places. It is also untestable there, and was untested.
+ * type — so a new arrangement arrived with no relief at all, and a rule that
+ * changed changed in one of four places. It is also untestable there, and was untested.
  *
- * The stage kinds genuinely differ in *what* is related, which is why this is a
- * declaration and not a constant: a pair relates its distance to its two
+ * The arrangements genuinely differ in *what* is related, which is why this
+ * is a declaration and not a constant: a pair relates its distance to its two
  * shifts, an epicyclic set relates its three shifts to each other through the
  * two distances that must agree, and a hula stage relates each mesh's pair
  * separately because its crank fixes their difference one mesh at a time.
@@ -41,9 +41,9 @@ given_at_most: number,
  * neither has anything to derive from. One of the two has to be a number
  * somebody gave.
  *
- * A kind with **no** distance input would say `0` here — its clearance
+ * A stage with **no** distance input would say `0` here — its clearance
  * could never be derived, because there is nothing to derive it from. That
- * is the same statement, counted; every kind has the input now, so none
+ * is the same statement, counted; every distance has the input, so none
  * says it.
  */
 automatic_at_most: number, 

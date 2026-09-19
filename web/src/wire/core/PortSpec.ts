@@ -12,10 +12,10 @@ export type PortSpec = {
 shaft: number, label: ShaftLabel, 
 /**
  * **What this port is asked if the train says nothing about it** — the
- * kind's convention *as the overlay leaves it*, with everything else
+ * stage's convention *as the overlay leaves it*, with everything else
  * the train states in force: a set's ring reads `free` here once its
  * carrier is held, because holding the carrier releases it. What a
  * panel's "convention" choice would come to, computed by the rule
- * rather than guessed from the kind.
+ * rather than guessed from the preset.
  */
 by_convention: Constraint, };

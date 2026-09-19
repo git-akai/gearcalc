@@ -1,7 +1,7 @@
 //! **The planetary preset**: one carrier, one sun, one ring, N planets — the
 //! inputs a designer of a simple set states, and the shape they lay out.
 //!
-//! The set is not a stage kind any more. Its geometry, closure, power flow
+//! The set is not a stage type of its own. Its geometry, closure, power flow
 //! and ratings are the one shape's ([`super::shape`]): a central axis with
 //! the sun, the carrier and the ring on it, a planet axis carried by the
 //! carrier and replicated `N` times, and two meshes on the one distance
@@ -99,7 +99,7 @@ pub struct PlanetaryStage {
     /// ([`crate::mesh::MeshKind::run_at`]) — which is what the absorbing shift
     /// is solved to leave. That is why it cannot be derived: a given distance
     /// and given shifts leave one gap on each mesh, and there is no one number
-    /// for this field to be. It carries the same `Auto` every kind's does so
+    /// for this field to be. It carries the same `Auto` every distance's does so
     /// the front end can offer it the same way; [`super::Stage::freedoms`]
     /// says it may not be automatic, and relief pins it.
     pub clearance: Auto<f64>,

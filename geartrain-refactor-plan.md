@@ -623,7 +623,7 @@ shapes — is kept exactly by making the core hold one shape.
 **What this costs, and it is accepted.** The result type unifies with the
 input: one `StageResult` of members, meshes and shafts, with the layout
 checks a set has and a pair does not as `Option`s. That revisits
-`docs/rationale.md#each-stage-kind-keeps-its-own-result-type`, whose claim
+`docs/rationale.md#one-stage-one-result` (then *each stage kind keeps its own result type*), whose claim
 was that a new kind should be new kinematics and no new rating machinery;
 the claim held (Phases 2–4 added no rating code), and the division it argued
 for was between *kinds*, which no longer exist. The rationale is rewritten,
@@ -673,7 +673,7 @@ Everything above them is unconditional and lands in Phases 0–4.
   it — are asked of the shape. What `crate::planetary` keeps is the set's
   vocabulary and Pennestrì's closed form, the independent check.
 - Every rating type. If any of them moves, the division argued in
-  `docs/rationale.md#each-stage-kind-keeps-its-own-result-type` was wrong, and
+  `docs/rationale.md#one-stage-one-result` (then *each stage kind keeps its own result type*) was wrong, and
   that is a finding worth having rather than a cost to pay quietly.
 
 ---
@@ -924,8 +924,17 @@ crossing it, exactly, and to `η |R − 1|` on a hula's meshes;
 `ShapeResult::ratio_per_tooth`, the graph at `z_i + 1`, held to the
 classical quotients. All three print in `gear-cli kinematics`, so the
 corpus walks them. The ablation: the set's closure solver and ring search,
-and the hula kind, above. What the four documents say of what exists is the
-pass left.
+and the hula kind, above.
+
+*The clean-up pass, done:* the tests read the shape rather than a pair view
+kept for them, `CrossedResult` is the crossed solve's own, the two `Mount`
+constructors and `ideal_ring` nothing called went, `train_hula_held_open_by`
+is `train_distance_sized_by` since every sized distance says so, and the
+vocabulary — in the four documents, the map, the strings and every comment
+— says *stage*, *preset* and *arrangement* where it said *kind*, keeping
+*kind* for a mesh's, a pair's and a load case's. What was a stage type is
+named as one, in the past tense, where the lesson still applies. The line
+counts against the beginning are in §5's closing paragraph.
 
 **Optional, scoped separately.** The lever diagram (the `m = 2` nullspace
 rendered — the solution, not a decoration); the inverse problem, searching

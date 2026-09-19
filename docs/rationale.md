@@ -88,7 +88,8 @@ reproduces the other.
   arm of its own ([the rating](reference.md#load-cases)).
 - A load case is the worst one a mesh carries, scaled — wherever the stage's
   power split does not depend on the magnitude passing through it, which is a
-  property each kind claims for itself rather than one assumed of all of them.
+  property of the shape's flow — linear in the torque through it — rather than
+  one assumed of gearing.
 - A load from the far end is a load from the near end with the direction
   reversed: one walk carries either, and a stage that locks in the direction of
   travel holds either ([the walk](reference.md#load-cases)).
@@ -154,7 +155,7 @@ a step in the quantity the clamp exists to keep smooth. `min(asked, 0.95 × max)
 is monotone in what was asked for; `if asked > max { 0.95 × max }` is not. Gated
 as that law rather than against a threshold.
 
-### A stage kind is a "stage"
+### An arrangement is a "stage"
 
 A worm stage, a hula stage; never a worm drive or an eccentric drive.
 
@@ -173,12 +174,13 @@ nothing else is:
 - **how a load is applied** — a reversing duty, whether the duty reverses.
 
 Neither names a part of a geartrain, so neither collides with the rule. And
-where the thing being named is not a stage, it is not called one: `hula.rs`
-describes an **arrangement** — four tooth counts, one crank offset and the
-shifts that close it, knowing nothing about loads — and `screw.rs` a **pair**.
+where the thing being named is not a stage, it is not called one:
+`train/arrangements.rs` describes **arrangements** — what sits where, knowing
+nothing about loads — and `screw.rs` a **pair**.
 
-**What would change it:** nothing about the word. If a future kind is genuinely
-not a stage of a geartrain, it needs its own noun rather than this one stretched.
+**What would change it:** nothing about the word. If a future arrangement is
+genuinely not a stage of a geartrain, it needs its own noun rather than this
+one stretched.
 
 ### Degrees where a designer states a number, radians in the mathematics
 
@@ -187,7 +189,7 @@ trigonometric expression wants 0.349. So a *stage input*, a *gear input* and
 anything crossing the boundary are in **degrees**, and everything from
 `plane.rs` inwards is in **radians**, converted once at the edge —
 `BasicRack::new(module, pressure_angle_deg, helix_angle_deg)` is where that
-happens for a rack, and `PairStage::geometry` for a screw pair.
+happens for a rack, and `PairStage::screw_at` for a screw pair.
 
 **What is not right is a name that means both.** This crate had four —
 `shaft_angle`, `lead_angle`, `wheel_helix_angle` and `pressure_angle` each
@@ -615,7 +617,7 @@ precedent does not settle.
 
 `ContactPath::load_fraction` takes a `LoadSharing` model, and
 `LoadSharing::LinearRamp` is an explicitly uncalibrated 1/3→2/3 ramp. It is a
-**stage input, off by default**, on every kind that reports a bending stress,
+**stage input, off by default**, on every stage that reports a bending stress,
 and it reaches bending alone.
 
 **Off by default, because it is an estimate.** A calibrated mesh-stiffness model
@@ -721,9 +723,9 @@ gearing. A worm is a screw gear with very few starts and a high lead angle.
 specification's own arrangement: `β₁ = Σ/2 + β_add`, `β₂ = Σ/2 − β_add`. And a
 worm is that stage with its first member's size stated as a pitch diameter
 rather than a helix angle — the same freedom read another way, `d = z m_n /
-cos β`. One stage type under the spur and worm kinds; what a kind adds is a
-preset, the words *starts* and *wheel*, and the worm's conventional proportions
-([each stage kind keeps its own result type](#each-stage-kind-keeps-its-own-result-type)).
+cos β`. One stage; what the worm preset adds is the words *starts* and
+*wheel*, and the worm's conventional proportions
+([one stage, one result](#one-stage-one-result)).
 
 **Verified:** `sin γ = z m_n/d` holds on both members, so writing the wheel's
 diameter as `z₂ m_n / sin γ₂` removes the axial module from the chain entirely
@@ -794,7 +796,7 @@ how well it turns once moving is decided against the **sliding** one.
 `Directional::once_moving` is the whole rule, and the static figure is never
 itself reported — its only job is the sign.
 
-Applied to every stage kind although only a worm is ever near its threshold, for
+Applied to every mesh although only a worm is ever near its threshold, for
 the same reason `PARALLEL_AXES` is a named zero: the rule is general and the
 geometry decides whether it bites. The default worm stage is self-locking, which
 is the answer a handbook gives.
@@ -808,17 +810,17 @@ decides it.
 A mesh whose teeth reach past the root circle they run into bottoms out whether
 a carrier is turning about it or not. So **what is asked of a mesh is asked
 once**, in one place, and every arrangement that builds one gets it —
-`auto::MeshTrial`. What a stage kind owns is what it genuinely does own: which
+`auto::MeshTrial`. What the shape owns is what it genuinely does own: which
 meshes a candidate has, and how each is *assembled* — at a clearance-opened
 centre distance, from a shaper cut, around a crank. Those are its mechanics.
 What is asked of the result is not.
 
-**Written per kind, they disagreed.** Three kinds each spelled the question out
-and between them answered it three ways: the parallel pair asked whether its
-teeth bottom out and neither epicyclic kind did; the pair and the set asked
-whether each member could be cut as asked, and a ring was asked by nobody. Each
-gap was invisible from inside the kind that had it, because the kind that got it
-right was somewhere else.
+**Written per stage type, they disagreed.** Three types each spelled the
+question out and between them answered it three ways: the parallel pair asked
+whether its teeth bottom out and neither epicyclic type did; the pair and the
+set asked whether each member could be cut as asked, and a ring was asked by
+nobody. Each gap was invisible from inside the type that had it, because the
+type that got it right was somewhere else.
 
 **The tool is the parameter, not the branch.** A member arrives as a `Cut`: a
 rack-generated one answers the four questions
@@ -1027,7 +1029,7 @@ count](#a-ring-is-a-gear-with-a-negative-tooth-count) read on the assembly —
 and the backlash law carries the same sign, so play is positive on either kind
 where the flanks have parted. **Measured, and it was live on every internal
 mesh:** the law reported the interference a separation caused as play of the
-same size, the two epicyclic kinds assembled their internal meshes a clearance
+same size, the two epicyclic stage types assembled their internal meshes a clearance
 *tighter* than zero backlash and took the magnitude of that overlap as the play
 they had, and the planetary set — whose two meshes share one physical distance
 and so need their zero-backlash distances to differ by `2c` — solved them to be
@@ -1040,9 +1042,9 @@ from the day this entry was written; the epicyclic set and the hula stage went
 on rating their meshes — path, stresses, efficiency, the interference verdicts
 and the tip room — at zero backlash, which the shipped hula stage turned into a
 crank held open until its tip margin was exactly nought and then run a clearance
-inside it. Both rate where they run now, and the hula arrangement solves for the
-far-side gap *as built*, its running clearance being geometry the arrangement
-has to know (`hula::Set::running_clearance`).
+inside it. Every stage rates where it runs now, and the shape sizes a distance
+for the far-side gap *as built*, each distance's running clearance being
+geometry the stage has to know (`DistanceReport::clearance`).
 
 **What would change this:** nothing about the direction. If a fourth mesh kind
 arrives whose flanks part some other way, it is a third value of the sign and
@@ -1086,7 +1088,7 @@ third entry point some day is a third value of `Port` and not a branch anywhere.
 **What went with the pair.** The rule that "the peak is taken *after* each
 direction's own distribution, never before it" — which
 [direction is the reader's](#direction-is-the-readers-not-the-mechanisms)
-records being got wrong in two stage kinds — is not generalised but **removed**:
+records being got wrong in two stage types — is not generalised but **removed**:
 two directions are two cases, each rated at its own torque in its own
 direction, and there is no maximum left to take in the wrong order. The only
 maxima that remain are in sizing, where an automatic face width answers to the
@@ -1095,11 +1097,10 @@ case sizes the part, however many overlap. The clamps went with it too: an
 operating torque was held to the peak and a note said so, and there is no peak
 to hold a case to now, cases being absolute and free to exceed one another.
 
-**Every case is evaluated or scaled at its own torque.** A parallel pair
-evaluates each at its own load; the epicyclic kinds solve their power flow once
-at unit torque and scale it — a power flow being linear in the torque through
-it — and every rating once at the largest torque a mesh carries in any case,
-each case being that scaled. The latter is the same "second case costs a
+**Every case is scaled at its own torque.** The stage solves its power flow
+once at unit torque in each direction and scales it — a power flow being
+linear in the torque through it — and every rating once at the largest torque
+a mesh carries in any case, each case being that scaled. The latter is the same "second case costs a
 multiply" the two-case model had, with the reference chosen so the shipped
 trains reproduce the figures they had to the bit; and it is what lets a case
 carrying nothing be a scale of zero where a flow solved at nothing would have
@@ -1225,7 +1226,7 @@ that was the worse of driving and being driven, the maximum had to be taken
 the two shaft torques to one magnitude first and pushing that through the
 forward construction is the same answer only where the distribution is
 direction-independent — a parallel-axis mesh carries one tangential force
-whichever way it turns — and every kind for which it is *not* had this fault
+whichever way it turns — and every stage type for which it is *not* had this fault
 in its ratings after the same fault had been corrected in its reports. A
 back-driven worm was rated at `η_forward` of the load it was holding, and a
 back-driven set's ring 6 % low in bending, which is the same 6 % the reported
@@ -1461,8 +1462,8 @@ latter covering only unfilled grades in any case.
 ### Equal planet load sharing is assumed
 
 Real sets need a floating member, and the remedy is a mesh-load factor of exactly
-the kind refused above. It is stated in every planetary result's notes rather
-than left in a document.
+the kind refused above. It is stated in the notes of every stage with a
+replicated axis rather than left in a document.
 
 ### A rating that cannot be taken costs the rating, not the stage
 
@@ -1511,7 +1512,7 @@ is an **input** the specification omitted, and inventing a default for it would
 be choosing a machine on the user's behalf.
 
 It is the **train's** input now, not the set's: which shaft is held and which
-driven is a constraint on a port, laid over what the kind holds *by
+driven is a constraint on a port, laid over what the stage holds *by
 convention* — the ring, for a set, and the panel says so in the words
 "convention: held" beside every port, so the default is named rather than
 invented. A convention is the weakest statement there is and gives way to any
@@ -1523,91 +1524,72 @@ cannot hold rather than quietly dropping one. That asymmetry is the whole of
 because an automatic value has nothing to say for itself, and a constraint a
 designer wrote has.
 
-### Each stage kind keeps its own result type
+### One stage, one result
 
-A crossed mesh has no bending stress; a planetary has three shafts, two meshes
-and a planet that is neither. Forcing those into one shape would mean a row of
-`Option`s and a comment apologising for each. What the kinds share is the
-vocabulary — `Backlash`, `TrainError`, the duty cycle — not the shape of their
-answers.
+A stage is a `Shape` — axes, shafts on them, members on the shafts, meshes
+between members, one distance per pair of axes that mesh — and its result is
+one `ShapeResult`: a `GearResult` per member, a `MeshReport` per mesh, a
+`DistanceReport` per distance, `MemberRating` over the meshes each member is
+in. A spur pair, a worm, a planetary set and a hula stage are **presets**: a
+builder that fills the shape in, the words a designer uses, which inputs a
+panel shows, and the conventional proportions a worm's faces take
+(`Distance::worm`). None of them is a type in the core, and `Stage` has one
+variant.
 
-**But a kind is not the same thing as a shape, and this rule was once read as
-if it were.** The worm stage was a stage *type* of its own — members that were
-not gears, no shift, no addendum, a result unlike a spur pair's — on the
+**It was not built this way, and the reasons it was not are the lessons.**
+Each arrangement was a stage *type* with a result of its own, on the reading
+that a crossed mesh has no bending stress and a set has a shaft that is not a
+gear, so one shape would be a row of `Option`s. Three things were wrong with
+that reading, and each is a rule now.
+
+**A type is not a shape.** The worm was a stage type of its own — members that
+were not gears, no shift, no addendum, a result unlike a pair's — on the
 reading that a worm is a thread. In the model this crate actually runs both
-flanks are involute helicoids on cylinders, a worm is a helical gear with a
-few starts at a steep helix, and its wheel is a helical gear at the
-complementary one; everything a gear can be asked, both can be asked. So
-the spur and worm presets carried one `PairStage` from then on and produced
-one result with one `MeshReport` — the mesh being one model with the shaft
-angle as a parameter, so the same rows with the numbers moving rather than a
-readout changing shape, and what only a line or only a point contact has in a
-`LineContact` or a `PointContact` beside them. A kind is a *layer* over that
-primitive: a preset, the words a
-designer uses, which inputs a panel shows, and the conventional proportions a
-worm's faces take (`Distance::worm`, once `PairKind`). It cost the core one
-enum read in one
-place, and it bought the worm a shift, an addendum, an interference check and
-a mode 3 that moves the wheel's shift as DIN 3975 has it — none of which the
-separate type could carry, and which the audit had recorded as its ideal
-(`corrections.md`, and the audit's record in `docs/history/audit.md`).
+flanks are involute helicoids on cylinders: a worm is a helical gear with a few
+starts at a steep helix, its wheel a helical gear at the complementary one, and
+everything a gear can be asked, both can be asked. Folding it into the pair
+bought the worm a shift, an addendum, an interference check and a mode that
+moves the wheel's shift as DIN 3975 has it — none of which the separate type
+could carry — and a **crossed gear pair**, which had inherited the thread's
+poverty, could say its flank had been eaten into where the same pinion with
+parallel shafts already could ([corrections](corrections.md#the-log)). *That
+is a gear* is not a qualification here: every member of every stage is a
+`GearResult`, and `StageResult::members()` is the walk over them.
 
-**The vocabulary is the larger half, and it has grown.** A member of any kind
-that is a *gear* is a `GearResult`; a parallel-axis mesh of any kind is a
-`MeshReport`; the rating every member gets is `MemberRating` over the meshes it
-is in.
+**A walk that names the arrangements forgets one.** A sweep over "every number
+every member reports", written field-path by field-path across five types, can
+only miss the type nobody named — which is how one of four expressions for a
+back-driving torque came to be unbounded and stay so (F30, a self-locking
+worm's wheel reporting 2.2e307 N·m). `members()` and `meshes()` are the
+accessors that sweep needs, and the laws in `train/mod.rs`'s tests run over
+every preset through them. The walk also found that **no quantitative law
+crosses the arrangements**: a parallel-axis member's forward torque is a
+projection with no efficiency in it, so its backward share is the same fraction
+for both members; a crossed pair's output carries a forward efficiency the
+backward load does not share, so its two members differ by exactly
+`1/η_forward`. The invariant that does hold everywhere is the weaker one —
+every member of a stage that reacts a load reports a share of it, finite, and
+signed like its own torque — and it is the one asserted.
 
-**"That is a gear" was once a qualification here**, and a field rather than a
-comment: a worm stage's members carried no `GearResult`, on the reading that a
-worm is a thread and its wheel the envelope of one, so a profile shift, a
-dedendum, an admissible range and an undercut flank were questions that could
-not be put to them. A **crossed gear pair**'s members had inherited the
-thread's poverty rather than the gear's vocabulary — a crossed pinion could not
-say its flank had been eaten into where the same pinion with parallel shafts
-could ([corrections.md](corrections.md)) — and that was the first sign the
-qualification was the type's rather than the model's. It is gone: every member
-of every kind is a gear, a worm's included (above).
+**A new arrangement is new kinematics and nothing else.** That was the claim
+the division was to be judged by: a new arrangement should be how its shafts
+relate, where its meshes sit and what carries what, with `MemberRating` and
+`MeshReport` keyed on members and meshes rather than on named roles. It was
+tested by building the shape and running a pair, a worm and every arrangement
+of a set through it beside the types' own solves. Every figure but four
+agreed, and each of the four was a fault in a type
+([corrections](corrections.md#the-log)) rather than a difference of model — so
+the types went. An epicyclic set is more reference frames than a pair, not a
+different thing; a centre distance shared by several meshes is a layshaft's
+question as much as a set's; what a type kept apart — three shafts here, two
+there, a planet's own row — the shape reads off its graph, and a layshaft, a
+Wolfrom, a stepped planet, a planocentric, a Ravigneaux and a hula stage are
+lists of what sits where (`train/arrangements.rs`) with no code of their own.
 
-**What the qualification then buys is the walk.** `StageResult::members()` is
-every member of a stage that is a gear, whatever kind the stage is, and it is
-the accessor a sweep over "every number every member reports" needs. Written
-field-path by field-path across five kinds, that sweep can only miss the kind
-nobody named — which is how one of the four expressions for a back-driving
-torque came to be unbounded and stay so.
-
-**And it found that no quantitative law crosses the kinds.** A parallel-axis
-member's forward torque is a geometric projection with no efficiency in it, so
-its backward share is the same fraction for both members of a pair. A crossed
-pair's output torque carries a forward efficiency the backward load does not
-share, so its two members differ by exactly `1/η_forward` — by construction, and
-correctly. The invariant that does hold everywhere is the weaker one, and it is
-the one asserted: every member of a stage that reacts a load reports a share of
-it, finite, and signed like its own torque. A kind adds its own
-shape *beside* those, never instead of them — a planet is a `GearResult` plus
-what only a planet has, and a hula gear is a `GearResult` plus which side of its
-pair it is. So "its own result type" means the arrangement's own facts, not its
-own copy of everyone's.
-
-The test of the division is what a new kind would cost. It should be new
-*kinematics* — how its shafts relate, where its meshes sit, what carries what —
-and no new rating machinery at all: `MemberRating` and `MeshReport` are keyed on
-members and meshes rather than on named roles. **That claim was tested, and
-it held so well that the kinds went.** Building one `Shape` — axes, shafts,
-members, meshes, distances — and running a pair, a worm and every arrangement
-of a set through it beside the kinds' own solves reproduced every figure but
-four, each a fault in a kind ([corrections](corrections.md#the-log)) and not
-a difference of model. So the kinds are presets now, over one shape and one
-result: `Stage::Shape`, with `PairStage` and `PlanetaryStage` as the builders
-`defaults` uses and a document may still be written in. An epicyclic set is
-more reference frames than a pair, not a different thing, and a centre
-distance shared by several meshes is a layshaft's question as much as a
-set's; what a kind kept apart — three shafts here, two there, a planet's own
-row — the shape reads off its graph. This section's first paragraph is kept
-as the rule it was and the record of how it was read: *its own result type*
-was the arrangement's own facts, and the arrangement is data now — the hula
-stage's too, once the shape learned to size a distance from a tip bound
-(`geartrain-refactor-plan.md`, *Phases 5d and 6*), so that no kind is left
-and `Stage` has one variant.
+**What would change it:** an arrangement the shape cannot lay out — a member
+on two axes, a mesh that is not two members — is a change to `shape.rs`, and
+the rule is that it is still not a type: the six questions `Constrained` asks
+are the whole of what a stage owes, and one `impl` answers them.
 
 ### Helical is not a lesser case
 
@@ -1752,11 +1734,11 @@ three sentences: one stage note for a line contact, another for a point, and a
 third, hand-written in the front end, drawn beside the row — so a reader was
 told twice, in words that did not agree. The mesh notes are on `MeshReport`
 now, which is what lets a set say *which* of its two meshes extrapolates, and
-what made the two epicyclic kinds raise the contact-ratio findings at all: the
+what made the two epicyclic stage types raise the contact-ratio findings at all: the
 pair had asked both questions and neither of them had asked either.
 
-**The self-locking sentence is kind-neutral**, because the note is raised on
-any crossed-axis mesh — a spur kind at a shaft angle as much as a worm — and
+**The self-locking sentence names no preset**, because the note is raised on
+any crossed-axis mesh — a spur pair at a shaft angle as much as a worm — and
 "the wheel cannot back-drive the worm" named parts that stage has none of.
 "The second member cannot drive the first" is what `Directional::locked` says.
 
@@ -1775,7 +1757,7 @@ failure. Both rows are gone.
 
 **What is not a repeat** is a figure the input does not show: a worm's lead
 angle, a hula mesh's far-side gap *as built* against the minimum it was asked
-to keep. And **which figure the box shows is the same on every kind**: the
+to keep. And **which figure the box shows is the same on every preset**: the
 distance the stage runs at, the nominal in the annotation. The hula's was the
 one exception, showing the zero-backlash offset and annotating the running one,
 which read as a different kind of number from the box beside it.
@@ -1800,7 +1782,7 @@ is why relief can be asked with nothing *just* touched. The panel used to
 reset that toggle itself when the shaft angle moved, and it was the one
 relief rule left written in TypeScript.
 
-### What a kind owes relief
+### What a stage owes relief
 
 The freedoms machinery was measured by what one change cost it — the helix
 becoming three readings on the members and the axial contact ratio arriving
@@ -1808,17 +1790,17 @@ as a fourth — and the answer was eight arms in a `match` over kind × freedom,
 three copies of the same precedence chain, a count in one group hand-derived
 from a toggle another group moves, and a walk that settled only because its
 groups were written in a lucky order. None of it wrong, all of it the shape
-that makes the next kind cost the same again.
+that made the next stage type cost the same again.
 
-So a kind now answers four questions, in `train::Constrained`, and nothing
+So a stage answers six questions, in `train::Constrained`, and nothing
 else: which members it has; every input relief may turn, by name; how its
-helix may be *stated* — the readings, in relief order; and which of its
-inputs argue with each other. Everything that walks those — counting,
-relieving, seeding a box from what it showed, reading the helix the readings
-state, lining a stage's inputs up against its result — is written once above
-the kinds. A member's inputs are resolved once for every kind by
-`Freedom::Member(i, _)`, so a per-member input that arrives is one line, not
-one per kind.
+helix may be *stated* — the readings, in relief order; which of its inputs
+argue with each other; where its shafts and meshes sit; and which shafts a
+train may address. Everything that walks those — counting, relieving, seeding
+a box from what it showed, reading the helix the readings state, lining a
+stage's inputs up against its result — is written once above the shape. A
+member's inputs are resolved once for every member by `Freedom::Member(i, _)`,
+so a per-member input that arrives is one line, not one per preset.
 
 **The readings are one list, read from both ends.** Relief turns them
 automatic least precious first, and the solve honours the *last* one given —
@@ -1873,8 +1855,8 @@ The gear tab can take one member of an open geartrain as a new tab. It is the
 same part described twice — a stage member is a `GearParams` with a rating
 around it — so the tab should show the tooth the stage rated, and the way to
 guarantee that is to hand over the parameters the stage *built* rather than
-the ones it was *given*: `GearResult::params`, filled once where every kind
-makes its result, carrying the shift the stage chose, the addendum a tip
+the ones it was *given*: `GearResult::params`, filled once where every member's
+result is made, carrying the shift the stage chose, the addendum a tip
 width held down, the helix shared out of a shaft angle with this member's
 hand, a planet's `2 − k`. The tab solves those with no guard left to fire —
 a test holds that nothing clamps — and quotes the stage's own pitch diameter.
@@ -2024,8 +2006,8 @@ as the field list beside it: a kind's name, its note and whether it is offered
 are one row rather than three places to keep in step, and the picker renders
 whatever the row says.
 
-**And the same table shape gates the geartrain's kinds**, so one knock reaches
-both. A stage kind was three hand-written buttons and four hand-written
+**And the same table shape gates the geartrain's presets**, so one knock reaches
+both. A stage preset was three hand-written buttons and four hand-written
 accessors for a default; it is one row each now, carrying the catalogue key, the
 default the core supplies and whether the mode has to be open for it. A crossed
 pair is deliberately not a row: it is a spur stage with its shafts at an angle,

@@ -32,7 +32,7 @@ is inside the pressure-angle range this tool allows.
 
 Domain: `inv α ≥ 0` for `α ≥ 0`, so `inv⁻¹(v)` for `v < 0` returns `None`. That is
 not a numerical failure — it means the requested centre distance is below what
-the base circles permit, and planetary ring searches request it constantly.
+the base circles permit, and a sweep over ring counts requests it constantly.
 
 ### Root finding
 
@@ -282,8 +282,8 @@ flanks have parted and negative where they overlap.
 **A clearance opens a mesh in its own direction.** A mesh assembled with a
 clearance `c` runs at `a_w + σ c` — `MeshKind::run_at`, the one place that
 direction is written — which is `+c` on the centres of an external pair and
-`−c` on an internal one. The law carried no `σ` and the two epicyclic kinds
-added the clearance on every mesh alike, so their internal meshes assembled a
+`−c` on an internal one. The law carried no `σ` and the two epicyclic stage
+types added the clearance on every mesh alike, so their internal meshes assembled a
 clearance *tighter* than zero backlash and reported that overlap as play
 ([corrections](corrections.md)).
 
@@ -323,8 +323,8 @@ second: the path, the operating pressure angle, the operating radii, the
 relative curvature, the stresses, the efficiency integral, and an internal
 pair's interference verdicts and tip room (`ring::mesh_at`). Only **backlash**
 keeps the design mesh, because it measures play against the zero-backlash
-reference. Every kind rates where it runs — the two epicyclic kinds rated at
-zero backlash for as long as a pair had not.
+reference. Every stage rates where it runs — the two epicyclic stage types
+rated at zero backlash for as long as a pair had not.
 
 | | how the distance enters |
 |---|---|
@@ -388,7 +388,7 @@ hula stage at a one-tooth difference is the case: it opens to about 45° of
 operating pressure angle to clear itself, sits just under continuous contact, and every split of
 both meshes is refused.
 
-Both of the distance findings belong to every kind that has a centre distance — a crank offset included,
+Both of the distance findings belong to every distance — a crank offset included,
 that being what a hula stage calls one — and both are `train::distance_notes`, so
 they are said in the same words wherever they arise.
 
@@ -430,7 +430,7 @@ is shared evenly, `β₁ = β₂ = Σ/2`, which is the spur gear at `Σ = 0` and
 special case for it. Every pair — spur, helical, crossed or worm — relates
 `{a, clearance, x₁, x₂, size}` by one equation, so four may be given. Which
 absorbs a given distance is a preference rather than a law, and it is the same
-on every kind: **the shifts do wherever one of them is free, and the size only
+on every preset: **the shifts do wherever one of them is free, and the size only
 when both are pinned**, because a shift moves the teeth where a size changes
 them. On a crossed mesh the shift enters as a rack's does,
 `a₀ = a_ref + (x₁ + x₂) m_n` exactly ([Crossed axes](#crossed-axes)), so the
@@ -448,7 +448,7 @@ overlap at zero helix, and `stage.overlap_needs_helix` says so. Crossed shafts
 have no overlap in this sense: the input is not offered there, and one that
 was given is relieved back to automatic.
 
-The worm kind sets the convention of worm practice as inputs: its worm's shift
+The worm preset sets the convention of worm practice as inputs: its worm's shift
 is pinned at zero — the worm is the tool its wheel is cut by — so a given
 distance moves the **wheel's** shift, as DIN 3975 has it, and pinning the
 wheel's too is what makes the worm's diameter absorb it. That last case is
@@ -478,12 +478,12 @@ many automatic pins one, in the order the stage declares. An entry of a group
 is one input stated one or more ways — a pair's size is either helix or the
 first pitch diameter, and the ratio where every face is given — counted once,
 given while any of its readings is, and within it at most one reading stands.
-A kind with **no** distance input would say `automatic_at_most = 0` for its
+A stage with **no** distance input would say `automatic_at_most = 0` for its
 clearance and so could never derive it — the same statement counted rather
-than special-cased, and since every kind has a distance input now, none says
-it. Each kind declares its groups, its readings and its inputs through
+than special-cased, and since every distance has the input, none says it.
+The shape declares its groups, its readings and its inputs through
 `train::Constrained`, and the walk over them is written once
-([rationale](rationale.md#what-a-kind-owes-relief)).
+([rationale](rationale.md#what-a-stage-owes-relief)).
 
 The objective and the constraints are not the same kind of thing, and failing at
 one must not discard the other: where the optimiser's own conditions — a minimum
@@ -872,8 +872,8 @@ One model covers a worm stage and a crossed helical pair, and one stage type
 too: a worm is a `PairStage` whose first member states its pitch diameter
 rather than its helix angle — the same reading of the same size — with the
 shift, addendum, dedendum and root round every other member has, and a root
-round of zero by preset because a worm's thread is ground to its root. The *kind* — spur or worm — is a layer over that: a
-preset, the words *starts* and *wheel*, which inputs a panel shows, and the
+round of zero by preset because a worm's thread is ground to its root. The
+*preset* — spur or worm — is a layer over that: the words *starts* and *wheel*, which inputs a panel shows, and the
 conventional proportions a worm's faces take. Nothing in the mathematics reads
 it.
 
@@ -1687,8 +1687,9 @@ x_p ≥ −inv(α_t)(z_s + z_p)/(2 tan α_n) − x_s          external
 x_p ≤  x_r + inv(α_t)(z_r − z_p)/(2 tan α_n)          internal
 ```
 
-Required planet shift is **strictly increasing in `z_ring`**, which is what makes
-the ring search provably complete, and `z_r = z_s + 2z_p` gives exactly zero at
+Required planet shift is **strictly increasing in `z_ring`**, so the counts
+that close form one run with no hole in it (`gear-cli planetary` sweeps them,
+each through the stage), and `z_r = z_s + 2z_p` gives exactly zero at
 no clearance — and `−c` at a clearance `c`, near enough: the planet thinned by
 the clearance opens both meshes, and the running distance stays at the ideal
 to well under a micron.
@@ -1712,20 +1713,19 @@ reads a given centre distance through, and a closed form rather than an
 iteration.
 
 Which member absorbs is read off the shift toggles rather than named by a
-control of its own: **the member left automatic absorbs, and the planet is
-preferred**, because it is the one no single mesh's operating angle is a
-statement about and the one this tool has always used. Pinning the planet is
-therefore how a designer asks the sun to close it instead — the same indirection
-by which pinning one of a hula stage's two members names the other as the
-one the crank supplies. Pinning all three over-specifies the set; the planet
-gives way, and the front end relieves it as it is created.
+control of its own, by [the stage's](#the-stage) one rule: **the member left
+automatic with the most leverage on the difference absorbs**, and on a set that
+is the planet, which moves the two distances apart at twice any other member's
+rate. Pinning the planet is therefore how a designer asks the sun to close it
+instead — the same indirection by which pinning one of a hula stage's two
+members names the other as the one the crank supplies. Pinning all three
+over-specifies the set; the planet gives way, and the front end relieves it as
+it is created.
 
 An absorbed shift is **checked, not bounded** — nothing is free to move it, so
 the only honest question is whether it actually undercuts, and the bound it
 answers to is `x_min` rather than a chooser's `max(x_min, 0)`
-([`train::undercut_bound`](#efficiency-parallel-axes)). The ring search keeps the
-planet as its absorber whatever the set does, because its completeness argument
-is about the planet's shift rising with the ring's count.
+([`train::undercut_bound`](#efficiency-parallel-axes)).
 
 **Layout checks**, all closed form: equal spacing needs `(z_s + z_r) mod N = 0`;
 simultaneous meshing needs `N | z_s` and `N | z_r`; planet clearance is
@@ -1742,9 +1742,13 @@ T_ring/T_sun = −i₀ η₀^w      T_carrier = −(T_sun + T_ring)
 η  = |T_out ω_out| / |T_in ω_in|
 ```
 
-**`w` is not known in advance**, since it depends on a torque that is itself
-being solved for, so both values are tried and the physical one kept. Two
-conditions decide it, and the first alone is not enough:
+This is `planetary::power`, the closed form the stage's mesh-by-mesh flow
+([the stage](#the-stage)) is held to on every arrangement; the stage itself
+assumes a direction per mesh and keeps the consistent assignment, which is
+the same decision made mesh by mesh. **`w` is not known in advance**, since
+it depends on a torque that is itself being solved for, so both values are
+tried and the physical one kept. Two conditions decide it, and the first
+alone is not enough:
 
 1. the sign the branch assumed has to be the sign it produces;
 2. **the output has to absorb what the input delivers** — `T_out ω_out ≤ 0`.
@@ -1786,15 +1790,15 @@ eccentric, so **both pairs are separated by the same distance**, the crank's
 offset, and that shared number is what makes the arrangement one mechanism
 rather than two independent meshes.
 
-**It is a preset of [the stage](#the-stage)**, as every kind is: a central
+**It is a preset of [the stage](#the-stage)**, as every arrangement is: a central
 axis carrying the grounded gear, the crank and the output; a wobble axis the
 crank carries, with both wobble gears on one shaft; two internal meshes on
 the one distance between the axes, which the tips size where it is
 automatic. Everything below — the offset from the gap and the tips, the
 shifts that reach it, the circulating power, the play at either shaft — the
 shape solves as it solves any arrangement, and `hula_recorded` in
-`train/shape.rs` holds it to the figures the kind recorded, to the digits the
-corpus printed, before it retired. What is this arrangement's own is the
+`train/shape.rs` holds it to the figures its own solver recorded, to the digits
+the corpus printed, before it retired. What is this arrangement's own is the
 algebra here, which is how those figures are read.
 
 ```text
@@ -1961,7 +1965,7 @@ addendum, the shaper and each mesh's shift division free (`gear-cli hulaband`):
 | 9 | 162 | 0.111 | 99.915 % | **78.5 %** | 13.6° | 0.014° |
 
 *(The operating angle is the **running** mesh's, 0.02 mm inside the
-zero-backlash crank; the kind that generated the first version of this table
+zero-backlash crank; the solver that generated the first version of this table
 quoted the zero-backlash angle.)*
 
 **These are optimised divisions, and they sit on a bound rather than at an
@@ -2123,8 +2127,8 @@ are asked at [`ring::mesh_with`](#limits) rather than restated here.
 
 ## The stage
 
-Every stage but the hula stage is one **shape**: a graph the geometry is hung
-on, and a solve that reads what to do off it rather than off a kind.
+Every stage is one **shape**: a graph the geometry is hung on, and a solve
+that reads what to do off it rather than off a type.
 
 ```text
 axis       carried_by  a shaft, or none for an axis fixed in the ground
@@ -2267,8 +2271,8 @@ A train is one shaft line, and what holds it still or turns it is the
 **train's** to say, not a stage's. There is no housing in the model: a shaft is
 fixed to ground, driven from outside, or free to do what the rest decides, and
 ground is one more shaft that happens to be held — the same row in the same
-matrix as any other. A stage kind that used to carry "sun in, ring fixed" as a
-field carries none, and answers instead which of its shafts are **ports** — the
+matrix as any other. A set, which used to carry "sun in, ring fixed" as a
+field, carries none, and the stage answers instead which of its shafts are **ports** — the
 ones a train may address — and which of those it holds *by convention*.
 
 ```text
@@ -2277,7 +2281,7 @@ coupling     ShaftRef = ShaftRef                  two shafts that turn as one
 ```
 
 **Conventions are laid under, and a statement replaces the convention of its
-kind.** With no constraints, every kind's convention stands: a pair's first
+kind.** With no constraints, every stage's convention stands: a pair's first
 member drives, a set's ring is held and its sun drives, the first stage of a
 chain is driven and each stage's conventional output is coupled to the next
 stage's conventional input. A constraint on a shaft replaces the convention *on
@@ -2295,7 +2299,7 @@ referred to, and its speed is the coupling's; a drive of one turn there as
 well would ask the shaft for two speeds, and did. So the same word arranges a
 set at the head of a chain and behind one, and the panel offers each port one
 choice — held, driven, free, or the convention as the overlay leaves it —
-on every kind alike.
+on every stage alike.
 
 **The chain reads its ends off the constraints.** A stage's input is the first
 of its ports not held, or the one driven; its output the next not held. So
@@ -2444,7 +2448,7 @@ both stresses and the widths each would need. A mesh reports its contact per
 case, and a stage every shaft's speed and torque per case.
 
 **Load sharing.** A stage input, `LoadSharing`, **off by default**, on every
-kind that reports a bending stress. It reaches bending alone — a contact rating
+stage that reports a bending stress. It reaches bending alone — a contact rating
 is already taken where one tooth carries everything, so sharing cannot move it —
 and where it is off the rating is `bending_section`'s own answer rather than one
 that agrees with it. Switched on, the mesh cycle is swept for the largest
@@ -2512,8 +2516,8 @@ Bending is per gear for the ordinary reason: each tooth has its own root section
 and form factor.
 
 **A member is rated over every mesh it is in, and the worst one answers.** Most
-members are in one; a planet is in two, and a stage kind not yet written may put
-one in more — so this is a fold over a list rather than a pair of names. The two
+members are in one; a planet is in two, and an arrangement not yet laid out may
+put one in more — so this is a fold over a list rather than a pair of names. The two
 meshes a planet is in carry the *same* tangential force, since it is the same
 planet transmitting through, and what separates them is the section each mesh's
 contact ratio puts the load at and the width that mesh carries it over — the
@@ -2586,7 +2590,7 @@ A simple pair has no carrier and one path, so this is the member's own
 revolutions and nothing more. An epicyclic set has both: in the carrier's frame
 the arm stands still and everything else turns past it, which is what makes the
 relative speed the one that counts — for a sun, a ring, a planet, a hula stage's
-grounded gear and its wobble body alike. The ratio is taken of the kind's
+grounded gear and its wobble body alike. The ratio is taken of the stage's
 **unit** kinematics rather than of a case's speeds, so a case held still is
 still engaged by every sweep its duty counts. The consequence worth stating is
 the one a per-member reading cannot: **a shaft that does not turn is still
