@@ -49,6 +49,7 @@ use crate::note::{key, Note};
 use crate::params::{Auto, GearParams};
 use crate::plane::BasicRack;
 use crate::ring::{Cutter, Ring};
+use crate::screw::{CrossedPath, Screw, ScrewParams};
 use crate::strength::{bending_stress, contact_stress, Load, RootStressModel, PARALLEL_AXES};
 use crate::tooth::Tooth;
 
@@ -243,7 +244,9 @@ impl Shape {
     }
 
     /// A mesh's kind, from its members: internal where exactly one is a
-    /// ring, on the side of the ring.
+    /// ring, on the side of the ring. A ring on crossed shafts is no mesh
+    /// the screw model has: both its flanks are involute helicoids on
+    /// cylinders, and a ring's is inside one.
     fn kind_of(&self, mesh: usize) -> Option<MeshKind> {
         let m = self.meshes[mesh];
         match (
@@ -251,9 +254,74 @@ impl Shape {
             self.members[m.b].ring.is_some(),
         ) {
             (false, false) => Some(MeshKind::External),
-            (false, true) => Some(MeshKind::Internal),
+            (false, true) if self.shaft_angle_of(mesh) == 0.0 => Some(MeshKind::Internal),
             _ => None,
         }
+    }
+
+    /// The angle between a mesh's two axes, degrees — nought on a
+    /// parallel-axis mesh, which is the line contact; anything else is the
+    /// point contact of crossed-axis screw gearing.
+    fn shaft_angle_of(&self, mesh: usize) -> f64 {
+        self.distance_of(mesh)
+            .map_or(0.0, |d| self.distances[d].angle)
+    }
+
+    /// Whether a mesh is the point contact of crossed shafts.
+    fn is_crossed(&self, mesh: usize) -> bool {
+        self.shaft_angle_of(mesh) != 0.0
+    }
+
+    /// **The screw gearing a crossed mesh is**, at these shifts and helices:
+    /// the first member's size read from its helix, the shifts entering as a
+    /// rack's do with each member's thickness modification as an equivalent
+    /// shift ([`ScrewParams::profile_shifts`]).
+    fn screw_of(&self, mesh: usize, shifts: &[f64], helix: &[f64]) -> Result<Screw, TrainError> {
+        let m = self.meshes[mesh];
+        // Caught here rather than in `Screw::new`, because by then the helix
+        // angle has become a diameter and the information is gone: `cos 90°`
+        // is 6e-17, not zero, so the diameter comes out enormous rather than
+        // infinite and passes every finiteness check downstream.
+        if helix[m.a].abs() >= 90.0 {
+            return Err(TrainError::Screw(
+                crate::screw::ScrewError::FirstMemberIsADisc,
+            ));
+        }
+        let module = self.members[m.a].module;
+        let eff = |i: usize| shifts[i] + self.base_params(i, helix).thickness_shift();
+        Screw::new(&ScrewParams {
+            normal_module: module,
+            normal_pressure_angle_rad: self.pressure_angle.to_radians(),
+            shaft_angle_rad: self.shaft_angle_of(mesh).to_radians(),
+            starts: self.members[m.a].gear.teeth,
+            wheel_teeth: self.members[m.b].gear.teeth,
+            worm_pitch_diameter: f64::from(self.members[m.a].gear.teeth.max(1)) * module
+                / helix[m.a].to_radians().cos(),
+            profile_shifts: [eff(m.a), eff(m.b)],
+        })
+        .map_err(TrainError::Screw)
+    }
+
+    /// **The effective shift sum that puts a mesh at `nominal`** — the
+    /// parallel mesh's involute relation, or the crossed mesh's rack law.
+    /// `None` where no sum reaches it.
+    fn shift_sum_reaching(&self, mesh: usize, nominal: f64, helix: &[f64]) -> Option<f64> {
+        if self.is_crossed(mesh) {
+            // At zero shift, which is the only thing the reference depends on.
+            let zero = vec![0.0; self.members.len()];
+            let s = self.screw_of(mesh, &zero, helix).ok()?;
+            let m = self.meshes[mesh];
+            let sum = (nominal - s.reference_distance) / self.members[m.a].module;
+            return sum.is_finite().then_some(sum);
+        }
+        let rack = self.rack_of(mesh, helix);
+        shift_sum_for(
+            rack.mt,
+            rack.alpha_t,
+            rack.alpha_n,
+            self.tooth_sum(mesh),
+            nominal,
+        )
     }
 
     /// The distance a mesh runs at — the entry for its two axes, either way
@@ -323,8 +391,10 @@ impl Shape {
     pub(crate) fn helix_angles(&self) -> Vec<f64> {
         let readings = self.readings();
         let first_a = self.meshes.first().map(|m| m.a);
+        // The last reading given is the one relief leaves standing, and the
+        // one the solve honours.
         let stated = |i: usize| -> Option<f64> {
-            readings.iter().find_map(|r| match r.freedom {
+            readings.iter().rev().find_map(|r| match r.freedom {
                 Freedom::Member(m, MemberFreedom::Helix) if m == i => r.helix,
                 Freedom::FirstPitchDiameter if i == 0 => r.helix,
                 // The overlap reads the size of the first mesh's first
@@ -345,41 +415,53 @@ impl Shape {
             let Some(d) = self.distance_of(k) else {
                 continue;
             };
-            if self.distances[d].angle != 0.0 {
-                continue;
-            }
-            let both_pinned = [m.a, m.b]
-                .iter()
-                .all(|&i| !self.members[i].gear.profile_shift.auto);
-            let Some(running) = self.given_running(d) else {
-                continue;
-            };
-            if !both_pinned {
-                continue;
-            }
             let Some(kind) = self.kind_of(k) else {
                 continue;
             };
-            let target = kind.nominal_of(running, self.distances[d].clearance.manual);
             let sign = kind.sign();
-            // The shifts as the members will actually be cut at this helix —
-            // a typed shift held to the undercut bound moves with the helix,
-            // and the size must reach the distance with the shift it gets.
+            let angle = self.distances[d].angle;
+            let both_pinned = [m.a, m.b]
+                .iter()
+                .all(|&i| !self.members[i].gear.profile_shift.auto);
+            let target = self
+                .given_running(d)
+                .filter(|_| both_pinned)
+                .map(|running| kind.nominal_of(running, self.distances[d].clearance.manual));
+            // The zero-backlash distance at a helix of the first member, with
+            // the shifts as the members will actually be cut at it — a typed
+            // shift held to the undercut bound moves with the helix, and the
+            // size must reach the distance with the shift it gets.
             let at = |beta: f64| -> f64 {
                 let mut helix = vec![0.0; self.members.len()];
                 helix[m.a] = beta;
-                helix[m.b] = -sign * beta;
+                helix[m.b] = angle - sign * beta;
                 let shifts: Vec<f64> = self.asked(&helix).iter().map(|a| a.settled).collect();
-                self.nominal_of(k, &shifts, &helix).unwrap_or(f64::NAN) - target
+                self.nominal_of(k, &shifts, &helix).unwrap_or(f64::NAN)
             };
-            // Straight teeth are the floor; the distance grows with the helix
-            // without bound below ninety degrees.
-            if at(0.0) > 0.0 {
-                continue;
-            }
-            if let Some(beta) = crate::solve::brent(at, 0.0, 89.0, crate::solve::Tol::default()) {
+            let sized = match target {
+                None => None,
+                Some(target) if angle == 0.0 => {
+                    // Straight teeth are the floor; the distance grows with
+                    // the helix without bound below ninety degrees.
+                    (at(0.0) <= target)
+                        .then(|| {
+                            crate::solve::brent(
+                                |b| at(b) - target,
+                                0.0,
+                                89.0,
+                                crate::solve::Tol::default(),
+                            )
+                        })
+                        .flatten()
+                }
+                Some(target) => self.size_reaching(k, target, &at),
+            };
+            // A crossed mesh with nothing stating its size shares the shaft
+            // angle evenly, which at a right angle is a 45°/45° crossed pair;
+            // a parallel one has straight teeth.
+            if let Some(beta) = sized.or_else(|| (angle != 0.0).then_some(angle / 2.0)) {
                 out[m.a] = Some(beta);
-                out[m.b] = Some(-sign * beta);
+                out[m.b] = Some(angle - sign * beta);
             }
         }
         // Propagate through the meshes until nothing moves.
@@ -387,15 +469,17 @@ impl Shape {
             let mut moved = false;
             for (k, m) in self.meshes.iter().enumerate() {
                 let sign = self.kind_of(k).map_or(1.0, MeshKind::sign);
-                // The opposite hand across an external mesh, the same hand
-                // across an internal one: `−sign · β`.
+                let angle = self.shaft_angle_of(k);
+                // `β_b = Σ − sign · β_a`: the opposite hand across an
+                // external mesh, the same hand across an internal one, and
+                // on crossed shafts the shaft angle shared between the two.
                 match (out[m.a], out[m.b]) {
                     (Some(a), None) => {
-                        out[m.b] = Some(-sign * a);
+                        out[m.b] = Some(angle - sign * a);
                         moved = true;
                     }
                     (None, Some(b)) => {
-                        out[m.a] = Some(-sign * b);
+                        out[m.a] = Some(angle - sign * b);
                         moved = true;
                     }
                     _ => {}
@@ -406,6 +490,67 @@ impl Shape {
             }
         }
         out.into_iter().map(|h| h.unwrap_or(0.0)).collect()
+    }
+
+    /// **The first member's helix that puts a crossed mesh at `target`**,
+    /// degrees — where one exists on the branch the member's own diameter
+    /// is on. `at` is the mesh's zero-backlash distance at a helix.
+    ///
+    /// # Two answers, and the branch is chosen by continuity
+    ///
+    /// On crossed shafts the distance has a **minimum** in the first
+    /// member's diameter ([`Screw::least_distance_lead_angle`]): steepening
+    /// the thread shrinks the worm and grows the wheel, and past the turning
+    /// point the second wins. So a target above the minimum is reached by
+    /// two worms, and picking one is a decision rather than a calculation.
+    /// It is taken **on the side the designer's own number is on** — the
+    /// diameter in the box — which is the only choice under which nudging
+    /// the target moves the answer smoothly instead of jumping between a
+    /// thin fast worm and a fat slow one. A target *below* the minimum is
+    /// reached by neither and there is no answer to give.
+    fn size_reaching(&self, mesh: usize, target: f64, at: &dyn Fn(f64) -> f64) -> Option<f64> {
+        let m = self.meshes[mesh];
+        let a = &self.members[m.a];
+        let z1 = f64::from(a.gear.teeth.max(1));
+        let floor = z1 * a.module;
+        // The designer's own number, held to the tooth's own diameter below
+        // which no pair exists.
+        let from = a.pitch_diameter.manual.max(floor * 1.000_001);
+        let sigma = self.shaft_angle_of(mesh).to_radians();
+        let turning = Screw::least_distance_lead_angle(
+            a.gear.teeth.max(1),
+            self.members[m.b].gear.teeth,
+            sigma,
+        )
+        .map(|least| floor / least.sin());
+        // The diameter is the helix read the other way, and the search runs
+        // over the diameter so the branch is the diameter's.
+        let helix_of = |d1: f64| (floor / d1).clamp(-1.0, 1.0).acos().to_degrees();
+        let distance = |d1: f64| at(helix_of(d1));
+        // No upper bound in the geometry, so one is grown until it brackets
+        // — the distance rises without bound on this branch, so it does.
+        let grown = |from: f64| {
+            let mut top = from * 2.0;
+            for _ in 0..60 {
+                if distance(top) >= target || !distance(top).is_finite() {
+                    break;
+                }
+                top *= 2.0;
+            }
+            top
+        };
+        let (lo, hi) = match turning {
+            Some(turning) if from <= turning => (floor * (1.0 + 1e-9), turning),
+            Some(turning) => (turning, grown(turning.max(from))),
+            None => (floor * (1.0 + 1e-9), grown(from.max(floor * 2.0))),
+        };
+        crate::solve::brent(
+            |d1| distance(d1) - target,
+            lo,
+            hi,
+            crate::solve::Tol::default(),
+        )
+        .map(helix_of)
     }
 
     /// The width the overlap reads its size against: the least given width.
@@ -509,8 +654,15 @@ impl Shape {
         eff(m.a) + sign * eff(m.b)
     }
 
-    /// The zero-backlash distance of a mesh at these shifts, closed form.
+    /// The zero-backlash distance of a mesh at these shifts, closed form:
+    /// the involute relation on parallel shafts, the rack law on crossed.
     fn nominal_of(&self, mesh: usize, shifts: &[f64], helix: &[f64]) -> Option<f64> {
+        if self.is_crossed(mesh) {
+            return self
+                .screw_of(mesh, shifts, helix)
+                .ok()
+                .map(|s| s.centre_distance);
+        }
         let rack = self.rack_of(mesh, helix);
         operating_geometry(
             rack.mt,
@@ -697,15 +849,8 @@ impl Shape {
             let d = self.distance_of(m)?;
             let running = plan.held[d]?;
             let kind = self.kind_of(m)?;
-            let rack = self.rack_of(m, helix);
             let nominal = kind.nominal_of(running, self.distances[d].clearance.manual);
-            let sum = shift_sum_for(
-                rack.mt,
-                rack.alpha_t,
-                rack.alpha_n,
-                self.tooth_sum(m),
-                nominal,
-            )?;
+            let sum = self.shift_sum_reaching(m, nominal, helix)?;
             let MeshInput { a, b, .. } = self.meshes[m];
             let sign = kind.sign();
             let (ta, tb) = (
@@ -779,6 +924,10 @@ impl Shape {
             f64::from(u8::from(mm.a == i)) + if mm.b == i { sign } else { 0.0 }
         };
         let slope = |mesh: usize, v: f64| -> Option<f64> {
+            if self.is_crossed(mesh) {
+                // The rack law: a module of distance per module of shift.
+                return Some(coefficient(mesh) * self.members[self.meshes[mesh].a].module);
+            }
             let rack = self.rack_of(mesh, helix);
             let sum_z = self.tooth_sum(mesh);
             let (aw, _, a) = operating_geometry(
@@ -806,7 +955,7 @@ impl Shape {
         let (mut lo, mut hi) = (f64::NEG_INFINITY, f64::INFINITY);
         for mesh in [first, m] {
             let c = coefficient(mesh);
-            if c == 0.0 {
+            if c == 0.0 || self.is_crossed(mesh) {
                 continue;
             }
             let rack = self.rack_of(mesh, helix);
@@ -1385,6 +1534,46 @@ impl Shape {
             .map(|c| c.shifts)
     }
 
+    /// **The screw gearing of a crossed mesh**, at the shifts the shape
+    /// settles on and the helices the readings decide — what the harness
+    /// prints a worm's lead angle and sizing from.
+    ///
+    /// # Errors
+    ///
+    /// [`TrainError::Screw`] where the pair cannot exist, and a wiring error
+    /// where the mesh is not on crossed shafts.
+    pub fn screw(&self, mesh: usize) -> Result<Screw, TrainError> {
+        if !self.is_crossed(mesh) {
+            return Err(TrainError::Wiring(super::WiringError::NotAMesh(mesh)));
+        }
+        let helix = self.helix_angles();
+        let x = self
+            .chosen_at(&crate::auto::Search::SHIPPED, &helix)?
+            .shifts;
+        self.screw_of(mesh, &x, &helix)
+    }
+
+    /// The gear a member would build at a shift, the helix as the readings
+    /// decide.
+    #[cfg(test)]
+    pub(crate) fn params_of(&self, i: usize, x: f64) -> GearParams {
+        self.params_at(i, x, &self.helix_angles())
+    }
+
+    /// A member's parameters before any automatic value is resolved.
+    #[cfg(test)]
+    pub(crate) fn base_params_of(&self, i: usize) -> GearParams {
+        self.base_params(i, &self.helix_angles())
+    }
+
+    /// Whether the optimiser chose, agreed with the floor, or found nothing.
+    #[cfg(test)]
+    pub(crate) fn searched(&self, search: &crate::auto::Search) -> super::Searched {
+        let helix = self.helix_angles();
+        self.chosen_at(search, &helix)
+            .map_or(super::Searched::FoundNothing, |c| c.how)
+    }
+
     /// The shifts the shape settles on under a search — what the tests
     /// written against the retired stage types' own choosers ask.
     #[cfg(test)]
@@ -1445,14 +1634,27 @@ impl Shape {
                 continue;
             }
             let m = self.meshes[k];
-            product *= crate::auto::MeshTrial {
-                members: [cut(m.a), cut(m.b)],
-                mesh: &bm.operating,
-                path: &bm.path,
-                min_contact_ratio: self.optimisation.min_contact_ratio,
-                friction: m.sliding_friction,
-            }
-            .efficiency()?;
+            let members = [cut(m.a), cut(m.b)];
+            let min_contact_ratio = self.optimisation.min_contact_ratio;
+            product *= match &bm.contact {
+                BuiltContact::Line(l) => crate::auto::MeshTrial {
+                    members,
+                    mesh: &l.operating,
+                    path: &l.path,
+                    min_contact_ratio,
+                    friction: m.sliding_friction,
+                }
+                .efficiency()?,
+                BuiltContact::Point(p) => crate::auto::CrossedTrial {
+                    members,
+                    screw: &p.screw,
+                    path: p.path.as_ref(),
+                    centre: bm.running,
+                    min_contact_ratio,
+                    friction: m.sliding_friction,
+                }
+                .efficiency()?,
+            };
         }
         Some(product)
     }
@@ -1613,12 +1815,342 @@ impl BuiltMember {
 /// One mesh as it runs.
 pub(crate) struct BuiltMesh {
     pub(crate) kind: MeshKind,
+    pub(crate) running: f64,
+    pub(crate) contact: BuiltContact,
+}
+
+/// **What the teeth of a mesh do to each other**: a line of contact on
+/// parallel shafts, a point on crossed ones. The one seam between the two
+/// models, as [`BuiltMember`] is between a rack-cut gear and a ring — every
+/// question the solve asks of a mesh is answered here, once per model, and
+/// nothing above needs to know which it is holding.
+pub(crate) enum BuiltContact {
+    Line(LineBuilt),
+    Point(PointBuilt),
+}
+
+/// The involute mesh of two gears on parallel shafts.
+pub(crate) struct LineBuilt {
     /// At zero backlash, where the shifts put it.
     pub(crate) design: Mesh,
     /// At the running distance, where the teeth touch.
     pub(crate) operating: Mesh,
     pub(crate) path: ContactPath,
-    pub(crate) running: f64,
+}
+
+/// Crossed-axis screw gearing between two involute helicoids.
+pub(crate) struct PointBuilt {
+    pub(crate) screw: Screw,
+    /// The zone the teeth leave at the running distance, before any face
+    /// limits it; `None` where the teeth never meet.
+    pub(crate) path: Option<CrossedPath>,
+}
+
+impl BuiltMesh {
+    /// The zero-backlash distance, where the shifts put the mesh.
+    pub(crate) fn nominal(&self) -> f64 {
+        match &self.contact {
+            BuiltContact::Line(l) => l.design.a_w,
+            BuiltContact::Point(p) => p.screw.centre_distance,
+        }
+    }
+
+    /// The line contact, where the mesh is one.
+    pub(crate) fn line(&self) -> Option<&LineBuilt> {
+        match &self.contact {
+            BuiltContact::Line(l) => Some(l),
+            BuiltContact::Point(_) => None,
+        }
+    }
+
+    /// The mesh's own efficiency at a friction coefficient, both ways: the
+    /// loss integral along a line contact, the friction balance along a
+    /// point's — which contains the pitch-point formula exactly and is the
+    /// fallback where the teeth leave no zone.
+    pub(crate) fn efficiency(&self, a: &Tooth, mu: f64, face: [f64; 2]) -> Directional<f64> {
+        match &self.contact {
+            BuiltContact::Line(l) => {
+                Directional::of(|d| efficiency(&l.path, &l.operating, a, mu, d))
+            }
+            BuiltContact::Point(p) => {
+                let zone = p.zone(face);
+                Directional::of(|d| {
+                    zone.and_then(|z| z.efficiency(&p.screw, mu, d, PATH_SAMPLES))
+                        .unwrap_or_else(|| p.screw.efficiency(mu, d))
+                })
+            }
+        }
+    }
+}
+
+impl PointBuilt {
+    /// The zone as the faces in use actually leave it.
+    pub(crate) fn zone(&self, face: [f64; 2]) -> Option<CrossedPath> {
+        self.path.as_ref().map(|path| {
+            path.limited_by_face(&self.screw, face)
+                .map_or(*path, |(z, _)| z)
+        })
+    }
+
+    /// **The friction at which each direction locks**, quoted beside the
+    /// efficiency along the same path — so it is the friction at which *it*
+    /// reaches zero rather than the pitch point's, in **both** directions,
+    /// since a pair that cannot be driven forward has a threshold too and
+    /// the reader is owed it. The pitch-point form is the fallback per
+    /// direction.
+    fn locking_friction(&self, face: [f64; 2]) -> Directional<f64> {
+        let pitch_point = self.screw.locking_friction();
+        let along = self
+            .zone(face)
+            .map(|z| z.locking_friction(&self.screw, PATH_SAMPLES));
+        Directional::of(|d| {
+            along
+                .and_then(|t| *t.get(d))
+                .unwrap_or_else(|| *pitch_point.get(d))
+        })
+    }
+
+    /// **One contact rating**, under a torque on the driving member in the
+    /// direction that presses that flank. The closure knows nothing about
+    /// which case asked.
+    ///
+    /// **The patch is the governing model's.** `hertz::peak_pressure` is the
+    /// larger of the ellipse and the line the teeth actually have — each
+    /// member's flank runs along its own ruling for `b / cos β_b`, and the
+    /// shorter bounds the patch exactly as the narrower face carries a
+    /// parallel pair — and the patch reported is the one that gave the
+    /// number. Without the line the crossed rating was the elliptical
+    /// solution alone, which assumes half-spaces of unlimited extent: at a
+    /// worm's 90° the patch is a small fraction of the face and the
+    /// assumption costs nothing; as the shafts come parallel the ellipse
+    /// lengthens without bound and the pressure it reports falls toward
+    /// zero, while the real pair is carrying its load on a line that has not
+    /// grown at all (`docs/corrections.md`).
+    ///
+    /// **Rated along the path, not at the pitch point.** The relative radius
+    /// peaks where the two roll lengths are equal and falls toward both ends
+    /// of the zone; the pitch point sits near that peak, so rating there
+    /// alone took the mesh at close to its gentlest. The points that matter
+    /// are the two boundaries of single-pair contact, where one tooth carries
+    /// everything; where `ε ≤ 1` those are the ends of the zone, so a face
+    /// too narrow raises this figure as well as costing continuity. The
+    /// force at *each* contact is that contact's own: a stress evaluated in
+    /// one place with a load computed in another is two answers wearing one
+    /// number.
+    fn rate(
+        &self,
+        face: [f64; 2],
+        e_star: f64,
+        friction: f64,
+        torque: f64,
+        on: MeshSide,
+        drive: Drive,
+    ) -> Result<super::ContactPatch, TrainError> {
+        let s = &self.screw;
+        let (curvature_along, curvature_across) =
+            s.contact_curvatures().ok_or(TrainError::NoContact)?;
+        let line_length = [0, 1]
+            .map(|i| face[i] / s.member_base(i).1.cos())
+            .into_iter()
+            .fold(f64::MAX, f64::min);
+        let patch_at = |along: f64, across: f64, force: f64| -> Option<(f64, [f64; 2])> {
+            let line = crate::hertz::line_pressure(across, force, line_length, e_star);
+            let ellipse = crate::hertz::elliptical_contact(along, across, force, e_star);
+            let pressure = crate::hertz::peak_pressure(along, across, force, line_length, e_star)?;
+            Some(match ellipse {
+                Some(e) if e.max_pressure > line => (
+                    pressure,
+                    [
+                        (2.0 * e.semi_major()).min(line_length),
+                        2.0 * e.semi_minor(),
+                    ],
+                ),
+                _ => (
+                    pressure,
+                    [
+                        line_length,
+                        2.0 * crate::hertz::line_half_width(across, pressure, e_star),
+                    ],
+                ),
+            })
+        };
+        let force = s.normal_force(torque, on, friction, drive);
+        let (pitch_pressure, pitch_patch) =
+            patch_at(curvature_along, curvature_across, force).ok_or(TrainError::NoContact)?;
+        let mut max_pressure = pitch_pressure;
+        let mut patch = pitch_patch;
+        let mut worst_position = 0.0;
+        let mut curvatures = (curvature_along, curvature_across);
+        if let Some(path) = self.zone(face) {
+            for position in path.single_pair_bounds(s) {
+                let contact = path.contact_at(s, position);
+                let Some((along, across)) = path.curvatures_at(s, position) else {
+                    continue;
+                };
+                let Some(force) = contact.normal_force(torque, on, friction, drive) else {
+                    continue;
+                };
+                let Some((pressure, here)) = patch_at(along, across, force) else {
+                    continue;
+                };
+                if pressure > max_pressure {
+                    max_pressure = pressure;
+                    patch = here;
+                    worst_position = position;
+                    curvatures = (along, across);
+                }
+            }
+        }
+        Ok(super::ContactPatch {
+            max_pressure,
+            at_pitch_point: pitch_pressure,
+            worst_position,
+            patch_length: patch[0],
+            patch_width: patch[1],
+            curvature_along: curvatures.0,
+            curvature_across: curvatures.1,
+        })
+    }
+
+    /// Angular play at one member, radians, at a centre distance `a`: the
+    /// separation above nominal and the axial slack projected onto the one
+    /// contact normal — the module documentation of [`super::crossed`]
+    /// derives it — through the law every mesh shares.
+    fn angular_play(&self, a: f64, axial_clearance: f64, teeth: u32) -> f64 {
+        let s = &self.screw;
+        let Some(n) = s.contact_normal() else {
+            return 0.0;
+        };
+        // A separation opens **both** flanks; a rigid-body slide along the
+        // worm's axis opens one exactly as far as it closes the other.
+        let separation = 2.0 * (a - s.centre_distance).max(0.0) * n[0].abs();
+        let slide = axial_clearance * n[2].abs();
+        crate::mesh::angular_play(separation + slide, teeth, s.normal_base_pitch())
+    }
+}
+
+/// Quadrature points for the friction balance the stage reports: the
+/// trapezium rule's residual is below 1e-9 here (`train::crossed`).
+const PATH_SAMPLES: usize = 2048;
+
+/// **What a point contact's builder has in hand** — the crossed-axis
+/// counterpart of [`super::LineMesh`], gathered for the same reason.
+struct PointMesh {
+    power_through: Directional<f64>,
+    coprime: bool,
+    efficiency: Directional<f64>,
+    locking_friction: Directional<f64>,
+    /// One contact per load case, in the loads' order.
+    contact: Vec<super::ContactPatch>,
+    backlash: [super::Backlash; 2],
+    flank_interference: [bool; 2],
+    /// The first member's reference radius, mm — what its pitch line speed
+    /// is read at.
+    first_reference_radius: f64,
+}
+
+/// A point contact's [`MeshReport`]: the zone as the faces leave it, the
+/// sliding at each case's own speed, and what the mesh has to say — whether
+/// it locks or nearly does, in **both** directions, against the static
+/// coefficient because that is what decides breaking away.
+fn point_mesh_report(
+    loads: &StageLoads,
+    p: &PointBuilt,
+    face: [f64; 2],
+    static_friction: f64,
+    m: PointMesh,
+) -> MeshReport {
+    let s = &p.screw;
+    let mut notes = Vec::new();
+    // Asked in both directions: a worm that cannot be back-driven is the
+    // familiar case and the one the word "self-locking" is for; a crossed
+    // pair at a steep helix split cannot be driven *forward*. Same
+    // construction, roles swapped — the keys differ because the sentence
+    // differs, which is a catalogue matter and not a computation.
+    let locked = m.efficiency.locked();
+    for drive in Drive::BOTH {
+        let threshold = *m.locking_friction.get(drive);
+        let (is_locked, is_near) = match drive {
+            Drive::Backward => (key::MESH_SELF_LOCKING, key::MESH_NEAR_SELF_LOCKING),
+            Drive::Forward => (key::MESH_FORWARD_LOCKING, key::MESH_NEAR_FORWARD_LOCKING),
+        };
+        let said = |k: &'static str| {
+            Note::new(k)
+                .number("friction", static_friction, 3)
+                .number("threshold", threshold, 4)
+        };
+        if *locked.get(drive) {
+            notes.push(said(is_locked));
+        } else if threshold > 0.0 && static_friction > 0.8 * threshold {
+            // **`threshold > 0.0` is load-bearing, not defensive.** A
+            // direction no friction can lock has a negative threshold, and
+            // `µ > 0.8 × a negative number` is true of every µ — so without
+            // this the "close to locking" note fires on precisely the pairs
+            // that are furthest from it. Forwards that is the ordinary case.
+            notes.push(said(is_near));
+        }
+    }
+    if m.efficiency.forward < 0.5 {
+        notes.push(Note::new(key::MESH_LOW_EFFICIENCY).number(
+            "percent",
+            m.efficiency.forward * 100.0,
+            1,
+        ));
+    }
+    // The zone as the widths in use actually leave it — one construction,
+    // asked twice for different things. No zone at all is a contact ratio
+    // of nought, which the note says as plainly as a short one.
+    let (contact_ratio, zone) = p.path.as_ref().map_or((0.0, None), |path| {
+        let (zone, limited_by) = path
+            .limited_by_face(s, face)
+            .unwrap_or((*path, crate::screw::ZoneLimit::Face));
+        (
+            zone.contact_ratio,
+            Some((
+                limited_by,
+                path.face_widths_for(s, 1.0),
+                zone.axial_travel(s),
+            )),
+        )
+    });
+    if contact_ratio < 1.0 {
+        notes.push(Note::new(key::MESH_CONTACT_RATIO_BELOW_ONE).number("ratio", contact_ratio, 3));
+    }
+    MeshReport {
+        notes,
+        power_through: m.power_through,
+        coprime: m.coprime,
+        contact_ratio,
+        locking_friction: m.locking_friction,
+        efficiency: m.efficiency,
+        sliding_ratio: s.sliding_ratio,
+        cases: loads
+            .cases
+            .iter()
+            .zip(m.contact)
+            .map(|(c, contact)| super::MeshCase {
+                case: c.case,
+                contact,
+                // **How fast the surfaces slide past each other**, which is a
+                // speed with no sign to it: a pair rubbing at 3 m/s rubs at
+                // 3 m/s whichever way round it is turning.
+                sliding_velocity: s.sliding_ratio
+                    * (c.speed / 60.0 * std::f64::consts::TAU).abs()
+                    * m.first_reference_radius,
+            })
+            .collect(),
+        backlash: m.backlash,
+        flank_interference: m.flank_interference,
+        // Both members external: the tips meet on the line of action or not
+        // at all.
+        tips: None,
+        line: None,
+        point: Some(super::PointContact {
+            limited_by: zone.map_or(crate::screw::ZoneLimit::Face, |z| z.0),
+            face_width_for_continuity: zone.and_then(|z| z.1),
+            axial_travel: zone.map_or([0.0; 2], |z| z.2),
+        }),
+    }
 }
 
 pub(crate) struct Built {
@@ -1688,8 +2220,26 @@ impl Shape {
             let d = self
                 .distance_of(k)
                 .ok_or(TrainError::Wiring(super::WiringError::NotAMesh(k)))?;
-            let design = Mesh::new(members[m.a].as_gear(), members[m.b].as_gear(), kind)
-                .map_err(TrainError::Mesh)?;
+            // The mesh at zero backlash, where the shifts put it: the
+            // involute mesh on parallel shafts, the screw gearing on crossed.
+            enum Zero {
+                Line(Mesh),
+                Point(Screw),
+            }
+            let zero = if self.is_crossed(k) {
+                Zero::Point(self.screw_of(k, x, helix)?)
+            } else {
+                Zero::Line(
+                    Mesh::new(members[m.a].as_gear(), members[m.b].as_gear(), kind)
+                        .map_err(TrainError::Mesh)?,
+                )
+            };
+            let clearance = self.distances[d].clearance.manual;
+            let opened = |nominal: f64| kind.run_at(nominal, clearance);
+            let nominal = match &zero {
+                Zero::Line(design) => design.a_w,
+                Zero::Point(screw) => screw.centre_distance,
+            };
             // The distance the pair of axes runs at: given, or the first
             // mesh's zero-backlash distance opened by the clearance — and
             // every later mesh on an automatic distance must agree with it,
@@ -1701,35 +2251,52 @@ impl Shape {
                 .or_else(|| self.running_target(d));
             let at = match running[d] {
                 Some(r) => {
-                    if target.is_none()
-                        && (design.running_distance(self.distances[d].clearance.manual) - r).abs()
-                            > 1e-9 * r.abs().max(1.0)
-                    {
+                    if target.is_none() && (opened(nominal) - r).abs() > 1e-9 * r.abs().max(1.0) {
                         return Err(TrainError::NoCommonDistance);
                     }
                     r
                 }
                 None => {
-                    let r = target.unwrap_or_else(|| {
-                        design.running_distance(self.distances[d].clearance.manual)
-                    });
+                    let r = target.unwrap_or_else(|| opened(nominal));
                     running[d] = Some(r);
                     r
                 }
             };
-            let operating = design.at(at).map_err(TrainError::Mesh)?;
-            let path = ContactPath::new(
-                members[m.a].as_gear(),
-                members[m.b].tip_radius(),
-                &operating,
-            )
-            .ok_or(TrainError::NoContact)?;
+            let contact = match zero {
+                Zero::Line(design) => {
+                    let operating = design.at(at).map_err(TrainError::Mesh)?;
+                    let path = ContactPath::new(
+                        members[m.a].as_gear(),
+                        members[m.b].tip_radius(),
+                        &operating,
+                    )
+                    .ok_or(TrainError::NoContact)?;
+                    BuiltContact::Line(LineBuilt {
+                        design,
+                        operating,
+                        path,
+                    })
+                }
+                Zero::Point(screw) => {
+                    // The tips are the teeth's own: this is the one place a
+                    // crossed pair's tooth form reaches an answer, which is
+                    // why it is specified at all (docs/reference.md#crossed-axes).
+                    // No zone at all — the teeth never meet — is not a
+                    // refusal here: it is a contact ratio of nought, said
+                    // by the mesh, and a flank inside a base cylinder is
+                    // fouling rather than idle.
+                    let path = screw.path_of_contact_at(
+                        members[m.a].tip_radius(),
+                        members[m.b].tip_radius(),
+                        at,
+                    );
+                    BuiltContact::Point(PointBuilt { screw, path })
+                }
+            };
             meshes.push(BuiltMesh {
                 kind,
-                design,
-                operating,
-                path,
                 running: at,
+                contact,
             });
         }
         Ok(Built {
@@ -1855,38 +2422,6 @@ pub fn solve_shape(
     let teeth = super::teeth_of(shape.members());
     let motion = wiring.unit_motion(&teeth, &boundary)?;
 
-    // ---- crossed axes: the point-contact model, over the pair it is
-    // written for.
-    if let Some((pair, kind)) = shape.as_crossed_pair() {
-        let sized = pair.sized();
-        let r = super::crossed::solve_crossed_pair(&sized, kind, loads, lib, &motion)?;
-        return Ok(ShapeResult {
-            ratio: r.ratio,
-            ratio_per_tooth: shape.ratio_per_tooth(&wiring, &teeth, &boundary),
-            efficiency: r.mesh.efficiency,
-            // The one mesh carries the whole of it, either way it turns.
-            circulation: Directional {
-                forward: f64::from(u8::from(r.mesh.efficiency.forward > 0.0)),
-                backward: f64::from(u8::from(r.mesh.efficiency.backward > 0.0)),
-            },
-            backlash: r.mesh.backlash_by_drive(),
-            distances: vec![DistanceReport {
-                nominal: vec![r.centre_distance_nominal],
-                running: r.centre_distance,
-                clearance: r.clearance,
-                sized_by: None,
-            }],
-            overlap: 0.0,
-            layouts: Vec::new(),
-            cases: Vec::new(),
-            members: r.gears.to_vec(),
-            meshes: vec![r.mesh],
-            notes: r.notes,
-        });
-    }
-    if shape.distances.iter().any(|d| d.angle != 0.0) {
-        return Err(TrainError::Wiring(super::WiringError::Unsolvable));
-    }
     let system = wiring.alone(&teeth)?;
     let speed: Vec<f64> = system
         .motion(&boundary.conditions)
@@ -1924,11 +2459,68 @@ pub fn solve_shape(
         })
         .collect::<Result<_, _>>()?;
 
+    // ---- the meshes each member is in, and which of them are lines.
+    let meshes_of: Vec<Vec<usize>> = (0..n)
+        .map(|i| {
+            (0..shape.meshes.len())
+                .filter(|&k| shape.meshes[k].a == i || shape.meshes[k].b == i)
+                .collect()
+        })
+        .collect();
+    let on_a_line = |i: usize| {
+        meshes_of[i]
+            .iter()
+            .any(|&k| built.meshes[k].line().is_some())
+    };
+
+    // ---- the widths a point contact runs at, decided before anything that
+    // reads them: a worm distance's conventional proportions, or the width
+    // in the box. Nothing rates a crossed pair's face — its pressure does
+    // not depend on the width, so no rating can be inverted for one, and an
+    // overlap ratio is a line contact's — so the width at which contact
+    // stays continuous is reported beside it as a figure, not acted on. A
+    // member on a line mesh as well is sized by that mesh below, and its
+    // point contact's zone is read at the width it ends with.
+    let recommended: Vec<Option<f64>> = (0..n)
+        .map(|i| {
+            meshes_of[i].iter().find_map(|&k| {
+                let d = shape.distance_of(k)?;
+                let BuiltContact::Point(p) = &built.meshes[k].contact else {
+                    return None;
+                };
+                if !shape.distances[d].worm {
+                    return None;
+                }
+                let m = shape.meshes[k];
+                Some(if i == m.a {
+                    super::crossed::proportions::worm_length(
+                        p.screw.axial_module,
+                        shape.members[m.b].gear.teeth,
+                        shape.members[m.a].gear.teeth,
+                    )
+                } else {
+                    super::crossed::proportions::wheel_face_width(
+                        p.screw.axial_module,
+                        p.screw.worm_pitch_diameter,
+                    )
+                })
+            })
+        })
+        .collect();
+    let early_width = |i: usize| -> f64 {
+        let w = &shape.members[i].gear.face_width;
+        recommended[i].map_or(w.manual, |r| w.resolve(r))
+    };
+    let face_of = |k: usize, width: &dyn Fn(usize) -> f64| -> [f64; 2] {
+        let m = shape.meshes[k];
+        [width(m.a), width(m.b)]
+    };
+
     // ---- each mesh's own efficiency, sliding and at rest.
     let mesh_efficiency = |k: usize, mu: f64| -> Directional<f64> {
         let bm = &built.meshes[k];
         let a = built.members[shape.meshes[k].a].as_gear();
-        Directional::of(|d| efficiency(&bm.path, &bm.operating, a, mu, d))
+        bm.efficiency(a, mu, face_of(k, &early_width))
     };
     let sliding: Vec<Directional<f64>> = (0..shape.meshes.len())
         .map(|k| mesh_efficiency(k, shape.meshes[k].sliding_friction))
@@ -2029,12 +2621,20 @@ pub fn solve_shape(
         .map(|k| loads.scaled(|c| pressing_torque_at_a(k, c)))
         .collect();
 
-    // ---- bending sections: one per (member, mesh) pair.
+    // ---- bending sections: one per (member, line mesh) pair. **No bending
+    // on a point contact, and that is a decision rather than a gap**: the
+    // tooth a beam formula would measure is not the tooth a crossed mesh
+    // loads — its contact is a point tracking diagonally across the flank,
+    // and a cantilever loaded across its whole face has no honest reading
+    // of it (docs/rationale.md#a-worm-stage-reports-no-bending-stress).
     let sharing = shape.load_sharing;
     let mut bendings: Vec<Vec<(usize, Option<super::Bending>)>> =
         (0..n).map(|_| Vec::new()).collect();
     for (k, m) in shape.meshes.iter().enumerate() {
-        let cr = built.meshes[k].path.contact_ratio;
+        let Some(line) = built.meshes[k].line() else {
+            continue;
+        };
+        let cr = line.path.contact_ratio;
         for i in [m.a, m.b] {
             bendings[i].push((
                 k,
@@ -2042,13 +2642,13 @@ pub fn solve_shape(
             ));
         }
     }
-    // **A member with no root section in any of its meshes refuses the
+    // **A member with no root section in any of its line meshes refuses the
     // stage**; one rated in some mesh keeps that rating and says which flank
     // went unrated — a planet whose ring-side load point falls off its flank
     // is still rated on its sun side, which is what the set's own kind did
     // without saying so. A ring refuses only its own rating.
-    for (m, b) in shape.members.iter().zip(&bendings) {
-        if m.ring.is_none() && b.iter().all(|(_, b)| b.is_none()) {
+    for (i, (m, b)) in shape.members.iter().zip(&bendings).enumerate() {
+        if m.ring.is_none() && on_a_line(i) && b.iter().all(|(_, b)| b.is_none()) {
             return Err(TrainError::NoRootSection);
         }
     }
@@ -2057,21 +2657,61 @@ pub fn solve_shape(
     let e_star: Vec<f64> = (0..shape.meshes.len())
         .map(|k| contact_modulus(&materials[shape.meshes[k].a], &materials[shape.meshes[k].b]))
         .collect();
-    let contact_at = |k: usize, width: f64| -> Result<crate::strength::ContactStress, TrainError> {
-        let m = shape.meshes[k];
-        let bm = &built.meshes[k];
-        contact_stress(
-            &bm.path,
-            &bm.operating,
-            built.members[m.a].as_gear(),
-            PARALLEL_AXES,
-            &Load::new(scaled[k].0, width),
-            e_star[k],
-        )
-        .ok_or(TrainError::NoContact)
-    };
-    let probes: Vec<crate::strength::ContactStress> = (0..shape.meshes.len())
+    // A line contact's stress at a width, from the worst torque the mesh
+    // carries; a point contact has none here — it is rated per case below.
+    let contact_at =
+        |k: usize, width: f64| -> Result<Option<crate::strength::ContactStress>, TrainError> {
+            let m = shape.meshes[k];
+            let Some(line) = built.meshes[k].line() else {
+                return Ok(None);
+            };
+            contact_stress(
+                &line.path,
+                &line.operating,
+                built.members[m.a].as_gear(),
+                PARALLEL_AXES,
+                &Load::new(scaled[k].0, width),
+                e_star[k],
+            )
+            .ok_or(TrainError::NoContact)
+            .map(Some)
+        };
+    let probes: Vec<Option<crate::strength::ContactStress>> = (0..shape.meshes.len())
         .map(|k| contact_at(k, PROBE))
+        .collect::<Result<_, _>>()?;
+    // **A point contact is rated on the torque of the member driving it, in
+    // the direction that presses that flank**, case by case — the efficiency
+    // *is* the friction balance, so the driver's torque and the driven
+    // member's are the same reading wherever the pair transmits, and where
+    // it does not — a locked pair — the driver's is the one the flanks are
+    // pressed by. The flow says which member drives in each case.
+    let point_contact =
+        |k: usize, faces: [f64; 2]| -> Result<Option<Vec<super::ContactPatch>>, TrainError> {
+            let m = shape.meshes[k];
+            let BuiltContact::Point(p) = &built.meshes[k].contact else {
+                return Ok(None);
+            };
+            loads
+                .cases
+                .iter()
+                .map(|c| {
+                    let at_a = pressing_torque_at_a(k, c);
+                    let (torque, on, drive) = match flow_for(c.drive).map(|f| f.directions[k]) {
+                        None | Some(Drive::Forward) => (at_a, MeshSide::First, Drive::Forward),
+                        Some(Drive::Backward) => (
+                            at_a * f64::from(shape.members[m.b].gear.teeth)
+                                / f64::from(shape.members[m.a].gear.teeth),
+                            MeshSide::Second,
+                            Drive::Backward,
+                        ),
+                    };
+                    p.rate(faces, e_star[k], m.sliding_friction, torque, on, drive)
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map(Some)
+        };
+    let point_probes: Vec<Option<Vec<super::ContactPatch>>> = (0..shape.meshes.len())
+        .map(|k| point_contact(k, face_of(k, &early_width)))
         .collect::<Result<_, _>>()?;
 
     // ---- what each member's ratings come to, from the probe pass.
@@ -2085,31 +2725,66 @@ pub fn solve_shape(
         )
         .map(|s| s * b.share)
     };
-    let always_reverses = |i: usize| bendings[i].len() > 1;
+    let always_reverses = |i: usize| meshes_of[i].len() > 1;
     let rating = |i: usize, widths: &[f64]| -> MemberRating<'_> {
-        let meshes: Vec<(Loading, Vec<f64>)> = bendings[i]
+        // A line mesh's loading at the probe width, every case a scale of
+        // it; a point mesh's at its own width, case by case.
+        let cases = loads
+            .cases
             .iter()
-            .map(|(k, b)| {
-                let m = shape.meshes[*k];
-                let side = usize::from(m.b == i);
-                let probe = Load::new(scaled[*k].0, PROBE);
-                let ft = probe.tangential(built.members[m.a].as_gear());
-                (
-                    Loading {
-                        bending: b.as_ref().and_then(|b| stress_at(b, ft, &probe)),
-                        contact: probes[*k].governing(side),
-                        measured_at: PROBE,
-                        carried_at: widths[*k],
-                    },
-                    scaled[*k].1.clone(),
-                )
+            .enumerate()
+            .map(|(c, load)| super::CaseLoadings {
+                load: *load,
+                meshes: meshes_of[i]
+                    .iter()
+                    .map(|&k| {
+                        let m = shape.meshes[k];
+                        let side = usize::from(m.b == i);
+                        match (&probes[k], &point_probes[k]) {
+                            (Some(probe_stress), _) => {
+                                let probe = Load::new(scaled[k].0, PROBE);
+                                let ft = probe.tangential(built.members[m.a].as_gear());
+                                let b = bendings[i]
+                                    .iter()
+                                    .find(|(kk, _)| *kk == k)
+                                    .and_then(|(_, b)| b.as_ref());
+                                Loading {
+                                    bending: b.and_then(|b| stress_at(b, ft, &probe)),
+                                    contact: probe_stress.governing(side),
+                                    measured_at: PROBE,
+                                    carried_at: widths[k],
+                                    sizes_face: true,
+                                }
+                                .under(scaled[k].1[c])
+                            }
+                            (None, Some(patches)) => Loading {
+                                bending: None,
+                                // The mesh's figure, which is the members'
+                                // figure: two flanks share one patch, one
+                                // normal force and one `E*`, and a point
+                                // contact has only the one place.
+                                contact: patches[c].max_pressure,
+                                measured_at: widths[k],
+                                carried_at: widths[k],
+                                sizes_face: false,
+                            },
+                            (None, None) => Loading {
+                                bending: None,
+                                contact: 0.0,
+                                measured_at: widths[k],
+                                carried_at: widths[k],
+                                sizes_face: false,
+                            },
+                        }
+                    })
+                    .collect(),
             })
             .collect();
         MemberRating {
             material: &materials[i],
             reversal,
             always_reverses: always_reverses(i),
-            cases: Loading::for_cases(loads, &meshes),
+            cases,
         }
     };
     let probe_widths = vec![PROBE; shape.meshes.len()];
@@ -2118,23 +2793,35 @@ pub fn solve_shape(
     let for_overlap = shape
         .meshes
         .iter()
-        .map(|m| {
+        .enumerate()
+        .filter(|(k, _)| built.meshes[*k].line().is_some())
+        .map(|(_, m)| {
             super::width_for_overlap(&shape.overlap, helix[m.a], shape.members[m.a].module)
                 .unwrap_or(0.0)
         })
         .fold(0.0_f64, f64::max);
+    // A member on no line mesh has nothing to ask of a rating, and asks
+    // nothing of its mate: its width is its own — a worm distance's
+    // proportions, or the box's, and the gear says which.
     let asks: Vec<f64> = (0..n)
         .map(|i| {
-            shape.members[i]
-                .gear
-                .face_sources
-                .width_for(
-                    &rating(i, &probe_widths).asks(),
-                    shape.members[i].gear.face_width.manual,
-                )
-                .max(for_overlap)
+            if on_a_line(i) {
+                shape.members[i]
+                    .gear
+                    .face_sources
+                    .width_for(
+                        &rating(i, &probe_widths).asks(),
+                        shape.members[i].gear.face_width.manual,
+                    )
+                    .max(for_overlap)
+            } else {
+                0.0
+            }
         })
         .collect();
+    let as_entered = |i: usize| {
+        shape.members[i].gear.face_width.auto && !on_a_line(i) && recommended[i].is_none()
+    };
     // **A member's automatic width is the largest requirement of any mesh it
     // is in**, because the narrower face carries the pair.
     let mesh_ask: Vec<f64> = shape
@@ -2144,11 +2831,18 @@ pub fn solve_shape(
         .collect();
     let widths: Vec<f64> = (0..n)
         .map(|i| {
-            let wanted = bendings[i]
+            let wanted = meshes_of[i]
                 .iter()
-                .map(|(k, _)| mesh_ask[*k])
+                .map(|&k| mesh_ask[k])
                 .fold(0.0_f64, f64::max);
-            shape.members[i].gear.face_width.resolve(wanted)
+            let own = shape.members[i].gear.face_width;
+            // Nothing rated it: its own proportions, or the box as entered.
+            let wanted = if on_a_line(i) {
+                wanted.max(recommended[i].unwrap_or(0.0))
+            } else {
+                recommended[i].unwrap_or(own.manual)
+            };
+            own.resolve(wanted)
         })
         .collect();
     let mesh_widths: Vec<f64> = shape
@@ -2156,8 +2850,12 @@ pub fn solve_shape(
         .iter()
         .map(|m| widths[m.a].min(widths[m.b]))
         .collect();
-    let rated_contact: Vec<crate::strength::ContactStress> = (0..shape.meshes.len())
+    let rated_contact: Vec<Option<crate::strength::ContactStress>> = (0..shape.meshes.len())
         .map(|k| contact_at(k, mesh_widths[k]))
+        .collect::<Result<_, _>>()?;
+    let final_width = |i: usize| widths[i];
+    let rated_point: Vec<Option<Vec<super::ContactPatch>>> = (0..shape.meshes.len())
+        .map(|k| point_contact(k, face_of(k, &final_width)))
         .collect::<Result<_, _>>()?;
 
     // ---- backlash: each mesh's play, and where it shows on each shaft.
@@ -2165,16 +2863,28 @@ pub fn solve_shape(
         let bm = &built.meshes[k];
         let m = shape.meshes[k];
         let d = shape.distance_of(k).unwrap_or(0);
-        let rack = shape.rack_of(k, &helix);
-        let bb = crate::plane::base_helix_angle(
-            helix[m.a].to_radians(),
-            shape.pressure_angle.to_radians(),
-        );
-        let slide = shape.distances[d].axial_clearance * bb.sin().abs();
-        let p_bn = std::f64::consts::PI * rack.mn * shape.pressure_angle.to_radians().cos();
-        // The row's play: `Δ = j |Σz| / a`, plus the axial float's.
-        bm.design.backlash(a).unwrap_or(0.0) * shape.tooth_sum(k).abs() / a
-            + 2.0 * std::f64::consts::PI * slide / p_bn
+        let axial = shape.distances[d].axial_clearance;
+        match &bm.contact {
+            BuiltContact::Line(l) => {
+                let rack = shape.rack_of(k, &helix);
+                let bb = crate::plane::base_helix_angle(
+                    helix[m.a].to_radians(),
+                    shape.pressure_angle.to_radians(),
+                );
+                let slide = axial * bb.sin().abs();
+                let p_bn = std::f64::consts::PI * rack.mn * shape.pressure_angle.to_radians().cos();
+                // The row's play: `Δ = j |Σz| / a`, plus the axial float's.
+                l.design.backlash(a).unwrap_or(0.0) * shape.tooth_sum(k).abs() / a
+                    + 2.0 * std::f64::consts::PI * slide / p_bn
+            }
+            // The screw law takes the *separation* from the geometric
+            // distance rather than the distance itself, and the row's play
+            // is a member's angular play at its own count.
+            BuiltContact::Point(p) => {
+                let z = shape.members[m.a].gear.teeth;
+                p.angular_play(a, axial, z) * f64::from(z)
+            }
+        }
     };
     // Play at a shaft per unit of play in mesh `k`, with the input and the
     // held shafts standing still.
@@ -2240,13 +2950,12 @@ pub fn solve_shape(
     let mut distances = Vec::new();
     for d in 0..shape.distances.len() {
         let meshes = shape.meshes_on(d);
-        let nominal: Vec<f64> = meshes.iter().map(|&k| built.meshes[k].design.a_w).collect();
+        let nominal: Vec<f64> = meshes.iter().map(|&k| built.meshes[k].nominal()).collect();
         let Some(&first) = meshes.first() else {
             continue;
         };
         let running = built.running[d].unwrap_or(0.0);
-        let clearance =
-            built.meshes[first].kind.sign() * (running - built.meshes[first].design.a_w);
+        let clearance = built.meshes[first].kind.sign() * (running - built.meshes[first].nominal());
         // What the distance has to say, **asked of every mesh on it**: a
         // given distance one mesh's shifts could not reach — a set with two
         // of its three shifts given and its distance too — is said of that
@@ -2258,8 +2967,8 @@ pub fn solve_shape(
                 shape
                     .given_running(d)
                     .map(|r| bm.kind.nominal_of(r, shape.distances[d].clearance.manual)),
-                bm.design.a_w,
-                bm.kind.sign() * (running - bm.design.a_w),
+                bm.nominal(),
+                bm.kind.sign() * (running - bm.nominal()),
             ));
         }
         distances.push(DistanceReport {
@@ -2370,6 +3079,7 @@ pub fn solve_shape(
             );
         }
         out.extend(g.face_width_note());
+        out.extend(as_entered(i).then(|| Note::new(key::GEAR_FACE_WIDTH_AS_ENTERED)));
         // ...and each mesh whose load point leaves this member no section
         // to rate, where another mesh's did.
         if bendings[i].iter().any(|(_, b)| b.is_some()) {
@@ -2397,11 +3107,11 @@ pub fn solve_shape(
     // shaft's figure (`ShapeResult::cases`), not the gear's. A member in two
     // meshes reports the larger.
     let member_torque = |i: usize, c: &super::StageLoad| -> f64 {
-        bendings[i]
+        meshes_of[i]
             .iter()
-            .map(|(k, _)| {
-                let m = shape.meshes[*k];
-                let at_a = pressing_torque_at_a(*k, c);
+            .map(|&k| {
+                let m = shape.meshes[k];
+                let at_a = pressing_torque_at_a(k, c);
                 if m.a == i {
                     at_a
                 } else {
@@ -2432,7 +3142,7 @@ pub fn solve_shape(
                 input: &shape.members[i].gear,
                 cases,
                 face_width: widths[i],
-                recommended_face_width: None,
+                recommended_face_width: recommended[i],
                 material: materials[i].clone(),
                 clamps: built.members[i].clamps(),
                 notes: gear_notes(i),
@@ -2446,58 +3156,82 @@ pub fn solve_shape(
             let m = shape.meshes[k];
             let bm = &built.meshes[k];
             let (a, b) = (&built.members[m.a], &built.members[m.b]);
-            super::line_mesh_report(
-                loads,
-                super::LineMesh {
-                    power_through: Directional {
-                        forward: moving.forward.as_ref().map_or(0.0, |f| f.mesh_powers[k]),
-                        backward: moving.backward.as_ref().map_or(0.0, |b| b.mesh_powers[k]),
+            let power_through = Directional {
+                forward: moving.forward.as_ref().map_or(0.0, |f| f.mesh_powers[k]),
+                backward: moving.backward.as_ref().map_or(0.0, |b| b.mesh_powers[k]),
+            };
+            let coprime =
+                super::gcd(shape.members[m.a].gear.teeth, shape.members[m.b].gear.teeth) == 1;
+            let efficiency = sliding[k].once_moving(&at_rest[k]);
+            let backlash = [
+                member_backlash(k, MeshSide::First),
+                member_backlash(k, MeshSide::Second),
+            ];
+            match &bm.contact {
+                BuiltContact::Line(l) => super::line_mesh_report(
+                    loads,
+                    super::LineMesh {
+                        power_through,
+                        coprime,
+                        contact_ratios: ContactRatios::of(
+                            l.path.contact_ratio,
+                            mesh_widths[k],
+                            helix[m.a],
+                            shape.members[m.a].module,
+                        ),
+                        operating_pressure_angle: l.operating.alpha_w.to_degrees(),
+                        efficiency,
+                        // Every line contact was rated above; the map is
+                        // over the option so nothing here can panic.
+                        contact: rated_contact[k].as_ref().map_or_else(Vec::new, |stress| {
+                            scaled[k]
+                                .1
+                                .iter()
+                                .map(|&s| {
+                                    super::ContactPatch::line(stress, s, mesh_widths[k], e_star[k])
+                                })
+                                .collect()
+                        }),
+                        backlash,
+                        flank_interference: l
+                            .operating
+                            .flank_interference([a.flank_ends(), b.flank_ends()]),
+                        tips: match &**b {
+                            BuiltMember::Ring { ring, .. } => {
+                                super::TipRoom::at(ring, a.as_gear(), bm.running)
+                            }
+                            BuiltMember::Rack { .. } => None,
+                        },
+                        notes: bendings[m.a]
+                            .iter()
+                            .find(|(kk, _)| *kk == k)
+                            .and_then(|(_, b)| b.as_ref().and_then(|b| b.note.clone()))
+                            .into_iter()
+                            .collect(),
                     },
-                    coprime: super::gcd(
-                        shape.members[m.a].gear.teeth,
-                        shape.members[m.b].gear.teeth,
-                    ) == 1,
-                    contact_ratios: ContactRatios::of(
-                        bm.path.contact_ratio,
-                        mesh_widths[k],
-                        helix[m.a],
-                        shape.members[m.a].module,
-                    ),
-                    operating_pressure_angle: bm.operating.alpha_w.to_degrees(),
-                    efficiency: sliding[k].once_moving(&at_rest[k]),
-                    contact: scaled[k]
-                        .1
-                        .iter()
-                        .map(|&s| {
-                            super::ContactPatch::line(
-                                &rated_contact[k],
-                                s,
-                                mesh_widths[k],
-                                e_star[k],
-                            )
-                        })
-                        .collect(),
-                    backlash: [
-                        member_backlash(k, MeshSide::First),
-                        member_backlash(k, MeshSide::Second),
-                    ],
-                    flank_interference: bm
-                        .operating
-                        .flank_interference([a.flank_ends(), b.flank_ends()]),
-                    tips: match &**b {
-                        BuiltMember::Ring { ring, .. } => {
-                            super::TipRoom::at(ring, a.as_gear(), bm.running)
-                        }
-                        BuiltMember::Rack { .. } => None,
+                ),
+                BuiltContact::Point(p) => point_mesh_report(
+                    loads,
+                    p,
+                    face_of(k, &final_width),
+                    m.static_friction,
+                    PointMesh {
+                        power_through,
+                        coprime,
+                        efficiency,
+                        locking_friction: p.locking_friction(face_of(k, &final_width)),
+                        contact: rated_point[k].clone().unwrap_or_default(),
+                        backlash,
+                        flank_interference: p.path.as_ref().map_or([true, true], |path| {
+                            path.flank_interference(&p.screw, [a.flank_ends(), b.flank_ends()])
+                        }),
+                        first_reference_radius: f64::from(shape.members[m.a].gear.teeth)
+                            * shape.members[m.a].module
+                            / helix[m.a].to_radians().cos()
+                            / 2.0,
                     },
-                    notes: bendings[m.a]
-                        .iter()
-                        .find(|(kk, _)| *kk == k)
-                        .and_then(|(_, b)| b.as_ref().and_then(|b| b.note.clone()))
-                        .into_iter()
-                        .collect(),
-                },
-            )
+                ),
+            }
         })
         .collect();
 
@@ -2781,49 +3515,6 @@ impl Shape {
             }],
         }
     }
-
-    /// **A crossed pair, read back as the pair the screw model takes.** The
-    /// point-contact model in [`super::crossed`] is written over a
-    /// [`super::PairStage`], and a shape whose one distance is at an angle
-    /// is exactly one of those; the view is built here so that model is
-    /// called and not copied. `None` where the shape is more than a pair.
-    fn as_crossed_pair(&self) -> Option<(super::PairStage, super::PairKind)> {
-        let d = self.distances.first()?;
-        if d.angle == 0.0
-            || self.distances.len() != 1
-            || self.members.len() != 2
-            || self.meshes.len() != 1
-        {
-            return None;
-        }
-        let m = self.meshes[0];
-        let (a, b) = (&self.members[m.a], &self.members[m.b]);
-        Some((
-            super::PairStage {
-                module: a.module,
-                pressure_angle: self.pressure_angle,
-                shaft_angle: d.angle,
-                pitch_diameter: a.pitch_diameter,
-                overlap: self.overlap,
-                sliding_friction: m.sliding_friction,
-                static_friction: m.static_friction,
-                thickness_mod: a.thickness_mod,
-                centre_distance: d.distance,
-                clearance: d.clearance,
-                tolerance_plus: d.tolerance_plus,
-                tolerance_minus: d.tolerance_minus,
-                optimisation: self.optimisation,
-                load_sharing: self.load_sharing,
-                axial_clearance: d.axial_clearance,
-                gears: [a.gear.clone(), b.gear.clone()],
-            },
-            if d.worm {
-                super::PairKind::Worm
-            } else {
-                super::PairKind::Spur
-            },
-        ))
-    }
 }
 
 impl From<&super::PlanetaryStage> for Shape {
@@ -3032,8 +3723,8 @@ mod tests {
         )
     }
 
-    /// **A crossed distance reaches the point-contact model**, and the shape
-    /// reports what it reports: a point contact, no bending on the worm.
+    /// **A crossed distance is built as the point-contact model**, and the
+    /// shape reports what it reports: a point contact, no bending on the worm.
     #[test]
     fn a_crossed_distance_is_a_point_contact() {
         for (pair, kind) in [
@@ -3041,7 +3732,7 @@ mod tests {
             (PairStage::worm().with_first_helix(45.0), PairKind::Spur),
         ] {
             let shape = Shape::from_pair(&pair, kind);
-            assert!(shape.as_crossed_pair().is_some());
+            assert!(shape.is_crossed(0) && shape.screw(0).is_ok());
             let r = solve_shape(
                 &shape,
                 &loads(),
@@ -3303,8 +3994,8 @@ mod tests {
                 &lib.get(&stage.planet.material).expect("a material").clone(),
             );
             let direct = contact_stress(
-                &b.meshes[0].path,
-                &b.meshes[0].operating,
+                &b.meshes[0].line().unwrap().path,
+                &b.meshes[0].line().unwrap().operating,
                 b.members[0].as_gear(),
                 PARALLEL_AXES,
                 &load,
@@ -3390,16 +4081,16 @@ mod tests {
             // the ring's, per path, is `η` less than the planet pressed it
             // with, read back across the ring mesh.
             let from_sun = each(
-                built.meshes[0].path.contact_ratio,
+                built.meshes[0].line().unwrap().path.contact_ratio,
                 Load::new((r.cases[0].torques[1] / planets).abs(), sp_width)
                     .across_mesh(built.members[0].as_gear(), planet)
                     .torque,
                 sp_width,
             );
             let from_ring = each(
-                built.meshes[1].path.contact_ratio,
+                built.meshes[1].line().unwrap().path.contact_ratio,
                 (r.cases[0].torques[3] / planets).abs()
-                    / built.meshes[1].operating.ratio()
+                    / built.meshes[1].line().unwrap().operating.ratio()
                     / r.meshes[1].efficiency.forward,
                 pr_width,
             );

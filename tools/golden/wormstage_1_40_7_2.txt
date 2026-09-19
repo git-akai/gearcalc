@@ -3,7 +3,7 @@ worm stage  z 1/40  module 1  ratio -40.0000:1  a 23.7273 mm
 
   member      torque Nm   face mm   d mm      material
   worm          2.0000    13.539    7.0000   4340 Hardened Steel
-  wheel        49.4437     4.690   40.4145   Brass C360
+  wheel        80.0000     4.690   40.4145   Brass C360
 
   efficiency   61.805 % forward / 0.000 % backward  (cannot be back-driven)
   contact      3376.1 MPa   patch 1.5807 x 0.9582 mm

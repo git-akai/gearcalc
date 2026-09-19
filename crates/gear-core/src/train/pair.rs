@@ -20,13 +20,10 @@
 //! records what that cost, and the audit's record (`docs/history/audit.md`,
 //! F83) what deleting it moved: nothing.
 
-use super::{Freedom, Reading, StageGear, TrainError};
+use super::StageGear;
 use crate::auto::automatic_profile_shift;
 use crate::contact::LoadSharing;
-use crate::mesh::{Mesh, MeshKind};
-use crate::params::{Auto, GearParams};
-use crate::screw::{Screw, ScrewParams};
-use crate::tooth::Tooth;
+use crate::params::Auto;
 
 /// **What a gear's two shift controls come to**, read once so every stage reads
 /// them the same way.
@@ -452,509 +449,63 @@ impl PairStage {
         self
     }
 
-    /// **Whether the axial contact ratio is a reading of the size**: both
-    /// face widths are given, so the width the mesh carries is known and a
-    /// ratio can be turned into a helix at it, and the shafts are parallel so
-    /// there is an overlap to reach. A fact about the widths, not about the
-    /// ratio's own toggle — which is what lets relief count it among the
-    /// readings the moment it is pinned.
-    #[must_use]
-    pub fn overlap_reads_size(&self) -> bool {
-        !self.is_crossed() && self.gears.iter().all(|g| !g.face_width.auto)
-    }
-
-    /// **Whether the axial contact ratio decides the helix**: it is a reading
-    /// of the size, and it is given.
-    #[must_use]
-    pub fn size_taken_by_overlap(&self) -> bool {
-        !self.overlap.auto && self.overlap_reads_size()
-    }
-
-    /// The width the mesh carries as given — the narrower of two given faces.
-    fn given_width(&self) -> f64 {
-        self.gears[0]
-            .face_width
-            .manual
-            .min(self.gears[1].face_width.manual)
-    }
-
-    /// The two gears' helix angles, degrees — from whichever reading of the
-    /// size is given ([`super::Reading`]), or from what decides it where none
-    /// is ([`Self::first_pitch_diameter`]).
-    ///
-    /// One place to ask, so the pair cannot disagree about a shaft angle they
-    /// share — and so `β₁ + β₂ = Σ` holds by construction rather than by a test.
-    /// A stated helix is kept in its own words, to the bit, rather than
-    /// becoming a diameter and coming back through an arccosine.
-    /// Either member's helix and the first member's diameter as readings of
-    /// the one size, and the ratio where it decides it — what the shape
-    /// declares to relief for every member; kept here for the crossed
-    /// model's own reading of the pair.
-    fn readings(&self) -> Vec<Reading> {
-        let z1 = f64::from(self.gears[0].teeth.max(1)) * self.module;
-        let mut out = vec![
-            Reading::helix(0, &self.gears[0], |b| b),
-            Reading::helix(1, &self.gears[1], |b| self.shaft_angle - b),
-            Reading {
-                freedom: Freedom::FirstPitchDiameter,
-                // `cos β = z m_n / d`, clamped so a diameter below the tooth's
-                // own reads as straight teeth rather than a NaN.
-                helix: (!self.pitch_diameter.auto).then(|| {
-                    (z1 / self.pitch_diameter.manual)
-                        .clamp(-1.0, 1.0)
-                        .acos()
-                        .to_degrees()
-                }),
-            },
-        ];
-        if self.overlap_reads_size() {
-            out.push(Reading::overlap(
-                &self.overlap,
-                self.module,
-                self.given_width(),
-            ));
-        }
-        out
-    }
-
-    #[must_use]
-    pub fn helix_angles(&self) -> [f64; 2] {
-        let first = super::stated_helix(&self.readings()).unwrap_or_else(|| {
-            // A diameter, given or solved. `cos β = z m_n / d`, clamped so a
-            // diameter below the tooth's own — which `geometry` refuses —
-            // reads as a helix of zero rather than a NaN.
-            let cos = (f64::from(self.gears[0].teeth.max(1)) * self.module
-                / self.first_pitch_diameter())
-            .clamp(-1.0, 1.0);
-            cos.acos().to_degrees()
-        });
-        [first, self.shaft_angle - first]
-    }
-
     /// Whether the shafts cross. The parallel case is the zero of the shaft
     /// angle, and it is the *mesh* that differs, not the stage.
     #[must_use]
     pub fn is_crossed(&self) -> bool {
         self.shaft_angle != 0.0
     }
+}
 
-    /// **The first member's pitch diameter, mm** — from whichever reading of
-    /// the size is given, or from what decides it where none is.
-    ///
-    /// The readings are one number, so this is the one accessor the crossed
-    /// geometry is built from whichever was stated: the diameter itself, to
-    /// the bit, or `z₁ m_n / cos β₁` from the helix the readings state. With
-    /// every reading automatic, what decides it is a given centre distance
-    /// with **both shifts pinned** — a shift absorbs a distance by
-    /// preference, since it moves the teeth where a size changes them, so
-    /// while one is free the size has nothing to absorb (see
-    /// [`Self::size_reaching`], which is also where the two-answers problem
-    /// is dealt with) — and otherwise **the shaft angle shared evenly**,
-    /// which at `Σ = 0` is a spur pair and at a right angle a 45°/45° crossed
-    /// one.
-    ///
-    /// Falling back to the even split where the distance cannot be reached is
-    /// `docs/rationale.md`'s clamp-rather-than-refuse: the stage still solves,
-    /// at a distance the reported clearance then makes visible.
-    #[must_use]
-    pub fn first_pitch_diameter(&self) -> f64 {
-        if !self.pitch_diameter.auto {
-            return self.pitch_diameter.manual;
-        }
-        let z1 = f64::from(self.gears[0].teeth.max(1)) * self.module;
-        let of_helix = |beta_deg: f64| z1 / beta_deg.to_radians().cos();
-        if let Some(beta) = super::stated_helix(&self.readings()) {
-            return of_helix(beta);
-        }
-        let shifts_pinned = self.gears.iter().all(|g| !g.profile_shift.auto);
-        if shifts_pinned {
-            // The branch is chosen by the diameter in the box — the designer's
-            // own number, which is what `size_reaching` argues from — held to
-            // the tooth's own diameter below which no pair exists.
-            let from = self.pitch_diameter.manual.max(z1 * 1.000_001);
-            if let Some(d1) = self
-                .nominal_distance()
-                .and_then(|target| self.size_reaching(target, from))
-            {
-                return d1;
-            }
-        }
-        of_helix(self.shaft_angle / 2.0)
+/// **The tests' door.** What the tests ask of a pair — its shifts, its
+/// screw geometry, the gear it builds — they ask of the shape it lays out,
+/// in the pair's own vocabulary; nothing here is a second chooser.
+#[cfg(test)]
+impl PairStage {
+    /// The shape this pair lays out: two axes in ground at the shaft angle,
+    /// one mesh, one distance.
+    pub(crate) fn shape(&self) -> super::shape::Shape {
+        super::shape::Shape::from(self)
     }
 
-    /// **The first member's size that puts this pair at `target`**, mm of pitch
-    /// diameter — where one exists on the branch the stage is already on.
-    ///
-    /// # Two answers, and the branch is chosen by continuity
-    ///
-    /// On crossed shafts the distance has a **minimum** in the first member's
-    /// diameter ([`Screw::least_distance_lead_angle`]): steepening the thread
-    /// shrinks the worm and grows the wheel, and past the turning point the
-    /// second wins. So a target above the minimum is reached by two worms, and
-    /// picking one is a decision rather than a calculation.
-    ///
-    /// It is taken **on the side the designer's own number is on**, which is the
-    /// only choice under which nudging the target moves the answer smoothly
-    /// instead of jumping between a thin fast worm and a fat slow one. A target
-    /// *below* the minimum is reached by neither and there is no answer to give.
-    ///
-    /// On parallel shafts there is no turning point — the distance only grows
-    /// with the helix — and the one branch runs from the tooth's own diameter
-    /// upward.
-    fn size_reaching(&self, target: f64, from: f64) -> Option<f64> {
-        let z1 = f64::from(self.gears[0].teeth.max(1));
-        let floor = z1 * self.module;
-        // **Degrees here, radians there.** `shaft_angle` is the designer's
-        // number and `Screw`'s is the mathematics'.
-        let turning = Screw::least_distance_lead_angle(
-            self.gears[0].teeth.max(1),
-            self.gears[1].teeth,
-            self.shaft_angle.to_radians(),
-        )
-        .map(|least| z1 * self.module / least.sin());
-
-        // The zero-backlash distance the whole stage would sit at with this
-        // size — the mesh's own, whichever mesh it is — with the shifts as the
-        // stage decides them. Both are pinned wherever this runs.
-        let distance = |d1: f64| -> f64 {
-            let mut probe = self.clone();
-            probe.pitch_diameter = Auto::fixed(d1);
-            probe.zero_backlash_distance().unwrap_or(f64::NAN)
-        };
-
-        // **`from` rather than `first_pitch_diameter()`** — that is what calls
-        // this, and reading it back here would recurse forever. It is the
-        // designer's own number, which is the whole point: the branch is chosen
-        // by where they already are. `floor` is the diameter at which the
-        // thread would wrap at a right angle, where `Screw::new` refuses.
-        let grown = |from: f64| {
-            // No upper bound in the geometry, so one is grown until it brackets
-            // — the distance rises without bound on this branch, so it does.
-            let mut top = from * 2.0;
-            for _ in 0..60 {
-                if distance(top) >= target || !distance(top).is_finite() {
-                    break;
-                }
-                top *= 2.0;
-            }
-            top
-        };
-        let (lo, hi) = match turning {
-            Some(turning) if from <= turning => (floor * (1.0 + 1e-9), turning),
-            Some(turning) => (turning, grown(turning.max(from))),
-            None => (floor * (1.0 + 1e-9), grown(from.max(floor * 2.0))),
-        };
-        crate::solve::brent(
-            |d1| distance(d1) - target,
-            lo,
-            hi,
-            crate::solve::Tol::default(),
-        )
-    }
-
-    /// **The zero-backlash centre distance this stage sits at**, mm, with the
-    /// shifts as it decides them — the parallel mesh's `a_w` or the crossed
-    /// mesh's rack-law distance, whichever mesh it has.
-    ///
-    /// `None` where the pair cannot mesh at all.
-    #[must_use]
-    pub fn zero_backlash_distance(&self) -> Option<f64> {
-        let x = self.chosen_at(&crate::auto::Search::SHIPPED).shifts;
-        if self.is_crossed() {
-            return self.screw_at(x).ok().map(|s| s.centre_distance);
-        }
-        let g = [0, 1].map(|i| Tooth::new(self.params_at(i, x[i])));
-        Mesh::new(&g[0], &g[1], MeshKind::External)
-            .ok()
-            .map(|m| m.a_w)
-    }
-
-    /// The crossed-axis geometry this stage describes, at given shifts.
-    ///
-    /// # Errors
-    ///
-    /// [`TrainError::Screw`] if the pair cannot exist.
-    pub fn screw_at(&self, shifts: [f64; 2]) -> Result<Screw, TrainError> {
-        // Caught here rather than in `Screw::new`, because by then the helix
-        // angle has become a diameter and the information is gone: `cos 90°` is
-        // 6e-17, not zero, so the diameter comes out enormous rather than
-        // infinite and passes every finiteness check downstream.
-        if self.helix_angles()[0].abs() >= 90.0 {
-            return Err(TrainError::Screw(
-                crate::screw::ScrewError::FirstMemberIsADisc,
-            ));
-        }
-        Screw::new(&ScrewParams {
-            normal_module: self.module,
-            normal_pressure_angle_rad: self.pressure_angle.to_radians(),
-            shaft_angle_rad: self.shaft_angle.to_radians(),
-            starts: self.gears[0].teeth,
-            wheel_teeth: self.gears[1].teeth,
-            worm_pitch_diameter: self.first_pitch_diameter(),
-            profile_shifts: shifts,
-        })
-        .map_err(TrainError::Screw)
-    }
-
-    /// **This stage with its automatic size resolved to a number**, so the
-    /// geometry below it is built once rather than solved again at every read
-    /// of a helix angle.
-    ///
-    /// Only where every reading *was* automatic: a stated reading is kept in
-    /// its own words, so a stated helix stays itself to the bit rather than
-    /// becoming a diameter and coming back through an arccosine.
-    #[must_use]
-    pub fn sized(&self) -> Self {
-        let any_stated =
-            !self.pitch_diameter.auto || self.gears.iter().any(|g| !g.helix_angle.auto);
-        if any_stated {
-            return self.clone();
-        }
-        Self {
-            pitch_diameter: Auto::fixed(self.first_pitch_diameter()),
-            ..self.clone()
-        }
-    }
-
-    /// The crossed-axis geometry this stage describes, at the shifts it
-    /// decides — its zero-backlash distance is the stage's.
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::screw_at`].
-    pub fn geometry(&self) -> Result<Screw, TrainError> {
-        self.screw_at(self.chosen_at(&crate::auto::Search::SHIPPED).shifts)
-    }
-
-    /// **The shift sum that puts this pair at `target`**, in normal modules —
-    /// the parallel mesh's involute relation, or the crossed mesh's rack law
-    /// ([`crate::screw::ScrewParams::profile_shifts`]). `None` where no sum
-    /// reaches it.
-    fn shift_sum_reaching(&self, target: f64) -> Option<f64> {
-        if self.is_crossed() {
-            // At zero shift, which is the only thing the reference depends on
-            // — and asking `geometry()` here would ask the shifts, which is
-            // what this is deciding.
-            let reference = self.screw_at([0.0; 2]).ok()?.reference_distance;
-            let sum = (target - reference) / self.module;
-            return sum.is_finite().then_some(sum);
-        }
-        let rack = crate::plane::BasicRack::new(
-            self.module,
-            self.pressure_angle,
-            self.helix_angles()[0].abs(),
-        );
-        let sum_z = f64::from(self.gears[0].teeth) + f64::from(self.gears[1].teeth);
-        crate::mesh::shift_sum_for(rack.mt, rack.alpha_t, rack.alpha_n, sum_z, target)
-    }
-
-    /// The two profile shifts, chosen together where that is what the stage
-    /// asked for.
-    ///
-    /// With the toggle off each gear answers on its own, as it always has: the
-    /// manual value, or the least shift that clears undercut. With it on the
-    /// pair is chosen at once, because a shift is only good or bad relative to
-    /// the one it meshes with — and what a designer has already given is handed
-    /// over as pinned rather than overridden.
-    // **The tests\' door.** The solve reads `chosen_at`, because it needs
-    // to know *how* the shifts were arrived at as well as what they are.
-    #[cfg(test)]
-    pub(super) fn shifts(&self) -> [f64; 2] {
+    /// The two profile shifts the shape settles on, at the shipped effort.
+    pub(crate) fn shifts(&self) -> [f64; 2] {
         self.shifts_at(&crate::auto::Search::SHIPPED)
     }
 
-    /// The **nominal** distance the shifts have to reach, where one was given —
-    /// the distance typed less the clearance it is opened by.
-    ///
-    /// `None` where the stage is not in mode 3: with the distance automatic
-    /// there is nothing to reach, and with the *clearance* automatic the
-    /// designer is asking what gap their shifts leave rather than for shifts
-    /// that make a gap. The same accessor, under the same name, is on every
-    /// kind that has a centre distance.
-    pub(super) fn nominal_distance(&self) -> Option<f64> {
-        self.given_distance()
-            .map(|running| MeshKind::External.nominal_of(running, self.clearance.manual))
+    /// As [`Self::shifts`], at a stated search effort.
+    pub(crate) fn shifts_at(&self, search: &crate::auto::Search) -> [f64; 2] {
+        let x = self.shape().shifts_at(search);
+        [x[0], x[1]]
     }
 
-    /// The **running** distance a designer gave, where mode 3 is on — the
-    /// number typed, which the pair is then judged against
-    /// (`train::distance_notes`).
-    pub(super) fn given_distance(&self) -> Option<f64> {
-        (!self.centre_distance.auto && !self.clearance.auto).then_some(self.centre_distance.manual)
+    /// The crossed-axis geometry this stage describes, at the shifts the
+    /// shape decides — its zero-backlash distance is the stage's.
+    pub(crate) fn geometry(&self) -> Result<crate::screw::Screw, super::TrainError> {
+        self.shape().screw(0)
     }
 
-    /// As [`Self::shifts`], at a stated search effort — which is what makes
-    /// "the shipped effort is converged" a claim something can raise and check
-    /// rather than a comment (`auto::Search`).
-    /// As [`Self::shifts_at`], **and whether the optimiser actually chose**.
-    ///
-    /// Two outcomes look identical from the shifts alone: a search that agreed
-    /// with the floor, and a search that found nothing admissible and left the
-    /// floor alone. `super::Searched` tells them apart, and the solve says the
-    /// second out loud.
-    pub(super) fn chosen_at(&self, search: &crate::auto::Search) -> super::Chosen<2> {
-        let asked = [0, 1].map(|i| self.gears[i].shift_asked(&self.base_params(i)));
-        let floor = asked.map(|a| a.search_floor);
-        let given = asked.map(|a| a.given);
-        // **Mode 3 needs both of them given.** A distance with an *automatic*
-        // clearance is the designer asking what gap their shifts leave — mode 2
-        // — and solving the shifts from the distance would answer a question
-        // they did not ask. So the sum is pinned only when the clearance is a
-        // number they stated.
-        let sum = self
-            .nominal_distance()
-            .and_then(|target| self.shift_sum_reaching(target));
-
-        // **What the constraints alone imply**, with no objective involved.
-        //
-        // A given centre distance fixes the shift *sum*; what it leaves
-        // undecided is the division, and with nothing to optimise that follows a
-        // stated rule ([`crate::auto::divide_shift_sum`]) rather than a search.
-        // A shift a designer *gave* is never one of the numbers being chosen: it
-        // stands, and the other member absorbs the whole of the rest.
-        //
-        // `None` where no distance was given — there is then nothing to place —
-        // or where no admissible pair of shifts reaches it, which is F55.
-        let constrained = || -> Option<[f64; 2]> {
-            let sum = sum?;
-            match given {
-                [Some(a), Some(b)] => Some([a, b]),
-                [Some(a), None] => Some([a, sum - a]),
-                [None, Some(b)] => Some([sum - b, b]),
-                [None, None] => {
-                    crate::auto::divide_shift_sum(&|i, x| self.params_at(i, x), 1.0, sum, floor)
-                }
-            }
-        };
-
-        // **A given centre distance is a constraint whether or not anything is
-        // being optimised.** It used to be read only on the optimiser's path, so
-        // the plainest thing a designer does — type a housing distance with
-        // nothing asked to move — returned the undercut floor and ran at
-        // whatever distance that happened to make. Mode 3 of the clearance
-        // paradigm (`docs/reference.md#which-of-the-three-numbers-is-given-and-which-follows`) is the
-        // rule: the distance and the clearance are given, so the shifts follow.
-        if !self.optimisation.enabled {
-            return super::Chosen {
-                shifts: constrained().unwrap_or_else(|| asked.map(|a| a.settled)),
-                how: super::Searched::NotAsked,
-            };
-        }
-        let bounds = crate::auto::Bounds {
-            floor,
-            min_contact_ratio: self.optimisation.min_contact_ratio,
-            // **The gap the designer nominated**, which is a number they
-            // stated even where the *reported* clearance is derived from a
-            // given distance. It is a guard on the trial mesh — the teeth
-            // must not bottom out — so what it wants is the intended gap,
-            // not whatever a candidate's shifts happen to leave.
-            clearance: self.clearance.manual,
-        };
-        let pinned = crate::auto::Pinned { shift: given, sum };
-        let pair = |x: [f64; 2]| [0, 1].map(|i| self.params_at(i, x[i]));
-        // **One search, two meshes.** The floor, the pinning, the box and the
-        // descent are the same; what a candidate is worth is the mesh's own
-        // question — the loss integral along a line contact, the friction
-        // balance along a point's — and the two meet at the parallel limit as
-        // the meshes do.
-        if self.is_crossed() {
-            crate::auto::crossed_shifts_for_efficiency(
-                &pair,
-                &|x| self.screw_at(x).ok(),
-                &bounds,
-                &pinned,
-                self.sliding_friction,
-                search,
-            )
-        } else {
-            crate::auto::shifts_for_efficiency(
-                &pair,
-                crate::mesh::MeshKind::External,
-                &bounds,
-                &pinned,
-                self.sliding_friction,
-                search,
-            )
-        }
-        // **Failing to optimise must not abandon a constraint.** The search has
-        // its own conditions — a minimum contact ratio, a tool that leaves the
-        // members alone — and where none of the candidates meets them it returns
-        // nothing. Falling back to `settled` then threw away the *centre
-        // distance* along with the optimisation, so a pair told to run at
-        // 23.6866 mm with 0.2 of clearance ran at 23.6433 instead, and said so
-        // only through a clearance readout nobody was watching.
-        //
-        // The objective is the thing being given up; the constraints are not.
-        // So the fallback is what the constraints alone imply, and only where
-        // *that* has no answer does the stage fall back to what it would have
-        // built unasked.
-        .map_or_else(
-            // Nothing admissible. The constraints still stand — see above — but
-            // the *objective* found no answer, and that is worth saying: it is
-            // otherwise indistinguishable from a search that agreed.
-            || super::Chosen {
-                shifts: constrained().unwrap_or_else(|| asked.map(|a| a.settled)),
-                how: super::Searched::FoundNothing,
-            },
-            |shifts| super::Chosen {
-                shifts,
-                how: super::Searched::Chose,
-            },
-        )
+    /// The first member's pitch diameter, mm, as the shape reads it from
+    /// the helix the readings decide.
+    pub(crate) fn first_pitch_diameter(&self) -> f64 {
+        f64::from(self.gears[0].teeth.max(1)) * self.module
+            / self.helix_angles()[0].to_radians().cos()
     }
 
-    /// As [`Self::shifts`], at a stated search effort — which is what makes
-    /// "the shipped effort is converged" a claim something can raise and check
-    /// rather than a comment (`auto::Search`).
-    #[cfg(test)]
-    pub(super) fn shifts_at(&self, search: &crate::auto::Search) -> [f64; 2] {
-        self.chosen_at(search).shifts
+    /// The two gears' helix angles, degrees, as the shape reads them.
+    pub(crate) fn helix_angles(&self) -> [f64; 2] {
+        let h = self.shape().helix_angles();
+        [h[0], h[1]]
     }
 
-    /// The gear the stage would build at a given shift — the automatic
-    /// addendum resolved, because a shift changes the tip width and so the
-    /// tooth that shift produces.
-    ///
-    /// [`Self::params`] is this at the shift the stage settled on, and the
-    /// optimiser searches over it, so the geometry that is rated is the
-    /// geometry that is built.
-    pub(super) fn params_at(&self, i: usize, x: f64) -> GearParams {
-        let g = &self.gears[i];
-        let with_shift = GearParams {
-            profile_shift: x,
-            ..self.base_params(i)
-        };
-        GearParams {
-            addendum: g.addendum_asked(&with_shift).used,
-            ..with_shift
-        }
+    /// The gear the stage would build at a given shift.
+    pub(crate) fn params_at(&self, i: usize, x: f64) -> crate::params::GearParams {
+        self.shape().params_of(i, x)
     }
 
     /// `GearParams` for one gear, before any automatic value is resolved.
-    pub(super) fn base_params(&self, i: usize) -> GearParams {
-        let g = &self.gears[i];
-        GearParams {
-            // A stage member is concentric: the eccentric feature is the gear
-            // tab's, and `..Default::default()` here would silently invent one
-            // the day a stage grew the input.
-            angular_shift: 0.0,
-            index_offset: 0.0,
-            module: self.module,
-            pressure_angle: self.pressure_angle,
-            teeth: g.teeth,
-            // Opposite hands mesh; the stage stores the magnitude once.
-            helix_angle: self.helix_angles()[i],
-            profile_shift: g.profile_shift.manual,
-            addendum: g.addendum,
-            dedendum: g.dedendum,
-            root_radius: g.root_radius,
-            // k1 + k2 = 2 by construction, not by assertion.
-            thickness_mod: if i == 0 {
-                self.thickness_mod
-            } else {
-                2.0 - self.thickness_mod
-            },
-        }
+    pub(crate) fn base_params(&self, i: usize) -> crate::params::GearParams {
+        self.shape().base_params_of(i)
     }
 }
 
@@ -966,7 +517,7 @@ pub(crate) fn solve_pair_stage(
     kind: PairKind,
     loads: &super::StageLoads,
     lib: &crate::material::MaterialLibrary,
-) -> Result<super::shape::ShapeResult, TrainError> {
+) -> Result<super::shape::ShapeResult, super::TrainError> {
     super::shape::solve_shape(
         &super::shape::Shape::from_pair(stage, kind),
         loads,

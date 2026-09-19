@@ -1626,8 +1626,10 @@ mod tests {
     ///   — with no refusal at all, which
     ///   `planetary::tests::a_driving_input_always_has_a_flow` holds in the
     ///   crate rather than in a note. The one mesh that can lock, the
-    ///   crossed-axis one, is solved in `train::crossed` and never reaches
-    ///   this flow; a parallel-axis mesh's efficiency is never nought.
+    ///   crossed-axis one, does not refuse the flow either: a mesh with no
+    ///   efficiency in a direction **holds** — its driver presses the flanks
+    ///   and its driven side takes nothing — which is a flow with an
+    ///   efficiency of nought rather than none (`train::flow`).
     ///
     ///   So it is an exemption with a reason rather than a hole: the ways the
     ///   flow can refuse are an input that does not turn, which the motion

@@ -868,14 +868,29 @@ leaves it unread.
 
 ## Crossed axes
 
-One model covers a worm stage and a crossed helical pair, and one stage type
+One model covers a worm stage and a crossed helical pair, and one stage
 too: a worm is a `PairStage` whose first member states its pitch diameter
 rather than its helix angle — the same reading of the same size — with the
 shift, addendum, dedendum and root round every other member has, and a root
 round of zero by preset because a worm's thread is ground to its root. The
-*preset* — spur or worm — is a layer over that: the words *starts* and *wheel*, which inputs a panel shows, and the
-conventional proportions a worm's faces take. Nothing in the mathematics reads
-it.
+*preset* — spur or worm — is a layer over that: the words *starts* and
+*wheel*, which inputs a panel shows, and the conventional proportions a
+worm's faces take. Nothing in the mathematics reads it.
+
+**And one solve.** A distance at an angle in [the stage](#the-stage) is this
+mesh, built as a point contact beside the shape's line contacts and asked
+the same questions: its zero-backlash distance is the rack law below rather
+than the involute relation, its shift sum reaches a given distance through
+it, its size is solved from a given distance with both shifts pinned on the
+branch the designer's own diameter is on, its efficiency is the friction
+balance along its path, its play is the projection below, and its contact
+is rated on the torque of whichever member the flow says drives it. What it
+does not have is a bending rating ([rationale](rationale.md#a-worm-stage-reports-no-bending-stress)), and its face
+is a proportion or the box rather than a rating. A worm can therefore sit
+in a stage with other meshes on other distances, and a self-locking mesh
+under a load from its driven side **holds**: the flow's driver presses the
+flanks, the driven shaft delivers nought, and the mesh's efficiency that way
+is nought.
 
 ```text
 sin γ = z m_n / d            exact, no iteration

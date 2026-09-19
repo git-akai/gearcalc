@@ -100,7 +100,7 @@ of a gear is worth more than knowing what it does.
 | `flow.rs` | **Power mesh by mesh with loss**: an assumed direction per mesh, `2^M` assignments filtered by consistency, the rowspace solve scaled by `η` on the driven side. Reproduces Pennestrì's `η₀^w` on every arrangement and knows nothing of geometry |
 | `pair.rs` | The pair **preset** and its readings: what `defaults` builds a spur or a worm from, the undercut bound a search or an absorber is held to, and the helix readings a shape shares. No solve |
 | `planetary.rs` | The set **preset**: three members, the shafts they sit on, the boundary a convention gives it. No solve |
-| `crossed.rs` | The crossed-axis solve for a distance whose angle is not zero — worm or crossed gear pair, one model; the shape routes such a distance here as a pair |
+| `crossed.rs` | The worm's conventional proportions, the derivation of how play reaches a crossed mesh, and the tests that hold the shape to the screw model on every crossed pair. **No solve**: a distance at an angle is a point contact the shape builds beside its line contacts (`shape.rs`'s `BuiltContact`) |
 | `hula.rs` | The hula **preset** — four gears on a crank as a designer states them — and `stage_efficiency`, the closed form the per-mesh flow is checked against. No solve: kinematically a compound planet with one planet and both meshes internal, which `Shape::from` lays out |
 
 ### The other crates

@@ -2932,20 +2932,22 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
             shaft_angle: shaft_angle_deg,
             ..worm_stage(starts, wheel_teeth, worm_diameter)
         };
-        if let Ok(g0) = base.geometry() {
+        // The screw geometry as the shape settles it — the one chooser.
+        let geometry = |stage: &gear_core::train::PairStage| {
+            gear_core::train::shape::Shape::from(stage).screw(0)
+        };
+        if let Ok(g0) = geometry(&base) {
             println!("  a mm given, the wheel's shift absorbs it");
             for step in 0..3 {
                 let target = g0.centre_distance + 0.5 * f64::from(step);
                 let mut stage = base.clone();
                 stage.centre_distance =
                     gear_core::params::Auto::fixed(target + stage.clearance.manual);
-                match stage.geometry() {
+                match geometry(&stage) {
                     Err(e) => println!("  {target:9.4}  {e:?}"),
                     Ok(s) => println!(
                         "  {target:9.4}  x2 {:+8.4}   d1 {:8.4} mm   ran at {:9.4}",
-                        s.shift_sum,
-                        stage.first_pitch_diameter(),
-                        s.centre_distance
+                        s.shift_sum, s.worm_pitch_diameter, s.centre_distance
                     ),
                 }
             }
@@ -2960,11 +2962,11 @@ fn worm_report(starts: u32, wheel_teeth: u32, worm_diameter: f64, shaft_angle_de
                 let mut stage = base.clone().size_free();
                 stage.centre_distance =
                     gear_core::params::Auto::fixed(target + stage.clearance.manual);
-                match stage.geometry() {
+                match geometry(&stage) {
                     Err(e) => println!("  {target:9.4}  {e:?}"),
                     Ok(s) => println!(
                         "  {target:9.4}  d1 {:8.4} mm   lead angle {:7.4} deg   ran at {:9.4}",
-                        stage.first_pitch_diameter(),
+                        s.worm_pitch_diameter,
                         s.lead_angle_rad.to_degrees(),
                         s.centre_distance
                     ),
@@ -3423,7 +3425,7 @@ fn crossed_report(z1: u32, z2: u32, shaft_angle: f64) {
         #[allow(clippy::cast_precision_loss)]
         let beta1 = shaft_angle * (i as f64 / 10.0);
         let stage = base.clone().with_first_helix(beta1);
-        let Ok(g) = stage.geometry() else {
+        let Ok(g) = gear_core::train::shape::Shape::from(&stage).screw(0) else {
             println!("{beta1:>7.1} {:>7} — no such pair", shaft_angle - beta1);
             continue;
         };

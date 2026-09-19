@@ -1162,6 +1162,62 @@ pub struct MeshTrial<'a> {
     pub friction: f64,
 }
 
+/// **One candidate crossed-axis mesh, as a search judges it** — the point
+/// contact's [`MeshTrial`], with the same members and the same refusals
+/// less the internal pair's tip question, which does not arise.
+pub struct CrossedTrial<'a> {
+    /// The two members, worm first.
+    pub members: [Cut<'a>; 2],
+    pub screw: &'a crate::screw::Screw,
+    /// The zone the **teeth** leave at the running distance — not the faces,
+    /// which the stage sizes to the answer; `None` where they never meet.
+    pub path: Option<&'a crate::screw::CrossedPath>,
+    /// The distance the pair runs at.
+    pub centre: f64,
+    pub min_contact_ratio: f64,
+    pub friction: f64,
+}
+
+impl CrossedTrial<'_> {
+    /// What this mesh keeps, driving forward, on the friction balance along
+    /// its path — or `None` where it is not a mesh a search may choose at
+    /// all: a member the tool would not leave as asked, a tip reaching the
+    /// mate's root across the line of centres, a tip past the flank it is
+    /// meshing with, or contact that does not stay continuous.
+    #[must_use]
+    pub fn efficiency(&self) -> Option<f64> {
+        if !self.members.iter().all(Cut::is_as_asked) {
+            return None;
+        }
+        let [a, b] = &self.members;
+        // A tip reaching the mate's root across the line of centres — the
+        // radial comparison `Mesh::bottom_clearance` makes, on a crossed
+        // pair's own distance.
+        if self.centre - a.tip_radius() - b.root_radius() < 0.0
+            || self.centre - b.tip_radius() - a.root_radius() < 0.0
+        {
+            return None;
+        }
+        let path = self.path?;
+        if path
+            .flank_interference(self.screw, [a.flank_ends(), b.flank_ends()])
+            .iter()
+            .any(|&bad| bad)
+        {
+            return None;
+        }
+        if path.contact_ratio < self.min_contact_ratio {
+            return None;
+        }
+        path.efficiency(
+            self.screw,
+            self.friction,
+            crate::contact::Drive::Forward,
+            SEARCH_SAMPLES,
+        )
+    }
+}
+
 impl MeshTrial<'_> {
     /// What this mesh keeps, driving forward — or `None` where it is not a mesh
     /// a search may choose at all.
@@ -1584,24 +1640,16 @@ pub fn crossed_shifts_for_efficiency(
         }
         let s = screw_at(x)?;
         let centre = s.centre_distance + clearance;
-        // A tip reaching the mate's root across the line of centres — the
-        // radial comparison `Mesh::bottom_clearance` makes, on a crossed pair's
-        // own distance.
-        if centre - a.ra - b.rf < 0.0 || centre - b.ra - a.rf < 0.0 {
-            return None;
+        let path = s.path_of_contact_at(a.ra, b.ra, centre);
+        CrossedTrial {
+            members,
+            screw: &s,
+            path: path.as_ref(),
+            centre,
+            min_contact_ratio,
+            friction,
         }
-        let path = s.path_of_contact_at(a.ra, b.ra, centre)?;
-        if path
-            .flank_interference(&s, [a.flank_ends(), b.flank_ends()])
-            .iter()
-            .any(|&bad| bad)
-        {
-            return None;
-        }
-        if path.contact_ratio < min_contact_ratio {
-            return None;
-        }
-        path.efficiency(&s, friction, crate::contact::Drive::Forward, SEARCH_SAMPLES)
+        .efficiency()
     };
 
     if pinned.freedoms() == 0 {

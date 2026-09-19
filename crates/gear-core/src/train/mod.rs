@@ -795,6 +795,15 @@ pub(crate) struct Loading {
     /// nothing to scale and the figures are the ones its own arithmetic
     /// produced, bit for bit.
     pub carried_at: f64,
+    /// **Whether the contact figure can be inverted for a width.** A line
+    /// contact's pressure falls with the face it is spread over, so a stress
+    /// says what width would bring it to the allowable; a point contact's
+    /// does not depend on the width at all, so it says nothing about one
+    /// — what sizes a crossed pair's face is continuity, or a worm's
+    /// proportions, reported as their own figure rather than smuggled in
+    /// here. Such a loading is taken at its own width, case by case, and
+    /// neither scales nor asks.
+    pub sizes_face: bool,
 }
 
 impl Loading {
@@ -820,31 +829,12 @@ impl Loading {
     /// rather than a second solve. A stage whose flow
     /// does not have that property builds each case's loadings itself, which is
     /// why they are held per case rather than as one list and a factor.
-    fn under(self, k: f64) -> Self {
+    pub(crate) fn under(self, k: f64) -> Self {
         Self {
             bending: self.bending.map(|s| s * k),
             contact: self.contact * k.sqrt(),
             ..self
         }
-    }
-
-    /// Every load case, for a stage whose ratings scale with the torque.
-    ///
-    /// `meshes` is one loading per mesh the member is in, evaluated at the
-    /// worst torque that mesh carries, with each case's torque as a fraction of
-    /// it ([`StageLoads::scaled`]). **The scale is the mesh's, not the
-    /// stage's**: which direction loads a mesh hardest is a fact about that
-    /// mesh, and a set's two meshes need not agree about it.
-    pub(crate) fn for_cases(loads: &StageLoads, meshes: &[(Self, Vec<f64>)]) -> Vec<CaseLoadings> {
-        loads
-            .cases
-            .iter()
-            .enumerate()
-            .map(|(c, load)| CaseLoadings {
-                load: *load,
-                meshes: meshes.iter().map(|(l, by)| l.under(by[c])).collect(),
-            })
-            .collect()
     }
 }
 
@@ -934,6 +924,9 @@ impl MemberRating<'_> {
                 // another mesh has.
                 let mut bending: Option<f64> = None;
                 let mut contact = 0.0_f64;
+                // The worst contact among the meshes whose figure a width
+                // can be read off, which is what the width is inverted from.
+                let mut sizable: Option<f64> = None;
                 let mut width = 0.0_f64;
                 for l in &c.meshes {
                     let (b, s) = l.at_width();
@@ -943,7 +936,10 @@ impl MemberRating<'_> {
                     if s >= contact {
                         contact = s;
                     }
-                    width = width.max(l.carried_at);
+                    if l.sizes_face {
+                        sizable = Some(sizable.map_or(s, |had: f64| had.max(s)));
+                        width = width.max(l.carried_at);
+                    }
                 }
                 let reverses = self
                     .reversal
@@ -970,11 +966,13 @@ impl MemberRating<'_> {
                                 ),
                             )
                         }),
-                        contact: Some(crate::strength::min_face_width_contact(
-                            contact,
-                            width,
-                            allowable(self.material, c.load.kind),
-                        )),
+                        contact: sizable.map(|contact| {
+                            crate::strength::min_face_width_contact(
+                                contact,
+                                width,
+                                allowable(self.material, c.load.kind),
+                            )
+                        }),
                     },
                 }
             })
@@ -1992,12 +1990,6 @@ pub(crate) enum Searched {
     FoundNothing,
 }
 
-/// A chooser's answer, and how it arrived.
-pub(crate) struct Chosen<const N: usize> {
-    pub shifts: [f64; N],
-    pub how: Searched,
-}
-
 impl Searched {
     /// The note this deserves, if any — so no caller has to remember the wording
     /// or which of the three states is worth saying out loud.
@@ -2210,13 +2202,6 @@ impl Reading {
                 .flatten(),
         }
     }
-}
-
-/// The helix the readings state, degrees of the first member — the last
-/// reading given, which is the one relief leaves standing — or `None` where
-/// every reading is automatic and something else decides.
-pub(crate) fn stated_helix(readings: &[Reading]) -> Option<f64> {
-    readings.iter().rev().find_map(|r| r.helix)
 }
 
 /// **The face width an axial contact ratio needs**, mm — `ε_β π m_n / sin |β|`
@@ -4033,10 +4018,12 @@ mod tests {
     ///
     /// It enters at the output. The member *on* that shaft carries the applied
     /// torque itself — nothing has happened to it yet — and the member at the
-    /// other end carries it referred by the ratio and cut by the mesh's loss
-    /// **the backward way**, exactly as driving forward the output member
-    /// carries the input's referred by the ratio and cut by the forward loss.
-    /// One construction, read from either end.
+    /// other end carries it **referred by the ratio**: a member's torque is
+    /// the torque its teeth carry, the driver's read across the mesh, whether
+    /// or not the mesh passes any of it on. What the far *shaft* delivers is
+    /// that cut by the mesh's loss the backward way — nought where the mesh
+    /// locks — and it is the shaft's figure, not the gear's. One
+    /// construction, read from either end.
     ///
     /// Two things this has caught, in opposite directions. It once *divided* by
     /// the backward efficiency, and a worm's is **zero** whenever it self-locks
@@ -4044,7 +4031,8 @@ mod tests {
     /// finite, so it crossed the boundary as a number rather than as the `null`
     /// an infinity becomes, and drew on screen as a figure. The correction
     /// dropped the factor altogether, which left the *worm* claiming a shaft
-    /// torque a locked mesh does not deliver.
+    /// torque a locked mesh does not deliver — which is why the shaft's
+    /// delivered torque is asserted here beside the tooth load.
     ///
     /// **Both ends of the friction range**, because a self-locking worm alone
     /// cannot tell "times `η_backward`" from "times nought": the loose fixture
@@ -4086,23 +4074,33 @@ mod tests {
                      but it reports {wheel}"
                 );
 
-                // ...and the worm carries it referred by the ratio and attenuated
-                // by the loss the mesh takes carrying it that way.
+                // ...and the worm's teeth carry it referred by the ratio —
+                // the *size* of the ratio, which is what a referral is —
+                // whether or not the mesh passes it on.
                 let worm = w.members[0].cases[BACK].torque;
-                // Referred by the *size* of the ratio, which is what a referral is.
-                let want = wheel / w.ratio.abs() * m.efficiency.backward.max(0.0);
+                let want = wheel / w.ratio.abs();
                 assert!(
                     (worm - want).abs() < 1e-9 * applied,
-                    "the worm reports {worm} where {wheel} at the wheel over a \
-                     ratio of {} at {:.4} backward efficiency is {want}",
+                    "the worm's teeth carry {worm} where {wheel} at the wheel over a \
+                     ratio of {} is {want}",
                     w.ratio,
+                );
+                // What the worm's *shaft* delivers is that attenuated by the
+                // loss the mesh takes carrying it backward: nought where it
+                // locks, something where it does not.
+                let delivered = w.cases[BACK].torques[1].abs();
+                let want = want * m.efficiency.backward.max(0.0);
+                assert!(
+                    (delivered - want).abs() < 1e-9 * applied,
+                    "the worm's shaft delivers {delivered} where {want} is {:.4} of \
+                     the tooth load",
                     m.efficiency.backward
                 );
                 assert_eq!(
                     locks,
-                    worm == 0.0,
+                    delivered == 0.0,
                     "a locked mesh delivers nothing to the worm's shaft, and an \
-                     unlocked one delivers something: {worm} N·m at μ = {friction}"
+                     unlocked one delivers something: {delivered} N·m at μ = {friction}"
                 );
             }
         }
@@ -4437,11 +4435,11 @@ mod tests {
                 .expect("the set has geometry");
             let (gs, gp, gr) = (&b.members[0], &b.members[1], &b.members[2]);
             let gaps = [
-                b.meshes[0].operating.bottom_clearance(
+                b.meshes[0].line().unwrap().operating.bottom_clearance(
                     [gs.tip_radius(), gp.tip_radius()],
                     [gs.root_radius(), gp.root_radius()],
                 ),
-                b.meshes[1].operating.bottom_clearance(
+                b.meshes[1].line().unwrap().operating.bottom_clearance(
                     [gp.tip_radius(), gr.tip_radius()],
                     [gp.root_radius(), gr.root_radius()],
                 ),
@@ -4477,7 +4475,7 @@ mod tests {
             for (m, mesh) in b.meshes.iter().enumerate() {
                 let (a, z) = (shape.meshes[m].a, shape.meshes[m].b);
                 let (pinion, ring) = (&b.members[a], &b.members[z]);
-                let gaps = mesh.operating.bottom_clearance(
+                let gaps = mesh.line().unwrap().operating.bottom_clearance(
                     [pinion.tip_radius(), ring.tip_radius()],
                     [pinion.root_radius(), ring.root_radius()],
                 );
@@ -4835,13 +4833,13 @@ mod tests {
                     };
                     Some(
                         one(
-                            &b.meshes[0].path,
-                            &b.meshes[0].operating,
+                            &b.meshes[0].line().unwrap().path,
+                            &b.meshes[0].line().unwrap().operating,
                             b.members[0].as_gear(),
                             set.sliding_friction_sun_planet,
                         ) * one(
-                            &b.meshes[1].path,
-                            &b.meshes[1].operating,
+                            &b.meshes[1].line().unwrap().path,
+                            &b.meshes[1].line().unwrap().operating,
                             b.members[1].as_gear(),
                             set.sliding_friction_planet_ring,
                         ),
@@ -9668,18 +9666,19 @@ mod tests {
             "this worm was meant to lock: backward efficiency {}",
             screw.efficiency.backward
         );
-        // The wheel is on the shaft the load enters by and carries all of it;
-        // the worm is at the far end of a mesh that cannot pass it, so its shaft
-        // carries **none** — which is what a locked stage means and is not the
-        // same as the case being absent (`a_self_locking_worm_reports_the_load_it_reacts`).
+        // The wheel is on the shaft the load enters by and carries all of it,
+        // and the worm's teeth carry it read across the mesh; the worm is at
+        // the far end of a mesh that cannot pass it, so its *shaft* carries
+        // **none** — which is what a locked stage means and is not the same
+        // as the case being absent (`a_self_locking_worm_reports_the_load_it_reacts`).
+        let teeth: Vec<f64> = worm.members.iter().map(|m| m.cases[BACK].torque).collect();
+        assert!(
+            (teeth[1] - 5.0).abs() < 1e-12 && (teeth[0] - 5.0 / worm.ratio.abs()).abs() < 1e-12,
+            "the stage that reacts the load carries it on both members' teeth: {teeth:?}"
+        );
         assert_eq!(
-            worm.members
-                .iter()
-                .map(|m| m.cases[BACK].torque)
-                .collect::<Vec<_>>(),
-            vec![0.0, 5.0],
-            "the stage that reacts the load carries it, on the member the load \
-             is on"
+            worm.cases[BACK].torques[1], 0.0,
+            "a locked mesh delivers nothing to the worm's shaft"
         );
         for s in &r.stages[..2] {
             for g in &spur(s).members {

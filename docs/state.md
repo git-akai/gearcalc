@@ -694,16 +694,16 @@ named in `strings.rs`'s `UNFIRED` with their evidence.
 - `clamp.ring_fully_filleted` — searched for over 71 750 ring/cutter
   combinations and never fired. `ShaperCut` already refuses a tool whose rounds
   overlap, which may shadow it entirely.
-- `error.train_no_power_flow` — an epicyclic set with no self-consistent power
-  flow. The site is live and the message is right; what no design reaches is
-  the **forward** solve refusing. A set asks `planetary::power` twice, and only
-  the forward call is a `?` — the backward one treats a set that cannot be
-  back-driven as an answer rather than a refusal, which is what self-locking
-  is. A genuinely driving input never refused across **1.1 million**
-  combinations, and `planetary::tests::a_driving_input_always_has_a_flow` holds
-  that in the crate rather than in this sentence. It also asserts that the two
-  refusals which *are* reachable still happen, so the sweep is a statement
-  about driving inputs and not about `power` never saying no.
+- `error.train_no_power_flow` — a stage with no self-consistent power flow.
+  The site is live (the shape's forward flow) and the message is right; what
+  no design reaches is that flow refusing. A stage asks `flow::solve` twice,
+  and only the forward call is a refusal — the backward one treats a stage
+  that cannot be back-driven as an answer, and a mesh with no efficiency in
+  a direction *holds* rather than refusing. The flow is held to Pennestrì's
+  closed form on every arrangement, and that form never refused a driving
+  input across **1.1 million** combinations;
+  `planetary::tests::a_driving_input_always_has_a_flow` holds that in the
+  crate rather than in this sentence.
 
 A second used to be listed here — `ring_addendum_clamped`, on the reading that
 a set solves its own ring addendum — and it fires on 441 of the 1 482 sets a

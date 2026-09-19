@@ -60,15 +60,21 @@
   case 2       0.6000 Nm /      0.00 rpm at end    ->      0.0000 Nm /     -0.00 rpm at start  held at 1
   case 3       2.0000 Nm /   2400.00 rpm at start  ->     49.4437 Nm /    -60.00 rpm at end    held at -
   stage 1  ratio     -40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
-    power through the teeth   1.000000 / 0.000000     one more tooth on each member: -20.000000 -41.000000
+    power through the teeth   1.000000 / 1.000000     one more tooth on each member: -20.000000 -41.000000
+    shaft first     case 1  speed    3000.000000  torque       2.000000
+    shaft first     case 2  speed      -0.000000  torque      -0.005887
+    shaft first     case 3  speed    2400.000000  torque       2.000000
+    shaft second    case 1  speed     -75.000000  torque      49.443687
+    shaft second    case 2  speed       0.000000  torque      -0.600000
+    shaft second    case 3  speed     -60.000000  torque      49.443687
     member 1  z 1   
       case 1  speed    3000.000000  vs frame    3000.000000  torque       2.000000  cycles -
-      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.000000  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.015000  cycles -
       case 3  speed    2400.000000  vs frame    2400.000000  torque       2.000000  cycles 1.440000e8 / 1.440000e8
     member 2  z 40  
-      case 1  speed     -75.000000  vs frame     -75.000000  torque      49.443687  cycles -
+      case 1  speed     -75.000000  vs frame     -75.000000  torque      80.000000  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.600000  cycles -
-      case 3  speed     -60.000000  vs frame     -60.000000  torque      49.443687  cycles 3.600000e6 / 3.600000e6
+      case 3  speed     -60.000000  vs frame     -60.000000  torque      80.000000  cycles 3.600000e6 / 3.600000e6
     mesh 1  efficiency  61.804609 / 0.000000   %  contact ratio   1.8140  coprime
   graph    mobility 1 degree(s), 1 given   total ratio -40
     stage 1  ratio -40
@@ -887,15 +893,21 @@
     mesh 1  efficiency  97.838469 / 97.838469  %  contact ratio   1.4369  shares a factor
     mesh 2  efficiency  99.444980 / 99.444980  %  contact ratio   1.9726  shares a factor
   stage 3  ratio     -40.000000   efficiency  61.804609 / 0.000000   %   backlash   0.155124 / 6.204966   deg
-    power through the teeth   1.000000 / 0.000000     one more tooth on each member: -20.000000 -41.000000
+    power through the teeth   1.000000 / 1.000000     one more tooth on each member: -20.000000 -41.000000
+    shaft first     case 1  speed    -169.435216  torque      34.018366
+    shaft first     case 2  speed      -0.000000  torque      -0.005887
+    shaft first     case 3  speed    -135.548173  torque      34.018366
+    shaft second    case 1  speed       4.235880  torque     840.996720
+    shaft second    case 2  speed       0.000000  torque      -0.600000
+    shaft second    case 3  speed       3.388704  torque     840.996720
     member 1  z 1   
       case 1  speed    -169.435216  vs frame    -169.435216  torque      34.018366  cycles -
-      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.000000  cycles -
+      case 2  speed      -0.000000  vs frame      -0.000000  torque       0.015000  cycles -
       case 3  speed    -135.548173  vs frame    -135.548173  torque      34.018366  cycles 8.132891e6 / 8.132891e6
     member 2  z 40  
-      case 1  speed       4.235880  vs frame       4.235880  torque     840.996720  cycles -
+      case 1  speed       4.235880  vs frame       4.235880  torque    1360.734643  cycles -
       case 2  speed       0.000000  vs frame       0.000000  torque       0.600000  cycles -
-      case 3  speed       3.388704  vs frame       3.388704  torque     840.996720  cycles 2.033230e5 / 2.033230e5
+      case 3  speed       3.388704  vs frame       3.388704  torque    1360.734643  cycles 2.033230e5 / 2.033230e5
     mesh 1  efficiency  61.804609 / 0.000000   %  contact ratio   1.8140  coprime
   graph    mobility 2 degree(s), 2 given   total ratio 12040/17
     stage 1  ratio -43/17
