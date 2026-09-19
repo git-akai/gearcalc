@@ -7178,6 +7178,16 @@
           },
           "by_convention": "free"
          }
+        ],
+        "members": [
+         {
+          "role": "gear",
+          "ordinal": null
+         },
+         {
+          "role": "gear",
+          "ordinal": null
+         }
         ]
        }
       ],
@@ -8830,6 +8840,16 @@
           },
           "by_convention": "free"
          }
+        ],
+        "members": [
+         {
+          "role": "gear",
+          "ordinal": null
+         },
+         {
+          "role": "gear",
+          "ordinal": null
+         }
         ]
        },
        {
@@ -8857,6 +8877,20 @@
            "member": 2
           },
           "by_convention": "held"
+         }
+        ],
+        "members": [
+         {
+          "role": "sun",
+          "ordinal": null
+         },
+         {
+          "role": "planet",
+          "ordinal": null
+         },
+         {
+          "role": "ring",
+          "ordinal": null
          }
         ]
        }

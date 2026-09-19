@@ -190,7 +190,7 @@
     const known = label ?? result.topology[stage]?.ports.find((x) => x.shaft === shaft)?.label;
     return t("ui.train_port_at", {
       stage: stageName(stage),
-      shaft: known ? shaftName(tab.train, stage, known) : String(shaft),
+      shaft: known ? shaftName(tab.train, result.topology, stage, known) : String(shaft),
     });
   };
   /** The ports a case's select offers, keyed for the select; a port is set
@@ -279,7 +279,7 @@
    *  for it. */
   const shaftLabel = (stage: number, s: number): string => {
     const label = result.topology[stage]?.ports.find((p) => p.shaft === s)?.label;
-    return label ? shaftName(tab.train, stage, label) : String(s);
+    return label ? shaftName(tab.train, result.topology, stage, label) : String(s);
   };
   /** Whether a mesh is internal and on distance `k` of a shape: one of
    *  its members has a cutter, and its two members' axes are the distance's. */
@@ -295,7 +295,7 @@
    *  and goes by the shaft that carries it. */
   const axisName = (shape: Shape, stage: number, axis: number): string => {
     const on = shape.members
-      .map((m, j) => (shape.shafts[m.shaft - 1]?.axis === axis ? memberName(tab.train, stage, j) : null))
+      .map((m, j) => (shape.shafts[m.shaft - 1]?.axis === axis ? memberName(tab.train, result.topology, stage, j) : null))
       .filter((x) => x !== null);
     if (on.length > 0) return on.join(" / ");
     const s = shape.shafts.findIndex((x) => x.axis === axis) + 1;
@@ -1104,7 +1104,7 @@
     {#each ports as p (p.shaft)}
       {@const stated = constraintOn(tab.train, i, p.shaft)}
       <label>
-        <span>{shaftName(tab.train, i, p.label)}</span>
+        <span>{shaftName(tab.train, result.topology, i, p.label)}</span>
         <select
           value={stated ?? ""}
           onchange={(e) => constrain(i, p.shaft, e.currentTarget.value as Constraint | "")}
@@ -1675,7 +1675,7 @@
         {@const crossed = stage.distances.some((d) => d.angle !== 0)}
         {@const epicyclic = stage.axes.some((a) => a.carried_by !== null)}
         {@const replicated = stage.axes.map((a, k) => (a.count > 1 ? k : -1)).filter((k) => k >= 0)}
-        {@const name = (j: number) => memberName(tab.train, i, j)}
+        {@const name = (j: number) => memberName(tab.train, result.topology, i, j)}
         {@const carriers = stage.shafts
           .map((_, s) => s + 1)
           .filter((s) => !stage.members.some((m) => m.shaft === s))}

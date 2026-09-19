@@ -1058,6 +1058,11 @@ pub struct PortSpec {
 )]
 pub struct StagePorts {
     pub ports: Vec<PortSpec>,
+    /// What each member is — sun, planet, ring, worm, wheel or a gear by
+    /// its number — read off the shape by the one rule
+    /// ([`super::shape::Shape::member_names`]), so a panel names a member
+    /// as the harness does without deriving it a second time.
+    pub members: Vec<super::shape::MemberName>,
 }
 
 /// One shaft of the train's motion, for the front end.
@@ -1144,6 +1149,9 @@ impl Train {
             .map(|(k, stage)| {
                 let w = stage.wiring();
                 StagePorts {
+                    members: match stage {
+                        super::Stage::Shape(s) => s.member_names(),
+                    },
                     ports: stage
                         .ports()
                         .ports

@@ -2161,7 +2161,12 @@ is **internal** exactly when one of its members has a cutter, and its sign is
 the mesh kind's. A mesh's **frame** is the carrier common to its two axes.
 The **wiring** is the members' shafts and the meshes' frames, and it feeds
 `kinematics.rs` as any other. The **ports** are the shafts not replicated;
-the shaft held by convention is the last ring's. A spur pair is two ground
+the shaft held by convention is the first ring's, the input the first port
+not held and the output the next — a chain's conventions, which a train's
+own constraints and couplings replace. **What each member is** — sun,
+planet, ring, worm, wheel, or a gear by its number — is read off the shape
+by one rule (`Shape::member_names`) and travels with the topology, so the
+harness and the panel name a member the same way. A spur pair is two ground
 axes, one mesh, one distance; a worm is the same at 90° with `worm` set; a
 set is three axes of which the planet's is carried by the carrier shaft and
 replicated `N` times, two meshes and one distance. `gear-wasm`'s `defaults`
@@ -2270,7 +2275,7 @@ has a `gear-cli kinematics` fixture and each but the Wolfrom — which closes
 only by shift — and the worm pair — whose crossed mesh the plane script
 does not lay out — a row in `tools/train_kinematics.py`, which now lays
 axes out off the line of centres where a Ravigneaux's short planet stands. The shafts are numbered so that the shape's own convention — first
-port driven, last ring held, the next free port the output — gives the
+port driven, first ring held, the next free port the output — gives the
 textbook arrangement with nothing stated.
 
 ## Trains

@@ -362,6 +362,63 @@ impl Shape {
         (!d.distance.auto).then_some(d.distance.manual)
     }
 
+    /// **What each member is, read off the shape** — the one rule, for the
+    /// harness's English and the panel's catalogue alike. A ring is a member
+    /// with a cutter; a planet is one on a carried axis; a sun meets a planet
+    /// from an axis that is not carried; a worm and its wheel are the two
+    /// ends of the first mesh on a distance marked as a worm drive; anything
+    /// else is a gear that goes by its number. Numbered where a role is
+    /// shared — a Wolfrom's two rings, a Ravigneaux's two suns, a hula
+    /// stage's two wobble gears — by the order the shape lists them.
+    #[must_use]
+    pub fn member_names(&self) -> Vec<MemberName> {
+        let carried = |i: usize| {
+            self.axis_of_shaft(self.shaft_of(i))
+                .is_some_and(|a| self.axes[a].carried_by.is_some())
+        };
+        let role = |i: usize| -> MemberRole {
+            for (k, m) in self.meshes.iter().enumerate() {
+                let worm = self
+                    .distance_of(k)
+                    .is_some_and(|d| self.distances[d].worm && self.meshes_on(d)[0] == k);
+                if worm && m.a == i {
+                    return MemberRole::Worm;
+                }
+                if worm && m.b == i {
+                    return MemberRole::Wheel;
+                }
+            }
+            if self.members[i].ring.is_some() {
+                return MemberRole::Ring;
+            }
+            if carried(i) {
+                return MemberRole::Planet;
+            }
+            let meets_a_planet = self
+                .meshes
+                .iter()
+                .any(|m| (m.a == i && carried(m.b)) || (m.b == i && carried(m.a)));
+            if meets_a_planet {
+                MemberRole::Sun
+            } else {
+                MemberRole::Gear
+            }
+        };
+        let roles: Vec<MemberRole> = (0..self.members.len()).map(role).collect();
+        roles
+            .iter()
+            .enumerate()
+            .map(|(i, &r)| {
+                let alike: Vec<usize> = (0..roles.len()).filter(|&j| roles[j] == r).collect();
+                MemberName {
+                    role: r,
+                    ordinal: (alike.len() > 1 && r != MemberRole::Gear)
+                        .then(|| alike.iter().position(|&j| j == i).map_or(1, |p| p + 1)),
+                }
+            })
+            .collect()
+    }
+
     /// The label a wiring gives a shaft: a carrier where it carries an axis,
     /// the first member on it otherwise.
     fn label_of(&self, shaft: Shaft) -> ShaftLabel {
@@ -2305,6 +2362,41 @@ impl Shape {
             running,
         })
     }
+}
+
+/// What a member is, as a designer names it — read off the shape by
+/// [`Shape::member_names`], so the harness and the panel name a member the
+/// same way from one rule.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum MemberRole {
+    /// A gear with no role but its number.
+    Gear,
+    Worm,
+    Wheel,
+    Sun,
+    Planet,
+    Ring,
+}
+
+/// A member's role, numbered where the shape has more than one of it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct MemberName {
+    pub role: MemberRole,
+    /// `1`, `2`, … where the role is shared, `None` where it is not.
+    pub ordinal: Option<usize>,
 }
 
 // ------------------------------------------------------------ the result ---
@@ -5131,5 +5223,69 @@ mod hula_recorded {
             1e-9,
             "the crank delivers it over η_b",
         );
+    }
+}
+
+#[cfg(test)]
+mod member_names {
+    //! **One rule names every member**, and the harness's corpus — unchanged
+    //! when its own naming was replaced by this — is the second reader.
+
+    use super::super::arrangements as arr;
+    use super::super::{HulaStage, PairKind, PairStage, PlanetaryStage};
+    use super::{MemberRole, Shape};
+
+    fn names(shape: &Shape) -> Vec<String> {
+        shape
+            .member_names()
+            .iter()
+            .map(|n| {
+                let word = format!("{:?}", n.role).to_lowercase();
+                n.ordinal.map_or(word.clone(), |o| format!("{word} {o}"))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn every_preset_and_arrangement_names_its_members_as_a_designer_does() {
+        let s = |v: &[&str]| v.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            names(&Shape::from(&PairStage::default())),
+            s(&["gear", "gear"])
+        );
+        assert_eq!(
+            names(&Shape::from_pair(&PairStage::worm(), PairKind::Worm)),
+            s(&["worm", "wheel"])
+        );
+        // The same teeth as a crossed gear pair are gears by number.
+        assert_eq!(
+            names(&Shape::from_pair(&PairStage::worm(), PairKind::Spur)),
+            s(&["gear", "gear"])
+        );
+        assert_eq!(
+            names(&Shape::from(&PlanetaryStage::default())),
+            s(&["sun", "planet", "ring"])
+        );
+        assert_eq!(
+            names(&Shape::from(&HulaStage::default())),
+            s(&["ring 1", "planet 1", "planet 2", "ring 2"])
+        );
+        assert_eq!(
+            names(&arr::wolfrom(18, [60, 61], 3)),
+            s(&["planet", "ring 1", "ring 2"])
+        );
+        assert_eq!(
+            names(&arr::ravigneaux([18, 30], [22, 18], 62, 3)),
+            s(&["sun 1", "sun 2", "planet 1", "planet 2", "ring"])
+        );
+        assert_eq!(
+            names(&arr::worm_and_pair((1, 40), (17, 43))),
+            s(&["worm", "wheel", "gear", "gear"])
+        );
+        // A gear is never numbered by its role: its number is the train's.
+        assert!(arr::layshaft((17, 43), &[(19, 41)], 0)
+            .member_names()
+            .iter()
+            .all(|n| n.role == MemberRole::Gear && n.ordinal.is_none()));
     }
 }

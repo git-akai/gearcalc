@@ -352,8 +352,11 @@ pub fn worm_and_pair(worm: (u32, u32), pair: (u32, u32)) -> Shape {
         .mesh(pinion, gear)
         .crossed([worm_axis, wheel_axis], 90.0)
         .distance([wheel_axis, out_axis]);
-    // A worm's size is its diameter, not a helix: seven millimetres at one
-    // start is the worm preset's.
+    // Sized as a worm and its wheel — the preset's word, which gives the
+    // two their conventional proportions and their names — and a worm's
+    // size is its diameter, not a helix: seven millimetres at one start is
+    // the worm preset's.
+    b.shape.distances[0].worm = true;
     b.shape.members[0].pitch_diameter = Auto::fixed(7.0);
     b.build()
 }

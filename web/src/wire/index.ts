@@ -48,6 +48,8 @@ export type { MaterialLibrary } from "./core/MaterialLibrary";
 export type { Measure } from "./core/Measure";
 export type { Member } from "./core/Member";
 export type { MemberFreedom } from "./core/MemberFreedom";
+export type { MemberName } from "./core/MemberName";
+export type { MemberRole } from "./core/MemberRole";
 export type { MeshCase } from "./core/MeshCase";
 export type { MeshInput } from "./core/MeshInput";
 export type { MeshReport } from "./core/MeshReport";

@@ -180,7 +180,7 @@ fn fixtures() -> Vec<(String, Train)> {
     ));
     // **The arrangements the shape reaches with no code of their own**
     // (`gear_core::train::arrangements`), each under its textbook boundary,
-    // which the shape's convention — first shaft driven, last ring held —
+    // which the shape's convention — first shaft driven, first ring held —
     // gives some of and the constraints the rest. `tools/train_kinematics.py`
     // derives the same speeds from rigid-body velocities.
     {
@@ -599,47 +599,29 @@ fn named(stages: &[Stage], at: ShaftRef, label: gear_core::train::ShaftLabel) ->
     }
 }
 
-/// **A member's name from its place in the shape**, not from a preset: a
-/// member on an axis a carrier carries is a planet, a ring beside one is a
-/// ring and any other central member a sun — numbered where a role is
-/// shared; with no carrier the members are first and second, as a pair's
-/// were, or numbered where there are more.
+/// **A member's name, as the shape reads it** ([`Shape::member_names`]),
+/// in the harness's English: a pair's two members are "first" and
+/// "second", a gear with no role but its number is "member n", and a role
+/// the shape numbers keeps its number.
 fn member_role(shape: &gear_core::train::shape::Shape, member: usize) -> String {
-    let carried = |shaft: usize| {
-        shape
-            .shafts
-            .get(shaft.wrapping_sub(1))
-            .is_some_and(|s| shape.axes[s.axis].carried_by.is_some())
-    };
-    let epicyclic = shape.axes.iter().any(|a| a.carried_by.is_some());
-    if !epicyclic {
-        return if shape.members.len() == 2 {
-            ["first", "second"][member].to_string()
-        } else {
-            format!("member {}", member + 1)
-        };
-    }
-    let role = |i: usize| {
-        let m = &shape.members[i];
-        if m.ring.is_some() {
-            "ring"
-        } else if carried(m.shaft) {
-            "planet"
-        } else {
-            "sun"
+    use gear_core::train::shape::MemberRole;
+    let names = shape.member_names();
+    let name = names[member];
+    let word = match name.role {
+        MemberRole::Gear | MemberRole::Worm | MemberRole::Wheel => {
+            return if shape.members.len() == 2 {
+                ["first", "second"][member].to_string()
+            } else {
+                format!("member {}", member + 1)
+            };
         }
+        MemberRole::Sun => "sun",
+        MemberRole::Planet => "planet",
+        MemberRole::Ring => "ring",
     };
-    let name = role(member);
-    // Numbered where the role is shared — a Wolfrom's two rings, a
-    // Ravigneaux's two suns — by the order the shape lists them in.
-    let alike: Vec<usize> = (0..shape.members.len())
-        .filter(|&i| role(i) == name)
-        .collect();
-    if alike.len() == 1 {
-        name.into()
-    } else {
-        let n = alike.iter().position(|&i| i == member).unwrap_or(0) + 1;
-        format!("{name} {n}")
+    match name.ordinal {
+        None => word.into(),
+        Some(n) => format!("{word} {n}"),
     }
 }
 

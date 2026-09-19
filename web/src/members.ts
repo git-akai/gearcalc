@@ -7,7 +7,16 @@
 // geartrain panel alone; the gear tab's *adopt* list needs the same numbers,
 // so they are written once here and both panels read them.
 
-import { t, type Shape, type ShaftLabel, type Stage, type Train } from "./core";
+import {
+  solveTrain,
+  t,
+  type MemberName,
+  type Shape,
+  type ShaftLabel,
+  type Stage,
+  type StagePorts,
+  type Train,
+} from "./core";
 
 /** One member of a train, as a list can show it. */
 export interface MemberRef {
@@ -47,70 +56,83 @@ export function carried(shape: Shape, member: number): boolean {
  *  word, and the worm is the first member of the first mesh on it. */
 export const isWorm = (shape: Shape): boolean => shape.distances[0]?.worm === true;
 
-/** **What a shape's member is, read off the shape.** A ring is a member with a
- *  cutter; a planet is one on a carried axis; a sun is what meshes with a
- *  planet from the ground; a worm and its wheel are the two ends of a distance
- *  marked as one. Anything else is a gear and goes by its number. The core
- *  keeps no such names — a set is a tick pattern of the shape, not a kind —
- *  so the words are found here, from the same facts the core solves on. */
-export function shapeRole(shape: Shape, member: number): string | null {
-  const role = (i: number): string | null => {
-    const m = shape.members[i];
-    if (isWorm(shape)) {
-      const first = shape.meshes[0];
-      if (first?.a === i) return t("ui.train_worm_member");
-      if (first?.b === i) return t("ui.train_wormwheel");
+/** **What each member of a train is**, as the core reads it off the shape —
+ *  one rule, in Rust, that the harness and this side both read
+ *  (`Shape::member_names`). It arrives with every solve's topology, which
+ *  needs no geometry and is present whether or not the train solved. */
+export function memberNames(train: Train): StagePorts[] {
+  return solveTrain(train).topology;
+}
+
+/** The word for a role, numbered where the shape has more than one of it;
+ *  `null` where the name *is* the number — a gear with no role. */
+export function roleLabel(name: MemberName | undefined): string | null {
+  if (name === undefined) return null;
+  const word = (() => {
+    switch (name.role) {
+      case "gear":
+        return null;
+      case "worm":
+        return t("ui.train_worm_member");
+      case "wheel":
+        return t("ui.train_wormwheel");
+      case "sun":
+        return t("ui.train_sun");
+      case "planet":
+        return t("ui.train_planet");
+      case "ring":
+        return t("ui.train_ring");
     }
-    if (m.ring !== null) return t("ui.train_ring");
-    if (carried(shape, i)) return t("ui.train_planet");
-    const meetsAPlanet = shape.meshes.some(
-      (x) => (x.a === i && carried(shape, x.b)) || (x.b === i && carried(shape, x.a)),
-    );
-    return meetsAPlanet ? t("ui.train_sun") : null;
-  };
-  const name = role(member);
-  if (name === null) return null;
-  // Numbered where a role is shared — a hula stage's two rings and two
-  // wobble gears, a Wolfrom's two rings — by the order the shape lists them.
-  const alike = shape.members.map((_, i) => i).filter((i) => role(i) === name);
-  return alike.length > 1 ? `${name} ${alike.indexOf(member) + 1}` : name;
+  })();
+  if (word === null) return null;
+  return name.ordinal === null ? word : `${word} ${name.ordinal}`;
 }
 
 /** The card's own name for a member, without its number. `null` where the
  *  name *is* the number — a pair's gears. */
-function roleName(stage: Stage, member: number): string | null {
-  return shapeRole(stage, member);
+function roleName(topology: StagePorts[], stage: number, member: number): string | null {
+  return roleLabel(topology[stage]?.members[member]);
 }
 
 /** **The name a shaft goes by**, from what the core says it is: ground, the
  *  shaft a member spins with — named after the member — or a carrier, which
  *  a hula stage calls its crank. Nothing here decides which shaft is which;
  *  that arrives with the label. */
-export function shaftName(train: Train, stage: number, label: ShaftLabel): string {
+export function shaftName(
+  train: Train,
+  topology: StagePorts[],
+  stage: number,
+  label: ShaftLabel,
+): string {
   switch (label.kind) {
     case "ground":
       return t("ui.train_ground");
     case "member":
-      return memberName(train, stage, label.member);
+      return memberName(train, topology, stage, label.member);
     case "carrier":
       return t("ui.train_carrier");
   }
 }
 
 /** The name a member's card carries: "gear 3" on a pair, the role elsewhere. */
-export function memberName(train: Train, stage: number, member: number): string {
-  const role = roleName(train.stages[stage], member);
+export function memberName(
+  train: Train,
+  topology: StagePorts[],
+  stage: number,
+  member: number,
+): string {
+  const role = roleName(topology, stage, member);
   const number = String(gearNumber(train, stage, member));
   return role === null ? t("ui.train_gear_name", { number }) : role;
 }
 
 /** Every member of a train, in order, with the label a list shows. */
-export function memberRefs(train: Train): MemberRef[] {
+export function memberRefs(train: Train, topology: StagePorts[] = memberNames(train)): MemberRef[] {
   const out: MemberRef[] = [];
   train.stages.forEach((stage, i) => {
     for (let j = 0; j < memberCount(stage); j++) {
       const number = gearNumber(train, i, j);
-      const role = roleName(stage, j);
+      const role = roleName(topology, i, j);
       out.push({
         stage: i,
         member: j,
