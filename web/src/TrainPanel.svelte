@@ -181,6 +181,11 @@
    *  as its stage and the shaft's own name — read off the topology the core
    *  sent, so a shaft's name is the wiring's and not a guess from its index. */
   const portLabel = (p: Port): string => {
+    // One convention throughout: a port is named by its shaft — the chain's
+    // ends too, which the core lists beside their names — and by its name
+    // only where the train has no motion to name a shaft from.
+    const open = result.motion?.ports.find((o) => portKey(o.port) === portKey(p));
+    if (open) return refLabel(open.at, open.label);
     if (p === "start") return t("ui.train_port_start");
     if (p === "end") return t("ui.train_port_end");
     return refLabel(p.at);
@@ -1633,64 +1638,14 @@
         </span>
       </div>
       {#if tab.openCases[i]}
-        <div class="body">
-          <!-- **One row per open port of the train**, each loaded or reacted.
-               A reacted port turns as the motion says and carries whatever
-               the flow puts on it; a loaded one carries a torque and a speed,
-               each given or derived — of the speeds exactly the train's
-               mobility given, of the torques one statics equation fewer than
-               the shafts that carry one, which the core keeps so through
-               relief after every toggle. A derived box shows what the case
-               comes to and stands blank until it can. Which allowable the
-               case is judged against is its kind, chosen when it was added. -->
-          <div class="ports">
-            {#each openPorts as p (portKey(p.port))}
-              {@const load = loadAt(c, p.port)}
-              {@const at = shaftOf(cres, p.at)}
-              <div class="port" class:loaded={load !== undefined}>
-                <div class="portrow">
-                  <span class="name">{portLabel(p.port)}</span>
-                  <div class="segmented">
-                    <button class:on={load !== undefined} onclick={() => setLoaded(i, p.port, true)}>
-                      {t("ui.train_case_load")}
-                    </button>
-                    <button class:on={load === undefined} onclick={() => setLoaded(i, p.port, false)}>
-                      {t("ui.train_case_reacted")}
-                    </button>
-                  </div>
-                </div>
-                {#if load}
-                  <div class="grid shared">
-                    {@render autoNumber(
-                      "ui.train_torque",
-                      load.torque,
-                      load.torque.auto ? (at?.torque ?? null) : undefined,
-                      0.01,
-                      touched(i, load, "torque"),
-                      undefined,
-                      "ui.train_nm",
-                    )}
-                    {@render autoNumber(
-                      "ui.train_speed",
-                      load.speed,
-                      load.speed.auto ? (at?.speed ?? null) : undefined,
-                      100,
-                      touched(i, load, "speed"),
-                      undefined,
-                      "ui.train_rpm",
-                    )}
-                  </div>
-                {/if}
-              </div>
-            {/each}
-          </div>
-
+        <div class="body casebody">
           <div class="grid shared">
             {#if c.kind === "fatigue"}
-              <!-- A fatigue case alone has a duty: an ultimate load is
-                   survived once and counts nothing. The sweep is measured at
-                   a named port, since it is a fact about the mechanism's
-                   motion and not about where its load enters. -->
+              <!-- **What is the case's, before what is each load's.** A
+                   fatigue case alone has a duty: an ultimate load is survived
+                   once and counts nothing. The sweep is measured at a named
+                   shaft, since it is a fact about the mechanism's motion and
+                   not about where its load enters. -->
               <div class="mode">
                 <span>{t("ui.train_actuation")}</span>
                 <div class="segmented">
@@ -1733,34 +1688,91 @@
                 {@render numberField("ui.train_runtime", () => cont.runtime_hours, (v) => (cont.runtime_hours = v), 100, "ui.train_hours")}
               {/if}
             {/if}
+
+            <!-- **One row per open port of the train**, each loaded or
+                 reacted, in the rows every other input sits in. A reacted
+                 port turns as the motion says and carries whatever the flow
+                 puts on it; a loaded one carries a torque and a speed, each
+                 given or derived — of the speeds exactly the train's mobility
+                 given, of the torques one statics equation fewer than the
+                 shafts that carry one, which the core keeps so through relief
+                 after every toggle. A derived box shows what the case comes
+                 to and stands blank until it can. Which allowable the case is
+                 judged against is its kind, chosen when it was added. -->
+            {#each openPorts as p (portKey(p.port))}
+              {@const load = loadAt(c, p.port)}
+              {@const at = shaftOf(cres, p.at)}
+              <div class="mode" class:later={c.kind === "fatigue" || p !== openPorts[0]}>
+                <span>{portLabel(p.port)}</span>
+                <div class="segmented">
+                  <button class:on={load !== undefined} onclick={() => setLoaded(i, p.port, true)}>
+                    {t("ui.train_case_load")}
+                  </button>
+                  <button class:on={load === undefined} onclick={() => setLoaded(i, p.port, false)}>
+                    {t("ui.train_case_reacted")}
+                  </button>
+                </div>
+              </div>
+              {#if load}
+                {@render autoNumber(
+                  "ui.train_torque",
+                  load.torque,
+                  load.torque.auto ? (at?.torque ?? null) : undefined,
+                  0.01,
+                  touched(i, load, "torque"),
+                  undefined,
+                  "ui.train_nm",
+                )}
+                {@render autoNumber(
+                  "ui.train_speed",
+                  load.speed,
+                  load.speed.auto ? (at?.speed ?? null) : undefined,
+                  100,
+                  touched(i, load, "speed"),
+                  undefined,
+                  "ui.train_rpm",
+                )}
+              {/if}
+            {/each}
           </div>
 
-          <!-- **What this case comes to, shaft by shaft**: every shaft of
-               every stage and the frame, what it is in this case — a load,
-               a reaction, fixed, or free — and what it turns at and carries.
-               A fixed shaft has no speed to report and shows none. The table
-               stands while the train has no answer, as every readout does;
-               the notes under it say why a case did not solve. -->
-          <details class="delivered" open>
-            <summary class="section-heading">{t("ui.train_case_delivered")}</summary>
-            <table class="shaftlist">
-              <tbody>
-                {#each cres?.shafts ?? [] as s (portKey({ at: s.at }))}
-                  <tr class:muted={s.role === "free"}>
-                    <th>{refLabel(s.at, s.label)}</th>
-                    <td class="role">{roleWord(s.role)}</td>
-                    <td class="figure">{s.speed === null ? "—" : `${num(s.speed, 1)} ${t("ui.train_rpm")}`}</td>
-                    <td class="figure">{num(s.torque, 4)} {t("ui.train_nm")}</td>
+          <!-- **What this case comes to, shaft by shaft**, in the table a
+               gear's ratings use: every shaft of every stage and the frame,
+               what it is in this case — a load, a reaction, fixed, or free —
+               and what it turns at and carries. A fixed shaft has no speed to
+               report and shows none. The table stands while the train has no
+               answer, as every readout does; the notes under it say why a
+               case did not solve. -->
+          <div class="delivered">
+            <h4 class="section-heading">{t("ui.train_case_delivered")}</h4>
+            <div class="caselist">
+              <table class="cases">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th></th>
+                    <th>{t("ui.train_speed")}<small>{t("ui.train_rpm")}</small></th>
+                    <th>{t("ui.train_torque")}<small>{t("ui.train_nm")}</small></th>
                   </tr>
-                {/each}
-              </tbody>
-            </table>
-          </details>
-          {#if (cres?.notes.length ?? 0) > 0}
-            <ul class="notes">
-              {#each cres?.notes ?? [] as n, j (j)}<li class="warn">{note(n)}</li>{/each}
-            </ul>
-          {/if}
+                </thead>
+                <tbody>
+                  {#each cres?.shafts ?? [] as s (portKey({ at: s.at }))}
+                    <tr class:muted={s.role === "free"}>
+                      <th>{refLabel(s.at, s.label)}</th>
+                      <td class="role">{roleWord(s.role)}</td>
+                      <td>{s.speed === null ? "—" : num(s.speed, 1)}</td>
+                      <td>{num(s.torque, 4)}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+            {#if (cres?.notes.length ?? 0) > 0}
+              <ul class="notes">
+                {#each cres?.notes ?? [] as n, j (j)}<li class="warn">{note(n)}</li>{/each}
+              </ul>
+            {/if}
+          </div>
           <button class="action danger" onclick={() => removeCase(i)}>{t("ui.train_remove_case")}</button>
         </div>
       {/if}
@@ -2490,61 +2502,39 @@
     opacity: 0.45;
     cursor: not-allowed;
   }
-  /* **A case's ports**, one row each: the port's name, whether it is loaded
-     or reacted, and — under a loaded one — its two figures in the same grid
-     every other input sits in. */
-  .ports {
+  /* **A case's inputs on the left, what it comes to on the right** — the
+     inputs in the one column every stage's shared block uses, and the table
+     beside them where the width allows, under them where it does not. */
+  .casebody {
     display: grid;
-    gap: 0.35rem;
-    margin: 0.6rem 0;
+    grid-template-columns: minmax(0, 34rem) minmax(0, 1fr);
+    gap: 0.6rem 1.5rem;
+    align-items: start;
   }
-  .port {
-    padding: 0.35rem 0.5rem;
-    border: 1px solid var(--rule);
-    border-radius: 3px;
+  @media (max-width: 60rem) {
+    .casebody {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
-  .port.loaded {
-    background: var(--hover);
+  .casebody > .action {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
-  .portrow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.6rem;
-    font-size: 0.85rem;
-  }
-  .port .grid.shared {
-    margin-top: 0.4rem;
-  }
-  /* What the case comes to, shaft by shaft: a table, as a member's ratings
-     are, because a reader compares down a column. */
   .delivered {
     margin-top: 0.6rem;
   }
-  table.shaftlist {
-    width: 100%;
-    margin-top: 0.3rem;
-    border-collapse: collapse;
-    font-size: 0.8rem;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+  .delivered h4 {
+    margin: 0;
   }
-  table.shaftlist th {
+  .delivered table.cases td.role {
     color: var(--muted);
-    font-weight: normal;
-    text-align: left;
-    padding: 0.1rem 0.6rem 0.1rem 0;
   }
-  table.shaftlist td {
-    padding: 0.1rem 0 0.1rem 0.6rem;
-    text-align: right;
-  }
-  table.shaftlist td.role {
-    color: var(--muted);
-    text-align: left;
-  }
-  table.shaftlist tr.muted {
+  .delivered table.cases tr.muted {
     opacity: 0.55;
+  }
+  /* A second port's row opens a second group, as a card's later heading does. */
+  .mode.later {
+    margin-top: 0.4rem;
   }
   .caret {
     color: var(--muted);
