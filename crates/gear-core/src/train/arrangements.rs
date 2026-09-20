@@ -369,13 +369,13 @@ mod tests {
     //! closed — the laws the set's tests hold, asked of the arrangements
     //! the set's kind could not name.
 
-    use super::super::shape::{solve_shape, ShapeResult};
+    use super::super::shape::{solve_loads, ShapeResult};
     use super::super::{test_library as library, Reversal, StageBoundary, StageLoads};
     use super::*;
 
     fn solve(shape: &Shape, held: &[Shaft], input: Shaft, output: Shaft) -> ShapeResult {
         let boundary = StageBoundary::holding(shape.shafts.len() + 1, held, input, output);
-        solve_shape(
+        solve_loads(
             shape,
             &StageLoads::at(2.0, 3000.0).under(boundary),
             &library(),

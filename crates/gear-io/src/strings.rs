@@ -1145,16 +1145,12 @@ mod tests {
         // through the geometry — the case has to be live, not merely
         // constructible.
         {
-            use gear_core::train::{LoadCase, PairStage, Port, Stage, Train};
+            use gear_core::train::{LoadCase, PairStage, Stage, Train};
             let train = |stages| Train {
                 load_cases: vec![
                     LoadCase::ultimate(2.0, 3000.0),
                     // A load from the end that nothing is asked to hold.
-                    LoadCase {
-                        port: Port::End,
-                        reacted: false,
-                        ..LoadCase::ultimate(5.0, 0.0)
-                    },
+                    LoadCase::back_driving(5.0),
                 ],
                 reversed_bending: false,
                 stages,
@@ -1412,7 +1408,7 @@ mod tests {
                 use gear_core::train::{LoadCase, PairStage, Port, ShaftRef, Stage, Train};
                 let at = |port| Train {
                     load_cases: vec![LoadCase {
-                        port,
+                        loads: vec![gear_core::train::Load::given(port, 2.0, 3000.0)],
                         ..LoadCase::ultimate(2.0, 3000.0)
                     }],
                     reversed_bending: false,

@@ -209,14 +209,14 @@ mod tests {
     //! free to move *quietly*. Asserted to half of the last digit each table
     //! prints, since that is the claim it makes.
 
-    use super::super::shape::{solve_shape, Shape, ShapeResult};
+    use super::super::shape::{solve_loads, Shape, ShapeResult};
     use super::super::{test_library, Reversal, StageBoundary, StageLoads, TrainError};
     use super::*;
 
     /// The hula's own arrangement: crank driven, grounded gear held, output
     /// out — the shape's shafts 1, 3 and 2.
     fn solve(stage: &HulaStage, speed: f64) -> Result<ShapeResult, TrainError> {
-        solve_shape(
+        solve_loads(
             &Shape::from(stage),
             &StageLoads::at(2.0, speed).under(StageBoundary::holding(5, &[3], 1, 2)),
             &test_library(),

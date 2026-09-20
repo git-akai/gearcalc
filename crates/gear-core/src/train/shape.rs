@@ -38,8 +38,8 @@
 use super::wiring::{MeshSpec, Mount, ShaftLabel, Wiring};
 use super::{
     Constrained, ContactRatios, Freedom, FreedomGroup, GearResult, Loading, MemberFacts,
-    MemberFreedom, MemberRating, MeshReport, Optimisation, Ports, Reading, StageGear, StageLoads,
-    TrainError, PROBE,
+    MemberFreedom, MemberRating, MeshReport, Optimisation, Ports, Reading, StageGear, TrainError,
+    PROBE,
 };
 use crate::contact::{efficiency, ContactPath, Directional, Drive, LoadSharing};
 use crate::kinematics::{Shaft, GROUND};
@@ -1928,7 +1928,8 @@ enum Coordinate {
 }
 
 /// The shifts a shape settled on, and how.
-struct Chosen {
+#[derive(Clone, Debug)]
+pub struct Chosen {
     shifts: Vec<f64>,
     how: super::Searched,
     /// The running distance each distance was held to — see [`Plan::held`].
@@ -2260,6 +2261,8 @@ struct PointMesh {
     /// The first member's reference radius, mm — what its pitch line speed
     /// is read at.
     first_reference_radius: f64,
+    /// The first member's speed against the mesh's frame, rpm, per case.
+    first_speed: Vec<f64>,
 }
 
 /// A point contact's [`MeshReport`]: the zone as the faces leave it, the
@@ -2267,7 +2270,7 @@ struct PointMesh {
 /// it locks or nearly does, in **both** directions, against the static
 /// coefficient because that is what decides breaking away.
 fn point_mesh_report(
-    loads: &StageLoads,
+    cases: &[super::CaseLoad],
     p: &PointBuilt,
     face: [f64; 2],
     static_friction: f64,
@@ -2337,18 +2340,18 @@ fn point_mesh_report(
         locking_friction: m.locking_friction,
         efficiency: m.efficiency,
         sliding_ratio: s.sliding_ratio,
-        cases: loads
-            .cases
+        cases: cases
             .iter()
             .zip(m.contact)
-            .map(|(c, contact)| super::MeshCase {
+            .zip(&m.first_speed)
+            .map(|((c, contact), speed)| super::MeshCase {
                 case: c.case,
                 contact,
                 // **How fast the surfaces slide past each other**, which is a
                 // speed with no sign to it: a pair rubbing at 3 m/s rubs at
                 // 3 m/s whichever way round it is turning.
                 sliding_velocity: s.sliding_ratio
-                    * (c.speed / 60.0 * std::f64::consts::TAU).abs()
+                    * (speed / 60.0 * std::f64::consts::TAU).abs()
                     * m.first_reference_radius,
             })
             .collect(),
@@ -2555,6 +2558,21 @@ pub struct MemberName {
     pub ordinal: Option<usize>,
 }
 
+/// **The tests' door**: a shape solved for loads asked of it as a lone
+/// stage — through the train of one every lone stage is solved as.
+#[cfg(test)]
+pub(crate) fn solve_loads(
+    shape: &Shape,
+    loads: &super::StageLoads,
+    lib: &MaterialLibrary,
+    reversal: super::Reversal,
+) -> Result<ShapeResult, TrainError> {
+    let stage = super::Stage::Shape(Box::new(shape.clone()));
+    super::solve_any_with(&stage, loads, lib, reversal).map(|r| match r {
+        super::StageResult::Shape(s) => *s,
+    })
+}
+
 // ------------------------------------------------------------ the result ---
 
 /// What one distance came to.
@@ -2657,16 +2675,33 @@ pub struct ShapeResult {
 /// root cannot be rated, or a boundary that leaves the motion undetermined.
 pub fn solve_shape(
     shape: &Shape,
-    loads: &StageLoads,
+    cases: &[super::CaseLoad],
+    boundary: &super::StageBoundary,
     lib: &MaterialLibrary,
     reversal: super::Reversal,
 ) -> Result<ShapeResult, TrainError> {
+    solve_shape_after(shape, cases, boundary, lib, reversal, None).map(|(r, _)| r)
+}
+
+/// [`solve_shape`], **with the shifts a prior solve of the same shape
+/// chose** handed back in — what lets a train's two passes over a stage
+/// search once. The search reads nothing a load case changes, so the
+/// second pass's answer is the first's; what it returns beside the result
+/// is what the third would take.
+pub fn solve_shape_after(
+    shape: &Shape,
+    cases: &[super::CaseLoad],
+    boundary: &super::StageBoundary,
+    lib: &MaterialLibrary,
+    reversal: super::Reversal,
+    prior: Option<Chosen>,
+) -> Result<(ShapeResult, Chosen), TrainError> {
     let n = shape.members.len();
     let helix = shape.helix_angles();
 
     // ---- motion first: tooth counts and topology, before any geometry.
     let wiring = Constrained::wiring(shape);
-    let boundary = super::StageBoundary::of(loads, &wiring, &Constrained::ports(shape));
+    let boundary = boundary.clone();
     let teeth = super::teeth_of(shape.members());
     let motion = wiring.unit_motion(&teeth, &boundary)?;
 
@@ -2692,8 +2727,11 @@ pub fn solve_shape(
     }
 
     // ---- the shifts, and every member and mesh built at them.
-    let chosen = shape.chosen_at(&crate::auto::Search::SHIPPED, &helix)?;
-    let x = chosen.shifts;
+    let chosen = match prior {
+        Some(c) => c,
+        None => shape.chosen_at(&crate::auto::Search::SHIPPED, &helix)?,
+    };
+    let x = chosen.shifts.clone();
     let built = shape.build(&x, &helix, &chosen.held)?;
 
     // ---- materials.
@@ -2810,6 +2848,7 @@ pub fn solve_shape(
                     &held,
                 ),
             )
+            .ok()
         })
     };
     let moving = flows(&sliding);
@@ -2826,31 +2865,11 @@ pub fn solve_shape(
         backward: resting.backward.as_ref().map_or(0.0, |b| b.efficiency),
     });
 
-    // **A case's torque is the mesh force referred to the stage's input
-    // shaft** — what the train hands every stage (`solve_train`'s walk): a
-    // load from the far end is divided by the ratio and nothing else, the
-    // losses sitting between the mesh and the shaft beyond. So a forward case
-    // enters at the input shaft at that torque, and a backward case enters
-    // at the *output* shaft at that torque times the ratio, and the flow in
-    // its direction is scaled to the shaft it enters by. Reading a backward
-    // case's torque as the input shaft's *delivered* torque instead — which
-    // an epicyclic set did — overstated everything inside it by `1/η`.
-    let ratio = motion.ratio().abs();
-    let flow_for = |d: Drive| -> Option<&super::flow::Flow> {
-        match d {
-            Drive::Forward => moving.forward.as_ref(),
-            Drive::Backward => moving.backward.as_ref(),
-        }
-    };
-    let scale_for = |c: &super::StageLoad| -> Option<(f64, &super::flow::Flow)> {
-        let f = flow_for(c.drive)?;
-        let (entry, torque) = match c.drive {
-            Drive::Forward => (boundary.input, c.torque),
-            Drive::Backward => (boundary.output, c.torque * ratio),
-        };
-        let at_entry = f.shaft_torques[entry];
-        (at_entry != 0.0).then(|| (torque / at_entry.abs(), f))
-    };
+    // **A case's torques are the train's** ([`super::solve_train`]): one
+    // flow across every stage's meshes, read off for this stage's — which
+    // member drives each mesh and the torque pressing it. The stage solves
+    // no flow of its own for a case.
+    //
     // **How many instances of a mesh act in parallel** — one per planet —
     // which is the mesh's own count, not what either member sees: a
     // planet sees one path of every mesh it is in, and a mesh between two
@@ -2860,16 +2879,12 @@ pub fn solve_shape(
     // The tangential force a mesh instance carries in a case, quoted as a
     // torque at member `a`: the driving member's torque, read across —
     // which is what the flow's mesh torque is, whichever member drives.
-    let pressing_torque_at_a = |k: usize, c: &super::StageLoad| -> f64 {
-        let Some((scale, f)) = scale_for(c) else {
-            return 0.0;
-        };
-        (f.mesh_torques[k] * scale / paths(k)).abs()
-    };
+    let pressing_torque_at_a =
+        |k: usize, c: &super::CaseLoad| -> f64 { (c.mesh_torques[k] / paths(k)).abs() };
     // Each mesh's worst pressing torque over the cases, and every case as a
     // scale of it — one evaluation per mesh, every case a multiplication.
     let scaled: Vec<(f64, Vec<f64>)> = (0..shape.meshes.len())
-        .map(|k| loads.scaled(|c| pressing_torque_at_a(k, c)))
+        .map(|k| super::scaled(cases, |c| pressing_torque_at_a(k, c)))
         .collect();
 
     // ---- bending sections: one per (member, line mesh) pair. **No bending
@@ -2916,6 +2931,12 @@ pub fn solve_shape(
             let Some(line) = built.meshes[k].line() else {
                 return Ok(None);
             };
+            // Nothing to rate: a stage with no case — the train's first
+            // pass, learning the geometry — takes no contact at all, rather
+            // than one at a face of no width to refuse.
+            if cases.is_empty() {
+                return Ok(None);
+            }
             contact_stress(
                 &line.path,
                 &line.operating,
@@ -2942,14 +2963,13 @@ pub fn solve_shape(
             let BuiltContact::Point(p) = &built.meshes[k].contact else {
                 return Ok(None);
             };
-            loads
-                .cases
+            cases
                 .iter()
                 .map(|c| {
                     let at_a = pressing_torque_at_a(k, c);
-                    let (torque, on, drive) = match flow_for(c.drive).map(|f| f.directions[k]) {
-                        None | Some(Drive::Forward) => (at_a, MeshSide::First, Drive::Forward),
-                        Some(Drive::Backward) => (
+                    let (torque, on, drive) = match c.directions[k] {
+                        Drive::Forward => (at_a, MeshSide::First, Drive::Forward),
+                        Drive::Backward => (
                             at_a * f64::from(shape.members[m.b].gear.teeth)
                                 / f64::from(shape.members[m.a].gear.teeth),
                             MeshSide::Second,
@@ -2980,12 +3000,13 @@ pub fn solve_shape(
     let rating = |i: usize, widths: &[f64]| -> MemberRating<'_> {
         // A line mesh's loading at the probe width, every case a scale of
         // it; a point mesh's at its own width, case by case.
-        let cases = loads
-            .cases
+        let cases = cases
             .iter()
             .enumerate()
             .map(|(c, load)| super::CaseLoadings {
-                load: *load,
+                case: load.case,
+                kind: load.kind,
+                reverses: load.reverses(),
                 meshes: meshes_of[i]
                     .iter()
                     .map(|&k| {
@@ -3301,7 +3322,10 @@ pub fn solve_shape(
         if let BuiltMember::Rack { tooth } = &*built.members[i] {
             out.extend(super::undercut_note(tooth));
         }
-        out.extend(reversal.note_for(reversal.reverses(always_reverses(i), loads.any_reverse())));
+        out.extend(reversal.note_for(reversal.reverses(
+            always_reverses(i),
+            cases.iter().any(super::CaseLoad::reverses),
+        )));
         let g = &shape.members[i].gear;
         if shape.members[i].ring.is_none() {
             out.extend(g.shift_asked(&shape.base_params(i, &helix)).note());
@@ -3341,7 +3365,7 @@ pub fn solve_shape(
     // What a member's *shaft* delivers, `η` less on the driven side, is the
     // shaft's figure (`ShapeResult::cases`), not the gear's. A member in two
     // meshes reports the larger.
-    let member_torque = |i: usize, c: &super::StageLoad| -> f64 {
+    let member_torque = |i: usize, c: &super::CaseLoad| -> f64 {
         meshes_of[i]
             .iter()
             .map(|&k| {
@@ -3358,16 +3382,27 @@ pub fn solve_shape(
     };
     let members: Vec<GearResult> = (0..n)
         .map(|i| {
-            let cases = rating(i, &mesh_widths)
+            let shaft = shape.shaft_of(i);
+            let frame = shape.frame_of_member(i);
+            let rated_cases = rating(i, &mesh_widths)
                 .rated()
                 .into_iter()
-                .map(|r| {
-                    let c = r.load;
-                    let m = motion.members[i];
+                .zip(cases)
+                .map(|(r, c)| {
+                    // How often this member's teeth are engaged over the
+                    // duty: its turns against the frame its mesh stands
+                    // still in, once for each parallel path it sees.
+                    let cycles = c.turns.as_ref().map(|t| {
+                        super::loaded_cycles(super::Turns {
+                            revolutions: (t[shaft] - t[frame]).abs()
+                                * f64::from(wiring.paths_seen(i)),
+                            reversing_actuations: c.reversing_actuations,
+                        })
+                    });
                     r.into_case(
-                        member_torque(i, &c),
-                        (m.speed.scale(c.speed), m.against_frame.scale(c.speed)),
-                        m.engagements,
+                        member_torque(i, c),
+                        (c.speeds[shaft], c.speeds[shaft] - c.speeds[frame]),
+                        cycles,
                     )
                 })
                 .collect();
@@ -3375,7 +3410,7 @@ pub fn solve_shape(
                 profile_shift: x[i],
                 params: built.members[i].params(),
                 input: &shape.members[i].gear,
-                cases,
+                cases: rated_cases,
                 face_width: widths[i],
                 recommended_face_width: recommended[i],
                 material: materials[i].clone(),
@@ -3404,7 +3439,7 @@ pub fn solve_shape(
             ];
             match &bm.contact {
                 BuiltContact::Line(l) => super::line_mesh_report(
-                    loads,
+                    cases,
                     super::LineMesh {
                         power_through,
                         coprime,
@@ -3446,7 +3481,7 @@ pub fn solve_shape(
                     },
                 ),
                 BuiltContact::Point(p) => point_mesh_report(
-                    loads,
+                    cases,
                     p,
                     face_of(k, &final_width),
                     m.static_friction,
@@ -3464,6 +3499,14 @@ pub fn solve_shape(
                             * shape.members[m.a].module
                             / helix[m.a].to_radians().cos()
                             / 2.0,
+                        // The first member's speed against the frame the
+                        // mesh stands still in, per case.
+                        first_speed: cases
+                            .iter()
+                            .map(|c| {
+                                c.speeds[shape.shaft_of(m.a)] - c.speeds[shape.frame_of_member(m.a)]
+                            })
+                            .collect(),
                     },
                 ),
             }
@@ -3475,7 +3518,7 @@ pub fn solve_shape(
         .and_then(|m| m.line.as_ref().map(|l| l.contact_ratios.overlap))
         .unwrap_or(0.0);
 
-    Ok(ShapeResult {
+    let result = ShapeResult {
         ratio: motion.ratio(),
         ratio_per_tooth: shape.ratio_per_tooth(&wiring, &teeth, &boundary),
         efficiency: stage_efficiency,
@@ -3493,22 +3536,19 @@ pub fn solve_shape(
         distances,
         overlap,
         layouts,
-        cases: loads
-            .cases
+        cases: cases
             .iter()
             .map(|c| ShaftCase {
                 case: c.case,
-                speeds: speed.iter().map(|w| w * c.speed).collect(),
-                torques: scale_for(c).map_or_else(
-                    || vec![0.0; speed.len()],
-                    |(scale, f)| f.shaft_torques.iter().map(|t| t * scale).collect(),
-                ),
+                speeds: c.speeds.clone(),
+                torques: c.torques.clone(),
             })
             .collect(),
         members,
         meshes,
         notes,
-    })
+    };
+    Ok((result, chosen))
 }
 
 // -------------------------------------------------- what a stage owes ---
@@ -3946,7 +3986,7 @@ mod tests {
 
     use super::*;
     use crate::planetary::{Arrangement, PlanetaryShaft};
-    use crate::train::{test_library, PairKind, PairStage, PlanetaryStage, StageLoad};
+    use crate::train::{test_library, PairKind, PairStage, PlanetaryStage, StageLoad, StageLoads};
 
     /// Both directions and both case kinds, at a torque and a speed.
     fn loads() -> StageLoads {
@@ -3976,7 +4016,7 @@ mod tests {
         loads: &StageLoads,
         lib: &MaterialLibrary,
     ) -> Result<ShapeResult, TrainError> {
-        solve_shape(
+        solve_loads(
             &Shape::from(set),
             loads,
             lib,
@@ -3994,7 +4034,7 @@ mod tests {
         ] {
             let shape = Shape::from_pair(&pair, kind);
             assert!(shape.is_crossed(0) && shape.screw(0).is_ok());
-            let r = solve_shape(
+            let r = solve_loads(
                 &shape,
                 &loads(),
                 &test_library(),
@@ -4109,7 +4149,7 @@ mod tests {
     fn one_more_tooth_moves_the_ratio_as_the_graph_says() {
         let lib = test_library();
         let pair = Shape::from_pair(&PairStage::default(), PairKind::Spur);
-        let r = solve_shape(&pair, &loads(), &lib, super::super::Reversal::default()).unwrap();
+        let r = solve_loads(&pair, &loads(), &lib, super::super::Reversal::default()).unwrap();
         assert!((r.ratio_per_tooth[1] + 44.0 / 17.0).abs() < 1e-12);
         assert!((r.ratio_per_tooth[0] + 43.0 / 18.0).abs() < 1e-12);
         assert!(
@@ -4968,7 +5008,7 @@ mod tests {
                 revolutions: 1.0,
                 reversing_actuations: reversing.then_some(1.0),
             });
-            solve_shape(&Shape::from(&stage), &loads, &lib, reversal).unwrap()
+            solve_loads(&Shape::from(&stage), &loads, &lib, reversal).unwrap()
         };
         // **On the member, not the stage.** Three members raising one note is
         // exactly what a stage-level list could not carry: one key, three
@@ -5245,7 +5285,7 @@ mod hula_recorded {
     /// out — shafts 1, 3 and 2 of the shape.
     fn solve(stage: &HulaStage, loads: StageLoads) -> ShapeResult {
         let boundary = super::super::StageBoundary::holding(5, &[3], 1, 2);
-        solve_shape(
+        solve_loads(
             &Shape::from(stage),
             &loads.under(boundary),
             &test_library(),

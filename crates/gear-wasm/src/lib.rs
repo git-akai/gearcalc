@@ -1082,7 +1082,7 @@ pub struct GearTabDefaults {
 }
 
 fn defaults_impl() -> Result<String, String> {
-    use gear_core::train::{LoadCase, PairStage, PlanetaryStage, Port, Stage, Train};
+    use gear_core::train::{LoadCase, PairStage, PlanetaryStage, Stage, Train};
 
     // The tab starts with an automatic face width, where the core's own
     // default is a plain 10 mm. Both are right for their caller: the CLI and
@@ -1158,11 +1158,7 @@ fn defaults_impl() -> Result<String, String> {
             // ratings answering different questions.
             load_cases: vec![
                 LoadCase::ultimate(0.1, 30_000.0),
-                LoadCase {
-                    port: Port::End,
-                    reacted: false,
-                    ..LoadCase::ultimate(3.0, 0.0)
-                },
+                LoadCase::back_driving(3.0),
                 LoadCase::fatigue(0.02, 30_000.0),
             ],
             // Off, like every other correction this crate could apply and does

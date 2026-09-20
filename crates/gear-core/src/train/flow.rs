@@ -98,10 +98,9 @@ impl Asked {
         output: Shaft,
         reactions: &[Shaft],
     ) -> Self {
-        let mut known = vec![None; shafts];
-        for s in 0..shafts {
-            known[s] = (s != GROUND && s != output && !reactions.contains(&s)).then_some(0.0);
-        }
+        let mut known: Vec<Option<f64>> = (0..shafts)
+            .map(|s| (s != GROUND && s != output && !reactions.contains(&s)).then_some(0.0))
+            .collect();
         known[input] = Some(torque);
         let unknown = (0..shafts).filter(|&s| known[s].is_none()).collect();
         Self { known, unknown }
@@ -127,6 +126,9 @@ pub struct Flow {
     pub mesh_torques: Vec<f64>,
     /// Per mesh, which member drives: `Forward` is `a`.
     pub directions: Vec<Drive>,
+    /// Per mesh, the factor the driven member's torque stands under — its
+    /// efficiency that way, nought where it holds.
+    pub factors: Vec<f64>,
     /// Per shaft, the external torque it carries: the input's as given, the
     /// output's and each reaction as found, and zero elsewhere. Ground's is
     /// the sum of what meshes against it.
@@ -151,10 +153,44 @@ impl Flow {
     pub fn circulation(&self) -> f64 {
         self.mesh_powers.iter().sum()
     }
+
+    /// **What mesh `k` puts on its three shafts** — `a`'s, `b`'s and the
+    /// frame's — the driver's whole, the driven member's under `η`, and the
+    /// frame's the negative sum: the moment balance of the three bodies. Summed
+    /// over a stage's meshes, a shaft's is the torque that stage delivers on
+    /// it — the external load at a port, what it passes on at a coupling.
+    #[must_use]
+    pub fn on_shafts(&self, k: usize, mesh: &MeshFlow) -> [f64; 3] {
+        let t = if mesh.za == 0.0 {
+            0.0
+        } else {
+            self.mesh_torques[k] / mesh.za
+        };
+        let (on_a, on_b) = match self.directions[k] {
+            Drive::Forward => (t * mesh.za, self.factors[k] * t * mesh.zb),
+            Drive::Backward => (self.factors[k] * t * mesh.za, t * mesh.zb),
+        };
+        [on_a, on_b, -(on_a + on_b)]
+    }
 }
 
 /// A tolerance for "this power is zero", relative to the powers in play.
 const ZERO: f64 = 1e-12;
+
+/// Why there is no flow.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Refused {
+    /// No known torque works with its shaft's speed: nothing drives.
+    NothingDrives,
+    /// The known torques do not determine the mesh torques — more unknown
+    /// reactions than the meshes can tell apart, a load between two shafts
+    /// both of which hold it, which is a division by stiffness this model
+    /// does not make.
+    Undetermined,
+    /// The known torques contradict the rows in every assignment of
+    /// directions: a load nothing holds, which turns the train.
+    Inconsistent,
+}
 
 /// **The power flow**, given every shaft's speed.
 ///
@@ -164,16 +200,25 @@ const ZERO: f64 = 1e-12;
 /// stage with more free shafts than a rating can be taken under. A stage
 /// that locks in this direction is **not** `None`: its locked mesh holds,
 /// the flow through it stops there, and the efficiency is nought.
-#[must_use]
-pub fn solve(shafts: usize, meshes: &[MeshFlow], speed: &[f64], asked: &Asked) -> Option<Flow> {
+///
+/// # Errors
+///
+/// [`Refused`] says which of the three.
+pub fn solve(
+    shafts: usize,
+    meshes: &[MeshFlow],
+    speed: &[f64],
+    asked: &Asked,
+) -> Result<Flow, Refused> {
     // What the known torques put in: the loads that work with their shafts.
     let input_power: f64 = (0..shafts)
         .filter_map(|s| asked.known_at(s).map(|t| t * speed[s]))
         .filter(|p| *p > 0.0)
         .sum();
     if input_power <= 0.0 || !input_power.is_finite() {
-        return None;
+        return Err(Refused::NothingDrives);
     }
+    let mut why = Refused::Inconsistent;
     let known = |s: Shaft| -> Option<f64> { asked.known_at(s) };
     let m = meshes.len();
     let mut best: Option<Flow> = None;
@@ -228,8 +273,14 @@ pub fn solve(shafts: usize, meshes: &[MeshFlow], speed: &[f64], asked: &Asked) -
                 })
             })
             .collect();
-        let Some(c) = least_squares_exact(rows, m) else {
-            continue;
+        let c = match least_squares_exact(rows, m) {
+            Ok(c) => c,
+            Err(undetermined) => {
+                if undetermined {
+                    why = Refused::Undetermined;
+                }
+                continue;
+            }
         };
         let shaft_torques: Vec<f64> = (0..shafts)
             .map(|s| (0..m).map(|k| per_unit(k, s) * c[k]).sum())
@@ -275,6 +326,7 @@ pub fn solve(shafts: usize, meshes: &[MeshFlow], speed: &[f64], asked: &Asked) -
         let flow = Flow {
             mesh_torques: c.iter().zip(meshes).map(|(c, m)| c * m.za).collect(),
             directions,
+            factors: factor,
             shaft_torques,
             efficiency,
             mesh_powers,
@@ -287,13 +339,13 @@ pub fn solve(shafts: usize, meshes: &[MeshFlow], speed: &[f64], asked: &Asked) -
             best = Some(flow);
         }
     }
-    best
+    best.ok_or(why)
 }
 
 /// Gaussian elimination on an over- or exactly-determined system whose rows
-/// are consistent: `None` where the unknowns are not all determined or the
-/// rows contradict each other.
-fn least_squares_exact(mut rows: Vec<Vec<f64>>, unknowns: usize) -> Option<Vec<f64>> {
+/// are consistent: `Err(true)` where the unknowns are not all determined,
+/// `Err(false)` where the rows contradict each other.
+fn least_squares_exact(mut rows: Vec<Vec<f64>>, unknowns: usize) -> Result<Vec<f64>, bool> {
     let mut pivots: Vec<usize> = Vec::new();
     let mut r = 0;
     for col in 0..unknowns {
@@ -322,7 +374,7 @@ fn least_squares_exact(mut rows: Vec<Vec<f64>>, unknowns: usize) -> Option<Vec<f
         r += 1;
     }
     if pivots.len() < unknowns {
-        return None;
+        return Err(true);
     }
     // Every row past the rank must have come out as `0 = 0`.
     let scale = rows
@@ -334,9 +386,9 @@ fn least_squares_exact(mut rows: Vec<Vec<f64>>, unknowns: usize) -> Option<Vec<f
         .skip(r)
         .any(|row| row[unknowns].abs() > 1e-9 * scale)
     {
-        return None;
+        return Err(false);
     }
-    Some((0..unknowns).map(|k| rows[k][unknowns]).collect())
+    Ok((0..unknowns).map(|k| rows[k][unknowns]).collect())
 }
 
 #[cfg(test)]
@@ -529,12 +581,15 @@ mod tests {
             input: PlanetaryShaft::Sun,
             fixed: PlanetaryShaft::Ring,
         };
-        assert!(solve(
-            5,
-            &set(t, 0.98, 0.99, 3.0),
-            &speeds(t, arrangement),
-            &Asked::through(5, SUN, 1.0, CARRIER, &[RING, PLANET]),
-        )
-        .is_none());
+        assert_eq!(
+            solve(
+                5,
+                &set(t, 0.98, 0.99, 3.0),
+                &speeds(t, arrangement),
+                &Asked::through(5, SUN, 1.0, CARRIER, &[RING, PLANET]),
+            )
+            .err(),
+            Some(Refused::Undetermined)
+        );
     }
 }

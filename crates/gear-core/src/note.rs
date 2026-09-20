@@ -155,10 +155,14 @@ pub mod key {
     //
     // What a stage cannot say, because it is a fact about the shaft line:
     // where — or whether — a load case is held at all.
-    /// `train.load_reacted_at`
-    pub const TRAIN_LOAD_REACTED_AT: &str = "train.load_reacted_at";
     /// `train.load_not_reacted`
     pub const TRAIN_LOAD_NOT_REACTED: &str = "train.load_not_reacted";
+    /// `train.case_no_load`
+    pub const TRAIN_CASE_NO_LOAD: &str = "train.case_no_load";
+    /// `train.case_underdetermined`
+    pub const TRAIN_CASE_UNDERDETERMINED: &str = "train.case_underdetermined";
+    /// `train.case_nothing_drives`
+    pub const TRAIN_CASE_NOTHING_DRIVES: &str = "train.case_nothing_drives";
 
     // ---- errors --------------------------------------------------- //
     //
@@ -267,7 +271,9 @@ pub mod key {
         STAGE_PLANET_CLEARANCE_BELOW_MINIMUM,
         STAGE_PLANETS_NOT_EVENLY_SPACED,
         STAGE_PLANETS_SHARE_LOAD_EQUALLY,
-        TRAIN_LOAD_REACTED_AT,
+        TRAIN_CASE_NO_LOAD,
+        TRAIN_CASE_UNDERDETERMINED,
+        TRAIN_CASE_NOTHING_DRIVES,
         TRAIN_LOAD_NOT_REACTED,
         ERROR_MESH_INCOMPATIBLE,
         ERROR_MESH_RING_TOO_SMALL,

@@ -520,7 +520,7 @@ pub(crate) fn solve_pair_stage(
     loads: &super::StageLoads,
     lib: &crate::material::MaterialLibrary,
 ) -> Result<super::shape::ShapeResult, super::TrainError> {
-    super::shape::solve_shape(
+    super::shape::solve_loads(
         &super::shape::Shape::from_pair(stage, kind),
         loads,
         lib,

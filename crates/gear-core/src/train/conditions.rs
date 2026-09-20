@@ -667,17 +667,21 @@ impl Train {
             // held and its large sun driven has the small sun and the
             // carrier both free, and a load at the carrier says which is the
             // output.
-            let stated = self.load_cases.iter().find_map(|c| match c.port {
-                Port::At(ShaftRef::Of { stage, shaft })
-                    if stage == k
-                        && shaft != input
-                        && ports.ports.contains(&shaft)
-                        && !held.contains(&shaft) =>
-                {
-                    Some(shaft)
-                }
-                _ => None,
-            });
+            let stated = self
+                .load_cases
+                .iter()
+                .flat_map(|c| c.loads.iter())
+                .find_map(|l| match l.at {
+                    Port::At(ShaftRef::Of { stage, shaft })
+                        if stage == k
+                            && shaft != input
+                            && ports.ports.contains(&shaft)
+                            && !held.contains(&shaft) =>
+                    {
+                        Some(shaft)
+                    }
+                    _ => None,
+                });
             let output = side(false, false)
                 .or(stated)
                 .unwrap_or_else(|| ports.ends(&held, Some(input)).1);

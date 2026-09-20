@@ -52,11 +52,7 @@ use gear_core::train::{
 fn loads() -> Vec<LoadCase> {
     vec![
         LoadCase::ultimate(2.0, 3000.0),
-        LoadCase {
-            port: Port::End,
-            reacted: true,
-            ..LoadCase::ultimate(0.6, 0.0)
-        },
+        LoadCase::back_driving_held(0.6),
         LoadCase {
             duty: Duty::Continuous {
                 runtime_hours: 1000.0,
@@ -250,12 +246,14 @@ fn fixtures() -> Vec<(String, Train)> {
             t.load_cases = t
                 .load_cases
                 .iter()
-                .map(|c| LoadCase {
-                    port: match c.port {
-                        Port::End => Port::At(ShaftRef::Of { stage: 0, shaft: 2 }),
-                        other => other,
-                    },
-                    ..*c
+                .map(|c| {
+                    let mut c = c.clone();
+                    for l in &mut c.loads {
+                        if l.at == Port::End {
+                            l.at = Port::At(ShaftRef::Of { stage: 0, shaft: 2 });
+                        }
+                    }
+                    c
                 })
                 .collect();
             t
@@ -369,9 +367,12 @@ fn fixtures() -> Vec<(String, Train)> {
         t.load_cases = t
             .load_cases
             .iter()
-            .map(|c| LoadCase {
-                port: Port::At(t.port_shaft(&boundaries, c.port)),
-                ..*c
+            .map(|c| {
+                let mut c = c.clone();
+                for l in &mut c.loads {
+                    l.at = Port::At(t.port_shaft(&boundaries, l.at));
+                }
+                c
             })
             .collect();
         t
@@ -496,20 +497,39 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
         r.backlash.forward.nominal,
         r.backlash.backward.nominal,
     );
+    // Every shaft of every case: what it is in the case and what it
+    // carries — the loads as given or derived, the reactions found.
     for c in &r.cases {
         let input = &train.load_cases[c.case];
         println!(
-            "  case {}   {:>10.4} Nm / {:>9.2} rpm at {:<5}  ->  {:>10.4} Nm / {:>9.2} rpm at {:<5}  held at {}",
+            "  case {}   {}{}",
             c.case + 1,
-            input.torque,
-            input.speed,
-            port(input.port),
-            c.delivered_torque,
-            c.delivered_speed,
-            port(c.delivered_at),
-            c.reacted_at
-                .map_or_else(|| "-".to_string(), |k| (k + 1).to_string()),
+            input
+                .loads
+                .iter()
+                .map(|l| format!(
+                    "{:>10.4} Nm / {:>9.2} rpm at {:<5}",
+                    l.torque.manual,
+                    l.speed.manual,
+                    port(l.at)
+                ))
+                .collect::<Vec<_>>()
+                .join("  +"),
+            if c.solved { "" } else { "   (not solved)" }
         );
+        for n in &c.notes {
+            println!("    ! {}", n.key);
+        }
+        for s in &c.shafts {
+            println!(
+                "    {:<8} {:<26} {:>10}  torque {:>12.6}",
+                format!("{:?}", s.role).to_lowercase(),
+                named(&train.stages, s.at, s.label),
+                s.speed
+                    .map_or_else(|| "-".to_string(), |v| format!("{v:.4} rpm")),
+                s.torque
+            );
+        }
     }
     for (k, s) in r.stages.iter().enumerate() {
         println!(
@@ -585,7 +605,7 @@ fn report(name: &str, train: &Train, r: &TrainResult) {
 /// What to call a shaft here — the harness's English, which the core does not
 /// have. A member's shaft is named after the member's role where the shape
 /// gives it one, so the corpus reads as it did.
-fn named(stages: &[Stage], at: ShaftRef, label: gear_core::train::ShaftLabel) -> String {
+pub fn named(stages: &[Stage], at: ShaftRef, label: gear_core::train::ShaftLabel) -> String {
     use gear_core::train::ShaftLabel;
     let stage = match at {
         ShaftRef::Ground => None,

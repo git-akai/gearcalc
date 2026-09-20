@@ -284,7 +284,7 @@ mod tests {
     use super::*;
     use gear_core::params::Auto;
     use gear_core::train::{
-        Constraint, Coupling, Duty, HulaStage, LoadCase, PairStage, PlanetaryStage, Port,
+        Constraint, Coupling, Duty, HulaStage, Load, LoadCase, PairStage, PlanetaryStage, Port,
         ShaftConstraint, ShaftRef, Stage,
     };
 
@@ -299,10 +299,8 @@ mod tests {
                 load_cases: vec![
                     LoadCase::ultimate(0.25, 12_000.0),
                     LoadCase {
-                        port: Port::End,
-                        reacted: false,
                         enabled: false,
-                        ..LoadCase::ultimate(0.1, 0.0)
+                        ..LoadCase::back_driving(0.1)
                     },
                     LoadCase {
                         duty: Duty::Continuous {
@@ -311,15 +309,19 @@ mod tests {
                         ..LoadCase::fatigue(0.2, 9600.0)
                     },
                     LoadCase {
-                        port: Port::End,
-                        reacted: true,
+                        loads: vec![Load::given(Port::End, 0.05, 100.0)],
                         ..LoadCase::fatigue(0.05, 100.0)
                     },
                     // ...and one written at a shaft by reference — the
                     // hula stage's output gear, which is also `end` — so the
                     // third spelling of a port round-trips.
                     LoadCase {
-                        port: Port::At(ShaftRef::Of { stage: 4, shaft: 4 }),
+                        loads: vec![
+                            Load::given(Port::At(ShaftRef::Of { stage: 4, shaft: 4 }), 0.05, 100.0),
+                            // ...and a derived load beside it, so an
+                            // `{ auto, manual }` on a load round-trips too.
+                            Load::derived(Port::Start),
+                        ],
                         duty: Duty::Intermittent {
                             range_degrees: 90.0,
                             at: Port::At(ShaftRef::Of { stage: 0, shaft: 1 }),
@@ -432,7 +434,7 @@ mod tests {
             .unwrap()
             .replace("speed = 12000.0", "speed = 3000.0 # slowed down by hand");
         let back = from_toml(&text).unwrap().document;
-        assert!((back.train.load_cases[0].speed - 3000.0).abs() < 1e-12);
+        assert!((back.train.load_cases[0].speed() - 3000.0).abs() < 1e-12);
     }
 
     /// A train with no load cases is a shaft line and round-trips as one: the

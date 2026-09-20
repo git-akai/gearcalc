@@ -1264,7 +1264,7 @@ fn hula_sweep(n: u32, clearance: f64, mesh_index: usize) {
 fn train_file_report(path: Option<&str>) {
     use gear_core::params::Auto;
     use gear_core::train::{
-        solve_train, Duty, LoadCase, PairStage, PlanetaryStage, Port, Stage, StageGear, Train,
+        solve_train, Duty, Load, LoadCase, PairStage, PlanetaryStage, Port, Stage, StageGear, Train,
     };
     use gear_io::TrainDocument;
 
@@ -1276,11 +1276,7 @@ fn train_file_report(path: Option<&str>) {
             // carry for a load, so the round trip is asked of all of it.
             load_cases: vec![
                 LoadCase::ultimate(2.0, 3000.0),
-                LoadCase {
-                    port: Port::End,
-                    reacted: false,
-                    ..LoadCase::ultimate(0.5, 0.0)
-                },
+                LoadCase::back_driving(0.5),
                 LoadCase {
                     duty: Duty::Continuous {
                         runtime_hours: 1000.0,
@@ -1288,8 +1284,7 @@ fn train_file_report(path: Option<&str>) {
                     ..LoadCase::fatigue(2.0, 2400.0)
                 },
                 LoadCase {
-                    port: Port::End,
-                    reacted: true,
+                    loads: vec![Load::given(Port::End, 0.2, 30.0)],
                     enabled: false,
                     ..LoadCase::fatigue(0.2, 30.0)
                 },
@@ -1361,18 +1356,17 @@ fn train_file_report(path: Option<&str>) {
     match (a, b) {
         (Ok(a), Ok(b)) => {
             println!("\n  quantity                 exported            re-imported   same");
+            let end = |r: &gear_core::train::TrainResult, t: &Train| -> (f64, f64) {
+                let b = t.boundaries().expect("boundaries");
+                r.cases[0]
+                    .shaft(t.port_shaft(&b, Port::End))
+                    .map_or((0.0, 0.0), |s| (s.speed.unwrap_or(0.0), s.torque))
+            };
+            let (a_end, b_end) = (end(&a, &doc.train), end(&b, &back.train));
             let rows: [(&str, f64, f64); 5] = [
                 ("total ratio", a.total_ratio, b.total_ratio),
-                (
-                    "output speed rpm",
-                    a.cases[0].delivered_speed,
-                    b.cases[0].delivered_speed,
-                ),
-                (
-                    "output torque Nm",
-                    a.cases[0].delivered_torque,
-                    b.cases[0].delivered_torque,
-                ),
+                ("output speed rpm", a_end.0, b_end.0),
+                ("output torque Nm", a_end.1, b_end.1),
                 (
                     "efficiency forward",
                     a.total_efficiency.forward,
@@ -1692,18 +1686,18 @@ fn train_report(mode: Option<&str>) {
         // at the far port, which is the other thing a case can be asked.
         load_cases: vec![
             LoadCase::ultimate(2.0, 3000.0),
-            LoadCase {
-                port: Port::End,
-                reacted: mode == Some("toggles"),
-                ..LoadCase::ultimate(
-                    match mode {
-                        Some("held") => 400.0,
-                        Some("mixed") => 0.6,
-                        Some("toggles") => 5.0,
-                        _ => 0.0,
-                    },
-                    0.0,
-                )
+            {
+                let torque = match mode {
+                    Some("held") => 400.0,
+                    Some("mixed") => 0.6,
+                    Some("toggles") => 5.0,
+                    _ => 0.0,
+                };
+                if mode == Some("toggles") {
+                    LoadCase::back_driving_held(torque)
+                } else {
+                    LoadCase::back_driving(torque)
+                }
             },
             LoadCase {
                 duty: if mode == Some("toggles") {
@@ -1860,26 +1854,40 @@ fn print_train_cases(train: &gear_core::train::Train, r: &gear_core::train::Trai
             }
         };
         println!(
-            "       case {}  {:<8} {:.3} Nm / {:.0} rpm at {}, {}   ->   {:.3} Nm / {:.1} rpm at {}{duty}",
+            "       case {}  {:<8} {}{duty}{}",
             c.case + 1,
             match input.kind {
                 CaseKind::Ultimate => "ultimate",
                 CaseKind::Fatigue => "fatigue",
             },
-            input.torque,
-            input.speed,
-            port(input.port),
-            if input.reacted {
-                "held at the far end"
-            } else {
-                "held by nothing"
-            },
-            c.delivered_torque,
-            c.delivered_speed,
-            port(c.delivered_at),
+            input
+                .loads
+                .iter()
+                .map(|l| format!(
+                    "{}{:.3} Nm / {}{:.0} rpm at {}",
+                    if l.torque.auto { "~" } else { "" },
+                    l.torque.manual,
+                    if l.speed.auto { "~" } else { "" },
+                    l.speed.manual,
+                    port(l.at)
+                ))
+                .collect::<Vec<_>>()
+                .join(" + "),
+            if c.solved { "" } else { "   (not solved)" }
         );
         for n in &c.notes {
             println!("              note: {}", words().render(n));
+        }
+        // Every shaft: what it is in this case and what it carries.
+        for s in &c.shafts {
+            println!(
+                "              {:<8} {:<24} {:>12}  {:>12.4} Nm",
+                format!("{:?}", s.role).to_lowercase(),
+                kinematics::named(&train.stages, s.at, s.label),
+                s.speed
+                    .map_or_else(|| "-".to_string(), |v| format!("{v:.2} rpm")),
+                s.torque
+            );
         }
     }
 }
