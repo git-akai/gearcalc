@@ -7,10 +7,10 @@ train  total ratio 6.0317:1   total efficiency 96.375 % forward / 96.375 % backw
               free     second                   -1186.05 rpm        0.0000 Nm
               free     first                    -1186.05 rpm        0.0000 Nm
               reacted  second                     497.37 rpm      -11.6260 Nm
-       case 2  ultimate 0.000 Nm / 0 rpm at end + 0.000 Nm / ~0 rpm at start   (not solved)
+       case 2  ultimate 0.000 Nm / 0 rpm at end + ~0.000 Nm / ~0 rpm at start   (not solved)
               note: no given torque does any work — every load is nought or on a still port: nothing drives this case
               fixed    ground                              -        0.0000 Nm
-              load     first                        0.00 rpm        0.0000 Nm
+              free     first                        0.00 rpm        0.0000 Nm
               free     second                       0.00 rpm        0.0000 Nm
               free     first                        0.00 rpm        0.0000 Nm
               load     second                       0.00 rpm        0.0000 Nm

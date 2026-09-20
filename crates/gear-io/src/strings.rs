@@ -1150,15 +1150,14 @@ mod tests {
                 load_cases: vec![
                     LoadCase::ultimate(2.0, 3000.0),
                     // A load from the end that nothing is asked to hold: the
-                    // start a load of nought beside it.
+                    // start declared free beside it.
                     LoadCase {
                         loads: vec![
                             gear_core::train::Load::given(gear_core::train::Port::End, 5.0, 0.0),
-                            gear_core::train::Load {
-                                at: gear_core::train::Port::Start,
-                                torque: gear_core::params::Auto::fixed(0.0),
-                                speed: gear_core::params::Auto::automatic(0.0),
-                            },
+                            gear_core::train::Load::declared(
+                                gear_core::train::Port::Start,
+                                gear_core::train::LoadRole::Free,
+                            ),
                         ],
                         ..LoadCase::back_driving(5.0)
                     },
@@ -1201,6 +1200,7 @@ mod tests {
                     LoadCase {
                         loads: vec![Load {
                             at: Port::Start,
+                            role: gear_core::train::LoadRole::Load,
                             torque: Auto::fixed(2.0),
                             speed: Auto::automatic(0.0),
                         }],

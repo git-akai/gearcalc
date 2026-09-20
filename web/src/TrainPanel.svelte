@@ -19,6 +19,8 @@
     type CaseShaft,
     type ShaftRole,
     type OpenPort,
+    type TrainBody,
+    type LoadRole,
     type GearCase,
     type MeshCase,
     outside,
@@ -208,19 +210,48 @@
   const portOptionsNow = $derived(portOptions(result.motion));
   const portByKey = (key: string): Port =>
     portOptionsNow.find((o) => o.key === key)?.port ?? "start";
-  /** **The train's open ports, as the core lists them** — every shaft a
-   *  load can enter by, each with the name the chain gives it. A case is a
-   *  row per one of these: loaded, or reacted. Where the train has no
-   *  motion to list them from, the two ends by name, so a case can still be
-   *  written. */
-  const openPorts = $derived<OpenPort[]>(
-    result.motion?.ports ??
-      (["start", "end"] as const).map((port) => ({
-        port,
-        at: { kind: "ground" },
-        label: { kind: "ground" },
-      })),
-  );
+  /** **The train's bodies, as the core lists them** — every port of every
+   *  stage, the shafts the couplings join gathered into one, in the order
+   *  the chain runs. A case is a row per body: fixed where the train holds
+   *  it, and otherwise a load, a reaction or free. Where the train has no
+   *  motion to list them from there are no rows, and the summary says why. */
+  const bodies = $derived<TrainBody[]>(result.motion?.bodies ?? []);
+  /** A body's name: every shaft of it, as a shaft is named anywhere. */
+  const bodyLabel = (b: TrainBody): string => b.shafts.map(([at, label]) => refLabel(at, label)).join("; ");
+  /** **What the case declares a body**, or what it is by default where the
+   *  case says nothing: the chain's ends are reacted, every other body is
+   *  free — the core's own rule, read back rather than restated. */
+  const roleOf = (c: LoadCase, b: TrainBody): LoadRole | "fixed" => {
+    if (b.held) return "fixed";
+    const entry = entryOf(c, b);
+    if (entry) return entry.role;
+    return b.end ? "reacted" : "free";
+  };
+  /** The case's entry for a body, under any of its shafts and either
+   *  spelling of a port. */
+  const entryOf = (c: LoadCase, b: TrainBody): Load | undefined => {
+    const keys = b.shafts.map(([at]) => portKey({ at }));
+    return c.loads.find((l) => keys.includes(shaftOfPort(l.at)));
+  };
+  /** **A body declared a load, reacted or free.** The entry is written at
+   *  the body's port — the chain's end by name, else its first shaft by
+   *  reference — with both figures derived where it is new: relief never
+   *  invents a given, so a load's boxes show what the case comes to, or
+   *  stand blank until the designer gives one. The figures are kept while
+   *  the body is reacted or free, and the core relieves what remains. */
+  function setRole(i: number, b: TrainBody, role: LoadRole) {
+    const c = tab.train.load_cases[i];
+    const entry = entryOf(c, b);
+    if (entry) {
+      if (entry.role === role) return;
+      entry.role = role;
+    } else if (b.port) {
+      c.loads.push({ at: b.port, role, torque: { auto: true, manual: 0 }, speed: { auto: true, manual: 0 } });
+    } else {
+      return;
+    }
+    relieveCase(tab.train, i, null, ratedUnder());
+  }
   /** The library the train is rated under, which relief seeds from too. */
   const ratedUnder = () => (library.origin === null ? undefined : library.materials);
   /** **The shaft a port names**, as the core lists it: a port is a shaft
@@ -229,28 +260,6 @@
    *  the spelling, so a load written either way is found under its row. */
   const shaftOfPort = (p: Port): string =>
     portKey({ at: result.motion?.ports.find((o) => portKey(o.port) === portKey(p))?.at ?? (p === "start" || p === "end" ? { kind: "ground" } : p.at) });
-  /** The load a case puts on a port, where it does. */
-  const loadAt = (c: LoadCase, port: Port): Load | undefined =>
-    c.loads.find((l) => shaftOfPort(l.at) === shaftOfPort(port));
-  /** **A port loaded or released.** Loading adds a load with both figures
-   *  derived — relief never invents a given, so the boxes show what the
-   *  case comes to, or stand blank until the designer gives one; releasing
-   *  takes the load away and the port is reacted again. Either way the
-   *  core relieves what remains. A load is written at the shaft by
-   *  reference, one spelling for every port. */
-  function setLoaded(i: number, p: OpenPort, on: boolean) {
-    const c = tab.train.load_cases[i];
-    const j = c.loads.findIndex((l) => shaftOfPort(l.at) === shaftOfPort(p.port));
-    if (on && j < 0) {
-      const at: Port = p.at.kind === "ground" ? p.port : { at: p.at };
-      c.loads.push({ at, torque: { auto: true, manual: 0 }, speed: { auto: true, manual: 0 } });
-    } else if (!on && j >= 0) {
-      c.loads.splice(j, 1);
-    } else {
-      return;
-    }
-    relieveCase(tab.train, i, null, ratedUnder());
-  }
   /** A figure of a load toggled: relief keeps this one and turns another. */
   const touched = (i: number, load: Load, which: LoadFreedom) => () => {
     const j = tab.train.load_cases[i].loads.indexOf(load);
@@ -261,6 +270,40 @@
    *  not solve. */
   const shaftOf = (cres: { shafts: CaseShaft[]; solved: boolean } | undefined, at: ShaftRef) =>
     cres?.solved ? cres.shafts.find((s) => portKey({ at: s.at }) === portKey({ at })) : undefined;
+  /** **What a case comes to, body by body**: the frame first, then every
+   *  body in the chain's order — a body two stages share is one row, named
+   *  by both its shafts, its figures those of the shaft the case applies
+   *  the body's torque at (the others carry the coupling and report exactly
+   *  nought, by the core's rule) — then every shaft that is no body, a
+   *  planet, on its own. Nothing is computed here: each row is one of the
+   *  core's rows, chosen. */
+  const delivered = (
+    cres: { shafts: CaseShaft[] } | undefined,
+  ): { key: string; name: string; role: ShaftRole; speed: number | null; torque: number }[] => {
+    if (!cres) return [];
+    const rows: { key: string; name: string; role: ShaftRole; speed: number | null; torque: number }[] = [];
+    const taken = new Set<string>();
+    const rank: Record<ShaftRole, number> = { load: 0, reacted: 1, fixed: 2, free: 3 };
+    const ground = cres.shafts.find((s) => s.at.kind === "ground");
+    if (ground) {
+      rows.push({ key: "ground", name: refLabel(ground.at, ground.label), role: ground.role, speed: ground.speed, torque: ground.torque });
+      taken.add(portKey({ at: ground.at }));
+    }
+    for (const b of bodies) {
+      const keys = b.shafts.map(([at]) => portKey({ at }));
+      const mine = cres.shafts.filter((s) => keys.includes(portKey({ at: s.at })));
+      if (mine.length === 0) continue;
+      const lead = mine.reduce((a, s) => (rank[s.role] < rank[a.role] ? s : a));
+      rows.push({ key: keys[0], name: bodyLabel(b), role: lead.role, speed: lead.speed, torque: lead.torque });
+      keys.forEach((k) => taken.add(k));
+    }
+    for (const s of cres.shafts) {
+      const k = portKey({ at: s.at });
+      if (taken.has(k)) continue;
+      rows.push({ key: k, name: refLabel(s.at, s.label), role: s.role, speed: s.speed, torque: s.torque });
+    }
+    return rows;
+  };
   const roleWord = (r: ShaftRole) =>
     t(
       {
@@ -273,6 +316,7 @@
   /** The heading's summary of a case: each given figure at its port. */
   const caseSummary = (c: LoadCase): string =>
     c.loads
+      .filter((l) => l.role === "load")
       .map((l) => {
         const parts: string[] = [];
         if (!l.torque.auto) parts.push(`${num(l.torque.manual, 3)} ${t("ui.train_nm")}`);
@@ -1722,29 +1766,51 @@
               {/if}
             {/if}
 
-            <!-- **One row per open port of the train**, each loaded or
-                 reacted, in the rows every other input sits in. A reacted
-                 port turns as the motion says and carries whatever the flow
-                 puts on it; a loaded one carries a torque and a speed, each
-                 given or derived — of the speeds exactly the train's mobility
-                 given, of the torques one statics equation fewer than the
-                 shafts that carry one, which the core keeps so through relief
-                 after every toggle. A derived box shows what the case comes
-                 to and stands blank until it can. Which allowable the case is
-                 judged against is its kind, chosen when it was added. -->
-            {#each openPorts as p (portKey(p.port))}
-              {@const load = loadAt(c, p.port)}
-              {@const at = shaftOf(cres, p.at)}
-              <div class="mode" class:later={c.kind === "fatigue" || p !== openPorts[0]}>
-                <span>{portLabel(p.port)}</span>
-                <div class="segmented">
-                  <button class:on={load !== undefined} onclick={() => setLoaded(i, p, true)}>
-                    {t("ui.train_case_load")}
-                  </button>
-                  <button class:on={load === undefined} onclick={() => setLoaded(i, p, false)}>
-                    {t("ui.train_case_reacted")}
-                  </button>
-                </div>
+            <!-- **One row per body of the train**, in the rows every other
+                 input sits in. A body the train holds is fixed, and no case
+                 can say otherwise. Every other body is what the case
+                 declares it: a load carries a torque and a speed, each
+                 given or derived — of the speeds exactly the train's
+                 mobility given, of the torques one statics equation fewer
+                 than the shafts that carry one, which the core keeps so
+                 through relief after every toggle; a reacted body turns as
+                 the motion says and carries whatever the flow puts on it;
+                 a free one turns and carries nothing. The chain's ends are
+                 reacted and everything else free until the case says so. A
+                 body two stages share is one shaft with two names, and
+                 cannot be a reaction — a second reaction on one chain is a
+                 division by stiffness the core refuses — so it is a load,
+                 an inline take-off, or free. A derived box shows what the
+                 case comes to and stands blank until it can. -->
+            {#each bodies as b (portKey({ at: b.shafts[0][0] }))}
+              {@const role = roleOf(c, b)}
+              {@const load = role === "load" ? entryOf(c, b) : undefined}
+              {@const at = shaftOf(cres, b.shafts[0][0])}
+              {@const coupled = b.shafts.length > 1}
+              <div class="mode" class:later={c.kind === "fatigue" || b !== bodies[0]}>
+                <span>{bodyLabel(b)}</span>
+                {#if role === "fixed"}
+                  <div class="segmented locked">
+                    <button class="on" disabled>{t("ui.train_case_fixed")}</button>
+                  </div>
+                {:else}
+                  <div class="segmented">
+                    <button class:on={role === "load"} onclick={() => setRole(i, b, "load")}>
+                      {t("ui.train_case_load")}
+                    </button>
+                    <button
+                      class:on={role === "reacted"}
+                      disabled={coupled}
+                      title={coupled ? t("ui.train_note_coupled_not_reacted") : undefined}
+                      onclick={() => setRole(i, b, "reacted")}
+                    >
+                      {t("ui.train_case_reacted")}
+                    </button>
+                    <button class:on={role === "free"} onclick={() => setRole(i, b, "free")}>
+                      {t("ui.train_case_free")}
+                    </button>
+                  </div>
+                {/if}
               </div>
               {#if load}
                 {@render autoNumber(
@@ -1795,12 +1861,12 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {#each cres?.shafts ?? [] as s (portKey({ at: s.at }))}
-                    <tr class:muted={s.role === "free"}>
-                      <th>{refLabel(s.at, s.label)}</th>
-                      <td class="role">{roleWord(s.role)}</td>
-                      <td>{s.speed === null ? "—" : num(s.speed, 1)}</td>
-                      <td>{num(s.torque, 4)}</td>
+                  {#each delivered(cres) as row (row.key)}
+                    <tr class:muted={row.role === "free"}>
+                      <th>{row.name}</th>
+                      <td class="role">{roleWord(row.role)}</td>
+                      <td>{row.speed === null ? "—" : num(row.speed, 1)}</td>
+                      <td>{num(row.torque, 4)}</td>
                     </tr>
                   {/each}
                 </tbody>
@@ -2422,6 +2488,19 @@
     border-left: none;
   }
   .segmented button.on {
+    background: var(--selected);
+  }
+  /* A choice the train has taken from the case — a held body, or a reaction
+     on a shaft two stages share — is shown and cannot be pressed. */
+  .segmented button:disabled {
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+  .segmented button:disabled:hover {
+    background: none;
+  }
+  .segmented button.on:disabled {
+    color: var(--fg);
     background: var(--selected);
   }
   .out {

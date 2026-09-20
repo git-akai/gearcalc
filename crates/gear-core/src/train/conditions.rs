@@ -1000,6 +1000,35 @@ pub struct MotionReport {
     /// Every shaft a load can enter by, named — what a load case's picker
     /// offers, in the order the chain runs.
     pub ports: Vec<OpenPort>,
+    /// **The train's bodies**: every port of every stage, with the shafts
+    /// the couplings make one of it — what a load case has a row for.
+    pub bodies: Vec<TrainBody>,
+}
+
+/// **One body of the train**: a port, or the shafts the couplings fix to
+/// one another — a pair's output and the next pair's input are one shaft
+/// with two names, and a case says one thing of it. What a load case is a
+/// row of: fixed where the train holds it, and otherwise a load, a
+/// reaction or free.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub struct TrainBody {
+    /// Every shaft of it, in the order the chain runs, each with its name.
+    pub shafts: Vec<(ShaftRef, ShaftLabel)>,
+    /// Held by the train — ground under another name — so no case can say
+    /// anything of it.
+    pub held: bool,
+    /// The port a case names it by: the chain's end by name where it is
+    /// one, else the earliest of its shafts by reference. `None` where it
+    /// is held.
+    pub port: Option<Port>,
+    /// Whether it is one of the chain's two ends.
+    pub end: bool,
 }
 
 impl Train {
@@ -1127,6 +1156,59 @@ impl Train {
                 .map(|&i| self.locate(at, i))
                 .collect(),
             ports: self.open_ports(&self.boundaries().ok()?),
+            bodies: self.bodies(&self.boundaries().ok()?),
         })
+    }
+
+    /// **Every body of the train** — see [`TrainBody`]: each stage's ports,
+    /// with the shafts the couplings in force join gathered into one, in
+    /// the order the chain runs.
+    #[must_use]
+    pub fn bodies(&self, boundaries: &[StageBoundary]) -> Vec<TrainBody> {
+        let couplings = self.couplings_in_force();
+        let ends: Vec<ShaftRef> = [Port::Start, Port::End]
+            .into_iter()
+            .map(|p| self.port_shaft(boundaries, p))
+            .collect();
+        // Every port of every stage, in order, then joined by the couplings:
+        // a body is the first shaft in it and every one a coupling reaches.
+        let mut bodies: Vec<TrainBody> = Vec::new();
+        for (k, stage) in self.stages.iter().enumerate() {
+            let w = stage.wiring();
+            let Some(b) = boundaries.get(k) else { break };
+            for shaft in stage.ports().ports {
+                let at = ShaftRef::Of { stage: k, shaft };
+                let joined_to = couplings.iter().find_map(|c| {
+                    if c.b == at {
+                        Some(c.a)
+                    } else if c.a == at {
+                        Some(c.b)
+                    } else {
+                        None
+                    }
+                });
+                let held = b.conditions[shaft] == Condition::Ground;
+                if let Some(body) = joined_to.and_then(|other| {
+                    bodies
+                        .iter_mut()
+                        .find(|x| x.shafts.iter().any(|(s, _)| *s == other))
+                }) {
+                    body.shafts.push((at, w.shafts[shaft]));
+                    body.held |= held;
+                    if body.held {
+                        body.port = None;
+                    }
+                    continue;
+                }
+                let end = ends.contains(&at);
+                bodies.push(TrainBody {
+                    shafts: vec![(at, w.shafts[shaft])],
+                    held,
+                    port: (!held).then(|| self.port_named(boundaries, at)),
+                    end,
+                });
+            }
+        }
+        bodies
     }
 }

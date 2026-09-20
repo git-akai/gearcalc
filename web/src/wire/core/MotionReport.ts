@@ -3,6 +3,7 @@ import type { Exact } from "./Exact";
 import type { OpenPort } from "./OpenPort";
 import type { ShaftRef } from "./ShaftRef";
 import type { ShaftReport } from "./ShaftReport";
+import type { TrainBody } from "./TrainBody";
 
 /**
  * **The train's motion as the front end receives it** — present whenever the
@@ -51,4 +52,9 @@ redundant: Array<ShaftRef>,
  * Every shaft a load can enter by, named — what a load case's picker
  * offers, in the order the chain runs.
  */
-ports: Array<OpenPort>, };
+ports: Array<OpenPort>, 
+/**
+ * **The train's bodies**: every port of every stage, with the shafts
+ * the couplings make one of it — what a load case has a row for.
+ */
+bodies: Array<TrainBody>, };

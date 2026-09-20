@@ -7,9 +7,9 @@ train  total ratio 101.1765:1   total efficiency 60.782 % forward / 0.000 % back
               free     second                   -1186.05 rpm        0.0000 Nm
               free     first                    -1186.05 rpm        0.0000 Nm
               reacted  second                      29.65 rpm     -122.9936 Nm
-       case 2  ultimate 400.000 Nm / 0 rpm at end + 0.000 Nm / ~0 rpm at start
+       case 2  ultimate 400.000 Nm / 0 rpm at end + ~0.000 Nm / ~0 rpm at start
               fixed    ground                              -     -400.0000 Nm
-              load     first                        0.00 rpm        0.0000 Nm
+              free     first                        0.00 rpm        0.0000 Nm
               free     second                       0.00 rpm        0.0000 Nm
               free     first                        0.00 rpm        0.0000 Nm
               load     second                       0.00 rpm      400.0000 Nm

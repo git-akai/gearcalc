@@ -151,6 +151,11 @@
 //!   torque of nought given and its speed automatic. A file that writes the
 //!   old four fields is refused by name, and one that gives more figures
 //!   than the train can honour is relieved on the way in, as a stage is.
+//! - **A load carries a `role`**: `"load"`, `"reacted"` or `"free"`, absent
+//!   meaning `"load"`, so a file written before it reads as it did. A port
+//!   the case does not mention keeps its default — the chain's ends
+//!   reacted, every other port free — and an entry says otherwise, its
+//!   figures kept while it is not a load.
 //!
 //! No compatibility shim, deliberately. Accepting both shapes means carrying two
 //! readers for one format and testing both forever, and the thing that would go

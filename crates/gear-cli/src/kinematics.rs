@@ -238,7 +238,7 @@ fn fixtures() -> Vec<(String, Train)> {
         // free, and `end` is the first of them — the small sun. The carrier
         // is the output a designer means, so every case loads it by
         // reference — a derived load where it reacts, the given one where
-        // it drives — and loads the small sun with a torque of nought, which
+        // it drives — and declares the small sun free, which
         // is how a case says a port turns and carries nothing.
         out.push(("ravigneaux-large-sun".to_string(), {
             let mut t = asked(
@@ -260,11 +260,10 @@ fn fixtures() -> Vec<(String, Train)> {
                     if !c.loads.iter().any(|l| l.at == at(carrier)) {
                         c.loads.push(gear_core::train::Load::derived(at(carrier)));
                     }
-                    c.loads.push(gear_core::train::Load {
-                        at: at(small_sun),
-                        torque: gear_core::params::Auto::fixed(0.0),
-                        speed: gear_core::params::Auto::automatic(0.0),
-                    });
+                    c.loads.push(gear_core::train::Load::declared(
+                        at(small_sun),
+                        gear_core::train::LoadRole::Free,
+                    ));
                     c
                 })
                 .collect();

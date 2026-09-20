@@ -178,7 +178,7 @@
     reacted  sun                        0.0000 rpm  torque    -0.083720
     load     carrier                    0.0000 rpm  torque     0.600000
     fixed    ring                                -  torque    -0.516280
-    free     planet                     0.0000 rpm  torque    -0.000000
+    free     planet                     0.0000 rpm  torque     0.000000
   case 3       2.0000 Nm /   2400.00 rpm at start
     fixed    ground                              -  torque     0.000000
     load     sun                        2400.0000 rpm  torque     2.000000
@@ -228,7 +228,7 @@
     fixed    sun                                 -  torque    -0.292495
     load     carrier                    3000.0000 rpm  torque     2.000000
     reacted  ring                       3500.0000 rpm  torque    -1.707505
-    free     planet                     4200.0000 rpm  torque    -0.000000
+    free     planet                     4200.0000 rpm  torque     0.000000
   case 2       0.6000 Nm /      0.00 rpm at end  
     fixed    ground                              -  torque     0.000000
     fixed    sun                                 -  torque     0.097295
@@ -240,7 +240,7 @@
     fixed    sun                                 -  torque    -0.292495
     load     carrier                    2400.0000 rpm  torque     2.000000
     reacted  ring                       2800.0000 rpm  torque    -1.707505
-    free     planet                     3360.0000 rpm  torque    -0.000000
+    free     planet                     3360.0000 rpm  torque     0.000000
   stage 1  ratio       0.857143   efficiency  99.604466 / 99.613635  %   backlash   0.048678 / 0.041724   deg
     power through the teeth   0.289334 / 0.284921     one more tooth on each member: 0.847059 0.857143 0.858824
     shaft sun       case 1  speed       0.000000  torque      -0.292495
@@ -601,7 +601,7 @@
     fixed    ground                              -  torque    -0.600000
     reacted  member 1                   0.0000 rpm  torque     0.000000
     load     member 4                   0.0000 rpm  torque     0.600000
-    free     member 2                   0.0000 rpm  torque    -0.000000
+    free     member 2                   0.0000 rpm  torque     0.000000
   case 3       2.0000 Nm /   2400.00 rpm at start
     fixed    ground                              -  torque   120.993614
     load     member 1                   2400.0000 rpm  torque     2.000000
@@ -794,8 +794,8 @@
     reacted  sun                        0.0000 rpm  torque     0.186933
     load     carrier                    0.0000 rpm  torque     0.600000
     fixed    ring                                -  torque    -0.786933
-    free     planet 1                   0.0000 rpm  torque    -0.000000
-    free     planet 2                   0.0000 rpm  torque    -0.000000
+    free     planet 1                   0.0000 rpm  torque     0.000000
+    free     planet 2                   0.0000 rpm  torque     0.000000
   case 3       2.0000 Nm /   2400.00 rpm at start
     fixed    ground                              -  torque     0.000000
     load     sun                        2400.0000 rpm  torque     2.000000
@@ -932,7 +932,7 @@
   total    ratio      -0.240000   efficiency  90.611620 / 90.948043  %   backlash   0.695140 / 0.166833   deg
   case 1       2.0000 Nm /   3000.00 rpm at start  +    0.0000 Nm /      0.00 rpm at 1.2    +    0.0000 Nm /      0.00 rpm at 1.1  
     fixed    ground                              -  torque     0.000000
-    load     sun 1                      -12500.0000 rpm  torque     0.000000
+    free     sun 1                      -12500.0000 rpm  torque     0.000000
     load     carrier                    -2812.5000 rpm  torque     1.951604
     load     sun 2                      3000.0000 rpm  torque     2.000000
     fixed    ring                                -  torque    -3.951604
@@ -940,7 +940,7 @@
     free     planet 2                   -12500.0000 rpm  torque     0.000000
   case 2       0.6000 Nm /      0.00 rpm at 1.2    +    0.0000 Nm /      0.00 rpm at 1.1  
     fixed    ground                              -  torque     0.000000
-    load     sun 1                      0.0000 rpm  torque    -0.000000
+    free     sun 1                      0.0000 rpm  torque     0.000000
     load     carrier                    0.0000 rpm  torque     0.600000
     reacted  sun 2                      0.0000 rpm  torque     0.516480
     fixed    ring                                -  torque    -1.116480
@@ -948,7 +948,7 @@
     free     planet 2                   0.0000 rpm  torque     0.000000
   case 3       2.0000 Nm /   2400.00 rpm at start  +    0.0000 Nm /      0.00 rpm at 1.2    +    0.0000 Nm /      0.00 rpm at 1.1  
     fixed    ground                              -  torque     0.000000
-    load     sun 1                      -10000.0000 rpm  torque     0.000000
+    free     sun 1                      -10000.0000 rpm  torque     0.000000
     load     carrier                    -2250.0000 rpm  torque     1.951604
     load     sun 2                      2400.0000 rpm  torque     2.000000
     fixed    ring                                -  torque    -3.951604
@@ -1017,7 +1017,7 @@
     fixed    sun 2                               -  torque     3.147788
     free     ring                       580.6452 rpm  torque     0.000000
     free     planet 1                   -409.0909 rpm  torque     0.000000
-    free     planet 2                   3000.0000 rpm  torque    -0.000000
+    free     planet 2                   3000.0000 rpm  torque     0.000000
   case 2       0.6000 Nm /      0.00 rpm at end  
     fixed    ground                              -  torque     0.000000
     reacted  sun 1                      0.0000 rpm  torque    -0.217005
@@ -1033,7 +1033,7 @@
     fixed    sun 2                               -  torque     3.147788
     free     ring                       464.5161 rpm  torque     0.000000
     free     planet 1                   -327.2727 rpm  torque     0.000000
-    free     planet 2                   2400.0000 rpm  torque    -0.000000
+    free     planet 2                   2400.0000 rpm  torque     0.000000
   stage 1  ratio       2.666667   efficiency  96.521026 / 96.446859  %   backlash   0.104114 / 0.277636   deg
     power through the teeth   1.838539 / 1.880253     one more tooth on each member: 2.578947 2.722222 2.666667 2.666667 2.666667
     shaft sun 1     case 1  speed    3000.000000  torque       2.000000
@@ -1160,7 +1160,7 @@
     free     sun                        -1186.0465 rpm  torque     0.000000
     free     carrier                    -169.4352 rpm  torque     0.000000
     fixed    ring                                -  torque   -29.043267
-    free     planet                     237.2093 rpm  torque    -0.000000
+    free     planet                     237.2093 rpm  torque     0.000000
     free     first                      -169.4352 rpm  torque     0.000000
     reacted  second                     4.2359 rpm  torque  -840.996720
   case 2       0.6000 Nm /      0.00 rpm at end  
@@ -1180,7 +1180,7 @@
     free     sun                        -948.8372 rpm  torque     0.000000
     free     carrier                    -135.5482 rpm  torque     0.000000
     fixed    ring                                -  torque   -29.043267
-    free     planet                     189.7674 rpm  torque    -0.000000
+    free     planet                     189.7674 rpm  torque     0.000000
     free     first                      -135.5482 rpm  torque     0.000000
     reacted  second                     3.3887 rpm  torque  -840.996720
   stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
@@ -1265,7 +1265,7 @@
     fixed    ground                              -  torque    40.718721
     load     sun                        3000.0000 rpm  torque     2.000000
     fixed    carrier                             -  torque   -13.675453
-    free     ring                       -500.0000 rpm  torque    -0.000000
+    free     ring                       -500.0000 rpm  torque     0.000000
     free     planet                     -1200.0000 rpm  torque     0.000000
     free     first                      -500.0000 rpm  torque     0.000000
     reacted  second                     197.6744 rpm  torque   -29.043267
@@ -1281,7 +1281,7 @@
     fixed    ground                              -  torque    40.718721
     load     sun                        2400.0000 rpm  torque     2.000000
     fixed    carrier                             -  torque   -13.675453
-    free     ring                       -400.0000 rpm  torque    -0.000000
+    free     ring                       -400.0000 rpm  torque     0.000000
     free     planet                     -960.0000 rpm  torque     0.000000
     free     first                      -400.0000 rpm  torque     0.000000
     reacted  second                     158.1395 rpm  torque   -29.043267
@@ -1350,7 +1350,7 @@
     free     sun                        -1186.0465 rpm  torque     0.000000
     fixed    carrier                             -  torque    34.018366
     reacted  ring                       197.6744 rpm  torque   -29.043267
-    free     planet                     474.4186 rpm  torque    -0.000000
+    free     planet                     474.4186 rpm  torque     0.000000
   case 2       0.6000 Nm /      0.00 rpm at end  
     fixed    ground                              -  torque     0.135124
     reacted  first                      0.0000 rpm  torque    -0.037829
@@ -1366,7 +1366,7 @@
     free     sun                        -948.8372 rpm  torque     0.000000
     fixed    carrier                             -  torque    34.018366
     reacted  ring                       158.1395 rpm  torque   -29.043267
-    free     planet                     379.5349 rpm  torque    -0.000000
+    free     planet                     379.5349 rpm  torque     0.000000
   stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
     power through the teeth   1.000000 / 1.000000     one more tooth on each member: -2.388889 -2.588235
     shaft first     case 1  speed    3000.000000  torque       2.000000
@@ -1528,7 +1528,7 @@
     free     sun                        -1186.0465 rpm  torque     0.000000
     fixed    carrier                             -  torque    34.018366
     reacted  ring                       197.6744 rpm  torque   -29.043267
-    free     planet                     474.4186 rpm  torque    -0.000000
+    free     planet                     474.4186 rpm  torque     0.000000
   case 2       0.6000 Nm /      0.00 rpm at 2.3  
     fixed    ground                              -  torque     0.135124
     reacted  first                      0.0000 rpm  torque    -0.037829
@@ -1544,7 +1544,7 @@
     free     sun                        -948.8372 rpm  torque     0.000000
     fixed    carrier                             -  torque    34.018366
     reacted  ring                       158.1395 rpm  torque   -29.043267
-    free     planet                     379.5349 rpm  torque    -0.000000
+    free     planet                     379.5349 rpm  torque     0.000000
   stage 1  ratio      -2.529412   efficiency  98.344976 / 98.344976  %   backlash   0.038950 / 0.098522   deg
     power through the teeth   1.000000 / 1.000000     one more tooth on each member: -2.388889 -2.588235
     shaft first     case 1  speed    3000.000000  torque       2.000000

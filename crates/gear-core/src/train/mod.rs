@@ -53,7 +53,7 @@ mod wiring;
 pub use conditions::{
     Constraint, Coupling, Exact, MotionError, MotionReport, OpenPort, PortSpec, Ports,
     ShaftConstraint, ShaftMotion, ShaftRef, ShaftReport, StageBoundary, StagePorts, Term,
-    TrainMotion,
+    TrainBody, TrainMotion,
 };
 
 use crate::kinematics::{Condition, Shaft, GROUND};
@@ -3168,7 +3168,33 @@ pub struct LoadCase {
     pub duty: Duty,
 }
 
-/// One load on one open port of the train.
+/// **What a case says a port is.** A port the case does not mention has a
+/// default — the chain's two ends are reacted, every other open port is
+/// free — and an entry says otherwise, or says the default in so many
+/// words.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[cfg_attr(
+    feature = "typescript",
+    derive(ts_rs::TS),
+    ts(export, export_to = "core/")
+)]
+pub enum LoadRole {
+    /// A load: a torque and a speed, each given or derived.
+    #[default]
+    Load,
+    /// Held by whatever is attached: it turns as the motion says and carries
+    /// the torque the flow puts on it, both found rather than given.
+    Reacted,
+    /// Turning and carrying nothing — a port with nothing attached. A free
+    /// port beside a given torque nothing else holds is the question
+    /// whether a stage locks, which the case answers by name.
+    Free,
+}
+
+/// One port of the train as a case declares it: a load, or a reaction or a
+/// free port said in so many words.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
@@ -3179,9 +3205,13 @@ pub struct LoadCase {
 )]
 pub struct Load {
     pub at: Port,
-    /// N·m, given or derived from the other loads through the flow. A given
-    /// nought is a port that turns freely and carries nothing — what a load
-    /// nothing holds comes to.
+    /// What the port is. The two figures below are read only for a load,
+    /// and kept while the port is reacted or free for the reason
+    /// [`Auto::manual`] is kept while automatic: switching back finds them
+    /// where they were.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub role: LoadRole,
+    /// N·m, given or derived from the other loads through the flow.
     pub torque: Auto<f64>,
     /// rpm, given or derived from the other loads through the motion. A
     /// given nought is a load held still; the flow then takes its direction
@@ -3195,6 +3225,7 @@ impl Load {
     pub fn given(at: Port, torque: f64, speed: f64) -> Self {
         Self {
             at,
+            role: LoadRole::Load,
             torque: Auto::fixed(torque),
             speed: Auto::fixed(speed),
         }
@@ -3206,9 +3237,26 @@ impl Load {
     pub fn derived(at: Port) -> Self {
         Self {
             at,
+            role: LoadRole::Load,
             torque: Auto::automatic(0.0),
             speed: Auto::automatic(0.0),
         }
+    }
+
+    /// A port declared reacted or free in so many words, its figures at
+    /// nought until it is made a load.
+    #[must_use]
+    pub fn declared(at: Port, role: LoadRole) -> Self {
+        Self {
+            role,
+            ..Self::derived(at)
+        }
+    }
+
+    /// Whether this entry is a load — the only kind with figures to read.
+    #[must_use]
+    pub fn is_load(&self) -> bool {
+        self.role == LoadRole::Load
     }
 }
 
@@ -3907,23 +3955,38 @@ impl Train {
             return Ok(false);
         };
         let mut moved = false;
-        let loaded_ends = ends
+        // **Relief turns the loads' figures and nothing else.** A port
+        // declared reacted or free is a declaration, not a figure: a
+        // reacted port is one unknown torque wherever it is, and a free
+        // port is a port that could have held the load and was told not to
+        // — it counts here as the reaction it declines to be, so that a
+        // given torque beside it stands and the solve can say that nothing
+        // holds it, which is the question whether a stage locks, asked on
+        // purpose and answered by name. The ends are reacted where the case
+        // neither loads nor frees them.
+        let n_loads = c.loads.iter().filter(|l| l.is_load()).count();
+        let declared_reacted = c.loads.iter().filter(|l| !l.is_load()).count();
+        let ends_reacted = ends
             .iter()
-            .filter(|&&e| c.loads.iter().any(|l| self_port_is(&boundaries, l.at, e)))
+            .filter(|&&e| !c.loads.iter().any(|l| self_port_is(&boundaries, l.at, e)))
             .count();
-        let reacted = ends.len() - loaded_ends;
+        let reacted = declared_reacted + ends_reacted;
         // A case short of a speed has no motion, and no statics to hold its
         // torques to: they are left as given, and the solve says what is
         // short. Relief takes a figure back only where the case can use
         // what remains.
-        let speeds_given = c.loads.iter().filter(|l| !l.speed.auto).count();
+        let speeds_given = c
+            .loads
+            .iter()
+            .filter(|l| l.is_load() && !l.speed.auto)
+            .count();
         for which in [LoadFreedom::Speed, LoadFreedom::Torque] {
             // The speeds decide the motion: `m` of them. The torques are
             // one short of the shafts that carry one, per degree of freedom.
             let limit = match which {
                 LoadFreedom::Speed => m,
                 LoadFreedom::Torque if speeds_given < m => usize::MAX,
-                LoadFreedom::Torque => (c.loads.len() + reacted).saturating_sub(m),
+                LoadFreedom::Torque => (n_loads + reacted).saturating_sub(m),
             };
             fn field(l: &mut Load, which: LoadFreedom) -> &mut Auto<f64> {
                 match which {
@@ -3934,6 +3997,7 @@ impl Train {
             let mut given = c
                 .loads
                 .iter()
+                .filter(|l| l.is_load())
                 .filter(|l| match which {
                     LoadFreedom::Torque => !l.torque.auto,
                     LoadFreedom::Speed => !l.speed.auto,
@@ -3944,6 +4008,9 @@ impl Train {
                 for (i, l) in c.loads.iter_mut().enumerate().rev() {
                     if given <= limit {
                         break;
+                    }
+                    if !l.is_load() {
+                        continue;
                     }
                     let is_just = just == Some(CaseFreedom { load: i, which });
                     if spare_just && is_just {
@@ -4266,14 +4333,21 @@ fn solve_train_under(
     let mut per_stage: Vec<Vec<CaseLoad>> = vec![Vec::new(); train.stages.len()];
     for (index, case) in train.load_cases.iter().enumerate() {
         let mut notes = Vec::new();
-        let loads: Vec<(Shaft, &Load)> = case
+        // Every entry by the shaft it names, whatever it declares; the
+        // loads among them are what carry figures.
+        let entries: Vec<(Shaft, &Load)> = case
             .loads
             .iter()
             .map(|l| (global(train.port_shaft(&boundaries, l.at)), l))
             .collect();
-        // A load at a shaft that is not a port — a planet's, a held ring's
-        // — is refused by name. A shaft two stages share is a port of both,
-        // and a load there is a load on the body they make.
+        let loads: Vec<(Shaft, &Load)> = entries
+            .iter()
+            .filter(|(_, l)| l.is_load())
+            .copied()
+            .collect();
+        // An entry at a shaft that is not a port — a planet's, a held
+        // ring's — is refused by name. A shaft two stages share is a port
+        // of both, and a load there is a load on the body they make.
         let mut ports: Vec<Shaft> = Vec::new();
         for (k, stage) in train.stages.iter().enumerate() {
             for s in stage.ports().ports {
@@ -4282,24 +4356,32 @@ fn solve_train_under(
                 }
             }
         }
-        if loads.iter().any(|(g, _)| !ports.contains(g)) {
+        if entries.iter().any(|(g, _)| !ports.contains(g)) {
             return Err(TrainError::LoadPort { case: index });
         }
         let loaded = |s: Shaft| loads.iter().any(|(g, _)| *g == s);
-        // **The chain's two ends are reacted where the case does not load
-        // them**: each turns as the motion says and carries whatever torque
-        // the flow puts on it — the same thing as a shaft the train holds
-        // by constraint, except that a fixed shaft is ground and a reacted
-        // one may turn. Every other open port the case does not load — a
-        // released ring, an idler's shaft on a layshaft, a hula's wobble
-        // body — is free: it turns and carries nothing, since a reaction
-        // there is a thing a designer attaches, and says so by loading it.
-        // A drive the train's own convention wrote is nobody's here — the
+        let declared =
+            |s: Shaft, role: LoadRole| entries.iter().any(|(g, l)| *g == s && l.role == role);
+        // **A port is what the case declares it**, and by default **the
+        // chain's two ends are reacted** — each turns as the motion says and
+        // carries whatever torque the flow puts on it, the same thing as a
+        // shaft the train holds by constraint except that a fixed shaft is
+        // ground and a reacted one may turn — and **every other open port
+        // is free**: it turns and carries nothing, since a reaction there
+        // is a thing a designer attaches, and says so by declaring it. A
+        // drive the train's own convention wrote is nobody's here — the
         // loads say what turns.
-        let reacted: Vec<Shaft> = [Port::Start, Port::End]
+        let ends: Vec<Shaft> = [Port::Start, Port::End]
             .iter()
             .map(|&p| global(train.port_shaft(&boundaries, p)))
-            .filter(|&s| !loaded(s))
+            .collect();
+        let reacted: Vec<Shaft> = ports
+            .iter()
+            .copied()
+            .filter(|&s| {
+                declared(s, LoadRole::Reacted)
+                    || (ends.contains(&s) && !loaded(s) && !declared(s, LoadRole::Free))
+            })
             .collect();
         let conditions: Vec<Condition> = base
             .iter()
@@ -4552,10 +4634,13 @@ fn solve_train_under(
                     // A body's external torque is reported on the shaft it
                     // is applied at — the loaded or reacted one — and a
                     // shaft coupled to it carries the coupling, not a load.
-                    torque: if s == rep[s] || role(s) != ShaftRole::Free {
-                        flow.shaft_torques[rep[s]]
-                    } else {
+                    // A free shaft carries nothing by declaration, and says
+                    // exactly nought rather than the `−1e-17` the solve
+                    // leaves on a body it was told carries none.
+                    torque: if role(s) == ShaftRole::Free {
                         0.0
+                    } else {
+                        flow.shaft_torques[rep[s]]
                     },
                 })
                 .collect(),
@@ -7032,11 +7117,13 @@ mod tests {
                 loads: vec![
                     Load {
                         at: Port::Start,
+                        role: LoadRole::Load,
                         torque: Auto::fixed(torque),
                         speed: Auto::automatic(0.0),
                     },
                     Load {
                         at: Port::End,
+                        role: LoadRole::Load,
                         torque: Auto::automatic(0.0),
                         speed: Auto::fixed(speed),
                     },
@@ -7116,6 +7203,121 @@ mod tests {
         }
     }
 
+    /// **A port is what the case declares it, and relief turns only the
+    /// loads.** A pair's end declared *free* beside a given start torque is
+    /// the question whether the train turns under the load, which relief
+    /// leaves standing — the start's torque is not one too many, since a
+    /// free port is no unknown — and the solve answers by name. The same
+    /// end declared *reacted* in so many words is what an unlisted end is.
+    /// On a differential, a ring declared reacted is one unknown torque
+    /// among the three ports, so of the sun's and the carrier's loads one
+    /// torque stands given; and the declared entries' own figures are
+    /// never turned.
+    #[test]
+    fn a_declared_port_is_what_it_says_and_relief_leaves_it_alone() {
+        let lib = library();
+        let mut t = two_stage();
+        t.stages.truncate(1);
+        t.load_cases = vec![LoadCase {
+            loads: vec![
+                Load::given(Port::Start, 0.1, 3000.0),
+                Load::declared(Port::End, LoadRole::Free),
+            ],
+            ..LoadCase::ultimate(0.1, 3000.0)
+        }];
+        t.relieve_case(0, None, &lib).unwrap();
+        let c = &t.load_cases[0];
+        assert!(!c.loads[0].torque.auto && !c.loads[0].speed.auto);
+        assert_eq!(c.loads[1].role, LoadRole::Free);
+        let r = solve_train(&t, &lib).unwrap();
+        assert!(!r.cases[0].solved);
+        assert!(r.cases[0]
+            .notes
+            .iter()
+            .any(|n| n.is(key::TRAIN_LOAD_NOT_REACTED)));
+        assert_eq!(at_port(&r, &t, 0, Port::End).role, ShaftRole::Free);
+        // Reacted in so many words: the same case as an unlisted end.
+        t.load_cases[0].loads[1] = Load::declared(Port::End, LoadRole::Reacted);
+        let said = solve_train(&t, &lib).unwrap();
+        t.load_cases[0].loads.truncate(1);
+        let unsaid = solve_train(&t, &lib).unwrap();
+        assert!(said.cases[0].solved);
+        assert_eq!(
+            at_port(&said, &t, 0, Port::End).torque,
+            at_port(&unsaid, &t, 0, Port::End).torque
+        );
+        assert_eq!(at_port(&said, &t, 0, Port::End).role, ShaftRole::Reacted);
+        // A differential's ring declared reacted: one unknown among three
+        // ports, so one of the two loads' torques gives way — the last.
+        let mut diff = two_stage();
+        diff.stages = vec![Stage::planetary(PlanetaryStage::default())];
+        let at = |shaft| ShaftRef::Of { stage: 0, shaft };
+        diff.constraints = vec![ShaftConstraint {
+            at: at(3),
+            constraint: Constraint::Free,
+        }];
+        diff.load_cases = vec![LoadCase {
+            loads: vec![
+                Load::given(Port::Start, 2.0, 3000.0),
+                Load::given(Port::At(at(2)), 1.0, -500.0),
+                Load::declared(Port::At(at(3)), LoadRole::Reacted),
+            ],
+            ..LoadCase::ultimate(2.0, 3000.0)
+        }];
+        diff.relieve_case(0, None, &lib).unwrap();
+        let c = &diff.load_cases[0];
+        assert!(!c.loads[0].torque.auto && c.loads[1].torque.auto);
+        assert!(!c.loads[0].speed.auto && !c.loads[1].speed.auto);
+        assert_eq!(c.loads[2].role, LoadRole::Reacted);
+        let r = solve_train(&diff, &lib).unwrap();
+        assert!(r.cases[0].solved, "{:?}", r.cases[0].notes);
+        let ring = r.cases[0].shaft(at(3)).unwrap();
+        assert_eq!(ring.role, ShaftRole::Reacted);
+        assert!(ring.torque.abs() > 0.0);
+    }
+
+    /// **The train's bodies are its ports joined by its couplings**: three
+    /// pairs in a chain are four bodies, the two inner ones a shaft with two
+    /// names, and only the outer two are ends; a set's held ring is a body
+    /// no case can name.
+    #[test]
+    fn the_bodies_are_the_ports_joined_by_the_couplings() {
+        let mut t = two_stage();
+        t.stages = vec![
+            Stage::spur(PairStage::default()),
+            Stage::spur(PairStage::default()),
+            Stage::spur(PairStage::default()),
+        ];
+        let at = |stage, shaft| ShaftRef::Of { stage, shaft };
+        let bodies = t.bodies(&t.boundaries().unwrap());
+        let shafts: Vec<Vec<ShaftRef>> = bodies
+            .iter()
+            .map(|b| b.shafts.iter().map(|(s, _)| *s).collect())
+            .collect();
+        assert_eq!(
+            shafts,
+            vec![
+                vec![at(0, 1)],
+                vec![at(0, 2), at(1, 1)],
+                vec![at(1, 2), at(2, 1)],
+                vec![at(2, 2)],
+            ]
+        );
+        assert_eq!(
+            bodies.iter().map(|b| b.end).collect::<Vec<_>>(),
+            vec![true, false, false, true]
+        );
+        assert_eq!(bodies[0].port, Some(Port::Start));
+        assert_eq!(bodies[1].port, Some(Port::At(at(0, 2))));
+        assert_eq!(bodies[3].port, Some(Port::End));
+        assert!(bodies.iter().all(|b| !b.held));
+        t.stages = vec![Stage::planetary(PlanetaryStage::default())];
+        let bodies = t.bodies(&t.boundaries().unwrap());
+        assert_eq!(bodies.len(), 3, "the planet is no body a case can name");
+        assert!(bodies[2].held && bodies[2].port.is_none());
+        assert_eq!(bodies[1].port, Some(Port::End));
+    }
+
     /// **A load between two stages is one flow across both**, and where it
     /// can be held decides what it does: a load on the sun a pair drives,
     /// with the pair's input reacted and the set's carrier reacted, is a
@@ -7144,13 +7346,11 @@ mod tests {
             solve_train(&shared, &lib).err(),
             Some(TrainError::LoadShared { case: 1 })
         );
-        // The start a load of nought: the carrier alone holds it, through
-        // the set — and the pair, with nothing at either end, carries none.
-        shared.load_cases[1].loads.push(Load {
-            at: Port::Start,
-            torque: Auto::fixed(0.0),
-            speed: Auto::automatic(0.0),
-        });
+        // The start declared free: the carrier alone holds it, through the
+        // set — and the pair, with nothing at either end, carries none.
+        shared.load_cases[1]
+            .loads
+            .push(Load::declared(Port::Start, LoadRole::Free));
         let r = solve_train(&shared, &lib).expect("the carrier holds it");
         assert!(r.cases[1].solved);
         let end = r.cases[1].shaft(at(1, carrier)).unwrap();
@@ -8591,14 +8791,10 @@ mod tests {
             .expect("every port is a shaft of the case")
     }
 
-    /// A load of nought at a port: free to turn, carrying nothing — what
-    /// "not reacted" at that end comes to.
+    /// A port declared free: turning, carrying nothing — what "not
+    /// reacted" at that end comes to.
     fn free(at: Port) -> Load {
-        Load {
-            at,
-            torque: Auto::fixed(0.0),
-            speed: Auto::automatic(0.0),
-        }
+        Load::declared(at, LoadRole::Free)
     }
     fn classic(
         input_speed: f64,

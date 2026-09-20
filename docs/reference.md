@@ -2416,15 +2416,29 @@ loads      one per loaded port     each: at (start | end | a shaft),
 duty       a fatigue case's        how the load is applied over the train's life
 ```
 
-**Ports.** The train's *open ports* are every stage's ports that the train
-does not fix — the chain's two ends by name, a shaft two stages share once
-under the earlier stage's name, a released ring or a second sun by
-reference. A port is a shaft on an axis nothing carries: a planet orbits, a
-hula's wobble body orbits, and nothing can be attached to either. The ends
+**Ports and bodies.** The train's *open ports* are every stage's ports that
+the train does not fix — the chain's two ends by name, a shaft two stages
+share once under the earlier stage's name, a released ring or a second sun
+by reference. A port is a shaft on an axis nothing carries: a planet orbits,
+a hula's wobble body orbits, and nothing can be attached to either. The ends
 are the convention's — a load names nothing, so a load written at `End`
-stays on one shaft as loads are added beside it. A case loads any port; a
-port that turns and carries nothing is a load with a torque of nought given
-and its speed derived. The two ends it does not load are
+stays on one shaft as loads are added beside it. The train's **bodies** are
+its ports with the shafts the couplings join gathered into one (`bodies`
+on the motion report): a pair's output and the next pair's input are one
+shaft with two names, and a case says one thing of it.
+
+**What a case says of a port.** Each entry carries a `role`: a **load**
+carries a torque and a speed, each given or derived; a **reacted** port is
+held by whatever is attached — it turns as the motion says and carries the
+torque the flow puts on it, both found; a **free** port turns and carries
+nothing. A port the case does not mention has a default: the chain's two
+ends are reacted, every other open port is free. A port the train holds is
+fixed — ground under another name — and no case can say anything of it. A
+shaft two stages share can be a load (an inline take-off, its torque given
+or derived) or free, not a reaction: a second reaction on one chain is a
+division by stiffness this model does not make, and the train refuses it by
+name. A free port beside a given torque nothing else holds is the question
+whether a stage locks, asked on purpose and answered by name. The two ends it does not load are
 **reacted**: each turns as the motion says and carries whatever torque the
 flow puts on it, and both are reported — the same thing as a shaft the train
 fixes, except that a fixed shaft is ground and reports no speed. Every other
@@ -2440,8 +2454,10 @@ given speed drives its port at one turn with every other given port still,
 and the family is that scaled and summed), and the torques on the loads and
 the reacted ends together are `m` short of all given — one statics equation
 per degree of freedom — so a pair with one load and one reacted end has one
-torque given, a take-off between two stages two. **Relief** keeps it so after
-every toggle, sparing the figure just touched and turning the others in load
+torque given, a take-off between two stages two; a port declared free counts
+as the reaction it declines to be, so the given torque beside it stands.
+**Relief** turns only the loads' figures — a reaction or a free port is a
+declaration — and keeps it so after every toggle, sparing the figure just touched and turning the others in load
 order from the last, and seeds every derived figure from what the case comes
 to; it never invents a given, and a case short of a speed keeps every torque
 it was given, since there is no motion to hold them to. A case short of a

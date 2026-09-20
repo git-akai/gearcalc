@@ -1713,10 +1713,10 @@ fn train_report(mode: Option<&str>) {
         //
         // **`toggles` reverses the duty**, which is the switch that lets a
         // reversed root reach a member at all — and holds a load from the end
-        // at the far port, the preset; every other mode puts a load of
-        // nought at the start beside it, so the start is free and the load
-        // is held only by a stage that locks — the other thing a case can
-        // be asked, and one the core answers by name.
+        // at the far port, the preset; every other mode declares the start
+        // free beside it, so the load is held only by a stage that locks —
+        // the other thing a case can be asked, and one the core answers by
+        // name.
         load_cases: vec![
             LoadCase::ultimate(2.0, 3000.0),
             {
@@ -1728,11 +1728,10 @@ fn train_report(mode: Option<&str>) {
                 };
                 let mut case = LoadCase::back_driving(torque);
                 if mode != Some("toggles") {
-                    case.loads.push(gear_core::train::Load {
-                        at: Port::Start,
-                        torque: gear_core::params::Auto::fixed(0.0),
-                        speed: gear_core::params::Auto::automatic(0.0),
-                    });
+                    case.loads.push(gear_core::train::Load::declared(
+                        Port::Start,
+                        gear_core::train::LoadRole::Free,
+                    ));
                 }
                 case
             },

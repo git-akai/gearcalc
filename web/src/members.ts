@@ -37,12 +37,15 @@ export function memberCount(stage: Stage): number {
   return stage.members.length;
 }
 
-/** The gear number of one member, counting every member of the stages
- *  before it. */
-export function gearNumber(train: Train, stage: number, member: number): number {
-  let n = member + 1;
-  for (let i = 0; i < stage; i++) n += memberCount(train.stages[i]);
-  return n;
+/** **The gear number of one member, within its stage.** A member is named
+ *  with its stage wherever the two can be told apart — "Stage 2 · Gear 1"
+ *  on a case's row, in the adopt list, on the shaft line — and within its
+ *  stage's own card the stage is the card, so the count starts over at
+ *  each stage; a body two stages share reads "Stage 1 · Gear 2; Stage 2 ·
+ *  Gear 1", which is the two names one shaft has. (It counted across the
+ *  stages once, which put a fresh stage's first gear at "Gear 3".) */
+export function gearNumber(_train: Train, _stage: number, member: number): number {
+  return member + 1;
 }
 
 /** Whether a member's axis is carried — turns in a frame that is not the
